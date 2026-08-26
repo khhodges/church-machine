@@ -38,8 +38,9 @@ const lumpAuditHasErrors = _auditMod.lumpAuditHasErrors;
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const CALL_OPCODE   = 2;
-// NOTE: LUMP_SLOT is derived from sim.bootEntrySlot inside setupSim() — do NOT
-// hardcode 3 here; bootEntrySlot migrated from 3 → 6 with Boot.Abstr token migration.
+// LUMP_SLOT is a permitted user slot selected from the simulator's immutable
+// built-in boundary.  The round-trip must not rewrite Boot.Abstr or any other
+// built-in slot after boot.
 const LUMP_BASE     = 0x80; // arbitrary physical base for tests
 
 // ── Encode a CALL instruction targeting CR0 with a given method index ─────────
@@ -56,10 +57,11 @@ function callInstr(methodIndex) {
 function setupSim(extWords) {
     const sim = new ChurchSimulator();
     sim.bootComplete = true;
-    const LUMP_SLOT = sim.bootEntrySlot;  // derive from simulator (currently 6; was 3 pre-migration)
+    const LUMP_SLOT = sim.firstUserNsSlot();
+    sim.bootEntrySlot = LUMP_SLOT;
     sim.nsCount = Math.max(sim.nsCount, LUMP_SLOT + 1);
 
-    // Seed NS slot 3 with a large enough lump so loadProgram takes the
+    // Seed the user slot with a large enough lump so loadProgram takes the
     // patch-in-place path (not the new-lump path at 0x0400).
     const INIT_CW  = 250;
     const GT_SEQ   = 5;
@@ -84,9 +86,10 @@ function setupSim(extWords) {
     // Write the lump (patch-in-place: extWords.length <= INIT_CW)
     sim.loadProgram(extWords, 0);
 
-    // Rebuild GT using the gt_seq stamped by loadProgram into NS[3].word2
+    // Rebuild GT using the gt_seq stamped by loadProgram into NS word 1.
+    // NS word 2 is the integrity seal and does not carry the generation.
     const lumpBaseActual = sim.memory[nsBase + 0];
-    const gtSeqAfter     = (sim.memory[nsBase + 2] >>> 25) & 0x7F;
+    const gtSeqAfter     = sim.parseNSWord1(sim.memory[nsBase + 1] >>> 0).gtSeq;
 
     // CR14: RX GT for instruction fetch
     const cr14GT = sim.createGT(gtSeqAfter, LUMP_SLOT, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);

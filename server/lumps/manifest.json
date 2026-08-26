@@ -1965,6 +1965,10 @@
     "abstraction": "CapabilityTest",
     "filename": "CapabilityTest.1.3045f510.lump",
     "sidecar_file": "CapabilityTest.1.3045f510.json",
+    "ns_slot": 10,
+    "ns_slot_policy": "static",
+    "archived": true,
+    "variant_group": "capabilitytest-history",
     "lump_size": 128,
     "cw": 21,
     "cc": 5,
@@ -1986,17 +1990,48 @@
   {
     "token": "c7425d6c",
     "abstraction": "CapabilityTest",
+    "filename": "c7425d6c.lump",
+    "sidecar_file": "c7425d6c.json",
     "ns_slot": 10,
     "ns_slot_policy": "static",
+    "archived": true,
+    "variant_group": "capabilitytest-history",
     "boot_resident": true,
-    "variant_group": null,
     "lump_size": 64,
     "cw": 23,
     "cc": 5,
     "grants": [
       "E"
     ],
-    "lump_version": 1
+    "lump_version": 1,
+    "binary_hash": "1a6f7fef427b5069ee55dcda784bcc5b8a716c9ab3e5241ac6509c1d9dc95ae0"
+  },
+  {
+    "token": "00000a00",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.2.c7a66d01.lump",
+    "sidecar_file": "CapabilityTest.2.c7a66d01.json",
+    "ns_slot": 10,
+    "ns_slot_policy": "static",
+    "boot_resident": true,
+    "variant_group": "capabilitytest-history",
+    "lump_size": 64,
+    "cw": 23,
+    "cc": 5,
+    "author": "",
+    "version": "",
+    "lump_version": 2,
+    "compiled_at": 1786924012.3060646,
+    "methods": [],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "1a6f7fef427b5069ee55dcda784bcc5b8a716c9ab3e5241ac6509c1d9dc95ae0",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
+    "dot_name": "CapabilityTest",
+    "issue_n": 1
   },
   {
     "token": "fe9c6e42",
