@@ -151,3 +151,4 @@
 - [TPERM domain-purity SelfTest rule](tperm-domain-purity-selftest.md) — cross-domain TPERM requests fault by design; resident self-tests must not expect a Z=0 continuation
 - [Fault trace delivery blocking](fault-trace-delivery-blocking.md) — fault packets await indefinitely for IDE trace acceptance before local reporting, so HTTPS outages surface as missing faults
 - [Static-slot historical variants](capabilitytest-static-variant-manifest.md) — archive older fixed-slot binaries in a shared variant group while the active manifest record names its exact artifact and sidecar
+- [Workspace mode switching](workspace-mode-switch.md) — a chat choice records mode intent but only the workspace mode control actually enables or blocks edits
