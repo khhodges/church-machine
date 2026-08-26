@@ -393,16 +393,17 @@
             if (cat.nsSlotPolicy === 'dynamic' || cat.floating || cat.nsSlot == null) continue;
             var saved = savedMap[cat.nsSlot];
             _rl.step2State[cat.nsSlot] = {
-                resident:    !!(saved && saved.resident),
-                prefetch:    !!(saved && saved.prefetch),
-                prefetchRequired: !(saved && saved.prefetchRequired === false),
-                prefetchOrder: (saved && Number.isInteger(saved.prefetchOrder))
-                    ? saved.prefetchOrder : cat.nsSlot,
-                downloadUrl: (saved && saved.downloadUrl) || ('/api/lump/' + (cat.token || '')),
+                // The catalog owns all transport and binary metadata.  This
+                // is the programmer-facing decision: exactly one policy.
+                loadPolicy: (saved && (saved.loadPolicy || saved.load_policy)) ||
+                    (saved && saved.resident ? 'Resident' :
+                        (saved && saved.prefetch ? 'Preload' : 'Lazy')),
                 physAddr:    (saved && Number.isFinite(saved.physAddr)) ? saved.physAddr : null,
                 lumpSize:    cat.lumpSize,
                 abstraction: cat.abstraction,
-                lumpToken:   (saved && saved.lumpToken) || cat.token
+                lumpToken:   (saved && saved.lumpToken) || cat.token,
+                binaryHash:  (saved && (saved.binaryHash || saved.binary_hash)) || cat.binaryHash,
+                identityHash:(saved && (saved.identityHash || saved.identity_hash)) || cat.identityHash
             };
         }
     }
@@ -451,7 +452,7 @@
         var occ = [];
         for (var slotStr in _rl.step2State) {
             var st = _rl.step2State[slotStr];
-            if (!st.resident) continue;
+            if (st.loadPolicy !== 'Resident') continue;
             var lbl = (st.abstraction || '?') + ' (NS ' + slotStr + ')';
             if (!Number.isFinite(st.physAddr) || st.physAddr < 0) {
                 return lbl + ': physAddr is required for resident lumps.';
@@ -498,16 +499,10 @@
         var slot  = parseInt(ev.target.getAttribute('data-rl-slot'), 10);
         var field = ev.target.getAttribute('data-rl-field');
         var st    = _rl.step2State[slot] || {};
-        if (field === 'resident') {
-            st.resident = !!ev.target.checked;
-            if (st.resident) st.prefetch = false;
-        } else if (field === 'prefetch') {
-            st.prefetch = !!ev.target.checked;
-            if (st.prefetch) st.resident = false;
-        } else if (field === 'prefetchRequired') {
-            st.prefetchRequired = !!ev.target.checked;
-        } else if (field === 'prefetchOrder') {
-            st.prefetchOrder = parseInt(ev.target.value, 10);
+        if (field === 'loadPolicy') {
+            var policy = ev.target.value;
+            st.loadPolicy = ['Empty', 'Resident', 'Preload', 'Lazy'].indexOf(policy) >= 0
+                ? policy : 'Lazy';
         } else if (field === 'physAddr') {
             var v = ev.target.value;
             st.physAddr = (v === '' ? null : parseInt(v, 10));
@@ -653,6 +648,7 @@
             for (var i = 0; i < _fixedCatalog.length; i++) {
                 var cat = _fixedCatalog[i];
                 var st  = _rl.step2State[cat.nsSlot] || {};
+                var isResident = st.loadPolicy === 'Resident';
                 var physVal = (st.physAddr != null && Number.isFinite(st.physAddr))
                               ? st.physAddr : '';
                 rows +=
@@ -660,36 +656,24 @@
                     '<td class="le-rl-td">' + esc(cat.abstraction || '?') + '</td>' +
                     '<td class="le-rl-td le-rl-td-num">' + esc(String(cat.nsSlot)) + '</td>' +
                     '<td class="le-rl-td le-rl-td-num">' + esc(cat.lumpSize != null ? String(cat.lumpSize) : '?') + '</td>' +
-                    '<td class="le-rl-td">' +
-                      '<label class="le-rl-mode-label' + (st.resident ? ' le-rl-mode-resident' : '') + '">' +
-                        '<input type="checkbox" class="le-rl-check"' +
-                          ' data-rl-slot="' + cat.nsSlot + '"' +
-                          ' data-rl-field="resident"' +
-                          (st.resident ? ' checked' : '') + '> ' +
-                        (st.resident ? 'Resident' : 'Lazy') +
-                      '</label>' +
-                    '</td>' +
+                    '<td class="le-rl-td"><select class="le-rl-policy"' +
+                      ' data-rl-slot="' + cat.nsSlot + '" data-rl-field="loadPolicy"' +
+                      ' aria-label="Load policy for ' + esc(cat.abstraction || ('slot ' + cat.nsSlot)) + '">' +
+                      '<option value="Empty"' + (st.loadPolicy === 'Empty' ? ' selected' : '') + '>Empty</option>' +
+                      '<option value="Resident"' + (isResident ? ' selected' : '') + '>Resident</option>' +
+                      '<option value="Preload"' + (st.loadPolicy === 'Preload' ? ' selected' : '') + '>Preload</option>' +
+                      '<option value="Lazy"' + (st.loadPolicy === 'Lazy' ? ' selected' : '') + '>Lazy load</option>' +
+                    '</select></td>' +
                     '<td class="le-rl-td">' +
                       '<input type="number" min="' + addrRange.min + '" max="' + addrRange.max + '" step="1"' +
                         ' class="le-rl-addr"' +
                         ' data-rl-slot="' + cat.nsSlot + '"' +
                         ' data-rl-field="physAddr"' +
                         ' value="' + esc(String(physVal)) + '"' +
-                        (st.resident ? '' : ' disabled') + '>' +
-                      '<div class="le-rl-addr-hint' + (st.resident ? '' : ' le-rl-addr-hint-inactive') + '">' +
+                        (isResident ? '' : ' disabled') + '>' +
+                      '<div class="le-rl-addr-hint' + (isResident ? '' : ' le-rl-addr-hint-inactive') + '">' +
                         esc(addrHintText) +
                       '</div>' +
-                    '</td>' +
-                    '<td class="le-rl-td">' +
-                      '<label class="le-rl-mode-label' + (st.prefetch ? ' le-rl-mode-resident' : '') + '">' +
-                        '<input type="checkbox" class="le-rl-check" data-rl-slot="' + cat.nsSlot +
-                          '" data-rl-field="prefetch"' + (st.prefetch ? ' checked' : '') + '> Prefetch</label>' +
-                      (st.prefetch ? '<label class="le-rl-mode-label"><input type="checkbox" data-rl-slot="' +
-                        cat.nsSlot + '" data-rl-field="prefetchRequired"' +
-                        (st.prefetchRequired ? ' checked' : '') + '> Required</label>' +
-                        '<input type="number" min="0" step="1" class="le-rl-addr" data-rl-slot="' +
-                        cat.nsSlot + '" data-rl-field="prefetchOrder" value="' +
-                        esc(String(st.prefetchOrder)) + '" title="Prefetch order">' : '') +
                     '</td>' +
                     '<td class="le-rl-td le-rl-td-boot">' + _bootBadge(cat) + '</td>' +
                     '</tr>';
@@ -754,10 +738,10 @@
 
         el.innerHTML =
             '<div class="le-panel le-panel-wide">' +
-            '<p class="le-panel-desc">Pick which catalog lumps are baked into the boot image at a fixed physical address ' +
-            '(<strong style="color:var(--church-gold)">Resident</strong>) and which are fetched on first ' +
-            '<code>CALL</code> (<strong>Lazy</strong>). Resident lumps require a physical address inside the usable ' +
-            'region (after the foundational lumps, before the NS table).</p>' +
+            '<p class="le-panel-desc">Choose one loading policy per Namespace slot: ' +
+            '<strong style="color:var(--church-gold)">Empty</strong>, <strong style="color:var(--church-gold)">Resident</strong>, ' +
+            '<strong style="color:var(--church-gold)">Preload</strong>, or <strong>Lazy load</strong>. ' +
+            'The IDE derives identity, size, hash, and transport details. Resident lumps require a physical address inside the usable region.</p>' +
             rlErrorMsg +
             '<div class="le-rl-table-wrap">' +
             '<table class="le-rl-table">' +
@@ -765,9 +749,8 @@
             '<th class="le-rl-th">Lump</th>' +
             '<th class="le-rl-th le-rl-th-narrow">NS</th>' +
             '<th class="le-rl-th le-rl-th-narrow">Size&nbsp;(w)</th>' +
-                '<th class="le-rl-th le-rl-th-mode">Mode</th>' +
+                '<th class="le-rl-th le-rl-th-mode">Load policy</th>' +
             '<th class="le-rl-th">Phys addr&nbsp;(resident only)</th>' +
-                '<th class="le-rl-th">Boot prefetch</th>' +
             '<th class="le-rl-th le-rl-th-boot">Boot?</th>' +
             '</tr></thead>' +
             '<tbody>' + rows + '</tbody>' +
@@ -820,7 +803,7 @@
                 ' style="display:none;" onchange="lumpEditorRLHandleUpload(this)">' +
             '</div>';
 
-        el.querySelectorAll('.le-rl-check, .le-rl-addr').forEach(function(inp) {
+        el.querySelectorAll('.le-rl-policy, .le-rl-addr').forEach(function(inp) {
             inp.oninput = inp.onchange = _rlOnChange;
         });
     }
@@ -1761,20 +1744,19 @@
             var st = _rl.step2State[slotStr];
             var row = {
                 nsSlot: parseInt(slotStr, 10),
-                resident: !!st.resident,
+                loadPolicy: ['Empty', 'Resident', 'Preload', 'Lazy'].indexOf(st.loadPolicy) >= 0
+                    ? st.loadPolicy : 'Lazy',
                 abstraction: st.abstraction,
                 lumpToken: st.lumpToken
             };
-            if (!row.resident && st.prefetch) {
-                row.prefetch = true;
-                row.prefetchRequired = st.prefetchRequired !== false;
-                row.prefetchOrder = Number.isInteger(st.prefetchOrder)
-                    ? st.prefetchOrder : row.nsSlot;
-                row.downloadUrl = st.downloadUrl || ('/api/lump/' + (st.lumpToken || ''));
-            }
-            if (st.resident) {
+            if (row.loadPolicy === 'Resident') {
                 row.physAddr = st.physAddr;
                 if (st.lumpSize) row.lumpSize = st.lumpSize;
+            } else if (row.loadPolicy === 'Preload') {
+                // Catalog-derived bridge bindings, never programmer inputs.
+                if (st.lumpSize) row.lumpSize = st.lumpSize;
+                if (st.binaryHash) row.binaryHash = st.binaryHash;
+                if (st.identityHash) row.identityHash = st.identityHash;
             }
             step2Lumps.push(row);
         }

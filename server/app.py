@@ -2328,13 +2328,92 @@ def _validate_step2_lump_tokens(step2):
             return f"Unknown LUMP version token {token!r} for abstraction {abstraction!r}"
     return None
 
-def _validate_step2(step2, step1, target_board):
-    """Validate the optional Step 2 (resident lumps) section.
+def _normalize_step2_preload_bindings(step2):
+    """Bind every Preload row to its canonical catalog record.
 
-    `step2.lumps` is a list of {nsSlot, resident, physAddr?, lumpSize?}.
-    Lazy entries (resident=False) need only nsSlot; resident entries must
-    specify a physAddr inside the usable region and not collide with
-    another resident lump or with the foundational layout.
+    The UI may omit these mechanical fields, but it may not choose them.  A
+    caller-supplied token, capacity, or digest must match the selected catalog
+    candidate exactly; omitted fields are populated from that candidate before
+    validation and persistence.
+    """
+    if step2 is None or not isinstance(step2, dict):
+        return step2, None
+    lumps = step2.get("lumps")
+    if not isinstance(lumps, list):
+        return step2, None
+    selected_tokens = _step2_selected_tokens(step2)
+    catalog_entries = _load_lump_catalog(selected_tokens) if selected_tokens else _load_lump_catalog()
+    catalog = {
+        entry.get("nsSlot"): entry for entry in catalog_entries
+        if isinstance(entry, dict) and isinstance(entry.get("nsSlot"), int)
+    }
+
+    def canonical_hash(value):
+        if value is None:
+            return None
+        value = str(value).strip().lower()
+        if value.startswith("sha256:"):
+            value = value[7:]
+        return value if len(value) == 64 and all(ch in "0123456789abcdef" for ch in value) else None
+
+    normalized_rows = []
+    for entry in lumps:
+        if not isinstance(entry, dict):
+            normalized_rows.append(entry)
+            continue
+        row = dict(entry)
+        policy = row.get("loadPolicy", row.get("load_policy"))
+        if policy is None:
+            policy = "Resident" if row.get("resident") else (
+                "Preload" if row.get("prefetch") else "Lazy")
+        if policy != "Preload":
+            normalized_rows.append(row)
+            continue
+        slot = row.get("nsSlot")
+        catalog_entry = catalog.get(slot)
+        # Let the ordinary Step 2 validator return its clear slot error.
+        if catalog_entry is None:
+            normalized_rows.append(row)
+            continue
+        canonical_token = str(catalog_entry.get("token") or "").lower()
+        canonical_size = catalog_entry.get("lumpSize")
+        canonical_binary = canonical_hash(
+            catalog_entry.get("binaryHash") or catalog_entry.get("binary_hash"))
+        canonical_identity = canonical_hash(
+            catalog_entry.get("identityHash") or catalog_entry.get("identity_hash"))
+        supplied_token = str(row.get("lumpToken") or "").lower()
+        if supplied_token and supplied_token != canonical_token:
+            return None, f"Wukong preload slot {slot} lumpToken does not match its canonical catalog record"
+        if row.get("lumpSize") is not None and row.get("lumpSize") != canonical_size:
+            return None, f"Wukong preload slot {slot} lumpSize does not match its canonical catalog record"
+        supplied_binary = row.get("binaryHash", row.get("binary_hash"))
+        if supplied_binary is not None and canonical_hash(supplied_binary) != canonical_binary:
+            return None, f"Wukong preload slot {slot} binaryHash does not match its canonical catalog record"
+        supplied_identity = row.get("identityHash", row.get("identity_hash"))
+        if supplied_identity is not None and (
+                not canonical_identity or canonical_hash(supplied_identity) != canonical_identity):
+            return None, f"Wukong preload slot {slot} identityHash does not match its canonical catalog record"
+        if not canonical_token or not isinstance(canonical_size, int) or not canonical_binary:
+            return None, f"Wukong preload slot {slot} lacks a complete canonical catalog binding"
+        row["abstraction"] = catalog_entry.get("abstraction") or row.get("abstraction")
+        row["lumpToken"] = canonical_token
+        row["lumpSize"] = canonical_size
+        row["binaryHash"] = canonical_binary
+        if canonical_identity:
+            row["identityHash"] = canonical_identity
+        else:
+            row.pop("identityHash", None)
+            row.pop("identity_hash", None)
+        normalized_rows.append(row)
+    normalized = dict(step2)
+    normalized["lumps"] = normalized_rows
+    return normalized, None
+
+def _validate_step2(step2, step1, target_board):
+    """Validate one load policy per Namespace slot.
+
+    New rows use ``loadPolicy`` (Empty, Resident, Preload, Lazy).  Legacy
+    resident/prefetch fields are accepted only as an input compatibility layer.
     """
     if step2 is None:
         return None
@@ -2390,7 +2469,6 @@ def _validate_step2(step2, step1, target_board):
     # NS slots 2–5 are MMIO (no RAM body) — they do not contribute to foundation_end.
     usable_end = total - NS_TABLE_RESERVE
     seen_slots = set()
-    seen_prefetch_orders = set()
     seen_wukong_prefetch_slots = set()
     wukong_prefetch_words = 0
     wukong_prefetch_count = 0
@@ -2407,27 +2485,19 @@ def _validate_step2(step2, step1, target_board):
         if slot in seen_slots:
             return f"duplicate step2.lumps entry for NS slot {slot}"
         seen_slots.add(slot)
+        policy = entry.get("loadPolicy", entry.get("load_policy"))
+        if policy is None:
+            policy = "Resident" if entry.get("resident") else (
+                "Preload" if entry.get("prefetch") else "Lazy")
+        if policy not in ("Empty", "Resident", "Preload", "Lazy"):
+            return f"NS slot {slot} has invalid loadPolicy {policy!r}"
+        if policy == "Empty":
+            continue
         if slot not in catalog:
             return f"NS slot {slot} is not present in the lump catalog"
-        resident = bool(entry.get("resident"))
+        resident = policy == "Resident"
         if not resident:
-            if entry.get("prefetch"):
-                url = entry.get("downloadUrl")
-                if not isinstance(url, str) or not url.strip():
-                    return f"lazy prefetch for NS slot {slot} requires downloadUrl"
-                url = url.strip()
-                if target_board == "wukong-xc7a100t" and not url.startswith("/api/lump/"):
-                    return ("Wukong prefetch is served only through the canonical "
-                            "/api/lump/<token> transport")
-                if not (url.startswith("/api/lump/") or url.startswith("https://")):
-                    return (f"lazy prefetch URL for NS slot {slot} must be an IDE "
-                            "raw-LUMP path or an https URL")
-                order = entry.get("prefetchOrder", slot)
-                if not isinstance(order, int) or order < 0:
-                    return f"prefetchOrder for NS slot {slot} must be a non-negative integer"
-                if order in seen_prefetch_orders:
-                    return f"duplicate prefetchOrder {order}"
-                seen_prefetch_orders.add(order)
+            if policy == "Preload":
                 if target_board == "wukong-xc7a100t":
                     if slot < 8 or slot >= _boot_image_gen.WUKONG_FORWARD_NS_SLOTS:
                         return ("Wukong prefetch requires a forward Namespace "
@@ -2643,6 +2713,9 @@ def boot_config_post():
     if err:
         return jsonify({"ok": False, "error": err}), 400
     step2 = data.get("step2")
+    step2, binding_err = _normalize_step2_preload_bindings(step2)
+    if binding_err:
+        return jsonify({"ok": False, "error": binding_err}), 400
     err2 = _validate_step2(step2, step1, target_board)
     if err2:
         return jsonify({"ok": False, "error": err2}), 400
@@ -2670,21 +2743,22 @@ def boot_config_post():
     if step2 is not None:
         norm = []
         for e in (step2.get("lumps") or []):
-            row = {"nsSlot": int(e["nsSlot"]),
-                   "resident": bool(e.get("resident"))}
+            policy = e.get("loadPolicy", e.get("load_policy"))
+            if policy is None:
+                policy = "Resident" if e.get("resident") else (
+                    "Preload" if e.get("prefetch") else "Lazy")
+            row = {"nsSlot": int(e["nsSlot"]), "loadPolicy": policy,
+                   # Compatibility projection for boot-image readers; not a
+                   # second programmer-facing decision.
+                   "resident": policy == "Resident"}
             if e.get("abstraction"):
                 row["abstraction"] = str(e["abstraction"])
             if e.get("lumpToken"):
                 row["lumpToken"] = str(e["lumpToken"])
-            if not row["resident"] and e.get("prefetch"):
-                row["prefetch"] = True
-                row["prefetchRequired"] = e.get("prefetchRequired") is not False
-                row["downloadUrl"] = str(e.get("downloadUrl", "")).strip()
-                row["prefetchOrder"] = int(e.get("prefetchOrder", row["nsSlot"]))
-                # The projected staging range and bridge hash check are both
-                # security properties. Retain them for lazy rows just as for
-                # resident rows; otherwise a later save silently weakens the
-                # capacity or identity policy.
+            if policy == "Preload":
+                # Capacity and canonical hashes are derived from the catalog
+                # and retained as bridge bindings.  URL, order, and
+                # required/optional controls are intentionally not persisted.
                 if e.get("lumpSize") is not None:
                     row["lumpSize"] = int(e["lumpSize"])
                 binary_hash = e.get("binaryHash") or e.get("binary_hash")

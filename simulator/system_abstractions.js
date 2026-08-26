@@ -2064,86 +2064,193 @@ class SystemAbstractions {
             return { ok: true, data: source.data, validation: validation.result };
         };
 
-        this.registry.bindMethod(BANK_REGISTRY_INDEX, 'Create', (sim, args = {}) => {
-            if (!sim.mElevation) return finishBankCapabilityResult(sim, 'CR0',
-                fail('Create', 'PERM', 'requires M-elevation (Bank authority)'));
+        // Load Abstractions authority boundary.  A transaction is deliberately
+        // opaque: Verify owns bytes + Gate 1–3 evidence, Certify owns the
+        // bootstrap decision, and Commit is the only code below that can
+        // allocate, publish an NS record, or materialize an E capability.
+        const loadTransactions = new Map();
+        let nextLoadTransaction = 0;
+        // Verify/Certify report ordinary results and never touch architectural
+        // result registers.  Commit alone owns ABI materialization (including
+        // clearing CR0 on a rejected installation).
+        const rejectLoad = (sim, stage, fault, message, materialize = false) => {
+            const result = fail(stage, fault, message);
+            return materialize ? finishBankCapabilityResult(sim, 'CR0', result) : result;
+        };
+        const transactionFor = (proofOrTx) => {
+            const id = proofOrTx && (proofOrTx.id || proofOrTx.transactionId);
+            return Number.isInteger(id) ? loadTransactions.get(id) : null;
+        };
+        const discardTransaction = (tx) => {
+            if (!tx) return;
+            tx.consumed = true;
+            tx.certified = false;
+            if (Array.isArray(tx.data)) tx.data.fill(0);
+            loadTransactions.delete(tx.id);
+        };
+        const verifyLoad = (sim, args = {}) => {
             const input = createLumpInput(sim, args);
-            if (!input.ok) return finishBankCapabilityResult(sim, 'CR0',
-                fail('Create', input.fault, input.message));
-
-            const validation = input.validation;
+            if (!input.ok) return rejectLoad(sim, 'Verify', input.fault, input.message);
+            // Gate 1 — the submitted source is a non-null Inform Read
+            // capability.  Raw values are retained only as rejected legacy
+            // inputs; they cannot cross this public authority boundary.
+            const cap = args.capabilities && (args.capabilities.lump || args.capabilities.source);
+            if (!cap || !cap.gt || (((cap.gt >>> 25) & 0x3) === 0)) {
+                return rejectLoad(sim, 'Verify', 'NO_CAPABILITY',
+                    'Verify requires a non-null submitted Read GT in CR1');
+            }
+            // Gate 2 — createLumpInput/sourceRegion has re-read the live
+            // source GT, sequence, region bounds and words without mutation.
+            // Gate 3 — validateLump has bound canonical dot.name/T-ID and both
+            // identity and binary hashes to that immutable byte copy.
+            const id = ++nextLoadTransaction;
+            loadTransactions.set(id, {
+                id,
+                data: input.data.slice(),
+                validation: input.validation,
+                provenance: args.provenance ? 'declared-not-attested' : 'integrity-only',
+                verified: true,
+                certified: false,
+                consumed: false
+            });
+            return {
+                ok: true,
+                result: {
+                    transaction: { id },
+                    metadata: {
+                        dot_name: input.validation.dot_name,
+                        issue_n: input.validation.issue_n,
+                        token: input.validation.token
+                    }
+                },
+                message: `Verify: Gates 1–3 accepted ${input.validation.dot_name}#${input.validation.issue_n}`
+            };
+        };
+        const certifyLoad = (sim, args = {}) => {
+            const tx = transactionFor(args.transaction || args.proof);
+            // T3.3 is intentionally the only bootstrap-trust seam.  Today the
+            // IDE/human M-elevation certifies; a genesis-signature verifier can
+            // replace this predicate without widening Verify or Commit.
+            if (!tx || tx.consumed || !tx.verified || !sim.mElevation) {
+                return rejectLoad(sim, 'Certify', 'PERM',
+                    'Certify requires an unconsumed verified transaction and IDE/bootstrap authority');
+            }
+            tx.certified = true;
+            // The proof is an opaque, immutable capability object.  An id and
+            // a `certified` bit alone are not forgeable authority.
+            tx.proof = Object.freeze({ id: tx.id, certified: true });
+            return { ok: true, result: { certifiedProof: tx.proof },
+                message: `Certify: bootstrap authority certified transaction ${tx.id}` };
+        };
+        const commitLoad = (sim, args = {}) => {
+            const tx = transactionFor(args.certifiedProof || args.proof);
+            if (!tx || tx.consumed || !tx.verified || !tx.certified ||
+                    args.certifiedProof !== tx.proof) {
+                discardTransaction(tx);
+                return rejectLoad(sim, 'Commit', 'PROOF',
+                    'Commit requires the exact certified proof produced by Certify', true);
+            }
+            const validation = tx.validation;
             const id = (bankState.nextVariableId || 0) + 1;
-            const allocation = registry.dispatchMethod(7, 'Allocate', sim, { size: input.data.length });
-            if (!allocation.ok) return finishBankCapabilityResult(sim, 'CR0',
-                fail('Create', allocation.fault || 'OOM', allocation.message));
+            const allocation = registry.dispatchMethod(7, 'Allocate', sim, { size: tx.data.length });
+            if (!allocation.ok) {
+                discardTransaction(tx);
+                return rejectLoad(sim, 'Commit', allocation.fault || 'OOM', allocation.message, true);
+            }
             const objectName = `Bank.Variable.${id}`;
             const ns = registerPrivateLockbox(sim, allocation.result.location, allocation.result.size, objectName);
             if (!ns.ok) {
                 releaseAllocation(sim, allocation.result.location);
-                return finishBankCapabilityResult(sim, 'CR0',
-                    fail('Create', ns.fault || 'NS_FULL', ns.message));
+                discardTransaction(tx);
+                return rejectLoad(sim, 'Commit', ns.fault || 'NS_FULL', ns.message, true);
             }
+            let securityObjectId = null;
+            let variable = null;
+            const rollback = () => {
+                if (variable) {
+                    zeroizeLockbox(sim, variable);
+                    if (sim._bankPrivateSlots) delete sim._bankPrivateSlots[variable.nsIndex];
+                    unprotectLockboxRange(sim, variable);
+                    delete bankState.variables[variable.id];
+                } else {
+                    for (let i = 0; i < allocation.result.size; i++) {
+                        sim.memory[allocation.result.location + i] = 0;
+                    }
+                }
+                if (securityObjectId !== null) this._topSecurityApi.revokeObject(securityObjectId);
+                registry.dispatchMethod(5, 'Remove', sim, { index: ns.result.nsIndex });
+                releaseAllocation(sim, allocation.result.location);
+                discardTransaction(tx);
+            };
             const objectResult = registry.dispatchMethod(5, 'SecureObjectAdd', sim, {
                 name: objectName,
                 methods: ['Read', 'InspectVariable', 'Release', 'RevokeVariable']
             });
             if (!objectResult.ok) {
-                registry.dispatchMethod(5, 'Remove', sim, { index: ns.result.nsIndex });
-                releaseAllocation(sim, allocation.result.location);
-                return finishBankCapabilityResult(sim, 'CR0',
-                    fail('Create', objectResult.fault || 'MINT', objectResult.message));
+                rollback();
+                return rejectLoad(sim, 'Commit', objectResult.fault || 'MINT', objectResult.message, true);
             }
+            securityObjectId = objectResult.result.objectId;
             const delegated = this._topSecurityApi.obtainPassKey(sim, {
                 objectId: objectResult.result.objectId,
                 passKey: objectResult.result.ownerPassKey
             });
             if (!delegated.ok || !delegated.result || !delegated.result.passKey) {
-                registry.dispatchMethod(5, 'Remove', sim, { index: ns.result.nsIndex });
-                releaseAllocation(sim, allocation.result.location);
-                return finishBankCapabilityResult(sim, 'CR0',
-                    fail('Create', delegated.fault || 'MINT', delegated.message || 'variable capability mint failed'));
+                rollback();
+                return rejectLoad(sim, 'Commit', delegated.fault || 'MINT',
+                    delegated.message || 'variable capability mint failed', true);
             }
-            const variable = {
-                id,
-                dot_name: validation.dot_name,
-                issue_n: validation.issue_n,
-                token: validation.token,
-                binary_hash: validation.binary_hash,
-                identity_hash: validation.identity_hash,
-                kind: 'lump',
-                words: input.data.length,
-                capacity: allocation.result.size,
-                location: allocation.result.location,
-                nsIndex: ns.result.nsIndex,
-                nsVersion: ns.result.version,
-                securityObjectId: objectResult.result.objectId,
-                sanctumKey: delegated.result.passKey,
-                currentSeq: 1,
-                seq: 1,
-                released: false,
-                revoked: false,
-                provenance: args.provenance ? 'declared-not-attested' : 'integrity-only',
-                createdAt: Date.now()
+            variable = {
+                id, dot_name: validation.dot_name, issue_n: validation.issue_n,
+                token: validation.token, binary_hash: validation.binary_hash,
+                identity_hash: validation.identity_hash, kind: 'lump',
+                words: tx.data.length, capacity: allocation.result.size,
+                location: allocation.result.location, nsIndex: ns.result.nsIndex,
+                nsVersion: ns.result.version, securityObjectId: objectResult.result.objectId,
+                sanctumKey: delegated.result.passKey, currentSeq: 1, seq: 1,
+                released: false, revoked: false, provenance: tx.provenance, createdAt: Date.now()
             };
-            for (let i = 0; i < input.data.length; i++) {
-                sim.memory[allocation.result.location + i] = input.data[i] >>> 0;
+            try {
+                for (let i = 0; i < tx.data.length; i++) {
+                    sim.memory[allocation.result.location + i] = tx.data[i] >>> 0;
+                }
+                if (!sim._bankPrivateSlots) sim._bankPrivateSlots = {};
+                sim._bankPrivateSlots[ns.result.nsIndex] = { variableId: id };
+                protectLockboxRange(sim, variable);
+                bankState.nextVariableId = id;
+                bankState.variables[id] = variable;
+                tx.consumed = true;
+                tx.data.fill(0);
+                loadTransactions.delete(tx.id);
+                const variableCapability = makeVariableCapability(delegated.result.passKey);
+                return finishBankCapabilityResult(sim, 'CR0', {
+                    ok: true,
+                    result: { variableCapability, capability: variableCapability,
+                        metadata: safeVariableMetadata(variable) },
+                    message: `Commit: ${validation.dot_name}#${validation.issue_n} committed as variable ${id}`
+                });
+            } catch (error) {
+                rollback();
+                return rejectLoad(sim, 'Commit', 'ATOMIC', `private custody rollback: ${error.message}`, true);
             }
-            if (!sim._bankPrivateSlots) sim._bankPrivateSlots = {};
-            sim._bankPrivateSlots[ns.result.nsIndex] = { variableId: id };
-            protectLockboxRange(sim, variable);
-            bankState.nextVariableId = id;
-            bankState.variables[id] = variable;
-            const variableCapability = makeVariableCapability(delegated.result.passKey);
-            return finishBankCapabilityResult(sim, 'CR0', {
-                ok: true,
-                result: {
-                    variableCapability,
-                    capability: variableCapability,
-                    metadata: safeVariableMetadata(variable)
-                },
-                message: `Bank.Create: verified ${validation.dot_name}#${validation.issue_n} LUMP committed as variable ${id}`
-            });
-        });
+        };
+        this.loadAbstractions = {
+            Verify: verifyLoad,
+            Certify: certifyLoad,
+            Commit: commitLoad,
+            Create: (sim, args = {}) => {
+                const verified = verifyLoad(sim, args);
+                if (!verified.ok) return finishBankCapabilityResult(sim, 'CR0', verified);
+                const certified = certifyLoad(sim, { transaction: verified.result.transaction });
+                if (!certified.ok) return finishBankCapabilityResult(sim, 'CR0', certified);
+                return commitLoad(sim, { certifiedProof: certified.result.certifiedProof });
+            }
+        };
+        this.registry.bindMethod(BANK_REGISTRY_INDEX, 'Verify', verifyLoad);
+        this.registry.bindMethod(BANK_REGISTRY_INDEX, 'Certify', certifyLoad);
+        this.registry.bindMethod(BANK_REGISTRY_INDEX, 'Commit', commitLoad);
+        this.registry.bindMethod(BANK_REGISTRY_INDEX, 'Create',
+            (sim, args = {}) => this.loadAbstractions.Create(sim, args));
 
         this.registry.bindMethod(BANK_REGISTRY_INDEX, 'Read', (sim, args = {}) => {
             const variable = variableForCapability(args, sim);

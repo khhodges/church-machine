@@ -1,15 +1,14 @@
 'use strict';
 
-// Regression coverage for ordered raw-LUMP boot prefetch. The browser loader
-// function is evaluated with a tiny fake simulator so this test exercises the
-// real sorting, retry, and required/optional policy without network or DOM
-// dependencies.
+// Regression coverage for the one-policy boot Preload flow. The browser loader
+// is evaluated with a tiny fake simulator, keeping transport independent of UI.
 
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
 const source = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
+const ChurchSimulator = require('./simulator.js');
 
 function extractFunction(name) {
     const start = source.indexOf(`async function ${name}(`);
@@ -83,30 +82,42 @@ async function runScenario(entries, outcomes) {
 
 (async () => {
     const ordered = await runScenario({
-        20: { prefetch: true, prefetchOrder: 2, label: 'Twenty', downloadUrl: '/api/lump/twenty', loaded: false },
-        12: { prefetch: true, prefetchOrder: 1, label: 'Twelve', downloadUrl: '/api/lump/twelve', loaded: false },
+        20: { loadPolicy: 'Preload', label: 'Twenty', downloadUrl: '/api/lump/twenty', loaded: false },
+        12: { loadPolicy: 'Preload', label: 'Twelve', downloadUrl: '/api/lump/twelve', loaded: false },
+        13: { loadPolicy: 'Lazy', label: 'Lazy', loaded: false },
+        14: { loadPolicy: 'Resident', label: 'Resident', loaded: false },
+        15: { loadPolicy: 'Empty', label: 'Empty', loaded: false },
     }, [true, true]);
-    check('orders slots by configured prefetchOrder', ordered.calls.map(c => c.slot).join(',') === '12,20');
+    check('orders Preload slots deterministically by slot', ordered.calls.map(c => c.slot).join(',') === '12,20');
     check('issues raw URLs from each config row', ordered.calls.map(c => c.url).join(',') === '/api/lump/twelve,/api/lump/twenty');
+    check('does not fetch Lazy, Resident, or Empty slots', ordered.calls.length === 2);
     check('uses the boot-prefetch install mode', ordered.calls.every(c => c.mode === 'boot-prefetch'));
     check('fetches one LUMP at a time', ordered.maxActive === 1);
     check('clears the boot promise after completion', ordered.sim._bootPrefetchPromise === null);
 
-    const optional = await runScenario({
-        4: { prefetch: true, prefetchOrder: 1, prefetchRequired: false, label: 'Optional', loaded: false },
-        5: { prefetch: true, prefetchOrder: 2, label: 'Required after optional', loaded: false },
+    const preloadFailure = await runScenario({
+        4: { loadPolicy: 'Preload', label: 'First preload', loaded: false },
+        5: { loadPolicy: 'Preload', label: 'Second preload', loaded: false },
     }, [false, false, true]);
-    check('retries an optional failure once then continues', optional.calls.map(c => c.slot).join(',') === '4,4,5');
-    check('does not stop boot for an optional failure', optional.sim._bootPrefetchFailed === false);
-    check('leaves an optional failed entry demand-loadable', optional.sim.lazyManifest[4].loaded === false);
+    check('retries a failed Preload once then continues', preloadFailure.calls.map(c => c.slot).join(',') === '4,4,5');
+    check('does not expose a required/optional boot stop', preloadFailure.sim._bootPrefetchFailed === false);
+    check('leaves a failed Preload independently demand-loadable', preloadFailure.sim.lazyManifest[4].loaded === false);
 
-    const required = await runScenario({
-        7: { prefetch: true, prefetchOrder: 1, label: 'Required', loaded: false },
-        8: { prefetch: true, prefetchOrder: 2, label: 'Never reached', loaded: false },
-    }, [false, false]);
-    check('stops after the bounded retry for a required failure', required.calls.map(c => c.slot).join(',') === '7,7');
-    check('marks a required prefetch failure as boot-blocking', required.sim._bootPrefetchFailed === true);
-    check('does not fetch later entries after required failure', required.sim.lazyManifest[8].loaded === false);
+    const legacy = await runScenario({
+        7: { prefetch: true, label: 'Legacy preload', loaded: false },
+        8: { loadPolicy: 'Lazy', label: 'Legacy lazy', loaded: false },
+    }, [true]);
+    check('accepts legacy prefetch manifests at the compatibility boundary', legacy.calls.map(c => c.slot).join(',') === '7');
+
+const policySim = new ChurchSimulator();
+policySim.lazyManifest = { 12: { loadPolicy: 'Preload', loaded: false } };
+let intercepted = 0;
+policySim._absentLumpIntercept = () => {
+    intercepted++;
+    return { absent: true, token: 'test' };
+};
+check('real simulator preloader recognizes canonical Preload policy',
+    !!policySim.prepareLumpPrefetch(12) && intercepted === 1);
 
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exitCode = failed ? 1 : 0;

@@ -46,6 +46,71 @@ const source = {
     }
 };
 
+// The public loader is a strict Verify → Certify → Commit composition.  These
+// checks exercise its narrow seams directly before using Create below.
+const validNsCount = () => Array.from({ length: sim.MAX_NS_ENTRIES },
+    (_, slot) => sim.isNSEntryValid(slot)).filter(Boolean).length;
+const beforeVerifyNsCount = validNsCount();
+const verified = registry.dispatchMethod(54, 'Verify', sim, { capabilities: { lump: source } });
+check('LOAD01: Verify accepts a non-null Read capability without publishing Namespace state',
+    verified.ok && verified.result.transaction && validNsCount() === beforeVerifyNsCount &&
+    sim.cr[0].word0 === 0);
+sim.mElevation = false;
+const rejectedCertification = registry.dispatchMethod(54, 'Certify', sim, {
+    transaction: verified.result.transaction
+});
+check('LOAD02: Certify fails closed without bootstrap authority',
+    !rejectedCertification.ok && validNsCount() === beforeVerifyNsCount && sim.cr[0].word0 === 0);
+sim.mElevation = true;
+const certified = registry.dispatchMethod(54, 'Certify', sim, {
+    transaction: verified.result.transaction
+});
+check('LOAD03: Certify produces an immutable opaque proof',
+    certified.ok && Object.isFrozen(certified.result.certifiedProof));
+const forgedCommit = registry.dispatchMethod(54, 'Commit', sim, {
+    certifiedProof: { id: certified.result.certifiedProof.id, certified: true }
+});
+check('LOAD04: Commit rejects a forged proof without partial publication',
+    !forgedCommit.ok && validNsCount() === beforeVerifyNsCount && sim.cr[0].word0 === 0);
+const replayAfterForged = registry.dispatchMethod(54, 'Commit', sim, {
+    certifiedProof: certified.result.certifiedProof
+});
+check('LOAD05: rejected proof attempts retire their transaction',
+    !replayAfterForged.ok && validNsCount() === beforeVerifyNsCount);
+const verifiedForCommit = registry.dispatchMethod(54, 'Verify', sim, { capabilities: { lump: source } });
+const certifiedForCommit = registry.dispatchMethod(54, 'Certify', sim, {
+    transaction: verifiedForCommit.result.transaction
+});
+const committed = registry.dispatchMethod(54, 'Commit', sim, {
+    certifiedProof: certifiedForCommit.result.certifiedProof
+});
+check('LOAD06: Commit atomically publishes custody and materializes CR0/DR0',
+    committed.ok && sim.cr[0].word0 !== 0 && sim.dr[0] === 1 &&
+    validNsCount() === beforeVerifyNsCount + 1);
+const replayCommit = registry.dispatchMethod(54, 'Commit', sim, {
+    certifiedProof: certifiedForCommit.result.certifiedProof
+});
+check('LOAD07: consumed proofs cannot issue a second E GT',
+    !replayCommit.ok && sim.cr[0].word0 === 0 && validNsCount() === beforeVerifyNsCount + 1);
+
+const verifiedForFailure = registry.dispatchMethod(54, 'Verify', sim, { capabilities: { lump: source } });
+const certifiedForFailure = registry.dispatchMethod(54, 'Certify', sim, {
+    transaction: verifiedForFailure.result.transaction
+});
+const originalObtainPassKey = system._topSecurityApi.obtainPassKey;
+system._topSecurityApi.obtainPassKey = () => ({
+    ok: false, fault: 'MINT', message: 'injected capability mint failure'
+});
+const failedAtomicCommit = registry.dispatchMethod(54, 'Commit', sim, {
+    certifiedProof: certifiedForFailure.result.certifiedProof
+});
+system._topSecurityApi.obtainPassKey = originalObtainPassKey;
+check('LOAD08: late capability-mint failure rolls back Namespace publication',
+    !failedAtomicCommit.ok && validNsCount() === beforeVerifyNsCount + 1 && sim.cr[0].word0 === 0);
+const afterRollback = registry.dispatchMethod(54, 'Create', sim, { capabilities: { lump: source } });
+check('LOAD09: rollback revokes provisional security state so the same variable name can be reused',
+    afterRollback.ok && validNsCount() === beforeVerifyNsCount + 2);
+
 const created = registry.dispatchMethod(54, 'Create', sim, { capabilities: { lump: source } });
 check('BANK01: Create returns a typed BankVariable capability in CR0',
     created.ok && created.result.variableCapability.register === 'CR0' &&

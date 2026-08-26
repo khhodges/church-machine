@@ -530,24 +530,23 @@ def build_wukong_prefetch_policy(cfg, source_words, dynamic_start):
     if not isinstance(cfg, dict) or not isinstance(source_words, list):
         return [], []
     step2 = cfg.get("step2") if isinstance(cfg.get("step2"), dict) else {}
-    rows = [e for e in (step2.get("lumps") or [])
-            if isinstance(e, dict) and e.get("prefetch") and not e.get("resident")]
-    rows.sort(key=lambda e: (int(e.get("prefetchOrder", e.get("nsSlot", 0))),
-                             int(e.get("nsSlot", 0))))
+    rows = [e for e in (step2.get("lumps") or []) if isinstance(e, dict) and
+            (e.get("loadPolicy") == "Preload" or
+             (not e.get("loadPolicy") and e.get("prefetch") and not e.get("resident")))]
+    # Policy is per slot; transport order is deterministic implementation detail.
+    rows.sort(key=lambda e: int(e.get("nsSlot", 0)))
     if len(rows) > PREFETCH_MAX_ENTRIES:
         raise ValueError(f"Wukong supports at most {PREFETCH_MAX_ENTRIES} prefetch entries")
     source_total, cursor = len(source_words), int(dynamic_start)
-    seen_slots, seen_orders, entries = set(), set(), []
+    seen_slots, entries = set(), []
     for row in rows:
         slot = row.get("nsSlot")
         if not isinstance(slot, int) or not (8 <= slot < WUKONG_FORWARD_NS_SLOTS):
             raise ValueError(f"Wukong prefetch slot must be between 8 and "
                              f"{WUKONG_FORWARD_NS_SLOTS - 1}")
-        order = int(row.get("prefetchOrder", slot))
-        if slot in seen_slots or order in seen_orders:
-            raise ValueError(f"duplicate Wukong prefetch slot/order ({slot}, {order})")
+        if slot in seen_slots:
+            raise ValueError(f"duplicate Wukong preload slot ({slot})")
         seen_slots.add(slot)
-        seen_orders.add(order)
         token_text = str(row.get("lumpToken") or "").lower()
         token_text = token_text[-8:] if len(token_text) >= 8 else ""
         if len(token_text) != 8:
@@ -575,7 +574,14 @@ def build_wukong_prefetch_policy(cfg, source_words, dynamic_start):
             hash32 = 0
         entries.append({
             "slot": slot, "token": token, "target": cursor, "capacity": size,
-            "authority": authority, "required": row.get("prefetchRequired") is not False,
+            # New policy rows have one fixed preload outcome.  Preserve the
+            # old required bit only while projecting a legacy prefetch record.
+            "authority": authority,
+            # Canonical Preload failure is local to the affected slot: after
+            # bounded retries the board advances and leaves that slot
+            # demand-loadable.  Only a legacy record retains its historic bit.
+            "required": (False if row.get("loadPolicy") == "Preload"
+                         else row.get("prefetchRequired") is not False),
             "hash32": hash32,
         })
         cursor += size

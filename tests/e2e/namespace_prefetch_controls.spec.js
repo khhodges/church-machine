@@ -1,16 +1,19 @@
 'use strict';
 
-// Namespace Table is the programmer-facing surface for raw boot prefetch.
-// This test uses a live IDE page and a synthetic eligible lazy slot, then
-// verifies the controls persist the same Step 2 record Builder consumes.
+// Namespace Table is the programmer-facing slot-policy surface.  This test
+// verifies it persists only the canonical policy record Builder consumes.
 
 const { test, expect } = require('@playwright/test');
 
-test('Namespace Table saves ordered raw-LUMP prefetch configuration', async ({ page }) => {
+test('Namespace Table saves an independent canonical Preload policy', async ({ page }) => {
     test.setTimeout(40000);
     let posted = null;
+    const binaryHash = 'a'.repeat(64);
+    const identityHash = 'b'.repeat(64);
 
     await page.goto('/simulator/');
+    // Keep unrelated persisted fault telemetry from covering this policy-only UI.
+    await page.addStyleTag({ content: '#faultModalOverlay { display: none !important; }' });
     await page.waitForFunction(() => typeof sim !== 'undefined' && typeof updateNamespace === 'function');
 
     await page.route('**/api/boot-config', async route => {
@@ -31,9 +34,7 @@ test('Namespace Table saves ordered raw-LUMP prefetch configuration', async ({ p
         sim.lazyManifest = sim.lazyManifest || {};
         sim.lazyManifest[selected] = {
             bootUpload: {},
-            priority: 'warm',
             label: 'Namespace prefetch fixture',
-            downloadUrl: '/api/lump/DEADBEEF',
         };
         window.bootConfig = {
             targetBoard: 'wukong-xc7a100t',
@@ -49,26 +50,38 @@ test('Namespace Table saves ordered raw-LUMP prefetch configuration', async ({ p
         return selected;
     });
 
-    const prefetch = page.locator(`input[data-ns-prefetch-slot="${slot}"][data-ns-prefetch-field="enabled"]`);
-    await expect(prefetch).toBeVisible();
-    await prefetch.check();
-
-    const required = page.locator(`input[data-ns-prefetch-slot="${slot}"][data-ns-prefetch-field="required"]`);
-    const order = page.locator(`input[data-ns-prefetch-slot="${slot}"][data-ns-prefetch-field="order"]`);
-    await expect(required).toBeChecked();
-    await expect(order).toHaveValue(String(slot));
-    await order.fill('2');
-    await order.blur();
+    const policy = page.getByLabel(`Load policy for slot ${slot}`);
+    await expect(policy).toBeVisible();
+    // Startup's asynchronous catalog refresh may still be in flight above;
+    // install the source record immediately before the user-facing change.
+    await page.evaluate((currentSlot) => {
+        sim.nsLabels[currentSlot] = 'Namespace prefetch fixture';
+        LumpRegistry.registerFromServer([{
+            abstraction: 'Namespace prefetch fixture',
+            dot_name: 'Namespace.Prefetch.1.deadbeef',
+            token: 'deadbeef',
+            lumpSize: 64,
+            binaryHash: 'a'.repeat(64),
+            identityHash: 'b'.repeat(64),
+        }]);
+    }, slot);
+    await policy.selectOption('Preload');
 
     await page.locator('#nsPrefetchSaveBtn').click();
     await expect.poll(() => posted).not.toBeNull();
 
     expect(posted.step2.lumps).toContainEqual(expect.objectContaining({
         nsSlot: slot,
-        resident: false,
-        prefetch: true,
-        prefetchRequired: true,
-        prefetchOrder: 2,
-        downloadUrl: '/api/lump/DEADBEEF',
+        loadPolicy: 'Preload',
+        abstraction: 'Namespace.Prefetch.1.deadbeef',
+        lumpToken: 'deadbeef',
+        lumpSize: 64,
+        binaryHash,
+        identityHash,
     }));
+    const row = posted.step2.lumps.find(entry => entry.nsSlot === slot);
+    expect(row).not.toHaveProperty('prefetch');
+    expect(row).not.toHaveProperty('prefetchRequired');
+    expect(row).not.toHaveProperty('prefetchOrder');
+    expect(row).not.toHaveProperty('downloadUrl');
 });

@@ -29,6 +29,7 @@ const STUB_LUMP = {
     abstraction: 'LED',
     lumpSize:    64,
     token:       'DEADBEEF',
+    binaryHash:  'aabbccdd',
 };
 
 const STUB_BOOT_CONFIG_RESPONSE = {
@@ -57,33 +58,19 @@ const STUB_BOOT_CONFIG_RESPONSE = {
 
 async function openResidentLumpsTab(page) {
     await page.goto('/simulator/');
-    await page.waitForLoadState('networkidle');
-
-    // S-IDE v1: #hamItem-builder and #builderViewTab-lump-resident both have
-    // hardcoded inline style="display:none" (debug-only views hidden by default).
-    // Remove the inline overrides so they are accessible in E2E tests without
-    // requiring ?debug=1 in the URL.
+    // These tests exercise boot-policy configuration, not runtime fault UI.
+    // The simulator can raise a persisted, unrelated startup fault while the
+    // policy panel initializes; keep that overlay out of this focused surface.
+    await page.addStyleTag({ content: '#faultModalOverlay { display: none !important; }' });
+    await page.waitForFunction(() =>
+        typeof window.switchView === 'function' &&
+        typeof window.switchBuilderViewTab === 'function');
+    // Builder is intentionally not in the ordinary navigation menu. Invoke its
+    // supported synchronous view API rather than testing menu visibility.
     await page.evaluate(() => {
-        const btn = document.getElementById('hamItem-builder');
-        if (btn) btn.style.display = '';
-        const tab = document.getElementById('builderViewTab-lump-resident');
-        if (tab) tab.style.display = '';
+        window.switchView('builder');
+        window.switchBuilderViewTab('lump-resident');
     });
-
-    // Open the hamburger menu.
-    const hamBtn = page.locator('#hamBtn');
-    await hamBtn.waitFor({ state: 'visible' });
-    await hamBtn.click();
-
-    // Navigate to Builder.
-    const builderBtn = page.locator('#hamItem-builder');
-    await builderBtn.waitFor({ state: 'visible' });
-    await builderBtn.click();
-
-    // Click the "Resident Lumps" tab inside the Builder view.
-    const residentTab = page.locator('#builderViewTab-lump-resident');
-    await residentTab.waitFor({ state: 'visible' });
-    await residentTab.click();
 
     // Wait for the panel to render its table.
     const panel = page.locator('#lumpResidentPanel');
@@ -149,10 +136,10 @@ test.describe('Resident Lumps tab — table loads', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Suite 2 — resident checkbox toggles the physAddr input
+// Suite 2 — policy selection controls the physAddr input
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('Resident Lumps tab — resident checkbox interaction', () => {
+test.describe('Resident Lumps tab — load policy selection', () => {
 
     test.beforeEach(async ({ page }) => {
         await page.route('**/api/boot-config', async route => {
@@ -168,33 +155,32 @@ test.describe('Resident Lumps tab — resident checkbox interaction', () => {
         });
     });
 
-    test('checking resident enables the physAddr input for that lump', async ({ page }) => {
+    test('choosing Resident enables the physAddr input for that lump', async ({ page }) => {
         test.setTimeout(40000);
         await openResidentLumpsTab(page);
 
         const panel   = page.locator('#lumpResidentPanel');
-        const check   = panel.locator('input[type="checkbox"][data-rl-slot="12"][data-rl-field="resident"]');
+        const policy  = panel.locator('select[data-rl-slot="12"][data-rl-field="loadPolicy"]');
         const addrIn  = panel.locator('input[type="number"][data-rl-slot="12"][data-rl-field="physAddr"]');
 
-        // Initially lazy — address input must be disabled.
-        await expect(check).not.toBeChecked();
+        // Initially Lazy — address input must be disabled.
+        await expect(policy).toHaveValue('Lazy');
         await expect(addrIn).toBeDisabled();
 
-        // Check the resident box.
-        await check.check();
+        await policy.selectOption('Resident');
 
-        // After checking, the address input must become enabled.
+        // Resident requires a placement.
         await expect(addrIn).toBeEnabled();
-        await expect(check).toBeChecked();
+        await expect(policy).toHaveValue('Resident');
     });
 
-    test('unchecking resident disables the physAddr input again', async ({ page }) => {
+    test('leaving Resident disables the physAddr input again', async ({ page }) => {
         test.setTimeout(40000);
 
-        // Start with the lump already resident so we can uncheck it.
+        // Start with the lump already resident so we can change policy.
         const residentConfig = JSON.parse(JSON.stringify(STUB_BOOT_CONFIG_RESPONSE));
         residentConfig.config.step2.lumps = [
-            { nsSlot: 12, resident: true, physAddr: 500, lumpSize: 64 }
+            { nsSlot: 12, loadPolicy: 'Resident', physAddr: 700, lumpSize: 64 }
         ];
 
         await page.route('**/api/boot-config', async route => {
@@ -212,17 +198,16 @@ test.describe('Resident Lumps tab — resident checkbox interaction', () => {
         await openResidentLumpsTab(page);
 
         const panel  = page.locator('#lumpResidentPanel');
-        const check  = panel.locator('input[type="checkbox"][data-rl-slot="12"][data-rl-field="resident"]');
+        const policy = panel.locator('select[data-rl-slot="12"][data-rl-field="loadPolicy"]');
         const addrIn = panel.locator('input[type="number"][data-rl-slot="12"][data-rl-field="physAddr"]');
 
         // Currently resident — input must be enabled.
-        await expect(check).toBeChecked();
+        await expect(policy).toHaveValue('Resident');
         await expect(addrIn).toBeEnabled();
 
-        // Uncheck.
-        await check.uncheck();
+        await policy.selectOption('Preload');
 
-        // Address input must be disabled again.
+        // Non-resident policies need no programmer-provided placement.
         await expect(addrIn).toBeDisabled();
     });
 
@@ -265,13 +250,13 @@ test.describe('Resident Lumps tab — Save fires POST to /api/boot-config', () =
         await openResidentLumpsTab(page);
 
         const panel  = page.locator('#lumpResidentPanel');
-        const check  = panel.locator('input[type="checkbox"][data-rl-slot="12"][data-rl-field="resident"]');
+        const policy = panel.locator('select[data-rl-slot="12"][data-rl-field="loadPolicy"]');
         const addrIn = panel.locator('input[type="number"][data-rl-slot="12"][data-rl-field="physAddr"]');
 
         // Mark LED as resident and supply a physAddr well above the foundational
         // region (Boot.NS 64 + Boot.Thread 64 + Boot.Abstr 64 = 192).
-        await check.check();
-        await addrIn.fill('500');
+        await policy.selectOption('Resident');
+        await addrIn.fill('700');
 
         // physAddr input fires an `input` event which triggers _rlOnChange and
         // re-renders the panel.  Give the DOM one tick to stabilise.
@@ -294,8 +279,9 @@ test.describe('Resident Lumps tab — Save fires POST to /api/boot-config', () =
         const lumps = capturedPostBody.step2.lumps;
         const ledEntry = lumps.find(l => l.nsSlot === 12);
         expect(ledEntry).toBeDefined();
-        expect(ledEntry.resident).toBe(true);
-        expect(ledEntry.physAddr).toBe(500);
+        expect(ledEntry.loadPolicy).toBe('Resident');
+        expect(ledEntry.physAddr).toBe(700);
+        expect(ledEntry).not.toHaveProperty('resident');
 
         // step1 and targetBoard must also be present in the payload.
         expect(capturedPostBody).toHaveProperty('step1');
@@ -305,12 +291,12 @@ test.describe('Resident Lumps tab — Save fires POST to /api/boot-config', () =
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Suite 4 — lazy boot-prefetch configuration
+// Suite 4 — independent Preload configuration
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('Resident Lumps tab — lazy boot prefetch', () => {
+test.describe('Resident Lumps tab — independent Preload policy', () => {
 
-    test('saves the default raw LUMP URL, order, and required policy', async ({ page }) => {
+    test('saves Preload without retired ordering, URL, or required controls', async ({ page }) => {
         test.setTimeout(40000);
         let capturedPostBody = null;
 
@@ -335,18 +321,11 @@ test.describe('Resident Lumps tab — lazy boot prefetch', () => {
 
         await openResidentLumpsTab(page);
         const panel = page.locator('#lumpResidentPanel');
-        const resident = panel.locator('input[data-rl-slot="12"][data-rl-field="resident"]');
-        const prefetch = panel.locator('input[data-rl-slot="12"][data-rl-field="prefetch"]');
-
-        await expect(resident).not.toBeChecked();
-        await prefetch.check();
-        await expect(resident).not.toBeChecked();
-
-        const required = panel.locator('input[data-rl-slot="12"][data-rl-field="prefetchRequired"]');
-        const order = panel.locator('input[data-rl-slot="12"][data-rl-field="prefetchOrder"]');
-        await expect(required).toBeChecked();
-        await expect(order).toHaveValue('12');
-        await order.fill('3');
+        const policy = panel.locator('select[data-rl-slot="12"][data-rl-field="loadPolicy"]');
+        await expect(policy).toHaveValue('Lazy');
+        await policy.selectOption('Preload');
+        await expect(panel.locator('[data-rl-field="prefetchRequired"]')).toHaveCount(0);
+        await expect(panel.locator('[data-rl-field="prefetchOrder"]')).toHaveCount(0);
 
         await panel.locator('button.le-save-btn', { hasText: 'Save boot config' }).click();
         await expect.poll(() => capturedPostBody).not.toBeNull();
@@ -354,12 +333,15 @@ test.describe('Resident Lumps tab — lazy boot prefetch', () => {
         const row = capturedPostBody.step2.lumps.find(entry => entry.nsSlot === 12);
         expect(row).toMatchObject({
             nsSlot:          12,
-            resident:        false,
-            prefetch:        true,
-            prefetchRequired: true,
-            prefetchOrder:   3,
-            downloadUrl:     '/api/lump/DEADBEEF',
+            loadPolicy:      'Preload',
+            lumpSize:        64,
+            binaryHash:      'aabbccdd',
         });
+        expect(row).not.toHaveProperty('resident');
+        expect(row).not.toHaveProperty('prefetch');
+        expect(row).not.toHaveProperty('prefetchRequired');
+        expect(row).not.toHaveProperty('prefetchOrder');
+        expect(row).not.toHaveProperty('downloadUrl');
     });
 
 });

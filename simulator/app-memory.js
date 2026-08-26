@@ -2742,7 +2742,7 @@ function updateNamespace() {
     html += _statChip('Free',     _cntFree,     '#6a9f6a', 'Slots available for allocation');
     html += `<span id="nsBoltDrag" class="ns-bolt-drag" draggable="true" title="Drag \u26a1 onto any NS row to crown that abstraction as Boot.Thread.CR0 \u2014 the first abstraction invoked after boot">\u26a1 Boot entry</span>`;
     html += `<button id="nsSaveBtn" onclick="event.stopPropagation();_nsTableSave(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save all NS table changes to boot-image.bin + ns-state.json — the single write path for NS mutations">\u{1F4BE} Save NS Table</button>`;
-    html += `<button id="nsPrefetchSaveBtn" onclick="event.stopPropagation();_nsPrefetchSaveClick(this)" style="background:#2a2415;color:#c89b3c;border:1px solid rgba(200,155,60,0.4);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save the Namespace Table's ordered raw-LUMP boot prefetch settings">Save prefetch</button>`;
+    html += `<button id="nsPrefetchSaveBtn" onclick="event.stopPropagation();_nsPrefetchSaveClick(this)" style="background:#2a2415;color:#c89b3c;border:1px solid rgba(200,155,60,0.4);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save each slot's load policy">Save policies</button>`;
     html += `<button onclick="event.stopPropagation();_nsTableAdd()" style="background:#1a2e1a;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Install a LUMP from the repository into the next free NS slot">+ Add LUMP</button>`;
     html += '</div>';
     // Bank custody status deliberately projects no raw NS slot, address,
@@ -2773,26 +2773,20 @@ function updateNamespace() {
 
     const typeNames = ['NULL','Inform','Outform','Abstract'];
 
-    // Namespace Table is the primary operational view for a slot. Keep its
-    // prefetch controls backed by the same Step 2 records as Builder >
-    // Resident LUMPs, so changing either surface produces one configuration.
+    // Namespace Table is the primary policy surface.  Each slot has exactly
+    // one policy; transport order, hashes, capacity and bridge details remain
+    // derived implementation data.
     function _nsPrefetchRow(slot, manifest) {
-        if (!manifest || manifest.priority === 'hot' || !manifest.bootUpload) return '';
+        if (!manifest || !manifest.bootUpload) return '';
         const cfg = window.bootConfig || {};
         const rows = cfg.step2 && Array.isArray(cfg.step2.lumps) ? cfg.step2.lumps : [];
-        const saved = rows.find(row => row && row.nsSlot === slot && !row.resident) || null;
-        const enabled = !!(saved && saved.prefetch);
-        const required = !(saved && saved.prefetchRequired === false);
-        const order = saved && Number.isInteger(saved.prefetchOrder) ? saved.prefetchOrder : slot;
-        const checked = enabled ? ' checked' : '';
-        const detail = enabled
-            ? `<label style="display:inline-flex;align-items:center;gap:3px;margin-left:5px;color:#f0a040;" title="Stop startup if this raw LUMP cannot be validated"><input type="checkbox" data-ns-prefetch-slot="${slot}" data-ns-prefetch-field="required"${required ? ' checked' : ''} onclick="event.stopPropagation();_nsPrefetchChange(${slot},'required',this.checked)"> required</label>` +
-              `<input type="number" min="0" step="1" value="${order}" data-ns-prefetch-slot="${slot}" data-ns-prefetch-field="order" title="Sequential boot prefetch order" onclick="event.stopPropagation()" onchange="event.stopPropagation();_nsPrefetchChange(${slot},'order',this.value)" style="width:42px;margin-left:5px;background:#0d0d1a;color:#d0d0e8;border:1px solid #6b5320;border-radius:3px;font-size:0.68rem;padding:1px 3px;">`
-            : '';
-        return `<span style="display:inline-flex;align-items:center;gap:3px;margin-left:5px;color:#c89b3c;white-space:nowrap;" title="Fetch this lazy LUMP during boot, before user code runs"><input type="checkbox" data-ns-prefetch-slot="${slot}" data-ns-prefetch-field="enabled"${checked} onclick="event.stopPropagation();_nsPrefetchChange(${slot},'enabled',this.checked)"> prefetch</span>${detail}`;
+        const saved = rows.find(row => row && row.nsSlot === slot) || null;
+        const value = saved && (saved.loadPolicy || saved.load_policy) ||
+            (saved && saved.resident ? 'Resident' : (saved && saved.prefetch ? 'Preload' : 'Lazy'));
+        return `<select aria-label="Load policy for slot ${slot}" onchange="event.stopPropagation();_nsPrefetchChange(${slot},this.value)" style="margin-left:5px;background:#0d0d1a;color:#d0d0e8;border:1px solid #6b5320;border-radius:3px;font-size:0.68rem;padding:1px 3px;"><option ${value==='Empty'?'selected':''}>Empty</option><option ${value==='Resident'?'selected':''}>Resident</option><option ${value==='Preload'?'selected':''}>Preload</option><option ${value==='Lazy'?'selected':''}>Lazy</option></select>`;
     }
 
-    window._nsPrefetchChange = function(slot, field, value) {
+    window._nsPrefetchChange = function(slot, value) {
         const cfg = window.bootConfig || {};
         if (!cfg.step2) cfg.step2 = { lumps: [] };
         if (!Array.isArray(cfg.step2.lumps)) cfg.step2.lumps = [];
@@ -2808,26 +2802,25 @@ function updateNamespace() {
             };
             cfg.step2.lumps.push(row);
         }
-        row.resident = false;
-        if (field === 'enabled') {
-            if (value) {
-                row.prefetch = true;
-                row.prefetchRequired = row.prefetchRequired !== false;
-                row.prefetchOrder = Number.isInteger(row.prefetchOrder) ? row.prefetchOrder : slot;
-                row.downloadUrl = row.downloadUrl || (manifest && manifest.downloadUrl) || ((src && src.token) ? '/api/lump/' + src.token : '');
-            } else {
-                delete row.prefetch;
-                delete row.prefetchRequired;
-                delete row.prefetchOrder;
-                delete row.downloadUrl;
-            }
-        } else if (field === 'required') {
-            row.prefetch = true;
-            row.prefetchRequired = !!value;
-        } else if (field === 'order') {
-            row.prefetch = true;
-            row.prefetchOrder = Math.max(0, parseInt(value, 10) || 0);
+        row.loadPolicy = ['Empty', 'Resident', 'Preload', 'Lazy'].includes(value) ? value : 'Lazy';
+        row.resident = row.loadPolicy === 'Resident'; // legacy readers
+        // Source metadata is catalog-owned.  The server fills any omitted
+        // binding, but retain a cached catalog record when it is available so
+        // the pending Namespace row remains self-describing before save.
+        if (row.loadPolicy === 'Preload' && src) {
+            row.abstraction = src.dot_name || src.dotName || src.abstraction || row.abstraction;
+            row.lumpToken = src.token || row.lumpToken;
+            const size = src.lumpSize != null ? src.lumpSize : src.lump_size;
+            const binaryHash = src.binaryHash || src.binary_hash;
+            const identityHash = src.identityHash || src.identity_hash;
+            if (Number.isInteger(size)) row.lumpSize = size;
+            if (binaryHash) row.binaryHash = binaryHash;
+            if (identityHash) row.identityHash = identityHash;
         }
+        delete row.prefetch;
+        delete row.prefetchRequired;
+        delete row.prefetchOrder;
+        delete row.downloadUrl;
         window._nsPrefetchDirty = true;
         updateNamespace();
     };
@@ -2864,7 +2857,7 @@ function updateNamespace() {
                 btn.style.color = '#4ec9b0';
                 setTimeout(() => {
                     btn.disabled = false;
-                    btn.textContent = 'Save prefetch';
+                    btn.textContent = 'Save policies';
                     btn.style.color = '';
                 }, 1800);
             }
@@ -2958,6 +2951,17 @@ function updateNamespace() {
         {
             const _srcLump = _findSrcLump(i, e.label);
             const _srcToken = _srcLump ? _srcLump.token : null;
+            const _slotIdentity = typeof sim.getSlotIdentity === 'function'
+                ? sim.getSlotIdentity(i) : null;
+            const _dotName = (_slotIdentity && _slotIdentity.dotName) ||
+                (_srcLump && (_srcLump.dotName || _srcLump.dot_name || _srcLump.abstraction)) ||
+                e.label || '';
+            const _tId = (_slotIdentity && _slotIdentity.cacheToken != null)
+                ? (_slotIdentity.cacheToken >>> 0).toString(16).padStart(8, '0')
+                : (_srcToken || '');
+            const _identity = _dotName && _tId
+                ? `<div style="font:0.64rem monospace;color:#9ca3af;margin-top:2px;" title="Canonical dot.name and T-ID">${_escHtml(_dotName)} · T:${_escHtml(_tId)}</div>`
+                : '';
             // Show Source for Inform (gtType 1) and Outform (gtType 2) only.
             // Hide for Null (0), Abstract (3), Thread slots, and hardware I/O caps.
             // has_source is intentionally NOT checked — lumps saved before source persistence
@@ -2972,7 +2976,7 @@ function updateNamespace() {
                                 THREAD_NS_SLOTS.has(i) ||
                                 _hwCapRe.test(e.label || '');
             if (codeNotResident) {
-                html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span>${_nsPrefetchRow(i, manifest)}</td>`;
+                html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span>${_nsPrefetchRow(i, manifest)}${_identity}</td>`;
             } else {
                 let _srcBtn = '';
                 if (!_hideSource) {
@@ -2984,7 +2988,7 @@ function updateNamespace() {
                         : `null,${i}`;
                     _srcBtn = `<button class="btn btn-xs" onclick="event.stopPropagation();_openLumpSource(${_onclickTarget})" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);" title="Open source in Repository view">Source</button>`;
                 }
-                html += `<td class="ns-entry-actions">${_srcBtn}${_nsPrefetchRow(i, manifest)}</td>`;
+                html += `<td class="ns-entry-actions">${_srcBtn}${_nsPrefetchRow(i, manifest)}${_identity}</td>`;
             }
         }
         html += '</tr>';
@@ -3263,6 +3267,10 @@ async function _nsPopulateAddMeta(token) {
 
     // ── Editable-field defaults from detailSidecar ────────────────────────────
     const bootResident  = !!(detailSidecar.boot_resident);
+    const loadPolicyDefault = ['Resident', 'Preload', 'Lazy'].includes(
+        detailSidecar.loadPolicy || detailSidecar.load_policy)
+        ? (detailSidecar.loadPolicy || detailSidecar.load_policy)
+        : (bootResident ? 'Resident' : 'Lazy');
     const contentType   = detailSidecar.content_type || 'code';
     const typField      = typeof detailSidecar.typ === 'number' ? detailSidecar.typ : 0;
     const gtTypeDefault = (contentType === 'outform' || typField === 2) ? 2 : 1;
@@ -3312,15 +3320,13 @@ async function _nsPopulateAddMeta(token) {
             <div style="${sGH}">INSTALL OPTIONS</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
                 <div>
-                    <span style="${sLabel}">Load Mode</span>
-                    <label style="display:block;cursor:pointer;font-size:0.79rem;margin-bottom:2px;">
-                        <input type="radio" name="_nsLoadMode" value="lazy" ${!bootResident ? 'checked' : ''} style="margin-right:4px;">
-                        Lazy Load <span style="color:#6b7280;font-size:0.7rem;">(stub)</span>
-                    </label>
-                    <label style="display:block;cursor:pointer;font-size:0.79rem;">
-                        <input type="radio" name="_nsLoadMode" value="resident" ${bootResident ? 'checked' : ''} style="margin-right:4px;">
-                        Boot Resident <span style="color:#6b7280;font-size:0.7rem;">(full)</span>
-                    </label>
+                    <span style="${sLabel}">Load Policy</span>
+                    <select id="_nsLoadPolicy" style="${sSelect}" title="The IDE derives transport, capacity, hash, and Namespace metadata.">
+                        <option value="Resident" ${loadPolicyDefault === 'Resident' ? 'selected' : ''}>Resident</option>
+                        <option value="Preload" ${loadPolicyDefault === 'Preload' ? 'selected' : ''}>Preload</option>
+                        <option value="Lazy" ${loadPolicyDefault === 'Lazy' ? 'selected' : ''}>Lazy load</option>
+                    </select>
+                    <div style="color:#6b7280;font-size:0.68rem;margin-top:3px;">Empty is available from an installed Namespace row.</div>
                 </div>
                 <div>
                     <span style="${sLabel}">NS Slot</span>
@@ -3349,8 +3355,10 @@ async function _nsPopulateAddMeta(token) {
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px 12px;font-size:0.78rem;">
                 <div><span style="${sLabel}">Token</span>
                      <span style="${sRoVal};font-family:monospace;">${esc(detailSidecar.token || '—')}</span></div>
-                <div><span style="${sLabel}">Name</span>
-                     <span style="${sRoVal}">${esc(detailSidecar.abstraction || detailSidecar.name || '—')}</span></div>
+                <div><span style="${sLabel}">Canonical dot.name</span>
+                     <span style="${sRoVal}">${esc(detailSidecar.dot_name || detailSidecar.dotName || detailSidecar.abstraction || detailSidecar.name || '—')}</span></div>
+                <div><span style="${sLabel}">T-ID</span>
+                     <span style="${sRoVal};font-family:monospace;">${esc(detailSidecar.cache_token || detailSidecar.token || '—')}</span></div>
                 <div><span style="${sLabel}">Code Words (CW)</span>
                      <span style="${sRoVal}">${cwDisplay}</span></div>
                 <div><span style="${sLabel}">C-List (CC)</span>
@@ -3400,8 +3408,9 @@ function _nsTableAddConfirm() {
     const sidecar = window._nsAddCurrentSidecar;
 
     // ── Read editable field values ────────────────────────────────────────────
-    const loadModeRadio = document.querySelector('input[name="_nsLoadMode"]:checked');
-    const loadMode      = loadModeRadio ? loadModeRadio.value : 'lazy';
+    const loadPolicyEl  = document.getElementById('_nsLoadPolicy');
+    const loadPolicy    = loadPolicyEl ? loadPolicyEl.value : 'Lazy';
+    const loadMode      = loadPolicy === 'Resident' ? 'resident' : 'lazy';
     const slotInputEl   = document.getElementById('_nsSlotInput');
     const slotInputVal  = slotInputEl ? slotInputEl.value.trim() : '';
     const gtTypeEl      = document.getElementById('_nsGtType');
@@ -3431,6 +3440,23 @@ function _nsTableAddConfirm() {
     const _doInstall = function(words) {
         const hdr = sim.parseLumpHeader(words[0] >>> 0);
         if (!hdr.valid) return Promise.reject('Invalid LUMP header (magic mismatch)');
+        const _canonicalHash = function(value) {
+            if (value == null) return null;
+            const hash = String(value).trim().replace(/^sha256:/i, '').toLowerCase();
+            return /^[0-9a-f]{64}$/.test(hash) ? hash : null;
+        };
+        // A Wukong Preload is a bridge-bound record.  Its capacity comes from
+        // the verified binary header and its digest from the authoritative
+        // detail sidecar; neither is a programmer-controlled modal field.
+        const _preloadBinding = loadPolicy === 'Preload' ? {
+            lumpSize: hdr.lumpSize,
+            binaryHash: _canonicalHash(sidecar && (sidecar.binary_hash || sidecar.binaryHash)),
+            identityHash: _canonicalHash(sidecar && (sidecar.identity_hash || sidecar.identityHash))
+        } : null;
+        if (_preloadBinding && !_preloadBinding.binaryHash) {
+            return Promise.reject(
+                'Preload requires the selected LUMP’s canonical binary hash; refusing to install an unbound bridge request.');
+        }
 
         // ── Determine target NS slot based on Slot Policy ─────────────────────
         // Dynamic: always auto-allocate (slot may change between reboots).
@@ -3634,6 +3660,35 @@ function _nsTableAddConfirm() {
             ns_slot_policy: _patchedPolicy,
             ns_slot:        _patchedSlot
         };
+        // The policy is the complete programmer-facing loading decision.
+        // All transport details are derived from canonical catalog metadata.
+        window.bootConfig = window.bootConfig || {};
+        window.bootConfig.step2 = window.bootConfig.step2 || { lumps: [] };
+        const _rows = window.bootConfig.step2.lumps || (window.bootConfig.step2.lumps = []);
+        const _canonicalName = (sidecar && (sidecar.dot_name || sidecar.dotName ||
+            sidecar.abstraction || sidecar.name)) || name;
+        let _row = _rows.find(r => r && r.nsSlot === slot);
+        if (!_row) {
+            _row = { nsSlot: slot, abstraction: _canonicalName, lumpToken: token };
+            _rows.push(_row);
+        }
+        _row.abstraction = _canonicalName;
+        _row.lumpToken = token;
+        _row.loadPolicy = loadPolicy;
+        _row.resident = loadPolicy === 'Resident';
+        delete _row.prefetch;
+        delete _row.prefetchRequired;
+        delete _row.prefetchOrder;
+        delete _row.downloadUrl;
+        if (_preloadBinding) {
+            _row.lumpSize = _preloadBinding.lumpSize;
+            _row.binaryHash = _preloadBinding.binaryHash;
+            if (_preloadBinding.identityHash) _row.identityHash = _preloadBinding.identityHash;
+            else delete _row.identityHash;
+        } else {
+            delete _row.binaryHash;
+            delete _row.identityHash;
+        }
 
         // ── Populate c-list GTs in DMEM from sidecar capabilities ─────────────
         // c-list lives at lumpBase + (lumpSize - cc) per parseLumpHeader:
@@ -3738,7 +3793,8 @@ function _nsTableAddConfirm() {
             sim.lazyManifest[slot] = {
                 label:     name,
                 source:    'ns-add',
-                priority:  'warm',
+            priority:  'warm',
+            loadPolicy,
                 size:      hdr.lumpSize,
                 allocBase: lumpBase,
                 allocSize: hdr.lumpSize,

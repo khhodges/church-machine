@@ -1963,9 +1963,11 @@ async function _startBootLumpPrefetch() {
         return sim._bootPrefetchPromise;
     }
     const entries = Object.entries(sim.lazyManifest || {})
-        .filter(([, e]) => e && e.prefetch && !e.loaded)
-        .sort((a, b) => (a[1].prefetchOrder - b[1].prefetchOrder) ||
-                       (Number(a[0]) - Number(b[0])));
+        // Preload is the sole startup-transport policy.  The legacy prefetch
+        // flag is accepted only for manifests produced by an older saved config.
+        .filter(([, e]) => e && (e.loadPolicy === 'Preload' ||
+            (!e.loadPolicy && e.prefetch)) && !e.loaded)
+        .sort((a, b) => Number(a[0]) - Number(b[0]));
     if (!entries.length) return;
     sim._bootPrefetchStarted = true;
     const con = document.getElementById('editorConsole');
@@ -1974,7 +1976,7 @@ async function _startBootLumpPrefetch() {
         console.log('[boot-prefetch]', msg);
     };
     const work = (async () => {
-        log(`[LOADER] Boot prefetch: ${entries.length} raw LUMP(s), sequential order ` +
+        log(`[LOADER] Boot preload: ${entries.length} raw LUMP(s), slot order ` +
             `${entries.map(([s]) => s).join(', ')}`);
         for (const [slotStr, entry] of entries) {
             const slot = Number(slotStr);
@@ -1982,11 +1984,11 @@ async function _startBootLumpPrefetch() {
             for (let attempt = 1; attempt <= 2 && !completed; attempt++) {
                 const absent = sim.prepareLumpPrefetch(slot);
                 if (!absent) {
-                    log(`⚠ Boot prefetch could not prepare Slot ${slot}`);
+                    log(`⚠ Boot preload could not prepare Slot ${slot}`);
                     break;
                 }
                 absent.fetchUrl = entry.downloadUrl || `/api/lump/${absent.token}`;
-                log(`[LOADER] Prefetching Slot ${slot} (${entry.label || 'entry_' + slot}) ` +
+                log(`[LOADER] Preloading Slot ${slot} (${entry.label || 'entry_' + slot}) ` +
                     `(attempt ${attempt}/2)`);
                 const result = await triggerLazyLoad(absent, 'boot-prefetch');
                 completed = !!(result && result.ok && entry.loaded);
@@ -1999,13 +2001,10 @@ async function _startBootLumpPrefetch() {
                 }
             }
             if (!completed) {
-                const required = entry.prefetchRequired !== false;
-                log(`${required ? '⊿ REQUIRED' : '⚠ OPTIONAL'} boot prefetch failed for ` +
-                    `Slot ${slot}; ${required ? 'boot prefetch stopped' : 'slot remains demand-loadable'}`);
-                if (required) {
-                    sim._bootPrefetchFailed = true;
-                    return;
-                }
+                // A failed Preload does not make a different slot unusable:
+                // it remains independently demand-loadable.  No user-visible
+                // required/optional or ordering controls participate here.
+                log(`⚠ Boot preload failed for Slot ${slot}; slot remains demand-loadable`);
             }
         }
         log('[LOADER] Boot prefetch complete');

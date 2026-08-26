@@ -11,6 +11,7 @@ from hardware.wukong_bridge import (
     parse_prefetch_incident,
 )
 from hardware.wukong_prefetch import (
+    PREFETCH_REQUIRED,
     PREFETCH_STATUS_CRC,
     PREFETCH_STATUS_MALFORMED,
     PREFETCH_STATUS_OK,
@@ -144,6 +145,23 @@ def test_projection_policy_orders_entries_and_reserves_bounded_capacity():
     assert entries[1]["authority"] & 0x1FFFFF == 63
 
 
+def test_canonical_preload_failure_is_nonblocking_and_next_slot_is_independent():
+    """New one-policy rows never encode the legacy halt-on-failure bit."""
+    source = [0] * 600
+    cfg = {"step2": {"lumps": [
+        {"nsSlot": 8, "loadPolicy": "Preload", "lumpToken": "00000008",
+         "lumpSize": 64, "binaryHash": "aabbccdd"},
+        {"nsSlot": 9, "loadPolicy": "Preload", "lumpToken": "00000009",
+         "lumpSize": 64, "binaryHash": "aabbccdd"},
+    ]}}
+    words, entries = build_wukong_prefetch_policy(cfg, source, 1400)
+    assert [entry["slot"] for entry in entries] == [8, 9]
+    assert all(entry["required"] is False for entry in entries)
+    # The policy word has no PREFETCH_REQUIRED bit for either independent slot.
+    assert all((words[2 + 6 * index] & (PREFETCH_REQUIRED << 16)) == 0
+               for index in range(len(entries)))
+
+
 def test_projection_policy_rejects_capacity_exhaustion():
     cfg = {"step2": {"lumps": [{
         "nsSlot": 8, "prefetch": True, "resident": False,
@@ -163,6 +181,7 @@ def test_lazy_prefetch_save_retains_capacity_and_hash_binding(monkeypatch, tmp_p
     config_path = tmp_path / "boot-config.json"
     monkeypatch.setattr(app_module, "BOOT_CONFIG_PATH", str(config_path))
     monkeypatch.setattr(app_module, "_validate_step1", lambda *_args: None)
+    monkeypatch.setattr(app_module, "_normalize_step2_preload_bindings", lambda step2: (step2, None))
     monkeypatch.setattr(app_module, "_validate_step2", lambda *_args: None)
     monkeypatch.setattr(app_module, "_validate_step3", lambda *_args: None)
     payload = {

@@ -18,6 +18,7 @@ Tests cover:
   - Two distinct totalNamespaceWords values to parameterise the usable-end ceiling
 """
 
+import json
 import os
 import sys
 from unittest.mock import patch
@@ -48,6 +49,7 @@ FAKE_CATALOG_ENTRY = {
     "nsSlot": NS_SLOT,
     "lumpSize": LUMP_SIZE,
     "token": "deadbeef",
+    "binaryHash": "a" * 64,
 }
 
 # foundation_end = namespaceLumpWords + threadLumpWords + BOOT_ABSTR_DEFAULT_SIZE
@@ -56,7 +58,7 @@ FAKE_CATALOG_ENTRY = {
 FOUNDATION_END = 64 + 256 + 64  # 384
 
 
-def _fake_catalog():
+def _fake_catalog(selected_tokens=None):
     return [FAKE_CATALOG_ENTRY]
 
 
@@ -216,6 +218,80 @@ class TestValidateStep2General:
             err = _validate_step2({"lumps": [entry_a, entry_b]}, self._step1(), TI60_BOARD)
         assert err is not None
         assert "overlap" in err
+
+    def test_single_load_policy_accepts_empty_preload_and_rejects_invalid_values(self):
+        """Policy owns startup semantics; no URL/order/required fields are needed."""
+        preload = {"lumps": [{
+            "nsSlot": NS_SLOT, "loadPolicy": "Preload",
+            # Hardware-facing identity/capacity are derived catalog bindings;
+            # URL, ordering and required/optional are deliberately absent.
+            "lumpToken": "deadbeef", "lumpSize": 64,
+            "binaryHash": "a" * 64,
+        }]}
+        assert _validate_step2(preload, self._step1(), TI60_BOARD) is None
+        empty = {"lumps": [{"nsSlot": NS_SLOT, "loadPolicy": "Empty"}]}
+        assert _validate_step2(empty, self._step1(), TI60_BOARD) is None
+        invalid = {"lumps": [{"nsSlot": NS_SLOT, "loadPolicy": "Prefetch"}]}
+        assert "invalid loadPolicy" in _validate_step2(
+            invalid, self._step1(), TI60_BOARD)
+
+    def test_canonical_preload_post_is_accepted_without_retired_controls(
+            self, monkeypatch, tmp_path):
+        """The Builder's catalog-derived Preload payload passes the real endpoint."""
+        monkeypatch.setattr(_app_module, "BOOT_CONFIG_PATH", str(tmp_path / "boot-config.json"))
+        manifest_path = tmp_path / "manifest.json"
+        manifest_path.write_text(json.dumps([{
+            "abstraction": "TestLump",
+            "token": "deadbeef",
+            "archived": False,
+        }]))
+        monkeypatch.setattr(_app_module, "LUMPS_MANIFEST_PATH", str(manifest_path))
+        payload = {
+            "targetBoard": TI60_BOARD,
+            "step1": dict(DEFAULT_BOOT_CONFIG["step1"]),
+            "step2": {"lumps": [{
+                "nsSlot": NS_SLOT,
+                "loadPolicy": "Preload",
+                "abstraction": "TestLump",
+                "lumpToken": "deadbeef",
+                "lumpSize": LUMP_SIZE,
+                # The server derives this binding when the policy control only
+                # supplies the selected Namespace slot.
+            }]},
+            "step3": {"emptySlotCount": 0},
+        }
+        with _app_module.app.test_client() as client:
+            response = client.post("/api/boot-config", json=payload)
+        assert response.status_code == 200, response.get_json()
+        saved = response.get_json()["config"]["step2"]["lumps"][0]
+        assert saved["loadPolicy"] == "Preload"
+        assert saved["lumpSize"] == LUMP_SIZE
+        assert saved["binaryHash"] == "a" * 64
+        for retired in ("prefetch", "prefetchRequired", "prefetchOrder", "downloadUrl"):
+            assert retired not in saved
+
+    def test_canonical_preload_rejects_forged_catalog_bindings(self, monkeypatch, tmp_path):
+        """A client cannot substitute a plausible hash or capacity for catalog truth."""
+        monkeypatch.setattr(_app_module, "BOOT_CONFIG_PATH", str(tmp_path / "boot-config.json"))
+        manifest_path = tmp_path / "manifest.json"
+        manifest_path.write_text(json.dumps([{
+            "abstraction": "TestLump", "token": "deadbeef", "archived": False,
+        }]))
+        monkeypatch.setattr(_app_module, "LUMPS_MANIFEST_PATH", str(manifest_path))
+        payload = {
+            "targetBoard": TI60_BOARD,
+            "step1": dict(DEFAULT_BOOT_CONFIG["step1"]),
+            "step2": {"lumps": [{
+                "nsSlot": NS_SLOT, "loadPolicy": "Preload",
+                "abstraction": "TestLump", "lumpToken": "deadbeef",
+                "lumpSize": 128, "binaryHash": "b" * 64,
+            }]},
+            "step3": {"emptySlotCount": 0},
+        }
+        with _app_module.app.test_client() as client:
+            response = client.post("/api/boot-config", json=payload)
+        assert response.status_code == 400
+        assert "does not match its canonical catalog record" in response.get_json()["error"]
 
 
 # ---------------------------------------------------------------------------

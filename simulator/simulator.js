@@ -599,7 +599,10 @@ class ChurchSimulator {
     // path allowed to validate and publish a resident promotion.
     prepareLumpPrefetch(slotIndex) {
         const entry = this.lazyManifest && this.lazyManifest[slotIndex];
-        if (!entry || !entry.prefetch || entry.loaded) return null;
+        // `Preload` is the canonical per-slot policy.  The prefetch flag is
+        // read only for saved manifests created before the policy migration.
+        if (!entry || !(entry.loadPolicy === 'Preload' ||
+                (!entry.loadPolicy && entry.prefetch)) || entry.loaded) return null;
         if (this.awaitingLump) return null;
         const result = this._absentLumpIntercept(
             entry, slotIndex, null, 'BOOT_PREFETCH', null, null);

@@ -306,6 +306,14 @@ function _initLazyLoadManifest() {
                         && window.bootConfig.step2.lumps) || [];
     const residentMap = {};   // nsSlot → {resident, physAddr}
     for (const e of step2Lumps) residentMap[e.nsSlot] = e;
+    // One programmer-selected policy per slot.  Legacy fields are normalized
+    // only at this input boundary so old saved images remain usable.
+    const policyFor = function(row) {
+        if (!row) return 'Lazy';
+        const explicit = row.loadPolicy || row.load_policy;
+        if (['Empty', 'Resident', 'Preload', 'Lazy'].includes(explicit)) return explicit;
+        return row.resident ? 'Resident' : (row.prefetch ? 'Preload' : 'Lazy');
+    };
 
     const manifest = {};
     const residentSlots = [];
@@ -321,7 +329,9 @@ function _initLazyLoadManifest() {
             }
             if (upload.methods && upload.methods.length > 0 && upload.index >= 16) {
                 const cfg = residentMap[upload.index];
-                const isResident = !!(cfg && cfg.resident);
+                const loadPolicy = policyFor(cfg);
+                if (loadPolicy === 'Empty') continue;
+                const isResident = loadPolicy === 'Resident';
                 const isHot = (upload.index === 19) || isResident;
                 let codeWords = 0;
                 for (const m of upload.methods) {
@@ -337,6 +347,7 @@ function _initLazyLoadManifest() {
                     label: upload.abstraction,
                     size: lumpSize,
                     priority: isHot ? 'hot' : 'warm',
+                    loadPolicy,
                     loaded: false,
                     loadCount: 0,
                     bootUpload: upload
@@ -344,17 +355,9 @@ function _initLazyLoadManifest() {
                 // Ordered raw-LUMP boot prefetch is opt-in.  Keep it on the
                 // manifest entry so the host loader can use the exact same
                 // identity registered for ordinary demand-driven loading.
-                const prefetch = step2Lumps.find(e =>
-                    e && e.nsSlot === upload.index && !e.resident && e.prefetch);
-                if (prefetch) {
-                    manifest[upload.index].prefetch = true;
-                    manifest[upload.index].prefetchOrder =
-                        Number.isInteger(prefetch.prefetchOrder)
-                            ? prefetch.prefetchOrder : upload.index;
-                    manifest[upload.index].prefetchRequired =
-                        prefetch.prefetchRequired !== false;
+                if (loadPolicy === 'Preload') {
                     manifest[upload.index].downloadUrl =
-                        prefetch.downloadUrl || `/api/lump/${upload.token || ''}`;
+                        `/api/lump/${upload.token || ''}`;
                     const catalogEntry = (window._lumpCatalog || []).find(c =>
                         c && c.nsSlot === upload.index);
                     if (catalogEntry && sim.registerSlotIdentity &&
@@ -368,7 +371,7 @@ function _initLazyLoadManifest() {
                                 binaryHash: catalogEntry.binaryHash
                             });
                         } catch (e) {
-                            console.warn(`[bootConfig] prefetch identity rejected for slot ${upload.index}:`, e);
+                            console.warn(`[bootConfig] preload identity rejected for slot ${upload.index}:`, e);
                         }
                     }
                 }
