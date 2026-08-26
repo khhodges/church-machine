@@ -6204,26 +6204,31 @@ class ChurchSimulator {
             }
         }
 
-        // Full 3×3 domain-purity check on the TPERM result permissions.
-        // Mirrors hardware perm_check.py:
-        //   DATA_PERMS = R | W | X   (Turing domain)
-        //   CAP_PERMS  = L | S | E   (Church domain)
-        //   domain_purity_ok = ~(has_turing & has_church)
-        // All 9 cross-pairs {R,W,X}×{L,S,E} are forbidden at creation time.
-        // TPERM can only attenuate (intersect) permissions, so if the result is
-        // mixed the preset and GT were already incompatible.
-        const resultR   = required.includes('R') && !!parsed.permissions['R'];
-        const resultW   = required.includes('W') && !!parsed.permissions['W'];
-        const resultX   = required.includes('X') && !!parsed.permissions['X'];
-        const resultL   = required.includes('L') && !!parsed.permissions['L'];
-        const resultS   = required.includes('S') && !!parsed.permissions['S'];
-        const resultE   = required.includes('E') && !!parsed.permissions['E'];
-        if ((resultR || resultW || resultX) && (resultL || resultS || resultE)) {
-            this.fault('TPERM_RSV', `TPERM CR${d.crDst}: result mixes Turing {R,W,X} with Church {L,S,E} permissions — domain-purity violation`);
+        // Ordinary presets are exact permission-set assertions.  Check the
+        // requested domain independently from the permission result: a
+        // cross-domain request must fault even when the target lacks every
+        // requested bit, while a same-domain missing/extra bit is just Z=0.
+        const turingKeys = ['R', 'W', 'X'];
+        const churchKeys = ['L', 'S', 'E'];
+        const requestedTuring = required.some(p => turingKeys.includes(p));
+        const requestedChurch = required.some(p => churchKeys.includes(p));
+        // parseGT intentionally exposes the decoded permission object but not
+        // the raw domain bit; read that bit directly so zero-permission GTs
+        // still have an unambiguous domain for this security check.
+        const targetDom = (gt >>> 27) & 1;
+        const crossDomain = (requestedTuring && requestedChurch) ||
+                            (requestedTuring && targetDom === 1) ||
+                            (requestedChurch && targetDom === 0);
+        if (crossDomain) {
+            this.fault('DOMAIN_PURITY', `TPERM CR${d.crDst}: requested {${required.join('')}} crosses the GT domain (${targetDom ? 'Church' : 'Turing'})`);
             return null;
         }
 
-        const hasAll = required.every(p => parsed.permissions[p] === 1);
+        const permissionKeys = ['R', 'W', 'X', 'L', 'S', 'E'];
+        const hasExactPermissions = permissionKeys.every(p =>
+            required.includes(p) === (parsed.permissions[p] === 1)
+        );
+        const hasAll = hasExactPermissions;
 
         if (bSet && hasAll) {
             this.cr[d.crDst].word0 = (this.cr[d.crDst].word0 & ~(1 << 31)) >>> 0;

@@ -238,7 +238,13 @@ TPERM CRd, #preset
 | src (4 bits) | Preset code — permission mask to AND with current permissions |
 | imm15 (15 bits) | 0x7FFF — all-ones sentinel; distinguishes restriction from health-check and allows health-check at offset 0 |
 
-ANDs the preset mask with CRd's current permissions. Permissions can only be removed, never added (monotonic restriction). Sets Z=1 if resulting permissions are non-zero. The attenuation is local to the cached CR; the namespace slot is not updated until a SAVE commits it. Domain purity is enforced: Turing (R, W, X) and Church (L, S, E) permissions cannot be mixed.
+Ordinary presets are exact permission-set checks: CRd must contain exactly the
+requested permissions, with no missing or extra bits. An exact same-domain
+match sets Z=1; a same-domain mismatch sets Z=0, N=1, C=0, V=0 and leaves
+CRd unchanged. A request for Turing permissions (R, W, X) against a Church
+GT, or Church permissions (L, S, E) against a Turing GT, faults with
+`DOMAIN_PURITY`. The separate `TPERM CRd, CRs, 0x7FFF` form remains the
+permission-subset attenuation operation described below.
 
 #### Preset Table
 

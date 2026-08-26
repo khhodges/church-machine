@@ -641,7 +641,7 @@ except OSError as exc:
         f"Wukong factory image requires canonical SelfTest lump: {_selftest_path}"
     ) from exc
 WUKONG_SELFTEST_WORDS = tuple(struct.unpack(">512I", _selftest_raw))
-assert WUKONG_SELFTEST_WORDS[0] == 0xF9868002  # cc=2 (Next.GT in slot 1); update when 00000600.lump is recompiled
+assert WUKONG_SELFTEST_WORDS[0] == 0xF987CC02  # cc=2 (Next.GT in slot 1); update when 00000600.lump is recompiled
 # c-list[0] is at word[512-cc] = word[510]; word[511] is c-list[1] (Next.GT, runtime-patched)
 assert WUKONG_SELFTEST_WORDS[510] == 0x4A000006  # c-list[0]: SelfTest E-GT (Church domain, E-perm, NS slot 6) — baked in at compile time
 

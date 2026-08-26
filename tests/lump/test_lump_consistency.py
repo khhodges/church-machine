@@ -751,15 +751,20 @@ SELFTEST_LUMP_CASES = [
 
 # cc>=1 lumps: SelfTest E-GT at slot 0 (POLA redesign — no Boot.Nucs needed)
 # PostFlashSelftest: CRC-32 token for the PostFlashSelftest binary (rebuilt alongside source)
-#   Current token: 059dc47f  cw=499  cc=2
+#   The token is read from manifest.json so this guard cannot drift after a
+#   source edit changes the CRC.
 #     slot 0 = SelfTest E-GT (NS slot 6, Church domain, E perm)
 #     slot 1 = Next.GT     (default = SelfTest self-loop; boot_image.py overrides)
 # SelfTest: token 00000600, cc=2 (slot 0 = SelfTest E-GT; slot 1 = Next.GT for continuation)
 # To regenerate PostFlashSelftest after editing the source:
 #   node scripts/build_selftest_lump.js
 #   Then update the token on the line below and commit .lump + .json + manifest.json.
+_POSTFLASH_SELFTEST_TOKEN = next(
+    (e["token"] for e in MANIFEST if e.get("abstraction") == "PostFlashSelftest"),
+    None,
+)
 SELFTEST_LUMP_CASES_CC1 = [
-    ("059dc47f", "PostFlashSelftest"),
+    (_POSTFLASH_SELFTEST_TOKEN, "PostFlashSelftest"),
     ("00000600", "SelfTest"),
 ]
 

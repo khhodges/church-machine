@@ -24,7 +24,8 @@ class ChurchTperm(Elaboratable):
 
         # Z-flag result latched on the cycle before COMPLETE.
         # Semantics by path:
-        #   permission preset (APPLY)  → 1 (can_only_reduce was true to reach APPLY)
+        #   CLEAR / exact permission preset → 1
+        #   same-domain permission mismatch → 0 (no write, no fault)
         #   EXACT (CHECK_EXACT)        → 1 (word0s matched; mismatch takes FAULT path)
         #   FRAME (CHECK_FRAME)        → stack_has_frame (1 if real return frame exists)
         # Valid only when tperm_complete is high.
@@ -55,6 +56,7 @@ class ChurchTperm(Elaboratable):
         # 6-bit logical permission mask for the requested preset (PERM_MASK_* constants).
         new_perms = Signal(6)
         is_reserved = Signal()
+        is_clear = Signal()
         is_exact  = Signal()   # preset == TpermPreset.EXACT
         is_frame  = Signal()   # preset == TpermPreset.FRAME
 
@@ -71,7 +73,7 @@ class ChurchTperm(Elaboratable):
 
         with m.Switch(preset_reg):
             with m.Case(TpermPreset.CLEAR):
-                m.d.comb += new_perms.eq(0)
+                m.d.comb += [new_perms.eq(0), is_clear.eq(1)]
             with m.Case(TpermPreset.R):
                 m.d.comb += new_perms.eq(PERM_MASK_R)
             with m.Case(TpermPreset.RW):
@@ -97,10 +99,23 @@ class ChurchTperm(Elaboratable):
             with m.Default():
                 m.d.comb += [new_perms.eq(0), is_reserved.eq(1)]
 
-        # can_only_reduce: requested permission set must be a subset of current GT permissions.
-        # Uses decoded logical 6-bit representations for both sides.
-        can_only_reduce = Signal()
-        m.d.comb += can_only_reduce.eq((new_perms & target_logical) == new_perms)
+        # Ordinary presets are exact assertions, not subset checks.  Domain
+        # purity is checked independently so a cross-domain request remains a
+        # hard fault even when the target is missing the requested permission.
+        requested_turing = Signal()
+        requested_church = Signal()
+        domain_purity_fault = Signal()
+        permissions_exact = Signal()
+        m.d.comb += [
+            requested_turing.eq(new_perms[:3] != 0),
+            requested_church.eq(new_perms[3:6] != 0),
+            domain_purity_fault.eq(
+                (requested_turing & requested_church) |
+                (requested_turing & target_gt.dom) |
+                (requested_church & ~target_gt.dom)
+            ),
+            permissions_exact.eq(target_logical == new_perms),
+        ]
 
         with m.FSM(name="tperm") as fsm:
             with m.State("IDLE"):
@@ -122,9 +137,19 @@ class ChurchTperm(Elaboratable):
                     m.next = "READ_CR2"
                 with m.Elif(is_frame):
                     m.next = "CHECK_FRAME"
-                with m.Elif(~can_only_reduce):
+                with m.Elif(is_clear):
+                    # CLEAR is an existence check, not a permission rewrite.
+                    m.d.sync += z_result_reg.eq(1)
+                    m.next = "COMPLETE"
+                with m.Elif(domain_purity_fault):
                     m.d.sync += [fault_flag.eq(1), fault_latched.eq(FaultType.DOMAIN_PURITY)]
                     m.next = "FAULT"
+                with m.Elif(~permissions_exact):
+                    # Same-domain missing or extra permissions are ordinary
+                    # failed checks.  Do not enter APPLY: the capability must
+                    # remain byte-for-byte unchanged.
+                    m.d.sync += z_result_reg.eq(0)
+                    m.next = "COMPLETE"
                 with m.Else():
                     m.next = "APPLY"
 
@@ -151,7 +176,7 @@ class ChurchTperm(Elaboratable):
                     m.next = "COMPLETE"
 
             with m.State("APPLY"):
-                # Reached only when can_only_reduce=1 → Z=1.
+                # Reached only for an exact ordinary permission-set match → Z=1.
                 m.d.sync += z_result_reg.eq(1)
                 # Encode result logical perms (new_perms & target_logical) back to dom+perm.
                 result_logical = Signal(6)

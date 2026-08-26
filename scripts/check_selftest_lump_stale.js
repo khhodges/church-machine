@@ -29,6 +29,7 @@ const ROOT      = path.resolve(__dirname, '..');
 const ASSEMBLER = path.join(ROOT, 'simulator', 'assembler.js');
 const SOURCE    = path.join(ROOT, 'simulator', 'examples', 'post_flash_selftest.cloomc');
 const LUMPS_DIR = path.join(ROOT, 'server', 'lumps');
+const CANONICAL_LUMP_PATH = path.join(LUMPS_DIR, '00000600.lump');
 
 // ── Minimal browser stubs so assembler.js loads in Node.js ──────────────────
 global.localStorage = {
@@ -160,7 +161,26 @@ if (!fs.existsSync(lumpPath)) {
     }
 }
 
-// 2. Sidecar JSON check ───────────────────────────────────────────────────────
+// 2. Canonical boot-image binary check ────────────────────────────────────────
+// The CRC-tokenized PostFlashSelftest file above is used by simulator tests;
+// boot_rom.py consumes the static token-00000600 artifact. Both must be
+// generated from the same source so hardware and simulator do not silently
+// execute different SelfTest programs.
+if (!fs.existsSync(CANONICAL_LUMP_PATH)) {
+    console.error('\nFAIL: server/lumps/00000600.lump does not exist.');
+    stale = true;
+} else {
+    const canonical = fs.readFileSync(CANONICAL_LUMP_PATH);
+    if (!canonical.equals(bytes)) {
+        console.error('\nFAIL: server/lumps/00000600.lump differs from the current SelfTest source.');
+        console.error(`      On-disk size: ${canonical.length} bytes, expected: ${bytes.length} bytes`);
+        stale = true;
+    } else {
+        console.log('OK:   server/lumps/00000600.lump — canonical boot image matches');
+    }
+}
+
+// 3. Sidecar JSON check ───────────────────────────────────────────────────────
 if (!fs.existsSync(sidecarPath)) {
     console.error(`\nFAIL: server/lumps/${token}.json does not exist.`);
     console.error('      The sidecar metadata file is missing — rebuild with:');
@@ -185,7 +205,7 @@ if (!fs.existsSync(sidecarPath)) {
     }
 }
 
-// 3. Manifest check ───────────────────────────────────────────────────────────
+// 4. Manifest check ───────────────────────────────────────────────────────────
 if (!fs.existsSync(MANIFEST)) {
     console.error('\nFAIL: server/lumps/manifest.json does not exist.');
     stale = true;

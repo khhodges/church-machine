@@ -130,7 +130,7 @@ dom=1 (Church):  perm[2]=E, perm[1]=S, perm[0]=L
 | [24:16] | gt_seq | 9-bit revocation counter                              |
 | [31]    | B      | Bind — GT propagation via mSave allowed when set      |
 
-**Domain purity**: Turing and Church bits are mutually exclusive by construction — `dom` determines the meaning of `perm[2:0]`, making a mixed-domain GT impossible to represent. TPERM still faults with `TPERM_RSV` for reserved preset codes that would imply cross-domain combinations.
+**Domain purity**: Turing and Church bits are mutually exclusive by construction — `dom` determines the meaning of `perm[2:0]`, making a mixed-domain GT impossible to represent. Ordinary TPERM requests for the other domain fault with `DOMAIN_PURITY`; reserved preset codes still fault with `TPERM_RSV`.
 
 > **Note:** `f_flag` (Far indicator) is **not** a GT word field. It is stored in NS SLOT Word 1 bit [31] — a property of the namespace slot, not the token.
 
@@ -360,9 +360,8 @@ Flag-writing summary across all 20 instructions:
 > **A.7 — CLEAR (preset 0) always passes for any non-NULL, non-reserved GT.**
 >
 > `TPERM CRd, CLEAR` requires no permissions. Since the required set is empty,
-> `required.every(p => gt.permissions[p])` is vacuously true. Z = 1 for any valid
-> non-NULL GT regardless of what permissions it actually holds. This is the
-> standard "GT is live and non-NULL" existence check.
+> the check passes for any valid non-NULL GT regardless of what permissions it
+> actually holds. CLEAR is an existence check and does not rewrite the GT.
 
 > **A.8 — NULL GT always produces Z = 0, N = 1, no fault.**
 >
@@ -377,15 +376,24 @@ Flag-writing summary across all 20 instructions:
 > BRANCH EQ, not_null
 > ```
 
-> **A.9 — Domain-purity violation → hard FAULT(TPERM_RSV).**
+> **A.9 — Domain-purity violation → hard FAULT(`DOMAIN_PURITY`).**
 >
-> If the *result* permission set (intersection of preset's required bits and the GT's
-> held bits) would combine X with any of L, S, or E, TPERM faults with `TPERM_RSV`.
-> This is a hard fault — not Z = 0, not recoverable.
+> An ordinary preset that requests Turing permissions (R, W, X) for a Church GT,
+> or Church permissions (L, S, E) for a Turing GT, is a domain-purity violation.
+> A custom mixed request is also a violation. TPERM faults with
+> `DOMAIN_PURITY`. This is a hard fault — not Z = 0, not recoverable.
 >
-> No built-in preset triggers this (presets are X-pure or LSE-pure, never mixed),
-> but a GT that already combines X and L/S/E could trigger it on certain presets.
-> In practice this guards against malformed GTs reaching code that uses them.
+> No built-in preset is mixed. The explicit request-domain check is intentional:
+> a cross-domain request faults even when the GT does not carry the requested
+> bit, so it cannot be mistaken for an ordinary failed permission check.
+
+> **A.9a — Ordinary permission presets require exact equality.**
+>
+> For R, RW, X, RX, RWX, L, S, E, and LS, the GT's complete
+> `{R,W,X,L,S,E}` permission set must equal the preset's set. Missing or extra
+> same-domain permissions produce `Z = 0, N = 1, C = 0, V = 0`, with no
+> capability write and no fault. This is distinct from a cross-domain request,
+> which takes the `DOMAIN_PURITY` fault path.
 
 > **A.10 — TPERM flag invariants: N = !Z, C = 0, V = 0 always.**
 >
@@ -845,17 +853,17 @@ B-modifier variants (bit 4 = 1): add 0x10 to any valid code (e.g. `EB = 0x18`). 
 **Semantics** (in order):
 1. **NULL check**: if `CRd.word0 == 0` → Z=0, N=1, C=0, V=0, return immediately (no fault).
 2. **Reserved preset check**: if preset code (bits[3:0]) is `0x0B–0x0F` → `FAULT(TPERM_RSV)`. Both hardware and simulator fault here (D-3 closed — simulator aligned with hardware, Task #873).
-3. **Domain-purity check**: if the intersection of the preset's required permissions and the GT's held permissions would combine X with any of L/S/E → `FAULT(TPERM_RSV)`.
-4. **Permission test**: `hasAll = required_permissions.every(p => GT.permissions[p])`.
-5. **B-modifier**: if bit 4 is set and `hasAll == true` → clear bit 31 of `CRd.word0` (the Busy bit) in place.
+3. **Domain-purity check**: if the request crosses the GT's domain → `FAULT(DOMAIN_PURITY)`.
+4. **Permission test**: the complete GT permission set must equal the preset set.
+5. **B-modifier**: if bit 4 is set and the exact permission check passes → clear bit 31 of `CRd.word0` (the Busy bit) in place.
 6. Set flags: Z = hasAll, N = !hasAll, C = 0, V = 0.
 
-**Flags:** N = !Z, Z = (all required permissions present), C = 0 (always), V = 0 (always)
+**Flags:** N = !Z, Z = (complete permission set exactly matches), C = 0 (always), V = 0 (always)
 
 **Faults:**
 | Fault | Condition |
 |-------|-----------|
-| `TPERM_RSV` | Result permissions would combine X with L/S/E (domain-purity violation) |
+| `DOMAIN_PURITY` | Ordinary request crosses the GT domain, or requests a mixed Turing/Church set |
 
 Reserved preset codes (0x0B–0x0F) fault with `TPERM_RSV` in both hardware and simulator (D-3 closed — aligned as of Task #873).
 

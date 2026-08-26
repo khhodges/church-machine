@@ -635,7 +635,7 @@ tH62:
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
-; SECTION I — TPERM presets + domain purity  (Tests 63-73)
+; SECTION I — TPERM presets + strict same-domain checks  (Tests 63-73)
 ; ═══════════════════════════════════════════════════════════════════════════════
 ; CR0 = E-GT for SelfTest  (Church dom=1, E-perm=1; from thread[+244] via boot)
 ; CR1 = E-GT for SelfTest  (Church dom=1, E-perm=1; loaded from c-list slot 0)
@@ -648,44 +648,44 @@ tIstart:
     IADD DR0, DR0, #63
     RETURN
 tI64:
-    ; Test 64: E-GT does NOT satisfy TPERM X  (Z=0: domain purity, Church ≠ Turing)
-    TPERM CR0, X
+    ; Test 64: E-GT does NOT satisfy TPERM L  (Z=0: same-domain missing permission)
+    TPERM CR0, L
     BRANCHNE tI65
     IADD DR0, DR0, #64
     RETURN
 tI65:
-    ; Test 65: E-GT does NOT satisfy TPERM R  (Z=0: no read permission)
-    TPERM CR0, R
+    ; Test 65: E-GT does NOT satisfy TPERM S  (Z=0: same-domain missing permission)
+    TPERM CR0, S
     BRANCHNE tI66
     IADD DR0, DR0, #65
     RETURN
 tI66:
-    ; Test 66: E-GT does NOT satisfy TPERM L  (Z=0: no launch permission)
-    TPERM CR0, L
+    ; Test 66: E-GT does NOT satisfy TPERM LS  (Z=0: same-domain missing permissions)
+    TPERM CR0, LS
     BRANCHNE tI67
     IADD DR0, DR0, #66
     RETURN
 tI67:
-    ; Test 67: E-GT does NOT satisfy TPERM S  (Z=0: no store permission)
-    TPERM CR0, S
+    ; Test 67: c-list E-GT satisfies TPERM E  (Z=1: verifies LOAD + TPERM together)
+    TPERM CR1, E
     BRANCHNE tI68
     IADD DR0, DR0, #67
     RETURN
 tI68:
-    ; Test 68: c-list E-GT satisfies TPERM E  (Z=1: verifies LOAD + TPERM together)
-    TPERM CR1, E
+    ; Test 68: c-list E-GT does NOT satisfy TPERM L  (Z=0: same-domain missing)
+    TPERM CR1, L
     BRANCHEQ tI69
     IADD DR0, DR0, #68
     RETURN
 tI69:
-    ; Test 69: c-list E-GT does NOT satisfy TPERM X  (Z=0: domain purity)
-    TPERM CR1, X
+    ; Test 69: c-list E-GT does NOT satisfy TPERM S  (Z=0: same-domain missing)
+    TPERM CR1, S
     BRANCHNE tI70
     IADD DR0, DR0, #69
     RETURN
 tI70:
-    ; Test 70: c-list E-GT does NOT satisfy TPERM R  (Z=0: no read permission)
-    TPERM CR1, R
+    ; Test 70: c-list E-GT does NOT satisfy TPERM LS  (Z=0: same-domain missing)
+    TPERM CR1, LS
     BRANCHNE tI71
     IADD DR0, DR0, #70
     RETURN
@@ -696,14 +696,14 @@ tI71:
     IADD DR0, DR0, #71
     RETURN
 tI72:
-    ; Test 72: E-GT does NOT satisfy TPERM RX  (Z=0: has neither R nor X bits)
-    TPERM CR0, RX
+    ; Test 72: E-GT still satisfies TPERM E after CLEAR (Z=1: CLEAR is non-mutating)
+    TPERM CR0, E
     BRANCHNE tI73
     IADD DR0, DR0, #72
     RETURN
 tI73:
-    ; Test 73: E-GT does NOT satisfy TPERM RWX  (Z=0: has neither R, W, nor X bits)
-    TPERM CR0, RWX
+    ; Test 73: E-GT still does not satisfy TPERM LS (Z=0: strict multi-permission check)
+    TPERM CR0, LS
     BRANCHNE tJstart
     IADD DR0, DR0, #73
     RETURN

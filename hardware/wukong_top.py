@@ -792,8 +792,7 @@ class ChurchWukongXC7A100T(Elaboratable):
                 (core.retire_valid & core.retire_fault_valid) |
                 self.sim_fault_inject)
         else:
-            m.d.comb += fault_halt.eq(
-                core.retire_valid & core.retire_fault_valid)
+            m.d.comb += fault_halt.eq(core.retire_valid & core.retire_fault_valid)
         recovery = m.submodules.fault_recovery = FaultRecoveryControl()
         m.d.comb += [
             recovery.fault_halt.eq(fault_halt),

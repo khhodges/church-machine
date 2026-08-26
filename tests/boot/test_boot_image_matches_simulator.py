@@ -241,6 +241,14 @@ def _write_synthetic_boot_abstr_lump(lumps_dir, lump_size=64, cw=3, cc=0):
                 "ns_slot_policy": "static",
                 "boot_resident": True,
             }], _mf)
+    with open(os.path.join(lumps_dir, "ns-state.json"), "w") as _sf:
+        json.dump({
+            "abstractions": [{
+                "name": "SelfTest",
+                "slot": BOOT_ABSTR_NS_SLOT,
+                "token": lump_token,
+            }]
+        }, _sf)
     return lump_path, lump_size
 
 
@@ -335,6 +343,13 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
             "ns_slot_policy": "static",
             "boot_resident": True,
         }]))
+    (tmp_path / "ns-state.json").write_text(json.dumps({
+        "abstractions": [{
+            "name": "SelfTest",
+            "slot": BOOT_ABSTR_NS_SLOT,
+            "token": saved_token,
+        }]
+    }))
 
     cfg = {
         "step1": {
@@ -409,7 +424,13 @@ def test_boot_image_next_gt_follows_lightning_bolt(tmp_path, lightning_slot, sta
     #    find_lump_file_by_abstraction() prefers the "filename" field in the
     #    manifest entry; we copy the canonical file into tmp_path and point the
     #    manifest at it so the generator loads the real binary.
-    CANONICAL_FILENAME = "SelfTest.1.30542a6d.lump"
+    with open(os.path.join(LUMPS_DIR, "manifest.json"), encoding="utf-8") as _mf:
+        _selftest_entries = json.load(_mf)
+    CANONICAL_FILENAME = next(
+        entry["filename"] for entry in _selftest_entries
+        if entry.get("abstraction") == "SelfTest"
+        and isinstance(entry.get("filename"), str)
+    )
     real_lump_src = os.path.join(LUMPS_DIR, CANONICAL_FILENAME)
     (tmp_path / CANONICAL_FILENAME).write_bytes(
         open(real_lump_src, "rb").read()
@@ -434,6 +455,13 @@ def test_boot_image_next_gt_follows_lightning_bolt(tmp_path, lightning_slot, sta
         "cc":              CC,
         "filename":        CANONICAL_FILENAME,
     }]))
+    (tmp_path / "ns-state.json").write_text(json.dumps({
+        "abstractions": [{
+            "name": "SelfTest",
+            "slot": BOOT_ABSTR_NS_SLOT,
+            "token": SAVED_TOKEN,
+        }]
+    }))
 
     cfg = {
         "step1": {

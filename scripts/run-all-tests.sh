@@ -356,7 +356,7 @@ register_suite "versions-view-tests" \
     'python3 -m pytest tests/server/test_versions_view_fields.py -v'
 
 register_suite "hardware-sim" \
-    'python -m hardware.test_mwin_seal && python -m hardware.test_outform_mode2 && python -m hardware.test_shift_ops && python -m hardware.test_irq_dispatch'
+    'python -m hardware.test_mwin_seal && python -m hardware.test_outform_mode2 && python -m hardware.test_shift_ops && python -m hardware.test_irq_dispatch && python -m hardware.test_tperm'
 
 register_suite "boot-rom-no-false-halt" \
     'python -m pytest hardware/test_boot_rom_no_false_halt.py tests/hardware/test_boot_rom_no_false_halt.py -v'

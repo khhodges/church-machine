@@ -1209,8 +1209,10 @@ The permission field at bits [31:25] uses a **dom+perm3** encoding:
 | gt_seq        | 24:16 | 9-bit revocation sequence |
 | slot_id       | 15:0  | Namespace slot ID; Abstract reuses this as value data |
 
-TPERM clears any subset of bits [31:25] to produce a weaker GT. Permission
-escalation is architecturally impossible.
+The distinct TPERM attenuation form (`imm15 = 0x7FFF`) clears a requested
+subset of permission bits [31:25] to produce a weaker GT. Ordinary named
+TPERM presets are exact checks and do not rewrite CRd on a same-domain
+mismatch. Permission escalation is architecturally impossible.
 
 ### Word 1 — Base Address
 

@@ -1,14 +1,9 @@
 'use strict';
 // Headless harness for tests/test_tperm_xlse.py.
 //
-// Tests the TPERM X⊕LSE domain-purity fault:
-//   result_perms = preset_mask ∩ GT.perms
-//   fault TPERM_RSV if result has X AND (L or S or E)
-//
-// Because no standard preset combines X with L/S/E, the test injects a
-// custom preset via the sim.tpermPresetMasks property (exposed for
-// testability). This mirrors the hardware tperm.py is_xlse_conflict check
-// on result_perms = new_perms & target_gt.perms.
+// Tests strict ordinary TPERM matching and domain purity. Same-domain
+// missing/extra permissions are ordinary Z=0 results; a cross-domain request
+// is a hard DOMAIN_PURITY fault.
 //
 // GT word layout (simulator parseGT):
 //   bits [15: 0]  slot_id
@@ -27,7 +22,7 @@
 global.window = { bootConfig: {} };
 const { bootSim } = require('./sim_helpers');
 
-function runTperm(scenarioName, crIdx, word0GT, customPresetSlot, customPresetPerms) {
+function runTperm(scenarioName, crIdx, word0GT, presetCode, customPresetPerms) {
     const sim = bootSim();
     if (!sim.bootComplete) {
         return { name: scenarioName, error: 'boot did not complete' };
@@ -40,8 +35,8 @@ function runTperm(scenarioName, crIdx, word0GT, customPresetSlot, customPresetPe
     sim.cr[crIdx].word0 = word0GT >>> 0;
 
     // Inject the custom preset if requested.
-    if (customPresetSlot !== null && customPresetPerms !== null) {
-        sim.tpermPresetMasks[customPresetSlot] = customPresetPerms;
+    if (customPresetPerms !== null) {
+        sim.tpermPresetMasks[presetCode] = customPresetPerms;
     }
 
     // Find the code lump.
@@ -49,13 +44,14 @@ function runTperm(scenarioName, crIdx, word0GT, customPresetSlot, customPresetPe
     const codeBase = cr14 ? cr14.word1 : null;
     if (codeBase == null) return { name: scenarioName, error: 'CR14.word1 is null' };
 
-    // Encode TPERM (opcode=6), targeting crIdx, imm = customPresetSlot.
-    const imm = (customPresetSlot !== null) ? customPresetSlot : 3;  // default: X preset
+    // Encode TPERM (opcode=6), targeting crIdx, imm = preset code.
+    const imm = presetCode;
     const instr = sim.encodeInstruction(6, 0xE, crIdx, 0, imm);
     sim.memory[codeBase + 1] = instr >>> 0;
 
     sim.pc = 0;
     sim.halted = false;
+    const before = sim.cr[crIdx].word0 >>> 0;
     const faultsBefore = sim.faultLog ? sim.faultLog.length : 0;
     sim.step();
     const faultsAfter = sim.faultLog ? sim.faultLog.length : 0;
@@ -66,31 +62,29 @@ function runTperm(scenarioName, crIdx, word0GT, customPresetSlot, customPresetPe
         faulted:   newFaults.length > 0,
         faultCode: newFaults.length ? newFaults[0].type : null,
         faultMsg:  newFaults.length ? newFaults[0].message : null,
-        flags:     { Z: sim.flags.Z, N: sim.flags.N },
+        flags:     { Z: sim.flags.Z, N: sim.flags.N, C: sim.flags.C, V: sim.flags.V },
+        unchanged: (sim.cr[crIdx].word0 >>> 0) === before,
     };
 }
 
-// GT word constants (simulator bit layout)
-// X at bit 27 (permBits bit 2), L at bit 28 (permBits bit 3),
-// S at bit 29 (permBits bit 4), E at bit 30 (permBits bit 5)
-// Inform type (0b01) at bit 23; slot_id = 1
-const GT_X_ONLY  = (0x04 << 25) | (0x01 << 23) | 1;   // X only: permBits=0b0000100
-const GT_X_L     = (0x0C << 25) | (0x01 << 23) | 1;   // X + L:  permBits=0b0001100
-const GT_X_S     = (0x14 << 25) | (0x01 << 23) | 1;   // X + S:  permBits=0b0010100
-const GT_X_E     = (0x24 << 25) | (0x01 << 23) | 1;   // X + E:  permBits=0b0100100
+// GT word constants (canonical v2 layout): type=Inform at bits [26:25],
+// domain at bit 27, and the domain-local permission payload at [30:28].
+const makeGT = (dom, perm3) => ((dom << 27) | (perm3 << 28) | (1 << 25) | 1) >>> 0;
+const GT_R_ONLY  = makeGT(0, 0b001);
+const GT_RW      = makeGT(0, 0b011);
+const GT_X_ONLY  = makeGT(0, 0b100);
+const GT_E_ONLY  = makeGT(1, 0b100);
 
 const results = [
-    // T_XLSE1: GT has X+L, custom preset ['X','L'] → result has X+L → TPERM_RSV fault
-    runTperm('T_XLSE1_xL_conflict',  5, GT_X_L, 11, ['X','L']),
-    // T_XLSE2: GT has X+S, custom preset ['X','S'] → result has X+S → TPERM_RSV fault
-    runTperm('T_XLSE2_xS_conflict',  5, GT_X_S, 14, ['X','S']),
-    // T_XLSE3: GT has X+E, custom preset ['X','E'] → result has X+E → TPERM_RSV fault
-    runTperm('T_XLSE3_xE_conflict',  5, GT_X_E, 13, ['X','E']),
-    // T_XLSE4: GT has X+L, standard preset [X] (code 3) → result has X only (L stripped)
-    //          → no conflict, TPERM succeeds (Z depends on whether GT has X)
-    runTperm('T_XLSE4_xL_no_conflict_via_X_preset', 5, GT_X_L, null, null),
-    // T_XLSE5: GT has X only, standard preset [X] (code 3) → result has X → no fault
-    runTperm('T_XLSE5_x_only_no_conflict', 5, GT_X_ONLY, null, null),
+    runTperm('T_STRICT1_exact_R_passes',          5, GT_R_ONLY, 1, null),
+    runTperm('T_STRICT2_extra_RW_for_R_fails',    5, GT_RW,     1, null),
+    runTperm('T_STRICT3_missing_W_for_RW_fails',  5, GT_R_ONLY, 2, null),
+    runTperm('T_STRICT4_exact_RW_passes',         5, GT_RW,     2, null),
+    runTperm('T_STRICT5_exact_E_passes',          5, GT_E_ONLY, 8, null),
+    runTperm('T_STRICT6_missing_LS_for_E_fails',  5, GT_E_ONLY, 9, null),
+    runTperm('T_STRICT7_cross_domain_faults',     5, GT_E_ONLY, 3, null),
+    // Mixed custom requests are also domain-purity faults.
+    runTperm('T_STRICT8_mixed_request_faults',   5, GT_R_ONLY, 11, ['X','L']),
 ];
 
 process.stdout.write(JSON.stringify(results, null, 2) + '\n');

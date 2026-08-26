@@ -1,21 +1,4 @@
-"""
-tests/test_tperm_xlse.py
-
-Regression tests for the TPERM X⊕LSE domain-purity fault.
-
-Architecture rule (simulator/simulator.js _execTperm, hardware/tperm.py CHECK state):
-  result_perms = preset_mask ∩ GT.perms
-  If result has both X and any of {L, S, E} → TPERM_RSV fault.
-  This mirrors hardware: result_perms = new_perms & target_gt.perms.
-
-Because no standard preset combines X with L/S/E, the tests inject custom
-presets via sim.tpermPresetMasks (exposed for testability) using reserved
-preset slots 11–14.
-
-All tests run through the sim_tperm_xlse.js harness which boots the simulator,
-preloads target CRs with crafted GTs, optionally injects a custom preset, and
-runs a single TPERM instruction.
-"""
+"""Simulator regressions for strict TPERM permission checks."""
 
 import json
 import os
@@ -43,40 +26,33 @@ def results():
     return _run_harness()
 
 
-class TestTpermXlseConflict:
-    """Custom presets that produce X + {L,S,E} in the result must fault TPERM_RSV."""
+class TestTpermStrict:
+    """Same-domain checks are exact; cross-domain checks hard-fault."""
 
-    def test_T_XLSE1_x_and_L_faults(self, results):
-        r = results["T_XLSE1_xL_conflict"]
-        assert r.get("faulted"), (
-            f"TPERM with result X+L should fault TPERM_RSV, got: {r}")
-        assert r.get("faultCode") == "TPERM_RSV", (
-            f"expected TPERM_RSV, got faultCode={r.get('faultCode')}: {r}")
+    def test_exact_R_passes(self, results):
+        r = results["T_STRICT1_exact_R_passes"]
+        assert not r["faulted"] and r["flags"] == {"Z": True, "N": False, "C": False, "V": False}
+        assert r["unchanged"]
 
-    def test_T_XLSE2_x_and_S_faults(self, results):
-        r = results["T_XLSE2_xS_conflict"]
-        assert r.get("faulted"), (
-            f"TPERM with result X+S should fault TPERM_RSV, got: {r}")
-        assert r.get("faultCode") == "TPERM_RSV", (
-            f"expected TPERM_RSV, got faultCode={r.get('faultCode')}: {r}")
+    @pytest.mark.parametrize("name", [
+        "T_STRICT2_extra_RW_for_R_fails",
+        "T_STRICT3_missing_W_for_RW_fails",
+        "T_STRICT6_missing_LS_for_E_fails",
+    ])
+    def test_same_domain_mismatch_is_flag_failure_without_write(self, results, name):
+        r = results[name]
+        assert not r["faulted"], f"same-domain mismatch faulted: {r}"
+        assert r["flags"] == {"Z": False, "N": True, "C": False, "V": False}
+        assert r["unchanged"], f"mismatch changed capability: {r}"
 
-    def test_T_XLSE3_x_and_E_faults(self, results):
-        r = results["T_XLSE3_xE_conflict"]
-        assert r.get("faulted"), (
-            f"TPERM with result X+E should fault TPERM_RSV, got: {r}")
-        assert r.get("faultCode") == "TPERM_RSV", (
-            f"expected TPERM_RSV, got faultCode={r.get('faultCode')}: {r}")
+    def test_exact_RW_and_E_pass(self, results):
+        for name in ("T_STRICT4_exact_RW_passes", "T_STRICT5_exact_E_passes"):
+            r = results[name]
+            assert not r["faulted"] and r["flags"]["Z"] and not r["flags"]["N"], r
+            assert r["unchanged"], r
 
-
-class TestTpermXlseNoConflict:
-    """Standard presets strip conflicting permissions — no fault expected."""
-
-    def test_T_XLSE4_x_L_gt_via_X_preset_no_fault(self, results):
-        r = results["T_XLSE4_xL_no_conflict_via_X_preset"]
-        assert not r.get("faulted"), (
-            f"TPERM [X] on X+L GT strips L from result — should not fault, got: {r}")
-
-    def test_T_XLSE5_x_only_no_fault(self, results):
-        r = results["T_XLSE5_x_only_no_conflict"]
-        assert not r.get("faulted"), (
-            f"TPERM [X] on X-only GT should not fault, got: {r}")
+    @pytest.mark.parametrize("name", ["T_STRICT7_cross_domain_faults", "T_STRICT8_mixed_request_faults"])
+    def test_cross_domain_is_hard_fault(self, results, name):
+        r = results[name]
+        assert r["faulted"] and r["faultCode"] == "DOMAIN_PURITY", r
+        assert r["unchanged"], r
