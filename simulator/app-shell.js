@@ -139,6 +139,259 @@ let lastAssembledNamedSlots = null;
 let lastMethodTableSize = 0;
 let _pendingSimLoad = false;
 
+// ── Execution identity ─────────────────────────────────────────────────────
+// This is deliberately browser-side provenance, not a replacement for LUMP
+// identity or Namespace authority.  It answers the programmer's more immediate
+// question: "what bytes/source does the thing I am looking at belong to?"
+let _executionIdentity = {
+    status: 'unverified',
+    abstraction: null,
+    token: null,
+    sourceHashUsed: null,
+    editorSourceHash: null,
+    binaryHash: null,
+    fetchedBinaryHash: null,
+    binaryStatus: 'unverified',
+    sourceStatus: 'unverified',
+    nsSlot: null,
+    nsSequence: null,
+    runStatus: 'idle',
+    runKind: null,
+    liveMemoryKnown: false,
+    reason: 'No verified program is loaded',
+};
+let _executionIdentityLastAnnouncement = null;
+
+function _executionIdentityHashSource(source) {
+    // A synchronous, deterministic source fingerprint keeps typing responsive.
+    // It is only used to compare the current editor with this browser session's
+    // run; saved LUMP source provenance remains the server-supplied SHA-256.
+    const text = String(source == null ? '' : source);
+    let h1 = 0x811c9dc5;
+    let h2 = 0x9e3779b9;
+    for (let i = 0; i < text.length; i++) {
+        const c = text.charCodeAt(i);
+        h1 ^= c; h1 = Math.imul(h1, 0x01000193);
+        h2 ^= (c + i) & 0xffff; h2 = Math.imul(h2, 0x85ebca6b);
+    }
+    return 'fnv1a:' + (h1 >>> 0).toString(16).padStart(8, '0') +
+        (h2 >>> 0).toString(16).padStart(8, '0');
+}
+
+function _executionIdentityNormalizeHash(value) {
+    if (value == null) return null;
+    const text = String(value).trim().replace(/^sha256:/i, '').replace(/^0x/i, '').toLowerCase();
+    return text || null;
+}
+
+function _executionIdentityEsc(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+}
+
+function _executionIdentityShort(value, length) {
+    const text = String(value == null ? '' : value);
+    const max = length || 18;
+    return text.length > max ? text.slice(0, Math.max(4, max - 1)) + '…' : text;
+}
+
+function _executionIdentityRecompute() {
+    const s = _executionIdentity;
+    if (!s.liveMemoryKnown) {
+        s.status = 'unverified';
+        s.reason = s.clearReason || 'Simulator memory has no known execution identity';
+    } else if (s.binaryStatus === 'mismatched') {
+        s.status = 'mismatched';
+        s.reason = 'Fetched binary differs from its compile-time hash';
+    } else if (s.sourceStatus === 'stale') {
+        s.status = 'stale';
+        s.reason = 'Editor source differs from the source used for this run';
+    } else if (!s.sourceComparable) {
+        s.status = 'unverified';
+        s.reason = 'Source bytes are unavailable, so editor freshness cannot be verified';
+    } else if (s.binaryStatus !== 'verified') {
+        s.status = 'unverified';
+        s.reason = 'No compile-time binary hash is available';
+    } else {
+        s.status = 'current';
+        s.reason = 'Editor, binary, and live memory agree with this run';
+    }
+}
+
+function _executionIdentityRenderOne(id) {
+    const host = document.getElementById(id);
+    if (!host) return;
+    const s = _executionIdentity;
+    const labels = {
+        current: 'CURRENT',
+        stale: 'STALE EDITOR',
+        mismatched: 'MISMATCHED BINARY',
+        unverified: 'UNVERIFIED',
+    };
+    const statusLabel = labels[s.status] || 'UNVERIFIED';
+    const abstraction = s.abstraction || 'No program loaded';
+    const token = s.token || '—';
+    const binary = s.binaryStatus === 'verified' ? 'verified' :
+        s.binaryStatus === 'mismatched' ? 'mismatch' : 'unverified';
+    const source = s.sourceStatus === 'stale' ? 'editor differs' :
+        s.sourceStatus === 'current' ? 'editor matches' :
+        s.sourceStatus === 'recorded' ? 'hash only' : 'not available';
+    const slot = s.nsSlot == null ? '—' :
+        String(s.nsSlot) + (s.nsSequence == null ? '' : ` / seq ${s.nsSequence}`);
+    host.className = `execution-identity-strip execution-identity-${s.status}`;
+    host.setAttribute('aria-label', `Execution identity: ${statusLabel}. ${s.reason}`);
+    host.title = s.reason;
+    host.innerHTML =
+        `<span class="execution-identity-state" title="${_executionIdentityEsc(s.reason)}">${statusLabel}</span>` +
+        `<span class="execution-identity-program" title="Executing abstraction: ${_executionIdentityEsc(abstraction)}">` +
+            `<b>Program</b> ${_executionIdentityEsc(_executionIdentityShort(abstraction, 28))}</span>` +
+        `<span title="LUMP token: ${_executionIdentityEsc(token)}"><b>Token</b> ${_executionIdentityEsc(_executionIdentityShort(token, 18))}</span>` +
+        `<span title="Source used for run: ${_executionIdentityEsc(s.sourceHashUsed || 'not recorded')}"><b>Source</b> ${_executionIdentityEsc(source)}</span>` +
+        `<span title="Binary verification: ${_executionIdentityEsc(s.fetchedBinaryHash || s.binaryHash || 'no baseline')}"><b>Binary</b> ${binary}</span>` +
+        `<span title="Namespace slot and retained sequence"><b>NS</b> ${_executionIdentityEsc(slot)}</span>` +
+        `<span class="execution-identity-run" title="Run status"><b>Run</b> ${_executionIdentityEsc(s.runStatus || 'idle')}</span>`;
+}
+
+function _executionIdentityRender() {
+    _executionIdentityRecompute();
+    _executionIdentityRenderOne('executionIdentityEditor');
+    _executionIdentityRenderOne('executionIdentityTrace');
+    _executionIdentityRenderOne('executionIdentityHwTrace');
+    const announcement = [
+        _executionIdentity.status,
+        _executionIdentity.token,
+        _executionIdentity.nsSlot,
+        _executionIdentity.runKind,
+    ].join('|');
+    if (announcement !== _executionIdentityLastAnnouncement) {
+        _executionIdentityLastAnnouncement = announcement;
+        const announcer = document.getElementById('executionIdentityAnnouncement');
+        if (announcer) {
+            announcer.textContent = `Execution identity ${_executionIdentity.status}: ${_executionIdentity.reason}`;
+        }
+    }
+}
+
+function _executionIdentityGet() {
+    return JSON.parse(JSON.stringify(_executionIdentity));
+}
+
+function _executionIdentityClear(reason) {
+    _executionIdentity = {
+        status: 'unverified',
+        abstraction: null, token: null, sourceHashUsed: null, editorSourceHash: null, sourceComparable: false,
+        binaryHash: null, fetchedBinaryHash: null, binaryStatus: 'unverified',
+        sourceStatus: 'unverified', nsSlot: null, nsSequence: null,
+        runStatus: 'idle', runKind: null, liveMemoryKnown: false,
+        clearReason: reason || null,
+        reason: reason || 'No verified program is loaded',
+    };
+    _executionIdentityRender();
+}
+
+function _executionIdentityBegin(meta) {
+    const m = meta || {};
+    const _hasSessionSource = m.source != null && !m.sourceHash;
+    _executionIdentity = {
+        status: 'unverified',
+        abstraction: m.abstraction || m.name || null,
+        token: m.token || null,
+        sourceHashUsed: m.sourceHash || (m.source != null ? _executionIdentityHashSource(m.source) : null),
+        editorSourceHash: m.source != null ? _executionIdentityHashSource(m.source) : null,
+        sourceComparable: _hasSessionSource,
+        binaryHash: _executionIdentityNormalizeHash(m.binaryHash),
+        fetchedBinaryHash: _executionIdentityNormalizeHash(m.fetchedBinaryHash),
+        binaryStatus: m.binaryHash && m.fetchedBinaryHash
+            ? (_executionIdentityNormalizeHash(m.binaryHash) === _executionIdentityNormalizeHash(m.fetchedBinaryHash) ? 'verified' : 'mismatched')
+            : 'unverified',
+        sourceStatus: m.sourceHash ? 'recorded' : (m.source != null ? 'current' : 'unverified'),
+        nsSlot: m.nsSlot == null ? null : Number(m.nsSlot),
+        nsSequence: m.nsSequence == null ? null : Number(m.nsSequence),
+        runStatus: m.runStatus || 'loaded',
+        runKind: m.runKind || null,
+        liveMemoryKnown: !!m.liveMemoryKnown,
+        reason: 'Program identity is being established',
+    };
+    _executionIdentityRender();
+}
+
+function _executionIdentityMarkLive(meta) {
+    const m = meta || {};
+    if (m.abstraction || m.name) _executionIdentity.abstraction = m.abstraction || m.name;
+    if (m.token) _executionIdentity.token = m.token;
+    if (!_executionIdentity.token && window.LumpRegistry &&
+            typeof window.LumpRegistry.getCurrent === 'function') {
+        _executionIdentity.token = window.LumpRegistry.getCurrent() || null;
+    }
+    if (m.nsSlot != null) _executionIdentity.nsSlot = Number(m.nsSlot);
+    if (m.nsSequence != null) _executionIdentity.nsSequence = Number(m.nsSequence);
+    _executionIdentity.liveMemoryKnown = true;
+    _executionIdentity.runStatus = m.runStatus || 'ready';
+    _executionIdentityRender();
+}
+
+function _executionIdentityUpdateEditor(source) {
+    if (_executionIdentity.sourceComparable && _executionIdentity.sourceHashUsed) {
+        _executionIdentity.editorSourceHash = _executionIdentityHashSource(source);
+        _executionIdentity.sourceStatus =
+            _executionIdentity.editorSourceHash === _executionIdentity.sourceHashUsed ? 'current' : 'stale';
+    }
+    _executionIdentityRender();
+}
+
+function _executionIdentitySetBinaryVerification(expected, actual) {
+    const e = _executionIdentityNormalizeHash(expected);
+    const a = _executionIdentityNormalizeHash(actual);
+    _executionIdentity.binaryHash = e;
+    _executionIdentity.fetchedBinaryHash = a;
+    _executionIdentity.binaryStatus = e && a ? (e === a ? 'verified' : 'mismatched') : 'unverified';
+    _executionIdentityRender();
+}
+
+async function _executionIdentityHashWords(words) {
+    if (!window.crypto || !window.crypto.subtle) return null;
+    const list = Array.isArray(words) ? words : Array.from(words || []);
+    const bytes = new Uint8Array(list.length * 4);
+    const view = new DataView(bytes.buffer);
+    list.forEach((word, i) => view.setUint32(i * 4, Number(word) >>> 0, false));
+    const digest = await window.crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function _executionIdentityVerifyWords(words, expected, token) {
+    return _executionIdentityHashWords(words).then(actual => {
+        if (token && _executionIdentity.token !== token) return null;
+        _executionIdentitySetBinaryVerification(expected, actual);
+        return actual;
+    }).catch(() => {
+        if (!token || _executionIdentity.token === token) {
+            _executionIdentity.binaryStatus = 'unverified';
+            _executionIdentityRender();
+        }
+        return null;
+    });
+}
+
+window.ExecutionIdentity = {
+    get: _executionIdentityGet,
+    clear: _executionIdentityClear,
+    begin: _executionIdentityBegin,
+    markLive: _executionIdentityMarkLive,
+    updateEditor: _executionIdentityUpdateEditor,
+    setBinaryVerification: _executionIdentitySetBinaryVerification,
+    hashSource: _executionIdentityHashSource,
+    hashWords: _executionIdentityHashWords,
+    verifyWords: _executionIdentityVerifyWords,
+    render: _executionIdentityRender,
+};
+
+document.addEventListener('input', function(e) {
+    if (e.target && e.target.id === 'asmEditor') {
+        _executionIdentityUpdateEditor(e.target.value);
+    }
+});
+
 // Called by _loadLumpBinaryIntoSim (app-lumps.js) after a LUMP binary is
 // loaded directly into the simulator.  Clears the assembler-path state so
 // that _applyPendingSimLoad() (in stepSim) and _autoLoadDefaultProgram() (on
@@ -225,6 +478,7 @@ function selectUserTab(id) {
     }
     const tab = userTabs.find(t => t.id === id);
     if (!tab) return;
+    if (window.ExecutionIdentity) window.ExecutionIdentity.clear('Program switched; assemble it to establish a new identity');
     if (typeof window.exitSavedLumpEditorMode === 'function') {
         window.exitSavedLumpEditorMode();
     }
@@ -1034,6 +1288,9 @@ function init() {
                            // real SelfTest LUMP has arrived.  A bare reset is
                            // deliberate: the normal auto-boot policy below
                            // decides whether to continue immediately.
+                           if (window.ExecutionIdentity) {
+                               window.ExecutionIdentity.clear('Boot image replacement reset the previous execution identity');
+                           }
                            sim.reset();
                        }
                    } else {

@@ -319,10 +319,18 @@ function assembleAndLoad() {
         sim.programLabels = labels;
         sim.programCapabilities = _cluCaps.slice();
         sim.programName = result.abstractionName || (methods.length > 0 ? methods[0].name : 'prog');
+        const _cluTok = typeof window._computeLumpToken === 'function'
+            ? window._computeLumpToken(_cluWords, _cluCaps) : null;
+        if (window.ExecutionIdentity) window.ExecutionIdentity.begin({
+            abstraction: sim.programName,
+            token: _cluTok,
+            source,
+            runKind: 'editor',
+            runStatus: 'assembled',
+        });
         window._assemblerSymbols = { labels, lumpName: sim.programName };
         _pendingSimLoad = true;
-        if (typeof window._computeLumpToken === 'function') {
-            const _cluTok = window._computeLumpToken(_cluWords, _cluCaps);
+        if (_cluTok) {
             if (window.LumpRegistry) {
                 window.LumpRegistry.registerMemory(_cluTok, sim.programName, _cluWords, _cluCaps);
                 window.LumpRegistry.setCurrent(_cluTok);
@@ -554,10 +562,18 @@ function assembleAndLoad() {
     const entryLabel = Object.keys(result.labels || {}).find(k => (result.labels[k] === 0)) || null;
     const _srcAbstrName = (source.match(/;\s*Abstraction:\s*(.+)/i) || [])[1]?.trim() || null;
     sim.programName = _srcAbstrName || entryLabel || (sim.nsLabels && sim.nsLabels[sim.bootEntrySlot]) || 'SelfTest';
+    const _asmTok = typeof window._computeLumpToken === 'function'
+        ? window._computeLumpToken(_rawWords, _rawCaps) : null;
+    if (window.ExecutionIdentity) window.ExecutionIdentity.begin({
+        abstraction: sim.programName,
+        token: _asmTok,
+        source,
+        runKind: 'editor',
+        runStatus: 'assembled',
+    });
     window._assemblerSymbols = { labels: result.labels || {}, lumpName: sim.programName };
     _pendingSimLoad = true;
-    if (typeof window._computeLumpToken === 'function') {
-        const _asmTok = window._computeLumpToken(_rawWords, _rawCaps);
+    if (_asmTok) {
         if (window.LumpRegistry) {
             window.LumpRegistry.registerMemory(_asmTok, sim.programName, _rawWords, _rawCaps);
             window.LumpRegistry.setCurrent(_asmTok);
@@ -1421,6 +1437,21 @@ function _applyPendingSimLoad() {
         return;
     }
     _pendingSimLoad = false;
+    if (window.ExecutionIdentity) window.ExecutionIdentity.markLive({
+        abstraction: sim.programName,
+        nsSlot: (typeof _progSlot !== 'undefined' ? _progSlot : null),
+        nsSequence: (typeof _progGtSeq !== 'undefined' ? _progGtSeq : null),
+        runStatus: 'ready',
+    });
+    // The assembled words are the local compile-time baseline. Hashing the
+    // exact words handed to loadProgram makes the editor path explicit rather
+    // than leaving every successful editor run permanently "unverified".
+    if (window.ExecutionIdentity && _aplToken) {
+        window.ExecutionIdentity.hashWords(_aplWords).then(expected => {
+            if (expected) return window.ExecutionIdentity.verifyWords(_aplWords, expected, _aplToken);
+            return null;
+        });
+    }
 }
 
 function runSimGo() {
@@ -2638,6 +2669,7 @@ function faultClear() {
     // discarding the user's program and nulling _editorLastSavedToken.
     _bootAuditAccum = [];
     _clearLumpPetNames();
+    if (window.ExecutionIdentity) window.ExecutionIdentity.clear('Fault clear reset the previous execution identity');
     try { localStorage.removeItem(_FAULT_LOG_LS_KEY); } catch(e) {}
     sim.reset();
     _initLazyLoadManifest();
@@ -3608,6 +3640,7 @@ function faultModalReboot() {
     // doing nothing or reopening the user's actual program — see
     // _openLastCompiledLump() in app-misc.js for the matching guard.
     _bootAuditAccum = [];
+    if (window.ExecutionIdentity) window.ExecutionIdentity.clear('Fault reboot reset the previous execution identity');
     sim.reset();
     _initLazyLoadManifest();
     pipelineViz.reset();
@@ -4043,6 +4076,7 @@ function resetSim() {
     // returns to the correct start instruction automatically.
     _bootAuditAccum = [];
     _clearLumpPetNames();
+    if (window.ExecutionIdentity) window.ExecutionIdentity.clear('Reset cleared the previous execution identity');
     sim.reset();
     _initLazyLoadManifest();
     pipelineViz.reset();
@@ -4064,6 +4098,7 @@ function resetAndStep() {
     // Do NOT clear _defaultProgramLoaded — see resetSim() comment.
     _bootAuditAccum = [];
     _clearLumpPetNames();
+    if (window.ExecutionIdentity) window.ExecutionIdentity.clear('Reset cleared the previous execution identity');
     sim.reset();
     _initLazyLoadManifest();
     pipelineViz.reset();
@@ -5729,6 +5764,7 @@ function loadExample(name) {
     window._wizardScaffoldActive = false;
     const editor = document.getElementById('asmEditor');
     if (!editor) return;
+    if (window.ExecutionIdentity) window.ExecutionIdentity.clear('Program switched; assemble it to establish a new identity');
     _editorCREditActive = false;
     _editorCREditCR = null;
     _editorCREditNS = null;
@@ -15768,8 +15804,12 @@ function _wukongTraceClampLayout(layout) {
         numberOr(layout && layout.width, Math.min(480, viewport.width - 16))));
     const height = Math.min(viewport.height - 16, Math.max(minHeight,
         numberOr(layout && layout.height, Math.min(220, viewport.height - 16))));
-    const defaultLeft = viewport.width - width - 16;
-    const defaultTop = viewport.height - height - 16;
+    // A bottom-right default leaves the only resize grip pressed against the
+    // viewport edge, so the window can only shrink until it is moved first.
+    // Start in the usable centre instead: both the title bar and bottom-right
+    // grip have room for their expected drag directions.
+    const defaultLeft = Math.max(8, Math.round((viewport.width - width) / 2));
+    const defaultTop = Math.max(8, Math.round((viewport.height - height) / 2));
     const left = Math.min(Math.max(8, numberOr(layout && layout.left, defaultLeft)),
         viewport.width - width - 8);
     const top = Math.min(Math.max(8, numberOr(layout && layout.top, defaultTop)),
@@ -15981,10 +16021,12 @@ window._wukongRecordSimulatorStep = _wukongRecordSimulatorStep;
             '<span id="wukong-hw-follow-status" class="wukong-hw-follow-status" role="status" aria-live="polite">Simulator follow off — hardware feed only</span>' +
         '</div>' +
         '<div id="wukong-hw-follow-current" class="wukong-hw-follow-current" role="status" aria-live="polite">SIM latest  — waiting for a simulator step</div>' +
+        '<div id="executionIdentityHwTrace" class="execution-identity-strip execution-identity-unverified" aria-label="Execution identity: unverified"></div>' +
         '<div id="wukong-health-strip" style="flex-shrink:0;padding:3px 8px 3px;background:#0e0e22;border-bottom:1px solid #2a2a44;font-size:10px;line-height:1.6;"></div>' +
         '<div id="wukong-hw-log-body" style="flex:1;min-height:0;overflow:auto;padding:4px 8px;color:#ccccee;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;"></div>' +
         '<div id="wukong-hw-log-resize-grip" class="wukong-hw-log-resize-grip" role="separator" aria-label="Resize HW Trace window" tabindex="0" title="Drag to resize"></div>';
     document.body.appendChild(panel);
+    if (window.ExecutionIdentity) window.ExecutionIdentity.render();
     _wukongTraceApplyLayout(panel, _wukongTraceReadLayout(), false);
 
     // Keep a moved/resized panel usable after viewport changes, without
@@ -16003,7 +16045,9 @@ window._wukongRecordSimulatorStep = _wukongRecordSimulatorStep;
     function endPointer() {
         if (dragState || resizeState) {
             _wukongTraceSaveLayout(_wukongTracePanelCurrentLayout(panel));
-            suppressHeaderClick = true;
+            // A plain title-bar click still collapses the panel.  Only consume
+            // its follow-up click after a real drag, not a zero-distance press.
+            suppressHeaderClick = !!(dragState && dragState.moved);
         }
         dragState = null;
         resizeState = null;
@@ -16015,6 +16059,9 @@ window._wukongRecordSimulatorStep = _wukongRecordSimulatorStep;
     function movePointer(e) {
         const point = panelPoint(e);
         if (dragState) {
+            if (Math.abs(point.x - dragState.x) > 3 || Math.abs(point.y - dragState.y) > 3) {
+                dragState.moved = true;
+            }
             _wukongTraceApplyLayout(panel, {
                 left: dragState.left + point.x - dragState.x,
                 top: dragState.top + point.y - dragState.y,
@@ -16033,7 +16080,7 @@ window._wukongRecordSimulatorStep = _wukongRecordSimulatorStep;
         const point = panelPoint(e);
         const layout = _wukongTracePanelCurrentLayout(panel);
         dragState = { x: point.x, y: point.y, left: layout.left, top: layout.top,
-            width: layout.width, height: layout.height };
+            width: layout.width, height: layout.height, moved: false };
         e.preventDefault();
         e.stopPropagation();
         document.addEventListener('mousemove', movePointer);
@@ -16057,8 +16104,6 @@ window._wukongRecordSimulatorStep = _wukongRecordSimulatorStep;
     const dragHandle = document.getElementById('wukong-hw-log-drag-handle');
     const resizeGrip = document.getElementById('wukong-hw-log-resize-grip');
     if (dragHandle) {
-        dragHandle.addEventListener('mousedown', beginDrag);
-        dragHandle.addEventListener('pointerdown', beginDrag);
         dragHandle.addEventListener('click', function(e) { e.stopPropagation(); });
         dragHandle.addEventListener('keydown', function(e) {
             const delta = e.shiftKey ? 40 : 16;
@@ -16117,7 +16162,24 @@ window._wukongRecordSimulatorStep = _wukongRecordSimulatorStep;
     var collapsed = false;
     var hdr = document.getElementById('wukong-hw-log-hdr');
     var colBtn = document.getElementById('wukong-hw-log-collapse');
+    function toggleCollapsed() {
+        collapsed = !collapsed;
+        var body = document.getElementById('wukong-hw-log-body');
+        if (body) body.style.display = collapsed ? 'none' : '';
+        panel.style.height = collapsed ? 'auto' :
+            _wukongTracePanelCurrentLayout(panel).height + 'px';
+        if (colBtn) colBtn.textContent = collapsed ? '▲' : '▼';
+    }
     if (hdr) {
+        // Window users naturally grab a title bar, not just its short title
+        // text.  Buttons and the follow label remain ordinary controls.
+        function beginHeaderDrag(e) {
+            if (e.target && e.target.closest &&
+                e.target.closest('button, label, input, select, a')) return;
+            beginDrag(e);
+        }
+        hdr.addEventListener('mousedown', beginHeaderDrag);
+        hdr.addEventListener('pointerdown', beginHeaderDrag);
         hdr.addEventListener('click', function(e) {
             if (suppressHeaderClick) {
                 suppressHeaderClick = false;
@@ -16125,14 +16187,13 @@ window._wukongRecordSimulatorStep = _wukongRecordSimulatorStep;
             }
             if (e.target && e.target.closest &&
                 (e.target.closest('button') || e.target.closest('label'))) return;
-            collapsed = !collapsed;
-            var body = document.getElementById('wukong-hw-log-body');
-            if (body) body.style.display = collapsed ? 'none' : '';
-            panel.style.height = collapsed ? 'auto' :
-                _wukongTracePanelCurrentLayout(panel).height + 'px';
-            if (colBtn) colBtn.textContent = collapsed ? '▲' : '▼';
+            toggleCollapsed();
         });
     }
+    if (colBtn) colBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        toggleCollapsed();
+    });
 })();
 
 // ── Pipeline health strip ──────────────────────────────────────────────────────
@@ -17763,6 +17824,9 @@ async function _wukongHwFaultReset() {
         if (!d) return;
         const ok = await _wukongWatchDelivery(d.id, 'REBOOT', 10000);
         if (ok) {
+            if (window.ExecutionIdentity) {
+                window.ExecutionIdentity.clear('Hardware reboot reset the previous execution identity');
+            }
             // Immediately clear hardware fault state so the status chip reverts
             // to a clean state synchronously on write confirmation, not after
             // the next poll cycle detects disconnection.

@@ -8223,8 +8223,9 @@ def get_lump_history(token):
     if not _re.fullmatch(r'[0-9a-f]{8}', key8):
         return jsonify({"error": "Invalid token"}), 400
     lumps_dir = LUMPS_DIR
-    # Find safe stem from manifest so we can match human-readable archive files
-    _safe_stem_h = None
+    # Match both the current filename stem and the stable abstraction-name
+    # archive stem. Older archives may predate a tokenized dot-name filename.
+    _safe_stems_h = set()
     _mf_path_h = os.path.join(lumps_dir, 'manifest.json')
     if os.path.isfile(_mf_path_h):
         try:
@@ -8234,18 +8235,21 @@ def get_lump_history(token):
                 if _e.get('token') == key8:
                     _fn = _e.get('filename', '')
                     if _fn and _fn.endswith('.lump'):
-                        _safe_stem_h = _re.sub(r'_v\d+$', '', _fn[:-5])
+                        _safe_stems_h.add(_re.sub(r'_v\d+$', '', _fn[:-5]))
+                    _name_h = _e.get('abstraction', '')
+                    if isinstance(_name_h, str) and _name_h:
+                        _safe_stems_h.add(_re.sub(r'[^A-Za-z0-9_.-]+', '_', _name_h))
                     break
         except Exception:
             pass
     pattern_token = _re.compile(rf'^{_re.escape(key8)}-v(\d+)\.lump$')
-    pattern_named = (
-        _re.compile(rf'^{_re.escape(_safe_stem_h)}_v(\d+)\.lump$')
-        if _safe_stem_h else None
-    )
+    pattern_named = [_re.compile(rf'^{_re.escape(_stem)}_v(\d+)\.lump$')
+                     for _stem in _safe_stems_h]
     entries = []
     for fn in (os.listdir(lumps_dir) if os.path.isdir(lumps_dir) else []):
-        m = pattern_token.match(fn) or (pattern_named and pattern_named.match(fn))
+        m = pattern_token.match(fn)
+        if not m:
+            m = next((pattern.match(fn) for pattern in pattern_named if pattern.match(fn)), None)
         if not m:
             continue
         ver = int(m.group(1))
@@ -8394,7 +8398,9 @@ def get_lump_version_words(token, version):
         return jsonify({"error": "Invalid token"}), 400
     lumps_dir = LUMPS_DIR
     lump_path_v = os.path.join(lumps_dir, f'{key8}-v{version}.lump')
-    # Also check for human-readable versioned archive: <AbsName>_v<N>.lump
+    # Also check current-filename and stable abstraction-name archives:
+    # <AbsName>_v<N>.lump. The latter preserves access to versions written
+    # before a dot-name filename became the manifest's active artifact.
     _mf_v = os.path.join(lumps_dir, 'manifest.json')
     if os.path.isfile(_mf_v):
         try:
@@ -8409,6 +8415,13 @@ def get_lump_version_words(token, version):
                         _np = os.path.join(lumps_dir, f'{_stem}_v{version}.lump')
                         if os.path.isfile(_np):
                             lump_path_v = _np
+                    if not os.path.isfile(lump_path_v):
+                        _name_v = _e.get('abstraction', '')
+                        if isinstance(_name_v, str) and _name_v:
+                            _safe_name_v = _re.sub(r'[^A-Za-z0-9_.-]+', '_', _name_v)
+                            _np = os.path.join(lumps_dir, f'{_safe_name_v}_v{version}.lump')
+                            if os.path.isfile(_np):
+                                lump_path_v = _np
                     break
         except Exception:
             pass

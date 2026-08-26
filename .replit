@@ -321,6 +321,17 @@ args = "node simulator/test_hw_trace_live_movable.js"
 [workflows.workflow.metadata]
 outputType = "console"
 
+[[workflows.workflow]]
+name = "execution-identity-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_execution_identity.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 
 [[workflows.workflow]]
 name = "step-settings-popover-tests"

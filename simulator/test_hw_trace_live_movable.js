@@ -100,9 +100,23 @@ function mouse(win, target, type, x, y) {
     check('LT-1d accessible controls expose move/resize labels',
         /Move HW Trace/.test(doc.getElementById('wukong-hw-log-drag-handle').getAttribute('aria-label')) &&
         /Resize HW Trace/.test(doc.getElementById('wukong-hw-log-resize-grip').getAttribute('aria-label')));
+    check('LT-1e identity strip is present without changing trace controls',
+        !!doc.getElementById('executionIdentityHwTrace') &&
+        /Execution identity: unverified/.test(
+            doc.getElementById('executionIdentityHwTrace').getAttribute('aria-label') || ''));
     const panel = doc.getElementById('wukong-hw-log');
-    check('LT-1e fresh layout opens away from primary top controls',
-        parseFloat(panel.style.left) > 300 && parseFloat(panel.style.top) > 200);
+    check('LT-1f fresh layout opens centrally with room to grow',
+        parseFloat(panel.style.left) > 8 && parseFloat(panel.style.top) > 8 &&
+        parseFloat(panel.style.left) + parseFloat(panel.style.width) < env.window.innerWidth - 8 &&
+        parseFloat(panel.style.top) + parseFloat(panel.style.height) < env.window.innerHeight - 8);
+    const header = doc.getElementById('wukong-hw-log-hdr');
+    const collapse = doc.getElementById('wukong-hw-log-collapse');
+    header.click();
+    check('LT-1g title-bar click still collapses without a drag',
+        doc.getElementById('wukong-hw-log-body').style.display === 'none');
+    collapse.click();
+    check('LT-1h collapse button expands without starting a drag',
+        doc.getElementById('wukong-hw-log-body').style.display !== 'none');
 })();
 
 // Dragging, resizing, and reload restoration retain a bounded usable layout.
@@ -111,20 +125,23 @@ function mouse(win, target, type, x, y) {
     const doc = env.document;
     const panel = doc.getElementById('wukong-hw-log');
     const drag = doc.getElementById('wukong-hw-log-drag-handle');
+    const header = doc.getElementById('wukong-hw-log-hdr');
     const grip = doc.getElementById('wukong-hw-log-resize-grip');
     const initialWidth = parseFloat(panel.style.width);
-    mouse(env.window, drag, 'mousedown', 20, 20);
-    mouse(env.window, doc, 'mousemove', 160, 90);
-    mouse(env.window, doc, 'mouseup', 160, 90);
-    check('LT-2a drag moves panel within viewport',
-        parseFloat(panel.style.left) >= 8 && parseFloat(panel.style.top) >= 8);
-
     mouse(env.window, grip, 'mousedown', 0, 0);
     mouse(env.window, doc, 'mousemove', 80, 45);
     mouse(env.window, doc, 'mouseup', 80, 45);
-    check('LT-2b resize grows panel', parseFloat(panel.style.width) > initialWidth);
+    check('LT-2a untouched panel grows from its initial position',
+        parseFloat(panel.style.width) > initialWidth);
+
+    mouse(env.window, header, 'mousedown', 20, 20);
+    mouse(env.window, doc, 'mousemove', 160, 90);
+    mouse(env.window, doc, 'mouseup', 160, 90);
+    check('LT-2b title bar drag moves panel within viewport',
+        parseFloat(panel.style.left) >= 8 && parseFloat(panel.style.top) >= 8);
+    check('LT-2b1 title text remains an accessible move handle', !!drag);
     const saved = env.window.localStorage.getItem('wukongHwTraceLayout');
-    check('LT-2c layout is persisted', !!saved && /"width"/.test(saved));
+    check('LT-2c resized and moved layout is persisted', !!saved && /"width"/.test(saved));
 
     const restored = makeEnv(saved);
     const restoredPanel = restored.document.getElementById('wukong-hw-log');

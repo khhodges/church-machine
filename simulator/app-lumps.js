@@ -5529,10 +5529,19 @@ async function openLumpInEditor(token) {
         var _savedDraft = _draftLsGet(token);
         if (_savedDraft !== null) _savedDraft = _migrateBfextBfinsSyntax(_savedDraft);
         var _hasDraft   = _savedDraft !== null && _savedDraft.trim() !== '' && _savedDraft !== _recoveredSource;
+        // Saved-LUMP source changes are programmatic, so they do not emit the
+        // native input event used by the normal editor freshness watcher.
+        // Keep a previous run visibly stale when this editor context changes.
+        var _setSavedLumpEditorSource = function(source) {
+            asmEd.value = source == null ? '' : source;
+            if (window.ExecutionIdentity) {
+                window.ExecutionIdentity.updateEditor(asmEd.value);
+            }
+        };
 
         if (_hasDraft) {
             // Restore draft content into editor
-            asmEd.value = _savedDraft;
+            _setSavedLumpEditorSource(_savedDraft);
             asmEd.classList.add('cm-editor-draft');
             // Show draft-restore banner above the editor
             var _existingDraftBanner = document.getElementById('_lumpDraftBanner');
@@ -5552,7 +5561,7 @@ async function openLumpInEditor(token) {
             if (_bannerDiscardBtn) {
                 _bannerDiscardBtn.addEventListener('click', function() {
                     _draftLsDel(token);
-                    asmEd.value = window._editorOriginalDisasm || '';
+                    _setSavedLumpEditorSource(window._editorOriginalDisasm || '');
                     asmEd.classList.remove('cm-editor-draft');
                     _draftBanner.remove();
                     if (typeof updateLineNumbers === 'function') updateLineNumbers();
@@ -5560,7 +5569,7 @@ async function openLumpInEditor(token) {
             }
         } else {
             // No draft — show recovered source only; disassembly stays on right.
-            asmEd.value = _recoveredSource;
+            _setSavedLumpEditorSource(_recoveredSource);
             asmEd.classList.remove('cm-editor-draft');
             // Show "source restored" banner when original source was fetched
             if (_sourceRestored) {
@@ -5634,7 +5643,7 @@ async function openLumpInEditor(token) {
         _draftLsDel(token);
         var _ed = document.getElementById('asmEditor');
         if (_ed) {
-            _ed.value = window._editorOriginalDisasm || '';
+            _setSavedLumpEditorSource(window._editorOriginalDisasm || '');
             _ed.classList.remove('cm-editor-draft');
             if (typeof updateLineNumbers === 'function') updateLineNumbers();
         }
@@ -6427,6 +6436,12 @@ async function _loadSavedLumpCapabilities(token, suppliedCaps) {
         capabilities: detail.capabilities,
         identityHash: detail.identity_hash || null,
         identitySealLocation: detail.identity_seal_location || null,
+        // This is the compile-time sidecar baseline.  Do not substitute the
+        // /words endpoint hash here: that hash is freshly computed from the
+        // response and therefore cannot reveal a replaced on-disk binary.
+        binaryHash: detail.binary_hash || null,
+        source: typeof detail.source === 'string' ? detail.source : null,
+        sourceHash: detail.source_hash || (detail.mtbf && detail.mtbf.source_hash) || null,
         // Required when a compiler-owned LUMP was already installed once:
         // its on-disk row 0 is a live GT and must still point at this source slot
         // before the destination loader is allowed to remint it.
@@ -6683,6 +6698,30 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
 
         const hdr = rawWords.length ? sim.parseLumpHeader(rawWords[0] >>> 0) : null;
         const wordCount = (hdr && hdr.valid) ? hdr.cw : rawWords.length;
+        let _nsSequence = null;
+        try {
+            const _nsBase = sim._nsSlotBase(_resolvedSlot);
+            if (sim.memory && sim.memory[_nsBase + 1] != null && sim.parseNSWord1) {
+                _nsSequence = sim.parseNSWord1(sim.memory[_nsBase + 1] >>> 0).gtSeq;
+            }
+        } catch (_) {}
+        if (window.ExecutionIdentity) {
+            window.ExecutionIdentity.begin({
+                abstraction: name || token,
+                token,
+                binaryHash: _savedMetadata.binaryHash,
+                source: _savedMetadata.source,
+                sourceHash: _savedMetadata.source !== null ? null : _savedMetadata.sourceHash,
+                nsSlot: _resolvedSlot,
+                nsSequence: _nsSequence,
+                runKind: 'saved-lump',
+                runStatus: 'loaded',
+            });
+            const editor = document.getElementById('asmEditor');
+            if (editor) window.ExecutionIdentity.updateEditor(editor.value);
+            window.ExecutionIdentity.markLive({ nsSlot: _resolvedSlot, nsSequence: _nsSequence, runStatus: 'ready' });
+            window.ExecutionIdentity.verifyWords(rawWords, _savedMetadata.binaryHash, token);
+        }
 
         if (btn) { btn.textContent = 'Loaded \u2713'; }
         const con = document.getElementById('editorConsole');
@@ -6864,7 +6903,12 @@ async function runSelftestLump() {
     const btn = document.getElementById('dashSelftestBtn');
     if (btn) { btn.disabled = true; btn.textContent = 'Loading\u2026'; }
     try {
-        const resp = await fetch(`/api/lump/${SELFTEST_TOKEN}/words`);
+        const [resp, selfTestDetail] = await Promise.all([
+            fetch(`/api/lump/${SELFTEST_TOKEN}/words`),
+            fetch(`/api/lumps/${SELFTEST_TOKEN}/detail`, { cache: 'no-store' })
+                .then(r => r.ok ? r.json() : null)
+                .catch(() => null),
+        ]);
         if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
         const data = await resp.json();
         const words = data.words || [];
@@ -6889,6 +6933,30 @@ async function runSelftestLump() {
             if (typeof _pendingSimLoad !== 'undefined') window._pendingSimLoad = true;
         }
         if (sim.programName !== undefined) sim.programName = SELFTEST_NAME;
+        if (window.ExecutionIdentity) {
+            window.ExecutionIdentity.begin({
+                abstraction: SELFTEST_NAME,
+                token: SELFTEST_TOKEN,
+                binaryHash: selfTestDetail && selfTestDetail.binary_hash,
+                source: selfTestDetail && typeof selfTestDetail.source === 'string'
+                    ? selfTestDetail.source : null,
+                sourceHash: selfTestDetail && typeof selfTestDetail.source === 'string'
+                    ? null : (selfTestDetail && selfTestDetail.source_hash),
+                nsSlot: sim._bootAbstrSlot,
+                runKind: 'selftest',
+                runStatus: 'running',
+            });
+            const editor = document.getElementById('asmEditor');
+            if (editor) window.ExecutionIdentity.updateEditor(editor.value);
+            window.ExecutionIdentity.markLive({
+                abstraction: SELFTEST_NAME,
+                nsSlot: sim._bootAbstrSlot,
+                runStatus: 'running',
+            });
+            window.ExecutionIdentity.verifyWords(
+                words, selfTestDetail && selfTestDetail.binary_hash, SELFTEST_TOKEN
+            );
+        }
 
         if (btn) btn.textContent = 'Running\u2026';
 

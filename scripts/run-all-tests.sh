@@ -259,6 +259,9 @@ register_suite "wukong-toolbar-btn-tests" \
 register_suite "hw-trace-live-movable-tests" \
     'node simulator/test_hw_trace_live_movable.js'
 
+register_suite "execution-identity-tests" \
+    'node simulator/test_execution_identity.js'
+
 register_suite "step-settings-popover-tests" \
     'node simulator/test_step_settings_popover.js'
 
@@ -459,7 +462,7 @@ ALL_GROUPS["boot"]="boot-image-matches-sim boot-image-loads-and-boots boot-image
 
 ALL_GROUPS["lump"]="lump-consistency lump-v13-freespace-tests lump-binary-tests wukong-callhome-hw-lump-tests lump-roundtrip editor-roundtrip-tests lump-gt-display-tests update-lump-tests lump-meta-patch-validation-tests"
 
-ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests warning-panel-tests bare-space-ns-fallback-tests disasm-panel-tests lump-dir-disasm-tooltip-tests boot-entry-sync-tests install-boot-entry-cr0-tests ns-slot-dynamic-tests rogue-namespace-slot-tests ns-slot-policy-restore-tests ns-slot-modal-persist-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests openin-links-tests open-lump-freshness-tests lump-warning-tests call-cr6-l-perm-tests return-cr6-l-perm-tests load-through-l-perm-cr6-tests return-cr14-trace-tests wukong-cr-update-tests wukong-hw-fault-tests wukong-trace-cr-server-tests return-fetch-lump-tests constants-lump-tests"
+ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests warning-panel-tests bare-space-ns-fallback-tests disasm-panel-tests lump-dir-disasm-tooltip-tests hw-trace-live-movable-tests execution-identity-tests boot-entry-sync-tests install-boot-entry-cr0-tests ns-slot-dynamic-tests rogue-namespace-slot-tests ns-slot-policy-restore-tests ns-slot-modal-persist-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests openin-links-tests open-lump-freshness-tests lump-warning-tests call-cr6-l-perm-tests return-cr6-l-perm-tests load-through-l-perm-cr6-tests return-cr14-trace-tests wukong-cr-update-tests wukong-hw-fault-tests wukong-trace-cr-server-tests return-fetch-lump-tests constants-lump-tests"
 
 ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabilities-blocks check-no-ti60-ui check-api-reference-stale check-whats-new-feed wukong-relay-deployment-guard wukong-fault-sentinel callhome-parser-tests check-slot-index-leak check-ila-probe-names test-check-ila-probe-names check-lumps-guard check-ns-word3-contract test-check-ns-word3-contract check-sitemap-figure-count check-verilog-rtlil-stale check-build-lump-sidecar-source check-wukong-callhome-divergence check-build-lump-clist build-selftest-lump-syntax check-book-chapters check-ide-intro-base-path"
 

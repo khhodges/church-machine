@@ -693,6 +693,7 @@
 
     <div id="editor" class="view">
         <section id="lastFaultHost" class="last-fault-host" aria-live="polite" aria-label="Last Accepted Fault"></section>
+        <div id="executionIdentityEditor" class="execution-identity-strip execution-identity-unverified" aria-label="Execution identity: unverified">UNVERIFIED — assemble or load a program to establish execution identity.</div>
         <div class="editor-layout">
             <div class="editor-panel">
                 <div class="editor-toolbar">
@@ -1207,6 +1208,8 @@
             <span class="trace-row-count" id="traceRowCount">0 rows</span>
             <button class="btn trace-clear-btn" id="traceClearBtn" onclick="clearTrace()">Clear</button>
         </div>
+        <div id="executionIdentityTrace" class="execution-identity-strip execution-identity-unverified" aria-label="Execution identity: unverified"></div>
+        <div id="executionIdentityAnnouncement" class="execution-identity-announcement" role="status" aria-live="polite"></div>
         <div class="trace-table-wrap" id="traceTableWrap">
             <table class="trace-table" id="traceTable">
                 <thead>

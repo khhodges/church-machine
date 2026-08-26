@@ -1057,6 +1057,54 @@
     cursor: pointer;
 }
 .trace-clear-btn:hover { background: #e74c3c; }
+.execution-identity-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+    box-sizing: border-box;
+    min-height: 30px;
+    padding: 0.35rem 0.75rem;
+    color: #dbeafe;
+    background: #111827;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    line-height: 1.35;
+}
+.execution-identity-announcement {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+.execution-identity-strip b { color: #94a3b8; font-weight: 600; }
+.execution-identity-state {
+    padding: 0.12rem 0.4rem;
+    border: 1px solid currentColor;
+    border-radius: 3px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+.execution-identity-current { color: #86efac; background: rgba(22, 101, 52, .2); }
+.execution-identity-stale { color: #fbbf24; background: rgba(120, 53, 15, .2); }
+.execution-identity-mismatched { color: #fca5a5; background: rgba(127, 29, 29, .22); }
+.execution-identity-unverified { color: #cbd5e1; background: rgba(71, 85, 105, .22); }
+.execution-identity-program { min-width: 8rem; }
+.execution-identity-run { margin-left: auto; }
+.wukong-hw-log-panel .execution-identity-strip {
+    flex-shrink: 0;
+    border-width: 0 0 1px;
+    border-radius: 0;
+    padding: 3px 8px;
+    font-size: 10px;
+}
 .trace-table-wrap {
     flex: 1;
     overflow: auto;
@@ -2655,6 +2703,8 @@
     }
     .wukong-hw-log-note { display: none; }
     .wukong-hw-follow-status { max-width: 100%; }
+    .execution-identity-strip { align-items: flex-start; gap: 0.35rem; }
+    .execution-identity-run { margin-left: 0; }
 }
 
 /* HW cursor — distinct amber-blue highlight, separate from the sim gold cursor */

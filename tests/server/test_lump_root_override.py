@@ -132,3 +132,37 @@ assert 0x37000003 not in canonical_words
             text=True,
             capture_output=True,
         )
+
+
+def test_legacy_named_archive_remains_fetchable_after_active_filename_changes():
+    """A named archive must survive a newer tokenized active filename."""
+    with tempfile.TemporaryDirectory() as tmp:
+        isolated_lumps = Path(tmp) / "lumps"
+        shutil.copytree(CANONICAL_LUMPS, isolated_lumps, symlinks=True)
+        probe = r'''
+import os
+import server.app as module
+
+client = module.app.test_client()
+history = client.get("/api/lumps/00aa9999/history")
+assert history.status_code == 200, history.get_json()
+versions = {entry["version"] for entry in history.get_json()["history"]}
+assert 16 in versions, versions
+
+archived = client.get("/api/lumps/00aa9999/words/16")
+assert archived.status_code == 200, archived.get_json()
+body = archived.get_json()
+assert body["version"] == 16
+assert body["abstraction"] == "Legacy"
+assert body["count"] == 64
+'''
+        env = os.environ.copy()
+        env["CHURCH_TEST_LUMPS_DIR"] = str(isolated_lumps)
+        subprocess.run(
+            [sys.executable, "-c", probe],
+            cwd=ROOT,
+            env=env,
+            check=True,
+            text=True,
+            capture_output=True,
+        )

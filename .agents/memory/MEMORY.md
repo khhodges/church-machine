@@ -154,3 +154,4 @@
 - [Static-slot historical variants](capabilitytest-static-variant-manifest.md) — archive older fixed-slot binaries in a shared variant group while the active manifest record names its exact artifact and sidecar
 - [Release-check registry policy](release-check-registry-policy.md) — sync configuration is required and fail-closed; every release suite must be workflow-backed or explicitly script-only
 - [UART raw-transfer ownership](uart-raw-transfer-ownership.md) — bridge control bytes must be deferred for the whole framed payload interval or they corrupt board-side binary parsers
+- [Execution identity provenance](execution-identity-provenance.md) — empty source is comparable; opaque cross-algorithm source hashes never prove editor freshness
