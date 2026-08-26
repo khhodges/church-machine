@@ -2777,6 +2777,12 @@ function updateNamespace() {
     // one policy; transport order, hashes, capacity and bridge details remain
     // derived implementation data.
     function _nsPrefetchRow(slot, manifest) {
+        // The boot catalog occupies slots 0–10.  Those entries are always
+        // resident and are not programmer-configurable; only user LUMP slots
+        // above the catalog expose the load-policy selector.
+        if (slot <= 10) {
+            return '<span class="ns-fixed-policy" title="Boot catalog slots are always resident">Resident</span>';
+        }
         if (!manifest || !manifest.bootUpload) return '';
         const cfg = window.bootConfig || {};
         const rows = cfg.step2 && Array.isArray(cfg.step2.lumps) ? cfg.step2.lumps : [];
@@ -2786,7 +2792,56 @@ function updateNamespace() {
         return `<select aria-label="Load policy for slot ${slot}" onchange="event.stopPropagation();_nsPrefetchChange(${slot},this.value)" style="margin-left:5px;background:#0d0d1a;color:#d0d0e8;border:1px solid #6b5320;border-radius:3px;font-size:0.68rem;padding:1px 3px;"><option ${value==='Empty'?'selected':''}>Empty</option><option ${value==='Resident'?'selected':''}>Resident</option><option ${value==='Preload'?'selected':''}>Preload</option><option ${value==='Lazy'?'selected':''}>Lazy</option></select>`;
     }
 
+    // Keep the canonical identity compact in the Namespace Table.  The
+    // complete dot.name/T-ID pair belongs in a row-local popup so long names
+    // do not stretch the table or get confused with the policy control.
+    window._nsShowIdentity = function(slot) {
+        const existing = document.getElementById('_nsIdentityModalOverlay');
+        if (existing) existing.remove();
+
+        const entry = sim && typeof sim.readNSEntry === 'function' ? sim.readNSEntry(slot) : null;
+        const src = (typeof _findSrcLump === 'function' && entry)
+            ? _findSrcLump(slot, entry.label) : null;
+        const identity = sim && typeof sim.getSlotIdentity === 'function'
+            ? sim.getSlotIdentity(slot) : null;
+        const dotName = (identity && identity.dotName) ||
+            (src && (src.dotName || src.dot_name || src.abstraction)) ||
+            (entry && entry.label) || 'Unavailable';
+        const tId = (identity && identity.cacheToken != null)
+            ? (identity.cacheToken >>> 0).toString(16).padStart(8, '0')
+            : ((src && src.token) || 'Unavailable');
+
+        const overlay = document.createElement('div');
+        overlay.id = '_nsIdentityModalOverlay';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.setAttribute('aria-label', `NS[${slot}] LUMP identity`);
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.72);padding:16px;box-sizing:border-box;';
+        overlay.innerHTML = `
+            <div style="background:#12121f;border:1px solid #2a2a4a;border-radius:8px;padding:20px 24px;min-width:320px;max-width:560px;width:100%;color:#d0d0e8;box-shadow:0 14px 48px rgba(0,0,0,0.45);">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;">
+                    <div style="color:#c89b3c;font-size:1rem;font-weight:600;">LUMP identity · NS[${slot}]</div>
+                    <button type="button" class="ns-identity-close" aria-label="Close identity popup" style="background:none;border:none;color:#888;font-size:1.2rem;cursor:pointer;padding:0 4px;">✕</button>
+                </div>
+                <div style="display:grid;grid-template-columns:auto 1fr;gap:10px 16px;align-items:baseline;font-size:0.82rem;">
+                    <span style="color:#888;">dot.name</span>
+                    <code style="color:#d0d0e8;overflow-wrap:anywhere;">${_escHtml(dotName)}</code>
+                    <span style="color:#888;">T-ID</span>
+                    <code style="color:#4ec9b0;overflow-wrap:anywhere;">${_escHtml(tId)}</code>
+                </div>
+            </div>`;
+        overlay.addEventListener('click', function(event) {
+            if (event.target === overlay || event.target.closest('.ns-identity-close')) overlay.remove();
+        });
+        document.body.appendChild(overlay);
+        const close = overlay.querySelector('.ns-identity-close');
+        if (close) close.focus();
+    };
+
     window._nsPrefetchChange = function(slot, value) {
+        // Boot catalog slots 0–10 are permanently resident.  Keep this guard
+        // at the mutation boundary as well as in the renderer.
+        if (slot <= 10) return;
         const cfg = window.bootConfig || {};
         if (!cfg.step2) cfg.step2 = { lumps: [] };
         if (!Array.isArray(cfg.step2.lumps)) cfg.step2.lumps = [];
@@ -2951,16 +3006,8 @@ function updateNamespace() {
         {
             const _srcLump = _findSrcLump(i, e.label);
             const _srcToken = _srcLump ? _srcLump.token : null;
-            const _slotIdentity = typeof sim.getSlotIdentity === 'function'
-                ? sim.getSlotIdentity(i) : null;
-            const _dotName = (_slotIdentity && _slotIdentity.dotName) ||
-                (_srcLump && (_srcLump.dotName || _srcLump.dot_name || _srcLump.abstraction)) ||
-                e.label || '';
-            const _tId = (_slotIdentity && _slotIdentity.cacheToken != null)
-                ? (_slotIdentity.cacheToken >>> 0).toString(16).padStart(8, '0')
-                : (_srcToken || '');
-            const _identity = _dotName && _tId
-                ? `<div style="font:0.64rem monospace;color:#9ca3af;margin-top:2px;" title="Canonical dot.name and T-ID">${_escHtml(_dotName)} · T:${_escHtml(_tId)}</div>`
+            const _identityBtn = (i > 10)
+                ? `<button type="button" class="btn btn-xs ns-identity-btn" aria-haspopup="dialog" onclick="event.stopPropagation();_nsShowIdentity(${i})" style="background:#27233b;color:#c4a7ff;border:1px solid rgba(196,167,255,0.35);margin-left:5px;font-size:0.65rem;padding:1px 5px;" title="Show canonical dot.name and T-ID">Identity</button>`
                 : '';
             // Show Source for Inform (gtType 1) and Outform (gtType 2) only.
             // Hide for Null (0), Abstract (3), Thread slots, and hardware I/O caps.
@@ -2976,7 +3023,7 @@ function updateNamespace() {
                                 THREAD_NS_SLOTS.has(i) ||
                                 _hwCapRe.test(e.label || '');
             if (codeNotResident) {
-                html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span>${_nsPrefetchRow(i, manifest)}${_identity}</td>`;
+                html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span>${_nsPrefetchRow(i, manifest)}${_identityBtn}</td>`;
             } else {
                 let _srcBtn = '';
                 if (!_hideSource) {
@@ -2988,7 +3035,7 @@ function updateNamespace() {
                         : `null,${i}`;
                     _srcBtn = `<button class="btn btn-xs" onclick="event.stopPropagation();_openLumpSource(${_onclickTarget})" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);" title="Open source in Repository view">Source</button>`;
                 }
-                html += `<td class="ns-entry-actions">${_srcBtn}${_nsPrefetchRow(i, manifest)}${_identity}</td>`;
+                html += `<td class="ns-entry-actions">${_srcBtn}${_nsPrefetchRow(i, manifest)}${_identityBtn}</td>`;
             }
         }
         html += '</tr>';

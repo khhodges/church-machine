@@ -28,7 +28,7 @@ test('Namespace Table saves an independent canonical Preload policy', async ({ p
 
     const slot = await page.evaluate(() => {
         const selected = Array.from({ length: sim.nsCount }, (_, index) => index)
-            .find(index => sim.readNSEntry(index));
+            .find(index => index > 10 && sim.readNSEntry(index));
         if (selected === undefined) throw new Error('No Namespace row is available for test');
 
         sim.lazyManifest = sim.lazyManifest || {};
