@@ -2762,6 +2762,11 @@ function _clearAllFaultNotes() {
 
 // ── Fault-log localStorage persistence ───────────────────────────────────────
 const _FAULT_LOG_LS_KEY = 'cm_fault_log';
+// Restored records are diagnostic history, not live machine state.  Keep them
+// visible after a reload only until the restarted simulator proves it can retire
+// one ordinary instruction.  Otherwise an old red banner can be mistaken for a
+// fault in the fresh session.
+let _restoredFaultLogAwaitingGoodStep = false;
 
 // The subset of fault-object fields we serialise (skips the large instrHistory array).
 const _FAULT_LOG_FIELDS = ['type','message','pc','physicalPC','step','faultStep','userNote',
@@ -2812,6 +2817,22 @@ function _saveFaultLog() {
     } catch(e) {}
 }
 
+function _clearRestoredFaultLogAfterGoodStep() {
+    if (!_restoredFaultLogAwaitingGoodStep || !sim || sim.halted) return false;
+
+    sim.faultLog = [];
+    _restoredFaultLogAwaitingGoodStep = false;
+    _lastFault = null;
+
+    // The old fault and any annotations belong to the execution that ended
+    // before this page was loaded.  A successful retirement starts a new,
+    // fault-free session, so do not resurrect them on its next refresh.
+    _clearAllFaultNotes();
+    faultAlertOff();
+    if (typeof updateGateLog === 'function') updateGateLog();
+    return true;
+}
+
 function _restoreFaultLog() {
     try {
         const raw = localStorage.getItem(_FAULT_LOG_LS_KEY);
@@ -2834,6 +2855,7 @@ function _restoreFaultLog() {
         }
         if (sim && sim.faultLog) {
             sim.faultLog = valid;
+            _restoredFaultLogAwaitingGoodStep = true;
         }
     } catch(e) { console.warn('[_restoreFaultLog] failed:', e); }
 }

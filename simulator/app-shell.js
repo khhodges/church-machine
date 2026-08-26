@@ -956,6 +956,16 @@ function init() {
 
     sim.on('stateChange', () => { updateDashboard(); updateLedStrip(); updateToolbarIdeBadge(); if (currentView === 'gt-view') renderGTView(); });
     sim.on('step', _traceRecordStep);
+    // A restored fault log describes a prior browser session.  Retiring one
+    // normal instruction in this session proves the old halt is no longer
+    // current, so remove it before the UI renders the new live state.
+    sim.on('step', (result) => {
+        const retiredNormally = result && !result.absent && !result.suspended &&
+            !result.lazySuspended && !result.rejected && !result.timerIRQ;
+        if (retiredNormally && typeof _clearRestoredFaultLogAfterGoodStep === 'function') {
+            _clearRestoredFaultLogAfterGoodStep();
+        }
+    });
     sim.on('reset', clearTrace);
     // Register the Last Fault panel listener here — sim is null during
     // app-run.js evaluation, so the listener must be wired after init().
