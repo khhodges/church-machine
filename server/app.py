@@ -2384,6 +2384,9 @@ def _validate_step2(step2, step1, target_board):
     usable_end = total - NS_TABLE_RESERVE
     seen_slots = set()
     seen_prefetch_orders = set()
+    seen_wukong_prefetch_slots = set()
+    wukong_prefetch_words = 0
+    wukong_prefetch_count = 0
     occupied = []  # list of (start, end_exclusive, label) for resident lumps
     for entry in lumps:
         if not isinstance(entry, dict):
@@ -2406,6 +2409,9 @@ def _validate_step2(step2, step1, target_board):
                 if not isinstance(url, str) or not url.strip():
                     return f"lazy prefetch for NS slot {slot} requires downloadUrl"
                 url = url.strip()
+                if target_board == "wukong-xc7a100t" and not url.startswith("/api/lump/"):
+                    return ("Wukong prefetch is served only through the canonical "
+                            "/api/lump/<token> transport")
                 if not (url.startswith("/api/lump/") or url.startswith("https://")):
                     return (f"lazy prefetch URL for NS slot {slot} must be an IDE "
                             "raw-LUMP path or an https URL")
@@ -2415,6 +2421,36 @@ def _validate_step2(step2, step1, target_board):
                 if order in seen_prefetch_orders:
                     return f"duplicate prefetchOrder {order}"
                 seen_prefetch_orders.add(order)
+                if target_board == "wukong-xc7a100t":
+                    if slot < 8 or slot >= _boot_image_gen.WUKONG_FORWARD_NS_SLOTS:
+                        return ("Wukong prefetch requires a forward Namespace "
+                                f"slot from 8 to {_boot_image_gen.WUKONG_FORWARD_NS_SLOTS - 1}")
+                    if slot in seen_wukong_prefetch_slots:
+                        return f"duplicate Wukong prefetch slot {slot}"
+                    seen_wukong_prefetch_slots.add(slot)
+                    wukong_prefetch_count += 1
+                    if wukong_prefetch_count > _boot_image_gen.PREFETCH_MAX_ENTRIES:
+                        return (f"Wukong supports at most "
+                                f"{_boot_image_gen.PREFETCH_MAX_ENTRIES} prefetch entries")
+                    token = str(entry.get("lumpToken") or "").lower()
+                    if len(token) != 8 or any(c not in "0123456789abcdef" for c in token):
+                        return f"Wukong prefetch slot {slot} requires an 8-hex lumpToken"
+                    binary_hash = str(
+                        entry.get("binaryHash") or entry.get("binary_hash") or "")
+                    if binary_hash.lower().startswith("sha256:"):
+                        binary_hash = binary_hash[7:]
+                    if (len(binary_hash) < 8 or
+                            any(c not in "0123456789abcdefABCDEF" for c in binary_hash)):
+                        return (f"Wukong prefetch slot {slot} requires a canonical "
+                                "binaryHash binding")
+                    capacity = entry.get("lumpSize") or catalog[slot].get("lumpSize")
+                    if (not isinstance(capacity, int) or capacity < 64 or
+                            capacity > _boot_image_gen.PREFETCH_MAX_LUMP_WORDS or
+                            capacity & (capacity - 1)):
+                        return f"Wukong prefetch slot {slot} needs a power-of-two lumpSize"
+                    wukong_prefetch_words += capacity
+                    if 1280 + wukong_prefetch_words > _boot_image_gen.WUKONG_DMEM_WORDS:
+                        return "configured Wukong prefetch bodies exceed board DMEM capacity"
             continue
         cat = catalog[slot]
         lump_size = entry.get("lumpSize") or cat.get("lumpSize")
@@ -2638,6 +2674,18 @@ def boot_config_post():
                 row["prefetchRequired"] = e.get("prefetchRequired") is not False
                 row["downloadUrl"] = str(e.get("downloadUrl", "")).strip()
                 row["prefetchOrder"] = int(e.get("prefetchOrder", row["nsSlot"]))
+                # The projected staging range and bridge hash check are both
+                # security properties. Retain them for lazy rows just as for
+                # resident rows; otherwise a later save silently weakens the
+                # capacity or identity policy.
+                if e.get("lumpSize") is not None:
+                    row["lumpSize"] = int(e["lumpSize"])
+                binary_hash = e.get("binaryHash") or e.get("binary_hash")
+                if binary_hash:
+                    row["binaryHash"] = str(binary_hash)
+                identity_hash = e.get("identityHash") or e.get("identity_hash")
+                if identity_hash:
+                    row["identityHash"] = str(identity_hash)
             if row["resident"]:
                 row["physAddr"] = int(e["physAddr"])
                 if e.get("lumpSize") is not None:
@@ -14413,7 +14461,8 @@ def boot_image_send_to_hardware():
         # image wraps its 14-bit upload address and corrupts the entry body.
         # Build the board-native projection after validating the generic source.
         try:
-            _wukong_raw, _wukong_entry_info = _boot_image_gen.build_wukong_upload_image(_raw)
+            _wukong_raw, _wukong_entry_info = _boot_image_gen.build_wukong_upload_image(
+                _raw, _read_saved_boot_config())
         except ValueError as _exc:
             return jsonify({'error': f'boot image cannot be projected for Wukong: {_exc}'}), 400
 

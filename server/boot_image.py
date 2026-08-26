@@ -101,6 +101,21 @@ WUKONG_DMEM_WORDS = 16_384
 WUKONG_UPLOAD_BODY_BASE_WORD = 1_280
 WUKONG_FORWARD_NS_SLOTS = 64
 
+try:
+    from hardware.wukong_prefetch import (
+        PREFETCH_POLICY_MAGIC, PREFETCH_POLICY_VERSION,
+        PREFETCH_POLICY_BASE_WORD, PREFETCH_POLICY_ENTRY_WORDS,
+        PREFETCH_MAX_ENTRIES, PREFETCH_MAX_LUMP_WORDS, PREFETCH_REQUIRED,
+    )
+except ImportError:
+    PREFETCH_POLICY_MAGIC = 0x57504B31
+    PREFETCH_POLICY_VERSION = 1
+    PREFETCH_POLICY_BASE_WORD = 320
+    PREFETCH_POLICY_ENTRY_WORDS = 6
+    PREFETCH_MAX_ENTRIES = 8
+    PREFETCH_MAX_LUMP_WORDS = 16384
+    PREFETCH_REQUIRED = 1
+
 # Direct dispatch: NUC_CODE (B:07) pre-loads CR0 with the boot-entry E-GT.
 # No CHANGE→TPERM→CALL trampoline — 00000600.lump must always be present.
 
@@ -510,7 +525,71 @@ def read_boot_entry_info(image_bytes):
     }
 
 
-def build_wukong_upload_image(generic_image):
+def build_wukong_prefetch_policy(cfg, source_words, dynamic_start):
+    """Build ordered post-boot entries for the native Wukong image."""
+    if not isinstance(cfg, dict) or not isinstance(source_words, list):
+        return [], []
+    step2 = cfg.get("step2") if isinstance(cfg.get("step2"), dict) else {}
+    rows = [e for e in (step2.get("lumps") or [])
+            if isinstance(e, dict) and e.get("prefetch") and not e.get("resident")]
+    rows.sort(key=lambda e: (int(e.get("prefetchOrder", e.get("nsSlot", 0))),
+                             int(e.get("nsSlot", 0))))
+    if len(rows) > PREFETCH_MAX_ENTRIES:
+        raise ValueError(f"Wukong supports at most {PREFETCH_MAX_ENTRIES} prefetch entries")
+    source_total, cursor = len(source_words), int(dynamic_start)
+    seen_slots, seen_orders, entries = set(), set(), []
+    for row in rows:
+        slot = row.get("nsSlot")
+        if not isinstance(slot, int) or not (8 <= slot < WUKONG_FORWARD_NS_SLOTS):
+            raise ValueError(f"Wukong prefetch slot must be between 8 and "
+                             f"{WUKONG_FORWARD_NS_SLOTS - 1}")
+        order = int(row.get("prefetchOrder", slot))
+        if slot in seen_slots or order in seen_orders:
+            raise ValueError(f"duplicate Wukong prefetch slot/order ({slot}, {order})")
+        seen_slots.add(slot)
+        seen_orders.add(order)
+        token_text = str(row.get("lumpToken") or "").lower()
+        token_text = token_text[-8:] if len(token_text) >= 8 else ""
+        if len(token_text) != 8:
+            raise ValueError(f"Wukong prefetch slot {slot} requires an 8-hex lumpToken")
+        try:
+            token = int(token_text, 16)
+        except ValueError as exc:
+            raise ValueError(f"Wukong prefetch slot {slot} has an invalid lumpToken") from exc
+        size = int(row.get("lumpSize") or SLOT_SIZE)
+        if size < 64 or size > PREFETCH_MAX_LUMP_WORDS or (size & (size - 1)):
+            raise ValueError(f"Wukong prefetch slot {slot} has invalid capacity {size}")
+        if cursor + size > WUKONG_DMEM_WORDS:
+            raise ValueError(f"Wukong prefetch slot {slot} exceeds Wukong DMEM capacity")
+        source_base = source_total - (slot + 1) * NS_ENTRY_WORDS
+        old_authority = source_words[source_base + 1] if 0 <= source_base < source_total else 0
+        # Preserve sequence/type/domain flags from the configured canonical
+        # descriptor and only substitute the staging range limit.
+        authority = (old_authority & ~0x1FFFFF) | ((size - 1) & 0x1FFFFF)
+        binary_hash = str(row.get("binaryHash") or row.get("binary_hash") or "")
+        if binary_hash.lower().startswith("sha256:"):
+            binary_hash = binary_hash[7:]
+        try:
+            hash32 = int(binary_hash[:8], 16) if len(binary_hash) >= 8 else 0
+        except ValueError:
+            hash32 = 0
+        entries.append({
+            "slot": slot, "token": token, "target": cursor, "capacity": size,
+            "authority": authority, "required": row.get("prefetchRequired") is not False,
+            "hash32": hash32,
+        })
+        cursor += size
+    words = [PREFETCH_POLICY_MAGIC, (PREFETCH_POLICY_VERSION << 16) | len(entries)]
+    for entry in entries:
+        words.extend([(entry["slot"] & 0xFFFF) |
+                      (PREFETCH_REQUIRED << 16 if entry["required"] else 0),
+                      entry["token"], entry["target"], entry["capacity"],
+                      entry["authority"], entry["hash32"]])
+    words.extend([0] * (2 + PREFETCH_MAX_ENTRIES * PREFETCH_POLICY_ENTRY_WORDS - len(words)))
+    return words, entries
+
+
+def build_wukong_upload_image(generic_image, boot_config=None):
     """Project a generic boot image onto Wukong's physical DMEM layout.
 
     Generic images use an inverted Namespace table at their tail; Wukong's
@@ -566,6 +645,10 @@ def build_wukong_upload_image(generic_image):
             "in Wukong's available DMEM body region"
         )
 
+    policy_words, policy_entries = build_wukong_prefetch_policy(
+        boot_config, source_words, WUKONG_UPLOAD_BODY_BASE_WORD + alloc_words
+    )
+
     # Lazy import prevents simulator-only generation from requiring FPGA
     # dependencies, while making this projection follow the actual bitstream
     # bootstrap structures rather than a copied server-side layout.
@@ -604,6 +687,9 @@ def build_wukong_upload_image(generic_image):
         WUKONG_CALLHOME_BASE_WORD + len(wch_words)] = wch_words
     mem[WUKONG_WCH_CLIST_WORD:
         WUKONG_WCH_CLIST_WORD + len(WUKONG_WCH_CLIST)] = list(WUKONG_WCH_CLIST)
+    if policy_words:
+        mem[PREFETCH_POLICY_BASE_WORD:
+            PREFETCH_POLICY_BASE_WORD + len(policy_words)] = policy_words
 
     # Mirror the FPGA initialisation order, including the fixed Thread objects.
     mem[WUKONG_THREAD_BASE_WORD] = WUKONG_THREAD_HEADER
@@ -630,6 +716,13 @@ def build_wukong_upload_image(generic_image):
     mem[target_ns_base + 2] = integrity32(body_base_byte, source_authority)
     mem[target_ns_base + 3] = source_cache_token
 
+    # Prefetch targets are intentionally not published yet.  Their policy
+    # records carry the private staging location and authority; the FPGA
+    # writes these four words only after a complete CRC/header-validated body.
+    for entry in policy_entries:
+        base = entry["slot"] * NS_ENTRY_WORDS
+        mem[base:base + NS_ENTRY_WORDS] = [0, 0, 0, 0]
+
     # The hardware boot ROM calls through this exact capability.
     mem[WUKONG_THREAD_CAPS0_WORD] = source_info["thread_caps0"]
 
@@ -653,6 +746,7 @@ def build_wukong_upload_image(generic_image):
         "caps0_ok": mem[WUKONG_THREAD_CAPS0_WORD] == source_info["expected_gt"],
         "source_entry_loc": entry_loc,
         "source_words": source_total,
+        "prefetch_policy": policy_entries,
     }
 
 

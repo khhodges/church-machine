@@ -53,6 +53,21 @@ import time
 import uuid
 
 try:
+    from .wukong_prefetch import (
+        PREFETCH_REQUEST_MAGIC, PREFETCH_INCIDENT_MAGIC, PREFETCH_REQUEST_LEN,
+        PREFETCH_STATUS_NOT_FOUND, PREFETCH_STATUS_MALFORMED,
+        PREFETCH_STATUS_CRC, PREFETCH_STATUS_TRANSPORT, PREFETCH_MAX_LUMP_WORDS,
+        build_response, parse_request, crc32,
+    )
+except ImportError:  # direct invocation: python hardware/wukong_bridge.py
+    from wukong_prefetch import (
+        PREFETCH_REQUEST_MAGIC, PREFETCH_INCIDENT_MAGIC, PREFETCH_REQUEST_LEN,
+        PREFETCH_STATUS_NOT_FOUND, PREFETCH_STATUS_MALFORMED,
+        PREFETCH_STATUS_CRC, PREFETCH_STATUS_TRANSPORT, PREFETCH_MAX_LUMP_WORDS,
+        build_response, parse_request, crc32,
+    )
+
+try:
     import serial
 except ImportError:
     serial = None  # unit tests import this module without pyserial; main() checks
@@ -537,6 +552,70 @@ def decode_trace_packet(pkt):
         'fault_valid': bool(raw11 & 0x40),
         'bp_hit':      bool(raw11 & 0x80),
     }
+
+
+def _prefetch_error_response(request, status):
+    """Build a payload-free response that the board can safely retry."""
+    return build_response(request["slot"], request["token"], [], status=status)
+
+
+def build_prefetch_response(request, http_response):
+    """Validate one canonical API LUMP response and frame it for the board."""
+    if getattr(http_response, "status_code", 0) == 404:
+        return _prefetch_error_response(request, PREFETCH_STATUS_NOT_FOUND)
+    if getattr(http_response, "status_code", 0) != 200:
+        return _prefetch_error_response(request, PREFETCH_STATUS_TRANSPORT)
+    payload = bytes(getattr(http_response, "content", b""))
+    if len(payload) < 8 or len(payload) % 4:
+        return _prefetch_error_response(request, PREFETCH_STATUS_MALFORMED)
+    advertised_crc = struct.unpack(">I", payload[:4])[0]
+    raw = payload[4:]
+    if crc32(raw) != advertised_crc:
+        return _prefetch_error_response(request, PREFETCH_STATUS_CRC)
+    headers = getattr(http_response, "headers", {})
+    hash_header = str(headers.get("X-Lump-Hash", ""))
+    if (not hash_header.startswith("sha256:") or
+            str(headers.get("X-Lump-Trust", "")).lower() != "canonical" or
+            str(headers.get("X-Lump-Cache-Token", "")).lower() !=
+            f"{request['token']:08x}" or
+            not str(headers.get("X-Lump-Identity-Hash", "")).startswith("sha256:")):
+        return _prefetch_error_response(request, PREFETCH_STATUS_MALFORMED)
+    import hashlib
+    digest = hashlib.sha256(raw).hexdigest()
+    if digest != hash_header[7:].lower():
+        return _prefetch_error_response(request, PREFETCH_STATUS_CRC)
+    if request.get("expected_hash32") and int(digest[:8], 16) != request["expected_hash32"]:
+        return _prefetch_error_response(request, PREFETCH_STATUS_MALFORMED)
+    words = list(struct.unpack(f">{len(raw) // 4}I", raw))
+    header = words[0]
+    allocation = 1 << (((header >> 23) & 0xF) + 6)
+    if (((header >> 27) & 0x1F) != 0x1F or ((header >> 8) & 0x3) != 0x3 or
+            allocation != len(words) or allocation > request["max_words"] or
+            allocation > PREFETCH_MAX_LUMP_WORDS):
+        return _prefetch_error_response(request, PREFETCH_STATUS_MALFORMED)
+    return build_response(request["slot"], request["token"], words)
+
+
+def handle_prefetch_request(frame, ide_base, verify_tls, http_get=None):
+    """Fetch and validate a board-requested LUMP without trusting UART input."""
+    request = parse_request(bytes(frame))
+    if request is None:
+        return None
+    getter = http_get or requests.get
+    try:
+        response = getter(f"{ide_base}/api/lump/{request['token']:08x}",
+                          timeout=5, verify=verify_tls)
+        return build_prefetch_response(request, response)
+    except Exception:
+        return _prefetch_error_response(request, PREFETCH_STATUS_TRANSPORT)
+
+
+def parse_prefetch_incident(frame):
+    """Decode a fixed 8-byte board incident, returning None for noise."""
+    if len(frame) != 8 or frame[0] != PREFETCH_INCIDENT_MAGIC or frame[1] != 1:
+        return None
+    return {"sequence": frame[2], "slot": frame[3],
+            "status": frame[4], "attempts": frame[5]}
 
 
 def _is_turing_only_result(decoded):
@@ -1606,6 +1685,11 @@ def main():
     _boot_q_pending   = False
     _boot_q_remaining = 0
     _boot_q_deadline  = 0.0
+    # Raw prefetch responses grant the board exclusive RX ownership. The timer
+    # derives the exact serial drain window and defers all control traffic.
+    prefetch_busy_until = 0.0
+    _boot_run_pending = False
+    _boot_run_deadline = 0.0
 
     # ── UART ASCII console forwarding ────────────────────────────────────
     # Printable UART bytes (banner text etc.) are line-buffered and POSTed
@@ -1686,6 +1770,46 @@ def main():
             while i < len(buf):
                 b = buf[i]
 
+                if b == PREFETCH_REQUEST_MAGIC:
+                    if len(buf) - i < PREFETCH_REQUEST_LEN:
+                        break
+                    request_frame = bytes(buf[i:i + PREFETCH_REQUEST_LEN])
+                    response = handle_prefetch_request(
+                        request_frame, ide_base, verify_tls)
+                    if response is None:
+                        i += 1
+                        continue
+                    try:
+                        ser.write(response)
+                        ser.flush()
+                        last_write_ts = time.time()
+                        prefetch_busy_until = max(
+                            prefetch_busy_until,
+                            last_write_ts + (len(response) * 10 / args.baud) + 0.25)
+                        print(f'[prefetch] request served ({len(response)} bytes)',
+                              flush=True)
+                    except Exception as exc:
+                        print(f'[prefetch] serial write failed: {exc}', flush=True)
+                    i += PREFETCH_REQUEST_LEN
+                    continue
+
+                if b == PREFETCH_INCIDENT_MAGIC:
+                    if len(buf) - i < 8:
+                        break
+                    incident = parse_prefetch_incident(bytes(buf[i:i + 8]))
+                    if incident is not None:
+                        delivery_worker.submit('console', {
+                            'text': ('[PREFETCH INCIDENT] required slot '
+                                     f'{incident["slot"]} stopped after '
+                                     f'{incident["attempts"]} attempt(s), '
+                                     f'status={incident["status"]}'),
+                            'ts': time.time(),
+                        })
+                        _bridge_status('prefetch_incident', 'fault_hold',
+                                       f'slot={incident["slot"]} status={incident["status"]}')
+                        i += 8
+                        continue
+
                 if b == SNAPSHOT_MAGIC:
                     decoded = try_parse_snapshot_frame(buf, i)
                     if decoded is False:
@@ -1747,7 +1871,7 @@ def main():
                     # the count — the boot sequence may be entirely composed of
                     # such packets and the gate must fire at the right time
                     # regardless of filtering mode.
-                    if _boot_q_pending:
+                    if _boot_q_pending and time.time() >= prefetch_busy_until:
                         _boot_q_remaining -= 1
                         if _boot_q_remaining <= 0:
                             _boot_q_pending = False
@@ -1910,21 +2034,13 @@ def main():
                     # trace packets have been observed — or after BOOT_Q_TIMEOUT
                     # seconds — whichever comes first.  This guarantees the
                     # snapshot always reflects post-boot register state.
-                    try:
-                        ser.write(b'r')
-                        last_write_ts = time.time()
-                        _bridge_status('automatic_run_after_sentinel', 'connected',
-                                       'intentional run after boot sentinel')
-                        _boot_q_pending   = True
-                        _boot_q_remaining = BOOT_TRACE_PACKET_COUNT
-                        _boot_q_deadline  = time.time() + BOOT_Q_TIMEOUT
-                        print(f'  [boot] deferring snapshot until '
-                              f'{BOOT_TRACE_PACKET_COUNT} boot trace packets '
-                              f'received (timeout={BOOT_Q_TIMEOUT:.1f}s)',
-                              flush=True)
-                    except Exception as exc:
-                        print(f'  [run send error] {exc}')
-                        _bridge_status('automatic_run_failed', 'serial_error', str(exc))
+                    _boot_run_pending = True
+                    _boot_run_deadline = time.time() + 0.25
+                    _boot_q_pending   = True
+                    _boot_q_remaining = BOOT_TRACE_PACKET_COUNT
+                    _boot_q_deadline  = time.time() + BOOT_Q_TIMEOUT
+                    print(f'  [boot] deferring run/snapshot until boot traffic '
+                          f'settles (timeout={BOOT_Q_TIMEOUT:.1f}s)', flush=True)
 
                     if sentinel['stale']:
                         if tu_version is None:
@@ -2032,11 +2148,21 @@ def main():
             # Apply only completed HTTP results. Network retries remain in the
             # daemon worker and can never stop UART decoding.
             _process_delivery_results()
+            if _boot_run_pending and now >= _boot_run_deadline and now >= prefetch_busy_until:
+                _boot_run_pending = False
+                try:
+                    ser.write(b'r')
+                    last_write_ts = now
+                    _bridge_status('automatic_run_after_sentinel', 'connected',
+                                   'intentional run after boot sentinel')
+                except Exception as exc:
+                    print(f'  [run send error] {exc}')
+                    _bridge_status('automatic_run_failed', 'serial_error', str(exc))
             # Deferred snapshot timeout: if the expected boot trace packets
             # have not all arrived within BOOT_Q_TIMEOUT seconds, send 'q'
             # anyway so the IDE still gets a register snapshot on boards that
             # emit fewer packets than expected (e.g. older bitstreams).
-            if _boot_q_pending and now >= _boot_q_deadline:
+            if _boot_q_pending and now >= _boot_q_deadline and now >= prefetch_busy_until:
                 _boot_q_pending = False
                 try:
                     ser.write(b'q')
@@ -2052,7 +2178,7 @@ def main():
             # ends without \n) is forwarded after 0.5 s of UART silence.
             if _console_line and now - _console_last[0] >= 0.5:
                 _console_flush(ide_base, verify_tls)
-            if now - last_poll >= 0.05:
+            if now - last_poll >= 0.05 and now >= prefetch_busy_until:
                 last_poll = now
                 try:
                     r = requests.get(

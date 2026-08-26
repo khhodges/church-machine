@@ -301,7 +301,7 @@ def test_fault_recovery_control_is_wired_into_top_execution_and_uart_gates():
     execution_gate = source[source.index('core.imem_valid.eq('):
                             source.index('core.free_run_start.eq(0)')]
     assert '~sentinel_req & ~recovery_hold' in execution_gate
-    assert 'core.halt_req.eq(step_halted | trace_stall | recovery_hold)' in execution_gate
+    assert 'core.halt_req.eq(step_halted | trace_stall | pf_hold | recovery_hold)' in execution_gate
 
     snapshot_final_byte = source.index(
         'with m.If(snap_bidx == _SNAP_FRAME_LEN - 1):')
