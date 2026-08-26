@@ -7,11 +7,9 @@
 - [NS slot 1 DEMO_CLIST stomp (stale binary)](ns-slot1-demo-clist-stomp.md) — old generator wrote clist_gts into NS TABLE tail, stomping NS[1] word0 (Thread loc) with 0x32000003; fixed in loadBootImage() + binary patched
 - [NULL GT type canonicalisation](null-gt-type-canon.md) — isNullGT checks bits[26:25]===0b00; only replace ===0 with isNullGT at hardware gates (mLoad, _fetchInstruction); UI presence checks (CR6 in resolvePendingSlot) must stay ===0
 - [THREAD_NS_SLOTS in E2E test GTs](thread-ns-slots-e2e-trap.md) — synthetic GT word0 index bits[15:0] must NOT be 1 or 45 (THREAD_NS_SLOTS); those trigger showThread→crDetailTab='lump' override; use index=0x20 (32) in test fixtures
-- [Wukong A7 orphaned file](wukong-a7-orphaned.md) — wukong_xc7a100t.py (v1.1 Ethernet) is NOT in the build; gen_rtlil.py builds from wukong_top.py (V3 LED-blink only)
 - [Wukong single-step trace architecture](wukong-trace-arch.md) — 11-byte 0xAA packets; uart_rx_pin=F3; retire_flags.as_value()[:4] for NZCV; COND_FLAGS_LAYOUT is 4-bit StructLayout; TraceUnit skips retire if busy (step mode guarantees idle); SelfTest F-bit failures pre-existed this task
 - [TraceUnit per-event packet format](trace-unit-per-event-format.md) — 12-byte per-event packets; multi-event queue (1–3 per retire); trace_stall backpressure; ELOADCALL/RETURN-CR14 known gaps
 - [Wukong boot three-bug root cause](wukong-boot-perm-l-trap.md) — three cooperating bugs (u_perm timing, CR6 S+E→L+E, BRAM address-stability valid); all fixed; NUC runs clean 2M+ cycles
-- [Wukong standalone step_mode trap](wukong-step-mode-trap.md) — step_mode init=1 halts CM immediately after boot; standalone builds need init=0 or CM never executes
 - [Amaranth sync-domain self-deadlocking reset](amaranth-sync-reset-deadlock.md) — rst_sr in sync domain driving ResetSignal("sync") locks reset HIGH forever; use reset_less=True + GSR instead
 - [Sapphire ROM BRAM iBus/dBus conflict](sapphire-rom-bram-dbus-hang.md) — ROM BRAM single-port: iBus wins always; any dBus lw from ROM hangs; all firmware strings must be static char[] (.data/RAM)
 - [Boot c-list slot index trap](boot-clist-slot-index.md) — clistGTs[0] is overwritten in-place (not prepended); UART=2, LED=3, BTN=4, TIMER=5 direct from _getHardwareBootCatalog() order
@@ -26,18 +24,13 @@
 - [Startup Wizard E2E setup](wizard-e2e-setup.md) — wizard is in #builder>#ti60ConnectPanel; needs switchView+switchBuilderViewTab; display:'' vs 'block' matters; use defer not async
 - [CLOOMC detection ordering](cloomc-detection-order.md) — _detectCLOOMC() matches keywords (abstraction, method, capabilities) that overlap all CLOOMC++ variants; must run AFTER specific detectors (Symbolic, Lambda, Haskell) or those languages break
 - [Ti60 SoC UART clockDivider](ti60-uart-clockdiv.md) — Sapphire SoC UART resets clockDivider to 0x00 (not 0x35); firmware MUST write UART_CLOCKDIV=53 before first uart_puts or output is 6.25 Mbaud silence
-- [Efinity version split](efinity-version-split.md) — CONFLICTED: in-repo wrappers say map=2025.2/pnr=2026.1, old note said all-2026.1; don't trust a version, verify BRAM INIT_0 is non-zero after synth
 - [Efinity map.v INIT_0 attribute format varies](efinity-init0-netlist-format.md) — 2026.1 uses unquoted `256'h...` literal not quoted hex string; guards must try both shapes
 - [Ti60F225 hardware facts](ti60f225-hardware.md) — board has exactly 3 user LEDs; church_ti60f225 module ports dbg_boot_complete/dbg_fault_valid/dbg_nia/dbg_fault must be wired in top.v; prior top.v tied them to zero with wrong comment claiming they weren't ports
 - [Sapphire SoC jtagCtrl_reset polarity](sapphire-jtag-reset.md) — jtagCtrl_reset=0 keeps debug domain in permanent reset → io_systemReset stuck HIGH → LED0 OFF; must tie to 1'b1
-- [Ti60 headless build — IO placement and LPF](ti60-headless-lpf.md) — 5-patch Efinity flow: Patch4 must CALL check_design() (ignore return) not bypass it; efx_run --flow pgm/pnr not efx_pgm/efx_pnr direct; peri.xml must have clk GPIO or IO pins all randomly placed
-- [Ti60 clk peri.xml + unassigned-pin phantom](efinity-clkin-duplicate-net.md) — authoritative clk = conn_type="normal"+clkmux_buf_name=""+ROUTE0 name=""; clkin/CLKMUX_L is the DISPROVEN fix; route.rpt.xml counts can be stale phantoms
 - [Sapphire SoC memory map](sapphire-soc-memory-map.md) — ROM=0xF9000000, UART=0xF8010000, GPIO=0xF8020000; sapphire_define.vh is empty in 2026.1; grep sapphire.v for addresses
 - [Sapphire POR asyncReset pulse required](sapphire-por-asyncreset.md) — io_asyncReset=1'b0 constant leaves io_systemReset stuck HIGH forever; must use 8-bit shift-reg POR (init=0xFF) to pulse it
-- [Efinity 2026.1 illegal synthesis params](efinity-2026-synth-params.md) — infer_set_reset/infer_clk_enable cause EFX-0002; Efinity re-injects them on every save; strip with sed before each compile
 - [Chromebook call-home bridge workflow](chromebook-callhome-workflow.md) — confirmed working flow; bridge baud=57600 (CLOCKDIV=53, 25 MHz, no PLL); --insecure required; make MUST run after git pull
 - [Sapphire SoC as Trusted Security Base](sapphire-soc-tsb.md) — RISC-V private RAM is the keystore; APB3 register map; 5 free capabilities; FAULT_RST gap; FP verdict; SHA32 commissioning impact
-- [Makefile tab rule](makefile-tab-rule.md) — edit tool converts tabs→spaces in recipe lines, breaking make; always use write tool for Makefile changes
 - [NS entry stride is 4 words](ns-entry-stride.md) — each NS slot is 4 words (16 bytes): [location, word1_authority, word2_integrity, abstract_gt]; slot N starts at byte N×16; never 3
 - [NS slot base inverted layout](ns-slot-base-inverted-layout.md) — _nsSlotBase() = NS_TABLE_BASE+NS_TABLE_RESERVE-(idx+1)*4 (inverted); never use NS_TABLE_BASE+idx*4 in loaders or tests
 - [Wukong NS base is not ISA-safe at zero](wukong-ns-base-isa-conflict.md) — standalone Wukong currently overrides the ISA top-of-memory NS base to 0; do not promote that shortcut into a new image without resolving DMEM size/base
@@ -48,12 +41,10 @@
 - [app.py raw SQL pattern](app-py-raw-sql.md) — server/app.py has no sqlite3 import; all DB access must use db.session.execute(_sa_text(...)); never _sqlite3.connect()
 - [church_ti60f225 module name](church-module-name.md) — Amaranth/Yosys generates module church_ti60f225 (no underscore); top.v must instantiate without underscore or efx_map hard-crashes with bare STACK TRACE
 - [v2.0 hardware format audit](v2-format-audit.md) — cond codes ARM order (CS=2 not LT=2); Turing opcodes at 16-25 not 10-19; integrity32=ROL-XOR not CRC; g_bit is toggle not set/clear; simulator NS format incompatible with hardware WORD2_LAYOUT; stale-opcode .lump sweep pattern
-- [Efinity headless PnR flow](efinity-headless-pnr.md) — efx_run.py needs PyQt6 (unavailable headless); VDB=top.vdb, sync=top.res.csv; set EFINITY_USER_DIR_INI+EFXPT_HOME; always use tmux
 - [Sapphire BRAM symbol file generation](sapphire-bram-symbol-gen.md) — ELF has 4096-byte page-align prefix before ROM; must use hardcoded ROM_BASE=0xF9000000 not min(paddr); files go in soc_combined/ not firmware/
 - [Sapphire firmware uart_putdec hang](sapphire-uart-putdec-hang.md) — uart_putdec using divu/remu hangs at runtime even with always_inline uart_putc; replaced with uart_puthex32_lower+uart_putc in callhome path
 - [Sapphire BRAM byte-store hang](sapphire-bram-byte-store-hang.md) — ANY sb to 0xF9007xxx hangs CPU; sha256.h/hkdf all use sb; precompute tokens or stub; only sw/lw safe in firmware
 - [CM APB3 bus contention](sapphire-bram-lbu-hang.md) — banner MUST be sent before CM_CTRL_RELEASED; CM grabs shared APB bus in ~tens of cycles, stalling SoC mid-UART-write; only first char escapes
-- [top.res.csv wrong sync file](top-res-csv-backslash.md) — Interface Designer writes outflow/<circuit>.interface.csv NOT top.res.csv; top.res.csv is MAP resource report; passing it to efx_pnr crashes "unknown escape sequence" on \t
 - [CM DMEM Thread.caps[0] boot fix](cm-dmem-thread-caps.md) — word 125=0x4A000006 (E-GT→slot 6 SelfTest); word 384=0xF8000000 lazy stub; regen: gen_verilog --ti60 then gen_cm_dmem_direct.py build/
 - [OBBS single-patch-location bug class](obbs-single-patch-location.md) — a newer patch step + an un-removed older patch step for the same artifact eventually double-run; make the later step a read-only self-test, not a fallback patch
 - [Ti60 one-button build](ti60-one-button-build.md) — CM DMEM/firmware patches must happen BEFORE synthesis (build_ti60_bitstream.sh, not run_efx_map.sh); patching map.v in PNR is ignored (PNR reads BRAM from top.vdb written by MAP)
@@ -65,7 +56,6 @@
 - [Boot catalog slot 4 no longer a gap](boot-catalog-slot4-no-longer-gap.md) — hardware boot catalog is 8 slots (0-6 named, gap moved to 7); never hardcode slot 3=Boot.Abstr, use sim.bootEntrySlot
 - [Boot catalog slot 7 — WukongCallHome](boot-catalog-slot7-wukong.md) — slot 7 is WukongCallHome (E-perm, loc=0x140); nsCount=8; must update simulator.js + boot_rom.py + boot_image.py + test together
 - [Freshness guards on idempotent patches must be content-based](freshness-guard-content-vs-mtime.md) — if a patch's output text never changes once applied, an mtime comparison against it will eventually false-positive forever
-- [Efinity PT Unified device package PYTHONPATH gap](efinity-pt-unified-pythonpath.md) — efx_run_pt_unified.py imports device.service from pt/bin; skipping setup.sh drops it from PYTHONPATH, causing a silent exit-0 no-op, not a crash
 - [EFXPT_HOME needs /pt suffix](efxpt-home-must-include-pt-suffix.md) — must equal $EFINITY_HOME/pt or Interface Designer's device-name check silently always fails ("unusupported device")
 - [LUMP abstraction-name consistency scoping](lump-abstraction-name-consistency.md) — drift check must exempt user-compiled + dynamic/NULL lumps or it false-fails on legitimate non-registry names (also in CM_LUMP_SPECIFICATION.md §Developer Traps)
 - [Boot DEMO_CLIST layout](demo-clist-layout.md) — [0]=mem-mgr, [1]=Boot.Thread, [2]=UART, [3]=LED, [4]=BTN, [5]=TIMER, [6]=SelfTest; no separate Boot.NS slot at [1]
@@ -144,6 +134,7 @@
 - [LUMP documentation cases](lump-documentation-cases.md) — classify each LUMP as fully documented, source without comments, or API only
 - [Fault snapshot reboot correlation](fault-snapshot-reboot-correlation.md) — auto-reboot only after the exact fault's complete snapshot is durably promoted
 - [Bitstream release candidate baseline](bitstream-release-candidate-baseline.md) — Versions must surface pending hardware commits; never claim an artifact released without a trusted source commit
+- [Wukong release-host staging](wukong-release-host-staging.md) — Build each candidate in a fresh commit-pinned vendor checkout; never reuse stale or dirty historical build directories
 - [Historical hardware authority chain](historical-hardware-authority-chain.md) — grant saved test context only through an exact build, source, and artifact-digest binding
 - [Testing iframe health regression](testing-iframe-health-regression.md) — isolate live telemetry when verifying health-panel state across persistent Builder-tab navigation
 - [Wukong UI surface ownership](wukong-ui-surface-ownership.md) — physical-board controls live only on Builder > Testing; simulator controls remain software-only

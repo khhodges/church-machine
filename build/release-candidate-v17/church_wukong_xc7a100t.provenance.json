@@ -1,0 +1,40 @@
+{
+  "artifacts": {
+    "church_wukong_xc7a100t.bit": {
+      "sha256": "9ef015d897161d79f75121f920fd2c18191b2b0ad3325c795f4a45e9c91f109b",
+      "size_bytes": 3826002
+    },
+    "church_wukong_xc7a100t.mcs": {
+      "sha256": "d609e72a5f0c84ea32b184c4491e36349c103dd75bf84678949f5857b8c17684",
+      "size_bytes": 10521876
+    }
+  },
+  "boot_inputs_sha256": {
+    "hardware/boot_rom.py": "1007e9813a4a87a53a8bb773489f93c27776f744e0ae51020a315c6d46e6e393",
+    "server/lumps/boot-image.bin": "6eeacc68a367edfe4182dbc4225062906bea495fa4ed7f256aa65720220e1507"
+  },
+  "generated_inputs_sha256": {
+    "build/church_wukong_xc7a100t.il": "02f59fe5780c2da7276599f56fd99b173b6b721d243fbc9e37689a2d5896b72b",
+    "build/church_wukong_xc7a100t.v": "83ca83c21a036f59cd6a0af2f720eb8bd61c45b780ffa959e5da05d278bd8420"
+  },
+  "hardware_sources_sha256": "344eb5f417504eeb0f7bc13bc825de4929cd98b229c694182020eaddbc9592c7",
+  "release_status": "candidate_not_published",
+  "schema_version": 1,
+  "sentinel": {
+    "build_version": 17,
+    "magic_hex": "0xBC",
+    "n_init": 526,
+    "tu_version": 2
+  },
+  "source_commit": "ff643a1ce6c9bbc222ac523a24f91dbca04b2a50",
+  "source_tree_clean_at_build": true,
+  "timing": {
+    "status": "clean",
+    "wns_ns": "1.358890"
+  },
+  "toolchain": {
+    "amaranth": "0.5.9",
+    "vivado": "2026.1",
+    "yosys": "0.51"
+  }
+}
