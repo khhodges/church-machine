@@ -700,6 +700,30 @@ def download_wukong_mcs():
                      download_name="church_wukong_xc7a100t.mcs",
                      mimetype="application/octet-stream")
 
+@app.route("/dl/wukong-v17-bit")
+def download_wukong_v17_bit():
+    """Serve the quarantined v17 candidate without replacing the release file."""
+    p = os.path.abspath(os.path.join(
+        _wukong_build_dir(), "release-candidate-v17",
+        "church_wukong_xc7a100t.bit"))
+    if not os.path.isfile(p):
+        return jsonify({"ok": False, "error": "v17 candidate is unavailable"}), 404
+    return send_file(p, as_attachment=True,
+                     download_name="church_wukong_xc7a100t_v17.bit",
+                     mimetype="application/octet-stream")
+
+@app.route("/dl/wukong-v17-mcs")
+def download_wukong_v17_mcs():
+    """Serve the quarantined v17 candidate without replacing the release file."""
+    p = os.path.abspath(os.path.join(
+        _wukong_build_dir(), "release-candidate-v17",
+        "church_wukong_xc7a100t.mcs"))
+    if not os.path.isfile(p):
+        return jsonify({"ok": False, "error": "v17 candidate is unavailable"}), 404
+    return send_file(p, as_attachment=True,
+                     download_name="church_wukong_xc7a100t_v17.mcs",
+                     mimetype="application/octet-stream")
+
 @app.route("/dl/wukong-verilog")
 def download_wukong_verilog():
     p = os.path.join(os.path.dirname(__file__), "..", "build", "church_wukong_xc7a100t.v")
