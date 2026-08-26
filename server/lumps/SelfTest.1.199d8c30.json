@@ -1,0 +1,98 @@
+{
+  "token": "56096905",
+  "abstraction": "SelfTest",
+  "filename": "SelfTest.1.199d8c30.lump",
+  "sidecar_file": "SelfTest.1.199d8c30.json",
+  "ns_slot": 6,
+  "lump_size": 4096,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 500,
+  "cc": 5,
+  "profile": "IoT",
+  "language": "",
+  "author": "",
+  "version": "",
+  "release_notes": "",
+  "methods": [],
+  "capabilities": [
+    {
+      "name": "SelfTest",
+      "rights": [
+        "E"
+      ],
+      "grants": [],
+      "nsIndex": 6
+    },
+    {
+      "name": "Next",
+      "rights": [
+        "E"
+      ],
+      "grants": [],
+      "nsIndex": 6
+    },
+    {
+      "name": "SlideRule",
+      "rights": [
+        "E"
+      ],
+      "grants": [
+        "E"
+      ],
+      "nsIndex": 16
+    },
+    {
+      "name": "Abacus",
+      "rights": [
+        "E"
+      ],
+      "grants": [
+        "E"
+      ],
+      "nsIndex": 17
+    },
+    {
+      "name": "Constants",
+      "rights": [
+        "E"
+      ],
+      "grants": [
+        "E"
+      ],
+      "nsIndex": 18
+    }
+  ],
+  "compiler_owned_self": false,
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown",
+    "source_hash": ""
+  },
+  "deployment": {
+    "target_board": "wukong-xc7a100t",
+    "profile": "IoT",
+    "built_at": "2026-08-26T22:08:42.890046Z",
+    "builder": "CLOOMC++ IDE v1.0"
+  },
+  "grants": [
+    "E"
+  ],
+  "source": "",
+  "binary_hash": "3aafdc4c0950f853a2d9fee4bfd5c9410b7531d26b4b44c55418bce1c287d58f",
+  "petname": "",
+  "issue_number": 1,
+  "identity_string": "SelfTest#1",
+  "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25",
+  "identity_seal_location": "sidecar",
+  "dot_name": "SelfTest",
+  "issue_n": 1,
+  "lump_version": 78,
+  "compiled_at": 1787782122.8900723,
+  "sourceStorageTier": 2
+}

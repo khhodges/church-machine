@@ -1880,7 +1880,8 @@
     "issue_n": 1,
     "ns_slot": 6,
     "ns_slot_policy": "static",
-    "boot_resident": true
+    "boot_resident": true,
+    "variant_group": "compiled_selftest"
   },
   {
     "token": "00000700",
@@ -2700,6 +2701,29 @@
     "issue_number": 1,
     "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f",
     "dot_name": "Adder",
+    "issue_n": 1
+  },
+  {
+    "token": "56096905",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.1.199d8c30.lump",
+    "sidecar_file": "SelfTest.1.199d8c30.json",
+    "lump_size": 4096,
+    "cw": 500,
+    "cc": 5,
+    "author": "",
+    "version": "",
+    "lump_version": 78,
+    "compiled_at": 1787782122.8900723,
+    "methods": [],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "3aafdc4c0950f853a2d9fee4bfd5c9410b7531d26b4b44c55418bce1c287d58f",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25",
+    "dot_name": "SelfTest",
     "issue_n": 1
   }
 ]
