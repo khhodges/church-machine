@@ -996,3 +996,36 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python -m pytest tests/server/test_primary_publish_config.py -v"
+
+[[workflows.workflow]]
+name = "wukong-health-strip-church-only-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_wukong_health_strip_church_only.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "wukong-turing-filter-server-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python3 -m pytest tests/server/test_wukong_turing_filter.py -v"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "deep-dive-annotations-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_deep_dive_annotations.js"
+
+[workflows.workflow.metadata]
+outputType = "console"

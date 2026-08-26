@@ -3,9 +3,9 @@
 /**
  * test_sync_guard.js
  *
- * Tests the fallback behaviour of check-run-all-tests-sync.js when
- * test-workflow-config.json is missing or unparseable, validates script-only
- * declarations, and confirms the happy-path produces the expected OK output.
+ * Tests fail-closed behaviour when test-workflow-config.json is missing or
+ * unparseable, validates script-only declarations, and confirms the happy-path
+ * produces the expected OK output.
  *
  * Run:  node scripts/test_sync_guard.js
  */
@@ -72,66 +72,85 @@ function configWithScriptOnlySuites(scriptOnlySuites) {
 }
 
 // ---------------------------------------------------------------------------
-// T1 — missing config file: exits 0, stderr contains WARNING
+// T1 — missing config file: exits 1 with a clear configuration error
 // ---------------------------------------------------------------------------
 {
     const result = withConfig(null, () => runGuard());
 
-    check('T1: missing config — exit code 0',
-        result.status === 0);
+    check('T1: missing config — exit code 1',
+        result.status === 1);
 
-    check('T1: missing config — WARNING on stderr',
-        (result.stderr || '').includes('WARNING'));
+    check('T1: missing config — clear error on stderr',
+        (result.stderr || '').includes('SYNC CONFIG ERROR') &&
+        (result.stderr || '').includes('not found'));
 }
 
 // ---------------------------------------------------------------------------
-// T2 — corrupt JSON: exits 0, stderr contains WARNING
+// T2 — corrupt JSON: exits 1 with a clear configuration error
 // ---------------------------------------------------------------------------
 {
     const result = withConfig('{ this is not valid JSON !!!', () => runGuard());
 
-    check('T2: corrupt JSON — exit code 0',
-        result.status === 0);
+    check('T2: corrupt JSON — exit code 1',
+        result.status === 1);
 
-    check('T2: corrupt JSON — WARNING on stderr',
-        (result.stderr || '').includes('WARNING'));
+    check('T2: corrupt JSON — clear error on stderr',
+        (result.stderr || '').includes('SYNC CONFIG ERROR') &&
+        (result.stderr || '').includes('could not parse'));
 }
 
 // ---------------------------------------------------------------------------
-// T3 — stale script-only declaration: exits 1 and reports the declaration
+// T3 — corrupt schema: exits 1 with a clear configuration error
+// ---------------------------------------------------------------------------
+{
+    const result = withConfig(JSON.stringify({
+        infrastructureWorkflows: [],
+        scriptOnlySuites: 'not-an-array',
+    }), () => runGuard());
+
+    check('T3: corrupt schema — exit code 1',
+        result.status === 1);
+
+    check('T3: corrupt schema — clear error on stderr',
+        (result.stderr || '').includes('SYNC CONFIG ERROR') &&
+        (result.stderr || '').includes('infrastructureWorkflows'));
+}
+
+// ---------------------------------------------------------------------------
+// T4 — stale script-only declaration: exits 1 and reports the declaration
 // ---------------------------------------------------------------------------
 {
     const config = configWithScriptOnlySuites(['suite-that-no-longer-exists']);
     const result = withConfig(config, () => runGuard());
     const output = `${result.stdout || ''}\n${result.stderr || ''}`;
 
-    check('T3: stale script-only declaration — exit code 1',
+    check('T4: stale script-only declaration — exit code 1',
         result.status === 1);
 
-    check('T3: stale script-only declaration — reports missing script registration',
+    check('T4: stale script-only declaration — reports missing script registration',
         output.includes('script-only declarations are not') &&
         output.includes('suite-that-no-longer-exists'));
 }
 
 // ---------------------------------------------------------------------------
-// T4 — script-only declaration with a dedicated workflow: exits 1 and reports it
+// T5 — script-only declaration with a dedicated workflow: exits 1 and reports it
 // ---------------------------------------------------------------------------
 {
     const config = configWithScriptOnlySuites(['assembler-tests']);
     const result = withConfig(config, () => runGuard());
     const output = `${result.stdout || ''}\n${result.stderr || ''}`;
 
-    check('T4: script-only declaration with workflow — exit code 1',
+    check('T5: script-only declaration with workflow — exit code 1',
         result.status === 1);
 
-    check('T4: script-only declaration with workflow — reports dedicated workflow',
+    check('T5: script-only declaration with workflow — reports dedicated workflow',
         output.includes('also have') &&
         output.includes('a dedicated workflow in .replit') &&
         output.includes('assembler-tests'));
 }
 
 // ---------------------------------------------------------------------------
-// T5 — duplicate script-only declaration: exits 1 and reports the duplicate
+// T6 — duplicate script-only declaration: exits 1 with a config error
 // ---------------------------------------------------------------------------
 {
     const config = configWithScriptOnlySuites([
@@ -143,25 +162,26 @@ function configWithScriptOnlySuites(scriptOnlySuites) {
     const result = withConfig(config, () => runGuard());
     const output = `${result.stdout || ''}\n${result.stderr || ''}`;
 
-    check('T5: duplicate script-only declaration — exit code 1',
+    check('T6: duplicate script-only declaration — exit code 1',
         result.status === 1);
 
-    check('T5: duplicate script-only declaration — reports duplicated suite',
-        output.includes('scriptOnlySuites contains duplicate declarations') &&
+    check('T6: duplicate script-only declaration — clear config error',
+        output.includes('SYNC CONFIG ERROR') &&
+        output.includes('"scriptOnlySuites" contains duplicate entries') &&
         output.includes('sha32-vectors') &&
         output.includes('lambda-exec-tests'));
 }
 
 // ---------------------------------------------------------------------------
-// T6 — normal case: exits 0, stdout contains "OK"
+// T7 — normal case: exits 0, stdout contains "OK"
 // ---------------------------------------------------------------------------
 {
     const result = runGuard();
 
-    check('T6: normal case — exit code 0',
+    check('T7: normal case — exit code 0',
         result.status === 0);
 
-    check('T6: normal case — OK line printed',
+    check('T7: normal case — OK line printed',
         (result.stdout || '').includes('OK — all'));
 }
 

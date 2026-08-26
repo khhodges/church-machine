@@ -2,10 +2,10 @@
 /**
  * check-run-all-tests-sync.js
  *
- * Diffs the set of test workflows in .replit against the run_suite entries in
- * scripts/run-all-tests.sh.  Exits non-zero with a clear message if any test
- * workflow is missing from the script, or if the script lists a suite name
- * that has no matching workflow.
+ * Diffs the set of test workflows in .replit against the register_suite
+ * entries in scripts/run-all-tests.sh. Exits non-zero with a clear message if
+ * any test workflow is missing from the script, if the script lists a suite
+ * name that has no matching workflow, or if the sync configuration is invalid.
  *
  * "Test workflow" is defined as any named workflow that is NOT in the
  * INFRASTRUCTURE_WORKFLOWS exclusion set below.  Add entries to that set only
@@ -31,109 +31,50 @@ const ROOT = path.resolve(__dirname, '..');
 // The list lives in scripts/test-workflow-config.json — edit that file
 // (not this one) when adding a new non-test workflow.
 //
-// Missing-file behaviour: if test-workflow-config.json cannot be found, the
-// guard falls back to the built-in DEFAULT_INFRASTRUCTURE_WORKFLOWS list below
-// and prints a warning.  The check still runs rather than aborting, so CI is
-// not silently broken by an accidentally deleted config file.  Restore the
-// file (or add the new workflow to the default list here) to suppress the
-// warning.
+// The configuration is required. A missing, malformed, or structurally
+// invalid file must stop the release check rather than silently changing which
+// workflows are considered tests.
 // ---------------------------------------------------------------------------
 
-/** Fallback used when test-workflow-config.json is absent. */
-const DEFAULT_INFRASTRUCTURE_WORKFLOWS = [
-    'Project',
-    'Church Machine IDE',
-    'all-tests',
-    'artifacts/mockup-sandbox: Component Preview Server',
-    'ti60-utilisation',
-];
-
-/**
- * Suites that are registered in run-all-tests.sh but have no dedicated
- * workflow entry (they run as direct scripts).  Keep this in sync with
- * the scriptOnlySuites array in test-workflow-config.json.
- */
-const DEFAULT_SCRIPT_ONLY_SUITES = [
-    'wukong-bridge-parser-tests',
-    'sha32-vectors',
-    'check-sha32-collisions',
-    'compile-api-tests',
-    'lump-builder-dispatch-tests',
-    'wukong-protocol-tests',
-    'update-lump-tests',
-    'check-slot-index-leak',
-    'ns-slot-dynamic-tests',
-    'rogue-namespace-slot-tests',
-    'lambda-exec-tests',
-    'hardware-sim',
-    'check-ila-probe-names',
-    'test-check-ila-probe-names',
-    'boot-gt-words-tests',
-    'trace-packet-execution-tests',
-    'sentinel-warning-tests',
-    'check-wukong-hw-init',
-    'wukong-cr-update-tests',
-    'wukong-trace-cr-server-tests',
-    'wukong-status-readonly-tests',
-    'versions-view-tests',
-    'pipeline-health-status-tests',
-    'pipeline-health-stages-tests',
-    'check-no-ti60-ui',
-    'bitstream-version-labeling-tests',
-    'boot-entry-hw-image-tests',
-    'lump-save-endpoint-tests',
-    'lump-save-error-surface-tests',
-    'constants-lump-tests',
-    'lump-v13-freespace-tests',
-    'check-lumps-guard',
-    'check-ns-word3-contract',
-    'test-check-ns-word3-contract',
-    'install-boot-entry-cr0-tests',
-];
-
 const configPath = path.join(__dirname, 'test-workflow-config.json');
-let INFRASTRUCTURE_WORKFLOWS;
+let parsedConfig;
 if (!fs.existsSync(configPath)) {
-    console.warn('WARNING: scripts/test-workflow-config.json not found at', configPath);
-    console.warn('Falling back to built-in default infrastructure-workflow list.');
-    console.warn('Restore the file to suppress this warning.\n');
-    INFRASTRUCTURE_WORKFLOWS = new Set(DEFAULT_INFRASTRUCTURE_WORKFLOWS);
-} else {
-    let parsed;
-    try {
-        parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    } catch (e) {
-        console.warn('WARNING: scripts/test-workflow-config.json could not be parsed:', e.message);
-        console.warn('Falling back to built-in default infrastructure-workflow list.\n');
-        parsed = { infrastructureWorkflows: DEFAULT_INFRASTRUCTURE_WORKFLOWS };
-    }
-    INFRASTRUCTURE_WORKFLOWS = new Set(parsed.infrastructureWorkflows);
+    console.error(`SYNC CONFIG ERROR — required file not found: ${configPath}`);
+    process.exit(1);
+}
+try {
+    parsedConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+} catch (e) {
+    console.error(`SYNC CONFIG ERROR — could not parse ${configPath}: ${e.message}`);
+    process.exit(1);
 }
 
-// Script-only suites: registered in run-all-tests.sh but intentionally have
-// no dedicated workflow entry (too lightweight, or workflow limit reached).
-let SCRIPT_ONLY_SUITES;
-let SCRIPT_ONLY_DUPLICATES = [];
-if (!fs.existsSync(configPath)) {
-    SCRIPT_ONLY_SUITES = new Set(DEFAULT_SCRIPT_ONLY_SUITES);
-} else {
-    let parsed2;
-    try {
-        parsed2 = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    } catch (e) {
-        parsed2 = { scriptOnlySuites: DEFAULT_SCRIPT_ONLY_SUITES };
-    }
-    const scriptOnlyDeclarations = parsed2.scriptOnlySuites || DEFAULT_SCRIPT_ONLY_SUITES;
-    const seenScriptOnlySuites = new Set();
-    SCRIPT_ONLY_DUPLICATES = [...new Set(
-        scriptOnlyDeclarations.filter(name => {
-            if (seenScriptOnlySuites.has(name)) return true;
-            seenScriptOnlySuites.add(name);
-            return false;
-        })
-    )].sort();
-    SCRIPT_ONLY_SUITES = new Set(scriptOnlyDeclarations);
+if (!parsedConfig || typeof parsedConfig !== 'object' || Array.isArray(parsedConfig)) {
+    console.error(`SYNC CONFIG ERROR — ${configPath} must contain a JSON object.`);
+    process.exit(1);
 }
+
+function readStringArray(field) {
+    const value = parsedConfig[field];
+    if (!Array.isArray(value) || value.length === 0 ||
+        value.some(name => typeof name !== 'string' || name.trim() === '')) {
+        console.error(
+            `SYNC CONFIG ERROR — ${configPath} must contain a non-empty "${field}" string array.`
+        );
+        process.exit(1);
+    }
+    const duplicates = [...new Set(value.filter((name, index) => value.indexOf(name) !== index))];
+    if (duplicates.length > 0) {
+        console.error(
+            `SYNC CONFIG ERROR — "${field}" contains duplicate entries: ${duplicates.join(', ')}`
+        );
+        process.exit(1);
+    }
+    return new Set(value);
+}
+
+const INFRASTRUCTURE_WORKFLOWS = readStringArray('infrastructureWorkflows');
+const SCRIPT_ONLY_SUITES = readStringArray('scriptOnlySuites');
 
 // ---------------------------------------------------------------------------
 // Parse .replit — extract names of all [[workflows.workflow]] entries
@@ -263,17 +204,6 @@ if (scriptOnlyWithWorkflow.length > 0) {
     console.error('');
     console.error('Remove the declaration from scriptOnlySuites; dedicated workflows');
     console.error('must be tracked as normal test workflows.');
-}
-
-if (SCRIPT_ONLY_DUPLICATES.length > 0) {
-    ok = false;
-    console.error('');
-    console.error('SYNC ERROR — scriptOnlySuites contains duplicate declarations:');
-    for (const name of SCRIPT_ONLY_DUPLICATES) {
-        console.error(`  • ${name}`);
-    }
-    console.error('');
-    console.error('Remove duplicate entries from scripts/test-workflow-config.json.');
 }
 
 if (ok) {
