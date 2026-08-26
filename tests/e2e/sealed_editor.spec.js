@@ -87,7 +87,9 @@ test.describe('Editor remains editable after compile', () => {
         });
 
         await page.goto('/simulator/');
-        await page.waitForLoadState('networkidle');
+        await page.waitForFunction(() =>
+            typeof window.compileAndBuild === 'function' &&
+            !!document.getElementById('asmEditor'));
 
         const after = await triggerCompile(page);
 
@@ -102,7 +104,9 @@ test.describe('Editor remains editable after compile', () => {
 
         // ── Reload and re-assert ──────────────────────────────────────────────
         await page.reload();
-        await page.waitForLoadState('networkidle');
+        await page.waitForFunction(() =>
+            typeof window.compileAndBuild === 'function' &&
+            !!document.getElementById('asmEditor'));
 
         const afterReload = await readEditableState(page);
 
@@ -114,6 +118,44 @@ test.describe('Editor remains editable after compile', () => {
 
         expect(afterReload.sealedLump,
             'cm_sealed_lump must still be absent after reload').toBeNull();
+    });
+
+    test('Enter keeps focus in raw assembly after compiling', async ({ page }) => {
+        test.setTimeout(60000);
+
+        await page.goto('/simulator/');
+        await page.waitForFunction(() =>
+            typeof window.assembleAndLoad === 'function' &&
+            !!document.getElementById('asmEditor'));
+
+        await page.evaluate(() => {
+            window.switchView('editor');
+            const editor = document.getElementById('asmEditor');
+            const language = document.getElementById('langSelector');
+            if (language) language.value = 'assembly';
+            editor.value = 'HALT';
+            window.assembleAndLoad();
+        });
+
+        const editor = page.locator('#asmEditor');
+        await editor.focus();
+        await page.keyboard.press('End');
+        await page.keyboard.press('Enter');
+        await page.keyboard.type('IADD DR1, DR1, #9');
+
+        const afterNewline = await page.evaluate(() => {
+            const ed = document.getElementById('asmEditor');
+            return {
+                focused: document.activeElement === ed,
+                readOnly: ed ? ed.readOnly : null,
+                value: ed ? ed.value : '',
+                pickerVisible: !!(window.AsmInstructionPicker && window.AsmInstructionPicker.isVisible()),
+            };
+        });
+        expect(afterNewline.focused, 'Enter must keep keyboard focus in the editor').toBe(true);
+        expect(afterNewline.readOnly, 'editor must remain writable after Enter').toBe(false);
+        expect(afterNewline.pickerVisible, 'Enter must not auto-open the instruction picker').toBe(false);
+        expect(afterNewline.value).toContain('HALT\nIADD DR1, DR1, #9');
     });
 
 });

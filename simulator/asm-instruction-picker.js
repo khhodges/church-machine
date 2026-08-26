@@ -744,19 +744,10 @@
                 return;
             }
 
-            if (e.key === 'Enter') {
-                // After the browser inserts the newline, check if new line is blank
-                setTimeout(function () {
-                    var val = textarea.value;
-                    var pos = textarea.selectionStart;
-                    var lineStart = val.lastIndexOf('\n', pos - 1) + 1;
-                    var lineEnd = val.indexOf('\n', pos);
-                    var currentLine = val.substring(lineStart, lineEnd === -1 ? val.length : lineEnd);
-                    if (currentLine.trim() === '') {
-                        showPicker(textarea);
-                    }
-                }, 0);
-            }
+            // Enter must leave focus in the editor so a programmer can keep
+            // typing on the next line. The picker remains available through
+            // its toolbar button and Ctrl/Cmd+Space shortcut; opening it
+            // automatically on every blank line steals focus into its filter.
         });
 
         // Dismiss on outside click (use document capture so we catch everything)
