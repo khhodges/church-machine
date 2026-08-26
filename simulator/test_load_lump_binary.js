@@ -14,8 +14,8 @@
 //            word (0) produces a clean halt rather than a fault entry.
 //   LLB-03  Synthetic NS slot 3 parameters (cw=17, cc=1) round-trip through
 //            loadLumpBinary: NS slot 3 word1 encodes limit=17, clistCount=1.
-//            (These are the same header parameters used by the real LED flash
-//            lump — token 00000300 — which occupies NS slot 3 at runtime.)
+//            (These model the historic LED-flash loader shape; the real-fixture
+//            checks below read their expected values from manifest.json.)
 //   LLB-04  loadLumpBinary with cc=0: NS slot 3 clistCount=0, CR6 zeroed.
 //   LLB-05  Memory layout: code word at 0x0401 survives the load unchanged.
 //   LLB-06  PC is reset to 0 by loadLumpBinary.
@@ -51,20 +51,17 @@
 //            = 0x83F5.
 //
 // Coverage (real fixture + app-path tests):
-// Fixture: server/lumps/00000300.lump — "LED flash" abstraction (per sidecar
-// JSON), loaded into NS slot 3 (sim.bootEntrySlot) at runtime.  cw=17, cc=1.
-// Note: the original task description referenced token "00000003"; the actual
-// Boot.Abstr slot fixture on disk is "00000300" (canonical per sidecar JSON).
+// Fixtures are resolved from canonical manifest entries, so a filename migration
+// cannot silently skip or stale the real-binary checks.
 //
-//   LLB-RBA Load the real LED flash binary (00000300.lump, big-endian as served
-//            by Flask /api/lump/00000300/words).  Verifies the file decodes as
-//            cw=17 cc=1 and that loadLumpBinary installs it correctly.
+//   LLB-RBA Load the canonical SelfTest binary, decoded as big-endian words just
+//            as Flask serves them, and verify that loadLumpBinary installs it.
 //   LLB-APP Mimic the _loadLumpBinaryIntoSim() app-path (fetch → rawWords →
 //            loadLumpBinary → parseLumpHeader → wordCount).  Uses the fixture
 //            file in place of the network fetch and asserts the "header row"
 //            values (wordCount=17, hdr.cc=1) that the browser console line
 //            displays after a successful load.
-//   LLB-STP step() on real LED flash (NS slot 3) code: physicalPC = 0x0401
+//   LLB-STP step() on canonical LED flash (NS slot 3) code: physicalPC = 0x0401
 //            and _instrHistory contains rawWords[1] after step(), proving the
 //            fetch phase reached the right address with the right word.
 
@@ -126,6 +123,24 @@ function check(label, cond, detail) {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const EXTENDED_BASE = 0x0400;
+const LUMPS_DIR = path.join(__dirname, '..', 'server', 'lumps');
+const LUMP_MANIFEST = JSON.parse(fs.readFileSync(path.join(LUMPS_DIR, 'manifest.json'), 'utf8'));
+function canonicalFixture(token, abstraction) {
+    const entry = LUMP_MANIFEST.find(candidate =>
+        candidate.token === token &&
+        candidate.abstraction === abstraction &&
+        typeof candidate.filename === 'string' &&
+        typeof candidate.sidecar_file === 'string'
+    );
+    if (!entry) {
+        throw new Error(
+            `manifest.json has no canonical ${abstraction} fixture entry (token ${token}).`
+        );
+    }
+    return entry;
+}
+const SELFTEST_FIXTURE = canonicalFixture('00000600', 'SelfTest');
+const LEDFLASH_FIXTURE = canonicalFixture('55f1a32f', 'LEDFlash');
 // Note: Boot.Abstr slot is accessed via sim.bootEntrySlot (default 3).
 // Do not hardcode a named NS slot constant here — use sim.bootEntrySlot instead.
 
@@ -323,7 +338,7 @@ console.log('\n--- LLB-02: step() fetches first code word without fault ---');
 
 // ── LLB-03: NS slot 3 parameters (cw=17, cc=1) round-trip ────────────────────
 // Synthetic test: constructs a LUMP with the header parameters that match the
-// real LED flash abstraction (token 00000300, NS slot 3): cw=17, cc=1.
+// historic LED-flash loader shape: cw=17, cc=1.
 console.log('\n--- LLB-03: Synthetic NS slot 3 cw=17 cc=1 round-trip (LED flash params) ---');
 {
     const { sim, nsBase, ok } = setupAndLoad({ cw: 17, cc: 1 });
@@ -418,25 +433,24 @@ console.log('\n--- LLB-08: NS[3].word2 seal consistent with EXTENDED_BASE and cw
         `stored=0x${storedWord2.toString(16)} expected=0x${expected.toString(16)}`);
 }
 
-// ── LLB-RBA: Real PostFlashSelftest binary (059dc47f.lump, Boot.Abstr slot) ──
-// Fixture: server/lumps/059dc47f.lump — canonical abstraction name "PostFlashSelftest"
-// per sidecar JSON (server/lumps/059dc47f.json), token 059dc47f, cw=499, cc=2,
-// lumpSize=512 (2048-byte file).  This is the Boot.Abstr lump (NS slot 6) that
+// ── LLB-RBA: Canonical SelfTest binary (Boot.Abstr slot) ──────────────────────
+// The manifest identifies the canonical SelfTest binary. It is the Boot.Abstr
+// lump (NS slot 6) that
 // the simulator loads into the boot entry slot at startup.
 // c-list: slot 0 = SelfTest E-GT; slot 1 = Next.GT (default=self-loop;
 //         boot_image.py overrides at image-generation time).
 // Completion: ELOADCALL CR1, Next — dispatches through c-list[1], not Thread.caps[0].
 // Reads the file as big-endian uint32 words — the same format served by the
-// Flask /api/lump/059dc47f/words endpoint.
+// Flask /api/lump/00000600/words endpoint.
 // To regenerate after editing the source:
 //   node scripts/build_selftest_lump.js
-//   Then update the token here and in tests/lump/test_lump_consistency.py
-//   and commit the new .lump + .json + manifest.json.
-console.log('\n--- LLB-RBA: Real PostFlashSelftest binary (059dc47f.lump, Boot.Abstr slot) ---');
+//   Then update the canonical manifest entry and commit the .lump + .json +
+//   manifest.json. This test resolves its fixture through that entry.
+console.log('\n--- LLB-RBA: Canonical SelfTest binary (Boot.Abstr slot) ---');
 {
-    const lumpPath = path.join(__dirname, '..', 'server', 'lumps', '059dc47f.lump');
+    const lumpPath = path.join(LUMPS_DIR, SELFTEST_FIXTURE.filename);
     const lumpExists = fs.existsSync(lumpPath);
-    check('LLB-RBA-0: 059dc47f.lump fixture file exists on disk', lumpExists,
+    check(`LLB-RBA-0: canonical SelfTest fixture ${SELFTEST_FIXTURE.filename} exists on disk`, lumpExists,
         lumpPath);
 
     if (lumpExists) {
@@ -485,15 +499,17 @@ console.log('\n--- LLB-RBA: Real PostFlashSelftest binary (059dc47f.lump, Boot.A
             sim2.cr[14].word1 === EXTENDED_BASE,
             `got 0x${sim2.cr[14].word1.toString(16)}`);
 
-        // LLB-RBA-11: Sidecar JSON metadata — prevents future token/name drift.
-        const sidecarPath = path.join(__dirname, '..', 'server', 'lumps', '059dc47f.json');
-        if (fs.existsSync(sidecarPath)) {
+        // LLB-RBA-11: Sidecar metadata is resolved through the same manifest
+        // entry, preventing independent fixture names from drifting.
+        const sidecarPath = path.join(LUMPS_DIR, SELFTEST_FIXTURE.sidecar_file);
+        const sidecarExists = fs.existsSync(sidecarPath);
+        check(`LLB-RBA-11: canonical SelfTest sidecar ${SELFTEST_FIXTURE.sidecar_file} exists on disk`,
+            sidecarExists, sidecarPath);
+        if (sidecarExists) {
             const sidecar = JSON.parse(fs.readFileSync(sidecarPath, 'utf8'));
-            check('LLB-RBA-11: sidecar token = 059dc47f (canonical token for PostFlashSelftest)',
-                sidecar.token === '059dc47f',
+            check('LLB-RBA-12: sidecar token matches the canonical SelfTest token',
+                sidecar.token === SELFTEST_FIXTURE.token,
                 `got token=${sidecar.token}`);
-        } else {
-            console.log('SKIP LLB-RBA-11 (sidecar 059dc47f.json not found)');
         }
     }
 }
@@ -508,10 +524,13 @@ console.log('\n--- LLB-RBA: Real PostFlashSelftest binary (059dc47f.lump, Boot.A
 //   5. Displays: `Loaded LUMP "${name}" — cw=${wordCount} cc=${hdr.cc}`
 // Here we substitute the network fetch with a file read (same byte format) and
 // verify the "header row" values that the browser console would display.
-console.log('\n--- LLB-APP: Mimic _loadLumpBinaryIntoSim app path with real fixture ---');
+console.log('\n--- LLB-APP: Mimic _loadLumpBinaryIntoSim app path with canonical LED flash fixture ---');
 {
-    const lumpPath = path.join(__dirname, '..', 'server', 'lumps', '00000300.lump');
-    if (fs.existsSync(lumpPath)) {
+    const lumpPath = path.join(LUMPS_DIR, LEDFLASH_FIXTURE.filename);
+    const lumpExists = fs.existsSync(lumpPath);
+    check(`LLB-APP-0: canonical LED flash fixture ${LEDFLASH_FIXTURE.filename} exists on disk`,
+        lumpExists, lumpPath);
+    if (lumpExists) {
         // Step 1: Read words from disk (replaces fetch → data.words)
         const rawWords = readLumpFile(lumpPath);
         check('LLB-APP-1: rawWords non-empty (simulates non-empty fetch response)',
@@ -532,28 +551,26 @@ console.log('\n--- LLB-APP: Mimic _loadLumpBinaryIntoSim app path with real fixt
         check('LLB-APP-3: hdr.valid (header row is well-formed)',
             hdr !== null && hdr.valid,
             hdr ? `magic=0x${hdr.magic.toString(16)}` : 'hdr is null');
-        check('LLB-APP-4: wordCount = 17 (cw shown in browser console line)',
-            wordCount === 17,
+        check(`LLB-APP-4: wordCount matches manifest cw (${LEDFLASH_FIXTURE.cw})`,
+            wordCount === LEDFLASH_FIXTURE.cw,
             `got wordCount=${wordCount}`);
-        check('LLB-APP-5: hdr.cc = 1 (cc shown in browser console line)',
-            hdr !== null && hdr.cc === 1,
+        check(`LLB-APP-5: hdr.cc matches manifest cc (${LEDFLASH_FIXTURE.cc})`,
+            hdr !== null && hdr.cc === LEDFLASH_FIXTURE.cc,
             hdr ? `got cc=${hdr.cc}` : 'hdr is null');
 
         // Verify simulator state matches the header-row values
         const p = sim.parseNSWord1(sim.memory[nsBase + 1]);
-        check('LLB-APP-6: NS[3] limit agrees with header-row wordCount (17)',
-            p.limit === wordCount,
-            `ns limit=${p.limit} wordCount=${wordCount}`);
-        check('LLB-APP-7: NS[3] clistCount agrees with header-row cc (1)',
-            sim.readNSEntry(sim.bootEntrySlot).clistCount === (hdr ? hdr.cc : -1),
-            `ns clistCount=${sim.readNSEntry(sim.bootEntrySlot).clistCount}`);
-    } else {
-        console.log('SKIP LLB-APP-* (fixture file not found)');
+        check('LLB-APP-6: NS[3] limit agrees with canonical header-row wordCount',
+            p.limit === LEDFLASH_FIXTURE.cw,
+            `ns limit=${p.limit} expected=${LEDFLASH_FIXTURE.cw}`);
+        check('LLB-APP-7: NS[3] clistCount agrees with canonical header cc',
+            sim.readNSEntry(sim.bootEntrySlot).clistCount === LEDFLASH_FIXTURE.cc,
+            `ns clistCount=${sim.readNSEntry(sim.bootEntrySlot).clistCount} expected=${LEDFLASH_FIXTURE.cc}`);
     }
 }
 
-// ── LLB-STP: step() on real LED flash (NS slot 3) code word ──────────────────
-// Calls step() once with the real LED flash lump (token 00000300) loaded into
+// ── LLB-STP: step() on canonical LED flash (NS slot 3) code word ─────────────
+// Calls step() once with the canonical LED flash lump loaded into
 // NS slot 3 and verifies that:
 //   (a) the fetch phase succeeded (physicalPC = 0x0401, instrHistory populated),
 //   (b) the right raw word was fetched (rawWords[1]).
@@ -563,10 +580,13 @@ console.log('\n--- LLB-APP: Mimic _loadLumpBinaryIntoSim app path with real fixt
 // The instruction itself may fault in this minimal harness because the NS table
 // is not fully populated; that is an execution fault, not a fetch fault, so we
 // only assert on the fetch evidence in _instrHistory.
-console.log('\n--- LLB-STP: step() on real LED flash (NS slot 3, token 00000300) code word ---');
+console.log('\n--- LLB-STP: step() on canonical LED flash (NS slot 3) code word ---');
 {
-    const lumpPath = path.join(__dirname, '..', 'server', 'lumps', '00000300.lump');
-    if (fs.existsSync(lumpPath)) {
+    const lumpPath = path.join(LUMPS_DIR, LEDFLASH_FIXTURE.filename);
+    const lumpExists = fs.existsSync(lumpPath);
+    check(`LLB-STP-0: canonical LED flash fixture ${LEDFLASH_FIXTURE.filename} exists on disk`,
+        lumpExists, lumpPath);
+    if (lumpExists) {
         const rawWords = readLumpFile(lumpPath);
         const { sim, nsBase } = setupSimForBinary();
         sim.loadLumpBinary(rawWords);
@@ -607,8 +627,6 @@ console.log('\n--- LLB-STP: step() on real LED flash (NS slot 3, token 00000300)
                 (entry.raw >>> 0) === expectedWord1,
                 `got 0x${(entry.raw>>>0).toString(16)} expected 0x${expectedWord1.toString(16)}`);
         }
-    } else {
-        console.log('SKIP LLB-STP-* (fixture file not found)');
     }
 }
 

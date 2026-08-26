@@ -34,6 +34,14 @@
     }
   ],
   "compiler_owned_self": true,
+  "ns_slot_policy": "dynamic",
+  "allocation_time_placeholders": [
+    {
+      "row": 0,
+      "role": "identity",
+      "word": "0xFEED5E1F"
+    }
+  ],
   "pet_names": {
     "DR": {},
     "CR": {}
