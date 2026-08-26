@@ -23,6 +23,7 @@
 //   T004 — saveToNamespaceAt stores BRANCH-encoded entries at specified slot
 //   T005 — 3-method LUMP: each method dispatches to the correct sentinel
 //   T006 — Bare legacy entries (pre-fix) resolve to the WRONG word (regression guard)
+//   T008 — same-name saves replace the selected user slot, not factory slot 6
 
 const ChurchSimulator = require('./simulator.js');
 
@@ -72,6 +73,43 @@ function check(label, cond) {
         console.log(`FAIL ${label}`);
         fail++;
     }
+}
+
+// ── T008: same-name release saves replace selected user slot only ────────────
+console.log('\n--- T008: same-name release saves replace selected user slot only ---');
+{
+    const sim = new ChurchSimulator();
+    sim.bootComplete = true;
+    const factorySlot = 6;
+    const factoryBase = sim._nsSlotBase(factorySlot);
+    const factoryBefore = [
+        sim.memory[factoryBase] >>> 0,
+        sim.memory[factoryBase + 1] >>> 0,
+        sim.memory[factoryBase + 2] >>> 0,
+        sim.memory[factoryBase + 3] >>> 0,
+    ];
+    const first = sim.saveToNamespace('SelfTest', [0x18000000], null, 1, []);
+    const firstToken = sim.lumpTokenAtSlot(first);
+    const second = sim.saveToNamespace('SelfTest', [0x18000001], null, 1, []);
+    const secondToken = sim.lumpTokenAtSlot(second);
+    const factoryAfter = [
+        sim.memory[factoryBase] >>> 0,
+        sim.memory[factoryBase + 1] >>> 0,
+        sim.memory[factoryBase + 2] >>> 0,
+        sim.memory[factoryBase + 3] >>> 0,
+    ];
+
+    check('T008a: first same-name release uses user space', first >= sim.firstUserNsSlot());
+    check('T008b: second same-name release replaces the same user slot', second === first);
+    check('T008c: both revisions retain their SelfTest name',
+        sim.nsLabels[first] === 'SelfTest' && sim.nsLabels[second] === 'SelfTest');
+    const replacedEntry = sim.readNSEntry(second);
+    check('T008d: replacement writes the new binary body',
+        replacedEntry && sim.memory[replacedEntry.word0_location + 1] === 0x18000001);
+    check('T008e: replacement binary receives a distinct T-ID',
+        firstToken && secondToken && firstToken !== secondToken);
+    check('T008f: factory SelfTest slot remains unchanged',
+        factoryBefore.every((word, index) => word === factoryAfter[index]));
 }
 
 // ── T001: saveToNamespace writes BRANCH-encoded entries to memory ──────────────

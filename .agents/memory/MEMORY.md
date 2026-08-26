@@ -155,3 +155,4 @@
 - [Release-check registry policy](release-check-registry-policy.md) — sync configuration is required and fail-closed; every release suite must be workflow-backed or explicitly script-only
 - [UART raw-transfer ownership](uart-raw-transfer-ownership.md) — bridge control bytes must be deferred for the whole framed payload interval or they corrupt board-side binary parsers
 - [Execution identity provenance](execution-identity-provenance.md) — empty source is comparable; opaque cross-algorithm source hashes never prove editor freshness
+- [Release LUMP replacement](lump-release-replacement.md) — release rebuilds replace the selected user slot by default; New Entry is explicit, while fixed system slots stay protected

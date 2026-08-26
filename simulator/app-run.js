@@ -11096,8 +11096,32 @@ function showSaveToNamespace() {
         opt.textContent = `[${i}] ${e.label}`;
         slotSel.appendChild(opt);
     }
+    // A release rebuild should default to replacing the currently selected
+    // user LUMP when its name is already present.  Keep New Entry available as
+    // the explicit choice for creating a separate copy.
     slotSel.value = 'new';
-    document.getElementById('saveNSLabel').value = '';
+    const _currentLump = window.LumpRegistry
+        ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())
+        : null;
+    const _currentName = _currentLump && _currentLump.abstraction
+        ? String(_currentLump.abstraction).trim().toLowerCase()
+        : (sim.programName ? String(sim.programName).trim().toLowerCase() : '');
+    if (_currentName) {
+        for (const _opt of Array.from(slotSel.options)) {
+            if (_opt.value === 'new') continue;
+            const _existingName = String(_opt.textContent || '')
+                .replace(/^\[\d+\]\s*/, '').trim().toLowerCase();
+            if (_existingName === _currentName) {
+                slotSel.value = _opt.value;
+                break;
+            }
+        }
+    }
+    const _defaultSlot = parseInt(slotSel.value, 10);
+    const _defaultEntry = slotSel.value !== 'new' && Number.isInteger(_defaultSlot)
+        ? sim.readNSEntry(_defaultSlot)
+        : null;
+    document.getElementById('saveNSLabel').value = _defaultEntry ? (_defaultEntry.label || '') : '';
     document.getElementById('saveNSLabel').disabled = false;
     document.getElementById('saveNSType').value = '0';
     document.getElementById('permR').checked = false;
@@ -13671,7 +13695,12 @@ function confirmSaveToNamespace() {
         var _svEntryPre = window.LumpRegistry
             ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())
             : null;
-        _svAbsName = (_svEntryPre && _svEntryPre.abstraction) || label;
+        // The Save-to-Namespace name is the explicit identity the programmer
+        // chose for this artifact.  It must not be replaced with a transient
+        // compiler label such as "start": this permits a user-derived revision
+        // to retain the name "SelfTest" while its distinct binary T-ID and
+        // timestamp distinguish it from the protected factory SelfTest.
+        _svAbsName = label;
         _svLang = (_svEntryPre && _svEntryPre.sources && _svEntryPre.sources.server
                    && _svEntryPre.sources.server.language)
                  || (typeof sim !== 'undefined' && sim._lastCompiledLanguage)
@@ -13771,6 +13800,9 @@ function confirmSaveToNamespace() {
     let idx;
     if (slotSel.value === 'new') {
         try {
+            // New Entry allocates a slot only when explicitly selected.  When an
+            // existing user slot is selected, the save below updates that LUMP
+            // in place for a new release build.
             idx = sim.saveToNamespace(label, _svWords, perms, gtType, _caps);
         } catch (err) {
             console.error('[SaveNS] save failed:', err);
