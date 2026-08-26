@@ -11048,10 +11048,10 @@ function confirmCreateNamespace() {
     updateDashboard();
 }
 
-// Return every user-replaceable Namespace slot known to the IDE. A user LUMP
-// may be saved in the repository before its slot appears in the current boot
-// image, so the live simulator table alone is not sufficient after a reload.
-// Live entries take precedence over persisted labels and catalog metadata.
+// Return every populated Namespace slot known to the IDE. A user LUMP may be
+// saved in the repository before its slot appears in the current boot image,
+// so the live simulator table alone is not sufficient after a reload. Live
+// entries take precedence over persisted labels and catalog metadata.
 function _collectSaveNamespaceSlotCandidates(simulator, serverLumps, savedLabels) {
     if (!simulator || typeof simulator.firstUserNsSlot !== 'function') return [];
     const firstUserSlot = simulator.firstUserNsSlot();
@@ -11059,7 +11059,7 @@ function _collectSaveNamespaceSlotCandidates(simulator, serverLumps, savedLabels
         ? simulator.MAX_NS_ENTRIES : (simulator.nsCount || 0);
     const candidates = new Map();
     const validSlot = function(slot) {
-        return Number.isInteger(slot) && slot >= firstUserSlot && slot < maxSlots;
+        return Number.isInteger(slot) && slot >= 0 && slot < maxSlots;
     };
     const usableLabel = function(label) {
         const text = String(label || '').trim();
@@ -11071,13 +11071,21 @@ function _collectSaveNamespaceSlotCandidates(simulator, serverLumps, savedLabels
         const label = usableLabel(rawLabel) || `Saved LUMP ${slot}`;
         const previous = candidates.get(slot);
         if (!previous || priority > previous.priority) {
-            candidates.set(slot, { slot, label, priority });
+            candidates.set(slot, {
+                slot,
+                label,
+                priority,
+                // Keep every slot visible. Boot.NS and Boot.Thread are the
+                // only entries disabled in this picker; the save path still
+                // performs its own authoritative slot validation.
+                disabled: slot === 0 || slot === 1,
+            });
         }
     };
 
     // Do not stop at nsCount: reloads restore the boot image's count, while a
     // user-selected replacement slot can legitimately sit above that boundary.
-    for (let slot = firstUserSlot; slot < maxSlots; slot++) {
+    for (let slot = 0; slot < maxSlots; slot++) {
         const entry = simulator.readNSEntry(slot);
         if (entry) add(slot, entry.label, 3);
     }
@@ -11125,6 +11133,7 @@ function _populateSaveNamespaceSlotPicker(options) {
         opt.value = String(candidate.slot);
         opt.textContent = `[${candidate.slot}] ${candidate.label}`;
         opt.dataset.nsLabel = candidate.label;
+        opt.disabled = Boolean(candidate.disabled);
         slotSel.appendChild(opt);
     }
 

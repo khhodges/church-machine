@@ -24,6 +24,9 @@ function check(label, condition) {
 }
 
 const liveSlots = new Map([
+    [0, { label: 'Boot.NS' }],
+    [1, { label: 'Boot.Thread' }],
+    [10, { label: 'Hardware Cap' }],
     [12, { label: 'Live Release' }],
     [14, { label: 'Live Wins' }],
 ]);
@@ -50,6 +53,12 @@ const result = collect(
     }
 );
 
+check('shows Boot.NS in the picker data',
+    result.some(entry => entry.slot === 0 && entry.label === 'Boot.NS' && entry.disabled));
+check('shows Boot.Thread in the picker data',
+    result.some(entry => entry.slot === 1 && entry.label === 'Boot.Thread' && entry.disabled));
+check('leaves non-bootstrap slots enabled in the picker',
+    result.some(entry => entry.slot === 10 && !entry.disabled));
 check('finds a live user slot above stale nsCount',
     result.some(entry => entry.slot === 12 && entry.label === 'Live Release'));
 check('includes a catalog-backed existing user slot',
@@ -60,9 +69,9 @@ check('accepts numeric server slot metadata',
     result.some(entry => entry.slot === 16 && entry.label === 'String Slot'));
 check('live namespace label takes precedence over saved metadata',
     result.some(entry => entry.slot === 14 && entry.label === 'Live Wins'));
-check('does not expose protected system slots',
-    !result.some(entry => entry.slot === 6));
+check('shows the other catalogued slots enabled',
+    result.some(entry => entry.slot === 6 && !entry.disabled));
 check('sorts slots numerically',
-    result.map(entry => entry.slot).join(',') === '12,13,14,15,16');
+    result.map(entry => entry.slot).join(',') === '0,1,6,10,12,13,14,15,16');
 
 console.log(`\n${passed} picker checks passed`);
