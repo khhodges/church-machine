@@ -28,3 +28,15 @@ page load" function is an easy one to miss because it doesn't look
 token/item-specific. Add a static/source-based regression test asserting the
 migration call appears, and appears *before* the restored value is used, so
 a future edit to that restore path can't silently drop the call again.
+
+For a retired built-in program, match both its distinctive built-in header
+and the obsolete instruction signature; save the original text under a
+separate backup key and write a version marker after replacement.
+
+**Why:** broad source rewrites can silently alter a user's intentional
+experiment. A backup and one-time marker make a targeted migration recoverable
+and prevent future user edits from being overwritten.
+
+**How to apply:** use this stricter pattern only when a known shipped example
+became invalid under a deliberate semantic change. Do not use it as a
+substitute for validating arbitrary user code.

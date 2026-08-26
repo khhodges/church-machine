@@ -4386,6 +4386,12 @@ class ChurchSimulator {
         const lastH = this._instrHistory && this._instrHistory.length > 0
             ? this._instrHistory[this._instrHistory.length - 1] : null;
         const faultStep = (lastH && lastH.step === this.stepCount) ? this.stepCount : null;
+        // A fault is an immutable historical event. Preserve the exact fetched
+        // instruction word now so an IDE reload, program load, or lazy-LUMP
+        // eviction cannot later pair this fault's message with different memory.
+        const faultRawWord = (faultStep !== null && lastH && Number.isInteger(lastH.raw))
+            ? (lastH.raw >>> 0)
+            : null;
         // Resolve the executing lump's label NOW, before any eviction can change nsLabels.
         const _cr14 = this.cr && this.cr[14];
         let faultLabel = null;
@@ -4428,6 +4434,7 @@ class ChurchSimulator {
             flagsSnapshot: this.flags ? {...this.flags} : {},
             instrHistory: this._instrHistory ? this._instrHistory.map(h => ({...h})) : [],
             faultStep: faultStep,
+            faultRawWord: faultRawWord,
             faultLabel: faultLabel,
             // Structured fault record fields (Task #1077)
             faultCode: faultCode,

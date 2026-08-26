@@ -2773,7 +2773,22 @@ const _FAULT_LOG_FIELDS = ['type','message','pc','physicalPC','step','faultStep'
                            '_nsSnapshot','faultLabel','crSnapshot','drSnapshot','flagsSnapshot',
                            'malformedReason',
                            'tier','catchInvoked','irqInvoked','tier3Recovery',
-                           'faultCode','faultingAbstractionSlot','faultingAbstractionLabel'];
+                           'faultCode','faultingAbstractionSlot','faultingAbstractionLabel',
+                           'faultRawWord'];
+
+// Return only the instruction word captured with a fault record.  Fault
+// details are historical evidence: never reinterpret them using live memory,
+// because a reload, new program, or lazy LUMP replacement may have changed
+// the word at the same physical address.
+function _faultRecordRawWord(f) {
+    if (!f) return null;
+    if (Number.isInteger(f.faultRawWord)) return f.faultRawWord >>> 0;
+    // Compatibility with records written before faultRawWord became canonical.
+    if (Number.isInteger(f._faultRawWord)) return f._faultRawWord >>> 0;
+    const hist = (f.instrHistory || []).find(h => h.step === f.faultStep)
+              || ((f.instrHistory || []).length ? f.instrHistory[f.instrHistory.length - 1] : null);
+    return hist && Number.isInteger(hist.raw) ? (hist.raw >>> 0) : null;
+}
 
 function _saveFaultLog() {
     try {
@@ -2806,11 +2821,10 @@ function _saveFaultLog() {
             for (const k of _FAULT_LOG_FIELDS) {
                 if (Object.prototype.hasOwnProperty.call(f, k)) out[k] = f[k];
             }
-            // Persist the raw instruction word so disasm survives a reload.
-            const _histEntry = (f.instrHistory || []).find(h => h.step === f.faultStep)
-                            || (f.instrHistory && f.instrHistory.length
-                                ? f.instrHistory[f.instrHistory.length - 1] : null);
-            if (_histEntry && _histEntry.raw !== undefined) out._faultRawWord = _histEntry.raw;
+            // Persist the immutable raw instruction word so fault rendering is
+            // never recomputed from memory that may belong to a later program.
+            const _faultWord = _faultRecordRawWord(f);
+            if (_faultWord !== null) out.faultRawWord = _faultWord;
             return out;
         });
         localStorage.setItem(_FAULT_LOG_LS_KEY, JSON.stringify(slim));
@@ -2844,8 +2858,12 @@ function _restoreFaultLog() {
         if (valid.length === 0) return;
         for (const f of valid) {
             // Reconstruct a synthetic instrHistory so showFaultModal can get the raw word.
-            if (f._faultRawWord !== undefined && !f.instrHistory) {
-                f.instrHistory = [{ step: f.faultStep != null ? f.faultStep : f.step, raw: f._faultRawWord }];
+            const _faultWord = _faultRecordRawWord(f);
+            if (_faultWord !== null) {
+                f.faultRawWord = _faultWord;
+            }
+            if (_faultWord !== null && !f.instrHistory) {
+                f.instrHistory = [{ step: f.faultStep != null ? f.faultStep : f.step, raw: _faultWord }];
             }
             // Fill userNote from the dedicated note key if not embedded in the slim entry.
             if (!f.userNote) {
@@ -2880,10 +2898,10 @@ function showFaultModal(f) {
     // fall back to f.pc (relative PC) for pre-boot faults or older entries.
     const pc     = (f.physicalPC !== undefined && f.physicalPC !== null) ? f.physicalPC : f.pc;
     const pcHex  = '0x' + pc.toString(16).toUpperCase().padStart(4, '0');
-    const _histEntry = (f.instrHistory || []).find(h => h.step === f.faultStep)
-                    || (f.instrHistory && f.instrHistory.length ? f.instrHistory[f.instrHistory.length - 1] : null);
-    const word   = _histEntry ? _histEntry.raw : ((sim.memory && pc < sim.memory.length) ? sim.memory[pc] : 0);
-    const disasm = assembler ? assembler.disassemble(word) : '???';
+    const word   = _faultRecordRawWord(f);
+    const disasm = word !== null
+        ? (assembler ? assembler.disassemble(word) : '???')
+        : 'instruction unavailable (historical record has no raw word)';
     if (!Object.prototype.hasOwnProperty.call(f, '_nsSnapshot')) {
         // Prefer CR14 snapshot — directly names the executing lump's ns slot
         // without depending on memory-range lookups.
@@ -10822,11 +10840,46 @@ function saveEditorState() {
     }
 }
 
+const _LEGACY_SELFTEST_TPERM_MIGRATION_KEY = 'church_editor_legacy_selftest_tperm_migrated_v1';
+const _LEGACY_SELFTEST_TPERM_BACKUP_KEY = 'church_editor_legacy_selftest_tperm_backup_v1';
+
+function _isLegacyPostFlashSelftestTpermSource(source) {
+    if (typeof source !== 'string') return false;
+    // This is deliberately limited to the retired built-in Post-Flash
+    // SelfTest. A user may legitimately write a DOMAIN_PURITY probe, so do not
+    // rewrite arbitrary programs that contain `TPERM CR0, X`.
+    const hasPostFlashHeader = /(?:^|\n)\s*;\s*Church Machine Post-Flash Exhaustive Self-Test\b/i.test(source);
+    const hasRetiredProbe = /(?:^|\n)\s*TPERM\s+CR0\s*,\s*X\b/im.test(source);
+    return hasPostFlashHeader && hasRetiredProbe;
+}
+
 function loadEditorState() {
     const editor = document.getElementById('asmEditor');
     if (editor) {
         let saved = localStorage.getItem('church_editor_code');
         if (saved) {
+            // Before strict same-domain TPERM enforcement, an old built-in
+            // Post-Flash SelfTest checked X against CR0's Church E-GT. That
+            // program now correctly traps DOMAIN_PURITY, but a saved browser
+            // snapshot can keep reloading it forever. Preserve the old source
+            // for audit/recovery, then install the current built-in SelfTest.
+            // This one-time migration intentionally does not touch user code.
+            if (_isLegacyPostFlashSelftestTpermSource(saved) &&
+                localStorage.getItem(_LEGACY_SELFTEST_TPERM_MIGRATION_KEY) !== '1') {
+                try {
+                    localStorage.setItem(_LEGACY_SELFTEST_TPERM_BACKUP_KEY, saved);
+                    loadExample('post_flash_selftest');
+                    if (editor.value) {
+                        saved = editor.value;
+                        localStorage.setItem('church_editor_code', saved);
+                        localStorage.setItem(_LEGACY_SELFTEST_TPERM_MIGRATION_KEY, '1');
+                    }
+                } catch (e) {
+                    // Restoration must remain non-destructive if the built-in
+                    // example cannot be loaded for any reason.
+                    editor.value = saved;
+                }
+            }
             // Migrate stale pos=N, w=N BFEXT/BFINS operand syntax (from a since-fixed
             // disassembler bug) to the current #N, #N syntax before restoring into the
             // editor — otherwise a browser with an old cached snapshot re-surfaces the

@@ -2026,6 +2026,42 @@ console.log('\n--- T012: faultSnapshot event emitted before _returnToBoot() ---'
     }
 }
 
+// ── T013: fault instruction identity survives later memory mutation ──────────
+console.log('\n--- T013: immutable fault instruction evidence ---');
+{
+    const { sim: t13sim } = makeTestSim();
+    const faultPC = 0x0180;
+    const tpermX = t13sim.encodeInstruction(6, 0xE, 0, 0, 3); // TPERM CR0, X
+    const replacement = t13sim.encodeInstruction(22, 0xE, 3, 3, 3); // ISUB DR3, DR3, #3
+
+    // Model a fetched TPERM instruction that faults after decode.
+    t13sim.pc = 0;
+    t13sim.physicalPC = faultPC;
+    t13sim.memory[faultPC] = tpermX;
+    t13sim._instrHistory = [{
+        step: t13sim.stepCount,
+        pc: 0,
+        physicalPC: faultPC,
+        raw: tpermX,
+        opName: 'TPERM',
+    }];
+    t13sim._currentInstrLabel = { opName: 'TPERM' };
+    t13sim.fault('DOMAIN_PURITY', 'TPERM CR0: requested {X} crosses the GT domain (Church)');
+
+    const t13fault = t13sim.faultLog[t13sim.faultLog.length - 1];
+    check('T013a: fault captures the exact fetched instruction word',
+        t13fault && t13fault.faultRawWord === tpermX);
+    check('T013b: fault captures its mnemonic at fault time',
+        t13fault && t13fault.faultingMnemonic === 'TPERM');
+
+    // A later program/lump may reuse this address. The fault record must retain
+    // TPERM rather than silently rendering the replacement instruction.
+    t13sim.memory[faultPC] = replacement;
+    check('T013c: later memory replacement cannot alter faultRawWord',
+        t13fault && t13fault.faultRawWord === tpermX &&
+        t13fault.faultRawWord !== t13sim.memory[faultPC]);
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

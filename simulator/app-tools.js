@@ -526,8 +526,15 @@ function updateGateLog() {
         // Resolve PC / disassembly
         const lfPC    = (lf.physicalPC !== undefined && lf.physicalPC !== null) ? lf.physicalPC : lf.pc;
         const lfPCHex = '0x' + (lfPC >>> 0).toString(16).toUpperCase().padStart(4, '0');
-        const lfWord  = (sim.memory && lfPC < sim.memory.length) ? sim.memory[lfPC] : 0;
-        const lfRawDisasm = (assembler) ? assembler.disassemble(lfWord) : '???';
+        // Fault records are historical. Do not decode current memory at lfPC:
+        // a new program or a reloaded LUMP can occupy that address after the
+        // fault and make the Gate Log contradict the saved fault message.
+        const lfWord = (typeof _faultRecordRawWord === 'function')
+            ? _faultRecordRawWord(lf)
+            : (Number.isInteger(lf.faultRawWord) ? (lf.faultRawWord >>> 0) : null);
+        const lfRawDisasm = lfWord !== null
+            ? ((assembler) ? assembler.disassemble(lfWord) : '???')
+            : 'instruction unavailable (historical record has no raw word)';
 
         // Apply pet names lightly (CR/DR substitution only)
         const _bPetCR = Object.assign({}, _petNameCRMap || {});
