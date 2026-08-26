@@ -5940,12 +5940,20 @@ _build_lazy_lumps()
 # production environments where GitHub may not be reachable.
 def _load_bundled_lumps():
     import glob as _glob
+    import re as _re_bundled
     lumps_dir = LUMPS_DIR
     if not os.path.isdir(lumps_dir):
         return
     for path in sorted(_glob.glob(os.path.join(lumps_dir, '*.lump'))):
         stem = os.path.splitext(os.path.basename(path))[0].lower()
-        token8 = stem.zfill(8)[:8]
+        # Only a token-shaped filename may register itself in the direct cache.
+        # Named binaries are registered exclusively by the manifest pass below.
+        # In particular, an archived SelfTest_v<N>.lump must remain viewable
+        # through the explicit history route, never become a runnable "SelfTest"
+        # alias merely because its filename shares that prefix.
+        if not _re_bundled.fullmatch(r'[0-9a-f]{1,8}', stem):
+            continue
+        token8 = stem.zfill(8)
         try:
             with open(path, 'rb') as fh:
                 data = fh.read()
@@ -8092,7 +8100,10 @@ def get_lump_detail(token):
 @app.route("/api/lump/<token_hex>/words")
 def get_lump_words(token_hex):
     """Return the raw uint32 word array of a saved lump as JSON."""
+    import re as _re_words
     raw   = token_hex.lower()
+    if not _re_words.fullmatch(r'[0-9a-f]{1,8}', raw):
+        return jsonify({"error": "Invalid token"}), 400
     key8  = (raw[:8] if len(raw) >= 8 else raw).zfill(8)
     key   = key8.lstrip('0') or '0'
     data  = LAZY_LUMPS.get(key8) or LAZY_LUMPS.get(key)

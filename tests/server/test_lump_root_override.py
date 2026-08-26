@@ -21,7 +21,10 @@ def test_boot_lump_read_and_resize_use_override_copy():
     canonical_digest = hashlib.sha256(CANONICAL_BOOT_IMAGE.read_bytes()).hexdigest()
     with tempfile.TemporaryDirectory() as tmp:
         isolated_lumps = Path(tmp) / "lumps"
-        shutil.copytree(CANONICAL_LUMPS, isolated_lumps)
+        # The checked-in library intentionally contains historical dangling
+        # aliases. Preserve them as links; dereferencing every archive makes
+        # an otherwise isolated endpoint test fail before its assertions run.
+        shutil.copytree(CANONICAL_LUMPS, isolated_lumps, symlinks=True)
         # Remove the manifest's standalone SelfTest record and its binary so
         # /resize resolves the embedded Boot.Abstr route we are testing.
         manifest_path = isolated_lumps / "manifest.json"
@@ -87,3 +90,45 @@ assert (isolated / "boot-image.bin").is_file()
             capture_output=True,
         )
     assert hashlib.sha256(CANONICAL_BOOT_IMAGE.read_bytes()).hexdigest() == canonical_digest
+
+
+def test_archived_named_lump_cannot_replace_canonical_selftest():
+    """An archived SelfTest_v<N> binary is history-only, never a token alias."""
+    with tempfile.TemporaryDirectory() as tmp:
+        isolated_lumps = Path(tmp) / "lumps"
+        shutil.copytree(CANONICAL_LUMPS, isolated_lumps, symlinks=True)
+        probe = r'''
+import os
+from pathlib import Path
+
+import server.app as module
+
+archive = Path(module.LUMPS_DIR) / "SelfTest_v76.lump"
+assert archive.is_file(), "fixture must include the archived SelfTest v76 binary"
+
+# Rebuild the in-memory cache from the isolated LUMP library.  The historical
+# filename must not create a human-readable executable alias.
+module.LAZY_LUMPS.clear()
+module._build_lazy_lumps()
+module._load_bundled_lumps()
+assert "selftest" not in module.LAZY_LUMPS
+
+client = module.app.test_client()
+archived_response = client.get("/api/lump/SelfTest_v76/words")
+assert archived_response.status_code == 400, archived_response.get_json()
+
+canonical_response = client.get("/api/lump/00000600/words")
+assert canonical_response.status_code == 200, canonical_response.get_json()
+canonical_words = canonical_response.get_json()["words"]
+assert 0x37000003 not in canonical_words
+'''
+        env = os.environ.copy()
+        env["CHURCH_TEST_LUMPS_DIR"] = str(isolated_lumps)
+        subprocess.run(
+            [sys.executable, "-c", probe],
+            cwd=ROOT,
+            env=env,
+            check=True,
+            text=True,
+            capture_output=True,
+        )

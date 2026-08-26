@@ -17,3 +17,15 @@ deleting its manifest record makes the binary look orphaned.
 **How to apply:** Use this pattern for future replacements of resident
 CapabilityTest artifacts or other fixed-slot built-ins; do not make TPERM or
 boot-image code choose between historical records.
+
+The executable LUMP serving path must accept only hexadecimal token identifiers.
+At startup, only token-named files may self-register; named binaries are
+registered through the active manifest record, while archived variants remain
+available only through explicit version-history routes.
+
+**Why:** A historical filename can share a built-in abstraction's readable
+prefix. Treating that prefix as a token makes an archive executable and can
+silently restore obsolete instructions.
+
+**How to apply:** Keep archival artifacts for provenance, but never expose
+their filename as a runnable LUMP alias.
