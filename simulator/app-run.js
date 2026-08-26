@@ -15738,6 +15738,204 @@ function _wukongIsConnected() {
            (Date.now() - _wukongLastTraceTs * 1000) < _WUKONG_STALE_MS;
 }
 
+// Simulator-follow is deliberately separate from the hardware cursor and event
+// history.  A free-running simulator can produce many step events in one
+// browser turn, so only the latest instruction is painted immediately; rows
+// are queued and flushed in one animation frame.
+const _WUKONG_SIM_LOG_MAX = 200;
+let _wukongSimFollowEnabled = false;
+let _wukongSimFollowQueue = [];
+let _wukongSimFollowFlushPending = false;
+let _wukongSimFollowFlushTimer = null;
+let _wukongSimFollowFlushIsRaf = false;
+
+function _wukongTraceViewport() {
+    const width = Math.max(160, (window.innerWidth || document.documentElement.clientWidth || 1024));
+    const height = Math.max(120, (window.innerHeight || document.documentElement.clientHeight || 768));
+    return { width, height };
+}
+
+function _wukongTraceClampLayout(layout) {
+    const viewport = _wukongTraceViewport();
+    const minWidth = Math.min(280, Math.max(160, viewport.width - 16));
+    const minHeight = Math.min(150, Math.max(112, viewport.height - 16));
+    const numberOr = function(value, fallback) {
+        if (value === null || value === undefined || value === '') return fallback;
+        const n = Number(value);
+        return Number.isFinite(n) ? n : fallback;
+    };
+    const width = Math.min(viewport.width - 16, Math.max(minWidth,
+        numberOr(layout && layout.width, Math.min(480, viewport.width - 16))));
+    const height = Math.min(viewport.height - 16, Math.max(minHeight,
+        numberOr(layout && layout.height, Math.min(220, viewport.height - 16))));
+    const defaultLeft = viewport.width - width - 16;
+    const defaultTop = viewport.height - height - 16;
+    const left = Math.min(Math.max(8, numberOr(layout && layout.left, defaultLeft)),
+        viewport.width - width - 8);
+    const top = Math.min(Math.max(8, numberOr(layout && layout.top, defaultTop)),
+        viewport.height - height - 8);
+    return {
+        left,
+        top,
+        width,
+        height,
+    };
+}
+
+function _wukongTraceReadLayout() {
+    try {
+        const raw = localStorage.getItem('wukongHwTraceLayout');
+        if (!raw) return null;
+        const value = JSON.parse(raw);
+        return value && typeof value === 'object' ? value : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function _wukongTraceSaveLayout(layout) {
+    try {
+        localStorage.setItem('wukongHwTraceLayout', JSON.stringify({
+            left: layout.left, top: layout.top, width: layout.width, height: layout.height,
+        }));
+    } catch (e) {}
+}
+
+function _wukongTraceApplyLayout(panel, layout, persist) {
+    if (!panel) return;
+    const next = _wukongTraceClampLayout(layout);
+    panel.style.left = next.left + 'px';
+    panel.style.top = next.top + 'px';
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+    panel.style.width = next.width + 'px';
+    panel.style.height = next.height + 'px';
+    panel._wukongTraceLayout = next;
+    // Preferred layout is only updated by an intentional move/resize.  A
+    // narrow browser window may temporarily clamp the displayed layout, but
+    // must not overwrite the user's normal desktop geometry.
+    if (persist || !panel._wukongTracePreferredLayout) {
+        panel._wukongTracePreferredLayout = Object.assign({}, persist ? next : (layout || next));
+    }
+    if (persist) _wukongTraceSaveLayout(next);
+}
+
+function _wukongTracePanelCurrentLayout(panel) {
+    if (panel && panel._wukongTraceLayout) return panel._wukongTraceLayout;
+    return _wukongTraceClampLayout({
+        left: parseFloat(panel && panel.style.left),
+        top: parseFloat(panel && panel.style.top),
+        width: parseFloat(panel && panel.style.width),
+        height: parseFloat(panel && panel.style.height),
+    });
+}
+
+function _wukongTraceCancelSimFlush() {
+    if (_wukongSimFollowFlushTimer !== null) {
+        if (_wukongSimFollowFlushIsRaf && typeof cancelAnimationFrame === 'function') {
+            cancelAnimationFrame(_wukongSimFollowFlushTimer);
+        } else {
+            clearTimeout(_wukongSimFollowFlushTimer);
+        }
+        _wukongSimFollowFlushTimer = null;
+    }
+    _wukongSimFollowFlushPending = false;
+    _wukongSimFollowQueue = [];
+}
+
+function _wukongUpdateSimulatorFollowStatus() {
+    const status = document.getElementById('wukong-hw-follow-status');
+    const toggle = document.getElementById('wukong-hw-follow-toggle');
+    if (toggle) toggle.checked = _wukongSimFollowEnabled;
+    if (status) {
+        status.textContent = _wukongSimFollowEnabled
+            ? 'Following simulator — hardware rows remain separate'
+            : 'Simulator follow off — hardware feed only';
+        status.className = _wukongSimFollowEnabled
+            ? 'wukong-hw-follow-status wukong-hw-follow-on'
+            : 'wukong-hw-follow-status';
+    }
+}
+
+function _wukongSetSimulatorFollow(enabled) {
+    _wukongSimFollowEnabled = !!enabled;
+    if (!_wukongSimFollowEnabled) _wukongTraceCancelSimFlush();
+    _wukongUpdateSimulatorFollowStatus();
+    return _wukongSimFollowEnabled;
+}
+window._wukongSetSimulatorFollow = _wukongSetSimulatorFollow;
+
+function _wukongFlushSimulatorFollow() {
+    _wukongSimFollowFlushPending = false;
+    _wukongSimFollowFlushTimer = null;
+    _wukongSimFollowFlushIsRaf = false;
+    if (!_wukongSimFollowEnabled) {
+        _wukongSimFollowQueue = [];
+        return;
+    }
+    const body = document.getElementById('wukong-hw-log-body');
+    if (!body) {
+        _wukongSimFollowQueue = [];
+        return;
+    }
+    const pending = _wukongSimFollowQueue.splice(0, _WUKONG_SIM_LOG_MAX);
+    const fragment = document.createDocumentFragment();
+    pending.forEach(function(entry) { fragment.appendChild(entry); });
+    body.appendChild(fragment);
+    // Keep simulator rows bounded independently of mixed HW rows.  The
+    // hardware history remains governed by _WUKONG_HW_LOG_MAX below.
+    let simRows = body.querySelectorAll('.wukong-sim-trace');
+    while (simRows.length > _WUKONG_SIM_LOG_MAX) {
+        simRows[0].remove();
+        simRows = body.querySelectorAll('.wukong-sim-trace');
+    }
+    while (body.childElementCount > _WUKONG_HW_LOG_MAX) {
+        body.removeChild(body.firstElementChild);
+    }
+    body.scrollTop = body.scrollHeight;
+}
+window._wukongFlushSimulatorFollow = _wukongFlushSimulatorFollow;
+
+function _wukongRecordSimulatorStep(result) {
+    if (!_wukongSimFollowEnabled || !result ||
+        result.absent || result.suspended || result.lazySuspended) return;
+    const addr = result.physicalPC != null ? result.physicalPC :
+        (result.pc != null ? result.pc : (sim && sim.physicalPC));
+    if (addr == null || !Number.isFinite(Number(addr))) return;
+    const nia = Number(addr) >>> 0;
+    const instr = result.instr;
+    let decoded = result.desc || 'executed';
+    if (instr && sim && typeof sim.opName === 'function') {
+        decoded = sim.opName(instr.opcode) + (sim.condName ? sim.condName(instr.cond) : '');
+        if (typeof assembler !== 'undefined' && assembler &&
+            typeof assembler.disassemble === 'function' && instr.raw != null) {
+            try { decoded = assembler.disassemble(instr.raw); } catch (e) {}
+        }
+    }
+    const latest = document.getElementById('wukong-hw-follow-current');
+    const niaText = '0x' + nia.toString(16).toUpperCase().padStart(8, '0');
+    const stepText = sim && sim.stepCount != null ? '  step=' + sim.stepCount : '';
+    if (latest) latest.textContent = 'SIM latest  NIA ' + niaText + '  ' + decoded + stepText;
+
+    const line = document.createElement('div');
+    line.className = 'wukong-trace-line wukong-sim-trace';
+    line.textContent = 'SIM: NIA=' + niaText + '  ' + decoded + stepText;
+    _wukongSimFollowQueue.push(line);
+    if (_wukongSimFollowQueue.length > _WUKONG_SIM_LOG_MAX) {
+        _wukongSimFollowQueue.splice(0, _wukongSimFollowQueue.length - _WUKONG_SIM_LOG_MAX);
+    }
+    if (_wukongSimFollowFlushPending) return;
+    _wukongSimFollowFlushPending = true;
+    if (typeof requestAnimationFrame === 'function') {
+        _wukongSimFollowFlushIsRaf = true;
+        _wukongSimFollowFlushTimer = requestAnimationFrame(_wukongFlushSimulatorFollow);
+    } else {
+        _wukongSimFollowFlushIsRaf = false;
+        _wukongSimFollowFlushTimer = setTimeout(_wukongFlushSimulatorFollow, 0);
+    }
+}
+window._wukongRecordSimulatorStep = _wukongRecordSimulatorStep;
+
 // ── Persistent HW trace log panel ─────────────────────────────────────────────
 // Injected into <body> once on load so trace messages are always visible
 // regardless of which IDE view (Dashboard, Namespace, etc.) is active.
@@ -15746,55 +15944,192 @@ function _wukongIsConnected() {
     if (document.getElementById('wukong-hw-log')) return;
     const panel = document.createElement('div');
     panel.id = 'wukong-hw-log';
+    panel.className = 'wukong-hw-log-panel';
     panel.style.cssText = [
         'display:flex',
         'position:fixed',
-        'bottom:0',
-        'right:0',
+        'left:auto',
+        'top:auto',
+        'bottom:16px',
+        'right:16px',
         'width:480px',
         'max-width:100vw',
-        'height:180px',
+        'height:220px',
         'background:#1a1a2e',
         'border:1px solid #3a3a5c',
-        'border-bottom:none',
-        'border-right:none',
-        'border-radius:6px 0 0 0',
+        'border-radius:6px',
         'z-index:9998',
         'flex-direction:column',
         'font-family:monospace',
         'font-size:11px',
         'box-shadow:-2px -2px 12px rgba(0,0,0,0.5)',
     ].join(';');
+    panel.setAttribute('role', 'region');
+    panel.setAttribute('aria-label', 'Live hardware trace');
     panel.innerHTML =
         '<div id="wukong-hw-log-hdr" style="display:flex;align-items:center;justify-content:space-between;padding:3px 8px;background:#12122a;border-bottom:1px solid #3a3a5c;flex-shrink:0;cursor:pointer;" title="Click to collapse/expand">' +
-            '<span style="color:#f0c040;font-weight:bold;font-size:11px;">⚡ HW Trace</span>' +
+            '<span id="wukong-hw-log-drag-handle" class="wukong-hw-log-drag-handle" role="button" tabindex="0" aria-label="Move HW Trace window" title="Drag to move" style="color:#f0c040;font-weight:bold;font-size:11px;cursor:grab;user-select:none;">⚡ HW Trace</span>' +
             '<span id="wukong-hw-log-filter-badge" style="display:none;margin-left:6px;padding:1px 5px;background:#92400e;color:#fcd34d;border:1px solid #d97706;border-radius:3px;font-size:9px;font-weight:bold;letter-spacing:.4px;white-space:nowrap;" title="Bridge is running with --church-only: bare Turing RESULT packets are suppressed">Turing filter ON</span>' +
             '<span id="wukong-hw-log-nia" style="color:#8888cc;font-size:10px;flex:1;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:0 8px;"></span>' +
-            '<button id="wukong-hw-log-clear" title="Clear this local view" style="background:none;border:none;color:#8888cc;cursor:pointer;font-size:11px;padding:0 4px;line-height:1;" onclick="event.stopPropagation();var b=document.getElementById(\'wukong-hw-log-body\');if(b)b.innerHTML=\'\';">✕ clear</button>' +
+            '<button id="wukong-hw-log-clear" title="Clear this local view" style="background:none;border:none;color:#8888cc;cursor:pointer;font-size:11px;padding:0 4px;line-height:1;">✕ clear</button>' +
             '<button id="wukong-hw-log-close" title="Hide HW Trace (server history is retained)" style="background:none;border:none;color:#8888cc;cursor:pointer;font-size:14px;padding:0 4px;line-height:1;">×</button>' +
             '<button id="wukong-hw-log-collapse" title="Minimise" style="background:none;border:none;color:#8888cc;cursor:pointer;font-size:14px;padding:0 4px;line-height:1;">▼</button>' +
         '</div>' +
         '<div class="wukong-hw-log-note" role="note">Execution view for this IDE session. Uses the same Wukong hardware trace/console feed as Testing; decoded events, NIA cursor, and fault context follow this session. Clear or hide this panel locally — the server event history is unchanged.</div>' +
+        '<div class="wukong-hw-follow-controls" role="group" aria-label="Simulator follow controls">' +
+            '<label class="wukong-hw-follow-label"><input type="checkbox" id="wukong-hw-follow-toggle"> <span>Follow simulator</span></label>' +
+            '<span id="wukong-hw-follow-status" class="wukong-hw-follow-status" role="status" aria-live="polite">Simulator follow off — hardware feed only</span>' +
+        '</div>' +
+        '<div id="wukong-hw-follow-current" class="wukong-hw-follow-current" role="status" aria-live="polite">SIM latest  — waiting for a simulator step</div>' +
         '<div id="wukong-health-strip" style="flex-shrink:0;padding:3px 8px 3px;background:#0e0e22;border-bottom:1px solid #2a2a44;font-size:10px;line-height:1.6;"></div>' +
-        '<div id="wukong-hw-log-body" style="flex:1;overflow:auto;padding:4px 8px;color:#ccccee;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;"></div>';
+        '<div id="wukong-hw-log-body" style="flex:1;min-height:0;overflow:auto;padding:4px 8px;color:#ccccee;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;"></div>' +
+        '<div id="wukong-hw-log-resize-grip" class="wukong-hw-log-resize-grip" role="separator" aria-label="Resize HW Trace window" tabindex="0" title="Drag to resize"></div>';
     document.body.appendChild(panel);
+    _wukongTraceApplyLayout(panel, _wukongTraceReadLayout(), false);
+
+    // Keep a moved/resized panel usable after viewport changes, without
+    // persisting a transient browser size as the user's preferred layout.
+    window.addEventListener('resize', function() {
+        _wukongTraceApplyLayout(panel,
+            panel._wukongTracePreferredLayout || _wukongTracePanelCurrentLayout(panel), false);
+    });
+
+    let dragState = null;
+    let resizeState = null;
+    let suppressHeaderClick = false;
+    function panelPoint(e) {
+        return { x: Number(e.clientX) || 0, y: Number(e.clientY) || 0 };
+    }
+    function endPointer() {
+        if (dragState || resizeState) {
+            _wukongTraceSaveLayout(_wukongTracePanelCurrentLayout(panel));
+            suppressHeaderClick = true;
+        }
+        dragState = null;
+        resizeState = null;
+        document.removeEventListener('mousemove', movePointer);
+        document.removeEventListener('mouseup', endPointer);
+        document.removeEventListener('pointermove', movePointer);
+        document.removeEventListener('pointerup', endPointer);
+    }
+    function movePointer(e) {
+        const point = panelPoint(e);
+        if (dragState) {
+            _wukongTraceApplyLayout(panel, {
+                left: dragState.left + point.x - dragState.x,
+                top: dragState.top + point.y - dragState.y,
+                width: dragState.width, height: dragState.height,
+            }, false);
+        } else if (resizeState) {
+            _wukongTraceApplyLayout(panel, {
+                left: resizeState.left, top: resizeState.top,
+                width: resizeState.width + point.x - resizeState.x,
+                height: resizeState.height + point.y - resizeState.y,
+            }, false);
+        }
+    }
+    function beginDrag(e) {
+        if (dragState || resizeState || (e.button != null && e.button !== 0)) return;
+        const point = panelPoint(e);
+        const layout = _wukongTracePanelCurrentLayout(panel);
+        dragState = { x: point.x, y: point.y, left: layout.left, top: layout.top,
+            width: layout.width, height: layout.height };
+        e.preventDefault();
+        e.stopPropagation();
+        document.addEventListener('mousemove', movePointer);
+        document.addEventListener('mouseup', endPointer);
+        document.addEventListener('pointermove', movePointer);
+        document.addEventListener('pointerup', endPointer);
+    }
+    function beginResize(e) {
+        if (dragState || resizeState || (e.button != null && e.button !== 0)) return;
+        const point = panelPoint(e);
+        const layout = _wukongTracePanelCurrentLayout(panel);
+        resizeState = { x: point.x, y: point.y, left: layout.left, top: layout.top,
+            width: layout.width, height: layout.height };
+        e.preventDefault();
+        e.stopPropagation();
+        document.addEventListener('mousemove', movePointer);
+        document.addEventListener('mouseup', endPointer);
+        document.addEventListener('pointermove', movePointer);
+        document.addEventListener('pointerup', endPointer);
+    }
+    const dragHandle = document.getElementById('wukong-hw-log-drag-handle');
+    const resizeGrip = document.getElementById('wukong-hw-log-resize-grip');
+    if (dragHandle) {
+        dragHandle.addEventListener('mousedown', beginDrag);
+        dragHandle.addEventListener('pointerdown', beginDrag);
+        dragHandle.addEventListener('click', function(e) { e.stopPropagation(); });
+        dragHandle.addEventListener('keydown', function(e) {
+            const delta = e.shiftKey ? 40 : 16;
+            let dx = 0, dy = 0;
+            if (e.key === 'ArrowLeft') dx = -delta;
+            else if (e.key === 'ArrowRight') dx = delta;
+            else if (e.key === 'ArrowUp') dy = -delta;
+            else if (e.key === 'ArrowDown') dy = delta;
+            else return;
+            const layout = _wukongTracePanelCurrentLayout(panel);
+            _wukongTraceApplyLayout(panel, Object.assign({}, layout, {
+                left: layout.left + dx, top: layout.top + dy,
+            }), true);
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    }
+    if (resizeGrip) {
+        resizeGrip.addEventListener('mousedown', beginResize);
+        resizeGrip.addEventListener('pointerdown', beginResize);
+        resizeGrip.addEventListener('keydown', function(e) {
+            const delta = e.shiftKey ? 40 : 16;
+            let dw = 0, dh = 0;
+            if (e.key === 'ArrowLeft') dw = -delta;
+            else if (e.key === 'ArrowRight') dw = delta;
+            else if (e.key === 'ArrowUp') dh = -delta;
+            else if (e.key === 'ArrowDown') dh = delta;
+            else return;
+            const layout = _wukongTracePanelCurrentLayout(panel);
+            _wukongTraceApplyLayout(panel, Object.assign({}, layout, {
+                width: layout.width + dw, height: layout.height + dh,
+            }), true);
+            e.preventDefault();
+        });
+    }
     var closeBtn = document.getElementById('wukong-hw-log-close');
     if (closeBtn) closeBtn.addEventListener('click', function(e) {
         e.stopPropagation();
         window._wukongHwLogHidden = true;
         panel.style.display = 'none';
     });
+    var clearBtn = document.getElementById('wukong-hw-log-clear');
+    if (clearBtn) clearBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var body = document.getElementById('wukong-hw-log-body');
+        if (body) body.innerHTML = '';
+        _wukongTraceCancelSimFlush();
+    });
+    var followToggle = document.getElementById('wukong-hw-follow-toggle');
+    if (followToggle) followToggle.addEventListener('change', function() {
+        _wukongSetSimulatorFollow(followToggle.checked);
+    });
+    _wukongUpdateSimulatorFollowStatus();
 
     // Collapse / expand on header click
     var collapsed = false;
     var hdr = document.getElementById('wukong-hw-log-hdr');
     var colBtn = document.getElementById('wukong-hw-log-collapse');
     if (hdr) {
-        hdr.addEventListener('click', function() {
+        hdr.addEventListener('click', function(e) {
+            if (suppressHeaderClick) {
+                suppressHeaderClick = false;
+                return;
+            }
+            if (e.target && e.target.closest &&
+                (e.target.closest('button') || e.target.closest('label'))) return;
             collapsed = !collapsed;
             var body = document.getElementById('wukong-hw-log-body');
             if (body) body.style.display = collapsed ? 'none' : '';
-            panel.style.height = collapsed ? 'auto' : '180px';
+            panel.style.height = collapsed ? 'auto' :
+                _wukongTracePanelCurrentLayout(panel).height + 'px';
             if (colBtn) colBtn.textContent = collapsed ? '▲' : '▼';
         });
     }
@@ -16999,6 +17334,13 @@ function _wukongAppendTrace(data) {
     const con       = document.getElementById('editorConsole');
     // If neither target exists yet (panel not injected, page still loading) bail.
     if (!hwLogBody && !con) return;
+    function _labelHardwareRow(line) {
+        line.dataset.source = 'hardware';
+        const source = document.createElement('span');
+        source.className = 'wukong-trace-source-label';
+        source.textContent = 'Hardware trace. ';
+        line.insertBefore(source, line.firstChild);
+    }
 
     // ── Console events from the bridge ────────────────────────────────────────
     // /hardware/wukong/console entries are {console: text, ts, seq} — raw UART
@@ -17009,11 +17351,13 @@ function _wukongAppendTrace(data) {
         const text   = data.console;
         const isWarn = /N_INIT mismatch|stale|WARNING|\u26A0/i.test(text);
         const line   = document.createElement('div');
-        line.className = 'wukong-trace-line' +
+        line.className = 'wukong-trace-line wukong-hardware-trace' +
             (isWarn ? ' wukong-trace-gap wukong-console-warn' : ' wukong-console-line');
+        line.dataset.source = 'hardware';
         line.appendChild(document.createTextNode(
             typeof _wukongFormatEvent === 'function'
                 ? _wukongFormatEvent(data) : '\nHW: ' + text));
+        _labelHardwareRow(line);
         for (const target of [con, hwLogBody]) {
             if (!target) continue;
             target.appendChild(line.cloneNode(true));
@@ -17028,8 +17372,11 @@ function _wukongAppendTrace(data) {
     // Snapshots and bridge lifecycle records are first-class ordered events.
     if (data.snapshot || data.kind === 'info') {
         const line = document.createElement('div');
-        line.className = 'wukong-trace-line' + (data.snapshot ? ' wukong-trace-fault' : '');
+        line.className = 'wukong-trace-line wukong-hardware-trace' +
+            (data.snapshot ? ' wukong-trace-fault' : '');
+        line.dataset.source = 'hardware';
         line.appendChild(document.createTextNode(_wukongFormatEvent(data)));
+        _labelHardwareRow(line);
         _appendToLog(hwLogBody, line, _WUKONG_HW_LOG_MAX);
         _appendToLog(con, line, 0);
         return;
@@ -17150,8 +17497,9 @@ function _wukongAppendTrace(data) {
         // the transition block above for the false→true case).
         if (data.fault_valid) _wukongShowFaultPanel(data);
         const line = document.createElement('div');
-        line.className = 'wukong-trace-line wukong-trace-call' +
+        line.className = 'wukong-trace-line wukong-hardware-trace wukong-trace-call' +
                          (data.fault_valid ? ' wukong-trace-fault' : '');
+        line.dataset.source = 'hardware';
         line.appendChild(document.createTextNode('\nHW: ' + _wukongTraceLocationText(data) +
             '  '));
         const callLink = document.createElement('button');
@@ -17167,6 +17515,7 @@ function _wukongAppendTrace(data) {
         line.appendChild(callLink);
         if (data.fault_valid) line.appendChild(document.createTextNode(
             '  \u26A1 ' + (_WUKONG_FAULT_NAMES[data.fault_code] || 'FAULT_' + data.fault_code)));
+        _labelHardwareRow(line);
         _appendToLog(hwLogBody, line, _WUKONG_HW_LOG_MAX);
         _appendToLog(con, line, 0);
         return;
@@ -17182,8 +17531,9 @@ function _wukongAppendTrace(data) {
         // Fault on RETURN_POP: show inline panel (modal already opened above).
         if (data.fault_valid) _wukongShowFaultPanel(data);
         const line = document.createElement('div');
-        line.className = 'wukong-trace-line wukong-trace-return' +
+        line.className = 'wukong-trace-line wukong-hardware-trace wukong-trace-return' +
                          (data.fault_valid ? ' wukong-trace-fault' : '');
+        line.dataset.source = 'hardware';
         line.appendChild(document.createTextNode('\nHW: ' + _wukongTraceLocationText(data) +
             '  '));
         const returnLink = document.createElement('button');
@@ -17199,6 +17549,7 @@ function _wukongAppendTrace(data) {
         line.appendChild(returnLink);
         if (data.fault_valid) line.appendChild(document.createTextNode(
             '  \u26A1 ' + (_WUKONG_FAULT_NAMES[data.fault_code] || 'FAULT_' + data.fault_code)));
+        _labelHardwareRow(line);
         _appendToLog(hwLogBody, line, _WUKONG_HW_LOG_MAX);
         _appendToLog(con, line, 0);
         return;
@@ -17235,7 +17586,9 @@ function _wukongAppendTrace(data) {
 
     // Fault lines get a distinct class so they stand out visually.
     const line = document.createElement('div');
-    line.className = 'wukong-trace-line' + (data.fault_valid ? ' wukong-trace-fault' : '');
+    line.className = 'wukong-trace-line wukong-hardware-trace' +
+        (data.fault_valid ? ' wukong-trace-fault' : '');
+    line.dataset.source = 'hardware';
     line.textContent = typeof _wukongFormatEvent === 'function'
         ? _wukongFormatEvent(data)
         : ('\nHW: ' + _wukongTraceLocationText(data) + ' ' + (evTraceName || 'TRACE'));
@@ -17262,6 +17615,7 @@ function _wukongAppendTrace(data) {
     // Keep the toolbar Wukong button's NIA ticker live too.
     if (typeof _wukongUpdateToolbarBtn === 'function') _wukongUpdateToolbarBtn(true);
 
+    _labelHardwareRow(line);
     _appendToLog(hwLogBody, line, _WUKONG_HW_LOG_MAX);
     _appendToLog(con, line, 0);
 }

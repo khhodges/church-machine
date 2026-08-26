@@ -956,6 +956,14 @@ function init() {
 
     sim.on('stateChange', () => { updateDashboard(); updateLedStrip(); updateToolbarIdeBadge(); if (currentView === 'gt-view') renderGTView(); });
     sim.on('step', _traceRecordStep);
+    // The optional live simulator-follow view is a UI projection only.  Keep it
+    // on its own listener so hardware trace events and simulator execution can
+    // never be mistaken for one another.
+    sim.on('step', (result) => {
+        if (typeof window._wukongRecordSimulatorStep === 'function') {
+            window._wukongRecordSimulatorStep(result);
+        }
+    });
     // A restored fault log describes a prior browser session.  Retiring one
     // normal instruction in this session proves the old halt is no longer
     // current, so remove it before the UI renders the new live state.
