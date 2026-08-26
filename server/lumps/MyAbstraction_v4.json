@@ -12,7 +12,7 @@
   "profile": "IoT",
   "language": "javascript",
   "author": "",
-  "version": "2026.08.26",
+  "version": "2026.08.25",
   "release_notes": "",
   "methods": [
     {
@@ -47,7 +47,7 @@
   "deployment": {
     "target_board": "wukong-xc7a100t",
     "profile": "IoT",
-    "built_at": "2026-08-26T15:04:03.875948Z",
+    "built_at": "2026-08-25T18:56:33.238229Z",
     "builder": "CLOOMC++ IDE v1.0"
   },
   "grants": [
@@ -62,6 +62,7 @@
   "identity_seal_location": "sidecar",
   "dot_name": "MyAbstraction",
   "issue_n": 1,
-  "lump_version": 5,
-  "compiled_at": 1787756643.8760083
+  "lump_version": 4,
+  "compiled_at": 1787684193.2382505,
+  "archived_version": 4
 }

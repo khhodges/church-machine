@@ -2558,35 +2558,6 @@
     "genesis_certificate_verification": "deferred-not-verified"
   },
   {
-    "token": "0f8ad81b",
-    "abstraction": "MyAbstraction",
-    "filename": "MyAbstraction.1.827cfd7c.lump",
-    "sidecar_file": "MyAbstraction.1.827cfd7c.json",
-    "lump_size": 64,
-    "cw": 2,
-    "cc": 1,
-    "author": "",
-    "version": "2026.08.25",
-    "lump_version": 4,
-    "compiled_at": 1787684193.2382505,
-    "methods": [
-      {
-        "name": "run",
-        "offset": 0,
-        "length": 2
-      }
-    ],
-    "grants": [
-      "E"
-    ],
-    "binary_hash": "5120739b4fb8cc7c6999e560ae4b48c56228c1c190a76778b4d0b56153c4fc4d",
-    "petname": "",
-    "issue_number": 1,
-    "identity_hash": "654062b290784712f75bdaa55e4584c6af6215072698b8e579049da720ad75ed",
-    "dot_name": "MyAbstraction",
-    "issue_n": 1
-  },
-  {
     "token": "00003600",
     "abstraction": "Bank",
     "filename": "Bank.1.a4327568.lump",
@@ -2700,6 +2671,35 @@
     "issue_number": 1,
     "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f",
     "dot_name": "Adder",
+    "issue_n": 1
+  },
+  {
+    "token": "0f8ad81b",
+    "abstraction": "MyAbstraction",
+    "filename": "MyAbstraction.1.827cfd7c.lump",
+    "sidecar_file": "MyAbstraction.1.827cfd7c.json",
+    "lump_size": 64,
+    "cw": 2,
+    "cc": 1,
+    "author": "",
+    "version": "2026.08.26",
+    "lump_version": 5,
+    "compiled_at": 1787756643.8760083,
+    "methods": [
+      {
+        "name": "run",
+        "offset": 0,
+        "length": 2
+      }
+    ],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "5120739b4fb8cc7c6999e560ae4b48c56228c1c190a76778b4d0b56153c4fc4d",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "654062b290784712f75bdaa55e4584c6af6215072698b8e579049da720ad75ed",
+    "dot_name": "MyAbstraction",
     "issue_n": 1
   }
 ]
