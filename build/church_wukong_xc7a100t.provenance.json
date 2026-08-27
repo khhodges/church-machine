@@ -1,24 +1,25 @@
 {
   "artifacts": {
     "church_wukong_xc7a100t.bit": {
-      "sha256": "4818bfea493f1493534b3443a46257c3a984e3c2fbc1a05b72db63bd12e862a2",
+      "sha256": "4f9b6432eeeebfb27aa060a2b0e508b1160adf06d969bc1b112a89f0771ae6f3",
       "size_bytes": 3826002
     },
     "church_wukong_xc7a100t.il": {
-      "sha256": "4598d8e83ecf1425a897b687c5b194e466b99c3b69dc74d87534ec9c1c87b69a",
-      "size_bytes": 3105371
+      "sha256": "831791fafd7419660eef2a1355cd142d0fc5bd36a47198c588b796f2128326f3",
+      "size_bytes": 3204148
     },
     "church_wukong_xc7a100t.mcs": {
-      "sha256": "b54fc8246a25bcc7033904226f6e45032053dbafb67c0201a9f80aa3d0fd0a01",
+      "sha256": "6798f7f298f7230473c38be3a3d23159a5b651c79c09482c7aae7c003a5e2120",
       "size_bytes": 10521876
     },
     "church_wukong_xc7a100t.v": {
-      "sha256": "baac4b80efff1f3b84ae3bf3b30d80aa5fda36aced75fd844e7efb2ce84a5eb3",
-      "size_bytes": 8109714
+      "sha256": "722a2af4a89d8aac2ab5fe31586afda662e75a9e044d464b86f8f00731d22b2e",
+      "size_bytes": 8456985
     }
   },
   "boot_inputs_sha256": {
-    "hardware/boot_rom.py": "4bfaad528cfeb39427e7fcd574ff132e38d6466fd6bd91c59f08dc3389ca36e3"
+    "hardware/boot_rom.py": "4bfaad528cfeb39427e7fcd574ff132e38d6466fd6bd91c59f08dc3389ca36e3",
+    "server/lumps/boot-image.bin": "b40eb8a680c8b927d894e2b8e685adcd5e8d73ceb0bde2b1df82ad5401e7b269"
   },
   "boot_layout": {
     "boot_program_words": [
@@ -33,15 +34,15 @@
     "selftest_ns_slot": 6,
     "thread_base_word": 896
   },
-  "generated_at_utc": "2026-08-27T14:13:27+00:00",
-  "hardware_sources_sha256": "68cdfc50231cbb404a90ff1de467f0c5835f6767d526d9dee7dbaa0f75875879",
+  "generated_at_utc": "2026-08-27T19:45:23+00:00",
+  "hardware_sources_sha256": "b963393e9ea139a5ca68efca5dca1c30b5fc59a79fae0ae92fe3423851241d99",
   "input_files_sha256": {
     "hardware/boot_rom.py": "4bfaad528cfeb39427e7fcd574ff132e38d6466fd6bd91c59f08dc3389ca36e3",
     "hardware/call.py": "176743ecf71d791d7c925e766f34ec29ea673cb7bf9f20e0203b33b3a1de3b50",
-    "hardware/change.py": "27f85fa8606f17a6e743e358d4bd626fdab0dafdd27dee32d4b880fa2f71586c",
+    "hardware/change.py": "c42f60d0b04327be4960eccc1059444a3dc1d02ead2bfe797c7e5a73c095f35d",
     "hardware/church_outform.py": "a6824c30a2db4f19cba7e4118926c11bcf9567d6ea355e6e1c2d5050690d2640",
     "hardware/cload.py": "69b5ab8e540352e20c18e098090cbb454cc35b5045a5244a8e688e93761e7dfb",
-    "hardware/core.py": "d1b40d53eb18c7e629105904285752fcd6279f2d39cdf4c5b33f463d2fe77875",
+    "hardware/core.py": "c9971d2a7ab11a6e849a8dc560f1f5582ef6727541acdd8f5dba6d5d53fdfced",
     "hardware/decoder.py": "07d8db93abd21aefb06514a8a0e939f17a3160b353bd2a499c2fadbaa511aad6",
     "hardware/dread.py": "656933b21b1eba56c6d110956b84d74621e4b90b17e804c0af8d55783d4e48d5",
     "hardware/dwrite.py": "557a105ca6aa98626511a966def9b92da19c05c323db3c862800623772c553f1",
@@ -55,7 +56,7 @@
     "hardware/lambda_unit.py": "86f0825ce518e506c0bb8584d1a78478b59193b2021a452c3a6c49f082558f23",
     "hardware/layouts.py": "cd72d312b5a25a2733591241eef187c1a4bd4971a58dc07b6cca0f134d3bd08f",
     "hardware/load.py": "26ee9f08ccb8581da07c7206dfbcfbd540d44e3161d28102db026f8060736f39",
-    "hardware/mload.py": "514d52cf711b7f10419e2669c294ab33edb80702efd7a138f6f4b1abc3f7d4b0",
+    "hardware/mload.py": "882ee1ae21d711a51d63f9cbd7051d3229fb4c0b865b873a4dd21ada6cba84ad",
     "hardware/mload_seq.py": "ea5154c255efbde9403831097308c0cb14b535b280591fadada450b23ccc9f54",
     "hardware/msave.py": "8e86215740942eaaaa4b9c6d6004c0e5b5bd748faf7122829346352ba87211d3",
     "hardware/ns_gate.py": "1659f0f9fab7fc830ade4c22122a0a2aefa784b2fe6715fa17e4ae05bed82cfc",
@@ -71,23 +72,23 @@
     "hardware/tperm.py": "58cb892e65a24fa24fe0beda842ebd416896a350512ac869615239e708f5884f",
     "hardware/uart_rx.py": "0c6dd3f87cc83277f08ce22ab84718868aa9ede693d158eb834509cf69dccf6d",
     "hardware/uart_tx.py": "22ad297089968c0a23f7912ad5e9b3252a91c05d7b58c159c771694c42bbd818",
-    "hardware/wukong_top.py": "aa47e4bcb14ca6051759789b6f0c4f9355b250675ca4743a1892eb2780ea5063",
-    "hardware/wukong_xc7a100t.tcl": "89725292cce7eb49e79f97db73cb1f1f14c077d527a2191f377aec77d9d16a34",
+    "hardware/wukong_top.py": "992862acd712f347a1394f730738c3a1462c8c0e41c62c662a9176586c6f36e9",
+    "hardware/wukong_xc7a100t.tcl": "c1062b700a27c00a857c8de26fe0ea86fff87e158a55caa9c1511deb3be01751",
     "hardware/wukong_xc7a100t.xdc": "fe416e3b65c8b728473891c1f966b6665ab59c13471fed33d7f6dcbebd1af4b8"
   },
   "release_status": "verified",
   "schema_version": 1,
   "sentinel": {
-    "build_version": 17,
+    "build_version": 18,
     "magic_hex": "0xBC",
     "n_init": 610,
     "tu_version": 2
   },
-  "source_commit": "12fd06ef649ce9c8fd243b288f3590188d785db9",
+  "source_commit": "4c7d9fd8a551a63007c5a1cbd28f0f9b832ca054",
   "source_tree_clean": true,
   "vivado": {
     "part": "xc7a100tfgg676-2",
-    "version": "Vivado v2026.1 (SW Build 6511674)",
-    "wns_ns": "1.924176"
+    "version": "2026.1",
+    "wns_ns": "1.470143"
   }
 }

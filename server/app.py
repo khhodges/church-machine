@@ -678,6 +678,19 @@ def _wukong_min_tu_version():
         pass
     return None
 
+def _wukong_min_thread_scheduler_build():
+    """Read the explicit M6 scheduler capability floor from the RTL source."""
+    try:
+        top = os.path.join(os.path.dirname(__file__), "..", "hardware", "wukong_top.py")
+        with open(os.path.abspath(top)) as f:
+            for line in f:
+                m = re.match(r"\s*WUKONG_THREAD_SCHEDULER_MIN_BUILD\s*=\s*(\d+)", line)
+                if m:
+                    return int(m.group(1))
+    except Exception:
+        pass
+    return None
+
 @app.route("/dl/wukong-bit")
 def download_wukong_bit():
     p = os.path.join(_wukong_build_dir(), "church_wukong_xc7a100t.bit")
@@ -14315,6 +14328,21 @@ def wukong_status_get():
         )
     with _wukong_boot_info_lock:
         boot_info = dict(_wukong_boot_info)
+    with _wukong_hw_entry_lock:
+        active_thread_contexts = list(_wukong_active_thread_contexts)
+    active_thread = None
+    thread_base = snapshot.get('thread_base') if isinstance(snapshot, dict) else None
+    if isinstance(thread_base, int):
+        for context in active_thread_contexts:
+            if context.get('base_word') == thread_base // 4:
+                active_thread = {
+                    'name': 'Thread.1' if context.get('number') == 1
+                            else f"Thread#{context.get('number')}",
+                    'position': context.get('number'),
+                    'count': len(active_thread_contexts),
+                    'slot': context.get('slot'),
+                }
+                break
     with _upload_in_flight_lock:
         upl       = _upload_in_flight
     with _wukong_command_lock:
@@ -14356,6 +14384,7 @@ def wukong_status_get():
         'cr6_gt':             cr_gts.get(6),
         'cr14_gt':            cr_gts.get(14),
         'boot_info':          boot_info,
+        'active_thread':      active_thread,
         # What the hardware will actually run at boot: power-on bitstream
         # default (slot 7, WukongCallHome) until a boot-image upload is
         # ACKed, then the uploaded image's entry slot.
@@ -14377,6 +14406,7 @@ def wukong_status_get():
         # sentinel-reported build_version / tu_version without extra requests.
         'expected_build_version': _wukong_build_version(),
         'min_tu_version':         _wukong_min_tu_version(),
+        'min_thread_scheduler_build': _wukong_min_thread_scheduler_build(),
         # Relay state — active when a dev IDE is mirroring from a remote server.
         'relay_enabled':    _wukong_relay_enabled,
         'relay_source_url': _wukong_relay_url,
@@ -14402,7 +14432,8 @@ def fpga_status_page():
 # Bridge POSTs here when a boot sentinel is received so the IDE can show a
 # visible banner if the bitstream is stale (old TraceUnit FSM).
 #
-#   POST /hardware/wukong/boot-info  — bridge reports {stale_tu, tu_version}
+#   POST /hardware/wukong/boot-info  — bridge reports {stale_tu, tu_version,
+#                                      build_version, thread_scheduler}
 #   GET  /hardware/wukong/boot-info  — IDE polls for the latest boot-info
 
 _wukong_boot_info_lock = _wk_threading.Lock()
@@ -14435,6 +14466,8 @@ WUKONG_POWERON_ENTRY_SLOT   = 7
 _wukong_hw_entry_lock       = _wk_threading.Lock()
 _wukong_hw_entry_slot       = None   # None = power-on default (no upload yet)
 _wukong_pending_entry_slot  = None   # entry slot of the upload in flight
+_wukong_active_thread_contexts = []  # acknowledged projected {number, slot, base_word}
+_wukong_pending_thread_contexts = []
 
 
 @app.route('/hardware/wukong/command-ack', methods=['POST'])
@@ -14501,11 +14534,14 @@ def wukong_upload_ack_post():
         _wukong_upload_ack = entry
     # A confirmed upload changes what the board will run on its next boot:
     # commit the uploaded image's entry slot as the hardware boot entry.
-    global _wukong_hw_entry_slot, _wukong_pending_entry_slot
+    global _wukong_hw_entry_slot, _wukong_pending_entry_slot, \
+        _wukong_active_thread_contexts, _wukong_pending_thread_contexts
     with _wukong_hw_entry_lock:
         if entry['ok'] and _wukong_pending_entry_slot is not None:
             _wukong_hw_entry_slot = _wukong_pending_entry_slot
+            _wukong_active_thread_contexts = list(_wukong_pending_thread_contexts)
         _wukong_pending_entry_slot = None
+        _wukong_pending_thread_contexts = []
     # Clear the in-flight flag so execution commands are accepted again.
     with _upload_in_flight_lock:
         _upload_in_flight = False
@@ -14600,22 +14636,33 @@ def boot_image_send_to_hardware():
         except ValueError as _exc:
             return jsonify({'error': f'boot image cannot be projected for Wukong: {_exc}'}), 400
 
-        # The upload image faithfully retains every generated Thread context,
-        # but the shipped Wukong top has one active ChurchCore context and no
-        # board-side scheduler or context-select command.  Do not let the IDE
-        # advertise a successful physical multi-Thread launch while only
-        # Thread.1 can begin execution.  The projection is intentionally
-        # built first so its layout remains tested and ready for the future
-        # scheduler protocol; this gate is immediately before UART delivery.
+        # Multi-Thread projection is safe only on firmware that explicitly
+        # advertises the M6 round-robin scheduler.  Do not infer capability
+        # from a connection or from a build name: old firmware remains
+        # fail-closed and can still receive the compatible single-Thread path.
         if _wukong_entry_info.get('thread_count', 1) > 1:
-            return jsonify({
-                'error': (
-                    'Wukong upload rejected — this board firmware supports one '
-                    'active Thread context and has no physical scheduler. '
-                    'Set threadCount to 1 before uploading.'
-                ),
-                'thread_count': _wukong_entry_info['thread_count'],
-            }), 400
+            with _wukong_boot_info_lock:
+                _boot_info = dict(_wukong_boot_info)
+            with _wukong_bridge_lock:
+                _bridge_session = str(
+                    _wukong_bridge_info.get('session_id', '') or '')
+            _minimum = _wukong_min_thread_scheduler_build()
+            _actual = _boot_info.get('build_version')
+            if (_minimum is None or not isinstance(_actual, int) or _actual < _minimum
+                    or _boot_info.get('thread_scheduler') is not True
+                    or _boot_info.get('trusted') is not True
+                    or not _bridge_session
+                    or _boot_info.get('session_id') != _bridge_session):
+                return jsonify({
+                    'error': (
+                        'Wukong upload rejected — multi-Thread images require '
+                        f'M6 round-robin scheduler firmware build {_minimum or "current"} or newer. '
+                        'Flash the supported board image, then reconnect so its boot sentinel is received.'
+                    ),
+                    'thread_count': _wukong_entry_info['thread_count'],
+                    'required_scheduler_build': _minimum,
+                    'board_build_version': _actual,
+                }), 400
 
         _encoded = _b64.b64encode(_wukong_raw).decode('ascii')
 
@@ -14628,9 +14675,10 @@ def boot_image_send_to_hardware():
         # consume the command and POST the ACK before the pending slot is
         # set, leaving the ACK unable to commit it (and the value stale).
         # Rolled back in the finally block on any enqueue failure.
-        global _wukong_pending_entry_slot
+        global _wukong_pending_entry_slot, _wukong_pending_thread_contexts
         with _wukong_hw_entry_lock:
             _wukong_pending_entry_slot = _wukong_entry_info['entry_slot']
+            _wukong_pending_thread_contexts = list(_wukong_entry_info.get('thread_contexts', []))
 
         # Clear any stale ACK from a previous upload BEFORE making the new
         # upload command observable to the bridge.  Clearing after would create
@@ -14664,6 +14712,7 @@ def boot_image_send_to_hardware():
         if _rollback:
             with _wukong_hw_entry_lock:
                 _wukong_pending_entry_slot = None
+                _wukong_pending_thread_contexts = []
             with _upload_in_flight_lock:
                 _upload_in_flight = False
 
@@ -14677,15 +14726,35 @@ def wukong_boot_info_post():
                      sequence (i.e. old 0xBB sentinel, or 0xBC with
                      tu_version < TU_VERSION_CALL_3PKT)
         tu_version — raw TU_VERSION byte from the sentinel (0x01 for 0xBB boards)
+        thread_scheduler — explicit M6 round-robin scheduler advertisement
     """
     global _wukong_boot_info
+    token = os.environ.get('REPORT_TOKEN', '').strip()
+    if not token:
+        return jsonify({
+            'ok': False,
+            'error': 'REPORT_TOKEN is not configured on this server',
+        }), 503
+    supplied = request.headers.get('Authorization', '')
+    if not hmac.compare_digest(supplied, f'Bearer {token}'):
+        return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
     data = request.get_json(silent=True) or {}
+    reported_session = str(data.get('session_id', '') or '')[:128]
+    with _wukong_bridge_lock:
+        active_session = str(_wukong_bridge_info.get('session_id', '') or '')
+    if not reported_session or reported_session != active_session:
+        return jsonify({
+            'ok': False,
+            'error': 'boot sentinel does not match the active bridge session',
+        }), 409
     bv = data.get('build_version')
     entry = {
         'stale_tu':     bool(data.get('stale_tu', False)),
         'tu_version':   int(data.get('tu_version', 0)),
         'build_version': int(bv) if bv is not None else None,
-        'session_id':   str(data.get('session_id', '') or '')[:128],
+        'thread_scheduler': bool(data.get('thread_scheduler', False)),
+        'session_id':   reported_session,
+        'trusted':      True,
         # Server-side receive timestamp: lets the /fpga page confirm a FRESH
         # sentinel arrived after an explicit reboot or authorized fault recovery.
         'received_ts':   _wk_time.time(),
@@ -14693,8 +14762,6 @@ def wukong_boot_info_post():
     with _wukong_boot_info_lock:
         _wukong_boot_info = entry
     with _wukong_bridge_lock:
-        if entry['session_id']:
-            _wukong_bridge_info['session_id'] = entry['session_id']
         _wukong_bridge_timeline.append({
             'ts': entry['received_ts'], 'session_id': entry['session_id'],
             'event': 'boot_sentinel', 'state': 'connected',

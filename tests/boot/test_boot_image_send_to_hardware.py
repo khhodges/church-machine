@@ -739,8 +739,8 @@ def test_send_to_hardware_rejects_mismatched_caps0(client):
         _restore_boot_bin(p, old)
 
 
-def test_send_to_hardware_rejects_multithread_without_board_scheduler(client):
-    """A board upload must not promise unavailable Thread#2+ scheduling."""
+def test_send_to_hardware_rejects_multithread_without_scheduler_capability(client):
+    """Multi-Thread uploads remain fail-closed until a capable board is seen."""
     cfg = {"step1": {
         "totalNamespaceWords": 16384,
         "namespaceLumpWords": 1024,
@@ -756,12 +756,96 @@ def test_send_to_hardware_rejects_multithread_without_board_scheduler(client):
         assert response.status_code == 400
         body = json.loads(response.data)
         assert body["thread_count"] == 2
-        assert "no physical scheduler" in body["error"]
+        assert "M6 round-robin scheduler" in body["error"]
+        assert body["required_scheduler_build"] >= 18
         with _app_module._wukong_command_lock:
             assert _app_module._wukong_pending_cmd is None
         with _app_module._upload_in_flight_lock:
             assert not _app_module._upload_in_flight
     finally:
+        _restore_boot_bin(p, old)
+
+
+def test_send_to_hardware_accepts_multithread_with_scheduler_capability(client):
+    """A fresh M6 scheduler sentinel admits the projected multi-Thread image."""
+    cfg = {"step1": {
+        "totalNamespaceWords": 16384,
+        "namespaceLumpWords": 1024,
+        "threadLumpWords": 256,
+        "threadCount": 2,
+    }}
+    payload = generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=10,
+                                  require_entry_resident=True)
+    p, old = _install_boot_bin(payload)
+    previous = dict(_app_module._wukong_boot_info)
+    previous_bridge = dict(_app_module._wukong_bridge_info)
+    try:
+        _app_module._wukong_boot_info = {
+            "build_version": _app_module._wukong_min_thread_scheduler_build(),
+            "thread_scheduler": False,
+            "trusted": True,
+            "session_id": "scheduler-test-session",
+        }
+        _app_module._wukong_bridge_info["session_id"] = "scheduler-test-session"
+        rejected = client.post('/api/boot-image/send-to-hardware',
+                               content_type='application/json', data='{}')
+        assert rejected.status_code == 400
+        assert "M6 round-robin scheduler" in json.loads(rejected.data)["error"]
+        _app_module._wukong_boot_info["thread_scheduler"] = True
+        response = client.post('/api/boot-image/send-to-hardware',
+                               content_type='application/json', data='{}')
+        assert response.status_code == 200
+        assert json.loads(response.data)["queued"] is True
+        with _app_module._wukong_hw_entry_lock:
+            assert len(_app_module._wukong_pending_thread_contexts) == 2
+    finally:
+        _app_module._wukong_boot_info = previous
+        _app_module._wukong_bridge_info = previous_bridge
+        with _app_module._wukong_command_lock:
+            _app_module._wukong_pending_cmd = None
+        with _app_module._upload_in_flight_lock:
+            _app_module._upload_in_flight = False
+        with _app_module._wukong_hw_entry_lock:
+            _app_module._wukong_pending_thread_contexts = []
+            _app_module._wukong_pending_entry_slot = None
+        _restore_boot_bin(p, old)
+
+
+def test_forged_boot_info_cannot_unlock_multithread_upload(client, monkeypatch):
+    """Browser-reachable clients cannot forge the board scheduler capability."""
+    cfg = {"step1": {
+        "totalNamespaceWords": 16384,
+        "namespaceLumpWords": 1024,
+        "threadLumpWords": 256,
+        "threadCount": 2,
+    }}
+    payload = generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=10,
+                                  require_entry_resident=True)
+    p, old = _install_boot_bin(payload)
+    previous = dict(_app_module._wukong_boot_info)
+    previous_bridge = dict(_app_module._wukong_bridge_info)
+    monkeypatch.setenv("REPORT_TOKEN", "bridge-report-secret")
+    try:
+        _app_module._wukong_boot_info = {}
+        _app_module._wukong_bridge_info["session_id"] = "forged-session"
+        forged = client.post(
+            "/hardware/wukong/boot-info",
+            json={
+                "build_version": _app_module._wukong_min_thread_scheduler_build(),
+                "thread_scheduler": True,
+                "session_id": "forged-session",
+            },
+        )
+        assert forged.status_code == 401
+        response = client.post('/api/boot-image/send-to-hardware',
+                               content_type='application/json', data='{}')
+        assert response.status_code == 400
+        assert "M6 round-robin scheduler" in json.loads(response.data)["error"]
+    finally:
+        _app_module._wukong_boot_info = previous
+        _app_module._wukong_bridge_info = previous_bridge
+        with _app_module._upload_in_flight_lock:
+            _app_module._upload_in_flight = False
         _restore_boot_bin(p, old)
 
 

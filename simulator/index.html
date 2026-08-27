@@ -438,6 +438,10 @@
                             </div>
                         </div>
                         <button class="btn btn-walk sim-icon-btn" id="toolWalkBtn" onclick="walkToggle()" data-tooltip="Walk — Animate step-by-step execution">&#x1F6B6;</button>
+                        <button class="btn sim-icon-btn" id="nextThreadBtn" onclick="nextConfiguredThread()"
+                                aria-label="Next Thread" data-tooltip="Next Thread — save this Thread and resume the next configured Thread">&#x21BB;</button>
+                        <span id="activeThreadStatus" class="fault-free-badge ff-zero" aria-live="polite"
+                              data-tooltip="Active configured Thread">Thread.1 · 1/1</span>
                         <div class="run-wrap" id="runWrap">
                             <button class="btn btn-success sim-icon-btn" id="btnRunSim" onclick="onRunBtnClick()" data-tooltip="Run — single-click to run · double-click for options">&#x1F3C3;</button>
                             <button class="btn btn-danger sim-icon-btn" id="btnStopSim" onclick="stopSim()" style="display:none;" data-tooltip="Stop — Halt execution immediately">&#x23F9;</button>

@@ -165,6 +165,9 @@ SENTINEL_V2_LEN   = 4      # 0xBC  N_INIT&0xFF  TU_VERSION  BUILD_VERSION
 
 # Minimum TU_VERSION required to guarantee correct ELOADCALL/XLOADLAMBDA trace.
 TU_VERSION_CALL_3PKT = 0x02  # must match _TU_VERSION_CALL_3PKT in wukong_top.py
+# Build 18 introduced the M6 edge-debounced physical Thread scheduler.  The
+# server uses this advertised sentinel identity as a fail-closed upload gate.
+THREAD_SCHEDULER_MIN_BUILD = 18
 
 
 def parse_boot_sentinel(buf, i=0):
@@ -230,6 +233,7 @@ def parse_boot_sentinel(buf, i=0):
             'n_init_byte':   buf[i + 1],
             'tu_version':    tu_version,
             'build_version': build_version,
+            'thread_scheduler': build_version >= THREAD_SCHEDULER_MIN_BUILD,
             'length':        SENTINEL_V2_LEN,
             'stale':         tu_version < TU_VERSION_CALL_3PKT,
         }
@@ -1049,6 +1053,7 @@ class FaultDeliveryWorker:
     def __init__(self, ide_base, verify_tls):
         self.ide_base = ide_base
         self.verify_tls = verify_tls
+        self.report_token = os.environ.get('REPORT_TOKEN', '').strip()
         # Fault evidence has a small reserved lane. Ordinary telemetry is
         # lossy by design during an outage: the most recent later trace/status
         # is useful, but no backlog is worth starving a board-fault record.
@@ -1154,9 +1159,13 @@ class FaultDeliveryWorker:
                         'boot_info': 'boot-info',
                     }[kind]
                     timeout = 0.5 if kind == 'status' else 1
+                    headers = ({
+                        'Authorization': f'Bearer {self.report_token}',
+                    } if self.report_token else {})
                     response = requests.post(
                         f'{self.ide_base}/hardware/wukong/{endpoint}',
-                        json=payload, timeout=timeout, verify=self.verify_tls)
+                        json=payload, headers=headers, timeout=timeout,
+                        verify=self.verify_tls)
                     reply = {} if 200 <= response.status_code < 300 else None
                 else:
                     try:
@@ -2068,6 +2077,7 @@ def main():
                         delivery_worker.submit('boot_info', {
                             'stale_tu': True, 'tu_version': post_tu,
                             'build_version': build_version,
+                            'thread_scheduler': bool(sentinel.get('thread_scheduler', False)),
                             'session_id': session_id,
                         })
                     else:
@@ -2075,6 +2085,7 @@ def main():
                         delivery_worker.submit('boot_info', {
                             'stale_tu': False, 'tu_version': tu_version,
                             'build_version': build_version,
+                            'thread_scheduler': bool(sentinel.get('thread_scheduler', False)),
                             'session_id': session_id,
                         })
 

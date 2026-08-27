@@ -152,6 +152,19 @@ class ChurchCore(Elaboratable):
         # the boot ladder re-runs (LOAD_NS→INIT_THRD→INIT_CLIST→LOAD_NUC),
         # and execution restarts at NIA=0.  REBOOT and FAULT both zero the NIA.
         self.reboot_req     = Signal()
+        # Physical scheduler request.  The Wukong top holds request until
+        # CHANGE completes or faults, so a button press can only start at a
+        # clean instruction boundary. CR12/CR13/CR15 retain their established
+        # system-wide-root roles; CHANGE restores the private code context.
+        self.thread_switch_req = Signal()
+        self.thread_switch_index = Signal(16)
+        self.thread_switch_busy = Signal()
+        self.thread_switch_complete = Signal()
+        self.thread_switch_fault = Signal()
+        self.active_thread_slot = Signal(16, init=1)
+        # Byte address of the active Thread context body. CR12 remains the
+        # system Thread root and is intentionally not overloaded with this.
+        self.active_thread_base = Signal(32)
 
         self.nia = Signal(32)
         self.flags = Signal(COND_FLAGS_LAYOUT)
@@ -627,7 +640,22 @@ class ChurchCore(Elaboratable):
         branch_taken    = Signal()
         branch_sx32     = Signal(32)
 
-        with m.If(u_dread.dr_wr_en):
+        change_dr_wr_en = Signal()
+        change_dr_wr_addr = Signal(4)
+        change_dr_wr_data = Signal(32)
+        if not self.iot_profile:
+            m.d.comb += [
+                change_dr_wr_en.eq(u_change.dr_wr_en),
+                change_dr_wr_addr.eq(u_change.dr_wr_addr),
+                change_dr_wr_data.eq(u_change.dr_wr_data),
+            ]
+        with m.If(change_dr_wr_en):
+            m.d.comb += [
+                u_regs.dr_wr_addr.eq(change_dr_wr_addr),
+                u_regs.dr_wr_data.eq(change_dr_wr_data),
+                u_regs.dr_wr_en.eq(1),
+            ]
+        with m.Elif(u_dread.dr_wr_en):
             m.d.comb += [
                 u_regs.dr_wr_addr.eq(u_dread.dr_wr_addr),
                 u_regs.dr_wr_data.eq(u_dread.dr_wr_data),
@@ -813,6 +841,11 @@ class ChurchCore(Elaboratable):
                 u_regs.m_flag_restore_en.eq(u_change.m_flag_restore_en),
                 u_regs.m_flag_restore_val.eq(u_change.m_flag_restore_val),
             ]
+            with m.If(u_change.flags_restore_en):
+                m.d.comb += [
+                    u_regs.flags_in.eq(u_change.flags_restore_val),
+                    u_regs.flags_wr_en.eq(1),
+                ]
 
         # M-window shadow data sources — mgt_set_trigger (from Abstract-GT CALL) takes
         # priority over cr15_m_set (test/microcode injection port).
@@ -860,6 +893,8 @@ class ChurchCore(Elaboratable):
         with m.Elif(self.free_run_start):
             m.d.sync += nia_reg.eq(self.free_run_nia)
         if not self.iot_profile:
+            with m.Elif(u_change.nia_restore_en):
+                m.d.sync += nia_reg.eq(u_change.nia_restore_val)
             with m.Elif(u_lambda.nia_set):
                 m.d.sync += nia_reg.eq(u_lambda.nia_value)
             with m.Elif(u_xloadlambda.nia_set):
@@ -1529,19 +1564,26 @@ class ChurchCore(Elaboratable):
             m.d.sync += _trace_load_shadow_gt.eq(u_regs.trace_rd_gt)
 
         if not self.iot_profile:
+            scheduler_inflight = Signal()
+            thread_switch_start_sig = Signal()
+            m.d.comb += thread_switch_start_sig.eq(
+                self.thread_switch_req & self.boot_complete & ~any_unit_busy)
             change_start_sig = Signal()
             m.d.comb += change_start_sig.eq(
-                cond_exec_enable & is_church_op & (church_op == ChurchOpcode.CHANGE) & ~any_unit_busy
+                (cond_exec_enable & is_church_op & (church_op == ChurchOpcode.CHANGE) & ~any_unit_busy) |
+                thread_switch_start_sig
             )
             m.d.comb += [
                 u_change.change_start.eq(change_start_sig),
-                u_change.cr_src.eq(cr_src),
-                u_change.cr_dst.eq(cr_dst),
+                u_change.cr_src.eq(Mux(thread_switch_start_sig, 15, cr_src)),
+                u_change.cr_dst.eq(Mux(thread_switch_start_sig, 14, cr_dst)),
                 u_change.m_elevated.eq(
                     (boot_state_reg != BootState.COMPLETE) | boot_microcode_active
                 ),
-                u_change.index.eq(cap_index),
-                u_change.change_mask.eq(u_decoder.call_mask),
+                u_change.index.eq(Mux(thread_switch_start_sig, self.thread_switch_index, cap_index)),
+                u_change.change_mask.eq(Mux(thread_switch_start_sig, 0x4FFF, u_decoder.call_mask)),
+                u_change.scheduler_mode.eq(thread_switch_start_sig),
+                u_change.active_thread_base.eq(self.active_thread_base),
                 u_change.cr_rd_data.eq(u_regs.cr_rd_data),
                 u_change.cr12_thread.eq(u_regs.cr12_thread),
                 u_change.cr15_namespace.eq(u_regs.cr15_namespace),
@@ -1555,6 +1597,30 @@ class ChurchCore(Elaboratable):
                 # enable/val out (wired below alongside other u_regs controls).
                 u_change.cr15_m_flag_in.eq(u_regs.cr15_m_flag),
                 u_change.boot_window.eq(boot_microcode_active),
+            ]
+            with m.If(clear_all):
+                m.d.sync += [
+                    scheduler_inflight.eq(0),
+                    self.active_thread_slot.eq(1),
+                    self.active_thread_base.eq(0),
+                ]
+            with m.Elif(thread_switch_start_sig):
+                m.d.sync += scheduler_inflight.eq(1)
+            with m.Elif(u_change.change_complete | u_change.change_fault):
+                m.d.sync += scheduler_inflight.eq(0)
+                with m.If(u_change.change_complete & scheduler_inflight):
+                    m.d.sync += [
+                        self.active_thread_slot.eq(self.thread_switch_index),
+                        self.active_thread_base.eq(u_change.thread_base_restore_val),
+                    ]
+            # Capture the initial boot Thread backing address as well.
+            with m.If(u_change.thread_base_restore_en):
+                m.d.sync += self.active_thread_base.eq(
+                    u_change.thread_base_restore_val)
+            m.d.comb += [
+                self.thread_switch_busy.eq(scheduler_inflight | thread_switch_start_sig),
+                self.thread_switch_complete.eq(u_change.change_complete & scheduler_inflight),
+                self.thread_switch_fault.eq(u_change.change_fault & scheduler_inflight),
             ]
 
             switch_start_sig = Signal()

@@ -685,7 +685,9 @@ def build_wukong_upload_image(generic_image, boot_config=None):
             "descriptor": descriptor, "size": size,
         })
 
-    thread_words = sum(item["size"] for item in thread_sources)
+    # The physical CHANGE context reserves cap slots through CR14, so each
+    # compact simulator Thread expands to one 512-word board allocation.
+    thread_words = sum(max(item["size"], 512) for item in thread_sources)
     dynamic_end = WUKONG_UPLOAD_BODY_BASE_WORD + alloc_words + thread_words
     if dynamic_end > WUKONG_DMEM_WORDS:
         raise ValueError(
@@ -767,16 +769,30 @@ def build_wukong_upload_image(generic_image, boot_config=None):
     thread_target = body_base + alloc_words
     projected_threads = []
     for item in thread_sources:
-        size = item["size"]
+        # Physical CHANGE stores the 12 private CR GTs at caps[0..11] and
+        # CR14 at caps[14].  Keep a board-only 512-word allocation so the
+        # latter lives within the sealed descriptor capacity; simulator files
+        # remain the compact 256-word format.
+        size = max(item["size"], 512)
         slot = item["slot"]
         source_base = item["source_base"]
         descriptor = item["descriptor"]
-        mem[thread_target:thread_target + size] = source_words[
-            source_base:source_base + size
+        mem[thread_target:thread_target + item["size"]] = source_words[
+            source_base:source_base + item["size"]
         ]
+        mem[thread_target] = (mem[thread_target] & ~(0xF << 23)) | (3 << 23)
+        if slot != 1:
+            # A generated Thread has never been switched out, so give it a
+            # concrete first-run code context instead of projecting zero CR14
+            # and zero PC. CR7 is initially null, making packed PC absolute.
+            # Subsequent CHANGE saves replace both words with live state.
+            if mem[thread_target + 17] == 0:
+                mem[thread_target + 17] = body_base_byte + 4
+            if mem[thread_target + 244 + 14] == 0:
+                mem[thread_target + 244 + 14] = source_info["expected_gt"]
         target_ns_base = slot * NS_ENTRY_WORDS
         target_byte = thread_target * 4
-        authority = descriptor[1]
+        authority = (descriptor[1] & ~0x1FFFFF) | (size - 1)
         mem[target_ns_base:target_ns_base + NS_ENTRY_WORDS] = [
             target_byte,
             authority,
@@ -793,6 +809,12 @@ def build_wukong_upload_image(generic_image, boot_config=None):
         })
         thread_target += size
     assert thread_target == dynamic_end, "Wukong Thread projection accounting drift"
+
+    # Non-authoritative metadata for the physical scheduler.  The final
+    # forward-table W3 belongs to an unoccupied slot and is never consulted for
+    # Namespace authority/integrity; the FPGA latches this count while receiving
+    # an upload and still validates every selected descriptor through mLoad.
+    mem[WUKONG_FORWARD_NS_SLOTS * NS_ENTRY_WORDS - 1] = thread_count
 
     # The hardware boot ROM calls through this exact capability.
     mem[WUKONG_THREAD_CAPS0_WORD] = source_info["thread_caps0"]

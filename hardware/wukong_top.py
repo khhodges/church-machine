@@ -65,6 +65,10 @@ from .uart_rx import UartRx
 # The bridge reports it to the IDE so the FPGA status page can confirm exactly
 # which build is running — no need to reprogram just to check.
 WUKONG_BUILD_VERSION = 18  # ← bump this before each new synthesis run
+# A board advertising this build (or newer) supports M6 round-robin Thread
+# selection for projected multi-Thread uploads.  Keep this explicit rather
+# than treating any arbitrary future build number as an accidental capability.
+WUKONG_THREAD_SCHEDULER_MIN_BUILD = 18
 
 # ── Wukong ROM: 3-instruction BOOT_PROGRAM ────────────────────────────────────
 # Architecture doc:             docs/wukong-boot.md
@@ -225,10 +229,14 @@ class ChurchWukongXC7A100T(Elaboratable):
     uart_tx_pin  out UART TX (E3, bank 34, LVCMOS33) — idles HIGH; 8N1 at `baud`
     """
 
-    def __init__(self, clk_freq=50_000_000, baud=57_600, sim_mode=False, build_sig=None):
+    def __init__(self, clk_freq=50_000_000, baud=57_600, sim_mode=False, build_sig=None,
+                 button_debounce_cycles=None):
         self.clk_freq = clk_freq
         self.baud     = baud
         self.sim_mode = sim_mode
+        self.button_debounce_cycles = (
+            button_debounce_cycles if button_debounce_cycles is not None
+            else (4 if sim_mode else 50_000))
 
         self.clk          = Signal()        # 50 MHz oscillator  (M21, SRCC bank 34)
         self.rst_n        = Signal(init=1)  # Active-low button   (M6) — constrained, reserved
@@ -264,6 +272,8 @@ class ChurchWukongXC7A100T(Elaboratable):
         # ports without needing a probe submodule.  Both are driven by elaborate().
         self.step_mode   = Signal(init=0)  # 0 = free-run; 1 = step/halt mode
         self.step_halted = Signal()        # 1 = CM currently held between retires
+        self.dbg_active_thread_slot = Signal(16)
+        self.dbg_thread_count = Signal(2, init=1)
 
     def elaborate(self, platform):
         m = Module()
@@ -748,6 +758,66 @@ class ChurchWukongXC7A100T(Elaboratable):
         m.d.sync += fault_latched.eq(~cm_reboot & (fault_latched | core.fault_valid))
         m.d.comb += core.reboot_req.eq(cm_reboot)
 
+        # ── M6 round-robin Thread button ──────────────────────────────────────
+        # M6 is active-low.  Two synchronizer flops keep this asynchronous board
+        # input out of the execution domain; stable state plus a saturating
+        # debounce counter emits exactly one pulse per press, never per held
+        # level.  The request is retained until the core accepts it at an
+        # instruction boundary and completes CHANGE.
+        debounce_limit = max(1, int(self.button_debounce_cycles))
+        m6_sync = Signal(2, init=0b11)
+        m6_pressed = Signal()
+        m6_stable_pressed = Signal()
+        m6_debounce = Signal(range(debounce_limit + 1))
+        m6_click = Signal()
+        m.d.sync += [
+            m6_sync.eq(Cat(self.rst_n, m6_sync[0])),
+            m6_click.eq(0),
+        ]
+        m.d.comb += m6_pressed.eq(~m6_sync[1])
+        with m.If(m6_pressed == m6_stable_pressed):
+            m.d.sync += m6_debounce.eq(0)
+        with m.Else():
+            with m.If(m6_debounce == debounce_limit - 1):
+                m.d.sync += [
+                    m6_stable_pressed.eq(m6_pressed),
+                    m6_debounce.eq(0),
+                ]
+                with m.If(m6_pressed):
+                    m.d.sync += m6_click.eq(1)
+            with m.Else():
+                m.d.sync += m6_debounce.eq(m6_debounce + 1)
+
+        # The projected image stores its configured count in the otherwise
+        # non-authoritative W3 of the unused final forward descriptor.  The
+        # serial receiver latches it while writing the upload, so the button
+        # can neither scan arbitrary memory nor accidentally schedule a stale
+        # body.  Factory boot remains Thread.1-only.
+        configured_thread_count = Signal(2, init=1)
+        with m.If(upload_wr_en & (upload_wr_addr == WUKONG_FORWARD_NS_SLOTS * 4 - 1)):
+            with m.If((upload_wr_data[:8] >= 1) & (upload_wr_data[:8] <= WUKONG_PHYSICAL_MAX_THREAD_COUNT)):
+                m.d.sync += configured_thread_count.eq(upload_wr_data[:2])
+            with m.Else():
+                m.d.sync += configured_thread_count.eq(1)
+
+        next_thread_slot = Signal(16)
+        m.d.comb += next_thread_slot.eq(
+            Mux(core.active_thread_slot == 1, 11,
+                Mux(core.active_thread_slot >= (9 + configured_thread_count),
+                    1, core.active_thread_slot + 1)))
+        thread_switch_pending = Signal()
+        with m.If(cm_reboot | core.thread_switch_complete | core.thread_switch_fault):
+            m.d.sync += thread_switch_pending.eq(0)
+        with m.Elif(m6_click & core.boot_complete & ~fault_latched &
+                    (configured_thread_count > 1) & ~thread_switch_pending):
+            m.d.sync += thread_switch_pending.eq(1)
+        m.d.comb += [
+            core.thread_switch_req.eq(thread_switch_pending),
+            core.thread_switch_index.eq(next_thread_slot),
+            self.dbg_active_thread_slot.eq(core.active_thread_slot),
+            self.dbg_thread_count.eq(configured_thread_count),
+        ]
+
         # step_mode=1 (default when IDE-connected): CM halts after each retired
         #   instruction and waits for an 's' command before executing the next one.
         # step_mode=0: CM executes freely; an 's' command requests a clean pause
@@ -834,6 +904,15 @@ class ChurchWukongXC7A100T(Elaboratable):
                 snapshot_pending.eq(1),
                 snapshot_reason.eq(Mux(bp_hit, 1, Mux(fault_halt, 2, 0))),
             ]
+        # A completed M6 switch is observable in the IDE through the normal
+        # complete architectural snapshot.  This carries the restored CR12
+        # thread base, allowing the server to report the active projected
+        # Thread without confusing it with simulator state.
+        with m.If(core.thread_switch_complete):
+            m.d.sync += [
+                snapshot_pending.eq(1),
+                snapshot_reason.eq(0),
+            ]
         # Fetch-settle bubble: DMEM BRAM is sync-read; the cycle after
         # imem_addr changes the read port still presents the OLD word.  Mask
         # imem_valid for that cycle or the core retires a stale decode right
@@ -851,7 +930,7 @@ class ChurchWukongXC7A100T(Elaboratable):
             # tells the bridge/IDE which build has actually restarted.
             core.imem_valid.eq(
                 ~step_halted & ~trace_stall & imem_settled &
-                ~sentinel_req & ~recovery_hold),
+                ~sentinel_req & ~recovery_hold & ~core.thread_switch_busy),
             core.halt_req.eq(step_halted | trace_stall | recovery_hold),
             core.free_run_start.eq(0),
             core.free_run_nia.eq(0),
@@ -1418,7 +1497,9 @@ class ChurchWukongXC7A100T(Elaboratable):
                         snap_nia.eq(core.nia),
                         snap_flags_latched.eq(live_snap_flags[:4]),
                         snap_m_flag_latched.eq(core.debug_m_flag),
-                        snap_thread_base.eq(core.debug_cr_words[12][1]),
+                        # CR12 is the system Thread root. Snapshot backing-store
+                        # telemetry must identify the actually scheduled body.
+                        snap_thread_base.eq(core.active_thread_base),
                         snap_bidx.eq(0),
                         snap_crc.eq(snap_header_crc),
                     ]

@@ -1210,7 +1210,8 @@ function init() {
         }
     }
 
-    sim.on('stateChange', () => { updateDashboard(); updateLedStrip(); updateToolbarIdeBadge(); if (currentView === 'gt-view') renderGTView(); });
+    sim.on('stateChange', () => { updateDashboard(); updateLedStrip(); updateToolbarIdeBadge(); if (typeof updateThreadControl === 'function') updateThreadControl(); if (currentView === 'gt-view') renderGTView(); });
+    sim.on('threadChange', () => { if (typeof updateThreadControl === 'function') updateThreadControl(); });
     sim.on('step', _traceRecordStep);
     // The optional live simulator-follow view is a UI projection only.  Keep it
     // on its own listener so hardware trace events and simulator execution can

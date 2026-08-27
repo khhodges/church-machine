@@ -1053,6 +1053,35 @@ let _simRunActive = false;
 
 let _runClickTimer = null;
 
+function updateThreadControl() {
+    const button = document.getElementById('nextThreadBtn');
+    const status = document.getElementById('activeThreadStatus');
+    if (!window.sim || typeof sim.activeThreadStatus !== 'function') return;
+    const state = sim.activeThreadStatus();
+    if (status) status.textContent = `${state.name} · ${state.position}/${state.count}`;
+    if (button) {
+        const unavailable = !sim.bootComplete || sim.running || state.count <= 1;
+        button.disabled = unavailable;
+        button.setAttribute('aria-disabled', unavailable ? 'true' : 'false');
+        button.setAttribute('data-tooltip', unavailable
+            ? (state.count <= 1 ? 'Next Thread — only Thread.1 is configured'
+                : 'Next Thread — available after boot while execution is paused')
+            : `Next Thread — switch to ${state.slots[(state.position % state.count)] === 1 ? 'Thread.1' : (sim.nsLabels[state.slots[(state.position % state.count)]] || 'next Thread')}`);
+    }
+}
+
+function nextConfiguredThread() {
+    if (!window.sim || typeof sim.advanceConfiguredThread !== 'function') return;
+    const outcome = sim.advanceConfiguredThread();
+    const consoleEl = document.getElementById('editorConsole');
+    if (consoleEl && outcome.reason) {
+        consoleEl.textContent += `\n⊿ ${outcome.reason}`;
+        consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+    updateThreadControl();
+    updateDashboard();
+}
+
 function onRunBtnClick() {
     if (_runClickTimer) {
         clearTimeout(_runClickTimer);

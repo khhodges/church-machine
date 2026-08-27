@@ -243,8 +243,18 @@ def test_wukong_projection_uploads_fixed_and_two_generated_thread_contexts():
         source_base = source_words[_ns_slot_base(source_total, slot)]
         target_base = context["base_word"]
         size = context["size"]
+        source_size = 1 << ((source_words[source_base] >> 23) & 0xF) + 6
         assert words[slot * NS_ENTRY_WORDS] == target_base * 4
-        assert words[target_base:target_base + size] == source_words[source_base:source_base + size]
+        assert size >= 512, "physical scheduler reserves caps through CR14"
+        expected = (source_words[source_base:source_base + source_size]
+                    + [0] * (context["size"] - source_size))
+        expected[0] = (expected[0] & ~(0xF << 23)) | (3 << 23)
+        if slot != 1:
+            expected[17] = WUKONG_UPLOAD_BODY_BASE_WORD * 4 + 4
+            expected[THREAD_CAPS_OFFSET + 14] = create_gt(
+                0, 10, {"E": 1}, 1)
+        assert words[target_base:target_base + context["size"]] == expected
+        assert ((words[target_base] >> 23) & 0xF) >= 3
         assert words[slot * NS_ENTRY_WORDS + 2] == integrity32(
             target_base * 4, words[slot * NS_ENTRY_WORDS + 1])
 
@@ -291,11 +301,28 @@ def test_wukong_projection_preserves_every_thread_private_body():
         target_base = row["base_word"]
         forward_base = slot * NS_ENTRY_WORDS
         assert words[forward_base] == target_base * 4
-        assert words[forward_base + 1] == source[_ns_slot_base(source_total, slot) + 1]
+        # Board-only expansion gives CHANGE room for persisted CR14 while
+        # retaining the generation/flags from the source descriptor.
+        assert (words[forward_base + 1] & ~0x1FFFFF) == (
+            source[_ns_slot_base(source_total, slot) + 1] & ~0x1FFFFF)
+        assert (words[forward_base + 1] & 0x1FFFFF) == row["size"] - 1
         assert words[forward_base + 2] == integrity32(
             target_base * 4, words[forward_base + 1])
-        assert words[target_base:target_base + row["size"]] == source[
-            source_base:source_base + row["size"]]
+        source_size = 1 << ((source[source_base] >> 23) & 0xF) + 6
+        assert words[target_base + 1:target_base + source_size] == source[
+            source_base + 1:source_base + source_size]
+        expansion = words[target_base + source_size:target_base + row["size"]]
+        if slot == 1:
+            assert expansion == [0] * (row["size"] - source_size)
+        else:
+            assert words[target_base + THREAD_CAPS_OFFSET + 14] == create_gt(
+                0, 10, {"E": 1}, 1)
+            assert all(
+                value == 0
+                for offset, value in enumerate(expansion, start=source_size)
+                if offset != THREAD_CAPS_OFFSET + 14
+            )
+        assert ((words[target_base] >> 23) & 0xF) >= 3
         assert words[target_base + 1] == values[0]
         assert words[target_base + 17] == values[1]
         assert row["caps0"] == expected_caps0

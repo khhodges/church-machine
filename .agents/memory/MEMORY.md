@@ -82,7 +82,7 @@
 - [Boot.Abstr c-list must be pre-populated](boot-abstr-clist-must-be-prepopulated.md) — boot path skips lazy GT injection; LUMP needs correct GTs baked in; JS vs Python GT formats differ; manifest filename field governs lump-consistency binary reads
 - [Thread base address zero](thread-base-address-zero.md) — a non-null CR12 may point to word 0; use an explicit missing-capability sentinel, never a base truthiness check
 - [Mint gate for NS slot registration](mint-gate-ns-registration.md) — only Mint.RegisterOutform→Navana.ADD→writeNSEntry may add NS slots; _seedIrqLazyManifest handles post-allocation state; no direct writeNSEntry outside this chain
-- [Wukong droplet SSH key](wukong-droplet-ssh.md) — how to SSH to 165.227.190.84 from Replit; key setup, build workflow, regeneration if rejected
+- [Wukong build-host policy](wukong-build-host-policy.md) — serialize resource-constrained Vivado builds and accept releases only with fresh, timing-clean provenance
 - [Wukong sentinel build version](wukong-sentinel-build-version.md) — 4-byte sentinel (0xBC N_INIT TU VER BUILD_VER); 'f' cmd re-arms; WUKONG_BUILD_VERSION in wukong_top.py; bump before each synthesis
 - [UartTx DONE-gap double-increment](uart-tx-done-gap-double-increment.md) — TX requesters gating on ~busy alone skip every other byte; must use ~busy & ~done (sentinel looked dead on hardware)
 - [Wukong sentinel_phase reset on 'f'](wukong-sentinel-phase-reset-bug.md) — 'f' must reset BOTH sentinel_sent AND sentinel_phase to 0; sentinel_phase alone causes single-byte re-fire (ignored by bridge)
@@ -138,7 +138,6 @@
 - [Historical hardware authority chain](historical-hardware-authority-chain.md) — grant saved test context only through an exact build, source, and artifact-digest binding
 - [Testing iframe health regression](testing-iframe-health-regression.md) — isolate live telemetry when verifying health-panel state across persistent Builder-tab navigation
 - [Wukong UI surface ownership](wukong-ui-surface-ownership.md) — physical-board controls live only on Builder > Testing; simulator controls remain software-only
-- [Artifact dependency lock refresh](artifact-dependency-lock-refresh.md) — a new pnpm-filtered artifact may need an online lock refresh before its local Vite binary is resolvable
 - [Primary publish vs static artifact](primary-publish-vs-static-artifact.md) — publishing a nested artifact can replace the custom-domain root despite a correct root autoscale config
 - [Actionable transport incidents](actionable-transport-incidents.md) — latch terminal failures until proven recovery; diagnostics may escalate guidance but never replace incident identity
 - [Top-security passkey credentials](top-security-passkeys.md) — protected-object access requires an object-scoped GT plus a 128-bit proof; never treat the GT alone as a secret
@@ -157,3 +156,4 @@
 - [Execution identity provenance](execution-identity-provenance.md) — empty source is comparable; opaque cross-algorithm source hashes never prove editor freshness
 - [Release LUMP replacement](lump-release-replacement.md) — release rebuilds replace the selected user slot by default; New Entry is explicit, while fixed system slots stay protected
 - [Save picker visibility](save-namespace-picker-visibility.md) — display every known NS slot; only Boot.NS and Boot.Thread are disabled in the picker
+- [Wukong scheduler Thread allocation](wukong-scheduler-thread-allocation.md) — physical round-robin contexts need 512-word projected Thread bodies for persisted CR14 capability state

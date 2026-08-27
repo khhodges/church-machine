@@ -41,6 +41,10 @@ class ChurchMLoad(Elaboratable):
         self.sub_direct = Signal()
         self.sub_direct_gt = Signal(32)
         self.sub_m_elevated = Signal()
+        # Read-only descriptor check used by the physical scheduler preflight.
+        # It executes c-list/direct and Namespace validation but never clears a
+        # G-bit or writes a CR/thread row.
+        self.sub_validate_only = Signal()
         self.sub_busy = Signal()
         self.sub_done = Signal()
         self.sub_fault = Signal()
@@ -63,6 +67,7 @@ class ChurchMLoad(Elaboratable):
         self.mem_wr_data = Signal(32)
 
         self.ns_entry_addr_out = Signal(32)
+        self.resolved_base = Signal(32)
         self.gbit_reset_done = Signal()
 
         self.thread_wr_en = Signal()
@@ -98,6 +103,7 @@ class ChurchMLoad(Elaboratable):
         cr_dst_reg = Signal(4)
         index_reg = Signal(16)
         direct_mode = Signal()
+        validate_only_reg = Signal()
         direct_gt_reg = Signal(32)
         m_elevated_reg = Signal()
         src_cap = Signal(CAP_REG_LAYOUT)
@@ -165,7 +171,10 @@ class ChurchMLoad(Elaboratable):
             u_ns_gate.mem_rd_valid.eq(u_ns_gate.ns_gate_busy & self.mem_rd_valid),
         ]
 
-        m.d.comb += self.ns_entry_addr_out.eq(u_ns_gate.ns_entry_addr_out)
+        m.d.comb += [
+            self.ns_entry_addr_out.eq(u_ns_gate.ns_entry_addr_out),
+            self.resolved_base.eq(u_ns_gate.raw_base),
+        ]
 
         with m.FSM(name="mload") as fsm:
             with m.State("IDLE"):
@@ -175,6 +184,7 @@ class ChurchMLoad(Elaboratable):
                         cr_dst_reg.eq(self.sub_cr_dst),
                         index_reg.eq(self.sub_index),
                         direct_mode.eq(self.sub_direct),
+                        validate_only_reg.eq(self.sub_validate_only),
                         direct_gt_reg.eq(self.sub_direct_gt),
                         m_elevated_reg.eq(self.sub_m_elevated),
                         result_cap.eq(0),
@@ -306,9 +316,15 @@ class ChurchMLoad(Elaboratable):
                     ]
                     if self.enable_seal_check:
                         m.d.sync += ns_w1_saved.eq(u_ns_gate.raw_w2)
-                        m.next = "RESET_GBIT"
+                        with m.If(validate_only_reg):
+                            m.next = "VALIDATE_COMPLETE"
+                        with m.Else():
+                            m.next = "RESET_GBIT"
                     else:
-                        m.next = "UPDATE_THREAD"
+                        with m.If(validate_only_reg):
+                            m.next = "VALIDATE_COMPLETE"
+                        with m.Else():
+                            m.next = "UPDATE_THREAD"
 
             if self.enable_seal_check:
                 with m.State("RESET_GBIT"):
@@ -337,6 +353,10 @@ class ChurchMLoad(Elaboratable):
                     self.cr_wr_data.eq(result_cap),
                     self.cr_wr_en.eq(1),
                 ]
+                m.next = "IDLE"
+
+            with m.State("VALIDATE_COMPLETE"):
+                # A successful preflight has no architectural side effects.
                 m.next = "IDLE"
 
             with m.State("FAULT"):
@@ -373,7 +393,8 @@ class ChurchMLoad(Elaboratable):
 
         m.d.comb += [
             self.sub_busy.eq(~fsm.ongoing("IDLE")),
-            self.sub_done.eq(fsm.ongoing("COMPLETE")),
+            self.sub_done.eq(fsm.ongoing("COMPLETE") |
+                             fsm.ongoing("VALIDATE_COMPLETE")),
             self.sub_fault.eq(fsm.ongoing("FAULT")),
             self.sub_fault_type.eq(fault_type_reg),
             self.outform_start_out.eq(fsm.ongoing("TRIGGER_OUTFORM")),

@@ -910,6 +910,8 @@ class ChurchSimulator {
         this.faultLog = [];
         this._instrHistory = [];
         this._currentInstrLabel = null;
+        this._currentThreadSlot = 1;
+        this._threadContextMap = new Map();
         this.faultViolationData = null;   // populated by B:00 FAULT_RST from last faultLog entry
         // Last complete state received from physical Wukong.  This is kept
         // separately from simulator breakpoint state and includes the raw
@@ -4313,6 +4315,78 @@ class ChurchSimulator {
         return cr12.word1 >>> 0;
     }
 
+    // The configured scheduler order is intentionally derived from the
+    // Namespace table rather than browser-only designer state.  This keeps a
+    // restored boot image, a freshly generated image, and the visible UI on
+    // one contract: Thread.1 is the fixed primary context, followed by the
+    // numbered generated Thread contexts in numeric order.
+    configuredThreadSlots() {
+        const slots = [];
+        if (this.isNSEntryValid(1)) slots.push(1);
+        const generated = [];
+        for (let slot = 0; slot < this.nsCount; slot++) {
+            const label = String(this.nsLabels[slot] || '');
+            const match = /^Thread#([2-9]\d*)$/.exec(label);
+            if (match && this.isNSEntryValid(slot)) {
+                generated.push({ slot, number: Number(match[1]) });
+            }
+        }
+        generated.sort((a, b) => a.number - b.number);
+        return slots.concat(generated.map(item => item.slot));
+    }
+
+    activeThreadStatus() {
+        const slots = this.configuredThreadSlots();
+        const activeSlot = Number.isInteger(this._currentThreadSlot)
+            ? this._currentThreadSlot : 1;
+        const position = Math.max(0, slots.indexOf(activeSlot));
+        return {
+            slot: activeSlot,
+            name: activeSlot === 1 ? 'Thread.1'
+                : (this.nsLabels[activeSlot] || `Thread slot ${activeSlot}`),
+            position: position + 1,
+            count: slots.length,
+            slots,
+        };
+    }
+
+    // Scheduler-only CHANGE entry point.  It shares CHANGE's complete
+    // context-save/restore implementation while deliberately bypassing a
+    // user-program capability: the configured Namespace itself is the
+    // authority for this local control, and the target is validated before
+    // any outgoing state is written.
+    advanceConfiguredThread() {
+        if (!this.bootComplete) {
+            return { ok: false, reason: 'Simulator is still booting' };
+        }
+        if (this.running) {
+            return { ok: false, reason: 'Pause execution before switching Threads' };
+        }
+        const slots = this.configuredThreadSlots();
+        if (!slots.length) return { ok: false, reason: 'No configured Thread context is available' };
+        if (slots.length === 1) return { ok: true, unchanged: true, ...this.activeThreadStatus() };
+
+        const current = Number.isInteger(this._currentThreadSlot) ? this._currentThreadSlot : 1;
+        const currentIndex = Math.max(0, slots.indexOf(current));
+        const target = slots[(currentIndex + 1) % slots.length];
+        const entry = this.readNSEntry(target);
+        const header = entry ? this.parseLumpHeader(this.memory[entry.word0_location] >>> 0) : null;
+        if (!entry || !header || !header.valid || header.typ !== 2 ||
+                header.lumpSize < THREAD_CAPS_OFFSET + 12) {
+            return { ok: false, reason: `Configured target ${this.nsLabels[target] || target} has an invalid Thread descriptor` };
+        }
+
+        const result = this._execChange({
+            crDst: 14, crSrc: 15, imm: target, scheduler: true,
+            mnemonic: 'NEXT_THREAD',
+        });
+        if (!result) return { ok: false, reason: 'Thread switch was rejected' };
+        const status = this.activeThreadStatus();
+        this.emit('threadChange', status);
+        this.emit('stateChange', this.getState());
+        return { ok: true, ...status, result };
+    }
+
     _writeDR(drIdx, value) {
         this.dr[drIdx] = value >>> 0;
         if (drIdx < 16) {
@@ -6265,8 +6339,9 @@ class ChurchSimulator {
             return null;
         }
 
+        const schedulerSwitch = d.scheduler === true;
         const srcGT = this.cr[d.crSrc].word0;
-        if (srcGT === 0) {
+        if (!schedulerSwitch && srcGT === 0) {
             this.fault('NULL_CAP', `CHANGE: CR${d.crSrc} (source) is NULL`);
             return null;
         }
@@ -6280,12 +6355,15 @@ class ChurchSimulator {
             this.fault('BOUNDS', `CHANGE: NS entry ${targetIdx} is null`);
             return null;
         }
-        const gtRead = this._capRead(d.crSrc, entry.word0_location, null, `CHANGE CR${d.crDst}`);
-        if (!gtRead.ok) {
-            this.fault(gtRead.fault, gtRead.message);
-            return null;
+        let gt = 0;
+        if (!schedulerSwitch) {
+            const gtRead = this._capRead(d.crSrc, entry.word0_location, null, `CHANGE CR${d.crDst}`);
+            if (!gtRead.ok) {
+                this.fault(gtRead.fault, gtRead.message);
+                return null;
+            }
+            gt = gtRead.value || 0;
         }
-        const gt = gtRead.value || 0;
 
         // ── System-wide registers (CR12/CR13): direct privileged write, no save ──
         if (d.crDst === 12 || d.crDst === 13) {
@@ -6380,6 +6458,12 @@ class ChurchSimulator {
         // ── Per-thread registers (CR14/CR15): full context switch ─────────────────
         // 1. Save outgoing thread state (CR0–CR11, CR14, CR15, DR0–DR15, STO, PC+1).
         //    CR12/CR13 are system-wide and excluded from the per-thread snapshot.
+        const targetHeader = this.parseLumpHeader(this.memory[entry.word0_location] >>> 0);
+        if (schedulerSwitch && (!targetHeader.valid || targetHeader.typ !== 2 ||
+                targetHeader.lumpSize < THREAD_CAPS_OFFSET + 12)) {
+            this.fault('BOUNDS', `NEXT_THREAD: Namespace slot ${targetIdx} is not a valid Thread descriptor`);
+            return null;
+        }
         if (!this._threadContextMap) this._threadContextMap = new Map();
         const outSlot = this._currentThreadSlot ?? null;
         this._threadContextMap.set(outSlot, {

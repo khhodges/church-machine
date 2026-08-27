@@ -28,7 +28,11 @@
 set PART     "xc7a100tfgg676-2"
 set TOP      "church_wukong_xc7a100t"
 set PROJ_DIR "./vivado_wukong"
-set JOBS     4
+# This design's RTL elaboration is memory-intensive.  Constraining Vivado's
+# internal parallelism keeps synthesis below the 8 GiB release-builder limit;
+# unbounded auto-threading is killed by the host before a bitstream is written.
+set JOBS     2
+set_param general.maxThreads 2
 
 ## ── Namespace/thread readiness gate ─────────────────────────────────────────
 ## This must run before create_project or any Vivado synthesis work.  Keeping

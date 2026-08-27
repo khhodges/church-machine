@@ -125,6 +125,27 @@ def test_status_delivery_submission_does_not_wait_for_an_outage(monkeypatch):
     release.set()
 
 
+def test_boot_info_delivery_authenticates_with_report_token(monkeypatch):
+    captured = {}
+    delivered = threading.Event()
+
+    def capture_post(*args, **kwargs):
+        captured.update(kwargs)
+        delivered.set()
+        return _FakeResponse()
+
+    monkeypatch.setenv('REPORT_TOKEN', 'bridge-report-secret')
+    monkeypatch.setattr(wb.requests, 'post', capture_post)
+    worker = wb.FaultDeliveryWorker('http://ide.test', True)
+    worker.submit('boot_info', {'build_version': 18,
+                                'thread_scheduler': True})
+    assert delivered.wait(1)
+    assert captured['headers'] == {
+        'Authorization': 'Bearer bridge-report-secret',
+    }
+    worker.close()
+
+
 def test_failed_fault_snapshot_delivery_keeps_active_incident_for_retry(monkeypatch):
     replies = [None, {
         'ok': True, 'accepted': True, 'promoted': True,
@@ -313,7 +334,7 @@ def test_fault_recovery_control_is_wired_into_top_execution_and_uart_gates():
             'snap_nia.eq(core.nia)',
             'snap_flags_latched.eq(live_snap_flags[:4])',
             'snap_m_flag_latched.eq(core.debug_m_flag)',
-            'snap_thread_base.eq(core.debug_cr_words[12][1])',
+            'snap_thread_base.eq(core.active_thread_base)',
             'snap_cr_words[cr_idx][word_idx].eq(',
             'snap_dr_words[dr_idx].eq('):
         assert marker in source

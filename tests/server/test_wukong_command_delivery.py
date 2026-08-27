@@ -185,14 +185,19 @@ class TestQueueConsumeAckLifecycle:
         _ack(client, 'f', qid, True)   # correct id still works afterwards
         assert _status(client)['command_delivery']['write_ok'] is True
 
-    def test_write_ts_after_sentinel_received_ts_ordering(self, client):
+    def test_write_ts_after_sentinel_received_ts_ordering(self, client, monkeypatch):
         """Sentinel confirmation is bound to write_ts: a boot-info received
         BEFORE the write ack must have received_ts < write_ts so the UI can
         reject a pre-existing sentinel as proof of reboot."""
-        client.post('/hardware/wukong/boot-info',
-                    data=json.dumps({'stale_tu': False, 'tu_version': 3,
-                                     'build_version': 7}),
-                    content_type='application/json')
+        monkeypatch.setenv('REPORT_TOKEN', 'bridge-report-secret')
+        _app_module._wukong_bridge_info['session_id'] = 'test-session'
+        response = client.post(
+            '/hardware/wukong/boot-info',
+            data=json.dumps({'stale_tu': False, 'tu_version': 3,
+                             'build_version': 7, 'session_id': 'test-session'}),
+            headers={'Authorization': 'Bearer bridge-report-secret'},
+            content_type='application/json')
+        assert response.status_code == 200
         old_ts = _status(client)['boot_info']['received_ts']
         qid = _post_cmd(client, 'f').get_json()['id']
         client.get('/hardware/wukong/command')
@@ -526,14 +531,19 @@ class TestAutomaticRunAfterSentinelLabel:
 
 
 class TestBootInfoReceivedTs:
-    def test_boot_info_stamped_with_received_ts(self, client):
+    def test_boot_info_stamped_with_received_ts(self, client, monkeypatch):
         """The sentinel-confirmation flow needs a server-side receive
         timestamp on boot_info so the UI can tell fresh from stale."""
         t0 = time.time()
-        client.post('/hardware/wukong/boot-info',
-                    data=json.dumps({'stale_tu': False, 'tu_version': 3,
-                                     'build_version': 7}),
-                    content_type='application/json')
+        monkeypatch.setenv('REPORT_TOKEN', 'bridge-report-secret')
+        _app_module._wukong_bridge_info['session_id'] = 'test-session'
+        response = client.post(
+            '/hardware/wukong/boot-info',
+            data=json.dumps({'stale_tu': False, 'tu_version': 3,
+                             'build_version': 7, 'session_id': 'test-session'}),
+            headers={'Authorization': 'Bearer bridge-report-secret'},
+            content_type='application/json')
+        assert response.status_code == 200
         bi = _status(client)['boot_info']
         assert bi['received_ts'] >= t0 - 1
         assert bi['build_version'] == 7
