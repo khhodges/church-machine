@@ -1254,6 +1254,99 @@ class ChurchSimulator {
         return { magic, n_minus_6, lumpSize, cw, typ, cc, valid: magic === 0x1F };
     }
 
+    // Return the private-memory geometry for one Namespace-resident Thread.
+    // Thread headers deliberately reinterpret the ordinary LUMP cw/cc fields:
+    // cw is the downward-growing stack size, while cc is the upward-growing
+    // heap size.  The data-register and capability regions are architectural
+    // constants.  Keep this decoder close to parseLumpHeader so all UI views
+    // use the selected Namespace body's header rather than live execution
+    // registers or a fixed Boot.Thread layout.
+    getThreadInstanceLayout(nsIndex) {
+        const unavailable = reason => ({ valid: false, nsIndex, reason });
+        if (!Number.isInteger(nsIndex) || nsIndex < 0 || nsIndex >= this.MAX_NS_ENTRIES) {
+            return unavailable('The selected Namespace slot is invalid.');
+        }
+        const entry = this.readNSEntry(nsIndex);
+        if (!entry) return unavailable('This Namespace slot has no resident Thread entry.');
+
+        const base = entry.word0_location;
+        if (!Number.isInteger(base) || base < 0 || base >= this.memory.length) {
+            return unavailable('The Namespace entry does not point to resident simulator memory.');
+        }
+
+        const headerWord = this.memory[base] >>> 0;
+        const header = this.parseLumpHeader(headerWord);
+        if (!header.valid || header.typ !== 2 || header.cw === 0) {
+            return unavailable('No valid Thread header is resident at this Namespace entry.');
+        }
+        if (base + header.lumpSize > this.memory.length) {
+            return unavailable(
+                `The ${header.lumpSize}-word Thread body extends beyond simulator memory.`
+            );
+        }
+
+        const entryLimit = this.parseNSWord1(entry.word1_limit).limit;
+        if (entryLimit + 1 < header.lumpSize) {
+            return unavailable(
+                `The Namespace limit (${entryLimit + 1} words) is smaller than the Thread header (${header.lumpSize} words).`
+            );
+        }
+
+        const drWords = 16;
+        // Thread execution and boot images use an architectural capability
+        // home at +244, even when the allocated Thread LUMP is larger than
+        // 256 words.  Larger bodies reserve additional capacity; they do not
+        // relocate saved CR0–CR11.  Keep the viewer aligned with the actual
+        // selected body the context-switch code reads and writes.
+        const capsWords = 12;
+        const capsStart = THREAD_CAPS_OFFSET;
+        const capsEnd = capsStart + capsWords - 1;
+        const privateZoneWords = capsEnd + 1;
+        const heapWords = header.cc;
+        const stackWords = header.cw;
+        const heapStart = 1 + drWords;
+        const heapEnd = heapStart + heapWords - 1;
+        const stackStart = capsStart - stackWords;
+        const stackEnd = capsStart - 1;
+        const freeStart = heapEnd + 1;
+        const freeEnd = stackStart - 1;
+
+        if (header.lumpSize < privateZoneWords ||
+            heapWords <= 0 || stackWords <= 0 || heapEnd >= stackStart || capsStart < 0) {
+            return unavailable(
+                'The Thread header describes overlapping or empty private memory zones.'
+            );
+        }
+
+        return {
+            valid: true,
+            nsIndex,
+            entry,
+            base,
+            headerWord,
+            header,
+            lumpSize: header.lumpSize,
+            drStart: 1,
+            drEnd: drWords,
+            drWords,
+            heapStart,
+            heapEnd,
+            heapWords,
+            freeStart,
+            freeEnd,
+            freeWords: Math.max(0, freeEnd - freeStart + 1),
+            stackStart,
+            stackEnd,
+            stackWords,
+            capsStart,
+            capsEnd,
+            capsWords,
+            privateZoneWords,
+            extensionStart: privateZoneWords,
+            extensionWords: header.lumpSize - privateZoneWords,
+        };
+    }
+
     // ── Ordinary-LUMP Namespace identity contract ───────────────────────────
     // Row zero of an ordinary executable LUMP is not a user capability.  It is
     // the resident object's own Inform E-GT.  A compiler writes the placeholder

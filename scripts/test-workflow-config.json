@@ -39,6 +39,7 @@
         "sha32-vectors",
         "test-check-ila-probe-names",
         "test-check-ns-word3-contract",
+        "thread-instance-zone-tests",
         "trace-packet-execution-tests",
         "update-lump-tests",
         "versions-view-tests",

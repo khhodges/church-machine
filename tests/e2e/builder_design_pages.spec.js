@@ -20,7 +20,7 @@ async function openBuilder(page) {
     // #hamItem-builder is hidden by default (debug-only view); un-hide for E2E.
     await page.evaluate(() => {
         const btn = document.getElementById('hamItem-builder');
-        if (btn) btn.style.display = '';
+        if (btn) btn.style.display = 'block';
     });
 
     const hamBtn = page.locator('#hamBtn');
@@ -244,5 +244,53 @@ test.describe('Builder design pages — Thread Lump & Namespace Lump', () => {
         await page.locator('#builderViewTab-lump-ns').click();
         await expect(page.locator('#lumpNSPanel')).toBeVisible();
         await expect(page.locator('#ti60ConnectPanel')).toBeHidden();
+    });
+});
+
+test.describe('Namespace Thread instance details', () => {
+    test('opens the clicked generated Thread body and preserves ordinary LUMP routing', async ({ page }) => {
+        await page.goto('/simulator/');
+        await page.waitForFunction(() =>
+            typeof sim !== 'undefined' &&
+            typeof switchView === 'function' &&
+            window.bootImageAvailable === true &&
+            sim.getThreadInstanceLayout(1).valid
+        );
+
+        await page.evaluate(() => {
+            const makeThread = (slot, base, label, marker) => {
+                sim.withNamespaceWrite('Thread detail browser test', () => {
+                    sim.writeNSEntry(slot, base, 255, 0, 0, 1, 0, 0, 0);
+                });
+                sim.nsLabels[slot] = label;
+                // typ=2, n-6=2 (256 words), cw=32 stack words, cc=12 heap words.
+                sim.memory[base] = sim.packLumpHeader(2, 32, 12, 2);
+                sim.memory[base + 1] = marker;
+                sim.memory[base + 17] = marker + 0x16;
+                sim.memory[base + 243] = marker + 0xF2;
+                sim.memory[base + 244] = 0x4A000006;
+            };
+            makeThread(11, 8192, 'Thread#2', 0x22220001);
+            makeThread(12, 8704, 'Thread#3', 0x33330001);
+            // Ensure an active execution context cannot leak into the popup.
+            sim.dr[0] = 0xDEADBEEF;
+            sim.sto = 999;
+            switchView('namespace');
+        });
+
+        await expect(page.locator('#namespace')).toBeVisible();
+        await page.locator('.ns-label', { hasText: 'Thread#3' }).click();
+        const threadModal = page.locator('[data-testid="thread-detail-modal"]');
+        await expect(threadModal).toBeVisible();
+        await expect(threadModal).toContainText('Thread#3');
+        await expect(threadModal).toContainText('0x33330001');
+        await expect(threadModal).toContainText('0x33330017');
+        await expect(threadModal).not.toContainText('0x22220001');
+        await expect(threadModal).not.toContainText('0xDEADBEEF');
+
+        await threadModal.locator('button[aria-label="Close Thread details"]').click();
+        await page.locator('.ns-label', { hasText: 'SelfTest' }).click();
+        await expect(page.locator('[data-testid="thread-detail-modal"]')).toHaveCount(0);
+        await expect(page.locator('#_nsLumpModalOverlay')).toContainText('LUMP HEADER');
     });
 });

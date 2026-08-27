@@ -192,7 +192,7 @@ function updateCRDetail() {
     const nsRegs = [15];
     const showCode = hasX || (crMbit && codeRegs.includes(crIdx));
     const showCList = hasL || (crMbit && clistRegs.includes(crIdx));
-    const showThread = THREAD_NS_SLOTS.has(nsIdx) || threadRegs.includes(crIdx);
+    const showThread = _isThreadNamespaceSlot(nsIdx) || threadRegs.includes(crIdx);
     const showNS = crMbit && nsRegs.includes(crIdx);
     const showData = (hasR || hasW) && !showCode && !showCList;
 
@@ -2012,39 +2012,41 @@ function renderBootNSImage() {
     return html;
 }
 
-// Thread lump sizing parameters — set by the IDE under programmer control.
-// FS = Full lump size  (F = full):  total words in the thread lump.
-// HS = Heap size       (H = heap):  max heap words; stored in header cc field.
-// SS = Stack size      (S = stack): stack words;    stored in header cw field.
-// Architecture-fixed zones: DR = 16 words (DR0–DR15), Caps = 12 words (CR0–CR11).
-const THREAD_FS = 256;  // Full size  (FS)
-const THREAD_HS =  64;  // Heap size  (HS)
-const THREAD_SS =  32;  // Stack size (SS)
+// Thread geometry is derived from the selected Namespace entry's own
+// resident body.  Do not substitute a default layout: that would show
+// Boot.Thread or live-register state for a different Thread instance.
+function _threadLayoutForSlot(nsIndex) {
+    if (!sim || typeof sim.getThreadInstanceLayout !== 'function') {
+        return { valid: false, nsIndex, reason: 'Thread memory is unavailable in this simulator.' };
+    }
+    return sim.getThreadInstanceLayout(nsIndex);
+}
 
-// Physical layout (word 0 at top, word FS-1 at bottom):
-//   +0                     Lump Header (1 word)
-//   +1        … +16        Zone ⑤ Data Registers — DR0..DR15 (16 words, fixed)
-//   +17       … +HS        Zone ④ Heap ↑ — HS words; grows upward
-//   +HS+1     … +FS-13-SS  Zone ③ Freespace — dynamic gap; Mint-verified all-zero
-//   +FS-12-SS … +FS-13     Zone ② LIFO Stack ↓ — SS words; grows downward
-//   +FS-12    … +FS-1      Zone ① Capabilities — CR0..CR11 GT Word 0; c-list tail (12 words, fixed)
-const THREAD_LAYOUT = {
-    HEADER_WORD:   0,
-    THREAD_HEADER: 0xF900_8240,  // magic=0x1F · n-6=log2(FS)-6 · cw=SS · typ=10 · cc=HS
-    DR_START:      1,              DR_END:    16,                        DR_WORDS:   16,
-    HEAP_START:   17,              HEAP_END:  17 + THREAD_HS - 1,        HEAP_WORDS: THREAD_HS,
-    FREE_START:   17 + THREAD_HS, FREE_END:  THREAD_FS - THREAD_SS - 13, FREE_WORDS: THREAD_FS - 17 - THREAD_HS - THREAD_SS - 12,
-    STACK_START:  THREAD_FS - THREAD_SS - 12, STACK_END: THREAD_FS - 13, STACK_WORDS: THREAD_SS,
-    CAPS_START:   THREAD_FS - 12, CAPS_END:  THREAD_FS - 1,             CAPS_WORDS: 12,
-    TOTAL:        THREAD_FS,
-};
-const THREAD_NS_SLOTS = new Set([1]);
+// Known Thread labels retain a Thread-specific unavailable state when the body
+// has been evicted or malformed.  A valid typ=2 header identifies any other
+// generated/resident Thread regardless of its label or Namespace slot number.
+function _isThreadNamespaceSlot(nsIndex, entry) {
+    if (_threadLayoutForSlot(nsIndex).valid) return true;
+    const label = String((entry && entry.label) || (sim && sim.nsLabels && sim.nsLabels[nsIndex]) || '');
+    return label === 'Boot.Thread' || /^Thread#\d+$/.test(label);
+}
 
 function renderThreadMemoryLayout(nsIndex, expandAll = false) {
-    const entry = sim.readNSEntry(nsIndex);
-    const slotBase = entry ? entry.word0_location : (nsIndex * sim.SLOT_SIZE);
+    const TL = _threadLayoutForSlot(nsIndex);
     const label = sim.nsLabels[nsIndex] || ('Slot ' + nsIndex);
-    const TL = THREAD_LAYOUT;
+    if (!TL.valid) {
+        const reason = String(TL.reason || 'The selected Thread body is unavailable.')
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return `<div class="thread-layout-view thread-layout-unavailable" data-thread-slot="${nsIndex}">` +
+            `<div class="thread-layout-sticky" id="thread-zone-hdr">` +
+            `<div class="thread-layout-header">${label} — Thread Memory Layout` +
+            `<span class="thread-layout-subhead">NS Slot ${nsIndex} · read-only</span></div></div>` +
+            `<div style="margin:16px;padding:14px;border:1px solid rgba(248,113,113,0.45);border-radius:6px;background:rgba(127,29,29,0.15);">` +
+            `<strong style="color:#fca5a5;">THREAD BODY UNAVAILABLE</strong>` +
+            `<p style="margin:7px 0 0;color:#d1d5db;line-height:1.45;">${reason} No values are shown because a Thread detail view only reads the selected Namespace body.</p>` +
+            `</div></div>`;
+    }
+    const slotBase = TL.base;
 
     const _collapsedCls = expandAll ? '' : ' thread-zone-collapsed';
     const _bodyDisplay  = expandAll ? '' : 'display:none;';
@@ -2063,12 +2065,12 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
     let html = '<div class="thread-layout-view">';
 
     // ── Sticky header block (title + lump header) ─────────────────────────
-    const headerWord = sim.memory[slotBase + TL.HEADER_WORD] || TL.THREAD_HEADER;
-    html += `<div class="thread-layout-sticky" id="thread-zone-hdr">`;
-    html += `<div class="thread-layout-header">${label} — Thread Memory Layout<span class="thread-layout-subhead">NS Slot ${nsIndex} · base ${addrOf(0)} · ${THREAD_FS} words·FS (${THREAD_FS * 4}\u202Fbytes)</span></div>`;
+    const headerWord = TL.headerWord;
+    html += `<div class="thread-layout-sticky" id="thread-zone-hdr" data-thread-slot="${nsIndex}">`;
+    html += `<div class="thread-layout-header">${label} — Thread Memory Layout<span class="thread-layout-subhead">NS Slot ${nsIndex} · base ${addrOf(0)} · ${TL.lumpSize} words·FS (${TL.lumpSize * 4}\u202Fbytes)</span></div>`;
     html += `<div class="thread-lump-hdr-block">`;
     html += `<span class="thread-lump-hdr-label">Lump Header</span>`;
-    html += `<span class="thread-lump-hdr-note">word 0 · magic=0x1F · n\u22126=${Math.log2(THREAD_FS) - 6} (${THREAD_FS}w·FS) · cw=${THREAD_SS}\u202F(SS) · typ=10 (Thread) · cc=${THREAD_HS}\u202F(HS)</span>`;
+    html += `<span class="thread-lump-hdr-note">word 0 · magic=0x1F · n\u22126=${TL.header.n_minus_6} (${TL.lumpSize}w·FS) · cw=${TL.stackWords}\u202F(SS) · typ=10 (Thread) · cc=${TL.heapWords}\u202F(HS)</span>`;
     html += `<div class="thread-lump-hdr-row">`;
     html += `<span class="thread-lump-off">+0</span>`;
     html += `<span class="thread-lump-addr">${addrOf(0)}</span>`;
@@ -2083,8 +2085,8 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
     // ── Zone ⑤: Data Registers (+1 … +16) ───────────────────────────────────
     html += secHdr('⑤', 'Data Registers', '16 words · DR0–DR15 · offset +1 … +16 · head of the slot (after header)', '#a855f7', 'thread-zone-5');
     html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>DR</th><th>Offset</th><th>Addr</th><th>Value (hex)</th><th>Value (dec)</th></tr></thead><tbody>';
-    for (let i = 0; i < TL.DR_WORDS; i++) {
-        const off  = TL.DR_START + i;
+    for (let i = 0; i < TL.drWords; i++) {
+        const off  = TL.drStart + i;
         const word = sim.memory[slotBase + off] || 0;
         const rowStyle = word ? '' : ' style="opacity:0.28;"';
         html += `<tr${rowStyle}><td style="color:#a855f7;">DR${i}</td><td style="color:#555;">+${off}</td><td style="font-family:monospace;">${addrOf(off)}</td><td style="color:#c084fc;font-family:monospace;">${hexOf(word)}</td><td style="color:#9ca3af;">${word >>> 0}</td></tr>`;
@@ -2094,13 +2096,13 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
 
     // ── Zone ④: Heap (+17 … +80) ─────────────────────────────────────────
     let heapNonZero = 0;
-    for (let i = TL.HEAP_START; i <= TL.HEAP_END; i++) {
+    for (let i = TL.heapStart; i <= TL.heapEnd; i++) {
         if (sim.memory[slotBase + i]) heapNonZero++;
     }
-    html += secHdr('④', 'Heap ↑', `${THREAD_HS} words·HS · offset +${TL.HEAP_START} … +${TL.HEAP_END} · base ${addrOf(TL.HEAP_START)} · ${heapNonZero} word${heapNonZero!==1?'s':''} allocated`, '#22c55e', 'thread-zone-4');
+    html += secHdr('④', 'Heap ↑', `${TL.heapWords} words·HS · offset +${TL.heapStart} … +${TL.heapEnd} · base ${addrOf(TL.heapStart)} · ${heapNonZero} word${heapNonZero!==1?'s':''} allocated`, '#22c55e', 'thread-zone-4');
     html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>Off</th><th>Addr</th><th>Hex</th><th>Decoded</th></tr></thead><tbody>';
-    for (let i = 0; i < TL.HEAP_WORDS; i++) {
-        const off  = TL.HEAP_START + i;
+    for (let i = 0; i < TL.heapWords; i++) {
+        const off  = TL.heapStart + i;
         const word = sim.memory[slotBase + off] || 0;
         const rowStyle = word ? '' : ' style="opacity:0.22;"';
         const decoded  = word ? `<span style="color:#9ca3af;">0x${word.toString(16).toUpperCase().padStart(8,'0')}</span>` : '<span style="color:#374151;">free</span>';
@@ -2111,15 +2113,15 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
 
     // ── Zone ③: Freespace (+81 … +211) ───────────────────────────────────
     let freeNonZero = 0;
-    for (let i = TL.FREE_START; i <= TL.FREE_END; i++) {
+    for (let i = TL.freeStart; i <= TL.freeEnd; i++) {
         if (sim.memory[slotBase + i]) freeNonZero++;
     }
-    html += secHdr('③', 'Freespace', `${TL.FREE_WORDS} words · offset +${TL.FREE_START} … +${TL.FREE_END} · ${freeNonZero} non-zero · shrinks as stack grows ↓ and heap grows ↑`, '#6b7280', 'thread-zone-3');
+    html += secHdr('③', 'Freespace', `${TL.freeWords} words · offset +${TL.freeStart} … +${TL.freeEnd} · ${freeNonZero} non-zero · fixed by this Thread header`, '#6b7280', 'thread-zone-3');
     if (freeNonZero === 0) {
-        html += `<div class="thread-free-empty">All ${TL.FREE_WORDS} words are zero — region is unallocated.</div>`;
+        html += `<div class="thread-free-empty">All ${TL.freeWords} words are zero — region is unallocated.</div>`;
     } else {
         html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>Off</th><th>Addr</th><th>Hex</th><th>Note</th></tr></thead><tbody>';
-        for (let i = TL.FREE_START; i <= TL.FREE_END; i++) {
+        for (let i = TL.freeStart; i <= TL.freeEnd; i++) {
             const word = sim.memory[slotBase + i] || 0;
             if (!word) continue;
             html += `<tr><td style="color:#6b7280;">+${i}</td><td style="font-family:monospace;">${addrOf(i)}</td><td style="color:rgba(206,145,120,0.8);font-family:monospace;">${hexOf(word)}</td><td style="color:#4b5563;">non-zero</td></tr>`;
@@ -2129,13 +2131,12 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
     html += secBody();
 
     // ── Zone ②: LIFO Stack (+212 … +243) ─────────────────────────────────
-    const stackWords = sim.memory.slice(slotBase + TL.STACK_START, slotBase + TL.STACK_END + 1);
+    const stackWords = sim.memory.slice(slotBase + TL.stackStart, slotBase + TL.stackEnd + 1);
     const stackUsed  = stackWords.filter(Boolean).length;
-    const stoLive    = (sim.sto != null) ? sim.sto : TL.STACK_END;
-    html += secHdr('②', 'LIFO Stack ↓', `${THREAD_SS} words·SS · offset +${TL.STACK_START} … +${TL.STACK_END} · STO=${stoLive} · grows ↓ · ${stackUsed} word${stackUsed!==1?'s':''} non-zero`, '#38bdf8', 'thread-zone-2');
+    html += secHdr('②', 'LIFO Stack ↓', `${TL.stackWords} words·SS · offset +${TL.stackStart} … +${TL.stackEnd} · grows ↓ · ${stackUsed} word${stackUsed!==1?'s':''} non-zero`, '#38bdf8', 'thread-zone-2');
     html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>Off</th><th>Addr</th><th>Hex</th><th>Decoded</th></tr></thead><tbody>';
-    for (let i = 0; i < TL.STACK_WORDS; i++) {
-        const off  = TL.STACK_START + i;
+    for (let i = 0; i < TL.stackWords; i++) {
+        const off  = TL.stackStart + i;
         const word = sim.memory[slotBase + off] || 0;
         const hex  = hexOf(word);
         let decoded;
@@ -2169,26 +2170,17 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
     html += secBody();
 
     // ── Zone ①: Capabilities (+244 … +255) ───────────────────────────────
-    html += secHdr('①', 'Capabilities', `12 words·fixed · CR0–CR11 · offset +${TL.CAPS_START} … +${TL.CAPS_END} · c-list tail · saved/restored on context switch`, '#f4b942', 'thread-zone-1');
+    html += secHdr('①', 'Capabilities', `${TL.capsWords} words·fixed · CR0–CR11 · offset +${TL.capsStart} … +${TL.capsEnd} · c-list tail · saved/restored on context switch`, '#f4b942', 'thread-zone-1');
     html += '<div class="abs-clist-heading">GOLDEN TOKENS</div>';
-    html += `<div class="abs-clist-count">cc\u00a0=\u00a0${TL.CAPS_WORDS} slots</div>`;
+    html += `<div class="abs-clist-count">${TL.capsWords} fixed capability slots</div>`;
     html += '<table class="abs-clist-table"><thead><tr>';
     html += '<th>CR</th><th>GT (HEX)</th><th>PERMS</th><th>TYPE</th><th>NAME</th>';
     html += '</tr></thead><tbody>';
-    for (let i = 0; i < TL.CAPS_WORDS; i++) {
-        const off  = TL.CAPS_START + i;
+    for (let i = 0; i < TL.capsWords; i++) {
+        const off  = TL.capsStart + i;
         const word = sim.memory[slotBase + off] || 0;
-        const _cr0Hint = (i === 0 && word === 0 && sim.bootEntrySlot !== null && sim.bootEntrySlot !== undefined)
-            ? ` ondblclick="_installBootEntryGTIntoCR0()" style="cursor:pointer;" title="Double-click to install boot-entry Enter-GT (Slot ${sim.bootEntrySlot}) into CR0"`
-            : '';
         if (word === 0) {
-            let emptyCell = `<td colspan="4" class="abs-clist-empty-slot">\u2014 (empty)`;
-            if (i === 0 && sim.bootEntrySlot !== null && sim.bootEntrySlot !== undefined) {
-                const _bLabel = (sim.nsLabels && sim.nsLabels[sim.bootEntrySlot]) || `Slot ${sim.bootEntrySlot}`;
-                emptyCell += `<span style="color:#6b7280;font-size:0.8em;margin-left:8px;" title="Double-click this row to install the Enter-GT">\u26a1 double-click to install Enter-GT for ${_bLabel}</span>`;
-            }
-            emptyCell += '</td>';
-            html += `<tr${_cr0Hint}><td class="abs-clist-idx">CR${i}</td>${emptyCell}</tr>`;
+            html += `<tr><td class="abs-clist-idx">CR${i}</td><td colspan="4" class="abs-clist-empty-slot">\u2014 (empty)</td></tr>`;
         } else {
             const parsed = sim.parseGT(word);
             const p = { ...parsed.permissions, F: parsed.type === 2 ? 1 : 0 };
@@ -2202,15 +2194,11 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
                 (typeof abstractionRegistry !== 'undefined' && abstractionRegistry &&
                  abstractionRegistry.abstractions && abstractionRegistry.abstractions[nsIdx] &&
                  abstractionRegistry.abstractions[nsIdx].name) || null;
-            // Boot-entry CR0: show ⚡ badge + name first, NS slot secondary
-            const isBootEntry = (i === 0 && p.E && nsIdx === sim.bootEntrySlot);
             const nameStr = label
-                ? (isBootEntry
-                    ? `<span class="abs-nsdecoder-badge-boot">\u26a1</span> <strong>${label}</strong> <span style="color:#6b7280;font-size:0.8em;margin-left:4px;">NS[${nsIdx}]</span>`
-                    : `<strong>${label}</strong> <span style="color:#6b7280;font-size:0.8em;margin-left:4px;">NS[${nsIdx}]</span>`)
+                ? `<strong>${label}</strong> <span style="color:#6b7280;font-size:0.8em;margin-left:4px;">NS[${nsIdx}]</span>`
                 : `NS[${nsIdx}]`;
             const gtHex = '0x' + word.toString(16).toUpperCase().padStart(8, '0');
-            html += `<tr${_cr0Hint}>`;
+            html += `<tr>`;
             html += `<td class="abs-clist-idx">CR${i}</td>`;
             html += `<td class="abs-clist-gt">${gtHex}</td>`;
             html += `<td class="abs-clist-perms">${permHtml}</td>`;
@@ -2251,7 +2239,9 @@ function _installBootEntryGTIntoCR0() {
         // The canonical boot thread is rooted at address 0, which is a valid
         // location and must not be rejected by a truthiness check.
         if (entry && typeof entry.word0_location === 'number') {
-            sim.memory[entry.word0_location + THREAD_LAYOUT.CAPS_START] = gtWord;
+            const layout = _threadLayoutForSlot(nsIdx);
+            if (!layout.valid) continue;
+            sim.memory[layout.base + layout.capsStart] = gtWord;
             wrote = true;
         }
     }
@@ -2272,7 +2262,7 @@ function _installBootEntryGTIntoCR0() {
 
 function renderMemoryDump(location, limit, nsIndex) {
     if (nsIndex === 0) return renderBootNSImage();
-    if (THREAD_NS_SLOTS.has(nsIndex)) return renderThreadMemoryLayout(nsIndex);
+    if (_isThreadNamespaceSlot(nsIndex)) return renderThreadMemoryLayout(nsIndex);
 
     const wordCount = limit;
     if (wordCount <= 0) return '<span style="color:#888;">Empty (limit=0)</span>';
@@ -3030,7 +3020,7 @@ function updateNamespace() {
             //   • User-facing cap names from _isHardwareCapName (LED0-5, UART, BTN, …)
             //   • Namespace-root entry (Boot.NS)
             const _hideSource = (e.gtType !== 1 && e.gtType !== 2) ||
-                                THREAD_NS_SLOTS.has(i) ||
+                                _isThreadNamespaceSlot(i, e) ||
                                 _hwCapRe.test(e.label || '');
             if (codeNotResident) {
                 html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span>${_nsPrefetchRow(i, manifest)}${_identityBtn}</td>`;
@@ -4089,6 +4079,10 @@ function _nsLabelOpen(slotIdx) {
     if (!sim) return;
     const e = sim.readNSEntry(slotIdx);
     if (!e) { _showNSTypeDescModal(slotIdx, null); return; }
+    if (_isThreadNamespaceSlot(slotIdx, e)) {
+        _showNSThreadModal(slotIdx);
+        return;
+    }
     // If a server-side LUMP is registered for this slot, always show the lump
     // detail modal — even when the boot-image NS entry has gtType != 1.
     // Boot-image lazy stubs pack gtType=3 in the hardware bit layout until the
@@ -4099,6 +4093,26 @@ function _nsLabelOpen(slotIdx) {
     } else {
         _showNSTypeDescModal(slotIdx, e);
     }
+}
+
+// Dedicated read-only popup for a selected Thread instance.  It intentionally
+// does not reuse the generic LUMP modal because Thread zone geometry and values
+// come from the selected Thread body rather than ordinary code/c-list fields.
+function _showNSThreadModal(slotIdx) {
+    const old = document.getElementById('_nsLumpModalOverlay');
+    if (old) old.remove();
+    const entry = sim && sim.readNSEntry(slotIdx);
+    const rawLabel = (entry && entry.label) || (sim && sim.nsLabels && sim.nsLabels[slotIdx]) || `NS[${slotIdx}]`;
+    const label = String(rawLabel).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const body = renderThreadMemoryLayout(slotIdx, true);
+    const html = `<div id="_nsLumpModalOverlay" data-testid="thread-detail-modal" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.72);" onclick="if(event.target===this)this.remove();">` +
+        `<div style="background:#1e1e1e;border:1px solid rgba(168,85,247,0.45);border-radius:8px;padding:18px 20px;max-width:1100px;width:94%;max-height:88vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.7);">` +
+        `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">` +
+        `<div><span style="color:#c084fc;font-weight:700;font-size:1rem;">${label}</span>` +
+        `<span style="color:#9ca3af;font-size:0.78rem;margin-left:8px;">NS[${slotIdx}] — selected Thread instance · read-only</span></div>` +
+        `<button onclick="document.getElementById('_nsLumpModalOverlay').remove()" aria-label="Close Thread details" style="background:none;border:none;color:#aaa;font-size:1.25rem;cursor:pointer;padding:0 4px;">✕</button>` +
+        `</div>${body}</div></div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
 }
 
 // ── NS slot load-mode cycling badge ─────────────────────────────────────────

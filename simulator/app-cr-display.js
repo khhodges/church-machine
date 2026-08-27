@@ -507,20 +507,9 @@ function scrollToThreadZone(zone) {
         }
 
         if (zone === 2) {
-            // Zone 2 (LIFO Stack): scroll so the Top of Stack frame (+1 frame below)
-            // is visible at the top of the viewport. The top frame sits at sto+1 (E-GT)
-            // and sto+2 (frame word); we anchor on sto+1 so both rows are shown first,
-            // with the next frame's rows visible below.
-            const sto = (sim && sim.sto != null) ? sim.sto : null;
-            let anchorRow = null;
-            if (sto != null) {
-                // sto+1 is the E-GT word of the topmost frame; sto+2 is the frame word.
-                // Show 1 row above the E-GT for visual breathing room (+2 px of padding).
-                const egOffset = sto + 1;
-                anchorRow = document.getElementById('thread-stack-row-' + egOffset);
-            }
-            // Fallback: if STO is unknown or the row isn't rendered, use the zone banner
-            if (!anchorRow) anchorRow = document.getElementById('thread-zone-2');
+            // A detail view can show a non-active Thread.  Do not use the
+            // simulator's live STO to choose an anchor for that Thread.
+            const anchorRow = document.getElementById('thread-zone-2');
             if (!anchorRow) return;
             const scroller = findScroller(anchorRow);
             if (scroller) {
@@ -568,17 +557,19 @@ function showZonePopup(evt, zone, nsIdx) {
     const pop = document.getElementById('zone-data-popup');
     if (!pop || !sim) return;
 
-    const entry = sim.readNSEntry ? sim.readNSEntry(nsIdx) : null;
-    const slotBase = (entry && entry.word0_location != null) ? (entry.word0_location >>> 0) : (nsIdx * 256);
-    const TL = THREAD_LAYOUT;
+    const TL = typeof sim.getThreadInstanceLayout === 'function'
+        ? sim.getThreadInstanceLayout(nsIdx)
+        : { valid: false, reason: 'Thread memory is unavailable in this simulator.' };
     const hexW = w => '0x' + (w >>> 0).toString(16).toUpperCase().padStart(8, '0');
     const hex4 = n => '0x' + (n >>> 0).toString(16).toUpperCase().padStart(4, '0');
 
     let html = '';
-
-    if (zone === 'hdr') {
-        const hdrWord = (sim.memory[slotBase] >>> 0) || TL.THREAD_HEADER;
-        const hdr = sim.parseLumpHeader ? sim.parseLumpHeader(hdrWord) : {};
+    if (!TL.valid) {
+        html = `<div class="zdp-title" style="border-color:#f87171;color:#fca5a5;">Thread Memory Unavailable</div>` +
+            `<div class="zdp-empty">${TL.reason || 'The selected Namespace entry has no valid resident Thread body.'}</div>`;
+    } else if (zone === 'hdr') {
+        const hdrWord = TL.headerWord;
+        const hdr = TL.header;
         const typNames = ['lump','namespace','thread','?'];
         html += `<div class="zdp-title" style="border-color:#6b7280;color:#9ca3af;">Lump Header · word +0</div>`;
         html += `<table>`;
@@ -586,9 +577,9 @@ function showZonePopup(evt, zone, nsIdx) {
         if (hdr.valid) {
             html += `<tr><td>magic</td><td class="zdp-val">0x1F <span class="zdp-lbl">(valid)</span></td></tr>`;
             html += `<tr><td>n−6</td><td class="zdp-val">${hdr.n_minus_6} → <span class="zdp-note">${hdr.lumpSize} words</span></td></tr>`;
-            html += `<tr><td>cw</td><td class="zdp-val">${hdr.cw} <span class="zdp-lbl">code words</span></td></tr>`;
+            html += `<tr><td>cw</td><td class="zdp-val">${TL.stackWords} <span class="zdp-lbl">stack words</span></td></tr>`;
             html += `<tr><td>typ</td><td class="zdp-val">${hdr.typ} <span class="zdp-lbl">${typNames[hdr.typ] || hdr.typ}</span></td></tr>`;
-            html += `<tr><td>cc</td><td class="zdp-val">${hdr.cc} <span class="zdp-lbl">c-list slots</span></td></tr>`;
+            html += `<tr><td>cc</td><td class="zdp-val">${TL.heapWords} <span class="zdp-lbl">heap words</span></td></tr>`;
         } else {
             html += `<tr><td colspan="2" class="zdp-empty">no valid lump header at this address</td></tr>`;
         }
@@ -597,31 +588,25 @@ function showZonePopup(evt, zone, nsIdx) {
     } else if (zone === 5) {
         html += `<div class="zdp-title" style="border-color:#a855f7;color:#c084fc;">⑤ Data Registers · DR0–DR15</div>`;
         html += `<table>`;
-        const drSrc = (sim.dr && sim.dr.length >= 16) ? sim.dr : null;
         for (let i = 0; i < 16; i++) {
-            const live = drSrc ? (drSrc[i] >>> 0) : 0;
-            const mem  = (sim.memory[slotBase + TL.DR_START + i] >>> 0) || 0;
-            const val  = drSrc ? live : mem;
+            const val  = (sim.memory[TL.base + TL.drStart + i] >>> 0) || 0;
             const cls  = val ? 'zdp-val' : 'zdp-dim';
-            const src  = drSrc ? '' : '<span class="zdp-lbl"> (mem)</span>';
             const pn = _petNameDRMap[i];
             const drLabel = pn ? `DR${i} (${pn})` : `DR${i}`;
-            html += `<tr><td style="color:#a855f7;">${drLabel}</td><td class="${cls}">${hexW(val)}${src}</td></tr>`;
+            html += `<tr><td style="color:#a855f7;">${drLabel}</td><td class="${cls}">${hexW(val)} <span class="zdp-lbl">(selected memory)</span></td></tr>`;
         }
         html += `</table>`;
 
     } else if (zone === 4) {
-        const dr5 = (sim.dr && sim.dr[5] != null) ? (sim.dr[5] >>> 0) : null;
         let allocCount = 0;
         let allocWords = [];
-        for (let i = 0; i < TL.HEAP_WORDS; i++) {
-            const w = sim.memory[slotBase + TL.HEAP_START + i] >>> 0;
-            if (w) { allocCount++; if (allocWords.length < 4) allocWords.push({off: TL.HEAP_START + i, w}); }
+        for (let i = 0; i < TL.heapWords; i++) {
+            const w = sim.memory[TL.base + TL.heapStart + i] >>> 0;
+            if (w) { allocCount++; if (allocWords.length < 4) allocWords.push({off: TL.heapStart + i, w}); }
         }
-        html += `<div class="zdp-title" style="border-color:#22c55e;color:#4ade80;">④ Heap · +${TL.HEAP_START}…+${TL.HEAP_END}</div>`;
+        html += `<div class="zdp-title" style="border-color:#22c55e;color:#4ade80;">④ Heap · +${TL.heapStart}…+${TL.heapEnd}</div>`;
         html += `<table>`;
-        html += `<tr><td>allocated</td><td class="zdp-note">${allocCount} / ${TL.HEAP_WORDS} words</td></tr>`;
-        if (dr5 !== null) html += `<tr><td>DR5 (frontier)</td><td class="zdp-hex">${hexW(dr5)}</td></tr>`;
+        html += `<tr><td>allocated</td><td class="zdp-note">${allocCount} / ${TL.heapWords} words</td></tr>`;
         if (allocWords.length === 0) {
             html += `<tr><td colspan="2" class="zdp-empty">heap is empty</td></tr>`;
         } else {
@@ -631,42 +616,38 @@ function showZonePopup(evt, zone, nsIdx) {
         html += `</table>`;
 
     } else if (zone === 3) {
-        const sto = (sim.sto != null) ? sim.sto : TL.STACK_END;
-        const freeWords = sto - TL.HEAP_END;          // between heap top and STO
         let nonZero = 0;
-        for (let i = TL.FREE_START; i <= TL.FREE_END; i++) {
-            if (sim.memory[slotBase + i]) nonZero++;
+        for (let i = TL.freeStart; i <= TL.freeEnd; i++) {
+            if (sim.memory[TL.base + i]) nonZero++;
         }
-        html += `<div class="zdp-title" style="border-color:#6b7280;color:#9ca3af;">③ Freespace · +${TL.FREE_START}…+${TL.FREE_END}</div>`;
+        html += `<div class="zdp-title" style="border-color:#6b7280;color:#9ca3af;">③ Freespace · +${TL.freeStart}…+${TL.freeEnd}</div>`;
         html += `<table>`;
-        html += `<tr><td>STO (live)</td><td class="zdp-note">${sto} <span class="zdp-lbl">(stack top offset)</span></td></tr>`;
-        html += `<tr><td>free gap</td><td class="zdp-val">${Math.max(0, freeWords)} words</td></tr>`;
+        html += `<tr><td>free gap</td><td class="zdp-val">${TL.freeWords} words <span class="zdp-lbl">(from selected header)</span></td></tr>`;
         html += `<tr><td>non-zero</td><td class="${nonZero?'zdp-note':'zdp-dim'}">${nonZero} word${nonZero!==1?'s':''}</td></tr>`;
         html += `</table>`;
 
     } else if (zone === 2) {
-        const sto = (sim.sto != null) ? sim.sto : TL.STACK_END;
-        const SP_MAX = TL.STACK_END;  // 243
-
-        // Walk physical memory: frame word at ptr (high), E-GT at ptr-1 (low).
-        // ptr starts at sto+2 (the frame word of the most-recent frame).
-        // prev_STO field in each frame word gives the ptr for the next older frame.
+        const SP_MAX = TL.stackEnd;
+        // Stack records are decoded strictly from the selected Thread body.
+        // The first non-zero word scanning down from its stack ceiling is the
+        // latest available frame candidate; no active simulator STO is used.
         const frames = [];
-        let ptr = sto + 2;
+        let ptr = TL.stackEnd;
+        while (ptr >= TL.stackStart && !(sim.memory[TL.base + ptr] >>> 0)) ptr--;
         const MAX_WALK = 16;  // safety cap against corrupt stacks
-        while (ptr >= TL.STACK_START && ptr <= SP_MAX && frames.length < MAX_WALK) {
-            const fw  = sim.memory[slotBase + ptr] >>> 0;
+        while (ptr >= TL.stackStart && ptr <= SP_MAX && frames.length < MAX_WALK) {
+            const fw  = sim.memory[TL.base + ptr] >>> 0;
             if (!fw) break;
             const niaBits = (fw >>> 13) & 0x7FFF;
             const szBit   = (fw >>> 12) & 1;
             const prevSTO =  fw & 0xFFF;
-            const egt     = (szBit && ptr > TL.STACK_START) ? (sim.memory[slotBase + ptr - 1] >>> 0) : 0;
+            const egt     = (szBit && ptr > TL.stackStart) ? (sim.memory[TL.base + ptr - 1] >>> 0) : 0;
             frames.push({ ptr, fw, niaBits, szBit, prevSTO, egt });
-            if (prevSTO >= ptr || prevSTO < TL.STACK_START) break;  // guard against bad prev_STO
+            if (prevSTO >= ptr || prevSTO < TL.stackStart) break;  // guard against bad prev_STO
             ptr = prevSTO;
         }
 
-        html += `<div class="zdp-title" style="border-color:#38bdf8;color:#7dd3fc;">② LIFO Stack · STO=${sto} · sp_max=${SP_MAX}</div>`;
+        html += `<div class="zdp-title" style="border-color:#38bdf8;color:#7dd3fc;">② LIFO Stack · +${TL.stackStart}…+${SP_MAX}</div>`;
         html += `<table>`;
         html += `<tr><td>depth</td><td class="zdp-note">${frames.length} frame${frames.length!==1?'s':''} (incl. sentinel)</td></tr>`;
         html += `</table>`;
@@ -716,9 +697,9 @@ function showZonePopup(evt, zone, nsIdx) {
     } else if (zone === 1) {
         html += `<div class="zdp-title" style="border-color:#f4b942;color:#fde68a;">① Capabilities · CR0–CR11 (c-list tail)</div>`;
         html += `<table>`;
-        for (let i = 0; i < TL.CAPS_WORDS; i++) {
-            const off  = TL.CAPS_START + i;
-            const word = sim.memory[slotBase + off] >>> 0;
+        for (let i = 0; i < TL.capsWords; i++) {
+            const off  = TL.capsStart + i;
+            const word = sim.memory[TL.base + off] >>> 0;
             if (!word) {
                 html += `<tr><td style="color:#f4b942;">CR${i}</td><td class="zdp-dim">0x00000000</td></tr>`;
                 continue;

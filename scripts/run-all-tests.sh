@@ -220,6 +220,9 @@ register_suite "ns-slot-policy-restore-tests" \
 register_suite "ns-slot-modal-persist-tests" \
     'node simulator/test_ns_slot_modal_persist.js'
 
+register_suite "thread-instance-zone-tests" \
+    'node simulator/test_thread_instance_zones.js'
+
 register_suite "warning-panel-tests" \
     'node simulator/test_asm_warning_panel.js'
 
