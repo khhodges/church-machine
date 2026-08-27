@@ -93,7 +93,7 @@
   "deployment": {
     "target_board": "wukong-xc7a100t",
     "profile": "Full",
-    "built_at": "2026-08-27T10:19:21.630331Z",
+    "built_at": "2026-08-27T10:13:53.147583Z",
     "builder": "CLOOMC++ IDE v1.0"
   },
   "grants": [
@@ -108,6 +108,7 @@
   "identity_seal_location": "sidecar",
   "dot_name": "Church.Machine.Post-Flash.Exhaustive.Self-Test.v1.1",
   "issue_n": 1,
-  "lump_version": 2,
-  "compiled_at": 1787825961.6303532
+  "lump_version": 1,
+  "compiled_at": 1787825633.1476033,
+  "archived_version": 1
 }
