@@ -46,6 +46,12 @@ check('single save writes the Namespace table before next-build settings',
 check('single save clears the dirty indicator only after both writes',
     clearDirty > saveConfig);
 
+const addStart = source.indexOf('const _doInstall = async function(words)');
+const addEnd = source.indexOf('const _onError = function(err)', addStart);
+const addInstall = source.slice(addStart, addEnd);
+check('adding a Namespace row automatically invokes the unified save',
+    addInstall.includes('await window._nsTableSave(saveBtn)'));
+
 const policyStart = source.indexOf('window._nsPrefetchChange = function');
 const policyEnd = source.indexOf('window._ensureNamespaceBuildConfig', policyStart);
 const policyChange = source.slice(policyStart, policyEnd);

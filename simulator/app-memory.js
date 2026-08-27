@@ -3510,7 +3510,7 @@ function _nsTableAddConfirm() {
     if (errEl) errEl.textContent = '';
 
     // Use cached words from the per-selection fetch if available; otherwise fetch now.
-    const _doInstall = function(words) {
+    const _doInstall = async function(words) {
         const hdr = sim.parseLumpHeader(words[0] >>> 0);
         if (!hdr.valid) return Promise.reject('Invalid LUMP header (magic mismatch)');
         const _canonicalHash = function(value) {
@@ -3888,7 +3888,19 @@ function _nsTableAddConfirm() {
         if (_overlay) _overlay.remove();
         _setNsDirty(true);
         if (typeof updateNamespace === 'function') updateNamespace();
-        return Promise.resolve();
+
+        // Adding a row is a complete user action, not a draft edit. Commit it
+        // immediately so a newly installed LUMP cannot disappear on reload
+        // while waiting for a separate manual save.
+        const saveBtn = document.getElementById('nsSaveBtn');
+        if (typeof window._nsTableSave === 'function') {
+            const saved = await window._nsTableSave(saveBtn);
+            if (!saved) {
+                console.warn('[_nsTableAddConfirm] new Namespace row remains unsaved; retry with Save for next build');
+            }
+        } else {
+            console.error('[_nsTableAddConfirm] Namespace save handler is unavailable');
+        }
     };
 
     const _onError = function(err) {
@@ -3941,7 +3953,7 @@ function _nsTableClear(slot) {
 // The boot image binary is little-endian 32-bit words (struct.pack "<{n}I"),
 // matching Uint32Array's native byte order on x86/x64.
 window._nsTableSave = async function(btn) {
-    if (!sim) return;
+    if (!sim) return false;
 
     // Check a boot image binary has actually been loaded (NS_TABLE_BASE must
     // have been set by loadBootImage — the default 0xF000 is valid too, but
@@ -3950,7 +3962,7 @@ window._nsTableSave = async function(btn) {
     if (!window.bootImage || !window.bootImageAvailable) {
         const msg = 'No boot image loaded — reset the simulator first, or upload a boot-image.bin from the Boot Image Designer.';
         if (btn) { const _orig = btn.textContent; btn.textContent = '\u26a0\ufe0f ' + msg; btn.style.color = '#f87171'; setTimeout(() => { btn.textContent = _orig; btn.style.color = ''; }, 4000); }
-        return;
+        return false;
     }
 
     const origText = btn ? btn.textContent : '';
@@ -4095,6 +4107,7 @@ window._nsTableSave = async function(btn) {
                 _setNsDirty(false);   // restore clean button state after timeout
             }, 2000);
         }
+        return true;
     } catch (err) {
         console.error('[_nsTableSave]', err);
         if (btn) {
@@ -4105,6 +4118,7 @@ window._nsTableSave = async function(btn) {
                 _setNsDirty(window._nsTableDirty);   // restore previous indicator
             }, 4000);
         }
+        return false;
     }
 };
 
