@@ -1,98 +1,35 @@
 # Wukong Build Checkpoint
 
-Generated : 2026-08-15T09:35:28Z
+Generated: 2026-08-27T14:13:27Z
 
----
+## Verified v17 release candidate
 
-## Bitstream
+| Field | Value |
+|---|---|
+| Release input commit | `12fd06ef649ce9c8fd243b288f3590188d785db9` |
+| Hardware source fingerprint | `68cdfc50231cbb404a90ff1de467f0c5835f6767d526d9dee7dbaa0f75875879` |
+| Sentinel | `0xBC`, N_INIT `610`, TU_VERSION `0x02`, build version `17` |
+| Vivado | v2026.1, SW Build 6511674 |
+| Final setup WNS | +1.924176 ns |
+| Bitstream | 3,826,002 bytes; SHA-256 `4818bfea493f1493534b3443a46257c3a984e3c2fbc1a05b72db63bd12e862a2` |
+| SPI image | 10,521,876 bytes; SHA-256 `b54fc8246a25bcc7033904226f6e45032053dbafb67c0201a9f80aa3d0fd0a01` |
+| Provenance | `release_status: verified`; verified from the clean, commit-pinned checkout |
 
-| Field            | Value |
-|------------------|-------|
-| Flashed version  | v14 |
-| Source version   | v15 (hardware/wukong_top.py) |
-| TU_VERSION       | 0x02 |
-| Built at         | 2026-08-14T19:37:58Z |
-| .bit size        | 3,826,002 bytes |
-| .bit md5         | b803d06274893f41de2b795d0679c6af |
-| .bit integrity   | ✅ md5 verified |
-| .mcs size        | 10,521,876 bytes |
-| .mcs timestamp   | 2026-08-15T00:11:43Z |
+The generated RTLIL and Verilog were freshness-checked before Vivado. Vivado
+completed synthesis, implementation, bitstream generation, and SPI-image
+generation with `EXIT_0`.
 
-> **Note:** "Flashed version" is what the board sentinel reports. "Source version" is
-> what the next Vivado build will bake in. They differ when source has been updated
-> but a new bitstream has not yet been synthesised.
+## Physical board status
 
----
+The release candidate has **not** been flashed from the build host: its USB
+inventory contains no JTAG or USB-UART device. Consequently, no v17 board
+sentinel, boot, upload, or post-upload smoke result has been recorded yet.
+Do not describe this candidate as flashed until the physical board reports the
+expected v17 sentinel and the upload smoke check succeeds.
 
-## Boot Namespace  (8 slots)
+## Release input boundary
 
-NS_TABLE_BASE = 0x1FC00
-
-| Slot | Name              | Location   | Perms | LUMP token   | Header word  | cw  | cc |
-|------|-------------------|------------|-------|--------------|--------------|-----|----|
-|  0   | Boot.NS (NS root) | 0x1FC00  | R+W   | —            | —            | —   | —  |
-|  1   | Boot.Thread       | 0xe00      | R+W   | —            | (in ROM)     | —   | —  |
-|  2   | UART_DEV          | 0x40000014  | R+W   | —            | MMIO         | —   | —  |
-|  3   | LED_DEV           | 0x40000000  | R+W   | —            | MMIO         | —   | —  |
-|  4   | BTN_DEV           | 0x40000028  | R     | —            | MMIO         | —   | —  |
-|  5   | TIMER_DEV         | 0x4000002C  | R+W   | —            | MMIO         | —   | —  |
-|  6   | SelfTest ⚡        | 0x0600      | E     | 00000600   | 0xF987CC01   | 499  | 1  |
-|  7   | WukongCallHome    | 0x1200    | E     | e186c4ec      | 0xF8000C02   | 3   | 2  |
-
-⚡ = default boot entry point (IDE-configurable via setBootEntrySlot)
-
----
-
-## Server LUMP Registry
-
-Registered abstractions in server/lumps/manifest.json:
-
-| NS slot | Token    | Abstraction           | cw  | cc | Ver |
-|---------|----------|-----------------------|-----|----|-----|
-|  6      | 00000600 | SelfTest              | 499 | 1  | 75 |
-|  7      | e186c4ec | WukongCallHome        | 3   | 2  | 1 |
-|  9      | 00001200 | Constants             | 18  | 2  | 0 |
-| 10      | c7425d6c | CapTest               | 23  | 5  | 1 |
-| 16      | 00001001 | SlideRule (Haskell)   | 137 | 1  | 0 |
-| 22      | 00001f00 | Tunnel                | 37  | 1  | 0 |
-| 23      | 00002000 | Keystone              | 22  | 2  | 0 |
-| 43      | b3076308 | EventRouter           | 19  | 0  | 0 |
-| None      | 00000300 | LEDFlash              | 1   | 1  | 3 |
-| None      | 00000800 | Scheduler.IRQ         | 1   | 0  | 1 |
-|  —      | 00001000 | SlideRule             | 2602 | 1  | 2 |
-| None      | 00003300 | Ethernet              | 13  | 1  | 0 |
-| None      | 00130000 | Loader                | 1   | 1  | 1 |
-| None      | 0baf5e0e | NoteG                 | 47  | 1  | 2 |
-| None      | 19d3e599 | IntegerOps            | 20  | 0  | 5 |
-| None      | 50789581 | Keystone              | 22  | 2  | 1 |
-| None      | 50ce4c64 | StringOps             | 315 | 0  | 1 |
-| None      | 5a93ce79 | BernoulliNumbers      | 15  | 1  | 2 |
-|  —      | 87c45cc2 | Abstraction:  WukongC | 73  | 2  | 3 |
-| None      | 8e37e416 | Tunnel                | 1   | 1  | 2 |
-| None      | 95a651e7 | NoteG                 | 38  | 1  | 6 |
-| None      | 97cc8047 | Human_Hand            | 7   | 1  | 13 |
-| None      | a56597e9 | PostFlashSelftest     | 499 | 1  | 0 |
-| None      | ab1e86af | WordString            | 294 | 0  | 0 |
-| None      | ab3de4fd | Salvation             | 141 | 0  | 1 |
-| None      | c3963aed | Memory                | 19  | 0  | 1 |
-| None      | cb8739cf | GT Encoding v1.1 Hard | 26  | 8  | 1 |
-| None      | d78f751b | Abstraction:  MorseCm | 363 | 1  | 4 |
-| None      | d9454529 | EnglishLoops          | 35  | 0  | 1 |
-
----
-
-## Approval Checklist
-
-Before flashing, verify:
-
-- [ ] Bitstream md5 verified (✅ md5 verified)
-- [ ] Flashed version matches expected (currently v14)
-- [ ] SelfTest LUMP token matches boot ROM assertion  (00000600.lump header = 0xF987CC01  cw=499  cc=1)
-- [ ] WukongCallHome LUMP present and header valid  (header = 0xF8000C02  cw=3  cc=2)
-- [ ] NS slot count = 8 (slots 0–7)
-- [ ] TU_VERSION = 0x02 (bridge must match or warn)
-- [ ] Source version v15 Verilog regenerated and transferred to droplet
-- [ ] MCS regenerated from same .bit (not stale)
-
----
-*Generated by scripts/gen_build_checkpoint.py*
+The candidate was built from hardware-only commit `12fd06ef…`; mutable
+`server/lumps/` library content was not part of that hardware release input.
+The detailed, machine-verifiable record is
+`church_wukong_xc7a100t.provenance.json`.

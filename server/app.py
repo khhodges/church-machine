@@ -2121,10 +2121,13 @@ BOOT_CONFIG_SCHEMA_VERSION = 1
 HARDWARE_PROFILES = {
     "wukong-xc7a100t": {
         "label": "QMTECH Wukong Artix-7 (XC7A100T)",
-        "totalRamWords": 65536,
-        "addressBits": 18,
-        "addressRange": "0x0000_0000 – 0x0003_FFFF (256 KB byte-addressable)",
-        "notes": "QMTECH Wukong XC7A100T — 256 KB block-RAM namespace window",
+        # This is the synthesized 16K-word Namespace BRAM, not the capacity
+        # of the Artix-7 device. Keep it tied to the upload projection ABI.
+        "totalRamWords": _boot_image_gen.WUKONG_DMEM_WORDS,
+        "addressBits": 16,
+        "addressRange": "0x0000_0000 – 0x0000_FFFF (64 KB byte-addressable)",
+        "notes": "QMTECH Wukong XC7A100T — 64 KB block-RAM namespace window",
+        "maxThreadCount": _boot_image_gen.WUKONG_PHYSICAL_MAX_THREAD_COUNT,
     },
 }
 
@@ -2488,9 +2491,6 @@ def _validate_step2(step2, step1, target_board):
     # 7–10), and every generated Thread body.
     usable_end = total - NS_TABLE_RESERVE
     seen_slots = set()
-    seen_wukong_prefetch_slots = set()
-    wukong_prefetch_words = 0
-    wukong_prefetch_count = 0
     occupied = []  # list of (start, end_exclusive, label) for resident lumps
     generated_thread_slots = _generated_thread_slots_for_step1(step1)
     for entry in lumps:
@@ -2523,35 +2523,9 @@ def _validate_step2(step2, step1, target_board):
         if not resident:
             if policy == "Preload":
                 if target_board == "wukong-xc7a100t":
-                    if slot < 8 or slot >= _boot_image_gen.WUKONG_FORWARD_NS_SLOTS:
-                        return ("Wukong prefetch requires a forward Namespace "
-                                f"slot from 8 to {_boot_image_gen.WUKONG_FORWARD_NS_SLOTS - 1}")
-                    if slot in seen_wukong_prefetch_slots:
-                        return f"duplicate Wukong prefetch slot {slot}"
-                    seen_wukong_prefetch_slots.add(slot)
-                    wukong_prefetch_count += 1
-                    if wukong_prefetch_count > _boot_image_gen.PREFETCH_MAX_ENTRIES:
-                        return (f"Wukong supports at most "
-                                f"{_boot_image_gen.PREFETCH_MAX_ENTRIES} prefetch entries")
-                    token = str(entry.get("lumpToken") or "").lower()
-                    if len(token) != 8 or any(c not in "0123456789abcdef" for c in token):
-                        return f"Wukong prefetch slot {slot} requires an 8-hex lumpToken"
-                    binary_hash = str(
-                        entry.get("binaryHash") or entry.get("binary_hash") or "")
-                    if binary_hash.lower().startswith("sha256:"):
-                        binary_hash = binary_hash[7:]
-                    if (len(binary_hash) < 8 or
-                            any(c not in "0123456789abcdefABCDEF" for c in binary_hash)):
-                        return (f"Wukong prefetch slot {slot} requires a canonical "
-                                "binaryHash binding")
-                    capacity = entry.get("lumpSize") or catalog[slot].get("lumpSize")
-                    if (not isinstance(capacity, int) or capacity < 64 or
-                            capacity > _boot_image_gen.PREFETCH_MAX_LUMP_WORDS or
-                            capacity & (capacity - 1)):
-                        return f"Wukong prefetch slot {slot} needs a power-of-two lumpSize"
-                    wukong_prefetch_words += capacity
-                    if 1280 + wukong_prefetch_words > _boot_image_gen.WUKONG_DMEM_WORDS:
-                        return "configured Wukong prefetch bodies exceed board DMEM capacity"
+                    return ("Wukong physical uploads include the selected boot "
+                            "entry and up to three Thread contexts; Preload "
+                            "LUMPs are not supported by this board build")
             continue
         cat = catalog[slot]
         lump_size = entry.get("lumpSize") or cat.get("lumpSize")
@@ -2633,10 +2607,13 @@ def _validate_step1(target_board, step1):
     # let a string/bool hand-edited into boot-config be silently coerced into
     # a different generated Thread layout.
     _raw_thread_count = step1.get("threadCount")
+    max_thread_count = profile.get(
+        "maxThreadCount", _boot_image_gen.MAX_THREAD_COUNT)
     if (_raw_thread_count is not None and
             (not isinstance(_raw_thread_count, int) or isinstance(_raw_thread_count, bool)
-             or not (1 <= _raw_thread_count <= _boot_image_gen.MAX_THREAD_COUNT))):
-        return "step1.threadCount must be an integer between 1 and 9 when provided"
+             or not (1 <= _raw_thread_count <= max_thread_count))):
+        return (f"step1.threadCount must be an integer between 1 and "
+                f"{max_thread_count} when provided for {profile['label']}")
     _thread_count = _raw_thread_count if _raw_thread_count is not None else 1
     # abstractionLumpWords is deprecated (Task #568/569) — silently ignore if present in
     # legacy saved configs; the generator derives the size from the saved lump directly.

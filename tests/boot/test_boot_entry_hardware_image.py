@@ -40,13 +40,16 @@ LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
 THREAD_CAPS_OFFSET = 244   # Thread.caps[0] word offset inside the Thread lump
 
 
-def _minimal_cfg(total=16384):
+def _minimal_cfg(total=16384, thread_count=None):
+    step1 = {
+        "totalNamespaceWords": total,
+        "namespaceLumpWords":  1024,
+        "threadLumpWords":      256,
+    }
+    if thread_count is not None:
+        step1["threadCount"] = thread_count
     return {
-        "step1": {
-            "totalNamespaceWords": total,
-            "namespaceLumpWords":  1024,
-            "threadLumpWords":      256,
-        },
+        "step1": step1,
     }
 
 
@@ -222,6 +225,29 @@ def test_wukong_projection_preserves_reissued_boot_entry_generation():
     assert words[10 * NS_ENTRY_WORDS + 1] >> 21 == 1
     assert words[896 + THREAD_CAPS_OFFSET] == create_gt(1, 10, {"E": 1}, 1)
 
+def test_wukong_projection_uploads_fixed_and_two_generated_thread_contexts():
+    """The physical image keeps only Thread.1 plus Thread#2/#3 from the IDE."""
+    cfg = _minimal_cfg(thread_count=3)
+    generic = generate_boot_image(
+        cfg, LUMPS_DIR, boot_entry_slot=10, require_entry_resident=True)
+    projected, info = build_wukong_upload_image(generic)
+    source_words = _unpack_words(generic)
+    words = _unpack_words(projected)
+    source_total = len(source_words)
+
+    assert info["thread_count"] == 3
+    assert [item["slot"] for item in info["thread_contexts"]] == [1, 11, 12]
+    assert len(info["thread_contexts"]) == 3
+    for context in info["thread_contexts"]:
+        slot = context["slot"]
+        source_base = source_words[_ns_slot_base(source_total, slot)]
+        target_base = context["base_word"]
+        size = context["size"]
+        assert words[slot * NS_ENTRY_WORDS] == target_base * 4
+        assert words[target_base:target_base + size] == source_words[source_base:source_base + size]
+        assert words[slot * NS_ENTRY_WORDS + 2] == integrity32(
+            target_base * 4, words[slot * NS_ENTRY_WORDS + 1])
+
 
 def test_wukong_projection_preserves_every_thread_private_body():
     """Each configured Thread receives its own complete native DMEM body.
@@ -278,29 +304,39 @@ def test_wukong_projection_preserves_every_thread_private_body():
 
 
 def test_wukong_projection_rejects_thread_contexts_over_physical_dmem():
-    """Projection fails explicitly instead of truncating Thread state."""
+    """Projection rejects more Thread contexts than the physical ABI supports."""
     cfg = _minimal_cfg(total=32768)
     cfg["step1"].update({"threadCount": 9, "threadLumpWords": 2048})
     generic = generate_boot_image(
         cfg, LUMPS_DIR, boot_entry_slot=10, require_entry_resident=True,
     )
-    with pytest.raises(ValueError, match="Thread-context words.*dynamic DMEM"):
+    with pytest.raises(ValueError, match="at most 3 Thread contexts"):
         build_wukong_upload_image(generic)
 
 
-def test_wukong_projection_rejects_preload_collision_with_thread_context():
-    """A stale UI preload choice may not overwrite a generated Thread slot."""
+def test_wukong_projection_ignores_retired_preload_policy():
+    """The removed FPGA prefetch policy cannot alter the native upload image."""
     cfg = _minimal_cfg()
     cfg["step1"]["threadCount"] = 2
     generic = generate_boot_image(
         cfg, LUMPS_DIR, boot_entry_slot=10, require_entry_resident=True,
     )
-    with pytest.raises(ValueError, match="preload policy cannot target Thread context"):
-        build_wukong_upload_image(generic, {
-            "step2": {
-                "lumps": [{
-                    "nsSlot": 11, "loadPolicy": "Preload",
-                    "lumpToken": "12345678", "lumpSize": 64,
-                }],
-            },
-        })
+    projected, info = build_wukong_upload_image(generic, {
+        "step2": {
+            "lumps": [{
+                "nsSlot": 11, "loadPolicy": "Preload",
+                "lumpToken": "12345678", "lumpSize": 64,
+            }],
+        },
+    })
+    assert len(projected) == WUKONG_DMEM_WORDS * 4
+    assert info["thread_count"] == 2
+    assert "prefetch_policy" not in info
+
+def test_wukong_projection_rejects_more_than_two_generated_thread_contexts():
+    """Thread.1 is fixed; only two generated Thread definitions fit the board ABI."""
+    generic = generate_boot_image(
+        _minimal_cfg(thread_count=4), LUMPS_DIR, boot_entry_slot=10,
+        require_entry_resident=True)
+    with pytest.raises(ValueError, match="at most 3 Thread contexts"):
+        build_wukong_upload_image(generic)

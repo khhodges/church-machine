@@ -99,7 +99,7 @@
     //   Tang Nano 9K          2,048 w  → no preset fits → fallback to min (shows warning)
     //   Tang Nano 20K / IoT  16,384 w  → only n=0 (16 K) shown
     //   (legacy ti60-f225)   65,536 w  → n=0–2 (16 K–64 K) shown
-    //   Wukong XC7A100T     131,072 w  → n=0–3 (16 K–128 K) shown
+    //   Wukong XC7A100T      16,384 w  → only n=0 (16 K) shown
     function getValidNSPresets(boardRam) {
         var fits = NS_PRESETS.filter(function (p) {
             return Math.pow(2, p.n + 14) <= boardRam;
@@ -128,7 +128,7 @@
         // Step 1: compute effective max count from saved lump size and board budget,
         // then clamp count and record a warning if it was reduced.
         var savedLumpSize = Math.pow(2, clamp(state.thread.lumpPow2, MIN_EXP, MAX_EXP));
-        var maxCount = profile.singleThread ? 1 : Math.min(9, Math.max(1, Math.floor(budget / savedLumpSize)));
+        var maxCount = Math.min(boardThreadCountLimit(profile), Math.max(1, Math.floor(budget / savedLumpSize)));
         if (state.thread.count > maxCount) {
             var savedCount = state.thread.count;
             state.thread.count = maxCount;
@@ -289,7 +289,7 @@
         var serverMax           = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 1024;
         var maxSl               = Math.min(totalNamespaceWords / 64, serverMax, NS_CAP_MAX);
         var nsSlotsMax          = Math.min(snapNSCap(state.ns.slots), maxSl);
-        var threadCount         = profile.singleThread ? 1 : clamp(state.thread.count, 1, 9);
+        var threadCount         = clamp(state.thread.count, 1, boardThreadCountLimit(profile));
         return {
             targetBoard: board,
             step1: {
@@ -434,7 +434,8 @@
         // reserved even when the lightning bolt targets a different entry.
         var bootAbstrSz = (_rl.limits && _rl.limits.bootAbstrLumpWords) || 64;
         var nsReserve = Math.max(16, Math.round(state.ns.slots) * 4);
-        var threadCount = Math.max(1, Math.min(9, parseInt(s1.threadCount, 10) || 1));
+        var threadCount = Math.max(1, Math.min(
+            boardThreadCountLimit(boardProfile), parseInt(s1.threadCount, 10) || 1));
         var sum = (s1.threadLumpWords || 0) * threadCount + bootAbstrSz + (4 * 64);
         var total  = s1.totalNamespaceWords || 0;
         var usable = total - nsReserve;
@@ -454,7 +455,8 @@
         var boardTotalWords = boardProfile.totalRamWords;
         var bootAbstrSz = (_rl.limits && _rl.limits.bootAbstrLumpWords) || 64;
         var nsReserveV = Math.max(16, Math.round(state.ns.slots) * 4);
-        var threadCount = Math.max(1, Math.min(9, parseInt(s1.threadCount, 10) || 1));
+        var threadCount = Math.max(1, Math.min(
+            boardThreadCountLimit(boardProfile), parseInt(s1.threadCount, 10) || 1));
         var sum = (s1.threadLumpWords || 0) * threadCount + bootAbstrSz + (4 * 64);
         var total  = s1.totalNamespaceWords || 0;
         var usable = total - nsReserveV;
@@ -826,8 +828,13 @@
 
     var BOARD_PROFILES = {
         'tang-nano-20k-iot': { label: 'Tang Nano 20K',      totalRamWords: 16384,  singleThread: true  },
-        'wukong-xc7a100t':   { label: 'Wukong XC7A100T',    totalRamWords: 131072, singleThread: false }
+        // Match the synthesized 16K-word Namespace BRAM (not FPGA capacity).
+        'wukong-xc7a100t':   { label: 'Wukong XC7A100T',    totalRamWords: 16384, singleThread: false, maxThreadCount: 3 }
     };
+
+    function boardThreadCountLimit(profile) {
+        return profile.singleThread ? 1 : (profile.maxThreadCount || 9);
+    }
 
     function getBoardProfile() {
         var board = (typeof localStorage !== 'undefined' && localStorage.getItem('fpga_board_target')) || 'wukong-xc7a100t';
@@ -847,7 +854,7 @@
         var budget       = Math.floor(profile.totalRamWords / 2);
 
         // Count is bounded by singleThread rule; compute preliminary max
-        var count        = clamp(state.thread.count, 1, profile.singleThread ? 1 : 9);
+        var count        = clamp(state.thread.count, 1, boardThreadCountLimit(profile));
 
         // Max lump size = floor(budget / count), capped at 8192 words
         var maxLumpWords = Math.max(64, Math.floor(budget / count));
@@ -873,7 +880,7 @@
         var wordHex = hex8(word);
 
         // Thread count max recalculated with actual lump size
-        var maxCount    = profile.singleThread ? 1 : Math.min(9, Math.max(1, Math.floor(budget / lumpSize)));
+        var maxCount    = Math.min(boardThreadCountLimit(profile), Math.max(1, Math.floor(budget / lumpSize)));
         count           = clamp(count, 1, maxCount);
         var totalMem    = lumpSize * count;
         var overBudget  = totalMem > budget;
@@ -1043,7 +1050,7 @@
         if (slots > capOptions[capOptions.length - 1]) slots = capOptions[capOptions.length - 1];
         var NS_TABLE_COMPUTED = slots * 4;
         var threadLump   = Math.pow(2, clamp(state.thread.lumpPow2, MIN_EXP, MAX_EXP));
-        var maxCount     = profile.singleThread ? 1 : Math.min(9, Math.max(1, Math.floor(budget / threadLump)));
+        var maxCount     = Math.min(boardThreadCountLimit(profile), Math.max(1, Math.floor(budget / threadLump)));
         var threadCount  = clamp(state.thread.count, 1, maxCount);
         // Boot overhead = Boot.NS lump (64 w) + one resident Thread lump per thread.
         // Null slot 2 has been removed — no 64-word gap between Thread and Boot.Abstr.
@@ -1422,7 +1429,7 @@
                 var _apprSize = Math.pow(2, clamp(state.thread.lumpPow2, MIN_EXP, MAX_EXP));
                 var _board2   = (typeof localStorage !== 'undefined' && localStorage.getItem('fpga_board_target')) || 'wukong-xc7a100t';
                 var _prof2    = BOARD_PROFILES[_board2] || BOARD_PROFILES['wukong-xc7a100t'];
-                var _apprCnt  = _prof2.singleThread ? 1 : clamp(state.thread.count, 1, 9);
+                var _apprCnt  = clamp(state.thread.count, 1, boardThreadCountLimit(_prof2));
                 if (_thr.size !== _apprSize) {
                     shapeFaults.push('committed Thread lump is ' + _thr.size.toLocaleString() +
                         ' words; the approved Thread size is ' + _apprSize.toLocaleString() + ' words');
@@ -1578,7 +1585,7 @@
     window.lumpEditorThreadLumpSize = function (exp) {
         var profile  = getBoardProfile();
         var budget   = Math.floor(profile.totalRamWords / 2);
-        var count    = clamp(state.thread.count, 1, profile.singleThread ? 1 : 9);
+        var count    = clamp(state.thread.count, 1, boardThreadCountLimit(profile));
         var maxWords = Math.min(Math.floor(budget / count), 8192);
         var maxExp   = Math.max(MIN_EXP, Math.min(MAX_EXP, Math.floor(Math.log2(maxWords))));
         state.thread.lumpPow2 = clamp(exp, MIN_EXP, maxExp);
@@ -1586,7 +1593,7 @@
 
         // Patch count slider max in-place so it reacts before the full re-render
         var lumpSize = Math.pow(2, state.thread.lumpPow2);
-        var maxCount = profile.singleThread ? 1 : Math.min(9, Math.max(1, Math.floor(budget / lumpSize)));
+        var maxCount = Math.min(boardThreadCountLimit(profile), Math.max(1, Math.floor(budget / lumpSize)));
         state.thread.count = clamp(state.thread.count, 1, maxCount);
         var sl  = document.getElementById('le-t-count-sl');
         var num = document.getElementById('le-t-count-num');
@@ -1598,7 +1605,7 @@
     };
 
     window.lumpEditorThreadCount = function (v) {
-        state.thread.count = clamp(v, 1, 9);
+        state.thread.count = clamp(v, 1, boardThreadCountLimit(getBoardProfile()));
         _threadCountClampedInfo = null;
         saveState();
         var sl  = document.getElementById('le-t-count-sl');

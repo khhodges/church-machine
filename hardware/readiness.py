@@ -20,8 +20,8 @@ ROOT = Path(__file__).resolve().parent.parent
 # has no effect on the generated Verilog/RTLIL circuit.
 #
 # WUKONG_SOURCES: CORE_SOURCES plus gen_rtlil.py (which has its own
-# post-processing) and the three Wukong-only modules imported at generation
-# time (wukong_top.py imports uart_tx.py and uart_rx.py).
+# post-processing) and the Wukong-only modules imported at generation time
+# (wukong_top.py imports uart_tx.py and uart_rx.py).
 # ---------------------------------------------------------------------------
 
 CORE_SOURCES: tuple[str, ...] = (

@@ -88,8 +88,8 @@ def test_n_init_is_positive():
 def test_n_init_fits_in_one_byte():
     """The low-byte N_INIT sentinel encoding must match the current image."""
     n = _compute_n_init()
-    assert n == 526, f"unexpected N_INIT={n}"
-    assert n & 0xFF == 0x0E, f"unexpected N_INIT low byte: 0x{n & 0xFF:02X}"
+    assert n == 610, f"unexpected N_INIT={n}"
+    assert n & 0xFF == 0x62, f"unexpected N_INIT low byte: 0x{n & 0xFF:02X}"
 
 
 def test_n_init_matches_bridge_helper():
@@ -138,7 +138,7 @@ def test_reference_file_exists_and_matches():
 def test_n_init_sentinel_byte_value():
     """Smoke-check the current N_INIT sentinel byte value."""
     n = _compute_n_init()
-    assert n & 0xFF == 0x0E, (
+    assert n & 0xFF == 0x62, (
         f"N_INIT & 0xFF changed: now 0x{n & 0xFF:02X} (N_INIT={n}). "
         "Update expected value here AND rebuild the Wukong bitstream."
     )

@@ -1,7 +1,7 @@
 {
-  "version": 14,
-  "md5": "b803d06274893f41de2b795d0679c6af",
-  "built_at": "2026-08-14T19:37:58Z",
-  "source_commit": null,
+  "version": 17,
+  "md5": "387ee0c7ebf66bc16e233d0c83a05caf",
+  "built_at": "2026-08-27T14:12:22Z",
+  "source_commit": "12fd06ef649ce9c8fd243b288f3590188d785db9",
   "size_bytes": 3826002
 }

@@ -58,14 +58,6 @@ from .boot_rom import (BootRom, BOOT_PROGRAM, WUKONG_NUC_PROGRAM, encode_turing,
                        wukong_wch_header)
 from .uart_tx import UartTx
 from .uart_rx import UartRx
-from .integrity32 import integrity32_amaranth
-from .wukong_prefetch import (
-    PREFETCH_REQUEST_MAGIC, PREFETCH_RESPONSE_MAGIC, PREFETCH_INCIDENT_MAGIC,
-    PREFETCH_POLICY_MAGIC, PREFETCH_POLICY_VERSION, PREFETCH_POLICY_BASE_WORD,
-    PREFETCH_POLICY_ENTRY_WORDS, PREFETCH_MAX_ENTRIES, PREFETCH_MAX_RETRIES,
-    PREFETCH_STATUS_OK, PREFETCH_STATUS_MALFORMED, PREFETCH_STATUS_CRC,
-    PREFETCH_STATUS_CAPACITY, PREFETCH_STATUS_TRANSPORT,
-)
 
 # ── Bitstream build version ────────────────────────────────────────────────────
 # Baked into the 4th byte of the boot sentinel (0xBC N_INIT TU_VERSION BUILD_VERSION).
@@ -487,56 +479,6 @@ class ChurchWukongXC7A100T(Elaboratable):
         _UPLOAD_WATCHDOG_LIMIT = max(self.clk_freq // self.baud * 10 * 20, 1000)
         upload_watchdog = Signal(range(_UPLOAD_WATCHDOG_LIMIT + 1))
 
-        # ── Post-boot LUMP prefetch transport ────────────────────────────────
-        # The native image carries a policy in the padding immediately after
-        # the boot c-list.  Policy records reserve body ranges but leave their
-        # forward NS entries unpublished.  A successful framed transfer is
-        # the only path that publishes one.
-        pf_magic = Signal(32)
-        pf_count = Signal(4)
-        pf_slot = [Signal(8, name=f"pf_slot{i}") for i in range(PREFETCH_MAX_ENTRIES)]
-        pf_required = [Signal(name=f"pf_required{i}") for i in range(PREFETCH_MAX_ENTRIES)]
-        pf_token = [Signal(32, name=f"pf_token{i}") for i in range(PREFETCH_MAX_ENTRIES)]
-        pf_target = [Signal(14, name=f"pf_target{i}") for i in range(PREFETCH_MAX_ENTRIES)]
-        pf_capacity = [Signal(15, name=f"pf_capacity{i}") for i in range(PREFETCH_MAX_ENTRIES)]
-        pf_authority = [Signal(32, name=f"pf_authority{i}") for i in range(PREFETCH_MAX_ENTRIES)]
-        pf_hash32 = [Signal(32, name=f"pf_hash32{i}") for i in range(PREFETCH_MAX_ENTRIES)]
-        pf_index = Signal(4)
-        pf_retry = Signal(2)
-        pf_sequence = Signal(8)
-        pf_header = [Signal(8, name=f"pf_hdr{i}") for i in range(16)]
-        pf_header_count = Signal(5)
-        pf_word_buf = [Signal(8, name=f"pf_word_b{i}") for i in range(3)]
-        pf_word_pos = Signal(2)
-        pf_word_index = Signal(15)
-        pf_word_count = Signal(15)
-        pf_expected_crc = Signal(32)
-        pf_error_status = Signal(8)
-        pf_crc = Signal(32, reset=0xFFFFFFFF)
-        pf_first_word = Signal(32)
-        pf_watchdog = Signal(range(_UPLOAD_WATCHDOG_LIMIT + 1))
-        pf_wr_en = Signal()
-        pf_wr_addr = Signal(14)
-        pf_wr_data = Signal(32)
-        pf_tx_req = Signal()
-        pf_tx_byte = Signal(8)
-        pf_tx_index = Signal(5)
-        pf_hold = Signal()
-        pf_started = Signal()
-        pf_done = Signal()
-        pf_incident_req = Signal()
-        pf_incident_byte = Signal(8)
-        pf_incident_index = Signal(3)
-
-        def _crc32_byte(crc, byte):
-            value = crc ^ byte
-            for _ in range(8):
-                value = Mux(value[0], (value >> 1) ^ 0xEDB88320, value >> 1)
-            return value
-
-        pf_crc_next = Signal(32)
-        m.d.comb += pf_crc_next.eq(_crc32_byte(pf_crc, uart_rx.data))
-
         # ── Boot-triggered / sentinel signals (declared early for arbitrator) ──
         # boot_triggered is driven by the boot FSM below; sentinel_sent latches
         # after all sentinel bytes have been accepted by the UART TX.
@@ -711,24 +653,18 @@ class ChurchWukongXC7A100T(Elaboratable):
                 Mux(sentinel_req & (sentinel_phase == 3),    C(_BUILD_VERSION & 0xFF, 8),
                 Mux(upload_ack_req,                          C(0x06, 8),
                 Mux(snapshot_tx_req,                         snapshot_tx_byte,
-                Mux(pf_incident_req,                         pf_incident_byte,
-                Mux(pf_tx_req,                               pf_tx_byte,
-                                                              trace_tx_byte)))))))))))  ,
+                                                               trace_tx_byte)))))))))  ,
             uart_tx.start.eq(
                 cm_tx_start |
                 (banner_req      & tx_free & ~cm_tx_start) |
                 (sentinel_req    & tx_free & ~cm_tx_start & ~banner_req) |
                 (upload_ack_req  & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req) |
                 (snapshot_tx_req & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req & ~upload_ack_req) |
-                (pf_incident_req & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req &
-                 ~upload_ack_req & ~snapshot_tx_req) |
-                (pf_tx_req       & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req &
-                 ~upload_ack_req & ~snapshot_tx_req & ~pf_incident_req) |
                 (trace_tx_req    & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req &
-                 ~upload_ack_req & ~snapshot_tx_req & ~pf_incident_req & ~pf_tx_req)),
+                 ~upload_ack_req & ~snapshot_tx_req)),
             trace_tx_ack.eq(
                 trace_tx_req & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req &
-                ~upload_ack_req & ~snapshot_tx_req & ~pf_incident_req & ~pf_tx_req),
+                ~upload_ack_req & ~snapshot_tx_req),
             snapshot_tx_ack.eq(
                 snapshot_tx_req & tx_free & ~cm_tx_start & ~sentinel_req &
                 ~banner_req & ~upload_ack_req),
@@ -799,44 +735,12 @@ class ChurchWukongXC7A100T(Elaboratable):
                 dmem_wr.data.eq(upload_wr_data),
                 dmem_wr.en.eq(1),
             ]
-        with m.Elif(pf_wr_en):
-            m.d.comb += [
-                dmem_wr.addr.eq(pf_wr_addr),
-                dmem_wr.data.eq(pf_wr_data),
-                dmem_wr.en.eq(1),
-            ]
         with m.Else():
             m.d.comb += [
                 dmem_wr.addr.eq(mem_addr),
                 dmem_wr.data.eq(cpu_wr_data),
                 dmem_wr.en.eq(cpu_wr_en),
             ]
-
-        # Capture policy words from an uploaded native image.  This shadow
-        # avoids competing with the CM for the single synchronous BRAM read
-        # port while the transport is active.
-        with m.If(upload_wr_en):
-            with m.If(upload_wr_addr == PREFETCH_POLICY_BASE_WORD):
-                m.d.sync += pf_magic.eq(upload_wr_data)
-            with m.Elif(upload_wr_addr == PREFETCH_POLICY_BASE_WORD + 1):
-                m.d.sync += pf_count.eq(upload_wr_data[:4])
-            for _i in range(PREFETCH_MAX_ENTRIES):
-                _base = PREFETCH_POLICY_BASE_WORD + 2 + _i * PREFETCH_POLICY_ENTRY_WORDS
-                with m.Elif(upload_wr_addr == _base):
-                    m.d.sync += [
-                        pf_slot[_i].eq(upload_wr_data[:8]),
-                        pf_required[_i].eq(upload_wr_data[16]),
-                    ]
-                with m.Elif(upload_wr_addr == _base + 1):
-                    m.d.sync += pf_token[_i].eq(upload_wr_data)
-                with m.Elif(upload_wr_addr == _base + 2):
-                    m.d.sync += pf_target[_i].eq(upload_wr_data[:14])
-                with m.Elif(upload_wr_addr == _base + 3):
-                    m.d.sync += pf_capacity[_i].eq(upload_wr_data[:15])
-                with m.Elif(upload_wr_addr == _base + 4):
-                    m.d.sync += pf_authority[_i].eq(upload_wr_data)
-                with m.Elif(upload_wr_addr == _base + 5):
-                    m.d.sync += pf_hash32[_i].eq(upload_wr_data)
 
         # ── Core control signals ───────────────────────────────────────────────
         fault_latched = Signal()
@@ -946,105 +850,13 @@ class ChurchWukongXC7A100T(Elaboratable):
             # reboot cannot execute far enough to starve the announcement that
             # tells the bridge/IDE which build has actually restarted.
             core.imem_valid.eq(
-                ~step_halted & ~trace_stall & ~pf_hold & imem_settled &
+                ~step_halted & ~trace_stall & imem_settled &
                 ~sentinel_req & ~recovery_hold),
-            core.halt_req.eq(step_halted | trace_stall | pf_hold | recovery_hold),
+            core.halt_req.eq(step_halted | trace_stall | recovery_hold),
             core.free_run_start.eq(0),
             core.free_run_nia.eq(0),
             core.gc_start.eq(0),
         ]
-
-        # Current policy record and transport framing fields.
-        pf_cur_slot = Signal(8)
-        pf_cur_required = Signal()
-        pf_cur_token = Signal(32)
-        pf_cur_target = Signal(14)
-        pf_cur_capacity = Signal(15)
-        pf_cur_authority = Signal(32)
-        pf_cur_hash32 = Signal(32)
-        with m.Switch(pf_index):
-            for _i in range(PREFETCH_MAX_ENTRIES):
-                with m.Case(_i):
-                    m.d.comb += [
-                        pf_cur_slot.eq(pf_slot[_i]),
-                        pf_cur_required.eq(pf_required[_i]),
-                        pf_cur_token.eq(pf_token[_i]),
-                        pf_cur_target.eq(pf_target[_i]),
-                        pf_cur_capacity.eq(pf_capacity[_i]),
-                        pf_cur_authority.eq(pf_authority[_i]),
-                        pf_cur_hash32.eq(pf_hash32[_i]),
-                    ]
-
-        # A policy transfer is a stop-the-world operation for the CM, but it
-        # never preempts an already-running trace/snapshot frame.
-        m.d.comb += pf_hold.eq(pf_started & ~pf_done)
-
-        # Request frame: D7 01 sequence slot token32 max_words16 0000 hash32.
-        m.d.comb += pf_tx_byte.eq(0)
-        with m.Switch(pf_tx_index):
-            with m.Case(0):  m.d.comb += pf_tx_byte.eq(PREFETCH_REQUEST_MAGIC)
-            with m.Case(1):  m.d.comb += pf_tx_byte.eq(1)
-            with m.Case(2):  m.d.comb += pf_tx_byte.eq(pf_sequence)
-            with m.Case(3):  m.d.comb += pf_tx_byte.eq(pf_cur_slot)
-            with m.Case(4):  m.d.comb += pf_tx_byte.eq(pf_cur_token[24:32])
-            with m.Case(5):  m.d.comb += pf_tx_byte.eq(pf_cur_token[16:24])
-            with m.Case(6):  m.d.comb += pf_tx_byte.eq(pf_cur_token[8:16])
-            with m.Case(7):  m.d.comb += pf_tx_byte.eq(pf_cur_token[:8])
-            with m.Case(8):  m.d.comb += pf_tx_byte.eq(pf_cur_capacity[8:15])
-            with m.Case(9):  m.d.comb += pf_tx_byte.eq(pf_cur_capacity[:8])
-            with m.Case(12): m.d.comb += pf_tx_byte.eq(pf_cur_hash32[24:32])
-            with m.Case(13): m.d.comb += pf_tx_byte.eq(pf_cur_hash32[16:24])
-            with m.Case(14): m.d.comb += pf_tx_byte.eq(pf_cur_hash32[8:16])
-            with m.Case(15): m.d.comb += pf_tx_byte.eq(pf_cur_hash32[:8])
-
-        # Incident frame: D9 version sequence slot status attempts 00 00.
-        m.d.comb += pf_incident_byte.eq(0)
-        with m.Switch(pf_incident_index):
-            with m.Case(0): m.d.comb += pf_incident_byte.eq(PREFETCH_INCIDENT_MAGIC)
-            with m.Case(1): m.d.comb += pf_incident_byte.eq(1)
-            with m.Case(2): m.d.comb += pf_incident_byte.eq(pf_sequence)
-            with m.Case(3): m.d.comb += pf_incident_byte.eq(pf_cur_slot)
-            with m.Case(4): m.d.comb += pf_incident_byte.eq(pf_error_status)
-            with m.Case(5): m.d.comb += pf_incident_byte.eq(pf_retry)
-
-        pf_response_token = Signal(32)
-        pf_response_count = Signal(32)
-        pf_response_crc = Signal(32)
-        m.d.comb += [
-            # Cat's first argument forms the least-significant byte.  These
-            # fields arrive MSB first on the UART, so reverse the wire order.
-            pf_response_token.eq(Cat(pf_header[7], pf_header[6], pf_header[5], pf_header[4])),
-            pf_response_count.eq(Cat(pf_header[11], pf_header[10], pf_header[9], pf_header[8])),
-            pf_response_crc.eq(Cat(pf_header[15], pf_header[14], pf_header[13], pf_header[12])),
-        ]
-
-        # Promotion writes the four-word forward NS descriptor only after all
-        # payload checks have passed.
-        pf_promote_index = Signal(2)
-        pf_desc_wr_en = Signal()
-        pf_desc_addr = Signal(14)
-        pf_desc_data = Signal(32)
-        pf_location_byte = Signal(32)
-        pf_integrity = Signal(32)
-        m.d.comb += [
-            pf_location_byte.eq(pf_cur_target << 2),
-            pf_desc_addr.eq((pf_cur_slot << 2) + pf_promote_index),
-            pf_desc_data.eq(0),
-        ]
-        integrity32_amaranth(m, pf_location_byte, pf_cur_authority, pf_integrity)
-        with m.Switch(pf_promote_index):
-            with m.Case(0): m.d.comb += pf_desc_data.eq(pf_location_byte)
-            with m.Case(1): m.d.comb += pf_desc_data.eq(pf_cur_authority)
-            with m.Case(2): m.d.comb += pf_desc_data.eq(pf_integrity)
-            with m.Case(3): m.d.comb += pf_desc_data.eq(pf_cur_token)
-
-        # Prefetch/descriptor writes have priority over CM writes.
-        with m.If(pf_desc_wr_en):
-            m.d.comb += [
-                dmem_wr.addr.eq(pf_desc_addr),
-                dmem_wr.data.eq(pf_desc_data),
-                dmem_wr.en.eq(1),
-            ]
 
         # ── Command parser FSM ─────────────────────────────────────────────────
         # Reads one-byte commands from the UART RX FIFO:
@@ -1078,14 +890,7 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         with m.FSM(name="cmd_parser"):
             with m.State("IDLE"):
-                with m.If(sentinel_sent & ~pf_started & ~pf_done & (pf_magic == PREFETCH_POLICY_MAGIC) &
-                          (pf_count != 0) & ~recovery_hold & ~trace_stall):
-                    m.d.sync += [
-                        pf_started.eq(1), pf_index.eq(0), pf_retry.eq(0),
-                        pf_sequence.eq(0), pf_done.eq(0),
-                    ]
-                    m.next = "PREFETCH_REQUEST"
-                with m.Elif(uart_rx.valid):
+                with m.If(uart_rx.valid):
                     with m.Switch(uart_rx.data):
                         with m.Case(0x73):  # 's'
                             # 's' is the universal pause/step control.  From
@@ -1142,162 +947,6 @@ class ChurchWukongXC7A100T(Elaboratable):
                                     snapshot_pending.eq(1),
                                     snapshot_reason.eq(3),
                                 ]
-
-            # Board-originated request/response transport.  These states are
-            # intentionally in the command FSM so the ordinary ASCII command
-            # parser can never consume a payload byte as a control command.
-            with m.State("PREFETCH_REQUEST"):
-                m.d.comb += pf_tx_req.eq(1)
-                with m.If(tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req &
-                          ~upload_ack_req & ~snapshot_tx_req & ~trace_tx_req):
-                    with m.If(pf_tx_index == 15):
-                        m.d.sync += [pf_tx_index.eq(0), pf_header_count.eq(0),
-                                     pf_watchdog.eq(0)]
-                        m.next = "PREFETCH_HEADER"
-                    with m.Else():
-                        m.d.sync += pf_tx_index.eq(pf_tx_index + 1)
-
-            with m.State("PREFETCH_HEADER"):
-                with m.If(uart_rx.valid):
-                    m.d.sync += [
-                        Array(pf_header)[pf_header_count].eq(uart_rx.data),
-                        pf_header_count.eq(pf_header_count + 1),
-                        pf_watchdog.eq(0),
-                    ]
-                    with m.If(pf_header_count == 15):
-                        m.next = "PREFETCH_HEADER_COMMIT"
-                with m.Else():
-                    m.d.sync += pf_watchdog.eq(pf_watchdog + 1)
-                    with m.If(pf_watchdog == _UPLOAD_WATCHDOG_LIMIT - 1):
-                        m.d.sync += [pf_error_status.eq(PREFETCH_STATUS_TRANSPORT),
-                                     pf_watchdog.eq(0)]
-                        m.next = "PREFETCH_FAIL"
-
-            with m.State("PREFETCH_HEADER_COMMIT"):
-                # Only a successful, policy-matching response may enter the
-                # payload state.  Error responses contain no payload.
-                with m.If((pf_header[0] != PREFETCH_RESPONSE_MAGIC) |
-                          (pf_header[1] != PREFETCH_POLICY_VERSION) |
-                          (pf_header[3] != pf_cur_slot) |
-                          (pf_response_token != pf_cur_token) |
-                          (pf_response_count == 0) |
-                          (pf_response_count > pf_cur_capacity) |
-                          (pf_response_count > 16384) |
-                          (pf_header[2] != PREFETCH_STATUS_OK)):
-                    m.d.sync += pf_error_status.eq(
-                        Mux(pf_header[2] == PREFETCH_STATUS_CAPACITY,
-                            PREFETCH_STATUS_CAPACITY, PREFETCH_STATUS_MALFORMED))
-                    m.next = "PREFETCH_FAIL"
-                with m.Else():
-                    m.d.sync += [
-                        pf_expected_crc.eq(pf_response_crc),
-                        pf_word_count.eq(pf_response_count[:15]),
-                        pf_word_index.eq(0), pf_word_pos.eq(0),
-                        pf_crc.eq(0xFFFFFFFF), pf_watchdog.eq(0),
-                    ]
-                    m.next = "PREFETCH_PAYLOAD"
-
-            with m.State("PREFETCH_PAYLOAD"):
-                with m.If(uart_rx.valid):
-                    m.d.sync += [pf_crc.eq(pf_crc_next), pf_watchdog.eq(0)]
-                    with m.Switch(pf_word_pos):
-                        with m.Case(0): m.d.sync += pf_word_buf[0].eq(uart_rx.data)
-                        with m.Case(1): m.d.sync += pf_word_buf[1].eq(uart_rx.data)
-                        with m.Case(2): m.d.sync += pf_word_buf[2].eq(uart_rx.data)
-                    with m.If(pf_word_pos == 3):
-                        m.d.comb += [
-                            pf_wr_en.eq(1),
-                            pf_wr_addr.eq(pf_cur_target + pf_word_index),
-                            pf_wr_data.eq(Cat(uart_rx.data, pf_word_buf[2],
-                                              pf_word_buf[1], pf_word_buf[0])),
-                        ]
-                        with m.If(pf_word_index == 0):
-                            m.d.sync += pf_first_word.eq(
-                                Cat(uart_rx.data, pf_word_buf[2],
-                                    pf_word_buf[1], pf_word_buf[0]))
-                        with m.If(pf_word_index + 1 >= pf_word_count):
-                            m.next = "PREFETCH_CHECK"
-                        with m.Else():
-                            m.d.sync += [
-                                pf_word_index.eq(pf_word_index + 1),
-                                pf_word_pos.eq(0),
-                            ]
-                    with m.Else():
-                        m.d.sync += pf_word_pos.eq(pf_word_pos + 1)
-                with m.Else():
-                    m.d.sync += pf_watchdog.eq(pf_watchdog + 1)
-                    with m.If(pf_watchdog == _UPLOAD_WATCHDOG_LIMIT - 1):
-                        m.d.sync += [pf_error_status.eq(PREFETCH_STATUS_TRANSPORT),
-                                     pf_watchdog.eq(0)]
-                        m.next = "PREFETCH_FAIL"
-
-            with m.State("PREFETCH_CHECK"):
-                # The first word must describe exactly the received allocation.
-                # The CRC is over the raw big-endian LUMP bytes.
-                m.d.sync += pf_watchdog.eq(0)
-                with m.If((pf_crc ^ 0xFFFFFFFF) != pf_expected_crc):
-                    m.d.sync += pf_error_status.eq(PREFETCH_STATUS_CRC)
-                    m.next = "PREFETCH_FAIL"
-                with m.Elif((((pf_first_word >> 27) & 0x1F) != 0x1F) |
-                            (((pf_first_word >> 8) & 0x3) != 0x3) |
-                            ((1 << (((pf_first_word >> 23) & 0xF) + 6)) != pf_word_count)):
-                    m.d.sync += pf_error_status.eq(PREFETCH_STATUS_MALFORMED)
-                    m.next = "PREFETCH_FAIL"
-                with m.Else():
-                    m.d.sync += pf_promote_index.eq(0)
-                    m.next = "PREFETCH_PROMOTE"
-
-            with m.State("PREFETCH_PROMOTE"):
-                m.d.comb += pf_desc_wr_en.eq(1)
-                with m.If(pf_promote_index == 3):
-                    with m.If(pf_index + 1 >= pf_count):
-                        m.d.sync += pf_done.eq(1)
-                        m.next = "IDLE"
-                    with m.Else():
-                        m.d.sync += [
-                            pf_index.eq(pf_index + 1), pf_retry.eq(0),
-                            pf_sequence.eq(pf_sequence + 1),
-                        ]
-                        m.next = "PREFETCH_REQUEST"
-                with m.Else():
-                    m.d.sync += pf_promote_index.eq(pf_promote_index + 1)
-
-            with m.State("PREFETCH_FAIL"):
-                with m.If(pf_retry + 1 < PREFETCH_MAX_RETRIES):
-                    m.d.sync += [
-                        pf_retry.eq(pf_retry + 1),
-                        pf_sequence.eq(pf_sequence + 1),
-                    ]
-                    m.next = "PREFETCH_REQUEST"
-                with m.Elif(pf_cur_required):
-                    m.d.sync += pf_incident_index.eq(0)
-                    m.next = "PREFETCH_INCIDENT"
-                with m.Elif(pf_index + 1 >= pf_count):
-                    m.d.sync += pf_done.eq(1)
-                    m.next = "IDLE"
-                with m.Else():
-                    m.d.sync += [
-                        pf_index.eq(pf_index + 1), pf_retry.eq(0),
-                        pf_sequence.eq(pf_sequence + 1),
-                    ]
-                    m.next = "PREFETCH_REQUEST"
-
-            with m.State("PREFETCH_INCIDENT"):
-                m.d.comb += pf_incident_req.eq(1)
-                with m.If(tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req &
-                          ~upload_ack_req & ~snapshot_tx_req & ~trace_tx_req):
-                    with m.If(pf_incident_index == 7):
-                        m.next = "PREFETCH_HALT"
-                    with m.Else():
-                        m.d.sync += pf_incident_index.eq(pf_incident_index + 1)
-
-            with m.State("PREFETCH_HALT"):
-                # Required failures remain stopped until a full reboot or
-                # explicit operator intervention; no partial slot is visible.
-                m.d.sync += step_mode.eq(1)
-                with m.If(uart_rx.valid & (uart_rx.data == 0x66)):  # 'f'
-                    m.d.comb += manual_reboot_cmd.eq(1)
-                    m.next = "IDLE"
 
             with m.State("BP_RECV"):
                 with m.If(uart_rx.valid):
@@ -1441,9 +1090,6 @@ class ChurchWukongXC7A100T(Elaboratable):
                 sentinel_phase.eq(0),
                 step_mode.eq(0),
                 step_halted.eq(0),
-                pf_started.eq(0),
-                pf_done.eq(0),
-                pf_retry.eq(0),
             ]
 
         # ── TraceUnit FSM ──────────────────────────────────────────────────────

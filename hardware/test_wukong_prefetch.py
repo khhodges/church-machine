@@ -11,7 +11,6 @@ from hardware.wukong_bridge import (
     parse_prefetch_incident,
 )
 from hardware.wukong_prefetch import (
-    PREFETCH_REQUIRED,
     PREFETCH_STATUS_CRC,
     PREFETCH_STATUS_MALFORMED,
     PREFETCH_STATUS_OK,
@@ -22,7 +21,6 @@ from hardware.wukong_prefetch import (
     parse_request,
     parse_response_header,
 )
-from server.boot_image import build_wukong_prefetch_policy
 
 
 class _Response:
@@ -104,75 +102,21 @@ def test_required_incident_frame_is_decodable():
     }
 
 
-def test_rtl_uses_big_endian_response_fields_and_emits_all_incident_bytes():
-    """Keep the FPGA parser in lockstep with the bridge's big-endian frames."""
+def test_physical_rtl_excludes_the_retired_prefetch_transport():
+    """The eight-entry post-boot transport must never return to the FPGA image."""
     from pathlib import Path
 
-    source = (Path(__file__).with_name("wukong_top.py")).read_text()
-    assert "Cat(pf_header[7], pf_header[6], pf_header[5], pf_header[4])" in source
-    assert "Cat(pf_header[11], pf_header[10], pf_header[9], pf_header[8])" in source
-    assert "Cat(pf_header[15], pf_header[14], pf_header[13], pf_header[12])" in source
-    assert "with m.If(pf_incident_index == 7):" in source
-    # This is the bridge wire format the RTL parser above consumes.
-    frame = build_prefetch_response(
-        parse_request(build_request(9, 12, 0x12345678, 64)),
-        _canonical_response())
-    parsed = parse_response_header(frame)
-    assert (parsed["token"], parsed["word_count"], parsed["crc"]) == (
-        0x12345678, 64, crc32(frame[16:]))
-
-
-def test_projection_policy_orders_entries_and_reserves_bounded_capacity():
-    source = [0] * 600
-    # Generic image uses an inverted Namespace table. Give each policy slot a
-    # distinct authority word so the projection must retain it.
-    source[-(9 + 1) * 4 + 1] = 0x4A120000
-    source[-(8 + 1) * 4 + 1] = 0x4A340000
-    cfg = {"step2": {"lumps": [
-        {"nsSlot": 9, "prefetch": True, "resident": False, "prefetchOrder": 2,
-         "lumpToken": "00000009", "lumpSize": 64, "binaryHash": "aabbccdd"},
-        {"nsSlot": 8, "prefetch": True, "resident": False, "prefetchOrder": 1,
-         "lumpToken": "00000008", "lumpSize": 128, "prefetchRequired": False},
-    ]}}
-    words, entries = build_wukong_prefetch_policy(cfg, source, 1400)
-    assert [entry["slot"] for entry in entries] == [8, 9]
-    assert entries[0]["target"] == 1400
-    assert entries[1]["target"] == 1528
-    assert words[1] & 0xFFFF == 2
-    assert entries[0]["required"] is False
-    # Bits 20:17 are part of W1's range; retaining them would authorize a
-    # larger body than the policy's allocated capacity.
-    assert entries[1]["authority"] & 0x1FFFFF == 63
-
-
-def test_canonical_preload_failure_is_nonblocking_and_next_slot_is_independent():
-    """New one-policy rows never encode the legacy halt-on-failure bit."""
-    source = [0] * 600
-    cfg = {"step2": {"lumps": [
-        {"nsSlot": 8, "loadPolicy": "Preload", "lumpToken": "00000008",
-         "lumpSize": 64, "binaryHash": "aabbccdd"},
-        {"nsSlot": 9, "loadPolicy": "Preload", "lumpToken": "00000009",
-         "lumpSize": 64, "binaryHash": "aabbccdd"},
-    ]}}
-    words, entries = build_wukong_prefetch_policy(cfg, source, 1400)
-    assert [entry["slot"] for entry in entries] == [8, 9]
-    assert all(entry["required"] is False for entry in entries)
-    # The policy word has no PREFETCH_REQUIRED bit for either independent slot.
-    assert all((words[2 + 6 * index] & (PREFETCH_REQUIRED << 16)) == 0
-               for index in range(len(entries)))
-
-
-def test_projection_policy_rejects_capacity_exhaustion():
-    cfg = {"step2": {"lumps": [{
-        "nsSlot": 8, "prefetch": True, "resident": False,
-        "lumpToken": "00000008", "lumpSize": 16384,
-    }]}}
-    try:
-        build_wukong_prefetch_policy(cfg, [0] * 100, 1280)
-    except ValueError as exc:
-        assert "capacity" in str(exc)
-    else:
-        raise AssertionError("Wukong projection accepted an overflowing staging body")
+    root = Path(__file__).resolve().parent.parent
+    artifacts = (
+        Path(__file__).with_name("wukong_top.py"),
+        root / "build" / "church_wukong_xc7a100t.il",
+        root / "build" / "church_wukong_xc7a100t.v",
+    )
+    retired_markers = ("wukong_prefetch", "PREFETCH_MAX_ENTRIES",
+                       "PREFETCH_REQUEST", "pf_header", "pf_incident_index")
+    for artifact in artifacts:
+        text = artifact.read_text()
+        assert all(marker not in text for marker in retired_markers), artifact
 
 
 def test_lazy_prefetch_save_retains_capacity_and_hash_binding(monkeypatch, tmp_path):

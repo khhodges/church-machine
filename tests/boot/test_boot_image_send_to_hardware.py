@@ -132,6 +132,7 @@ def _reset_wukong_globals():
     """Reset the command-queue, upload-ack, and in-flight globals between tests."""
     with _app_module._wukong_command_lock:
         _app_module._wukong_pending_cmd = None
+        _app_module._wukong_cmd_delivery = None
     with _app_module._wukong_upload_ack_lock:
         _app_module._wukong_upload_ack = {}
     with _app_module._upload_in_flight_lock:
@@ -142,6 +143,7 @@ def _reset_wukong_globals():
     yield
     with _app_module._wukong_command_lock:
         _app_module._wukong_pending_cmd = None
+        _app_module._wukong_cmd_delivery = None
     with _app_module._wukong_upload_ack_lock:
         _app_module._wukong_upload_ack = {}
     with _app_module._upload_in_flight_lock:
@@ -158,7 +160,7 @@ def boot_bin_path(tmp_path, monkeypatch):
     Must be a REAL generated image: send-to-hardware now runs a residency /
     caps[0] gate (read_boot_entry_info) and rejects malformed blobs with 400.
     """
-    lumps_dir = os.path.join(ROOT, 'server', 'lumps')
+    lumps_dir = LUMPS_DIR
     os.makedirs(lumps_dir, exist_ok=True)
     bin_path = os.path.join(lumps_dir, 'boot-image.bin')
 
@@ -184,9 +186,10 @@ def boot_bin_path(tmp_path, monkeypatch):
 
 def test_send_to_hardware_missing_file_returns_404(client, tmp_path, monkeypatch):
     """Returns 404 when boot-image.bin does not exist."""
-    # Redirect SERVER_DIR to a temp dir that has no lumps/boot-image.bin.
-    fake_server_dir = str(tmp_path / 'server')
-    monkeypatch.setattr(_app_module, '_SERVER_DIR', fake_server_dir)
+    # The handler reads its configured LUMPS_DIR, which boot tests redirect to
+    # private storage. Point that exact dependency at an empty temporary dir.
+    fake_lumps_dir = str(tmp_path / 'lumps')
+    monkeypatch.setattr(_app_module, 'LUMPS_DIR', fake_lumps_dir)
 
     resp = client.post('/api/boot-image/send-to-hardware',
                        content_type='application/json', data='{}')
@@ -365,7 +368,7 @@ def test_server_queues_native_wukong_le_image():
     n_all = len(le_bytes) // 4
     words = list(struct.unpack(f'<{n_all}I', le_bytes))
 
-    lumps_dir = os.path.join(ROOT, 'server', 'lumps')
+    lumps_dir = LUMPS_DIR
     os.makedirs(lumps_dir, exist_ok=True)
     bin_path  = os.path.join(lumps_dir, 'boot-image.bin')
 
@@ -673,7 +676,7 @@ def test_direct_u_cmd_sets_in_flight_flag(client):
 
 def _install_boot_bin(payload):
     """Write payload to server/lumps/boot-image.bin; returns (path, old_data)."""
-    lumps_dir = os.path.join(ROOT, 'server', 'lumps')
+    lumps_dir = LUMPS_DIR
     os.makedirs(lumps_dir, exist_ok=True)
     bin_path = os.path.join(lumps_dir, 'boot-image.bin')
     old_data = open(bin_path, 'rb').read() if os.path.exists(bin_path) else None
