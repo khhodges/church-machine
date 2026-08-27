@@ -16,8 +16,10 @@ window._nsState = null;
 })();
 
 // ── NS table dirty tracking ──────────────────────────────────────────────────
-// Set to true when in-memory NS state diverges from committed boot-image.bin.
-// Cleared to false after a successful Save NS Table.
+// Set to true when in-memory NS state or next-build load policy diverges from
+// the committed files.  The UI deliberately presents this as one save action:
+// programmers should not need to understand the separate binary/config stores.
+// Cleared to false after both saves succeed.
 window._nsTableDirty = false;
 
 // Update the Save NS button appearance to reflect dirty state.
@@ -32,7 +34,7 @@ function _setNsDirty(dirty) {
         btn.style.borderColor = 'rgba(240,160,64,0.5)';
         btn.style.background  = '#2a1e0a';
     } else {
-        btn.textContent = '\u{1F4BE} Save NS Table';
+        btn.textContent = '\u{1F4BE} Save for next build';
         btn.style.color = '#7ec87e';
         btn.style.borderColor = 'rgba(100,200,100,0.35)';
         btn.style.background  = '#1a2a1f';
@@ -2741,8 +2743,7 @@ function updateNamespace() {
     html += _statChip('Garbage',  _cntGarbage,  '#f87171', 'Cleared slots — GT cycle count bumped, content zeroed');
     html += _statChip('Free',     _cntFree,     '#6a9f6a', 'Slots available for allocation');
     html += `<span id="nsBoltDrag" class="ns-bolt-drag" draggable="true" title="Drag \u26a1 onto any NS row to crown that abstraction as Boot.Thread.CR0 \u2014 the first abstraction invoked after boot">\u26a1 Boot entry</span>`;
-    html += `<button id="nsSaveBtn" onclick="event.stopPropagation();_nsTableSave(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save all NS table changes to boot-image.bin + ns-state.json — the single write path for NS mutations">\u{1F4BE} Save NS Table</button>`;
-    html += `<button id="nsPrefetchSaveBtn" onclick="event.stopPropagation();_nsPrefetchSaveClick(this)" style="background:#2a2415;color:#c89b3c;border:1px solid rgba(200,155,60,0.4);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save each slot's load policy">Save policies</button>`;
+    html += `<button id="nsSaveBtn" onclick="event.stopPropagation();_nsTableSave(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save Namespace changes and load policies for the next build">\u{1F4BE} Save for next build</button>`;
     html += `<button onclick="event.stopPropagation();_nsTableAdd()" style="background:#1a2e1a;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Install a LUMP from the repository into the next free NS slot">+ Add LUMP</button>`;
     html += '</div>';
     // Bank custody status deliberately projects no raw NS slot, address,
@@ -2877,13 +2878,33 @@ function updateNamespace() {
         delete row.prefetchOrder;
         delete row.downloadUrl;
         window._nsPrefetchDirty = true;
+        _setNsDirty(true);
         updateNamespace();
     };
 
-    window._nsPrefetchSave = async function() {
-        const cfg = window.bootConfig;
-        if (!cfg || !cfg.step1) {
-            throw new Error('Boot configuration is not available; open Builder once to initialize it.');
+    // Build a complete config even on a fresh project.  The old UI required
+    // opening Builder and saving Step 1 before Namespace policies could be
+    // saved.  That was an implementation detail leaking into the user flow.
+    window._ensureNamespaceBuildConfig = async function() {
+        const localCfg = (window.bootConfig && typeof window.bootConfig === 'object')
+            ? window.bootConfig : {};
+        let serverData = null;
+        if (!localCfg.step1) {
+            const configResponse = await fetch('/api/boot-config');
+            serverData = await configResponse.json();
+            if (!configResponse.ok) {
+                throw new Error((serverData && serverData.error) || `HTTP ${configResponse.status}`);
+            }
+        }
+        const baseCfg = (serverData && (serverData.config || serverData.defaults)) || {};
+        const cfg = {
+            targetBoard: localCfg.targetBoard || baseCfg.targetBoard || 'wukong-xc7a100t',
+            step1: localCfg.step1 || baseCfg.step1,
+            step2: localCfg.step2 || baseCfg.step2 || { lumps: [] },
+            step3: localCfg.step3 || baseCfg.step3 || { emptySlotCount: 0 }
+        };
+        if (!cfg.step1) {
+            throw new Error('The default build configuration is unavailable.');
         }
         const response = await fetch('/api/boot-config', {
             method: 'POST',
@@ -2899,6 +2920,11 @@ function updateNamespace() {
         if (!response.ok || body.ok === false) throw new Error(body.error || `HTTP ${response.status}`);
         window.bootConfig = body.config || cfg;
         window._nsPrefetchDirty = false;
+        return window.bootConfig;
+    };
+
+    window._nsPrefetchSave = async function() {
+        return window._ensureNamespaceBuildConfig();
     };
     window._nsPrefetchSaveClick = async function(btn) {
         if (btn) {
@@ -3908,9 +3934,10 @@ function _nsTableClear(slot) {
 
 // ── NS table: Save — the single write path for all NS mutations ───────────────
 // Persists in-memory NS state to server/lumps/boot-image.bin AND
-// server/lumps/ns-state.json via the /api/boot-image/save-ns endpoint.
-// All other NS mutations (Add LUMP, Clear slot, boot-entry drag) are in-memory
-// only until the user clicks Save NS Table.
+// server/lumps/ns-state.json via the /api/boot-image/save-ns endpoint, then
+// persists the next-build configuration in the same user action.
+// All NS mutations (Add LUMP, Clear slot, boot-entry drag, load policy changes)
+// remain in-memory until the user clicks Save for next build.
 // The boot image binary is little-endian 32-bit words (struct.pack "<{n}I"),
 // matching Uint32Array's native byte order on x86/x64.
 window._nsTableSave = async function(btn) {
@@ -4039,6 +4066,16 @@ window._nsTableSave = async function(btn) {
         });
         const data = await resp.json();
         if (!resp.ok || data.ok === false) throw new Error((data && data.error) || `HTTP ${resp.status}`);
+
+        // Keep the live table and the next-build policy in one explicit save
+        // action.  This also creates the default Step 1 configuration on a
+        // fresh project, so the user never has to visit Builder just to unlock
+        // the Namespace save button.
+        try {
+            await window._ensureNamespaceBuildConfig();
+        } catch (configErr) {
+            throw new Error('Namespace saved, but next-build settings were not saved: ' + configErr.message);
+        }
 
         // Replace cached binary so the next reset re-applies the new image.
         window.bootImage          = words.buffer;
@@ -6005,7 +6042,7 @@ window.applyPOLA = async function(nsIdx) {
 window.addEventListener('beforeunload', function _nsBeforeUnload(e) {
     if (!window._nsTableDirty) return;
     e.preventDefault();
-    return (e.returnValue = 'NS table has unsaved changes — click \u201cSave NS Table\u201d to persist them before leaving.');
+    return (e.returnValue = 'Namespace changes have not been saved — click \u201cSave for next build\u201d before leaving.');
 });
 
 // ── Boot Sequence Code ─────────────────────────────────────────────────────
