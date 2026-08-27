@@ -1859,6 +1859,59 @@ details[open] .ti60-advanced-summary::before { transform: rotate(90deg); }
 .versions-value a { color: #8ab4f8; text-decoration: none; }
 .versions-value a:hover { text-decoration: underline; }
 .versions-note { font-size: 0.78rem; color: #999; margin-top: 0.45rem; line-height: 1.4; }
+.versions-build-status-card { border-left: 3px solid #818cf8; }
+.versions-build-state { display: inline-flex; align-items: center; gap: 0.4rem; }
+.versions-build-state .versions-badge { font-size: 0.8rem; }
+.versions-build-status-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1rem;
+    color: #aeb9d0;
+    font-size: 0.76rem;
+    margin-top: 0.55rem;
+}
+.versions-build-status-meta code { color: #c7d2fe; }
+.versions-build-message {
+    margin-top: 0.6rem;
+    padding: 0.5rem 0.65rem;
+    border-radius: 5px;
+    background: #15152a;
+    color: #c8c8e0;
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+.versions-build-message.is-failed {
+    background: #291616;
+    border: 1px solid #713535;
+    color: #fecaca;
+}
+.versions-build-next { display: block; margin-top: 0.25rem; color: #fde68a; }
+.versions-build-log { margin-top: 0.55rem; }
+.versions-build-log summary { cursor: pointer; color: #9fb4d8; font-size: 0.76rem; }
+.versions-build-log pre {
+    max-height: 9rem;
+    overflow: auto;
+    margin: 0.35rem 0 0;
+    padding: 0.55rem;
+    background: #0d0d18;
+    border: 1px solid #2a2a4a;
+    border-radius: 4px;
+    color: #aeb9d0;
+    font: 0.72rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    white-space: pre-wrap;
+}
+.versions-build-action {
+    margin-top: 0.6rem;
+    background: #2d2a56;
+    color: #d7d4ff;
+    border: 1px solid #625bb0;
+    border-radius: 5px;
+    padding: 0.32rem 0.72rem;
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+.versions-build-action:hover { background: #3c3770; }
 .versions-advice-btn {
     background: #3d3416; color: #e8c96a; border: 1px solid #7a672c; border-radius: 5px;
     padding: 0.25rem 0.7rem; font-size: 0.8rem; cursor: pointer; margin-left: 0.5rem;
@@ -1882,7 +1935,10 @@ details[open] .ti60-advanced-summary::before { transform: rotate(90deg); }
 .versions-advice-item .vai-title { font-weight: 600; }
 .versions-advice-item.vai-bad  .vai-title { color: #e88a8a; }
 .versions-advice-item.vai-warn .vai-title { color: #e8c96a; }
-.versions-advice-item .vai-fix { color: #9fb4d8; display: block; margin-top: 0.1rem; }
+.versions-advice-item .vai-fix { color: #9fb4d8; display: block; margin-top: 0.25rem; }
+.versions-advice-item .vai-fix ol { margin: 0; padding-left: 1.35rem; }
+.versions-advice-item .vai-fix li { margin: 0.18rem 0; }
+.versions-advice-item .vai-stop { display: block; margin-top: 0.3rem; color: #f0c674; font-size: 0.75rem; }
 .versions-advice-allok { color: #7fd894; }
 .versions-badge {
     display: inline-block;
@@ -1966,6 +2022,8 @@ details[open] .ti60-advanced-summary::before { transform: rotate(90deg); }
 .bitstream-log-age { color: #8290a8; white-space: nowrap; }
 
 @media (max-width: 700px) {
+    .versions-header { flex-wrap: wrap; }
+    .versions-last-checked { width: 100%; margin-left: 0; }
     .versions-card-wide { grid-column: span 1; }
     .bitstream-log-row {
         grid-template-columns: auto 1fr;

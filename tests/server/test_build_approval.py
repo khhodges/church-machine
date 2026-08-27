@@ -19,6 +19,7 @@ import os
 import struct
 import sys
 import tempfile
+from unittest.mock import patch
 
 import pytest
 
@@ -637,6 +638,19 @@ def test_build_approval_exposes_release_and_validation_comments():
     assert '_loadReleaseContext()' in approval
     assert '_renderIssueComments(data)' in approval
     assert 'Open Build Approval &amp; review comments' in runtime
+
+
+def test_build_status_endpoint_includes_build_timestamps():
+    """Status consumers can show when a remote build started and finished."""
+    with _app.app.test_request_context('/api/wukong-build/status'):
+        with patch.object(_app, '_ba_check_report_token',
+                          return_value=(True, None)):
+            response = _app.wukong_build_status()
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert 'started_at' in payload
+    assert 'updated_at' in payload
+    assert 'finished_at' in payload
 
 
 def test_worker_droplet_constants_defined():

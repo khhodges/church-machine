@@ -14816,6 +14816,9 @@ _ba_build_done: bool  = True              # True = idle; False = in-progress
 _ba_build_exit        = None
 _ba_build_phase       = 'idle'
 _ba_build_diagnosis   = None
+_ba_build_started_at  = None
+_ba_build_updated_at  = None
+_ba_build_finished_at = None
 _ba_build_lock        = threading.Lock()
 _ba_build_version_context = None
 
@@ -15590,6 +15593,7 @@ def _ba_classify_build_failure(exit_code, log, phase='unknown'):
 def _ba_build_worker(key_path):
     """Background thread: SSH to droplet, start Vivado in tmux, stream log."""
     global _ba_build_log, _ba_build_done, _ba_build_exit, _ba_build_phase, _ba_build_diagnosis
+    global _ba_build_updated_at, _ba_build_finished_at
 
     ssh_base = [
         'ssh', '-i', key_path,
@@ -15599,8 +15603,11 @@ def _ba_build_worker(key_path):
     ]
 
     def _append(line):
+        global _ba_build_updated_at
         with _ba_build_lock:
             _ba_build_log.append(line)
+            _ba_build_updated_at = _ba_datetime.datetime.now(
+                _ba_datetime.timezone.utc).isoformat().replace('+00:00', 'Z')
 
     with _ba_build_lock:
         active_build_context = dict(_ba_build_version_context or {})
@@ -15609,11 +15616,15 @@ def _ba_build_worker(key_path):
     def _finish(code):
         nonlocal artifact_hash
         global _ba_build_done, _ba_build_exit, _ba_build_phase, _ba_build_diagnosis
+        global _ba_build_updated_at, _ba_build_finished_at
         with _ba_build_lock:
             _ba_build_done = True
             _ba_build_exit = code
             _ba_build_phase = 'complete' if code == 0 else 'failed'
             _ba_build_diagnosis = _ba_classify_build_failure(code, _ba_build_log, _ba_build_phase)
+            now = _ba_datetime.datetime.now(_ba_datetime.timezone.utc).isoformat().replace('+00:00', 'Z')
+            _ba_build_finished_at = now
+            _ba_build_updated_at = now
             build_context = dict(_ba_build_version_context or {})
         # A successful remote synthesis persists its expected artifact digest.
         # Upload later verifies the published bytes against this value.
@@ -15637,10 +15648,9 @@ def _ba_build_worker(key_path):
         except Exception:
             app.logger.exception("Could not persist Wukong bitstream version log")
 
-        _append('🔗 Connecting to build droplet…')
-        with _ba_build_lock:
-            _ba_build_phase = 'launching'
-
+    _append('🔗 Connecting to build droplet…')
+    with _ba_build_lock:
+        _ba_build_phase = 'launching'
     try:
         # 1. Kill any existing session + start new tmux Vivado build
         import shlex as _ba_shlex
@@ -15754,6 +15764,7 @@ def wukong_build_start():
     The nonce is obtained from GET /api/build-approval/ns-map.
     """
     global _ba_build_log, _ba_build_done, _ba_build_exit, _ba_build_phase, _ba_build_diagnosis, _ba_build_version_context
+    global _ba_build_started_at, _ba_build_updated_at, _ba_build_finished_at
 
     ok, err = _ba_validate_build_auth()
     if not ok:
@@ -15798,6 +15809,10 @@ def wukong_build_start():
         _ba_build_exit = None
         _ba_build_phase = 'queued'
         _ba_build_diagnosis = None
+        _ba_build_started_at = _ba_datetime.datetime.now(
+            _ba_datetime.timezone.utc).isoformat().replace('+00:00', 'Z')
+        _ba_build_updated_at = _ba_build_started_at
+        _ba_build_finished_at = None
         source_version = _wukong_build_version()
         source_commit = _git_full_head() or _git_short_hash()
         try:
@@ -15850,10 +15865,16 @@ def wukong_build_status():
         exit_code = _ba_build_exit
         phase = _ba_build_phase
         diagnosis = _ba_build_diagnosis
+        started_at = _ba_build_started_at
+        updated_at = _ba_build_updated_at
+        finished_at = _ba_build_finished_at
         build_context = dict(_ba_build_version_context or {})
     return jsonify({'log': log[-200:], 'log_tail': log[-40:], 'done': done,
                     'exit_code': exit_code, 'phase': phase,
                     'diagnosis': diagnosis,
+                    'started_at': started_at,
+                    'updated_at': updated_at,
+                    'finished_at': finished_at,
                     'build_record_id': build_context.get('record_id'),
                     'hardware_version': build_context.get('version'),
                     'source_commit': build_context.get('source_commit'),

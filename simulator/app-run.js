@@ -11872,13 +11872,14 @@ const VersionsView = {
         const btn = document.getElementById('versionsRefreshBtn');
         if (btn && manual) btn.disabled = true;
         try {
-            const [statusRes, ghRes, diffRes, bsRes, bitstreamLogRes, prodRes] = await Promise.allSettled([
+            const [statusRes, ghRes, diffRes, bsRes, bitstreamLogRes, prodRes, buildStatusRes] = await Promise.allSettled([
                 fetch('/hardware/wukong/status').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
                 fetch('/api/github/activity').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
                 fetch('/api/versions/github-diff').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
                 fetch('/api/bitstream-status').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
                 fetch('/api/bitstream-versions').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
                 fetch('/api/versions/production').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
+                this._fetchBuildStatus(),
             ]);
             const status = statusRes.status === 'fulfilled' ? statusRes.value : null;
             const gh     = ghRes.status === 'fulfilled' ? ghRes.value : null;
@@ -11886,6 +11887,7 @@ const VersionsView = {
             const bs     = bsRes.status === 'fulfilled' ? bsRes.value : null;
             const bitstreamLog = bitstreamLogRes.status === 'fulfilled' ? bitstreamLogRes.value : null;
             const prod   = prodRes.status === 'fulfilled' ? prodRes.value : null;
+            const buildStatus = buildStatusRes.status === 'fulfilled' ? buildStatusRes.value : null;
             this._lastDiff = diff;
             this._renderIde(status, gh, diff);
             this._renderGithub(status, gh);
@@ -11894,6 +11896,7 @@ const VersionsView = {
             this._renderBitstreamRelease(bitstreamLog && bitstreamLog.release);
             this._renderBitstreamLog(bitstreamLog);
             this._renderProd(prod);
+            this._renderBuildStatus(buildStatus);
             this._renderAdvice(status, gh, diff, bs, prod);
             const lc = document.getElementById('versionsLastChecked');
             if (lc) lc.textContent = 'Checked ' + new Date().toLocaleTimeString();
@@ -11901,6 +11904,26 @@ const VersionsView = {
             this._inFlight = false;
             if (btn) btn.disabled = false;
         }
+    },
+
+    _buildStatusHeaders() {
+        try {
+            const token = sessionStorage.getItem('ba_build_token') || '';
+            return token ? { 'Authorization': 'Bearer ' + token } : {};
+        } catch (_) {
+            return {};
+        }
+    },
+
+    async _fetchBuildStatus() {
+        const response = await fetch('/api/wukong-build/status', {
+            headers: this._buildStatusHeaders(),
+        });
+        if (response.status === 401 || response.status === 403) {
+            return { auth_required: true };
+        }
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        return response.json();
     },
 
     toggleAdvice(force) {
@@ -11914,28 +11937,48 @@ const VersionsView = {
     // for any mismatch or problem (shown in the "Health" popup).
     _collectAdvice(status, gh, diff, bs, prod) {
         const issues = [];
-        const add = (sev, title, fix) => issues.push({ sev, title, fix });
+        const add = (sev, title, steps, stop) => issues.push({ sev, title, steps, stop });
 
         // IDE ↔ GitHub
         if (diff && diff.in_sync === false) {
             const c = diff.counts || {};
             const n = (c.changed || 0) + (c.local_only || 0) + (c.github_only || 0);
+            const sourceAction = c.local_only && !c.github_only && !c.changed
+                ? 'Push the current IDE changes to GitHub.'
+                : c.github_only && !c.local_only && !c.changed
+                    ? 'Pull the latest GitHub commit into the IDE.'
+                    : 'Decide which source should win, then pull or push until both sides match.';
             add('warn', `IDE and GitHub differ (${n} file${n === 1 ? '' : 's'})`,
-                'The running IDE is not the same code as the latest GitHub commit. Push local changes (or pull the latest commit) so the two stay in sync; expand the diff list on the IDE card to see what differs.');
+                [
+                    sourceAction,
+                    'Refresh this Versions view and expand the IDE diff list to confirm the commits and files match.',
+                    'Stop before approval if the source direction is unclear or the diff still shows changes.'
+                ], 'Do not freeze a build approval snapshot while source alignment is unresolved.');
         }
 
         // Attached FPGA / bridge
         if (status && !status.bridge_connected) {
             add('bad', 'FPGA board not connected',
-                'The Wukong bridge is offline. Start the bridge on the host machine (Connect tab \u2192 bridge instructions), then press Refresh. Firmware checks below cannot run until the board reports in.');
+                [
+                    'Start the Wukong bridge on the host machine using the Connect tab instructions.',
+                    'Press Refresh after the bridge reports a connection.',
+                    'Confirm the board sentinel and firmware version appear before continuing.'
+                ], 'Stop until the bridge is online; a build cannot verify hardware while the board is offline.');
         } else if (status && status.boot_info && status.boot_info.tu_version == null) {
             add('warn', 'No boot sentinel received yet',
-                'The bridge is online but the board has not announced its firmware. Send \u2018f\u2019 (Reboot) from the Connect tab to re-arm the sentinel.');
+                [
+                    'Send “f” (Reboot) from the Connect tab to re-arm the board sentinel.',
+                    'Press Refresh and wait for the TU and build version to appear.'
+                ], 'Stop if the sentinel remains missing; the running firmware cannot be verified.');
         } else if (status && status.boot_info && status.expected_build_version != null &&
                    status.boot_info.build_version != null &&
                    status.boot_info.build_version !== status.expected_build_version) {
             add('warn', `Board firmware v${status.boot_info.build_version} \u2260 repo expectation v${status.expected_build_version}`,
-                'The bitstream running on the board is out of date. Download the current .bit from the Connect tab and reflash the board.');
+                [
+                    'Download the current .bit from the Connect tab.',
+                    'Flash the FPGA through the Connect tab, then restart the bridge if needed.',
+                    'Press Refresh and verify the board reports the expected firmware version.'
+                ], 'Stop until the board version matches the repo expectation; do not use an older board image for verification.');
         }
 
         // Bitstream metadata
@@ -11943,29 +11986,56 @@ const VersionsView = {
             const fwRaw = bs.firmware_version != null ? String(bs.firmware_version) : '';
             const fw = fwRaw.replace(/^v+/i, '');
             const expected = status ? status.expected_build_version : null;
-            if (fw && !/^\d+$/.test(fw)) {
+            if (bs.version_known === false) {
+                add('warn', 'Stored bitstream metadata is unverified',
+                    [
+                        'Open Build Approval and review the current hardware checks.',
+                        'Freeze approval, build the selected source, and upload the resulting .bit through the existing upload flow.',
+                        'Return here and verify the regenerated sidecar, version, and artifact hash.'
+                    ], 'Stop until the stored .bit has a trusted sidecar; a board sentinel does not certify the downloadable artifact.');
+            } else if (fw && !/^\d+$/.test(fw)) {
                 add('warn', `Bitstream version looks malformed (\u201C${fwRaw}\u201D)`,
-                    'The stored bitstream metadata has a non-numeric firmware version, so it cannot be compared with the repo expectation. Re-upload the bitstream from a current build so the metadata is regenerated.');
+                    [
+                        'Open Build Approval and review the current hardware checks.',
+                        'Freeze a clean approval, build the selected source, and upload the resulting .bit.',
+                        'Return here and verify the new sidecar and version before flashing.'
+                    ], 'Stop until the stored artifact has verified, numeric metadata.');
             } else if (expected != null && fw && Number(fw) !== Number(expected)) {
                 add('warn', `Stored bitstream is v${fw} but the repo expects v${expected}`,
-                    'The pre-built bitstream on the server is older than the current code expects. Rebuild with Vivado (or upload the latest build) so downloads from the Connect tab match the repo.');
+                    [
+                        'Open Build Approval and review the current hardware checks.',
+                        'Freeze approval, run the remote Vivado build, and upload the resulting .bit.',
+                        'Return here and verify the stored version before flashing or testing.'
+                    ], 'Stop until the stored artifact matches the repo expectation and its provenance is verified.');
             }
             if (bs.built_at) {
                 const ageDays = (Date.now() - Date.parse(bs.built_at)) / 86400000;
                 if (isFinite(ageDays) && ageDays > 30) {
                     add('warn', `Bitstream build is ${Math.round(ageDays)} days old`,
-                        'The stored bitstream predates recent commits. If hardware behaviour matters, rebuild and re-upload it so the .bit matches the current repo.');
+                        [
+                            'Open Build Approval and review source and hardware checks.',
+                            'Freeze approval, build, and upload a fresh bitstream.',
+                            'Verify the uploaded version and then refresh the board status.'
+                        ], 'Stop if the artifact provenance or upload verification is missing.');
                 }
             }
         } else if (bs && bs.ok && !bs.present) {
             add('warn', 'No pre-built bitstream on the server',
-                'Users cannot download a .bit from the Connect tab until one is uploaded from a Vivado build.');
+                [
+                    'Open Build Approval and resolve every hardware check.',
+                    'Freeze approval, run the remote Vivado build, and upload the resulting .bit.',
+                    'Verify the uploaded version before flashing a board.'
+                ], 'Stop until a verified artifact is available.');
         }
 
         // Production
         if (prod && !prod.error && prod.version != null && prod.in_sync === false) {
             add('warn', 'Production runs a different version than this IDE',
-                'lab.cloomc.org is serving a different commit. Deploy the current version (or expect behaviour differences between this IDE and production).');
+                [
+                    'Confirm which source version is intended for production.',
+                    'Deploy that version through the existing release process, or use the production version as the comparison baseline.',
+                    'Refresh this view and verify production matches before comparing production results with this IDE.'
+                ], 'Stop if production and the IDE represent different releases; do not treat their behavior as equivalent.');
         }
 
         return issues;
@@ -11988,7 +12058,74 @@ const VersionsView = {
         body.innerHTML = issues.map(i =>
             `<div class="versions-advice-item vai-${i.sev}">` +
             `<span class="vai-title">${this._esc(i.title)}</span>` +
-            `<span class="vai-fix">${this._esc(i.fix)}</span></div>`).join('');
+            `<span class="vai-fix"><ol>${(i.steps || []).map(step => `<li>${this._esc(step)}</li>`).join('')}</ol>` +
+            (i.stop ? `<span class="vai-stop"><b>Stop condition:</b> ${this._esc(i.stop)}</span>` : '') +
+            `</span></div>`).join('');
+    },
+
+    _renderBuildStatus(data) {
+        const el = document.getElementById('versionsBuildStatusBody');
+        if (!el) return;
+        if (!data) {
+            el.innerHTML = this._badge('unknown', 'Unavailable') +
+                '<div class="versions-note">The remote build status could not be reached. Refresh, or open Build Approval to check it directly.</div>';
+            return;
+        }
+        if (data.auth_required) {
+            el.innerHTML = this._badge('unknown', 'Build token required') +
+                '<div class="versions-note">Enter the Build Approval token in the Build Approval tab to view the protected remote build status here.</div>' +
+                '<button type="button" class="versions-build-action" onclick="switchBuilderViewTab(\'build\')">Open Build Approval</button>';
+            return;
+        }
+        const phase = String(data.phase || 'idle').toLowerCase();
+        const done = data.done === true;
+        const hasExitCode = data.exit_code != null;
+        const failed = phase === 'failed' || (done && hasExitCode && data.exit_code !== 0);
+        const complete = done && !failed &&
+            (phase === 'complete' || phase === 'completed' || phase === 'succeeded' ||
+                (hasExitCode && data.exit_code === 0));
+        const states = {
+            idle: ['unknown', 'Idle'],
+            queued: ['warn', 'Queued'],
+            launching: ['warn', 'Connecting'],
+            connecting: ['warn', 'Connecting'],
+            running: ['warn', 'Running'],
+            complete: ['ok', 'Completed'],
+            completed: ['ok', 'Completed'],
+            succeeded: ['ok', 'Completed'],
+            failed: ['bad', 'Failed'],
+        };
+        const state = failed ? states.failed : complete ? states.complete : (states[phase] || states.idle);
+        const latest = Array.isArray(data.log_tail) && data.log_tail.length
+            ? data.log_tail[data.log_tail.length - 1] : '';
+        const diagnosis = data.diagnosis || null;
+        const message = failed && diagnosis && diagnosis.what_failed
+            ? diagnosis.what_failed
+            : latest || (state[1] === 'Idle'
+                ? 'No remote build has been started.'
+                : state[1] === 'Completed' ? 'Remote Vivado completed.'
+                : 'Waiting for the remote build to report progress.');
+        const context = [];
+        if (data.hardware_version != null) context.push(`Build <code>v${this._esc(data.hardware_version)}</code>`);
+        if (data.source_commit) context.push(`Source <code>${this._esc(String(data.source_commit).slice(0, 12))}</code>`);
+        if (data.started_at) context.push(`Started ${this._esc(this._age(data.started_at) || data.started_at)}`);
+        if (data.finished_at) context.push(`Finished ${this._esc(this._age(data.finished_at) || data.finished_at)}`);
+        if (data.updated_at && !data.finished_at) context.push(`Updated ${this._esc(this._age(data.updated_at) || data.updated_at)}`);
+        const log = Array.isArray(data.log_tail) ? data.log_tail : [];
+        const logHtml = log.length
+            ? `<details class="versions-build-log"><summary>Show latest log lines</summary><pre>${this._esc(log.join('\n'))}</pre></details>`
+            : '';
+        const next = failed && diagnosis && diagnosis.next_action
+            ? `<span class="versions-build-next"><b>Next action:</b> ${this._esc(diagnosis.next_action)}</span>`
+            : complete
+                ? '<span class="versions-build-next">Next action: upload the verified artifact from Connect, then refresh and verify the board.</span>'
+                : '';
+        el.innerHTML =
+            `<div class="versions-build-state" data-build-phase="${this._esc(phase)}">${this._badge(state[0], state[1])}</div>` +
+            (context.length ? `<div class="versions-build-status-meta">${context.join(' &middot; ')}</div>` : '') +
+            `<div class="versions-build-message${failed ? ' is-failed' : ''}">${this._esc(message)}${next}</div>` +
+            logHtml +
+            (failed || state[1] === 'Idle' ? '<button type="button" class="versions-build-action" onclick="switchBuilderViewTab(\'build\')">Open Build Approval</button>' : '');
     },
 
     // Render a human explanation of WHAT differs between the local checkout

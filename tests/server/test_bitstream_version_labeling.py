@@ -354,6 +354,43 @@ def test_versions_view_renders_release_candidate_and_build_action():
     assert "Open Build Approval &amp; review comments" in run
 
 
+def test_versions_view_renders_build_status_guidance_and_state_mapping():
+    """Versions exposes protected remote-build state without inventing a run."""
+    index_path = os.path.join(ROOT, "simulator", "index.html")
+    run_path = os.path.join(ROOT, "simulator", "app-run.js")
+    styles_path = os.path.join(ROOT, "simulator", "styles-base.css")
+    with open(index_path, encoding="utf-8") as handle:
+        index = handle.read()
+    with open(run_path, encoding="utf-8") as handle:
+        run = handle.read()
+    with open(styles_path, encoding="utf-8") as handle:
+        styles = handle.read()
+
+    assert 'id="versionsCardBuildStatus"' in index
+    assert 'id="versionsBuildStatusBody"' in index
+    assert "fetch('/api/wukong-build/status'" in run
+    for label in ("Idle", "Queued", "Connecting", "Running", "Completed", "Failed"):
+        assert f"'{label}'" in run or f'"{label}"' in run
+    assert "No remote build has been started." in run
+    assert "Next action:" in run
+    assert "versions-build-status-meta" in styles
+
+
+def test_versions_guidance_has_numbered_recovery_stop_conditions():
+    """Mismatch advice tells users how to align source, hardware, and releases."""
+    run_path = os.path.join(ROOT, "simulator", "app-run.js")
+    with open(run_path, encoding="utf-8") as handle:
+        run = handle.read()
+
+    assert "Push the current IDE changes to GitHub." in run
+    assert "Pull the latest GitHub commit into the IDE." in run
+    assert "Start the Wukong bridge" in run
+    assert "Press Refresh" in run
+    assert "Freeze approval" in run
+    assert "upload the resulting .bit" in run
+    assert "Stop condition:" in run
+
+
 def test_versions_view_includes_github_push_action():
     """GitHub differences expose the explicit push action and server route."""
     index_path = os.path.join(ROOT, "simulator", "index.html")
