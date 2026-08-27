@@ -65,13 +65,30 @@ def test_status_remains_readonly_with_new_fields():
     assert d1['min_tu_version'] == d2['min_tu_version']
 
 
+def test_standalone_bridge_version_matches_wukong_build():
+    bridge_path = os.path.join(ROOT, 'hardware', 'wukong_bridge.py')
+    with open(bridge_path, encoding='utf-8') as handle:
+        bridge = handle.read()
+    match = re.search(r"^\s*BRIDGE_VERSION\s*=\s*(\d+)", bridge, re.MULTILINE)
+    assert match, "BRIDGE_VERSION missing from hardware/wukong_bridge.py"
+    assert int(match.group(1)) == _app_module._wukong_build_version(), (
+        "The standalone Windows bridge must advertise the same version as "
+        "hardware/wukong_top.py"
+    )
+
+
 def test_bridge_version_is_exposed_in_versions_view():
     index_path = os.path.join(ROOT, 'simulator', 'index.html')
     with open(index_path, encoding='utf-8') as handle:
         index = handle.read()
+    run_path = os.path.join(ROOT, 'simulator', 'app-run.js')
+    with open(run_path, encoding='utf-8') as handle:
+        app_run = handle.read()
     assert 'id="versionsCardBridge"' in index
     assert 'id="versionsBridgeBody"' in index
-    assert 'bridge_version' in index or 'USB-UART Bridge' in index
+    assert '_renderBridge(status)' in app_run
+    assert 'bridge.bridge_version' in app_run
+    assert 'Matches build v' in app_run
 
 
 def test_connect_view_clarifies_jtag_and_usb_uart_connections():
