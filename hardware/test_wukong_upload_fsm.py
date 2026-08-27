@@ -52,6 +52,7 @@ from amaranth.sim import Simulator
 
 from hardware.uart_rx import UartRx
 from hardware.uart_tx import UartTx
+from hardware.hw_types import WUKONG_DMEM_WORDS
 
 
 # ── Test-rig ──────────────────────────────────────────────────────────────────
@@ -82,9 +83,10 @@ class UploadFsmRig(Elaboratable):
     DMEM_DEPTH = 256          # 256 × 32-bit words = 1 KB (enough for all tests)
     MAX_BYTES  = DMEM_DEPTH * 4  # 1024
 
-    def __init__(self, clk_freq=100, baud=1):
+    def __init__(self, clk_freq=100, baud=1, dmem_init=None):
         self.clk_freq       = clk_freq
         self.baud           = baud
+        self.dmem_init      = list(dmem_init or [])
         self.uart_rx_pin    = Signal(init=1)   # UART RX (active-high idle)
         self.uart_tx_pin    = Signal(init=1)   # UART TX (active-high idle)
         # Testbench-driven DMEM read port
@@ -104,7 +106,7 @@ class UploadFsmRig(Elaboratable):
 
         # ── BRAM ──────────────────────────────────────────────────────────────
         dmem    = m.submodules.dmem = Memory(
-            shape=unsigned(32), depth=self.DMEM_DEPTH, init=[])
+            shape=unsigned(32), depth=self.DMEM_DEPTH, init=self.dmem_init)
         dmem_rd = dmem.read_port(domain="sync")
         dmem_wr = dmem.write_port()
         m.d.comb += [dmem_rd.addr.eq(self.dmem_rd_addr),
@@ -255,21 +257,21 @@ class UploadFsmRig(Elaboratable):
 _DIVISOR = 100   # clk_freq=100, baud=1  → 100 cycles per UART bit
 
 
-async def _send_uart_bytes(ctx, rx_pin, data):
+async def _send_uart_bytes(ctx, rx_pin, data, divisor=_DIVISOR):
     """Drive rx_pin with 8N1-encoded bytes (active-high idle, LSB first)."""
     ctx.set(rx_pin, 1)
     await ctx.tick()
     await ctx.tick()
     for b in data:
         ctx.set(rx_pin, 0)                       # start bit
-        for _ in range(_DIVISOR):
+        for _ in range(divisor):
             await ctx.tick()
         for bit_idx in range(8):                 # 8 data bits, LSB first
             ctx.set(rx_pin, (b >> bit_idx) & 1)
-            for _ in range(_DIVISOR):
+            for _ in range(divisor):
                 await ctx.tick()
         ctx.set(rx_pin, 1)                       # stop bit
-        for _ in range(_DIVISOR):
+        for _ in range(divisor):
             await ctx.tick()
     await ctx.tick()
 
@@ -288,9 +290,9 @@ def _upload_frame(words):
     return bytes([0x75]) + struct.pack('>I', len(payload)) + payload
 
 
-def _sim_ticks_for(frame):
+def _sim_ticks_for(frame, divisor=_DIVISOR):
     """Upper-bound cycle count for receiving `frame` bytes through UartRx."""
-    return len(frame) * _DIVISOR * 10 + 200
+    return len(frame) * divisor * 10 + 200
 
 
 def _run_concurrent(dut, drive_fn, monitor_fn):
@@ -570,6 +572,74 @@ def test_le_file_bytes_after_bridge_swap_land_correctly_in_dmem():
         f"  Expected: {[hex(w) for w in known_words]}\n"
         f"  Got:      {[hex(w) for w in result['dmem']]}"
     )
+
+
+def test_projected_multithread_contexts_fit_physical_dmem_model():
+    """The native image keeps two generated Thread contexts in board DMEM.
+
+    The smaller UART framing tests above already validate every uploaded word's
+    address and byte order.  This model-level test loads the real projection
+    into a 16K-compatible DMEM prefix and verifies the physical addresses that
+    the ChurchCore will resolve through its forward Namespace table.
+    """
+    from server.boot_image import (
+        NS_ENTRY_WORDS, build_wukong_upload_image, generate_boot_image,
+        generated_thread_slots,
+    )
+    from hardware.change import THREAD_CAPS_OFFSET
+
+    class PhysicalPrefixUploadRig(UploadFsmRig):
+        # The selected entry plus Thread.1–Thread#3 all fit below this strict
+        # prefix of the board's 16K-word DMEM.
+        DMEM_DEPTH = 4096
+
+    lumps_dir = os.path.join(ROOT, 'server', 'lumps')
+    config = {"step1": {
+        "totalNamespaceWords": WUKONG_DMEM_WORDS,
+        "namespaceLumpWords": 1024,
+        "threadLumpWords": 256,
+        "threadCount": 3,
+    }}
+    generic = generate_boot_image(config, lumps_dir, boot_entry_slot=10,
+                                  require_entry_resident=True)
+    generic_words = list(struct.unpack(f"<{len(generic) // 4}I", generic))
+    source_total = len(generic_words)
+    private_values = {}
+    for number, slot in enumerate((1,) + generated_thread_slots(3), start=1):
+        source_ns = source_total - (slot + 1) * NS_ENTRY_WORDS
+        source_base = generic_words[source_ns]
+        private_values[slot] = 0x7A000000 + number
+        generic_words[source_base + 17] = private_values[slot]
+    generic = struct.pack(f"<{source_total}I", *generic_words)
+
+    native, info = build_wukong_upload_image(generic)
+    assert len(native) == WUKONG_DMEM_WORDS * 4
+    prefix_words = list(struct.unpack(
+        f"<{info['dynamic_end']}I", native[:info['dynamic_end'] * 4]))
+    assert len(prefix_words) == info["dynamic_end"]
+    dut = PhysicalPrefixUploadRig(dmem_init=prefix_words)
+    result = {}
+
+    async def tb(ctx):
+        for context in info["thread_contexts"]:
+            slot = context["slot"]
+            base = context["base_word"]
+            result[slot] = (
+                await _read_dmem_word(ctx, dut, slot * NS_ENTRY_WORDS),
+                await _read_dmem_word(ctx, dut, base + 17),
+                await _read_dmem_word(ctx, dut, base + THREAD_CAPS_OFFSET),
+            )
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(tb)
+    sim.run()
+    for context in info["thread_contexts"]:
+        slot = context["slot"]
+        descriptor_location, private_word, caps0 = result[slot]
+        assert descriptor_location == context["base_word"] * 4
+        assert private_word == private_values[slot]
+        assert caps0 == context["caps0"]
 
 
 def test_upload_watchdog_aborts_truncated_frame():

@@ -14623,6 +14623,23 @@ def boot_image_send_to_hardware():
         except ValueError as _exc:
             return jsonify({'error': f'boot image cannot be projected for Wukong: {_exc}'}), 400
 
+        # The upload image faithfully retains every generated Thread context,
+        # but the shipped Wukong top has one active ChurchCore context and no
+        # board-side scheduler or context-select command.  Do not let the IDE
+        # advertise a successful physical multi-Thread launch while only
+        # Thread.1 can begin execution.  The projection is intentionally
+        # built first so its layout remains tested and ready for the future
+        # scheduler protocol; this gate is immediately before UART delivery.
+        if _wukong_entry_info.get('thread_count', 1) > 1:
+            return jsonify({
+                'error': (
+                    'Wukong upload rejected — this board firmware supports one '
+                    'active Thread context and has no physical scheduler. '
+                    'Set threadCount to 1 before uploading.'
+                ),
+                'thread_count': _wukong_entry_info['thread_count'],
+            }), 400
+
         _encoded = _b64.b64encode(_wukong_raw).decode('ascii')
 
         # Register NIA label map so trace events for the uploaded lump resolve

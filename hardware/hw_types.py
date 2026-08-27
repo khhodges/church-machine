@@ -25,6 +25,17 @@ GT_TYPE_ABSTRACT = 0b11
 NUM_CAP_REGS = 16
 NUM_DATA_REGS = 16
 
+# Wukong's UART uploader replaces this complete physical DMEM image.  Its
+# forward Namespace table occupies words 0..255 and the fixed factory image
+# owns words through 1279, leaving the dynamic projection region at 1280.
+# Thread.1 plus Thread#2..Thread#9 use slots 1 and 11..18 respectively; every
+# one is below the 64 forward descriptors the board can address.
+WUKONG_DMEM_WORDS = 16_384
+WUKONG_FORWARD_NS_SLOTS = 64
+WUKONG_UPLOAD_BODY_BASE_WORD = 1_280
+WUKONG_PHYSICAL_MAX_THREAD_COUNT = 9
+WUKONG_GENERATED_THREAD_FIRST_NS_SLOT = 11
+
 CR_HEAP         = 5
 CR_CLIST        = 6
 CR_NUCLEUS      = 7

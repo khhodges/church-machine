@@ -736,6 +736,32 @@ def test_send_to_hardware_rejects_mismatched_caps0(client):
         _restore_boot_bin(p, old)
 
 
+def test_send_to_hardware_rejects_multithread_without_board_scheduler(client):
+    """A board upload must not promise unavailable Thread#2+ scheduling."""
+    cfg = {"step1": {
+        "totalNamespaceWords": 16384,
+        "namespaceLumpWords": 1024,
+        "threadLumpWords": 256,
+        "threadCount": 2,
+    }}
+    payload = generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=10,
+                                  require_entry_resident=True)
+    p, old = _install_boot_bin(payload)
+    try:
+        response = client.post('/api/boot-image/send-to-hardware',
+                               content_type='application/json', data='{}')
+        assert response.status_code == 400
+        body = json.loads(response.data)
+        assert body["thread_count"] == 2
+        assert "no physical scheduler" in body["error"]
+        with _app_module._wukong_command_lock:
+            assert _app_module._wukong_pending_cmd is None
+        with _app_module._upload_in_flight_lock:
+            assert not _app_module._upload_in_flight
+    finally:
+        _restore_boot_bin(p, old)
+
+
 def test_hw_entry_slot_committed_only_after_ok_ack(client):
     """hw_entry_slot stays at the power-on default (7) until the bridge ACKs
     the upload ok, then reflects the uploaded image's entry slot."""

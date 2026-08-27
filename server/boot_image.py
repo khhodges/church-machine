@@ -94,12 +94,20 @@ _MANDATORY_NS_SLOTS = (0, 1, 2, 3, 4, 5, BOOT_ABSTR_NS_SLOT, CAPABILITY_TEST_NS_
 BOOT_IMAGE_FORMAT_TAG = 0xB0072862  # Task #2862: resident NS Word3 is cache_token32; must match simulator.js
 
 # Wukong's FPGA DMEM and serial uploader are fixed at 16K 32-bit words.  The
-# first 256 words are reserved for its forward Namespace table and bootstrap
-# space; its built-in structures occupy words through 1279.  A selected
-# boot-entry body is projected beginning at word 1280, safely after them.
-WUKONG_DMEM_WORDS = 16_384
-WUKONG_UPLOAD_BODY_BASE_WORD = 1_280
-WUKONG_FORWARD_NS_SLOTS = 64
+# shared physical-layout constants live with the hardware ABI so Python
+# projection code and Amaranth never independently redefine the limits.
+try:
+    from hardware.hw_types import (
+        WUKONG_DMEM_WORDS,
+        WUKONG_FORWARD_NS_SLOTS,
+        WUKONG_UPLOAD_BODY_BASE_WORD,
+        WUKONG_PHYSICAL_MAX_THREAD_COUNT,
+    )
+except ImportError:
+    WUKONG_DMEM_WORDS = 16_384
+    WUKONG_FORWARD_NS_SLOTS = 64
+    WUKONG_UPLOAD_BODY_BASE_WORD = 1_280
+    WUKONG_PHYSICAL_MAX_THREAD_COUNT = 9
 
 try:
     from hardware.wukong_prefetch import (
@@ -658,10 +666,21 @@ def build_wukong_upload_image(generic_image, boot_config=None):
     entry LUMP with unrelated words.
 
     Start from the authoritative Wukong bootstrap layout, copy the selected
-    resident LUMP (including its tail c-list) to a safe dynamic body address,
-    install a forward descriptor, and update Boot.Thread.caps[0].  Returns
-    little-endian image bytes and the corresponding board-entry information.
-    The bridge performs the final per-word LE-to-BE conversion for UART.
+    resident LUMP (including its tail c-list) and every configured Thread
+    context to safe dynamic body addresses, then install forward descriptors.
+    Thread bodies are the canonical saved private state: copying the complete
+    allocation preserves DRs, heap/stack words, and CR home slots rather than
+    reconstructing them from the active simulator context.
+
+    The physical board has one active ChurchCore context.  It can retain all
+    configured Thread contexts in DMEM for explicit CHANGE-based cooperative
+    switching, but it does not provide a preemptive scheduler.  Projection
+    therefore admits at most the V20 physical maximum and rejects a layout
+    whose selected LUMP plus all Thread bodies cannot fit the 16K DMEM.
+
+    Returns little-endian image bytes and the corresponding board-entry
+    information. The bridge performs the final per-word LE-to-BE conversion
+    for UART.
     """
     source_info = read_boot_entry_info(generic_image)
     if not source_info["resident"]:
@@ -704,9 +723,109 @@ def build_wukong_upload_image(generic_image, boot_config=None):
             "in Wukong's available DMEM body region"
         )
 
+    # Thread count is committed in the generic image (NS table base - 4).
+    # It is intentionally read from the image rather than the optional saved
+    # config: an image can outlive later design edits, and projection must
+    # never silently drop private state because a stale config says "1".
+    source_tag_idx = -1
+    for _i in range(1, min(8192, source_total) + 1):
+        _pos = source_total - _i
+        if source_words[_pos] == BOOT_IMAGE_FORMAT_TAG:
+            source_tag_idx = _pos
+            break
+    if source_tag_idx < 3:
+        raise ValueError("Wukong upload source has no valid Namespace metadata")
+    thread_count = source_words[source_tag_idx - 3] & 0xFF
+    thread_count = thread_count if thread_count >= 1 else 1
+    if thread_count > WUKONG_PHYSICAL_MAX_THREAD_COUNT:
+        raise ValueError(
+            f"Wukong supports at most {WUKONG_PHYSICAL_MAX_THREAD_COUNT} "
+            f"physical Thread contexts; source image requests {thread_count}"
+        )
+
+    # A Thread LUMP is context state, not an executable entry abstraction.
+    # Projecting it as both the boot entry and a context would make its forward
+    # descriptor ambiguous, so fail before producing a superficially valid
+    # image that faults on boot.
+    thread_slots = (1,) + generated_thread_slots(thread_count)
+    if entry_slot in thread_slots:
+        raise ValueError(
+            f"Wukong boot entry slot {entry_slot} is a Thread context, not an "
+            "executable abstraction"
+        )
+
+    def _source_ns_words(slot):
+        base = source_total - (slot + 1) * NS_ENTRY_WORDS
+        if base < 0 or base + NS_ENTRY_WORDS > source_total:
+            raise ValueError(
+                f"Wukong source Thread slot {slot} has no complete Namespace descriptor"
+            )
+        return base, source_words[base:base + NS_ENTRY_WORDS]
+
+    thread_sources = []
+    source_ranges = []
+    for ordinal, slot in enumerate(thread_slots, start=1):
+        source_ns_base, descriptor = _source_ns_words(slot)
+        source_base = descriptor[0]
+        if not (0 <= source_base < source_total):
+            raise ValueError(
+                f"Wukong source Thread#{ordinal} slot {slot} has invalid body "
+                f"location 0x{source_base:08X}"
+            )
+        header = source_words[source_base]
+        magic = (header >> 27) & 0x1F
+        typ = (header >> 8) & 0x3
+        size = 1 << (((header >> 23) & 0xF) + 6)
+        if magic != 0x1F or typ != 2:
+            raise ValueError(
+                f"Wukong source Thread#{ordinal} slot {slot} is not a Thread "
+                f"LUMP (header=0x{header:08X})"
+            )
+        if size < 256 or source_base + size > source_total:
+            raise ValueError(
+                f"Wukong source Thread#{ordinal} slot {slot} has an invalid "
+                f"{size}-word body"
+            )
+        for other_start, other_end, other_slot in source_ranges:
+            if source_base < other_end and source_base + size > other_start:
+                raise ValueError(
+                    f"Wukong source Thread slots {other_slot} and {slot} overlap"
+                )
+        source_ranges.append((source_base, source_base + size, slot))
+        thread_sources.append({
+            "number": ordinal,
+            "slot": slot,
+            "source_base": source_base,
+            "source_ns_base": source_ns_base,
+            "descriptor": descriptor,
+            "size": size,
+        })
+
+    # The selected executable is always first (maintaining the established
+    # entry address), followed by Thread.1 through Thread#N in deterministic
+    # numeric order.  Prefetch staging begins only after every persistent
+    # Thread context, so it cannot overwrite private state later.
+    thread_words = sum(item["size"] for item in thread_sources)
+    dynamic_end = WUKONG_UPLOAD_BODY_BASE_WORD + alloc_words + thread_words
+    if dynamic_end > WUKONG_DMEM_WORDS:
+        raise ValueError(
+            f"Wukong image needs {alloc_words} selected-entry words plus "
+            f"{thread_words} Thread-context words ({thread_count} Threads), "
+            f"but only {WUKONG_DMEM_WORDS - WUKONG_UPLOAD_BODY_BASE_WORD} "
+            "dynamic DMEM words are available"
+        )
+
     policy_words, policy_entries = build_wukong_prefetch_policy(
-        boot_config, source_words, WUKONG_UPLOAD_BODY_BASE_WORD + alloc_words
+        boot_config, source_words, dynamic_end
     )
+    policy_thread_slots = sorted(
+        entry["slot"] for entry in policy_entries if entry["slot"] in thread_slots
+    )
+    if policy_thread_slots:
+        raise ValueError(
+            "Wukong preload policy cannot target Thread context Namespace slot(s): "
+            + ", ".join(str(slot) for slot in policy_thread_slots)
+        )
 
     # Lazy import prevents simulator-only generation from requiring FPGA
     # dependencies, while making this projection follow the actual bitstream
@@ -750,7 +869,10 @@ def build_wukong_upload_image(generic_image, boot_config=None):
         mem[PREFETCH_POLICY_BASE_WORD:
             PREFETCH_POLICY_BASE_WORD + len(policy_words)] = policy_words
 
-    # Mirror the FPGA initialisation order, including the fixed Thread objects.
+    # Mirror the FPGA initialisation order, including the factory Thread
+    # object.  The generic Thread.1 body below replaces its forward descriptor
+    # on upload; retaining this factory content preserves standalone reset
+    # behaviour and backwards-compatible debug inspection.
     mem[WUKONG_THREAD_BASE_WORD] = WUKONG_THREAD_HEADER
     mem[WUKONG_THREAD_STO_WORD] = WUKONG_THREAD_STO_INIT
     mem[WUKONG_THREAD_CAPS12_WORD] = make_gt(
@@ -774,6 +896,40 @@ def build_wukong_upload_image(generic_image, boot_config=None):
     mem[target_ns_base + 1] = source_authority
     mem[target_ns_base + 2] = integrity32(body_base_byte, source_authority)
     mem[target_ns_base + 3] = source_cache_token
+
+    # Materialize all Thread instances.  The source body is copied verbatim:
+    # it contains the per-Thread DR/heap/stack/CR private state and the
+    # selected boot-entry E-GT at the fixed +244 cap-home offset.  Native
+    # forward descriptors use byte locations, unlike the generic tail-table's
+    # word locations, so each must be re-sealed after relocation.
+    thread_target = body_base + alloc_words
+    projected_threads = []
+    for item in thread_sources:
+        size = item["size"]
+        slot = item["slot"]
+        descriptor = item["descriptor"]
+        source_base = item["source_base"]
+        mem[thread_target:thread_target + size] = source_words[
+            source_base:source_base + size
+        ]
+        target_ns_base = slot * NS_ENTRY_WORDS
+        target_byte = thread_target * 4
+        authority = descriptor[1]
+        mem[target_ns_base + 0] = target_byte
+        mem[target_ns_base + 1] = authority
+        mem[target_ns_base + 2] = integrity32(target_byte, authority)
+        mem[target_ns_base + 3] = descriptor[3]
+        projected_threads.append({
+            "number": item["number"],
+            "slot": slot,
+            "source_base": source_base,
+            "base_word": thread_target,
+            "size": size,
+            "caps0": source_words[source_base + 244],
+        })
+        thread_target += size
+
+    assert thread_target == dynamic_end, "Wukong Thread projection accounting drift"
 
     # Prefetch targets are intentionally not published yet.  Their policy
     # records carry the private staging location and authority; the FPGA
@@ -805,6 +961,9 @@ def build_wukong_upload_image(generic_image, boot_config=None):
         "caps0_ok": mem[WUKONG_THREAD_CAPS0_WORD] == source_info["expected_gt"],
         "source_entry_loc": entry_loc,
         "source_words": source_total,
+        "thread_count": thread_count,
+        "thread_contexts": projected_threads,
+        "dynamic_end": dynamic_end,
         "prefetch_policy": policy_entries,
     }
 

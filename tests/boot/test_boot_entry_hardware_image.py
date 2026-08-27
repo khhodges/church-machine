@@ -28,6 +28,7 @@ from server.boot_image import (
     read_boot_entry_info,
     build_wukong_upload_image,
     create_gt,
+    generated_thread_slots,
     integrity32,
     NS_ENTRY_WORDS,
     WUKONG_DMEM_WORDS,
@@ -220,3 +221,86 @@ def test_wukong_projection_preserves_reissued_boot_entry_generation():
     assert projected_info["caps0_ok"] is True
     assert words[10 * NS_ENTRY_WORDS + 1] >> 21 == 1
     assert words[896 + THREAD_CAPS_OFFSET] == create_gt(1, 10, {"E": 1}, 1)
+
+
+def test_wukong_projection_preserves_every_thread_private_body():
+    """Each configured Thread receives its own complete native DMEM body.
+
+    Distinct values in Thread.1–Thread#3's DR/heap/cap zones prove projection
+    does not reconstruct contexts from the active Thread or drop generated
+    instances while copying the selected executable.
+    """
+    cfg = _minimal_cfg()
+    cfg["step1"]["threadCount"] = 3
+    generic = generate_boot_image(
+        cfg, LUMPS_DIR, boot_entry_slot=10, require_entry_resident=True,
+    )
+    source = _unpack_words(generic)
+    source_total = len(source)
+    thread_slots = (1,) + generated_thread_slots(3)
+    private_values = {}
+    for number, slot in enumerate(thread_slots, start=1):
+        source_base = source[_ns_slot_base(source_total, slot)]
+        # DR1, heap[0], and a non-boot capability home are all private body
+        # words. Keep caps[0] intact so source boot-entry validation remains
+        # meaningful.
+        values = (0x11000000 + number, 0x22000000 + number, 0x33000000 + number)
+        source[source_base + 1] = values[0]
+        source[source_base + 17] = values[1]
+        source[source_base + THREAD_CAPS_OFFSET + 1] = values[2]
+        private_values[slot] = (source_base, values, source[source_base + THREAD_CAPS_OFFSET])
+    generic = struct.pack(f"<{source_total}I", *source)
+
+    projected, info = build_wukong_upload_image(generic)
+    words = _unpack_words(projected)
+
+    assert info["thread_count"] == 3
+    assert [row["slot"] for row in info["thread_contexts"]] == list(thread_slots)
+    assert info["dynamic_end"] <= WUKONG_DMEM_WORDS
+    assert info["entry_loc"] == WUKONG_UPLOAD_BODY_BASE_WORD
+
+    for row in info["thread_contexts"]:
+        slot = row["slot"]
+        source_base, values, expected_caps0 = private_values[slot]
+        target_base = row["base_word"]
+        forward_base = slot * NS_ENTRY_WORDS
+        assert words[forward_base] == target_base * 4
+        assert words[forward_base + 1] == source[_ns_slot_base(source_total, slot) + 1]
+        assert words[forward_base + 2] == integrity32(
+            target_base * 4, words[forward_base + 1])
+        assert words[target_base:target_base + row["size"]] == source[
+            source_base:source_base + row["size"]]
+        assert words[target_base + 1] == values[0]
+        assert words[target_base + 17] == values[1]
+        assert row["caps0"] == expected_caps0
+        assert words[target_base + THREAD_CAPS_OFFSET] == expected_caps0
+        assert words[target_base + THREAD_CAPS_OFFSET + 1] == values[2]
+
+
+def test_wukong_projection_rejects_thread_contexts_over_physical_dmem():
+    """Projection fails explicitly instead of truncating Thread state."""
+    cfg = _minimal_cfg(total=32768)
+    cfg["step1"].update({"threadCount": 9, "threadLumpWords": 2048})
+    generic = generate_boot_image(
+        cfg, LUMPS_DIR, boot_entry_slot=10, require_entry_resident=True,
+    )
+    with pytest.raises(ValueError, match="Thread-context words.*dynamic DMEM"):
+        build_wukong_upload_image(generic)
+
+
+def test_wukong_projection_rejects_preload_collision_with_thread_context():
+    """A stale UI preload choice may not overwrite a generated Thread slot."""
+    cfg = _minimal_cfg()
+    cfg["step1"]["threadCount"] = 2
+    generic = generate_boot_image(
+        cfg, LUMPS_DIR, boot_entry_slot=10, require_entry_resident=True,
+    )
+    with pytest.raises(ValueError, match="preload policy cannot target Thread context"):
+        build_wukong_upload_image(generic, {
+            "step2": {
+                "lumps": [{
+                    "nsSlot": 11, "loadPolicy": "Preload",
+                    "lumpToken": "12345678", "lumpSize": 64,
+                }],
+            },
+        })
