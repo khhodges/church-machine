@@ -2170,11 +2170,10 @@ DEFAULT_BOOT_CONFIG = {
 # GT bits[15:0] supports up to 65535 slots; 1024 is the practical cap.
 # At 4 words per entry this reserves up to 4096 words of the namespace LUMP.
 MAX_NS_ENTRIES = 1024
-# How many named NS entries are present after a cold boot.
-# The 8-slot boot model populates exactly slots 0–7 during
-# _initNamespaceTable(): Boot.NS (0), Boot.Thread (1), UART_DEV (2),
-# LED_DEV (3), BTN_DEV (4), TIMER_DEV (5), SelfTest (6),
-# WukongCallHome (7).
+# How many fixed named NS entries are present after a cold boot. Configured
+# Thread#2 onward occupy deterministic slots immediately after this catalog.
+# _initNamespaceTable() always populates Boot.NS (0), Boot.Thread (1), UART,
+# LED, BTN, TIMER, SelfTest, WukongCallHome, Tunnel, Ethernet, CapabilityTest.
 # Slots 2–5 are MMIO device windows backed by hardware registers, not RAM.
 # The ⚡ lightning bolt sets Thread.CR0 to whichever slot the programmer
 # chooses as boot entry (default 6 = SelfTest; Wukong boards use 7).
@@ -2189,6 +2188,20 @@ BASE_NAMED_NS_COUNT = 11
 # Slots 2–5: UART_DEV, LED_DEV, BTN_DEV, TIMER_DEV (MMIO windows; NS entries
 #            point at physical hardware addresses, no lump body in RAM).
 RESERVED_NS_SLOTS = set(range(BASE_NAMED_NS_COUNT))
+
+
+def _generated_thread_slots_for_step1(step1):
+    """Return the generated Thread#2+ slots reserved by a valid Step-1 config."""
+    try:
+        return set(_boot_image_gen.generated_thread_slots(
+            _boot_image_gen.configured_thread_count(step1 or {})))
+    except ValueError:
+        return set()
+
+
+def _named_ns_count_for_step1(step1):
+    """Fixed catalog plus the configured generated Thread Namespace entries."""
+    return BASE_NAMED_NS_COUNT + len(_generated_thread_slots_for_step1(step1))
 LUMP_MAX_ARCHIVE_VERSIONS = 20  # max archived versions kept per token; oldest are pruned
 if LUMP_MAX_ARCHIVE_VERSIONS < 0:
     raise ValueError(f"LUMP_MAX_ARCHIVE_VERSIONS must be >= 0, got {LUMP_MAX_ARCHIVE_VERSIONS}")
@@ -2409,6 +2422,35 @@ def _normalize_step2_preload_bindings(step2):
     normalized["lumps"] = normalized_rows
     return normalized, None
 
+def _boot_abstr_size_for_validation():
+    """Return the actual SelfTest allocation used at fixed NS slot 6."""
+    boot_abstr_size = BOOT_ABSTR_DEFAULT_SIZE
+    saved_abstr_path = _boot_image_gen.find_lump_file_by_abstraction(
+        LUMPS_DIR, "SelfTest", _boot_image_gen.BOOT_ABSTR_NS_SLOT)
+    if saved_abstr_path is None:
+        return boot_abstr_size
+    try:
+        import struct as _vstruct
+        with open(saved_abstr_path, "rb") as fh:
+            raw = fh.read()
+        n_words = len(raw) // 4
+        if n_words < 1:
+            return boot_abstr_size
+        hdr = _vstruct.unpack(">I", raw[:4])[0]
+        magic = (hdr >> 27) & 0x1F
+        n_minus_6 = (hdr >> 23) & 0xF
+        cw = (hdr >> 10) & 0x1FFF
+        cc = hdr & 0xFF
+        declared = 1 << (n_minus_6 + 6)
+        if (magic == 0x1F and 64 <= declared <= 16384
+                and n_words >= declared and cw >= 1 and cc >= 1
+                and cc <= declared):
+            return declared
+    except OSError:
+        pass
+    return boot_abstr_size
+
+
 def _validate_step2(step2, step1, target_board):
     """Validate one load policy per Namespace slot.
 
@@ -2437,42 +2479,20 @@ def _validate_step2(step2, step1, target_board):
     # Determine actual Boot.Abstr size from the saved SelfTest lump (looked up via
     # manifest.json).  A resident step-2 lump must not overlap whichever Boot.Abstr
     # will actually be placed.
-    _abstr_size_for_validation = BOOT_ABSTR_DEFAULT_SIZE
-    _saved_abstr_path = _boot_image_gen.find_lump_file_by_abstraction(
-        LUMPS_DIR, "SelfTest", _boot_image_gen.BOOT_ABSTR_NS_SLOT)
-    if _saved_abstr_path is not None:
-        try:
-            import struct as _vstruct
-            with open(_saved_abstr_path, "rb") as _fh:
-                _raw = _fh.read()
-            _n_words = len(_raw) // 4
-            if _n_words >= 1:
-                _hdr       = _vstruct.unpack(">I", _raw[:4])[0]
-                _magic     = (_hdr >> 27) & 0x1F
-                _n_minus_6 = (_hdr >> 23) & 0xF
-                _cw        = (_hdr >> 10) & 0x1FFF
-                _cc        = _hdr & 0xFF
-                _declared  = 1 << (_n_minus_6 + 6)
-                # Use the same validation criteria as generate_boot_image()
-                # so that "placed size" is computed consistently between generation
-                # and validation; an invalid/truncated lump falls back to the default.
-                if (_magic == 0x1F and
-                        64 <= _declared <= 16384 and
-                        _n_words >= _declared and
-                        _cw >= 1 and _cc >= 1 and _cc <= _declared):
-                    _abstr_size_for_validation = _declared
-        except OSError:
-            pass
-    foundation_end = (step1["namespaceLumpWords"] +
-                      step1["threadLumpWords"] * int(step1.get("threadCount") or 1) +
-                      _abstr_size_for_validation)       # Boot.Abstr: saved lump size or 64w default
-    # NS slots 2–5 are MMIO (no RAM body) — they do not contribute to foundation_end.
+    _abstr_size_for_validation = _boot_abstr_size_for_validation()
+    _thread_count = _boot_image_gen.configured_thread_count(step1)
+    foundation_end = _boot_image_gen.boot_resident_region_end(
+        step1["threadLumpWords"], _abstr_size_for_validation, _thread_count)
+    # The Namespace LUMP lives at the Namespace-table tail.  The protected
+    # RAM prefix includes Thread.1, SelfTest, fixed catalog bodies (slots
+    # 7–10), and every generated Thread body.
     usable_end = total - NS_TABLE_RESERVE
     seen_slots = set()
     seen_wukong_prefetch_slots = set()
     wukong_prefetch_words = 0
     wukong_prefetch_count = 0
     occupied = []  # list of (start, end_exclusive, label) for resident lumps
+    generated_thread_slots = _generated_thread_slots_for_step1(step1)
     for entry in lumps:
         if not isinstance(entry, dict):
             return "each step2.lumps entry must be an object"
@@ -2482,6 +2502,10 @@ def _validate_step2(step2, step1, target_board):
         if slot in RESERVED_NS_SLOTS:
             return (f"NS slot {slot} is reserved (foundational lump or device "
                     f"MMIO) and cannot host a resident lump")
+        if slot in generated_thread_slots:
+            return (f"NS slot {slot} is reserved for generated "
+                    f"{_boot_image_gen.generated_thread_label(slot)} and cannot "
+                    "host a programmer-selected lump")
         if slot in seen_slots:
             return f"duplicate step2.lumps entry for NS slot {slot}"
         seen_slots.add(slot)
@@ -2574,11 +2598,10 @@ def _validate_step3(step3, step1, step2):
     n = step3.get("emptySlotCount", 0)
     if not isinstance(n, int) or n < 0:
         return "step3.emptySlotCount must be a non-negative integer"
-    # The simulator's _initNamespaceTable() writes BASE_NAMED_NS_COUNT named
-    # entries from the default abstraction catalog regardless of what Step 2
-    # contains. Step 3 reserves additional empty entries on top of that
-    # baseline, so the cap is BASE_NAMED_NS_COUNT + n <= MAX_NS_ENTRIES.
-    end = BASE_NAMED_NS_COUNT + n
+    # Generated Thread#2 onward are named entries too. Step 3 reserves after
+    # the fixed catalog plus those deterministic Thread slots.
+    named_count = _named_ns_count_for_step1(step1)
+    end = named_count + n
     # Validate against the *configured* capacity (step1.nsSlotsMax, legacy
     # default 256) so save-time and generation-time contracts agree — the
     # generator rejects overflow of the configured table, not the 1024 cap.
@@ -2589,7 +2612,7 @@ def _validate_step3(step3, step1, step2):
         pass
     _cap = min(_cap, MAX_NS_ENTRIES)
     if end > _cap:
-        return (f"step3.emptySlotCount ({n}) plus the {BASE_NAMED_NS_COUNT} "
+        return (f"step3.emptySlotCount ({n}) plus the {named_count} "
                 f"named NS slots written at boot would need {end} entries "
                 f"but the configured NS table only holds {_cap}")
     return None
@@ -2606,6 +2629,15 @@ def _validate_step1(target_board, step1):
         v = step1.get(f)
         if not isinstance(v, int) or v <= 0:
             return f"step1.{f} must be a positive integer"
+    # Validate before using the count in arithmetic.  In particular, do not
+    # let a string/bool hand-edited into boot-config be silently coerced into
+    # a different generated Thread layout.
+    _raw_thread_count = step1.get("threadCount")
+    if (_raw_thread_count is not None and
+            (not isinstance(_raw_thread_count, int) or isinstance(_raw_thread_count, bool)
+             or not (1 <= _raw_thread_count <= _boot_image_gen.MAX_THREAD_COUNT))):
+        return "step1.threadCount must be an integer between 1 and 9 when provided"
+    _thread_count = _raw_thread_count if _raw_thread_count is not None else 1
     # abstractionLumpWords is deprecated (Task #568/569) — silently ignore if present in
     # legacy saved configs; the generator derives the size from the saved lump directly.
     total = step1["totalNamespaceWords"]
@@ -2619,10 +2651,10 @@ def _validate_step1(target_board, step1):
             return f"step1.{f} must be at least 64 words (FPGA minimum slot)"
     # Boot.Abstr actual size is always BOOT_ABSTR_DEFAULT_SIZE (64) or the saved
     # lump size — abstractionLumpWords is ignored for the foundation_sum check.
-    foundation_sum = (step1["namespaceLumpWords"] +
-                      step1["threadLumpWords"] * int(step1.get("threadCount") or 1) +
-                      BOOT_ABSTR_DEFAULT_SIZE)        # Boot.Abstr (slot 6) — always 64w minimum
-    # NS slots 2–5 are MMIO (no RAM body) — they do not contribute to foundation_sum.
+    foundation_sum = _boot_image_gen.boot_resident_region_end(
+        step1["threadLumpWords"], BOOT_ABSTR_DEFAULT_SIZE, _thread_count)
+    # The Namespace LUMP occupies the Namespace-table tail, while slots 2–5
+    # are MMIO.  The contiguous RAM prefix also includes catalog slots 7–10.
     if foundation_sum > total:
         return (f"Sum of foundational lump sizes ({foundation_sum}) exceeds "
                 f"totalNamespaceWords ({total})")
@@ -2634,12 +2666,6 @@ def _validate_step1(target_board, step1):
         if _raw_ns_slots_max > MAX_NS_ENTRIES:
             return (f"step1.nsSlotsMax ({_raw_ns_slots_max}) exceeds the maximum "
                     f"supported NS slot count ({MAX_NS_ENTRIES})")
-    # Optional threadCount (Task #2562): V20 Thread.1..Thread.n resident stack
-    # objects. Each thread costs threadLumpWords of resident RAM.
-    _raw_thread_count = step1.get("threadCount")
-    if _raw_thread_count is not None:
-        if not isinstance(_raw_thread_count, int) or not (1 <= _raw_thread_count <= 9):
-            return "step1.threadCount must be an integer between 1 and 9 when provided"
     # The Thread capability zone sits at a fixed +244 offset, so any thread
     # body smaller than 256 words cannot contain its own CR0 boot-entry GT.
     if step1["threadLumpWords"] < 256:
@@ -2649,6 +2675,10 @@ def _validate_step1(target_board, step1):
     # window for the namespace table itself.  Reserve size is now dynamic:
     # nextPow2(nsSlotsMax × 4).
     _ns_slots_max_v1 = int(_raw_ns_slots_max or _boot_image_gen.DEFAULT_NS_SLOTS_MAX)
+    if _ns_slots_max_v1 < _named_ns_count_for_step1(step1):
+        return (f"step1.nsSlotsMax ({_ns_slots_max_v1}) cannot hold the "
+                f"{_named_ns_count_for_step1(step1)} named entries required by "
+                f"threadCount ({step1.get('threadCount', 1)})")
     NS_TABLE_RESERVE = _boot_image_gen.ns_table_reserve_words(_ns_slots_max_v1)
     usable = total - NS_TABLE_RESERVE
     if foundation_sum > usable:
@@ -2700,7 +2730,14 @@ def boot_config_get():
         ),
         "limits": {
             "maxNsEntries": MAX_NS_ENTRIES,
-            "baseNamedNsCount": BASE_NAMED_NS_COUNT,
+            # The physical boot layout always stores SelfTest at slot 6, even
+            # when the lightning-bolt target is another catalog entry. The
+            # Builder needs this authoritative size for resident addresses.
+            "bootAbstrLumpWords": _boot_abstr_size_for_validation(),
+            "baseNamedNsCount": _named_ns_count_for_step1(
+                cfg.get("step1") if isinstance(cfg, dict) else DEFAULT_BOOT_CONFIG["step1"]),
+            "generatedThreadSlots": sorted(_generated_thread_slots_for_step1(
+                cfg.get("step1") if isinstance(cfg, dict) else DEFAULT_BOOT_CONFIG["step1"])),
         },
     })
 
@@ -6113,6 +6150,23 @@ def _derive_ns_state_entries():
             6: "SelfTest", 7: "WukongCallHome",
             8: "Tunnel", 9: "Ethernet", 10: "CapabilityTest",
         }
+        # The V20 raw Namespace descriptor carries authority/integrity, not
+        # a persisted display type. Boot-image entries are Inform descriptors
+        # by construction; retain the small map for compatibility with an
+        # older parser which did expose gt_type.
+        _GT_TYPE_NAMES = {1: "Inform", 2: "Outform"}
+        # Generated Thread entries do not have manifest records: their names
+        # are part of the boot-image layout policy.  Trust the binary's
+        # count sentinel before assigning one of these labels so a stale
+        # single-thread image never reinterprets a user-owned slot.
+        _thread_count = 1
+        try:
+            _raw_view = _boot_image_gen.parse_ns_table_raw(_raw) or {}
+            _thread_count = int((_raw_view.get("thread") or {}).get("count") or 1)
+        except Exception:
+            pass
+        for _thread_slot in _boot_image_gen.generated_thread_slots(_thread_count):
+            _HW_CATALOG[_thread_slot] = _boot_image_gen.generated_thread_label(_thread_slot)
 
         # Read boot-entry slot from binary sentinel (NS_TABLE_BASE - 2).
         _boot_slot = None
@@ -6134,10 +6188,10 @@ def _derive_ns_state_entries():
         for _r in _rows:
             _sl  = _r["slot"]
             _loc = _r["location"]
-            _typ = _GT_TYPE_NAMES.get(_r["gt_type"], "Inform")
+            _typ = _GT_TYPE_NAMES.get(_r.get("gt_type", 1), "Inform")
             _lim = _r["limit17"]
             _seq = _r["seq"]
-            _seal = _r["seal"]
+            _seal = _r.get("seal", _r.get("integrity32", 0))
             _g    = _r["g"]
             _nm   = _slot_names.get(_sl) or _HW_CATALOG.get(_sl) or f"slot_{_sl}"
             _e = {

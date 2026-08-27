@@ -215,6 +215,59 @@ DEFAULT_ABSTRACTION_CATALOG = [
 ]
 assert len(DEFAULT_ABSTRACTION_CATALOG) == 11, "catalog drift vs simulator.js"
 
+# Thread.1 is the fixed Boot.Thread entry at NS slot 1.  Configured secondary
+# threads are concrete, resident Thread LUMPs, so they need stable Namespace
+# identities too.  Reserve the slots immediately after the fixed boot catalog:
+# Thread#2 -> 11, Thread#3 -> 12, and so on.  This is deliberately independent
+# of allocation order and of the mutable Step-2 catalog.
+GENERATED_THREAD_FIRST_NS_SLOT = len(DEFAULT_ABSTRACTION_CATALOG)
+MAX_THREAD_COUNT = 9
+
+
+def configured_thread_count(step1):
+    """Return the validated V20 Thread Count from a Step-1 config."""
+    raw = step1.get("threadCount", 1) if isinstance(step1, dict) else 1
+    if not isinstance(raw, int) or isinstance(raw, bool) or not (1 <= raw <= MAX_THREAD_COUNT):
+        raise ValueError(
+            f"threadCount must be an integer between 1 and {MAX_THREAD_COUNT}"
+        )
+    return raw
+
+
+def generated_thread_slots(thread_count):
+    """Return deterministic NS slots for Thread#2 through Thread#N."""
+    if not isinstance(thread_count, int) or isinstance(thread_count, bool) or not (
+            1 <= thread_count <= MAX_THREAD_COUNT):
+        raise ValueError(
+            f"threadCount must be an integer between 1 and {MAX_THREAD_COUNT}"
+        )
+    return tuple(range(
+        GENERATED_THREAD_FIRST_NS_SLOT,
+        GENERATED_THREAD_FIRST_NS_SLOT + thread_count - 1,
+    ))
+
+
+def generated_thread_label(slot):
+    """Return the display pet name for a generated Thread slot, if any."""
+    offset = slot - GENERATED_THREAD_FIRST_NS_SLOT
+    return f"Thread#{offset + 2}" if offset >= 0 else None
+
+
+def boot_resident_region_end(thread_size, boot_abstr_size, thread_count):
+    """Return the first free RAM word after the fixed boot bodies.
+
+    The Namespace LUMP is stored at the Namespace-table tail.  RAM starts with
+    Thread.1, SelfTest, then the four fixed catalog bodies at slots 7–10;
+    generated Thread#2 onward follow them contiguously.  Step-2 resident
+    bodies must begin at or after this address.
+    """
+    return (
+        thread_size * thread_count
+        + boot_abstr_size
+        + (len(DEFAULT_ABSTRACTION_CATALOG) - BOOT_ABSTR_NS_SLOT - 1) * SLOT_SIZE
+    )
+
+
 # MMIO NS slot specs: (mmio_byte_addr, lim17).
 # Slots 2-5 use physical MMIO addresses — no RAM body is allocated;
 # running_offset is not advanced for these slots.
@@ -1222,15 +1275,19 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             f"generate_boot_image: nsSlotsMax={_ns_slots_max} exceeds the "
             f"V20 maximum of {MAX_NS_ENTRIES} slots.")
 
-    # V20 thread count (Task #2562): Thread.1..Thread.n resident stack objects.
-    # Thread.1 is the NS-slot-1 Boot.Thread; threads 2..n are additional resident
-    # bodies placed after the catalog allocations (no NS entries — the designer's
-    # Thread.2..Thread.n pet names are presentational; only Thread.1 is hardwired).
-    try:
-        _thread_count = int(step1.get("threadCount") or 1)
-    except (TypeError, ValueError):
-        _thread_count = 1
-    _thread_count = max(1, min(9, _thread_count))
+    # Thread.1 remains the fixed Boot.Thread at NS[1].  Thread#2 onward are
+    # generated resident entries immediately after the fixed catalog.  Reject,
+    # rather than clamp, invalid counts so a hand-edited config cannot silently
+    # produce a different Namespace layout than the designer displayed.
+    _thread_count = configured_thread_count(step1)
+    _generated_thread_slots = generated_thread_slots(_thread_count)
+    if _generated_thread_slots and _generated_thread_slots[-1] >= _ns_slots_max:
+        raise ValueError(
+            f"generate_boot_image: threadCount={_thread_count} requires generated "
+            f"Thread slots through {_generated_thread_slots[-1]}, but "
+            f"step1.nsSlotsMax is {_ns_slots_max}. Increase nsSlotsMax or reduce "
+            "the Thread Count."
+        )
     NS_TABLE_RESERVE = ns_table_reserve_words(_ns_slots_max)   # local, shadows module constant
 
     # ── Preflight: warn when manifest and sidecar ns_slot disagree ───────────
@@ -1339,7 +1396,10 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # windows (2-5) must not be overridden by caller-supplied physAddr values.
     _FOUNDATIONAL_SLOTS = {0, 1, BOOT_ABSTR_NS_SLOT}  # slots 0, 1, 6 — minimal boot trio
     _DEVICE_REG_SLOTS   = set(_MMIO_SLOT_SPECS.keys())            # slots 2..5 (MMIO)
-    _RESERVED_SLOTS     = _FOUNDATIONAL_SLOTS | _DEVICE_REG_SLOTS
+    # Every fixed catalog body has a deterministic RAM location, not just the
+    # foundational trio.  Keep all catalog identities immutable so direct
+    # generator callers cannot create an overlap the Builder would reject.
+    _RESERVED_SLOTS     = set(range(len(DEFAULT_ABSTRACTION_CATALOG))) | set(_generated_thread_slots)
 
     phys_override = {}
     for e in step2_lumps:
@@ -1439,6 +1499,53 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # All 11 catalog entries are non-null (slots 0–10). This must match simulator.js nsCount.
     ns_count = max((i + 1 for i, e in enumerate(catalog) if e is not None), default=0)
 
+    # ----- Generated Thread Namespace entries ----------------------------
+    # Each secondary Thread has the same complete Thread LUMP layout as the
+    # fixed Thread.1 entry and is discoverable through a deterministic Inform
+    # descriptor.  Place bodies after the fixed catalog's RAM bodies, matching
+    # simulator.js fallback initialization exactly.
+    extra_thread_locs = []
+    for _ordinal, _thread_slot in enumerate(_generated_thread_slots, start=2):
+        _thread_loc = running_offset
+        _thread_end = _thread_loc + thread_size
+        # Keep all resident bodies below the three metadata sentinel words.
+        if _thread_end > ns_table_base - 3:
+            raise ValueError(
+                f"generate_boot_image: Thread#{_ordinal} ({thread_size} words at "
+                f"0x{_thread_loc:X}) does not fit below the NS table "
+                f"(base 0x{ns_table_base:X}); reduce threadCount, "
+                f"threadLumpWords, or nsSlotsMax, or increase "
+                f"totalNamespaceWords."
+            )
+        write_ns_entry(mem, total, NS_ENTRY_WORDS, _thread_slot, _thread_loc,
+                       (thread_size - 1) & 0x1FFFF, 0, 0, 1, 0, 0, 0)
+        locations[_thread_slot] = _thread_loc
+        extra_thread_locs.append(_thread_loc)
+        running_offset = _thread_end
+        ns_count = max(ns_count, _thread_slot + 1)
+
+    # The catalog loop has reserved RAM for all fixed catalog bodies and the
+    # generated-thread loop has reserved every configured Thread body.  A
+    # Step-2 body is written later, so reject an overlap before it can corrupt
+    # a Thread header or its CR0 boot-entry capability.
+    _protected_end = boot_resident_region_end(
+        thread_size, actual_abstr_size, _thread_count)
+    assert running_offset == _protected_end, (
+        "boot layout drift: catalog allocation no longer matches the "
+        "resident-region contract")
+    for _e2 in step2_lumps:
+        if not (isinstance(_e2, dict) and bool(_e2.get("resident"))):
+            continue
+        _e2_phys = _e2.get("physAddr")
+        _e2_size = _e2.get("lumpSize") or SLOT_SIZE
+        if (isinstance(_e2_phys, int) and isinstance(_e2_size, int)
+                and _e2_size > 0 and _e2_phys < _protected_end
+                and _e2_phys + _e2_size > 0):
+            raise ValueError(
+                f"generate_boot_image: resident Step-2 lump at "
+                f"physAddr {_e2_phys} overlaps the fixed boot and generated "
+                f"Thread region (0..{_protected_end - 1})")
+
     # ----- Step 2 augmentation: NS entries for extended slots (≥8) ------
     # The 11-slot hardware catalog loop above creates NS entries for
     # slots 0–10.  Resident
@@ -1513,31 +1620,15 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     _boot_entry_seq = (mem[_boot_entry_ns_base + 1] >> 21) & 0x1FF
     mem[thread_loc + 244] = create_gt(_boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
 
-    # ----- V20 additional threads (Thread.2 .. Thread.n) -----------------
-    # Each extra thread is a resident stack object identical in shape to
-    # Thread.1: same header encoding and a CR0 boot-entry E-GT at the fixed
-    # +244 capability zone (CR1.. remain null GTs / zero).  They are placed
-    # contiguously after the catalog allocations and carry no NS entries —
-    # only Thread.1 (NS slot 1) is hardwired into the boot namespace.
-    extra_thread_locs = []
-    if _thread_count > 1:
-        _t_cursor = running_offset
-        for _tn in range(2, _thread_count + 1):
-            _t_end = _t_cursor + thread_size
-            # Must stay clear of the stored-nsCount / boot-entry / format-tag
-            # sentinel words at ns_table_base-3 .. ns_table_base-1.
-            if _t_end > ns_table_base - 3:
-                raise ValueError(
-                    f"generate_boot_image: Thread.{_tn} ({thread_size} words at "
-                    f"0x{_t_cursor:X}) does not fit below the NS table "
-                    f"(base 0x{ns_table_base:X}); reduce threadCount, "
-                    f"threadLumpWords, or nsSlotsMax, or increase "
-                    f"totalNamespaceWords.")
-            mem[_t_cursor] = pack_lump_header(_ns_n_minus_6(thread_size), 32, 12, 2)
-            mem[_t_cursor + 244] = create_gt(_boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
-            extra_thread_locs.append(_t_cursor)
-            _t_cursor = _t_end
-        running_offset = _t_cursor
+    # ----- Generated Thread bodies (Thread#2 .. Thread#N) ----------------
+    # Their Namespace descriptors were emitted above.  Initialise each body
+    # after resolving the live boot-entry generation, so every CR0 credential
+    # is identical to Thread.1's selected SelfTest/boot-entry E-GT.
+    for _thread_loc in extra_thread_locs:
+        mem[_thread_loc] = pack_lump_header(
+            _ns_n_minus_6(thread_size), 32, 12, 2)
+        mem[_thread_loc + 244] = create_gt(
+            _boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
 
     # Memory-manager GT at c-list[0]: R|W capability over NS slot 0 (full namespace).
     mem_mgr_gt = create_gt(0, 0, {"R":1, "W":1}, 1)

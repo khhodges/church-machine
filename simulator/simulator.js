@@ -433,6 +433,15 @@ class ChurchSimulator {
             }
             if (_bootCatalog[_bi]) {
                 this.nsLabels[_bi] = _bootCatalog[_bi].label;
+            } else if (_bi >= _bootCatalog.length) {
+                const _threadCount = Math.max(1, (src[tagIdx - 3] >>> 0) & 0xFF);
+                const _threadFirst = _bootCatalog.length;
+                if (_bi >= _threadFirst && _bi < _threadFirst + _threadCount - 1) {
+                    this.nsLabels[_bi] = `Thread#${_bi - _threadFirst + 2}`;
+                } else if (!this.nsLabels[_bi] || this.nsLabels[_bi] === '(free)' || this.nsLabels[_bi] === '(reserved)') {
+                    const _savedLabel = cfg && cfg.slotLabels && cfg.slotLabels[_bi];
+                    this.nsLabels[_bi] = _savedLabel || `slot_${_bi}`;
+                }
             } else if (!this.nsLabels[_bi] || this.nsLabels[_bi] === '(free)' || this.nsLabels[_bi] === '(reserved)') {
                 // Slot has binary data but no catalog entry — use user-saved label from
                 // bootConfig.slotLabels (persisted by +Add LUMP) or fall back to slot_N.
@@ -2000,6 +2009,15 @@ class ChurchSimulator {
         const _bcStep1 = (typeof window !== 'undefined' && window.bootConfig
                           && window.bootConfig.step1) ? window.bootConfig.step1 : null;
         const THREAD_LUMP_SIZE     = (_bcStep1 && _bcStep1.threadLumpWords)    || 256;
+        const THREAD_COUNT = (_bcStep1 && Number.isInteger(_bcStep1.threadCount))
+            ? _bcStep1.threadCount : 1;
+        if (THREAD_COUNT < 1 || THREAD_COUNT > 9) {
+            throw new Error(`Boot config step1.threadCount must be between 1 and 9 (got ${THREAD_COUNT})`);
+        }
+        const GENERATED_THREAD_FIRST_SLOT = abstractions.length;
+        const generatedThreadSlots = Array.from(
+            { length: THREAD_COUNT - 1 },
+            (_, index) => GENERATED_THREAD_FIRST_SLOT + index);
         // Boot.Abstr lump size: always 64w in the fallback init path (Task #568).
         // The hardcoded init is only a fallback when no binary boot image is present;
         // loadBootImage() uses the actual size from the generator.  Defaulting to 64w
@@ -2026,6 +2044,10 @@ class ChurchSimulator {
         const physAddrOverride = {};   // nsSlot → physAddr
         for (const e of _bcStep2Lumps) {
             if (e && e.resident && Number.isFinite(e.physAddr) && e.physAddr > 0) {
+                if (Number.isInteger(e.nsSlot) && e.nsSlot < abstractions.length) {
+                    throw new Error(
+                        `Boot config NS slot ${e.nsSlot} is a fixed boot catalog slot and cannot host a Step-2 lump.`);
+                }
                 physAddrOverride[e.nsSlot] = e.physAddr;
             }
         }
@@ -2092,6 +2114,49 @@ class ChurchSimulator {
             clistChildren.push(i);
             const gtWord = this.createGT(0, i, a.perms, 1);
             clistGTs.push(gtWord);
+        }
+
+        // Generated Thread#2 onward are resident Thread LUMPs with stable NS
+        // identities immediately after the fixed boot catalog.  A Step-2
+        // selection at one of these slots is a configuration collision, never
+        // a reason to overwrite the generated thread.
+        const maxEntriesForThreads = (this.NS_TABLE_RESERVE / this.NS_ENTRY_WORDS) | 0;
+        for (const threadSlot of generatedThreadSlots) {
+            if (threadSlot >= maxEntriesForThreads) {
+                throw new Error(
+                    `Boot config threadCount=${THREAD_COUNT} requires generated Thread slot ${threadSlot}, ` +
+                    `but the Namespace table only holds ${maxEntriesForThreads} slots.`);
+            }
+            if (_bcStep2Lumps.some(e => e && (e.nsSlot | 0) === threadSlot)) {
+                throw new Error(
+                    `Boot config NS slot ${threadSlot} is reserved for Thread#${threadSlot - GENERATED_THREAD_FIRST_SLOT + 2} ` +
+                    'and cannot host a Step-2 lump.');
+            }
+            const threadLoc = runningOffset;
+            if (threadLoc + THREAD_LUMP_SIZE > this.NS_TABLE_BASE - 3) {
+                throw new Error(
+                    `Generated Thread#${threadSlot - GENERATED_THREAD_FIRST_SLOT + 2} does not fit below the Namespace table.`);
+            }
+            this.writeNSEntry(threadSlot, threadLoc, THREAD_LUMP_SIZE - 1,
+                0, 0, 1, 0, 0, 0);
+            this.nsLabels[threadSlot] = `Thread#${threadSlot - GENERATED_THREAD_FIRST_SLOT + 2}`;
+            this.nsChainable[threadSlot] = false;
+            runningOffset += THREAD_LUMP_SIZE;
+        }
+
+        // Step-2 resident bodies are materialised after this bootstrap path.
+        // They must not overlap the fixed catalog bodies or any generated
+        // Thread body, otherwise a later eager install could corrupt CR0.
+        const protectedResidentEnd = runningOffset;
+        for (const _e2 of _bcStep2Lumps) {
+            if (!_e2 || !_e2.resident || !Number.isFinite(_e2.physAddr)) continue;
+            const _e2Size = (_e2.lumpSize || this.SLOT_SIZE) | 0;
+            if (_e2Size > 0 && _e2.physAddr < protectedResidentEnd
+                    && _e2.physAddr + _e2Size > 0) {
+                throw new Error(
+                    `Step-2 resident NS slot ${_e2.nsSlot} overlaps the fixed boot and generated ` +
+                    `Thread region (0..${protectedResidentEnd - 1}).`);
+            }
         }
 
         // ── Step 2 augmentation: NS entries for extended slots (≥8) ──────────
@@ -2167,6 +2232,12 @@ class ChurchSimulator {
         // c-list entries at the NS TABLE tail.  Must match boot_image.py's
         // _ns_count_stored computation (scan before c-list + empty_count).
         this.memory[this.NS_TABLE_BASE - 3] = (this.nsCount >>> 0);
+        // The count marker at -4 is legacy-zero for the default one-thread
+        // layout.  Multi-thread images use it to identify the deterministic
+        // Thread#2+ Namespace slots during committed-image inspection.
+        if (THREAD_COUNT > 1) {
+            this.memory[this.NS_TABLE_BASE - 4] = THREAD_COUNT >>> 0;
+        }
 
         const THREAD_SW = 32;
         const THREAD_CC = 12;
@@ -2193,6 +2264,13 @@ class ChurchSimulator {
             ? this.parseNSWord1(_initialBootEntry.word1_limit).gtSeq : 0;
         this.memory[threadLoc + THREAD_CAPS_OFFSET] =
             this.createGT(_initialBootSeq, this.bootEntrySlot, {E: 1}, 1);
+        for (const threadSlot of generatedThreadSlots) {
+            const generatedThreadLoc = this.memory[this._nsSlotBase(threadSlot)] >>> 0;
+            this.memory[generatedThreadLoc] = this.packLumpHeader(
+                THREAD_N_MINUS_6, THREAD_SW, THREAD_CC, 2);
+            this.memory[generatedThreadLoc + THREAD_CAPS_OFFSET] =
+                this.createGT(_initialBootSeq, this.bootEntrySlot, {E: 1}, 1);
+        }
 
         // Memory-manager GT at c-list[0]: R|W Inform capability over NS slot 0 (full namespace).
         clistGTs[0] = this.createGT(0, BOOT_NS_SLOT_HEADER, {R:1, W:1}, 1);

@@ -35,10 +35,19 @@ import pytest
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)
 
-from server.boot_image import generate_boot_image, NS_TABLE_RESERVE, NS_ENTRY_WORDS  # noqa: E402
+from server.boot_image import (  # noqa: E402
+    BOOT_ABSTR_NS_SLOT,
+    NS_ENTRY_WORDS,
+    NS_TABLE_RESERVE,
+    create_gt,
+    generate_boot_image,
+    generated_thread_slots,
+    parse_ns_table_raw,
+)
 
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
 HARNESS   = os.path.join(ROOT, "tests", "boot", "sim_init_dump.js")
+THREAD_CAPS_OFFSET = 244
 
 
 # ---- configs ---------------------------------------------------------------
@@ -83,9 +92,17 @@ def _cfg_step3_reservation():
     return cfg
 
 
+def _cfg_generated_threads(count):
+    cfg = _cfg_default()
+    cfg["step1"]["threadCount"] = count
+    return cfg
+
+
 CONFIGS = [
     pytest.param(_cfg_default(),           id="default"),
     pytest.param(_cfg_custom_step1(),      id="custom_step1"),
+    pytest.param(_cfg_generated_threads(2), id="generated_threads_2"),
+    pytest.param(_cfg_generated_threads(5), id="generated_threads_5"),
     pytest.param(_cfg_step2_resident(),    id="step2_resident"),
     pytest.param(_cfg_step3_reservation(), id="step3_reservation"),
 ]
@@ -279,6 +296,104 @@ def test_boot_image_matches_simulator(cfg, tmp_path):
     py_bytes  = generate_boot_image(cfg, str(tmp_path))
     sim_words = _run_simulator(cfg)
     _compare(py_bytes, sim_words, cfg)
+
+
+@pytest.mark.parametrize("count", [1, 2, 5])
+def test_generated_thread_namespace_entries_have_stable_slots_and_boot_cr0(count, tmp_path):
+    """Thread#2 onward are resident, named NS entries with Thread.1's CR0."""
+    _write_synthetic_boot_abstr_lump(str(tmp_path))
+    cfg = _cfg_generated_threads(count)
+    image = generate_boot_image(cfg, str(tmp_path))
+    raw = parse_ns_table_raw(image)
+    assert raw is not None
+    assert raw["thread"]["count"] == count
+
+    entries = {row["slot"]: row for row in raw["entries"]}
+    expected_slots = generated_thread_slots(count)
+    assert all(slot in entries for slot in range(11))
+    assert tuple(slot for slot in entries if slot >= 11) == expected_slots
+
+    # N=1 remains the historical 11-entry layout.  Generated threads begin
+    # immediately after the final catalog body and remain physically contiguous.
+    if count == 1:
+        assert 11 not in entries
+        return
+
+    expected_cr0 = create_gt(0, BOOT_ABSTR_NS_SLOT, {"E": 1}, 1)
+    previous_location = entries[10]["w0"] + 64
+    thread_size = cfg["step1"]["threadLumpWords"]
+    for slot in expected_slots:
+        location = entries[slot]["w0"]
+        assert location == previous_location
+        assert entries[slot]["w1"] & 0x1FFFF == thread_size - 1
+        header = struct.unpack_from("<I", image, location * 4)[0]
+        assert (header >> 27) & 0x1F == 0x1F
+        assert ((header >> 8) & 0x3) == 2
+        cr0 = struct.unpack_from("<I", image, (location + THREAD_CAPS_OFFSET) * 4)[0]
+        assert cr0 == expected_cr0
+        previous_location = location + thread_size
+
+
+def test_generated_thread_slot_collision_and_capacity_are_rejected(tmp_path):
+    _write_synthetic_boot_abstr_lump(str(tmp_path))
+    cfg = _cfg_generated_threads(2)
+    cfg["step2"] = {"lumps": [{
+        "nsSlot": 11, "resident": True, "physAddr": 4096, "lumpSize": 64,
+    }]}
+    with pytest.raises(ValueError, match=r"slot 11 is reserved"):
+        generate_boot_image(cfg, str(tmp_path))
+
+    cfg = _cfg_generated_threads(2)
+    cfg["step1"]["nsSlotsMax"] = 11
+    with pytest.raises(ValueError, match=r"requires generated Thread slots through 11"):
+        generate_boot_image(cfg, str(tmp_path))
+
+
+def test_generated_thread_body_overlap_and_nondefault_boot_entry_are_rejected_or_preserved(tmp_path):
+    """Thread bodies cannot be clobbered and retain the selected entry target."""
+    _write_synthetic_boot_abstr_lump(str(tmp_path))
+    colliding = _cfg_generated_threads(2)
+    colliding["step2"] = {"lumps": [{
+        "nsSlot": 16, "resident": True, "physAddr": 640, "lumpSize": 256,
+    }]}
+    with pytest.raises(ValueError, match=r"overlaps the fixed boot and generated Thread region"):
+        generate_boot_image(colliding, str(tmp_path))
+
+    image = generate_boot_image(_cfg_generated_threads(5), str(tmp_path), boot_entry_slot=7)
+    entries = {row["slot"]: row for row in parse_ns_table_raw(image)["entries"]}
+    expected = create_gt(0, 7, {"E": 1}, 1)
+    for slot in generated_thread_slots(5):
+        location = entries[slot]["w0"]
+        assert struct.unpack_from("<I", image, (location + THREAD_CAPS_OFFSET) * 4)[0] == expected
+
+
+def test_default_thread_count_remains_byte_compatible(tmp_path):
+    """The pre-feature default omits threadCount and must remain unchanged."""
+    _write_synthetic_boot_abstr_lump(str(tmp_path))
+    legacy = _cfg_default()
+    explicit_single = _cfg_default()
+    explicit_single["step1"]["threadCount"] = 1
+    assert generate_boot_image(legacy, str(tmp_path)) == generate_boot_image(
+        explicit_single, str(tmp_path))
+
+
+def test_committed_ns_state_names_generated_threads_from_image_count(tmp_path, monkeypatch):
+    """Committed inspection exposes generated slots with their stable pet names."""
+    _write_synthetic_boot_abstr_lump(str(tmp_path))
+    image_path = tmp_path / "boot-image.bin"
+    image_path.write_bytes(generate_boot_image(_cfg_generated_threads(5), str(tmp_path)))
+
+    from server import app as server_app
+    monkeypatch.setattr(server_app, "BOOT_IMAGE_PATH", str(image_path))
+    monkeypatch.setattr(server_app, "LUMPS_DIR", str(tmp_path))
+    monkeypatch.setattr(server_app, "BOOT_CONFIG_PATH", str(tmp_path / "missing-config.json"))
+    monkeypatch.setattr(server_app, "BOOT_CONFIG_LEGACY_PATH", str(tmp_path / "missing-legacy.json"))
+
+    entries = server_app._derive_ns_state_entries()
+    names = {entry["slot"]: entry["name"] for entry in entries}
+    assert {slot: names[slot] for slot in generated_thread_slots(5)} == {
+        11: "Thread#2", 12: "Thread#3", 13: "Thread#4", 14: "Thread#5",
+    }
 
 
 # ---- saved-lump path tests -------------------------------------------------

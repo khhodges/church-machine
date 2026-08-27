@@ -2654,6 +2654,29 @@
     "issue_n": 1
   },
   {
+    "token": "56096905",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.1.199d8c30.lump",
+    "sidecar_file": "SelfTest.1.199d8c30.json",
+    "lump_size": 4096,
+    "cw": 500,
+    "cc": 5,
+    "author": "",
+    "version": "",
+    "lump_version": 78,
+    "compiled_at": 1787782122.8900723,
+    "methods": [],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "3aafdc4c0950f853a2d9fee4bfd5c9410b7531d26b4b44c55418bce1c287d58f",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25",
+    "dot_name": "SelfTest",
+    "issue_n": 1
+  },
+  {
     "token": "00aa9999",
     "abstraction": "Legacy",
     "filename": "Legacy.1.8b7fb77f.lump",
@@ -2663,8 +2686,8 @@
     "cc": 1,
     "author": "",
     "version": "",
-    "lump_version": 39,
-    "compiled_at": 1787780286.3536763,
+    "lump_version": 41,
+    "compiled_at": 1787824951.893728,
     "methods": [
       "Add"
     ],
@@ -2688,8 +2711,8 @@
     "cc": 1,
     "author": "",
     "version": "",
-    "lump_version": 114,
-    "compiled_at": 1787780288.0900176,
+    "lump_version": 122,
+    "compiled_at": 1787824952.7848883,
     "methods": [
       "Add"
     ],
@@ -2701,29 +2724,6 @@
     "issue_number": 1,
     "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f",
     "dot_name": "Adder",
-    "issue_n": 1
-  },
-  {
-    "token": "56096905",
-    "abstraction": "SelfTest",
-    "filename": "SelfTest.1.199d8c30.lump",
-    "sidecar_file": "SelfTest.1.199d8c30.json",
-    "lump_size": 4096,
-    "cw": 500,
-    "cc": 5,
-    "author": "",
-    "version": "",
-    "lump_version": 78,
-    "compiled_at": 1787782122.8900723,
-    "methods": [],
-    "grants": [
-      "E"
-    ],
-    "binary_hash": "3aafdc4c0950f853a2d9fee4bfd5c9410b7531d26b4b44c55418bce1c287d58f",
-    "petname": "",
-    "issue_number": 1,
-    "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25",
-    "dot_name": "SelfTest",
     "issue_n": 1
   }
 ]

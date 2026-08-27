@@ -413,15 +413,12 @@
         var s1   = p.step1;
         var board        = p.targetBoard || 'wukong-xc7a100t';
         var boardProfile = BOARD_PROFILES[board] || BOARD_PROFILES['wukong-xc7a100t'];
-        var bootSlot = parseInt(localStorage.getItem('bootEntrySlot'), 10);
-        if (!Number.isFinite(bootSlot) || bootSlot < 0) bootSlot = 3;
-        var bootCatEntry = null;
-        for (var bi = 0; bi < _rl.catalog.length; bi++) {
-            if (_rl.catalog[bi].nsSlot === bootSlot) { bootCatEntry = _rl.catalog[bi]; break; }
-        }
-        var bootAbstrSz  = (bootCatEntry && bootCatEntry.lumpSize) ? bootCatEntry.lumpSize : 64;
+        // SelfTest at fixed slot 6 is the physical Boot.Abstr body. It stays
+        // reserved even when the lightning bolt targets a different entry.
+        var bootAbstrSz = (_rl.limits && _rl.limits.bootAbstrLumpWords) || 64;
         var nsReserve = Math.max(16, Math.round(state.ns.slots) * 4);
-        var sum    = (s1.namespaceLumpWords || 0) + (s1.threadLumpWords || 0) + bootAbstrSz;
+        var threadCount = Math.max(1, Math.min(9, parseInt(s1.threadCount, 10) || 1));
+        var sum = (s1.threadLumpWords || 0) * threadCount + bootAbstrSz + (4 * 64);
         var total  = s1.totalNamespaceWords || 0;
         var usable = total - nsReserve;
         var boardTotalWords = boardProfile.totalRamWords;
@@ -438,15 +435,10 @@
         var board        = p.targetBoard || 'wukong-xc7a100t';
         var boardProfile = BOARD_PROFILES[board] || BOARD_PROFILES['wukong-xc7a100t'];
         var boardTotalWords = boardProfile.totalRamWords;
-        var bootSlotV = parseInt(localStorage.getItem('bootEntrySlot'), 10);
-        if (!Number.isFinite(bootSlotV) || bootSlotV < 0) bootSlotV = 3;
-        var bootCatEntryV = null;
-        for (var bvi = 0; bvi < _rl.catalog.length; bvi++) {
-            if (_rl.catalog[bvi].nsSlot === bootSlotV) { bootCatEntryV = _rl.catalog[bvi]; break; }
-        }
-        var bootAbstrSz  = (bootCatEntryV && bootCatEntryV.lumpSize) ? bootCatEntryV.lumpSize : 64;
+        var bootAbstrSz = (_rl.limits && _rl.limits.bootAbstrLumpWords) || 64;
         var nsReserveV = Math.max(16, Math.round(state.ns.slots) * 4);
-        var sum    = (s1.namespaceLumpWords || 0) + (s1.threadLumpWords || 0) + bootAbstrSz;
+        var threadCount = Math.max(1, Math.min(9, parseInt(s1.threadCount, 10) || 1));
+        var sum = (s1.threadLumpWords || 0) * threadCount + bootAbstrSz + (4 * 64);
         var total  = s1.totalNamespaceWords || 0;
         var usable = total - nsReserveV;
         var occ = [];
@@ -481,7 +473,7 @@
             occ.push({ start: st.physAddr, end: st.physAddr + sz, label: lbl });
         }
         var maxNs   = _rl.limits.maxNsEntries   || 256;
-        var baseNs  = _rl.limits.baseNamedNsCount || 47;
+        var baseNs  = 11 + Math.max(0, _getStep1Payload().step1.threadCount - 1);
         var emptyCount = _rl.emptySlotCount || 0;
         if (!Number.isFinite(emptyCount) || emptyCount < 0) {
             return 'Empty NS slot count must be a non-negative integer.';
@@ -522,7 +514,7 @@
 
         var err    = _rlValidate();
         var maxNs  = _rl.limits.maxNsEntries    || 256;
-        var baseNs = _rl.limits.baseNamedNsCount || 47;
+        var baseNs = 11 + Math.max(0, _getStep1Payload().step1.threadCount - 1);
 
         // 3-LUMP starter kit — always shown at top, locked as Boot
         var bootSlot = parseInt(localStorage.getItem('bootEntrySlot'), 10);
@@ -1062,7 +1054,11 @@
             { label: 'Boot.NS', words: namespaceLumpWords, cls: 'le-zone-hdr' }
         ];
         for (var _ti = 1; _ti <= threadCount; _ti++) {
-            allZones.push({ label: 'Thread.' + _ti, words: threadLump, cls: 'le-zone-stack' });
+            allZones.push({
+                label: _ti === 1 ? 'Thread.1' : 'Thread#' + _ti,
+                words: threadLump,
+                cls: 'le-zone-stack'
+            });
         }
         allZones.push(
             { label: 'Pool',     words: Math.max(pool, 0), cls: 'le-zone-free' },
@@ -1071,11 +1067,15 @@
 
         var threadZoneDesc = threadCount === 1
             ? 'Thread.1 (' + threadLump.toLocaleString() + ' w)'
-            : threadCount + ' \u00d7 ' + threadLump.toLocaleString() + ' w (Thread.1\u2026Thread.' + threadCount + ')';
+            : threadCount + ' \u00d7 ' + threadLump.toLocaleString() + ' w (Thread.1, Thread#2\u2026Thread#' + threadCount + ')';
+        var generatedThreadSlots = threadCount > 1
+            ? 'NS slots 11\u2013' + (9 + threadCount) + ' (Thread#2\u2026Thread#' + threadCount + ')'
+            : 'None (Thread.1 remains the fixed NS slot 1 entry)';
         var nsTableDesc = esc(NS_TABLE_COMPUTED.toLocaleString() + ' words (' + slots + ' slots × 4)');
         var grid = renderGrid([
             ['Target board',   boardInfo, 'le-val-gold'],
             ['Total words',    esc(total.toLocaleString() + '  (2^' + (n + 14) + ')'), noFit ? '' : 'le-val-gold'],
+            ['Generated Thread slots', esc(generatedThreadSlots), ''],
             ['n_minus_6',     esc(String(n)), ''],
             ['typ field',     '01  (Namespace, reserved)', ''],
             ['Slot capacity',  esc(slots.toLocaleString() + '  (power of two; up to ' + Math.min(maxSl, NS_CAP_MAX).toLocaleString() + ' for this memory size)'), ''],

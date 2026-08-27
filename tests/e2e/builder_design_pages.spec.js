@@ -169,6 +169,19 @@ test.describe('Builder design pages — Thread Lump & Namespace Lump', () => {
         // CR0 must be a live E-GT targeting the committed boot-entry slot.
         expect(c.thread.cr0Word).not.toBe(0);
         expect(c.thread.cr0Word & 0xFFFF).toBe(c.thread.bootSlot);
+
+        // Secondary resident threads are discoverable Namespace entries, not
+        // merely reserved physical memory. This remains vacuously true for
+        // the default single-thread image and verifies labels/slots whenever
+        // a multi-thread image is committed.
+        const generated = (nsState.abstractions || [])
+            .filter(row => /^Thread#\d+$/.test(row.name || ''))
+            .sort((a, b) => a.slot - b.slot);
+        expect(generated).toHaveLength(c.thread.count - 1);
+        generated.forEach((row, index) => {
+            expect(row.slot).toBe(11 + index);
+            expect(row.name).toBe(`Thread#${index + 2}`);
+        });
     });
 
     test('drill-down flags NS-header, thread-count, and CR0 contradictions', async ({ page }) => {

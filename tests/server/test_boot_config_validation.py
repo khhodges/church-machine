@@ -20,6 +20,7 @@ Tests cover:
 
 import json
 import os
+import struct
 import sys
 from unittest.mock import patch
 
@@ -52,10 +53,10 @@ FAKE_CATALOG_ENTRY = {
     "binaryHash": "a" * 64,
 }
 
-# foundation_end = namespaceLumpWords + threadLumpWords + BOOT_ABSTR_DEFAULT_SIZE
-# NS slots 2–5 are MMIO (no RAM body) — they do not contribute to foundation_end.
-# With ns_lump=64, thread_lump=256, BOOT_ABSTR_DEFAULT_SIZE=64 → 384
-FOUNDATION_END = 64 + 256 + 64  # 384
+# Thread.1, Boot.Abstr, and catalog bodies at slots 7–10 occupy the RAM
+# prefix. Boot.NS instead resides at the Namespace-table tail.
+# With thread_lump=256 and BOOT_ABSTR_DEFAULT_SIZE=64 → 576.
+FOUNDATION_END = 256 + 64 + (4 * 64)  # 576
 
 
 def _fake_catalog(selected_tokens=None):
@@ -312,6 +313,50 @@ class TestValidateStep1ThreadGeometry:
         err = _validate_step1(DEFAULT_BOOT_CONFIG["targetBoard"], step1)
         assert err is not None
         assert "threadLumpWords must be at least 256" in err
+
+    def test_generated_thread_slots_are_reserved_and_need_namespace_capacity(self):
+        step1 = _make_step1(16384)
+        step1["threadCount"] = 2
+        collision = {"lumps": [{"nsSlot": 11, "loadPolicy": "Empty"}]}
+        err = _validate_step2(collision, step1, TI60_BOARD)
+        assert err is not None
+        assert "Thread#2" in err
+
+        step1["nsSlotsMax"] = 11
+        err = _validate_step1(TI60_BOARD, step1)
+        assert err is not None
+        assert "cannot hold" in err
+
+    def test_resident_lump_cannot_overlap_generated_thread_memory(self):
+        step1 = _make_step1(16384)
+        step1["threadCount"] = 2
+        # Thread#2 occupies words 576..831 in the canonical boot layout.
+        err = _validate_step2(_make_step2(640, lump_size=256), step1, TI60_BOARD)
+        assert err is not None
+        assert "foundational" in err
+
+    def test_boot_config_exposes_fixed_selftest_size_for_builder_placement(self, tmp_path):
+        """Builder receives slot-6's size, not a selected lightning-bolt target."""
+        words = [0] * 512
+        words[0] = (0x1F << 27) | (3 << 23) | (3 << 10) | 2
+        (tmp_path / "00000600.lump").write_bytes(struct.pack(">512I", *words))
+        (tmp_path / "manifest.json").write_text(json.dumps([{
+            "token": "00000600",
+            "abstraction": "SelfTest",
+            "ns_slot": 6,
+            "ns_slot_policy": "static",
+        }]))
+        (tmp_path / "ns-state.json").write_text(json.dumps({
+            "abstractions": [{"name": "SelfTest", "slot": 6, "token": "00000600"}],
+        }))
+        with (
+            patch.object(_app_module, "LUMPS_DIR", str(tmp_path)),
+            patch.object(_app_module, "BOOT_CONFIG_PATH", str(tmp_path / "none.json")),
+            patch.object(_app_module, "BOOT_CONFIG_LEGACY_PATH", str(tmp_path / "none-legacy.json")),
+        ):
+            response = _app_module.app.test_client().get("/api/boot-config")
+        assert response.status_code == 200
+        assert response.get_json()["limits"]["bootAbstrLumpWords"] == 512
 
 
 # ---------------------------------------------------------------------------
