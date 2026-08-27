@@ -65,6 +65,15 @@ def test_status_remains_readonly_with_new_fields():
     assert d1['min_tu_version'] == d2['min_tu_version']
 
 
+def test_bridge_version_is_exposed_in_versions_view():
+    index_path = os.path.join(ROOT, 'simulator', 'index.html')
+    with open(index_path, encoding='utf-8') as handle:
+        index = handle.read()
+    assert 'id="versionsCardBridge"' in index
+    assert 'id="versionsBridgeBody"' in index
+    assert 'bridge_version' in index or 'USB-UART Bridge' in index
+
+
 def test_connect_view_clarifies_jtag_and_usb_uart_connections():
     index_path = os.path.join(ROOT, 'simulator', 'index.html')
     with open(index_path, encoding='utf-8') as handle:

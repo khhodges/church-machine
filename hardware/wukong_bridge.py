@@ -162,6 +162,10 @@ BOOT_SENTINEL_V1  = 0xBB   # old/stale 2-byte sentinel magic
 BOOT_SENTINEL_V2  = 0xBC   # current 3-byte sentinel magic
 SENTINEL_V1_LEN   = 2      # 0xBB  N_INIT&0xFF
 SENTINEL_V2_LEN   = 4      # 0xBC  N_INIT&0xFF  TU_VERSION  BUILD_VERSION
+# The bridge is distributed as a standalone file, so it cannot import the
+# FPGA source's WUKONG_BUILD_VERSION when it runs on Windows. Keep this
+# advertised bridge/build identity in lockstep with wukong_top.py.
+BRIDGE_VERSION    = 18
 
 # Minimum TU_VERSION required to guarantee correct ELOADCALL/XLOADLAMBDA trace.
 TU_VERSION_CALL_3PKT = 0x02  # must match _TU_VERSION_CALL_3PKT in wukong_top.py
@@ -1510,6 +1514,7 @@ def main():
                 print(f'[bridge] {port} not found — trying {alt} instead')
                 port = alt
         print(f'Wukong bridge: {port} @ {args.baud} baud → {ide_base}')
+    print(f'[bridge] version v{BRIDGE_VERSION} (for Wukong build v{BRIDGE_VERSION})')
     if not verify_tls:
         print('SSL verification disabled — add a cert to enable')
     if church_only:
@@ -1553,6 +1558,7 @@ def main():
         """Best-effort health publication; never blocks the UART loop."""
         payload = {
             'session_id': session_id, 'serial_port': port,
+            'bridge_version': BRIDGE_VERSION,
             'event': event, 'state': state or bridge_state, 'reason': reason,
             'reconnect_attempt': reconnect_attempt,
             'last_read_ts': last_read_ts, 'last_write_ts': last_write_ts,

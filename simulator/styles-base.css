@@ -1976,6 +1976,9 @@ details[open] .ti60-advanced-summary::before { transform: rotate(90deg); }
 .versions-card-wide {
     grid-column: span 2;
 }
+.versions-card#versionsCardBridge {
+    border-left: 3px solid #a78bfa;
+}
 
 .versions-release-items {
   margin-top: 0.55rem;

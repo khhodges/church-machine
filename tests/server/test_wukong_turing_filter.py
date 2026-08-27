@@ -86,6 +86,15 @@ def _status(client):
 
 class TestChurchOnlyRoundTrip:
 
+    def test_bridge_version_round_trip(self, client):
+        """The bridge build identity survives status POST → Versions status GET."""
+        r = _bridge_status(client, session_id='version-session',
+                           bridge_version=18, serial_port='COM4')
+        assert r.status_code == 200
+        status = _status(client)
+        assert status['bridge']['bridge_version'] == 18
+        assert status['bridge']['serial_port'] == 'COM4'
+
     def test_church_only_true_stored_and_returned(self, client):
         """POST church_only=True → GET status has bridge.church_only is True."""
         r = _bridge_status(client, session_id='test-session', church_only=True)

@@ -11896,6 +11896,7 @@ const VersionsView = {
             this._renderBitstreamRelease(bitstreamLog && bitstreamLog.release);
             this._renderBitstreamLog(bitstreamLog);
             this._renderProd(prod);
+            this._renderBridge(status);
             this._renderBuildStatus(buildStatus);
             this._renderAdvice(status, gh, diff, bs, prod);
             const lc = document.getElementById('versionsLastChecked');
@@ -11979,6 +11980,28 @@ const VersionsView = {
                     'Flash the FPGA through the Connect tab, then restart the bridge if needed.',
                     'Press Refresh and verify the board reports the expected firmware version.'
                 ], 'Stop until the board version matches the repo expectation; do not use an older board image for verification.');
+        }
+
+        // Bridge build identity
+        const bridgeInfo = status && status.bridge ? status.bridge : {};
+        const bridgeVersion = bridgeInfo.bridge_version;
+        const expectedBridgeVersion = status ? status.expected_build_version : null;
+        if (status && status.bridge_connected && bridgeVersion == null) {
+            add('warn', 'Bridge version is unavailable',
+                [
+                    'Download the current Wukong bridge from the Connect tab or the IDE download link.',
+                    'Replace the old wukong_bridge.py on the Windows host and restart it.',
+                    'Refresh this Versions view and confirm the bridge reports its version.'
+                ], 'Stop if the bridge version cannot be confirmed against the build.');
+        } else if (status && status.bridge_connected &&
+                   expectedBridgeVersion != null && bridgeVersion != null &&
+                   Number(bridgeVersion) !== Number(expectedBridgeVersion)) {
+            add('warn', `Bridge v${bridgeVersion} \u2260 repo build v${expectedBridgeVersion}`,
+                [
+                    'Download the current Wukong bridge from the Connect tab or the IDE download link.',
+                    'Replace the old wukong_bridge.py on the Windows host and restart it.',
+                    'Refresh this Versions view and confirm the bridge version matches the repo build.'
+                ], 'Stop until the bridge and FPGA build identities match.');
         }
 
         // Bitstream metadata
@@ -12463,6 +12486,45 @@ const VersionsView = {
             this._historicalNamespaceKey = namespaceKey;
             recallBuildNamespace(nsMatch.build_id, 'connected FPGA');
         }
+    },
+
+    _renderBridge(status) {
+        const el = document.getElementById('versionsBridgeBody');
+        if (!el) return;
+        if (!status) {
+            el.innerHTML = this._badge('unknown', 'Unavailable') +
+                '<div class="versions-note">Could not reach the server status endpoint.</div>';
+            return;
+        }
+        const bridge = status.bridge || {};
+        const version = bridge.bridge_version;
+        const expected = status.expected_build_version;
+        const versionKnown = version != null && /^\d+$/.test(String(version));
+        let badge;
+        if (!status.bridge_connected) {
+            badge = this._badge('bad', 'Offline');
+        } else if (!versionKnown) {
+            badge = this._badge('unknown', 'Version unavailable');
+        } else if (expected == null) {
+            badge = this._badge('unknown', 'Build expectation unavailable');
+        } else if (Number(version) === Number(expected)) {
+            badge = this._badge('ok', `Matches build v${this._esc(expected)}`);
+        } else {
+            badge = this._badge('warn', `Does not match build v${this._esc(expected)}`);
+        }
+        const versionLine = versionKnown
+            ? `<div class="versions-value">bridge v${this._esc(version)}</div>`
+            : '<div class="versions-value">bridge version unknown</div>';
+        const portLine = bridge.serial_port
+            ? `<div class="versions-note">Serial port <code>${this._esc(bridge.serial_port)}</code></div>`
+            : '';
+        const ageLine = status.bridge_poll_age != null
+            ? `<div class="versions-note">Last poll ${this._esc(this._age(Date.now() - Number(status.bridge_poll_age) * 1000) || 'recently')}</div>`
+            : '';
+        const offlineNote = !status.bridge_connected
+            ? '<div class="versions-note">Start the Windows Wukong bridge, then refresh this view.</div>'
+            : '';
+        el.innerHTML = versionLine + badge + portLine + ageLine + offlineNote;
     },
 
     _namespaceMatchLine(match) {

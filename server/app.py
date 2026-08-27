@@ -13074,6 +13074,13 @@ def wukong_bridge_status_post():
     now = _wk_time.time()
     session = str(data.get('session_id', '') or '')[:128]
     event = str(data.get('event', '') or '')[:80]
+    raw_bridge_version = data.get('bridge_version')
+    bridge_version = None
+    if not isinstance(raw_bridge_version, bool):
+        try:
+            bridge_version = max(0, min(255, int(raw_bridge_version)))
+        except (TypeError, ValueError):
+            pass
     raw_fault = data.get('fault_delivery')
     fault_delivery = None
     if isinstance(raw_fault, dict):
@@ -13097,6 +13104,7 @@ def wukong_bridge_status_post():
             _wukong_bridge_info.update({
                 'session_id': session,
                 'serial_port': str(data.get('serial_port', '') or '')[:128],
+                'bridge_version': bridge_version,
                 'state': str(data.get('state', '') or '')[:40],
                 'reason': str(data.get('reason', '') or '')[:400],
                 'last_read_ts': data.get('last_read_ts'),
