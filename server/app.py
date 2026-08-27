@@ -209,21 +209,35 @@ RISCV_CAP_DIR = os.path.join(BASE_DIR, "riscv_cap")
 
 BOOT_ID = str(uuid.uuid4())
 
-def _git_short_hash():
+def _build_version_identity():
+    """Return the current build identifier together with its identity type.
+
+    Development workspaces have Git metadata, while published deployments
+    identify themselves with the Replit deployment build ID.  These strings
+    use different namespaces and must not be presented as comparable commits.
+    """
     try:
-        return subprocess.check_output(
+        version = subprocess.check_output(
             ["git", "rev-parse", "--short", "HEAD"],
             cwd=BASE_DIR, stderr=subprocess.DEVNULL
         ).decode().strip()
+        if version:
+            return version, "git"
     except Exception:
         pass
-    for env_key in ("REPL_DEPLOY_ID", "REPL_ID"):
-        val = os.environ.get(env_key, "")
-        if val:
-            return val[:8]
-    return "unknown"
+    deploy_id = os.environ.get("REPL_DEPLOY_ID", "")
+    if deploy_id:
+        return deploy_id[:8], "deployment"
+    repl_id = os.environ.get("REPL_ID", "")
+    if repl_id:
+        return repl_id[:8], "runtime"
+    return "unknown", "unknown"
 
-BUILD_VERSION = _git_short_hash()
+def _git_short_hash():
+    """Backward-compatible shorthand for callers storing a build identifier."""
+    return _build_version_identity()[0]
+
+BUILD_VERSION, BUILD_VERSION_KIND = _build_version_identity()
 
 _COMPRESSIBLE = ('javascript', 'css', 'html', 'json', 'text/')
 _gz_cache = {}
@@ -1850,7 +1864,11 @@ def favicon():
 
 @app.route("/api/boot-id")
 def boot_id():
-    return jsonify({"bootId": BOOT_ID, "version": BUILD_VERSION})
+    return jsonify({
+        "bootId": BOOT_ID,
+        "version": BUILD_VERSION,
+        "version_kind": BUILD_VERSION_KIND,
+    })
 
 # ---------------------------------------------------------------------------
 # Daily report — manual trigger
@@ -5029,9 +5047,23 @@ def versions_production():
             data = r.json()
             if isinstance(data, dict) and data.get("version"):
                 payload["version"] = data.get("version")
+                remote_kind = str(data.get("version_kind") or "unknown")
+                payload["version_kind"] = remote_kind
                 payload["boot_id"] = data.get("bootId")
                 payload["local_version"] = BUILD_VERSION
-                payload["in_sync"] = (data.get("version") == BUILD_VERSION)
+                payload["local_version_kind"] = BUILD_VERSION_KIND
+                comparable = (
+                    remote_kind != "unknown" and
+                    remote_kind == BUILD_VERSION_KIND
+                )
+                payload["in_sync"] = (
+                    data.get("version") == BUILD_VERSION if comparable else None
+                )
+                payload["comparison"] = (
+                    "match" if payload["in_sync"] is True else
+                    "mismatch" if payload["in_sync"] is False else
+                    "not_comparable"
+                )
                 # Only cache validated successful responses; errors are never
                 # cached so the next UI refresh retries immediately.
                 _versions_prod_cache["ts"] = now
@@ -14410,6 +14442,7 @@ def wukong_status_get():
         'halt':                _wukong_halt_summary(latest, snapshot, delivery,
                                                     bridge_info, now),
         'ide_version':        BUILD_VERSION,
+        'ide_version_kind':   BUILD_VERSION_KIND,
         # Repo-side expectations so the Versions view can compare against the
         # sentinel-reported build_version / tu_version without extra requests.
         'expected_build_version': _wukong_build_version(),

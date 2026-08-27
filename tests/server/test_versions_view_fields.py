@@ -47,6 +47,7 @@ def test_status_exposes_version_fields():
     assert resp.status_code == 200
     data = resp.get_json()
     assert 'ide_version' in data and data['ide_version']
+    assert data['ide_version_kind'] in {'git', 'deployment', 'runtime', 'unknown'}
     assert 'expected_build_version' in data
     assert 'min_tu_version' in data
     assert data['expected_build_version'] == _app_module._wukong_build_version()
@@ -63,6 +64,40 @@ def test_status_remains_readonly_with_new_fields():
     d2 = client.get('/hardware/wukong/status').get_json()
     assert d1['expected_build_version'] == d2['expected_build_version']
     assert d1['min_tu_version'] == d2['min_tu_version']
+
+
+def test_boot_id_identifies_which_version_namespace_it_uses():
+    data = app.test_client().get('/api/boot-id').get_json()
+    assert data['version']
+    assert data['version_kind'] in {'git', 'deployment', 'runtime', 'unknown'}
+
+
+def test_production_deployment_id_is_not_compared_to_a_local_git_commit(monkeypatch):
+    class ProductionReply:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {
+                'bootId': 'published-boot',
+                'version': 'published-build',
+                'version_kind': 'deployment',
+            }
+
+    monkeypatch.setattr(_app_module, 'BUILD_VERSION', 'local-git-commit')
+    monkeypatch.setattr(_app_module, 'BUILD_VERSION_KIND', 'git')
+    monkeypatch.setattr(
+        _app_module.http_requests, 'get',
+        lambda *args, **kwargs: ProductionReply(),
+    )
+    monkeypatch.setattr(
+        _app_module, '_versions_prod_cache', {'ts': 0.0, 'payload': None},
+    )
+    data = app.test_client().get('/api/versions/production').get_json()
+    assert data['version_kind'] == 'deployment'
+    assert data['local_version_kind'] == 'git'
+    assert data['in_sync'] is None
+    assert data['comparison'] == 'not_comparable'
 
 
 def test_standalone_bridge_version_matches_wukong_build():
@@ -89,6 +124,7 @@ def test_bridge_version_is_exposed_in_versions_view():
     assert '_renderBridge(status)' in app_run
     assert 'bridge.bridge_version' in app_run
     assert 'Matches build v' in app_run
+    assert 'Not directly comparable' in app_run
 
 
 def test_connect_view_clarifies_jtag_and_usb_uart_connections():

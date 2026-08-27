@@ -12427,14 +12427,30 @@ const VersionsView = {
                 (prod && prod.url ? `<div class="versions-note"><a href="${this._esc(prod.url)}" target="_blank" rel="noopener">${this._esc(prod.url)}</a></div>` : '');
             return;
         }
-        const badge = prod.in_sync
+        const labels = {
+            git: 'Git commit',
+            deployment: 'published build',
+            runtime: 'runtime build',
+            unknown: 'build identity',
+        };
+        const remoteKind = prod.version_kind || 'unknown';
+        const localKind = prod.local_version_kind || 'unknown';
+        const remoteLabel = labels[remoteKind] || labels.unknown;
+        const localLabel = labels[localKind] || labels.unknown;
+        const badge = prod.in_sync === true
             ? this._badge('ok', 'Same version as this IDE')
-            : this._badge('warn', 'Different version than this IDE');
+            : prod.in_sync === false
+                ? this._badge('warn', 'Different version than this IDE')
+                : this._badge('unknown', 'Not directly comparable');
+        const comparisonNote = prod.in_sync == null
+            ? `<div class="versions-note">Production reports a ${this._esc(remoteLabel)}; this IDE reports a ${this._esc(localLabel)}. These identifiers are not a source mismatch.</div>`
+            : '';
         el.innerHTML =
-            `<div class="versions-value"><code>${this._esc(prod.version)}</code></div>` +
+            `<div class="versions-value">${this._esc(remoteLabel)} <code>${this._esc(prod.version)}</code></div>` +
             badge +
             `<div class="versions-note"><a href="${this._esc(prod.url)}" target="_blank" rel="noopener">${this._esc(prod.url)}</a>` +
-            (prod.local_version ? ` &middot; this IDE: <code>${this._esc(prod.local_version)}</code>` : '') + '</div>';
+            (prod.local_version ? ` &middot; this IDE ${this._esc(localLabel)}: <code>${this._esc(prod.local_version)}</code>` : '') + '</div>' +
+            comparisonNote;
     },
 
     _renderFpga(status) {
