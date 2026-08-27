@@ -2938,7 +2938,7 @@ function updateNamespace() {
                 btn.style.color = '#4ec9b0';
                 setTimeout(() => {
                     btn.disabled = false;
-                    btn.textContent = 'Save policies';
+                    btn.textContent = 'Save for next build';
                     btn.style.color = '';
                 }, 1800);
             }
@@ -5332,7 +5332,7 @@ window.lumpSaveLump = async function(nsIdx) {
     const metadata = {
         abstraction:  absName,
         // ns_slot intentionally omitted — ns-state.json is the authoritative
-        // slot→token map; slot assignment is committed via Save NS Table.
+        // slot→token map; slot assignment is committed via Save for next build.
         content_type: typeNames[hdr.typ] || 'code',
         cw:           hdr.cw,
         cc:           hdr.cc,
