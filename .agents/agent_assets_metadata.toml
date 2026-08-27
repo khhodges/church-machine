@@ -232,3 +232,17 @@ mtime_ms = 1787840027694
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/0d999345-01ce-4345-b212-1790cb643c58/086c0583-00f3-46ea-948d-e7186ff53236"
 storage_version_token = "1787840220900615"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "MsuSFa9nKq6ijrgbuSmjP"
+uri = "file://build/release-candidate-v17/church_wukong_xc7a100t.bit"
+type = "unspecified"
+title = "Wukong v17 bitstream"
+description = "QMTECH Wukong XC7A100T volatile JTAG image. SHA-256: 9ef015d897161d79f75121f920fd2c18191b2b0ad3325c795f4a45e9c91f109b. Size: 3,826,002 bytes."
+
+[[outputs]]
+id = "Mrcu2VwvAcyUf8QeifRtS"
+uri = "file://build/release-candidate-v17/church_wukong_xc7a100t.mcs"
+type = "unspecified"
+title = "Wukong v17 persistent MCS image"
+description = "QMTECH Wukong XC7A100T persistent-flash image. SHA-256: d609e72a5f0c84ea32b184c4491e36349c103dd75bf84678949f5857b8c17684. Size: 10,521,876 bytes."
