@@ -9,7 +9,7 @@
       "g": 0,
       "limit": "0x000FF",
       "seq": 0,
-      "seal": "0x9741"
+      "seal": "0xDE8DDEEF"
     },
     {
       "name": "Boot.Thread",
@@ -20,7 +20,7 @@
       "g": 0,
       "limit": "0x001FF",
       "seq": 0,
-      "seal": "0xDC0F"
+      "seal": "0xDE925EEF"
     },
     {
       "name": "UART_DEV",
@@ -31,7 +31,7 @@
       "g": 0,
       "limit": "0x00002",
       "seq": 0,
-      "seal": "0xDD36"
+      "seal": "0xDEADF4CF"
     },
     {
       "name": "LED_DEV",
@@ -42,7 +42,7 @@
       "g": 0,
       "limit": "0x00004",
       "seq": 0,
-      "seal": "0x6CA6"
+      "seal": "0xDEAD3ECF"
     },
     {
       "name": "BTN_DEV",
@@ -53,7 +53,7 @@
       "g": 0,
       "limit": "0x00000",
       "seq": 0,
-      "seal": "0x9EAF"
+      "seal": "0xDEADAACF"
     },
     {
       "name": "TIMER_DEV",
@@ -64,30 +64,30 @@
       "g": 0,
       "limit": "0x00004",
       "seq": 0,
-      "seal": "0x14DA"
+      "seal": "0xDEAD28CF"
     },
     {
       "name": "SelfTest",
       "slot": 6,
       "location": "0x00000200",
       "type": "Inform",
-      "boot": true,
       "f": 0,
       "g": 0,
       "limit": "0x001FD",
       "seq": 0,
-      "seal": "0xB8CE"
+      "seal": "0xDE931EEF",
+      "boot": true
     },
     {
-      "name": "WukongCallHome.hw",
+      "name": "WukongCallHome",
       "slot": 7,
       "location": "0x00000400",
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x00049",
+      "limit": "0x0007D",
       "seq": 0,
-      "seal": "0xA125"
+      "seal": "0xDEA01EEF"
     },
     {
       "name": "Tunnel",
@@ -96,9 +96,9 @@
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x0003F",
+      "limit": "0x0003E",
       "seq": 0,
-      "seal": "0xD1E8"
+      "seal": "0xDEA85EEF"
     },
     {
       "name": "Ethernet",
@@ -107,9 +107,9 @@
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x0003F",
+      "limit": "0x0003E",
       "seq": 0,
-      "seal": "0x624C"
+      "seal": "0xDEA83EEF"
     },
     {
       "name": "CapabilityTest",
@@ -118,10 +118,55 @@
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x0003F",
+      "limit": "0x0003A",
       "seq": 0,
-      "seal": "0x0CD0"
+      "seal": "0xDEA89EEF"
+    },
+    {
+      "name": "Thread#2",
+      "slot": 11,
+      "location": "0x00000500",
+      "type": "Inform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x001FF",
+      "seq": 0,
+      "seal": "0xDE90DEEF"
+    },
+    {
+      "name": "Thread#3",
+      "slot": 12,
+      "location": "0x00000700",
+      "type": "Inform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x001FF",
+      "seq": 0,
+      "seal": "0xDE91DEEF"
+    },
+    {
+      "name": "Constants",
+      "slot": 13,
+      "location": "0x00000A00",
+      "type": "Inform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x00017",
+      "seq": 0,
+      "seal": "0xDEAA5EEF"
+    },
+    {
+      "name": "SlideRule",
+      "slot": 14,
+      "location": "0x00000B00",
+      "type": "Inform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x00A2A",
+      "seq": 0,
+      "seal": "0xDFED7EEF"
     }
   ],
-  "generated_at": 1787092483.9646783
+  "generated_at": 1787867340.0465639,
+  "committed_raw_fingerprint": "8b23abc9220eb3c5a736e5ec12adbedc1b58d31bcc79e566141158a29bccee14"
 }
