@@ -116,6 +116,21 @@ scp -i ~/.ssh/replit_droplet -o StrictHostKeyChecking=no \
 | Reusing synth checkpoint for resume | `launch_runs impl_1 -to_step write_bitstream` can fail if run already at 100% | Use `open_checkpoint *_routed.dcp` + `write_bitstream` directly |
 | Tcl readiness check cannot import Amaranth | Vivado's settings script can replace `PATH`, hiding the isolated build Python | Set `CM_PYTHON` to the virtualenv interpreter; the TCL gate uses it explicitly |
 
+## Build-host serialization
+
+Run only one Vivado synthesis/implementation job at a time on the 8 GB droplet.
+Before launching, inspect active Vivado process trees and wait for any unrelated
+build to finish rather than starting another one or killing a build you do not
+own.
+
+**Why:** Concurrent Wukong builds exhausted available memory, triggered Vivado's
+thrashing detector, and left synthesis in Cross Boundary and Area Optimization
+without log progress for more than an hour.
+
+**How to apply:** Check for active vendor jobs before staging or launching. Use a
+no-hangup wrapper that writes an explicit exit-status file, and accept artifacts
+only after `EXIT_0`, clean timing evidence, and fresh output timestamps.
+
 **Why:** The container filesystem resets between sessions; the private key must
 come from a Replit secret or be regenerated and re-added each time.
 The single-line collapsing trap has bitten twice — always use the Python formatter.
