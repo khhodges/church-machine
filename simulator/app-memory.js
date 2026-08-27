@@ -2534,9 +2534,10 @@ function _maybeApplyBootImage() {
 // config. The server writes server/lumps/boot-image.bin and returns
 // download / inline-binary URLs; we surface the download link and arm
 // the simulator to load the image on the next reset.
-function generateBootImage() {
+function generateBootImage(onApplied) {
     const result = document.getElementById('le-rl-gen-result');
     const btn    = document.getElementById('le-rl-gen-btn');
+    const notifyApplied = typeof onApplied === 'function' ? onApplied : function() {};
     if (result) result.textContent = 'Generating\u2026';
     if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
     fetch('/api/boot-image/generate', {
@@ -2548,6 +2549,7 @@ function generateBootImage() {
         .then(({ ok, body }) => {
             if (!ok || body.ok === false) {
                 if (result) result.textContent = (body && body.error) || 'Generation failed.';
+                notifyApplied(false);
                 return;
             }
             const kib = (body.bytes / 1024).toFixed(1);
@@ -2579,17 +2581,25 @@ function generateBootImage() {
                             window.bootImageAvailable = true;
                             _applyBootEntryToSim();
                             if (typeof window._clearBootImageStickyPatches === 'function') window._clearBootImageStickyPatches(sim.nsCount || 0);
+                            notifyApplied(true);
                         } else {
                             window.bootImage = null;
                             window.bootImageAvailable = false;
                             if (result) result.textContent = 'Generated image was rejected by the loader (stale/invalid) — regenerate.';
+                            notifyApplied(false);
                         }
-                    } catch(e) { console.warn('[bootImage] apply failed:', e); }
+                    } catch(e) {
+                        console.warn('[bootImage] apply failed:', e);
+                        notifyApplied(false);
+                    }
+                } else {
+                    notifyApplied(false);
                 }
             });
         })
         .catch(err => {
             if (result) result.textContent = 'Generation failed: ' + err;
+            notifyApplied(false);
         })
         .finally(() => {
             if (btn) { btn.disabled = false; btn.style.opacity = '1'; }

@@ -329,7 +329,24 @@
                 return false;
             }
             window.bootConfig = res.body.config;
-            if (statusEl) statusEl.textContent = 'Step 1 saved. Reset the simulator to apply.';
+            // Saving the designer changes the persisted boot geometry, which
+            // also determines the generated Thread#2…Thread#N namespace
+            // entries.  Do not leave the live simulator on the previous
+            // boot-image snapshot: regenerate and load it now so the
+            // Namespace Table reflects the saved design immediately.
+            if (statusEl) statusEl.textContent = 'Step 1 saved. Updating Namespace Table…';
+            if (typeof generateBootImage === 'function') {
+                generateBootImage(function(applied) {
+                    if (statusEl) {
+                        statusEl.textContent = applied
+                            ? 'Step 1 saved. Namespace Table updated.'
+                            : 'Step 1 saved. Reset the simulator to apply.';
+                    }
+                    if (applied && typeof updateNamespace === 'function') updateNamespace();
+                });
+            } else if (statusEl) {
+                statusEl.textContent = 'Step 1 saved. Reset the simulator to apply.';
+            }
             return true;
         })
         .catch(function(err) {
