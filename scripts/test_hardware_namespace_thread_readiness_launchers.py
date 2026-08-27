@@ -36,7 +36,7 @@ def test_wukong_tcl_gates_vivado_synthesis() -> None:
     assert "check_hardware_namespace_thread_readiness.py" in text
     _assert_before(
         text,
-        "exec python3 $readiness_script",
+        "exec $readiness_python $readiness_script",
         "launch_runs synth_1",
         "Wukong Vivado launcher",
     )

@@ -97,15 +97,22 @@ def check_contract() -> list[str]:
     return checks
 
 
-def check_artifacts() -> list[str]:
+def check_artifacts(build_dir: Path | str = ROOT / "build") -> list[str]:
+    """Check generated artifacts in *build_dir* for current source stamps.
+
+    The default keeps the pre-synthesis command pointed at the repository
+    build directory, while the explicit path makes the same gate usable by
+    generation tests and isolated build pipelines.
+    """
+    build_dir = Path(build_dir)
     checks = []
-    for relative, sources in (
-        ("build/church_core.v", CORE_SOURCES),
-        ("build/church_core_iot.v", CORE_SOURCES),
-        ("build/church_wukong_xc7a100t.il", WUKONG_SOURCES),
-        ("build/church_wukong_xc7a100t.v", WUKONG_SOURCES),
+    for filename, sources in (
+        ("church_core.v", CORE_SOURCES),
+        ("church_core_iot.v", CORE_SOURCES),
+        ("church_wukong_xc7a100t.il", WUKONG_SOURCES),
+        ("church_wukong_xc7a100t.v", WUKONG_SOURCES),
     ):
-        path = ROOT / relative
+        path = build_dir / filename
         if path.exists():
             ok, detail = artifact_is_fresh(path, sources)
             if not ok:
@@ -114,9 +121,17 @@ def check_artifacts() -> list[str]:
     return checks
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if len(argv) > 1:
+        print(
+            "usage: check_hardware_namespace_thread_readiness.py [build_dir]",
+            file=sys.stderr,
+        )
+        return 2
+    build_dir = argv[0] if argv else ROOT / "build"
     try:
-        messages = check_contract() + check_artifacts()
+        messages = check_contract() + check_artifacts(build_dir)
     except (AssertionError, FileNotFoundError) as exc:
         print(f"hardware-readiness: FAIL: {exc}", file=sys.stderr)
         return 1

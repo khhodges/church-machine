@@ -20,7 +20,11 @@ from hardware.readiness import (
     artifact_stamp,
     stamp_text,
 )
-from scripts.check_hardware_namespace_thread_readiness import check_contract
+from hardware.gen_verilog import generate_core_iot_verilog
+from scripts.check_hardware_namespace_thread_readiness import (
+    check_artifacts,
+    check_contract,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -85,6 +89,24 @@ def test_empty_file_is_reported_stale(tmp_path: Path):
 def test_wukong_stamp_is_different_from_core_stamp():
     """CORE and WUKONG source sets must produce distinct fingerprints."""
     assert artifact_stamp(CORE_SOURCES) != artifact_stamp(WUKONG_SOURCES)
+
+
+def test_generated_iot_verilog_passes_readiness_and_rejects_stale_stamp(
+    tmp_path: Path,
+):
+    """The IoT generator must emit the stamp consumed by the readiness gate."""
+    output_path = Path(generate_core_iot_verilog(tmp_path))
+
+    messages = check_artifacts(tmp_path)
+    assert output_path.name == "church_core_iot.v"
+    assert any("church_core_iot.v" in message for message in messages)
+
+    lines = output_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    lines[0] = "// CM-HARDWARE-SOURCES-SHA256: " + "0" * 64 + "\n"
+    output_path.write_text("".join(lines), encoding="utf-8")
+
+    with pytest.raises(AssertionError, match="regenerate before synthesis"):
+        check_artifacts(tmp_path)
 
 
 # ---------------------------------------------------------------------------
