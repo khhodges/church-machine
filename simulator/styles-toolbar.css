@@ -509,6 +509,24 @@
 .cr-lump-name { display: block; font-size: 0.70rem; font-style: normal; color: var(--text-muted, #888); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 88px; }
 .cr-gt { color: var(--church-gold); }
 .cr-perms { font-size: 0.68rem; }
+.cr-target { color: #9cc7f5; }
+.cr-ns-slot { color: #8ec5ff; font-weight: 600; }
+.cr-ns-label {
+    color: var(--text-secondary);
+    font-size: 0.66rem;
+    font-style: italic;
+}
+.cr-ns-empty, .cr-ns-unavailable, .cr-version-neutral { color: var(--text-secondary); }
+.cr-version-check {
+    display: inline-block;
+    font-size: 0.67rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    cursor: help;
+}
+.cr-version-valid { color: #86efac; }
+.cr-version-stale, .cr-version-revoked, .cr-version-malformed,
+.cr-version-missing, .cr-version-unavailable { color: #fca5a5; }
 .cr-type { color: var(--text-secondary); font-size: 0.68rem; }
 .cr-flag { text-align: center; color: var(--church-gold); font-weight: 600; }
 .cr-m { text-align: center; color: var(--text-secondary); }

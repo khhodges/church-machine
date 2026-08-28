@@ -22,7 +22,7 @@ global.window = {
 const ChurchSimulator = require('./simulator.js');
 const sim = new ChurchSimulator();
 
-const dom = new JSDOM('<!doctype html><body><div id="namespaceTable"></div></body>');
+const dom = new JSDOM('<!doctype html><body><div id="namespaceTable"></div><div id="crRegs"></div></body>');
 const sandbox = {
     console,
     document: dom.window.document,
@@ -41,6 +41,96 @@ sandbox.window.bootConfig = global.window.bootConfig;
 sandbox.window.addEventListener = () => {};
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(__dirname + '/app-memory.js', 'utf8'), sandbox);
+vm.runInContext(fs.readFileSync(__dirname + '/app-cr-display.js', 'utf8'), sandbox);
+
+// CR rows derive validation from the live Namespace every time they render.
+// Cover matching, stale, missing, malformed, revoked, Abstract, and NULL rows.
+const validationSlot = 11;
+const validationEntry = sim.readNSEntry(validationSlot);
+const validationSeq = sim.parseNSWord1(validationEntry.word1_limit).gtSeq;
+const crWordsFor = word0 => ({
+    word0: word0 >>> 0,
+    word1: validationEntry.word0_location >>> 0,
+    word2: validationEntry.word1_limit >>> 0,
+    word3: validationEntry.word3_cache_token >>> 0,
+    m: 0,
+});
+sim.cr[0] = crWordsFor(sim.createGT(validationSeq, validationSlot, { R: 1 }, 1));
+sim.cr[1] = crWordsFor(sim.createGT((validationSeq + 1) & 0x1FF, validationSlot, { E: 1 }, 1));
+const missingSlot = Math.min(sim.MAX_NS_ENTRIES - 1, sim.nsCount + 5);
+sim.cr[2] = crWordsFor(sim.createGT(1, missingSlot, { W: 1 }, 1));
+const malformedChurchGT = (
+    (3 << 28) | (1 << 27) | (1 << 25) |
+    ((validationSeq & 0x1FF) << 16) | validationSlot
+) >>> 0;
+sim.cr[3] = crWordsFor(malformedChurchGT);
+const revokedSlot = 12;
+const revokedEntry = sim.readNSEntry(revokedSlot);
+const revokedSeq = sim.parseNSWord1(revokedEntry.word1_limit).gtSeq;
+sim.memory[sim._nsSlotBase(revokedSlot) + 2] ^= 1;
+sim.cr[4] = crWordsFor(sim.createGT(revokedSeq, revokedSlot, { R: 1 }, 1));
+sim.cr[5] = crWordsFor(sim.createAbstractGT(0, { R: 1 }, 7, 0x1234));
+sim.cr[6] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
+
+assert.strictEqual(sim.getFormattedCR(0).validationStatus, 'valid',
+    'matching GT and live Namespace versions validate');
+assert.strictEqual(sim.getFormattedCR(1).validationStatus, 'stale',
+    'mismatched GT and live Namespace versions are stale');
+assert.strictEqual(sim.getFormattedCR(2).validationStatus, 'missing',
+    'a GT outside the live Namespace is missing');
+assert.strictEqual(sim.getFormattedCR(3).validationStatus, 'malformed',
+    'an invalid multi-Church-permission GT is malformed');
+assert.strictEqual(sim.getFormattedCR(4).validationStatus, 'revoked',
+    'a matching GT whose live Namespace seal is invalid is revoked');
+assert.strictEqual(sim.getFormattedCR(5).validationStatus, 'unavailable',
+    'an Abstract GT has no Namespace version to validate');
+assert.strictEqual(sim.getFormattedCR(5).nsSlot, null,
+    'an Abstract GT payload is never exposed as a Namespace slot');
+assert.strictEqual(sim.getFormattedCR(5).perms, '-R-----',
+    'an Abstract GT uses its dedicated R/W permission layout');
+assert.strictEqual(sim.getFormattedCR(5).gtSeq, 7,
+    'an Abstract GT uses its dedicated seven-bit version field');
+assert.strictEqual(sim.getFormattedCR(6).validationStatus, 'null',
+    'a NULL CR remains a safe neutral state');
+
+sandbox._petNameCRMap = {};
+sandbox.updateCRDisplay();
+const crHtml = dom.window.document.getElementById('crRegs').innerHTML;
+assert(crHtml.includes(`NS[${validationSlot}]`) &&
+       crHtml.includes(sim.nsLabels[validationSlot]),
+    'rendered CR target includes NS[n] and its live label');
+assert(crHtml.includes('[-R-----]'),
+    'rendered CR row includes its decoded permission set');
+assert.strictEqual(dom.window.document.querySelectorAll('.cr-version-valid').length, 1,
+    'only the matching row renders a validation success');
+assert(dom.window.document.querySelector('.cr-version-valid').textContent.includes('\u2713'),
+    'the matching row renders a visible check mark');
+assert(dom.window.document.querySelector('.cr-version-stale'),
+    'the stale row renders a non-success state');
+assert(dom.window.document.querySelector('.cr-version-missing'),
+    'the missing row renders a non-success state');
+assert(dom.window.document.querySelector('.cr-version-malformed'),
+    'the malformed row renders a non-success state');
+assert(dom.window.document.querySelector('.cr-version-revoked'),
+    'the revoked row renders a non-success state');
+assert(dom.window.document.querySelector('.cr-version-unavailable'),
+    'the Abstract row renders a non-success state');
+assert(crHtml.includes('Abstract GT'),
+    'the Abstract row renders no fabricated Namespace target');
+assert(dom.window.document.querySelector('.cr-version-unavailable').textContent.includes('v7 / NS \u2014') &&
+       crHtml.includes('[-R-----]'),
+    'the Abstract row renders its own permissions and unavailable version check');
+assert(dom.window.document.querySelector('.cr-version-neutral'),
+    'the NULL row renders a safe neutral version cell');
+
+// Re-rendering derives status from the current live Namespace, not cached data.
+sim.memory[sim._nsSlotBase(validationSlot) + 1] =
+    (validationEntry.word1_limit ^ (1 << 21)) >>> 0;
+sandbox.updateCRDisplay();
+assert.strictEqual(sim.getFormattedCR(0).validationStatus, 'stale',
+    'a live Namespace sequence mutation makes the same CR stale');
+assert.strictEqual(dom.window.document.querySelectorAll('.cr-version-valid').length, 0,
+    'a refresh removes the validation check after the live version changes');
 
 const thread2 = sim.getThreadInstanceLayout(11);
 const thread3 = sim.getThreadInstanceLayout(12);
@@ -88,7 +178,7 @@ crDetailTitle.id = 'crDetailTitle';
 const crDetailContent = dom.window.document.createElement('div');
 crDetailContent.id = 'crDetailContent';
 dom.window.document.body.append(crDetailTitle, crDetailContent);
-sandbox.selectedCR = 12;
+vm.runInContext('selectedCR = 12;', sandbox);
 sandbox._petNameCRMap = {};
 sim.bootComplete = false;
 sim._currentThreadSlot = 12;

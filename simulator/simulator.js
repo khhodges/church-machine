@@ -9289,6 +9289,114 @@ class ChurchSimulator {
         return { ok: true };
     }
 
+    getCRValidation(idx) {
+        const cr = this.cr && this.cr[idx];
+        const gtWord = cr ? (cr.word0 >>> 0) : 0;
+        if (!cr || ChurchSimulator.isNullGT(gtWord)) {
+            return {
+                status: 'null',
+                valid: false,
+                nsSlot: null,
+                nsLabel: '',
+                gtVersion: null,
+                nsVersion: null,
+                versionMatch: null,
+                sealValid: null,
+                message: 'NULL capability',
+            };
+        }
+
+        let parsed;
+        try {
+            parsed = this.parseGT(gtWord);
+        } catch (error) {
+            return {
+                status: 'malformed',
+                valid: false,
+                nsSlot: null,
+                nsLabel: '',
+                gtVersion: null,
+                nsVersion: null,
+                versionMatch: false,
+                sealValid: false,
+                message: 'Malformed Golden Token',
+            };
+        }
+
+        const nsSlot = Number.isInteger(parsed.index) ? parsed.index : null;
+        const nsLabel = nsSlot !== null && this.nsLabels
+            ? (this.nsLabels[nsSlot] || '') : '';
+        const base = {
+            status: 'missing',
+            valid: false,
+            nsSlot,
+            nsLabel,
+            gtVersion: Number.isInteger(parsed.gt_seq) ? parsed.gt_seq : null,
+            nsVersion: null,
+            versionMatch: false,
+            sealValid: false,
+            message: '',
+            parsed,
+            nsEntry: null,
+        };
+
+        if (parsed.malformed) {
+            base.status = 'malformed';
+            base.message = parsed.malformedReason
+                ? `Malformed Golden Token (${parsed.malformedReason})`
+                : 'Malformed Golden Token';
+            return base;
+        }
+
+        // Abstract GTs encode device/elevation data in the low bits, not a
+        // Namespace slot.  Keep them explicit and safe for the dashboard
+        // rather than treating their payload as a live NS index.
+        if (parsed.type === 3) {
+            const abstract = this.parseAbstractGT(gtWord);
+            base.status = 'unavailable';
+            base.nsSlot = null;
+            base.nsLabel = '';
+            base.gtVersion = abstract.gt_seq;
+            base.message = 'Abstract GT has no Namespace slot';
+            return base;
+        }
+
+        if (nsSlot === null || nsSlot < 0 ||
+                nsSlot >= this.MAX_NS_ENTRIES || nsSlot >= this.nsCount) {
+            base.message = `NS[${nsSlot === null ? '?' : nsSlot}] is outside the live Namespace`;
+            return base;
+        }
+
+        let nsEntry;
+        try {
+            nsEntry = this.readNSEntry(nsSlot);
+        } catch (error) {
+            nsEntry = null;
+        }
+        if (!nsEntry) {
+            base.message = `NS[${nsSlot}] has no live Namespace entry`;
+            return base;
+        }
+
+        base.nsEntry = nsEntry;
+        const authority = this.parseNSWord1(nsEntry.word1_limit);
+        base.nsVersion = authority.gtSeq;
+        base.versionMatch = base.gtVersion === base.nsVersion;
+        base.sealValid = this.validateMAC(nsEntry);
+        if (!base.versionMatch) {
+            base.status = 'stale';
+            base.message = `GT version ${base.gtVersion} does not match live NS version ${base.nsVersion}`;
+        } else if (!base.sealValid) {
+            base.status = 'revoked';
+            base.message = `NS[${nsSlot}] integrity seal is invalid`;
+        } else {
+            base.status = 'valid';
+            base.valid = true;
+            base.message = `GT version ${base.gtVersion} matches live NS version ${base.nsVersion}`;
+        }
+        return base;
+    }
+
     getFormattedCR(idx) {
         const cr = this.cr[idx];
         const isEmpty = !cr || ChurchSimulator.isNullGT(cr.word0 >>> 0);
@@ -9296,13 +9404,17 @@ class ChurchSimulator {
             return {
                 index: idx, isNull: true, mBit: 0,
                 word0_gt: '00000000', perms: '-------', gtSeq: 0, gtIndex: 0, gtType: 'NULL', gtTypeName: 'NULL',
+                nsSlot: null, nsLabel: '', nsVersion: null, versionMatch: null,
+                validationStatus: 'null', validationMessage: 'NULL capability',
                 word1_location: 0,
                 word2_limit_raw: 0, limitB: 0, limitF: 0, limit17: 0,
                 word3_seals_raw: 0, sealGtSeq: 0, sealCRC: 0,
             };
         }
         const parsed = this.parseGT(cr.word0);
-        const nsEntry = this.readNSEntry(parsed.index);
+        const abstract = parsed.type === 3 ? this.parseAbstractGT(cr.word0) : null;
+        const validation = this.getCRValidation(idx);
+        const nsEntry = validation.nsEntry;
         const nsWord1 = nsEntry ? nsEntry.word1_limit : cr.word2;
         const lim = this.parseNSWord1(nsWord1);
         // Canonical NS ABI: gt_seq lives in W1[29:21] (authority word), and the
@@ -9310,21 +9422,30 @@ class ChurchSimulator {
         // + legacy CRC16 integrity metadata (CR.word3 now exposes cache T).
         const sealGtSeq = lim.gtSeq;
         const sealCRC = nsEntry ? (nsEntry.word2_seals >>> 0) : 0;
-        const permStr = (parsed.permissions.B ? 'B' : '-') +
-                        (parsed.permissions.R ? 'R' : '-') +
-                        (parsed.permissions.W ? 'W' : '-') +
-                        (parsed.permissions.X ? 'X' : '-') +
-                        (parsed.permissions.L ? 'L' : '-') +
-                        (parsed.permissions.S ? 'S' : '-') +
-                        (parsed.permissions.E ? 'E' : '-');
+        const permStr = abstract
+            ? '-' + (abstract.R ? 'R' : '-') + (abstract.W ? 'W' : '-') + '----'
+            : (parsed.permissions.B ? 'B' : '-') +
+              (parsed.permissions.R ? 'R' : '-') +
+              (parsed.permissions.W ? 'W' : '-') +
+              (parsed.permissions.X ? 'X' : '-') +
+              (parsed.permissions.L ? 'L' : '-') +
+              (parsed.permissions.S ? 'S' : '-') +
+              (parsed.permissions.E ? 'E' : '-');
         return {
             index: idx, isNull: false, mBit: cr.m || 0,
             word0_gt: cr.word0.toString(16).toUpperCase().padStart(8, '0'),
             perms: permStr,
-            gtSeq: parsed.gt_seq,
+            gtSeq: abstract ? abstract.gt_seq : parsed.gt_seq,
             gtIndex: parsed.index,
             gtType: parsed.type,
             gtTypeName: parsed.typeName,
+            nsSlot: validation.nsSlot,
+            nsLabel: validation.nsLabel,
+            nsVersion: validation.nsVersion,
+            versionMatch: validation.versionMatch,
+            sealValid: validation.sealValid,
+            validationStatus: validation.status,
+            validationMessage: validation.message,
             word1_location: cr.word1,
             word2_limit_raw: nsWord1,
             limitB: parsed.permissions.B,

@@ -60,12 +60,47 @@ function updateCRDisplay() {
         const clickable = !cr.isNull ? ' cr-clickable' : '';
         const lumpTag = (i === 6 || i === 14) && !cr.isNull && sim.programName
             ? `<span class="cr-lump-name">${sim.programName}</span>` : '';
+        const escCell = value => String(value == null ? '' : value)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const nsSlot = cr.nsSlot !== undefined
+            ? cr.nsSlot : (!cr.isNull && Number.isInteger(cr.gtIndex) ? cr.gtIndex : null);
+        const nsLabel = cr.nsLabel || '';
+        let targetHtml = '<span class="cr-ns-empty">\u2014</span>';
+        if (!cr.isNull && nsSlot !== null && nsSlot !== undefined) {
+            targetHtml = `<span class="cr-ns-slot">NS[${escCell(nsSlot)}]</span>` +
+                (nsLabel ? ` <span class="cr-ns-label">${escCell(nsLabel)}</span>` : '');
+        } else if (!cr.isNull && cr.gtTypeName === 'Abstract') {
+            targetHtml = '<span class="cr-ns-unavailable">Abstract GT</span>';
+        }
+        let versionHtml = '<span class="cr-version-neutral" title="NULL capability">\u2014</span>';
+        if (!cr.isNull) {
+            // Only the simulator's complete live Namespace validation may
+            // display success.  Legacy/incomplete rows remain non-successful.
+            const status = cr.validationStatus || 'unavailable';
+            const gtVersion = cr.gtSeq == null ? '?' : `v${cr.gtSeq}`;
+            const nsVersion = cr.nsVersion == null
+                ? '\u2014' : `v${cr.nsVersion}`;
+            const isValid = status === 'valid';
+            const icon = isValid ? '&#x2713;' : '&#x2717;';
+            const statusText = status === 'valid' ? 'validated'
+                : status === 'stale' ? 'stale'
+                : status === 'revoked' ? 'revoked'
+                : status === 'malformed' ? 'malformed'
+                : status === 'unavailable' ? 'unavailable'
+                : 'missing';
+            const message = cr.validationMessage ||
+                `GT ${gtVersion} / live Namespace ${nsVersion} (${statusText})`;
+            versionHtml = `<span class="cr-version-check cr-version-${escCell(status)}" ` +
+                `title="${escCell(message)}" aria-label="${escCell(message)}">` +
+                `${icon} ${gtVersion} / NS ${nsVersion}</span>`;
+        }
         html += `<tr class="${nullCls}${groupCls}${clickable}" ${!cr.isNull ? `onclick="openCRDetail(${i})"` : ''}>`;
         html += `<td class="cr-idx">${i}</td>`;
         html += `<td class="cr-gt">0x${cr.word0_gt}</td>`;
         html += `<td class="cr-perms">[${cr.perms}]</td>`;
-        html += `<td>${cr.gtSeq}</td>`;
-        html += `<td>${cr.gtIndex}</td>`;
+        html += `<td class="cr-version">${versionHtml}</td>`;
+        html += `<td class="cr-target">${targetHtml}</td>`;
         html += `<td class="cr-type">${cr.gtTypeName}</td>`;
         html += `<td class="cr-m ${cr.mBit ? 'cr-m-set' : ''}">${cr.mBit}</td>`;
         html += `<td class="cr-name" onmouseenter="showCRPopup(event,${i})" onmouseleave="hideCRPopup()">${name}${lumpTag}</td>`;
