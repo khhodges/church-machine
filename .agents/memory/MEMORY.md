@@ -157,3 +157,4 @@
 - [Release LUMP replacement](lump-release-replacement.md) — release rebuilds replace the selected user slot by default; New Entry is explicit, while fixed system slots stay protected
 - [Save picker visibility](save-namespace-picker-visibility.md) — display every known NS slot; only Boot.NS and Boot.Thread are disabled in the picker
 - [Wukong scheduler Thread allocation](wukong-scheduler-thread-allocation.md) — physical round-robin contexts need 512-word projected Thread bodies for persisted CR14 capability state
+- [Namespace upload composite integrity](namespace-upload-composite-integrity.md) — validate each LUMP, then bind slots, layout, boot entry, and hashes into one exact upload image
