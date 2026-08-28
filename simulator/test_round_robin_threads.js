@@ -62,6 +62,18 @@ assert.strictEqual(committed.cr[0].word0, entryWords[0],
 assert.strictEqual(committed.dr[1], 0xA1001001,
     'committed image restores Thread.1 DR state after wraparound');
 
+// Switching saved images is a memory-image operation, not a boot-phase
+// operation. It must work while the loaded image is stopped before boot.
+const preBoot = new ChurchSimulator();
+assert.strictEqual(preBoot.loadBootImage(image), true,
+    `pre-boot fixture image must load: ${preBoot.lastBootImageError || 'unknown error'}`);
+preBoot.bootComplete = false;
+preBoot._currentThreadSlot = 1;
+const preBootEntryGT = preBoot.memory[preBoot.readNSEntry(1).word0_location + 244] >>> 0;
+preBoot._writeCR(0, preBootEntryGT, preBoot.readNSEntry(preBootEntryGT & 0xFFFF));
+assert.strictEqual(preBoot.advanceConfiguredThread().slot, 11,
+    'saved Thread images can be selected before the boot ceremony runs');
+
 // The browser declares `let sim` in app-shell.js. Top-level `let` bindings are
 // not mirrored onto window, so the toolbar handler must use the lexical `sim`
 // binding rather than silently returning when window.sim is absent.
@@ -116,6 +128,11 @@ vm.runInContext([
 uiContext.updateThreadControl();
 assert.strictEqual(button.disabled, false,
     'Next Thread button is enabled with three configured Threads');
+uiSim.bootComplete = false;
+uiContext.updateThreadControl();
+assert.strictEqual(button.disabled, false,
+    'Next Thread button remains enabled for saved images before boot');
+uiSim.bootComplete = true;
 uiSim.running = true;
 uiContext.updateThreadControl();
 assert.strictEqual(button.disabled, true,

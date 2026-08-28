@@ -1060,12 +1060,16 @@ function updateThreadControl() {
     const state = sim.activeThreadStatus();
     if (status) status.textContent = `${state.name} · ${state.position}/${state.count}`;
     if (button) {
-        const unavailable = !sim.bootComplete || sim.running || state.count <= 1;
+        // Saved Thread images are independently switchable whenever the
+        // machine is stopped.  Boot is not an execution prerequisite here:
+        // the Namespace and Thread LUMPs are already present in the loaded
+        // memory image, and CHANGE restores the selected image's context.
+        const unavailable = sim.running || state.count <= 1;
         button.disabled = unavailable;
         button.setAttribute('aria-disabled', unavailable ? 'true' : 'false');
         button.setAttribute('data-tooltip', unavailable
             ? (state.count <= 1 ? 'Next Thread — only Thread.1 is configured'
-                : 'Next Thread — available after boot while execution is paused')
+                : 'Next Thread — pause execution before switching Threads')
             : `Next Thread — switch to ${state.slots[(state.position % state.count)] === 1 ? 'Thread.1' : (sim.nsLabels[state.slots[(state.position % state.count)]] || 'next Thread')}`);
     }
 }

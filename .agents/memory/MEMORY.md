@@ -152,5 +152,6 @@
 - [Release LUMP replacement](lump-release-replacement.md) — release rebuilds replace the selected user slot by default; New Entry is explicit, while fixed system slots stay protected
 - [Save picker visibility](save-namespace-picker-visibility.md) — display every known NS slot; only Boot.NS and Boot.Thread are disabled in the picker
 - [Wukong scheduler Thread allocation](wukong-scheduler-thread-allocation.md) — physical round-robin contexts need 512-word projected Thread bodies for persisted CR14 capability state
+- [Stopped Thread image selection](stopped-thread-image-selection.md) — saved Thread images may be cycled before or after boot whenever execution is not running
 - [Namespace upload composite integrity](namespace-upload-composite-integrity.md) — validate each LUMP, then bind slots, layout, boot entry, and hashes into one exact upload image
 - [Dynamic composite POLA boundary](dynamic-composite-pola-boundary.md) — keep abstraction LUMPs immutable; cryptographically validate and POLA-secure dynamic changes in the active composite image

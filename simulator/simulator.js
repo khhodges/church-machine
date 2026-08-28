@@ -4386,9 +4386,6 @@ class ChurchSimulator {
     // authority for this local control, and the target is validated before
     // any outgoing state is written.
     advanceConfiguredThread() {
-        if (!this.bootComplete) {
-            return { ok: false, reason: 'Simulator is still booting' };
-        }
         if (this.running) {
             return { ok: false, reason: 'Pause execution before switching Threads' };
         }
