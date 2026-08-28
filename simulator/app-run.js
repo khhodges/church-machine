@@ -1084,6 +1084,12 @@ function nextConfiguredThread() {
     }
     updateThreadControl();
     updateDashboard();
+    if (outcome.ok && typeof openCRDetail === 'function') {
+        // Next Thread is a suspended-image browser action. Keep the detail
+        // panel on the selected Thread's CR12 memory map rather than leaving
+        // the previously selected CR14 register view visible.
+        openCRDetail(12);
+    }
 }
 
 function onRunBtnClick() {

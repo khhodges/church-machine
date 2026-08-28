@@ -136,6 +136,7 @@ const button = {
 const status = { textContent: '' };
 const consoleEl = { textContent: '', scrollTop: 0, scrollHeight: 0 };
 let dashboardUpdates = 0;
+let openedCR = null;
 const uiContext = {
     window: {}, // deliberately has no window.sim
     sim: uiSim,
@@ -149,6 +150,7 @@ const uiContext = {
         },
     },
     updateDashboard() { dashboardUpdates++; },
+    openCRDetail(crIndex) { openedCR = crIndex; },
 };
 vm.createContext(uiContext);
 vm.runInContext([
@@ -177,6 +179,8 @@ assert(finishRunSource.includes('updateThreadControl();'),
 uiContext.nextConfiguredThread();
 assert.strictEqual(uiSim.activeThreadStatus().slot, 11,
     'browser-shaped Next Thread click switches to Thread#2 without window.sim');
+assert.strictEqual(openedCR, 12,
+    'Next Thread opens the selected Thread CR12 memory-map view');
 assert.strictEqual(status.textContent, 'Thread#2 · 2/3',
     'toolbar status follows the newly active Thread LUMP');
 uiContext.nextConfiguredThread();
