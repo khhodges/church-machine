@@ -4,6 +4,7 @@
 // Namespace order, wrap exactly once, preserve private state, and fail before
 // mutating the current context when a target descriptor is invalid.
 const assert = require('assert');
+const vm = require('vm');
 global.window = { bootConfig: { step1: {
     totalNamespaceWords: 16384, namespaceLumpWords: 1024,
     threadLumpWords: 256, threadCount: 3,
@@ -92,4 +93,63 @@ assert.strictEqual(committed.cr[0].word0, 0xA1000001,
     'committed image restores Thread.1 CR state after wraparound');
 assert.strictEqual(committed.dr[1], 0xA1001001,
     'committed image restores Thread.1 DR state after wraparound');
+
+// The browser declares `let sim` in app-shell.js. Top-level `let` bindings are
+// not mirrored onto window, so the toolbar handler must use the lexical `sim`
+// binding rather than silently returning when window.sim is absent.
+function functionSource(source, name) {
+    const start = source.indexOf(`function ${name}(`);
+    assert(start >= 0, `${name} must exist in app-run.js`);
+    const brace = source.indexOf('{', start);
+    let depth = 0;
+    for (let i = brace; i < source.length; i++) {
+        if (source[i] === '{') depth++;
+        else if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1);
+    }
+    throw new Error(`Could not extract ${name}`);
+}
+
+const appRunSource = fs.readFileSync(__dirname + '/app-run.js', 'utf8');
+const uiSim = new ChurchSimulator();
+assert.strictEqual(uiSim.loadBootImage(image), true,
+    `UI fixture image must load: ${uiSim.lastBootImageError || 'unknown error'}`);
+uiSim.bootComplete = true;
+uiSim._currentThreadSlot = 1;
+const button = {
+    disabled: false,
+    attrs: {},
+    setAttribute(name, value) { this.attrs[name] = value; },
+};
+const status = { textContent: '' };
+const consoleEl = { textContent: '', scrollTop: 0, scrollHeight: 0 };
+let dashboardUpdates = 0;
+const uiContext = {
+    window: {}, // deliberately has no window.sim
+    sim: uiSim,
+    document: {
+        getElementById(id) {
+            return {
+                nextThreadBtn: button,
+                activeThreadStatus: status,
+                editorConsole: consoleEl,
+            }[id] || null;
+        },
+    },
+    updateDashboard() { dashboardUpdates++; },
+};
+vm.createContext(uiContext);
+vm.runInContext([
+    functionSource(appRunSource, 'updateThreadControl'),
+    functionSource(appRunSource, 'nextConfiguredThread'),
+].join('\n'), uiContext);
+uiContext.updateThreadControl();
+assert.strictEqual(button.disabled, false,
+    'Next Thread button is enabled with three configured Threads');
+uiContext.nextConfiguredThread();
+assert.strictEqual(uiSim.activeThreadStatus().slot, 11,
+    'browser-shaped Next Thread click switches to Thread#2 without window.sim');
+assert.strictEqual(status.textContent, 'Thread#2 · 2/3',
+    'toolbar status follows the newly active Thread LUMP');
+assert.strictEqual(dashboardUpdates, 1,
+    'Next Thread click refreshes the dashboard');
 console.log('PASS round-robin Thread scheduler');

@@ -1056,7 +1056,7 @@ let _runClickTimer = null;
 function updateThreadControl() {
     const button = document.getElementById('nextThreadBtn');
     const status = document.getElementById('activeThreadStatus');
-    if (!window.sim || typeof sim.activeThreadStatus !== 'function') return;
+    if (!sim || typeof sim.activeThreadStatus !== 'function') return;
     const state = sim.activeThreadStatus();
     if (status) status.textContent = `${state.name} · ${state.position}/${state.count}`;
     if (button) {
@@ -1071,7 +1071,7 @@ function updateThreadControl() {
 }
 
 function nextConfiguredThread() {
-    if (!window.sim || typeof sim.advanceConfiguredThread !== 'function') return;
+    if (!sim || typeof sim.advanceConfiguredThread !== 'function') return;
     const outcome = sim.advanceConfiguredThread();
     const consoleEl = document.getElementById('editorConsole');
     if (consoleEl && outcome.reason) {
