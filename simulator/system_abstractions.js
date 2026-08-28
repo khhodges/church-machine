@@ -741,20 +741,10 @@ class SystemAbstractions {
             const ledPK = mintPassKey(sim, 'LED', PASSKEY_PERM_ALL);
 
             if (ledPK) {
-                const threadEntry = sim.readNSEntry(1);
-                if (threadEntry) {
-                    const threadParsed = sim.parseNSWord1(threadEntry.word1_limit);
-                    const threadBase = threadEntry.word0_location;
-                    const allocSize = threadParsed.limit + 1;
-                    const newClistCount = threadEntry.clistCount + 1;
-                    const clistSlot = threadBase + allocSize - newClistCount;
-                    sim.memory[clistSlot] = ledPK.gt;
-                    // C-list count is owned by the resident LUMP header, not W1.
-                    const threadHdr = sim.parseLumpHeader(sim.memory[threadBase]);
-                    sim.memory[threadBase] = sim.packLumpHeader(
-                        threadHdr.nMinus6, threadHdr.cw, newClistCount, threadHdr.typ);
-                }
-
+                // A Thread body has exactly twelve architectural CR homes at
+                // +244..+255.  Runtime PassKeys are tracked by Navana's virtual
+                // map; they must never be appended to that fixed region or
+                // reflected by changing the resident Thread header's cc field.
                 if (!sim.nsClistMap[1]) sim.nsClistMap[1] = [];
                 sim.nsClistMap[1].push({ gt: ledPK.gt, device: 'LED', passKeyId: ledPK.id });
             }

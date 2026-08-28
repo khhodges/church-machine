@@ -8,6 +8,8 @@ const assert = require('assert');
 const fs = require('fs');
 const vm = require('vm');
 const { JSDOM } = require('jsdom');
+const AbstractionRegistry = require('./abstractions.js');
+const SystemAbstractions = require('./system_abstractions.js');
 
 global.window = {
     bootConfig: {
@@ -237,5 +239,30 @@ assert.notStrictEqual(wideThread.capsStart, wideThread.lumpSize - wideThread.cap
     'viewer does not fabricate a tail capability zone for a larger Thread');
 assert.notStrictEqual(wideSim.memory[wideThread.base + wideThread.capsStart], 0,
     'the selected 512-word body exposes its stored CR0');
+
+// Full boot runs Navana.Init, which mints runtime PassKeys.  Those credentials
+// live in Navana's virtual map and must not expand or rewrite the fixed twelve
+// CR homes in any resident Thread body.
+global.window.bootConfig.step1.threadCount = 3;
+const bootRegistry = new AbstractionRegistry();
+new SystemAbstractions(bootRegistry);
+const bootSim = new ChurchSimulator();
+bootSim.initAbstractions(bootRegistry, null, null);
+const bootThreadHeader = bootSim.memory[bootSim.readNSEntry(1).word0_location] >>> 0;
+for (let i = 0; i < 8 && !bootSim.bootComplete && !bootSim.halted; i++) {
+    assert.strictEqual(bootSim._bootStep(), true, `boot step ${i} advances`);
+}
+assert.strictEqual(bootSim.bootComplete, true, 'full boot completes with Navana.Init');
+assert.strictEqual(
+    bootSim.memory[bootSim.readNSEntry(1).word0_location] >>> 0,
+    bootThreadHeader,
+    'Navana.Init does not rewrite the fixed Thread.1 header'
+);
+for (const slot of [1, 11, 12]) {
+    const layout = bootSim.getThreadInstanceLayout(slot);
+    assert(layout.valid, `${bootSim.nsLabels[slot]} remains a valid Thread after boot`);
+    assert.strictEqual(layout.capsStart, 244, `${bootSim.nsLabels[slot]} keeps CR homes at +244`);
+    assert.strictEqual(layout.capsWords, 12, `${bootSim.nsLabels[slot]} keeps exactly twelve CR homes`);
+}
 
 console.log('thread instance zone tests passed');
