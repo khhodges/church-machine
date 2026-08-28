@@ -550,6 +550,105 @@ assert('T6e: hw disconnected + sim not booted → RESET',
         'retry schedule missing');
 }
 
-console.log('');
-console.log((passed + failed) + ' tests: ' + passed + ' passed, ' + failed + ' failed');
-if (failed > 0) process.exit(1);
+// ── T11: failed board reboot leaves the Reboot button clickable ───────────────
+// Exercise _wukongShowFaultPanel itself with a rejecting board command.  The
+// assertion runs after the async click handler's finally block has executed.
+{
+    function makeDomElement(tag) {
+        const handlers = {};
+        const element = {
+            tagName: tag,
+            id: '',
+            className: '',
+            textContent: '',
+            style: { cssText: '', opacity: '' },
+            title: '',
+            dataset: {},
+            innerHTML: '',
+            parentNode: null,
+            children: [],
+            appendChild: function(child) {
+                this.children.push(child);
+                child.parentNode = this;
+            },
+            addEventListener: function(type, handler) {
+                handlers[type] = handler;
+            },
+            dispatch: function(type) {
+                return handlers[type] ? handlers[type]({}) : undefined;
+            },
+            insertBefore: function(child, before) {
+                const index = this.children.indexOf(before);
+                if (index === -1) this.children.push(child);
+                else this.children.splice(index, 0, child);
+                child.parentNode = this;
+            },
+            querySelector: function(selector) {
+                if (selector === '.wukong-fault-view-link') {
+                    return makeDomElement('button');
+                }
+                return null;
+            },
+            remove: function() { this.removed = true; },
+        };
+        return element;
+    }
+
+    const editorConsole = makeDomElement('div');
+    const editorParent = makeDomElement('div');
+    editorConsole.parentNode = editorParent;
+    let faultPanel = null;
+    global.document = {
+        getElementById: function(id) {
+            if (id === 'editorConsole') return editorConsole;
+            if (id === 'wukong-fault-panel') return faultPanel;
+            return null;
+        },
+        createElement: function(tag) { return makeDomElement(tag); },
+    };
+    editorParent.insertBefore = function(child, before) {
+        faultPanel = child;
+        child.parentNode = editorParent;
+    };
+    global._wukongFaultDismissed = false;
+    global._wukongLastFaultData = null;
+    global._wukongHwFaulted = true;
+    global._wukongPrevFaultValid = true;
+    global._WUKONG_FAULT_NAMES = _WUKONG_FAULT_NAMES;
+    global._WUKONG_EV_INSTR_NAME = _WUKONG_EV_INSTR_NAME;
+    global._wukongPostCmd = function() {
+        return Promise.reject(new Error('board disconnected'));
+    };
+    global._wukongHideFaultPanel = function() {};
+    global.updateFlagsDisplay = function() {};
+    global._escHtml = function(value) { return String(value); };
+    global._wukongOpenFaultDisasm = function() {};
+
+    const resetBody = extractFunctionBody(appRunSrc, '_wukongHwFaultReset', '');
+    // eslint-disable-next-line no-new-func
+    global._wukongHwFaultReset = new Function(
+        'return async function _wukongHwFaultReset() {' + resetBody + '\n};'
+    )();
+    const showPanelBody = extractFunctionBody(appRunSrc, '_wukongShowFaultPanel', 'data');
+    // eslint-disable-next-line no-new-func
+    const showFaultPanel = new Function('data', showPanelBody);
+    showFaultPanel({ fault_code: 1, nia: 0x140, ev_type: 0 });
+
+    const rebootBtn = faultPanel.children[1].children.find(function(child) {
+        return child.className === 'wukong-fault-reboot-btn';
+    });
+    rebootBtn.dispatch('click');
+    assert('T11a: failed reboot disables button while command is in flight',
+        rebootBtn.disabled === true && rebootBtn.style.opacity === '0.5',
+        'disabled=' + rebootBtn.disabled + ', opacity=' + rebootBtn.style.opacity);
+
+    setImmediate(function() {
+        assert('T11b: failed reboot restores a clickable button',
+            rebootBtn.disabled === false && rebootBtn.style.opacity === '',
+            'disabled=' + rebootBtn.disabled + ', opacity=' + rebootBtn.style.opacity);
+
+        console.log('');
+        console.log((passed + failed) + ' tests: ' + passed + ' passed, ' + failed + ' failed');
+        if (failed > 0) process.exit(1);
+    });
+}

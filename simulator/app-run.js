@@ -18609,7 +18609,20 @@ function _wukongShowFaultPanel(data) {
     rebootBtn.textContent = '\u21BA Reboot';
     rebootBtn.title = 'Send reboot command to the board and clear the fault badge';
     rebootBtn.addEventListener('click', function() {
-        _wukongHwFaultReset();
+        if (rebootBtn.disabled) return;
+        rebootBtn.disabled = true;
+        rebootBtn.style.opacity = '0.5';
+        (async function() {
+            try {
+                await _wukongHwFaultReset();
+            } catch(e) {
+                // The reset function normally handles board errors itself, but
+                // the button must recover even if a future failure escapes it.
+            } finally {
+                rebootBtn.disabled = false;
+                rebootBtn.style.opacity = '';
+            }
+        })();
     });
     body.appendChild(rebootBtn);
 
