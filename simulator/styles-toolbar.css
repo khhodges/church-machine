@@ -477,6 +477,26 @@
     white-space: nowrap;
     font-size: 0.68rem;
 }
+.cr-table .cr-table-groups th {
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.64rem;
+    letter-spacing: 0.05em;
+}
+.cr-table .cr-group-head {
+    border-left: 1px solid var(--border);
+}
+.cr-table .cr-group-gt {
+    color: var(--church-gold);
+    background: rgba(200,160,32,0.12);
+}
+.cr-table .cr-group-cr {
+    color: var(--church-blue);
+    background: rgba(96,165,250,0.09);
+}
+.cr-table .cr-group-cr-id {
+    vertical-align: middle;
+}
 .cr-table td {
     padding: 0.2rem 0.4rem;
     border-bottom: 1px solid rgba(45,55,72,0.3);

@@ -24,17 +24,21 @@ function updateCRDisplay() {
         14: { group: 'privil', role: 'privil', badge: 'Priv'   },
         15: { group: 'privil', role: 'privil', badge: 'Priv'   },
     };
-    const COLS = 14;
-    let html = '<table class="cr-table"><thead><tr>';
-    html += '<th>CR</th><th>M</th><th>Name</th><th>Role</th>';
-    html += '<th>R0: GT</th><th>Perms</th><th>Seq</th><th>Idx</th><th>Type</th>';
-    html += '<th>R1: Location</th>';
+    const TOTAL_COLS = 15;
+    let html = '<table class="cr-table"><thead>';
+    html += '<tr class="cr-table-groups">';
+    html += '<th rowspan="2" class="cr-group-cr-id">CR#</th>';
+    html += '<th colspan="5" class="cr-group-head cr-group-gt">GT FIELDS (R0)</th>';
+    html += '<th colspan="9" class="cr-group-head cr-group-cr">CR / SLOT FIELDS</th>';
+    html += '</tr><tr>';
+    html += '<th>GT</th><th>Perms</th><th>Version</th><th>NS Slot</th><th>Type</th>';
+    html += '<th>M</th><th>Name</th><th>Role</th><th>R1: Location</th>';
     html += '<th>R0:B</th><th>F</th><th>Limit[16:0]</th>';
     html += '<th>W1: Seq</th><th>W2: Integrity32</th>';
     html += '</tr></thead><tbody>';
     for (let i = 0; i < 16; i++) {
         if (i === 12) {
-            html += `<tr class="cr-separator"><td colspan="${COLS + 1}">&#9472;&#9472; Not in GT zone &#9472;&#9472; CR12 Thread Stack (Priv) \u00b7 CR13 Interrupt Handler (System) \u00b7 CR14\u201315 Privileged &#9472;&#9472;</td></tr>`;
+            html += `<tr class="cr-separator"><td colspan="${TOTAL_COLS}">&#9472;&#9472; Not in GT zone &#9472;&#9472; CR12 Thread Stack (Priv) \u00b7 CR13 Interrupt Handler (System) \u00b7 CR14\u201315 Privileged &#9472;&#9472;</td></tr>`;
         }
         const cr = sim.getFormattedCR(i);
         const petCR = _petNameCRMap[i];
@@ -58,14 +62,14 @@ function updateCRDisplay() {
             ? `<span class="cr-lump-name">${sim.programName}</span>` : '';
         html += `<tr class="${nullCls}${groupCls}${clickable}" ${!cr.isNull ? `onclick="openCRDetail(${i})"` : ''}>`;
         html += `<td class="cr-idx">${i}</td>`;
-        html += `<td class="cr-m ${cr.mBit ? 'cr-m-set' : ''}">${cr.mBit}</td>`;
-        html += `<td class="cr-name" onmouseenter="showCRPopup(event,${i})" onmouseleave="hideCRPopup()">${name}${lumpTag}</td>`;
-        html += `<td><span class="cr-role-badge cr-role-${meta.role}">${meta.badge}</span></td>`;
         html += `<td class="cr-gt">0x${cr.word0_gt}</td>`;
         html += `<td class="cr-perms">[${cr.perms}]</td>`;
         html += `<td>${cr.gtSeq}</td>`;
         html += `<td>${cr.gtIndex}</td>`;
         html += `<td class="cr-type">${cr.gtTypeName}</td>`;
+        html += `<td class="cr-m ${cr.mBit ? 'cr-m-set' : ''}">${cr.mBit}</td>`;
+        html += `<td class="cr-name" onmouseenter="showCRPopup(event,${i})" onmouseleave="hideCRPopup()">${name}${lumpTag}</td>`;
+        html += `<td><span class="cr-role-badge cr-role-${meta.role}">${meta.badge}</span></td>`;
         html += `<td>0x${cr.word1_location.toString(16).toUpperCase().padStart(8, '0')}</td>`;
         html += `<td class="cr-flag">${cr.limitB}</td>`;
         html += `<td class="cr-flag">${cr.limitF}</td>`;
