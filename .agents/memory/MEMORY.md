@@ -1,10 +1,7 @@
 - [System CR register layout](system-cr-register-layout.md) — DR0 and CR5/6/12/13/14/15 are system-reserved; available params start at DR1, CR0–CR4, CR7–CR11
-- [Boot-image regen SelfTest manifest gap](boot-image-regen-selftest-manifest-gap.md) — generate_boot_image needs manifest abstraction=="SelfTest"@slot6; entry is "start"/null, so full regen fails; patch surgically
 - [Dot pet name identity architecture](dot-pet-name-identity.md) — petname.Abstraction#n is global identity; two seals (identity_hash + binary_hash); self Inform GT at c-list row 0
 - [ns-state.json rich NS-entry format](ns-state-dot-name-format.md) — one rich object per occupied slot (name, slot, location, type, f, g, limit, seq, seal, boot?); no flat-name list or top-level boot_entry
-- [gen_cm_dmem_direct.py double-definition trap](gen-cm-dmem-double-definition.md) — appends cm_dmem_bram to church_ti60_f225.v AND writes cm_dmem_bram.v; delete the .v and strip XML entry before MAP
 - [NS slot restore post-c-list-write read](ns-slot-restore-post-clist-read.md) — NS slot 1 location must be captured BEFORE the c-list write loop; same bug existed in both boot_image.py and simulator.js
-- [NS slot 1 DEMO_CLIST stomp (stale binary)](ns-slot1-demo-clist-stomp.md) — old generator wrote clist_gts into NS TABLE tail, stomping NS[1] word0 (Thread loc) with 0x32000003; fixed in loadBootImage() + binary patched
 - [NULL GT type canonicalisation](null-gt-type-canon.md) — isNullGT checks bits[26:25]===0b00; only replace ===0 with isNullGT at hardware gates (mLoad, _fetchInstruction); UI presence checks (CR6 in resolvePendingSlot) must stay ===0
 - [THREAD_NS_SLOTS in E2E test GTs](thread-ns-slots-e2e-trap.md) — synthetic GT word0 index bits[15:0] must NOT be 1 or 45 (THREAD_NS_SLOTS); those trigger showThread→crDetailTab='lump' override; use index=0x20 (32) in test fixtures
 - [Wukong single-step trace architecture](wukong-trace-arch.md) — 11-byte 0xAA packets; uart_rx_pin=F3; retire_flags.as_value()[:4] for NZCV; COND_FLAGS_LAYOUT is 4-bit StructLayout; TraceUnit skips retire if busy (step mode guarantees idle); SelfTest F-bit failures pre-existed this task
@@ -85,7 +82,6 @@
 - [Wukong build-host policy](wukong-build-host-policy.md) — serialize resource-constrained Vivado builds and accept releases only with fresh, timing-clean provenance
 - [Wukong sentinel build version](wukong-sentinel-build-version.md) — 4-byte sentinel (0xBC N_INIT TU VER BUILD_VER); 'f' cmd re-arms; WUKONG_BUILD_VERSION in wukong_top.py; bump before each synthesis
 - [UartTx DONE-gap double-increment](uart-tx-done-gap-double-increment.md) — TX requesters gating on ~busy alone skip every other byte; must use ~busy & ~done (sentinel looked dead on hardware)
-- [Wukong sentinel_phase reset on 'f'](wukong-sentinel-phase-reset-bug.md) — 'f' must reset BOTH sentinel_sent AND sentinel_phase to 0; sentinel_phase alone causes single-byte re-fire (ignored by bridge)
 - [Wukong boot CALL/LOAD/retire fixes](wukong-boot-callhome-fixes.md) — sync-BRAM fetch-settle bubble, issue-cycle busy gaps, operand latching, busy-gated decoder faults, boot_retire_count reset on FAULT_RST
 - [Wukong IRQ arm gate](wukong-irq-arm-gate.md) — irq_armed_reg+first_call_done_reg cleared on FAULT_RST; dispatch disabled until first CALL→method→RETURN completes
 - [Wukong boot CALL direct-GT resolution](wukong-boot-call-resolution.md) — decoder call_mask=0 always; boot window uses BOOT_RESTORE_MASK (CR0+CR12); CALL bypasses c-list via mload_direct+boot_window_lat
@@ -112,7 +108,6 @@
 - [Lump V1.3 self-defining freespace](lump-v13-self-definition.md) — 0xAB frame at word cw+1 (API JSON + optional source); JS/Python emitters must stay in lockstep; compile cache key must include tier
 - [Schema field removal must sweep all readers](schema-field-removal-sweep.md) — purge CI workflow steps + doc-figure HTML viewers too; add a CI invariant so the key stays gone
 - [Boot-suite test isolation](boot-suite-triage-clusters.md) — destructive tests on shared live dirs need a cross-process write lock or temp-dir isolation, not snapshot/restore alone; bulk-failure triage needs reconciled per-cluster F/E counts
-- [SelfTest word510 E-GT stomp](selftest-lump-word510-stomp.md) — boot_rom asserts word[510]=0x4A000006; full tests/boot run is destructive to server/lumps and caused the drift
 - [Case-insensitive metadata aliases](case-insensitive-metadata-aliases.md) — case-equivalent registry aliases must update atomically; diagnostics dedupe only within one source location
 - [Direct LUMP call selector](direct-lump-call-selector.md) — single-entry LUMPs whose first code word is executable must use selector 0, never method-table selector 1
 - [Declared C-list B-flag rule](declared-clist-b-flag-rule.md) — declared capability rows must use B=0; browser and server validators must reject B-set Inform tokens consistently
@@ -158,3 +153,4 @@
 - [Save picker visibility](save-namespace-picker-visibility.md) — display every known NS slot; only Boot.NS and Boot.Thread are disabled in the picker
 - [Wukong scheduler Thread allocation](wukong-scheduler-thread-allocation.md) — physical round-robin contexts need 512-word projected Thread bodies for persisted CR14 capability state
 - [Namespace upload composite integrity](namespace-upload-composite-integrity.md) — validate each LUMP, then bind slots, layout, boot entry, and hashes into one exact upload image
+- [Dynamic composite POLA boundary](dynamic-composite-pola-boundary.md) — keep abstraction LUMPs immutable; cryptographically validate and POLA-secure dynamic changes in the active composite image
