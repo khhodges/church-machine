@@ -104,6 +104,40 @@ def _capabilitytest_manifest_body():
     return list(struct.unpack(f">{len(raw) // 4}I", raw))
 
 
+def _write_oversized_catalog_fixture(lumps_dir):
+    """Write SelfTest plus a 256-word resident slot-10 LUMP."""
+    self_token = "00000600"
+    self_words = [0] * 64
+    self_words[0] = (0x1F << 27) | (3 << 10)
+    (lumps_dir / f"{self_token}.lump").write_bytes(
+        struct.pack(">64I", *self_words))
+
+    catalog_token = "aabbccdd"
+    catalog_name = "CapabilityTest.9.aabbccdd.lump"
+    catalog_words = [0] * 256
+    catalog_words[0] = (0x1F << 27) | (2 << 23) | (1 << 10) | 5
+    catalog_words[1] = 0xF8000000
+    catalog_words[-5:] = [0x04000020 + i for i in range(5)]
+    (lumps_dir / catalog_name).write_bytes(
+        struct.pack(">256I", *catalog_words))
+
+    (lumps_dir / "manifest.json").write_text(json.dumps([
+        {"token": self_token, "abstraction": "SelfTest",
+         "ns_slot": 6, "boot_resident": True},
+        {"token": catalog_token, "abstraction": "CapabilityTest",
+         "ns_slot": 10, "filename": catalog_name, "boot_resident": True},
+    ]))
+    (lumps_dir / "ns-state.json").write_text(json.dumps({
+        "abstractions": [
+            {"name": "SelfTest", "slot": 6, "token": self_token,
+             "type": "Inform"},
+            {"name": "CapabilityTest", "slot": 10, "token": catalog_token,
+             "filename": catalog_name, "issue_n": 9, "type": "Inform"},
+        ],
+    }))
+    return catalog_words
+
+
 @pytest.mark.parametrize("slot", [6, 7])
 def test_caps0_gt_and_entry_body_resident(slot):
     """Hardware image carries the requested E-GT at Thread.caps[0] and a
@@ -257,6 +291,48 @@ def test_wukong_projection_uploads_fixed_and_two_generated_thread_contexts():
         assert ((words[target_base] >> 23) & 0xF) >= 3
         assert words[slot * NS_ENTRY_WORDS + 2] == integrity32(
             target_base * 4, words[slot * NS_ENTRY_WORDS + 1])
+
+
+def test_oversized_catalog_allocation_preserves_three_threads_and_projection(tmp_path):
+    """A large fixed resident body cannot overwrite generated Thread contexts."""
+    catalog_words = _write_oversized_catalog_fixture(tmp_path)
+    cfg = _minimal_cfg(thread_count=3)
+    cfg["step1"]["threadLumpWords"] = 512
+    generic = generate_boot_image(
+        cfg, str(tmp_path), boot_entry_slot=10, require_entry_resident=True)
+    source = _unpack_words(generic)
+    source_total = len(source)
+    entries = {
+        slot: source[_ns_slot_base(source_total, slot):
+                     _ns_slot_base(source_total, slot) + NS_ENTRY_WORDS]
+        for slot in (1, 10, 11, 12)
+    }
+
+    assert entries[1][0] == 0
+    assert entries[10][0] == 768
+    assert entries[11][0] == entries[10][0] + 256
+    assert entries[12][0] == entries[11][0] + 512
+    assert source[entries[10][0]:entries[10][0] + 256] == catalog_words
+    for slot in (1, 11, 12):
+        base = entries[slot][0]
+        assert ((source[base] >> 27) & 0x1F) == 0x1F
+        assert ((source[base] >> 8) & 0x3) == 2
+        assert source[base + THREAD_CAPS_OFFSET] == create_gt(
+            0, 10, {"E": 1}, 1)
+
+    projected, info = build_wukong_upload_image(generic)
+    projected_words = _unpack_words(projected)
+    assert [row["slot"] for row in info["thread_contexts"]] == [1, 11, 12]
+    for row in info["thread_contexts"]:
+        source_base = entries[row["slot"]][0]
+        target_base = row["base_word"]
+        expected = source[source_base:source_base + 512]
+        expected[0] = (expected[0] & ~(0xF << 23)) | (3 << 23)
+        if row["slot"] != 1:
+            expected[17] = WUKONG_UPLOAD_BODY_BASE_WORD * 4 + 4
+            expected[THREAD_CAPS_OFFSET + 14] = create_gt(
+                0, 10, {"E": 1}, 1)
+        assert projected_words[target_base:target_base + 512] == expected
 
 
 def test_wukong_projection_preserves_every_thread_private_body():

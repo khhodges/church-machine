@@ -245,7 +245,8 @@ def generated_thread_label(slot):
     return f"Thread#{offset + 2}" if offset >= 0 else None
 
 
-def boot_resident_region_end(thread_size, boot_abstr_size, thread_count):
+def boot_resident_region_end(thread_size, boot_abstr_size, thread_count,
+                             catalog_slot_sizes=None):
     """Return the first free RAM word after the fixed boot bodies.
 
     The Namespace LUMP is stored at the Namespace-table tail.  RAM starts with
@@ -253,11 +254,13 @@ def boot_resident_region_end(thread_size, boot_abstr_size, thread_count):
     generated Thread#2 onward follow them contiguously.  Step-2 resident
     bodies must begin at or after this address.
     """
-    return (
-        thread_size * thread_count
-        + boot_abstr_size
-        + (len(DEFAULT_ABSTRACTION_CATALOG) - BOOT_ABSTR_NS_SLOT - 1) * SLOT_SIZE
+    catalog_slot_sizes = catalog_slot_sizes or {}
+    trailing_catalog_words = sum(
+        catalog_slot_sizes.get(slot, SLOT_SIZE)
+        for slot in range(BOOT_ABSTR_NS_SLOT + 1,
+                          len(DEFAULT_ABSTRACTION_CATALOG))
     )
+    return thread_size * thread_count + boot_abstr_size + trailing_catalog_words
 
 
 # MMIO NS slot specs: (mmio_byte_addr, lim17).
@@ -1468,12 +1471,41 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     }
     trusted_cache_tokens = _load_trusted_cache_token_map(_manifest_path_for_cache)
     catalog = DEFAULT_ABSTRACTION_CATALOG
+    # Resolve boot-resident catalog bodies before assigning any locations.
+    # Their declared LUMP allocation, not the historical 64-word catalog
+    # default and not merely the file's byte length, reserves physical RAM.
+    # The same cached body is embedded later so placement and writing cannot
+    # disagree and overwrite a generated Thread context.
+    _boot_resident_bodies = {}
+    _boot_resident_allocations = {}
+    for _slot, _tok, _filename in _load_boot_resident_entries(
+            _manifest_path_for_cache, _selected_slot_tokens):
+        if (_slot == BOOT_ABSTR_NS_SLOT
+                or not (0 <= _slot < len(catalog))
+                or _slot in _MMIO_SLOT_SPECS):
+            continue
+        _body = _read_lump_body(lumps_dir, _tok, _filename)
+        if _body is None:
+            continue
+        if not _body or ((_body[0] >> 27) & 0x1F) != 0x1F:
+            raise ValueError(
+                f"generate_boot_image: boot-resident catalog slot {_slot} "
+                "does not contain a valid LUMP header")
+        _declared_words = 1 << (((_body[0] >> 23) & 0xF) + 6)
+        if len(_body) < _declared_words:
+            raise ValueError(
+                f"generate_boot_image: boot-resident catalog slot {_slot} "
+                f"declares {_declared_words} words but its file contains only "
+                f"{len(_body)}")
+        _boot_resident_bodies[_slot] = _body[:_declared_words]
+        _boot_resident_allocations[_slot] = _declared_words
     slot_sizes = {
         0: ns_size,
         1: thread_size,
         # Slots 2-5: MMIO — no RAM body, handled by _MMIO_SLOT_SPECS.
         BOOT_ABSTR_NS_SLOT: actual_abstr_size,  # SelfTest: from saved lump or 64w default
     }
+    slot_sizes.update(_boot_resident_allocations)
 
     # ----- NS entries ----------------------------------------------------
     clist_gts = []
@@ -1571,7 +1603,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # Step-2 body is written later, so reject an overlap before it can corrupt
     # a Thread header or its CR0 boot-entry capability.
     _protected_end = boot_resident_region_end(
-        thread_size, actual_abstr_size, _thread_count)
+        thread_size, actual_abstr_size, _thread_count,
+        _boot_resident_allocations)
     assert running_offset == _protected_end, (
         "boot layout drift: catalog allocation no longer matches the "
         "resident-region contract")
@@ -1832,19 +1865,17 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # overwrite this placement in the loop below.
     _manifest_path = os.path.join(lumps_dir, "manifest.json")
     _token_map     = _load_catalog_token_map(_manifest_path, _selected_slot_tokens)
-    for _slot, _tok, _filename in _load_boot_resident_entries(
-            _manifest_path, _selected_slot_tokens):
-        if _slot == BOOT_ABSTR_NS_SLOT:
-            # Boot.Abstr is always synthesised above (via manifest lookup).
-            # A manifest boot_resident entry at the same slot must not overwrite it.
-            continue
+    for _slot, _body in _boot_resident_bodies.items():
         _phys = locations.get(_slot)
         if _phys is None:
             continue
-        _body = _read_lump_body(lumps_dir, _tok, _filename)
-        if _body is None:
-            continue
-        _n = min(len(_body), total - _phys)
+        _allocation = _boot_resident_allocations[_slot]
+        if _phys + _allocation > ns_table_base - 3:
+            raise ValueError(
+                f"generate_boot_image: boot-resident catalog slot {_slot} "
+                f"({_allocation} words at 0x{_phys:X}) does not fit below "
+                f"the NS table (base 0x{ns_table_base:X})")
+        _n = min(len(_body), _allocation)
         for _wi in range(_n):
             mem[_phys + _wi] = _body[_wi] & 0xFFFFFFFF
         # Update NS entry word1 (lim17 + cc) and word2 (seal) to match the
@@ -1853,7 +1884,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         # Preserve word3 (cache_token32) from the catalog loop.
         _hdr      = _body[0] if _body else 0
         _body_cc  = _hdr & 0xFF
-        _body_sz  = len(_body)
+        _body_sz  = _allocation
         _br_lim17 = (_body_sz - _body_cc - 1) & 0x1FFFF
         _br_ns_base = total - (_slot + 1) * NS_ENTRY_WORDS
         _br_cache_token = mem[_br_ns_base + 3]

@@ -333,11 +333,8 @@ def test_dynamic_pool_is_zeroed_at_boot_time():
     """
     for label, cfg in [("default config", _default_cfg()),
                        ("custom config",  _custom_cfg())]:
-        ns    = int(cfg["step1"]["namespaceLumpWords"])
-        th    = int(cfg["step1"]["threadLumpWords"])
         total = int(cfg["step1"]["totalNamespaceWords"])
 
-        pool_start    = _compute_catalog_pool_start(ns, th)
         ns_table_base = total - NS_TABLE_RESERVE
         # Three non-zero control words precede the NS table (A7 v1.2):
         #   ns_table_base-3 = stored nsCount (non-zero)
@@ -345,12 +342,26 @@ def test_dynamic_pool_is_zeroed_at_boot_time():
         #   ns_table_base-1 = BOOT_IMAGE_FORMAT_TAG (non-zero)
         pool_end      = ns_table_base - 3
 
+        image = generate_boot_image(cfg, LUMPS_DIR)
+        words = _parse_image(image, total)
+        # Derive the first free word from the generated image itself. Fixed
+        # catalog LUMPs may reserve more than SLOT_SIZE and generated Thread
+        # contexts are also resident allocations, so the old constant-size
+        # catalog arithmetic no longer identifies the dynamic pool boundary.
+        pool_start = 0
+        for slot in range(NS_TABLE_RESERVE // NS_ENTRY_WORDS):
+            ns_base = total - (slot + 1) * NS_ENTRY_WORDS
+            location = words[ns_base]
+            if not (0 <= location < ns_table_base):
+                continue
+            header = words[location]
+            if (header >> 27) != LUMP_HEADER_MAGIC:
+                continue
+            allocation = 1 << (((header >> 23) & 0xF) + 6)
+            pool_start = max(pool_start, location + allocation)
         assert pool_start < pool_end, (
             f"{label}: pool_start=0x{pool_start:04X} is not before pool_end=0x{pool_end:04X}"
         )
-
-        image = generate_boot_image(cfg, LUMPS_DIR)
-        words = _parse_image(image, total)
 
         pool_region = words[pool_start : pool_end]
         non_zero = [(pool_start + i, w) for i, w in enumerate(pool_region) if w != 0]
