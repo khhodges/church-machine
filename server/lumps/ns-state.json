@@ -143,8 +143,19 @@
       "limit": "0x001FF",
       "seq": 0,
       "seal": "0xDE91DEEF"
+    },
+    {
+      "name": "Bridge.Preload",
+      "slot": 13,
+      "location": "0x00000A00",
+      "type": "Outform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x00001",
+      "seq": 0,
+      "seal": "0xDEA89EEF"
     }
   ],
-  "generated_at": 1787929858.8229635,
-  "committed_raw_fingerprint": "027f7f708be1cda4b0978eae8f894815dad2a21688fb265e90b43dfc95becfcc"
+  "generated_at": 1787931332.040624,
+  "committed_raw_fingerprint": "17282e47802f8fb5c60b4c854e55ffd25f610ecf6ee11d5ed2db389f91dd6b69"
 }
