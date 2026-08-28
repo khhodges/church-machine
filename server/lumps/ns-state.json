@@ -143,41 +143,8 @@
       "limit": "0x001FF",
       "seq": 0,
       "seal": "0xDE91DEEF"
-    },
-    {
-      "name": "slot_13",
-      "slot": 13,
-      "location": "0x00000A00",
-      "type": "Inform",
-      "f": 0,
-      "g": 0,
-      "limit": "0x00017",
-      "seq": 0,
-      "seal": "0xDEAA5EEF"
-    },
-    {
-      "name": "slot_14",
-      "slot": 14,
-      "location": "0x00000B00",
-      "type": "Inform",
-      "f": 0,
-      "g": 0,
-      "limit": "0x00A2A",
-      "seq": 0,
-      "seal": "0xDFED7EEF"
-    },
-    {
-      "name": "Bridge.Preload",
-      "slot": 15,
-      "location": "0x00000C00",
-      "type": "Outform",
-      "f": 0,
-      "g": 0,
-      "limit": "0x00001",
-      "seq": 0,
-      "seal": "0xDEAB9EEF"
     }
   ],
-  "generated_at": 1787921322.8232107,
-  "committed_raw_fingerprint": "2293e116e58468f45d0a3b3c84837a9126309b78c53a52671870cdf5df0dfbf1"
+  "generated_at": 1787924529.1057189,
+  "committed_raw_fingerprint": "a2f2670c6547c556689f8ff8cebf6d97ba632666ef322491d9a89f6e173ff11a"
 }
