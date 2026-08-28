@@ -45,6 +45,7 @@ class ChurchReturn(Elaboratable):
 
         self.cr5_heap   = Signal(CAP_REG_LAYOUT)
         self.cr12_thread = Signal(CAP_REG_LAYOUT)
+        self.thread_base = Signal(32)
 
         self.mem_rd_addr  = Signal(32)
         self.mem_rd_en    = Signal()
@@ -173,7 +174,7 @@ class ChurchReturn(Elaboratable):
                 m.d.sync += [
                     return_cap.eq(self.cr_rd_data),
                     heap_base_latched.eq(cr5_view.word1_location),
-                    thread_base_latched.eq(cr12_view.word1_location),
+                    thread_base_latched.eq(self.thread_base),
                 ]
                 m.next = "CHECK_PERM"
 

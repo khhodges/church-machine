@@ -694,9 +694,8 @@ def build_wukong_upload_image(generic_image, boot_config=None):
             "descriptor": descriptor, "size": size,
         })
 
-    # The physical CHANGE context reserves cap slots through CR14, so each
-    # compact simulator Thread expands to one 512-word board allocation.
-    thread_words = sum(max(item["size"], 512) for item in thread_sources)
+    # Physical CHANGE consumes the ordinary software Thread layout directly.
+    thread_words = sum(item["size"] for item in thread_sources)
     dynamic_end = WUKONG_UPLOAD_BODY_BASE_WORD + alloc_words + thread_words
     if dynamic_end > WUKONG_DMEM_WORDS:
         raise ValueError(
@@ -778,27 +777,13 @@ def build_wukong_upload_image(generic_image, boot_config=None):
     thread_target = body_base + alloc_words
     projected_threads = []
     for item in thread_sources:
-        # Physical CHANGE stores the 12 private CR GTs at caps[0..11] and
-        # CR14 at caps[14].  Keep a board-only 512-word allocation so the
-        # latter lives within the sealed descriptor capacity; simulator files
-        # remain the compact 256-word format.
-        size = max(item["size"], 512)
+        size = item["size"]
         slot = item["slot"]
         source_base = item["source_base"]
         descriptor = item["descriptor"]
         mem[thread_target:thread_target + item["size"]] = source_words[
             source_base:source_base + item["size"]
         ]
-        mem[thread_target] = (mem[thread_target] & ~(0xF << 23)) | (3 << 23)
-        if slot != 1:
-            # A generated Thread has never been switched out, so give it a
-            # concrete first-run code context instead of projecting zero CR14
-            # and zero PC. CR7 is initially null, making packed PC absolute.
-            # Subsequent CHANGE saves replace both words with live state.
-            if mem[thread_target + 17] == 0:
-                mem[thread_target + 17] = body_base_byte + 4
-            if mem[thread_target + 244 + 14] == 0:
-                mem[thread_target + 244 + 14] = source_info["expected_gt"]
         target_ns_base = slot * NS_ENTRY_WORDS
         target_byte = thread_target * 4
         authority = (descriptor[1] & ~0x1FFFFF) | (size - 1)
@@ -1691,6 +1676,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             f"than the fixed Thread capability zone offset (+244); each thread "
             f"body must be at least 256 words to contain its own CR0")
     mem[thread_loc] = pack_lump_header(_ns_n_minus_6(thread_size), 32, 12, 2)
+    mem[thread_loc + 17] = thread_size - 13
     _boot_entry_ns_base = total - (boot_entry_slot + 1) * NS_ENTRY_WORDS
     _boot_entry_seq = (mem[_boot_entry_ns_base + 1] >> 21) & 0x1FF
     mem[thread_loc + 244] = create_gt(_boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
@@ -1702,6 +1688,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     for _thread_loc in extra_thread_locs:
         mem[_thread_loc] = pack_lump_header(
             _ns_n_minus_6(thread_size), 32, 12, 2)
+        mem[_thread_loc + 17] = thread_size - 13
         mem[_thread_loc + 244] = create_gt(
             _boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
 

@@ -835,18 +835,6 @@ class ChurchCore(Elaboratable):
             self.dbg_cr8_gt.eq(u_regs.cr_word_rd_data),
         ]
 
-        # CHANGE restore signals only exist on the full profile (not IoT)
-        if not self.iot_profile:
-            m.d.comb += [
-                u_regs.m_flag_restore_en.eq(u_change.m_flag_restore_en),
-                u_regs.m_flag_restore_val.eq(u_change.m_flag_restore_val),
-            ]
-            with m.If(u_change.flags_restore_en):
-                m.d.comb += [
-                    u_regs.flags_in.eq(u_change.flags_restore_val),
-                    u_regs.flags_wr_en.eq(1),
-                ]
-
         # M-window shadow data sources — mgt_set_trigger (from Abstract-GT CALL) takes
         # priority over cr15_m_set (test/microcode injection port).
         # For the cr15_m_set path we compute integrity32 here so the WRITEBACK check
@@ -1190,7 +1178,10 @@ class ChurchCore(Elaboratable):
             u_call.cr5_heap.eq(u_regs.cr5_heap),
             u_call.caller_pc.eq(nia_reg[2:17]),           # CALL word offset (nia_reg >> 2)
             u_call.cr12_thread.eq(u_regs.cr12_thread),
-            u_call.thread_base.eq(View(CAP_REG_LAYOUT, u_regs.cr12_thread).word1_location),
+            u_call.thread_base.eq(Mux(
+                boot_microcode_active,
+                View(CAP_REG_LAYOUT, u_regs.cr12_thread).word1_location,
+                self.active_thread_base)),
             # THREAD_HDR: populated by CHANGE on thread restore, cached for CALL's stack validation
             u_call.thread_hdr.eq(u_change.thread_hdr_out if not self.iot_profile else 0),
             # Parallel register-file mask operations for domain-crossing cleanup
@@ -1209,6 +1200,7 @@ class ChurchCore(Elaboratable):
             u_return.lambda_pc.eq(lambda_pc_reg),
             u_return.cr5_heap.eq(u_regs.cr5_heap),
             u_return.cr12_thread.eq(u_regs.cr12_thread),
+            u_return.thread_base.eq(self.active_thread_base),
             u_return.mem_rd_data.eq(self.dmem_rd_data),
             u_return.mem_rd_valid.eq(self.dmem_rd_valid),
         ]
@@ -1581,7 +1573,7 @@ class ChurchCore(Elaboratable):
                     (boot_state_reg != BootState.COMPLETE) | boot_microcode_active
                 ),
                 u_change.index.eq(Mux(thread_switch_start_sig, self.thread_switch_index, cap_index)),
-                u_change.change_mask.eq(Mux(thread_switch_start_sig, 0x4FFF, u_decoder.call_mask)),
+                u_change.change_mask.eq(Mux(thread_switch_start_sig, 0x0FFF, u_decoder.call_mask)),
                 u_change.scheduler_mode.eq(thread_switch_start_sig),
                 u_change.active_thread_base.eq(self.active_thread_base),
                 u_change.cr_rd_data.eq(u_regs.cr_rd_data),
@@ -1591,11 +1583,6 @@ class ChurchCore(Elaboratable):
                 u_change.mem_rd_valid.eq(self.dmem_rd_valid),
                 u_change.mem_wr_done.eq(1),
                 u_change.dr_rd_data.eq(u_regs.dr_rd_data1),
-                u_change.nia.eq(nia_reg),
-                u_change.flags.eq(u_regs.flags),
-                # M-flag save/restore (Task #432): pass current M-flag in; get restore
-                # enable/val out (wired below alongside other u_regs controls).
-                u_change.cr15_m_flag_in.eq(u_regs.cr15_m_flag),
                 u_change.boot_window.eq(boot_microcode_active),
             ]
             with m.If(clear_all):
@@ -1656,7 +1643,7 @@ class ChurchCore(Elaboratable):
                 # Call-stack frame push: heap cap, thread-lump base, thread header
                 # (LUMP_HEADER_LAYOUT for sp_max/sp_min bounds), and CR12 for null check.
                 u_eloadcall.cr5_heap.eq(u_regs.cr5_heap),
-                u_eloadcall.thread_base.eq(View(CAP_REG_LAYOUT, u_regs.cr12_thread).word1_location),
+                u_eloadcall.thread_base.eq(self.active_thread_base),
                 u_eloadcall.thread_hdr.eq(u_change.thread_hdr_out if not self.iot_profile else 0),
                 u_eloadcall.cr12_thread.eq(u_regs.cr12_thread),
             ]
@@ -2719,7 +2706,7 @@ class ChurchCore(Elaboratable):
             ]
         if not self.iot_profile:
             with m.Elif(u_change.mem_rd_en):
-                # CHANGE LOAD_THREAD / RESTORE_CALL / RESTORE_M_FLAG_RD /
+                # CHANGE LOAD_THREAD / RESTORE_CALL / scheduler entry/header /
                 # READ_THREAD_HDR: internal mload and direct reads need the
                 # DMEM bus.  Previously absent from this mux — the second
                 # CHANGE boot-ROM run hung because there was no other unit
@@ -2729,7 +2716,7 @@ class ChurchCore(Elaboratable):
                     self.dmem_rd_en.eq(1),
                 ]
             with m.Elif(u_change.mem_wr_en):
-                # CHANGE SAVE_DR / SAVE_PACKED_PC / SAVE_M_FLAG writes.
+                # CHANGE saves CR0–CR11 homes and DR0–DR15 only.
                 m.d.comb += [
                     self.dmem_addr.eq(u_change.mem_wr_addr),
                     self.dmem_wr_data.eq(u_change.mem_wr_data),

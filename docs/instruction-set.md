@@ -130,9 +130,9 @@ CHANGE CRd, CRs, idx
 
 Privileged register write. Reads the GT at index `idx` in CRs's c-list and installs it into privileged register CRd (CR12–CR15 only; PRIV_REG fault if CRd < 12).
 
-- **CR12** (system-wide thread stack): full context switch — saves CR0–CR11, CR14, CR15, DRs, and PC into the current thread lump; loads the target thread's saved state. First activation starts at PC=0.
+- **CR12** (system-wide thread stack): direct privileged load; not a scheduler context snapshot.
 - **CR13** (system-wide interrupt handler): direct write; no context switch. Installs the IRQ thread GT for use by Tier 3 fault recovery.
-- **CR14/CR15** (per-thread): full context switch — saves CR0–CR11, CR14, CR15, DRs, and PC into the current thread lump; loads the target thread's saved state. First activation starts at PC=0.
+- **Scheduler CHANGE**: saves/restores CR0–CR11 and DR0–DR15 homes, validates restored CR0, derives transient CR14, and enters at code word 1 without a CALL frame.
 
 ### SWITCH (opcode 5)
 

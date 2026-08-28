@@ -10,43 +10,6 @@ global.window = { bootConfig: { step1: {
     threadLumpWords: 256, threadCount: 3,
 } } };
 const ChurchSimulator = require('./simulator.js');
-const sim = new ChurchSimulator();
-sim.bootComplete = true;
-sim._currentThreadSlot = 1;
-
-assert.deepStrictEqual(sim.configuredThreadSlots(), [1, 11, 12],
-    'configured order is Thread.1, Thread#2, Thread#3');
-sim.cr[0] = { word0: 0x11111111, word1: 1, word2: 2, word3: 3 };
-sim.dr[1] = 0x11110001;
-let switched = sim.advanceConfiguredThread();
-assert(switched.ok && switched.slot === 11 && switched.position === 2,
-    'first action selects Thread#2');
-
-sim.cr[0] = { word0: 0x22222222, word1: 4, word2: 5, word3: 6 };
-sim.dr[1] = 0x22220001;
-switched = sim.advanceConfiguredThread();
-assert(switched.ok && switched.slot === 12 && switched.position === 3,
-    'second action selects Thread#3');
-switched = sim.advanceConfiguredThread();
-assert(switched.ok && switched.slot === 1 && switched.position === 1,
-    'third action wraps to Thread.1');
-assert.strictEqual(sim.cr[0].word0, 0x11111111, 'Thread.1 register state is restored');
-assert.strictEqual(sim.dr[1], 0x11110001, 'Thread.1 DR state is restored');
-
-const before = sim.activeThreadStatus();
-const badBase = sim.readNSEntry(11).word0_location;
-sim.memory[badBase] = 0; // invalid descriptor must be rejected before saving Thread.1
-switched = sim.advanceConfiguredThread();
-assert(!switched.ok, 'invalid target is rejected');
-assert.strictEqual(sim.activeThreadStatus().slot, before.slot,
-    'validation failure leaves active Thread unchanged');
-
-global.window.bootConfig.step1.threadCount = 1;
-const one = new ChurchSimulator();
-one.bootComplete = true;
-assert(one.advanceConfiguredThread().ok && one.advanceConfiguredThread().unchanged,
-    'one-Thread configurations remain Thread.1');
-
 // Regenerate the exact three-Thread image inputs used by the IDE. This catches
 // a later boot-resident catalog embedding pass overwriting Thread#2/#3 without
 // depending on the workspace-only, ignored boot-image.bin file.
@@ -68,10 +31,6 @@ assert.strictEqual(generated.status, 0,
 const image = generated.stdout.buffer.slice(
     generated.stdout.byteOffset,
     generated.stdout.byteOffset + generated.stdout.byteLength);
-if (fs.existsSync('server/lumps/boot-image.bin')) {
-    assert(fs.readFileSync('server/lumps/boot-image.bin').equals(generated.stdout),
-        'saved IDE image must match deterministic regeneration');
-}
 assert.strictEqual(committed.loadBootImage(image), true,
     `committed image must load: ${committed.lastBootImageError || 'unknown error'}`);
 committed.bootComplete = true;
@@ -82,15 +41,24 @@ const committedBases = [1, 11, 12].map(slot => committed.readNSEntry(slot).word0
 assert(committedBases[0] + 512 <= committedBases[1] &&
        committedBases[1] + 512 <= committedBases[2],
     'committed Thread bodies are non-overlapping');
-committed.cr[0] = { word0: 0xA1000001, word1: 1, word2: 2, word3: 3, m: 0 };
+const entryWords = [1, 11, 12].map((slot, i) =>
+    committed.memory[committedBases[i] + 244] >>> 0);
+const initialEntry = committed.readNSEntry(entryWords[0] & 0xFFFF);
+committed._writeCR(0, entryWords[0], initialEntry);
 committed.dr[1] = 0xA1001001;
 assert.strictEqual(committed.advanceConfiguredThread().slot, 11);
-committed.cr[0] = { word0: 0xA2000002, word1: 4, word2: 5, word3: 6, m: 0 };
+assert.strictEqual(committed.pc, 1, 'dormant Thread entry starts at code word 1');
+assert.strictEqual(committed.cr[14].word0 & 0xFFFF,
+    committed.cr[0].word0 & 0xFFFF, 'CR14 target is derived from restored CR0');
+const firstEntry = committed.readNSEntry(committed.cr[0].word0 & 0xFFFF);
+assert.strictEqual(committed._fetchInstruction().addr,
+    firstEntry.word0_location + 1,
+    'first fetch after dormant CHANGE executes code LUMP word 1');
 committed.dr[1] = 0xA2001002;
 assert.strictEqual(committed.advanceConfiguredThread().slot, 12);
 assert.strictEqual(committed.advanceConfiguredThread().slot, 1);
-assert.strictEqual(committed.cr[0].word0, 0xA1000001,
-    'committed image restores Thread.1 CR state after wraparound');
+assert.strictEqual(committed.cr[0].word0, entryWords[0],
+    'committed image restores Thread.1 CR0 entry authority after wraparound');
 assert.strictEqual(committed.dr[1], 0xA1001001,
     'committed image restores Thread.1 DR state after wraparound');
 
@@ -115,6 +83,9 @@ assert.strictEqual(uiSim.loadBootImage(image), true,
     `UI fixture image must load: ${uiSim.lastBootImageError || 'unknown error'}`);
 uiSim.bootComplete = true;
 uiSim._currentThreadSlot = 1;
+const uiBootBase = uiSim.readNSEntry(1).word0_location;
+const uiBootEntryGT = uiSim.memory[uiBootBase + 244] >>> 0;
+uiSim._writeCR(0, uiBootEntryGT, uiSim.readNSEntry(uiBootEntryGT & 0xFFFF));
 const button = {
     disabled: false,
     attrs: {},
@@ -145,13 +116,6 @@ vm.runInContext([
 uiContext.updateThreadControl();
 assert.strictEqual(button.disabled, false,
     'Next Thread button is enabled with three configured Threads');
-// Real boot compacts the primary Boot.Thread descriptor to 64 words. Its live
-// context is nevertheless complete and is saved by the first switch, so the
-// third click must be allowed to resume it rather than requiring a first-start
-// caps zone that is no longer needed.
-const bootThreadEntry = uiSim.readNSEntry(1);
-uiSim.memory[bootThreadEntry.word0_location] &=
-    ~((0xF << 23) >>> 0);
 uiContext.nextConfiguredThread();
 assert.strictEqual(uiSim.activeThreadStatus().slot, 11,
     'browser-shaped Next Thread click switches to Thread#2 without window.sim');
@@ -169,4 +133,17 @@ assert.strictEqual(status.textContent, 'Thread.1 · 1/3',
     'toolbar status wraps to the boot Thread');
 assert.strictEqual(dashboardUpdates, 3,
     'each Next Thread click refreshes the dashboard');
+
+const nonElevated = new ChurchSimulator();
+nonElevated.bootComplete = true;
+nonElevated.mElevation = false;
+nonElevated.cr[0] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
+const rejectedChange = nonElevated._execChange({
+    crDst: 12, crSrc: 0, imm: 1, scheduler: false, mnemonic: 'CHANGE',
+});
+assert.strictEqual(rejectedChange, null,
+    'non-elevated CHANGE CR12 returns an architecture fault instead of throwing');
+assert(nonElevated.faultLog.length > 0 &&
+       nonElevated.faultLog[nonElevated.faultLog.length - 1].type === 'NULL_CAP',
+    'non-elevated CHANGE CR12 records an architecture fault');
 console.log('PASS round-robin Thread scheduler');

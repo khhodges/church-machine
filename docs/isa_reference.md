@@ -760,7 +760,7 @@ Encoding: op[4:0]=0x04 | cond[4] | CRd[4] | CRs[4] | idx[15]
 
 **Semantics by destination register (hardware):**
 - **CR12 or CR13** (system-wide): Load GT directly from c-list at `CRs[idx]`; no per-thread save/restore.
-- **CR14 or CR15** (per-thread): Full context switch — save the current thread's per-thread registers (CR0–CR11, CR14, CR15, DR0–DR15, STO, PC, flags) to the current thread lump; load the incoming thread's saved state from its lump. First activation of a thread starts at PC = 0.
+- **Scheduler CHANGE**: save CR0–CR11 to words +244…+255 and DR0–DR15 to +1…+16, then restore those homes from the selected dormant Thread. Restored CR0 is validated as the entry E-GT; hardware derives executable CR14 from its code LUMP header and begins at word 1 (raw LUMP byte base + 4). The transition pushes no CALL frame. PC, flags, M state, STO, CR14, and CR15 are not serialized in Thread data.
 
 **Flags:** N — Z — C — V (no flag writes)
 

@@ -2358,7 +2358,7 @@ in hardware — no literals for stack bounds in the FSM.
 |------|-----------|--------------|-------|-------|
 | Header        | HDR   | +0                               | 1        | Header word — never executed |
 | ⑤ Data Regs    | DR    | +1 … +16                        | 16       | DR0…DR15 (16 × 32-bit, fixed) |
-| ④ Heap         | HEAP  | +17 … +17+heapWords−1           | heapWords | IDE-defined; grows upward |
+| ④ Heap         | HEAP  | +17 … +28                        | 12       | +17 is Heap[0]/STO, initialized to the empty-stack ceiling (243 for the canonical 256-word Thread); +18…+28 are remaining heap words |
 | ③ Freespace    | FREE  | +17+heapWords … +sp_max          | dynamic  | Collision zone; all-zero at creation |
 | ② LIFO Stack   | STACK | +stack_min … +sp_max            | sw       | IDE-defined; grows downward |
 | ① Capabilities | CAPS  | +lumpSize−12 … +lumpSize−1      | 12       | GT Word 0 × 12; c-list tail (architecture-fixed) |
@@ -2483,10 +2483,9 @@ hidden **STO** (Stack Top Offset) register tracking the current top.
 `Mint.Thread` sets STO = `sp_max` (example: 243) at Thread creation — this
 is the empty-stack sentinel; the first word pushed onto the stack occupies
 `sp_max−1` (cursor STO field decreases by 1 for LAMBDA, by 2 for CALL).
-CR12 is saved and restored on every CHANGE alongside STO, DR0–DR15, PC,
-and FLAGS (see §CHANGE Context Save below). CR13 and CR15 are system-wide
-registers not touched by CHANGE. CR14 is also not touched by CHANGE — it is
-transient and re-derived by cLoad on the next CALL.
+CR12, CR13, and CR15 are system-wide registers not serialized by CHANGE.
+CR14 is transient and is derived from restored CR0 and the selected code LUMP
+header on entry. STO remains Heap[0] at Thread word +17; it is not a packed PC.
 
 The Zone ④ **Heap** (words 17..17+heapWords−1, example: 17..80) is entirely absent from the hardware
 save/restore path. It is private to its thread — no other thread holds a GT
@@ -2616,22 +2615,15 @@ the simulator writes 0 to DR0 unconditionally after every instruction.
 
 ## CHANGE Context Save
 
-On every **CHANGE** (context switch), the hardware saves the outgoing
-thread's per-thread state and restores the incoming thread's saved state.
+On every scheduler **CHANGE**, hardware saves and restores only the ordinary
+software Thread homes.
 
 **Saved and restored by CHANGE (per-thread):**
 
 | Register | Role |
 |----------|------|
-| **CR0–CR11** | Programmer-accessible capability registers (GT zone) — already persisted live by mLoad |
-| **CR14** | Code register (Priv zone, per-thread) — X-only code GT for instruction fetch |
-| **CR15** | Namespace root (Priv zone, per-thread) — re-installed from saved state |
-| **CR5** | Heap GT — re-installed from incoming Zone ④ bounds automatically |
-| **STO** | Stack Top Offset hidden register — current stack depth |
-| **DR0–DR15** | All 16 data registers |
-| **PC** | Program counter |
-| **FLAGS** | Condition flags |
-| **LAMBDA state** | LAMBDA_PC and LAMBDA-active flag |
+| **CR0–CR11** | GT Word 0 homes at +244…+255 |
+| **DR0–DR15** | Initial/live data-register homes at +1…+16 |
 
 **Never touched by CHANGE (system-wide):**
 
@@ -2639,13 +2631,18 @@ thread's per-thread state and restores the incoming thread's saved state.
 |----------|------|
 | **CR12** | Thread stack (Priv zone, system-wide) — shared across all threads; cannot be written by CHANGE |
 | **CR13** | Interrupt handler (Priv zone, system-wide) — one handler for the whole machine; CHANGE must not re-point it |
+| **CR15** | Namespace root |
+| **CR14** | Derived transiently from restored CR0; never stored in the Thread |
+| **PC / flags / M state** | Entry begins at code word 1; these are not Thread data words |
 
 CR0–CR11 (Zone ①, the programmer-accessible capability registers) are
 **implicitly** kept in sync by mLoad — every time mLoad loads a GT into
 CR_N it writes the same word back to lump word N. CHANGE does not need to
 explicitly save them; they are always current in the lump. On restore,
 CHANGE reads the incoming thread's GT zone from its lump to reload CR0–CR11.
-CR5 is additionally re-installed from the incoming thread's Zone ④ bounds.
+After restore, CHANGE validates CR0 through the Namespace gate, constructs an
+R+X CR14 with base and limit from the selected code LUMP header, and sets NIA
+to the raw LUMP byte base + 4. This transparent entry pushes no CALL frame.
 
 ---
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CI guard: fail if any stale CR7 signal names survive into synthesised Verilog.
+# CI guard: fail if stale scheduler-semantic CR7 names survive.
 #
 # The registers were renamed CR7→CR14 in hardware/core.py.  If someone
 # regenerates the netlists from an unpatched source the old cr7_wr_* names
@@ -26,7 +26,7 @@ else
     )
 fi
 
-PATTERN="cr7_wr_"
+PATTERN='cr7_wr_|cr7_base|RESTORE_CR7'
 
 FAILED=0
 
@@ -36,10 +36,10 @@ for f in "${VERILOG_FILES[@]}"; do
         continue
     fi
 
-    matches=$(grep -c "$PATTERN" "$f" || true)
+    matches=$(grep -E -c "$PATTERN" "$f" || true)
     if [ "$matches" -gt 0 ]; then
         echo "FAIL: $f contains $matches occurrence(s) of '$PATTERN'" >&2
-        grep -n "$PATTERN" "$f" >&2
+        grep -E -n "$PATTERN" "$f" >&2
         FAILED=1
     else
         echo "OK:   $f — no stale '$PATTERN' signal names"

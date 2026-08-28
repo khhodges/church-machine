@@ -940,7 +940,6 @@ class ChurchSimulator {
         this._instrHistory = [];
         this._currentInstrLabel = null;
         this._currentThreadSlot = 1;
-        this._threadContextMap = new Map();
         this.faultViolationData = null;   // populated by B:00 FAULT_RST from last faultLog entry
         // Last complete state received from physical Wukong.  This is kept
         // separately from simulator breakpoint state and includes the raw
@@ -2373,6 +2372,7 @@ class ChurchSimulator {
         const THREAD_N_MINUS_6 = Math.max(0, Math.ceil(Math.log2(THREAD_LUMP_SIZE)) - 6);
         const threadLoc = this.memory[this._nsSlotBase(1)];
         this.memory[threadLoc] = this.packLumpHeader(THREAD_N_MINUS_6, THREAD_SW, THREAD_CC, 2);
+        this.memory[threadLoc + 17] = THREAD_LUMP_SIZE - 13;
 
         // Thread caps zone — CR0 home slot at word offset +244 is pre-set to an Enter-GT
         // for bootEntrySlot (the ⚡ lightning-bolt selection, e.g. LED Flash at slot 10).
@@ -2394,6 +2394,7 @@ class ChurchSimulator {
                 THREAD_N_MINUS_6, THREAD_SW, THREAD_CC, 2);
             this.memory[generatedThreadLoc + THREAD_CAPS_OFFSET] =
                 this.createGT(_initialBootSeq, this.bootEntrySlot, {E: 1}, 1);
+            this.memory[generatedThreadLoc + 17] = THREAD_LUMP_SIZE - 13;
         }
 
         // Memory-manager GT at c-list[0]: R|W Inform capability over NS slot 0 (full namespace).
@@ -4400,9 +4401,8 @@ class ChurchSimulator {
         const target = slots[(currentIndex + 1) % slots.length];
         const entry = this.readNSEntry(target);
         const header = entry ? this.parseLumpHeader(this.memory[entry.word0_location] >>> 0) : null;
-        const hasSavedContext = !!(this._threadContextMap && this._threadContextMap.has(target));
         if (!entry || !header || !header.valid || header.typ !== 2 ||
-                (!hasSavedContext && header.lumpSize < THREAD_CAPS_OFFSET + 12)) {
+                header.lumpSize < THREAD_CAPS_OFFSET + 12) {
             return { ok: false, reason: `Configured target ${this.nsLabels[target] || target} has an invalid Thread descriptor` };
         }
 
@@ -6356,13 +6356,9 @@ class ChurchSimulator {
         // Semantics by destination:
         //   CR12 (thread stack)  system-wide: load GT directly; no per-thread save.
         //   CR13 (interrupt handler)   system-wide: load GT directly; no per-thread save.
-        //   CR14 (code register)       per-thread:  full context switch — atomically
-        //      saves the outgoing thread's per-thread registers and restores the
-        //      incoming thread's saved state (if any), then resumes at its saved PC.
-        //   CR15 (namespace root)      per-thread:  same full context switch as CR14.
-        //
-        // Per-thread save covers: CR0–CR11, CR14, CR15, DR0–DR15, STO, PC, FLAGS.
-        // CR12 and CR13 are system-wide — never saved or restored per-thread.
+        //   Scheduler: save/restore CR0–CR11 and DR0–DR15 homes, validate
+        //      restored CR0, derive transient CR14, and enter at code word 1.
+        // PC, flags, M state, STO, CR14, and CR15 are not Thread data words.
 
         if (d.crDst < 12) {
             this.fault('PRIV_REG', `CHANGE: target CR${d.crDst} is not privileged — CHANGE may only write CR12–CR15`);
@@ -6401,19 +6397,7 @@ class ChurchSimulator {
             // match the target CR's port address in the Church Hardware Address Range.
             // M-elevation during boot (this.mElevation) bypasses this check.
             //
-            // CHANGE CR12 first-activation bypass: mirrors the hardware RESTORE_CALL FSM
-            // which runs unconditionally on the first CHANGE CR12 after boot (before any
-            // per-thread state has been saved).  The Boot.Abstr program uses CR12's own
-            // zero-perm GT as the source, so S-perm is never present; the first-activation
-            // path is privileged by construction (it can only be reached from Boot.Abstr).
-            //
-            // The bypass is deliberately narrowed to crSrc === crDst === 12 — the
-            // "self-reload" pattern used exclusively by Boot.Abstr.  Any CHANGE CR12 that
-            // names a DIFFERENT source register (e.g. T11: crSrc=0) must still satisfy
-            // the full S-perm + port-address authority check.
-            const isFirstActivation = d.crDst === 12 && d.crSrc === 12 &&
-                (!this._threadContextMap || !this._threadContextMap.has(targetIdx));
-            if (!this.mElevation && !isFirstActivation) {
+            if (!this.mElevation) {
                 const srcParsed = this.parseGT(this.cr[d.crSrc].word0);
                 if (!srcParsed.permissions['S']) {
                     this.fault('PERM_S', `CHANGE CR${d.crDst}: source CR${d.crSrc} lacks S-perm (required for system-wide CR12/CR13 write)`);
@@ -6439,8 +6423,7 @@ class ChurchSimulator {
             if (!this._writeCR(d.crDst, gtToWrite, entry)) return null;
 
             // ── CHANGE CR12: mirror the hardware RESTORE_CALL FSM ──────────────────
-            // When mElevation=true (boot) or when this thread slot has never been
-            // suspended (first-activation), the hardware loads CR0–CR11 from the
+            // During M-elevated boot, hardware loads CR0–CR11 from the
             // incoming thread's caps zone (thread[+THREAD_CAPS_OFFSET .. +THREAD_CAPS_OFFSET+11]).
             // Without this restore the subsequent TPERM/CALL will see NULL in CR0 and fault.
             //
@@ -6449,7 +6432,7 @@ class ChurchSimulator {
             // lump's first word), which is not a valid GT and would cause _writeCR's
             // home-slot mLoad authority check to fault.  The RESTORE_CALL FSM is a hardware-
             // privileged operation that bypasses normal capability authority checking.
-            const doRestoreCall = d.crDst === 12 && (this.mElevation || isFirstActivation);
+            const doRestoreCall = d.crDst === 12 && this.mElevation;
             if (doRestoreCall) {
                 const threadEntry = this.readNSEntry(targetIdx);
                 if (threadEntry) {
@@ -6485,89 +6468,82 @@ class ChurchSimulator {
             return { pc: this.pc - 1, instr: d, desc };
         }
 
-        // ── Per-thread registers (CR14/CR15): full context switch ─────────────────
-        // 1. Save outgoing thread state (CR0–CR11, CR14, CR15, DR0–DR15, STO, PC+1).
-        //    CR12/CR13 are system-wide and excluded from the per-thread snapshot.
+        // ── Scheduler CHANGE: dormant Thread entry ────────────────────────────────
+        // A Thread serializes only DR0–DR15 and the CR0–CR11 GT homes. CR14,
+        // NIA, flags, M state, and STO are not scheduler context words.
         const targetHeader = this.parseLumpHeader(this.memory[entry.word0_location] >>> 0);
-        const hasSavedTargetContext = !!(this._threadContextMap && this._threadContextMap.has(targetIdx));
         if (schedulerSwitch && (!targetHeader.valid || targetHeader.typ !== 2 ||
-                (!hasSavedTargetContext && targetHeader.lumpSize < THREAD_CAPS_OFFSET + 12))) {
+                targetHeader.lumpSize < THREAD_CAPS_OFFSET + 12)) {
             this.fault('BOUNDS', `NEXT_THREAD: Namespace slot ${targetIdx} is not a valid Thread descriptor`);
             return null;
         }
-        if (!this._threadContextMap) this._threadContextMap = new Map();
         const outSlot = this._currentThreadSlot ?? null;
-        this._threadContextMap.set(outSlot, {
-            crs:   this.cr.slice(0, 12).map(c => ({ ...c })),  // CR0–CR11 only
-            cr14:  { ...this.cr[14] },
-            cr15:  { ...this.cr[15] },
-            drs:   [...this.dr],
-            flags: { ...this.flags },
-            sto:   this.sto,
-            pc:    this.pc + 1,   // resume at the instruction *after* this CHANGE
-        });
-
-        const inState = this._threadContextMap.get(targetIdx);
-
-        // 2a. Restore incoming thread state if it was previously suspended.
-        //     Use the incoming thread's own saved CR14/CR15 (not the instruction's gt).
-        if (inState) {
-            for (let i = 0; i < 12; i++) this.cr[i] = { ...inState.crs[i] };
-            this.cr[14] = { ...inState.cr14 };
-            this.cr[15] = { ...inState.cr15 };
-            this.dr = [...inState.drs];
-            this.flags = { ...inState.flags };
-            this.sto = inState.sto;
-            this._currentThreadSlot = targetIdx;
-            const resumePC = inState.pc;
-            const desc = `CHANGE CR${d.crDst} (context switch: CR0–CR11+CR14+CR15+DRs saved for slot ${outSlot !== null ? outSlot : 'boot'}; resuming slot ${targetIdx} at PC=${resumePC}; CR12/CR13 unchanged)`;
-            this.output += desc + '\n';
-            this.pc = resumePC;   // resume at saved PC (no additional increment)
-            this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_PUSH, 0);
-            this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_CR12, this.cr[12].word0 >>> 0);
-            this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_CR5,  this.cr[5].word0  >>> 0);
-            return { pc: resumePC, instr: d, desc };
-        }
-
-        // 2b. First activation of this thread slot: synthesise a valid R+X GT for the
-        //     target NS slot and install it into the destination CR.
-        //
-        //     The raw word at entry.word0_location is the thread lump header
-        //     (magic + cc + cw), NOT a valid Golden Token.  Writing it into
-        //     CR14.word0 would corrupt every subsequent mLoad / code-lump fetch
-        //     with a bogus NS index or version.  This is the same class of bug
-        //     fixed for CR12 in Task #655.
-        //
-        //     Instead synthesise a valid R+X GT matching the B:07 NUC_CODE boot
-        //     ROM pattern (line 1575: createGT with R+X, same gt_seq as the NS
-        //     entry so mLoad's version check passes).
-        const fa_gt_seq = this.parseNSWord1(entry.word1_limit).gtSeq;
-        const codeGT = this.createGT(fa_gt_seq, targetIdx, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);
-        if (!this._writeCR(d.crDst, codeGT, entry)) return null;
-        // Restore CR0–CR11 from the incoming thread lump's caps zone (THREAD_CAPS_OFFSET).
-        // Mirrors hardware RESTORE_CALL FSM: cr_index=i → c-list[i] → thread word tBase+THREAD_CAPS_OFFSET+i.
-        // CR0 slot (thread[+244]) holds the programmable Entry E-GT (written by SetEntry / setBootEntrySlot).
-        const threadEntry = this.readNSEntry(targetIdx);
-        if (threadEntry) {
-            const tBase = threadEntry.word0_location;
-            for (let i = 0; i < 12; i++) {
-                const gtWord = this.memory[tBase + THREAD_CAPS_OFFSET + i] >>> 0;
-                if (gtWord !== 0) {
-                    const capEntry = this.readNSEntry(this.parseGT(gtWord).index);
-                    this._writeCR(i, gtWord, capEntry);
-                } else {
-                    this.cr[i] = { word0: 0, word1: 0, word2: 0, word3: 0 };
+        if (schedulerSwitch && outSlot !== null) {
+            const outEntry = this.readNSEntry(outSlot);
+            if (outEntry) {
+                const outBase = outEntry.word0_location;
+                for (let i = 0; i < 16; i++) {
+                    this.memory[outBase + 1 + i] = this.dr[i] >>> 0;
+                }
+                for (let i = 0; i < 12; i++) {
+                    this.memory[outBase + THREAD_CAPS_OFFSET + i] =
+                        this.cr[i].word0 >>> 0;
                 }
             }
         }
+
+        const tBase = entry.word0_location;
+        for (let i = 0; i < 12; i++) {
+            const gtWord = this.memory[tBase + THREAD_CAPS_OFFSET + i] >>> 0;
+            if (gtWord !== 0) {
+                const capEntry = this.readNSEntry(this.parseGT(gtWord).index);
+                if (!capEntry || !this._writeCR(i, gtWord, capEntry)) return null;
+            } else {
+                this.cr[i] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
+            }
+        }
+        for (let i = 0; i < 16; i++) {
+            this.dr[i] = this.memory[tBase + 1 + i] >>> 0;
+        }
+
+        // Restored CR0 is the sole entry authority. Validate it through mLoad,
+        // then derive the same executable CR14 shape as a CALL index 0.
+        const entryGT = this.cr[0].word0 >>> 0;
+        const entryParsed = this.parseGT(entryGT);
+        const entryCheck = this.mLoad(entryGT, 'E', 14);
+        if (!entryCheck.ok) {
+            this.fault(entryCheck.fault, `CHANGE dormant entry CR0: ${entryCheck.message}`);
+            return null;
+        }
+        const codeEntry = entryCheck.entry;
+        const codeHeader = this.parseLumpHeader(
+            this.memory[codeEntry.word0_location] >>> 0);
+        if (!codeHeader.valid || codeHeader.cw === 0) {
+            this.fault('BOUNDS', 'CHANGE dormant entry CR0 does not name executable code');
+            return null;
+        }
+        const codeGT = this.createGT(
+            entryParsed.gt_seq, entryParsed.index,
+            {R:1,W:0,X:1,L:0,S:0,E:0}, entryParsed.type);
+        this.cr[14] = {
+            word0: codeGT,
+            // _fetchInstruction addresses word1 + 1 + pc. Dormant CHANGE
+            // exposes pc=1, so bias the internal base by one word to fetch
+            // the required first code word at raw LUMP base + 1.
+            word1: (codeEntry.word0_location - 1) >>> 0,
+            word2: ((codeEntry.word1_limit & ~0x1FFFFF) |
+                    ((codeHeader.cw - 1) & 0x1FFFFF)) >>> 0,
+            word3: codeEntry.word2_seals >>> 0,
+            m: 0,
+        };
         this._currentThreadSlot = targetIdx;
-        const desc = `CHANGE CR${d.crDst} (context switch: CR0–CR11+CR14+CR15+DRs saved for slot ${outSlot !== null ? outSlot : 'boot'}; first activation of slot ${targetIdx} — starting at PC=0; CR0 restored from thread[+244]; CR12/CR13 unchanged) <- [CR${d.crSrc}+${targetIdx}]`;
+        const desc = `CHANGE CR${d.crDst} (dormant entry: CR0–CR11+DRs restored for slot ${targetIdx}; CR14 derived from CR0 slot ${entryParsed.index}; starting at PC=1; no CALL frame)`;
         this.output += desc + '\n';
-        this.pc = 0;   // first activation always begins at PC=0
+        this.pc = 1;
         this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_PUSH, 0);
         this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_CR12, this.cr[12].word0 >>> 0);
         this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_CR5,  this.cr[5].word0  >>> 0);
-        return { pc: 0, instr: d, desc };
+        return { pc: 1, instr: d, desc };
     }
 
     _execSwitch(d) {

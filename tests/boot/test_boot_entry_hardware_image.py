@@ -279,16 +279,12 @@ def test_wukong_projection_uploads_fixed_and_two_generated_thread_contexts():
         size = context["size"]
         source_size = 1 << ((source_words[source_base] >> 23) & 0xF) + 6
         assert words[slot * NS_ENTRY_WORDS] == target_base * 4
-        assert size >= 512, "physical scheduler reserves caps through CR14"
+        assert size == source_size
         expected = (source_words[source_base:source_base + source_size]
                     + [0] * (context["size"] - source_size))
-        expected[0] = (expected[0] & ~(0xF << 23)) | (3 << 23)
-        if slot != 1:
-            expected[17] = WUKONG_UPLOAD_BODY_BASE_WORD * 4 + 4
-            expected[THREAD_CAPS_OFFSET + 14] = create_gt(
-                0, 10, {"E": 1}, 1)
         assert words[target_base:target_base + context["size"]] == expected
-        assert ((words[target_base] >> 23) & 0xF) >= 3
+        assert ((words[target_base] >> 23) & 0xF) == (
+            (source_words[source_base] >> 23) & 0xF)
         assert words[slot * NS_ENTRY_WORDS + 2] == integrity32(
             target_base * 4, words[slot * NS_ENTRY_WORDS + 1])
 
@@ -319,6 +315,7 @@ def test_oversized_catalog_allocation_preserves_three_threads_and_projection(tmp
         assert ((source[base] >> 8) & 0x3) == 2
         assert source[base + THREAD_CAPS_OFFSET] == create_gt(
             0, 10, {"E": 1}, 1)
+        assert source[base + 17] == 512 - 13
 
     projected, info = build_wukong_upload_image(generic)
     projected_words = _unpack_words(projected)
@@ -327,11 +324,6 @@ def test_oversized_catalog_allocation_preserves_three_threads_and_projection(tmp
         source_base = entries[row["slot"]][0]
         target_base = row["base_word"]
         expected = source[source_base:source_base + 512]
-        expected[0] = (expected[0] & ~(0xF << 23)) | (3 << 23)
-        if row["slot"] != 1:
-            expected[17] = WUKONG_UPLOAD_BODY_BASE_WORD * 4 + 4
-            expected[THREAD_CAPS_OFFSET + 14] = create_gt(
-                0, 10, {"E": 1}, 1)
         assert projected_words[target_base:target_base + 512] == expected
 
 
@@ -377,8 +369,7 @@ def test_wukong_projection_preserves_every_thread_private_body():
         target_base = row["base_word"]
         forward_base = slot * NS_ENTRY_WORDS
         assert words[forward_base] == target_base * 4
-        # Board-only expansion gives CHANGE room for persisted CR14 while
-        # retaining the generation/flags from the source descriptor.
+        # Projection retains the exact ordinary Thread body and descriptor flags.
         assert (words[forward_base + 1] & ~0x1FFFFF) == (
             source[_ns_slot_base(source_total, slot) + 1] & ~0x1FFFFF)
         assert (words[forward_base + 1] & 0x1FFFFF) == row["size"] - 1
@@ -387,18 +378,9 @@ def test_wukong_projection_preserves_every_thread_private_body():
         source_size = 1 << ((source[source_base] >> 23) & 0xF) + 6
         assert words[target_base + 1:target_base + source_size] == source[
             source_base + 1:source_base + source_size]
-        expansion = words[target_base + source_size:target_base + row["size"]]
-        if slot == 1:
-            assert expansion == [0] * (row["size"] - source_size)
-        else:
-            assert words[target_base + THREAD_CAPS_OFFSET + 14] == create_gt(
-                0, 10, {"E": 1}, 1)
-            assert all(
-                value == 0
-                for offset, value in enumerate(expansion, start=source_size)
-                if offset != THREAD_CAPS_OFFSET + 14
-            )
-        assert ((words[target_base] >> 23) & 0xF) >= 3
+        assert row["size"] == source_size
+        assert ((words[target_base] >> 23) & 0xF) == (
+            (source[source_base] >> 23) & 0xF)
         assert words[target_base + 1] == values[0]
         assert words[target_base + 17] == values[1]
         assert row["caps0"] == expected_caps0
