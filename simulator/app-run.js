@@ -2188,6 +2188,10 @@ function runSim() {
     function finishRun(stopReason, breakpointAddr) {
         _simRunActive = false;
         _showStopBtn(false);
+        // updateThreadControl() disabled the switch button while sim.running
+        // was true.  sim.run() has returned now, so refresh that independent
+        // toolbar control explicitly; updateDashboard() does not own it.
+        updateThreadControl();
         console.log('[finishRun] stopReason=', stopReason, 'halted=', sim.halted, 'bootComplete=', sim.bootComplete, 'faultLog=', sim.faultLog.length, 'steps=', totalSteps);
         if (sim.faultLog.length > 0) console.log('[finishRun] FAULTS:', JSON.stringify(sim.faultLog.map(f => f.type + ': ' + f.message)));
         const ranClean = ((stopReason === 'halted' || sim.halted) && sim.faultLog.length === 0)

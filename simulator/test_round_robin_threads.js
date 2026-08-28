@@ -116,6 +116,17 @@ vm.runInContext([
 uiContext.updateThreadControl();
 assert.strictEqual(button.disabled, false,
     'Next Thread button is enabled with three configured Threads');
+uiSim.running = true;
+uiContext.updateThreadControl();
+assert.strictEqual(button.disabled, true,
+    'Next Thread button is disabled while the simulator is actively running');
+uiSim.running = false;
+uiContext.updateThreadControl();
+assert.strictEqual(button.disabled, false,
+    'Next Thread button is re-enabled after the simulator pauses');
+const finishRunSource = functionSource(appRunSource, 'finishRun');
+assert(finishRunSource.includes('updateThreadControl();'),
+    'run cleanup refreshes the independently-owned Thread toolbar state');
 uiContext.nextConfiguredThread();
 assert.strictEqual(uiSim.activeThreadStatus().slot, 11,
     'browser-shaped Next Thread click switches to Thread#2 without window.sim');
