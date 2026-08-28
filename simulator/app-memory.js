@@ -2454,7 +2454,7 @@ function _loadBootConfig() {
     return fetch('/api/boot-config')
         .then(r => r.json())
         .then(data => {
-            window.bootConfig = (data && data.config) || null;
+            _setActiveBootConfig((data && data.config) || null);
             _hardwareProfiles = (data && data.profiles) || {};
             _lumpCatalog      = (data && data.lumpCatalog) || [];
             if (data && data.limits) _bdLimits = data.limits;
@@ -2466,13 +2466,56 @@ function _loadBootConfig() {
         });
 }
 
+function _reportBootImageRejection(message, resultEl) {
+    const detail = message || (sim && sim.lastBootImageError) ||
+        'Saved boot image was rejected. Regenerate it for the current memory configuration.';
+    console.warn('[bootImage] ' + detail);
+    if (resultEl) resultEl.textContent = detail;
+    const con = document.getElementById('editorConsole');
+    if (con && !con.textContent.includes(detail)) {
+        con.textContent += (con.textContent ? '\n' : '') + '[BOOTIMG] ' + detail;
+    }
+}
+
+function _setActiveBootConfig(config, serverInvalidated, invalidatedImageWords) {
+    const previousWords = window.bootConfig && window.bootConfig.step1
+        ? window.bootConfig.step1.totalNamespaceWords : null;
+    const nextWords = config && config.step1
+        ? config.step1.totalNamespaceWords : null;
+    window.bootConfig = config || null;
+    if (serverInvalidated || (
+        Number.isInteger(previousWords) && Number.isInteger(nextWords) &&
+        previousWords !== nextWords
+    )) {
+        window.bootImage = null;
+        window.bootImageAvailable = false;
+        const imageWords = Number.isInteger(invalidatedImageWords)
+            ? invalidatedImageWords : previousWords;
+        _reportBootImageRejection(
+            `Saved boot image has ${Number(imageWords || 0).toLocaleString()} words, but the configured Namespace memory has ${Number(nextWords || 0).toLocaleString()} words. The previous saved boot image is no longer usable; regenerate it for the current memory configuration.`
+        );
+        return true;
+    }
+    return false;
+}
+window._setActiveBootConfig = _setActiveBootConfig;
+
 
 
 // Task #217 — fetch the saved boot-image.bin (if any) without triggering
 // a 404 console error noise. Returns ArrayBuffer or null.
 function _probeBootImage() {
     return fetch('/api/boot-image/binary', { cache: 'no-store' })
-        .then(r => r.ok ? r.arrayBuffer() : null)
+        .then(async r => {
+            if (r.ok) return r.arrayBuffer();
+            let detail = '';
+            try {
+                const body = await r.json();
+                detail = body && body.error ? body.error : '';
+            } catch (_) {}
+            if (detail) _reportBootImageRejection(detail);
+            return null;
+        })
         .catch(() => null);
 }
 
@@ -2497,11 +2540,15 @@ function _maybeApplyBootImage() {
             if (sim.loadBootImage(window.bootImage) === true) {
                 _applyBootEntryToSim(); _evictBootImgPatches();
             } else {
-                console.warn('[bootImage] cached image rejected by loadBootImage(); clearing active state.');
+                _reportBootImageRejection(sim.lastBootImageError);
                 window.bootImage = null;
                 window.bootImageAvailable = false;
             }
-        } catch (e) { console.warn('[bootImage] apply failed:', e); }
+        } catch (e) {
+            _reportBootImageRejection('Saved boot image could not be applied: ' + e.message);
+            window.bootImage = null;
+            window.bootImageAvailable = false;
+        }
         return;
     }
     if (window.bootImageAvailable) {
@@ -2512,11 +2559,15 @@ function _maybeApplyBootImage() {
                         window.bootImage = buf;
                         _applyBootEntryToSim(); _evictBootImgPatches();
                     } else {
-                        console.warn('[bootImage] fetched image rejected by loadBootImage(); clearing active state.');
+                        _reportBootImageRejection(sim.lastBootImageError);
                         window.bootImage = null;
                         window.bootImageAvailable = false;
                     }
-                } catch(e){ console.warn('[bootImage] apply failed:', e); }
+                } catch(e){
+                    _reportBootImageRejection('Saved boot image could not be applied: ' + e.message);
+                    window.bootImage = null;
+                    window.bootImageAvailable = false;
+                }
             }
         });
     }
@@ -2577,11 +2628,13 @@ function generateBootImage(onApplied) {
                         } else {
                             window.bootImage = null;
                             window.bootImageAvailable = false;
-                            if (result) result.textContent = 'Generated image was rejected by the loader (stale/invalid) — regenerate.';
+                            _reportBootImageRejection(sim.lastBootImageError, result);
                             notifyApplied(false);
                         }
                     } catch(e) {
-                        console.warn('[bootImage] apply failed:', e);
+                        window.bootImage = null;
+                        window.bootImageAvailable = false;
+                        _reportBootImageRejection('Generated boot image could not be applied: ' + e.message, result);
                         notifyApplied(false);
                     }
                 } else {
@@ -2644,9 +2697,13 @@ function uploadBootImageFile(file) {
                             } else {
                                 window.bootImage = null;
                                 window.bootImageAvailable = false;
-                                if (result) result.textContent = 'Uploaded image was rejected by the loader (stale/invalid).';
+                                _reportBootImageRejection(sim.lastBootImageError, result);
                             }
-                        } catch(e) { console.warn('[bootImage] apply failed:', e); }
+                        } catch(e) {
+                            window.bootImage = null;
+                            window.bootImageAvailable = false;
+                            _reportBootImageRejection('Uploaded boot image could not be applied: ' + e.message, result);
+                        }
                     }
                 });
             })
@@ -2918,7 +2975,11 @@ function updateNamespace() {
         });
         const body = await response.json();
         if (!response.ok || body.ok === false) throw new Error(body.error || `HTTP ${response.status}`);
-        window.bootConfig = body.config || cfg;
+        _setActiveBootConfig(
+            body.config || cfg,
+            body.bootImageInvalidated === true,
+            body.invalidatedBootImageWords
+        );
         window._nsPrefetchDirty = false;
         return window.bootConfig;
     };

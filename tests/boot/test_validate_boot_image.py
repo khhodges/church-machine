@@ -101,6 +101,16 @@ def test_validate_boot_image_accepts_valid_image():
     total = int(cfg["step1"]["totalNamespaceWords"])
     validate_boot_image(image, total)
 
+def test_validate_boot_image_rejects_image_larger_than_configured_memory():
+    image_cfg = _default_cfg()
+    image_cfg["step1"]["totalNamespaceWords"] = 32768
+    image = generate_boot_image(image_cfg, LUMPS_DIR)
+    with pytest.raises(
+        ValueError,
+        match=r"saved image has 32768 words.*configured Namespace memory has 16384 words.*regenerate",
+    ):
+        validate_boot_image(image, 16384)
+
 
 def test_validate_boot_image_infers_total_from_length():
     """validate_boot_image works when total_namespace_words is omitted."""

@@ -408,9 +408,9 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
     Catching both here surfaces version mismatches and slot problems with
     a clear Python-level error before the image ever reaches the harness.
 
-    ``total_namespace_words`` defaults to ``len(image_bytes) // 4``; pass
-    the explicit value from the config dict when available so the check is
-    exact even if the image has trailing padding.
+    ``total_namespace_words`` defaults to ``len(image_bytes) // 4``. When an
+    explicit configured size is supplied, the image must contain exactly that
+    many words; partial overlays and trailing padding are rejected.
 
     Foundational slots (0, 1, 6=Boot.Abstr) and MMIO device slots
     (2=UART_DEV, 3=LED_DEV, 4=BTN_DEV, 5=TIMER_DEV) are all checked.
@@ -420,14 +420,20 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
                     is zeroed, or the image is too small to contain the NS
                     table at all.
     """
+    if len(image_bytes) % 4 != 0:
+        raise ValueError(
+            f"validate_boot_image: image size {len(image_bytes)} bytes is not "
+            "a whole number of 32-bit words; regenerate the boot image"
+        )
     if total_namespace_words is None:
         total_namespace_words = len(image_bytes) // 4
     total = total_namespace_words
     n_words = len(image_bytes) // 4
-    if n_words < total:
+    if n_words != total:
         raise ValueError(
-            f"validate_boot_image: image is too small "
-            f"({n_words} words, expected {total})"
+            f"validate_boot_image: saved image has {n_words} words, but the "
+            f"configured Namespace memory has {total} words; regenerate the "
+            "boot image for the current memory configuration"
         )
     words = struct.unpack(f"<{n_words}I", image_bytes[: n_words * 4])
 

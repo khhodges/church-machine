@@ -284,15 +284,34 @@ class ChurchSimulator {
     // method just copies the words in. Call AFTER reset() (which sized
     // memory[] from window.bootConfig).
     //
-    // Bytes longer than the memory window are truncated (defensive); a
-    // shorter image leaves the tail untouched. nsCount is recomputed by
+    // The image must exactly match the active memory window. Partial overlays
+    // are unsafe because the Namespace table lives at the image tail; truncating
+    // a larger image records a table base that does not exist in simulator
+    // memory and turns a configuration mismatch into a LOAD_NS integrity fault.
+    // nsCount is recomputed by
     // (a) scanning the resulting NS table for non-zero entries, then
     // (b) extending the count to include Step 3 reserved-but-empty slots
     //     from window.bootConfig so empty slots remain addressable in
     //     the dashboard and through the runtime nsCount.
     loadBootImage(arrayBuffer) {
-        if (!arrayBuffer || arrayBuffer.byteLength < 4) return false;
+        this.lastBootImageError = null;
+        if (!arrayBuffer || arrayBuffer.byteLength < 4) {
+            this.lastBootImageError = 'Boot image is empty or too small. Regenerate the saved image for the current memory configuration.';
+            this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError}\n`;
+            return false;
+        }
+        if (arrayBuffer.byteLength % 4 !== 0) {
+            this.lastBootImageError = `Boot image size ${arrayBuffer.byteLength} bytes is not a whole number of 32-bit words. Regenerate the saved image for the current memory configuration.`;
+            this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError}\n`;
+            return false;
+        }
         const src = new Uint32Array(arrayBuffer);
+        const configuredWords = this.memory.length;
+        if (src.length !== configuredWords) {
+            this.lastBootImageError = `Saved boot image has ${src.length.toLocaleString()} words, but the configured simulator memory has ${configuredWords.toLocaleString()} words. Regenerate the saved image for the current memory configuration.`;
+            this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected before changing simulator state.\n`;
+            return false;
+        }
 
         // Backwards-scan for BOOT_IMAGE_FORMAT_TAG (Task #1244).
         // The tag's position encodes the actual NS table reserve size dynamically,
@@ -310,14 +329,23 @@ class ChurchSimulator {
             }
         }
         if (tagIdx < 0) {
-            this.output += `[BOOTIMG] WARNING: BOOT_IMAGE_FORMAT_TAG not found in last 8192 words; ignoring binary — using built-in namespace defaults.\n`;
+            this.lastBootImageError = 'BOOT_IMAGE_FORMAT_TAG not found in the last 8192 words; regenerate the saved image for the current memory configuration.';
+            this.output += `[BOOTIMG] WARNING: ${this.lastBootImageError} Using built-in namespace defaults.\n`;
             return false;
         }
         const discoveredNsTableBase    = tagIdx + 1;
         const discoveredNsTableReserve = src.length - discoveredNsTableBase;
         // Reserve must be a positive multiple of NS_ENTRY_WORDS (4 words per slot).
         if (discoveredNsTableReserve < this.NS_ENTRY_WORDS || discoveredNsTableReserve % this.NS_ENTRY_WORDS !== 0) {
-            this.output += `[BOOTIMG] WARNING: invalid NS table reserve ${discoveredNsTableReserve} (not a positive multiple of ${this.NS_ENTRY_WORDS}) derived from tag at word ${tagIdx}; ignoring binary.\n`;
+            this.lastBootImageError = `Invalid Namespace-table reserve ${discoveredNsTableReserve} words (not a positive multiple of ${this.NS_ENTRY_WORDS}) derived from tag at word ${tagIdx}. Regenerate the saved image for the current memory configuration.`;
+            this.output += `[BOOTIMG] WARNING: ${this.lastBootImageError} Ignoring binary.\n`;
+            return false;
+        }
+        const discoveredNsTableEnd = discoveredNsTableBase + discoveredNsTableReserve;
+        if (discoveredNsTableBase < 0 || discoveredNsTableBase >= configuredWords ||
+                discoveredNsTableEnd !== configuredWords) {
+            this.lastBootImageError = `Saved boot image Namespace table spans words ${discoveredNsTableBase}–${discoveredNsTableEnd - 1}, outside the configured ${configuredWords.toLocaleString()}-word simulator memory. Regenerate the saved image for the current memory configuration.`;
+            this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected before changing simulator state.\n`;
             return false;
         }
         const discoveredMaxNsEntries = (discoveredNsTableReserve / this.NS_ENTRY_WORDS) | 0;
@@ -345,7 +373,8 @@ class ChurchSimulator {
                 const _bodyWord1 = src[_abstrLoc + 1] >>> 0;
                 const _op1       = (_bodyWord1 >>> 27) & 0x1F;
                 if (_op1 === 4 /* CHANGE */) {
-                    this.output += `[BOOTIMG] ERROR: stale trampoline-era boot image — Boot.Abstr lump (slot ${discoveredBootEntrySlot}) first body word is CHANGE (0x${_bodyWord1.toString(16).padStart(8, '0')}). This image pre-dates direct-dispatch and is unsafe to load. Rejected.\n`;
+                    this.lastBootImageError = `Stale trampoline-era boot image: Boot.Abstr lump (slot ${discoveredBootEntrySlot}) first body word is CHANGE (0x${_bodyWord1.toString(16).padStart(8, '0')}). This image pre-dates direct-dispatch and must be regenerated.`;
+                    this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected.\n`;
                     return false;
                 }
             }
@@ -379,7 +408,7 @@ class ChurchSimulator {
             }
         }
 
-        const n   = Math.min(src.length, this.memory.length);
+        const n   = src.length;
         for (let i = 0; i < n; i++) this.memory[i] = src[i] >>> 0;
         // Read the stored nsCount from NS_TABLE_BASE-3 (tagIdx-2).
         // This value is written by both boot_image.py and _initNamespaceTable()

@@ -2841,7 +2841,28 @@ def boot_config_post():
             json.dump(cfg, f, indent=2)
     except Exception as e:
         return jsonify({"ok": False, "error": f"Failed to write boot-config.json: {e}"}), 500
-    return jsonify({"ok": True, "config": cfg})
+    # A boot image is a complete memory image, not an overlay. If Step 1 now
+    # selects a different memory size, report the cached binary as invalidated.
+    # Keep the file until explicit regeneration replaces it; all serve/upload
+    # gates validate against the configured size, so it cannot be advertised or
+    # applied in the interim.
+    boot_image_invalidated = False
+    invalidated_image_words = None
+    if os.path.isfile(BOOT_IMAGE_PATH):
+        try:
+            image_bytes = os.path.getsize(BOOT_IMAGE_PATH)
+            configured_bytes = cfg["step1"]["totalNamespaceWords"] * 4
+            if image_bytes != configured_bytes:
+                boot_image_invalidated = True
+                invalidated_image_words = image_bytes // 4
+        except OSError as exc:
+            logging.warning("boot_config_post: could not inspect cached boot image: %s", exc)
+    return jsonify({
+        "ok": True,
+        "config": cfg,
+        "bootImageInvalidated": boot_image_invalidated,
+        "invalidatedBootImageWords": invalidated_image_words,
+    })
 
 
 def _optional_report_token_check():
@@ -3078,8 +3099,13 @@ def boot_image_download():
         return jsonify({"error": "boot-image.bin not generated yet"}), 404
     with open(BOOT_IMAGE_PATH, "rb") as _f:
         _image_bytes = _f.read()
+    _cfg, _cfg_err = _read_saved_boot_config()
+    _configured_words = (
+        int(_cfg["step1"]["totalNamespaceWords"])
+        if _cfg_err is None and _cfg is not None else None
+    )
     try:
-        _boot_image_gen.validate_boot_image(_image_bytes)
+        _boot_image_gen.validate_boot_image(_image_bytes, _configured_words)
     except ValueError as _e:
         logging.error("boot_image_download: stale or invalid boot image on disk: %s", _e)
         return jsonify({"error": f"Boot image on disk is stale or invalid: {_e}"}), 500
@@ -3087,7 +3113,7 @@ def boot_image_download():
                      as_attachment=True, download_name="boot-image.bin")
 
 def _boot_image_is_stale():
-    """Return True if any tracked LUMP source is newer than boot-image.bin.
+    """Return True if the image size or any tracked source is stale.
 
     Checked files: 00000600.lump (Boot.Abstr binary) and manifest.json
     (controls boot_resident flag).  If boot-image.bin does not exist the
@@ -3096,6 +3122,11 @@ def _boot_image_is_stale():
     if not os.path.isfile(BOOT_IMAGE_PATH):
         return False
     try:
+        _cfg, _cfg_err = _read_saved_boot_config()
+        if _cfg_err is None and _cfg is not None:
+            _expected_bytes = int(_cfg["step1"]["totalNamespaceWords"]) * 4
+            if os.path.getsize(BOOT_IMAGE_PATH) != _expected_bytes:
+                return True
         _img_mtime = os.path.getmtime(BOOT_IMAGE_PATH)
         _lumps_dir = os.path.dirname(BOOT_IMAGE_PATH)
         for _fname in ("00000600.lump", "manifest.json"):
@@ -3136,11 +3167,16 @@ def boot_image_binary():
     if _boot_image_is_stale():
         _new_bytes, _regen_err = _auto_regen_boot_image()
         if _regen_err:
-            logging.warning("boot_image_binary: staleness regen failed (%s); serving cached copy", _regen_err)
+            logging.warning("boot_image_binary: staleness regen failed (%s); cached copy remains unavailable", _regen_err)
     with open(BOOT_IMAGE_PATH, "rb") as _f:
         _image_bytes = _f.read()
+    _cfg, _cfg_err = _read_saved_boot_config()
+    _configured_words = (
+        int(_cfg["step1"]["totalNamespaceWords"])
+        if _cfg_err is None and _cfg is not None else None
+    )
     try:
-        _boot_image_gen.validate_boot_image(_image_bytes)
+        _boot_image_gen.validate_boot_image(_image_bytes, _configured_words)
     except ValueError as _e:
         logging.error("boot_image_binary: stale or invalid boot image on disk: %s", _e)
         return jsonify({"error": f"Boot image on disk is stale or invalid: {_e}"}), 500
@@ -3151,8 +3187,24 @@ def boot_image_binary():
 
 @app.route("/api/boot-image/exists", methods=["GET"])
 def boot_image_exists():
-    """Return whether a boot-image.bin currently exists on disk."""
-    return jsonify({"exists": os.path.isfile(BOOT_IMAGE_PATH)})
+    """Return whether a compatible boot-image.bin currently exists on disk."""
+    if not os.path.isfile(BOOT_IMAGE_PATH):
+        return jsonify({"exists": False})
+    cfg, cfg_err = _read_saved_boot_config()
+    if cfg_err:
+        return jsonify({"exists": False, "reason": cfg_err})
+    configured_words = int(cfg["step1"]["totalNamespaceWords"])
+    image_words = os.path.getsize(BOOT_IMAGE_PATH) // 4
+    if os.path.getsize(BOOT_IMAGE_PATH) != configured_words * 4:
+        return jsonify({
+            "exists": False,
+            "reason": (
+                f"Saved boot image has {image_words} words, but configured "
+                f"Namespace memory has {configured_words} words; regenerate "
+                "the boot image for the current memory configuration"
+            ),
+        })
+    return jsonify({"exists": True})
 
 
 def _crc16_ccitt(data_bytes):
@@ -3452,8 +3504,12 @@ def boot_image_upload():
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
 
+    cfg, cfg_err = _read_saved_boot_config()
+    if cfg_err:
+        return jsonify({"ok": False, "error": cfg_err}), 400
+    configured_words = int(cfg["step1"]["totalNamespaceWords"])
     try:
-        _boot_image_gen.validate_boot_image(image_bytes)
+        _boot_image_gen.validate_boot_image(image_bytes, configured_words)
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
 
@@ -3558,8 +3614,12 @@ def boot_image_save_ns():
     except ValueError as _exc:
         return jsonify({"ok": False, "error": str(_exc)}), 400
 
+    cfg, cfg_err = _read_saved_boot_config()
+    if cfg_err:
+        return jsonify({"ok": False, "error": cfg_err}), 400
+    configured_words = int(cfg["step1"]["totalNamespaceWords"])
     try:
-        _boot_image_gen.validate_boot_image(_img_bytes)
+        _boot_image_gen.validate_boot_image(_img_bytes, configured_words)
     except ValueError as _exc:
         return jsonify({"ok": False, "error": str(_exc)}), 400
 

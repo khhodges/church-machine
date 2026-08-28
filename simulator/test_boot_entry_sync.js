@@ -470,6 +470,15 @@ console.log('\n--- T211: late boot-image arrival replaces fallback CR state ---'
     const bootImage = bootImageBytes.buffer.slice(
         bootImageBytes.byteOffset, bootImageBytes.byteOffset + bootImageBytes.byteLength
     );
+    global.window = {
+        bootConfig: {
+            step1: {
+                totalNamespaceWords: bootImageBytes.byteLength / 4,
+                namespaceLumpWords: 64,
+                threadLumpWords: 512,
+            },
+        },
+    };
     const sim = new ChurchSimulator();
 
     function completeBoot(machine) {

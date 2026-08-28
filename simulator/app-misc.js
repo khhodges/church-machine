@@ -1211,7 +1211,11 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(r => r.json())
         .then(data => {
             _hardwareProfiles = (data && data.profiles) || {};
-            window.bootConfig = (data && data.config) || null;
+            if (typeof window._setActiveBootConfig === 'function') {
+                window._setActiveBootConfig((data && data.config) || null);
+            } else {
+                window.bootConfig = (data && data.config) || null;
+            }
             _lumpCatalog = (data && data.lumpCatalog) || [];
         })
         .catch(err => { console.warn('[bootConfig] prefetch failed:', err); });

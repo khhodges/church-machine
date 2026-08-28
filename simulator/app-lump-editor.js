@@ -328,7 +328,14 @@
                 if (errEl)    errEl.textContent    = (res.body && res.body.error) || 'Save failed.';
                 return false;
             }
-            window.bootConfig = res.body.config;
+            const memoryChanged = typeof window._setActiveBootConfig === 'function'
+                ? window._setActiveBootConfig(
+                    res.body.config, res.body.bootImageInvalidated === true,
+                    res.body.invalidatedBootImageWords)
+                : false;
+            if (memoryChanged && sim && typeof sim.reset === 'function') {
+                sim.reset();
+            }
             // Saving the designer changes the persisted boot geometry, which
             // also determines the generated Thread#2…Thread#N namespace
             // entries.  Do not leave the live simulator on the previous
@@ -1811,7 +1818,13 @@
                 renderResidentPanel();
                 return;
             }
-            window.bootConfig = res.body.config;
+            if (typeof window._setActiveBootConfig === 'function') {
+                window._setActiveBootConfig(
+                    res.body.config, res.body.bootImageInvalidated === true,
+                    res.body.invalidatedBootImageWords);
+            } else {
+                window.bootConfig = res.body.config;
+            }
             _rl.statusMsg = 'Saved. Reset the simulator to apply the new boot config.';
             _rl.errorMsg  = '';
             renderResidentPanel();

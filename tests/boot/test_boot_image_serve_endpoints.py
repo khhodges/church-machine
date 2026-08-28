@@ -63,6 +63,11 @@ def _tamper_format_tag(image_bytes):
 def _make_valid_image():
     return generate_boot_image(_default_cfg(), LUMPS_DIR)
 
+def _make_oversized_image():
+    cfg = _default_cfg()
+    cfg["step1"]["totalNamespaceWords"] = 32768
+    return generate_boot_image(cfg, LUMPS_DIR)
+
 
 def _write_tampered(path):
     tampered = _tamper_format_tag(_make_valid_image())
@@ -136,6 +141,69 @@ def test_binary_valid_image_returns_200(client, temp_image_path):
     assert resp.data == valid_bytes, (
         f"Response body length {len(resp.data)} != image length {len(valid_bytes)}"
     )
+
+def test_binary_never_serves_cached_image_for_different_memory_size(
+        client, temp_image_path):
+    with open(temp_image_path, "wb") as image_file:
+        image_file.write(_make_oversized_image())
+
+    with patch("server.app._auto_regen_boot_image",
+               return_value=(None, "regeneration unavailable")):
+        resp = client.get("/api/boot-image/binary")
+
+    assert resp.status_code == 500
+    error = resp.get_json()["error"]
+    assert "32768 words" in error
+    assert "16384 words" in error
+    assert "regenerate" in error.lower()
+
+
+def test_exists_does_not_advertise_image_for_different_memory_size(
+        client, temp_image_path):
+    with open(temp_image_path, "wb") as image_file:
+        image_file.write(_make_oversized_image())
+
+    resp = client.get("/api/boot-image/exists")
+
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["exists"] is False
+    assert "32768 words" in body["reason"]
+    assert "16384 words" in body["reason"]
+
+
+def test_boot_config_size_change_invalidates_cached_image_availability(
+        client, tmp_path):
+    image_path = tmp_path / "boot-image.bin"
+    config_path = tmp_path / "boot-config.json"
+    image_path.write_bytes(_make_oversized_image())
+    config_path.write_text('{"step1":{"totalNamespaceWords":32768}}')
+    payload = {
+        "targetBoard": "wukong-xc7a100t",
+        "step1": {
+            "totalNamespaceWords": 16384,
+            "namespaceLumpWords": 64,
+            "threadLumpWords": 256,
+        },
+        "step2": {"lumps": []},
+        "step3": {"emptySlotCount": 0},
+    }
+
+    with patch("server.app.BOOT_IMAGE_PATH", str(image_path)), \
+            patch("server.app.BOOT_CONFIG_PATH", str(config_path)), \
+            patch("server.app.BOOT_CONFIG_LEGACY_PATH",
+                  str(tmp_path / "missing-legacy.json")):
+        save_resp = client.post("/api/boot-config", json=payload)
+        exists_resp = client.get("/api/boot-image/exists")
+
+    assert save_resp.status_code == 200
+    assert save_resp.get_json()["bootImageInvalidated"] is True
+    assert save_resp.get_json()["invalidatedBootImageWords"] == 32768
+    assert exists_resp.status_code == 200
+    exists_body = exists_resp.get_json()
+    assert exists_body["exists"] is False
+    assert "32768 words" in exists_body["reason"]
+    assert "16384 words" in exists_body["reason"]
 
 
 # ---------------------------------------------------------------------------

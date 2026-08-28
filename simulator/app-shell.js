@@ -1275,9 +1275,20 @@ function init() {
                                window._clearBootImageStickyPatches(sim.nsCount || 0);
                            }
                        } else {
-                           console.warn('[bootImage] loadBootImage() rejected the fetched image (stale/invalid); not marking available.');
+                            if (typeof _reportBootImageRejection === 'function') {
+                                _reportBootImageRejection(sim.lastBootImageError);
+                            } else {
+                                console.warn('[bootImage] loadBootImage() rejected the fetched image.');
+                            }
                        }
-                   } catch(e) { console.warn('[bootImage] apply failed:', e); _accepted = false; }
+                    } catch(e) {
+                        if (typeof _reportBootImageRejection === 'function') {
+                            _reportBootImageRejection('Saved boot image could not be applied: ' + e.message);
+                        } else {
+                            console.warn('[bootImage] apply failed:', e);
+                        }
+                        _accepted = false;
+                    }
                    if (_accepted) {
                        // Cache before resetting: _maybeApplyBootImage(), the
                        // reset listener, uses this exact buffer to overlay the

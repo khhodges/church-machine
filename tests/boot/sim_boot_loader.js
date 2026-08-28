@@ -50,6 +50,14 @@ process.stdin.on('end', () => {
 
     // Wipe memory so the only source of NS-table / lump bytes is the boot image.
     sim.memory.fill(0);
+    const beforeLoad = {
+        memory: Array.from(sim.memory),
+        nsTableBase: sim.NS_TABLE_BASE | 0,
+        nsTableReserve: sim.NS_TABLE_RESERVE | 0,
+        maxNsEntries: sim.MAX_NS_ENTRIES | 0,
+        nsCount: sim.nsCount | 0,
+        bootEntrySlot: sim.bootEntrySlot | 0,
+    };
 
     // loadBootImage takes an ArrayBuffer-like; pass a fresh ArrayBuffer copy.
     const ab = imgBuf.buffer.slice(
@@ -63,7 +71,7 @@ process.stdin.on('end', () => {
     const MAX_STEPS = 64;
     let iters = 0;
     const stepSnapshots = [];
-    while (iters < MAX_STEPS && !sim.bootComplete && !sim.halted) {
+    while (loaded === true && iters < MAX_STEPS && !sim.bootComplete && !sim.halted) {
         const bootStepBefore = sim.bootStep | 0;
         const outputBefore   = sim.output || '';
         const advanced = sim._bootStep();
@@ -91,6 +99,16 @@ process.stdin.on('end', () => {
 
     const status = {
         loaded: loaded === true,
+        lastBootImageError: sim.lastBootImageError || null,
+        rejectedAtomically:
+            loaded === true ? null : (
+                beforeLoad.nsTableBase === (sim.NS_TABLE_BASE | 0) &&
+                beforeLoad.nsTableReserve === (sim.NS_TABLE_RESERVE | 0) &&
+                beforeLoad.maxNsEntries === (sim.MAX_NS_ENTRIES | 0) &&
+                beforeLoad.nsCount === (sim.nsCount | 0) &&
+                beforeLoad.bootEntrySlot === (sim.bootEntrySlot | 0) &&
+                beforeLoad.memory.every((word, index) => word === (sim.memory[index] >>> 0))
+            ),
         bootComplete: sim.bootComplete === true,
         halted: sim.halted === true,
         bootStep: sim.bootStep | 0,

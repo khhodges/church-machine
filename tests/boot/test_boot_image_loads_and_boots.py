@@ -488,6 +488,56 @@ def test_stale_image_reports_loaded_false():
         "loadBootImage() must reject an image without the current format tag"
     )
 
+def test_oversized_image_is_rejected_atomically_before_load_ns():
+    """A valid 32K image cannot be partially overlaid on a 16K simulator."""
+    image_cfg = _cfg_custom_step1()
+    simulator_cfg = _cfg_default()
+    image = generate_boot_image(image_cfg, LUMPS_DIR)
+
+    status = _run_harness(simulator_cfg, image)
+
+    assert status["loaded"] is False
+    assert status["rejectedAtomically"] is True, status
+    assert "32,768 words" in status["lastBootImageError"]
+    assert "16,384 words" in status["lastBootImageError"]
+    assert "regenerate" in status["lastBootImageError"].lower()
+    assert status["faultLog"] == [], (
+        "configuration mismatch must be rejected by the loader, not become "
+        f"a LOAD_NS integrity fault: {status['faultLog']}"
+    )
+    assert status["bootStep"] == 0
+
+
+def test_undersized_image_is_rejected_atomically_before_load_ns():
+    """A valid 16K image cannot be treated as an overlay on a 32K simulator."""
+    image_cfg = _cfg_default()
+    simulator_cfg = _cfg_custom_step1()
+    image = generate_boot_image(image_cfg, LUMPS_DIR)
+
+    status = _run_harness(simulator_cfg, image)
+
+    assert status["loaded"] is False
+    assert status["rejectedAtomically"] is True, status
+    assert "16,384 words" in status["lastBootImageError"]
+    assert "32,768 words" in status["lastBootImageError"]
+    assert "regenerate" in status["lastBootImageError"].lower()
+    assert status["faultLog"] == []
+    assert status["bootStep"] == 0
+
+
+def test_matching_16k_image_preserves_namespace_table_and_load_ns():
+    """The exact-size image keeps its complete tail table and passes LOAD_NS."""
+    cfg = _cfg_default()
+    image = generate_boot_image(cfg, LUMPS_DIR)
+    status = _run_harness(cfg, image)
+
+    assert status["loaded"] is True
+    assert status["memoryWords"] == 16384
+    assert status["nsTableBase"] + 1024 == status["memoryWords"]
+    assert status["bootComplete"] is True
+    assert status["faultLog"] == []
+    assert _gt_index(status["cr15"]["word0"]) == 0
+
 
 if __name__ == "__main__":
     failures = 0
