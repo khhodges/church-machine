@@ -145,11 +145,28 @@ vm.runInContext([
 uiContext.updateThreadControl();
 assert.strictEqual(button.disabled, false,
     'Next Thread button is enabled with three configured Threads');
+// Real boot compacts the primary Boot.Thread descriptor to 64 words. Its live
+// context is nevertheless complete and is saved by the first switch, so the
+// third click must be allowed to resume it rather than requiring a first-start
+// caps zone that is no longer needed.
+const bootThreadEntry = uiSim.readNSEntry(1);
+uiSim.memory[bootThreadEntry.word0_location] &=
+    ~((0xF << 23) >>> 0);
 uiContext.nextConfiguredThread();
 assert.strictEqual(uiSim.activeThreadStatus().slot, 11,
     'browser-shaped Next Thread click switches to Thread#2 without window.sim');
 assert.strictEqual(status.textContent, 'Thread#2 · 2/3',
     'toolbar status follows the newly active Thread LUMP');
-assert.strictEqual(dashboardUpdates, 1,
-    'Next Thread click refreshes the dashboard');
+uiContext.nextConfiguredThread();
+assert.strictEqual(uiSim.activeThreadStatus().slot, 12,
+    'second browser-shaped click switches to Thread#3');
+assert.strictEqual(status.textContent, 'Thread#3 · 3/3',
+    'toolbar status follows Thread#3');
+uiContext.nextConfiguredThread();
+assert.strictEqual(uiSim.activeThreadStatus().slot, 1,
+    'third browser-shaped click restores the saved boot Thread');
+assert.strictEqual(status.textContent, 'Thread.1 · 1/3',
+    'toolbar status wraps to the boot Thread');
+assert.strictEqual(dashboardUpdates, 3,
+    'each Next Thread click refreshes the dashboard');
 console.log('PASS round-robin Thread scheduler');

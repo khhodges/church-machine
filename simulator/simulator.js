@@ -4400,8 +4400,9 @@ class ChurchSimulator {
         const target = slots[(currentIndex + 1) % slots.length];
         const entry = this.readNSEntry(target);
         const header = entry ? this.parseLumpHeader(this.memory[entry.word0_location] >>> 0) : null;
+        const hasSavedContext = !!(this._threadContextMap && this._threadContextMap.has(target));
         if (!entry || !header || !header.valid || header.typ !== 2 ||
-                header.lumpSize < THREAD_CAPS_OFFSET + 12) {
+                (!hasSavedContext && header.lumpSize < THREAD_CAPS_OFFSET + 12)) {
             return { ok: false, reason: `Configured target ${this.nsLabels[target] || target} has an invalid Thread descriptor` };
         }
 
@@ -6488,8 +6489,9 @@ class ChurchSimulator {
         // 1. Save outgoing thread state (CR0–CR11, CR14, CR15, DR0–DR15, STO, PC+1).
         //    CR12/CR13 are system-wide and excluded from the per-thread snapshot.
         const targetHeader = this.parseLumpHeader(this.memory[entry.word0_location] >>> 0);
+        const hasSavedTargetContext = !!(this._threadContextMap && this._threadContextMap.has(targetIdx));
         if (schedulerSwitch && (!targetHeader.valid || targetHeader.typ !== 2 ||
-                targetHeader.lumpSize < THREAD_CAPS_OFFSET + 12)) {
+                (!hasSavedTargetContext && targetHeader.lumpSize < THREAD_CAPS_OFFSET + 12))) {
             this.fault('BOUNDS', `NEXT_THREAD: Namespace slot ${targetIdx} is not a valid Thread descriptor`);
             return null;
         }
