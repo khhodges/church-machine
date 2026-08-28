@@ -99,28 +99,40 @@ function updateCRDetail() {
         titleEl.style.display = 'none';
         if (!sim.bootComplete && (crIdx === 12 || crIdx === 14)) {
             try {
-                const threadNSWord0Addr = sim._nsSlotBase(1);
+                // Show the saved image currently selected by the stopped
+                // Thread switcher, not always Boot.Thread.  The selected
+                // image is meaningful before boot because its five zones are
+                // already present in the uploaded memory.
+                let _selectedThreadSlot = 1;
+                if (typeof sim.activeThreadStatus === 'function') {
+                    const _threadStatus = sim.activeThreadStatus();
+                    if (_threadStatus && Number.isInteger(_threadStatus.slot)) {
+                        _selectedThreadSlot = _threadStatus.slot;
+                    }
+                }
+                const threadNSWord0Addr = sim._nsSlotBase(_selectedThreadSlot);
                 const threadBase = threadNSWord0Addr !== undefined
                     ? (sim.memory[threadNSWord0Addr] >>> 0) : 0;
-                if (threadBase > 0 && threadBase < sim.memory.length) {
+                // Word address zero is a valid Thread body location.
+                if (threadBase >= 0 && threadBase < sim.memory.length) {
                     if (crIdx === 12) {
                         // CR12 pre-boot: render the full 5-zone thread memory layout
                         // (⑤DR, ④Heap, ③Free, ②Stack, ①Caps) exactly as shown in
-                        // the tutorials, reading from Boot.Thread (NS slot 1) in
-                        // the bitstream-loaded memory.
-                        const _nsIdx1 = 1;
+                        // the tutorials, reading from the selected stopped image.
+                        const _threadLabel = (sim.nsLabels && sim.nsLabels[_selectedThreadSlot])
+                            || `Thread slot ${_selectedThreadSlot}`;
                         let hBar = '<div class="crd-menu-bar">';
-                        hBar += `<span class="crd-menu-active-label">Boot.Thread \u2014 Designed Boot State</span>`;
+                        hBar += `<span class="crd-menu-active-label">${_threadLabel} \u2014 Suspended Memory Image</span>`;
                         hBar += `<span class="crd-zone-nav" title="Jump to zone \u00b7 hover for live data">`;
-                        hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone('hdr')" onmouseenter="showZonePopup(event,'hdr',${_nsIdx1})" onmouseleave="hideZonePopup()">Hdr</button>`;
-                        hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(5)" onmouseenter="showZonePopup(event,5,${_nsIdx1})" onmouseleave="hideZonePopup()">&#x2464;\u202FDR</button>`;
-                        hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(4)" onmouseenter="showZonePopup(event,4,${_nsIdx1})" onmouseleave="hideZonePopup()">&#x2463;\u202FHeap</button>`;
-                        hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(3)" onmouseenter="showZonePopup(event,3,${_nsIdx1})" onmouseleave="hideZonePopup()">&#x2462;\u202FFree</button>`;
-                        hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(2)" onmouseenter="showZonePopup(event,2,${_nsIdx1})" onmouseleave="hideZonePopup()">&#x2461;\u202FStack</button>`;
-                        hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(1)" onmouseenter="showZonePopup(event,1,${_nsIdx1})" onmouseleave="hideZonePopup()">&#x2460;\u202FCaps</button>`;
+                        hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone('hdr')" onmouseenter="showZonePopup(event,'hdr',${_selectedThreadSlot})" onmouseleave="hideZonePopup()">Hdr</button>`;
+                        hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(5)" onmouseenter="showZonePopup(event,5,${_selectedThreadSlot})" onmouseleave="hideZonePopup()">&#x2464;\u202FDR</button>`;
+                        hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(4)" onmouseenter="showZonePopup(event,4,${_selectedThreadSlot})" onmouseleave="hideZonePopup()">&#x2463;\u202FHeap</button>`;
+                        hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(3)" onmouseenter="showZonePopup(event,3,${_selectedThreadSlot})" onmouseleave="hideZonePopup()">&#x2462;\u202FFree</button>`;
+                        hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(2)" onmouseenter="showZonePopup(event,2,${_selectedThreadSlot})" onmouseleave="hideZonePopup()">&#x2461;\u202FStack</button>`;
+                        hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(1)" onmouseenter="showZonePopup(event,1,${_selectedThreadSlot})" onmouseleave="hideZonePopup()">&#x2460;\u202FCaps</button>`;
                         hBar += `</span>`;
                         hBar += '</div>';
-                        contentEl.innerHTML = hBar + renderThreadMemoryLayout(_nsIdx1, true);
+                        contentEl.innerHTML = hBar + renderThreadMemoryLayout(_selectedThreadSlot, true);
                         contentEl.classList.add('crd-content-thread');
                         return;
                     }
@@ -128,8 +140,10 @@ function updateCRDetail() {
                     const CAPS_OFF = 244;
                     const word = sim.memory[threadBase + CAPS_OFF] >>> 0;
                     let preBootHtml = '';
-                    preBootHtml += `<div style="padding:0.75rem 1rem 0.25rem;color:#f4b942;font-weight:600;font-size:0.85rem;letter-spacing:0.04em;">DESIGNED BOOT STATE</div>`;
-                    preBootHtml += `<div style="padding:0 1rem 0.75rem;color:var(--text-secondary);font-size:0.8rem;">CR14 will be loaded from Thread.CR0 on boot \u2014 this is its designed startup value:</div>`;
+                    const _selectedThreadLabel = (sim.nsLabels && sim.nsLabels[_selectedThreadSlot])
+                        || `Thread slot ${_selectedThreadSlot}`;
+                    preBootHtml += `<div style="padding:0.75rem 1rem 0.25rem;color:#f4b942;font-weight:600;font-size:0.85rem;letter-spacing:0.04em;">SUSPENDED THREAD IMAGE</div>`;
+                    preBootHtml += `<div style="padding:0 1rem 0.75rem;color:var(--text-secondary);font-size:0.8rem;">CR14 is not live yet. This is the selected ${_selectedThreadLabel} CR0 home:</div>`;
                     preBootHtml += `<table class="abs-clist-table" style="margin:0 1rem 1rem;"><thead><tr><th>CR</th><th>GT (HEX)</th><th>PERMS</th><th>TYPE</th><th>NAME</th></tr></thead><tbody>`;
                     if (word === 0) {
                         preBootHtml += `<tr><td class="abs-clist-idx">CR0</td><td colspan="4" class="abs-clist-empty-slot">\u2014 (empty)</td></tr>`;

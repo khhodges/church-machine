@@ -80,6 +80,33 @@ sim.bootEntrySlot = 7;
 assert.strictEqual(sandbox.renderThreadMemoryLayout(11, true), bootSlotSixHtml,
     'changing active boot selection does not alter an inactive Thread detail');
 
+// CR12 is not live before boot, but its detail panel must still project the
+// currently selected suspended Thread image.  Thread.1 may validly start at
+// physical word zero, so the renderer cannot use base-address truthiness.
+const crDetailTitle = dom.window.document.createElement('div');
+crDetailTitle.id = 'crDetailTitle';
+const crDetailContent = dom.window.document.createElement('div');
+crDetailContent.id = 'crDetailContent';
+dom.window.document.body.append(crDetailTitle, crDetailContent);
+sandbox.selectedCR = 12;
+sandbox._petNameCRMap = {};
+sim.bootComplete = false;
+sim._currentThreadSlot = 12;
+sandbox.updateCRDetail();
+assert(crDetailContent.innerHTML.includes('Thread#3 — Suspended Memory Image'),
+    'pre-boot CR12 identifies the selected suspended Thread');
+assert(crDetailContent.innerHTML.includes('thread-zone-5') &&
+       crDetailContent.innerHTML.includes('thread-zone-4') &&
+       crDetailContent.innerHTML.includes('thread-zone-3') &&
+       crDetailContent.innerHTML.includes('thread-zone-2') &&
+       crDetailContent.innerHTML.includes('thread-zone-1'),
+    'pre-boot CR12 exposes all five selected Thread zones');
+assert(crDetailContent.innerHTML.includes('0x33330001') &&
+       !crDetailContent.innerHTML.includes('0x22220001'),
+    'pre-boot CR12 reads the selected Thread#3 body, not Thread#2');
+assert(!crDetailContent.textContent.includes('Machine not booted yet'),
+    'pre-boot CR12 no longer replaces an available suspended image with a boot hint');
+
 sandbox._nsLabelOpen(12);
 let modal = dom.window.document.querySelector('[data-testid="thread-detail-modal"]');
 assert(modal, 'clicking a generated Thread Namespace label opens the Thread popup');
