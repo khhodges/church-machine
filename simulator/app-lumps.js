@@ -1869,6 +1869,7 @@ function _renderLumpDnaTab(tk) {
 // This graph deliberately works from the list endpoint's binary-derived
 // clist_entries. A missing NS resolution is still a node, so stale or legacy
 // capability references remain visible instead of disappearing.
+/* ---- DD_GRAPH_UNIT_TEST_EXPORT_START ---- */
 function _deepDiveLumpForToken(token) {
     return (_lumpsCache || []).find(l => l && l.token === token) ||
         (_lumpsCache || []).find(l => l && (l.token || '').replace(/[^a-z0-9]/gi, '') ===
@@ -1887,6 +1888,7 @@ function _deepDiveTargetToken(entry) {
 
 function _buildLumpDeepDiveGraph(rootLump) {
     if (!rootLump) return null;
+    if (!Array.isArray(rootLump.clist_entries) || rootLump.clist_entries.length === 0) return null;
     const lumps = _lumpsCache || [];
     const nodes = [], edges = [], byKey = new Map(), queued = new Set();
     const keyFor = (token, fallback) => token
@@ -1980,6 +1982,7 @@ function _buildLumpDeepDiveGraph(rootLump) {
     svg += '</g></svg>';
     return { svg, wrapId: `lump-deep-dive-graph-${(rootLump.token || 'root').replace(/[^a-z0-9]/gi, '')}`, nodes, edges };
 }
+/* ---- DD_GRAPH_UNIT_TEST_EXPORT_END ---- */
 
 function _closeLumpDeepDive() {
     const modal = document.getElementById('lumpDeepDiveModal');

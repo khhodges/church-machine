@@ -22,6 +22,9 @@
 //   DE-18 _ddRenderSourceFailed — clicking badge still calls _deepDiveOpenAbstraction
 //   DE-19 _deepDiveOpenAbstraction — calls switchView then showAbstractionDetail
 //   DE-20 _deepDiveOpenAbstraction — looks up slot via abstractionRegistry when nsSlot=null
+//   DE-21 _buildLumpDeepDiveGraph — empty C-List returns null
+//   DE-22 _buildLumpDeepDiveGraph — cyclic dependencies render an amber dashed edge
+//   DE-23 _deepDiveLumpForToken — unknown token returns null
 //
 // Run with:  node simulator/test_deep_dive_annotations.js
 
@@ -39,7 +42,10 @@ const src = fs.readFileSync(SRC_PATH, 'utf8');
 const exportMatch = src.match(
     /\/\* ---- DD_ANNOTATIONS_UNIT_TEST_EXPORT_START[\s\S]*?DD_ANNOTATIONS_UNIT_TEST_EXPORT_END ---- \*\//
 );
-if (!exportMatch) {
+const graphExportMatch = src.match(
+    /\/\* ---- DD_GRAPH_UNIT_TEST_EXPORT_START[\s\S]*?DD_GRAPH_UNIT_TEST_EXPORT_END ---- \*\//
+);
+if (!exportMatch || !graphExportMatch) {
     console.error('FATAL: DD_ANNOTATIONS_UNIT_TEST_EXPORT markers not found in app-lumps.js');
     process.exit(1);
 }
@@ -56,7 +62,7 @@ function section(title) { console.log(`\n--- ${title} ---`); }
 // ── Build a test JSDOM + load the helpers in it ───────────────────────────────
 
 function makeEnv(overrides) {
-    // overrides: { switchView, showAbstractionDetail, _closeLumpDeepDive, abstractionRegistry }
+    // overrides: { switchView, showAbstractionDetail, _closeLumpDeepDive, abstractionRegistry, _lumpsCache }
     const dom = new JSDOM('<!DOCTYPE html><body></body>', {
         runScripts: 'dangerously',
     });
@@ -67,11 +73,15 @@ function makeEnv(overrides) {
     window.switchView              = overrides.switchView              || (() => {});
     window.showAbstractionDetail   = overrides.showAbstractionDetail   || (() => {});
     window.abstractionRegistry     = overrides.abstractionRegistry     || undefined;
+    window._lumpsCache             = overrides._lumpsCache             || [];
 
     // Evaluate the exported block in this window context
     const scriptEl = window.document.createElement('script');
-    scriptEl.textContent = exportMatch[0];
+    scriptEl.textContent = graphExportMatch[0];
     window.document.head.appendChild(scriptEl);
+    const annotationScriptEl = window.document.createElement('script');
+    annotationScriptEl.textContent = exportMatch[0];
+    window.document.head.appendChild(annotationScriptEl);
 
     return window;
 }
@@ -347,6 +357,49 @@ section('DE-20: _deepDiveOpenAbstraction — registry lookup when nsSlot=null');
     win._deepDiveOpenAbstraction(null, 'English.Contact');
     assert(showCalls.length === 1, 'showAbstractionDetail called exactly once');
     assert(showCalls[0] === 9, 'looked up slot 9 from registry by name');
+}
+
+// ── DE-21 through DE-23: LUMP Deep Dive graph edge cases ─────────────────────
+
+section('DE-21: _buildLumpDeepDiveGraph — empty C-List returns null');
+{
+    const win = makeEnv({});
+    const result = win._buildLumpDeepDiveGraph({
+        token: 'empty',
+        dot_name: 'Empty.CList',
+        clist_entries: []
+    });
+    assert(result === null, 'empty C-List returns null for the no-data branch');
+}
+
+section('DE-22: _buildLumpDeepDiveGraph — cycle renders without infinite recursion');
+{
+    const first = {
+        token: 'cycle-a',
+        dot_name: 'Cycle.A',
+        clist_entries: [{ target_token: 'cycle-b', perms: 'R' }]
+    };
+    const second = {
+        token: 'cycle-b',
+        dot_name: 'Cycle.B',
+        clist_entries: [{ target_token: 'cycle-a', perms: 'R' }]
+    };
+    const win = makeEnv({ _lumpsCache: [first, second] });
+    const result = win._buildLumpDeepDiveGraph(first);
+    assert(result !== null, 'cyclic graph returns an SVG result');
+    assert(result.nodes.length === 2, 'cycle produces exactly two lump nodes');
+    assert(result.edges.length === 2, 'cycle produces both dependency edges');
+    assert(result.svg.includes('stroke="#f59e0b"'), 'cycle edge uses the amber stroke');
+    assert(result.svg.includes('stroke-dasharray="5 3"'), 'cycle edge uses dashed styling');
+}
+
+section('DE-23: _deepDiveLumpForToken — unknown token returns null');
+{
+    const win = makeEnv({
+        _lumpsCache: [{ token: 'known', dot_name: 'Known.Lump' }]
+    });
+    const result = win._deepDiveLumpForToken('missing');
+    assert(result === null, 'unknown token returns null');
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
