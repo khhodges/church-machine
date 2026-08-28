@@ -4405,6 +4405,13 @@ class ChurchSimulator {
 
         const result = this._execChange({
             crDst: 14, crSrc: 15, imm: target, scheduler: true,
+            // A reset/pre-boot live bank is not an activated Thread context.
+            // Browse the saved images without persisting that scratch state.
+            saveOutgoing: this.bootComplete,
+            // Selection itself is not instruction execution.  If a saved
+            // image has no executable CR0, expose it and let the first Step
+            // raise the architectural fault.
+            deferEntryFault: true,
             mnemonic: 'NEXT_THREAD',
         });
         if (!result) return { ok: false, reason: 'Thread switch was rejected' };
@@ -6475,7 +6482,10 @@ class ChurchSimulator {
             return null;
         }
         const outSlot = this._currentThreadSlot ?? null;
-        if (schedulerSwitch && outSlot !== null) {
+        // Before boot, the live CR/DR banks are reset scratch state rather
+        // than the selected Thread's restored context.  Manual image browsing
+        // must not overwrite a valid saved Thread with those zero registers.
+        if (schedulerSwitch && d.saveOutgoing !== false && outSlot !== null) {
             const outEntry = this.readNSEntry(outSlot);
             if (outEntry) {
                 const outBase = outEntry.word0_location;
@@ -6509,6 +6519,14 @@ class ChurchSimulator {
         const entryParsed = this.parseGT(entryGT);
         const entryCheck = this.mLoad(entryGT, 'E', 14);
         if (!entryCheck.ok) {
+            if (schedulerSwitch && d.deferEntryFault === true) {
+                this.cr[14] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
+                this._currentThreadSlot = targetIdx;
+                this.pc = 1;
+                const desc = `Selected dormant Thread slot ${targetIdx}; CR0 entry validation deferred until execution`;
+                this.output += desc + '\n';
+                return { pc: 1, instr: d, desc, entryReady: false };
+            }
             this.fault(entryCheck.fault, `CHANGE dormant entry CR0: ${entryCheck.message}`);
             return null;
         }
@@ -6516,6 +6534,14 @@ class ChurchSimulator {
         const codeHeader = this.parseLumpHeader(
             this.memory[codeEntry.word0_location] >>> 0);
         if (!codeHeader.valid || codeHeader.cw === 0) {
+            if (schedulerSwitch && d.deferEntryFault === true) {
+                this.cr[14] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
+                this._currentThreadSlot = targetIdx;
+                this.pc = 1;
+                const desc = `Selected dormant Thread slot ${targetIdx}; executable CR0 entry validation deferred until execution`;
+                this.output += desc + '\n';
+                return { pc: 1, instr: d, desc, entryReady: false };
+            }
             this.fault('BOUNDS', 'CHANGE dormant entry CR0 does not name executable code');
             return null;
         }

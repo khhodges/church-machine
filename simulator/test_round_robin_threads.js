@@ -69,10 +69,40 @@ assert.strictEqual(preBoot.loadBootImage(image), true,
     `pre-boot fixture image must load: ${preBoot.lastBootImageError || 'unknown error'}`);
 preBoot.bootComplete = false;
 preBoot._currentThreadSlot = 1;
-const preBootEntryGT = preBoot.memory[preBoot.readNSEntry(1).word0_location + 244] >>> 0;
-preBoot._writeCR(0, preBootEntryGT, preBoot.readNSEntry(preBootEntryGT & 0xFFFF));
+const preBootThread1Base = preBoot.readNSEntry(1).word0_location;
+const preBootThread1EntryGT = preBoot.memory[preBootThread1Base + 244] >>> 0;
+assert.strictEqual(preBoot.cr[0].word0, 0,
+    'pre-boot live CR0 starts reset and does not represent Thread.1');
 assert.strictEqual(preBoot.advanceConfiguredThread().slot, 11,
     'saved Thread images can be selected before the boot ceremony runs');
+assert.strictEqual(preBoot.memory[preBootThread1Base + 244], preBootThread1EntryGT,
+    'pre-boot browsing does not overwrite Thread.1 saved CR0 with reset live state');
+assert.strictEqual(preBoot.advanceConfiguredThread().slot, 12,
+    'pre-boot browsing continues to Thread#3');
+assert.strictEqual(preBoot.advanceConfiguredThread().slot, 1,
+    'pre-boot browsing cycles back to Thread.1');
+assert.strictEqual(preBoot.cr[0].word0, preBootThread1EntryGT,
+    'cycling back restores Thread.1 original saved CR0');
+assert.strictEqual(preBoot.faultLog.length, 0,
+    'cycling among stopped saved images never raises a machine fault');
+
+const deferred = new ChurchSimulator();
+assert.strictEqual(deferred.loadBootImage(image), true,
+    `deferred-entry fixture image must load: ${deferred.lastBootImageError || 'unknown error'}`);
+deferred.bootComplete = true;
+deferred._currentThreadSlot = 1;
+const deferredTargetBase = deferred.readNSEntry(11).word0_location;
+deferred.memory[deferredTargetBase + 244] = 0;
+const selectedInvalid = deferred.advanceConfiguredThread();
+assert.strictEqual(selectedInvalid.ok, true,
+    'manual selection accepts a saved Thread whose executable CR0 is empty');
+assert.strictEqual(selectedInvalid.result.entryReady, false,
+    'manual selection reports that entry validation was deferred');
+assert.strictEqual(deferred.faultLog.length, 0,
+    'manual selection alone does not raise an architectural fault');
+deferred.step();
+assert(deferred.faultLog.length > 0,
+    'the first attempted instruction raises the deferred entry fault');
 
 // The browser declares `let sim` in app-shell.js. Top-level `let` bindings are
 // not mirrored onto window, so the toolbar handler must use the lexical `sim`

@@ -3,8 +3,8 @@ name: Stopped Thread image selection
 description: Defines when the simulator may manually cycle among saved Thread memory images.
 ---
 
-Manual Thread selection is a saved-memory-image operation, not a boot-dependent operation. Allow cycling among configured Thread images before boot, after boot, while reset, or while paused. Block it only while execution is actively running or when fewer than two saved Thread images exist.
+Manual Thread selection is a saved-memory-image operation, not a boot-dependent operation. Allow cycling among configured Thread images before boot, after boot, while reset, or while paused. Block it only while execution is actively running or when fewer than two saved Thread images exist. Selection itself must not raise an architectural fault; entry validation faults belong to the first attempted instruction.
 
-**Why:** The Namespace and static Thread bodies are already present in the uploaded memory image. Requiring the boot ceremony before selecting one unnecessarily prevents inspecting and choosing saved contexts.
+**Why:** The Namespace and static Thread bodies are already present in the uploaded memory image. Before boot, live registers are reset scratch state and must not overwrite the selected image. Users must be able to inspect even an incomplete saved context without executing it.
 
-**How to apply:** Keep the toolbar enablement rule and the simulator-side switch guard aligned. Neither may require `bootComplete`; both must retain the active-execution lock.
+**How to apply:** Keep the toolbar and simulator guards aligned. Neither may require `bootComplete`; both retain the active-execution lock. Skip outgoing persistence when live state is pre-boot, and defer invalid entry faults until Step/Run.
