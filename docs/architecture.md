@@ -1,11 +1,408 @@
 # Church Machine Architecture
 
-**v1.0 — 2026-04-29**
+**v1.1 — 2026-08-28**
 **CONFIDENTIAL**
 
 ## Overview
 
 The Church Machine is a capability-secured processor that enforces security at the instruction level. There is no operating system, no privileged mode, no superuser. Every memory access — read or write — passes through a hardware validation gate (mLoad or mSave) that checks an unforgeable Golden Token before permitting the operation.
+
+This reference uses four different meanings of “image” and keeps them separate:
+the JTAG-flashed FPGA bitstream, the power-on boot baseline contained by that
+bitstream, a locally generated software-image candidate, and the exact software
+image currently active on the board. The first two establish the machine and its
+trusted validation boundary; the latter two are Namespace composites that must
+cross an explicit validation and commit boundary.
+
+The lifecycle and liveness contracts below are architectural requirements. Some
+of the supporting IDE, simulator, and Wukong plumbing exists today; the
+execution-watchdog hardware and authenticated whole-image commit protocol are
+not implied by the presence of an upload timeout or a working boot sequence.
+
+## Artifact Model, Trust Boundary, and Image Handoff
+
+### Four artifacts, four identities
+
+| Artifact | Identity and owner | Mutability | Role |
+|---|---|---|---|
+| **FPGA bitstream** | JTAG-programmed target artifact, identified by its build/source/artifact digest | Flashed as a unit; not edited by a running Thread | Configures the FPGA fabric, Boot ROM, memory geometry, device profile, and hardware safety mechanisms |
+| **Power-on boot baseline** | Immutable baseline content selected by the bitstream: Boot ROM, boot Namespace entries, `SelfTest`, `CapabilityTest`, and the named baseline validation Threads | Immutable during a power-on session | Establishes the Namespace and proves the board can boot, exercise capabilities, switch contexts, and handle the button path |
+| **Software-image candidate** | A locally generated, deterministic Namespace composite with its own composite digest | Staged and rejected or accepted as a whole | The proposed set of LUMPs, Namespace bindings, layout, boot entry, and configured Thread contexts |
+| **Active software image** | The exact candidate digest recorded as committed after reboot and post-commit validation | Never modified in place | The only software composite that the board is allowed to treat as the current installed image |
+
+The bitstream is not the software image. The boot baseline is not a
+slot-count shortcut or a claim that every resident object is trusted. A
+candidate may contain the same LUMPs as the baseline, but it remains a
+candidate until its complete composite has been accepted and validated.
+
+### Stateful handoff
+
+The intended board/IDE lifecycle is the following stateful handoff. Arrows
+marked **FAIL** terminate in maintenance or rejection; they never overwrite the
+previous active image.
+
+```text
+ JTAG flash
+     |
+     v
+ BITSTREAM FLASHED
+     |
+     v
+ BOOT BASELINE STARTED
+     |
+     +-- FAIL: boot fault ----------------------> MAINTENANCE / FAULT
+     |
+     v
+ SelfTest + CapabilityTest + baseline Thread validation
+     |
+     +-- FAIL: evidence incomplete or bad ------> MAINTENANCE / BASELINE-REJECTED
+     |
+     v
+ BOARD READY
+     |
+     |  create candidate from Namespace design
+     v
+ CANDIDATE CREATED
+     |
+     +-- FAIL: invalid membership/layout -------> REJECTED (active unchanged)
+     |
+     v
+ CANDIDATE TRANSFERRED
+     |
+     +-- FAIL: payload/trust/integrity ----------> REJECTED (active unchanged)
+     |
+     v
+ CANDIDATE RECEIVED -> CANDIDATE ACCEPTED
+                              |
+                              +-- FAIL: pre-commit image validation
+                              |       -> VALIDATION-FAILED (active unchanged)
+                              |
+                              +-- pass: exact digest + signature + layout
+                              v
+                       CANDIDATE COMMITTED (atomic)
+                              |
+                              +-- FAIL: commit record ----> MAINTENANCE
+                              |                            (prior selected)
+                              v
+                       REBOOT INTO CANDIDATE
+                              |
+                              +-- FAIL: post-commit ------> VALIDATION-FAILED
+                              |                            -> select prior bank
+                              |                            -> reboot prior image
+                              v
+                       POST-COMMIT VALIDATION
+                              |
+                              +-- pass ------------------> ACTIVE IMAGE
+```
+
+“Committed” means the complete candidate was durably accepted as one image; it
+does not by itself mean that post-reboot validation has passed. “Active” is
+reserved for the exact digest whose post-commit evidence is present.
+
+The commit store has two durable roles: **prior-active** and **candidate**.
+Transfer writes only the candidate bank. Pre-commit validation checks the whole
+candidate there; the prior-active bank and its selected digest are not
+modified. Atomic commit writes one selector record containing the candidate
+bank, composite digest, and authorization evidence. If that record is torn or
+invalid, boot selects prior-active. If reboot or post-commit validation fails,
+the maintenance controller must atomically restore the prior-active selector
+and reboot that bank; “leave the failed candidate selected” is not an allowed
+policy. Only after post-commit validation passes are the bank roles advanced so
+the validated candidate becomes active and the former active bank becomes the
+next rollback bank.
+
+### TRUSTED VALIDATION
+
+The trusted validation set is deliberately narrow:
+
+1. the flashed bitstream and its immutable power-on boot baseline;
+2. `SelfTest`;
+3. `CapabilityTest`;
+4. `Thread.1` (`Boot.Thread`) and every configured generated baseline
+   validation context, named `Thread#2` through `Thread#N`;
+5. the button-driven execution of those named Threads;
+6. round-robin switching between them; and
+7. context isolation: each Thread's CR/DR/PC and stack state is restored
+   without leaking state into another Thread.
+
+`N` is the configured baseline Thread count, not a hardcoded trust or memory
+limit. The baseline evidence must identify every configured context that the
+baseline is expected to exercise. A Thread is not trusted because it exists,
+because it is resident, or because it belongs to the Thread category. Only the
+named validation Threads listed above, after their required tests execute and
+pass, are inside **TRUSTED VALIDATION**. Ordinary application Threads and
+candidate Threads remain contained, untrusted program entities until they pass
+the required validation.
+
+The boundary can therefore be drawn as:
+
+```text
+ TRUSTED VALIDATION BOUNDARY
+ ┌───────────────────────────────────────────────────────────────┐
+ │ FPGA bitstream                                               │
+ │ immutable/power-on boot baseline                             │
+ │ SelfTest · CapabilityTest · Thread.1 · Thread#2…Thread#N     │
+ │ executed button path · round-robin · context-isolation proof │
+ └───────────────────────────────────────────────────────────────┘
+                 │ validation and explicit image commit
+                 v
+ OUTSIDE THE BOUNDARY
+ ┌───────────────────────────────────────────────────────────────┐
+ │ software-image candidate · ordinary application Threads       │
+ │ resident-but-unexecuted LUMPs · unvalidated runtime content   │
+ └───────────────────────────────────────────────────────────────┘
+```
+
+“Resident” describes where bytes are. “Executed and passed” describes evidence.
+They are never interchangeable.
+
+### Namespace-driven software-image scope
+
+The [Namespace design](figures/namespace-architecture.html) governs software
+image membership: bootstrap, resident, freespace/Outform, and Namespace-table
+members are selected as one Namespace design. There is **no slot-13 limit**,
+and no other artificial slot-number cutoff is part of the image definition. A
+software image contains the Namespace entries and LUMPs selected by that
+design, including the configured boot entry and Thread contexts, subject to
+actual validity and capacity checks. That page's older fixed-address and field
+diagrams are explanatory history, not normative representation: where they
+conflict, the target-defined layout and four-word format in this document and
+`CM_LUMP_SPECIFICATION.md` govern. This task does not rewrite that page.
+
+Namespace slot identity is a logical binding: it names an entry and its
+generation/authority relationship. It is not a promise that slot `n` consumes
+one fixed physical block, nor is a high slot number evidence that an image is
+too large. Physical limits come separately from the target's memory geometry,
+the Namespace table representation, per-LUMP allocation/layout rules, and the
+target's actual Namespace capacity (including Wukong's projected upload
+format). The composite generator must reject an image that does not fit those
+real limits; it must not reject one merely because a slot number is above 13.
+
+### Whole-image upload and runtime residency
+
+Wukong's current board-installation boundary is a **complete software
+composite**: the candidate image, its Namespace table, selected LUMP bodies,
+layout metadata, boot entry, and identity data are transferred, validated, and
+committed as one image. A partial collection of individually uploaded LUMPs is
+not an active board image.
+
+This does not remove the runtime Outform/Lazy Load/eviction architecture.
+Inside an already committed image, an Outform may be resolved later, a LUMP
+may be loaded into a residency cache on first use, and an evictable LUMP may
+leave memory and later be restored. Those are residency and resolution
+transitions, not installation or image-identity transitions. They must preserve
+the committed Namespace membership and the authority needed to resolve the
+member. Outform/network timeouts and lazy-resolution failures do not silently
+turn a partial runtime cache into a new active image.
+
+### Composite identity and digest
+
+The composite identity is a content address, not a status label. Version 1 is
+the SHA-256 digest of the following canonical UTF-8 byte serialization:
+
+```text
+CM-SOFTWARE-IMAGE/1\n
+target=<canonical target profile>\n
+memory_words=<unsigned decimal>\n
+ns_capacity=<unsigned decimal>\n
+boot_entry=<unsigned decimal>\n
+threads=<unsigned decimal>\n
+entry=<slot>,<kind>,<location>,<allocation_words>,<limit_offset>,<member_hash>,<member_token>\n
+...
+```
+
+The header keys appear in the order shown. Each `entry` is emitted once for
+each occupied Namespace slot, sorted by unsigned logical slot number
+ascending. Numeric values are canonical unsigned decimal; target profile,
+kind, hashes, and tokens are lowercase ASCII/UTF-8 with no surrounding
+whitespace; the line terminator is LF. `member_hash` is the full canonical
+SHA-256 binary/content identity of the member LUMP (including the bytes that
+the member's own identity contract covers). `member_token` is the member's
+canonical lower-case eight-hex-digit token. For hardware-only entries with no
+LUMP body, the member hash and token are the literal `none`. The member token
+therefore contributes as a stable lookup identity, while the full member hash
+prevents the 32-bit token from being the composite's sole identity.
+
+The canonical representation includes exactly the membership and placement
+inputs needed to reproduce the image: target profile, memory and Namespace
+capacity, boot entry, configured Thread count, each slot, entry kind, physical
+location, allocation, limit, and the member LUMP identities. It excludes
+mutable or runtime-only fields: display pet-name text and UI ordering,
+`gt_seq`/revocation generation, GC `g_bit`, locality `f_flag`, non-authoritative
+cache token W3, residency/LRU/eviction state, network session identifiers,
+upload framing, timestamps, transport retry counters, debugger state, and
+validation status/evidence. A change to any included input produces a new
+digest; changing an excluded field does not.
+
+The IDE computes and displays this digest before transfer. The authorized IDE
+signs a domain-separated acceptance statement:
+
+```text
+Ed25519-Sign(ide_private_key,
+  "CM-IMAGE-AUTH/1\n" || target_machine_commitment || "\n" ||
+  composite_digest || "\n" || monotonic_candidate_sequence || "\n")
+```
+
+The board verifies the signature with the IDE public key bound at machine
+birth/adoption, verifies that the machine commitment names this board, and
+requires a candidate sequence greater than the last committed sequence. A
+valid transport hash without this digest-bound authorization is not
+acceptance. The receiver recomputes the composite digest from the received
+candidate before signature verification, and post-commit validation recomputes
+it from the active Namespace and member bytes. The IDE may label the image
+**active** only when those values match exactly; a member LUMP's token is not a
+substitute for the composite digest.
+
+### Image and trust invariants
+
+These rules are checkable by the IDE, simulator, or hardware boundary:
+
+1. The active image is never modified in place; a change creates a new
+   candidate digest.
+2. No candidate becomes active without the required **TRUSTED VALIDATION**
+   evidence, including every configured baseline validation Thread.
+3. A failed, rejected, or incomplete candidate leaves the prior active image
+   intact and usable.
+4. Resident bytes are not equivalent to executed validation evidence.
+5. Namespace membership is governed by the Namespace design and actual target
+   capacity; there is no artificial slot-13 ceiling.
+6. The active status names one exact composite digest, not merely a successful
+   transport or a matching member token.
+
+## RUN-TO-SUSPENSION AND WATCHDOG
+
+### Scheduler handoff model
+
+Execution is **run to suspension**, not run to completion. A Thread or
+abstraction owns an instruction segment until one of these defined handoff
+points occurs:
+
+- `CALL` / Enter — hand control to the entered abstraction;
+- `RETURN` — hand control back to the saved caller;
+- `CHANGE` — save the current context and select another Thread;
+- Wait-on-flag — the owner cannot proceed until the named condition/flag is
+  available; and
+- explicit yield — the running code asks the scheduler to select another
+  ready context.
+
+The `T&S`/test-and-set operation is atomic but is **not** itself a suspension
+point. An ordinary instruction segment cannot be preempted in its middle.
+IRQs are queued, not nested into the current segment, and receive a turn at
+the next legal suspension point. The architectural queue is FIFO with a
+target-declared depth of at least one. Arrival order is preserved; simultaneous
+arrivals are ordered by ascending architectural IRQ reason code. An IRQ that
+arrives while another IRQ handler owns the segment remains pending until that
+handler reaches a suspension point; it does not nest. Queue-full is a sticky
+`IRQ_OVERFLOW` fault and must never silently overwrite an older pending IRQ.
+The current one-deep, last-wins pending register in `hardware/irq_dispatch.py`
+does not yet meet this contract and must be replaced or wrapped before the
+architecture can be claimed on hardware. This preserves atomic capability
+transitions and makes context handoff observable and testable.
+
+Run-to-suspension does not permit an unbounded non-suspending loop. The
+execution watchdog is the minimal backstop for a segment or system that makes
+no measurable progress. It detects absence of progress; it is not a distributed
+wait-graph detector and cannot prove the semantic cause of a deadlock.
+
+### Execution watchdog contract
+
+The authoritative pet source is a hardware **retirement/progress monitor**:
+the core emits a progress event only when the current instruction segment
+retires an instruction or reaches a defined suspension/hand-off event. The
+watchdog accepts that hardware progress event, not a timer tick, UART byte,
+network response, debugger command, or ordinary application-Thread call.
+Application code has no instruction or MMIO write that can arbitrarily pet it.
+
+The production interval is a target-clock-count parameter
+`EXECUTION_WATCHDOG_LIMIT`; tests use small deterministic values. The counter
+is reset to zero by an accepted progress event and increments once per target
+clock while execution is enabled. The threshold is inclusive and precise:
+the watchdog fires on the first clock for which
+`counter == EXECUTION_WATCHDOG_LIMIT` without an accepted progress event.
+A progress event and threshold comparison in the same clock gives progress
+priority and re-arms without firing. This rule removes the off-by-one
+ambiguity and makes re-arm behavior deterministic.
+
+The execution watchdog is enabled only after the power-on baseline has
+completed and normal execution has started. On entry to an authorized debugger
+pause, complete-image upload/validation, or controlled reboot/maintenance
+window, the control FSM disables the watchdog and synchronously sets its
+counter to zero. The counter remains zero for every paused clock. On the
+single-cycle authorized resume event, the FSM enables the watchdog with
+counter zero; counting begins on the following clock unless a progress event
+arrives. This disable-zero-resume rule is the only pause/re-arm behavior. A
+pause is authorized by the hardware maintenance/debug channel; a periodic
+timer interrupt or ordinary Thread cannot create one.
+
+On fire, hardware first latches a unique watchdog incident identity together
+with the fault code, current NIA, active Thread slot, active composite digest
+reference, and the complete architectural snapshot required by the fault
+telemetry contract. Recovery is then a **controlled reset** through the
+serialized fault-recovery boundary. The exact order is: disable execution;
+latch the incident; finish and durably promote the incident snapshot; receive
+an acceptance acknowledgement carrying that same incident identity; authorize
+one reset; restart the boot baseline; and re-enable the watchdog only on the
+normal-execution resume event after baseline validation. No timeout or
+unrelated acknowledgement may skip the snapshot-acceptance step. The prior
+active image remains the selected image; a watchdog fire does not commit a
+candidate and does not isolate or rewrite an individual LUMP. After reboot,
+the baseline must pass again before the board is ready. The incident remains
+visible until that exact incident is correlated with recovery, so a later
+clean boot cannot erase evidence of the fire.
+
+### Separate timeout domains
+
+| Mechanism | Trigger and owner | Consequence |
+|---|---|---|
+| **Execution watchdog** | No hardware retirement/progress event for the execution threshold; owned by the core/watchdog FSM | Latch snapshot identity, hold execution, controlled reset, rerun baseline validation |
+| **UART upload-payload watchdog** | No byte while Wukong is in `UPLOAD_LEN`/`UPLOAD_DATA`; owned by the upload receiver | Abort the incomplete payload and return the command parser to a safe state; it says nothing about CPU liveness |
+| **Outform/network timeout** | Locator/tunnel response or network exchange exceeds its protocol timeout; owned by Outform/network machinery | Fail or retry that resolution; it does not prove execution deadlock and does not activate an image |
+| **Debugger/maintenance pause** | Authorized debugger halt or complete-image maintenance window; owned by the maintenance controller | Pause execution watchdog and instruction progress intentionally; resume or reject under control, with no watchdog incident |
+
+The existing UART payload timer must not be described as an execution
+watchdog. Likewise, an Outform timeout is a dependency failure, and a
+debugger pause is intentional absence of retirement. None is evidence that the
+execution watchdog has fired.
+
+### Verification plan
+
+The IDE/simulator and hardware/RTL suites must cover the same contract:
+
+- healthy retirement continuously pets the watchdog and never fires;
+- a deliberately non-suspending long-running Thread reaches the exact
+  threshold and fires on the specified boundary;
+- a no-progress/deadlock scenario fires without requiring a wait-graph
+  detector;
+- `CALL`, `RETURN`, `CHANGE`, Wait-on-flag, and explicit yield are recognized
+  as handoff points;
+- IRQs queue FIFO during a segment, are delivered at a suspension point, and
+  never preempt or nest in the middle of that segment; simultaneous ordering,
+  in-handler arrival, and sticky queue overflow are deterministic;
+- threshold `limit-1`, `limit`, and same-cycle-progress cases prove the
+  inclusive comparison;
+- an accepted progress event re-arms the counter, while a periodic timer and
+  an ordinary Thread cannot pet it;
+- authorized debugger pauses and complete-image upload pauses do not create
+  false incidents, while upload-payload expiry remains separately observable;
+- fire captures a deterministic incident/snapshot before controlled recovery,
+  preserves the prior active image, and re-arms only after baseline and
+  post-recovery validation.
+
+Use a small count in deterministic simulator/RTL tests and a production-scale
+clock parameter on the target. These tests establish the contract; they must
+not be replaced by a test that merely observes the existing upload timeout.
+
+### IDE-facing status
+
+The status model exposes the handoff without collapsing distinct states:
+`candidate`, `received`, `accepted`, `committed`, `active`, and
+`validation-failed` (plus maintenance/rejected for terminal failures). Where
+available, the IDE shows image size, Namespace contents and slot identities,
+Thread count, boot entry, composite identity/digest, validation evidence, and
+the watchdog incident identity/snapshot. “Received” means transport completed;
+“accepted” means structural/integrity checks passed; “committed” means the
+whole candidate crossed the atomic install boundary; “active” additionally
+requires post-commit validation of the exact digest.
 
 ## Design Principles
 
@@ -100,13 +497,19 @@ All abstractions use **Inform (01)** GTs. The Inform GT's `slot_id` indexes a na
 
 ## Namespace Table Slot Format
 
-The namespace table begins at `0xFD00`. Each entry occupies exactly **3 consecutive 32-bit words** (12 bytes):
+Each Namespace entry occupies exactly **4 consecutive 32-bit words** (16
+bytes). The target memory/layout defines the table base and capacity; V20
+layouts place the table at the top of memory with logical slots descending
+from the highest entry:
 
 ```
-NS[slot_id] byte address = 0xFD00 + slot_id × 12
+NS[slot_id] word address = total_words - (slot_id + 1) × 4
 ```
 
-The table supports up to **65,536 entries** (bounded by the 16-bit `slot_id` field). Slots 0–7 are reserved by the boot sequence; application abstractions start at slot 8 or higher.
+The GT encoding can name up to **65,536 entries** through its 16-bit
+`slot_id`, but a concrete image is bounded by the actual Namespace capacity
+encoded by its target layout. Bootstrap and board-profile assignments are
+defined by the image; they are not an image-membership ceiling.
 
 An entry is considered **empty** when both Word 0 and Word 1 are zero.
 
@@ -159,6 +562,14 @@ Revocation: increment `NS Word 1 [27:21]` by 1. All existing GTs for this entry 
 
 ---
 
+### Word 3 — cache token
+
+Word 3 is the issue-blind, non-authoritative 32-bit cache/lookup token `T`.
+It is not covered by `integrity32` and cannot establish Namespace membership
+or replace validation of the canonical LUMP identity.
+
+---
+
 ### Lump split (abstraction lumps)
 
 When CALL resolves an Inform GT, cLoad reads the **lump header** at `raw_base`. The header encodes:
@@ -192,6 +603,7 @@ Offset +1   Word 1 — limit     [31:29]  spare
                                [27:21]  gt_seq (7-bit revocation counter)
                                [20:0]   limit_offset (object size - 1 in words)
 Offset +2   Word 2 — integrity [31:0]   integrity32 parallel check
+Offset +3   Word 3 — cache token [31:0] non-authoritative lookup value T
 ```
 
 ## Register Architecture
@@ -227,14 +639,21 @@ ARM-style condition flags: N (negative), Z (zero), C (carry), V (overflow). Set 
 
 ### Unified Address Space
 
-The 16-bit physical address space is accessed through the GT gate via mLoad:
+Concrete RAM geometry is target-defined and accessed through the GT gate via
+mLoad. Code/data allocations grow within the target's ordinary memory region;
+the Namespace table is reserved at the top of that target's software-image
+memory and uses the inverted four-word slot layout defined above. MMIO and
+Abstract GT sentinels are routed outside ordinary LUMP RAM.
 
 ```
-0x0000 – 0xFCFF    General memory (code + data objects)
-0xFD00 – 0xFDFF    Namespace table (NS entries)
-0xFE00 – 0xFEFF    Device I/O (UART, LED, Button, Timer, Display) — L/S access only
-0xFF00 – 0xFFFF    Machine registers (read-only inspection)
+0 … ns_table_base-1             General memory (code + data objects)
+ns_table_base … total_words-1   Namespace table (4-word entries, target capacity)
+0x40000000 MMIO route           Board devices — L/S access only
+0xFE000000 and above             Abstract GT / tunnel / system sentinels
 ```
+
+There is no universal `0xFD00` Namespace-table base. Any such address in an
+older figure is a historical example, not a portable image rule.
 
 ### MMIO Register Map
 
@@ -282,7 +701,9 @@ provisioning protocol and security model.
 
 ### Namespace Entries
 
-Each namespace entry is **4 words (16 bytes)**, stride = `slot_id × 16` from the NS table base:
+Each Namespace entry is **4 words (16 bytes)**. Logical slot `n` begins at
+`total_words - (n + 1) × 4`; increasing slot numbers therefore move downward
+from the top of the target image:
 
 - **Word 0** (base): 32-bit lump base byte address
 - **Word 1** (WORD2_LAYOUT): `spare[31:29] | g_bit[28] | gt_seq[27:21] | limit_offset[20:0]`
@@ -290,7 +711,8 @@ Each namespace entry is **4 words (16 bytes)**, stride = `slot_id × 16` from th
 - **Word 3** (`cache_token32`): issue-blind 32-bit lookup/cache value `T`;
   non-authoritative and not covered by `integrity32`
 
-The NS table supports up to 65,536 entries (16-bit `slot_id`).
+The GT field can encode up to 65,536 entries (16-bit `slot_id`); the usable
+count in a concrete image is the smaller target-declared Namespace capacity.
 
 When the GT's `slot_id` identifies an abstraction lump, CALL invokes cLoad, which reads the lump header at `raw_base` to obtain `cc` (c-list count) and `n_minus_6` (size exponent) and performs the lump split. The NS entry itself contains only the base address, gt_seq, and limit_offset — no clistCount or type field.
 
@@ -298,18 +720,31 @@ Integrity = integrity32 recomputed over NS Word 0 and NS Word 1 (`g_bit` masked)
 
 ## Boot Sequence
 
-Boot is defined by exactly three lumps and three standard ISA instructions. Every CR value
-is derived from NS entry data read at runtime; the tables below show the exact bit patterns.
+The ROM entry sequence is three standard ISA instructions — load the Namespace
+root, change into the boot Thread, and call the boot-entry capability. The
+complete power-on baseline is larger than those three words: target hardware
+also performs reset/initialization states and provides the Namespace,
+Boot.Thread, validation LUMPs, and board-profile capabilities needed to execute
+the baseline. The tables below describe the instruction-level bootstrap; the
+artifact and handoff model above defines when the resulting board is trusted
+and ready.
 
 > **Cross-reference**: `hardware/core.py` boot FSM (`BootState` cases) and
 > `simulator/simulator.js` `_bootStep()` implement the same three-instruction sequence.
 
 
-### NULL_CAP Standalone Problem (Wukong)
+### Wukong boot-entry handoff
 
-`BOOT_PROGRAM[2]` is `CALL CR0` — it invokes whatever capability is stored in `Thread.caps[0]` (DMEM word 244, at `threadBase=0 + THREAD_CAPS_OFFSET=244`). In the factory bitstream this word is zero (NULL), so the CALL faults `NULL_CAP` and the CM halts permanently. There is no recovery path without a power-cycle and a rebuild.
+`BOOT_PROGRAM[2]` is `CALL CR0`: it invokes the capability restored from
+`Thread.caps[0]` in the active Boot.Thread allocation. The current factory
+Wukong baseline stores the SelfTest E-GT there, so factory power-on enters
+SelfTest. A generated candidate image may select a different valid boot-entry
+GT; the candidate's canonical `boot_entry` field and the post-commit active
+digest must record that selection.
 
-**The Wukong FPGA ROM always contains only the 3-instruction `BOOT_PROGRAM`.** `WUKONG_NUC_PROGRAM` is not in ROM — it is a 73-instruction DMEM LUMP at NS slot 7 (`WukongCallHome`). To use it as a standalone boot abstraction, set DMEM word 244 to a WukongCallHome E-GT in `hardware/wukong_top.py`'s `dmem_init`, rebuild, and reflash.
+**The Wukong FPGA ROM contains only the 3-instruction `BOOT_PROGRAM` plus its
+guard.** `WUKONG_NUC_PROGRAM` is not in ROM — it is the DMEM LUMP at NS slot 7
+(`WukongCallHome`) and is entered only when the active image selects it.
 
 Human-readable source: `simulator/examples/wukong_callhome.cloomc` — see `docs/wukong-boot.md`.
 
@@ -715,17 +1150,21 @@ is allocated until a real, callable LUMP exists behind it.
 
 The namespace has three distinct layers:
 
-**Layer 1 — Universal (ISA-mandated, every board, every build)**
+**Layer 1 — Universal bootstrap roles (ISA-mandated, every board, every build)**
 
-Two slots only. Fixed by the boot program in silicon.
+Two universal roles are fixed by the boot program in silicon. This is a
+statement about bootstrap addressing, not a two-slot Namespace or image limit.
 
 | Name | Why hardwired |
 |------|--------------|
 | Boot.NS | First instruction: `LOAD CR15, CR15[0]` — namespace root |
 | Boot.Thread | Second instruction: `CHANGE CR12, CR15[1]` — thread stack; loads CR0 from Thread.caps[0] |
 
-These are the only two slots ever addressed by number. Every other slot in the system is
-addressed exclusively by pet name — a Golden Token held in a c-list.
+These are the only two universal slot identities required by the three-word
+bootstrap. A concrete board profile and committed Namespace may assign
+additional logical slots for devices, validation content, services, and
+application LUMPs. Normal program access is through a Golden Token held in a
+c-list rather than through a source-level slot-number convention.
 
 **Layer 2 — Board Profile (hardware-specific, defined by the boot image generator)**
 
@@ -742,19 +1181,26 @@ board. For the Wukong A7:
 A different board produces a different profile. Board profile slots are always resident — MMIO
 capabilities have no lump to load; the NS entry is the capability.
 
-**Layer 3 — Programmable (lazy-load, programmer-defined)**
+**Layer 3 — Validation and programmable Namespace membership**
 
-Two lazy-load slots above the board profile:
+The Namespace design, not a fixed count of “lazy-load slots,” selects the
+remaining members. A Wukong baseline includes at least the following named
+validation content, and a committed image may contain additional resident or
+Outform members up to the real target capacity:
 
 | Pet Name | Role |
 |----------|------|
-| SelfTest | Recovery abstraction — runs at every boot, ends with CALL CR0 or loops if CR0 is null |
-| *(programmer's name)* | First user abstraction — what it does, how it loads, and what it calls are entirely the programmer's design |
+| SelfTest | Baseline instruction and machine-health validation |
+| CapabilityTest | Baseline capability-boundary validation |
+| Thread.1, Thread#2…Thread#N | Named baseline Thread contexts exercised by the button and round-robin/context-isolation tests |
+| *(programmer-selected names)* | Ordinary application content; contained and untrusted until its required validation passes |
 
-The second slot has no fixed name and no fixed function. The boot system's contract ends at:
-*SelfTest ran, CR0 holds a valid E-GT, CALL is dispatched.* The programmer names the
-abstraction, decides whether it fetches a lump over CallHome, reads from flash, or does
-something else entirely.
+The boot system's readiness contract ends only after the named baseline
+validation set has executed and passed. Residency alone does not meet that
+contract. Whether an application member is initially resident, resolved through
+Outform, restored after eviction, or fetched through a board service is a
+runtime policy within the committed image and does not change its installation
+boundary.
 
 ### The Namespace Liveness Rule
 
@@ -783,10 +1229,13 @@ that need CHANGE authority.
 
 ### Dynamic Namespace Extension
 
-All slots above the boot boundary are allocated at runtime. The mechanism is a method —
-**AllocSlot** or equivalent — on whichever trusted abstraction the programmer installs in the
-second lazy-load slot. That abstraction holds the Abstract S-perm GT in its c-list, which
-authorises the low-level M-elevated write that creates and seals a new NS entry.
+Slots above the universal bootstrap roles may be assigned by the committed
+Namespace composite or allocated later under that image's runtime Namespace
+policy. Runtime extension uses a method — **AllocSlot** or equivalent — on the
+trusted Namespace-management abstraction selected by the image. That
+abstraction holds the Abstract S-perm GT in its c-list, which authorises the
+low-level M-elevated write that creates and seals a new NS entry. It is not
+tied to a fixed “second lazy-load slot.”
 
 The result of AllocSlot is a Golden Token — a pet-named, typed capability handle. The caller
 never sees or stores the slot number. From the programmer's perspective the namespace grows by
@@ -814,6 +1263,10 @@ If `Thread.caps[0]` has not been configured the machine loops indefinitely in th
 keeping the hardware alive and visibly running. The moment a valid E-GT is written into
 `Thread.caps[0]` the next loop iteration dispatches cleanly. No fault. No halt.
 
+This recovery loop is baseline behavior, not permission for arbitrary
+application code to run forever without suspension. Once normal execution is
+enabled, the run-to-suspension and execution-watchdog contract applies.
+
 ### The IDE as a Telescope
 
 The IDE is not an independent entity with its own boot logic. It is the Church Machine ISA
@@ -821,22 +1274,25 @@ running in JavaScript — a transparent implementation of the same rules the har
 silicon. Every capability check, every mLoad pipeline stage, every GT validation, every boot FSM
 state is identical in both. The substrate differs (FPGA logic vs JavaScript); the rules do not.
 
-When the IDE flags a capability violation, that is not a simulation artefact. That is the Church
-Machine architecture saying the same operation would fault on hardware. A program that passes the
-IDE without faults is correct according to the CM ISA and will behave identically on the FPGA.
-The IDE makes hidden hardware steps visible, nameable, pauseable, and auditable. It is a
-telescope into the hardware, not a replacement for it.
+When the IDE flags a capability violation, that is the simulator applying the
+same architectural rule the hardware is expected to enforce. Passing the IDE is
+necessary evidence, not proof that a particular bitstream, target projection,
+or physical board was validated. The IDE makes hidden hardware steps visible,
+nameable, pauseable, and auditable; target verification and post-commit digest
+validation remain separate required evidence.
 
 ## Cross-references
 
 - [CM_LUMP_SPECIFICATION.md](./CM_LUMP_SPECIFICATION.md) — Lump header format, lump split mechanics, and
-  power-of-2 allocation rules
-- [CM_LUMP_SPECIFICATION.md](./CM_LUMP_SPECIFICATION.md) — Full binary-level lump specification with
-  encoding formulae, example words, and hardware flow diagrams
-- [CM_LUMP_SPECIFICATION.md](./CM_LUMP_SPECIFICATION.md) — Boot image design and three-lump
-  foundation architecture (Salvation, Navana, Mint)
+  power-of-2 allocation rules, canonical LUMP tokens, and the authoritative
+  Namespace Table build directive
+- [Namespace design](./figures/namespace-architecture.html) — Namespace
+  capacity, slot membership, residency, and freespace model
+- [Church Machine lifecycle design](./church-machine-lifecycle-design.md) —
+  identity, deployment, call-home, and lifecycle trust roots; its
+  machine-lifecycle mechanisms are explicitly design work where marked
 - [golden-tokens.md](./golden-tokens.md) — Golden Token format, CRC coverage, permission
   model, and revocation protocol
 
 ---
-*Confidential — Kenneth Hamer-Hodges — April 2026*
+*Confidential — Kenneth Hamer-Hodges — August 2026*
