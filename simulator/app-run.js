@@ -797,7 +797,7 @@ function _buildNIARows(prevAddr, currAddr) {
 
 const _BOOT_STEPS = [
     { addrStr: 'B:00', disasm: 'FAULT_RST',  label: 'Capture fault context \u2192 clear all CRs / DRs',                              offset: null, prog: 'boot' },
-    { addrStr: 'B:01', disasm: 'LOAD_NS',    label: 'CR15 \u2190 NS[0] Namespace (base=0x0000, full memory)',                         offset: null, prog: 'boot' },
+    { addrStr: 'B:01', disasm: 'LOAD_NS',    label: 'CR15 \u2190 NS[0] Boot.NS.',                                                   offset: null, prog: 'boot' },
     { addrStr: 'B:02', disasm: 'INIT_THRD',  label: 'CR12 \u2190 NS[1] thread stack GT (zero perms, Inform)',                         offset: null, prog: 'boot' },
     { addrStr: 'B:03', disasm: 'INIT_HEAP',  label: 'CR5(RW) \u2190 thread heap \u00b7 CHANGE-consistent synthesis',                  offset: null, prog: 'boot' },
     { addrStr: 'B:04', disasm: 'CALL_HOME',  label: 'Tunnel.Register \u2192 23-byte packet \u00b7 await ACK',                         offset: null, prog: 'boot' },
@@ -15924,7 +15924,7 @@ User abstractions:
 
 Boot sequence (B:00–B:07, 8 steps):
   B:00  FAULT_RST  — capture fault context; clear all CRs / DRs
-  B:01  LOAD_NS    — CR15 ← NS[0] Namespace GT
+  B:01  LOAD_NS    — CR15 ← NS[0] Boot.NS.
   B:02  INIT_THRD  — CR12 ← NS[1] thread stack GT (zero perms)
   B:03  INIT_HEAP  — CR5(RW) ← thread heap (CHANGE-consistent)
   B:04  CALL_HOME  — Tunnel.Register → 23-byte packet; await ACK

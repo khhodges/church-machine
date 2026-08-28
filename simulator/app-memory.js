@@ -395,7 +395,7 @@ function updateCRDetail() {
             const _beLabel = (sim.nsLabels && sim.nsLabels[bootEntrySlot]) || `Slot ${bootEntrySlot}`;
             const _bootPreamble = [
                 { addr: 'B:00', desc: 'FAULT_RST',   decomp: 'CR0\u2013CR15 \u2190 NULL \u00b7 DR0\u2013DR15 \u2190 0' },
-                { addr: 'B:01', desc: 'LOAD_NS',     decomp: 'CR15 \u2190 NS[0] Namespace (M=1, base=0x0000, perms=none)' },
+                { addr: 'B:01', desc: 'LOAD_NS',     decomp: 'CR15 \u2190 NS[0] Boot.NS.' },
                 { addr: 'B:02', desc: 'INIT_THRD',   decomp: 'CR12 \u2190 NS[1] thread stack GT (M=1, Inform, zero perms)' },
                 { addr: 'B:03', desc: 'INIT_HEAP',   decomp: 'CR5(RW) \u2190 thread heap \u00b7 CHANGE-consistent synthesis' },
                 { addr: 'B:04', desc: 'CALL_HOME',   decomp: 'Tunnel.Register \u2192 23-byte packet [0xCE11, board, FW, HMAC(4), UID(8), reason, fault, NIA(4)] \u00b7 await ACK' },
