@@ -92,57 +92,57 @@
     {
       "name": "Tunnel",
       "slot": 8,
-      "location": "0x00000440",
+      "location": "0x00000600",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x0003E",
       "seq": 0,
-      "seal": "0xDEA85EEF"
+      "seal": "0xDEA97EEF"
     },
     {
       "name": "Ethernet",
       "slot": 9,
-      "location": "0x00000480",
+      "location": "0x00000640",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x0003E",
       "seq": 0,
-      "seal": "0xDEA83EEF"
+      "seal": "0xDEA95EEF"
     },
     {
       "name": "CapabilityTest",
       "slot": 10,
-      "location": "0x000004C0",
+      "location": "0x00000680",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x0003A",
       "seq": 0,
-      "seal": "0xDEA89EEF"
+      "seal": "0xDEA9BEEF"
     },
     {
       "name": "Thread#2",
       "slot": 11,
-      "location": "0x00000500",
+      "location": "0x000006C0",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x001FF",
       "seq": 0,
-      "seal": "0xDE90DEEF"
+      "seal": "0xDE913EEF"
     },
     {
       "name": "Thread#3",
       "slot": 12,
-      "location": "0x00000700",
+      "location": "0x000008C0",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x001FF",
       "seq": 0,
-      "seal": "0xDE91DEEF"
+      "seal": "0xDE963EEF"
     },
     {
       "name": "Bridge.Preload",
@@ -156,5 +156,6 @@
       "seal": "0xDEA89EEF"
     }
   ],
-  "generated_at": 1787931332.040624
+  "generated_at": 1787951299.3936589,
+  "committed_raw_fingerprint": "071247d2c3ad625e2cc8d3834f306042e86017056f02160e557606e4ef904b30"
 }
