@@ -273,9 +273,66 @@ uiSim.running = false;
 uiContext.updateThreadControl();
 assert.strictEqual(button.disabled, false,
     'Next Thread button is re-enabled after the simulator pauses');
+
+// Walk executes one instruction and then waits for its next timer tick. During
+// that interval sim.running is false, so invoke the real Walk lifecycle with
+// only the next-step callback stubbed.
+uiContext.pipelineViz = null;
+uiContext.switchView = () => {};
+vm.runInContext([
+    'let walkRunning = false;',
+    'let walkTimer = null;',
+    'let walkBootTimer = null;',
+    functionSource(appRunSource, 'updateWalkBtn'),
+    'function walkNext() {}',
+    functionSource(appRunSource, 'finishWalk'),
+    functionSource(appRunSource, 'walkToggle'),
+].join('\n'), uiContext);
+vm.runInContext('walkToggle();', uiContext);
+assert.strictEqual(uiSim.walkActive, true,
+    'Walk start holds the simulator Thread-switch lock');
+assert.strictEqual(uiSim.running, false,
+    'the Walk between-ticks fixture is not covered by sim.running');
+assert.strictEqual(button.disabled, true,
+    'Next Thread stays disabled between Walk ticks');
+
+const walkContextBefore = {
+    slot: uiSim.activeThreadStatus().slot,
+    cr: JSON.parse(JSON.stringify(uiSim.cr)),
+    dr: [...uiSim.dr],
+    pc: uiSim.pc,
+    physicalPC: uiSim.physicalPC,
+    halted: uiSim.halted,
+    running: uiSim.running,
+    stepCount: uiSim.stepCount,
+};
+const directWalkSwitch = uiSim.advanceConfiguredThread();
+assert.strictEqual(directWalkSwitch.ok, false,
+    'direct Thread switches are rejected between Walk ticks');
+assert.match(directWalkSwitch.reason, /Walk/,
+    'the rejected direct switch explains that Walk must stop first');
+assert.deepStrictEqual({
+    slot: uiSim.activeThreadStatus().slot,
+    cr: JSON.parse(JSON.stringify(uiSim.cr)),
+    dr: [...uiSim.dr],
+    pc: uiSim.pc,
+    physicalPC: uiSim.physicalPC,
+    halted: uiSim.halted,
+    running: uiSim.running,
+    stepCount: uiSim.stepCount,
+}, walkContextBefore,
+    'a rejected between-ticks switch does not mutate the live Thread context');
+
+vm.runInContext('walkToggle();', uiContext);
+assert.strictEqual(uiSim.walkActive, false,
+    'Walk stop releases the simulator Thread-switch lock');
+assert.strictEqual(button.disabled, false,
+    'Next Thread is re-enabled after Walk releases its lock');
+
 const finishRunSource = functionSource(appRunSource, 'finishRun');
 assert(finishRunSource.includes('updateThreadControl();'),
     'run cleanup refreshes the independently-owned Thread toolbar state');
+const dashboardUpdatesBeforeThreadClicks = dashboardUpdates;
 uiContext.nextConfiguredThread();
 assert.strictEqual(uiSim.activeThreadStatus().slot, 11,
     'browser-shaped Next Thread click switches to Thread#2 without window.sim');
@@ -293,7 +350,7 @@ assert.strictEqual(uiSim.activeThreadStatus().slot, 1,
     'third browser-shaped click restores the saved boot Thread');
 assert.strictEqual(status.textContent, 'Thread.1 · 1/3',
     'toolbar status wraps to the boot Thread');
-assert.strictEqual(dashboardUpdates, 3,
+assert.strictEqual(dashboardUpdates - dashboardUpdatesBeforeThreadClicks, 3,
     'each Next Thread click refreshes the dashboard');
 
 const nonElevated = new ChurchSimulator();

@@ -1039,10 +1039,7 @@ function _flushPendingPipelineBuffer() {
 let walkRunning = false;
 let walkTimer = null;
 
-// ── Run popover ─────────────────────────────────────────────────────────────
-// Default to a visible one-instruction cadence.  Run used to execute 500
-// instructions before yielding, which meant the progress counter and current
-// code row were rarely painted before the program stopped.
+let walkBootTimer = null;
 let runBatchSize = 1;
 let _runStopped = false;
 // _simRunActive is true from the moment runSim() starts its async batch loop
@@ -1064,11 +1061,12 @@ function updateThreadControl() {
         // machine is stopped.  Boot is not an execution prerequisite here:
         // the Namespace and Thread LUMPs are already present in the loaded
         // memory image, and CHANGE restores the selected image's context.
-        const unavailable = sim.running || state.count <= 1;
+        const unavailable = sim.running || sim.walkActive || state.count <= 1;
         button.disabled = unavailable;
         button.setAttribute('aria-disabled', unavailable ? 'true' : 'false');
         button.setAttribute('data-tooltip', unavailable
             ? (state.count <= 1 ? 'Next Thread — only Thread.1 is configured'
+                : sim.walkActive ? 'Next Thread — stop Walk before switching Threads'
                 : 'Next Thread — pause execution before switching Threads')
             : `Next Thread — switch to ${state.slots[(state.position % state.count)] === 1 ? 'Thread.1' : (sim.nsLabels[state.slots[(state.position % state.count)]] || 'next Thread')}`);
     }
@@ -1682,51 +1680,60 @@ function updateWalkBtn() {
     }
 }
 
+function finishWalk() {
+    walkRunning = false;
+    if (walkTimer) { clearTimeout(walkTimer); walkTimer = null; }
+    if (walkBootTimer) { clearInterval(walkBootTimer); walkBootTimer = null; }
+    if (pipelineViz) pipelineViz.stopAnimation();
+    if (sim) sim.walkActive = false;
+    updateWalkBtn();
+    updateThreadControl();
+    updateDashboard();
+}
 function walkToggle() {
     if (walkRunning) {
-        walkRunning = false;
-        if (walkTimer) { clearTimeout(walkTimer); walkTimer = null; }
-        if (pipelineViz) pipelineViz.stopAnimation();
-        updateWalkBtn();
-        updateDashboard();
+        finishWalk();
         return;
     }
+    walkRunning = true;
+    sim.walkActive = true;
+    updateWalkBtn();
+    updateThreadControl();
     if (!sim.bootComplete) {
         slowBoot();
-        const waitForBoot = setInterval(() => {
+        walkBootTimer = setInterval(() => {
             if (sim.bootComplete && !bootAnimating) {
-                clearInterval(waitForBoot);
-                walkRunning = true;
+                clearInterval(walkBootTimer);
+                walkBootTimer = null;
                 switchView('dashboard');
                 openCRDetail(14);
                 updateWalkBtn();
+                updateThreadControl();
                 updateDashboard();
                 walkNext();
+            } else if (sim.halted) {
+                finishWalk();
             }
         }, 200);
         return;
     }
-    walkRunning = true;
     switchView('dashboard');
     openCRDetail(14);
     updateWalkBtn();
+    updateThreadControl();
     updateDashboard();
     walkNext();
 }
 
 function walkNext() {
     if (!walkRunning || !sim.bootComplete) {
-        walkRunning = false;
-        updateWalkBtn();
-        updateDashboard();
+        finishWalk();
         return;
     }
     const result = sim.step();
     window._lastStepWasReturn = !!(result && result.opName === 'RETURN');
     if (!result) {
-        walkRunning = false;
-        updateWalkBtn();
-        updateDashboard();
+        finishWalk();
         return;
     }
     // Stop-before-execute breakpoint check: after the step, ask the simulator for the
@@ -1736,8 +1743,7 @@ function walkNext() {
     if (simBreakpoints.size > 0 && !sim.halted) {
         const nextAddr = sim._nextPhysicalAddr();
         if (nextAddr >= 0 && simBreakpoints.has(nextAddr >>> 0)) {
-            walkRunning = false;
-            updateWalkBtn();
+            finishWalk();
             const con2 = document.getElementById('editorConsole');
             if (con2) {
                 con2.textContent += `\n[BP] Breakpoint at 0x${(nextAddr >>> 0).toString(16).toUpperCase().padStart(4,'0')}`;
@@ -1758,24 +1764,18 @@ function walkNext() {
             if (walkRunning && sim.bootComplete) {
                 walkTimer = setTimeout(walkNext, 600);
             } else {
-                walkRunning = false;
-                updateWalkBtn();
-                updateDashboard();
+                finishWalk();
             }
         }).catch(err => {
             console.error('walkNext animate error:', err);
-            walkRunning = false;
-            updateWalkBtn();
-            updateDashboard();
+            finishWalk();
         });
     } else {
         updateDashboard();
         if (walkRunning && sim.bootComplete) {
             walkTimer = setTimeout(walkNext, 1000);
         } else {
-            walkRunning = false;
-            updateWalkBtn();
-            updateDashboard();
+            finishWalk();
         }
     }
 }

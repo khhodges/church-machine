@@ -919,6 +919,10 @@ class ChurchSimulator {
         this.flags = { N: false, Z: false, C: false, V: false };
         this.sto = 243;  // sp_max = lumpSize(256) - caps(12) - 1; hardware starts here, CALL decrements
         this.running = false;
+        // Browser Walk is asynchronous: sim.running is false between timed
+        // single-step ticks, but the live Thread context must remain locked
+        // for the entire Walk session.
+        this.walkActive = false;
         this.halted = false;
         this.stepCount = 0;
         // User-visible execution accounting.  Keep this separate from stepCount:
@@ -4391,6 +4395,9 @@ class ChurchSimulator {
     // authority for this local control, and the target is validated before
     // any outgoing state is written.
     advanceConfiguredThread() {
+        if (this.walkActive) {
+            return { ok: false, reason: 'Stop Walk before switching Threads' };
+        }
         if (this.running) {
             return { ok: false, reason: 'Pause execution before switching Threads' };
         }
@@ -9794,7 +9801,7 @@ ChurchSimulator.isPendingGT = function (word) {
 
 ChurchSimulator.makePendingGT = function (petName) {
     const names = ChurchSimulator.PENDING_GT_NAMES;
-    const idx = (word >>> 0) & 0xFFFF;
+    let idx = names.indexOf(petName);
     if (idx < 0) {
         idx = names.length;
         names.push(petName);
