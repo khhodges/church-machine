@@ -16,20 +16,9 @@ const { test, expect } = require('@playwright/test');
 async function openBuilder(page) {
     await page.goto('/simulator/');
     await page.waitForLoadState('domcontentloaded');
-
-    // #hamItem-builder is hidden by default (debug-only view); un-hide for E2E.
-    await page.evaluate(() => {
-        const btn = document.getElementById('hamItem-builder');
-        if (btn) btn.style.display = 'block';
-    });
-
-    const hamBtn = page.locator('#hamBtn');
-    await hamBtn.waitFor({ state: 'visible' });
-    await hamBtn.click();
-
-    const builderBtn = page.locator('#hamItem-builder');
-    await builderBtn.waitFor({ state: 'visible' });
-    await builderBtn.click();
+    await page.waitForFunction(() => typeof switchView === 'function');
+    await page.evaluate(() => switchView('builder'));
+    await expect(page.locator('#builder')).toBeVisible();
 }
 
 test.describe('Builder design pages — Thread Lump & Namespace Lump', () => {
@@ -61,6 +50,11 @@ test.describe('Builder design pages — Thread Lump & Namespace Lump', () => {
         // Design reference sections (from the Thread tutorial content)
         await expect(panel.locator('.le-design-step').first()).toBeVisible({ timeout: 8000 });
         expect(await panel.locator('.le-design-step').count()).toBeGreaterThan(3);
+        const referenceText = await panel.locator('.le-design-step').allInnerTexts();
+        expect(referenceText.join('\n')).toMatch(/Six Regions, One Fixed Private ABI/);
+        expect(referenceText.join('\n')).toMatch(/\+244.*\+255/);
+        expect(referenceText.join('\n')).toMatch(/CR0.*CR11/);
+        expect(referenceText.join('\n')).toMatch(/\+256.*reserved extension/i);
 
         // Interactive editor still present
         await expect(panel.locator('.le-panel')).toBeVisible();

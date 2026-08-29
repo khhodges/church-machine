@@ -1,0 +1,39 @@
+{
+  "name": "Church Machine Thread",
+  "normative": true,
+  "header": {
+    "typ": 2,
+    "stackField": "cw",
+    "stackAlias": "sw",
+    "heapField": "cc"
+  },
+  "supportedBodyWords": [256, 512, 1024, 2048, 4096, 8192],
+  "canonicalBodyWords": 256,
+  "headerOffset": 0,
+  "dataRegisters": {
+    "first": 0,
+    "last": 15,
+    "offset": 1,
+    "words": 16
+  },
+  "heapOffset": 17,
+  "stackPointerHomeOffset": 17,
+  "capabilityHomes": {
+    "firstRegister": 0,
+    "lastRegister": 11,
+    "offset": 244,
+    "words": 12
+  },
+  "runtimeCapabilityRegisters": [12, 13, 14, 15],
+  "privateAbiWords": 256,
+  "extensionOffset": 256,
+  "zoneOrder": [
+    "Header",
+    "Data Registers",
+    "Heap",
+    "Freespace",
+    "LIFO Stack",
+    "Capabilities",
+    "Reserved Extension"
+  ]
+}

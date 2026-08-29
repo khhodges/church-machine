@@ -1610,7 +1610,7 @@ The per-type distribution containers are:
 | Lump type | File extension | Contents |
 |-----------|---------------|----------|
 | Abstraction | `dot.name.issue.token.zip` | Single `dot.name.issue.token.lump` binary — header + code + freespace + c-list |
-| Thread | `*.thread.zip` | Single `.bin` file — header + five zones |
+| Thread | `*.thread.zip` | Single `.bin` file — six regions including Header |
 | Namespace | `*.namespace.zip` | `manifest.json` + NS LUMP `.bin` + optional bundled deps |
 | Data | `*.data.zip` | Single `.bin` file — header + raw data |
 
@@ -2290,8 +2290,9 @@ field `0x1F` as every other lump. The `typ` field is set to `10`
 > the 13-bit `cw` (code word count) field is otherwise wasted — a Thread
 > carries no executable code. The hardware and Mint **reinterpret** it as `sw`
 > (stack words). The IDE sets `sw` at thread-creation time; Mint validates
-> that `sw > 0`, `cc > 0`, and `17 + cc + sw ≤ lumpSize − 12`. All zone
-> boundaries are then derived from `sw` at CALL time — no literals in the FSM.
+> that `sw > 0`, `cc > 0`, and `17 + cc + sw ≤ 244`. The stack and persisted
+> homes use fixed private-ABI offsets, so their boundaries do not depend on a
+> larger allocation's tail.
 
 **Encoding example** (256-word thread, 32 stack words):
 
@@ -2309,8 +2310,10 @@ carried in the NS slot `gt_seq` field, not the header.
 
 ## Thread Lump Memory Layout
 
-Word 0 is the header. The five live-state zones occupy Words 1..255.
-Word addresses increase downward from the base.
+Word 0 is the header. The six regions of the fixed private ABI occupy Words
+0..255. Word addresses increase downward from the base. A Thread allocation
+larger than 256 words retains this ABI unchanged; words +256 onward are a
+separate reserved extension, never extra heap/stack or relocated CR homes.
 
 ```
 ┌─────────────────────────────────────────────┐  ← base  (+0)            ← Word 0
@@ -2327,26 +2330,26 @@ Word addresses increase downward from the base.
 │  ③ Freespace                                │  [dynamic]
 │     Unallocated — shrinks as Stack/Heap grow│
 │     Mint verifies all-zero at creation time │
-├─────────────────────────────────────────────┤  ← sp_max →              ← STO_initial (empty)
-│  ② LIFO Stack  ↓                            │  [sw words]  IDE-defined
+├─────────────────────────────────────────────┤  ← 244−sw →              ← stack base
+│  ② LIFO Stack  ↓                            │  [sw words]  cw/sw-defined
 │     CALL: 2-word frame  [E-GT · frame word] │  STO -= 2
 │     LAMBDA: 1-word frame  [frame word]      │  STO -= 1
-│     Grows downward; STO hidden register     │  sp_max = lumpSize−12−1
-│     sp_min = lumpSize−12−sw+2               │  CALL fault if STO < sp_min
-├─────────────────────────────────────────────┤  ← lumpSize−12 →         ← c-list base
+│     Grows downward; STO hidden register     │  sp_max = 243
+│     sp_min = 244−sw+2                       │  CALL fault if STO < sp_min
+├─────────────────────────────────────────────┤  ← +244 →                ← persisted CR base
 │  ① Capabilities                             │  [12 words]  architecture-fixed
 │     CR0 … CR11 — Golden Token words         │  one 32-bit GT Word 0 per slot
-│     Fixed zone — mLoad keeps this zone      │  = c-list tail (12 words)
-└─────────────────────────────────────────────┘  ← lumpSize−1 →
+│     Fixed homes — CHANGE persists these only│  +244 … +255
+└─────────────────────────────────────────────┘  ← +255 →
 ```
 
 **Stack bound formulas** (all in word offsets from lump base, IDE-controlled via `sw`):
 
 | Signal | Formula | Example (sw=32, lumpSize=256) |
 |--------|---------|-------------------------------|
-| `sp_max` | `lumpSize − 12 − 1` | 243 (initial STO, empty stack) |
-| `stack_min` | `lumpSize − 12 − sw` | 212 (bottom of Stack zone) |
-| `sp_min` | `lumpSize − 12 − sw + 2` | 214 (CALL minimum: needs 2 slots) |
+| `sp_max` | `243` | 243 (initial STO, empty stack) |
+| `stack_min` | `244 − sw` | 212 (bottom of Stack zone) |
+| `sp_min` | `244 − sw + 2` | 214 (CALL minimum: needs 2 slots) |
 
 The CALL FSM reads the thread header at `thread_base` to recover `sw` and
 `n_minus_6` (caps zone is architecture-fixed at 12). Both bounds are enforced
@@ -2358,37 +2361,32 @@ in hardware — no literals for stack bounds in the FSM.
 |------|-----------|--------------|-------|-------|
 | Header        | HDR   | +0                               | 1        | Header word — never executed |
 | ⑤ Data Regs    | DR    | +1 … +16                        | 16       | DR0…DR15 (16 × 32-bit, fixed) |
-| ④ Heap         | HEAP  | +17 … +28                        | 12       | +17 is Heap[0]/STO, initialized to the empty-stack ceiling (243 for the canonical 256-word Thread); +18…+28 are remaining heap words |
-| ③ Freespace    | FREE  | +17+heapWords … +sp_max          | dynamic  | Collision zone; all-zero at creation |
-| ② LIFO Stack   | STACK | +stack_min … +sp_max            | sw       | IDE-defined; grows downward |
-| ① Capabilities | CAPS  | +lumpSize−12 … +lumpSize−1      | 12       | GT Word 0 × 12; c-list tail (architecture-fixed) |
+| ④ Heap         | HEAP  | +17 … +(17+cc−1)                | cc       | IDE-defined heap; +17 is Heap[0] |
+| ③ Freespace    | FREE  | +(17+cc) … +(243−sw)             | dynamic  | Collision zone; all-zero at creation |
+| ② LIFO Stack   | STACK | +(244−sw) … +243                | sw       | Header `cw/sw`; grows downward |
+| ① Capabilities | CAPS  | +244 … +255                     | 12       | GT Word 0 × 12: persisted CR0…CR11 homes |
 
-All five zones fit within `lumpSize` words. The Capabilities zone at
-the tail (last 12 words, architecture-fixed) is identical to the lump c-list
-tail, eliminating the overlap from the previous layout.
+The six regions fit within the fixed +0…+255 private ABI. CR12…CR15 are
+privileged/runtime registers and have no persisted Thread-memory homes.
 
 ---
 
-## C-List at the Tail — Zone ① (Capabilities)
+## Fixed Persisted CR Homes — Zone ① (Capabilities)
 
-The LUMP spec places the c-list at the physical tail (last `cc` words).
-In a Thread lump the caps zone is always 12 words (architecture-fixed), so
-the c-list occupies words `lumpSize-12`..`lumpSize-1` = words 244..255 (for
-lumpSize=256). **Zone ① (CR0..CR11) is also at words +244..+255** — the same region.
-
-The resolution: by reversing the zone order, Zone ① and the c-list tail are
-now co-located:
+Thread capability persistence is a fixed private ABI, not a tail-derived
+c-list calculation. **Zone ① is always words +244..+255**, for CR0..CR11,
+regardless of the allocated Thread body size. CR12..CR15 are privileged/runtime
+registers and have no persisted homes.
 
 | Region | Offsets | Role |
 |--------|---------|------|
-| Zone ① (live CRs) | +244 … +255 | Save/restore target for SAVE/LOAD at runtime AND c-list pre-population |
-| C-list tail | +244 … +255 | Boot-time initialisation — pre-populated by Mint.Thread with the initial 12 GT Word 0 values |
+| Zone ① (persisted CR homes) | +244 … +255 | Save/restore target for CR0..CR11 |
+| Reserved extension | +256 onward | Present only in larger allocations; separate from the fixed Thread ABI |
 
 `Mint.Thread` populates words +244..+255 with the initial GT Word 0 values at
 creation time. The boot sequence then LOAD-s them into the CRs via `mLoad`.
-Thereafter SAVE/LOAD operates on Zone ① (words +244..+255) directly. Zone ①
-serves both as the live capability register zone and the c-list tail — one
-12-word region with two semantic roles.
+Thereafter SAVE/LOAD operates on Zone ① (words +244..+255) directly. These
+are fixed persisted CR homes, not an allocation-tail-derived c-list.
 
 ---
 
@@ -2471,21 +2469,23 @@ No numbered CR is permanently dedicated to any named system service.
 
 ### CR12–CR15 — Privileged Zone (Priv zone)
 
-CR12–CR15 are not stored in Zone ① of the Thread lump. They are held
-exclusively in the hardware CR file and are loaded via `mLoad(NS Slot 1)`
-at boot step B:02. They carry zero permissions in their stored GT Word 0
-and are of Inform-type — the hardware returns a constant on DREAD. They
-are never written to lump memory and are never accessible via DREAD.
+CR12–CR15 are not stored in Zone ① of the Thread lump. Zone ① contains
+exactly the twelve persisted homes CR0–CR11 at +244…+255. CR12–CR15 are
+privileged/runtime registers held exclusively in the hardware CR file and
+are never written to Thread lump memory or accessible via DREAD.
 
-**CR12 — Thread Stack.** CR12 holds the privileged thread stack capability. Its NS entry encodes the Thread lump's base address and total word count, which the hardware uses as the anchor for the stack: the effective stack zone spans `stack_min` (= `lumpSize−12−sw`,
-example: 212) up to `sp_max` (= `lumpSize−12−1`, example: 243), with the
+**CR12 — Thread Stack.** CR12 holds the privileged thread stack capability.
+The fixed private ABI stack zone spans `stack_min` (= `244−sw`, example: 212)
+up to `sp_max` (= `243`), with the
 hidden **STO** (Stack Top Offset) register tracking the current top.
 `Mint.Thread` sets STO = `sp_max` (example: 243) at Thread creation — this
 is the empty-stack sentinel; the first word pushed onto the stack occupies
 `sp_max−1` (cursor STO field decreases by 1 for LAMBDA, by 2 for CALL).
 CR12, CR13, and CR15 are system-wide registers not serialized by CHANGE.
 CR14 is transient and is derived from restored CR0 and the selected code LUMP
-header on entry. STO remains Heap[0] at Thread word +17; it is not a packed PC.
+header on entry. The live STO field is hardware-only cursor state; its
+reserved backing word is Heap[0] at +17. It is not a packed PC or a capability
+home in the Thread body. Software heap payload begins at Heap[1].
 
 The Zone ④ **Heap** (words 17..17+heapWords−1, example: 17..80) is entirely absent from the hardware
 save/restore path. It is private to its thread — no other thread holds a GT
@@ -2515,10 +2515,10 @@ heap objects without any further indirection.
 
 ## Zone ② — LIFO Stack
 
-`sw` words at offsets `lumpSize−12−sw .. lumpSize−12−1` (IDE-defined).
+`sw` words at fixed offsets `244−sw .. 243` (header `cw/sw`, IDE-defined).
 The stack grows downward (toward lower offsets). **STO** (Stack Top Offset,
 a hidden per-thread register) tracks the current top. `Mint.Thread`
-initialises STO = `lumpSize−12−1` = **sp_max** at Thread creation (the
+initialises STO = `243` = **sp_max** at Thread creation (the
 empty-stack sentinel at the top of Zone ②); the first word pushed lands at
 `sp_max−1` (STO -= 1 for LAMBDA, -= 2 for CALL).
 
@@ -2558,14 +2558,15 @@ relaxes the overflow threshold automatically.
 
 ## Zone ③ — Freespace
 
-`17+heapWords` to `sp_max` words (dynamic, IDE-defined; example: +81..+243,
-163 words). This is the collision zone between the upward-growing Heap and
+`17+heapWords` through `stack_min−1` (dynamic, IDE-defined; with cc=64 and
+sw=32: +81..+211, 131 words). This is the collision zone between the upward-growing Heap and
 the downward-growing Stack. At Thread creation `Mint.Thread` verifies all
 words in this zone are zero.
 
 At runtime, Heap objects above heap base and Stack frames below `sp_max`
 both consume words from this zone. The sum of live Heap allocation and live
-Stack depth must not exceed `sp_max − 17 − heapWords + 1` words (example: 163).
+Stack geometry must satisfy `17 + heapWords + sw ≤ 244`; freespace is the
+remaining interval between the two fixed-size zones.
 
 This is the only zone in any Church Machine lump that is dynamically
 variable at runtime. Function abstraction freespace is fixed at compile
@@ -2637,7 +2638,7 @@ software Thread homes.
 
 CR0–CR11 (Zone ①, the programmer-accessible capability registers) are
 **implicitly** kept in sync by mLoad — every time mLoad loads a GT into
-CR_N it writes the same word back to lump word N. CHANGE does not need to
+CR_N it writes the same word back to fixed home `+244+N`. CHANGE does not need to
 explicitly save them; they are always current in the lump. On restore,
 CHANGE reads the incoming thread's GT zone from its lump to reload CR0–CR11.
 After restore, CHANGE validates CR0 through the Namespace gate, constructs an
@@ -2657,23 +2658,23 @@ Step 1  Read Mem[base] — the header word.
 Step 2  magic[31:27] == 0x1F — reject if not.
 Step 3  typ[9:8] == 0b10 (clist-only) — reject if not; prevents calling
           Mint.Thread on a code lump.
-Step 4  n-6[26:23] == 2 — Thread lump size is fixed at 256 words;
-          reject if mismatch.
-Step 5  cw[22:10] == 0 — Thread lump has no code; reject if non-zero.
-Step 6  cc[7:0] > 0 AND 17 + cc + sw ≤ lumpSize − 12 — heapWords (cc) must be
+Step 4  n-6[26:23] describes an allocation of at least 256 words; words
+          +256 onward, if present, are reserved extension words.
+Step 5  cw[22:10] is reinterpreted as sw — reject zero stack words.
+Step 6  cc[7:0] > 0 AND 17 + cc + sw ≤ 244 — heapWords (cc) must be
           positive and all zones must fit; reject if not.
-Step 7  Scan words 81..211 (Zone ③, Freespace): reject if any word
-          is non-zero. Zone ①  and Zone ⑤ are pre-populated by the
+Step 7  Scan the derived Zone ③ range +17+cc .. +(243−sw): reject if any word
+          is non-zero. Zone ① and Zone ⑤ are pre-populated by the
           boot sequence and are not scanned.
-Step 8  Copy initial GT Word 0 values into c-list tail (words 244..255).
+Step 8  Copy initial GT Word 0 values into fixed CR0..CR11 homes (+244..+255).
 Step 9  Issue E-GT (B E) for Scheduler, RW-GT (B R W) for Thread.
 Step 10 Write single Object NS slot.
 ```
 
 The difference from `Mint.Lump`:
 - `typ` is `10`, not `00`
-- `cw == 0` is enforced, not derived
-- Freespace scan covers Zone ③ only (not words 1..cw+1, since cw=0)
+- `cw` is `sw` for Thread stack geometry, not a code count
+- Freespace scan covers derived Zone ③ only
 - Zone ① and Zone ⑤ are intentionally pre-populated; the scan skips them
 - Two GTs are issued instead of one
 
@@ -2683,8 +2684,9 @@ The difference from `Mint.Lump`:
 
 Thread lumps are distributed as `*.thread.zip` files, following the same
 ZIP container rules as function abstraction lumps (bit 3 = 0, uncompressed
-size present in local file header). The contained binary is the 256-word
-Thread lump image — header word followed by the five zones.
+size present in local file header). A canonical image is a 256-word Thread
+lump — header word followed by the five remaining fixed-ABI regions. A larger
+image appends only the reserved extension after +255.
 
 ```
 MyApp.thread.zip
@@ -2699,9 +2701,10 @@ MyApp.thread.zip
 
 The ZIP pre-allocation sequence is identical to that for function
 abstraction lumps — the Locator reads `uncompressed_size` from the local
-file header, derives `n = log2(size / 4) = 8` (always 8 for Thread), calls
-the Memory Manager to reserve a 256-word region, inflates into it, then
-passes `(base, 8)` to `Mint.Thread` for validation and GT issuance.
+file header, derives `n = log2(size / 4)`, reserves that power-of-two region,
+inflates into it, then passes `(base, n)` to `Mint.Thread` for validation and
+GT issuance. The canonical image has `n = 8`; larger images retain the same
+fixed private ABI through +255.
 
 ### What the IDE Writes at Compile Time
 
@@ -3143,25 +3146,25 @@ already owns.
 | **Purpose** | CALL & RETURN code unit (one abstraction, several methods) | Live execution context (one thread) · Full machine state save on suspension using CHANGE | SWITCH into CR15 · NS Address-space root + NS Table + lazy-load host |
 | **Word 0** | Header `0x1F` | Header `0x1F` | Header `0x1F` |
 | **`typ` field** | `00` — callable · Enter only | `10` — clist-only | `10` NS table directory only |
-| **`cw` field** | Code word count (≥ 0) | Always `0` | Always `0` |
+| **`cw` field** | Code word count (≥ 0) | Reinterpreted as `sw` stack words | Always `0` |
 | **`cc` field** | Compiler-chosen GT count | **heapWords** (IDE-set; caps always 12, architecture-fixed) | None — NS Table only |
 | **Example header** | `0xF881_AC00` (Decimal, n=7 cw=107 cc=0) | `0xF900_8240` (n-6=2, sw=32, heapWords=cc=64) | Binary data |
 | **Entry point** | PC = 1 on every CALL | Never — not callable | Never — not callable |
-| **Words 1..cw** | [CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html) code (dispatcher + methods) | Absent — `cw = 0` | Boot / init microcode and SWITCH |
-| **Freespace zone** | Compile-time fixed · `0xAB` content header + embedded API/source, zero remainder (legacy: all-zero) · immutable per release | Dynamic 131 words — Stack ↓ and Heap ↑ collide | Between init code and NS Table · all-zero |
-| **C-list zone** | Last `cc` words · list E-GTs · compiler-set | Last 12 words · CR0–CR11 + LIFO Stack | BINARY DATA |
-| **Unique body** | Code and C-List | 5 zones: Header · Caps · Stack · Free · Heap · DR | NS Table (N × 4-word entries: Inform GT + reserved) |
+| **Words 1..cw** | [CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html) code (dispatcher + methods) | DR0–DR15 at +1…+16; no code | Boot / init microcode and SWITCH |
+| **Freespace zone** | Compile-time fixed · `0xAB` content header + embedded API/source, zero remainder (legacy: all-zero) · immutable per release | Dynamic: +(17+cc)…+(243−sw), between Heap ↑ and Stack ↓ | Between init code and NS Table · all-zero |
+| **C-list zone** | Last `cc` words · list E-GTs · compiler-set | Fixed persisted homes +244…+255: CR0–CR11 | BINARY DATA |
+| **Unique body** | Code and C-List | 6 regions: Header · DR · Heap · Free · Stack · Caps | NS Table (N × 4-word entries: Inform GT + reserved) |
 | **Physical scope · 2^n frame size** | One lump region | One 256/512/1024-word thread frames | Entire application address space |
 | **NS Table** | None — uses parent NS | None — uses parent NS | IS the NS Table |
 | **Outform support** | No — all deps must be Live at call time | No | Yes — Absent event → Locator fetch |
 | **Lazy load** | Fetch from Home Base Library | Not applicable | Hosts the Locator; fetches from Home Base IDE |
 | **Issued by** | `Mint.Lump(base, n)` | `Mint.Thread(base, n)` | `Mint.Lump(base, n)` or FPGA-embedded (Boot.NS) |
-| **Transient CR14** | Code view (X) words 1..cw | Loaded into CR12 | Code view (X) if typ=00 |
+| **Transient CR14** | Code view (X) words 1..cw | Derived from restored CR0; not persisted | Code view (X) if typ=00 |
 | **Transient CR6** | C-list view (L) last `cc` words | Not derived | C-list view (L) last `cc` words |
 | **Issued GTs** | One E-GT (caller holds) | GT (Thread) | GT NS |
 | **GC interaction** | G bit in NS slot Word 1 authority | G bits in live CR authority snapshots in Zone ① | Live & Dead slots |
 | **lumpSize** | 2^n compiler-chosen (64–16 384 words) | IDE defined 2^n < 1024 | 2^n IDE-chosen; Boot.NS = 2^14 = 16 384 words |
-| **Freespace verified by Mint** | Yes — words cw+1..lumpSize-cc-1: `0xAB` content-frame validation (bounds + zero remainder, step 7) or all-zero (legacy) | Zone ③ only (words 45..175); Zone ① skipped | Scan CRC per slot |
+| **Freespace verified by Mint** | Yes — words cw+1..lumpSize-cc-1: `0xAB` content-frame validation (bounds + zero remainder, step 7) or all-zero (legacy) | Zone ③ only: +(17+cc)…+(243−sw); fixed CR homes skipped | Scan CRC per slot |
 | **Distribution format** | `dot.name.issue.token.zip` | `*.thread.zip` | `*.namespace.zip` |
 | **Simulator NS slot** | Most slots (Salvation=4, Mint=6, …) | Slots 1 and 45 | Slot 0 (Boot.NS) |
 | **CALL target** | Yes | No | No |

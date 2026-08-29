@@ -11,6 +11,7 @@
 
 const fs   = require('fs');
 const path = require('path');
+global.ThreadDesign = require('../../simulator/thread_design.js');
 
 const src = fs.readFileSync(
     path.join(__dirname, '../../simulator/lump-audit.js'),
@@ -150,11 +151,10 @@ console.log('\nTest 6b: cw=0 typ=01 (data lump — RB1 pass)');
 
 // ─── Test 6c: typ=10 (Thread/clist-only) — RB1 pass ─────────────────────
 // For Thread lumps, cw is reinterpreted as sw (stack words) and cc as
-// heapWords. Both must be >0; geometry must fit: 17+sw+cc ≤ lumpSize-12.
-// 64-word lump (nMinus6=0): sw=2, hw=4 → 1+16+4+2+12=35 ≤ 64 ✓
+// heapWords. Both must be >0 and the body must support the fixed 256-word ABI.
 console.log('\nTest 6c: typ=10 Thread — sw=2, heapWords=4, geometry valid (RB1 pass)');
 {
-    const words = makeWellFormed({ cw: 2, cc: 4, nMinus6: 0, typ: 2 });
+    const words = makeWellFormed({ cw: 2, cc: 4, nMinus6: 2, typ: 2 });
     const results = lumpAudit(words, null);
     assertRule(results, 'RB1', 'pass', 'RB1 typ=10 Thread geometry valid pass');
     assert(!lumpAuditHasErrors(results), 'no errors');
@@ -407,21 +407,21 @@ function makeThreadHeader({ nMinus6 = 2, sw = 32, hw = 64 } = {}) {
 //   Words 1..16: DR0..DR15 data registers (may be non-zero for a live thread)
 //   Words 17..80: heap zone (heapWords=64 words; may be non-zero)
 //   Words 81..211: freespace (collision zone; all-zero at creation time)
-//   Words 212..243: stack zone (sw=32 words; grows downward; may be non-zero)
+//   Words 212..243: stack zone (sw=32 words; fixed ABI; may be non-zero)
 //   Words 244..255: caps zone (12 architecture-fixed GT Word 0 values)
 //
 // fsStart = 17 + heapWords = 17 + 64 = 81
-// fsEnd   = lumpSize - 12 - sw = 256 - 12 - 32 = 212
+// fsEnd   = 244 - sw = 212
 function makeValidThread({ sw = 32, hw = 64, nMinus6 = 2 } = {}) {
     const lumpSize = 1 << (nMinus6 + 6);
     const words = new Array(lumpSize).fill(0);
     words[0] = makeThreadHeader({ nMinus6, sw, hw });
     // Non-zero DRs and stack (live thread state — not freespace, so allowed)
     for (let i = 1; i <= 16; i++) words[i] = 0x12340000 + i;   // DR0..DR15
-    const stackMin = lumpSize - 12 - sw;
-    for (let i = stackMin; i < lumpSize - 12; i++) words[i] = 0xABCD0000 + i; // stack
-    // Caps zone (12 words at lumpSize-12): valid or null GTs
-    for (let i = lumpSize - 12; i < lumpSize; i++) words[i] = 0x4A000000 + (i - (lumpSize - 12));
+    const stackMin = 244 - sw;
+    for (let i = stackMin; i < 244; i++) words[i] = 0xABCD0000 + i; // stack
+    // Caps zone: exactly 12 fixed homes for CR0..CR11, never allocation-tail based.
+    for (let i = 244; i <= 255; i++) words[i] = 0x4A000000 + (i - 244);
     // Freespace (81..211): all-zero (already zeroed by fill(0))
     return words;
 }
@@ -572,6 +572,21 @@ console.log('\nTest 38: Thread with RETURN-shaped DR values — RSM not emitted'
     const results = lumpAudit(words, null);
     assert(!results.find(r => r.ruleId === 'RSM'), 'RSM not emitted for Thread DR state');
     assert(!lumpAuditHasErrors(results), 'no errors');
+}
+
+// ─── Test 39a: Larger Thread retains its fixed +0..+255 private ABI ───────
+console.log('\nTest 39a: 512-word Thread keeps fixed homes, stack, and extension boundary');
+{
+    const words = makeValidThread({ nMinus6: 3, sw: 32, hw: 64 });
+    // A malformed GT at the allocation tail is an extension word, not CR12 or
+    // a thirteenth persisted home. It must not be audited as a capability.
+    words[500] = 0x04000001;
+    const results = lumpAudit(words, null);
+    assertRule(results, 'RB1', 'pass', 'RB1 pass: 512-word Thread preserves fixed ABI geometry');
+    assertRule(results, 'RFS', 'pass', 'RFS pass: only canonical Freespace is scanned');
+    assertRule(results, 'RGT', 'pass', 'RGT pass: only CR0..CR11 fixed homes are capability words');
+    assert(!lumpAuditHasErrors(results),
+        'words +256 onward are reserved extension, never tail-relocated caps/stack/heap');
 }
 
 // ─── Test 39: Malformed data lump (cw=1, cc=1) — only RB1 fires ──────────

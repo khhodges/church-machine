@@ -5,12 +5,14 @@ from .hw_types import *
 from .layouts import (GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT,
                       LUMP_HEADER_LAYOUT, WORD2_LAYOUT)
 from .mload import ChurchMLoad
-
-# Offset (in words) from the thread lump base to the first thread capability.
-# Thread.caps[0..11] occupy the canonical 12-word tail of a 256-word Thread.
-# RESTORE_CALL loads CR0–CR11 by reading CR8[THREAD_CAPS_OFFSET + cr_index].
-# Cross-reference: simulator.js THREAD_CAPS_OFFSET, hw_types.py §"Thread layout".
-THREAD_CAPS_OFFSET = 244
+from .thread_design import (
+    THREAD_CAPS_OFFSET,
+    THREAD_CAP_WORDS,
+    THREAD_DR_OFFSET,
+    THREAD_HEAP_OFFSET,
+    THREAD_MIN_N_MINUS_6,
+    THREAD_MAX_N_MINUS_6,
+)
 
 
 class ChurchChange(Elaboratable):
@@ -127,7 +129,7 @@ class ChurchChange(Elaboratable):
         BOOT_RESTORE_MASK = (1 << 0)
         # Dormant Threads store only the twelve software capability homes.
         # CR14 is transparently derived from restored CR0 on every activation.
-        SCHEDULER_RESTORE_MASK = 0x0FFF  # CR0–CR11
+        SCHEDULER_RESTORE_MASK = (1 << THREAD_CAP_WORDS) - 1
         m.d.comb += effective_mask.eq(
             Mux(self.m_elevated,
                 C(BOOT_RESTORE_MASK, 16),
@@ -166,8 +168,6 @@ class ChurchChange(Elaboratable):
             thread_base)
 
         fetched_gt_latched = Signal(32)
-
-        DR_OFFSET = 1
 
         mload_src = Signal(4)
         mload_dst = Signal(4)
@@ -469,9 +469,19 @@ class ChurchChange(Elaboratable):
                 m.d.sync += preflight_rd_armed.eq(1)
                 with m.If(self.mem_rd_valid & preflight_rd_armed):
                     m.d.sync += preflight_rd_armed.eq(0)
+                    # A Thread is admitted only when its header conforms to
+                    # the normative fixed private ABI.  cw is stack words,
+                    # cc is heap words, and the two zones must leave a
+                    # non-overlapping boundary before capabilities at +244.
                     with m.If((self.mem_rd_data[27:32] == 0x1F) &
                               (self.mem_rd_data[8:10] == 2) &
-                              (self.mem_rd_data[23:27] >= 2)):
+                              (self.mem_rd_data[23:27] >= THREAD_MIN_N_MINUS_6) &
+                              (self.mem_rd_data[23:27] <= THREAD_MAX_N_MINUS_6) &
+                              (self.mem_rd_data[10:23] > 0) &
+                              (self.mem_rd_data[0:8] > 0) &
+                              ((self.mem_rd_data[10:23] +
+                                self.mem_rd_data[0:8]) <=
+                               (THREAD_CAPS_OFFSET - THREAD_HEAP_OFFSET))):
                         m.next = "SAVE_CR_READ"
                     with m.Else():
                         m.d.sync += [
@@ -497,7 +507,7 @@ class ChurchChange(Elaboratable):
                     mem_wr_data_reg.eq(self.cr_rd_data.as_value()[:32]),
                 ]
                 with m.If(self.mem_wr_done):
-                    with m.If(save_cr_index == 11):
+                    with m.If(save_cr_index == THREAD_CAP_WORDS - 1):
                         m.next = "SAVE_DR"
                     with m.Else():
                         m.d.sync += save_cr_index.eq(save_cr_index + 1)
@@ -507,7 +517,7 @@ class ChurchChange(Elaboratable):
                 m.d.comb += self.dr_rd_addr.eq(save_index[:4])
                 m.d.comb += [
                     mem_wr_en_reg.eq(1),
-                    mem_wr_addr_reg.eq(outgoing_thread_base + ((DR_OFFSET + save_index) << 2)),
+                    mem_wr_addr_reg.eq(outgoing_thread_base + ((THREAD_DR_OFFSET + save_index) << 2)),
                     mem_wr_data_reg.eq(self.dr_rd_data),
                 ]
                 with m.If(self.mem_wr_done):
@@ -618,7 +628,7 @@ class ChurchChange(Elaboratable):
                 m.d.comb += [
                     direct_rd_active.eq(1),
                     direct_rd_addr.eq(
-                        restore_base + ((DR_OFFSET + save_index) << 2)),
+                        restore_base + ((THREAD_DR_OFFSET + save_index) << 2)),
                 ]
                 with m.If(~restore_rd_armed):
                     m.d.sync += restore_rd_armed.eq(1)

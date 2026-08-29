@@ -67,8 +67,10 @@
     }
     var V20_NS_TOTAL_N        = 1;   // 2^(1+14) = 32K words = 128 KiB
     var V20_THREAD_LUMP_POW2  = 9;   // 512 words
-    var V20_THREAD_CAPS_OFFSET = 244;
-    var V20_THREAD_CAP_WORDS  = 15;  // CR0..CR14; CR15 is Namespace
+    var THREAD = window.ThreadDesign;
+    if (!THREAD || !THREAD.normative) {
+        throw new Error('Normative Thread design is unavailable');
+    }
     var V20_WCH_BASE_BYTE     = 0x1600;
     var V20_WCH_END_BYTE      = 0x17FF;
 
@@ -174,9 +176,10 @@
     }
 
     // state.thread.lumpPow2: exponent for lump size (e.g. 8 = 256 words)
-    // state.thread.stackFrames: number of stack frames (each frame = 2 words)
+    // Thread geometry fields are encoded directly in the Thread header:
+    // cw/sw = stack words and cc = heap words.
     var state = {
-        thread: { lumpPow2: V20_THREAD_LUMP_POW2, stackFrames: 16, count: 1 },
+        thread: { lumpPow2: V20_THREAD_LUMP_POW2, stackFrames: 16, heapWords: 12, count: 1 },
         ns: { n_minus_6: V20_NS_TOTAL_N, slots: NS_CAP_MIN }
     };
 
@@ -193,6 +196,9 @@
                 }
                 if (s.thread.stackFrames !== undefined) {
                     state.thread.stackFrames = clamp(s.thread.stackFrames, 10, 255);
+                }
+                if (s.thread.heapWords !== undefined) {
+                    state.thread.heapWords = clamp(s.thread.heapWords, 1, 255);
                 }
                 state.thread.count = (s.thread.count !== undefined) ? clamp(s.thread.count, 1, 9) : 1;
             }
@@ -296,6 +302,8 @@
                 totalNamespaceWords: totalNamespaceWords,
                 namespaceLumpWords:  64,
                 threadLumpWords:     threadLumpWords,
+                threadStackWords:    clamp(state.thread.stackFrames, 10, 255) * 2,
+                threadHeapWords:     clamp(state.thread.heapWords, 1, 255),
                 nsSlotsMax:          nsSlotsMax,
                 threadCount:         threadCount
             }
@@ -828,9 +836,9 @@
 
     // ── Thread panel ──────────────────────────────────────────────────────────
 
-    var DR_WORDS  = 16;   // DR0–DR15, static
-    var CAP_WORDS = V20_THREAD_CAP_WORDS; // CR0–CR14 GT home slots; CR15 is Namespace
-    var MIN_EXP   = 6;    // 64 words minimum lump
+    var DR_WORDS  = THREAD.dataRegisters.words;
+    var CAP_WORDS = THREAD.capabilityHomes.words;
+    var MIN_EXP   = Math.log2(Math.min.apply(null, THREAD.supportedBodyWords));
     var MAX_EXP   = 13;   // 8192 words cap
 
     var BOARD_PROFILES = {
@@ -876,13 +884,13 @@
         var stackFrames  = clamp(state.thread.stackFrames, 10, 255);
         var stackWords   = stackFrames * 2;
 
-        // Heap is derived — may go negative (over-capacity)
-        var heap         = lumpSize - 1 - DR_WORDS - stackWords - CAP_WORDS;
-        var overCapacity = heap <= 0;
+        var heap = clamp(state.thread.heapWords, 1, 255);
+        var layout = THREAD.layout(lumpSize, stackWords, heap);
+        var overCapacity = !layout.valid;
 
-        // cw encodes heap words; cc encodes frame count
-        var cw = overCapacity ? 0 : heap;
-        var cc = stackFrames;
+        // Thread headers reinterpret cw as stack words; cc is heap words.
+        var cw = overCapacity ? 0 : stackWords;
+        var cc = heap;
         var word    = packHdr(n, cw, cc, 2);
         var wordHex = hex8(word);
 
@@ -912,9 +920,13 @@
             { label: 'Header',    words: 1,           cls: 'le-zone-hdr'   },
             { label: 'Data Regs', words: DR_WORDS,    cls: 'le-zone-dr'    },
             { label: 'Heap',      words: heap,         cls: 'le-zone-heap'  },
+            { label: 'Freespace', words: layout.freeWords, cls: 'le-zone-free' },
             { label: 'Stack',     words: stackWords,   cls: 'le-zone-stack' },
             { label: 'Cap Regs',  words: CAP_WORDS,   cls: 'le-zone-caps'  }
         ];
+        if (!overCapacity && layout.extensionWords) {
+            zones.push({ label: 'Reserved Extension', words: layout.extensionWords, cls: 'le-zone-free' });
+        }
 
         var grid = renderGrid([
             ['Target board',   esc(profile.label), 'le-val-gold'],
@@ -927,10 +939,12 @@
             ['typ field',      '10  (Thread)', ''],
             ['Header',         '1 word', ''],
             ['Data Regs',      esc(DR_WORDS + ' words  (DR0–DR15, static)'), ''],
-            ['Heap (cw)',      heapDisplay, overCapacity ? '' : ''],
-            ['Stack (cc)',     esc(stackFrames + ' frames  (' + stackWords + ' words)'), ''],
-            ['Cap Regs',       esc(CAP_WORDS + ' words  (CR0–CR14 GT slots, static)'), ''],
-            ['Capability offset', esc('+' + V20_THREAD_CAPS_OFFSET + ' … +' + (V20_THREAD_CAPS_OFFSET + CAP_WORDS - 1) + '  (fixed; CR0 = WukongCallHome boot entry)'), 'le-val-gold'],
+            ['Heap (cc)',      heapDisplay, overCapacity ? '' : ''],
+            ['Freespace',      overCapacity ? '—' : esc(layout.freeWords + ' words  (+' + layout.freeStart + ' … +' + layout.freeEnd + ')'), ''],
+            ['Stack (cw/sw)',  esc(stackFrames + ' frames  (' + stackWords + ' words; +' + layout.stackStart + ' … +' + layout.stackEnd + ')'), ''],
+            ['Cap Regs',       esc(CAP_WORDS + ' words  (CR0–CR11 persisted homes)'), ''],
+            ['Capability offset', esc('+' + layout.capsStart + ' … +' + layout.capsEnd + '  (fixed; never relocated)'), 'le-val-gold'],
+            ['Reserved extension', esc(layout.extensionWords + ' words  (+' + layout.extensionStart + ' onward; outside the private ABI)'), ''],
             ['WukongCallHome', esc('0x' + V20_WCH_BASE_BYTE.toString(16).toUpperCase() + '–0x' + V20_WCH_END_BYTE.toString(16).toUpperCase() + '  (after full Thread allocation)'), 'le-val-gold'],
             ['Header word',    '<span id="le-thread-hex" class="le-hex">' + esc(wordHex) + '</span>' + copyBtn('le-thread-hex'), 'le-val-mono']
         ]);
@@ -985,7 +999,7 @@
             threadCountClampBanner +
             threadClampBanner +
             overCapWarning +
-             '<p class="le-panel-desc">V20 reserves a 512-word Thread object with its capability zone at offset +244. CR0\u2013CR14 are restored from the Thread; CR0 carries the WukongCallHome boot entry. Choose lump size and stack frames; heap is derived automatically.</p>' +
+             '<p class="le-panel-desc">This design is normative for every Thread. The private ABI is fixed at +0\u2026+255: Header, DR0\u2013DR15, Heap, Freespace, LIFO Stack ending at +243, then the twelve persisted CR0\u2013CR11 homes at +244\u2026+255. CR12\u2013CR15 are privileged/runtime state and are not persisted homes. Larger bodies add a reserved extension after +255; they never move the capability zone.</p>' +
             '<div class="le-field-row">' +
                 '<label class="le-label">Lump size<span class="le-range-hint"> 2^' + MIN_EXP + '\u2013' + maxLumpPow2 + ', max ' + fmtWords(Math.pow(2, maxLumpPow2)) + ' w</span></label>' +
                 '<div class="le-input-group le-input-group-wide">' +
@@ -993,7 +1007,7 @@
                 '</div>' +
             '</div>' +
                 '<div class="le-thread-sync-note">' +
-                '<span class="le-thread-sync-badge">V20 Thread\u00a0= ' + esc(fmtWords(lumpSize)) + '\u00a0words\u00a0(2^' + lumpPow2 + ')\u00a0\u00b7 caps @ +244\u00a0\u00b7 CR0\u2013CR14\u00a0\u2014 reflected\u00a0in\u00a0Resident\u00a0Lumps\u00a0SIZE\u00a0column</span>' +
+                '<span class="le-thread-sync-badge">Normative Thread\u00a0= ' + esc(fmtWords(lumpSize)) + '\u00a0words\u00a0(2^' + lumpPow2 + ')\u00a0\u00b7 cw/sw=' + stackWords + '\u00a0\u00b7 cc=' + heap + '\u00a0\u00b7 CR0\u2013CR11 fixed @ +244\u2026+255</span>' +
             '</div>' +
             '<div class="le-field-row">' +
                 '<label class="le-label">Thread count<span class="le-range-hint">' + esc(countHint) + '</span></label>' +
@@ -1009,10 +1023,11 @@
                     '<input type="number" class="le-number" id="le-t-stack-num" min="10" max="255" value="' + stackFrames + '" oninput="lumpEditorThreadStack(this.value)">' +
                 '</div>' +
             '</div>' +
-            '<div class="le-field-row le-field-readonly">' +
-                '<label class="le-label">Heap words<span class="le-range-hint"> (derived)</span></label>' +
+            '<div class="le-field-row">' +
+                '<label class="le-label">Heap words (cc)<span class="le-range-hint"> 1\u2013255</span></label>' +
                 '<div class="le-input-group">' +
-                    '<div class="le-readonly-val">' + heapDisplay + '</div>' +
+                    '<input type="range" class="le-slider" id="le-t-heap-sl" min="1" max="255" value="' + heap + '" oninput="lumpEditorThreadHeap(this.value)">' +
+                    '<input type="number" class="le-number" id="le-t-heap-num" min="1" max="255" value="' + heap + '" oninput="lumpEditorThreadHeap(this.value)">' +
                 '</div>' +
             '</div>' +
             '<div class="le-bar-label-row"><span>Single thread memory layout</span><span class="le-bar-label-count">' + esc(lumpSize.toLocaleString() + ' words') + '</span></div>' +
@@ -1531,7 +1546,7 @@
     function renderDesignHero(kind) {
         var title = (kind === 'thread') ? 'Thread Lump \u2014 Design Page' : 'Namespace Lump \u2014 Design Page';
         var blurb = (kind === 'thread')
-            ? 'The V20 Thread Lump holds a running computation\u2019s full context in a 512-word allocation. Its fixed capability zone begins at offset +244 and restores CR0\u2013CR14; CR0 carries the WukongCallHome boot entry.'
+            ? 'The normative Thread design fixes the private ABI at +0\u2026+255 for every supported allocation. Header cw/sw is stack words, cc is heap words, Freespace separates them, and exactly CR0\u2013CR11 persist at +244\u2026+255; CR12\u2013CR15 remain privileged/runtime state.'
             : 'The V20 Namespace Lump (NS Slot\u202f0) describes the physical address space with a power-of-two number of sixteen-byte entries (64\u20131024, chosen interactively) at the top of memory. Slot 0 is the highest-address entry; slots descend by 16 bytes toward the table base.';
         return '<div class="le-design-hero">' +
             '<div class="le-design-hero-title">' + esc(title) + '</div>' +
@@ -1629,6 +1644,16 @@
         var num = document.getElementById('le-t-stack-num');
         if (sl  && sl  !== document.activeElement) sl.value  = state.thread.stackFrames;
         if (num && num !== document.activeElement) num.value = state.thread.stackFrames;
+        render();
+    };
+
+    window.lumpEditorThreadHeap = function (v) {
+        state.thread.heapWords = clamp(v, 1, 255);
+        saveState();
+        var sl = document.getElementById('le-t-heap-sl');
+        var num = document.getElementById('le-t-heap-num');
+        if (sl && sl !== document.activeElement) sl.value = state.thread.heapWords;
+        if (num && num !== document.activeElement) num.value = state.thread.heapWords;
         render();
     };
 

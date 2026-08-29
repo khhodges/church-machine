@@ -2186,7 +2186,7 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
     html += secBody();
 
     // ── Zone ①: Capabilities (+244 … +255) ───────────────────────────────
-    html += secHdr('①', 'Capabilities', `${TL.capsWords} words·fixed · CR0–CR11 · offset +${TL.capsStart} … +${TL.capsEnd} · c-list tail · saved/restored on context switch`, '#f4b942', 'thread-zone-1');
+    html += secHdr('①', 'Capabilities', `${TL.capsWords} words·fixed · CR0–CR11 · offset +${TL.capsStart} … +${TL.capsEnd} · fixed private-ABI homes · saved/restored on context switch`, '#f4b942', 'thread-zone-1');
     html += '<div class="abs-clist-heading">GOLDEN TOKENS</div>';
     html += `<div class="abs-clist-count">${TL.capsWords} fixed capability slots</div>`;
     html += '<table class="abs-clist-table"><thead><tr>';
@@ -2227,6 +2227,14 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
     }
     html += '</tbody></table>';
     html += secBody();
+
+    if (TL.extensionWords > 0) {
+        html += secHdr('⑥', 'Reserved Extension',
+            `${TL.extensionWords} words · offset +${TL.extensionStart} … +${TL.lumpSize - 1} · outside the fixed private ABI`,
+            '#64748b', 'thread-zone-extension');
+        html += '<div class="thread-free-empty">Reserved allocation extension — not Heap, Stack, or relocated capability homes.</div>';
+        html += secBody();
+    }
 
     html += '</div>';
     return html;

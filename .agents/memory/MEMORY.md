@@ -4,7 +4,7 @@
 - [NS slot restore post-c-list-write read](ns-slot-restore-post-clist-read.md) — NS slot 1 location must be captured BEFORE the c-list write loop; same bug existed in both boot_image.py and simulator.js
 - [NULL GT type canonicalisation](null-gt-type-canon.md) — isNullGT checks bits[26:25]===0b00; only replace ===0 with isNullGT at hardware gates (mLoad, _fetchInstruction); UI presence checks (CR6 in resolvePendingSlot) must stay ===0
 - [THREAD_NS_SLOTS in E2E test GTs](thread-ns-slots-e2e-trap.md) — synthetic GT word0 index bits[15:0] must NOT be 1 or 45 (THREAD_NS_SLOTS); those trigger showThread→crDetailTab='lump' override; use index=0x20 (32) in test fixtures
-- [Wukong single-step trace architecture](wukong-trace-arch.md) — 11-byte 0xAA packets; uart_rx_pin=F3; retire_flags.as_value()[:4] for NZCV; COND_FLAGS_LAYOUT is 4-bit StructLayout; TraceUnit skips retire if busy (step mode guarantees idle); SelfTest F-bit failures pre-existed this task
+- [Wukong single-step trace architecture](wukong-trace-arch.md) — 11-byte 0xAA packets; F3 UART; 4-bit NZCV; step mode guarantees TraceUnit is idle
 - [TraceUnit per-event packet format](trace-unit-per-event-format.md) — 12-byte per-event packets; multi-event queue (1–3 per retire); trace_stall backpressure; ELOADCALL/RETURN-CR14 known gaps
 - [Wukong boot three-bug root cause](wukong-boot-perm-l-trap.md) — three cooperating bugs (u_perm timing, CR6 S+E→L+E, BRAM address-stability valid); all fixed; NUC runs clean 2M+ cycles
 - [Amaranth sync-domain self-deadlocking reset](amaranth-sync-reset-deadlock.md) — rst_sr in sync domain driving ResetSignal("sync") locks reset HIGH forever; use reset_less=True + GSR instead
@@ -22,7 +22,7 @@
 - [CLOOMC detection ordering](cloomc-detection-order.md) — _detectCLOOMC() matches keywords (abstraction, method, capabilities) that overlap all CLOOMC++ variants; must run AFTER specific detectors (Symbolic, Lambda, Haskell) or those languages break
 - [Ti60 SoC UART clockDivider](ti60-uart-clockdiv.md) — Sapphire SoC UART resets clockDivider to 0x00 (not 0x35); firmware MUST write UART_CLOCKDIV=53 before first uart_puts or output is 6.25 Mbaud silence
 - [Efinity map.v INIT_0 attribute format varies](efinity-init0-netlist-format.md) — 2026.1 uses unquoted `256'h...` literal not quoted hex string; guards must try both shapes
-- [Ti60F225 hardware facts](ti60f225-hardware.md) — board has exactly 3 user LEDs; church_ti60f225 module ports dbg_boot_complete/dbg_fault_valid/dbg_nia/dbg_fault must be wired in top.v; prior top.v tied them to zero with wrong comment claiming they weren't ports
+- [Ti60F225 hardware facts](ti60f225-hardware.md) — exactly 3 user LEDs; all generated debug ports must be wired in top.v
 - [Sapphire SoC jtagCtrl_reset polarity](sapphire-jtag-reset.md) — jtagCtrl_reset=0 keeps debug domain in permanent reset → io_systemReset stuck HIGH → LED0 OFF; must tie to 1'b1
 - [Sapphire SoC memory map](sapphire-soc-memory-map.md) — ROM=0xF9000000, UART=0xF8010000, GPIO=0xF8020000; sapphire_define.vh is empty in 2026.1; grep sapphire.v for addresses
 - [Sapphire POR asyncReset pulse required](sapphire-por-asyncreset.md) — io_asyncReset=1'b0 constant leaves io_systemReset stuck HIGH forever; must use 8-bit shift-reg POR (init=0xFF) to pulse it
@@ -37,7 +37,7 @@
 - [CLOOMC source expression subset](cloomc-source-expression-subset.md) — split compound guards and nested expressions into single-op temporaries; use bfext/bfins for bitfield work
 - [app.py raw SQL pattern](app-py-raw-sql.md) — server/app.py has no sqlite3 import; all DB access must use db.session.execute(_sa_text(...)); never _sqlite3.connect()
 - [church_ti60f225 module name](church-module-name.md) — Amaranth/Yosys generates module church_ti60f225 (no underscore); top.v must instantiate without underscore or efx_map hard-crashes with bare STACK TRACE
-- [v2.0 hardware format audit](v2-format-audit.md) — cond codes ARM order (CS=2 not LT=2); Turing opcodes at 16-25 not 10-19; integrity32=ROL-XOR not CRC; g_bit is toggle not set/clear; simulator NS format incompatible with hardware WORD2_LAYOUT; stale-opcode .lump sweep pattern
+- [v2.0 hardware format audit](v2-format-audit.md) — ARM cond order; Turing opcodes 16–25; ROL-XOR integrity; g_bit toggles; hardware WORD2 differs from simulator NS
 - [Sapphire BRAM symbol file generation](sapphire-bram-symbol-gen.md) — ELF has 4096-byte page-align prefix before ROM; must use hardcoded ROM_BASE=0xF9000000 not min(paddr); files go in soc_combined/ not firmware/
 - [Sapphire firmware uart_putdec hang](sapphire-uart-putdec-hang.md) — uart_putdec using divu/remu hangs at runtime even with always_inline uart_putc; replaced with uart_puthex32_lower+uart_putc in callhome path
 - [Sapphire BRAM byte-store hang](sapphire-bram-byte-store-hang.md) — ANY sb to 0xF9007xxx hangs CPU; sha256.h/hkdf all use sb; precompute tokens or stub; only sw/lw safe in firmware
@@ -48,7 +48,7 @@
 - [Boot namespace architecture rules](boot-namespace-rules.md) — 2 hardwired slots only; namespace liveness rule; authority = Abstract GT not NS entry; 3-layer boot model; SelfTest loop/CALL pattern
 - [Boot.Abstr token and filename migration](boot-abstr-token-migration.md) — slot 3→6, token 00000003→00000600; NS_TABLE_RESERVE 1024→4096 fix; canonical 00000600.lump must be kept alive by save_lump(); Python create_gt vs JS createGT use different bit layouts
 - [Simulator E2E boot-state testing](sim-e2e-boot-testing.md) — instantBoot() fails at B:04 (async fetch); slowBoot() blocked by bootAnimating; force sim.bootComplete=true; suppress #whatsNewModal via addInitScript
-- [LUMP staleness guards keyed by exact name string](lump-name-casing-staleness-gap.md) — a casing-mismatched abstraction name hides an orphaned lump from staleness checks forever; also check UI code for independently-rotted hardcoded tokens (also in CM_LUMP_SPECIFICATION.md §Developer Traps)
+- [LUMP name casing staleness gap](lump-name-casing-staleness-gap.md) — case drift hides orphaned LUMPs from guards; independently audit UI hardcoded tokens
 - [Self-diagnosing remote build guards](self-diagnosing-remote-guards.md) — version-stamp script output and dump actual-vs-expected state on failure when the script runs on a machine you can't directly access
 - [Boot catalog slot 4 no longer a gap](boot-catalog-slot4-no-longer-gap.md) — hardware boot catalog is 8 slots (0-6 named, gap moved to 7); never hardcode slot 3=Boot.Abstr, use sim.bootEntrySlot
 - [Boot catalog slot 7 — WukongCallHome](boot-catalog-slot7-wukong.md) — slot 7 is WukongCallHome (E-perm, loc=0x140); nsCount=8; must update simulator.js + boot_rom.py + boot_image.py + test together
@@ -59,7 +59,7 @@
 - [NS slot migration GT-bypass trap](ns-slot-gt-bypass-trap.md) — when NS slot N migrates, audit ALL c-list fallback paths; old slot number silently maps to wrong GT (was LED_DEV, not SelfTest)
 - [Stale-version redirect strips query strings](stale-version-redirect-strips-query.md) — server AND client cache-bust redirects must each forward the full query string or URL flags (?debug=1 etc.) silently die on every page load
 - [Async in-flight flag needs catch reset](async-inflight-flag-needs-catch-reset.md) — an in-flight/saving boolean gating a disabled UI control must reset on ALL 3 async outcomes (success, explicit failure, AND rejected promise) or the control sticks disabled forever
-- [Language-detection mnemonic-collision bug class](language-detection-mnemonic-collision.md) — CALL/LOAD mnemonics misread as English verbs, `capabilities {` misread as CLOOMC; misdetection only reaches the compiler via assembleAndLoad's isHighLevel gate, not compileAndBuild; Save-to-NS never sets the Open-Lump token (by design)
+- [Language detection mnemonic collisions](language-detection-mnemonic-collision.md) — CALL/LOAD and `capabilities {` overlap languages; only assembleAndLoad's high-level gate exposes it
 - [OBBS top.v / apb3_cm_bridge.v not deployed](obbs-top-v-not-deployed.md) — OBBS was not copying top.v or apb3_cm_bridge.v to $SOC_DIR; stale jtagCtrl_reset=0 copy → SoC in permanent reset → all LEDs OFF, UART silent
 - [Editor-state migration coverage gap](editor-state-migration-coverage-gap.md) — a one-shot text migration must be wired into every independent save/restore path (keyed draft store AND generic "last session" snapshot), or the "fixed" bug reappears via the unpatched path
 - [Assembler nsLoaded vs _capBlockSlots slot confusion](assembler-nsloaded-slot-confusion.md) — for 2-op LOAD/SAVE, nsLoaded stores CR register number (not c-list slot); _capBlockSlots[name] is always the correct slot for a fresh c-list access
@@ -67,15 +67,15 @@
 - [GitHub API PUT for cross-repo file delivery](github-api-put-delivery.md) — when git histories diverge, PUT individual files via Contents API from Replit bash ($GITHUB_PAT); droplet uses `git checkout origin/main -- <file>` to receive them
 - [Ti60 firmware update pipeline](ti60-firmware-update-pipeline.md) — PNR-only skips 3 required steps (patch sapphire.v, delete VDB, MAP); must run full OBBS; serve hex from $SOC_DIR/outflow/ not repo bitstreams/ (git pull overwrites)
 - [QMTECH Wukong V3 pinout + BUFG trap](wukong-v3-pinout.md) — clk=M21 SRCC bank34, led=G21/G20 active-LOW; never use Instance("BUFG") in Amaranth for Vivado — opt_design silently drops it; use direct comb assign so Vivado auto-infers IBUF→BUFG
-- [LUMP Viewing label sync](lump-viewing-label-sync.md) — Viewing label must update synchronously (showLumpDetail entry + renderLumps direct call), never only via the async fetch; cross-script bare function declarations need window.X = X (also in CM_LUMP_SPECIFICATION.md §Developer Traps)
+- [LUMP Viewing label sync](lump-viewing-label-sync.md) — update synchronously at entry and direct render; cross-script declarations need window exports
 - [CR14.word0 GT update on NS slot migration](cr14-gt-update-on-slot-migration.md) — loadProgram only updates CR14.word1/word2/word3; after changing bootEntrySlot you must also set CR14.word0 to a fresh R+X GT or every fetch faults before stepCount++
 - [A7 v1.2 stored nsCount anti-inflation pattern](a7-nscount-stored-word.md) — c-list at NS TABLE tail inflates nsCount to MAX_NS_ENTRIES; fix: store clean count at NS_TABLE_BASE-3 (scan before c-list + emptyCount); loadBootImage() reads it, forward scan only as fallback
-- [IRQ LUMP lazy-load gate — manifest guard](irq-lump-lazy-gate-guard.md) — lazy-load body gate in _fireSchedulerIRQ must check lazyManifest[slot] exists; test harnesses that pre-seed irqLumpSlot without a manifest entry skip the gate and use abstractionRegistry directly (also in CM_LUMP_SPECIFICATION.md §Developer Traps)
+- [IRQ LUMP lazy-load manifest guard](irq-lump-lazy-gate-guard.md) — gate on a manifest entry; pre-seeded test slots otherwise bypass it via abstractionRegistry
 - [Tier-3 boot recovery slot redirect](tier3-boot-recovery-slot-redirect.md) — stepSim/runSim/instantBoot/slowBoot must save+redirect sim.bootEntrySlot to sim._bootAbstrSlot around every _bootStep() call or B:05 RANGE-faults on an empty gap slot after reset
 - [_applyBootEntryToSim early-fire / _injectClistNow ascending-NS bug class](apply-boot-entry-early-fire.md) — two cooperating bugs producing CR14 RANGE fault on first single-step with a runtime LUMP at slot 7
 - [lump-audit BRANCH opcode drift](lump-audit-branch-opcode.md) — lump-audit.js _rciBranchOp must equal 23 (v2.0); opcode 17=DWRITE; c-list zeros are expected at compile time (runtime fills them)
 - [Wukong write_bitstream DRC NSTD-1/UCIO-1](wukong-bitstream-drc-fix.md) — launch_runs -to_step write_bitstream spawns fresh session; XDC severity overrides lost; use open_run+write_bitstream directly instead
-- [NS slot label persistence across hard resets](ns-slot-label-persistence.md) — step3 labels slots '(reserved)' before loadBootImage restores binary data; reseed loop must include '(reserved)' in its override condition; labels persisted via /api/boot-config/slot-label + bootConfig.slotLabels
+- [NS slot labels across hard resets](ns-slot-label-persistence.md) — reseeding must override temporary '(reserved)' labels after binary restoration
 - [Boot.Abstr c-list must be pre-populated](boot-abstr-clist-must-be-prepopulated.md) — boot path skips lazy GT injection; LUMP needs correct GTs baked in; JS vs Python GT formats differ; manifest filename field governs lump-consistency binary reads
 - [Thread base address zero](thread-base-address-zero.md) — a non-null CR12 may point to word 0; use an explicit missing-capability sentinel, never a base truthiness check
 - [Mint gate for NS slot registration](mint-gate-ns-registration.md) — only Mint.RegisterOutform→Navana.ADD→writeNSEntry may add NS slots; _seedIrqLazyManifest handles post-allocation state; no direct writeNSEntry outside this chain
@@ -100,7 +100,6 @@
 - [Wukong RTL generation initializer bottleneck](wukong-rtl-generation-init-bottleneck.md) — fixed 64 KiB DMEM is not proof of a BRAM issue; Amaranth conversion can stall before Yosys/Vivado
 - [Amaranth shape() memoization](amaranth-shape-memoization.md) — Operator/SwitchValue.shape() uncached in 0.5.8; monkey-patch both before convert() for O(n) instead of O(n²)
 - [ns-state snapshot vs raw binary](ns-state-snapshot-vs-raw.md) — ns-state.json fields can be stale vs boot-image.bin; use the endpoint `committed` raw-words block for hex display and fault checks
-- [V20 designer boot-image contract](v20-designer-contract.md) — thread caps at fixed +244 forces threadLumpWords>=256; base-4 threadCount sentinel; parse nsHeader/thread blocks; DEFAULT_NS_SLOTS_MAX=256 fallback; E2E stale-5050/unsafe-port trap
 - [ELOADCALL frame-push full bounds](eloadcall-frame-push-bounds.md) — ELOADCALL needs thread_hdr+cr12_thread inputs; PUSH_CR5_CR12 before STO read; callee_egt from CALL_P1_DONE CR6 (phase-1), not phase-0 loaded_cap
 - [Sidecar spec vs implementation](sidecar-spec-vs-implementation.md) — mechanical-cache rule is future-normative; verify field/writer claims against server/app.py before spec edits
 - [Freespace validation zone per typ](freespace-validation-zone-per-typ.md) — freespace scans must branch on lump typ: Thread uses the collision zone, Namespace skips; generic cw/cc bounds reject valid Threads
@@ -151,9 +150,8 @@
 - [Execution identity provenance](execution-identity-provenance.md) — empty source is comparable; opaque cross-algorithm source hashes never prove editor freshness
 - [Release LUMP replacement](lump-release-replacement.md) — release rebuilds replace the selected user slot by default; New Entry is explicit, while fixed system slots stay protected
 - [Save picker visibility](save-namespace-picker-visibility.md) — display every known NS slot; only Boot.NS and Boot.Thread are disabled in the picker
-- [Wukong scheduler Thread allocation](wukong-scheduler-thread-allocation.md) — physical round-robin contexts need 512-word projected Thread bodies for persisted CR14 capability state
 - [Stopped Thread image selection](stopped-thread-image-selection.md) — saved Thread images may be cycled before or after boot whenever execution is not running
 - [Halted Thread activation order](halted-thread-activation-order.md) — install incoming CR12 before live CR/DR restore; HALT and call-frame state never cross a manual Thread switch
-- [Thread capability homes are fixed](thread-capability-homes-fixed.md) — runtime credentials must not expand a Thread header or overwrite its 12 CR homes at +244…+255
 - [Namespace upload composite integrity](namespace-upload-composite-integrity.md) — validate each LUMP, then bind slots, layout, boot entry, and hashes into one exact upload image
 - [Dynamic state uses ISA protection only](dynamic-composite-pola-boundary.md) — dynamic word changes are not POLA-persisted; type, permission, and bounds checks are the complete access rule
+- [Normative Thread private ABI](normative-thread-private-abi.md) — shared design owns one fixed private ABI; larger allocations reserve extensions instead of relocating core zones

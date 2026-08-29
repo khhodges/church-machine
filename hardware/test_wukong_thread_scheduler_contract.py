@@ -8,12 +8,14 @@ from hardware.change import ChurchChange
 from hardware.mload import ChurchMLoad
 from hardware.hw_types import GT_TYPE_INFORM
 from server.boot_image import create_gt, integrity32, pack_lump_header, pack_ns_word1
+from hardware.thread_design import THREAD_CAP_WORDS
 
 
 def test_scheduler_contract_has_no_serialized_entry_context():
     source = open("hardware/change.py").read()
     assert 'm.next = "PREFLIGHT"' in source
-    assert 'SCHEDULER_RESTORE_MASK = 0x0FFF' in source
+    assert 'SCHEDULER_RESTORE_MASK = (1 << THREAD_CAP_WORDS) - 1' in source
+    assert THREAD_CAP_WORDS == 12
     assert 'm.next = "ENTRY_CR0_READ"' in source
     assert 'mload_direct_gt.eq(entry_gt_latched)' in source
     assert "entry_gt_view.gt_type != GT_TYPE_INFORM" in source

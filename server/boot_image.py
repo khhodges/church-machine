@@ -82,6 +82,22 @@ try:
     from hardware.hw_types import BOOT_ABSTR_NS_SLOT
 except ImportError:
     BOOT_ABSTR_NS_SLOT = 6   # fallback: hardware.hw_types not on path (standalone runner)
+try:
+    from hardware.thread_design import (
+        THREAD_CAPS_OFFSET,
+        THREAD_HEAP_OFFSET,
+        THREAD_MIN_WORDS,
+        THREAD_SUPPORTED_BODY_WORDS,
+        thread_layout,
+    )
+except ImportError:
+    from thread_design import (
+        THREAD_CAPS_OFFSET,
+        THREAD_HEAP_OFFSET,
+        THREAD_MIN_WORDS,
+        THREAD_SUPPORTED_BODY_WORDS,
+        thread_layout,
+    )
 
 # Mandatory NS slots — every valid boot image must have a non-zero entry here.
 # Minimal boot trio: NS root (0), Thread (1), SelfTest/boot-entry (6).
@@ -1296,6 +1312,12 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     total       = int(step1["totalNamespaceWords"])
     ns_size     = int(step1["namespaceLumpWords"])
     thread_size = int(step1["threadLumpWords"])
+    thread_stack_words = int(step1.get("threadStackWords", 32))
+    thread_heap_words = int(step1.get("threadHeapWords", 12))
+    layout = thread_layout(thread_size, thread_stack_words, thread_heap_words)
+    if not layout["valid"]:
+        raise ValueError("generate_boot_image: Thread geometry does not conform "
+                         "to the normative Thread design")
 
     # Dynamic NS table reserve (Task #1244): size follows configured slot capacity.
     # nsSlotsMax defaults to DEFAULT_NS_SLOTS_MAX (256) when absent — legacy images.
@@ -1670,16 +1692,17 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # chooses a different entry point; the simulator's "if empty" guard is a no-op
     # when loading a boot image that already carries this word.
     thread_loc = locations[1]
-    if thread_size < 256:
+    if thread_size not in THREAD_SUPPORTED_BODY_WORDS:
         raise ValueError(
-            f"generate_boot_image: threadLumpWords ({thread_size}) is smaller "
-            f"than the fixed Thread capability zone offset (+244); each thread "
-            f"body must be at least 256 words to contain its own CR0")
-    mem[thread_loc] = pack_lump_header(_ns_n_minus_6(thread_size), 32, 12, 2)
-    mem[thread_loc + 17] = thread_size - 13
+            f"generate_boot_image: threadLumpWords ({thread_size}) is not a "
+            f"supported Thread body size; choose one of "
+            f"{', '.join(map(str, THREAD_SUPPORTED_BODY_WORDS))}")
+    mem[thread_loc] = pack_lump_header(
+        _ns_n_minus_6(thread_size), thread_stack_words, thread_heap_words, 2)
+    mem[thread_loc + THREAD_HEAP_OFFSET] = THREAD_CAPS_OFFSET - 1
     _boot_entry_ns_base = total - (boot_entry_slot + 1) * NS_ENTRY_WORDS
     _boot_entry_seq = (mem[_boot_entry_ns_base + 1] >> 21) & 0x1FF
-    mem[thread_loc + 244] = create_gt(_boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
+    mem[thread_loc + THREAD_CAPS_OFFSET] = create_gt(_boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
 
     # ----- Generated Thread bodies (Thread#2 .. Thread#N) ----------------
     # Their Namespace descriptors were emitted above.  Initialise each body
@@ -1687,9 +1710,9 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # is identical to Thread.1's selected SelfTest/boot-entry E-GT.
     for _thread_loc in extra_thread_locs:
         mem[_thread_loc] = pack_lump_header(
-            _ns_n_minus_6(thread_size), 32, 12, 2)
-        mem[_thread_loc + 17] = thread_size - 13
-        mem[_thread_loc + 244] = create_gt(
+            _ns_n_minus_6(thread_size), thread_stack_words, thread_heap_words, 2)
+        mem[_thread_loc + THREAD_HEAP_OFFSET] = THREAD_CAPS_OFFSET - 1
+        mem[_thread_loc + THREAD_CAPS_OFFSET] = create_gt(
             _boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
 
     # Memory-manager GT at c-list[0]: R|W capability over NS slot 0 (full namespace).

@@ -2679,6 +2679,22 @@ def _validate_step1(target_board, step1):
     if step1["threadLumpWords"] < 256:
         return ("step1.threadLumpWords must be at least 256: the Thread "
                 "capability zone lives at fixed offset +244 inside the lump")
+    if step1["threadLumpWords"] not in _boot_image_gen.THREAD_SUPPORTED_BODY_WORDS:
+        return ("step1.threadLumpWords must be one of the normative Thread body "
+                f"sizes: {_boot_image_gen.THREAD_SUPPORTED_BODY_WORDS}")
+    _thread_stack_words = step1.get("threadStackWords", 32)
+    _thread_heap_words = step1.get("threadHeapWords", 12)
+    if (not isinstance(_thread_stack_words, int) or isinstance(_thread_stack_words, bool)
+            or _thread_stack_words <= 0):
+        return "step1.threadStackWords must be a positive integer"
+    if (not isinstance(_thread_heap_words, int) or isinstance(_thread_heap_words, bool)
+            or not (1 <= _thread_heap_words <= 255)):
+        return "step1.threadHeapWords must be an integer between 1 and 255"
+    _thread_layout = _boot_image_gen.thread_layout(
+        step1["threadLumpWords"], _thread_stack_words, _thread_heap_words)
+    if not _thread_layout["valid"]:
+        return ("step1 Thread geometry overlaps: heap and stack must leave "
+                "Freespace before the fixed +244 capability homes")
     # The simulator reserves the top NS_TABLE_RESERVE words of the namespace
     # window for the namespace table itself.  Reserve size is now dynamic:
     # nextPow2(nsSlotsMax × 4).
@@ -2785,6 +2801,8 @@ def boot_config_post():
     # Persist threadCount when provided (Task #2562 — V20 Thread.1..Thread.n).
     if step1.get("threadCount") is not None:
         cfg["step1"]["threadCount"] = int(step1["threadCount"])
+    cfg["step1"]["threadStackWords"] = int(step1.get("threadStackWords", 32))
+    cfg["step1"]["threadHeapWords"] = int(step1.get("threadHeapWords", 12))
     if step2 is not None:
         norm = []
         for e in (step2.get("lumps") or []):

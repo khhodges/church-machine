@@ -211,7 +211,7 @@ function assertThreadTableColumns(html, layout, base, label) {
     const view = new JSDOM(`<body>${html}</body>`).window.document;
     const tables = [...view.querySelectorAll('.thread-zone-table, .abs-clist-table')];
     const zoneTables = [...view.querySelectorAll('.thread-zone-table')];
-    assert.strictEqual(tables.length, 5, `${label} renders one table for each memory zone`);
+    assert.strictEqual(tables.length, 5, `${label} renders one table for each non-header memory zone`);
     assert.strictEqual(zoneTables.length, 4, `${label} renders Data, Heap, Freespace, and Stack tables`);
     for (const table of tables) {
         assert.deepStrictEqual(
@@ -261,10 +261,22 @@ function assertThreadTableColumns(html, layout, base, label) {
         `${label} Capabilities ends at its fixed offset and address`
     );
     const headerRow = view.querySelector('.thread-lump-hdr-row');
+    assert(headerRow, `${label} renders the Header as a distinct sixth region`);
     assert.strictEqual(headerRow.children[0].textContent.trim(), '+0',
         `${label} lump header starts at relative offset zero`);
     assert.strictEqual(headerRow.children[1].textContent.trim(), expectedAddress(0),
         `${label} lump header places its physical address second`);
+    assert.strictEqual(
+        1 + zoneTables.length + (capabilityTable ? 1 : 0),
+        6,
+        `${label} displays Header, DR, Heap, Freespace, Stack, and Capabilities`
+    );
+    const capRows = [...capabilityTable.querySelectorAll('tbody tr')];
+    assert.strictEqual(capRows.length, 12, `${label} displays exactly twelve persisted capability homes`);
+    capRows.forEach((row, i) => {
+        assert(row.textContent.includes(`CR${i}`),
+            `${label} labels fixed capability home +${244 + i} as CR${i}`);
+    });
 }
 
 assertThreadTableColumns(thread2Html, thread2, thread2.base, 'Thread#2');
@@ -346,6 +358,12 @@ const wideThread = wideSim.getThreadInstanceLayout(11);
 assert(wideThread.valid, 'a 512-word generated Thread body decodes');
 assert.strictEqual(wideThread.lumpSize, 512, 'selected header retains its full allocated size');
 assert.strictEqual(wideThread.capsStart, 244, 'larger Thread bodies retain the actual CR0 home');
+assert.strictEqual(wideThread.capsEnd, 255, 'larger Thread bodies retain CR11 at fixed +255');
+assert.strictEqual(wideThread.stackEnd, 243, 'larger Thread bodies retain the fixed stack ceiling');
+assert.strictEqual(wideThread.stackStart, 244 - wideThread.stackWords,
+    'larger Thread bodies derive stack size from cw/sw, not cc or allocation tail');
+assert.strictEqual(wideThread.freeStart, 17 + wideThread.heapWords,
+    'larger Thread bodies derive heap extent from cc before Freespace');
 assert.notStrictEqual(wideThread.capsStart, wideThread.lumpSize - wideThread.capsWords,
     'viewer does not fabricate a tail capability zone for a larger Thread');
 assert.notStrictEqual(wideSim.memory[wideThread.base + wideThread.capsStart], 0,

@@ -9,6 +9,9 @@ if (typeof module !== 'undefined' && typeof AbstractGTManager === 'undefined') {
     /* global AbstractGTManager */
     global.AbstractGTManager = _agm.AbstractGTManager;
 }
+const THREAD_DESIGN = typeof ThreadDesign !== 'undefined'
+    ? ThreadDesign
+    : require('./thread_design.js');
 //
 // This is the heart of the browser-based Church Machine IDE.  It implements a
 // cycle-accurate (at the instruction level) simulation of the Church Machine
@@ -91,8 +94,8 @@ if (typeof module !== 'undefined' && typeof AbstractGTManager === 'undefined') {
 //
 // -----------------------------------------------------------------------------
 
-// Offset of the caps zone (CR0-CR11 GT home slots) inside a 256-word thread lump
-const THREAD_CAPS_OFFSET = 244;
+// The normative Thread geometry is generated from shared/thread_design.json.
+const THREAD_CAPS_OFFSET = THREAD_DESIGN.capabilityHomes.offset;
 
 // ── Church Hardware Address Range (0xFFFFFF00 – 0xFFFFFFFF) ─────────────────
 // Privileged control-register ports and M-bit authority ports.
@@ -1331,27 +1334,8 @@ class ChurchSimulator {
             );
         }
 
-        const drWords = 16;
-        // Thread execution and boot images use an architectural capability
-        // home at +244, even when the allocated Thread LUMP is larger than
-        // 256 words.  Larger bodies reserve additional capacity; they do not
-        // relocate saved CR0–CR11.  Keep the viewer aligned with the actual
-        // selected body the context-switch code reads and writes.
-        const capsWords = 12;
-        const capsStart = THREAD_CAPS_OFFSET;
-        const capsEnd = capsStart + capsWords - 1;
-        const privateZoneWords = capsEnd + 1;
-        const heapWords = header.cc;
-        const stackWords = header.cw;
-        const heapStart = 1 + drWords;
-        const heapEnd = heapStart + heapWords - 1;
-        const stackStart = capsStart - stackWords;
-        const stackEnd = capsStart - 1;
-        const freeStart = heapEnd + 1;
-        const freeEnd = stackStart - 1;
-
-        if (header.lumpSize < privateZoneWords ||
-            heapWords <= 0 || stackWords <= 0 || heapEnd >= stackStart || capsStart < 0) {
+        const layout = THREAD_DESIGN.layout(header.lumpSize, header.cw, header.cc);
+        if (!layout.valid) {
             return unavailable(
                 'The Thread header describes overlapping or empty private memory zones.'
             );
@@ -1365,24 +1349,7 @@ class ChurchSimulator {
             headerWord,
             header,
             lumpSize: header.lumpSize,
-            drStart: 1,
-            drEnd: drWords,
-            drWords,
-            heapStart,
-            heapEnd,
-            heapWords,
-            freeStart,
-            freeEnd,
-            freeWords: Math.max(0, freeEnd - freeStart + 1),
-            stackStart,
-            stackEnd,
-            stackWords,
-            capsStart,
-            capsEnd,
-            capsWords,
-            privateZoneWords,
-            extensionStart: privateZoneWords,
-            extensionWords: header.lumpSize - privateZoneWords,
+            ...layout,
         };
     }
 
@@ -1559,9 +1526,13 @@ class ChurchSimulator {
         if (_isNamespace) return { ok: true, legacy: true };  // NS Table body — freespace concept does not apply
         let fsStart, fsEnd;
         if (_isThread) {
-            // Thread header reinterprets cc as heapWords and cw as stack words.
-            fsStart = 17 + hdr.cc;                 // first word after heap zone
-            fsEnd   = hdr.lumpSize - 12 - hdr.cw;  // first stack word (exclusive)
+            const layout = THREAD_DESIGN.layout(hdr.lumpSize, hdr.cw, hdr.cc);
+            if (!layout.valid) {
+                return { ok: false, code: 'FS_THREAD_GEOMETRY',
+                         detail: 'Thread header does not conform to the normative Thread design.' };
+            }
+            fsStart = layout.freeStart;
+            fsEnd = layout.stackStart;
         } else {
             fsStart = 1 + hdr.cw;
             fsEnd   = hdr.lumpSize - hdr.cc;
@@ -2141,6 +2112,8 @@ class ChurchSimulator {
         const _bcStep1 = (typeof window !== 'undefined' && window.bootConfig
                           && window.bootConfig.step1) ? window.bootConfig.step1 : null;
         const THREAD_LUMP_SIZE     = (_bcStep1 && _bcStep1.threadLumpWords)    || 256;
+        const THREAD_SW = (_bcStep1 && _bcStep1.threadStackWords) || 32;
+        const THREAD_CC = (_bcStep1 && _bcStep1.threadHeapWords) || 12;
         const THREAD_COUNT = (_bcStep1 && Number.isInteger(_bcStep1.threadCount))
             ? _bcStep1.threadCount : 1;
         if (THREAD_COUNT < 1 || THREAD_COUNT > 9) {
@@ -2371,8 +2344,6 @@ class ChurchSimulator {
             this.memory[this.NS_TABLE_BASE - 4] = THREAD_COUNT >>> 0;
         }
 
-        const THREAD_SW = 32;
-        const THREAD_CC = 12;
         // n_minus_6 is derived from the actual lump size so a programmer
         // -chosen THREAD_LUMP_SIZE > 256 gets a header that describes the
         // real allocation (was hardcoded to 2 ⇒ 256 words, which silently
@@ -2381,7 +2352,7 @@ class ChurchSimulator {
         const THREAD_N_MINUS_6 = Math.max(0, Math.ceil(Math.log2(THREAD_LUMP_SIZE)) - 6);
         const threadLoc = this.memory[this._nsSlotBase(1)];
         this.memory[threadLoc] = this.packLumpHeader(THREAD_N_MINUS_6, THREAD_SW, THREAD_CC, 2);
-        this.memory[threadLoc + 17] = THREAD_LUMP_SIZE - 13;
+        this.memory[threadLoc + THREAD_DESIGN.heapOffset] = THREAD_CAPS_OFFSET - 1;
 
         // Thread caps zone — CR0 home slot at word offset +244 is pre-set to an Enter-GT
         // for bootEntrySlot (the ⚡ lightning-bolt selection, e.g. LED Flash at slot 10).
@@ -2403,7 +2374,7 @@ class ChurchSimulator {
                 THREAD_N_MINUS_6, THREAD_SW, THREAD_CC, 2);
             this.memory[generatedThreadLoc + THREAD_CAPS_OFFSET] =
                 this.createGT(_initialBootSeq, this.bootEntrySlot, {E: 1}, 1);
-            this.memory[generatedThreadLoc + 17] = THREAD_LUMP_SIZE - 13;
+            this.memory[generatedThreadLoc + THREAD_DESIGN.heapOffset] = THREAD_CAPS_OFFSET - 1;
         }
 
         // Memory-manager GT at c-list[0]: R|W Inform capability over NS slot 0 (full namespace).
@@ -4410,8 +4381,10 @@ class ChurchSimulator {
         const target = slots[(currentIndex + 1) % slots.length];
         const entry = this.readNSEntry(target);
         const header = entry ? this.parseLumpHeader(this.memory[entry.word0_location] >>> 0) : null;
-        if (!entry || !header || !header.valid || header.typ !== 2 ||
-                header.lumpSize < THREAD_CAPS_OFFSET + 12) {
+        const layout = header && header.valid && header.typ === 2
+            ? THREAD_DESIGN.layout(header.lumpSize, header.cw, header.cc)
+            : null;
+        if (!entry || !layout || !layout.valid) {
             return { ok: false, reason: `Configured target ${this.nsLabels[target] || target} has an invalid Thread descriptor` };
         }
 
@@ -5819,7 +5792,7 @@ class ChurchSimulator {
             const hdr = this.parseLumpHeader(hdrRead.value);
             const lumpSize = hdr.valid ? hdr.lumpSize : 256;
             const sw = (hdr.valid && hdr.typ === 2) ? hdr.cw : 0;
-            const sp_max = lumpSize - 12 - 1;
+            const sp_max = THREAD_CAPS_OFFSET - 1;
             const sp_min = sp_max - sw + 1;
             const newSTO = (savedSTO - 2) & 0xFFF;
             if (newSTO < sp_min) {
@@ -6530,8 +6503,11 @@ class ChurchSimulator {
         // A Thread serializes only DR0–DR15 and the CR0–CR11 GT homes. CR14,
         // NIA, flags, M state, and STO are not scheduler context words.
         const targetHeader = this.parseLumpHeader(this.memory[entry.word0_location] >>> 0);
-        if (schedulerSwitch && (!targetHeader.valid || targetHeader.typ !== 2 ||
-                targetHeader.lumpSize < THREAD_CAPS_OFFSET + 12)) {
+        const targetLayout = targetHeader.valid && targetHeader.typ === 2
+            ? THREAD_DESIGN.layout(
+                targetHeader.lumpSize, targetHeader.cw, targetHeader.cc)
+            : null;
+        if (schedulerSwitch && (!targetLayout || !targetLayout.valid)) {
             this.fault('BOUNDS', `NEXT_THREAD: Namespace slot ${targetIdx} is not a valid Thread descriptor`);
             return null;
         }

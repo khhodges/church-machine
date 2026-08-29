@@ -53,6 +53,29 @@ const targetCapsBefore = committed.memory.slice(
     committedBases[1] + 244, committedBases[1] + 256);
 const cr15Before = {...committed.cr[15]};
 committed.halted = true;
+
+// Simulator scheduler admission must reject exactly the malformed Thread
+// geometries rejected by hardware CHANGE preflight, before saving live state.
+const targetHeaderOriginal = committed.memory[committedBases[1]] >>> 0;
+const malformedThreadHeaders = [
+    { name: 'zero stack', word: committed.packLumpHeader(3, 0, 64, 2) },
+    { name: 'zero heap', word: committed.packLumpHeader(3, 32, 0, 2) },
+    { name: 'overlapping heap and stack', word: committed.packLumpHeader(3, 220, 20, 2) },
+    { name: 'unsupported allocation size', word: committed.packLumpHeader(8, 32, 64, 2) },
+];
+for (const malformed of malformedThreadHeaders) {
+    committed.memory[committedBases[1]] = malformed.word;
+    const drBeforeReject = [...committed.dr];
+    const rejected = committed.advanceConfiguredThread();
+    assert.strictEqual(rejected.ok, false,
+        `${malformed.name} Thread is rejected by scheduler admission`);
+    assert.deepStrictEqual(committed.dr, drBeforeReject,
+        `${malformed.name} rejection occurs before outgoing context save`);
+    assert.strictEqual(committed._currentThreadSlot, 1,
+        `${malformed.name} rejection does not activate the target`);
+}
+committed.memory[committedBases[1]] = targetHeaderOriginal;
+
 assert.strictEqual(committed.advanceConfiguredThread().slot, 11);
 assert.strictEqual(committed.halted, false,
     'manual CHANGE clears the outgoing HALT latch so execution controls can run');

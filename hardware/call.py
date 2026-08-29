@@ -6,6 +6,7 @@ from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, WORD2_LAYOUT, LUMP_HEADER_LAYOUT
 from .perm_check import perm_bit
 from .mload_seq import mload_wait_body
 from .stack_frame import stack_slot_addr
+from .thread_design import THREAD_CAPS_OFFSET, THREAD_CAP_WORDS
 
 
 class ChurchCall(Elaboratable):
@@ -83,8 +84,8 @@ class ChurchCall(Elaboratable):
         # Parallel domain-crossing register operations (driven for one cycle at CLEAR_B).
         # cr_b_clear_mask: bit N=1 → clear b_flag on CRN (preserved registers)
         # cr_null_mask:    bit N=1 → write NULL to CRN  (non-preserved registers)
-        self.cr_b_clear_mask = Signal(12)
-        self.cr_null_mask    = Signal(12)
+        self.cr_b_clear_mask = Signal(THREAD_CAP_WORDS)
+        self.cr_null_mask    = Signal(THREAD_CAP_WORDS)
 
         # Code fence bounds — driven combinatorially; valid when call_complete=1.
         # code_lo_out: byte address of first instruction (lump_base + 4)
@@ -147,19 +148,17 @@ class ChurchCall(Elaboratable):
         # THREAD_HDR is loaded once by CHANGE on thread restore; valid for the entire
         # lifetime of the thread. No memory read needed per CALL.
         thread_hdr_view = View(LUMP_HEADER_LAYOUT, self.thread_hdr)
-        thr_lump_sz = Signal(15)
-        m.d.comb += thr_lump_sz.eq(Const(1, 15) << (thread_hdr_view.n_minus_6 + 6))
 
-        # sp_max = thr_lump_sz − 12 − 1      (top of Stack zone; caps zone = 12, fixed)
-        # sp_min = thr_lump_sz − 12 − sw + 2 (CALL needs 2 words: STO >= sp_min)
+        # Stack and persisted CR homes remain at their canonical offsets even
+        # when a Thread allocation has a reserved extension beyond +255.
         # Break into two binary subtractions so Yosys does not merge into a
         # multi-term $macc cell that write_verilog cannot emit as plain Verilog.
         sp_max      = Signal(15)
         sp_min      = Signal(15)
-        sp_min_base = Signal(15)   # thr_lump_sz − 10  (= − 12 + 2, binary step)
+        sp_min_base = Signal(15)
         m.d.comb += [
-            sp_max.eq(thr_lump_sz - 12 - 1),
-            sp_min_base.eq(thr_lump_sz - 10),
+            sp_max.eq(THREAD_CAPS_OFFSET - 1),
+            sp_min_base.eq(THREAD_CAPS_OFFSET + 2),
             sp_min.eq(sp_min_base - thread_hdr_view.cw),
         ]
 
@@ -580,10 +579,11 @@ class ChurchCall(Elaboratable):
                 # Single-cycle domain-crossing register cleanup via parallel mask ports:
                 #   mask bit=1 (null mask) → write NULL to whole register (b_flag → 0 implicitly)
                 #   mask bit=0 (b_clear)   → preserve register, clear only b_flag (bit 31 of GT)
-                # sp_max/sp_min are derived combinatorially from self.thread_hdr — no memory read.
+                # sp_min is derived from thread_hdr.cw; sp_max is the fixed
+                # private-ABI stack ceiling immediately below capability homes.
                 m.d.comb += [
-                    self.cr_null_mask.eq(mask_latched[:12]),
-                    self.cr_b_clear_mask.eq(~mask_latched[:12]),
+                    self.cr_null_mask.eq(mask_latched[:THREAD_CAP_WORDS]),
+                    self.cr_b_clear_mask.eq(~mask_latched[:THREAD_CAP_WORDS]),
                 ]
                 m.next = "CHECK_CR5_CR12"
 
@@ -613,11 +613,9 @@ class ChurchCall(Elaboratable):
                     m.next = "STACK_CHECK"
 
             with m.State("STACK_CHECK"):
-                # Upper bound: STO > sp_max means the pointer is corrupted or
-                # the header is wrong (STO was never at most lumpSize−cc−1).
-                # Lower bound: STO < sp_min means a CALL would push the frame
-                # below the stack zone floor (lumpSize−cc−sw+2).
-                # Both bounds are IDE-set via the thread header sw field.
+                # Upper bound: STO > fixed sp_max (+243) is corrupt.
+                # Lower bound: STO < sp_min means a CALL would push below the
+                # stack floor derived from header cw/sw (244−sw+2).
                 with m.If(sp_latched > sp_max):
                     m.d.sync += [
                         fault_latched.eq(1),

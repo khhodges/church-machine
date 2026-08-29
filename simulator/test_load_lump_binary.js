@@ -1578,7 +1578,7 @@ console.log('\n--- LLB-25: private-data reminting is exact and atomic ---');
         rawRowZero.sim.output.slice(-260));
 
     const architecturalRowZero = privateSentinelLoad({
-        rows: [0], compilerOwnedSelf: false, privateDataRows: [], typ: 2
+        rows: [0], compilerOwnedSelf: false, privateDataRows: [], typ: 3
     });
     check('LLB-25f: architectural row 0 cannot use the private sentinel',
         architecturalRowZero.ok === false &&

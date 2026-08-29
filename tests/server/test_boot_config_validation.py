@@ -319,6 +319,27 @@ class TestValidateStep1ThreadGeometry:
         assert err is not None
         assert "threadLumpWords must be at least 256" in err
 
+    def test_non_power_of_two_body_size_is_rejected(self):
+        step1 = dict(DEFAULT_BOOT_CONFIG["step1"])
+        step1["threadLumpWords"] = 384
+        err = _validate_step1(DEFAULT_BOOT_CONFIG["targetBoard"], step1)
+        assert err is not None
+        assert "power of 2" in err
+
+    def test_header_fields_drive_stack_and_heap_without_relocating_caps(self):
+        step1 = dict(DEFAULT_BOOT_CONFIG["step1"])
+        step1.update({
+            "threadLumpWords": 512,
+            "threadStackWords": 48,
+            "threadHeapWords": 80,
+        })
+        assert _validate_step1(DEFAULT_BOOT_CONFIG["targetBoard"], step1) is None
+
+        step1["threadHeapWords"] = 200
+        err = _validate_step1(DEFAULT_BOOT_CONFIG["targetBoard"], step1)
+        assert err is not None
+        assert "fixed +244 capability homes" in err
+
     def test_generated_thread_slots_are_reserved_and_need_namespace_capacity(self):
         step1 = _make_step1(16384)
         step1["threadCount"] = 2

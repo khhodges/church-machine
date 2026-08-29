@@ -20,6 +20,7 @@
  *   RMC — if a manifest is supplied, its cw / cc / lump_size agree with the binary header
  *   RSM — no stub methods (bare RETURN with no real code body — compiler error)
  */
+const _THREAD_DESIGN = globalThis.ThreadDesign;
 
 // ── Freespace 0xAB content-frame validator (Mint validation step 7) ────────
 // Validates the V1.3 self-definition content frame in a typ=lump freespace
@@ -187,6 +188,7 @@ function lumpAudit(words, manifest, lineNums, opts) {
     // typ=10, cw>0 (Thread): `cw` is reinterpreted as `sw` (stack words) and
     //   `cc` as `heapWords` (Appendix A).  Mint requires sw > 0, cc > 0, and
     //   header(1) + DR(16) + heapWords + sw + caps(12) ≤ lumpSize.
+    const _isThreadHeader = typ === 2 && cw > 0;
     if (typ === 1 /* data */) {
         // Spec requires both cw and cc to be zero for typ=01 data lumps.
         if (cw !== 0 || cc !== 0) {
@@ -223,10 +225,7 @@ function lumpAudit(words, manifest, lineNums, opts) {
         // Thread LUMP (typ=10, cw>0): cw = sw (stack words), cc = heapWords.
         const sw = cw;            // cw field reinterpreted as stack words
         const hw = cc;            // cc field reinterpreted as heap words
-        const CAPS_ZONE  = 12;   // architecture-fixed (CR0..CR11)
-        const DR_ZONE    = 16;   // data registers DR0..DR15
-        const HDR        = 1;    // header word
-        const minFit = HDR + DR_ZONE + hw + sw + CAPS_ZONE;  // 29 + hw + sw
+        const layout = _THREAD_DESIGN && _THREAD_DESIGN.layout(lumpSize, sw, hw);
         if (hw === 0) {
             results.push({
                 ruleId: 'RB1',
@@ -235,21 +234,21 @@ function lumpAudit(words, manifest, lineNums, opts) {
                 detail: 'Thread lump (typ=10, cw>0) header has heapWords (cc field) = 0. ' +
                     'Mint validates cc > 0; a Thread with no heap zone is malformed.',
             });
-        } else if (minFit > lumpSize) {
+        } else if (!layout || !layout.valid) {
             results.push({
                 ruleId: 'RB1',
                 severity: 'error',
-                message: `Thread lump: zones don\u2019t fit \u2014 header+DR+heap+stack+caps = ${minFit} > lumpSize (${lumpSize}).`,
-                detail: `Thread lump (typ=10) geometry invalid: header(1) + DR(16) + heap(${hw}) + stack(${sw}) + caps(12) = ${minFit} words, ` +
-                    `but lumpSize = ${lumpSize}. Mint requires 17 + sw + cc \u2264 lumpSize \u2212 12.`,
+                message: 'Thread lump: zones do not fit the fixed private ABI.',
+                detail: `Thread lump (typ=10) geometry invalid: heap ends at +${16 + hw}, stack begins at +${244 - sw}, ` +
+                    'and persisted CR0\u2013CR11 homes remain fixed at +244\u2026+255.',
             });
         } else {
             results.push({
                 ruleId: 'RB1',
                 severity: 'pass',
                 message: `Thread lump: sw=${sw}, heapWords=${hw} \u2014 geometry valid \u2713`,
-                detail: `Thread lump (typ=10): header(1) + DR(16) + heap(${hw}) + stack(${sw}) + caps(12) = ${minFit} words, ` +
-                    `fits within ${lumpSize}-word lump \u2713`,
+                detail: `Thread lump (typ=10): cw/sw=${sw}, cc/heapWords=${hw}, Freespace +${layout.freeStart}\u2026+${layout.freeEnd}, ` +
+                    `stack +${layout.stackStart}\u2026+243, persisted CR homes +244\u2026+255 \u2713`,
             });
         }
     } else if (cw >= 1) {
@@ -269,7 +268,19 @@ function lumpAudit(words, manifest, lineNums, opts) {
     }
 
     const contentWords = 1 + cw + cc;
-    if (contentWords <= lumpSize) {
+    if (_isThreadHeader) {
+        const layout = _THREAD_DESIGN && _THREAD_DESIGN.layout(lumpSize, cw, cc);
+        results.push({
+            ruleId: 'RB2',
+            severity: layout && layout.valid ? 'pass' : 'error',
+            message: layout && layout.valid
+                ? 'Thread private ABI fits without relocating fixed homes \u2713'
+                : 'Thread private ABI geometry is invalid.',
+            detail: layout && layout.valid
+                ? `Heap +17\u2026+${layout.heapEnd}, Freespace +${layout.freeStart}\u2026+${layout.freeEnd}, Stack +${layout.stackStart}\u2026+243, CR0\u2013CR11 +244\u2026+255 \u2713`
+                : 'cw/sw and cc must define positive, non-overlapping Stack and Heap zones before fixed CR0\u2013CR11 homes.',
+        });
+    } else if (contentWords <= lumpSize) {
         results.push({
             ruleId: 'RB2',
             severity: 'pass',
@@ -294,7 +305,7 @@ function lumpAudit(words, manifest, lineNums, opts) {
         //
         // Thread lumps (typ=10, cw>0): freespace is the collision zone
         // between heap (grows ↑ from word 17+heapWords) and stack
-        // (grows ↓ from word lumpSize-12-sw).
+        // (whose fixed private-ABI floor is word 244-sw).
         //
         // Standard lumps (typ=00/01/11): freespace = words cw+1 .. lumpSize-cc-1.
         // Data lumps (typ=01): payload lives in words 1..cw; the zone after it
@@ -309,9 +320,9 @@ function lumpAudit(words, manifest, lineNums, opts) {
         } else {
         let fsStart, fsEnd;
         if (_isThread) {
-            const hw = cc;   // cc reinterpreted as heap words
-            fsStart = 17 + hw;              // first word after heap zone
-            fsEnd   = lumpSize - 12 - cw;  // first stack word (exclusive)
+            const layout = _THREAD_DESIGN.layout(lumpSize, cw, cc);
+            fsStart = layout.freeStart;
+            fsEnd = layout.stackStart;
         } else {
             fsStart = 1 + cw;
             fsEnd   = lumpSize - cc;
@@ -424,15 +435,14 @@ function lumpAudit(words, manifest, lineNums, opts) {
     // for capabilities injected at deployment time.
     //
     // For Thread lumps (typ=10): the caps zone is architecture-fixed at 12 words
-    // at lumpSize-12..lumpSize-1 (CR0..CR11), regardless of the cc (heapWords) field.
+    // at +244..+255 (CR0..CR11), regardless of allocation size or cc.
     // For standard lumps: the c-list is at lumpSize-cc..lumpSize-1.
     //
     // Namespace LUMPs (typ=10, cw=0): body is the NS Table — no GT c-list at tail.
     // Applying RGT to NS Table entries would scan binary NS data as GT Word 0s
     // and produce meaningless or false-positive errors.  Skip RGT for Namespace.
     //
-    // Thread LUMPs (typ=10, cw>0): caps zone is architecture-fixed at 12 words
-    // at lumpSize-12..lumpSize-1, regardless of cc (heapWords).
+    // Thread LUMPs (typ=10, cw>0): caps zone is architecture-fixed at +244..+255.
     //
     // Standard lumps (typ=00/01/11): c-list is at lumpSize-cc..lumpSize-1.
     //
@@ -440,8 +450,8 @@ function lumpAudit(words, manifest, lineNums, opts) {
     // For standard lumps: also skipped when cc=0.  Namespace lumps: always skipped.
     const _rgtIsThread    = (typ === 2 && cw > 0);
     const _rgtIsNamespace = (typ === 2 && cw === 0);
-    const _rgtSlotCount = _rgtIsThread ? 12 : cc;
-    const _rgtBaseIdx   = lumpSize - _rgtSlotCount;
+    const _rgtSlotCount = _rgtIsThread ? _THREAD_DESIGN.capabilityHomes.words : cc;
+    const _rgtBaseIdx   = _rgtIsThread ? _THREAD_DESIGN.capabilityHomes.offset : lumpSize - _rgtSlotCount;
     // Also skip RGT for data LUMPs (typ=01): body is programmer payload, not a c-list.
     const _rgtRun = !_rgtIsNamespace && typ !== 1 && actualWords === lumpSize && contentWords <= lumpSize && _rgtSlotCount > 0;
     if (_rgtIsNamespace) {
