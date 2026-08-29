@@ -2677,35 +2677,6 @@
     "issue_n": 1
   },
   {
-    "token": "13812cdf",
-    "abstraction": "Church Machine Post-Flash Exhaustive Self-Test v1.1",
-    "filename": "Church.Machine.Post-Flash.Exhaustive.Self-Test.v1.1.1.777cc8d3.lump",
-    "sidecar_file": "Church.Machine.Post-Flash.Exhaustive.Self-Test.v1.1.1.777cc8d3.json",
-    "lump_size": 512,
-    "cw": 500,
-    "cc": 5,
-    "author": "",
-    "version": "2026.08.27",
-    "lump_version": 2,
-    "compiled_at": 1787825961.6303532,
-    "methods": [
-      {
-        "name": "run",
-        "offset": 0,
-        "length": 500
-      }
-    ],
-    "grants": [
-      "E"
-    ],
-    "binary_hash": "f2df718b1b98770debc5d97f58bdde4ba0a7181ec4d7cee39aafcd484b144e7c",
-    "petname": "",
-    "issue_number": 1,
-    "identity_hash": "1e8501640341f08135e6007b69ad11b28e765adaca73b4b9475a7874528d713a",
-    "dot_name": "Church.Machine.Post-Flash.Exhaustive.Self-Test.v1.1",
-    "issue_n": 1
-  },
-  {
     "token": "00aa9999",
     "abstraction": "Legacy",
     "filename": "Legacy.1.8b7fb77f.lump",
@@ -2753,6 +2724,35 @@
     "issue_number": 1,
     "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f",
     "dot_name": "Adder",
+    "issue_n": 1
+  },
+  {
+    "token": "13812cdf",
+    "abstraction": "Church Machine Post-Flash Exhaustive Self-Test v1.1",
+    "filename": "Church.Machine.Post-Flash.Exhaustive.Self-Test.v1.1.1.777cc8d3.lump",
+    "sidecar_file": "Church.Machine.Post-Flash.Exhaustive.Self-Test.v1.1.1.777cc8d3.json",
+    "lump_size": 512,
+    "cw": 500,
+    "cc": 5,
+    "author": "",
+    "version": "2026.08.29",
+    "lump_version": 3,
+    "compiled_at": 1788014967.3553412,
+    "methods": [
+      {
+        "name": "run",
+        "offset": 0,
+        "length": 500
+      }
+    ],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "f2df718b1b98770debc5d97f58bdde4ba0a7181ec4d7cee39aafcd484b144e7c",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "1e8501640341f08135e6007b69ad11b28e765adaca73b4b9475a7874528d713a",
+    "dot_name": "Church.Machine.Post-Flash.Exhaustive.Self-Test.v1.1",
     "issue_n": 1
   }
 ]
