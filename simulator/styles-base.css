@@ -291,6 +291,19 @@ header h1 a:hover {
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 6px;
     background: rgba(8,10,20,0.7);
+    cursor: zoom-in;
+    transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+.ti60-config-image-card:hover,
+.ti60-config-image-card:focus-visible,
+.ti60-board-photo-card:hover,
+.ti60-board-photo-card:focus-visible {
+    border-color: rgba(147,197,253,0.75);
+    box-shadow: 0 0 0 2px rgba(96,165,250,0.16), 0 8px 24px rgba(0,0,0,0.24);
+    outline: none;
+}
+.ti60-config-image-card:hover {
+    transform: translateY(-1px);
 }
 .ti60-config-image-card img {
     display: block;
@@ -344,6 +357,8 @@ header h1 a:hover {
     border: 1px solid rgba(240,198,116,0.3);
     border-radius: 8px;
     background: rgba(8,10,20,0.7);
+    cursor: zoom-in;
+    transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 .ti60-board-photo-card img {
     display: block;
@@ -364,6 +379,142 @@ header h1 a:hover {
 .ti60-board-photo-card figcaption span {
     color: #9aa9bd;
     font-size: 0.7rem;
+}
+.ti60-image-viewer[hidden] {
+    display: none;
+}
+.ti60-image-viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 12000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(3,5,12,0.86);
+    backdrop-filter: blur(5px);
+}
+.ti60-image-viewer-dialog {
+    display: flex;
+    flex-direction: column;
+    width: min(1120px, 96vw);
+    max-height: 94vh;
+    overflow: hidden;
+    border: 1px solid rgba(147,197,253,0.42);
+    border-radius: 10px;
+    background: #0e111d;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.62);
+}
+.ti60-image-viewer-toolbar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    background: linear-gradient(90deg, rgba(96,165,250,0.1), rgba(218,165,32,0.06));
+}
+.ti60-image-viewer-kicker {
+    color: #93c5fd;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+}
+.ti60-image-viewer-toolbar h2 {
+    margin: 0.18rem 0 0;
+    color: #f0f2f8;
+    font-size: 1rem;
+}
+.ti60-image-viewer-close {
+    flex: 0 0 auto;
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 5px;
+    background: rgba(255,255,255,0.04);
+    color: #c8d0df;
+    font-size: 1.35rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.ti60-image-viewer-close:hover,
+.ti60-image-viewer-close:focus-visible {
+    border-color: #f0c674;
+    color: #f0c674;
+    outline: none;
+}
+.ti60-image-viewer-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 260px;
+    min-height: 0;
+}
+.ti60-image-viewer-stage {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 260px;
+    padding: 1rem 3.1rem;
+    background: #070a12;
+}
+.ti60-image-viewer-image {
+    display: block;
+    max-width: 100%;
+    max-height: calc(94vh - 128px);
+    object-fit: contain;
+}
+.ti60-image-viewer-nav {
+    position: absolute;
+    top: 50%;
+    z-index: 1;
+    width: 2.2rem;
+    height: 2.8rem;
+    transform: translateY(-50%);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 5px;
+    background: rgba(9,13,25,0.78);
+    color: #eef2ff;
+    font-size: 2rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.ti60-image-viewer-nav:hover,
+.ti60-image-viewer-nav:focus-visible {
+    border-color: #f0c674;
+    color: #f0c674;
+    outline: none;
+}
+.ti60-image-viewer-nav:disabled {
+    display: none;
+}
+.ti60-image-viewer-prev { left: 0.7rem; }
+.ti60-image-viewer-next { right: 0.7rem; }
+.ti60-image-viewer-copy {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.8rem;
+    padding: 1.25rem;
+    border-left: 1px solid rgba(255,255,255,0.1);
+    background: rgba(96,165,250,0.045);
+}
+.ti60-image-viewer-copy p {
+    margin: 0;
+    color: #c0cad9;
+    font-size: 0.82rem;
+    line-height: 1.55;
+}
+.ti60-image-viewer-position {
+    color: #f0c674 !important;
+    font-size: 0.7rem !important;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.ti60-image-viewer-hint {
+    color: #7d8ba2 !important;
+    font-size: 0.68rem !important;
 }
 
 .ti60-connect-header { margin-bottom: 1.25rem; }
