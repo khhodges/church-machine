@@ -1,10 +1,10 @@
 ---
-name: Dynamic composite POLA boundary
-description: Security and persistence boundary between immutable abstraction LUMPs and validated dynamic Namespace changes
+name: Dynamic state uses ISA protection only
+description: Separates static POLA tooling from runtime changes governed solely by ISA capability checks
 ---
 
-Individual abstraction LUMPs are trusted, reusable starting points and must not be rewritten as a side effect of runtime POLA or dynamic Namespace changes. Dynamic changes belong to the active composite image and must be accepted only after structural, cryptographic identity/integrity, authority, permission, sequence, and bounds validation; POLA remains enforced for that active state until reload.
+POLA persistence does not apply to dynamic changes. Dynamic reads and writes are governed only by the ISA rules for the capability covering each word: type, permissions, and bounds. Do not add a separate persisted POLA state, automatically save dynamic mutations, or rewrite an existing header because protected content changed.
 
-**Why:** Keeping source LUMPs immutable preserves clean recovery and composition points. Cryptographic validation and least authority can guarantee the defined capability boundary, but they do not by themselves prove universal absence of malware, side channels, implementation defects, or denial of service.
+**Why:** Dynamic state is machine execution state, not a new static policy artifact. Treating it as POLA-persisted state adds authority and lifecycle semantics outside the ISA and incorrectly couples content mutation to header or repository mutation.
 
-**How to apply:** Persist or upload validated composite state as a whole, never mutate every underlying abstraction LUMP. Use fail-closed checks and state rollback on errors/restarts, and describe security claims with their explicit trust and threat-model assumptions.
+**How to apply:** Let DREAD, DWRITE, LOAD, SAVE, and related instructions enforce their normal type, permission, and range checks on every affected word. Keep dynamic mutations in active memory unless a separate ISA-authorized operation explicitly defines otherwise.

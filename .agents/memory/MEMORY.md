@@ -155,4 +155,4 @@
 - [Stopped Thread image selection](stopped-thread-image-selection.md) — saved Thread images may be cycled before or after boot whenever execution is not running
 - [Thread capability homes are fixed](thread-capability-homes-fixed.md) — runtime credentials must not expand a Thread header or overwrite its 12 CR homes at +244…+255
 - [Namespace upload composite integrity](namespace-upload-composite-integrity.md) — validate each LUMP, then bind slots, layout, boot entry, and hashes into one exact upload image
-- [Dynamic composite POLA boundary](dynamic-composite-pola-boundary.md) — keep abstraction LUMPs immutable; cryptographically validate and POLA-secure dynamic changes in the active composite image
+- [Dynamic state uses ISA protection only](dynamic-composite-pola-boundary.md) — dynamic word changes are not POLA-persisted; type, permission, and bounds checks are the complete access rule
