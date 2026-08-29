@@ -664,8 +664,8 @@ WUKONG_DEMO_NAMESPACE[WUKONG_CALLHOME_NS_SLOT * 4 + 2] = integrity32(_wch_loc_by
 # Wukong Boot.Thread lump relocation — slot 1 loc 0x000 → 0xE00
 #
 # With the NS table at DMEM byte 0, a Thread lump that also aliases byte 0
-# collides with the table: Heap[0] (thread word 17, the STO stack pointer
-# CALL reads and writes) is NS slot 4's word1.  The boot CALL then reads
+# collides with the table: protected STO (thread word 17, read and written by
+# CALL/RETURN) is NS slot 4's word1. The boot CALL then reads
 # STO=0 → STACK_OVERFLOW, and any CALL/RETURN would corrupt slot 4.
 # Relocate the Thread lump to byte 0xE00 (word 896) — after the full SelfTest
 # image (words 384-895) and before WukongCallHome (words 1152-1279).
@@ -679,7 +679,7 @@ WUKONG_THREAD_BASE_WORD = 896                # byte 0xE00
 WUKONG_THREAD_HEADER = (
     (0x1F << 27) | (2 << 23) | (32 << 10) | (2 << 8) | 12
 )  # n_minus_6=2 (256 words), sw=32, typ=2, cc=12 — mirrors boot_image.py
-WUKONG_THREAD_STO_WORD  = WUKONG_THREAD_BASE_WORD + 17    # Heap[0] = STO
+WUKONG_THREAD_STO_WORD  = WUKONG_THREAD_BASE_WORD + 17    # protected STO
 WUKONG_THREAD_STO_INIT  = 243                             # sp_max
 WUKONG_THREAD_CAPS0_WORD  = WUKONG_THREAD_BASE_WORD + 244  # Thread.caps[0]
 WUKONG_THREAD_CAPS12_WORD = WUKONG_THREAD_BASE_WORD + 256  # Thread.caps[12]

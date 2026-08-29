@@ -86,7 +86,7 @@ try:
     from hardware.thread_design import (
         THREAD_CAPS_OFFSET,
         THREAD_MIN_WORDS,
-        THREAD_STACK_POINTER_HOME_OFFSET,
+        THREAD_STO_OFFSET,
         THREAD_SUPPORTED_BODY_WORDS,
         thread_layout,
     )
@@ -94,7 +94,7 @@ except ImportError:
     from thread_design import (
         THREAD_CAPS_OFFSET,
         THREAD_MIN_WORDS,
-        THREAD_STACK_POINTER_HOME_OFFSET,
+        THREAD_STO_OFFSET,
         THREAD_SUPPORTED_BODY_WORDS,
         thread_layout,
     )
@@ -1699,7 +1699,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             f"{', '.join(map(str, THREAD_SUPPORTED_BODY_WORDS))}")
     mem[thread_loc] = pack_lump_header(
         _ns_n_minus_6(thread_size), thread_stack_words, thread_heap_words, 2)
-    mem[thread_loc + THREAD_STACK_POINTER_HOME_OFFSET] = layout["stack_end"]
+    mem[thread_loc + THREAD_STO_OFFSET] = layout["stack_end"]
     _boot_entry_ns_base = total - (boot_entry_slot + 1) * NS_ENTRY_WORDS
     _boot_entry_seq = (mem[_boot_entry_ns_base + 1] >> 21) & 0x1FF
     mem[thread_loc + THREAD_CAPS_OFFSET] = create_gt(_boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
@@ -1711,7 +1711,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     for _thread_loc in extra_thread_locs:
         mem[_thread_loc] = pack_lump_header(
             _ns_n_minus_6(thread_size), thread_stack_words, thread_heap_words, 2)
-        mem[_thread_loc + THREAD_STACK_POINTER_HOME_OFFSET] = layout["stack_end"]
+        mem[_thread_loc + THREAD_STO_OFFSET] = layout["stack_end"]
         mem[_thread_loc + THREAD_CAPS_OFFSET] = create_gt(
             _boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
 
@@ -1769,7 +1769,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             pass
 
     # Preserve the cache_token32 word3 that the catalog loop wrote for Boot.Abstr.
-    # The lazy/resident paths below only need to update word1 (lim17+cc) and
+    # The lazy/resident paths below only need to update word1 (limit/authority) and
     # word2 (seal); word0 (location) and word3 (cache token) stay from the loop.
     _abstr_ns_base = total - (BOOT_ABSTR_NS_SLOT + 1) * NS_ENTRY_WORDS
     _abstr_cache_token = mem[_abstr_ns_base + 3]

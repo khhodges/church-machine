@@ -187,7 +187,8 @@ function lumpAudit(words, manifest, lineNums, opts) {
     //   (See CM_LUMP_SPECIFICATION.md Appendix B.)
     // typ=10, cw>0 (Thread): `cw` is reinterpreted as `sw` (stack words) and
     //   `cc` as `heapWords` (Appendix A).  Mint requires sw > 0, cc > 0, and
-    //   header(1) + DR(16) + heapWords + sw + caps(12) ≤ lumpSize.
+    //   header(1) + DR(16) + protected STO(1) + heapWords + sw +
+    //   caps(12) ≤ lumpSize.
     const _isThreadHeader = typ === 2 && cw > 0;
     if (typ === 1 /* data */) {
         // Spec requires both cw and cc to be zero for typ=01 data lumps.
@@ -277,7 +278,7 @@ function lumpAudit(words, manifest, lineNums, opts) {
                 ? 'Thread private ABI fits without relocating fixed homes \u2713'
                 : 'Thread private ABI geometry is invalid.',
             detail: layout && layout.valid
-                ? `Heap +17\u2026+${layout.heapEnd}, Freespace +${layout.freeStart}\u2026+${layout.freeEnd}, Stack +${layout.stackStart}\u2026+243, CR0\u2013CR11 +244\u2026+255 \u2713`
+                ? `Protected STO +${layout.protectedStoOffset}, Heap +${layout.heapStart}\u2026+${layout.heapEnd}, Freespace +${layout.freeStart}\u2026+${layout.freeEnd}, Stack +${layout.stackStart}\u2026+243, CR0\u2013CR11 +244\u2026+255 \u2713`
                 : 'cw/sw and cc must define positive, non-overlapping Stack and Heap zones before fixed CR0\u2013CR11 homes.',
         });
     } else if (contentWords <= lumpSize) {
@@ -304,7 +305,7 @@ function lumpAudit(words, manifest, lineNums, opts) {
         // body would falsely flag valid NS Table entries as dirty.  Skip RFS.
         //
         // Thread lumps (typ=10, cw>0): freespace is the collision zone
-        // between heap (grows ↑ from word 17+heapWords) and stack
+        // between heap (grows ↑ from word 18) and stack
         // (whose fixed private-ABI floor is word 244-sw).
         //
         // Standard lumps (typ=00/01/11): freespace = words cw+1 .. lumpSize-cc-1.

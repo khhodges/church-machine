@@ -2,10 +2,11 @@ from amaranth import *
 from amaranth.lib.data import View
 
 from .hw_types import *
-from .layouts import GT_LAYOUT, CAP_REG_LAYOUT
+from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT
 from .perm_check import perm_bit
 from .mload_seq import mload_wait_body
 from .stack_frame import stack_slot_addr
+from .thread_design import THREAD_STO_OFFSET
 
 
 class ChurchReturn(Elaboratable):
@@ -57,6 +58,8 @@ class ChurchReturn(Elaboratable):
         self.mem_wr_en   = Signal()
 
         self.cload_e_gt = Signal(32)
+        self.flags_restore_en = Signal()
+        self.flags_restore_data = Signal(COND_FLAGS_LAYOUT)
 
     def elaborate(self, platform):
         m = Module()
@@ -89,20 +92,26 @@ class ChurchReturn(Elaboratable):
 
         heap_base_latched   = Signal(32)
         thread_base_latched = Signal(32)
+        protected_sto_addr  = Signal(32)
+        m.d.comb += protected_sto_addr.eq(
+            thread_base_latched + (THREAD_STO_OFFSET << 2))
 
-        sto_latched        = Signal(32)
+        sto_indicator      = Signal(32)
+        sto_latched        = Signal(12)
         callee_egt_latched = Signal(32)
         return_pc_latched  = Signal(15)
-        prev_sto_latched   = Signal(16)
+        prev_sto_latched   = Signal(12)
+        prev_sz_latched    = Signal()
+        prev_flags_latched = Signal(COND_FLAGS_LAYOUT)
 
         frame_word    = Signal(32)
         frame_sz      = Signal()
         frame_ret_pc  = Signal(15)
         frame_prev_sto = Signal(16)
         m.d.comb += [
-            frame_sz.eq(frame_word[31]),
-            frame_ret_pc.eq(frame_word[16:31]),
-            frame_prev_sto.eq(frame_word[0:16]),
+            frame_sz.eq(frame_word[12]),
+            frame_ret_pc.eq(frame_word[13:28]),
+            frame_prev_sto.eq(frame_word[0:12]),
         ]
 
         local_cr_rd_en = Signal()
@@ -140,6 +149,10 @@ class ChurchReturn(Elaboratable):
         ]
 
         m.d.comb += self.cload_e_gt.eq(callee_egt_latched)
+        m.d.comb += [
+            self.flags_restore_en.eq(0),
+            self.flags_restore_data.eq(prev_flags_latched),
+        ]
 
         sub_start_reg     = Signal()
         sub_done_latched  = Signal()
@@ -201,33 +214,39 @@ class ChurchReturn(Elaboratable):
                     m.d.sync += [fault_flag.eq(1), fault_latched.eq(FaultType.NULL_CAP)]
                     m.next = "FAULT"
                 with m.Else():
-                    m.next = "READ_HEAP"
+                    m.next = "READ_STO"
 
-            with m.State("READ_HEAP"):
+            with m.State("READ_STO"):
                 m.d.comb += [
-                    local_mem_rd_addr.eq(heap_base_latched),
+                    local_mem_rd_addr.eq(protected_sto_addr),
                     local_mem_rd_en.eq(1),
                 ]
                 with m.If(self.mem_rd_valid):
-                    m.d.sync += sto_latched.eq(self.mem_rd_data)
+                    m.d.sync += [
+                        sto_indicator.eq(self.mem_rd_data),
+                        sto_latched.eq(self.mem_rd_data[:12]),
+                    ]
                     m.next = "READ_FRAME"
 
             with m.State("READ_FRAME"):
                 m.d.comb += [
-                    local_mem_rd_addr.eq(stack_slot_addr(thread_base_latched, sto_latched, 2)),
+                    local_mem_rd_addr.eq(
+                        thread_base_latched +
+                        ((sto_latched + Mux(sto_indicator[12], 2, 1)) << 2)),
                     local_mem_rd_en.eq(1),
                 ]
                 with m.If(self.mem_rd_valid):
                     m.d.sync += frame_word.eq(self.mem_rd_data)
-                    with m.If(~self.mem_rd_data[31]):
-                        m.d.sync += [fault_flag.eq(1), fault_latched.eq(FaultType.STACK_CORRUPT)]
-                        m.next = "FAULT"
-                    with m.Else():
-                        m.d.sync += [
-                            return_pc_latched.eq(self.mem_rd_data[16:31]),
-                            prev_sto_latched.eq(self.mem_rd_data[0:16]),
-                        ]
+                    m.d.sync += [
+                        return_pc_latched.eq(self.mem_rd_data[13:28]),
+                        prev_sto_latched.eq(self.mem_rd_data[0:12]),
+                        prev_sz_latched.eq(self.mem_rd_data[12]),
+                        prev_flags_latched.eq(self.mem_rd_data[28:32]),
+                    ]
+                    with m.If(sto_indicator[12]):
                         m.next = "READ_EGT"
+                    with m.Else():
+                        m.next = "POP_STACK"
 
             with m.State("READ_EGT"):
                 m.d.comb += [
@@ -240,9 +259,12 @@ class ChurchReturn(Elaboratable):
 
             with m.State("POP_STACK"):
                 m.d.comb += [
-                    local_mem_wr_addr.eq(heap_base_latched),
-                    local_mem_wr_data.eq(Cat(prev_sto_latched, Const(0, 16))),
+                    local_mem_wr_addr.eq(protected_sto_addr),
+                    local_mem_wr_data.eq(Cat(
+                        prev_sto_latched, prev_sz_latched,
+                        Const(0, 15), prev_flags_latched.as_value())),
                     local_mem_wr_en.eq(1),
+                    self.flags_restore_en.eq(1),
                 ]
                 m.next = "SET_NIA"
 

@@ -36,7 +36,7 @@ from server.boot_image import (
 )
 from hardware.thread_design import (
     THREAD_CAPS_OFFSET,
-    THREAD_STACK_POINTER_HOME_OFFSET,
+    THREAD_STO_OFFSET,
 )
 
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
@@ -317,7 +317,7 @@ def test_oversized_catalog_allocation_preserves_three_threads_and_projection(tmp
         assert ((source[base] >> 8) & 0x3) == 2
         assert source[base + THREAD_CAPS_OFFSET] == create_gt(
             0, 10, {"E": 1}, 1)
-        assert source[base + THREAD_STACK_POINTER_HOME_OFFSET] == (
+        assert source[base + THREAD_STO_OFFSET] == (
             THREAD_CAPS_OFFSET - 1)
 
     projected, info = build_wukong_upload_image(generic)
@@ -348,7 +348,7 @@ def test_wukong_projection_preserves_every_thread_private_body():
     private_values = {}
     for number, slot in enumerate(thread_slots, start=1):
         source_base = source[_ns_slot_base(source_total, slot)]
-        # DR1, heap[0], and a non-boot capability home are all private body
+        # DR1, the protected STO slot, and a non-boot capability home are private
         # words. Keep caps[0] intact so source boot-entry validation remains
         # meaningful.
         values = (0x11000000 + number, 0x22000000 + number, 0x33000000 + number)

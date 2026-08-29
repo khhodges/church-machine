@@ -2098,6 +2098,18 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
     html += `</div>`;
     html += `</div>`;
 
+    // ── Protected machine state: STO (+17) ───────────────────────────────
+    const stoOff = TL.protectedStoOffset;
+    const stoWord = sim.memory[slotBase + stoOff] >>> 0;
+    const stoValue = stoWord & 0xFFF;
+    const stoSize = (stoWord >>> 12) & 1;
+    const stoFlags = (stoWord >>> 28) & 0xF;
+    html += secHdr('⑥', 'Protected Thread Indicator', `1 word · offset +${stoOff} · FLAGS[31:28] | SZ[12] | STO[11:0] · outside CR5 heap bounds`, '#f59e0b', 'thread-zone-sto');
+    html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>Offset</th><th>Addr</th><th>State</th><th>Value</th></tr></thead><tbody>';
+    html += `<tr><td class="thread-offset-cell" style="color:#f59e0b;">+${stoOff}</td><td class="thread-address-cell">${addrOf(stoOff)}</td><td>FLAGS=${stoFlags.toString(2).padStart(4,'0')} · SZ=${stoSize} · STO=${stoValue}</td><td>${hexOf(stoWord)}</td></tr>`;
+    html += '</tbody></table>';
+    html += secBody();
+
     // ── Zone ⑤: Data Registers (+1 … +16) ───────────────────────────────────
     html += secHdr('⑤', 'Data Registers', '16 words · DR0–DR15 · offset +1 … +16 · head of the slot (after header)', '#a855f7', 'thread-zone-5');
     html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>Offset</th><th>Addr</th><th>DR</th><th>Value (hex)</th><th>Value (dec)</th></tr></thead><tbody>';
@@ -2110,7 +2122,7 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
     html += '</tbody></table>';
     html += secBody();
 
-    // ── Zone ④: Heap (+17 … +80) ─────────────────────────────────────────
+    // ── Zone ④: Heap (starts at +18) ─────────────────────────────────────
     let heapNonZero = 0;
     for (let i = TL.heapStart; i <= TL.heapEnd; i++) {
         if (sim.memory[slotBase + i]) heapNonZero++;

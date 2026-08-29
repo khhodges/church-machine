@@ -134,7 +134,7 @@ MyApp.thread.zip uncompressed_size = 1 024 bytes  →  n = 8  →  n-6 = 2
 Word 0:          Header (typ=10, sw, heapWords)       [never executed]
 Words 1..16:     ⑤ Data Registers DR0–DR15            [16 words, fixed]
 Words 17..16+heapWords:   ④ Heap ↑                   [IDE: heapWords]
-Words 17+heapWords..sp_max: ③ Freespace              [zero at creation]
+Words 18+heapWords..sp_max: ③ Freespace              [zero at creation]
 Words sp_max+1..lumpSize-13: ② LIFO Stack ↓          [IDE: sw words]
 Words lumpSize-12..lumpSize-1: ① Capabilities CR0–CR11 [12 words, fixed]
 ```

@@ -2,11 +2,12 @@ from amaranth import *
 from amaranth.lib.data import View
 
 from .hw_types import *
-from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, LUMP_HEADER_LAYOUT
+from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, LUMP_HEADER_LAYOUT, COND_FLAGS_LAYOUT
 from .mload import ChurchMLoad
 from .perm_check import perm_bit
 from .mload_seq import mload_wait_body
 from .stack_frame import stack_slot_addr
+from .thread_design import THREAD_STO_OFFSET
 
 
 class ChurchELoadCall(Elaboratable):
@@ -48,22 +49,21 @@ class ChurchELoadCall(Elaboratable):
         # identical to a CALL frame so that RETURN inside an ELOADCALL-entered
         # lump can unwind cleanly instead of faulting (NIA→0 → RANGE fault).
         #
-        # Frame word layout (matches call.py / stack_frame.py):
-        #   bit[31]    = SZ = 1  (CALL/ELOADCALL frame tag)
-        #   bits[30:16] = sentinel_return_pc = 3  (BRANCH -1 at boot ROM word 3)
-        #   bits[15:0]  = prev_STO (current STO before decrement)
+        # Frame word layout: FLAGS[31:28] | return_PC[27:13] |
+        # prior_SZ[12] | prev_STO[11:0].
         #
         # Core wires these from u_regs.cr5_heap, u_regs.cr12_thread, CR12.word1_location,
         # and u_change.thread_hdr_out (per-thread LUMP_HEADER_LAYOUT word).
-        self.cr5_heap    = Signal(CAP_REG_LAYOUT)   # heap cap (word1_location = Heap[0] addr)
+        self.cr5_heap    = Signal(CAP_REG_LAYOUT)   # ordinary heap cap (base = Thread +18)
         self.thread_base = Signal(32)               # CR12 thread lump byte base
         self.thread_hdr  = Signal(32)               # LUMP_HEADER_LAYOUT word (n_minus_6, cw, cc)
         self.cr12_thread = Signal(CAP_REG_LAYOUT)   # CR12 thread cap (for null check)
+        self.flags = Signal(COND_FLAGS_LAYOUT)
 
         # Direct DMEM writes for the three frame-push words:
         #   (1) callee E-GT  at thread_base + (STO-1)*4
         #   (2) frame word   at thread_base + STO*4
-        #   (3) new STO      at Heap[0] = CR5.word1_location
+        #   (3) new STO      at protected Thread word +17
         self.mem_wr_addr = Signal(32)
         self.mem_wr_data = Signal(32)
         self.mem_wr_en   = Signal()
@@ -149,10 +149,11 @@ class ChurchELoadCall(Elaboratable):
             cr12_null.eq(cr12_gt.gt_type == GT_TYPE_NULL),
         ]
 
-        sto_latched   = Signal(32)   # STO word index read from Heap[0]
-        sto_reading   = Signal()     # asserted to drive the Heap[0] read
+        sto_indicator = Signal(32)
+        sto_latched   = Signal(12)
+        sto_reading   = Signal()     # asserted to drive the protected STO read
         sto_rd_armed  = Signal()     # one-cycle guard before trusting mem_rd_valid
-        sto_read_addr = Signal(32)   # byte address of Heap[0] = CR5.word1_location
+        sto_read_addr = Signal(32)
         frame_word    = Signal(32)   # SZ=1 | sentinel_return_pc | prev_STO
 
         local_mem_wr_en   = Signal()
@@ -160,11 +161,11 @@ class ChurchELoadCall(Elaboratable):
         local_mem_wr_data = Signal(32)
 
         m.d.comb += [
-            sto_read_addr.eq(cr5_view.word1_location[:32]),
-            # frame_word: bit31=SZ=1, bits[30:16]=sentinel_pc, bits[15:0]=prev_STO
-            frame_word.eq(Cat(sto_latched[:16],
-                              Const(_SENTINEL_RETURN_PC, 15),
-                              Const(1, 1))),
+            sto_read_addr.eq(
+                self.thread_base + (THREAD_STO_OFFSET << 2)),
+            frame_word.eq(Cat(
+                sto_latched, sto_indicator[12],
+                Const(_SENTINEL_RETURN_PC, 15), self.flags.as_value())),
         ]
 
         loaded_view = View(CAP_REG_LAYOUT, loaded_cap)
@@ -219,8 +220,7 @@ class ChurchELoadCall(Elaboratable):
             self.cr_wr_addr.eq(u_mload.cr_wr_addr),
             self.cr_wr_data.eq(u_mload.cr_wr_data),
             self.cr_wr_en.eq(u_mload.cr_wr_en),
-            # Mux (priority: method-entry > STO read > mload's normal bus).
-            # sto_reading: PUSH_ARM/PUSH_READ_STO states assert this to read Heap[0].
+            # Mux (priority: method-entry > protected STO read > mload's normal bus).
             self.mem_addr.eq(
                 Mux(method_entry_reading, method_entry_addr_sig,
                 Mux(sto_reading,          sto_read_addr,
@@ -421,14 +421,14 @@ class ChurchELoadCall(Elaboratable):
             # FETCH_METHOD_ENTRY) so a failed instruction never corrupts the stack.
             #
             #   PUSH_CR5_CR12  — validate CR5 (non-null, has R-perm) and CR12 (non-null)
-            #   PUSH_ARM       — arm the Heap[0] read (assert sto_reading for 1 cycle)
+            #   PUSH_ARM       — arm the protected STO read
             #   PUSH_READ_STO  — wait for STO read valid; latch into sto_latched
             #   PUSH_BOUNDS    — full stack-zone bounds check using thread_hdr:
             #                      STO > sp_max → STACK_CORRUPT (pointer out of zone)
             #                      STO < sp_min → STACK_OVERFLOW (zone exhausted)
             #   PUSH_EGT       — write callee E-GT (phase-1 CR6 GT) at (STO-1)
             #   PUSH_FRAME     — write frame word  at thread_base+STO*4
-            #   PUSH_STO       — write new STO (STO-2) back to Heap[0]
+            #   PUSH_STO       — write new STO (STO-2) back to Thread +17
             # After PUSH_STO the FSM proceeds to COMPLETE.
 
             with m.State("PUSH_CR5_CR12"):
@@ -464,7 +464,11 @@ class ChurchELoadCall(Elaboratable):
             with m.State("PUSH_READ_STO"):
                 m.d.comb += sto_reading.eq(1)
                 with m.If(sto_rd_armed & self.mem_rd_valid):
-                    m.d.sync += [sto_latched.eq(self.mem_rd_data), sto_rd_armed.eq(0)]
+                    m.d.sync += [
+                        sto_indicator.eq(self.mem_rd_data),
+                        sto_latched.eq(self.mem_rd_data[:12]),
+                        sto_rd_armed.eq(0),
+                    ]
                     m.next = "PUSH_BOUNDS"
 
             with m.State("PUSH_BOUNDS"):
@@ -508,12 +512,14 @@ class ChurchELoadCall(Elaboratable):
                 m.next = "PUSH_STO"
 
             with m.State("PUSH_STO"):
-                # Write new STO = STO-2 to Heap[0] = CR5.word1_location.
+                # Write new STO = STO-2 to protected Thread word +17.
                 # Full 32-bit write matches ChurchCall.STACK_WRITE_SP.
                 m.d.comb += [
                     local_mem_wr_en.eq(1),
                     local_mem_wr_addr.eq(sto_read_addr),
-                    local_mem_wr_data.eq(sto_latched - 2),
+                    local_mem_wr_data.eq(Cat(
+                        (sto_latched - 2)[:12], Const(1, 1),
+                        Const(0, 15), self.flags.as_value())),
                 ]
                 m.next = "COMPLETE"
 

@@ -76,7 +76,7 @@ All deviations D-1 through D-12 are **CLOSED/RESOLVED**. No open hardware deviat
 
 ### D-8: CR5 Thread-Register Behavior (Installed by CHANGE)
 
-- **Hardware (corrected, Task #451)**: The incorrect `cr5_stack` mechanism (a 256-entry hardware stack pushed by CALL, popped by RETURN) has been removed from all variants (`hardware/`, `ctmm_cap_amaranth/`, `ctmm_amaranth/`, `church_machine/`). CR5 is now correctly a thread register: `hardware/change.py` synthesises and installs the CR5 (Heap GT) from the incoming thread's Zone ④ bounds (base = `thread_base + 17*4`, limit_offset = `heapWords − 1` from the lump header `cc` field) in the new `INSTALL_CR5` FSM state after `READ_THREAD_HDR`.
+- **Hardware (corrected)**: The incorrect `cr5_stack` mechanism (a 256-entry hardware stack pushed by CALL, popped by RETURN) has been removed from all variants (`hardware/`, `ctmm_cap_amaranth/`, `ctmm_amaranth/`, `church_machine/`). `hardware/change.py` synthesises CR5 as the ordinary Heap GT (base = `thread_base + 18*4`, limit_offset = `heapWords − 1`). The machine-protected STO remains in reserved Thread word +17 and is addressed independently by stack operations.
 - **Resolution (Task #451)**: All docs (`architecture.md`, `call-stack.md`, `garbage-collection.md`, `church-instructions.md`, `AMARANTH-SIMULATOR-AUDIT-2026-04-23.md`) and simulator comments updated to match the specification in `CM_LUMP_SPECIFICATION.md`. The `saved_cr5_gt` signal and `RESTORE_CR5`/`PHASE0` FSM states have been removed from all CALL and RETURN units respectively.
 - **Status**: RESOLVED
 

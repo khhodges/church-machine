@@ -57,6 +57,7 @@ CORE_SOURCES: tuple[str, ...] = (
     "hardware/stack_frame.py",
     "hardware/switch.py",
     "hardware/tperm.py",
+    "hardware/thread_design.py",
 )
 
 WUKONG_SOURCES: tuple[str, ...] = CORE_SOURCES + (

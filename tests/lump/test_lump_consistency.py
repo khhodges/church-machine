@@ -2319,13 +2319,13 @@ class TestR21_FreespaceZeroFill:
             )
 
         # Thread LUMPs (typ=10, cw>0): freespace is the collision zone between
-        # the heap (grows ↑ from word 17+heapWords) and the stack (grows ↓ to
+        # the heap (grows ↑ from word 18) and the stack (grows ↓ to
         # word lumpSize-12-sw).  Use Thread-specific geometry, not generic cw/cc.
         # (CM_LUMP_SPECIFICATION.md Appendix A, "Zone Constants" table.)
         if typ == 0b10 and cw > 0:
             sw      = cw   # cw field is sw (stack words) for Thread LUMPs
             hw      = cc   # cc field is heapWords for Thread LUMPs
-            fs_start = 17 + hw          # first word after heap zone
+            fs_start = 18 + hw          # first word after heap zone
             fs_end   = lump_sz - 12 - sw  # first stack word (exclusive end)
         else:
             # Executable data words follow code and are not freespace.  The

@@ -17,8 +17,11 @@ THREAD_SUPPORTED_BODY_WORDS = tuple(THREAD_DESIGN["supportedBodyWords"])
 THREAD_HEADER_OFFSET = THREAD_DESIGN["headerOffset"]
 THREAD_DR_OFFSET = THREAD_DESIGN["dataRegisters"]["offset"]
 THREAD_DR_WORDS = THREAD_DESIGN["dataRegisters"]["words"]
+THREAD_STO_OFFSET = THREAD_DESIGN["protectedStoOffset"]
 THREAD_HEAP_OFFSET = THREAD_DESIGN["heapOffset"]
-THREAD_STACK_POINTER_HOME_OFFSET = THREAD_DESIGN["stackPointerHomeOffset"]
+# Compatibility name for older importers. The word is protected Thread state,
+# not part of the ordinary heap described by CR5.
+THREAD_STACK_POINTER_HOME_OFFSET = THREAD_STO_OFFSET
 THREAD_CAPS_OFFSET = THREAD_DESIGN["capabilityHomes"]["offset"]
 THREAD_CAP_WORDS = THREAD_DESIGN["capabilityHomes"]["words"]
 THREAD_PRIVATE_ABI_WORDS = THREAD_DESIGN["privateAbiWords"]
@@ -48,6 +51,7 @@ def thread_layout(lump_size: int, stack_words: int, heap_words: int) -> dict:
         "lump_size": lump_size,
         "dr_start": THREAD_DR_OFFSET,
         "dr_end": THREAD_DR_OFFSET + THREAD_DR_WORDS - 1,
+        "sto_offset": THREAD_STO_OFFSET,
         "heap_start": heap_start,
         "heap_end": heap_end,
         "free_start": free_start,

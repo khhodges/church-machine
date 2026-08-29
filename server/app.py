@@ -3160,7 +3160,7 @@ def _boot_image_is_stale():
                 "<I", _image_bytes, _thread_ns_word0 * 4)[0]
             _sto_idx = (
                 _thread_loc
-                + _boot_image_gen.THREAD_STACK_POINTER_HOME_OFFSET
+                + _boot_image_gen.THREAD_STO_OFFSET
             )
             if not 0 <= _sto_idx < _total_words:
                 return True

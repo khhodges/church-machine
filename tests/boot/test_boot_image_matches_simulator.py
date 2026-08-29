@@ -46,7 +46,7 @@ from server.boot_image import (  # noqa: E402
 )
 from hardware.thread_design import (  # noqa: E402
     THREAD_CAPS_OFFSET,
-    THREAD_STACK_POINTER_HOME_OFFSET,
+    THREAD_STO_OFFSET,
 )
 
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
@@ -394,17 +394,17 @@ def test_generated_threads_use_fixed_stack_boundary(tmp_path):
     slots = [1, *generated_thread_slots(thread_count)]
     expected_boundary = THREAD_CAPS_OFFSET - 1
     retired_tail_relative_boundary = int(step1["threadLumpWords"]) - 13
-    assert THREAD_STACK_POINTER_HOME_OFFSET == 17
+    assert THREAD_STO_OFFSET == 17
     assert expected_boundary == 0xF3
     assert retired_tail_relative_boundary == 0x1F3
 
     for slot in slots:
         ns_base = total - (slot + 1) * NS_ENTRY_WORDS
         thread_loc = words[ns_base]
-        actual_boundary = words[thread_loc + THREAD_STACK_POINTER_HOME_OFFSET]
+        actual_boundary = words[thread_loc + THREAD_STO_OFFSET]
         assert actual_boundary == expected_boundary, (
             f"NS slot {slot} Thread boundary at +"
-            f"{THREAD_STACK_POINTER_HOME_OFFSET} is 0x{actual_boundary:08X}; "
+            f"{THREAD_STO_OFFSET} is 0x{actual_boundary:08X}; "
             f"expected fixed +243 (0x{expected_boundary:08X})"
         )
 

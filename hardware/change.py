@@ -10,6 +10,7 @@ from .thread_design import (
     THREAD_CAP_WORDS,
     THREAD_DR_OFFSET,
     THREAD_HEAP_OFFSET,
+    THREAD_STO_OFFSET,
     THREAD_MIN_N_MINUS_6,
     THREAD_MAX_N_MINUS_6,
 )
@@ -81,6 +82,9 @@ class ChurchChange(Elaboratable):
         self.dr_wr_data = Signal(32)
         self.nia_restore_en = Signal()
         self.nia_restore_val = Signal(32)
+        self.flags_in = Signal(COND_FLAGS_LAYOUT)
+        self.flags_restore_en = Signal()
+        self.flags_restore_data = Signal(COND_FLAGS_LAYOUT)
 
     def elaborate(self, platform):
         m = Module()
@@ -232,6 +236,7 @@ class ChurchChange(Elaboratable):
         preflight_rd_armed = Signal()
         restore_rd_armed = Signal()
         restore_word = Signal(32)
+        indicator_word = Signal(32)
         scheduler_ns_active = Signal()
         scheduler_ns_rd_armed = Signal()
         scheduler_ns_addr = Signal(32)
@@ -259,7 +264,8 @@ class ChurchChange(Elaboratable):
             cr5_new_gt.dom.eq(0),
             cr5_new_gt.perm.eq(0b011),   # R+W in Turing domain
             cr5_new_gt.b_flag.eq(0),
-            cr5_cap_view.word1_location.eq(restore_base + (17 << 2)),
+            cr5_cap_view.word1_location.eq(
+                restore_base + (THREAD_HEAP_OFFSET << 2)),
             cr5_cap_view.word2_w2.eq(thr_hdr_view.cc - 1),
             entry_cr14_gt.slot_id.eq(entry_gt_view.slot_id),
             entry_cr14_gt.gt_seq.eq(entry_gt_view.gt_seq),
@@ -303,6 +309,8 @@ class ChurchChange(Elaboratable):
             self.dr_wr_data.eq(restore_word),
             self.nia_restore_en.eq(0),
             self.nia_restore_val.eq(entry_raw_base + 4),
+            self.flags_restore_en.eq(0),
+            self.flags_restore_data.eq(indicator_word[28:32]),
         ]
 
         # Default: mload_start_reg self-clears every cycle; the FSM states that
@@ -523,7 +531,35 @@ class ChurchChange(Elaboratable):
                 with m.If(self.mem_wr_done):
                     m.d.sync += save_index.eq(save_index + 1)
                     with m.If(save_index >= 15):
-                        m.next = "LOAD_THREAD"
+                        m.d.sync += restore_rd_armed.eq(0)
+                        m.next = "SAVE_INDICATOR_READ"
+
+            with m.State("SAVE_INDICATOR_READ"):
+                m.d.comb += [
+                    direct_rd_active.eq(1),
+                    direct_rd_addr.eq(
+                        outgoing_thread_base + (THREAD_STO_OFFSET << 2)),
+                ]
+                with m.If(~restore_rd_armed):
+                    m.d.sync += restore_rd_armed.eq(1)
+                with m.Elif(self.mem_rd_valid):
+                    m.d.sync += [
+                        indicator_word.eq(self.mem_rd_data),
+                        restore_rd_armed.eq(0),
+                    ]
+                    m.next = "SAVE_INDICATOR_WRITE"
+
+            with m.State("SAVE_INDICATOR_WRITE"):
+                m.d.comb += [
+                    mem_wr_en_reg.eq(1),
+                    mem_wr_addr_reg.eq(
+                        outgoing_thread_base + (THREAD_STO_OFFSET << 2)),
+                    mem_wr_data_reg.eq(Cat(
+                        indicator_word[:13], Const(0, 15),
+                        self.flags_in.as_value())),
+                ]
+                with m.If(self.mem_wr_done):
+                    m.next = "LOAD_THREAD"
 
             with m.State("LOAD_THREAD"):
                 m.d.comb += [
@@ -646,10 +682,30 @@ class ChurchChange(Elaboratable):
                     self.dr_wr_data.eq(restore_word),
                 ]
                 with m.If(save_index >= 15):
-                    m.next = "ENTRY_CR0_READ"
+                    m.d.sync += restore_rd_armed.eq(0)
+                    m.next = "RESTORE_INDICATOR"
                 with m.Else():
                     m.d.sync += save_index.eq(save_index + 1)
                     m.next = "RESTORE_DR"
+
+            with m.State("RESTORE_INDICATOR"):
+                m.d.comb += [
+                    direct_rd_active.eq(1),
+                    direct_rd_addr.eq(
+                        restore_base + (THREAD_STO_OFFSET << 2)),
+                ]
+                with m.If(~restore_rd_armed):
+                    m.d.sync += restore_rd_armed.eq(1)
+                with m.Elif(self.mem_rd_valid):
+                    m.d.sync += [
+                        indicator_word.eq(self.mem_rd_data),
+                        restore_rd_armed.eq(0),
+                    ]
+                    m.next = "RESTORE_INDICATOR_COMMIT"
+
+            with m.State("RESTORE_INDICATOR_COMMIT"):
+                m.d.comb += self.flags_restore_en.eq(1)
+                m.next = "ENTRY_CR0_READ"
 
             with m.State("ENTRY_CR0_READ"):
                 m.d.comb += self.cr_rd_addr.eq(0)
@@ -772,7 +828,9 @@ class ChurchChange(Elaboratable):
             with m.State("INSTALL_CR5"):
                 # Synthesise the Zone ④ heap GT from the incoming thread's lump header
                 # and install it into CR5 (the heap cap).
-                # base = thread_base + 17 words; limit_offset = heapWords - 1.
+                # CR5 covers only ordinary heap words. The protected STO word
+                # at +17 is outside this capability.
+                # base = thread_base + 18 words; limit_offset = heapWords - 1.
                 m.d.comb += cr5_install_active.eq(1)
                 m.next = "COMPLETE"
 

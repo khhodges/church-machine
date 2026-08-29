@@ -80,7 +80,7 @@ def _build_dmem_init():
 
     # Boot.Thread lump at byte 0xE00 (word 896) — mirrors wukong_top.py.
     # See boot_rom.py for the relocation rationale (base-0 Thread lump
-    # collides with the NS table: Heap[0]/STO is NS slot 4 word1).
+    # collides with the NS table: protected STO is NS slot 4 word1).
     dmem[WUKONG_THREAD_BASE_WORD]   = WUKONG_THREAD_HEADER
     dmem[WUKONG_THREAD_STO_WORD]    = WUKONG_THREAD_STO_INIT
     dmem[WUKONG_THREAD_CAPS0_WORD]  = E_GT_SELFTEST

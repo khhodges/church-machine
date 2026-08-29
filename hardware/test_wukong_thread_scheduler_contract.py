@@ -24,7 +24,7 @@ def test_scheduler_contract_has_no_serialized_entry_context():
     assert 'self.nia_restore_val.eq(entry_raw_base + 4)' in source
     for stale in (
         "cr7_base", "PACKED_PC_OFFSET", "M_FLAG_OFFSET", "SAVE_PACKED_PC",
-        "SAVE_M_FLAG", "RESTORE_PC", "RESTORE_M_FLAG", "flags_restore",
+        "SAVE_M_FLAG", "RESTORE_PC", "RESTORE_M_FLAG",
     ):
         assert stale not in source
     rtlil.convert(ChurchMLoad(), ports=[])
@@ -144,8 +144,9 @@ def test_change_derives_entry_from_cr0_without_frame_or_context_words():
         assert mem[new_base + 17 * 4] == 243
         assert mem[new_base + 18 * 4] == 0x18181818
         assert mem[new_base + 258 * 4] == 0xDEADBEEF
+        assert old_base + 17 * 4 in writes
         forbidden = {
-            old_base + 17 * 4, old_base + 18 * 4, old_base + 258 * 4,
+            old_base + 18 * 4, old_base + 258 * 4,
             new_base + 17 * 4, new_base + 18 * 4, new_base + 258 * 4,
         }
         assert forbidden.isdisjoint(writes)

@@ -3,10 +3,10 @@ Focused simulation test for ChurchCall stack push states.
 
 Spec (CM_LUMP_SPECIFICATION.md §"Zone ② — LIFO Stack"):
   CALL frame (SZ=1 — 2 words):      STO -= 2 after push
-    STO+0:  Frame word: SZ[1] | return_PC[15] | prev_STO[16]
+    STO+0:  Frame word: FLAGS[4] | return_PC[15] | prior_SZ[1] | prev_STO[12]
     STO-1:  E-GT Word 0 of the callee
 
-  Stack grows downward; STO stored at Heap[0] = Mem[CR5.word1_location].
+  Stack grows downward; STO is protected Thread state at reserved offset +17.
   Thread header (at thread_base) encodes:
     n_minus_6, sw (cw field for typ=10), cc
   Derived bounds (hardware, IDE-set via sw):
@@ -44,7 +44,8 @@ from hardware.hw_types import (
 from hardware.layouts import GT_LAYOUT, CAP_REG_LAYOUT
 
 THREAD_BASE   = 0x4000
-SP_STORE_ADDR = 0x3000
+STO_STORE_ADDR = THREAD_BASE + 17 * 4
+HEAP_BASE_ADDR = THREAD_BASE + 18 * 4
 CALLEE_LUMP_BASE = 0x9004
 CALLEE_EGT    = 0x4A000001
 CALLER_PC     = 42
@@ -79,8 +80,8 @@ def _build_lump_hdr(n_minus_6=0, cc=4, cw=8, magic=0x5):
 
 def _expected_frame_word(sto, caller_pc):
     return_pc = (caller_pc + 1) & 0x7FFF
-    prev_sto  = sto & 0xFFFF
-    return (1 << 31) | (return_pc << 16) | prev_sto
+    prev_sto  = sto & 0xFFF
+    return (return_pc << 13) | prev_sto
 
 
 def _run_scenario(initial_sto, expect_fault=None):
@@ -95,7 +96,7 @@ def _run_scenario(initial_sto, expect_fault=None):
     cr6_cap    = CALLEE_EGT
     ns_cap     = _build_cap(slot_id=0, perms=0, location=0x8000)
     code_cap   = _build_cap(slot_id=2, perms=PERM_MASK_E, location=CALLEE_LUMP_BASE)
-    cr5_cap    = _build_cap(slot_id=5, perms=PERM_MASK_R | PERM_MASK_W, location=SP_STORE_ADDR)
+    cr5_cap    = _build_cap(slot_id=5, perms=PERM_MASK_R | PERM_MASK_W, location=HEAP_BASE_ADDR)
     cr12_cap   = _build_cap(slot_id=12, perms=0, location=THREAD_BASE)
 
     # Callee lump header (for FETCH_LUMP, callee ns entry word3):
@@ -181,7 +182,7 @@ def _run_scenario(initial_sto, expect_fault=None):
             elif rd_en:
                 if rd_addr == CALLEE_LUMP_BASE:
                     pending_read = (rd_addr, callee_lump_hdr)
-                elif rd_addr == SP_STORE_ADDR:
+                elif rd_addr == STO_STORE_ADDR:
                     pending_read = (rd_addr, initial_sto)
                 else:
                     errors.append(
@@ -251,11 +252,11 @@ def _run_scenario(initial_sto, expect_fault=None):
         )
 
         a2, d2 = stack_writes[2]
-        assert a2 == SP_STORE_ADDR, (
-            f"STACK_WRITE_SP addr: expected 0x{SP_STORE_ADDR:08x}, got 0x{a2:08x}"
+        assert a2 == STO_STORE_ADDR, (
+            f"STACK_WRITE_SP addr: expected 0x{STO_STORE_ADDR:08x}, got 0x{a2:08x}"
         )
-        assert d2 == initial_sto - 2, (
-            f"STACK_WRITE_SP data: expected STO-2={initial_sto - 2}, got {d2}"
+        assert d2 == (1 << 12) | (initial_sto - 2), (
+            f"STACK_WRITE_SP data: expected packed SZ=1, STO-2={initial_sto - 2}, got {d2}"
         )
 
 
@@ -315,7 +316,7 @@ def test_sw_parametrized():
             callee_cap = _build_cap(slot_id=1, perms=PERM_MASK_E, location=0x2000)
             ns_cap     = _build_cap(slot_id=0, perms=0, location=0x8000)
             code_cap   = _build_cap(slot_id=2, perms=PERM_MASK_E, location=CALLEE_LUMP_BASE)
-            cr5_cap    = _build_cap(slot_id=5, perms=PERM_MASK_R | PERM_MASK_W, location=SP_STORE_ADDR)
+            cr5_cap    = _build_cap(slot_id=5, perms=PERM_MASK_R | PERM_MASK_W, location=HEAP_BASE_ADDR)
             cr12_cap   = _build_cap(slot_id=12, perms=0, location=THREAD_BASE)
             callee_lump_hdr = _build_lump_hdr(n_minus_6=0, cc=4, cw=8, magic=0x5)
 
@@ -383,7 +384,7 @@ def test_sw_parametrized():
                     elif rd_en:
                         if rd_addr == CALLEE_LUMP_BASE:
                             pending_read = (rd_addr, callee_lump_hdr)
-                        elif rd_addr == SP_STORE_ADDR:
+                        elif rd_addr == STO_STORE_ADDR:
                             pending_read = (rd_addr, sto_val)
                         else:
                             local_errors.append(

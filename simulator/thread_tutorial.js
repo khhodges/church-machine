@@ -48,7 +48,7 @@ class ThreadTutorial {
             header:'+0 \u2192',
             dr:    'word 1 \u2192',
             heap:  'word 17 \u2192',
-            free:  '17+heapWords \u2192',
+            free:  '18+heapWords \u2192',
             stack: '244\u2212sw \u2192',
             cap:   'word 244 \u2192',
         };
@@ -80,7 +80,7 @@ class ThreadTutorial {
                 title: 'What Is a Thread Abstraction?',
                 type: 'intro',
                 content: `<p>A <strong>Thread Abstraction</strong> is the Church Machine\u2019s representation of a running computation. Like all abstractions it lives inside a <em>lump</em> (a contiguous block of namespace words), but its internal structure is different from a Programmed Abstraction: it carries both a protected capability set <em>and</em> a live execution context.</p>
-<p>A dormant Thread uses the canonical 256-word software layout. CR0\u2013CR11 are restored from words <code>+244\u2026+255</code>. Word <code>+17</code> is Heap[0]/STO and is initialized to the empty-stack ceiling; this is 243 for the canonical 256-word Thread. There is no packed PC, serialized M flag, or CR14 home.</p>
+<p>A dormant Thread uses the canonical 256-word software layout. CR0\u2013CR11 are restored from words <code>+244\u2026+255</code>. Word <code>+17</code> is the machine-protected STO slot and is initialized to the empty-stack ceiling; this is 243 for the canonical 256-word Thread. The ordinary software heap starts at <code>+18</code>. There is no packed PC, serialized M flag, or CR14 home.</p>
 ${this._memMap(null)}
 <div class="sr-key-concept"><div class="sr-concept-title">Six Regions, One Fixed Private ABI</div>
 <p>Reading top-to-bottom: <strong>Header \u2192 Data Registers \u2192 Heap \u2192 Freespace \u2192 Stack \u2192 Capabilities</strong>. The private ABI is fixed through <code>+255</code>: CR0\u2013CR11 are exactly <code>+244\u2026+255</code>, even in a larger Thread body. Words <code>+256</code> onward are a separate reserved extension, never relocated capabilities or additional heap/stack.</p></div>
@@ -118,7 +118,7 @@ ${this._memMap(null)}
 <tr><td>+246</td><td>CR2</td><td>General-purpose</td><td>Programmer</td></tr>
 <tr><td>+247</td><td>CR3</td><td>General-purpose</td><td>Programmer</td></tr>
 <tr><td>+248</td><td>CR4</td><td>General-purpose</td><td>Programmer</td></tr>
-<tr><td>+249</td><td>CR5</td><td>Heap GT \u00b7 Zone \u2463 bounds (17 \u2026 17+heapWords\u22121) \u00b7 installed by CHANGE</td><td><strong>Convention</strong></td></tr>
+<tr><td>+249</td><td>CR5</td><td>Heap GT \u00b7 Zone \u2463 bounds (18 \u2026 18+heapWords\u22121) \u00b7 installed by CHANGE; excludes protected STO</td><td><strong>Convention</strong></td></tr>
 <tr><td>+250</td><td>CR6</td><td>C-list view (E+M+B?-only) \u00b7 re-derived on CALL/RETURN/CHANGE</td><td><strong>Architecture</strong></td></tr>
 <tr><td>+251</td><td>CR7</td><td>General-purpose</td><td>Programmer</td></tr>
 <tr><td>+252</td><td>CR8</td><td>General-purpose</td><td>Programmer</td></tr>
@@ -153,7 +153,7 @@ ${this._memMap(null)}
 </table>
 <p>A frame word pushed onto the stack is a <strong>direct snapshot</strong> of this register with bit 31 set (SZ tag) and NIA pre-incremented to the return address:</p></div>
 <table class="sr-table"><tr><th>Stack slot</th><th>Contents</th></tr>
-<tr><td>STO+0 \u2014 frame word (both frame types)</td><td><code>SZ[1] | return_PC[15] | prev_STO[16]</code></td></tr>
+<tr><td>STO+0 \u2014 frame word (both frame types)</td><td><code>FLAGS[4] | return_PC[15] | prior_SZ[1] | prev_STO[12]</code></td></tr>
 <tr><td>STO\u22121 \u2014 E-GT word (CALL only)</td><td>Caller\u2019s E-GT Word 0 \u2014 RETURN revalidates it to re-derive CR6 and CR14</td></tr>
 </table>
 <table class="sr-table"><tr><th>Frame word field</th><th>Bits</th><th>Meaning</th></tr>
@@ -163,9 +163,9 @@ ${this._memMap(null)}
 </table>
 <p>RETURN recovers the full execution state in <strong>one memory read and one register write</strong>: it reads the frame word at STO+0 and writes it back into the cursor register with bit 31 cleared. Both NIA and STO are restored atomically. The cursor is runtime state, not an additional persisted CR home.</p>
 <div class="sr-key-concept"><div class="sr-concept-title">STO Is Hardware-Only \u2014 No Data Instruction Can Reach It</div>
-<p>The live cursor register is <strong>inaccessible to DREAD and DWRITE</strong>. Its STO field is mirrored in the reserved Heap[0] backing word at <code>+17</code>; software heap payload therefore begins at Heap[1]. CALL, RETURN, LAMBDA, and CHANGE maintain the cursor/backing state and apply <code>sp_min</code> from header <code>cw/sw</code> plus the architecture-fixed <code>sp_max=+243</code> before stack writes.</p></div>
+<p>The live cursor register is <strong>inaccessible to DREAD and DWRITE</strong>. Its STO field is stored in the reserved machine-protected word at <code>+17</code>. CR5 begins at <code>+18</code>, so no ordinary heap capability can address STO. CALL, RETURN, LAMBDA, and CHANGE maintain the cursor/backing state and apply <code>sp_min</code> from header <code>cw/sw</code> plus the architecture-fixed <code>sp_max=+243</code> before stack writes.</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">LIFO, Not FIFO</div>
-<p>The stack discipline is <strong>Last-In First-Out</strong>: CALL decrements the STO field of the cursor register and RETURN increments it (via <code>prev_STO</code> in the frame word). Nested calls push sequentially deeper; unwinding always reverses that order. No frame can be forged or overwritten because all stack words are inside the thread\u2019s lump and bounds are hardware-enforced. Initial STO and its Heap[0] backing word are <code>sp_max = +243</code> (the 12 persisted capability homes begin at +244).</p></div>`
+<p>The stack discipline is <strong>Last-In First-Out</strong>: CALL decrements the STO field of the cursor register and RETURN increments it (via <code>prev_STO</code> in the frame word). Nested calls push sequentially deeper; unwinding always reverses that order. No frame can be forged or overwritten because all stack words are inside the thread\u2019s lump and bounds are hardware-enforced. Initial STO in protected word <code>+17</code> is <code>sp_max = +243</code> (the 12 persisted capability homes begin at +244).</p></div>`
             },
             {
                 title: '\u2462 Freespace \u2014 The Dynamic Buffer',
@@ -187,7 +187,7 @@ ${this._memMap(null)}
 <p>After the Data Registers, the <strong>heap</strong> holds dynamically-allocated objects. Its size is fixed at thread-creation time by the IDE slot metadata stored in the NS entry\u2019s heapSize field.</p>
 <ul>
 <li><strong>Heap base</strong>: word 17 (immediately after Data Registers)</li>
-<li><strong>Heap limit</strong>: word <code>17+heapWords\u22121</code> (must not collide with freespace; <code>heapWords = cc</code> field in Header[0])</li>
+<li><strong>Heap limit</strong>: word <code>18+heapWords\u22121</code> (must not collide with freespace; <code>heapWords = cc</code> field in Header[0])</li>
 <li><strong>Allocation</strong>: thread objects advance the heap pointer upward (bump allocation); objects grow from heap base toward freespace</li>
 <li><strong>Fixed ceiling</strong>: the heap cannot expand beyond its allocated words; each thread owns its heap region exclusively</li>
 <li><strong>Object GC</strong>: Zone \u2463 is not individually scanned \u2014 the hardware G-bit GC operates at the Thread object level; the entire lump is live or reclaimed as one unit; heap memory management within Zone \u2463 is a software concern</li>
@@ -201,7 +201,7 @@ ${this._memMap(null)}
 <tr><td>word1_location</td><td>lumpBase + 17\u00d74 (byte addr)</td><td>Heap base \u2014 first valid byte of Zone \u2463</td></tr>
 <tr><td>limit_offset</td><td>heapWords \u2212 1</td><td>Inclusive word count; last valid index from base</td></tr>
 </table>
-<p>Every <code>DREAD</code> and <code>DWRITE</code> instruction that uses CR5 runs a <strong>TPERM bounds check</strong> before touching memory: <code>offset \u2264 CR5.limit_offset</code>. A write beyond word <code>17+heapWords\u22121</code> faults immediately \u2014 the heap can never silently overflow into freespace or the stack. The IDE sets <code>heapWords</code> via the <code>cc</code> field in Header[0] (bits [7:0]); CHANGE loads the correct CR5 on every resume; the hardware enforces the ceiling on every access.</p></div>
+<p>Every <code>DREAD</code> and <code>DWRITE</code> instruction that uses CR5 runs a <strong>TPERM bounds check</strong> before touching memory: <code>offset \u2264 CR5.limit_offset</code>. CR5 starts at word <code>+18</code>, so protected STO at <code>+17</code> is unreachable. A write beyond word <code>18+heapWords\u22121</code> faults immediately \u2014 the heap can never silently overflow into freespace or the stack. The IDE sets <code>heapWords</code> via the <code>cc</code> field in Header[0] (bits [7:0]); CHANGE loads the correct CR5 on every resume; the hardware enforces the ceiling on every access.</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">Why Fixed at Design Time?</div>
 <p>The IDE declares heap size as part of the thread\u2019s capability contract. A thread cannot silently consume unbounded memory \u2014 it must declare its maximum heap at upload time, and Navana enforces that limit at allocation. This makes memory usage auditable before the program runs.</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">Object Garbage Collection</div>
@@ -235,7 +235,7 @@ ${this._memMap(null)}
 <tr><td>Header</td><td>word 0</td><td>1 word (fixed)</td><td>0xF900_8240 (magic, typ=10, sw=32, heapWords=cc=64)</td></tr>
 <tr><td>\u2464 Data Registers</td><td>word 1</td><td>16 words (fixed)</td><td>Architecture constant (DR0\u2013DR15)</td></tr>
 <tr><td>\u2463 Heap</td><td>word 17</td><td><code>heapWords</code> \u2193</td><td>Header[0] <code>cc</code> field \u00b7 IDE-set</td></tr>
-<tr><td>\u2462 Freespace</td><td>17+heapWords</td><td>dynamic</td><td>Residual gap between heap top and stack floor</td></tr>
+<tr><td>\u2462 Freespace</td><td>18+heapWords</td><td>dynamic</td><td>Residual gap between heap top and stack floor</td></tr>
 <tr><td>\u2461 LIFO Stack</td><td><code>244\u2212sw</code> \u2026 <code>243</code></td><td><code>cw/sw</code> words \u2193</td><td>Header <code>cw/sw</code> field \u00b7 cursor STO = 243 (empty)</td></tr>
 <tr><td>\u2460 GT Zone (Capabilities)</td><td>word 244</td><td>12 words (architecture-fixed)</td><td>CR0\u2013CR11 at +244\u2026+255; CR12\u2013CR15 are runtime-only</td></tr>
 </table>

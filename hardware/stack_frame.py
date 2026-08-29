@@ -4,11 +4,12 @@ Single source of truth for the Thread-Lump stack slot byte-address formula
 used by call.py and ret.py.
 
 Stack layout (byte addresses relative to thread_base):
-    slot  STO+0   frame word  (SZ=1 | return_PC[15] | prev_STO[16])
+    slot  STO+0   frame word  (FLAGS[4] | return_PC[15] | prior_SZ[1] | prev_STO[12])
     slot  STO-1   callee E-GT word 0
 
-The Stack Top Offset (STO) is a *word* index stored in Heap[0]
-(= Mem[CR5.word1_location + 0]).  The byte address of a slot is:
+The Stack Top Offset (STO) is a *word* index stored in the machine-protected
+Thread word at offset +17. It is outside CR5's ordinary heap bounds. The byte
+address of a stack slot is:
 
     thread_base + (sto + word_offset) * 4
 

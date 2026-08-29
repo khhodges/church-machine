@@ -2,11 +2,14 @@ from amaranth import *
 from amaranth.lib.data import View
 
 from .hw_types import *
-from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, WORD2_LAYOUT, LUMP_HEADER_LAYOUT
+from .layouts import (
+    GT_LAYOUT, CAP_REG_LAYOUT, WORD2_LAYOUT, LUMP_HEADER_LAYOUT,
+    COND_FLAGS_LAYOUT,
+)
 from .perm_check import perm_bit
 from .mload_seq import mload_wait_body
 from .stack_frame import stack_slot_addr
-from .thread_design import THREAD_CAPS_OFFSET, THREAD_CAP_WORDS
+from .thread_design import THREAD_CAPS_OFFSET, THREAD_CAP_WORDS, THREAD_STO_OFFSET
 
 
 class ChurchCall(Elaboratable):
@@ -61,8 +64,8 @@ class ChurchCall(Elaboratable):
         # CR14 code cap for NIA base (populated after Phase 2 mload)
         self.cr14_code = Signal(CAP_REG_LAYOUT)
 
-        # CR5 heap capability — live view; word1_location is the heap base address
-        # (STO is stored at Heap[0] = Mem[CR5.word1_location]; initial value = 212)
+        # CR5 ordinary heap capability. STO is protected Thread state at +17
+        # and is addressed independently from this capability.
         self.cr5_heap = Signal(CAP_REG_LAYOUT)
 
         # Word offset of the CALL instruction itself (nia_reg >> 2, lower 15 bits).
@@ -80,6 +83,7 @@ class ChurchCall(Elaboratable):
         # entire lifetime of the thread. CALL reads stack bounds from it directly,
         # eliminating the FETCH_THREAD_HDR memory read from the CALL pipeline.
         self.thread_hdr = Signal(32)
+        self.flags = Signal(COND_FLAGS_LAYOUT)
 
         # Parallel domain-crossing register operations (driven for one cycle at CLEAR_B).
         # cr_b_clear_mask: bit N=1 → clear b_flag on CRN (preserved registers)
@@ -142,7 +146,11 @@ class ChurchCall(Elaboratable):
         local_mem_wr_data = Signal(32)
         local_mem_wr_en = Signal()
 
-        sp_latched = Signal(32)    # STO read from Heap[0] = Mem[CR5.word1_location]
+        sp_indicator = Signal(32)
+        sp_latched = Signal(12)
+        protected_sto_addr = Signal(32)
+        m.d.comb += protected_sto_addr.eq(
+            self.thread_base + (THREAD_STO_OFFSET << 2))
 
         # Thread header — decoded combinatorially from THREAD_HDR hidden register.
         # THREAD_HDR is loaded once by CHANGE on thread restore; valid for the entire
@@ -177,14 +185,13 @@ class ChurchCall(Elaboratable):
         # Resident Inform W3 latch — non-authoritative cache token (diagnostic).
         cache_token32_lat = Signal(32)
 
-        # CALL frame word (spec §"Zone ② — LIFO Stack"):
-        #   bit[31]    = SZ = 1  (CALL frame tag)
-        #   bits[30:16] = return_PC = caller_pc + 1  (word offset after CALL)
-        #   bits[15:0]  = prev_STO = sp_latched[15:0]
+        # CALL frame word: FLAGS[31:28] | return_PC[27:13] |
+        # prior_SZ[12] | prev_STO[11:0].
         # Written to thread_base + STO*4 (STO+0); E-GT written to STO-1.
         frame_word = Signal(32)
         m.d.comb += frame_word.eq(
-            Cat(sp_latched[:16], (self.caller_pc + 1)[:15], Const(1, 1))
+            Cat(sp_latched, sp_indicator[12],
+                (self.caller_pc + 1)[:15], self.flags.as_value())
         )
 
         cr5_heap_view = View(CAP_REG_LAYOUT, self.cr5_heap)
@@ -601,15 +608,22 @@ class ChurchCall(Elaboratable):
                     m.next = "STACK_READ_SP"
 
             with m.State("STACK_READ_SP"):
-                # Read STO from Heap[0] = Mem[CR5.word1_location].
+                # Read protected per-Thread STO directly from reserved word +17.
                 # STO is a word offset; the stack grows downward (STO -= 2 per CALL).
                 m.d.comb += [
-                    self.mem_rd_addr.eq(cr5_heap_view.word1_location),
+                    self.mem_rd_addr.eq(protected_sto_addr),
                     self.mem_rd_en.eq(1),
                 ]
                 m.d.sync += rd_armed.eq(1)
                 with m.If(self.mem_rd_valid & rd_armed):
-                    m.d.sync += [sp_latched.eq(self.mem_rd_data), rd_armed.eq(0)]
+                    m.d.sync += [
+                        sp_indicator.eq(Mux(self.boot_window, 0, self.mem_rd_data)),
+                        # A reboot starts a fresh machine call stack even though
+                        # BRAM retains the prior protected indicator contents.
+                        sp_latched.eq(Mux(
+                            self.boot_window, sp_max, self.mem_rd_data[:12])),
+                        rd_armed.eq(0),
+                    ]
                     m.next = "STACK_CHECK"
 
             with m.State("STACK_CHECK"):
@@ -622,7 +636,10 @@ class ChurchCall(Elaboratable):
                         fault_type_latched.eq(FaultType.STACK_CORRUPT),
                     ]
                     m.next = "FAULT"
-                with m.Elif(sp_latched < sp_min):
+                # BOOT_PROGRAM enters the first resident abstraction before a
+                # normal Thread header is cached; the fixed empty-stack
+                # sentinel remains valid for that one elevated CALL.
+                with m.Elif((sp_latched < sp_min) & ~self.boot_window):
                     m.d.sync += [
                         fault_latched.eq(1),
                         fault_type_latched.eq(FaultType.STACK_OVERFLOW),
@@ -643,7 +660,7 @@ class ChurchCall(Elaboratable):
                 m.next = "STACK_WRITE_FRAME"
 
             with m.State("STACK_WRITE_FRAME"):
-                # Spec: STO+0 holds the frame word: SZ[1] | return_PC[15] | prev_STO[16].
+                # STO+0 holds FLAGS | return_PC | prior_SZ | prev_STO.
                 # frame_word is a combinatorial signal computed above.
                 # Byte address = thread_base + STO*4
                 m.d.comb += [
@@ -654,10 +671,12 @@ class ChurchCall(Elaboratable):
                 m.next = "STACK_WRITE_SP"
 
             with m.State("STACK_WRITE_SP"):
-                # STO -= 2: write STO-2 back to Heap[0] = Mem[CR5.word1_location].
+                # Pack live FLAGS, current SZ=1 (frame includes GT), and STO-2.
                 m.d.comb += [
-                    local_mem_wr_addr.eq(cr5_heap_view.word1_location),
-                    local_mem_wr_data.eq(sp_latched - 2),
+                    local_mem_wr_addr.eq(protected_sto_addr),
+                    local_mem_wr_data.eq(Cat(
+                        (sp_latched - 2)[:12], Const(1, 1),
+                        Const(0, 15), self.flags.as_value())),
                     local_mem_wr_en.eq(1),
                 ]
                 m.next = "COMPLETE"

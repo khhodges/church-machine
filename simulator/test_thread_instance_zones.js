@@ -211,8 +211,14 @@ function assertThreadTableColumns(html, layout, base, label) {
     const view = new JSDOM(`<body>${html}</body>`).window.document;
     const tables = [...view.querySelectorAll('.thread-zone-table, .abs-clist-table')];
     const zoneTables = [...view.querySelectorAll('.thread-zone-table')];
-    assert.strictEqual(tables.length, 5, `${label} renders one table for each non-header memory zone`);
-    assert.strictEqual(zoneTables.length, 4, `${label} renders Data, Heap, Freespace, and Stack tables`);
+    assert.strictEqual(layout.protectedStoOffset, 17, `${label} keeps protected STO at +17`);
+    assert.strictEqual(layout.heapStart, 18, `${label} starts ordinary heap at +18`);
+    assert.strictEqual(tables.length, 6, `${label} renders one table for each non-header memory zone`);
+    assert.strictEqual(zoneTables.length, 5, `${label} renders Data, protected STO, Heap, Freespace, and Stack tables`);
+    const stoRow = view.querySelector('#thread-zone-sto + .thread-zone-body tbody tr');
+    assert(stoRow, `${label} renders protected STO separately`);
+    assert.strictEqual(stoRow.cells[0].textContent.trim(), '+17',
+        `${label} protected STO row is at +17`);
     for (const table of tables) {
         assert.deepStrictEqual(
             [...table.querySelectorAll('thead th')].slice(0, 2).map(cell => cell.textContent.trim()),
@@ -237,14 +243,14 @@ function assertThreadTableColumns(html, layout, base, label) {
     };
     const capabilityTable = view.querySelector('.abs-clist-table');
     assert.deepStrictEqual(
-        [firstRow(zoneTables[0]).cells[0].textContent.trim(),
-         firstRow(zoneTables[0]).cells[1].textContent.trim()],
+        [firstRow(zoneTables[1]).cells[0].textContent.trim(),
+         firstRow(zoneTables[1]).cells[1].textContent.trim()],
         [`+${layout.drStart}`, expectedAddress(layout.drStart)],
         `${label} Data Registers starts at its selected-lump offset and address`
     );
     assert.deepStrictEqual(
-        [lastRow(zoneTables[1]).cells[0].textContent.trim(),
-         lastRow(zoneTables[1]).cells[1].textContent.trim()],
+        [lastRow(zoneTables[2]).cells[0].textContent.trim(),
+         lastRow(zoneTables[2]).cells[1].textContent.trim()],
         [`+${layout.heapEnd}`, expectedAddress(layout.heapEnd)],
         `${label} Heap ends at its selected-lump offset and address`
     );
@@ -268,8 +274,8 @@ function assertThreadTableColumns(html, layout, base, label) {
         `${label} lump header places its physical address second`);
     assert.strictEqual(
         1 + zoneTables.length + (capabilityTable ? 1 : 0),
-        6,
-        `${label} displays Header, DR, Heap, Freespace, Stack, and Capabilities`
+        7,
+        `${label} displays Header, DR, Protected Indicator, Heap, Freespace, Stack, and Capabilities`
     );
     const capRows = [...capabilityTable.querySelectorAll('tbody tr')];
     assert.strictEqual(capRows.length, 12, `${label} displays exactly twelve persisted capability homes`);
@@ -362,7 +368,7 @@ assert.strictEqual(wideThread.capsEnd, 255, 'larger Thread bodies retain CR11 at
 assert.strictEqual(wideThread.stackEnd, 243, 'larger Thread bodies retain the fixed stack ceiling');
 assert.strictEqual(wideThread.stackStart, 244 - wideThread.stackWords,
     'larger Thread bodies derive stack size from cw/sw, not cc or allocation tail');
-assert.strictEqual(wideThread.freeStart, 17 + wideThread.heapWords,
+assert.strictEqual(wideThread.freeStart, 18 + wideThread.heapWords,
     'larger Thread bodies derive heap extent from cc before Freespace');
 assert.notStrictEqual(wideThread.capsStart, wideThread.lumpSize - wideThread.capsWords,
     'viewer does not fabricate a tail capability zone for a larger Thread');

@@ -10,7 +10,7 @@ Covers the FETCH_METHOD_ENTRY FSM state and the nia_computed Mux:
 
 Memory map used in these tests:
   LUMP_BASE     = 0x9000   CR14.word1_location after Phase 2 mLoad (raw lump base)
-  SP_STORE_ADDR = 0x3000   Heap[0] — holds the current stack-top offset (STO)
+  STO_STORE_ADDR = THREAD_BASE + 17*4 — protected stack-top offset (STO)
   THREAD_BASE   = 0x4000   Base of the thread lump
 
 FSM states exercised:
@@ -39,8 +39,9 @@ from hardware.hw_types import (
 from hardware.layouts import CAP_REG_LAYOUT
 
 LUMP_BASE     = 0x9000
-SP_STORE_ADDR = 0x3000
 THREAD_BASE   = 0x4000
+STO_STORE_ADDR = THREAD_BASE + 17 * 4
+HEAP_BASE_ADDR = THREAD_BASE + 18 * 4
 CALLER_PC     = 10
 CALLEE_EGT    = 0x4A000001
 
@@ -91,7 +92,7 @@ def _run_dispatch(call_imm_val, method_entry_word=0,
     callee_cap      = _build_cap(slot_id=1, perms=PERM_MASK_E, location=0x2000)
     ns_cap          = _build_cap(slot_id=0, perms=0, location=0x8000)
     code_cap        = _build_cap(slot_id=2, perms=PERM_MASK_E, location=LUMP_BASE)
-    cr5_cap         = _build_cap(slot_id=5, perms=PERM_MASK_R | PERM_MASK_W, location=SP_STORE_ADDR)
+    cr5_cap         = _build_cap(slot_id=5, perms=PERM_MASK_R | PERM_MASK_W, location=HEAP_BASE_ADDR)
     cr12_cap        = _build_cap(slot_id=12, perms=0, location=THREAD_BASE)
     callee_lump_hdr = _build_lump_hdr(n_minus_6=CALLEE_N6, cc=CALLEE_CC, cw=CALLEE_CW, magic=0x5)
     thr_hdr         = _build_lump_hdr(n_minus_6=THR_N6, cc=THR_CC, cw=THR_SW, magic=0x1F)
@@ -176,7 +177,7 @@ def _run_dispatch(call_imm_val, method_entry_word=0,
                     pending_read = (rd_addr, callee_lump_hdr)
                 elif call_imm_val > 0 and rd_addr == method_table_addr:
                     pending_read = (rd_addr, method_entry_word)
-                elif rd_addr == SP_STORE_ADDR:
+                elif rd_addr == STO_STORE_ADDR:
                     pending_read = (rd_addr, INITIAL_STO)
                 else:
                     errors.append(

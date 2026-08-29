@@ -371,7 +371,7 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         # Boot.Thread lump at byte 0xE00 (word 896) — see boot_rom.py for the
         # relocation rationale (a base-0 Thread lump collides with the NS
-        # table: Heap[0]/STO is NS slot 4 word1).
+        # table: protected Thread STO is NS slot 4 word1).
         #   header  : valid lump header (size=256, sw=32, cc=12)
         #   STO     : 243 (sp_max) so the boot CALL's stack push succeeds
         #   caps[0] : SelfTest E-GT (NS slot 6) — the ⚡ boot entry.

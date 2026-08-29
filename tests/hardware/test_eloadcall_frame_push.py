@@ -60,9 +60,10 @@ def _first_next_in_state(name: str) -> str:
 class _FrameWordEncoder(Elaboratable):
     """Thin wrapper for the frame_word combinatorial formula.
 
-    bit[31]     = SZ = 1  (CALL/ELOADCALL frame tag)
-    bits[30:16] = sentinel_return_pc = 3  (NIA=0x0C = boot ROM BRANCH -1)
-    bits[15:0]  = prev_STO
+    bits[31:28] = FLAGS
+    bits[27:13] = sentinel_return_pc = 3
+    bit[12]     = prior SZ
+    bits[11:0]  = prev_STO
     A dummy sync register allows add_clock.
     """
     _SENTINEL_RETURN_PC = 3
@@ -76,9 +77,9 @@ class _FrameWordEncoder(Elaboratable):
         m = Module()
         m.d.sync += self._tick_reg.eq(~self._tick_reg)
         m.d.comb += self.frame_word.eq(
-            Cat(self.sto_in[:16],
+            Cat(self.sto_in[:12], Const(0, 1),
                 Const(self._SENTINEL_RETURN_PC, 15),
-                Const(1, 1))
+                Const(0, 4))
         )
         return m
 
@@ -308,27 +309,27 @@ def _run_frame_word(sto_value: int) -> int:
 
 
 class TestFrameWordEncoding:
-    """Behavioral sim: frame word SZ=1, sentinel_pc=3, prev_STO in bits[15:0]."""
+    """Behavioral sim for FLAGS | return_PC | prior_SZ | prev_STO."""
 
-    def test_sz_flag_is_set(self):
+    def test_prior_sz_is_clear_for_empty_stack(self):
         fw = _run_frame_word(48)
-        assert (fw >> 31) & 1 == 1, f"frame_word[31] (SZ) must be 1; got {fw:#010x}"
+        assert (fw >> 12) & 1 == 0
 
     def test_sentinel_return_pc_is_3(self):
         fw = _run_frame_word(48)
-        return_pc = (fw >> 16) & 0x7FFF
-        assert return_pc == 3, f"frame_word bits[30:16] = {return_pc}, expected 3"
+        return_pc = (fw >> 13) & 0x7FFF
+        assert return_pc == 3
 
     def test_prev_sto_preserved_in_low_bits(self):
         for sto in (_STO_VALID, 128, 10, 2):
             fw = _run_frame_word(sto)
-            prev_sto = fw & 0xFFFF
-            assert prev_sto == sto & 0xFFFF
+            prev_sto = fw & 0xFFF
+            assert prev_sto == sto & 0xFFF
 
     def test_frame_word_for_sto_valid(self):
-        """STO=48 → SZ=1 | sentinel=3 | prev_STO=48."""
+        """STO=48 → FLAGS=0 | sentinel=3 | prior_SZ=0 | prev_STO=48."""
         fw = _run_frame_word(_STO_VALID)
-        expected = (1 << 31) | (3 << 16) | _STO_VALID
+        expected = (3 << 13) | _STO_VALID
         assert fw == expected, f"got {fw:#010x}, expected {expected:#010x}"
 
 
@@ -342,7 +343,7 @@ class TestFrameWordEncoding:
 # CR7  (CR_NUCLEUS): written by mload phase 2
 # CR14 (CR_CLOOMC): ns_base=0x600 cap (used for NIA in fast path)
 # cr15_namespace:   NS table base=0x500, limit=8 entries
-# cr5_heap:         valid Turing Inform R-perm GT; Heap[0] at word1_location=0x400
+# cr5_heap:         valid Turing Inform R-perm GT; ordinary heap base=0x148
 # cr12_thread:      valid non-null GT; thread lump base at word1_location=0x100
 # thread_base:      0x100
 # thread_hdr:       _THREAD_HDR (sp_max=51, sp_min=44)
@@ -360,13 +361,13 @@ class TestFrameWordEncoding:
 # 0x538  NS slot 3 word2_integrity = 0xDEB65EEF
 # 0x53C  NS slot 3 word3_abstract_gt = 0
 # 0x800  phase-2 c-list GT (m_elevated → NS check bypassed): INFORM_EL_SLOT2
-# 0x400  Heap[0] = STO value (parametrised)
+# 0x144  protected Thread STO value (thread_base 0x100 + 17 words)
 #
 # Expected writes (STO=48, thread_base=0x100)
 # ===========================================
 # (0x1BC, 0x5A000003)  callee E-GT at thread_base+(STO-1)*4  ← SLOT3, not SLOT2
 # (0x1C0, 0x80030030)  frame word  at thread_base+STO*4     (SZ=1, sentinel=3, prev=48)
-# (0x400, 46)          new STO (48-2)
+# (0x144, 46)          new protected STO (48-2)
 
 
 def _run_eloadcall_dut(
@@ -380,7 +381,7 @@ def _run_eloadcall_dut(
 
     Parameters
     ----------
-    sto_value : STO word read from Heap[0].
+    sto_value : STO word read from the protected Thread +17 slot.
     cr5_gt    : word0_gt for the cr5_heap cap (controls PUSH_CR5_CR12 CR5 check).
     cr12_gt   : word0_gt for the cr12_thread cap (controls PUSH_CR5_CR12 CR12 check).
     call_imm  : 0 = fast path, >0 = indexed method dispatch.
@@ -420,7 +421,7 @@ def _run_eloadcall_dut(
         0x800: _INFORM_EL_SLOT2,
 
         # Stack read
-        0x400: sto_value,            # Heap[0] = STO
+        0x144: sto_value,            # protected Thread +17 = STO
     }
 
     results = {
@@ -440,7 +441,7 @@ def _run_eloadcall_dut(
         ctx.set(dut.mask,      0)
         ctx.set(dut.thread_base,               0x100)
         ctx.set(dut.thread_hdr,                _THREAD_HDR)
-        ctx.set(dut.cr5_heap.as_value(),       _make_cap(cr5_gt,  0x400, 0))
+        ctx.set(dut.cr5_heap.as_value(),       _make_cap(cr5_gt,  0x148, 0))
         ctx.set(dut.cr12_thread.as_value(),    _make_cap(cr12_gt, 0x100, 0))
         ctx.set(dut.cr15_namespace.as_value(), _make_cap(0, 0x500, 8))
         ctx.set(dut.pet_name_rd_data,          0)
@@ -555,16 +556,17 @@ class TestELoadCallDUTFastPath:
         """Write 2: frame word at thread_base + STO*4 = 0x1C0."""
         addr, data = sim_results["writes"][1]
         assert addr == 0x1C0, f"frame word addr: expected 0x1C0, got {addr:#x}"
-        expected_frame = (1 << 31) | (3 << 16) | _STO_VALID   # SZ=1, sentinel=3, prev=48
+        expected_frame = (3 << 13) | _STO_VALID
         assert data == expected_frame, (
             f"frame word: expected {expected_frame:#010x}, got {data:#010x}"
         )
 
     def test_third_write_is_new_sto(self, sim_results):
-        """Write 3: new STO = 48 - 2 = 46 at Heap[0] (0x400)."""
+        """Write 3: new protected STO = 48 - 2 = 46 at Thread +17."""
         addr, data = sim_results["writes"][2]
-        assert addr == 0x400, f"STO write addr: expected 0x400, got {addr:#x}"
-        assert data == _STO_VALID - 2, f"new STO: expected {_STO_VALID - 2}, got {data}"
+        assert addr == 0x144, f"STO write addr: expected 0x144, got {addr:#x}"
+        assert data == (1 << 12) | (_STO_VALID - 2), (
+            f"new indicator: expected SZ=1, STO={_STO_VALID - 2}, got {data}")
 
     def test_nia_is_ns_base_plus_4(self, sim_results):
         """Fast path NIA = ns_base + 4 = 0x600 + 4 = 0x604."""

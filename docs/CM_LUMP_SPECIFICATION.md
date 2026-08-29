@@ -2290,7 +2290,7 @@ field `0x1F` as every other lump. The `typ` field is set to `10`
 > the 13-bit `cw` (code word count) field is otherwise wasted — a Thread
 > carries no executable code. The hardware and Mint **reinterpret** it as `sw`
 > (stack words). The IDE sets `sw` at thread-creation time; Mint validates
-> that `sw > 0`, `cc > 0`, and `17 + cc + sw ≤ 244`. The stack and persisted
+> that `sw > 0`, `cc > 0`, and `18 + cc + sw ≤ 244`. The stack and persisted
 > homes use fixed private-ABI offsets, so their boundaries do not depend on a
 > larger allocation's tail.
 
@@ -2310,7 +2310,7 @@ carried in the NS slot `gt_seq` field, not the header.
 
 ## Thread Lump Memory Layout
 
-Word 0 is the header. The six regions of the fixed private ABI occupy Words
+Word 0 is the header. The fixed private ABI occupies Words
 0..255. Word addresses increase downward from the base. A Thread allocation
 larger than 256 words retains this ABI unchanged; words +256 onward are a
 separate reserved extension, never extra heap/stack or relocated CR homes.
@@ -2321,12 +2321,15 @@ separate reserved extension, never extra heap/stack or relocated CR homes.
 ├─────────────────────────────────────────────┤  ← base  (+1)            ← DR base
 │  ⑤ Data Registers                           │  [16 words]  fixed
 │     DR0 … DR15 — 32-bit registers           │
-├─────────────────────────────────────────────┤  ← base  (+17)           ← heap base
+├─────────────────────────────────────────────┤  ← base  (+17)
+│  Protected STO                              │  [1 word]  machine-only
+│     Stack Top Offset; outside CR5 bounds    │
+├─────────────────────────────────────────────┤  ← base  (+18)           ← heap base
 │  ④ Heap  ↑                                  │  [heapWords]  IDE-defined
 │     Size = cc words · cc field in Header[0] │
 │     Objects allocated from heap base upward │
 │     Grows toward Freespace                  │
-├─────────────────────────────────────────────┤  ← 17+heapWords →        ← FREE base
+├─────────────────────────────────────────────┤  ← 18+heapWords →        ← FREE base
 │  ③ Freespace                                │  [dynamic]
 │     Unallocated — shrinks as Stack/Heap grow│
 │     Mint verifies all-zero at creation time │
@@ -2361,12 +2364,13 @@ in hardware — no literals for stack bounds in the FSM.
 |------|-----------|--------------|-------|-------|
 | Header        | HDR   | +0                               | 1        | Header word — never executed |
 | ⑤ Data Regs    | DR    | +1 … +16                        | 16       | DR0…DR15 (16 × 32-bit, fixed) |
-| ④ Heap         | HEAP  | +17 … +(17+cc−1)                | cc       | IDE-defined heap; +17 is Heap[0] |
-| ③ Freespace    | FREE  | +(17+cc) … +(243−sw)             | dynamic  | Collision zone; all-zero at creation |
+| Protected STO | STO   | +17                              | 1        | Machine-only stack cursor; outside CR5 |
+| ④ Heap         | HEAP  | +18 … +(18+cc−1)                | cc       | IDE-defined ordinary heap |
+| ③ Freespace    | FREE  | +(18+cc) … +(243−sw)             | dynamic  | Collision zone; all-zero at creation |
 | ② LIFO Stack   | STACK | +(244−sw) … +243                | sw       | Header `cw/sw`; grows downward |
 | ① Capabilities | CAPS  | +244 … +255                     | 12       | GT Word 0 × 12: persisted CR0…CR11 homes |
 
-The six regions fit within the fixed +0…+255 private ABI. CR12…CR15 are
+These regions fit within the fixed +0…+255 private ABI. CR12…CR15 are
 privileged/runtime registers and have no persisted Thread-memory homes.
 
 ---
@@ -2483,11 +2487,11 @@ is the empty-stack sentinel; the first word pushed onto the stack occupies
 `sp_max−1` (cursor STO field decreases by 1 for LAMBDA, by 2 for CALL).
 CR12, CR13, and CR15 are system-wide registers not serialized by CHANGE.
 CR14 is transient and is derived from restored CR0 and the selected code LUMP
-header on entry. The live STO field is hardware-only cursor state; its
-reserved backing word is Heap[0] at +17. It is not a packed PC or a capability
-home in the Thread body. Software heap payload begins at Heap[1].
+header on entry. The live STO field is hardware-only cursor state stored in
+the reserved protected word at +17. It is not a packed PC, capability home,
+or ordinary heap payload. CR5 begins at +18 and cannot address this word.
 
-The Zone ④ **Heap** (words 17..17+heapWords−1, example: 17..80) is entirely absent from the hardware
+The Zone ④ **Heap** (words 18..18+heapWords−1, example: 18..81) is entirely absent from the hardware
 save/restore path. It is private to its thread — no other thread holds a GT
 that spans those words — and is managed entirely by software running within
 the thread. The allocator, GC policy, object layout, and compaction strategy
@@ -2526,7 +2530,7 @@ empty-stack sentinel at the top of Zone ②); the first word pushed lands at
 
 ```
 CALL frame (SZ=1 — 2 words):      STO -= 2 after push
-  STO+0:  Frame word: SZ[1] | return_PC[15] | prev_STO[16]
+  STO+0:  Frame word: FLAGS[4] | return_PC[15] | prior_SZ[1] | prev_STO[12]
   STO-1:  E-GT Word 0 of the callee  (Golden Token, Church-side)
 
 LAMBDA frame (SZ=0 — 1 word):     STO -= 1 after push
@@ -2558,14 +2562,14 @@ relaxes the overflow threshold automatically.
 
 ## Zone ③ — Freespace
 
-`17+heapWords` through `stack_min−1` (dynamic, IDE-defined; with cc=64 and
-sw=32: +81..+211, 131 words). This is the collision zone between the upward-growing Heap and
+`18+heapWords` through `stack_min−1` (dynamic, IDE-defined; with cc=64 and
+sw=32: +82..+211, 130 words). This is the collision zone between the upward-growing Heap and
 the downward-growing Stack. At Thread creation `Mint.Thread` verifies all
 words in this zone are zero.
 
 At runtime, Heap objects above heap base and Stack frames below `sp_max`
 both consume words from this zone. The sum of live Heap allocation and live
-Stack geometry must satisfy `17 + heapWords + sw ≤ 244`; freespace is the
+Stack geometry must satisfy `18 + heapWords + sw ≤ 244`; freespace is the
 remaining interval between the two fixed-size zones.
 
 This is the only zone in any Church Machine lump that is dynamically
@@ -2576,10 +2580,10 @@ time and never changes; Thread freespace is live.
 
 ## Zone ④ — Heap
 
-`heapWords` words at offsets +17..+17+heapWords−1 (IDE-defined; example:
-64 words, +17..+80). Fixed size set by the IDE slot metadata
-at design time. Objects are allocated from base+17 upward using bump
-allocation; DR5 tracks the current frontier (offset from word 17 to the
+`heapWords` words at offsets +18..+18+heapWords−1 (IDE-defined; example:
+64 words, +18..+81). Fixed size set by the IDE slot metadata
+at design time. Objects are allocated from base+18 upward using bump
+allocation; DR5 tracks the current frontier (offset from word 18 to the
 next free word).
 
 **Object garbage collection.** Zone ④ is not individually scanned by the
@@ -2661,9 +2665,9 @@ Step 3  typ[9:8] == 0b10 (clist-only) — reject if not; prevents calling
 Step 4  n-6[26:23] describes an allocation of at least 256 words; words
           +256 onward, if present, are reserved extension words.
 Step 5  cw[22:10] is reinterpreted as sw — reject zero stack words.
-Step 6  cc[7:0] > 0 AND 17 + cc + sw ≤ 244 — heapWords (cc) must be
+Step 6  cc[7:0] > 0 AND 18 + cc + sw ≤ 244 — heapWords (cc) must be
           positive and all zones must fit; reject if not.
-Step 7  Scan the derived Zone ③ range +17+cc .. +(243−sw): reject if any word
+Step 7  Scan the derived Zone ③ range +18+cc .. +(243−sw): reject if any word
           is non-zero. Zone ① and Zone ⑤ are pre-populated by the
           boot sequence and are not scanned.
 Step 8  Copy initial GT Word 0 values into fixed CR0..CR11 homes (+244..+255).
@@ -3151,7 +3155,7 @@ already owns.
 | **Example header** | `0xF881_AC00` (Decimal, n=7 cw=107 cc=0) | `0xF900_8240` (n-6=2, sw=32, heapWords=cc=64) | Binary data |
 | **Entry point** | PC = 1 on every CALL | Never — not callable | Never — not callable |
 | **Words 1..cw** | [CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html) code (dispatcher + methods) | DR0–DR15 at +1…+16; no code | Boot / init microcode and SWITCH |
-| **Freespace zone** | Compile-time fixed · `0xAB` content header + embedded API/source, zero remainder (legacy: all-zero) · immutable per release | Dynamic: +(17+cc)…+(243−sw), between Heap ↑ and Stack ↓ | Between init code and NS Table · all-zero |
+| **Freespace zone** | Compile-time fixed · `0xAB` content header + embedded API/source, zero remainder (legacy: all-zero) · immutable per release | Dynamic: +(18+cc)…+(243−sw), between Heap ↑ and Stack ↓ | Between init code and NS Table · all-zero |
 | **C-list zone** | Last `cc` words · list E-GTs · compiler-set | Fixed persisted homes +244…+255: CR0–CR11 | BINARY DATA |
 | **Unique body** | Code and C-List | 6 regions: Header · DR · Heap · Free · Stack · Caps | NS Table (N × 4-word entries: Inform GT + reserved) |
 | **Physical scope · 2^n frame size** | One lump region | One 256/512/1024-word thread frames | Entire application address space |
@@ -3164,7 +3168,7 @@ already owns.
 | **Issued GTs** | One E-GT (caller holds) | GT (Thread) | GT NS |
 | **GC interaction** | G bit in NS slot Word 1 authority | G bits in live CR authority snapshots in Zone ① | Live & Dead slots |
 | **lumpSize** | 2^n compiler-chosen (64–16 384 words) | IDE defined 2^n < 1024 | 2^n IDE-chosen; Boot.NS = 2^14 = 16 384 words |
-| **Freespace verified by Mint** | Yes — words cw+1..lumpSize-cc-1: `0xAB` content-frame validation (bounds + zero remainder, step 7) or all-zero (legacy) | Zone ③ only: +(17+cc)…+(243−sw); fixed CR homes skipped | Scan CRC per slot |
+| **Freespace verified by Mint** | Yes — words cw+1..lumpSize-cc-1: `0xAB` content-frame validation (bounds + zero remainder, step 7) or all-zero (legacy) | Zone ③ only: +(18+cc)…+(243−sw); fixed CR homes skipped | Scan CRC per slot |
 | **Distribution format** | `dot.name.issue.token.zip` | `*.thread.zip` | `*.namespace.zip` |
 | **Simulator NS slot** | Most slots (Salvation=4, Mint=6, …) | Slots 1 and 45 | Slot 0 (Boot.NS) |
 | **CALL target** | Yes | No | No |

@@ -42,8 +42,9 @@ const THREAD_DESIGN = typeof ThreadDesign !== 'undefined'
 // THREAD LUMP LAYOUT  (256 words, NS[1] "Boot.Thread")
 //   +0        Header word
 //   +1..+16   Data Registers  DR0–DR15
-//   +17..+80  Heap (64 words)
-//   +81..+211 Free space
+//   +17       Protected STO (machine-only)
+//   +18..+81  Heap (64 words)
+//   +82..+211 Free space
 //   +212..+243 Stack (32 words, grows down from +243)
 //   +244..+255 Caps zone — GT home slots for CR0–CR11 (CR6=c-list root)
 //
@@ -96,7 +97,8 @@ const THREAD_DESIGN = typeof ThreadDesign !== 'undefined'
 
 // The normative Thread geometry is generated from shared/thread_design.json.
 const THREAD_CAPS_OFFSET = THREAD_DESIGN.capabilityHomes.offset;
-const THREAD_STACK_POINTER_HOME_OFFSET = THREAD_DESIGN.stackPointerHomeOffset;
+const THREAD_STO_OFFSET = THREAD_DESIGN.protectedStoOffset;
+const THREAD_HEAP_OFFSET = THREAD_DESIGN.heapOffset;
 
 // ── Church Hardware Address Range (0xFFFFFF00 – 0xFFFFFFFF) ─────────────────
 // Privileged control-register ports and M-bit authority ports.
@@ -1518,7 +1520,7 @@ class ChurchSimulator {
     // distinct codes: FS_LEGACY_NONZERO, FS_BAD_FLAGS, FS_API_LEN,
     // FS_API_OVERFLOW, FS_SRC_LEN, FS_SRC_OVERFLOW, FS_PAD_NONZERO, FS_TAIL_NONZERO.
     // Thread lumps (typ=10, cw>0) use the collision-zone bounds — the heap
-    // (grows ↑ from word 17+heapWords) and stack (grows ↓) hold live state, so
+    // (grows ↑ from word 18) and stack (grows ↓) hold live state, so
     // only the gap between them is freespace (same zone as lump-audit.js RFS).
     // Namespace lumps (typ=10, cw=0): body IS the NS Table — no freespace scan.
     mintStep7Freespace(words, hdr) {
@@ -2355,7 +2357,7 @@ class ChurchSimulator {
             THREAD_DESIGN.layout(THREAD_LUMP_SIZE, THREAD_SW, THREAD_CC).stackEnd;
         const threadLoc = this.memory[this._nsSlotBase(1)];
         this.memory[threadLoc] = this.packLumpHeader(THREAD_N_MINUS_6, THREAD_SW, THREAD_CC, 2);
-        this.memory[threadLoc + THREAD_STACK_POINTER_HOME_OFFSET] = THREAD_STACK_BOUNDARY;
+        this.memory[threadLoc + THREAD_STO_OFFSET] = THREAD_STACK_BOUNDARY;
 
         // Thread caps zone — CR0 home slot at word offset +244 is pre-set to an Enter-GT
         // for bootEntrySlot (the ⚡ lightning-bolt selection, e.g. LED Flash at slot 10).
@@ -2377,7 +2379,7 @@ class ChurchSimulator {
                 THREAD_N_MINUS_6, THREAD_SW, THREAD_CC, 2);
             this.memory[generatedThreadLoc + THREAD_CAPS_OFFSET] =
                 this.createGT(_initialBootSeq, this.bootEntrySlot, {E: 1}, 1);
-            this.memory[generatedThreadLoc + THREAD_STACK_POINTER_HOME_OFFSET] = THREAD_STACK_BOUNDARY;
+            this.memory[generatedThreadLoc + THREAD_STO_OFFSET] = THREAD_STACK_BOUNDARY;
         }
 
         // Memory-manager GT at c-list[0]: R|W Inform capability over NS slot 0 (full namespace).
@@ -2741,11 +2743,17 @@ class ChurchSimulator {
                 const _threadHdrWord12 = this.memory[_threadBase12] >>> 0;
                 const _threadHdr12    = this.parseLumpHeader(_threadHdrWord12);
                 const _threadCC12     = _threadHdr12.valid ? _threadHdr12.cc : 0;
-                const _heapStart12    = 1 + 16 + _threadCC12;                     // first word above header + DR zone + c-list
-                const _spMax12        = (_threadHdr12.valid ? _threadHdr12.lumpSize : 256) - 12 - 1;
+                const _heapStart12    = THREAD_HEAP_OFFSET;
+                const _heapEnd12      = _heapStart12 + _threadCC12 - 1;
                 const _seq1h = this.parseNSWord1(_initThrdEntry.word1_limit).gtSeq;
                 const gt5 = this.createGT(_seq1h, BOOT_NS_SLOT_THREAD, {R:1,W:1,X:0,L:0,S:0,E:0}, 1);  // RW Inform GT for the thread lump (Slot 1)
-                this._writeCR(5, gt5, _initThrdEntry);                             // CR5 ← heap RW token (base=thread lump, perms=RW)
+                this.cr[5] = {
+                    word0: gt5 >>> 0,
+                    word1: (_threadBase12 + THREAD_HEAP_OFFSET) >>> 0,
+                    word2: Math.max(0, _threadCC12 - 1) >>> 0,
+                    word3: 0,
+                    m: 0,
+                };
                 // Boot ROM instruction [1]: CHANGE CR12, CR15[1] — 3 trace packets (hardware NIA=1)
                 this._emitTrace(1, TRACE_EV_CHANGE_PUSH, 0);
                 this._emitTrace(1, TRACE_EV_CHANGE_CR12, this.cr[12].word0 >>> 0);
@@ -2755,7 +2763,7 @@ class ChurchSimulator {
                 // created directly by the boot state machine, CHANGE-consistent).
                 this.auditLog.push({
                     gate: 'HEAP',
-                    desc: `CR5(RW) ← thread heap  · base=0x${(_threadBase12).toString(16).toUpperCase()}, heap=[+${_heapStart12}..+${_spMax12}] (CHANGE-consistent, RW Inform)`,
+                    desc: `CR5(RW) ← thread heap · base=0x${this.cr[5].word1.toString(16).toUpperCase()}, heap=[+${_heapStart12}..+${_heapEnd12}] (protected STO remains outside CR5 at +${THREAD_STO_OFFSET})`,
                     label: this.nsLabels[BOOT_NS_SLOT_THREAD] || 'Boot.Thread',
                     nsIndex: BOOT_NS_SLOT_THREAD,
                     requiredPerm: null,
@@ -2988,6 +2996,7 @@ class ChurchSimulator {
                 if (threadBase !== null) {
                     this._writeRuntimeWord(threadBase + sp_max, sentinelFrameWord);
                     this._writeRuntimeWord(threadBase + sp_max - 1, oldCR6GT);
+                    this._writeProtectedSto(threadBase, sp_max - 2, 1, this.flags);
                 }
                 this.sto = sp_max - 2;
 
@@ -4326,6 +4335,45 @@ class ChurchSimulator {
             return null;
         }
         return cr12.word1 >>> 0;
+    }
+
+    _protectedStoAddress(threadBase = this._activeThreadBase()) {
+        if (!Number.isInteger(threadBase)) return null;
+        return (threadBase + THREAD_STO_OFFSET) >>> 0;
+    }
+
+    _readProtectedSto(threadBase = this._activeThreadBase()) {
+        const addr = this._protectedStoAddress(threadBase);
+        return addr === null ? (this.sto >>> 0) : ((this.memory[addr] >>> 0) & 0xFFF);
+    }
+
+    _packProtectedIndicator(sto, sz = 0, flags = this.flags) {
+        const { N=false, Z=false, C=false, V=false } = flags || {};
+        const flagBits = ((N ? 1 : 0) << 3) | ((Z ? 1 : 0) << 2) |
+            ((C ? 1 : 0) << 1) | (V ? 1 : 0);
+        return (((flagBits & 0xF) << 28) | ((sz & 1) << 12) |
+            (sto & 0xFFF)) >>> 0;
+    }
+
+    _unpackProtectedIndicator(word) {
+        const flagBits = (word >>> 28) & 0xF;
+        return {
+            flags: { N: !!(flagBits & 8), Z: !!(flagBits & 4),
+                C: !!(flagBits & 2), V: !!(flagBits & 1) },
+            sz: (word >>> 12) & 1,
+            sto: word & 0xFFF,
+        };
+    }
+
+    _writeProtectedSto(threadBase, value, sz = null, flags = null) {
+        const addr = this._protectedStoAddress(threadBase);
+        if (addr === null) return false;
+        const current = this._unpackProtectedIndicator(this.memory[addr] >>> 0);
+        this._writeRuntimeWord(addr, this._packProtectedIndicator(
+            value,
+            sz === null ? current.sz : sz,
+            flags || current.flags));
+        return true;
     }
 
     // The configured scheduler order is intentionally derived from the
@@ -5787,8 +5835,9 @@ class ChurchSimulator {
 
         this._flushLambdaCache();
 
-        const savedSTO = this.sto;
         const callThreadBase = this._activeThreadBase();
+        const savedSTO = this._readProtectedSto(callThreadBase);
+        this.sto = savedSTO;
         if (callThreadBase !== null) {
             const hdrRead = this._threadRead(callThreadBase, `CALL CR${d.crDst} thread-hdr`);
             if (!hdrRead.ok) return null;
@@ -5814,7 +5863,9 @@ class ChurchSimulator {
             }
         }
         const oldCR6GT = this.cr[6].word0 >>> 0;
-        const frameWord = this._packFrameWord(this.pc + 1, 1, savedSTO);
+        const priorFrame = this.callStack[this.callStack.length - 1];
+        const frameWord = this._packFrameWord(
+            this.pc + 1, priorFrame ? priorFrame.sz : 0, savedSTO);
         this.callStack.push({
             returnPC:   this.pc + 1,
             savedCRs:   this.cr.map(c => ({...c})),
@@ -5835,6 +5886,9 @@ class ChurchSimulator {
             }
         }
         this.sto = (savedSTO - 2) & 0xFFF;
+        if (callThreadBase !== null) {
+            this._writeProtectedSto(callThreadBase, this.sto, 1, this.flags);
+        }
         this._resetAllMBits();   // CALL boundary: M is reset on all CRs (architecture rule)
 
         const base = nsEntry.word0_location;
@@ -6336,7 +6390,14 @@ class ChurchSimulator {
             }
         }
         if (frame.savedFlags) this.flags = {...frame.savedFlags};
-        if (typeof frame.savedSTO === 'number') this.sto = frame.savedSTO;
+        if (typeof frame.savedSTO === 'number') {
+            this.sto = frame.savedSTO;
+            if (tnBaseRet !== null) {
+                const priorFrame = this.callStack[this.callStack.length - 1];
+                this._writeProtectedSto(
+                    tnBaseRet, this.sto, priorFrame ? priorFrame.sz : 0, this.flags);
+            }
+        }
         const frameTag = frame.sz === 0 ? 'LAMBDA' : 'CALL';
         const isLeafLambda = frame.sz === 0 && this.lambdaActive && this.lambdaCachedFrame;
         if (isLeafLambda) {
@@ -6530,6 +6591,11 @@ class ChurchSimulator {
                         outBase + THREAD_CAPS_OFFSET + i,
                         this.cr[i].word0);
                 }
+                const currentFrame = this.callStack[this.callStack.length - 1];
+                this._writeRuntimeWord(
+                    outBase + THREAD_STO_OFFSET,
+                    this._packProtectedIndicator(
+                        this.sto, currentFrame ? currentFrame.sz : 0, this.flags));
             }
         }
 
@@ -6572,15 +6638,29 @@ class ChurchSimulator {
         for (let i = 0; i < 16; i++) {
             this.dr[i] = this.memory[tBase + 1 + i] >>> 0;
         }
-        // PC, flags, STO, host call frames, and Lambda state are transient
-        // execution state, not serialized Thread words.  A dormant Thread
-        // activation starts at its entry with a clean execution frame.
+        // STO is protected per-Thread state at +17. Host-only frame objects,
+        // flags, and Lambda cache state remain transient.
         this.flags = { N: false, Z: false, C: false, V: false };
-        this.sto = THREAD_CAPS_OFFSET - 1;
+        const restoredIndicator = this._unpackProtectedIndicator(
+            this.memory[tBase + THREAD_STO_OFFSET] >>> 0);
+        this.sto = restoredIndicator.sto;
+        this.flags = restoredIndicator.flags;
         this.callStack = [];
         this.lambdaActive = false;
         this.lambdaReturnPC = 0;
         this.lambdaCachedFrame = null;
+        const threadLayout = targetLayout || THREAD_DESIGN.layout(
+            targetHeader.lumpSize, targetHeader.cw, targetHeader.cc);
+        const heapGT = this.createGT(
+            threadSeq, targetIdx,
+            {R:1,W:1,X:0,L:0,S:0,E:0}, 1);
+        this.cr[5] = {
+            word0: heapGT >>> 0,
+            word1: (tBase + threadLayout.heapStart) >>> 0,
+            word2: (threadLayout.heapWords - 1) >>> 0,
+            word3: 0,
+            m: 0,
+        };
 
         // Restored CR0 is the sole entry authority. Validate it through mLoad,
         // then derive the same executable CR14 shape as a CALL index 0.
@@ -6927,8 +7007,9 @@ class ChurchSimulator {
 
         this._flushLambdaCache();
 
-        const savedSTO = this.sto;
         const lambdaThreadBase = this._activeThreadBase();
+        const savedSTO = this._readProtectedSto(lambdaThreadBase);
+        this.sto = savedSTO;
         if (lambdaThreadBase !== null) {
             const hdrRead = this._threadRead(lambdaThreadBase, `LAMBDA CR${crIdx} thread-hdr`);
             if (!hdrRead.ok) return null;
@@ -6953,7 +7034,9 @@ class ChurchSimulator {
                 return null;
             }
         }
-        const frameWord = this._packFrameWord(this.pc + 1, 0, savedSTO);
+        const priorFrame = this.callStack[this.callStack.length - 1];
+        const frameWord = this._packFrameWord(
+            this.pc + 1, priorFrame ? priorFrame.sz : 0, savedSTO);
         this.callStack.push({
             returnPC:   this.pc + 1,
             savedCRs:   this.cr.map(c => ({...c})),
@@ -6967,6 +7050,9 @@ class ChurchSimulator {
         this.lambdaReturnPC = this.pc + 1;
         this.lambdaCachedFrame = { addr: savedSTO, word: frameWord, threadBase: lambdaThreadBase };
         this.sto = (savedSTO - 1) & 0xFFF;
+        if (lambdaThreadBase !== null) {
+            this._writeProtectedSto(lambdaThreadBase, this.sto, 0, this.flags);
+        }
 
         const label = this.nsLabels[check.index] || 'reduction';
         const desc = `LAMBDA CR${crIdx} -> ${label} [SZ=0, STO:${savedSTO}->${this.sto}]`;
@@ -7188,8 +7274,9 @@ class ChurchSimulator {
         }
         const clistStart_ec = hdr_ec.lumpSize - hdr_ec.cc;
 
-        const savedSTO_ec = this.sto;
         const ecThreadBase = this._activeThreadBase();
+        const savedSTO_ec = this._readProtectedSto(ecThreadBase);
+        this.sto = savedSTO_ec;
         if (ecThreadBase !== null) {
             const hdrRead_th = this._threadRead(ecThreadBase, `ELOADCALL CR${d.crDst} thread-hdr`);
             if (!hdrRead_th.ok) return null;
@@ -7204,7 +7291,9 @@ class ChurchSimulator {
                 this.output += `[STACK WARNING] ELOADCALL CR${d.crDst}: STO=${newSTO_ec} below sw limit sp_min=${sp_min_th} (sw=${sw_th}) — V flag set\n`;
             }
         }
-        const frameWord_ec = this._packFrameWord(this.pc + 1, 1, savedSTO_ec);
+        const priorFrame_ec = this.callStack[this.callStack.length - 1];
+        const frameWord_ec = this._packFrameWord(
+            this.pc + 1, priorFrame_ec ? priorFrame_ec.sz : 0, savedSTO_ec);
         // Save CRs BEFORE any _writeCR calls so RETURN correctly restores the caller's context.
         this.callStack.push({
             returnPC:   this.pc + 1,
@@ -7224,6 +7313,9 @@ class ChurchSimulator {
             }
         }
         this.sto = (savedSTO_ec - 2) & 0xFFF;
+        if (ecThreadBase !== null) {
+            this._writeProtectedSto(ecThreadBase, this.sto, 1, this.flags);
+        }
 
         // Write the loaded GT into the destination CR.
         if (!this._writeCR(d.crDst, slotGT, entry)) return null;

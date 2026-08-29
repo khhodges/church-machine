@@ -27,8 +27,23 @@
         "offset": 1,
         "words": 16
     },
-    "heapOffset": 17,
-    "stackPointerHomeOffset": 17,
+    "protectedStoOffset": 17,
+    "protectedIndicator": {
+        "stoBits": [
+            0,
+            11
+        ],
+        "sizeBit": 12,
+        "reservedBits": [
+            13,
+            27
+        ],
+        "flagsBits": [
+            28,
+            31
+        ]
+    },
+    "heapOffset": 18,
     "capabilityHomes": {
         "firstRegister": 0,
         "lastRegister": 11,
@@ -46,6 +61,7 @@
     "zoneOrder": [
         "Header",
         "Data Registers",
+        "Protected STO",
         "Heap",
         "Freespace",
         "LIFO Stack",
@@ -79,6 +95,8 @@
             drStart: raw.dataRegisters.offset,
             drEnd: raw.dataRegisters.offset + raw.dataRegisters.words - 1,
             drWords: raw.dataRegisters.words,
+            protectedStoOffset: raw.protectedStoOffset,
+            protectedIndicator: raw.protectedIndicator,
             heapStart: heapStart,
             heapEnd: heapEnd,
             heapWords: heapWords,

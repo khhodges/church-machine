@@ -98,8 +98,9 @@ INIT_THRD:  CHANGE  AL, CR12, CR12, #1   ; B:02 \u2014 switch to thread context<
 <tr><th>Offset (words)</th><th>Zone</th><th>Description</th></tr>
 <tr><td>0</td><td>Lump Header</td><td><code>0xF900_020C</code> \u2014 never executed; encodes lump shape</td></tr>
 <tr><td>+1 \u2026 +16</td><td>\u2464 Data Registers</td><td>DR0\u2013DR15 shadow; fixed at the head, just after the header</td></tr>
-<tr><td>+17 \u2026 +80</td><td>\u2463 Heap</td><td>Fixed 64-word heap; objects allocated from heap base upward</td></tr>
-<tr><td>+81 \u2026 +211</td><td>\u2462 Freespace</td><td>Dynamic gap between heap top \u2191 and stack bottom \u2193</td></tr>
+<tr><td>+17</td><td>Protected STO</td><td>Machine-only stack cursor; outside CR5 bounds</td></tr>
+<tr><td>+18 \u2026 +81</td><td>\u2463 Heap</td><td>Fixed 64-word heap; objects allocated from heap base upward</td></tr>
+<tr><td>+82 \u2026 +211</td><td>\u2462 Freespace</td><td>Dynamic gap between heap top \u2191 and stack bottom \u2193</td></tr>
 <tr><td>+212 \u2026 +243</td><td>\u2461 LIFO Stack</td><td>CALL/RETURN frames; STO initial\u202f=\u202f212 (empty), grows downward</td></tr>
 <tr><td>+244 \u2026 +255</td><td>\u2460 Capabilities</td><td>GT Word\u202f0 \u00d7 12 (CR0\u2013CR11); c-list tail; saved/restored by mLoad</td></tr>
 </table>

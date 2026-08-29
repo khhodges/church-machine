@@ -738,6 +738,19 @@ class ChurchCore(Elaboratable):
                 u_regs.dr_wr_en.eq(0),
             ]
 
+        # CHANGE/RETURN restore the packed protected-indicator flags.
+        if not self.iot_profile:
+            with m.If(u_change.flags_restore_en):
+                m.d.comb += [
+                    u_regs.flags_in.eq(u_change.flags_restore_data),
+                    u_regs.flags_wr_en.eq(1),
+                ]
+        with m.If(u_return.flags_restore_en):
+            m.d.comb += [
+                u_regs.flags_in.eq(u_return.flags_restore_data),
+                u_regs.flags_wr_en.eq(1),
+            ]
+
         # IRQ dispatch DR writes — last-write-wins: override the chain above
         # for the one cycle that u_irq_dispatch fires each write pulse.
         if not self.iot_profile:
@@ -1184,6 +1197,7 @@ class ChurchCore(Elaboratable):
                 self.active_thread_base)),
             # THREAD_HDR: populated by CHANGE on thread restore, cached for CALL's stack validation
             u_call.thread_hdr.eq(u_change.thread_hdr_out if not self.iot_profile else 0),
+            u_call.flags.eq(u_regs.flags),
             # Parallel register-file mask operations for domain-crossing cleanup
             u_regs.cr_b_clear_mask.eq(u_call.cr_b_clear_mask),
             u_regs.cr_null_mask.eq(u_call.cr_null_mask),
@@ -1251,7 +1265,7 @@ class ChurchCore(Elaboratable):
             u_tperm.preset.eq(u_decoder.tperm_preset),
             u_tperm.cr_rd_data.eq(u_regs.cr_rd_data),
             # FRAME preset: Z=1 if a real return frame exists (STO < sp_max).
-            # STO is held in thread memory (Heap[0]); a cached register is needed
+            # STO is held in protected Thread word +17; a cached register is needed
             # to drive this without a memory read cycle.  Tied to 0 until the
             # thread-scheduler exposes a cached sto_reg signal here.
             # TODO: wire to sto_cached < sp_max when core gains an STO cache.
@@ -1584,6 +1598,7 @@ class ChurchCore(Elaboratable):
                 u_change.mem_wr_done.eq(1),
                 u_change.dr_rd_data.eq(u_regs.dr_rd_data1),
                 u_change.boot_window.eq(boot_microcode_active),
+                u_change.flags_in.eq(u_regs.flags),
             ]
             with m.If(clear_all):
                 m.d.sync += [
@@ -1646,6 +1661,7 @@ class ChurchCore(Elaboratable):
                 u_eloadcall.thread_base.eq(self.active_thread_base),
                 u_eloadcall.thread_hdr.eq(u_change.thread_hdr_out if not self.iot_profile else 0),
                 u_eloadcall.cr12_thread.eq(u_regs.cr12_thread),
+                u_eloadcall.flags.eq(u_regs.flags),
             ]
 
             xloadlambda_start_sig = Signal()
@@ -2723,7 +2739,7 @@ class ChurchCore(Elaboratable):
                     self.dmem_wr_en.eq(1),
                 ]
             with m.Elif(u_eloadcall.mem_rd_en):
-                # ELOADCALL PUSH_ARM / PUSH_READ_STO: read Heap[0] (STO) before
+                # ELOADCALL PUSH_ARM / PUSH_READ_STO: read protected STO before
                 # pushing the call-stack frame.  Mutually exclusive with
                 # u_shared_mload (call/return/load) and u_change.
                 m.d.comb += [

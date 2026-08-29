@@ -410,7 +410,7 @@ function makeThreadHeader({ nMinus6 = 2, sw = 32, hw = 64 } = {}) {
 //   Words 212..243: stack zone (sw=32 words; fixed ABI; may be non-zero)
 //   Words 244..255: caps zone (12 architecture-fixed GT Word 0 values)
 //
-// fsStart = 17 + heapWords = 17 + 64 = 81
+// fsStart = 18 + heapWords = 18 + 64 = 82
 // fsEnd   = 244 - sw = 212
 function makeValidThread({ sw = 32, hw = 64, nMinus6 = 2 } = {}) {
     const lumpSize = 1 << (nMinus6 + 6);

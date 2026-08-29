@@ -134,6 +134,12 @@ console.log('\n--- BA-3: CR5 (B:03 INIT_HEAP) ---');
         entry && JSON.stringify(entry.label));
     check('BA-3f: result is pass',
         entry && entry.result === 'pass', entry && entry.result);
+    check('BA-3g: CR5 ordinary heap starts at Thread +18',
+        sim.cr[5].word1 === sim.cr[12].word1 + 18,
+        `CR5.base=${sim.cr[5].word1}, Thread.base=${sim.cr[12].word1}`);
+    check('BA-3h: protected STO at Thread +17 is below CR5 base',
+        sim.cr[12].word1 + 17 < sim.cr[5].word1,
+        `STO=${sim.cr[12].word1 + 17}, CR5.base=${sim.cr[5].word1}`);
 }
 
 // ─── BA-4: CR6 initial E-perm — INIT_ABSTR ───────────────────────────────────

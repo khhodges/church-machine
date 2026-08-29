@@ -1284,7 +1284,7 @@ console.log('\n--- LLB-19: Truncated buffer (header says 64 words, buffer has 32
         const words = new Array(lumpSize).fill(0);
         words[0] = makeHdr(stackWords, heapWords, 2, 2);   // typ=2 (clist-only/Thread), cw=stack, cc=heap
         for (let i = 1; i <= 16; i++) words[i] = 0x11110000 + i;             // DR0..DR15 live values
-        for (let i = 17; i < 17 + heapWords; i++) words[i] = 0x22220000 + i; // heap state
+        for (let i = 18; i < 18 + heapWords; i++) words[i] = 0x22220000 + i; // heap state
         for (let i = lumpSize - 12 - stackWords; i < lumpSize - 12; i++) words[i] = 0x33330000 + i; // stack
         for (let i = lumpSize - 12; i < lumpSize; i++) words[i] = 0x4A000006; // caps zone GTs
         if (dirtyCollisionZone) words[100] = 0xBADC0DE1;   // inside collision zone

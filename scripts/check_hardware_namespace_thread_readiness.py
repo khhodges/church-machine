@@ -84,7 +84,7 @@ def check_contract() -> list[str]:
              "SelfTest entry is not at the canonical Wukong location")
     _fail_if(WUKONG_THREAD_BASE_WORD > 0, "thread lump must not overlap the NS root")
     _fail_if(WUKONG_THREAD_STO_WORD == WUKONG_THREAD_BASE_WORD + 17,
-             "thread STO is not at Heap[0]")
+             "protected Thread STO is not at reserved offset +17")
     _fail_if(WUKONG_THREAD_CAPS0_WORD == WUKONG_THREAD_BASE_WORD + 244,
              "Thread.caps[0] is not at the fixed +244 offset")
     _fail_if(WUKONG_THREAD_CAPS12_WORD == WUKONG_THREAD_BASE_WORD + 256,

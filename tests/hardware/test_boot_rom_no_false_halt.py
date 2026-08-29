@@ -409,13 +409,12 @@ class TestBridgeSentinelHaltOrdering:
             "ser.write(b'r') not found after the sentinel branch in wukong_bridge.py"
         )
         # The sentinel block must arm the deferred-q gate, not send 'q' directly.
-        # Find the end of the sentinel block (the 'if sentinel[stale]:' that follows).
-        sentinel_block_end = src.find("if sentinel['stale']:", run_write_idx)
+        # Find the end of the deferred automatic-run try block.
+        sentinel_block_end = src.find("except Exception as exc:", run_write_idx)
         assert sentinel_block_end != -1, (
-            "'if sentinel[stale]:' end marker not found after ser.write(b'r') "
-            "in wukong_bridge.py — sentinel block boundary may have changed"
+            "automatic-run exception boundary not found after ser.write(b'r')"
         )
-        sentinel_block = src[run_write_idx:sentinel_block_end]
+        sentinel_block = src[sentinel_branch_idx:sentinel_block_end]
         assert '_boot_q_pending' in sentinel_block, (
             "_boot_q_pending not armed in the sentinel try-block — "
             "the bridge must set _boot_q_pending = True after 'r' so the "

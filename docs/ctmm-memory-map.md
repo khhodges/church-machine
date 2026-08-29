@@ -270,8 +270,9 @@ are available to the heap allocator; the NS entry for slot 2 is all-zero
 |:-----------------|:----------------|------:|:-----|
 | +0               | `0x0040`        |     1 | **Header** (`0xF9008240`) |
 | +1 … +16         | `0x0041–0x0050` |    16 | **DR zone** — home locations for DR0–DR15 |
-| +17 … +32        | `0x0051–0x0060` |    16 | **Heap zone** (`cw=32` marks end of data zone) |
-| +33 … +191       | `0x0061–0x00BF` |   159 | Free space |
+| +17              | `0x0051`        |     1 | **Protected STO** — machine-only, outside CR5 bounds |
+| +18 … +33        | `0x0052–0x0061` |    16 | **Heap zone** |
+| +34 … +191       | `0x0062–0x00BF` |   158 | Free space |
 | +192 … +255      | `0x00C0–0x00FF` |    64 | **Protected zone** (`lumpSize − cc = 192` is c-list base; `cc=64`) |
 | +212 … +243      | `0x00D4–0x00F3` |    32 | **Stack** (grows down; STO starts at 243) |
 | +244 … +255      | `0x00F4–0x00FF` |    12 | **Caps zone** — GT home slots for CR0–CR11 |
@@ -495,14 +496,14 @@ fetches instructions from here.
 | +14    | `0x004E`| `00000000` | HALT (empty/zero)     | DR13 home slot |
 | +15    | `0x004F`| `00000000` | HALT (empty/zero)     | DR14 home slot |
 | +16    | `0x0050`| `00000000` | HALT (empty/zero)     | DR15 home slot |
-| +17    | `0x0051`| `00000000` | HALT (empty/zero)     | Heap slot 0 |
-| +18    | `0x0052`| `00000000` | HALT (empty/zero)     | Heap slot 1 |
-| +19    | `0x0053`| `00000000` | HALT (empty/zero)     | Heap slot 2 |
-| +20    | `0x0054`| `00000000` | HALT (empty/zero)     | Heap slot 3 |
-| +21    | `0x0055`| `00000000` | HALT (empty/zero)     | Heap slot 4 |
-| +22    | `0x0056`| `00000000` | HALT (empty/zero)     | Heap slot 5 |
-| +23    | `0x0057`| `00000000` | HALT (empty/zero)     | Heap slot 6 |
-| +24    | `0x0058`| `00000000` | HALT (empty/zero)     | Heap slot 7 |
+| +17    | `0x0051`| `000000F3` | —                     | Protected STO (243), machine-only |
+| +18    | `0x0052`| `00000000` | HALT (empty/zero)     | Heap slot 0 |
+| +19    | `0x0053`| `00000000` | HALT (empty/zero)     | Heap slot 1 |
+| +20    | `0x0054`| `00000000` | HALT (empty/zero)     | Heap slot 2 |
+| +21    | `0x0055`| `00000000` | HALT (empty/zero)     | Heap slot 3 |
+| +22    | `0x0056`| `00000000` | HALT (empty/zero)     | Heap slot 4 |
+| +23    | `0x0057`| `00000000` | HALT (empty/zero)     | Heap slot 5 |
+| +24    | `0x0058`| `00000000` | HALT (empty/zero)     | Heap slot 6 |
 | +25    | `0x0059`| `00000000` | HALT (empty/zero)     | Heap slot 8 |
 | +26    | `0x005A`| `00000000` | HALT (empty/zero)     | Heap slot 9 |
 | +27    | `0x005B`| `00000000` | HALT (empty/zero)     | Heap slot 10 |
