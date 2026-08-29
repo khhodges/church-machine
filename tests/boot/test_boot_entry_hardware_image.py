@@ -34,10 +34,12 @@ from server.boot_image import (
     WUKONG_DMEM_WORDS,
     WUKONG_UPLOAD_BODY_BASE_WORD,
 )
+from hardware.thread_design import (
+    THREAD_CAPS_OFFSET,
+    THREAD_STACK_POINTER_HOME_OFFSET,
+)
 
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
-
-THREAD_CAPS_OFFSET = 244   # Thread.caps[0] word offset inside the Thread lump
 
 
 def _minimal_cfg(total=16384, thread_count=None):
@@ -315,7 +317,8 @@ def test_oversized_catalog_allocation_preserves_three_threads_and_projection(tmp
         assert ((source[base] >> 8) & 0x3) == 2
         assert source[base + THREAD_CAPS_OFFSET] == create_gt(
             0, 10, {"E": 1}, 1)
-        assert source[base + 17] == 512 - 13
+        assert source[base + THREAD_STACK_POINTER_HOME_OFFSET] == (
+            THREAD_CAPS_OFFSET - 1)
 
     projected, info = build_wukong_upload_image(generic)
     projected_words = _unpack_words(projected)

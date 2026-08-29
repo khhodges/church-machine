@@ -85,16 +85,16 @@ except ImportError:
 try:
     from hardware.thread_design import (
         THREAD_CAPS_OFFSET,
-        THREAD_HEAP_OFFSET,
         THREAD_MIN_WORDS,
+        THREAD_STACK_POINTER_HOME_OFFSET,
         THREAD_SUPPORTED_BODY_WORDS,
         thread_layout,
     )
 except ImportError:
     from thread_design import (
         THREAD_CAPS_OFFSET,
-        THREAD_HEAP_OFFSET,
         THREAD_MIN_WORDS,
+        THREAD_STACK_POINTER_HOME_OFFSET,
         THREAD_SUPPORTED_BODY_WORDS,
         thread_layout,
     )
@@ -1699,7 +1699,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             f"{', '.join(map(str, THREAD_SUPPORTED_BODY_WORDS))}")
     mem[thread_loc] = pack_lump_header(
         _ns_n_minus_6(thread_size), thread_stack_words, thread_heap_words, 2)
-    mem[thread_loc + THREAD_HEAP_OFFSET] = THREAD_CAPS_OFFSET - 1
+    mem[thread_loc + THREAD_STACK_POINTER_HOME_OFFSET] = layout["stack_end"]
     _boot_entry_ns_base = total - (boot_entry_slot + 1) * NS_ENTRY_WORDS
     _boot_entry_seq = (mem[_boot_entry_ns_base + 1] >> 21) & 0x1FF
     mem[thread_loc + THREAD_CAPS_OFFSET] = create_gt(_boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
@@ -1711,7 +1711,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     for _thread_loc in extra_thread_locs:
         mem[_thread_loc] = pack_lump_header(
             _ns_n_minus_6(thread_size), thread_stack_words, thread_heap_words, 2)
-        mem[_thread_loc + THREAD_HEAP_OFFSET] = THREAD_CAPS_OFFSET - 1
+        mem[_thread_loc + THREAD_STACK_POINTER_HOME_OFFSET] = layout["stack_end"]
         mem[_thread_loc + THREAD_CAPS_OFFSET] = create_gt(
             _boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
 

@@ -44,10 +44,13 @@ from server.boot_image import (  # noqa: E402
     generated_thread_slots,
     parse_ns_table_raw,
 )
+from hardware.thread_design import (  # noqa: E402
+    THREAD_CAPS_OFFSET,
+    THREAD_STACK_POINTER_HOME_OFFSET,
+)
 
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
 HARNESS   = os.path.join(ROOT, "tests", "boot", "sim_init_dump.js")
-THREAD_CAPS_OFFSET = 244
 
 
 # ---- configs ---------------------------------------------------------------
@@ -375,6 +378,35 @@ def test_default_thread_count_remains_byte_compatible(tmp_path):
     explicit_single["step1"]["threadCount"] = 1
     assert generate_boot_image(legacy, str(tmp_path)) == generate_boot_image(
         explicit_single, str(tmp_path))
+
+
+def test_generated_threads_use_fixed_stack_boundary(tmp_path):
+    """Every generated Thread must use fixed private-ABI stack geometry."""
+    _write_synthetic_boot_abstr_lump(str(tmp_path))
+    cfg = _cfg_generated_threads(3)
+    cfg["step1"]["threadLumpWords"] = 512
+    generated = generate_boot_image(cfg, str(tmp_path))
+    step1 = cfg["step1"]
+    total = int(step1["totalNamespaceWords"])
+    assert len(generated) == total * 4
+    words = struct.unpack(f"<{total}I", generated)
+    thread_count = int(step1.get("threadCount") or 1)
+    slots = [1, *generated_thread_slots(thread_count)]
+    expected_boundary = THREAD_CAPS_OFFSET - 1
+    retired_tail_relative_boundary = int(step1["threadLumpWords"]) - 13
+    assert THREAD_STACK_POINTER_HOME_OFFSET == 17
+    assert expected_boundary == 0xF3
+    assert retired_tail_relative_boundary == 0x1F3
+
+    for slot in slots:
+        ns_base = total - (slot + 1) * NS_ENTRY_WORDS
+        thread_loc = words[ns_base]
+        actual_boundary = words[thread_loc + THREAD_STACK_POINTER_HOME_OFFSET]
+        assert actual_boundary == expected_boundary, (
+            f"NS slot {slot} Thread boundary at +"
+            f"{THREAD_STACK_POINTER_HOME_OFFSET} is 0x{actual_boundary:08X}; "
+            f"expected fixed +243 (0x{expected_boundary:08X})"
+        )
 
 
 def test_committed_ns_state_names_generated_threads_from_image_count(tmp_path, monkeypatch):

@@ -96,6 +96,7 @@ const THREAD_DESIGN = typeof ThreadDesign !== 'undefined'
 
 // The normative Thread geometry is generated from shared/thread_design.json.
 const THREAD_CAPS_OFFSET = THREAD_DESIGN.capabilityHomes.offset;
+const THREAD_STACK_POINTER_HOME_OFFSET = THREAD_DESIGN.stackPointerHomeOffset;
 
 // ── Church Hardware Address Range (0xFFFFFF00 – 0xFFFFFFFF) ─────────────────
 // Privileged control-register ports and M-bit authority ports.
@@ -2350,9 +2351,11 @@ class ChurchSimulator {
         // drifted from server/boot_image.py for custom Step-1 sizes — see
         // tests/test_boot_image_matches_simulator.py).
         const THREAD_N_MINUS_6 = Math.max(0, Math.ceil(Math.log2(THREAD_LUMP_SIZE)) - 6);
+        const THREAD_STACK_BOUNDARY =
+            THREAD_DESIGN.layout(THREAD_LUMP_SIZE, THREAD_SW, THREAD_CC).stackEnd;
         const threadLoc = this.memory[this._nsSlotBase(1)];
         this.memory[threadLoc] = this.packLumpHeader(THREAD_N_MINUS_6, THREAD_SW, THREAD_CC, 2);
-        this.memory[threadLoc + THREAD_DESIGN.heapOffset] = THREAD_CAPS_OFFSET - 1;
+        this.memory[threadLoc + THREAD_STACK_POINTER_HOME_OFFSET] = THREAD_STACK_BOUNDARY;
 
         // Thread caps zone — CR0 home slot at word offset +244 is pre-set to an Enter-GT
         // for bootEntrySlot (the ⚡ lightning-bolt selection, e.g. LED Flash at slot 10).
@@ -2374,7 +2377,7 @@ class ChurchSimulator {
                 THREAD_N_MINUS_6, THREAD_SW, THREAD_CC, 2);
             this.memory[generatedThreadLoc + THREAD_CAPS_OFFSET] =
                 this.createGT(_initialBootSeq, this.bootEntrySlot, {E: 1}, 1);
-            this.memory[generatedThreadLoc + THREAD_DESIGN.heapOffset] = THREAD_CAPS_OFFSET - 1;
+            this.memory[generatedThreadLoc + THREAD_STACK_POINTER_HOME_OFFSET] = THREAD_STACK_BOUNDARY;
         }
 
         // Memory-manager GT at c-list[0]: R|W Inform capability over NS slot 0 (full namespace).
