@@ -2257,7 +2257,7 @@ function _installBootEntryGTIntoCR0() {
         if (entry && typeof entry.word0_location === 'number') {
             const layout = _threadLayoutForSlot(nsIdx);
             if (!layout.valid) continue;
-            sim.memory[layout.base + layout.capsStart] = gtWord;
+            sim.writePersistentWord(layout.base + layout.capsStart, gtWord);
             wrote = true;
         }
     }
@@ -3662,7 +3662,7 @@ function _nsTableAddConfirm() {
 
         const copyLen = Math.min(words.length, EXTENDED_STRIDE);
         for (let wi = 0; wi < copyLen; wi++) {
-            sim.memory[lumpBase + wi] = words[wi] >>> 0;
+            sim.writePersistentWord(lumpBase + wi, words[wi]);
         }
 
         // limit17: always hdr.cw (real grant interval) regardless of load mode.
@@ -3903,10 +3903,11 @@ function _nsTableAddConfirm() {
                         // been cleared+reinstalled. (W2 is integrity32, not a version.)
                         const nsW1      = sim.memory[sim._nsSlotBase(refSlot) + 1] >>> 0;
                         const liveGtSeq = sim.parseNSWord1(nsW1).gtSeq;
-                        sim.memory[writeAddr] = sim.createGT(liveGtSeq, refSlot, _parseCapPerms(cap), 1) >>> 0;
+                        sim.writePersistentWord(writeAddr,
+                            sim.createGT(liveGtSeq, refSlot, _parseCapPerms(cap), 1));
                     } else {
                         // NS slot not yet loaded — write null GT (0); runtime lazy-resolve fills it.
-                        sim.memory[writeAddr] = 0x00000000;
+                        sim.writePersistentWord(writeAddr, 0x00000000);
                     }
                     continue;
                 }
@@ -3916,12 +3917,12 @@ function _nsTableAddConfirm() {
                 const preGtStr = cap.gt || cap.abstract_gt;
                 if (preGtStr) {
                     const parsed = parseInt(String(preGtStr), 16);
-                    if (!isNaN(parsed)) { sim.memory[writeAddr] = parsed >>> 0; }
+                    if (!isNaN(parsed)) { sim.writePersistentWord(writeAddr, parsed); }
                     continue;
                 }
 
                 // 3. No GT source at all: write null GT (0); lazy-resolve at runtime.
-                sim.memory[writeAddr] = 0x00000000;
+                sim.writePersistentWord(writeAddr, 0x00000000);
             }
         }
         sim._compilerOwnedSelfSlots = sim._compilerOwnedSelfSlots || {};
@@ -3935,7 +3936,7 @@ function _nsTableAddConfirm() {
         // reseals word2. limit17 = hdr.cw was already written above, so the
         // grant interval and seal are correct after restore.
         if (loadMode === 'lazy') {
-            sim.memory[lumpBase] = 0;               // magic=0 ≠ 0x1F → not resident
+            sim.writePersistentWord(lumpBase, 0);   // magic=0 ≠ 0x1F → not resident
             if (!sim.lazyManifest) sim.lazyManifest = {};
             const _lazyCode = Array.from(words.slice(1, 1 + hdr.cw));
             sim.lazyManifest[slot] = {
@@ -4062,9 +4063,12 @@ window._nsTableSave = async function(btn) {
             throw new Error(`Unexpected boot image size: ${bootWordCount} words`);
         }
 
-        // Snapshot current sim.memory into a fresh Uint32Array of exactly that size.
-        const words = new Uint32Array(bootWordCount);
-        for (let i = 0; i < bootWordCount; i++) words[i] = sim.memory[i] >>> 0;
+        // Snapshot only persistent/static state. Runtime DREAD/DWRITE/LOAD/SAVE
+        // effects remain live execution state and must not leak into the next
+        // composite image merely because the Namespace is explicitly saved.
+        const words = typeof sim.snapshotPersistentMemory === 'function'
+            ? sim.snapshotPersistentMemory(bootWordCount)
+            : new Uint32Array(sim.memory.slice(0, bootWordCount));
 
         // Keep the boot-entry sentinel in sync with the current UI selection.
         const sentinelIdx = (sim.NS_TABLE_BASE >>> 0) - 2;
@@ -5170,16 +5174,18 @@ window.lumpCompress = async function(nsIdx) {
     while ((64 << newNM6) < minSize) newNM6++;
 
     // ── Step 4: write new header ──────────────────────────────────────────────
-    sim.memory[baseLoc] = sim.packLumpHeader(newNM6, cw, cc, typ) >>> 0;
+    sim.writePersistentWord(baseLoc, sim.packLumpHeader(newNM6, cw, cc, typ));
 
     // Zero freespace within new lump (code already in-place at [1..cw])
-    for (let i = cw + 1; i < minSize - cc; i++) sim.memory[baseLoc + i] = 0;
+    for (let i = cw + 1; i < minSize - cc; i++) sim.writePersistentWord(baseLoc + i, 0);
 
     // Write c-list at new tail
-    for (let i = 0; i < cc; i++) sim.memory[baseLoc + minSize - cc + i] = clistWords[i];
+    for (let i = 0; i < cc; i++) {
+        sim.writePersistentWord(baseLoc + minSize - cc + i, clistWords[i]);
+    }
 
     // Zero freed trailing words
-    for (let i = minSize; i < currentSize; i++) sim.memory[baseLoc + i] = 0;
+    for (let i = minSize; i < currentSize; i++) sim.writePersistentWord(baseLoc + i, 0);
 
     // ── Step 5: update NS entry ───────────────────────────────────────────────
     // Canonical NS ABI: W1 is authority only (limit[20:0] | gtSeq[29:21] | G | F).
@@ -5395,7 +5401,11 @@ window.lumpSaveLump = async function(nsIdx) {
     // a null-GT fault (ok=false) does.
     {
         const _pnaWords = [];
-        for (let i = 0; i < hdr.lumpSize; i++) _pnaWords.push(sim.memory[baseLoc + i] >>> 0);
+        for (let i = 0; i < hdr.lumpSize; i++) {
+            _pnaWords.push(typeof sim.persistentMemoryWord === 'function'
+                ? sim.persistentMemoryWord(baseLoc + i)
+                : (sim.memory[baseLoc + i] >>> 0));
+        }
         const _pnaResult = (typeof petNameAudit === 'function') ? petNameAudit(
             _pnaWords,
             { cw: hdr.cw, cc: hdr.cc, lumpSize: hdr.lumpSize },
@@ -5416,7 +5426,11 @@ window.lumpSaveLump = async function(nsIdx) {
     // ── 7. All checks passed — write to repository ─────────────────────────
     checks.push(`\u2139 All checks passed. Saving ${hdr.lumpSize}-word lump\u2026`);
     const words = [];
-    for (let i = 0; i < hdr.lumpSize; i++) words.push(sim.memory[baseLoc + i] >>> 0);
+    for (let i = 0; i < hdr.lumpSize; i++) {
+        words.push(typeof sim.persistentMemoryWord === 'function'
+            ? sim.persistentMemoryWord(baseLoc + i)
+            : (sim.memory[baseLoc + i] >>> 0));
+    }
     const typeNames = ['code', 'namespace', 'thread', '?'];
     const metadata = {
         abstraction:  absName,
@@ -5688,7 +5702,7 @@ function _computeReferencedCListSlots(codeBase, codeCount) {
 // Called by the "× zero" button in the C-List panel.
 function zeroLumpSlot(addr) {
     if (!sim || addr < 0 || addr >= sim.memory.length) return;
-    sim.memory[addr] = 0;
+    sim.writePersistentWord(addr, 0);
     updateCRDetail();
 }
 
@@ -5714,7 +5728,7 @@ window.zeroAllUnrefSlots = function(nsIdx) {
         const addr = clistBase + i;
         if ((sim.memory[addr] >>> 0) !== 0) {
             if (refSlots.has(i) || indSlots.has(i)) continue;
-            sim.memory[addr] = 0;
+            sim.writePersistentWord(addr, 0);
             zeroed++;
         }
     }
@@ -5779,7 +5793,7 @@ window.applyPOLA = async function(nsIdx) {
             const _pn = (_pg && sim.nsLabels && sim.nsLabels[_pg.index]) ? sim.nsLabels[_pg.index] : `GT@slot${i}`;
             zeroedLog.push(`  slot ${i} \u201C${_pn}\u201D (unreferenced)`);
             oldGTs[i] = 0;
-            sim.memory[clistBase + i] = 0;
+            sim.writePersistentWord(clistBase + i, 0);
             zeroedCount++;
         }
     }
@@ -5879,7 +5893,8 @@ window.applyPOLA = async function(nsIdx) {
             if (oldToNew.has(oldSlot)) {
                 const newSlot = oldToNew.get(oldSlot);
                 if (newSlot !== oldSlot) {
-                    sim.memory[addr] = ((word & 0xFFFF8000) | (newSlot & 0x7FFF)) >>> 0;
+                    sim.writePersistentWord(addr,
+                        ((word & 0xFFFF8000) | (newSlot & 0x7FFF)) >>> 0);
                     rewriteCount++;
                 }
             }
@@ -6057,9 +6072,9 @@ window.applyPOLA = async function(nsIdx) {
 
     // ── Step 6: write compacted c-list at new tail position ────────────────
     const newClistBase = baseLoc + lumpSize - newCC;
-    for (let j = 0; j < newCC; j++) sim.memory[newClistBase + j] = newGTs[j] >>> 0;
+    for (let j = 0; j < newCC; j++) sim.writePersistentWord(newClistBase + j, newGTs[j]);
     // Zero freed region between old and new c-list start
-    for (let addr = clistBase; addr < newClistBase; addr++) sim.memory[addr] = 0;
+    for (let addr = clistBase; addr < newClistBase; addr++) sim.writePersistentWord(addr, 0);
 
     // ── Step 7: update lump header and NS entry ────────────────────────────
     // Canonical NS ABI: c-list count is NOT a W1 field. It lives in the resident
@@ -6067,7 +6082,7 @@ window.applyPOLA = async function(nsIdx) {
     // table. gt_seq is W1[29:21]; W2 is integrity32(W0, W1). The authority word
     // W1 is unchanged here (only the c-list count changed), and writeNSEntry
     // recomputes W2 coherently.
-    sim.memory[baseLoc] = sim.packLumpHeader(n_minus_6, cw, newCC, typ) >>> 0;
+    sim.writePersistentWord(baseLoc, sim.packLumpHeader(n_minus_6, cw, newCC, typ));
     const nsBase = sim._nsSlotBase(nsIdx);
     const oldEntry = sim.readNSEntry(nsIdx) || {};
     const w1fP   = sim.parseNSWord1(sim.memory[nsBase + 1] >>> 0);

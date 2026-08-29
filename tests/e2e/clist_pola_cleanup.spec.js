@@ -50,7 +50,11 @@ test.describe('POLA cleanup button in the C-List viewer', () => {
 
     test.beforeEach(async ({ page }) => {
         await page.goto('/simulator/');
-        await page.waitForLoadState('networkidle');
+        await page.waitForFunction(() =>
+            typeof sim !== 'undefined' &&
+            window.CListViewer &&
+            typeof window.CListViewer.show === 'function' &&
+            document.getElementById('asmEditor'));
     });
 
     test('POLA button is rendered in the popup header', async ({ page }) => {
@@ -59,6 +63,22 @@ test.describe('POLA cleanup button in the C-List viewer', () => {
         const polaBtn = page.locator('.clist-viewer-popup [data-action="pola-cleanup"]');
         await polaBtn.waitFor({ state: 'visible' });
         await expect(polaBtn).toContainText('POLA');
+    });
+
+    test('source POLA stays an explicit static edit, separate from runtime persistence', async ({ page }) => {
+        await openClistPopup(page, SOURCE_WITH_UNUSED);
+
+        const contract = await page.evaluate(() => ({
+            runtimeSnapshot: typeof sim.snapshotPersistentMemory === 'function',
+            persistentWord: typeof sim.persistentMemoryWord === 'function',
+            sourceBefore: document.getElementById('asmEditor').value,
+        }));
+        expect(contract.runtimeSnapshot).toBe(true);
+        expect(contract.persistentWord).toBe(true);
+        expect(contract.sourceBefore).toMatch(/UNUSED_CAP/);
+
+        await page.locator('.clist-viewer-popup [data-action="pola-cleanup"]').click();
+        await expect(page.locator('#asmEditor')).not.toHaveValue(/UNUSED_CAP/);
     });
 
     test('clicking POLA removes an unused capability and shows a toast', async ({ page }) => {
@@ -142,8 +162,11 @@ test.describe('POLA cleanup button in the C-List viewer', () => {
         await expect(body).not.toContainText('Boot.NS');
         await expect(body).not.toContainText('Boot.Thread');
 
-        // Instead, an explicit empty-state message is shown.
-        await expect(body).toContainText('No capabilities declared');
+        // Compiler-owned SELF is synthetic and remains display-only even after
+        // every source-declared capability is removed.
+        await expect(body).toContainText('SELF');
+        await expect(body).not.toContainText('UNUSED_ONE');
+        await expect(body).not.toContainText('UNUSED_TWO');
 
         const editorValue = await page.locator('#asmEditor').inputValue();
         expect(editorValue).not.toMatch(/UNUSED_ONE/);

@@ -37,6 +37,9 @@ const sandbox = {
     btoa: s => Buffer.from(s, 'binary').toString('base64'),
     abstractionRegistry: { abstractions: [] },
     currentView: 'namespace',
+    correctCRDetailTab: tab => tab,
+    _lumpManifests: {},
+    _petNameDRMap: {},
 };
 sandbox.window.sim = sim;
 sandbox.window.bootConfig = global.window.bootConfig;
@@ -142,6 +145,47 @@ assert.strictEqual(thread3.base, sim.readNSEntry(12).word0_location);
 assert.strictEqual(thread2.heapWords, 12, 'Thread header cc defines its heap size');
 assert.strictEqual(thread2.stackWords, 32, 'Thread header cw defines its stack size');
 assert.strictEqual(thread2.capsStart, 244, 'capabilities remain at the Thread body tail');
+
+// Runtime register/capability writes update the live Thread image, but the
+// persistence snapshot must retain the pre-execution words and header.
+const runtimeSim = new ChurchSimulator();
+const runtimeThread = runtimeSim.getThreadInstanceLayout(11);
+const runtimeHeaderBefore = runtimeSim.memory[runtimeThread.base] >>> 0;
+const runtimeDr1Addr = runtimeThread.base + runtimeThread.drStart + 1;
+const runtimeDrBefore = runtimeSim.memory[runtimeDr1Addr] >>> 0;
+const runtimeCapAddr = runtimeThread.base + runtimeThread.capsStart;
+const runtimeCapBefore = runtimeSim.memory[runtimeCapAddr] >>> 0;
+const runtimeStackAddr = runtimeThread.base + runtimeThread.stackEnd;
+const runtimeStackBefore = runtimeSim.memory[runtimeStackAddr] >>> 0;
+const runtimeThreadEntry = runtimeSim.readNSEntry(11);
+runtimeSim.cr[12].word0 = runtimeSim.createGT(0, 11, {R:1, W:1}, 2);
+runtimeSim.cr[12].word1 = runtimeThread.base;
+runtimeSim.cr[12].word2 = runtimeThreadEntry.word1_limit >>> 0;
+runtimeSim._currentThreadSlot = 11;
+runtimeSim._writeDR(1, 0xD1A0D1A0);
+runtimeSim._writeCR(0, 0x4A000006, runtimeSim.readNSEntry(6));
+runtimeSim._writeRuntimeWord(runtimeStackAddr, 0xC011F24D);
+const persistentAfterRuntime = runtimeSim.snapshotPersistentMemory(runtimeSim.memory.length);
+assert.strictEqual(runtimeSim.memory[runtimeDr1Addr], 0xD1A0D1A0,
+    'runtime DR writes remain visible in the active Thread image');
+assert.strictEqual(runtimeSim.memory[runtimeCapAddr], 0x4A000006,
+    'runtime LOAD-style CR writes remain visible in the active Thread image');
+assert.strictEqual(persistentAfterRuntime[runtimeDr1Addr], runtimeDrBefore,
+    'runtime DR changes are excluded from persistent snapshots');
+assert.strictEqual(persistentAfterRuntime[runtimeCapAddr], runtimeCapBefore,
+    'runtime capability changes are excluded from persistent snapshots');
+assert.strictEqual(runtimeSim.memory[runtimeStackAddr], 0xC011F24D,
+    'runtime CALL-frame state remains visible in the live Thread stack');
+assert.strictEqual(persistentAfterRuntime[runtimeStackAddr], runtimeStackBefore,
+    'runtime CALL-frame state is excluded from persistent snapshots');
+assert.strictEqual(persistentAfterRuntime[runtimeThread.base], runtimeHeaderBefore,
+    'runtime protected-content changes leave the persisted Thread header unchanged');
+assert.strictEqual(runtimeSim.memory[runtimeThread.base], runtimeHeaderBefore,
+    'runtime protected-content changes leave the live Thread header unchanged');
+runtimeSim.writePersistentWord(runtimeDr1Addr, 0x51544154);
+assert.strictEqual(runtimeSim.snapshotPersistentMemory(runtimeSim.memory.length)[runtimeDr1Addr],
+    0x51544154,
+    'an explicit static edit rebases a previously runtime-mutated word');
 
 // Give the bodies unmistakably separate private contents and make active
 // simulator state intentionally disagree with both.

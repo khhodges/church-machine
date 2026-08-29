@@ -5713,7 +5713,9 @@ async function _saveLumpDirectVersion(token, lump, btn) {
     if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
     var opName = 'Save Lump \u2014 ' + (lump.abstraction || token);
     try {
-        // 1. Fetch authoritative binary from server
+        // 1. Fetch the authoritative static binary from the server. Never
+        // source this version from live simulator memory: runtime word changes
+        // are execution state and are not POLA-persisted.
         var _wr = await fetch('/api/lump/' + token + '/words', { cache: 'no-store' });
         if (!_wr.ok) throw new Error('Could not fetch lump binary (HTTP ' + _wr.status + ')');
         var _wj = await _wr.json();

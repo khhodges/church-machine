@@ -410,6 +410,7 @@ class ChurchSimulator {
 
         const n   = src.length;
         for (let i = 0; i < n; i++) this.memory[i] = src[i] >>> 0;
+        this._runtimeWordOriginals = new Map();
         // Read the stored nsCount from NS_TABLE_BASE-3 (tagIdx-2).
         // This value is written by both boot_image.py and _initNamespaceTable()
         // (scan before c-list + empty_count) and avoids counting c-list entries
@@ -950,6 +951,10 @@ class ChurchSimulator {
         // is programmer-chosen via the Boot Image Designer (totalNamespaceWords).
         // Falls back to historical 65536 when no project boot config is loaded.
         this.memory = new Uint32Array(this._namespaceMemoryWords());
+        // Instruction-driven word mutations are execution state, not
+        // persistent POLA state. Record each pre-execution word once so save
+        // paths can serialize the static image without changing live memory.
+        this._runtimeWordOriginals = new Map();
         this.NS_TABLE_BASE = this.memory.length - this.NS_TABLE_RESERVE;
 
         this.nsLabels = {};
@@ -1863,7 +1868,7 @@ class ChurchSimulator {
         // Write a valid lump header at this slot's region (cc=0: let
         // _injectClistNow fill the c-list lazily in the same apply-call).
         if (lumpBase + newLumpSize <= this.NS_TABLE_BASE) {
-            this.memory[lumpBase] = this.packLumpHeader(n_minus_6, cw, 0, 0);
+            this.writePersistentWord(lumpBase, this.packLumpHeader(n_minus_6, cw, 0, 0));
         }
 
         // NS entry: Inform GT (type=1), limit17=cw, cc=0 (updated by loadProgram
@@ -2004,7 +2009,7 @@ class ChurchSimulator {
         const newGT = this.createGT(
             this._nsSequenceForWrite(nsIdx), nsIdx,
             { R:0, W:0, X:0, L:0, S:0, E:1 }, 1);
-        this.memory[addr] = newGT >>> 0;
+        this._writeRuntimeWord(addr, newGT);
         this.output += `[RESOLVE] CR${slotIdx} "${pendingName}" \u2192 NS[${nsIdx}] introduced interactively.\n`;
 
         // Resume suspended thread if this slot was the cause of a lazy-suspend.
@@ -2906,7 +2911,7 @@ class ChurchSimulator {
                     // simulator), so the old falsy guard `&& _b5ThreadEntry.word0_location`
                     // silently skipped the write.  Use a typeof check instead.
                     const _b5CR0Addr = (_b5ThreadEntry.word0_location >>> 0) + THREAD_CAPS_OFFSET;
-                    this.memory[_b5CR0Addr] = gt6;
+                    this._writeRuntimeWord(_b5CR0Addr, gt6);
                     // [BOOT] INIT_ABSTR Thread.caps[0] — replaced by per-event trace packets
                 }
 
@@ -3003,8 +3008,8 @@ class ChurchSimulator {
                 });
                 const threadBase = this._activeThreadBase();
                 if (threadBase !== null) {
-                    this.memory[threadBase + sp_max]     = sentinelFrameWord;
-                    this.memory[threadBase + sp_max - 1] = oldCR6GT;
+                    this._writeRuntimeWord(threadBase + sp_max, sentinelFrameWord);
+                    this._writeRuntimeWord(threadBase + sp_max - 1, oldCR6GT);
                 }
                 this.sto = sp_max - 2;
 
@@ -4433,7 +4438,7 @@ class ChurchSimulator {
             if (threadBase !== null) {
                 const homeAddr = (threadBase + 1 + drIdx) >>> 0;
                 if (homeAddr < this.memory.length) {
-                    this.memory[homeAddr] = value >>> 0;
+                    this._writeRuntimeWord(homeAddr, value);
                 }
             }
         }
@@ -4465,7 +4470,7 @@ class ChurchSimulator {
                         return false;
                     }
                 }
-                this.memory[homeAddr] = gt32 >>> 0;
+                this._writeRuntimeWord(homeAddr, gt32);
             }
         }
         return true;
@@ -4641,8 +4646,45 @@ class ChurchSimulator {
             this.fault(check.fault, `${label}: CR12 write @${absAddr}: ${check.message}`);
             return false;
         }
-        this.memory[absAddr] = value >>> 0;
+        this._writeRuntimeWord(absAddr, value);
         return true;
+    }
+
+    _writeRuntimeWord(absAddr, value) {
+        if (!Number.isInteger(absAddr) || absAddr < 0 || absAddr >= this.memory.length) {
+            throw new RangeError(`runtime word address ${absAddr} is outside memory`);
+        }
+        if (!this._runtimeWordOriginals) this._runtimeWordOriginals = new Map();
+        if (!this._runtimeWordOriginals.has(absAddr)) {
+            this._runtimeWordOriginals.set(absAddr, this.memory[absAddr] >>> 0);
+        }
+        this.memory[absAddr] = value >>> 0;
+    }
+
+    writePersistentWord(absAddr, value) {
+        if (!Number.isInteger(absAddr) || absAddr < 0 || absAddr >= this.memory.length) {
+            throw new RangeError(`persistent word address ${absAddr} is outside memory`);
+        }
+        if (this._runtimeWordOriginals) this._runtimeWordOriginals.delete(absAddr);
+        this.memory[absAddr] = value >>> 0;
+    }
+
+    persistentMemoryWord(absAddr) {
+        if (this._runtimeWordOriginals && this._runtimeWordOriginals.has(absAddr)) {
+            return this._runtimeWordOriginals.get(absAddr) >>> 0;
+        }
+        return this.memory[absAddr] >>> 0;
+    }
+
+    snapshotPersistentMemory(wordCount = this.memory.length) {
+        const count = Math.max(0, Math.min(this.memory.length, wordCount >>> 0));
+        const words = this.memory.slice(0, count);
+        if (this._runtimeWordOriginals) {
+            for (const [addr, original] of this._runtimeWordOriginals) {
+                if (addr < count) words[addr] = original >>> 0;
+            }
+        }
+        return words;
     }
 
     _flushLambdaCache() {
@@ -5260,7 +5302,7 @@ class ChurchSimulator {
                     const _resolvedGT = this.createGT(
                         this._nsSequenceForWrite(_resolvedNsIdx), _resolvedNsIdx,
                         {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
-                    this.memory[clistLoc + d.imm] = _resolvedGT >>> 0;
+                    this._writeRuntimeWord(clistLoc + d.imm, _resolvedGT);
                     slotGT = _resolvedGT >>> 0;
                     this.output += `[LAZY-RESOLVE] NULL Slot ${d.imm} "${_pcn}" \u2192 NS[${_resolvedNsIdx}] resolved instantly.\n`;
                     // Fall through to continue LOAD processing
@@ -5320,7 +5362,7 @@ class ChurchSimulator {
                 const _resolvedGT = this.createGT(
                     this._nsSequenceForWrite(_resolvedNsIdx), _resolvedNsIdx,
                     {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
-                this.memory[clistLoc + d.imm] = _resolvedGT >>> 0;
+                this._writeRuntimeWord(clistLoc + d.imm, _resolvedGT);
                 slotGT = _resolvedGT >>> 0;
                 this.output += `[LAZY-RESOLVE] Slot ${d.imm} "${_pendingName}" \u2192 NS[${_resolvedNsIdx}] resolved instantly.\n`;
             } else {
@@ -5595,7 +5637,7 @@ class ChurchSimulator {
             }
         }
 
-        this.memory[clistLoc + d.imm] = srcGT;
+        this._writeRuntimeWord(clistLoc + d.imm, srcGT);
         const srcParsed = saveCheck.parsed;
         const clistIdx = clistCheck.parsed.index;
         if (!this.nsClistMap[clistIdx]) {
@@ -6495,11 +6537,12 @@ class ChurchSimulator {
             if (outEntry) {
                 const outBase = outEntry.word0_location;
                 for (let i = 0; i < 16; i++) {
-                    this.memory[outBase + 1 + i] = this.dr[i] >>> 0;
+                    this._writeRuntimeWord(outBase + 1 + i, this.dr[i]);
                 }
                 for (let i = 0; i < 12; i++) {
-                    this.memory[outBase + THREAD_CAPS_OFFSET + i] =
-                        this.cr[i].word0 >>> 0;
+                    this._writeRuntimeWord(
+                        outBase + THREAD_CAPS_OFFSET + i,
+                        this.cr[i].word0);
                 }
             }
         }
@@ -6998,7 +7041,7 @@ class ChurchSimulator {
                     const _resolvedGT = this.createGT(
                         this._nsSequenceForWrite(_resolvedNsIdx), _resolvedNsIdx,
                         {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
-                    this.memory[srcLoc + ecRow] = _resolvedGT >>> 0;
+                    this._writeRuntimeWord(srcLoc + ecRow, _resolvedGT);
                     slotGT = _resolvedGT >>> 0;
                     this.output += `[LAZY-RESOLVE] NULL Slot ${ecRow} "${_pcn}" \u2192 NS[${_resolvedNsIdx}] resolved instantly.\n`;
                     // Fall through to continue ELOADCALL processing
@@ -7061,7 +7104,7 @@ class ChurchSimulator {
                 const _resolvedGT = this.createGT(
                     this._nsSequenceForWrite(_resolvedNsIdx), _resolvedNsIdx,
                     {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
-                this.memory[srcLoc + ecRow] = _resolvedGT >>> 0;
+                this._writeRuntimeWord(srcLoc + ecRow, _resolvedGT);
                 slotGT = _resolvedGT >>> 0;
                 this.output += `[LAZY-RESOLVE] ELOADCALL: Slot ${ecRow} "${_pendingName}" \u2192 NS[${_resolvedNsIdx}] resolved instantly.\n`;
                 // Fall through to continue ELOADCALL processing
@@ -7312,7 +7355,7 @@ class ChurchSimulator {
                     const _resolvedGT = this.createGT(
                         this._nsSequenceForWrite(_resolvedNsIdx), _resolvedNsIdx,
                         {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
-                    this.memory[srcLoc + d.imm] = _resolvedGT >>> 0;
+                    this._writeRuntimeWord(srcLoc + d.imm, _resolvedGT);
                     slotGT = _resolvedGT >>> 0;
                     this.output += `[LAZY-RESOLVE] NULL Slot ${d.imm} "${_pcn}" \u2192 NS[${_resolvedNsIdx}] resolved instantly.\n`;
                     // Fall through to continue XLOADLAMBDA processing
@@ -7554,7 +7597,7 @@ class ChurchSimulator {
                     if (dwThreadBase !== null) {
                         const dwHomeAddr = (dwThreadBase + 1 + drIdx) >>> 0;
                         if (dwHomeAddr < this.memory.length) {
-                            this.memory[dwHomeAddr] = value;
+                            this._writeRuntimeWord(dwHomeAddr, value);
                         }
                     }
                 }
@@ -7792,9 +7835,9 @@ class ChurchSimulator {
                 return null;
             }
         }
-        this.memory[loc + offset] = value;
+        this._writeRuntimeWord(loc + offset, value);
         if (dwHomeAddr >= 0) {
-            this.memory[dwHomeAddr] = value;
+            this._writeRuntimeWord(dwHomeAddr, value);
         }
 
         // Route device writes to simulated hardware peripherals
@@ -8227,10 +8270,11 @@ class ChurchSimulator {
                         const newLumpBase = EXTENDED_BASE;
 
                         // Write lump header: cc=0 (lazy injection fills C-List later)
-                        this.memory[newLumpBase] = this.packLumpHeader(n_minus_6, words.length, 0, 0);
+                        this.writePersistentWord(newLumpBase,
+                            this.packLumpHeader(n_minus_6, words.length, 0, 0));
                         // Write code words starting at word 1
                         for (let i = 0; i < words.length; i++) {
-                            this.memory[newLumpBase + 1 + i] = words[i] >>> 0;
+                            this.writePersistentWord(newLumpBase + 1 + i, words[i]);
                         }
 
                         // Update NS slot 3: point to new lump, limit17 = words.length, cc=0.
@@ -8289,7 +8333,7 @@ class ChurchSimulator {
         const codeStart = this.bootComplete ? baseAddr + 1 : baseAddr;
         for (let i = 0; i < words.length; i++) {
             if (codeStart + i < this.memory.length) {
-                this.memory[codeStart + i] = words[i] >>> 0;
+                this.writePersistentWord(codeStart + i, words[i]);
             }
         }
 
@@ -8311,7 +8355,8 @@ class ChurchSimulator {
                 // is reset to the boot lump while NS slot 3 still points to EXTENDED_BASE).
                 if (newCW !== hdr.cw || nsStoredBase !== baseAddr || cr14Base !== baseAddr) {
                     if (newCW !== hdr.cw) {
-                        this.memory[baseAddr] = ((hdrWord & ~(0x1FFF << 10)) | ((newCW & 0x1FFF) << 10)) >>> 0;
+                        this.writePersistentWord(baseAddr,
+                            ((hdrWord & ~(0x1FFF << 10)) | ((newCW & 0x1FFF) << 10)) >>> 0);
                     }
                     const oldW1        = this.memory[nsBase + 1] >>> 0;
                     const w1f          = this.parseNSWord1(oldW1);
@@ -9578,13 +9623,13 @@ class ChurchSimulator {
         // Word 0: lump header (magic=0x1F, n_minus_6, cw=codeLen, cc, typ=0).
         // Previously a GT word was written here, which broke CALL dispatch and
         // lumpSaveLump because both require magic=0x1F at bits[31:27] of word 0.
-        this.memory[loc] = this.packLumpHeader(n_minus_6, codeLen, cc, 0);
+        this.writePersistentWord(loc, this.packLumpHeader(n_minus_6, codeLen, cc, 0));
         for (let i = 0; i < codeLen; i++) {
-            this.memory[loc + 1 + i] = words[i] >>> 0;
+            this.writePersistentWord(loc + 1 + i, words[i]);
         }
         // Zero freespace and c-list region.
         for (let i = 1 + codeLen; i < lumpSize; i++) {
-            this.memory[loc + i] = 0;
+            this.writePersistentWord(loc + i, 0);
         }
         this.emit('stateChange', this.getState());
         return idx;
@@ -9620,7 +9665,7 @@ class ChurchSimulator {
         const lim17 = Math.min(lumpSize - cc - 1, 0x1FFFF);
         // Zero the entire lump region before writing the new lump.
         for (let j = 0; j < lumpSize; j++) {
-            if (loc + j < this.memory.length) this.memory[loc + j] = 0;
+            if (loc + j < this.memory.length) this.writePersistentWord(loc + j, 0);
         }
         // No trusted full identity is registered by this local save path, so W3
         // remains zero rather than carrying permission-derived data.
@@ -9636,9 +9681,9 @@ class ChurchSimulator {
         // Word 0: lump header (magic=0x1F, n_minus_6, cw=codeLen, cc, typ=0).
         // Previously a GT word was written here, which broke CALL dispatch and
         // lumpSaveLump because both require magic=0x1F at bits[31:27] of word 0.
-        this.memory[loc] = this.packLumpHeader(n_minus_6, codeLen, cc, 0);
+        this.writePersistentWord(loc, this.packLumpHeader(n_minus_6, codeLen, cc, 0));
         for (let i = 0; i < codeLen; i++) {
-            this.memory[loc + 1 + i] = words[i] >>> 0;
+            this.writePersistentWord(loc + 1 + i, words[i]);
         }
         this.emit('stateChange', this.getState());
         return idx;
@@ -9673,7 +9718,7 @@ class ChurchSimulator {
             );
         });
         for (let i = 0; i < dataWords.length; i++) {
-            this.memory[loc + i] = dataWords[i] >>> 0;
+            this.writePersistentWord(loc + i, dataWords[i]);
         }
         this.emit('stateChange', this.getState());
         return true;
@@ -9749,7 +9794,7 @@ ChurchSimulator.isPendingGT = function (word) {
 
 ChurchSimulator.makePendingGT = function (petName) {
     const names = ChurchSimulator.PENDING_GT_NAMES;
-    let idx = names.indexOf(petName);
+    const idx = (word >>> 0) & 0xFFFF;
     if (idx < 0) {
         idx = names.length;
         names.push(petName);

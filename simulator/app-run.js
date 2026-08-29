@@ -1205,14 +1205,15 @@ function _injectClistNow() {
             const cap     = _curCapsAll[i];
             const capName = (typeof cap === 'string' ? cap : (cap.name || '')).trim();
             const rights  = typeof cap === 'string' ? [] : (cap.rights || []);
-            if (!capName) { sim.memory[clistBase + i] = 0; continue; }
+            if (!capName) { sim.writePersistentWord(clistBase + i, 0); continue; }
 
             // The ordinary abstraction's self row is compiler-owned.  It must
             // be minted from the *current* sequence, never copied from a saved
             // placeholder or a prior slot allocation.
             if (i === 0 && cap && typeof cap === 'object' && cap.compiler_owned_self === true) {
                 const selfSeq = sim.parseNSWord1(sim.memory[nsBase + 1] >>> 0).gtSeq;
-                sim.memory[clistBase] = sim.createGT(selfSeq, BOOT_ABSTR_SLOT, {E:1}, 1) >>> 0;
+                sim.writePersistentWord(clistBase,
+                    sim.createGT(selfSeq, BOOT_ABSTR_SLOT, {E:1}, 1));
                 sim._compilerOwnedSelfSlots = sim._compilerOwnedSelfSlots || {};
                 sim._compilerOwnedSelfSlots[BOOT_ABSTR_SLOT] = true;
                 continue;
@@ -1241,7 +1242,7 @@ function _injectClistNow() {
                     }
                     return false;
                 }
-                sim.memory[clistBase + i] = cap.token >>> 0;
+                sim.writePersistentWord(clistBase + i, cap.token);
                 continue;
             }
 
@@ -1255,21 +1256,21 @@ function _injectClistNow() {
             // Church E-GT at the current boot-entry slot, which has migrated over
             // time — do NOT hardcode 3, use sim.bootEntrySlot).
             if (capName.toUpperCase() === 'BOOT.NUCS') {
-                sim.memory[clistBase + i] =
-                    sim.createGT(_gtSeqForSlot(1), 1, {X:1}, 1) >>> 0;
+                sim.writePersistentWord(clistBase + i,
+                    sim.createGT(_gtSeqForSlot(1), 1, {X:1}, 1));
                 continue;
             }
             if (capName.toUpperCase() === 'BOOT.ABSTR') {
-                sim.memory[clistBase + i] =
-                    sim.createGT(bootGtSeq, sim.bootEntrySlot, {E:1}, 1) >>> 0;
+                sim.writePersistentWord(clistBase + i,
+                    sim.createGT(bootGtSeq, sim.bootEntrySlot, {E:1}, 1));
                 continue;
             }
 
             const devKey = Object.keys(_devSlotMap)
                 .find(k => k.toLowerCase() === capName.toLowerCase());
             if (devKey !== undefined) {
-                sim.memory[clistBase + i] =
-                    (sim.demoClistGTs[_devSlotMap[devKey]] || 0) >>> 0;
+                sim.writePersistentWord(clistBase + i,
+                    (sim.demoClistGTs[_devSlotMap[devKey]] || 0) >>> 0);
                 continue;
             }
 
@@ -1297,8 +1298,8 @@ function _injectClistNow() {
                 if (!perms.R && !perms.W && !perms.X && !perms.L && !perms.S && !perms.E) {
                     perms.E = 1;  // no rights declared → safe Church entry default
                 }
-                sim.memory[clistBase + i] =
-                    sim.createGT(_gtSeqForSlot(nsIdx), nsIdx, perms, 1) >>> 0;
+                sim.writePersistentWord(clistBase + i,
+                    sim.createGT(_gtSeqForSlot(nsIdx), nsIdx, perms, 1));
                 continue;
             }
 
@@ -1308,10 +1309,10 @@ function _injectClistNow() {
             const _pendingWord = (typeof ChurchSimulator !== 'undefined' && ChurchSimulator.makePendingGT)
                 ? ChurchSimulator.makePendingGT(capName)
                 : 0;
-            sim.memory[clistBase + i] = _pendingWord >>> 0;
+            sim.writePersistentWord(clistBase + i, _pendingWord);
         }
 
-        sim.memory[lumpBase] = ((lumpHdr & ~0xFF) | (cc & 0xFF)) >>> 0;
+        sim.writePersistentWord(lumpBase, ((lumpHdr & ~0xFF) | (cc & 0xFF)) >>> 0);
         const nsWord1B = sim.memory[nsBase + 1] >>> 0;
         sim._nsClistCount[BOOT_ABSTR_SLOT] = cc;
         const cr6GTb = sim.createGT(
@@ -1338,9 +1339,9 @@ function _injectClistNow() {
         const cc        = sim.demoClistGTs.length;
         const clistBase = lumpBase + SLOT_SIZE - cc;
         for (let i = 0; i < cc; i++) {
-            sim.memory[clistBase + i] = sim.demoClistGTs[i] >>> 0;
+            sim.writePersistentWord(clistBase + i, sim.demoClistGTs[i]);
         }
-        sim.memory[lumpBase] = ((lumpHdr & ~0xFF) | (cc & 0xFF)) >>> 0;
+        sim.writePersistentWord(lumpBase, ((lumpHdr & ~0xFF) | (cc & 0xFF)) >>> 0);
         const nsWord1A = sim.memory[nsBase + 1] >>> 0;
         sim._nsClistCount[BOOT_ABSTR_SLOT] = cc;
         const cr6GTa = sim.createGT(
@@ -1429,7 +1430,7 @@ function _applyPendingSimLoad() {
             ? sim._activeThreadBase()
             : null;
         if (threadBase !== null) {
-            sim.memory[threadBase + sp_max] = sentinelFrameWord;
+            sim._writeRuntimeWord(threadBase + sp_max, sentinelFrameWord);
         }
         sim.sto = sp_max - 2;
     }
@@ -1458,13 +1459,15 @@ function _applyPendingSimLoad() {
         sim.cr[0] = { word0: _progGT, word1: 0, word2: 0, word3: 0, m: 0 };
         const _thEntry = sim.readNSEntry(1);
         if (_thEntry && _thEntry.word0_location > 0) {
-            sim.memory[(_thEntry.word0_location + 244) >>> 0] = _progGT;
+            sim.writePersistentWord((_thEntry.word0_location + 244) >>> 0, _progGT);
         }
         // Patch Boot.NS c-list entry [_progSlot] with the new GT so the
         // dependency graph shows a named entry rather than null/free.
         const _nsLumpHdr = sim.parseLumpHeader(sim.memory[0] >>> 0);
         if (_nsLumpHdr.valid && _progSlot < _nsLumpHdr.cc) {
-            sim.memory[_nsLumpHdr.lumpSize - _nsLumpHdr.cc + _progSlot] = _progGT;
+            sim.writePersistentWord(
+                _nsLumpHdr.lumpSize - _nsLumpHdr.cc + _progSlot,
+                _progGT);
             if (sim.demoClistGTs && _progSlot < sim.demoClistGTs.length) {
                 sim.demoClistGTs[_progSlot] = _progGT;
             }
