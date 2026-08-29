@@ -82,6 +82,17 @@ def _write_valid(path):
     return valid
 
 
+def _write_retired_tail_relative_thread_image(path):
+    stale = bytearray(_make_valid_image())
+    total = len(stale) // 4
+    thread_ns_word0 = total - (2 * 4)
+    thread_loc = struct.unpack_from("<I", stale, thread_ns_word0 * 4)[0]
+    struct.pack_into("<I", stale, (thread_loc + 17) * 4, 0x1F3)
+    with open(path, "wb") as f:
+        f.write(stale)
+    return bytes(stale)
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -141,6 +152,27 @@ def test_binary_valid_image_returns_200(client, temp_image_path):
     assert resp.data == valid_bytes, (
         f"Response body length {len(resp.data)} != image length {len(valid_bytes)}"
     )
+
+
+def test_binary_regenerates_retired_tail_relative_thread_boundary(
+        client, temp_image_path):
+    stale_bytes = _write_retired_tail_relative_thread_image(temp_image_path)
+    valid_bytes = _make_valid_image()
+
+    def regenerate_image():
+        with open(temp_image_path, "wb") as image_file:
+            image_file.write(valid_bytes)
+        return valid_bytes, None
+
+    with patch("server.app._auto_regen_boot_image",
+               side_effect=regenerate_image) as regenerate:
+        resp = client.get("/api/boot-image/binary")
+
+    assert stale_bytes != valid_bytes
+    regenerate.assert_called_once_with()
+    assert resp.status_code == 200
+    assert resp.data == valid_bytes
+
 
 def test_binary_never_serves_cached_image_for_different_memory_size(
         client, temp_image_path):
