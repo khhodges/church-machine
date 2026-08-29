@@ -1085,9 +1085,9 @@ function nextConfiguredThread() {
     updateThreadControl();
     updateDashboard();
     if (outcome.ok && typeof openCRDetail === 'function') {
-        // Next Thread is a suspended-image browser action. Keep the detail
-        // panel on the selected Thread's CR12 memory map rather than leaving
-        // the previously selected CR14 register view visible.
+        // The manual CHANGE has made this Thread the live stopped context.
+        // Open its CR12 memory map while Step/Walk/Run remain ready to execute
+        // the restored CR/DR bank.
         openCRDetail(12);
     }
 }

@@ -153,6 +153,7 @@
 - [Save picker visibility](save-namespace-picker-visibility.md) — display every known NS slot; only Boot.NS and Boot.Thread are disabled in the picker
 - [Wukong scheduler Thread allocation](wukong-scheduler-thread-allocation.md) — physical round-robin contexts need 512-word projected Thread bodies for persisted CR14 capability state
 - [Stopped Thread image selection](stopped-thread-image-selection.md) — saved Thread images may be cycled before or after boot whenever execution is not running
+- [Halted Thread activation order](halted-thread-activation-order.md) — install incoming CR12 before live CR/DR restore; HALT and call-frame state never cross a manual Thread switch
 - [Thread capability homes are fixed](thread-capability-homes-fixed.md) — runtime credentials must not expand a Thread header or overwrite its 12 CR homes at +244…+255
 - [Namespace upload composite integrity](namespace-upload-composite-integrity.md) — validate each LUMP, then bind slots, layout, boot entry, and hashes into one exact upload image
 - [Dynamic state uses ISA protection only](dynamic-composite-pola-boundary.md) — dynamic word changes are not POLA-persisted; type, permission, and bounds checks are the complete access rule

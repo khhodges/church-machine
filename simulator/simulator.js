@@ -4415,6 +4415,11 @@ class ChurchSimulator {
             mnemonic: 'NEXT_THREAD',
         });
         if (!result) return { ok: false, reason: 'Thread switch was rejected' };
+        // A successful manual CHANGE selects a runnable stopped context.  HALT
+        // is an execution latch, not part of the saved Thread image, so carrying
+        // it into the incoming context would make Step/Walk/Run silently no-op.
+        this.halted = false;
+        this.running = false;
         const status = this.activeThreadStatus();
         this.emit('threadChange', status);
         this.emit('stateChange', this.getState());
@@ -6500,11 +6505,37 @@ class ChurchSimulator {
         }
 
         const tBase = entry.word0_location;
+        // CHANGE makes the incoming Thread the active CR12 context before any
+        // restored register can be written.  Leaving CR12 on the outgoing
+        // Thread makes later CR/DR writes target the wrong saved image.
+        const threadSeq = this.parseNSWord1(entry.word1_limit).gtSeq;
+        const threadGT = this.createGT(
+            threadSeq, targetIdx,
+            {R:0,W:0,X:0,L:0,S:0,E:0}, 1);
+        this.cr[12] = {
+            word0: threadGT >>> 0,
+            word1: tBase >>> 0,
+            word2: entry.word1_limit >>> 0,
+            word3: 0,
+            m: 0,
+        };
+
+        // Build the live CR bank directly from the saved homes.  This is the
+        // privileged restore half of CHANGE, not twelve ordinary CR writes:
+        // ordinary _writeCR calls would write through CR12 and needlessly
+        // mutate the incoming image while it is being restored.
         for (let i = 0; i < 12; i++) {
             const gtWord = this.memory[tBase + THREAD_CAPS_OFFSET + i] >>> 0;
             if (gtWord !== 0) {
-                const capEntry = this.readNSEntry(this.parseGT(gtWord).index);
-                if (!capEntry || !this._writeCR(i, gtWord, capEntry)) return null;
+                const parsed = this.parseGT(gtWord);
+                const capEntry = parsed.type === 3 ? null : this.readNSEntry(parsed.index);
+                this.cr[i] = {
+                    word0: gtWord,
+                    word1: capEntry ? (capEntry.word0_location >>> 0) : 0,
+                    word2: capEntry ? (capEntry.word1_limit >>> 0) : 0,
+                    word3: 0,
+                    m: 0,
+                };
             } else {
                 this.cr[i] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
             }
@@ -6512,6 +6543,15 @@ class ChurchSimulator {
         for (let i = 0; i < 16; i++) {
             this.dr[i] = this.memory[tBase + 1 + i] >>> 0;
         }
+        // PC, flags, STO, host call frames, and Lambda state are transient
+        // execution state, not serialized Thread words.  A dormant Thread
+        // activation starts at its entry with a clean execution frame.
+        this.flags = { N: false, Z: false, C: false, V: false };
+        this.sto = THREAD_CAPS_OFFSET - 1;
+        this.callStack = [];
+        this.lambdaActive = false;
+        this.lambdaReturnPC = 0;
+        this.lambdaCachedFrame = null;
 
         // Restored CR0 is the sole entry authority. Validate it through mLoad,
         // then derive the same executable CR14 shape as a CALL index 0.

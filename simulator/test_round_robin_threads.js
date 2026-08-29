@@ -46,7 +46,23 @@ const entryWords = [1, 11, 12].map((slot, i) =>
 const initialEntry = committed.readNSEntry(entryWords[0] & 0xFFFF);
 committed._writeCR(0, entryWords[0], initialEntry);
 committed.dr[1] = 0xA1001001;
+committed.memory[committedBases[1] + 1] = 0xB2000000;
+committed.memory[committedBases[1] + 2] = 0xB2000001;
+committed.memory[committedBases[2] + 1] = 0xC3000000;
+committed.halted = true;
 assert.strictEqual(committed.advanceConfiguredThread().slot, 11);
+assert.strictEqual(committed.halted, false,
+    'manual CHANGE clears the outgoing HALT latch so execution controls can run');
+assert.strictEqual(committed.cr[12].word1, committedBases[1],
+    'manual CHANGE installs the selected Thread base into live CR12');
+assert.strictEqual(committed.parseGT(committed.cr[12].word0).index, 11,
+    'manual CHANGE installs the selected Thread identity into live CR12');
+assert.strictEqual(committed.dr[0], 0xB2000000,
+    'manual CHANGE restores saved DR0 into the live register bank');
+assert.strictEqual(committed.dr[1], 0xB2000001,
+    'manual CHANGE restores saved DR1 instead of retaining the outgoing value');
+assert.strictEqual(committed.cr[0].word0, entryWords[1],
+    'manual CHANGE restores saved CR0 into the live capability bank');
 assert.strictEqual(committed.pc, 1, 'dormant Thread entry starts at code word 1');
 assert.strictEqual(committed.cr[14].word0 & 0xFFFF,
     committed.cr[0].word0 & 0xFFFF, 'CR14 target is derived from restored CR0');
@@ -54,13 +70,34 @@ const firstEntry = committed.readNSEntry(committed.cr[0].word0 & 0xFFFF);
 assert.strictEqual(committed._fetchInstruction().addr,
     firstEntry.word0_location + 1,
     'first fetch after dormant CHANGE executes code LUMP word 1');
+const selectedStep = committed.step();
+assert(selectedStep,
+    'Step executes after selecting a Thread that was switched from HALT');
+assert.strictEqual(selectedStep.physicalPC, firstEntry.word0_location + 1,
+    'Step executes the selected Thread entry rather than the outgoing context');
 committed.dr[1] = 0xA2001002;
 assert.strictEqual(committed.advanceConfiguredThread().slot, 12);
+assert.strictEqual(committed.cr[12].word1, committedBases[2],
+    'the next CHANGE moves live CR12 to Thread#3');
+assert.strictEqual(committed.dr[0], 0xC3000000,
+    'the next CHANGE restores Thread#3 live data registers');
 assert.strictEqual(committed.advanceConfiguredThread().slot, 1);
 assert.strictEqual(committed.cr[0].word0, entryWords[0],
     'committed image restores Thread.1 CR0 entry authority after wraparound');
 assert.strictEqual(committed.dr[1], 0xA1001001,
     'committed image restores Thread.1 DR state after wraparound');
+assert.strictEqual(committed.cr[12].word1, committedBases[0],
+    'wraparound restores Thread.1 as the live CR12 context');
+
+// Run uses the same step engine as the Walk control.  A one-instruction run
+// after manual CHANGE must therefore retire from the selected Thread too.
+committed.halted = true;
+assert.strictEqual(committed.advanceConfiguredThread().slot, 11);
+const selectedRun = committed.run(1);
+assert.strictEqual(selectedRun.steps, 1,
+    'Run retires an instruction after selecting a Thread from HALT');
+assert.strictEqual(committed.cr[12].word1, committedBases[1],
+    'Run keeps the selected Thread installed as the live context');
 
 // Switching saved images is a memory-image operation, not a boot-phase
 // operation. It must work while the loaded image is stopped before boot.
@@ -100,6 +137,8 @@ assert.strictEqual(selectedInvalid.result.entryReady, false,
     'manual selection reports that entry validation was deferred');
 assert.strictEqual(deferred.faultLog.length, 0,
     'manual selection alone does not raise an architectural fault');
+assert.strictEqual(deferred.halted, false,
+    'an invalid selected entry still releases HALT so execution can report its fault');
 deferred.step();
 assert(deferred.faultLog.length > 0,
     'the first attempted instruction raises the deferred entry fault');
