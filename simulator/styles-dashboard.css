@@ -664,6 +664,28 @@ a.next-step-link:hover {
     width: 100%;
     margin-bottom: 0.3rem;
 }
+.thread-zone-table th:first-child,
+.thread-zone-table th:nth-child(2),
+.thread-zone-table td.thread-offset-cell,
+.thread-zone-table td.thread-address-cell,
+.abs-clist-table th:first-child,
+.abs-clist-table th:nth-child(2),
+.abs-clist-table td.thread-offset-cell,
+.abs-clist-table td.thread-address-cell {
+    white-space: nowrap;
+}
+.thread-zone-table th:first-child,
+.thread-zone-table td.thread-offset-cell,
+.abs-clist-table th:first-child,
+.abs-clist-table td.thread-offset-cell {
+    min-width: 3.2rem;
+}
+.thread-zone-table th:nth-child(2),
+.thread-zone-table td.thread-address-cell,
+.abs-clist-table th:nth-child(2),
+.abs-clist-table td.thread-address-cell {
+    min-width: 4.5rem;
+}
 .thread-free-empty {
     color: #4b5563;
     font-style: italic;

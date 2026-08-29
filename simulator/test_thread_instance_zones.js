@@ -191,10 +191,14 @@ assert.strictEqual(runtimeSim.snapshotPersistentMemory(runtimeSim.memory.length)
 // simulator state intentionally disagree with both.
 sim.memory[thread2.base + thread2.drStart] = 0x22220001;
 sim.memory[thread2.base + thread2.heapStart] = 0x22220017;
+sim.memory[thread2.base + thread2.freeStart] = 0x22220081;
+sim.memory[thread2.base + thread2.freeEnd] = 0x22220153;
 sim.memory[thread2.base + thread2.stackEnd] = 0x222200F3;
 sim.memory[thread2.base + thread2.capsStart] = 0x4A000006;
 sim.memory[thread3.base + thread3.drStart] = 0x33330001;
 sim.memory[thread3.base + thread3.heapStart] = 0x33330017;
+sim.memory[thread3.base + thread3.freeStart] = 0x33330081;
+sim.memory[thread3.base + thread3.freeEnd] = 0x33330153;
 sim.memory[thread3.base + thread3.stackEnd] = 0x333300F3;
 sim.memory[thread3.base + thread3.capsStart] = 0x4A000007;
 sim.dr[0] = 0xDEADBEEF;
@@ -202,6 +206,69 @@ sim.sto = 999;
 
 const thread2Html = sandbox.renderThreadMemoryLayout(11, true);
 const thread3Html = sandbox.renderThreadMemoryLayout(12, true);
+
+function assertThreadTableColumns(html, layout, base, label) {
+    const view = new JSDOM(`<body>${html}</body>`).window.document;
+    const tables = [...view.querySelectorAll('.thread-zone-table, .abs-clist-table')];
+    const zoneTables = [...view.querySelectorAll('.thread-zone-table')];
+    assert.strictEqual(tables.length, 5, `${label} renders one table for each memory zone`);
+    assert.strictEqual(zoneTables.length, 4, `${label} renders Data, Heap, Freespace, and Stack tables`);
+    for (const table of tables) {
+        assert.deepStrictEqual(
+            [...table.querySelectorAll('thead th')].slice(0, 2).map(cell => cell.textContent.trim()),
+            ['Offset', 'Addr'],
+            `${label} puts Offset and Addr first in every zone table`
+        );
+        for (const row of table.querySelectorAll('tbody tr')) {
+            assert(row.cells.length >= 2, `${label} zone rows include offset and address`);
+            assert(/^\+\d+$/.test(row.cells[0].textContent.trim()),
+                `${label} zone row starts with a zero-based relative offset`);
+            assert(/^0x[0-9A-F]+$/.test(row.cells[1].textContent.trim()),
+                `${label} zone row includes a physical address second`);
+        }
+    }
+
+    const expectedAddress = offset => '0x' +
+        (base + offset).toString(16).toUpperCase().padStart(4, '0');
+    const firstRow = table => table.querySelector('tbody tr');
+    const lastRow = table => {
+        const rows = table.querySelectorAll('tbody tr');
+        return rows[rows.length - 1];
+    };
+    const capabilityTable = view.querySelector('.abs-clist-table');
+    assert.deepStrictEqual(
+        [firstRow(zoneTables[0]).cells[0].textContent.trim(),
+         firstRow(zoneTables[0]).cells[1].textContent.trim()],
+        [`+${layout.drStart}`, expectedAddress(layout.drStart)],
+        `${label} Data Registers starts at its selected-lump offset and address`
+    );
+    assert.deepStrictEqual(
+        [lastRow(zoneTables[1]).cells[0].textContent.trim(),
+         lastRow(zoneTables[1]).cells[1].textContent.trim()],
+        [`+${layout.heapEnd}`, expectedAddress(layout.heapEnd)],
+        `${label} Heap ends at its selected-lump offset and address`
+    );
+    assert.deepStrictEqual(
+        [firstRow(capabilityTable).cells[0].textContent.trim(),
+         firstRow(capabilityTable).cells[1].textContent.trim()],
+        [`+${layout.capsStart}`, expectedAddress(layout.capsStart)],
+        `${label} Capabilities starts at its fixed offset and address`
+    );
+    assert.deepStrictEqual(
+        [lastRow(capabilityTable).cells[0].textContent.trim(),
+         lastRow(capabilityTable).cells[1].textContent.trim()],
+        [`+${layout.capsEnd}`, expectedAddress(layout.capsEnd)],
+        `${label} Capabilities ends at its fixed offset and address`
+    );
+    const headerRow = view.querySelector('.thread-lump-hdr-row');
+    assert.strictEqual(headerRow.children[0].textContent.trim(), '+0',
+        `${label} lump header starts at relative offset zero`);
+    assert.strictEqual(headerRow.children[1].textContent.trim(), expectedAddress(0),
+        `${label} lump header places its physical address second`);
+}
+
+assertThreadTableColumns(thread2Html, thread2, thread2.base, 'Thread#2');
+assertThreadTableColumns(thread3Html, thread3, thread3.base, 'Thread#3');
 assert(thread2Html.includes('0x22220001'), 'Thread#2 shows its saved DR value');
 assert(thread2Html.includes('0x22220017'), 'Thread#2 shows its saved heap value');
 assert(!thread2Html.includes('0x33330001'), 'Thread#2 never reads Thread#3 memory');

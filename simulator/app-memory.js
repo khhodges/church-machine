@@ -2100,12 +2100,12 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
 
     // ── Zone ⑤: Data Registers (+1 … +16) ───────────────────────────────────
     html += secHdr('⑤', 'Data Registers', '16 words · DR0–DR15 · offset +1 … +16 · head of the slot (after header)', '#a855f7', 'thread-zone-5');
-    html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>DR</th><th>Offset</th><th>Addr</th><th>Value (hex)</th><th>Value (dec)</th></tr></thead><tbody>';
+    html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>Offset</th><th>Addr</th><th>DR</th><th>Value (hex)</th><th>Value (dec)</th></tr></thead><tbody>';
     for (let i = 0; i < TL.drWords; i++) {
         const off  = TL.drStart + i;
         const word = sim.memory[slotBase + off] || 0;
         const rowStyle = word ? '' : ' style="opacity:0.28;"';
-        html += `<tr${rowStyle}><td style="color:#a855f7;">DR${i}</td><td style="color:#555;">+${off}</td><td style="font-family:monospace;">${addrOf(off)}</td><td style="color:#c084fc;font-family:monospace;">${hexOf(word)}</td><td style="color:#9ca3af;">${word >>> 0}</td></tr>`;
+        html += `<tr${rowStyle}><td class="thread-offset-cell" style="color:#555;">+${off}</td><td class="thread-address-cell" style="font-family:monospace;">${addrOf(off)}</td><td style="color:#a855f7;">DR${i}</td><td style="color:#c084fc;font-family:monospace;">${hexOf(word)}</td><td style="color:#9ca3af;">${word >>> 0}</td></tr>`;
     }
     html += '</tbody></table>';
     html += secBody();
@@ -2116,13 +2116,13 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
         if (sim.memory[slotBase + i]) heapNonZero++;
     }
     html += secHdr('④', 'Heap ↑', `${TL.heapWords} words·HS · offset +${TL.heapStart} … +${TL.heapEnd} · base ${addrOf(TL.heapStart)} · ${heapNonZero} word${heapNonZero!==1?'s':''} allocated`, '#22c55e', 'thread-zone-4');
-    html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>Off</th><th>Addr</th><th>Hex</th><th>Decoded</th></tr></thead><tbody>';
+    html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>Offset</th><th>Addr</th><th>Hex</th><th>Decoded</th></tr></thead><tbody>';
     for (let i = 0; i < TL.heapWords; i++) {
         const off  = TL.heapStart + i;
         const word = sim.memory[slotBase + off] || 0;
         const rowStyle = word ? '' : ' style="opacity:0.22;"';
         const decoded  = word ? `<span style="color:#9ca3af;">0x${word.toString(16).toUpperCase().padStart(8,'0')}</span>` : '<span style="color:#374151;">free</span>';
-        html += `<tr${rowStyle}><td style="color:#22c55e;">+${off}</td><td style="font-family:monospace;">${addrOf(off)}</td><td style="color:rgba(206,145,120,0.8);font-family:monospace;">${hexOf(word)}</td><td>${decoded}</td></tr>`;
+        html += `<tr${rowStyle}><td class="thread-offset-cell" style="color:#22c55e;">+${off}</td><td class="thread-address-cell" style="font-family:monospace;">${addrOf(off)}</td><td style="color:rgba(206,145,120,0.8);font-family:monospace;">${hexOf(word)}</td><td>${decoded}</td></tr>`;
     }
     html += '</tbody></table>';
     html += secBody();
@@ -2136,11 +2136,11 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
     if (freeNonZero === 0) {
         html += `<div class="thread-free-empty">All ${TL.freeWords} words are zero — region is unallocated.</div>`;
     } else {
-        html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>Off</th><th>Addr</th><th>Hex</th><th>Note</th></tr></thead><tbody>';
+        html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>Offset</th><th>Addr</th><th>Hex</th><th>Note</th></tr></thead><tbody>';
         for (let i = TL.freeStart; i <= TL.freeEnd; i++) {
             const word = sim.memory[slotBase + i] || 0;
             if (!word) continue;
-            html += `<tr><td style="color:#6b7280;">+${i}</td><td style="font-family:monospace;">${addrOf(i)}</td><td style="color:rgba(206,145,120,0.8);font-family:monospace;">${hexOf(word)}</td><td style="color:#4b5563;">non-zero</td></tr>`;
+            html += `<tr><td class="thread-offset-cell" style="color:#6b7280;">+${i}</td><td class="thread-address-cell" style="font-family:monospace;">${addrOf(i)}</td><td style="color:rgba(206,145,120,0.8);font-family:monospace;">${hexOf(word)}</td><td style="color:#4b5563;">non-zero</td></tr>`;
         }
         html += '</tbody></table>';
     }
@@ -2150,7 +2150,7 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
     const stackWords = sim.memory.slice(slotBase + TL.stackStart, slotBase + TL.stackEnd + 1);
     const stackUsed  = stackWords.filter(Boolean).length;
     html += secHdr('②', 'LIFO Stack ↓', `${TL.stackWords} words·SS · offset +${TL.stackStart} … +${TL.stackEnd} · grows ↓ · ${stackUsed} word${stackUsed!==1?'s':''} non-zero`, '#38bdf8', 'thread-zone-2');
-    html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>Off</th><th>Addr</th><th>Hex</th><th>Decoded</th></tr></thead><tbody>';
+    html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>Offset</th><th>Addr</th><th>Hex</th><th>Decoded</th></tr></thead><tbody>';
     for (let i = 0; i < TL.stackWords; i++) {
         const off  = TL.stackStart + i;
         const word = sim.memory[slotBase + off] || 0;
@@ -2180,7 +2180,7 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
             }
         }
         const rowStyle = word ? '' : ' style="opacity:0.25;"';
-        html += `<tr id="thread-stack-row-${off}"${rowStyle}><td style="color:#38bdf8;">+${off}</td><td style="font-family:monospace;">${addrOf(off)}</td><td style="color:rgba(206,145,120,0.85);font-family:monospace;">${hex}</td><td>${decoded}</td></tr>`;
+        html += `<tr id="thread-stack-row-${off}"${rowStyle}><td class="thread-offset-cell" style="color:#38bdf8;">+${off}</td><td class="thread-address-cell" style="font-family:monospace;">${addrOf(off)}</td><td style="color:rgba(206,145,120,0.85);font-family:monospace;">${hex}</td><td>${decoded}</td></tr>`;
     }
     html += '</tbody></table>';
     html += secBody();
@@ -2190,13 +2190,13 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
     html += '<div class="abs-clist-heading">GOLDEN TOKENS</div>';
     html += `<div class="abs-clist-count">${TL.capsWords} fixed capability slots</div>`;
     html += '<table class="abs-clist-table"><thead><tr>';
-    html += '<th>CR</th><th>GT (HEX)</th><th>PERMS</th><th>TYPE</th><th>NAME</th>';
+    html += '<th>Offset</th><th>Addr</th><th>CR</th><th>GT (HEX)</th><th>PERMS</th><th>TYPE</th><th>NAME</th>';
     html += '</tr></thead><tbody>';
     for (let i = 0; i < TL.capsWords; i++) {
         const off  = TL.capsStart + i;
         const word = sim.memory[slotBase + off] || 0;
         if (word === 0) {
-            html += `<tr><td class="abs-clist-idx">CR${i}</td><td colspan="4" class="abs-clist-empty-slot">\u2014 (empty)</td></tr>`;
+            html += `<tr><td class="thread-offset-cell abs-clist-offset">+${off}</td><td class="thread-address-cell abs-clist-address">${addrOf(off)}</td><td class="abs-clist-idx">CR${i}</td><td colspan="4" class="abs-clist-empty-slot">\u2014 (empty)</td></tr>`;
         } else {
             const parsed = sim.parseGT(word);
             const p = { ...parsed.permissions, F: parsed.type === 2 ? 1 : 0 };
@@ -2215,6 +2215,8 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
                 : `NS[${nsIdx}]`;
             const gtHex = '0x' + word.toString(16).toUpperCase().padStart(8, '0');
             html += `<tr>`;
+            html += `<td class="thread-offset-cell abs-clist-offset">+${off}</td>`;
+            html += `<td class="thread-address-cell abs-clist-address">${addrOf(off)}</td>`;
             html += `<td class="abs-clist-idx">CR${i}</td>`;
             html += `<td class="abs-clist-gt">${gtHex}</td>`;
             html += `<td class="abs-clist-perms">${permHtml}</td>`;
