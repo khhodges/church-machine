@@ -125,7 +125,8 @@ def _run_dispatch(call_imm_val, method_entry_word=0,
 
         phase1_done        = False
         mload_ack_pending  = False
-        callee_lump_served = False
+        pending_read = None
+        read_ops = []
 
         MAX_TICKS = 180
         for _ in range(MAX_TICKS):
@@ -154,21 +155,35 @@ def _run_dispatch(call_imm_val, method_entry_word=0,
                 ctx.set(dut.mload_done, 1)
                 mload_ack_pending = True
 
-            if rd_en:
-                if not callee_lump_served and rd_addr == LUMP_BASE:
-                    ctx.set(dut.mem_rd_data,  callee_lump_hdr)
-                    ctx.set(dut.mem_rd_valid, 1)
-                    callee_lump_served = True
+            # Model synchronous memory explicitly: capture the request now,
+            # assert valid/data on the next cycle, and require CALL to keep the
+            # request stable until that response is consumed.
+            ctx.set(dut.mem_rd_valid, 0)
+            if pending_read is not None:
+                pending_addr, pending_data = pending_read
+                if not rd_en or rd_addr != pending_addr:
+                    errors.append(
+                        "Memory protocol failure: CALL changed or dropped "
+                        f"read 0x{pending_addr:08x} before its response cycle"
+                    )
+                    break
+                ctx.set(dut.mem_rd_data, pending_data)
+                ctx.set(dut.mem_rd_valid, 1)
+                read_ops.append(pending_addr)
+                pending_read = None
+            elif rd_en:
+                if rd_addr == LUMP_BASE:
+                    pending_read = (rd_addr, callee_lump_hdr)
                 elif call_imm_val > 0 and rd_addr == method_table_addr:
-                    ctx.set(dut.mem_rd_data,  method_entry_word)
-                    ctx.set(dut.mem_rd_valid, 1)
+                    pending_read = (rd_addr, method_entry_word)
                 elif rd_addr == SP_STORE_ADDR:
-                    ctx.set(dut.mem_rd_data,  INITIAL_STO)
-                    ctx.set(dut.mem_rd_valid, 1)
+                    pending_read = (rd_addr, INITIAL_STO)
                 else:
-                    ctx.set(dut.mem_rd_valid, 0)
-            else:
-                ctx.set(dut.mem_rd_valid, 0)
+                    errors.append(
+                        "Memory protocol failure: unexpected CALL read address "
+                        f"0x{rd_addr:08x}"
+                    )
+                    break
 
             if comp or fault:
                 if expect_fault is not None:
@@ -187,7 +202,11 @@ def _run_dispatch(call_imm_val, method_entry_word=0,
 
             await ctx.tick()
         else:
-            errors.append(f"FSM did not complete within {MAX_TICKS} ticks")
+            errors.append(
+                f"FSM did not complete within {MAX_TICKS} ticks; "
+                f"acknowledged reads={[f'0x{addr:08x}' for addr in read_ops]}, "
+                f"pending={pending_read}"
+            )
 
         if expect_fault is None and expect_nia is not None:
             if nia_captured[0] is None:

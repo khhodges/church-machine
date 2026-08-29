@@ -45,6 +45,7 @@ from hardware.layouts import GT_LAYOUT, CAP_REG_LAYOUT
 
 THREAD_BASE   = 0x4000
 SP_STORE_ADDR = 0x3000
+CALLEE_LUMP_BASE = 0x9004
 CALLEE_EGT    = 0x4A000001
 CALLER_PC     = 42
 
@@ -93,18 +94,18 @@ def _run_scenario(initial_sto, expect_fault=None):
     callee_cap = _build_cap(slot_id=1, perms=PERM_MASK_E, location=0x2000)
     cr6_cap    = CALLEE_EGT
     ns_cap     = _build_cap(slot_id=0, perms=0, location=0x8000)
-    code_cap   = _build_cap(slot_id=2, perms=PERM_MASK_E, location=0x9004)
+    code_cap   = _build_cap(slot_id=2, perms=PERM_MASK_E, location=CALLEE_LUMP_BASE)
     cr5_cap    = _build_cap(slot_id=5, perms=PERM_MASK_R | PERM_MASK_W, location=SP_STORE_ADDR)
     cr12_cap   = _build_cap(slot_id=12, perms=0, location=THREAD_BASE)
 
     # Callee lump header (for FETCH_LUMP, callee ns entry word3):
     callee_lump_hdr = _build_lump_hdr(n_minus_6=0, cc=4, cw=8, magic=0x5)
 
-    # Thread lump header (for FETCH_THREAD_HDR, at thread_base):
-    #   typ field not encoded by _build_lump_hdr but hardware only reads cw/cc/n_minus_6/magic
+    # Thread lump header is supplied through the hidden per-thread register.
     thr_hdr = _build_lump_hdr(n_minus_6=THR_N6, cc=THR_CC, cw=THR_SW, magic=0x1F)
 
     wr_ops = []
+    read_ops = []
 
     async def process(ctx):
         ctx.set(dut.caller_pc, CALLER_PC)
@@ -130,8 +131,7 @@ def _run_scenario(initial_sto, expect_fault=None):
 
         phase1_done = False
         mload_ack_pending = False
-        callee_lump_served = False
-        thread_hdr_served = False
+        pending_read = None
 
         MAX_TICKS = 140
         for t in range(MAX_TICKS):
@@ -162,26 +162,33 @@ def _run_scenario(initial_sto, expect_fault=None):
                 ctx.set(dut.mload_done, 1)
                 mload_ack_pending = True
 
-            # Respond to memory reads by address:
-            if rd_en:
-                if rd_addr == THREAD_BASE and not thread_hdr_served:
-                    # FETCH_THREAD_HDR: thread's own lump header at word 0
-                    ctx.set(dut.mem_rd_data, thr_hdr)
-                    ctx.set(dut.mem_rd_valid, 1)
-                    thread_hdr_served = True
-                elif not callee_lump_served and rd_addr != SP_STORE_ADDR and rd_addr != THREAD_BASE:
-                    # FETCH_LUMP: callee lump header from NS entry word3
-                    ctx.set(dut.mem_rd_data, callee_lump_hdr)
-                    ctx.set(dut.mem_rd_valid, 1)
-                    callee_lump_served = True
+            # Synchronous one-cycle memory responder. Capture a request first,
+            # then assert valid on the following cycle, when CALL's rd_armed
+            # guard is ready to consume it.
+            ctx.set(dut.mem_rd_valid, 0)
+            if pending_read is not None:
+                pending_addr, pending_data = pending_read
+                if not rd_en or rd_addr != pending_addr:
+                    errors.append(
+                        "Memory protocol failure: CALL changed or dropped "
+                        f"read 0x{pending_addr:08x} before its response cycle"
+                    )
+                    break
+                ctx.set(dut.mem_rd_data, pending_data)
+                ctx.set(dut.mem_rd_valid, 1)
+                read_ops.append(pending_addr)
+                pending_read = None
+            elif rd_en:
+                if rd_addr == CALLEE_LUMP_BASE:
+                    pending_read = (rd_addr, callee_lump_hdr)
                 elif rd_addr == SP_STORE_ADDR:
-                    # STACK_READ_SP: STO value
-                    ctx.set(dut.mem_rd_data, initial_sto)
-                    ctx.set(dut.mem_rd_valid, 1)
+                    pending_read = (rd_addr, initial_sto)
                 else:
-                    ctx.set(dut.mem_rd_valid, 0)
-            else:
-                ctx.set(dut.mem_rd_valid, 0)
+                    errors.append(
+                        "Memory protocol failure: unexpected CALL read address "
+                        f"0x{rd_addr:08x}"
+                    )
+                    break
 
             if comp or fault:
                 if expect_fault is not None:
@@ -202,7 +209,11 @@ def _run_scenario(initial_sto, expect_fault=None):
 
             await ctx.tick()
         else:
-            errors.append(f"FSM did not complete within {MAX_TICKS} ticks")
+            errors.append(
+                f"FSM did not complete within {MAX_TICKS} ticks; "
+                f"acknowledged reads={[f'0x{addr:08x}' for addr in read_ops]}, "
+                f"pending={pending_read}"
+            )
 
     sim = Simulator(dut)
     sim.add_clock(1e-6)
@@ -303,7 +314,7 @@ def test_sw_parametrized():
 
             callee_cap = _build_cap(slot_id=1, perms=PERM_MASK_E, location=0x2000)
             ns_cap     = _build_cap(slot_id=0, perms=0, location=0x8000)
-            code_cap   = _build_cap(slot_id=2, perms=PERM_MASK_E, location=0x9004)
+            code_cap   = _build_cap(slot_id=2, perms=PERM_MASK_E, location=CALLEE_LUMP_BASE)
             cr5_cap    = _build_cap(slot_id=5, perms=PERM_MASK_R | PERM_MASK_W, location=SP_STORE_ADDR)
             cr12_cap   = _build_cap(slot_id=12, perms=0, location=THREAD_BASE)
             callee_lump_hdr = _build_lump_hdr(n_minus_6=0, cc=4, cw=8, magic=0x5)
@@ -332,8 +343,8 @@ def test_sw_parametrized():
 
                 phase1_done = False
                 mload_ack = False
-                callee_served = False
-                thr_served = False
+                pending_read = None
+                read_ops = []
 
                 for _ in range(150):
                     comp   = ctx.get(dut2.call_complete)
@@ -356,22 +367,30 @@ def test_sw_parametrized():
                         ctx.set(dut2.mload_done, 1)
                         mload_ack = True
 
-                    if rd_en:
-                        if rd_addr == THREAD_BASE and not thr_served:
-                            ctx.set(dut2.mem_rd_data, thr_hdr_val)
-                            ctx.set(dut2.mem_rd_valid, 1)
-                            thr_served = True
-                        elif not callee_served and rd_addr != SP_STORE_ADDR and rd_addr != THREAD_BASE:
-                            ctx.set(dut2.mem_rd_data, callee_lump_hdr)
-                            ctx.set(dut2.mem_rd_valid, 1)
-                            callee_served = True
+                    ctx.set(dut2.mem_rd_valid, 0)
+                    if pending_read is not None:
+                        pending_addr, pending_data = pending_read
+                        if not rd_en or rd_addr != pending_addr:
+                            local_errors.append(
+                                "Memory protocol failure: CALL changed or dropped "
+                                f"read 0x{pending_addr:08x} before its response cycle"
+                            )
+                            break
+                        ctx.set(dut2.mem_rd_data, pending_data)
+                        ctx.set(dut2.mem_rd_valid, 1)
+                        read_ops.append(pending_addr)
+                        pending_read = None
+                    elif rd_en:
+                        if rd_addr == CALLEE_LUMP_BASE:
+                            pending_read = (rd_addr, callee_lump_hdr)
                         elif rd_addr == SP_STORE_ADDR:
-                            ctx.set(dut2.mem_rd_data, sto_val)
-                            ctx.set(dut2.mem_rd_valid, 1)
+                            pending_read = (rd_addr, sto_val)
                         else:
-                            ctx.set(dut2.mem_rd_valid, 0)
-                    else:
-                        ctx.set(dut2.mem_rd_valid, 0)
+                            local_errors.append(
+                                "Memory protocol failure: unexpected CALL read address "
+                                f"0x{rd_addr:08x}"
+                            )
+                            break
 
                     if comp or fault:
                         if exp_fault is not None:
@@ -387,7 +406,11 @@ def test_sw_parametrized():
                         break
                     await ctx.tick()
                 else:
-                    local_errors.append(f"sw={sw} STO={sto_val}: FSM did not complete")
+                    local_errors.append(
+                        f"sw={sw} STO={sto_val}: FSM did not complete; "
+                        f"acknowledged reads={[f'0x{addr:08x}' for addr in read_ops]}, "
+                        f"pending={pending_read}"
+                    )
 
             sim2 = Simulator(dut2)
             sim2.add_clock(1e-6)
