@@ -3,13 +3,13 @@
     {
       "name": "Boot.NS",
       "slot": 0,
-      "location": "0x00003C00",
+      "location": "0x00003F00",
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x003FF",
+      "limit": "0x000FF",
       "seq": 0,
-      "seal": "0xDECC5EEF"
+      "seal": "0xDEADDEEF"
     },
     {
       "name": "Boot.Thread",
@@ -145,38 +145,17 @@
       "seal": "0xDE963EEF"
     },
     {
-      "name": "slot_13",
+      "name": "Bridge.Preload",
       "slot": 13,
       "location": "0x00000A00",
-      "type": "Inform",
-      "f": 0,
-      "g": 0,
-      "limit": "0x00001",
-      "seq": 0,
-      "seal": "0xDEA89EEF"
-    },
-    {
-      "name": "slot_14",
-      "slot": 14,
-      "location": "0x00000B00",
-      "type": "Inform",
-      "f": 0,
-      "g": 0,
-      "limit": "0x00001",
-      "seq": 0,
-      "seal": "0xDEA81EEF"
-    },
-    {
-      "name": "Bridge.Preload",
-      "slot": 15,
-      "location": "0x00000C00",
       "type": "Outform",
       "f": 0,
       "g": 0,
       "limit": "0x00001",
       "seq": 0,
-      "seal": "0xDEAB9EEF"
+      "seal": "0xDEA89EEF"
     }
   ],
-  "generated_at": 1788007898.4793363
+  "generated_at": 1788025425.8821573,
+  "committed_raw_fingerprint": "5f91c97912f3a3ccd64ea988cfa86f21b6958c220604c81966a9c135ece48ade"
 }
