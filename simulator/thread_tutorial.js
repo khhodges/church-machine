@@ -38,16 +38,18 @@ class ThreadTutorial {
         const sections = [
             { id: 'header',label: 'Header',                    sub: 'Word +0 \u00b7 geometry and resource contract', bg: '#2a2a2a', border: '#555',    text: '#aaa'    },
             { id: 'dr',    label: '\u2464 Data Registers',    sub: 'DR0\u2013DR15  (16 \u00d7 32-bit, fixed)',        bg: '#1e0840', border: '#8040c0', text: '#b080f0' },
-            { id: 'heap',  label: '\u2463 Heap \u2193',       sub: 'Size = cc words \u00b7 cc field in Header[0] \u00b7 IDE-set', bg: '#002a10', border: '#20a040', text: '#60d080' },
+            { id: 'sto',   label: '\u25c6 Protected STO',      sub: 'Machine-protected Thread word +17 \u00b7 FLAGS/SZ/STO \u00b7 not heap storage', bg: '#3a2200', border: '#f59e0b', text: '#fbbf24' },
+            { id: 'heap',  label: '\u2463 Heap \u2193',       sub: 'Size = cc words \u00b7 cc field in Header[0] \u00b7 IDE-set \u00b7 starts at +18', bg: '#002a10', border: '#20a040', text: '#60d080' },
             { id: 'free',  label: '\u2462 Freespace',         sub: 'Dynamic gap \u00b7 shrinks as stack/heap grow', bg: '#181818', border: '#404040', text: '#888'    },
             { id: 'stack', label: '\u2461 LIFO Stack \u2191', sub: 'Size = sw words \u00b7 sw field in Header[0] \u00b7 SW-defined by IDE', bg: '#002a40', border: '#2080c0', text: '#60b8f0' },
             { id: 'cap',   label: '\u2460 Capabilities',     sub: '12 persisted GT homes: CR0\u2013CR11  (+244\u2026+255)', bg: '#3a2c00', border: '#c8a020', text: '#f0d060' },
         ];
-        const heights = { header: 44, dr: 64, heap: 72, free: 56, stack: 96, cap: 72 };
+        const heights = { header: 44, dr: 64, sto: 64, heap: 72, free: 56, stack: 96, cap: 72 };
         const addrLabels = {
             header:'+0 \u2192',
             dr:    'word 1 \u2192',
-            heap:  'word 17 \u2192',
+            sto:   'word 17 \u2192',
+            heap:  'word 18 \u2192',
             free:  '18+heapWords \u2192',
             stack: '244\u2212sw \u2192',
             cap:   'word 244 \u2192',
@@ -83,9 +85,9 @@ class ThreadTutorial {
 <p>A dormant Thread uses the canonical 256-word software layout. CR0\u2013CR11 are restored from words <code>+244\u2026+255</code>. Word <code>+17</code> is the machine-protected STO slot and is initialized to the empty-stack ceiling; this is 243 for the canonical 256-word Thread. The ordinary software heap starts at <code>+18</code>. There is no packed PC, serialized M flag, or CR14 home.</p>
 ${this._memMap(null)}
 <div class="sr-key-concept"><div class="sr-concept-title">Six Regions, One Fixed Private ABI</div>
-<p>Reading top-to-bottom: <strong>Header \u2192 Data Registers \u2192 Heap \u2192 Freespace \u2192 Stack \u2192 Capabilities</strong>. The private ABI is fixed through <code>+255</code>: CR0\u2013CR11 are exactly <code>+244\u2026+255</code>, even in a larger Thread body. Words <code>+256</code> onward are a separate reserved extension, never relocated capabilities or additional heap/stack.</p></div>
+<p>Reading top-to-bottom: <strong>Header \u2192 Data Registers \u2192 Protected STO \u2192 Heap \u2192 Freespace \u2192 Stack \u2192 Capabilities</strong>. The machine-protected STO indicator occupies reserved word <code>+17</code>; ordinary heap begins at <code>+18</code>. The private ABI is fixed through <code>+255</code>: CR0\u2013CR11 are exactly <code>+244\u2026+255</code>, even in a larger Thread body. Words <code>+256</code> onward are a separate reserved extension, never relocated capabilities or additional heap/stack.</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">Object Garbage Collection</div>
-<p>Zone \u2463 (Heap) is <strong>not individually scanned</strong> by the hardware GC. The G-bit mark-and-sweep operates at the <em>Thread object</em> level: when the system GC marks the Thread GT as reachable, the <strong>entire lump</strong> \u2014 all six regions \u2014 is considered live and left untouched. If the Thread GT becomes unreachable, the whole lump is reclaimed at once. All heap memory management within Zone \u2463 \u2014 allocation, compaction, and freeing \u2014 is a <strong>software concern</strong> left to the thread\u2019s own code.</p></div>`
+<p>Zone \u2463 (Heap) is <strong>not individually scanned</strong> by the hardware GC. The G-bit mark-and-sweep operates at the <em>Thread object</em> level: when the system GC marks the Thread GT as reachable, the <strong>entire lump</strong> \u2014 all seven regions \u2014 is considered live and left untouched. If the Thread GT becomes unreachable, the whole lump is reclaimed at once. All heap memory management within Zone \u2463 \u2014 allocation, compaction, and freeing \u2014 is a <strong>software concern</strong> left to the thread\u2019s own code.</p></div>`
             },
             {
                 title: 'Header[0] \u2014 Thread Lump Bit Fields',
@@ -186,7 +188,7 @@ ${this._memMap(null)}
                 content: `${this._memMap('heap')}
 <p>After the Data Registers, the <strong>heap</strong> holds dynamically-allocated objects. Its size is fixed at thread-creation time by the IDE slot metadata stored in the NS entry\u2019s heapSize field.</p>
 <ul>
-<li><strong>Heap base</strong>: word 17 (immediately after Data Registers)</li>
+<li><strong>Heap base</strong>: word 18 (after the protected STO word at +17)</li>
 <li><strong>Heap limit</strong>: word <code>18+heapWords\u22121</code> (must not collide with freespace; <code>heapWords = cc</code> field in Header[0])</li>
 <li><strong>Allocation</strong>: thread objects advance the heap pointer upward (bump allocation); objects grow from heap base toward freespace</li>
 <li><strong>Fixed ceiling</strong>: the heap cannot expand beyond its allocated words; each thread owns its heap region exclusively</li>
@@ -198,7 +200,7 @@ ${this._memMap(null)}
 <div class="sr-key-concept"><div class="sr-concept-title">How Is the Heap Limit Enforced? \u2014 CR5</div>
 <p><strong>CR5</strong> is the Heap Golden Token. It is installed by CHANGE each time this thread is resumed. Its two key fields set the hardware boundary:</p>
 <table class="sr-table"><tr><th>CR5 field</th><th>Value</th><th>Effect</th></tr>
-<tr><td>word1_location</td><td>lumpBase + 17\u00d74 (byte addr)</td><td>Heap base \u2014 first valid byte of Zone \u2463</td></tr>
+<tr><td>word1_location</td><td>lumpBase + 18\u00d74 (byte addr)</td><td>Heap base \u2014 first valid byte of Zone \u2463, after protected STO</td></tr>
 <tr><td>limit_offset</td><td>heapWords \u2212 1</td><td>Inclusive word count; last valid index from base</td></tr>
 </table>
 <p>Every <code>DREAD</code> and <code>DWRITE</code> instruction that uses CR5 runs a <strong>TPERM bounds check</strong> before touching memory: <code>offset \u2264 CR5.limit_offset</code>. CR5 starts at word <code>+18</code>, so protected STO at <code>+17</code> is unreachable. A write beyond word <code>18+heapWords\u22121</code> faults immediately \u2014 the heap can never silently overflow into freespace or the stack. The IDE sets <code>heapWords</code> via the <code>cc</code> field in Header[0] (bits [7:0]); CHANGE loads the correct CR5 on every resume; the hardware enforces the ceiling on every access.</p></div>
@@ -234,7 +236,8 @@ ${this._memMap(null)}
 <table class="sr-table"><tr><th>Region</th><th>Start</th><th>Size</th><th>Defined by</th></tr>
 <tr><td>Header</td><td>word 0</td><td>1 word (fixed)</td><td>0xF900_8240 (magic, typ=10, sw=32, heapWords=cc=64)</td></tr>
 <tr><td>\u2464 Data Registers</td><td>word 1</td><td>16 words (fixed)</td><td>Architecture constant (DR0\u2013DR15)</td></tr>
-<tr><td>\u2463 Heap</td><td>word 17</td><td><code>heapWords</code> \u2193</td><td>Header[0] <code>cc</code> field \u00b7 IDE-set</td></tr>
+<tr><td>\u25c6 Protected STO</td><td>word 17</td><td>1 word</td><td>Machine-protected FLAGS/SZ/STO indicator; excluded from heap</td></tr>
+<tr><td>\u2463 Heap</td><td>word 18</td><td><code>heapWords</code> \u2193</td><td>Header[0] <code>cc</code> field \u00b7 IDE-set</td></tr>
 <tr><td>\u2462 Freespace</td><td>18+heapWords</td><td>dynamic</td><td>Residual gap between heap top and stack floor</td></tr>
 <tr><td>\u2461 LIFO Stack</td><td><code>244\u2212sw</code> \u2026 <code>243</code></td><td><code>cw/sw</code> words \u2193</td><td>Header <code>cw/sw</code> field \u00b7 cursor STO = 243 (empty)</td></tr>
 <tr><td>\u2460 GT Zone (Capabilities)</td><td>word 244</td><td>12 words (architecture-fixed)</td><td>CR0\u2013CR11 at +244\u2026+255; CR12\u2013CR15 are runtime-only</td></tr>
@@ -293,7 +296,7 @@ ${this._memMap(null)}
             html += '<div class="sr-step-container sr-type-intro">';
             html += '<div class="sr-step-title">Thread Abstraction Memory Layout</div>';
             html += '<div class="sr-step-content">';
-            html += '<p>This tutorial walks through the six memory regions of a Church Machine Thread Abstraction: Header, the data-register file, heap, dynamic freespace, LIFO call stack, and fixed GT homes (CR0\u2013CR11). It also covers mLoad\u2019s GT-zone maintenance and how CHANGE suspends and resumes threads.</p>';
+            html += '<p>This tutorial walks through the seven memory regions of a Church Machine Thread Abstraction: Header, the data-register file, protected STO, heap, dynamic freespace, LIFO call stack, and fixed GT homes (CR0\u2013CR11). It also covers mLoad\u2019s GT-zone maintenance and how CHANGE suspends and resumes threads.</p>';
             html += '<p>Click <strong>Next</strong> to begin.</p>';
             html += '</div></div>';
         }

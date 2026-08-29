@@ -242,9 +242,23 @@ function assertThreadTableColumns(html, layout, base, label) {
         return rows[rows.length - 1];
     };
     const capabilityTable = view.querySelector('.abs-clist-table');
+    const sectionLabels = [...view.querySelectorAll('.thread-zone-hdr')]
+        .map(header => header.textContent.replace(/\s+/g, ' ').trim().replace(/^[▼▶]/, ''));
     assert.deepStrictEqual(
-        [firstRow(zoneTables[1]).cells[0].textContent.trim(),
-         firstRow(zoneTables[1]).cells[1].textContent.trim()],
+        sectionLabels.map(label => label.replace(/\s+.*$/, '')),
+        ['⑤', '◆', '④', '③', '②', '①'],
+        `${label} keeps Data Registers, Protected STO, Heap, Freespace, Stack, Capabilities order`
+    );
+    assert(sectionLabels[1].includes('Protected STO') &&
+           sectionLabels[1].includes('offset +17') &&
+           sectionLabels[1].includes('machine-protected Thread word'),
+        `${label} identifies +17 as the machine-protected STO word`);
+    assert(sectionLabels[2].includes('offset +18') &&
+           sectionLabels[2].includes(`${layout.heapWords} words`),
+        `${label} starts Heap at +18 and shows its cc-sized extent`);
+    assert.deepStrictEqual(
+        [firstRow(zoneTables[0]).cells[0].textContent.trim(),
+         firstRow(zoneTables[0]).cells[1].textContent.trim()],
         [`+${layout.drStart}`, expectedAddress(layout.drStart)],
         `${label} Data Registers starts at its selected-lump offset and address`
     );
@@ -300,6 +314,13 @@ const bootSlotSixHtml = sandbox.renderThreadMemoryLayout(11, true);
 sim.bootEntrySlot = 7;
 assert.strictEqual(sandbox.renderThreadMemoryLayout(11, true), bootSlotSixHtml,
     'changing active boot selection does not alter an inactive Thread detail');
+
+vm.runInContext(fs.readFileSync(__dirname + '/thread_tutorial.js', 'utf8'), sandbox);
+const tutorialMap = vm.runInContext('new ThreadTutorial()._memMap(null)', sandbox);
+assert(tutorialMap.includes('◆ Protected STO') &&
+       tutorialMap.includes('Machine-protected Thread word +17') &&
+       tutorialMap.includes('word 18'),
+    'Thread tutorial map shows protected STO at +17 and Heap at +18');
 
 // CR12 is not live before boot, but its detail panel must still project the
 // currently selected suspended Thread image.  Thread.1 may validly start at
