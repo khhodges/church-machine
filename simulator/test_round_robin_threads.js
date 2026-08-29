@@ -49,6 +49,9 @@ committed.dr[1] = 0xA1001001;
 committed.memory[committedBases[1] + 1] = 0xB2000000;
 committed.memory[committedBases[1] + 2] = 0xB2000001;
 committed.memory[committedBases[2] + 1] = 0xC3000000;
+const targetCapsBefore = committed.memory.slice(
+    committedBases[1] + 244, committedBases[1] + 256);
+const cr15Before = {...committed.cr[15]};
 committed.halted = true;
 assert.strictEqual(committed.advanceConfiguredThread().slot, 11);
 assert.strictEqual(committed.halted, false,
@@ -63,10 +66,42 @@ assert.strictEqual(committed.dr[1], 0xB2000001,
     'manual CHANGE restores saved DR1 instead of retaining the outgoing value');
 assert.strictEqual(committed.cr[0].word0, entryWords[1],
     'manual CHANGE restores saved CR0 into the live capability bank');
-assert.strictEqual(committed.pc, 1, 'dormant Thread entry starts at code word 1');
+assert.strictEqual(committed.pc, 0,
+    'dormant Thread uses direct selector PC 0 with the canonical code base');
 assert.strictEqual(committed.cr[14].word0 & 0xFFFF,
     committed.cr[0].word0 & 0xFFFF, 'CR14 target is derived from restored CR0');
 const firstEntry = committed.readNSEntry(committed.cr[0].word0 & 0xFFFF);
+const firstHeader = committed.parseLumpHeader(
+    committed.memory[firstEntry.word0_location] >>> 0);
+const cr14Perms = committed.parseGT(committed.cr[14].word0).permissions;
+const cr6Perms = committed.parseGT(committed.cr[6].word0).permissions;
+assert.strictEqual(committed.cr[14].word1, firstEntry.word0_location,
+    'CHANGE reloads CR14 with the canonical raw LUMP base');
+assert.deepStrictEqual(
+    {R: cr14Perms.R, W: cr14Perms.W, X: cr14Perms.X, L: cr14Perms.L},
+    {R: 1, W: 0, X: 1, L: 0},
+    'CHANGE header microcode reloads CR14 with RX permissions');
+assert.strictEqual(committed.cr[14].m, 1,
+    'CHANGE header microcode installs CR14 with the same M state as CALL');
+assert.strictEqual(committed.cr[6].word1,
+    firstEntry.word0_location + firstHeader.lumpSize - firstHeader.cc,
+    'CHANGE header microcode reloads CR6 at the LUMP c-list tail');
+assert.deepStrictEqual(
+    {R: cr6Perms.R, W: cr6Perms.W, X: cr6Perms.X, L: cr6Perms.L},
+    {R: 0, W: 0, X: 0, L: 1},
+    'CHANGE header microcode reloads CR6 with L-only permissions');
+assert.strictEqual(committed.cr[6].m, 1,
+    'CHANGE header microcode installs CR6 with the same M state as CALL');
+assert.strictEqual(committed.cr[6].word2, committed.cr[14].word2,
+    'CR6 and CR14 share the validated Namespace limit metadata');
+assert.strictEqual(committed.cr[6].word3, committed.cr[14].word3,
+    'CR6 and CR14 share the validated Namespace seal metadata');
+assert.deepStrictEqual(committed.cr[15], cr15Before,
+    'manual Thread CHANGE does not replace the live Namespace root in CR15');
+assert.deepStrictEqual(
+    committed.memory.slice(committedBases[1] + 244, committedBases[1] + 256),
+    targetCapsBefore,
+    'privileged restore reads the incoming capability homes without rewriting them');
 assert.strictEqual(committed._fetchInstruction().addr,
     firstEntry.word0_location + 1,
     'first fetch after dormant CHANGE executes code LUMP word 1');
@@ -142,6 +177,32 @@ assert.strictEqual(deferred.halted, false,
 deferred.step();
 assert(deferred.faultLog.length > 0,
     'the first attempted instruction raises the deferred entry fault');
+
+const malformed = new ChurchSimulator();
+assert.strictEqual(malformed.loadBootImage(image), true,
+    `malformed-header fixture image must load: ${malformed.lastBootImageError || 'unknown error'}`);
+malformed.bootComplete = true;
+malformed._currentThreadSlot = 1;
+const malformedTargetBase = malformed.readNSEntry(11).word0_location;
+const malformedEntryGT = malformed.memory[malformedTargetBase + 244] >>> 0;
+const malformedCodeEntry = malformed.readNSEntry(
+    malformed.parseGT(malformedEntryGT).index);
+malformed.memory[malformedCodeEntry.word0_location] = 0;
+malformed.halted = true;
+const malformedSelection = malformed.advanceConfiguredThread();
+assert.strictEqual(malformedSelection.ok, true,
+    'manual selection accepts a non-null entry whose LUMP header is malformed');
+assert.strictEqual(malformedSelection.result.entryReady, false,
+    'malformed entry-header validation remains deferred until execution');
+assert.strictEqual(malformed.faultLog.length, 0,
+    'malformed LUMP selection alone raises no architectural fault');
+assert.strictEqual(malformed.cr[6].word0, 0,
+    'deferred malformed header does not expose a stale CR6 c-list view');
+assert.strictEqual(malformed.cr[14].word0, 0,
+    'deferred malformed header does not expose a stale CR14 code view');
+malformed.step();
+assert(malformed.faultLog.length > 0,
+    'the first attempted instruction reports the malformed selected LUMP');
 
 // The browser declares `let sim` in app-shell.js. Top-level `let` bindings are
 // not mirrored onto window, so the toolbar handler must use the lexical `sim`

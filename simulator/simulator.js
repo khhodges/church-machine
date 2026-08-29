@@ -5826,40 +5826,9 @@ class ChurchSimulator {
         const hasLumpHeader = hdr.valid && hdr.cc > 0;
 
         if (hasLumpHeader) {
-            const cw       = hdr.cw;
-            const cc       = hdr.cc;
-            const lumpSz   = hdr.lumpSize;
-            // clistStart = lumpSz - cc: c-list occupies the LAST cc words of the slot.
-            // Matches call.py line 282: base = NS_base + (lumpSize − cc) × 4 (byte addr of c-list[0]).
-            // lumpSz is always 2^(n_minus_6+6) (a power of 2, min 64 words) — NOT (1+cw+cc).
-            const clistStart = lumpSz - cc;
-
-            // CR14 (code, RX, M=1) and CR6 (c-list, E+M=1) set simultaneously from single lump header read.
-            // M=1 on both: CALL Phase 1 mLoad is always M-elevated (call.py: mload_m_elevated = 1).
-            const cr14GT = this.createGT(srcParsed.gt_seq, check.index, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);
-            this.cr[14] = {
-                word0: cr14GT,
-                word1: base,
-                word2: nsEntry.word1_limit >>> 0,
-                word3: nsEntry.word2_seals,
-                m: 1    // CALL Phase 1 mLoad is always M-elevated
-            };
-
-            // CR6: L-only GT — same slot/seq/type as source, perms fixed to L alone.
-            // L allows LOAD to extract capabilities from the c-list via mLoad.
-            // Matches hardware call.py: cr6_adj_gt.perm.eq(0b001) (L = perm[0] in Church domain).
-            // M is recorded in cr.m = 1 (not in the GT perms field).
-            const cr6GT = this.createGT(srcParsed.gt_seq, check.index, {R:0,W:0,X:0,L:1,S:0,E:0}, srcParsed.type);
-            this.cr[6] = {
-                word0: cr6GT,                       // L-only (c-list access via LOAD; matches hardware call.py perm=0b001)
-                word1: (base + clistStart) >>> 0,
-                word2: nsEntry.word1_limit >>> 0,
-                word3: nsEntry.word2_seals,
-                m: 1    // M set (CALL Phase 1 mLoad always M-elevated; call.py: mload_m_elevated = 1)
-            };
-            // CR6 lives in the CALL stack frame (written above); NOT in the caps zone
-
-            cr14Desc = `, hdr=0x${hdrWord.toString(16).toUpperCase().padStart(8,'0')} → CR14+CR6 simultaneous: CR14(RX M=1,cw=${cw},lim=0..${cw-1}) CR6(L M=1,cc=${cc},base=0x${(base+clistStart).toString(16).toUpperCase()})`;
+            const headerContext = this._installLumpHeaderContext(
+                srcParsed, check.index, nsEntry, hdr);
+            cr14Desc = `, hdr=0x${hdrWord.toString(16).toUpperCase().padStart(8,'0')} → ${headerContext.desc}`;
         } else {
             // Non-lump-header path: write L-only GT to CR6 + M.
             // Matches hardware call.py: cr6_adj_gt.perm.eq(0b001) (L = perm[0] in Church domain).
@@ -5936,6 +5905,37 @@ class ChurchSimulator {
         this._emitTrace(this.physicalPC, TRACE_EV_CALL_CR14, this.cr[14].word0 >>> 0);
         this._emitTrace(this.physicalPC, TRACE_EV_CALL_PUSH, 0);
         return { pc: prevPC, instr: d, desc, pipeline: this._callPipeline(d, label) };
+    }
+
+    // CALL and scheduler CHANGE use the same header-load microcode. A single
+    // validated LUMP header establishes the RX code view in CR14 and the
+    // L-only c-list view in CR6 simultaneously.
+    _installLumpHeaderContext(sourceParsed, nsIndex, nsEntry, hdr) {
+        const base = nsEntry.word0_location >>> 0;
+        const clistStart = hdr.lumpSize - hdr.cc;
+        const cr14GT = this.createGT(
+            sourceParsed.gt_seq, nsIndex,
+            {R:1,W:0,X:1,L:0,S:0,E:0}, 1);
+        const cr6GT = this.createGT(
+            sourceParsed.gt_seq, nsIndex,
+            {R:0,W:0,X:0,L:1,S:0,E:0}, sourceParsed.type);
+        this.cr[14] = {
+            word0: cr14GT,
+            word1: base,
+            word2: nsEntry.word1_limit >>> 0,
+            word3: nsEntry.word2_seals >>> 0,
+            m: 1,
+        };
+        this.cr[6] = {
+            word0: cr6GT,
+            word1: (base + clistStart) >>> 0,
+            word2: nsEntry.word1_limit >>> 0,
+            word3: nsEntry.word2_seals >>> 0,
+            m: 1,
+        };
+        return {
+            desc: `CR14+CR6 simultaneous: CR14(RX M=1,cw=${hdr.cw},lim=0..${hdr.cw - 1}) CR6(L M=1,cc=${hdr.cc},base=0x${(base + clistStart).toString(16).toUpperCase()})`,
+        };
     }
 
     _dispatchAbstraction(d, check, abstraction) {
@@ -6560,53 +6560,51 @@ class ChurchSimulator {
         const entryCheck = this.mLoad(entryGT, 'E', 14);
         if (!entryCheck.ok) {
             if (schedulerSwitch && d.deferEntryFault === true) {
+                this.cr[6] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
                 this.cr[14] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
                 this._currentThreadSlot = targetIdx;
-                this.pc = 1;
+                this.pc = 0;
                 const desc = `Selected dormant Thread slot ${targetIdx}; CR0 entry validation deferred until execution`;
                 this.output += desc + '\n';
-                return { pc: 1, instr: d, desc, entryReady: false };
+                return { pc: 0, instr: d, desc, entryReady: false };
             }
             this.fault(entryCheck.fault, `CHANGE dormant entry CR0: ${entryCheck.message}`);
             return null;
         }
         const codeEntry = entryCheck.entry;
-        const codeHeader = this.parseLumpHeader(
-            this.memory[codeEntry.word0_location] >>> 0);
-        if (!codeHeader.valid || codeHeader.cw === 0) {
+        const codeHeaderCheck = this.mLoad(
+            entryGT, 'E', 14, codeEntry.word0_location);
+        const codeHeader = codeHeaderCheck.ok
+            ? this.parseLumpHeader(this.memory[codeEntry.word0_location] >>> 0)
+            : null;
+        if (!codeHeaderCheck.ok || !codeHeader || !codeHeader.valid ||
+                codeHeader.cw === 0 || codeHeader.cc === 0) {
             if (schedulerSwitch && d.deferEntryFault === true) {
+                this.cr[6] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
                 this.cr[14] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
                 this._currentThreadSlot = targetIdx;
-                this.pc = 1;
+                this.pc = 0;
                 const desc = `Selected dormant Thread slot ${targetIdx}; executable CR0 entry validation deferred until execution`;
                 this.output += desc + '\n';
-                return { pc: 1, instr: d, desc, entryReady: false };
+                return { pc: 0, instr: d, desc, entryReady: false };
             }
-            this.fault('BOUNDS', 'CHANGE dormant entry CR0 does not name executable code');
+            const faultType = !codeHeaderCheck.ok ? codeHeaderCheck.fault : 'BOUNDS';
+            const faultMessage = !codeHeaderCheck.ok
+                ? codeHeaderCheck.message
+                : 'CHANGE dormant entry CR0 does not name executable code with a c-list';
+            this.fault(faultType, faultMessage);
             return null;
         }
-        const codeGT = this.createGT(
-            entryParsed.gt_seq, entryParsed.index,
-            {R:1,W:0,X:1,L:0,S:0,E:0}, entryParsed.type);
-        this.cr[14] = {
-            word0: codeGT,
-            // _fetchInstruction addresses word1 + 1 + pc. Dormant CHANGE
-            // exposes pc=1, so bias the internal base by one word to fetch
-            // the required first code word at raw LUMP base + 1.
-            word1: (codeEntry.word0_location - 1) >>> 0,
-            word2: ((codeEntry.word1_limit & ~0x1FFFFF) |
-                    ((codeHeader.cw - 1) & 0x1FFFFF)) >>> 0,
-            word3: codeEntry.word2_seals >>> 0,
-            m: 0,
-        };
+        const headerContext = this._installLumpHeaderContext(
+            entryParsed, entryParsed.index, codeEntry, codeHeader);
         this._currentThreadSlot = targetIdx;
-        const desc = `CHANGE CR${d.crDst} (dormant entry: CR0–CR11+DRs restored for slot ${targetIdx}; CR14 derived from CR0 slot ${entryParsed.index}; starting at PC=1; no CALL frame)`;
+        const desc = `CHANGE CR${d.crDst} (dormant entry: CR0–CR11+DRs restored for slot ${targetIdx}; ${headerContext.desc}; starting at direct selector PC=0; no CALL frame)`;
         this.output += desc + '\n';
-        this.pc = 1;
+        this.pc = 0;
         this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_PUSH, 0);
         this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_CR12, this.cr[12].word0 >>> 0);
         this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_CR5,  this.cr[5].word0  >>> 0);
-        return { pc: 1, instr: d, desc };
+        return { pc: 0, instr: d, desc };
     }
 
     _execSwitch(d) {
