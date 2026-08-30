@@ -9,6 +9,7 @@ const { test, expect } = require('@playwright/test');
 const A = 'AAA00001';
 const B = 'BBB00002';
 const C = 'CCC00003';
+const EMPTY = 'EMPTY004';
 
 const STUB_LUMPS = [
     {
@@ -34,6 +35,12 @@ const STUB_LUMPS = [
         lump_type: 'code', content_type: 'code', language: 'cloomc',
         lump_size: 80, ns_slot: 12,
         clist_entries: [{ target_token: A, perms: 'R' }], // cycle
+    },
+    {
+        token: EMPTY, dot_name: 'Graph.Empty', abstraction: 'GraphEmpty',
+        lump_type: 'code', content_type: 'code', language: 'cloomc',
+        lump_size: 64, ns_slot: 13,
+        clist_entries: [],
     },
 ];
 
@@ -125,5 +132,33 @@ test.describe('LUMP DNA graph regression', () => {
         await modal.locator('.lump-deep-dive-close').click();
         await expect(modal).toHaveCount(0);
         await expect(page.locator('#lumpPickerSelect')).toBeVisible();
+    });
+
+    test('shows a clear no-data message without initializing a graph for an empty C-List', async ({ page }) => {
+        await openGraph(page);
+
+        // Spy on the shared graph initializer before opening the empty lump.
+        // The modal should take its no-data branch instead of creating a
+        // graph wrapper and invoking pan/zoom setup.
+        await page.evaluate(() => {
+            window.__deepDiveGraphInitCalls = 0;
+            const original = window._initNsDepGraphPanZoom;
+            window._initNsDepGraphPanZoom = function (...args) {
+                window.__deepDiveGraphInitCalls++;
+                return original.apply(this, args);
+            };
+        });
+
+        const trigger = page.locator(`button[data-deep-dive-token="${EMPTY}"]`);
+        await trigger.click();
+
+        const modal = page.locator('#lumpDeepDiveModal');
+        await expect(modal).toBeVisible();
+        await expect(modal.locator('#lumpDeepDiveBody'))
+            .toContainText('No C-List data is available for this LUMP.');
+        await expect(modal.locator('.lump-deep-dive-svg')).toHaveCount(0);
+        await expect(modal.locator('.ns-dep-graph-wrap')).toHaveCount(0);
+        await expect(modal.locator('.lumps-loading')).toHaveCount(0);
+        expect(await page.evaluate(() => window.__deepDiveGraphInitCalls)).toBe(0);
     });
 });
