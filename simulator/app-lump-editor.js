@@ -177,7 +177,7 @@
 
     // state.thread.lumpPow2: exponent for lump size (e.g. 8 = 256 words)
     // Thread geometry fields are encoded directly in the Thread header:
-    // cw/sw = stack words and cc = heap words.
+    // cw/sw = stack words and cc = the 12 capability-home count.
     var state = {
         thread: { lumpPow2: V20_THREAD_LUMP_POW2, stackFrames: 16, heapWords: 12, count: 1 },
         ns: { n_minus_6: V20_NS_TOTAL_N, slots: NS_CAP_MIN }
@@ -303,7 +303,7 @@
                 namespaceLumpWords:  64,
                 threadLumpWords:     threadLumpWords,
                 threadStackWords:    clamp(state.thread.stackFrames, 10, 255) * 2,
-                threadHeapWords:     clamp(state.thread.heapWords, 1, 255),
+                threadHeapWords:     12,
                 nsSlotsMax:          nsSlotsMax,
                 threadCount:         threadCount
             }
@@ -884,13 +884,18 @@
         var stackFrames  = clamp(state.thread.stackFrames, 10, 255);
         var stackWords   = stackFrames * 2;
 
-        var heap = clamp(state.thread.heapWords, 1, 255);
-        var layout = THREAD.layout(lumpSize, stackWords, heap);
-        var overCapacity = !layout.valid;
+        var capsStart = lumpSize - CAP_WORDS;
+        var capsEnd = lumpSize - 1;
+        var stackEnd = capsStart - 1;
+        var stackStart = stackEnd - stackWords + 1;
+        var heapStart = 18;
+        var heapEnd = stackStart - 1;
+        var heap = Math.max(0, heapEnd - heapStart + 1);
+        var overCapacity = heapEnd < heapStart;
 
-        // Thread headers reinterpret cw as stack words; cc is heap words.
+        // Thread headers reinterpret cw as stack words; cc is always 12.
         var cw = overCapacity ? 0 : stackWords;
-        var cc = heap;
+        var cc = CAP_WORDS;
         var word    = packHdr(n, cw, cc, 2);
         var wordHex = hex8(word);
 
@@ -910,7 +915,7 @@
 
         var heapDisplay = overCapacity
             ? '<span class="le-overflow">⚠ over capacity — increase lump size or reduce stack</span>'
-            : esc(heap.toLocaleString() + ' words');
+            : esc(heap.toLocaleString() + ' words  (+18 … +' + heapEnd + '; derived)');
 
         var memStatus = overBudget
             ? '<span class="le-overflow">⚠ ' + esc(fmtWords(totalMem) + ' words — exceeds 50 % budget') + '</span>'
@@ -919,8 +924,8 @@
         var zones = overCapacity ? [] : [
             { label: 'Header',    words: 1,           cls: 'le-zone-hdr'   },
             { label: 'Data Regs', words: DR_WORDS,    cls: 'le-zone-dr'    },
-            { label: 'Heap',      words: heap,         cls: 'le-zone-heap'  },
-            { label: 'Freespace', words: layout.freeWords, cls: 'le-zone-free' },
+            { label: 'Protected STO', words: 1,         cls: 'le-zone-hdr'   },
+            { label: 'Heap',      words: heap,          cls: 'le-zone-heap'  },
             { label: 'Stack',     words: stackWords,   cls: 'le-zone-stack' },
             { label: 'Cap Regs',  words: CAP_WORDS,   cls: 'le-zone-caps'  }
         ];
@@ -935,12 +940,12 @@
             ['typ field',      '10  (Thread)', ''],
             ['Header',         '1 word', ''],
             ['Data Regs',      esc(DR_WORDS + ' words  (DR0–DR15, static)'), ''],
-            ['Heap (cc)',      heapDisplay, overCapacity ? '' : ''],
-            ['Freespace',      overCapacity ? '—' : esc(layout.freeWords + ' words  (+' + layout.freeStart + ' … +' + layout.freeEnd + ')'), ''],
-            ['Stack (cw/sw)',  esc(stackFrames + ' frames  (' + stackWords + ' words; +' + layout.stackStart + ' … +' + layout.stackEnd + ')'), ''],
-            ['Cap Regs',       esc(CAP_WORDS + ' words  (CR0–CR11 persisted homes)'), ''],
-            ['Capability offset', esc('+' + layout.capsStart + ' … +' + layout.capsEnd + '  (fixed; never relocated)'), 'le-val-gold'],
-            ['Thread size policy', esc(lumpSize + ' words  (only the defined +0 … +255 layout is supported)'), 'le-val-gold'],
+            ['Protected STO',  '+17 (machine-protected)', ''],
+            ['Heap',           heapDisplay, overCapacity ? '' : ''],
+            ['Stack (cw/sw)',  esc(stackFrames + ' frames  (' + stackWords + ' words; +' + stackStart + ' … +' + stackEnd + ')'), ''],
+            ['Cap Regs (cc)',  esc(CAP_WORDS + ' words  (CR0–CR11 persisted homes)'), ''],
+            ['Capability offset', esc('+' + capsStart + ' … +' + capsEnd + '  (lump-size tail)'), 'le-val-gold'],
+            ['Thread size policy', esc(lumpSize + ' words  (n−6 defines this total allocation)'), 'le-val-gold'],
             ['WukongCallHome', esc('0x' + V20_WCH_BASE_BYTE.toString(16).toUpperCase() + '–0x' + V20_WCH_END_BYTE.toString(16).toUpperCase() + '  (after full Thread allocation)'), 'le-val-gold'],
             ['Header word',    '<span id="le-thread-hex" class="le-hex">' + esc(wordHex) + '</span>' + copyBtn('le-thread-hex'), 'le-val-mono']
         ]);
@@ -995,7 +1000,7 @@
             threadCountClampBanner +
             threadClampBanner +
             overCapWarning +
-             '<p class="le-panel-desc">This design is normative for every Thread. The supported body is exactly +0\u2026+255: Header, DR0\u2013DR15, Protected STO, Heap, Freespace, LIFO Stack ending at +243, then the twelve persisted CR0\u2013CR11 homes at +244\u2026+255. CR12\u2013CR15 are privileged/runtime state and are not persisted homes. Larger Thread bodies are rejected because the architecture defines no region after +255.</p>' +
+             '<p class="le-panel-desc">This design is normative for every Thread. n\u22126 defines the total lump size; after Header, DR0\u2013DR15, and protected STO +17, Heap fills +18 through the stack start. The LIFO Stack is immediately before the twelve persisted CR0\u2013CR11 homes at the lump tail (lumpSize\u221212 \u2026 lumpSize\u22121). cc is the fixed capability-home count (12), not a heap size. Increasing lump size grows Heap; Threads have no Freespace zone.</p>' +
             '<div class="le-field-row">' +
                 '<label class="le-label">Lump size<span class="le-range-hint"> 2^' + MIN_EXP + '\u2013' + maxLumpPow2 + ', max ' + fmtWords(Math.pow(2, maxLumpPow2)) + ' w</span></label>' +
                 '<div class="le-input-group le-input-group-wide">' +
@@ -1003,7 +1008,7 @@
                 '</div>' +
             '</div>' +
                 '<div class="le-thread-sync-note">' +
-                '<span class="le-thread-sync-badge">Normative Thread\u00a0= ' + esc(fmtWords(lumpSize)) + '\u00a0words\u00a0(2^' + lumpPow2 + ')\u00a0\u00b7 cw/sw=' + stackWords + '\u00a0\u00b7 cc=' + heap + '\u00a0\u00b7 CR0\u2013CR11 fixed @ +244\u2026+255</span>' +
+                '<span class="le-thread-sync-badge">Thread = ' + esc(fmtWords(lumpSize)) + ' words (2^' + lumpPow2 + ') \u00b7 cw/sw=' + stackWords + ' \u00b7 cc=12 homes \u00b7 Heap=' + heap + ' words \u00b7 CR0\u2013CR11 @ +' + capsStart + '\u2026+' + capsEnd + '</span>' +
             '</div>' +
             '<div class="le-field-row">' +
                 '<label class="le-label">Thread count<span class="le-range-hint">' + esc(countHint) + '</span></label>' +
@@ -1017,13 +1022,6 @@
                 '<div class="le-input-group">' +
                     '<input type="range"  class="le-slider" id="le-t-stack-sl"  min="10" max="255" value="' + stackFrames + '" oninput="lumpEditorThreadStack(this.value)">' +
                     '<input type="number" class="le-number" id="le-t-stack-num" min="10" max="255" value="' + stackFrames + '" oninput="lumpEditorThreadStack(this.value)">' +
-                '</div>' +
-            '</div>' +
-            '<div class="le-field-row">' +
-                '<label class="le-label">Heap words (cc)<span class="le-range-hint"> 1\u2013255</span></label>' +
-                '<div class="le-input-group">' +
-                    '<input type="range" class="le-slider" id="le-t-heap-sl" min="1" max="255" value="' + heap + '" oninput="lumpEditorThreadHeap(this.value)">' +
-                    '<input type="number" class="le-number" id="le-t-heap-num" min="1" max="255" value="' + heap + '" oninput="lumpEditorThreadHeap(this.value)">' +
                 '</div>' +
             '</div>' +
             '<div class="le-bar-label-row"><span>Single thread memory layout</span><span class="le-bar-label-count">' + esc(lumpSize.toLocaleString() + ' words') + '</span></div>' +
@@ -1542,7 +1540,7 @@
     function renderDesignHero(kind) {
         var title = (kind === 'thread') ? 'Thread Lump \u2014 Design Page' : 'Namespace Lump \u2014 Design Page';
         var blurb = (kind === 'thread')
-            ? 'The normative Thread design fixes the private ABI at +0\u2026+255 for every supported allocation. Header cw/sw is stack words, cc is heap words, Freespace separates them, and exactly CR0\u2013CR11 persist at +244\u2026+255; CR12\u2013CR15 remain privileged/runtime state.'
+            ? 'Thread n\u22126 defines total allocation. Header cw/sw is stack words; cc=12 is the capability-home count. Heap runs from +18 to Stack, Stack precedes the twelve tail CR0\u2013CR11 homes, and Threads have no Freespace zone; CR12\u2013CR15 remain privileged/runtime state.'
             : 'The V20 Namespace Lump (NS Slot\u202f0) describes the physical address space with a power-of-two number of sixteen-byte entries (64\u20131024, chosen interactively) at the top of memory. Slot 0 is the highest-address entry; slots descend by 16 bytes toward the table base.';
         return '<div class="le-design-hero">' +
             '<div class="le-design-hero-title">' + esc(title) + '</div>' +

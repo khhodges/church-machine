@@ -31,6 +31,7 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 import server.app as _app_module
+from hardware.thread_design import thread_layout
 from server.app import (
     DEFAULT_BOOT_CONFIG,
     HARDWARE_PROFILES,
@@ -326,21 +327,23 @@ class TestValidateStep1ThreadGeometry:
         assert err is not None
         assert "power of 2" in err
 
-    def test_larger_thread_body_is_rejected(self):
+    def test_larger_thread_body_expands_heap(self):
         step1 = dict(DEFAULT_BOOT_CONFIG["step1"])
         step1["threadLumpWords"] = 512
         err = _validate_step1(DEFAULT_BOOT_CONFIG["targetBoard"], step1)
-        assert err is not None
-        assert "normative Thread body sizes" in err
+        assert err is None
+        layout = thread_layout(512, 32)
+        assert layout["heap_words"] == 450
+        assert layout["caps_start"] == 500
 
-    def test_header_fields_drive_stack_and_heap_within_defined_body(self):
+    def test_stack_field_drives_boundary_and_heap_is_derived(self):
         step1 = dict(DEFAULT_BOOT_CONFIG["step1"])
         step1.update({"threadStackWords": 48, "threadHeapWords": 80})
         assert _validate_step1(DEFAULT_BOOT_CONFIG["targetBoard"], step1) is None
         step1["threadHeapWords"] = 200
-        err = _validate_step1(DEFAULT_BOOT_CONFIG["targetBoard"], step1)
-        assert err is not None
-        assert "fixed +244 capability homes" in err
+        assert _validate_step1(DEFAULT_BOOT_CONFIG["targetBoard"], step1) is None
+        layout = thread_layout(step1["threadLumpWords"], 48)
+        assert layout["heap_words"] == step1["threadLumpWords"] - 18 - 48 - 12
 
     def test_generated_thread_slots_are_reserved_and_need_namespace_capacity(self):
         step1 = _make_step1(16384)

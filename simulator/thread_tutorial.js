@@ -10,7 +10,7 @@ class ThreadTutorial {
             { bits: '[26:23]', name: 'n\u22126', val: 'IDE',   note: 'lumpSize = 2^(val+6)',               w: 4,  bg: '#3a2000', border: '#c86000', text: '#f09040' },
             { bits: '[22:10]', name: 'cw/sw',  val: 'IDE',   note: 'Stack words (cw reinterpreted for typ=10)', w: 13, bg: '#002a40', border: '#2080c0', text: '#60b8f0' },
             { bits: '[9:8]',   name: 'typ',    val: '10',    note: 'clist-only = Thread abstraction',    w: 2,  bg: '#2a2a2a', border: '#555',    text: '#888'    },
-            { bits: '[7:0]',   name: 'cc',     val: 'IDE',   note: 'Heap size \u2014 IDE sets max heap words (e.g. cc=64 \u2192 Zone \u2463 holds up to 64 words)', w: 8,  bg: '#002a10', border: '#20a040', text: '#60d080' },
+            { bits: '[7:0]',   name: 'cc',     val: '12',    note: 'Capability-home count: CR0\u2013CR11 at the lump tail', w: 8,  bg: '#3a2c00', border: '#c8a020', text: '#f0d060' },
         ];
         const total = 32;
         let bar = '<div style="display:flex;width:100%;border-radius:3px;overflow:hidden;margin-bottom:2px;">';
@@ -39,20 +39,18 @@ class ThreadTutorial {
             { id: 'header',label: 'Header',                    sub: 'Word +0 \u00b7 geometry and resource contract', bg: '#2a2a2a', border: '#555',    text: '#aaa'    },
             { id: 'dr',    label: '\u2464 Data Registers',    sub: 'DR0\u2013DR15  (16 \u00d7 32-bit, fixed)',        bg: '#1e0840', border: '#8040c0', text: '#b080f0' },
             { id: 'sto',   label: '\u25c6 Protected STO',      sub: 'Machine-protected Thread word +17 \u00b7 FLAGS/SZ/STO \u00b7 not heap storage', bg: '#3a2200', border: '#f59e0b', text: '#fbbf24' },
-            { id: 'heap',  label: '\u2463 Heap \u2193',       sub: 'Size = cc words \u00b7 cc field in Header[0] \u00b7 IDE-set \u00b7 starts at +18', bg: '#002a10', border: '#20a040', text: '#60d080' },
-            { id: 'free',  label: '\u2462 Freespace',         sub: 'Dynamic gap \u00b7 shrinks as stack/heap grow', bg: '#181818', border: '#404040', text: '#888'    },
-            { id: 'stack', label: '\u2461 LIFO Stack \u2191', sub: 'Size = sw words \u00b7 sw field in Header[0] \u00b7 SW-defined by IDE', bg: '#002a40', border: '#2080c0', text: '#60b8f0' },
-            { id: 'cap',   label: '\u2460 Capabilities',     sub: '12 persisted GT homes: CR0\u2013CR11  (+244\u2026+255)', bg: '#3a2c00', border: '#c8a020', text: '#f0d060' },
+            { id: 'heap',  label: '\u2463 Heap',       sub: 'Starts at +18 and fills through stackStart\u22121; grows with lump size', bg: '#002a10', border: '#20a040', text: '#60d080' },
+            { id: 'stack', label: '\u2462 LIFO Stack \u2193', sub: 'sw words immediately before tail capability homes', bg: '#002a40', border: '#2080c0', text: '#60b8f0' },
+            { id: 'cap',   label: '\u2461 Capabilities',     sub: '12 persisted GT homes: CR0\u2013CR11 (lumpSize\u221212 \u2026 lumpSize\u22121)', bg: '#3a2c00', border: '#c8a020', text: '#f0d060' },
         ];
-        const heights = { header: 44, dr: 64, sto: 64, heap: 72, free: 56, stack: 96, cap: 72 };
+        const heights = { header: 44, dr: 64, sto: 64, heap: 72, stack: 96, cap: 72 };
         const addrLabels = {
             header:'+0 \u2192',
             dr:    'word 1 \u2192',
             sto:   'word 17 \u2192',
             heap:  'word 18 \u2192',
-            free:  '18+heapWords \u2192',
-            stack: '244\u2212sw \u2192',
-            cap:   'word 244 \u2192',
+            stack: 'lumpSize\u221212\u2212sw \u2192',
+            cap:   'lumpSize\u221212 \u2192',
         };
         let html = '<div style="display:flex;gap:8px;margin:12px 0 4px 0;align-items:stretch;">';
         html += '<div style="display:flex;flex-direction:column;justify-content:flex-start;width:140px;flex-shrink:0;font-size:0.68rem;color:#666;font-family:monospace;">';
@@ -82,10 +80,10 @@ class ThreadTutorial {
                 title: 'What Is a Thread Abstraction?',
                 type: 'intro',
                 content: `<p>A <strong>Thread Abstraction</strong> is the Church Machine\u2019s representation of a running computation. Like all abstractions it lives inside a <em>lump</em> (a contiguous block of namespace words), but its internal structure is different from a Programmed Abstraction: it carries both a protected capability set <em>and</em> a live execution context.</p>
-<p>A dormant Thread uses the canonical 256-word software layout. CR0\u2013CR11 are restored from words <code>+244\u2026+255</code>. Word <code>+17</code> is the machine-protected STO slot and is initialized to the empty-stack ceiling; this is 243 for the canonical 256-word Thread. The ordinary software heap starts at <code>+18</code>. There is no packed PC, serialized M flag, or CR14 home.</p>
+<p>A dormant Thread uses a size declared by header <code>n\u22126</code>. CR0\u2013CR11 are restored from the final twelve words, <code>+(lumpSize\u221212)\u2026+(lumpSize\u22121)</code>. Word <code>+17</code> is the machine-protected STO slot; the ordinary software heap starts at <code>+18</code> and extends to the stack. There is no packed PC, serialized M flag, or CR14 home.</p>
 ${this._memMap(null)}
-<div class="sr-key-concept"><div class="sr-concept-title">Six Regions, One Fixed Private ABI</div>
-<p>Reading top-to-bottom: <strong>Header \u2192 Data Registers \u2192 Protected STO \u2192 Heap \u2192 Freespace \u2192 Stack \u2192 Capabilities</strong>. The machine-protected STO indicator occupies reserved word <code>+17</code>; ordinary heap begins at <code>+18</code>. The supported Thread body is exactly <code>+0\u2026+255</code>, with CR0\u2013CR11 at <code>+244\u2026+255</code>. Larger bodies are rejected because the architecture defines no Thread region after <code>+255</code>.</p></div>
+<div class="sr-key-concept"><div class="sr-concept-title">Five Regions, Tail-Derived Capability Homes</div>
+<p>Reading top-to-bottom: <strong>Header \u2192 Data Registers \u2192 Protected STO \u2192 Heap \u2192 Stack \u2192 Capabilities</strong>. The machine-protected STO indicator occupies reserved word <code>+17</code>; Heap begins at <code>+18</code>, ends immediately before Stack, and grows when <code>n\u22126</code> grows. Stack is immediately before the final twelve capability homes. There is no Thread Freespace region.</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">Object Garbage Collection</div>
 <p>Zone \u2463 (Heap) is <strong>not individually scanned</strong> by the hardware GC. The G-bit mark-and-sweep operates at the <em>Thread object</em> level: when the system GC marks the Thread GT as reachable, the <strong>entire lump</strong> is considered live and left untouched. If the Thread GT becomes unreachable, the whole lump is reclaimed at once. All heap memory management within Zone \u2463 \u2014 allocation, compaction, and freeing \u2014 is a <strong>software concern</strong> left to the thread\u2019s own code.</p></div>`
             },
@@ -98,16 +96,16 @@ ${this._memMap(null)}
 <tr><th>Field</th><th>Bits</th><th>Width</th><th>Thread value</th><th>Meaning</th></tr>
 <tr><td><code style="color:#888">magic</code></td><td>[31:27]</td><td>5&nbsp;b</td><td><code>0x1F</code></td><td>Trap-on-execute guard \u2014 executing word&nbsp;0 always faults</td></tr>
 <tr><td><code style="color:#f09040">n\u22126</code></td><td>[26:23]</td><td>4&nbsp;b</td><td>IDE</td><td><code>lumpSize = 2^(val+6)</code>; e.g. val=2 \u2192 2^8 = 256 words</td></tr>
-<tr><td><code style="color:#60b8f0">cw/sw</code></td><td>[22:10]</td><td>13&nbsp;b</td><td>IDE</td><td><strong>Stack words</strong> \u2014 <code>cw</code> field reinterpreted for typ=10; stack ends at +243; max CALL frames&nbsp;= sw\u00f72</td></tr>
+<tr><td><code style="color:#60b8f0">cw/sw</code></td><td>[22:10]</td><td>13&nbsp;b</td><td>IDE</td><td><strong>Stack words</strong> \u2014 <code>cw</code> field reinterpreted for typ=10; Stack ends immediately before the tail homes</td></tr>
 <tr><td><code style="color:#888">typ</code></td><td>[9:8]</td><td>2&nbsp;b</td><td><code>10</code></td><td>clist-only \u2014 identifies this lump as a Thread (no executable code)</td></tr>
-<tr><td><code style="color:#60d080">cc</code></td><td>[7:0]</td><td>8&nbsp;b</td><td>IDE</td><td><strong>Heap size</strong> \u2014 IDE sets the heap zone size limit; the independently fixed capability zone is exactly 12 words at +244\u2026+255</td></tr>
+<tr><td><code style="color:#f0d060">cc</code></td><td>[7:0]</td><td>8&nbsp;b</td><td><code>12</code></td><td><strong>Capability-home count</strong> \u2014 the twelve CR0\u2013CR11 homes occupy the final 12 words</td></tr>
 </table>
 <div class="sr-key-concept"><div class="sr-concept-title">Encoding Formula</div>
-<p><code>(0x1F &lt;&lt; 27) | (n_minus_6 &lt;&lt; 23) | (sw &lt;&lt; 10) | (0b10 &lt;&lt; 8) | heapWords</code></p>
-<p>Example \u2014 the defined 256-word V20 Thread, sw=32 stack words, heapWords=64:</p>
-<p><code style="color:#60d080;font-size:1rem;">0xF900_8240</code>&nbsp;&nbsp;(magic=0x1F, n\u22126=2, sw=32, typ=10, cc=64)</p></div>
+<p><code>(0x1F &lt;&lt; 27) | (n_minus_6 &lt;&lt; 23) | (sw &lt;&lt; 10) | (0b10 &lt;&lt; 8) | 12</code></p>
+<p>Canonical 256-word example \u2014 sw=32 stack words, cc=12 homes:</p>
+<p><code style="color:#f0d060;font-size:1rem;">0xF900_820C</code>&nbsp;&nbsp;(magic=0x1F, n\u22126=2, sw=32, typ=10, cc=12)</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">Why Reinterpret <code>cw</code> and <code>cc</code>?</div>
-<p>A Thread carries <em>no executable code</em>, so the 13-bit <code>cw</code> (code-word count) field is otherwise wasted. The hardware and Mint reinterpret it as <code>sw</code> (stack words) when <code>typ=10</code>. The stack occupies <code>+244\u2212sw\u2026+243</code>; the V20 capability homes remain fixed at <code>+244\u2026+255</code>, so <code>cc</code> remains the IDE-defined heap size.</p></div>`,
+<p>A Thread carries <em>no executable code</em>, so the 13-bit <code>cw</code> (code-word count) field is reinterpreted as <code>sw</code> (stack words) when <code>typ=10</code>. The stack occupies <code>+(lumpSize\u221212\u2212sw)\u2026+(lumpSize\u221213)</code>; <code>cc=12</code> records the persisted-home count. Heap is the remaining region from <code>+18</code> to the stack start\u22121.</p></div>`,
             },
             {
                 title: '\u2460 Capabilities \u2014 GT Zone for CR0\u2013CR11',
@@ -170,32 +168,20 @@ ${this._memMap(null)}
 <p>The stack discipline is <strong>Last-In First-Out</strong>: CALL decrements the STO field of the cursor register and RETURN increments it (via <code>prev_STO</code> in the frame word). Nested calls push sequentially deeper; unwinding always reverses that order. No frame can be forged or overwritten because all stack words are inside the thread\u2019s lump and bounds are hardware-enforced. Initial STO in protected word <code>+17</code> is <code>sp_max = +243</code> (the 12 persisted capability homes begin at +244).</p></div>`
             },
             {
-                title: '\u2462 Freespace \u2014 The Dynamic Buffer',
-                type: 'freespace',
-                content: `${this._memMap('free')}
-<p>Between the bottom of the current stack frame and the top of the heap lies <strong>unallocated freespace</strong>. This region shrinks from two directions:</p>
-<ul>
-<li>\u2193 The <strong>stack grows down</strong> as calls are nested deeper</li>
-<li>\u2191 The <strong>heap grows up</strong> as objects are allocated</li>
-</ul>
-<p>Freespace is not a named region at the hardware level \u2014 it is simply the words between the current stack pointer and the current heap pointer. The IDE sets the initial allocation so that even a fully-populated stack and a full heap leave a small safety margin.</p>
-<div class="sr-key-concept"><div class="sr-concept-title">Stack Overflow = Thread Suspension (Recoverable)</div>
-<p>The NS slot\u2019s limit field is the hardware guard. If the stack pointer reaches the limit, a <code>STACK_OVERFLOW</code> warning is raised <em>before any write occurs</em> and the thread is <strong>suspended</strong> for programmed recovery. The recovery handler can abort the thread, inspect state in the IDE debugger, or take corrective action \u2014 no smash is possible because the hardware blocks the write and suspends cleanly.</p></div>`
-            },
-            {
-                title: '\u2463 Heap \u2014 Fixed-Size Object Store',
+                title: '\u2463 Heap \u2014 Derived Object Store',
                 type: 'heap',
                 content: `${this._memMap('heap')}
-<p>After the Data Registers, the <strong>heap</strong> holds dynamically-allocated objects. Its size is fixed at thread-creation time by the IDE slot metadata stored in the NS entry\u2019s heapSize field.</p>
+<p>After the Data Registers and protected STO, the <strong>heap</strong> holds dynamically-allocated objects. Its size is derived: it starts at <code>+18</code> and fills every word through <code>stackStart\u22121</code>. Increasing the <code>n\u22126</code> lump size grows Heap when stack size is unchanged.</p>
 <ul>
 <li><strong>Heap base</strong>: word 18 (after the protected STO word at +17)</li>
-<li><strong>Heap limit</strong>: word <code>18+heapWords\u22121</code> (must not collide with freespace; <code>heapWords = cc</code> field in Header[0])</li>
-<li><strong>Allocation</strong>: thread objects advance the heap pointer upward (bump allocation); objects grow from heap base toward freespace</li>
-<li><strong>Fixed ceiling</strong>: the heap cannot expand beyond its allocated words; each thread owns its heap region exclusively</li>
+<li><strong>Heap limit</strong>: word <code>stackStart\u22121</code>; Stack begins at <code>lumpSize\u221212\u2212sw</code></li>
+<li><strong>Allocation</strong>: thread objects advance the heap pointer upward (bump allocation) toward Stack</li>
+<li><strong>Derived ceiling</strong>: each Thread owns its Heap region exclusively; select a larger lump to enlarge it</li>
 <li><strong>Object GC</strong>: Zone \u2463 is not individually scanned \u2014 the hardware G-bit GC operates at the Thread object level; the entire lump is live or reclaimed as one unit; heap memory management within Zone \u2463 is a software concern</li>
 </ul>
 <table class="sr-table"><tr><th>Header[0] field</th><th>Bits</th><th>Encodes</th></tr>
-<tr><td>cc</td><td>[7:0]</td><td>heapWords \u2014 IDE-set number of heap words reserved</td></tr>
+<tr><td>n\u22126</td><td>[26:23]</td><td>total lump size; its growth enlarges Heap</td></tr>
+<tr><td>cc</td><td>[7:0]</td><td>12 persisted capability homes, not heap words</td></tr>
 </table>
 <div class="sr-key-concept"><div class="sr-concept-title">How Is the Heap Limit Enforced? \u2014 CR5</div>
 <p><strong>CR5</strong> is the Heap Golden Token. It is installed by CHANGE each time this thread is resumed. Its two key fields set the hardware boundary:</p>

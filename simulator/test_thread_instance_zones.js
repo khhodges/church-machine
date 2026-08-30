@@ -142,9 +142,10 @@ const thread3 = sim.getThreadInstanceLayout(12);
 assert(thread2.valid && thread3.valid, 'generated Thread bodies must decode as resident Threads');
 assert.strictEqual(thread2.base, sim.readNSEntry(11).word0_location);
 assert.strictEqual(thread3.base, sim.readNSEntry(12).word0_location);
-assert.strictEqual(thread2.heapWords, 12, 'Thread header cc defines its heap size');
+assert.strictEqual(thread2.heapWords, 194, '256-word Thread Heap fills every word before a 32-word stack');
 assert.strictEqual(thread2.stackWords, 32, 'Thread header cw defines its stack size');
 assert.strictEqual(thread2.capsStart, 244, 'capabilities remain at the Thread body tail');
+assert.strictEqual(thread2.header.cc, 12, 'Thread header cc counts persisted CR0\u2013CR11 homes');
 
 // Runtime register/capability writes update the live Thread image, but the
 // persistence snapshot must retain the pre-execution words and header.
@@ -190,15 +191,13 @@ assert.strictEqual(runtimeSim.snapshotPersistentMemory(runtimeSim.memory.length)
 // Give the bodies unmistakably separate private contents and make active
 // simulator state intentionally disagree with both.
 sim.memory[thread2.base + thread2.drStart] = 0x22220001;
-sim.memory[thread2.base + thread2.heapStart] = 0x22220017;
-sim.memory[thread2.base + thread2.freeStart] = 0x22220081;
-sim.memory[thread2.base + thread2.freeEnd] = 0x22220153;
+sim.memory[thread2.base + thread2.heapStart] = 0x22220081;
+sim.memory[thread2.base + thread2.heapEnd] = 0x22220153;
 sim.memory[thread2.base + thread2.stackEnd] = 0x222200F3;
 sim.memory[thread2.base + thread2.capsStart] = 0x4A000006;
 sim.memory[thread3.base + thread3.drStart] = 0x33330001;
-sim.memory[thread3.base + thread3.heapStart] = 0x33330017;
-sim.memory[thread3.base + thread3.freeStart] = 0x33330081;
-sim.memory[thread3.base + thread3.freeEnd] = 0x33330153;
+sim.memory[thread3.base + thread3.heapStart] = 0x33330081;
+sim.memory[thread3.base + thread3.heapEnd] = 0x33330153;
 sim.memory[thread3.base + thread3.stackEnd] = 0x333300F3;
 sim.memory[thread3.base + thread3.capsStart] = 0x4A000007;
 sim.dr[0] = 0xDEADBEEF;
@@ -213,8 +212,8 @@ function assertThreadTableColumns(html, layout, base, label) {
     const zoneTables = [...view.querySelectorAll('.thread-zone-table')];
     assert.strictEqual(layout.protectedStoOffset, 17, `${label} keeps protected STO at +17`);
     assert.strictEqual(layout.heapStart, 18, `${label} starts ordinary heap at +18`);
-    assert.strictEqual(tables.length, 6, `${label} renders one table for each non-header memory zone`);
-    assert.strictEqual(zoneTables.length, 5, `${label} renders Data, protected STO, Heap, Freespace, and Stack tables`);
+    assert.strictEqual(tables.length, 5, `${label} renders one table for each non-header memory zone`);
+    assert.strictEqual(zoneTables.length, 4, `${label} renders Data, protected STO, Heap, and Stack tables`);
     const stoRow = view.querySelector('#thread-zone-sto + .thread-zone-body tbody tr');
     assert(stoRow, `${label} renders protected STO separately`);
     assert.strictEqual(stoRow.cells[0].textContent.trim(), '+17',
@@ -246,16 +245,19 @@ function assertThreadTableColumns(html, layout, base, label) {
         .map(header => header.textContent.replace(/\s+/g, ' ').trim().replace(/^[▼▶]/, ''));
     assert.deepStrictEqual(
         sectionLabels.map(label => label.replace(/\s+.*$/, '')),
-        ['⑤', '◆', '④', '③', '②', '①'],
-        `${label} keeps Data Registers, Protected STO, Heap, Freespace, Stack, Capabilities order`
+        ['⑤', '◆', '④', '②', '①'],
+        `${label} keeps Data Registers, Protected STO, Heap, Stack, Capabilities order`
     );
     assert(sectionLabels[1].includes('Protected STO') &&
            sectionLabels[1].includes('offset +17') &&
            sectionLabels[1].includes('machine-protected Thread word'),
         `${label} identifies +17 as the machine-protected STO word`);
+    const stackStart = layout.lumpSize - 12 - layout.stackWords;
+    const heapEnd = stackStart - 1;
+    const heapWords = heapEnd - 18 + 1;
     assert(sectionLabels[2].includes('offset +18') &&
-           sectionLabels[2].includes(`${layout.heapWords} words`),
-        `${label} starts Heap at +18 and shows its cc-sized extent`);
+           sectionLabels[2].includes(`${heapWords} words`),
+        `${label} starts Heap at +18 and shows its size-derived extent`);
     assert.deepStrictEqual(
         [firstRow(zoneTables[0]).cells[0].textContent.trim(),
          firstRow(zoneTables[0]).cells[1].textContent.trim()],
@@ -265,20 +267,20 @@ function assertThreadTableColumns(html, layout, base, label) {
     assert.deepStrictEqual(
         [lastRow(zoneTables[2]).cells[0].textContent.trim(),
          lastRow(zoneTables[2]).cells[1].textContent.trim()],
-        [`+${layout.heapEnd}`, expectedAddress(layout.heapEnd)],
-        `${label} Heap ends at its selected-lump offset and address`
+         [`+${heapEnd}`, expectedAddress(heapEnd)],
+         `${label} Heap ends immediately before Stack`
     );
     assert.deepStrictEqual(
         [firstRow(capabilityTable).cells[0].textContent.trim(),
          firstRow(capabilityTable).cells[1].textContent.trim()],
-        [`+${layout.capsStart}`, expectedAddress(layout.capsStart)],
-        `${label} Capabilities starts at its fixed offset and address`
+         [`+${layout.lumpSize - 12}`, expectedAddress(layout.lumpSize - 12)],
+         `${label} Capabilities starts at the lump tail`
     );
     assert.deepStrictEqual(
         [lastRow(capabilityTable).cells[0].textContent.trim(),
          lastRow(capabilityTable).cells[1].textContent.trim()],
-        [`+${layout.capsEnd}`, expectedAddress(layout.capsEnd)],
-        `${label} Capabilities ends at its fixed offset and address`
+         [`+${layout.lumpSize - 1}`, expectedAddress(layout.lumpSize - 1)],
+         `${label} Capabilities ends at the lump tail`
     );
     const headerRow = view.querySelector('.thread-lump-hdr-row');
     assert(headerRow, `${label} renders the Header as a distinct sixth region`);
@@ -288,26 +290,26 @@ function assertThreadTableColumns(html, layout, base, label) {
         `${label} lump header places its physical address second`);
     assert.strictEqual(
         1 + zoneTables.length + (capabilityTable ? 1 : 0),
-        7,
-        `${label} displays Header, DR, Protected Indicator, Heap, Freespace, Stack, and Capabilities`
+        6,
+        `${label} displays Header, DR, Protected Indicator, Heap, Stack, and Capabilities`
     );
     const capRows = [...capabilityTable.querySelectorAll('tbody tr')];
     assert.strictEqual(capRows.length, 12, `${label} displays exactly twelve persisted capability homes`);
     capRows.forEach((row, i) => {
         assert(row.textContent.includes(`CR${i}`),
-            `${label} labels fixed capability home +${244 + i} as CR${i}`);
+            `${label} labels tail capability home +${layout.lumpSize - 12 + i} as CR${i}`);
     });
 }
 
 assertThreadTableColumns(thread2Html, thread2, thread2.base, 'Thread#2');
 assertThreadTableColumns(thread3Html, thread3, thread3.base, 'Thread#3');
 assert(thread2Html.includes('0x22220001'), 'Thread#2 shows its saved DR value');
-assert(thread2Html.includes('0x22220017'), 'Thread#2 shows its saved heap value');
+assert(thread2Html.includes('0x22220081'), 'Thread#2 shows its saved heap value');
 assert(!thread2Html.includes('0x33330001'), 'Thread#2 never reads Thread#3 memory');
 assert(!thread2Html.includes('0xDEADBEEF'), 'Thread detail never substitutes live DR state');
 assert(!thread2Html.includes('STO=999'), 'Thread detail never substitutes live stack state');
 assert(thread3Html.includes('0x33330001'), 'Thread#3 shows its own saved DR value');
-assert(thread3Html.includes('0x33330017'), 'Thread#3 shows its own saved heap value');
+assert(thread3Html.includes('0x33330081'), 'Thread#3 shows its own saved heap value');
 assert(!thread3Html.includes('0x22220001'), 'Thread#3 never reads Thread#2 memory');
 sim.bootEntrySlot = 6;
 const bootSlotSixHtml = sandbox.renderThreadMemoryLayout(11, true);
@@ -323,13 +325,13 @@ assert(tutorialMap.includes('◆ Protected STO') &&
        tutorialMap.includes('Machine-protected Thread word +17') &&
        tutorialMap.includes('word 18'),
     'Thread tutorial map shows protected STO at +17 and Heap at +18');
-assert(tutorialText.includes('defined 256-word V20 Thread') &&
-       tutorialText.includes('0xF900_8240') &&
+assert(tutorialText.includes('0xF900_820C') &&
+       tutorialText.includes('cc=12') &&
        tutorialText.includes('n\u22126=2'),
-    'Thread tutorial uses the one supported 256-word header encoding');
-assert(!tutorialText.includes('512-word V20 thread') &&
-       !tutorialText.includes('larger than 256 words'),
-    'Thread tutorial never presents a larger Thread body as supported');
+    'Thread tutorial uses cc=12 capability homes and the selected n-6 size');
+assert(tutorialText.includes('grows when') &&
+       tutorialText.includes('There is no Thread Freespace region'),
+    'Thread tutorial explains size-derived Heap and removes Freespace');
 
 // CR12 is not live before boot, but its detail panel must still project the
 // currently selected suspended Thread image.  Thread.1 may validly start at
@@ -348,10 +350,9 @@ assert(crDetailContent.innerHTML.includes('Thread#3 — Suspended Memory Image')
     'pre-boot CR12 identifies the selected suspended Thread');
 assert(crDetailContent.innerHTML.includes('thread-zone-5') &&
        crDetailContent.innerHTML.includes('thread-zone-4') &&
-       crDetailContent.innerHTML.includes('thread-zone-3') &&
        crDetailContent.innerHTML.includes('thread-zone-2') &&
        crDetailContent.innerHTML.includes('thread-zone-1'),
-    'pre-boot CR12 exposes all five selected Thread zones');
+    'pre-boot CR12 exposes all four selected Thread zones plus capabilities');
 assert(crDetailContent.innerHTML.includes('0x33330001') &&
        !crDetailContent.innerHTML.includes('0x22220001'),
     'pre-boot CR12 reads the selected Thread#3 body, not Thread#2');
@@ -378,8 +379,7 @@ assert.strictEqual(dom.window.document.querySelector('[data-testid="thread-detai
 assert(dom.window.document.getElementById('_nsLumpModalOverlay').textContent.includes('LUMP HEADER'),
     'ordinary LUMPs retain their generic detail modal');
 
-// A larger allocated Thread body has no architectural layout. The viewer must
-// reject it rather than inventing a tail region or relocating fixed zones.
+// A larger Thread body gives the additional n-6-selected capacity to Heap.
 global.window.bootConfig = {
     step1: {
         totalNamespaceWords: 32768,
@@ -390,11 +390,12 @@ global.window.bootConfig = {
 };
 const wideSim = new ChurchSimulator();
 const wideThread = wideSim.getThreadInstanceLayout(11);
-assert(!wideThread.valid, 'a 512-word generated Thread body is unsupported');
-assert.strictEqual(wideThread.sizeSupported, false, 'layout reports the explicit size-policy failure');
+assert(wideThread.valid, 'a 512-word generated Thread body is supported');
+assert.strictEqual(wideThread.sizeSupported, true, 'layout accepts the n-6-selected size');
 assert.strictEqual(wideThread.lumpSize, 512, 'selected header retains its full allocated size');
-assert.strictEqual(wideThread.capsStart, 244, 'unsupported size does not relocate the defined CR0 home');
-assert.strictEqual(wideThread.capsEnd, 255, 'unsupported size does not relocate CR11');
+assert.strictEqual(wideThread.heapWords, 450, 'additional Thread words are assigned to Heap');
+assert.strictEqual(wideThread.capsStart, 500, 'CR0 home remains twelve words from the Thread tail');
+assert.strictEqual(wideThread.capsEnd, 511, 'CR11 occupies the final Thread word');
 
 // Restore a supported body before testing normal boot behavior below.
 global.window.bootConfig.step1.threadLumpWords = 256;

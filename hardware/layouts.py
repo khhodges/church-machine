@@ -33,7 +33,7 @@ WORD2_LAYOUT = StructLayout({
 })
 
 LUMP_HEADER_LAYOUT = StructLayout({
-    "cc":        unsigned(8),    # bits  [7:0]  — c-list slot count (0..255); for typ=10 Thread: repurposed as heapWords (IDE-set max heap words; caps zone architecture-fixed at 12)
+    "cc":        unsigned(8),    # bits  [7:0]  — c-list slot count (0..255); Thread uses 12 persisted CR0-CR11 homes at the LUMP tail
     "typ":       unsigned(2),    # bits  [9:8]  — object type: 00=lump, 01=data, 10=clist-only, 11=Outform
     "cw":        unsigned(13),   # bits [22:10] — code word count (0..8191)
     "n_minus_6": unsigned(4),    # bits [26:23] — lumpSize = 2^(val+6), valid range 0..8

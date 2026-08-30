@@ -5,9 +5,9 @@
     "typ": 2,
     "stackField": "cw",
     "stackAlias": "sw",
-    "heapField": "cc"
+    "capabilityField": "cc"
   },
-  "supportedBodyWords": [256],
+  "supportedBodyWords": [256, 512, 1024, 2048, 4096, 8192],
   "unsupportedBodyPolicy": "reject",
   "canonicalBodyWords": 256,
   "headerOffset": 0,
@@ -28,17 +28,15 @@
   "capabilityHomes": {
     "firstRegister": 0,
     "lastRegister": 11,
-    "offset": 244,
+    "placement": "tail",
     "words": 12
   },
   "runtimeCapabilityRegisters": [12, 13, 14, 15],
-  "privateAbiWords": 256,
   "zoneOrder": [
     "Header",
     "Data Registers",
     "Protected STO",
     "Heap",
-    "Freespace",
     "LIFO Stack",
     "Capabilities"
   ]

@@ -18,21 +18,19 @@ const output = `'use strict';
     if (typeof module !== 'undefined' && module.exports) module.exports = design;
     if (root) root.ThreadDesign = design;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (raw) {
-    function layout(lumpSize, stackWords, heapWords) {
+    function layout(lumpSize, stackWords) {
         lumpSize = Number(lumpSize);
         stackWords = Number(stackWords);
-        heapWords = Number(heapWords);
-        var capsStart = raw.capabilityHomes.offset;
+        var capsStart = lumpSize - raw.capabilityHomes.words;
         var capsEnd = capsStart + raw.capabilityHomes.words - 1;
         var heapStart = raw.heapOffset;
-        var heapEnd = heapStart + heapWords - 1;
         var stackEnd = capsStart - 1;
         var stackStart = capsStart - stackWords;
-        var freeStart = heapEnd + 1;
-        var freeEnd = stackStart - 1;
+        var heapEnd = stackStart - 1;
+        var heapWords = Math.max(0, heapEnd - heapStart + 1);
         var supported = raw.supportedBodyWords.indexOf(lumpSize) !== -1;
         var valid = supported && stackWords > 0 && heapWords > 0 &&
-            heapEnd < stackStart && capsEnd < raw.privateAbiWords;
+            heapEnd + 1 === stackStart && capsEnd === lumpSize - 1;
         return Object.freeze({
             valid: valid,
             sizeSupported: supported,
@@ -46,16 +44,12 @@ const output = `'use strict';
             heapStart: heapStart,
             heapEnd: heapEnd,
             heapWords: heapWords,
-            freeStart: freeStart,
-            freeEnd: freeEnd,
-            freeWords: Math.max(0, freeEnd - freeStart + 1),
             stackStart: stackStart,
             stackEnd: stackEnd,
             stackWords: stackWords,
             capsStart: capsStart,
             capsEnd: capsEnd,
-            capsWords: raw.capabilityHomes.words,
-            privateZoneWords: raw.privateAbiWords
+            capsWords: raw.capabilityHomes.words
         });
     }
     return Object.freeze(Object.assign({}, raw, { layout: layout }));

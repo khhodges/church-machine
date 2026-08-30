@@ -263,28 +263,27 @@ are available to the heap allocator; the NS entry for slot 2 is all-zero
 
 ### 4.3 Thread lump — Slot 1, Boot.Thread (base `0x0040`)
 
-256-word lump.  Header: `0xF9008240` — `magic=0x1F`, `n_minus_6=2` → 256w,
-`cw=32`, `typ=2` (Thread), `cc=64`.
+Canonical 256-word lump. Header: `0xF900820C` — `magic=0x1F`,
+`n_minus_6=2` → 256w, `cw/sw=32`, `typ=2` (Thread), `cc=12` capability
+homes.
 
 | Offset from base | Word address    | Words | Zone |
 |:-----------------|:----------------|------:|:-----|
 | +0               | `0x0040`        |     1 | **Header** (`0xF9008240`) |
 | +1 … +16         | `0x0041–0x0050` |    16 | **DR zone** — home locations for DR0–DR15 |
 | +17              | `0x0051`        |     1 | **Protected STO** — machine-only, outside CR5 bounds |
-| +18 … +33        | `0x0052–0x0061` |    16 | **Heap zone** |
-| +34 … +191       | `0x0062–0x00BF` |   158 | Free space |
-| +192 … +255      | `0x00C0–0x00FF` |    64 | **Protected zone** (`lumpSize − cc = 192` is c-list base; `cc=64`) |
+| +18 … +211       | `0x0052–0x0113` |   194 | **Heap zone** — derived from total size and Stack |
 | +212 … +243      | `0x00D4–0x00F3` |    32 | **Stack** (grows down; STO starts at 243) |
 | +244 … +255      | `0x00F4–0x00FF` |    12 | **Caps zone** — GT home slots for CR0–CR11 |
 
 **Thread lump `cw` and `cc` semantics (typ=2):**
 
-For Thread-type lumps `cw` does not count code words.  It marks the end of the
-data zone.  The hardware uses:
+For Thread-type lumps `cw` is `sw`, the stack-word count, and `cc=12` is the
+capability-home count. `n-6` supplies total size. The hardware uses:
 
 ```
-sp_min = lumpSize − cc − cw + 2 = 256 − 64 − 32 + 2 = 162
-sp_max = THREAD_CAPS_OFFSET − 1  = 243
+sp_min = lumpSize − 12 − sw + 2 = 256 − 12 − 32 + 2 = 214
+sp_max = lumpSize − 13 = 243
 ```
 
 **DR zone and caps zone at boot:** All 28 words (`+1…+16` and `+244…+255`) are

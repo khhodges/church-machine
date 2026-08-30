@@ -2284,23 +2284,23 @@ field `0x1F` as every other lump. The `typ` field is set to `10`
 | n-6   | IDE   | lumpSize = 2^(val+6); e.g. val=2 → 256 words |
 | sw    | IDE   | **Stack words** — `cw` field reinterpreted for `typ=10`; set by IDE at thread creation, validated by Mint |
 | typ   | 10    | clist-only — Mint does not scan for an executable code region |
-| cc    | IDE   | **heapWords** — IDE-set max heap words; caps zone is architecture-fixed at 12 words |
+| cc    | 12    | **Capability-home count** — CR0–CR11 occupy the final 12 words of the lump |
 
 > **`cw` → `sw` reinterpretation:** For `typ=10` (Thread/clist-only) lumps,
 > the 13-bit `cw` (code word count) field is otherwise wasted — a Thread
 > carries no executable code. The hardware and Mint **reinterpret** it as `sw`
 > (stack words). The IDE sets `sw` at thread-creation time; Mint validates
-> that `sw > 0`, `cc > 0`, and `18 + cc + sw ≤ 244`. The stack and persisted
-> homes use fixed private-ABI offsets. The only supported Thread body is the
-> defined 256-word layout; larger bodies are rejected.
+> that `sw > 0` and `cc = 12`. `n-6` defines the complete lump size. The
+> persisted homes are the tail range `lumpSize−12 … lumpSize−1`; Stack is
+> directly before them, and Heap fills the remaining range from `+18`.
 
 **Encoding example** (256-word thread, 32 stack words):
 
 ```
-(0x1F << 27) | (2 << 23) | (sw << 10) | (0b10 << 8) | heapWords
+(0x1F << 27) | (2 << 23) | (sw << 10) | (0b10 << 8) | 12
 
-Boot.Thread   (n-6=2, sw=32, cc=64, typ=10):  0xF900_8240
-Thread        (n-6=2, sw=32, cc=64, typ=10):  0xF900_8240
+Boot.Thread   (n-6=2, sw=32, cc=12, typ=10):  0xF900_820C
+Thread        (n-6=2, sw=32, cc=12, typ=10):  0xF900_820C
 ```
 
 Thread lumps of the same geometry share the same header word. Version is
@@ -2310,10 +2310,9 @@ carried in the NS slot `gt_seq` field, not the header.
 
 ## Thread Lump Memory Layout
 
-Word 0 is the header. The Thread occupies Words 0..255. Word addresses
-increase downward from the base. The architecture defines no Thread region,
-format, ownership, or access policy after +255, so larger Thread bodies are
-rejected.
+Word 0 is the header. `n-6` defines the Thread's total word count. Word
+addresses increase downward from the base; the twelve capability homes are
+always the tail of that declared allocation.
 
 ```
 ┌─────────────────────────────────────────────┐  ← base  (+0)            ← Word 0
@@ -2325,34 +2324,29 @@ rejected.
 │  Protected STO                              │  [1 word]  machine-only
 │     Stack Top Offset; outside CR5 bounds    │
 ├─────────────────────────────────────────────┤  ← base  (+18)           ← heap base
-│  ④ Heap  ↑                                  │  [heapWords]  IDE-defined
-│     Size = cc words · cc field in Header[0] │
-│     Objects allocated from heap base upward │
-│     Grows toward Freespace                  │
-├─────────────────────────────────────────────┤  ← 18+heapWords →        ← FREE base
-│  ③ Freespace                                │  [dynamic]
-│     Unallocated — shrinks as Stack/Heap grow│
-│     Mint verifies all-zero at creation time │
-├─────────────────────────────────────────────┤  ← 244−sw →              ← stack base
+│  ④ Heap  ↑                                  │  [+18 … stackStart−1]
+│     Fills all words up to Stack             │
+│     Grows when n-6/lump size grows          │
+├─────────────────────────────────────────────┤  ← lumpSize−12−sw →      ← stack base
 │  ② LIFO Stack  ↓                            │  [sw words]  cw/sw-defined
 │     CALL: 2-word frame  [E-GT · frame word] │  STO -= 2
 │     LAMBDA: 1-word frame  [frame word]      │  STO -= 1
-│     Grows downward; STO hidden register     │  sp_max = 243
-│     sp_min = 244−sw+2                       │  CALL fault if STO < sp_min
-├─────────────────────────────────────────────┤  ← +244 →                ← persisted CR base
+│     Grows downward; STO hidden register     │  sp_max = lumpSize−13
+│     sp_min = lumpSize−12−sw+2               │  CALL fault if STO < sp_min
+├─────────────────────────────────────────────┤  ← lumpSize−12 →         ← persisted CR base
 │  ① Capabilities                             │  [12 words]  architecture-fixed
 │     CR0 … CR11 — Golden Token words         │  one 32-bit GT Word 0 per slot
-│     Fixed homes — CHANGE persists these only│  +244 … +255
-└─────────────────────────────────────────────┘  ← +255 →
+│     Tail homes — CHANGE persists these only │  lumpSize−12 … lumpSize−1
+└─────────────────────────────────────────────┘  ← lumpSize−1 →
 ```
 
 **Stack bound formulas** (all in word offsets from lump base, IDE-controlled via `sw`):
 
 | Signal | Formula | Example (sw=32, lumpSize=256) |
 |--------|---------|-------------------------------|
-| `sp_max` | `243` | 243 (initial STO, empty stack) |
-| `stack_min` | `244 − sw` | 212 (bottom of Stack zone) |
-| `sp_min` | `244 − sw + 2` | 214 (CALL minimum: needs 2 slots) |
+| `sp_max` | `lumpSize − 13` | 243 for a 256-word Thread |
+| `stack_min` | `lumpSize − 12 − sw` | 212 for sw=32, lumpSize=256 |
+| `sp_min` | `lumpSize − 12 − sw + 2` | 214 (CALL minimum: needs 2 slots) |
 
 The CALL FSM reads the thread header at `thread_base` to recover `sw` and
 `n_minus_6` (caps zone is architecture-fixed at 12). Both bounds are enforced
@@ -2365,12 +2359,11 @@ in hardware — no literals for stack bounds in the FSM.
 | Header        | HDR   | +0                               | 1        | Header word — never executed |
 | ⑤ Data Regs    | DR    | +1 … +16                        | 16       | DR0…DR15 (16 × 32-bit, fixed) |
 | Protected STO | STO   | +17                              | 1        | Machine-only stack cursor; outside CR5 |
-| ④ Heap         | HEAP  | +18 … +(18+cc−1)                | cc       | IDE-defined ordinary heap |
-| ③ Freespace    | FREE  | +(18+cc) … +(243−sw)             | dynamic  | Collision zone; all-zero at creation |
-| ② LIFO Stack   | STACK | +(244−sw) … +243                | sw       | Header `cw/sw`; grows downward |
-| ① Capabilities | CAPS  | +244 … +255                     | 12       | GT Word 0 × 12: persisted CR0…CR11 homes |
+| ④ Heap         | HEAP  | +18 … +(lumpSize−13−sw)         | derived  | Grows with lump size; no independent control |
+| ② LIFO Stack   | STACK | +(lumpSize−12−sw) … +(lumpSize−13) | sw    | Header `cw/sw`; grows downward |
+| ① Capabilities | CAPS  | +(lumpSize−12) … +(lumpSize−1)  | 12       | GT Word 0 × 12: persisted CR0…CR11 homes; `cc=12` |
 
-These regions fit within the fixed +0…+255 private ABI. CR12…CR15 are
+These regions fit within the `n-6` declared allocation. CR12…CR15 are
 privileged/runtime registers and have no persisted Thread-memory homes.
 
 ---

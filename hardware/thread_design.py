@@ -22,31 +22,29 @@ THREAD_HEAP_OFFSET = THREAD_DESIGN["heapOffset"]
 # Compatibility name for older importers. The word is protected Thread state,
 # not part of the ordinary heap described by CR5.
 THREAD_STACK_POINTER_HOME_OFFSET = THREAD_STO_OFFSET
-THREAD_CAPS_OFFSET = THREAD_DESIGN["capabilityHomes"]["offset"]
 THREAD_CAP_WORDS = THREAD_DESIGN["capabilityHomes"]["words"]
-THREAD_PRIVATE_ABI_WORDS = THREAD_DESIGN["privateAbiWords"]
+THREAD_CAPS_OFFSET = THREAD_CANONICAL_WORDS - THREAD_CAP_WORDS
 THREAD_MIN_N_MINUS_6 = int(math.log2(THREAD_MIN_WORDS)) - 6
 THREAD_MAX_N_MINUS_6 = int(math.log2(max(THREAD_SUPPORTED_BODY_WORDS))) - 6
 
 
-def thread_layout(lump_size: int, stack_words: int, heap_words: int) -> dict:
-    """Derive all Thread zones from the normative fixed private ABI."""
+def thread_layout(lump_size: int, stack_words: int, _legacy_heap_words: int | None = None) -> dict:
+    """Derive the Thread layout; heap consumes all space before the stack."""
     size_supported = lump_size in THREAD_SUPPORTED_BODY_WORDS
-    caps_start = THREAD_CAPS_OFFSET
+    caps_start = lump_size - THREAD_CAP_WORDS
     caps_end = caps_start + THREAD_CAP_WORDS - 1
     heap_start = THREAD_HEAP_OFFSET
-    heap_end = heap_start + heap_words - 1
     stack_end = caps_start - 1
     stack_start = caps_start - stack_words
-    free_start = heap_end + 1
-    free_end = stack_start - 1
+    heap_end = stack_start - 1
+    heap_words = max(0, heap_end - heap_start + 1)
     return {
         "valid": (
             size_supported
             and stack_words > 0
             and heap_words > 0
-            and heap_end < stack_start
-            and caps_end < THREAD_PRIVATE_ABI_WORDS
+            and heap_end + 1 == stack_start
+            and caps_end == lump_size - 1
         ),
         "size_supported": size_supported,
         "lump_size": lump_size,
@@ -55,8 +53,7 @@ def thread_layout(lump_size: int, stack_words: int, heap_words: int) -> dict:
         "sto_offset": THREAD_STO_OFFSET,
         "heap_start": heap_start,
         "heap_end": heap_end,
-        "free_start": free_start,
-        "free_end": free_end,
+        "heap_words": heap_words,
         "stack_start": stack_start,
         "stack_end": stack_end,
         "caps_start": caps_start,

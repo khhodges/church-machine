@@ -150,11 +150,10 @@ console.log('\nTest 6b: cw=0 typ=01 (data lump — RB1 pass)');
 }
 
 // ─── Test 6c: typ=10 (Thread/clist-only) — RB1 pass ─────────────────────
-// For Thread lumps, cw is reinterpreted as sw (stack words) and cc as
-// heapWords. Both must be >0 and the body must support the fixed 256-word ABI.
-console.log('\nTest 6c: typ=10 Thread — sw=2, heapWords=4, geometry valid (RB1 pass)');
+// For Thread lumps, cw is sw and cc is the 12 persisted capability homes.
+console.log('\nTest 6c: typ=10 Thread — sw=2, cc=12, geometry valid (RB1 pass)');
 {
-    const words = makeWellFormed({ cw: 2, cc: 4, nMinus6: 2, typ: 2 });
+    const words = makeWellFormed({ cw: 2, cc: 12, nMinus6: 2, typ: 2 });
     const results = lumpAudit(words, null);
     assertRule(results, 'RB1', 'pass', 'RB1 typ=10 Thread geometry valid pass');
     assert(!lumpAuditHasErrors(results), 'no errors');
