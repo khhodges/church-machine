@@ -39,7 +39,7 @@ class ThreadTutorial {
             { id: 'header',label: 'Header',                    sub: 'Word +0 \u00b7 geometry and resource contract', bg: '#2a2a2a', border: '#555',    text: '#aaa'    },
             { id: 'dr',    label: '\u2464 Data Registers',    sub: 'DR0\u2013DR15  (16 \u00d7 32-bit, fixed)',        bg: '#1e0840', border: '#8040c0', text: '#b080f0' },
             { id: 'sto',   label: '\u25c6 Protected STO',      sub: 'Machine-protected Thread word +17 \u00b7 FLAGS/SZ/STO \u00b7 not heap storage', bg: '#3a2200', border: '#f59e0b', text: '#fbbf24' },
-            { id: 'heap',  label: '\u2463 Heap',       sub: 'Starts at +18 and fills through stackStart\u22121; grows with lump size', bg: '#002a10', border: '#20a040', text: '#60d080' },
+            { id: 'heap',  label: '\u2463 Heap',       sub: 'HeapWords = 2^((n\u22126)+6) \u2212 cw \u2212 30 \u00b7 starts at +18 and fills through stackStart\u22121', bg: '#002a10', border: '#20a040', text: '#60d080' },
             { id: 'stack', label: '\u2462 LIFO Stack \u2193', sub: 'sw words immediately before tail capability homes', bg: '#002a40', border: '#2080c0', text: '#60b8f0' },
             { id: 'cap',   label: '\u2461 Capabilities',     sub: '12 persisted GT homes: CR0\u2013CR11 (lumpSize\u221212 \u2026 lumpSize\u22121)', bg: '#3a2c00', border: '#c8a020', text: '#f0d060' },
         ];
