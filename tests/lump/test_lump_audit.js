@@ -574,19 +574,21 @@ console.log('\nTest 38: Thread with RETURN-shaped DR values — RSM not emitted'
     assert(!lumpAuditHasErrors(results), 'no errors');
 }
 
-// ─── Test 39a: Larger Thread retains its fixed +0..+255 private ABI ───────
-console.log('\nTest 39a: 512-word Thread keeps fixed homes, stack, and extension boundary');
+// ─── Test 39a: Larger Thread bodies are explicitly unsupported ───────────
+console.log('\nTest 39a: 512-word Thread is rejected without inventing a tail region');
 {
     const words = makeValidThread({ nMinus6: 3, sw: 32, hw: 64 });
-    // A malformed GT at the allocation tail is an extension word, not CR12 or
-    // a thirteenth persisted home. It must not be audited as a capability.
+    // A malformed GT at the allocation tail must not be reclassified as CR12,
+    // a thirteenth persisted home, Heap, Stack, Freespace, or any extension.
     words[500] = 0x04000001;
     const results = lumpAudit(words, null);
-    assertRule(results, 'RB1', 'pass', 'RB1 pass: 512-word Thread preserves fixed ABI geometry');
+    assertRule(results, 'RB1', 'error', 'RB1 rejects unsupported 512-word Thread body');
+    assert(results.find(r => r.ruleId === 'RB1' && /defines no Thread region after \+255/.test(r.detail)),
+        'RB1 explains the explicit supported-size policy');
     assertRule(results, 'RFS', 'pass', 'RFS pass: only canonical Freespace is scanned');
     assertRule(results, 'RGT', 'pass', 'RGT pass: only CR0..CR11 fixed homes are capability words');
-    assert(!lumpAuditHasErrors(results),
-        'words +256 onward are reserved extension, never tail-relocated caps/stack/heap');
+    assert(lumpAuditHasErrors(results),
+        'unsupported tail is rejected rather than assigned an architectural meaning');
 }
 
 // ─── Test 39: Malformed data lump (cw=1, cc=1) — only RB1 fires ──────────

@@ -2240,14 +2240,6 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
     html += '</tbody></table>';
     html += secBody();
 
-    if (TL.extensionWords > 0) {
-        html += secHdr('⑥', 'Reserved Extension',
-            `${TL.extensionWords} words · offset +${TL.extensionStart} … +${TL.lumpSize - 1} · outside the fixed private ABI`,
-            '#64748b', 'thread-zone-extension');
-        html += '<div class="thread-free-empty">Reserved allocation extension — not Heap, Stack, or relocated capability homes.</div>';
-        html += secBody();
-    }
-
     html += '</div>';
     return html;
 }

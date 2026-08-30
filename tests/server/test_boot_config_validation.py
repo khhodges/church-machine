@@ -310,7 +310,7 @@ class TestValidateStep1ThreadGeometry:
     def test_default_thread_size_is_valid(self):
         step1 = dict(DEFAULT_BOOT_CONFIG["step1"])
         assert _validate_step1(DEFAULT_BOOT_CONFIG["targetBoard"], step1) is None
-        assert step1["threadLumpWords"] >= 256
+        assert step1["threadLumpWords"] == 256
 
     def test_undersized_thread_is_rejected_before_image_generation(self):
         step1 = dict(DEFAULT_BOOT_CONFIG["step1"])
@@ -326,15 +326,17 @@ class TestValidateStep1ThreadGeometry:
         assert err is not None
         assert "power of 2" in err
 
-    def test_header_fields_drive_stack_and_heap_without_relocating_caps(self):
+    def test_larger_thread_body_is_rejected(self):
         step1 = dict(DEFAULT_BOOT_CONFIG["step1"])
-        step1.update({
-            "threadLumpWords": 512,
-            "threadStackWords": 48,
-            "threadHeapWords": 80,
-        })
-        assert _validate_step1(DEFAULT_BOOT_CONFIG["targetBoard"], step1) is None
+        step1["threadLumpWords"] = 512
+        err = _validate_step1(DEFAULT_BOOT_CONFIG["targetBoard"], step1)
+        assert err is not None
+        assert "normative Thread body sizes" in err
 
+    def test_header_fields_drive_stack_and_heap_within_defined_body(self):
+        step1 = dict(DEFAULT_BOOT_CONFIG["step1"])
+        step1.update({"threadStackWords": 48, "threadHeapWords": 80})
+        assert _validate_step1(DEFAULT_BOOT_CONFIG["targetBoard"], step1) is None
         step1["threadHeapWords"] = 200
         err = _validate_step1(DEFAULT_BOOT_CONFIG["targetBoard"], step1)
         assert err is not None

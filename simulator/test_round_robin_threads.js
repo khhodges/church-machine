@@ -17,7 +17,7 @@ const fs = require('fs');
 const { spawnSync } = require('child_process');
 global.window.bootConfig.step1 = {
     totalNamespaceWords: 16384, namespaceLumpWords: 64,
-    threadLumpWords: 512, threadCount: 3,
+    threadLumpWords: 256, threadCount: 3,
 };
 const committed = new ChurchSimulator();
 const generated = spawnSync('python', ['-c', [
@@ -38,8 +38,8 @@ committed._currentThreadSlot = 1;
 assert.deepStrictEqual(committed.configuredThreadSlots(), [1, 11, 12],
     'committed image exposes all three Thread contexts');
 const committedBases = [1, 11, 12].map(slot => committed.readNSEntry(slot).word0_location);
-assert(committedBases[0] + 512 <= committedBases[1] &&
-       committedBases[1] + 512 <= committedBases[2],
+assert(committedBases[0] + 256 <= committedBases[1] &&
+       committedBases[1] + 256 <= committedBases[2],
     'committed Thread bodies are non-overlapping');
 const entryWords = [1, 11, 12].map((slot, i) =>
     committed.memory[committedBases[i] + 244] >>> 0);

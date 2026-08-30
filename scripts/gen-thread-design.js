@@ -35,6 +35,7 @@ const output = `'use strict';
             heapEnd < stackStart && capsEnd < raw.privateAbiWords;
         return Object.freeze({
             valid: valid,
+            sizeSupported: supported,
             lumpSize: lumpSize,
             headerOffset: raw.headerOffset,
             drStart: raw.dataRegisters.offset,
@@ -54,9 +55,7 @@ const output = `'use strict';
             capsStart: capsStart,
             capsEnd: capsEnd,
             capsWords: raw.capabilityHomes.words,
-            privateZoneWords: raw.privateAbiWords,
-            extensionStart: raw.extensionOffset,
-            extensionWords: Math.max(0, lumpSize - raw.extensionOffset)
+            privateZoneWords: raw.privateAbiWords
         });
     }
     return Object.freeze(Object.assign({}, raw, { layout: layout }));

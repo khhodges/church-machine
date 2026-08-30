@@ -1,12 +1,13 @@
 """Focused contract coverage for Wukong's physical Thread scheduler."""
 from pathlib import Path
 
+import pytest
 from amaranth.back import rtlil
 from amaranth.sim import Simulator
 
 from hardware.change import ChurchChange
 from hardware.mload import ChurchMLoad
-from hardware.hw_types import GT_TYPE_INFORM
+from hardware.hw_types import FaultType, GT_TYPE_INFORM
 from server.boot_image import create_gt, integrity32, pack_lump_header, pack_ns_word1
 from hardware.thread_design import THREAD_CAP_WORDS
 
@@ -41,7 +42,12 @@ def test_m6_contract_has_synchronizer_debounce_and_fetch_quiesce():
     assert 'snap_thread_base.eq(core.active_thread_base)' in source
 
 
-def test_change_derives_entry_from_cr0_without_frame_or_context_words():
+@pytest.mark.parametrize(
+    ("thread_n_minus_6", "expect_bounds_fault"),
+    [(2, False), (3, True)],
+)
+def test_change_enforces_defined_thread_body_before_restoring_context(
+        thread_n_minus_6, expect_bounds_fault):
     dut = ChurchChange()
     sim = Simulator(dut)
     sim.add_clock(1e-6)
@@ -59,7 +65,7 @@ def test_change_derives_entry_from_cr0_without_frame_or_context_words():
 
     descriptor(thread_slot, new_base, 255)
     descriptor(code_slot, code_base, 63)
-    mem[new_base] = pack_lump_header(2, 32, 12, 2)
+    mem[new_base] = pack_lump_header(thread_n_minus_6, 32, 12, 2)
     mem[code_base] = pack_lump_header(0, 7, 2, 0)
     entry_gt = create_gt(0, code_slot, {"E": 1}, GT_TYPE_INFORM)
     for i in range(12):
@@ -125,16 +131,25 @@ def test_change_derives_entry_from_cr0_without_frame_or_context_words():
         ctx.set(dut.change_start, 1)
         await cycle()
         ctx.set(dut.change_start, 0)
+        terminal = None
         for _ in range(2500):
             await cycle()
-            assert not ctx.get(dut.change_fault), (
-                f"CHANGE faulted with type {ctx.get(dut.fault_type)}; "
-                f"last reads={reads[-16:]}")
+            if ctx.get(dut.change_fault):
+                terminal = "fault"
+                break
             if ctx.get(dut.change_complete):
+                terminal = "complete"
                 break
         else:
             raise AssertionError("scheduler CHANGE timed out")
 
+        if expect_bounds_fault:
+            assert terminal == "fault"
+            assert ctx.get(dut.fault_type) == FaultType.BOUNDS
+            assert writes == [], "unsupported Thread must fault before context save"
+            return
+
+        assert terminal == "complete"
         assert nia == code_base + 4
         assert drs[1] == 0xA0000001
         cr14 = crs[14]

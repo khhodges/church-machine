@@ -295,7 +295,7 @@ def test_oversized_catalog_allocation_preserves_three_threads_and_projection(tmp
     """A large fixed resident body cannot overwrite generated Thread contexts."""
     catalog_words = _write_oversized_catalog_fixture(tmp_path)
     cfg = _minimal_cfg(thread_count=3)
-    cfg["step1"]["threadLumpWords"] = 512
+    cfg["step1"]["threadLumpWords"] = 256
     generic = generate_boot_image(
         cfg, str(tmp_path), boot_entry_slot=10, require_entry_resident=True)
     source = _unpack_words(generic)
@@ -307,9 +307,9 @@ def test_oversized_catalog_allocation_preserves_three_threads_and_projection(tmp
     }
 
     assert entries[1][0] == 0
-    assert entries[10][0] == 768
+    assert entries[10][0] == 512
     assert entries[11][0] == entries[10][0] + 256
-    assert entries[12][0] == entries[11][0] + 512
+    assert entries[12][0] == entries[11][0] + 256
     assert source[entries[10][0]:entries[10][0] + 256] == catalog_words
     for slot in (1, 11, 12):
         base = entries[slot][0]
@@ -326,8 +326,8 @@ def test_oversized_catalog_allocation_preserves_three_threads_and_projection(tmp
     for row in info["thread_contexts"]:
         source_base = entries[row["slot"]][0]
         target_base = row["base_word"]
-        expected = source[source_base:source_base + 512]
-        assert projected_words[target_base:target_base + 512] == expected
+        expected = source[source_base:source_base + 256]
+        assert projected_words[target_base:target_base + 256] == expected
 
 
 def test_wukong_projection_preserves_every_thread_private_body():
@@ -394,7 +394,7 @@ def test_wukong_projection_preserves_every_thread_private_body():
 def test_wukong_projection_rejects_thread_contexts_over_physical_dmem():
     """Projection rejects more Thread contexts than the physical ABI supports."""
     cfg = _minimal_cfg(total=32768)
-    cfg["step1"].update({"threadCount": 9, "threadLumpWords": 2048})
+    cfg["step1"].update({"threadCount": 9, "threadLumpWords": 256})
     generic = generate_boot_image(
         cfg, LUMPS_DIR, boot_entry_slot=10, require_entry_resident=True,
     )

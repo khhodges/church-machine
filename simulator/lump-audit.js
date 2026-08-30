@@ -235,7 +235,15 @@ function lumpAudit(words, manifest, lineNums, opts) {
                 detail: 'Thread lump (typ=10, cw>0) header has heapWords (cc field) = 0. ' +
                     'Mint validates cc > 0; a Thread with no heap zone is malformed.',
             });
-        } else if (!layout || !layout.valid) {
+        } else if (!layout || !layout.sizeSupported) {
+            results.push({
+                ruleId: 'RB1',
+                severity: 'error',
+                message: `Thread lump: unsupported ${lumpSize}-word body.`,
+                detail: `Thread bodies must be one of: ${_THREAD_DESIGN.supportedBodyWords.join(', ')} words. ` +
+                    'The architecture defines no Thread region after +255.',
+            });
+        } else if (!layout.valid) {
             results.push({
                 ruleId: 'RB1',
                 severity: 'error',
@@ -276,10 +284,14 @@ function lumpAudit(words, manifest, lineNums, opts) {
             severity: layout && layout.valid ? 'pass' : 'error',
             message: layout && layout.valid
                 ? 'Thread private ABI fits without relocating fixed homes \u2713'
-                : 'Thread private ABI geometry is invalid.',
+                : (layout && !layout.sizeSupported
+                    ? `Unsupported Thread body size: ${lumpSize} words.`
+                    : 'Thread private ABI geometry is invalid.'),
             detail: layout && layout.valid
                 ? `Protected STO +${layout.protectedStoOffset}, Heap +${layout.heapStart}\u2026+${layout.heapEnd}, Freespace +${layout.freeStart}\u2026+${layout.freeEnd}, Stack +${layout.stackStart}\u2026+243, CR0\u2013CR11 +244\u2026+255 \u2713`
-                : 'cw/sw and cc must define positive, non-overlapping Stack and Heap zones before fixed CR0\u2013CR11 homes.',
+                : (layout && !layout.sizeSupported
+                    ? `Only ${_THREAD_DESIGN.supportedBodyWords.join(', ')}-word Thread bodies are supported; the architecture defines no region after +255.`
+                    : 'cw/sw and cc must define positive, non-overlapping Stack and Heap zones before fixed CR0\u2013CR11 homes.'),
         });
     } else if (contentWords <= lumpSize) {
         results.push({

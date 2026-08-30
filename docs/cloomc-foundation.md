@@ -320,7 +320,7 @@ The `typ` field (bits [9:8] of the header word) identifies one of three LUMP typ
 | # | LUMP | NS Slot | Role | Comment |
 |---|------|---------|------|-----------------|
 | 1 | **NS LUMP** | 0 | `totalNamespaceWords` — the board's physical memory envelope; everything else follows from this one value | Yes — logically prior to everything |
-| 2 | **Thread LUMP** | 1 | Any stack and heap size desired; `Thread.CR0` holds the E-GT for the Application LUMP | Yes — logically prior to first instruction |
+| 2 | **Thread LUMP** | 1 | Defined 256-word body; stack and heap sizes are selected within it; `Thread.CR0` holds the E-GT for the Application LUMP | Yes — logically prior to first instruction |
 | 3 | **Application LUMP** | IDE-configured (programmed slot # any valid Abstraction from the tested LUMP repository | First abstraction the thread calls via the GT held by`Thread.CR0`; content is board- and IDE-programmer selected | The application entry point |
 
 Slot 0 and 1 are fixed but all other slots are programmable using the IDE. Slot 2 onward are

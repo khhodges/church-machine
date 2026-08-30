@@ -475,7 +475,7 @@ console.log('\n--- T211: late boot-image arrival replaces fallback CR state ---'
             step1: {
                 totalNamespaceWords: bootImageBytes.byteLength / 4,
                 namespaceLumpWords: 64,
-                threadLumpWords: 512,
+                threadLumpWords: 256,
             },
         },
     };

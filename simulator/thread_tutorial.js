@@ -85,9 +85,9 @@ class ThreadTutorial {
 <p>A dormant Thread uses the canonical 256-word software layout. CR0\u2013CR11 are restored from words <code>+244\u2026+255</code>. Word <code>+17</code> is the machine-protected STO slot and is initialized to the empty-stack ceiling; this is 243 for the canonical 256-word Thread. The ordinary software heap starts at <code>+18</code>. There is no packed PC, serialized M flag, or CR14 home.</p>
 ${this._memMap(null)}
 <div class="sr-key-concept"><div class="sr-concept-title">Six Regions, One Fixed Private ABI</div>
-<p>Reading top-to-bottom: <strong>Header \u2192 Data Registers \u2192 Protected STO \u2192 Heap \u2192 Freespace \u2192 Stack \u2192 Capabilities</strong>. The machine-protected STO indicator occupies reserved word <code>+17</code>; ordinary heap begins at <code>+18</code>. The private ABI is fixed through <code>+255</code>: CR0\u2013CR11 are exactly <code>+244\u2026+255</code>, even in a larger Thread body. Words <code>+256</code> onward are a separate reserved extension, never relocated capabilities or additional heap/stack.</p></div>
+<p>Reading top-to-bottom: <strong>Header \u2192 Data Registers \u2192 Protected STO \u2192 Heap \u2192 Freespace \u2192 Stack \u2192 Capabilities</strong>. The machine-protected STO indicator occupies reserved word <code>+17</code>; ordinary heap begins at <code>+18</code>. The supported Thread body is exactly <code>+0\u2026+255</code>, with CR0\u2013CR11 at <code>+244\u2026+255</code>. Larger bodies are rejected because the architecture defines no Thread region after <code>+255</code>.</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">Object Garbage Collection</div>
-<p>Zone \u2463 (Heap) is <strong>not individually scanned</strong> by the hardware GC. The G-bit mark-and-sweep operates at the <em>Thread object</em> level: when the system GC marks the Thread GT as reachable, the <strong>entire lump</strong> \u2014 all seven regions \u2014 is considered live and left untouched. If the Thread GT becomes unreachable, the whole lump is reclaimed at once. All heap memory management within Zone \u2463 \u2014 allocation, compaction, and freeing \u2014 is a <strong>software concern</strong> left to the thread\u2019s own code.</p></div>`
+<p>Zone \u2463 (Heap) is <strong>not individually scanned</strong> by the hardware GC. The G-bit mark-and-sweep operates at the <em>Thread object</em> level: when the system GC marks the Thread GT as reachable, the <strong>entire lump</strong> is considered live and left untouched. If the Thread GT becomes unreachable, the whole lump is reclaimed at once. All heap memory management within Zone \u2463 \u2014 allocation, compaction, and freeing \u2014 is a <strong>software concern</strong> left to the thread\u2019s own code.</p></div>`
             },
             {
                 title: 'Header[0] \u2014 Thread Lump Bit Fields',
@@ -104,8 +104,8 @@ ${this._memMap(null)}
 </table>
 <div class="sr-key-concept"><div class="sr-concept-title">Encoding Formula</div>
 <p><code>(0x1F &lt;&lt; 27) | (n_minus_6 &lt;&lt; 23) | (sw &lt;&lt; 10) | (0b10 &lt;&lt; 8) | heapWords</code></p>
-<p>Example \u2014 512-word V20 thread, sw=32 stack words, heapWords=64:</p>
-<p><code style="color:#60d080;font-size:1rem;">0xF980_8240</code>&nbsp;&nbsp;(magic=0x1F, n\u22126=3, sw=32, typ=10, cc=64)</p></div>
+<p>Example \u2014 the defined 256-word V20 Thread, sw=32 stack words, heapWords=64:</p>
+<p><code style="color:#60d080;font-size:1rem;">0xF900_8240</code>&nbsp;&nbsp;(magic=0x1F, n\u22126=2, sw=32, typ=10, cc=64)</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">Why Reinterpret <code>cw</code> and <code>cc</code>?</div>
 <p>A Thread carries <em>no executable code</em>, so the 13-bit <code>cw</code> (code-word count) field is otherwise wasted. The hardware and Mint reinterpret it as <code>sw</code> (stack words) when <code>typ=10</code>. The stack occupies <code>+244\u2212sw\u2026+243</code>; the V20 capability homes remain fixed at <code>+244\u2026+255</code>, so <code>cc</code> remains the IDE-defined heap size.</p></div>`,
             },
@@ -113,7 +113,7 @@ ${this._memMap(null)}
                 title: '\u2460 Capabilities \u2014 GT Zone for CR0\u2013CR11',
                 type: 'capabilities',
                 content: `${this._memMap('cap')}
-<p>V20 reserves <strong>exactly 12 words</strong> at fixed offsets <code>+244\u2026+255</code> as the persisted <strong>GT homes</strong>: one Golden Token home for each of CR0\u2013CR11. These offsets do not move when a Thread allocation is larger than 256 words. CR12\u2013CR15 are privileged/runtime registers, not persisted homes; CR14 is derived transiently from restored CR0.</p>
+<p>V20 reserves <strong>exactly 12 words</strong> at fixed offsets <code>+244\u2026+255</code> as the persisted <strong>GT homes</strong>: one Golden Token home for each of CR0\u2013CR11 in the defined 256-word body. CR12\u2013CR15 are privileged/runtime registers, not persisted homes; CR14 is derived transiently from restored CR0.</p>
 <table class="sr-table"><tr><th>Offset (+244+N)</th><th>CR</th><th>Role</th><th>Controlled by</th></tr>
 <tr><td>+244</td><td>CR0</td><td>General-purpose</td><td>Programmer</td></tr>
 <tr><td>+245</td><td>CR1</td><td>CALL/RETURN ABI \u00b7 argument GT in; return GT out</td><td><strong>Architecture</strong></td></tr>
@@ -242,7 +242,7 @@ ${this._memMap(null)}
 <tr><td>\u2461 LIFO Stack</td><td><code>244\u2212sw</code> \u2026 <code>243</code></td><td><code>cw/sw</code> words \u2193</td><td>Header <code>cw/sw</code> field \u00b7 cursor STO = 243 (empty)</td></tr>
 <tr><td>\u2460 GT Zone (Capabilities)</td><td>word 244</td><td>12 words (architecture-fixed)</td><td>CR0\u2013CR11 at +244\u2026+255; CR12\u2013CR15 are runtime-only</td></tr>
 </table>
-<p>For an allocation larger than 256 words, the fixed private ABI above remains unchanged through <code>+255</code>. Words <code>+256</code> onward are a reserved extension and are not extra heap, stack, or relocated capability homes.</p>
+<p>The Thread header must describe the supported 256-word body. A larger allocation is rejected; words after <code>+255</code> have no defined Thread format, ownership, or access policy.</p>
 <div class="sr-key-concept"><div class="sr-concept-title">CR12 \u2014 Thread Stack (Privileged, System-Wide)</div>
 <p>Boot step B:02 (INIT_THRD) loads <strong>one</strong> register from NS Slot 1:</p>
 <ul>

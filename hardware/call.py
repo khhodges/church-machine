@@ -158,7 +158,7 @@ class ChurchCall(Elaboratable):
         thread_hdr_view = View(LUMP_HEADER_LAYOUT, self.thread_hdr)
 
         # Stack and persisted CR homes remain at their canonical offsets even
-        # when a Thread allocation has a reserved extension beyond +255.
+        # while keeping persisted capability homes at their fixed offsets.
         # Break into two binary subtractions so Yosys does not merge into a
         # multi-term $macc cell that write_verilog cannot emit as plain Verilog.
         sp_max      = Signal(15)

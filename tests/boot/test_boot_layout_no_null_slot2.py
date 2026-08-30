@@ -115,12 +115,12 @@ def _default_cfg():
 
 
 def _custom_cfg():
-    """Non-default thread size to confirm the no-gap formula holds generally."""
+    """Larger Namespace allocation with the defined Thread size."""
     return {
         "step1": {
             "totalNamespaceWords": 16384,
             "namespaceLumpWords":  1024,
-            "threadLumpWords":      512,
+            "threadLumpWords":      256,
         },
     }
 
@@ -205,20 +205,17 @@ def test_boot_abstr_immediately_follows_thread_default():
 
 
 def test_boot_abstr_immediately_follows_thread_custom():
-    """Custom config (thread=512): Boot.Abstr header at 0x200 (= thread_size).
-
-    Exercises the general physAddr=thread_size formula with a non-default size.
-    """
+    """Custom Namespace config keeps Boot.Abstr directly after Thread."""
     cfg   = _custom_cfg()
-    th    = int(cfg["step1"]["threadLumpWords"])   # 512
+    th    = int(cfg["step1"]["threadLumpWords"])   # 256
     total = int(cfg["step1"]["totalNamespaceWords"])
 
-    assert th == 0x200, f"Test assumption: thread_size should be 0x200 got 0x{th:04X}"
+    assert th == 0x100, f"Test assumption: thread_size should be 0x100 got 0x{th:04X}"
 
     image = generate_boot_image(cfg, LUMPS_DIR)
     words = _parse_image(image, total)
 
-    _assert_boot_abstr_at(words, th, "custom config (thread=512)")
+    _assert_boot_abstr_at(words, th, "custom Namespace config (thread=256)")
 
 
 def test_ns_slot0_word0_is_ns_table_base():

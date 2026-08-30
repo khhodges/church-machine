@@ -54,7 +54,8 @@ test.describe('Builder design pages — Thread Lump & Namespace Lump', () => {
         expect(referenceText.join('\n')).toMatch(/Six Regions, One Fixed Private ABI/);
         expect(referenceText.join('\n')).toMatch(/\+244.*\+255/);
         expect(referenceText.join('\n')).toMatch(/CR0.*CR11/);
-        expect(referenceText.join('\n')).toMatch(/\+256.*reserved extension/i);
+        expect(referenceText.join('\n')).toMatch(/larger bodies are rejected/i);
+        expect(referenceText.join('\n')).not.toMatch(/reserved extension/i);
 
         // Interactive editor still present
         await expect(panel.locator('.le-panel')).toBeVisible();

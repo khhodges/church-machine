@@ -25,13 +25,13 @@ THREAD_STACK_POINTER_HOME_OFFSET = THREAD_STO_OFFSET
 THREAD_CAPS_OFFSET = THREAD_DESIGN["capabilityHomes"]["offset"]
 THREAD_CAP_WORDS = THREAD_DESIGN["capabilityHomes"]["words"]
 THREAD_PRIVATE_ABI_WORDS = THREAD_DESIGN["privateAbiWords"]
-THREAD_EXTENSION_OFFSET = THREAD_DESIGN["extensionOffset"]
 THREAD_MIN_N_MINUS_6 = int(math.log2(THREAD_MIN_WORDS)) - 6
 THREAD_MAX_N_MINUS_6 = int(math.log2(max(THREAD_SUPPORTED_BODY_WORDS))) - 6
 
 
 def thread_layout(lump_size: int, stack_words: int, heap_words: int) -> dict:
     """Derive all Thread zones from the normative fixed private ABI."""
+    size_supported = lump_size in THREAD_SUPPORTED_BODY_WORDS
     caps_start = THREAD_CAPS_OFFSET
     caps_end = caps_start + THREAD_CAP_WORDS - 1
     heap_start = THREAD_HEAP_OFFSET
@@ -42,12 +42,13 @@ def thread_layout(lump_size: int, stack_words: int, heap_words: int) -> dict:
     free_end = stack_start - 1
     return {
         "valid": (
-            lump_size in THREAD_SUPPORTED_BODY_WORDS
+            size_supported
             and stack_words > 0
             and heap_words > 0
             and heap_end < stack_start
             and caps_end < THREAD_PRIVATE_ABI_WORDS
         ),
+        "size_supported": size_supported,
         "lump_size": lump_size,
         "dr_start": THREAD_DR_OFFSET,
         "dr_end": THREAD_DR_OFFSET + THREAD_DR_WORDS - 1,
@@ -60,6 +61,4 @@ def thread_layout(lump_size: int, stack_words: int, heap_words: int) -> dict:
         "stack_end": stack_end,
         "caps_start": caps_start,
         "caps_end": caps_end,
-        "extension_start": THREAD_EXTENSION_OFFSET,
-        "extension_words": max(0, lump_size - THREAD_EXTENSION_OFFSET),
     }

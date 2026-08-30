@@ -2291,8 +2291,8 @@ field `0x1F` as every other lump. The `typ` field is set to `10`
 > carries no executable code. The hardware and Mint **reinterpret** it as `sw`
 > (stack words). The IDE sets `sw` at thread-creation time; Mint validates
 > that `sw > 0`, `cc > 0`, and `18 + cc + sw ≤ 244`. The stack and persisted
-> homes use fixed private-ABI offsets, so their boundaries do not depend on a
-> larger allocation's tail.
+> homes use fixed private-ABI offsets. The only supported Thread body is the
+> defined 256-word layout; larger bodies are rejected.
 
 **Encoding example** (256-word thread, 32 stack words):
 
@@ -2310,10 +2310,10 @@ carried in the NS slot `gt_seq` field, not the header.
 
 ## Thread Lump Memory Layout
 
-Word 0 is the header. The fixed private ABI occupies Words
-0..255. Word addresses increase downward from the base. A Thread allocation
-larger than 256 words retains this ABI unchanged; words +256 onward are a
-separate reserved extension, never extra heap/stack or relocated CR homes.
+Word 0 is the header. The Thread occupies Words 0..255. Word addresses
+increase downward from the base. The architecture defines no Thread region,
+format, ownership, or access policy after +255, so larger Thread bodies are
+rejected.
 
 ```
 ┌─────────────────────────────────────────────┐  ← base  (+0)            ← Word 0
@@ -2379,13 +2379,12 @@ privileged/runtime registers and have no persisted Thread-memory homes.
 
 Thread capability persistence is a fixed private ABI, not a tail-derived
 c-list calculation. **Zone ① is always words +244..+255**, for CR0..CR11,
-regardless of the allocated Thread body size. CR12..CR15 are privileged/runtime
-registers and have no persisted homes.
+in every supported Thread body. CR12..CR15 are privileged/runtime registers
+and have no persisted homes.
 
 | Region | Offsets | Role |
 |--------|---------|------|
 | Zone ① (persisted CR homes) | +244 … +255 | Save/restore target for CR0..CR11 |
-| Reserved extension | +256 onward | Present only in larger allocations; separate from the fixed Thread ABI |
 
 `Mint.Thread` populates words +244..+255 with the initial GT Word 0 values at
 creation time. The boot sequence then LOAD-s them into the CRs via `mLoad`.
@@ -2662,8 +2661,8 @@ Step 1  Read Mem[base] — the header word.
 Step 2  magic[31:27] == 0x1F — reject if not.
 Step 3  typ[9:8] == 0b10 (clist-only) — reject if not; prevents calling
           Mint.Thread on a code lump.
-Step 4  n-6[26:23] describes an allocation of at least 256 words; words
-          +256 onward, if present, are reserved extension words.
+Step 4  n-6[26:23] describes exactly 256 words; reject any larger body
+          because the Thread architecture defines no region after +255.
 Step 5  cw[22:10] is reinterpreted as sw — reject zero stack words.
 Step 6  cc[7:0] > 0 AND 18 + cc + sw ≤ 244 — heapWords (cc) must be
           positive and all zones must fit; reject if not.
@@ -2688,9 +2687,9 @@ The difference from `Mint.Lump`:
 
 Thread lumps are distributed as `*.thread.zip` files, following the same
 ZIP container rules as function abstraction lumps (bit 3 = 0, uncompressed
-size present in local file header). A canonical image is a 256-word Thread
-lump — header word followed by the five remaining fixed-ABI regions. A larger
-image appends only the reserved extension after +255.
+size present in local file header). A Thread image is a 256-word lump —
+header word followed by the remaining defined regions. Larger Thread images
+are unsupported and must be rejected.
 
 ```
 MyApp.thread.zip
@@ -2707,8 +2706,7 @@ The ZIP pre-allocation sequence is identical to that for function
 abstraction lumps — the Locator reads `uncompressed_size` from the local
 file header, derives `n = log2(size / 4)`, reserves that power-of-two region,
 inflates into it, then passes `(base, n)` to `Mint.Thread` for validation and
-GT issuance. The canonical image has `n = 8`; larger images retain the same
-fixed private ABI through +255.
+GT issuance. The canonical and only supported image has `n = 8`.
 
 ### What the IDE Writes at Compile Time
 
@@ -3158,7 +3156,7 @@ already owns.
 | **Freespace zone** | Compile-time fixed · `0xAB` content header + embedded API/source, zero remainder (legacy: all-zero) · immutable per release | Dynamic: +(18+cc)…+(243−sw), between Heap ↑ and Stack ↓ | Between init code and NS Table · all-zero |
 | **C-list zone** | Last `cc` words · list E-GTs · compiler-set | Fixed persisted homes +244…+255: CR0–CR11 | BINARY DATA |
 | **Unique body** | Code and C-List | 6 regions: Header · DR · Heap · Free · Stack · Caps | NS Table (N × 4-word entries: Inform GT + reserved) |
-| **Physical scope · 2^n frame size** | One lump region | One 256/512/1024-word thread frames | Entire application address space |
+| **Physical scope · 2^n frame size** | One lump region | One 256-word Thread frame | Entire application address space |
 | **NS Table** | None — uses parent NS | None — uses parent NS | IS the NS Table |
 | **Outform support** | No — all deps must be Live at call time | No | Yes — Absent event → Locator fetch |
 | **Lazy load** | Fetch from Home Base Library | Not applicable | Hosts the Locator; fetches from Home Base IDE |
@@ -3167,7 +3165,7 @@ already owns.
 | **Transient CR6** | C-list view (L) last `cc` words | Not derived | C-list view (L) last `cc` words |
 | **Issued GTs** | One E-GT (caller holds) | GT (Thread) | GT NS |
 | **GC interaction** | G bit in NS slot Word 1 authority | G bits in live CR authority snapshots in Zone ① | Live & Dead slots |
-| **lumpSize** | 2^n compiler-chosen (64–16 384 words) | IDE defined 2^n < 1024 | 2^n IDE-chosen; Boot.NS = 2^14 = 16 384 words |
+| **lumpSize** | 2^n compiler-chosen (64–16 384 words) | Architecture-defined 256 words | 2^n IDE-chosen; Boot.NS = 2^14 = 16 384 words |
 | **Freespace verified by Mint** | Yes — words cw+1..lumpSize-cc-1: `0xAB` content-frame validation (bounds + zero remainder, step 7) or all-zero (legacy) | Zone ③ only: +(18+cc)…+(243−sw); fixed CR homes skipped | Scan CRC per slot |
 | **Distribution format** | `dot.name.issue.token.zip` | `*.thread.zip` | `*.namespace.zip` |
 | **Simulator NS slot** | Most slots (Salvation=4, Mint=6, …) | Slots 1 and 45 | Slot 0 (Boot.NS) |

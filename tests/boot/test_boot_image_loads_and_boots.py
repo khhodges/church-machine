@@ -67,7 +67,7 @@ def _cfg_custom_step1():
         "step1": {
             "totalNamespaceWords": 32768,
             "namespaceLumpWords":  1024,
-            "threadLumpWords":      512,
+            "threadLumpWords":      256,
         },
     }
 
@@ -252,7 +252,7 @@ def _saved_project_cfg():
         "step1": {
             "totalNamespaceWords": 32768,
             "namespaceLumpWords":   1024,
-            "threadLumpWords":       512,
+            "threadLumpWords":       256,
         },
     }
 

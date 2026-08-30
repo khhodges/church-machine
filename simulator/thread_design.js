@@ -12,13 +12,9 @@
         "heapField": "cc"
     },
     "supportedBodyWords": [
-        256,
-        512,
-        1024,
-        2048,
-        4096,
-        8192
+        256
     ],
+    "unsupportedBodyPolicy": "reject",
     "canonicalBodyWords": 256,
     "headerOffset": 0,
     "dataRegisters": {
@@ -57,7 +53,6 @@
         15
     ],
     "privateAbiWords": 256,
-    "extensionOffset": 256,
     "zoneOrder": [
         "Header",
         "Data Registers",
@@ -65,8 +60,7 @@
         "Heap",
         "Freespace",
         "LIFO Stack",
-        "Capabilities",
-        "Reserved Extension"
+        "Capabilities"
     ]
 };
     var design = factory(raw);
@@ -90,6 +84,7 @@
             heapEnd < stackStart && capsEnd < raw.privateAbiWords;
         return Object.freeze({
             valid: valid,
+            sizeSupported: supported,
             lumpSize: lumpSize,
             headerOffset: raw.headerOffset,
             drStart: raw.dataRegisters.offset,
@@ -109,9 +104,7 @@
             capsStart: capsStart,
             capsEnd: capsEnd,
             capsWords: raw.capabilityHomes.words,
-            privateZoneWords: raw.privateAbiWords,
-            extensionStart: raw.extensionOffset,
-            extensionWords: Math.max(0, lumpSize - raw.extensionOffset)
+            privateZoneWords: raw.privateAbiWords
         });
     }
     return Object.freeze(Object.assign({}, raw, { layout: layout }));

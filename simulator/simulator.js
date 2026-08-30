@@ -1307,7 +1307,7 @@ class ChurchSimulator {
     // use the selected Namespace body's header rather than live execution
     // registers or a fixed Boot.Thread layout.
     getThreadInstanceLayout(nsIndex) {
-        const unavailable = reason => ({ valid: false, nsIndex, reason });
+        const unavailable = (reason, details = {}) => ({ ...details, valid: false, nsIndex, reason });
         if (!Number.isInteger(nsIndex) || nsIndex < 0 || nsIndex >= this.MAX_NS_ENTRIES) {
             return unavailable('The selected Namespace slot is invalid.');
         }
@@ -1339,8 +1339,16 @@ class ChurchSimulator {
 
         const layout = THREAD_DESIGN.layout(header.lumpSize, header.cw, header.cc);
         if (!layout.valid) {
+            if (!layout.sizeSupported) {
+                return unavailable(
+                    `The ${header.lumpSize}-word Thread body is unsupported. ` +
+                    `Only ${THREAD_DESIGN.supportedBodyWords.join(', ')}-word Thread bodies are defined.`,
+                    { entry, base, headerWord, header, lumpSize: header.lumpSize, ...layout }
+                );
+            }
             return unavailable(
-                'The Thread header describes overlapping or empty private memory zones.'
+                'The Thread header describes overlapping or empty private memory zones.',
+                { entry, base, headerWord, header, lumpSize: header.lumpSize, ...layout }
             );
         }
 

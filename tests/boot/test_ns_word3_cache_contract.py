@@ -44,7 +44,7 @@ def test_generated_resident_entries_use_cache_tokens_not_permission_annotations(
         "step1": {
             "totalNamespaceWords": 32768,
             "namespaceLumpWords": 1024,
-            "threadLumpWords": 512,
+            "threadLumpWords": 256,
         },
     }
     image = generate_boot_image(cfg, LUMPS_DIR)

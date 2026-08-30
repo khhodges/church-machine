@@ -317,10 +317,19 @@ assert.strictEqual(sandbox.renderThreadMemoryLayout(11, true), bootSlotSixHtml,
 
 vm.runInContext(fs.readFileSync(__dirname + '/thread_tutorial.js', 'utf8'), sandbox);
 const tutorialMap = vm.runInContext('new ThreadTutorial()._memMap(null)', sandbox);
+const tutorialText = vm.runInContext(
+    'new ThreadTutorial().steps.map(step => step.content).join("\\n")', sandbox);
 assert(tutorialMap.includes('◆ Protected STO') &&
        tutorialMap.includes('Machine-protected Thread word +17') &&
        tutorialMap.includes('word 18'),
     'Thread tutorial map shows protected STO at +17 and Heap at +18');
+assert(tutorialText.includes('defined 256-word V20 Thread') &&
+       tutorialText.includes('0xF900_8240') &&
+       tutorialText.includes('n\u22126=2'),
+    'Thread tutorial uses the one supported 256-word header encoding');
+assert(!tutorialText.includes('512-word V20 thread') &&
+       !tutorialText.includes('larger than 256 words'),
+    'Thread tutorial never presents a larger Thread body as supported');
 
 // CR12 is not live before boot, but its detail panel must still project the
 // currently selected suspended Thread image.  Thread.1 may validly start at
@@ -369,9 +378,8 @@ assert.strictEqual(dom.window.document.querySelector('[data-testid="thread-detai
 assert(dom.window.document.getElementById('_nsLumpModalOverlay').textContent.includes('LUMP HEADER'),
     'ordinary LUMPs retain their generic detail modal');
 
-// A larger allocated Thread body still keeps CR0–CR11 at the hardware's
-// architectural +244 home; the allocated size must not make the viewer invent
-// a tail at +500.
+// A larger allocated Thread body has no architectural layout. The viewer must
+// reject it rather than inventing a tail region or relocating fixed zones.
 global.window.bootConfig = {
     step1: {
         totalNamespaceWords: 32768,
@@ -382,19 +390,14 @@ global.window.bootConfig = {
 };
 const wideSim = new ChurchSimulator();
 const wideThread = wideSim.getThreadInstanceLayout(11);
-assert(wideThread.valid, 'a 512-word generated Thread body decodes');
+assert(!wideThread.valid, 'a 512-word generated Thread body is unsupported');
+assert.strictEqual(wideThread.sizeSupported, false, 'layout reports the explicit size-policy failure');
 assert.strictEqual(wideThread.lumpSize, 512, 'selected header retains its full allocated size');
-assert.strictEqual(wideThread.capsStart, 244, 'larger Thread bodies retain the actual CR0 home');
-assert.strictEqual(wideThread.capsEnd, 255, 'larger Thread bodies retain CR11 at fixed +255');
-assert.strictEqual(wideThread.stackEnd, 243, 'larger Thread bodies retain the fixed stack ceiling');
-assert.strictEqual(wideThread.stackStart, 244 - wideThread.stackWords,
-    'larger Thread bodies derive stack size from cw/sw, not cc or allocation tail');
-assert.strictEqual(wideThread.freeStart, 18 + wideThread.heapWords,
-    'larger Thread bodies derive heap extent from cc before Freespace');
-assert.notStrictEqual(wideThread.capsStart, wideThread.lumpSize - wideThread.capsWords,
-    'viewer does not fabricate a tail capability zone for a larger Thread');
-assert.notStrictEqual(wideSim.memory[wideThread.base + wideThread.capsStart], 0,
-    'the selected 512-word body exposes its stored CR0');
+assert.strictEqual(wideThread.capsStart, 244, 'unsupported size does not relocate the defined CR0 home');
+assert.strictEqual(wideThread.capsEnd, 255, 'unsupported size does not relocate CR11');
+
+// Restore a supported body before testing normal boot behavior below.
+global.window.bootConfig.step1.threadLumpWords = 256;
 
 // Full boot runs Navana.Init, which mints runtime PassKeys.  Those credentials
 // live in Navana's virtual map and must not expand or rewrite the fixed twelve

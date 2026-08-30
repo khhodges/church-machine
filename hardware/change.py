@@ -467,9 +467,9 @@ class ChurchChange(Elaboratable):
                     m.next = "PREFLIGHT_HDR"
 
             with m.State("PREFLIGHT_HDR"):
-                # Private body must be a large enough Thread allocation before
-                # outgoing DR/CR state is persisted.  The caps zone ends at
-                # word 255, so n_minus_6>=2 (256 words) is the minimum.
+                # Private body must use a supported Thread allocation before
+                # outgoing DR/CR state is persisted. The shared contract
+                # currently admits only the fully-defined 256-word layout.
                 m.d.comb += preflight_hdr_active.eq(1)
                 # The DMEM read port is shared and synchronous; arm one cycle
                 # before accepting valid so a final Namespace-gate response

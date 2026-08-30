@@ -66,7 +66,7 @@
         return Math.min(nextPow2(v), NS_CAP_MAX);
     }
     var V20_NS_TOTAL_N        = 1;   // 2^(1+14) = 32K words = 128 KiB
-    var V20_THREAD_LUMP_POW2  = 9;   // 512 words
+    var V20_THREAD_LUMP_POW2  = 8;   // 256 words: the complete defined Thread layout
     var THREAD = window.ThreadDesign;
     if (!THREAD || !THREAD.normative) {
         throw new Error('Normative Thread design is unavailable');
@@ -839,7 +839,7 @@
     var DR_WORDS  = THREAD.dataRegisters.words;
     var CAP_WORDS = THREAD.capabilityHomes.words;
     var MIN_EXP   = Math.log2(Math.min.apply(null, THREAD.supportedBodyWords));
-    var MAX_EXP   = 13;   // 8192 words cap
+    var MAX_EXP   = Math.log2(Math.max.apply(null, THREAD.supportedBodyWords));
 
     var BOARD_PROFILES = {
         'tang-nano-20k-iot': { label: 'Tang Nano 20K',      totalRamWords: 16384,  singleThread: true  },
@@ -924,10 +924,6 @@
             { label: 'Stack',     words: stackWords,   cls: 'le-zone-stack' },
             { label: 'Cap Regs',  words: CAP_WORDS,   cls: 'le-zone-caps'  }
         ];
-        if (!overCapacity && layout.extensionWords) {
-            zones.push({ label: 'Reserved Extension', words: layout.extensionWords, cls: 'le-zone-free' });
-        }
-
         var grid = renderGrid([
             ['Target board',   esc(profile.label), 'le-val-gold'],
             ['Physical RAM',   esc(profile.totalRamWords.toLocaleString() + ' words'), ''],
@@ -944,7 +940,7 @@
             ['Stack (cw/sw)',  esc(stackFrames + ' frames  (' + stackWords + ' words; +' + layout.stackStart + ' … +' + layout.stackEnd + ')'), ''],
             ['Cap Regs',       esc(CAP_WORDS + ' words  (CR0–CR11 persisted homes)'), ''],
             ['Capability offset', esc('+' + layout.capsStart + ' … +' + layout.capsEnd + '  (fixed; never relocated)'), 'le-val-gold'],
-            ['Reserved extension', esc(layout.extensionWords + ' words  (+' + layout.extensionStart + ' onward; outside the private ABI)'), ''],
+            ['Thread size policy', esc(lumpSize + ' words  (only the defined +0 … +255 layout is supported)'), 'le-val-gold'],
             ['WukongCallHome', esc('0x' + V20_WCH_BASE_BYTE.toString(16).toUpperCase() + '–0x' + V20_WCH_END_BYTE.toString(16).toUpperCase() + '  (after full Thread allocation)'), 'le-val-gold'],
             ['Header word',    '<span id="le-thread-hex" class="le-hex">' + esc(wordHex) + '</span>' + copyBtn('le-thread-hex'), 'le-val-mono']
         ]);
@@ -999,7 +995,7 @@
             threadCountClampBanner +
             threadClampBanner +
             overCapWarning +
-             '<p class="le-panel-desc">This design is normative for every Thread. The private ABI is fixed at +0\u2026+255: Header, DR0\u2013DR15, Heap, Freespace, LIFO Stack ending at +243, then the twelve persisted CR0\u2013CR11 homes at +244\u2026+255. CR12\u2013CR15 are privileged/runtime state and are not persisted homes. Larger bodies add a reserved extension after +255; they never move the capability zone.</p>' +
+             '<p class="le-panel-desc">This design is normative for every Thread. The supported body is exactly +0\u2026+255: Header, DR0\u2013DR15, Protected STO, Heap, Freespace, LIFO Stack ending at +243, then the twelve persisted CR0\u2013CR11 homes at +244\u2026+255. CR12\u2013CR15 are privileged/runtime state and are not persisted homes. Larger Thread bodies are rejected because the architecture defines no region after +255.</p>' +
             '<div class="le-field-row">' +
                 '<label class="le-label">Lump size<span class="le-range-hint"> 2^' + MIN_EXP + '\u2013' + maxLumpPow2 + ', max ' + fmtWords(Math.pow(2, maxLumpPow2)) + ' w</span></label>' +
                 '<div class="le-input-group le-input-group-wide">' +

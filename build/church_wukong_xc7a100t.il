@@ -1,4 +1,4 @@
-# CM-HARDWARE-SOURCES-SHA256: 937001f0319739b7ae9ccef8f50299d823db1e68d5840977f346d86084224e4b
+# CM-HARDWARE-SOURCES-SHA256: 73819af559ffa5dd264c760ff5ec59958b0554b7ce4190ec4e217408673dc75a
 attribute \generator "Amaranth"
 attribute \src "/home/runner/workspace/hardware/wukong_top.py:279"
 attribute \top 1
@@ -56491,10 +56491,10 @@ module \top.core.u_change
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
-    parameter \B_WIDTH 3
+    parameter \B_WIDTH 2
     parameter \Y_WIDTH 1
     connect \A \mem_rd_data [26:23]
-    connect \B 3'111
+    connect \B 2'10
     connect \Y $111
   end
 

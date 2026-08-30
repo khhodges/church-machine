@@ -66,14 +66,13 @@ def _cfg_default():
 
 
 def _cfg_custom_step1():
-    # Larger thread lump; verifies the lump-header n_minus_6 computation is
-    # driven by threadLumpWords (not hardcoded). Boot.Abstr is always 64w
-    # default (Task #568); abstractionLumpWords is deprecated and ignored.
+    # A larger Namespace allocation keeps the defined 256-word Thread layout.
+    # Boot.Abstr is always 64w default; abstractionLumpWords is deprecated.
     return {
         "step1": {
             "totalNamespaceWords": 32768,
             "namespaceLumpWords":  1024,
-            "threadLumpWords":      512,
+            "threadLumpWords":      256,
         },
     }
 
@@ -384,7 +383,6 @@ def test_generated_threads_use_fixed_stack_boundary(tmp_path):
     """Every generated Thread must use fixed private-ABI stack geometry."""
     _write_synthetic_boot_abstr_lump(str(tmp_path))
     cfg = _cfg_generated_threads(3)
-    cfg["step1"]["threadLumpWords"] = 512
     generated = generate_boot_image(cfg, str(tmp_path))
     step1 = cfg["step1"]
     total = int(step1["totalNamespaceWords"])
@@ -393,10 +391,8 @@ def test_generated_threads_use_fixed_stack_boundary(tmp_path):
     thread_count = int(step1.get("threadCount") or 1)
     slots = [1, *generated_thread_slots(thread_count)]
     expected_boundary = THREAD_CAPS_OFFSET - 1
-    retired_tail_relative_boundary = int(step1["threadLumpWords"]) - 13
     assert THREAD_STO_OFFSET == 17
     assert expected_boundary == 0xF3
-    assert retired_tail_relative_boundary == 0x1F3
 
     for slot in slots:
         ns_base = total - (slot + 1) * NS_ENTRY_WORDS

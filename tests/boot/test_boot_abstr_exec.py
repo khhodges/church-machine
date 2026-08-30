@@ -57,7 +57,7 @@ def _cfg_custom_step1():
         "step1": {
             "totalNamespaceWords": 32768,
             "namespaceLumpWords":     64,
-            "threadLumpWords":       512,
+            "threadLumpWords":       256,
         },
     }
 

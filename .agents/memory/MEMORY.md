@@ -154,5 +154,5 @@
 - [Halted Thread activation order](halted-thread-activation-order.md) — install incoming CR12 before live CR/DR restore; HALT and call-frame state never cross a manual Thread switch
 - [Namespace upload composite integrity](namespace-upload-composite-integrity.md) — validate each LUMP, then bind slots, layout, boot entry, and hashes into one exact upload image
 - [Dynamic state uses ISA protection only](dynamic-composite-pola-boundary.md) — dynamic word changes are not POLA-persisted; type, permission, and bounds checks are the complete access rule
-- [Normative Thread private ABI](normative-thread-private-abi.md) — shared design owns one fixed private ABI; larger allocations reserve extensions instead of relocating core zones
+- [Normative Thread private ABI](normative-thread-private-abi.md) — shared design owns one fixed 256-word layout; larger Thread bodies are rejected, not assigned a tail region
 - [Protected Thread indicator](protected-thread-indicator.md) — word +17 packs FLAGS/SZ/STO outside CR5; frame words save the prior indicator state
