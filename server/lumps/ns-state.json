@@ -145,27 +145,17 @@
       "seal": "0xDE963EEF"
     },
     {
-      "name": "slot_13",
+      "name": "Bridge.Preload",
       "slot": 13,
       "location": "0x00000A00",
-      "type": "Inform",
-      "f": 0,
-      "g": 0,
-      "limit": "0x00001",
-      "seq": 0,
-      "seal": "0xDEA89EEF"
-    },
-    {
-      "name": "Bridge.Preload",
-      "slot": 14,
-      "location": "0x00000B00",
       "type": "Outform",
       "f": 0,
       "g": 0,
       "limit": "0x00001",
       "seq": 0,
-      "seal": "0xDEA81EEF"
+      "seal": "0xDEA89EEF"
     }
   ],
-  "generated_at": 1788050562.7727807
+  "generated_at": 1788094858.3241696,
+  "committed_raw_fingerprint": "5f91c97912f3a3ccd64ea988cfa86f21b6958c220604c81966a9c135ece48ade"
 }
