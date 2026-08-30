@@ -2802,6 +2802,9 @@
     .modal-dialog {
         min-width: unset;
         max-width: 95vw;
+        max-height: calc(100dvh - 2rem);
+        overflow-y: auto;
+        overscroll-behavior: contain;
         margin: 0 0.5rem;
     }
 

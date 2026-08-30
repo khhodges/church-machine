@@ -16424,7 +16424,7 @@ window._wukongRecordSimulatorStep = _wukongRecordSimulatorStep;
     panel.id = 'wukong-hw-log';
     panel.className = 'wukong-hw-log-panel';
     panel.style.cssText = [
-        'display:flex',
+        'display:none',
         'position:fixed',
         'left:auto',
         'top:auto',
@@ -16464,6 +16464,12 @@ window._wukongRecordSimulatorStep = _wukongRecordSimulatorStep;
         '<div id="wukong-hw-log-body" style="flex:1;min-height:0;overflow:auto;padding:4px 8px;color:#ccccee;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;"></div>' +
         '<div id="wukong-hw-log-resize-grip" class="wukong-hw-log-resize-grip" role="separator" aria-label="Resize HW Trace window" tabindex="0" title="Drag to resize"></div>';
     document.body.appendChild(panel);
+    window._wukongHwLogHidden = true;
+    const traceToggle = document.getElementById('wukongTraceToggleBtn');
+    if (traceToggle) {
+        traceToggle.setAttribute('aria-pressed', 'false');
+        traceToggle.classList.add('trace-panel-hidden');
+    }
     if (window.ExecutionIdentity) window.ExecutionIdentity.render();
     _wukongTraceApplyLayout(panel, _wukongTraceReadLayout(), false);
 

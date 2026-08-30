@@ -644,6 +644,24 @@
     font-size: 0.65rem;
     color: #6b7280;
 }
+
+/* Popup audit: anchored toolbar panels stay inside narrow/zoomed viewports. */
+@media (max-width: 600px) {
+    .step-settings-popover,
+    .run-popover {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        top: max(4.25rem, env(safe-area-inset-top));
+        width: auto;
+        min-width: 0;
+        max-width: none;
+        max-height: calc(100dvh - 5.5rem);
+        transform: none;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+}
 .run-batch-select {
     width: 100%;
     background: #111827;
