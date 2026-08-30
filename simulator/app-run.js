@@ -1137,7 +1137,6 @@ function hideRunPopover() {
 //   cc = lastAssembledCapabilities.length.
 function _injectClistNow() {
     if (!sim.bootComplete || !sim.demoClistGTs || !sim.demoClistGTs.length) return;
-    const _icn_pre244 = sim.memory[244] >>> 0;
 
     // Guard against stale named-slot entries from a previous program (Task #1547).
     // Reset petNameMemory to the hardware boot defaults before any markNamedSlots()
@@ -1352,12 +1351,6 @@ function _injectClistNow() {
             m: 0,
         };
     }
-    const _icn_post244 = sim.memory[244] >>> 0;
-    if (_icn_post244 !== _icn_pre244) {
-        console.warn('[_injectClistNow] mem[244] CHANGED: 0x' + _icn_pre244.toString(16) + ' → 0x' + _icn_post244.toString(16) + ' BOOT_ABSTR_SLOT=' + BOOT_ABSTR_SLOT + ' lumpBase=0x' + (sim.memory[sim._nsSlotBase(BOOT_ABSTR_SLOT)]>>>0).toString(16));
-    } else {
-        console.log('[_injectClistNow] mem[244] unchanged=0x' + _icn_post244.toString(16) + ' BOOT_ABSTR_SLOT=' + BOOT_ABSTR_SLOT);
-    }
     return true;
 }
 
@@ -1412,7 +1405,19 @@ function _applyPendingSimLoad() {
     // equivalent sentinel frame here so Compile+Run matches real-boot behavior.
     // loadProgram() above resets callStack to [], so this is always the first frame.
     if (sim.callStack && sim.callStack.length === 0) {
-        const sp_max = 243; // THREAD_CAPS_OFFSET(244) - 1, mirrors simulator.js NUC_CLIST sentinel
+        const threadBase = typeof sim._activeThreadBase === 'function'
+            ? sim._activeThreadBase()
+            : null;
+        const threadLayout = threadBase !== null &&
+                typeof sim._threadLayoutAtBase === 'function'
+            ? sim._threadLayoutAtBase(threadBase)
+            : null;
+        if (!threadLayout || !threadLayout.valid) {
+            sim.fault('BOUNDS', 'Compile+Run: active Thread has invalid or unsupported geometry');
+            _pendingSimLoad = false;
+            return;
+        }
+        const sp_max = threadLayout.stackEnd;
         const sentinelFrameWord = sim._packFrameWordRaw(0x7FFF, 1, sp_max);
         sim.callStack.push({
             sentinel: true,
@@ -1424,12 +1429,7 @@ function _applyPendingSimLoad() {
             sz: 1,
             frameWord: sentinelFrameWord,
         });
-        const threadBase = typeof sim._activeThreadBase === 'function'
-            ? sim._activeThreadBase()
-            : null;
-        if (threadBase !== null) {
-            sim._writeRuntimeWord(threadBase + sp_max, sentinelFrameWord);
-        }
+        sim._writeRuntimeWord(threadBase + sp_max, sentinelFrameWord);
         sim.sto = sp_max - 2;
     }
     // Skip past the lump header (word 0) and method table so PC starts at the
@@ -1451,13 +1451,23 @@ function _applyPendingSimLoad() {
 
     // Update Thread.CR0 to the compiled program's NS slot E-GT (Task #2084).
     // This replaces the SelfTest E-GT that the boot sequence installed at
-    // thread[+THREAD_CAPS_OFFSET=244], making CR0 reference the user's program.
+    // thread[+capsStart], making CR0 reference the user's program.
     if (_progSlot !== null && sim.bootComplete) {
         const _progGT = sim.createGT(_progGtSeq, _progSlot, {E:1}, 1) >>> 0;
         sim.cr[0] = { word0: _progGT, word1: 0, word2: 0, word3: 0, m: 0 };
         const _thEntry = sim.readNSEntry(1);
         if (_thEntry && _thEntry.word0_location > 0) {
-            sim.writePersistentWord((_thEntry.word0_location + 244) >>> 0, _progGT);
+            const _thLayout = typeof sim._threadLayoutAtBase === 'function'
+                ? sim._threadLayoutAtBase(_thEntry.word0_location)
+                : null;
+            if (!_thLayout || !_thLayout.valid) {
+                sim.fault('BOUNDS', 'Compile+Run: Boot.Thread has invalid or unsupported geometry');
+                _pendingSimLoad = false;
+                return;
+            }
+            sim.writePersistentWord(
+                (_thEntry.word0_location + _thLayout.capsStart) >>> 0,
+                _progGT);
         }
         // Patch Boot.NS c-list entry [_progSlot] with the new GT so the
         // dependency graph shows a named entry rather than null/free.

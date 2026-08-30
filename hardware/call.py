@@ -68,8 +68,10 @@ class ChurchCall(Elaboratable):
         # and is addressed independently from this capability.
         self.cr5_heap = Signal(CAP_REG_LAYOUT)
 
-        # Word offset of the CALL instruction itself (nia_reg >> 2, lower 15 bits).
-        # Frame word encodes return_PC = caller_pc + 1 (next instruction after CALL).
+        # Word offset of the CALL instruction itself (separate core NIA state,
+        # not packed with protected STO). The frame records return_PC =
+        # caller_pc + 1 beside the prior STO so RETURN can restore both through
+        # their separate hardware paths.
         self.caller_pc = Signal(15)
 
         # Thread lump byte base address (CR12.word1_location)
@@ -190,7 +192,8 @@ class ChurchCall(Elaboratable):
         cache_token32_lat = Signal(32)
 
         # CALL frame word: FLAGS[31:28] | return_PC[27:13] |
-        # prior_SZ[12] | prev_STO[11:0].
+        # prior_SZ[12] | prev_STO[11:0]. This is a rendezvous record for
+        # separate NIA and protected-indicator state, not a live cursor image.
         # Written to thread_base + STO*4 (STO+0); E-GT written to STO-1.
         frame_word = Signal(32)
         m.d.comb += frame_word.eq(

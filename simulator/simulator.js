@@ -6621,10 +6621,16 @@ class ChurchSimulator {
         // A Thread serializes only DR0–DR15 and the CR0–CR11 GT homes. CR14,
         // NIA, flags, M state, and STO are not scheduler context words.
         const targetHeader = this.parseLumpHeader(this.memory[entry.word0_location] >>> 0);
-        const targetLayout = targetHeader.valid && targetHeader.typ === 2
-            ? THREAD_DESIGN.layout(
-                targetHeader.lumpSize, targetHeader.cw)
-            : null;
+        // Scheduler admission must use the same complete Thread contract as
+        // hardware CHANGE: supported body size, typ=Thread, cc=12, and
+        // header-derived non-overlapping Heap/Stack geometry. Do not derive a
+        // layout from size/cw alone, or malformed cc=0 images can be activated
+        // and have capability homes restored from the wrong tail.
+        const targetLayout = schedulerSwitch
+            ? this._threadLayoutAtBase(entry.word0_location)
+            : (targetHeader.valid && targetHeader.typ === 2
+                ? THREAD_DESIGN.layout(targetHeader.lumpSize, targetHeader.cw)
+                : null);
         if (schedulerSwitch && (!targetLayout || !targetLayout.valid)) {
             this.fault('BOUNDS', `NEXT_THREAD: Namespace slot ${targetIdx} is not a valid Thread descriptor`);
             return null;

@@ -82,6 +82,9 @@ class ChurchChange(Elaboratable):
         self.nia_restore_en = Signal()
         self.nia_restore_val = Signal(32)
         self.flags_in = Signal(COND_FLAGS_LAYOUT)
+        # NIA is separate core state. CHANGE does not persist the outgoing NIA;
+        # an incoming Thread starts at the CR0-selected abstraction's word 1.
+        # FLAGS/SZ/STO are persisted independently in protected Thread word +17.
         self.flags_restore_en = Signal()
         self.flags_restore_data = Signal(COND_FLAGS_LAYOUT)
 
@@ -559,6 +562,8 @@ class ChurchChange(Elaboratable):
                     m.next = "SAVE_INDICATOR_WRITE"
 
             with m.State("SAVE_INDICATOR_WRITE"):
+                # Preserve protected SZ/STO and current flags at Thread word +17.
+                # There is deliberately no NIA field in this persisted word.
                 m.d.comb += [
                     mem_wr_en_reg.eq(1),
                     mem_wr_addr_reg.eq(
@@ -790,6 +795,9 @@ class ChurchChange(Elaboratable):
                         m.next = "FAULT"
 
             with m.State("ENTRY_COMMIT"):
+                # Restore NIA independently from the protected indicator. A
+                # resumed Thread enters its CR0 abstraction at code word 1;
+                # it does not resume an outgoing instruction address.
                 m.d.comb += [
                     self.cr_wr_addr.eq(14),
                     self.cr_wr_data.eq(entry_cr14),

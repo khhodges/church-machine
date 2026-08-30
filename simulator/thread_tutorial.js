@@ -84,8 +84,8 @@ class ThreadTutorial {
 ${this._memMap(null)}
 <div class="sr-key-concept"><div class="sr-concept-title">Six Regions, Tail-Derived Capability Homes</div>
 <p>Reading top-to-bottom: <strong>Header \u2192 Data Registers \u2192 Protected STO \u2192 Heap \u2192 Stack \u2192 Capabilities</strong>. The machine-protected STO indicator occupies reserved word <code>+17</code>; Heap begins at <code>+18</code>, ends immediately before Stack, and grows when <code>n\u22126</code> grows. Stack is immediately before the final twelve capability homes. There is no Thread Freespace region (generic non-Thread lumps retain their Freespace).</p></div>
-<div class="sr-key-concept"><div class="sr-concept-title">Object Garbage Collection</div>
-<p>Zone \u2463 (Heap) is <strong>not individually scanned</strong> by the hardware GC. The G-bit mark-and-sweep operates at the <em>Thread object</em> level: when the system GC marks the Thread GT as reachable, the <strong>entire lump</strong> is considered live and left untouched. If the Thread GT becomes unreachable, the whole lump is reclaimed at once. All heap memory management within Zone \u2463 \u2014 allocation, compaction, and freeing \u2014 is a <strong>software concern</strong> left to the thread\u2019s own code.</p></div>`
+<div class="sr-key-concept"><div class="sr-concept-title">Software-Managed Heap</div>
+<p>Zone \u2463 is ordinary private Thread storage. Hardware derives and enforces its CR5 bounds, while allocation, object layout, reclamation, and compaction are software policy. The Thread layout itself makes no claim about a particular garbage collector.</p></div>`
             },
             {
                 title: 'Header[0] \u2014 Thread Lump Bit Fields',
@@ -137,36 +137,31 @@ ${this._memMap(null)}
                 title: '\u2461 LIFO Stack \u2014 Grows Downward',
                 type: 'stack',
                 content: `${this._memMap('stack')}
-<p>The <strong>LIFO call stack</strong> begins at <code>stackStart=capsStart\u2212sw</code> and expands <em>downward</em> toward the heap. The current stack position is held in the <strong>cursor register</strong> \u2014 a single 32-bit hardware-only register that packs both the current instruction offset (NIA) and the current stack top offset (STO) into one word. CALL pushes a 2-word frame; LAMBDA pushes a 1-word frame. RETURN pops the correct number based on the SZ bit.</p>
+<p>The <strong>LIFO call stack</strong> begins at <code>stackStart=capsStart\u2212sw</code> and expands <em>downward</em> toward the heap. NIA is separate core execution state. The current stack position is the STO field in the machine-protected Thread word at <code>+17</code>. CALL pushes a 2-word frame; LAMBDA pushes a 1-word frame. RETURN pops the correct number based on the SZ bit.</p>
 <ul>
-<li><strong>Stack top</strong> (<code>sp_max</code>): <code>+(capsStart\u22121)</code>; initial cursor STO field = <code>capsStart\u22121</code></li>
+<li><strong>Stack top</strong> (<code>sp_max</code>): <code>+(capsStart\u22121)</code>; initial protected STO field = <code>capsStart\u22121</code></li>
 <li><strong>Stack floor</strong> (<code>sp_min</code>): <code>capsStart \u2212 sw + 2</code> \u2014 IDE-controlled via the header <code>cw/sw</code> field</li>
 <li><strong>Overflow</strong>: hardware raises <code>STACK_OVERFLOW</code> <em>before any write</em> when STO &lt; sp_min; raises <code>STACK_CORRUPT</code> when STO &gt; sp_max</li>
-<li><strong>2-word CALL frame (SZ=1)</strong>: <code>[E-GT \u00b7 frame\u202fword]</code> \u2014 cursor STO field decreases by 2</li>
-<li><strong>1-word LAMBDA frame (SZ=0)</strong>: <code>[frame\u202fword only]</code> \u2014 cursor STO field decreases by 1</li>
+<li><strong>2-word CALL frame (SZ=1)</strong>: <code>[E-GT \u00b7 frame\u202fword]</code> \u2014 protected STO decreases by 2</li>
+<li><strong>1-word LAMBDA frame (SZ=0)</strong>: <code>[frame\u202fword only]</code> \u2014 protected STO decreases by 1</li>
 </ul>
-<div class="sr-key-concept"><div class="sr-concept-title">The Cursor Register \u2014 NIA + STO in One Word</div>
-<p>The Church Machine keeps both the current instruction pointer and the current stack top in a single 32-bit hardware register that is <strong>never addressable by data instructions</strong>:</p>
-<table class="sr-table"><tr><th>Bits</th><th>Field</th><th>Meaning</th></tr>
-<tr><td>31</td><td>0 (live)</td><td>Always zero while running \u2014 the SZ tag only appears in stored frame words</td></tr>
-<tr><td>30:16</td><td>NIA [15]</td><td>Current word offset from CR14.base (next instruction to execute)</td></tr>
-<tr><td>15:0</td><td>STO [16]</td><td>Current stack top word offset from thread lump base</td></tr>
-</table>
-<p>A frame word pushed onto the stack is a <strong>direct snapshot</strong> of this register with bit 31 set (SZ tag) and NIA pre-incremented to the return address:</p></div>
+<div class="sr-key-concept"><div class="sr-concept-title">NIA and STO Are Separate</div>
+<p>The live NIA belongs to the core and is not stored in the Thread lump. The protected word at <code>+17</code> stores <code>FLAGS[31:28] | reserved[27:13] | SZ[12] | STO[11:0]</code>. CALL reads STO from that word, writes a frame containing the return PC and prior STO, then writes the decremented STO back to <code>+17</code>. RETURN restores the protected indicator and NIA through separate hardware write paths.</p></div>
 <table class="sr-table"><tr><th>Stack slot</th><th>Contents</th></tr>
 <tr><td>STO+0 \u2014 frame word (both frame types)</td><td><code>FLAGS[4] | return_PC[15] | prior_SZ[1] | prev_STO[12]</code></td></tr>
 <tr><td>STO\u22121 \u2014 E-GT word (CALL only)</td><td>Caller\u2019s E-GT Word 0 \u2014 RETURN revalidates it to re-derive CR6 and CR14</td></tr>
 </table>
 <table class="sr-table"><tr><th>Frame word field</th><th>Bits</th><th>Meaning</th></tr>
-<tr><td>SZ</td><td>31</td><td>1 = 2-word CALL frame \u00b7 0 = 1-word LAMBDA frame</td></tr>
-<tr><td>return_PC</td><td>30:16</td><td>NIA + 1: word offset of the instruction <em>after</em> CALL in the caller\u2019s code</td></tr>
-<tr><td>prev_STO</td><td>15:0</td><td>STO at the moment of CALL \u2014 restored into cursor register by RETURN</td></tr>
+<tr><td>FLAGS</td><td>31:28</td><td>Caller condition flags restored by RETURN</td></tr>
+<tr><td>return_PC</td><td>27:13</td><td>NIA + 1: word offset of the instruction <em>after</em> CALL in the caller\u2019s code</td></tr>
+<tr><td>prior_SZ</td><td>12</td><td>Previous protected frame-size indicator</td></tr>
+<tr><td>prev_STO</td><td>11:0</td><td>STO at the moment of CALL \u2014 restored to protected word <code>+17</code> by RETURN</td></tr>
 </table>
-<p>RETURN recovers the full execution state in <strong>one memory read and one register write</strong>: it reads the frame word at STO+0 and writes it back into the cursor register with bit 31 cleared. Both NIA and STO are restored atomically. The cursor is runtime state, not an additional persisted CR home.</p>
+<p>RETURN reads the frame selected by protected STO, restores <code>FLAGS/SZ/STO</code> to word <code>+17</code>, and drives the saved return PC onto the core\u2019s NIA restore path. These are coordinated by the RETURN state machine but are not one packed live register assignment.</p>
 <div class="sr-key-concept"><div class="sr-concept-title">STO Is Hardware-Only \u2014 No Data Instruction Can Reach It</div>
-<p>The live cursor register is <strong>inaccessible to DREAD and DWRITE</strong>. Its STO field is stored in the reserved machine-protected word at <code>+17</code>. CR5 begins at <code>+18</code>, so no ordinary heap capability can address STO. CALL, RETURN, LAMBDA, and CHANGE maintain the cursor/backing state and apply <code>sp_min</code> from header <code>cw/sw</code> plus <code>sp_max=capsStart\u22121</code> before stack writes.</p></div>
+<p>The protected indicator is <strong>inaccessible to DREAD and DWRITE</strong>. CR5 begins at <code>+18</code>, so no ordinary heap capability can address word <code>+17</code>. CALL, RETURN, LAMBDA, and CHANGE maintain the indicator and apply <code>sp_min</code> from header <code>cw/sw</code> plus <code>sp_max=capsStart\u22121</code> before stack writes.</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">LIFO, Not FIFO</div>
-<p>The stack discipline is <strong>Last-In First-Out</strong>: CALL decrements the STO field of the cursor register and RETURN increments it (via <code>prev_STO</code> in the frame word). Nested calls push sequentially deeper; unwinding always reverses that order. No frame can be forged or overwritten because all stack words are inside the thread\u2019s lump and bounds are hardware-enforced. Initial STO in protected word <code>+17</code> is <code>sp_max = capsStart\u22121</code>.</p></div>`
+<p>The stack discipline is <strong>Last-In First-Out</strong>: CALL decrements protected STO and RETURN restores it from <code>prev_STO</code> in the frame word. Nested calls push sequentially deeper; unwinding reverses that order. Hardware bounds prevent a frame write outside the declared Stack region. Initial STO in protected word <code>+17</code> is <code>sp_max = capsStart\u22121</code>.</p></div>`
             },
             {
                 title: '\u2463 Heap \u2014 Derived Object Store',
@@ -178,7 +173,7 @@ ${this._memMap(null)}
 <li><strong>Heap limit</strong>: word <code>stackStart\u22121</code>; <code>stackStart=capsStart\u2212sw</code></li>
 <li><strong>Allocation</strong>: thread objects advance the heap pointer upward (bump allocation) toward Stack</li>
 <li><strong>Derived ceiling</strong>: each Thread owns its Heap region exclusively; select a larger lump to enlarge it</li>
-<li><strong>Object GC</strong>: Zone \u2463 is not individually scanned \u2014 the hardware G-bit GC operates at the Thread object level; the entire lump is live or reclaimed as one unit; heap memory management within Zone \u2463 is a software concern</li>
+<li><strong>Reclamation policy</strong>: allocation and reclamation within Zone \u2463 are software concerns; hardware enforces only the derived CR5 bounds</li>
 </ul>
 <table class="sr-table"><tr><th>Header[0] field</th><th>Bits</th><th>Encodes</th></tr>
 <tr><td>n\u22126</td><td>[26:23]</td><td>total lump size; its growth enlarges Heap</td></tr>
@@ -193,8 +188,8 @@ ${this._memMap(null)}
 <p>Every <code>DREAD</code> and <code>DWRITE</code> instruction that uses CR5 runs a <strong>TPERM bounds check</strong> before touching memory: <code>offset \u2264 CR5.limit_offset</code>. CR5 starts at word <code>+18</code>, so protected STO at <code>+17</code> is unreachable. A write beyond word <code>18+heapWords\u22121</code> faults immediately \u2014 the heap can never silently overflow into the stack. <code>heapWords=lumpSize\u2212sw\u221230</code> is derived from the Thread header geometry, not encoded by <code>cc</code>; CHANGE loads the correct CR5 on every resume.</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">Why Fixed at Design Time?</div>
 <p>The IDE declares heap size as part of the thread\u2019s capability contract. A thread cannot silently consume unbounded memory \u2014 it must declare its maximum heap at upload time, and Navana enforces that limit at allocation. This makes memory usage auditable before the program runs.</p></div>
-<div class="sr-key-concept"><div class="sr-concept-title">Object Garbage Collection</div>
-<p>Zone \u2463 is <strong>not individually scanned</strong> by the hardware GC. The G-bit mark-and-sweep operates at the <em>Thread object</em> level: when the system GC marks the Thread GT as reachable, the entire lump \u2014 including Zone \u2463 \u2014 is live and untouched. If the Thread GT becomes unreachable, the whole lump is reclaimed at once. All allocation, object layout, compaction, and freeing within Zone \u2463 is a <strong>software concern</strong> left to the thread\u2019s own code running inside the lump.</p></div>`
+<div class="sr-key-concept"><div class="sr-concept-title">Heap Policy Is Not Header State</div>
+<p>The header defines the Heap\u2019s extent, not its allocator or collector. Thread code may use bump allocation, free lists, tracing, regions, or another policy without changing the hardware layout.</p></div>`
             },
             {
                 title: '\u2464 Data Registers \u2014 The Register File',
@@ -232,7 +227,7 @@ ${this._memMap(null)}
 <div class="sr-key-concept"><div class="sr-concept-title">CR12 \u2014 Thread Stack (Privileged, System-Wide)</div>
 <p>Boot step B:02 (INIT_THRD) loads <strong>one</strong> register from NS Slot 1:</p>
 <ul>
-<li><strong>CR12 \u2014 Thread Stack</strong> (Inform-type, zero perms, Priv zone CR12\u2013CR15). Loaded from NS Slot 1 via mLoad at B:02. CR12 holds the thread stack capability. The actual stack position is tracked by the <strong>cursor register</strong> (hardware-only 32-bit word: NIA[30:16] | STO[15:0]). CR12\u2013CR15 are runtime-only, never persisted; CHANGE persists only CR0\u2013CR11 at the tail homes.</li>
+<li><strong>CR12 \u2014 Thread Stack</strong> (Inform-type, zero perms, Priv zone CR12\u2013CR15). Loaded from NS Slot 1 via mLoad at B:02. CR12 identifies the Thread backing lump. Stack position is protected STO at word <code>+17</code>; NIA remains separate core state. CR12\u2013CR15 are runtime-only and have no tail homes.</li>
 <li>CR8 is programmer-defined (Prog zone CR7\u2013CR11) and carries no architecture-assigned role.</li>
 </ul></div>`
             },
@@ -243,14 +238,14 @@ ${this._memMap(null)}
 <div class="sr-security-list">
 <div class="sr-sec-item"><span class="sr-sec-num">1</span><strong>Boot \u2014 INIT_THRD (B:02).</strong> <code>sim._bootStep()</code> loads NS Slot 1 into <strong>CR12</strong> (thread stack GT, zero perms, Inform-type) via mLoad. CR12 encodes the lump base and total size; the stack region and heap bounds are derived from this metadata by the hardware. The lump is now the active thread context; CR0\u201311 hold the initial capability set. CR8 is not touched at boot and is available for programmer use.</div>
 <div class="sr-sec-item"><span class="sr-sec-num">2</span><strong>mLoad \u2014 GT zone maintenance.</strong> The fixed GT homes mirror persisted CR0\u2013CR11 only: CR<sub>N</sub> maps to <code>+(capsStart+N)</code>, where <code>capsStart=lumpSize\u221212</code>. CR12\u2013CR15 are runtime-only and have no Thread-memory homes.</div>
-<div class="sr-sec-item"><span class="sr-sec-num">3</span><strong>CALL.</strong> Entering any abstraction pushes a <strong>2-word frame (SZ=1)</strong> onto the LIFO stack: slot STO\u22121 = caller\u2019s E-GT Word 0, slot STO+0 = frame word <code>SZ=1 | return_PC[15] | prev_STO[16]</code>. The cursor register\u2019s STO field decreases by 2. LAMBDA pushes a <strong>1-word frame (SZ=0)</strong>: slot STO+0 = frame word <code>SZ=0 | lambda_arg[15] | prev_STO[16]</code>, cursor STO field decreases by 1. Before any write, hardware checks <code>sp_min=capsStart\u2212sw+2</code> and <code>sp_max=capsStart\u22121</code>.</div>
-<div class="sr-sec-item"><span class="sr-sec-num">4</span><strong>RETURN.</strong> One memory read: the frame word at cursor STO+0. One register write: the cursor register \u2190 frame word with bit 31 cleared. Both NIA and STO are restored atomically in that single assignment. SZ=1 only: re-derives CR6 and CR14 by revalidating the caller\u2019s E-GT at slot STO\u22121. Applies the MASK literal in the RETURN instruction to clear the specified CRs.</div>
-<div class="sr-sec-item"><span class="sr-sec-num">5</span><strong>CHANGE \u2014 Save homes.</strong> Save CR0\u2013CR11 at <code>capsStart\u2026capsStart+11</code> and DR0\u2013DR15 at +1\u2026+16 only.</div>
-<div class="sr-sec-item"><span class="sr-sec-num">6</span><strong>Dormant entry.</strong> Restore those homes, validate CR0, dynamically reconstruct CR14 from the active abstraction header, and begin at word 1 without a CALL frame. CR14 is never persisted.</div>
-<div class="sr-sec-item"><span class="sr-sec-num">7</span><strong>Heap allocation &amp; Object GC.</strong> Objects are written into the heap (Zone \u2463) via DWRITE using CR5 (Heap GT). When the derived heap is exhausted a <code>FAULT [HEAP_FULL]</code> fires. Zone \u2463 is <strong>not individually scanned</strong> by the hardware GC \u2014 the G-bit mark-and-sweep operates at the Thread object level. When the system GC marks the Thread GT as reachable, the entire lump including Zone \u2463 is live; if the Thread GT becomes unreachable, the whole lump is reclaimed at once. All allocation, compaction, and freeing within Zone \u2463 is a <strong>software concern</strong> left to thread code. The simulator\u2019s <strong>Run GC</strong> button provides a manual trigger for interactive demonstration only.</div>
+<div class="sr-sec-item"><span class="sr-sec-num">3</span><strong>CALL.</strong> Entering any abstraction pushes a <strong>2-word frame (SZ=1)</strong> onto the LIFO stack: slot STO\u22121 = caller\u2019s E-GT Word 0, slot STO+0 = frame word <code>SZ=1 | return_PC[15] | prev_STO[12]</code>. Protected STO decreases by 2. LAMBDA pushes a <strong>1-word frame (SZ=0)</strong> and decreases protected STO by 1. Before any write, hardware checks <code>sp_min=capsStart\u2212sw+2</code> and <code>sp_max=capsStart\u22121</code>.</div>
+<div class="sr-sec-item"><span class="sr-sec-num">4</span><strong>RETURN.</strong> Read protected STO, then the selected frame. Restore <code>FLAGS/SZ/STO</code> to word <code>+17</code> and restore the saved return PC through the separate NIA path. SZ=1 also re-derives CR6 and CR14 from the saved E-GT.</div>
+<div class="sr-sec-item"><span class="sr-sec-num">5</span><strong>CHANGE \u2014 Save context.</strong> Save CR0\u2013CR11 at <code>capsStart\u2026capsStart+11</code>, DR0\u2013DR15 at +1\u2026+16, and the protected <code>FLAGS/SZ/STO</code> indicator at +17. NIA is not persisted.</div>
+<div class="sr-sec-item"><span class="sr-sec-num">6</span><strong>Dormant entry.</strong> Restore those homes and the protected indicator, validate CR0, reconstruct CR14 from the active abstraction header, and set NIA to code word 1 without a CALL frame. CR14 and prior NIA are never persisted.</div>
+<div class="sr-sec-item"><span class="sr-sec-num">7</span><strong>Heap allocation.</strong> Objects are written into the heap (Zone \u2463) via DREAD/DWRITE using CR5. CR5 enforces the derived boundary; allocation and reclamation within that boundary are software policy.</div>
 </div>
-<div class="sr-key-concept"><div class="sr-concept-title">No Stack Smash, No Heap Spray</div>
-<p>Because every region has hardware-enforced bounds derived from immutable NS slot metadata, <strong>buffer overflows, stack smashes, and heap sprays are impossible</strong>. If the stack pointer reaches its limit, the hardware raises <code>STACK_OVERFLOW</code>, suspends the thread, and blocks the write \u2014 the heap is never touched. An attacker cannot forge the GTs in the capability region. All without any OS, runtime check, or compiler mitigation.</p></div>`
+<div class="sr-key-concept"><div class="sr-concept-title">Region Separation</div>
+<p>Header-derived bounds keep protected STO, Heap, Stack, and capability homes distinct. A frame push that would cross the Stack floor raises <code>STACK_OVERFLOW</code> before the write; CR5 cannot address protected STO or Stack. Software remains responsible for safe object handling inside the Heap.</p></div>`
             }
         ];
     }

@@ -1299,10 +1299,10 @@ console.log('\n--- LLB-19: Truncated buffer (header says 64 words, buffer has 32
             heapRes.ok === true, JSON.stringify(heapRes));
     }
     {
-        // loadLumpBinary end-to-end with the valid Thread binary — must not be
-        // rejected by the step-7 gate (the collision zone is the only freespace).
+        // loadLumpBinary end-to-end with live Thread Heap state — no part of
+        // the derived Thread body is treated as generic Freespace.
         const sim = freshSim();
-        const ok = sim.loadLumpBinary(makeThreadWords());
+        const ok = sim.loadLumpBinary(makeThreadWords({ nonZeroHeap: true }));
         check('LLB-20n: loadLumpBinary accepts a valid Thread lump with live state',
             ok === true, sim.output.slice(-200));
     }
@@ -1320,8 +1320,8 @@ console.log('\n--- LLB-19: Truncated buffer (header says 64 words, buffer has 32
         check('LLB-20i: receiveLump accepts a valid Tier 0 frame', res.ok === true, JSON.stringify(res));
     }
     {
-        const { res } = receive(makeThreadWords());
-        check('LLB-20o: receiveLump accepts a valid Thread lump with live state (collision zone zero)',
+        const { res } = receive(makeThreadWords({ nonZeroHeap: true }));
+        check('LLB-20o: receiveLump accepts a valid Thread lump with non-zero derived Heap',
             res.ok === true, JSON.stringify(res));
     }
     {

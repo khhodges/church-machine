@@ -360,9 +360,9 @@ console.log('\n--- T-RT06: Regression gate — BRANCH encoding vs. bare address 
 // Header word bit layout:
 //   [31:27] magic   = 0x1F
 //   [26:23] n_minus_6
-//   [22:10] cw      (heap words)
+//   [22:10] cw      (stack words for typ=2)
 //   [ 9: 8] typ     = 2  (Thread = binary 10)
-//   [ 7: 0] cc      (stackFrames)
+//   [ 7: 0] cc      = 12 capability homes
 console.log('\n--- T-RT07: Thread LUMP header encoding round-trip ---');
 {
     const DR_WORDS  = 16;
@@ -376,9 +376,9 @@ console.log('\n--- T-RT07: Thread LUMP header encoding round-trip ---');
     const lumpSize   = 1 << lumpPow2;                               // 256
     const n_minus_6  = lumpPow2 - 6;                                // 2
     const stackWords = stackFrames * 2;                              // 40
-    const heap       = lumpSize - 1 - DR_WORDS - stackWords - CAP_WORDS; // 187
-    const cw         = heap;
-    const cc         = stackFrames;
+    const heap       = lumpSize - stackWords - 30;                    // 186
+    const cw         = stackWords;
+    const cc         = CAP_WORDS;
     const typ        = 2;   // Thread
 
     // Pack (mirrors app-lump-editor.js packHdr)
@@ -399,9 +399,10 @@ console.log('\n--- T-RT07: Thread LUMP header encoding round-trip ---');
 
     check('T-RT07a: magic = 0x1F',                     upMagic   === 0x1F);
     check('T-RT07b: n_minus_6 = lumpPow2 - 6 = 2',    upNMinus6 === n_minus_6);
-    check('T-RT07c: cw = heap words = 187',            upCW      === cw);
+    check('T-RT07c: cw = stack words = 40',            upCW      === cw);
     check('T-RT07d: typ = 2 (Thread)',                 upTyp     === 2);
-    check('T-RT07e: cc = stackFrames = 20',            upCC      === cc);
+    check('T-RT07e: cc = capability homes = 12',       upCC      === cc);
+    check('T-RT07e2: derived heap words = 186',         heap      === 186);
 
     // Second case: lumpPow2=10 (1024 words), stackFrames=64
     const lp2b    = 10;
@@ -409,48 +410,49 @@ console.log('\n--- T-RT07: Thread LUMP header encoding round-trip ---');
     const lsb     = 1 << lp2b;                                     // 1024
     const nmb     = lp2b - 6;                                       // 4
     const swb     = sfb * 2;                                        // 128
-    const heapB   = lsb - 1 - DR_WORDS - swb - CAP_WORDS;          // 867
+    const heapB   = lsb - swb - 30;                                // 866
     const wordB   = (
         (0x1F          << 27) |
         ((nmb  & 0xF)  << 23) |
-        ((heapB & 0x1FFF) << 10) |
+        ((swb   & 0x1FFF) << 10) |
         ((2    & 0x3)  <<  8) |
-        (sfb   & 0xFF)
+        (CAP_WORDS & 0xFF)
     ) >>> 0;
 
     check('T-RT07f: case2 n_minus_6 = 4',   ((wordB >>> 23) & 0xF)    === nmb);
-    check('T-RT07g: case2 cw = 867',        ((wordB >>> 10) & 0x1FFF) === heapB);
-    check('T-RT07h: case2 cc = 64',         ( wordB         & 0xFF)   === sfb);
+    check('T-RT07g: case2 cw = 128 stack words', ((wordB >>> 10) & 0x1FFF) === swb);
+    check('T-RT07h: case2 cc = 12 homes',    ( wordB         & 0xFF)   === CAP_WORDS);
     check('T-RT07i: case2 typ = 2',         ((wordB >>>  8) & 0x3)    === 2);
+    check('T-RT07i2: case2 derived heap = 866', heapB === 866);
 }
 
 // ── T-RT07j/k: over-capacity guard — cw clamps to 0, RB1 fires as error ───────
 // Mirror the guard in app-lump-editor.js renderThreadPanel():
-//   heap = lumpSize - 1 - DR_WORDS - stackWords - CAP_WORDS
+//   heap = lumpSize - stackWords - 30
 //   cw   = overCapacity ? 0 : heap
-// We choose a tiny lump (lumpPow2=6, 64 words) with a large stackFrames (30),
-// which makes heap <= 0.
+// Use the smallest supported Thread (256 words) with an oversized stack.
 console.log('\n--- T-RT07j/k: Thread LUMP over-capacity guard ---');
 {
     const DR_WORDS    = 16;
     const CAP_WORDS   = 12;
-    const lumpPow2    = 6;    // 64-word lump — smallest legal Thread LUMP
-    const stackFrames = 30;   // 30 × 2 = 60 stack words  →  heap = 64-1-16-60-12 = -25
+    const lumpPow2    = 8;     // 256-word lump — smallest supported Thread
+    const stackFrames = 114;   // 228 stack words → heap = 256-228-30 = -2
 
-    const lumpSize   = 1 << lumpPow2;                                   // 64
-    const n_minus_6  = lumpPow2 - 6;                                    // 0
-    const stackWords = stackFrames * 2;                                  // 60
-    const heap       = lumpSize - 1 - DR_WORDS - stackWords - CAP_WORDS; // -25
+    const lumpSize   = 1 << lumpPow2;                                   // 256
+    const n_minus_6  = lumpPow2 - 6;                                    // 2
+    const stackWords = stackFrames * 2;                                 // 228
+    const heap       = lumpSize - stackWords - 30;                        // -2
     const overCapacity = heap <= 0;
 
     // Editor guard: cw = 0 when over-capacity
     const cw = overCapacity ? 0 : heap;
-    const cc = stackFrames;
+    const cc = CAP_WORDS;
 
     check('T-RT07j: heap <= 0 when over-capacity',  overCapacity === true);
     check('T-RT07j: cw clamps to 0 (not negative)', cw === 0);
+    check('T-RT07j: cc remains 12 capability homes', cc === 12);
 
-    // Build a minimal binary (64 words) with this header so lumpAudit has a
+    // Build a minimal binary (256 words) with this header so lumpAudit has a
     // properly-sized array to inspect (R2 must pass for RB1 to be reached).
     const hdr = (
         (0x1F          << 27) |

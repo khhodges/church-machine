@@ -114,13 +114,15 @@ function makeEnv(opts) {
         renderAbstractions: function() {},
         updateNamespace: function() {},
         abstractionRegistry: { abstractions: {} },
-        THREAD_CAPS_OFFSET: 244,
         sim: {
             bootEntrySlot: 6,
             memory: new Array(4096).fill(0),
             output: '',
             createGT: function() { return 0x4A000000; },
             _nsSlotBase: function() { return 100; },
+            _threadLayoutAtBase: function() {
+                return { valid: true, capsStart: 244 };
+            },
             readNSEntry: function() { return { word0_location: 0x200, word1_limit: 16 }; },
             nsLabels: {},
             emit: function() {},

@@ -1554,10 +1554,10 @@ administrative metadata and is never included in the distribution zip.
 ```
 MyApp.thread.zip
 +-- MyApp.thread.bin    ← 256-word Thread lump binary (1 024 bytes)
-                           Word 0:        0xF900_020C (header)
+                           Word 0:        0xF900_820C (sw=32, cc=12)
                            Words 1..16:   Zone ⑤ — DR0..DR15 (all zero at creation)
-                           Words 17..80:  Zone ④ — Heap (all zero at creation)
-                           Words 81..211: Zone ③ — Freespace (all zero — Mint verifies)
+                           Word 17:       Protected FLAGS/SZ/STO indicator
+                           Words 18..211: Zone ④ — Heap (all zero at creation)
                            Words 212..243: Zone ② — LIFO Stack (all zero at creation)
                            Words 244..255: Zone ① — initial CR0..CR11 GT Word 0 values
 ```
@@ -2262,7 +2262,9 @@ What makes the Thread distinct is how the rest of the lump is used.
 A function abstraction lump holds executable [CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html) code followed by
 freespace. The Thread lump holds **live execution state** — capability
 registers, a call stack, heap, and data registers — rather than code.
-PC never enters the Thread lump. It is a static data structure of a suspended Thread registers, indicators, GTs, heap and stack saved and restored by the CHANGE instruction, not a program.
+NIA never addresses the Thread lump as code. A Thread lump is backing storage
+for suspended registers, the protected FLAGS/SZ/STO indicator, GT homes, Heap,
+and Stack; executable code remains in abstraction lumps.
 
 See Tutorial on Threads
 
@@ -2476,20 +2478,21 @@ exactly the twelve persisted homes CR0–CR11 at `capsStart…capsStart+11`.
 CR12–CR15 are runtime-only registers held exclusively in the hardware CR
 file and are never written to Thread lump memory or accessible via DREAD.
 
-**CR12 — Thread Stack.** CR12 holds the privileged thread stack capability.
-The fixed private ABI stack zone spans `stack_min` (= `244−sw`, example: 212)
-up to `sp_max` (= `243`), with the
-hidden **STO** (Stack Top Offset) register tracking the current top.
-`Mint.Thread` sets STO = `sp_max` (example: 243) at Thread creation — this
+**CR12 — Thread Stack.** CR12 holds the privileged Thread capability.
+The private ABI stack zone spans `stackStart = capsStart−sw` through
+`sp_max = capsStart−1`, with protected **STO** (Stack Top Offset) at Thread
+word `+17` tracking the current top.
+`Mint.Thread` sets STO = `sp_max` at Thread creation — this
 is the empty-stack sentinel; the first word pushed onto the stack occupies
-`sp_max−1` (cursor STO field decreases by 1 for LAMBDA, by 2 for CALL).
+`sp_max−1` (protected STO decreases by 1 for LAMBDA, by 2 for CALL).
 CR12, CR13, and CR15 are system-wide registers not serialized by CHANGE.
 CR14 is transient and is derived from restored CR0 and the selected code LUMP
-header on entry. The live STO field is hardware-only cursor state stored in
+header on entry. The live STO field is hardware-only protected state stored in
 the reserved protected word at +17. It is not a packed PC, capability home,
 or ordinary heap payload. CR5 begins at +18 and cannot address this word.
 
-The Zone ④ **Heap** (words 18..18+heapWords−1, example: 18..81) is entirely absent from the hardware
+The Zone ④ **Heap** (words 18..stackStart−1; 18..211 in the 256-word,
+sw=32 example) is entirely absent from the hardware
 save/restore path. It is private to its thread — no other thread holds a GT
 that spans those words — and is managed entirely by software running within
 the thread. The allocator, GC policy, object layout, and compaction strategy
@@ -2500,7 +2503,7 @@ two threads in the same application may use completely different allocation
 strategies without any conflict or coordination at the hardware level.
 
 By convention **CR5 is the Heap GT** — a data GT whose range covers exactly
-Zone ④ (words 17..80) of the thread's own lump. The CHANGE instruction
+Zone ④ (words 18..stackStart−1) of the thread's own lump. The CHANGE instruction
 installs this GT transparently into CR5 as part of context restoration,
 scoped to the IDE-defined bounds of Zone ④. This gives the thread immediate
 DREAD/DWRITE access to its heap on every context-load without an explicit
@@ -2508,7 +2511,7 @@ LOAD instruction, while keeping the heap strictly private: the GT covers only
 this thread's Zone ④ and cannot be widened by the programmer.
 
 **DR5 is the heap allocation pointer** — a raw 32-bit offset from Zone ④
-base (word 17) giving the next free word. CR5 and DR5 form the complete
+base (word 18) giving the next free word. CR5 and DR5 form the complete
 heap register pair: CR5 is the access right, DR5 is the position. Together
 they are everything the software allocator needs to allocate, read, and write
 heap objects without any further indirection.
@@ -2517,10 +2520,11 @@ heap objects without any further indirection.
 
 ## Zone ② — LIFO Stack
 
-`sw` words at fixed offsets `244−sw .. 243` (header `cw/sw`, IDE-defined).
+`sw` words at derived offsets `capsStart−sw .. capsStart−1`
+(header `cw/sw`, IDE-defined).
 The stack grows downward (toward lower offsets). **STO** (Stack Top Offset,
-a hidden per-thread register) tracks the current top. `Mint.Thread`
-initialises STO = `243` = **sp_max** at Thread creation (the
+a protected per-Thread field at word `+17`) tracks the current top. `Mint.Thread`
+initialises STO = `capsStart−1` = **sp_max** at Thread creation (the
 empty-stack sentinel at the top of Zone ②); the first word pushed lands at
 `sp_max−1` (STO -= 1 for LAMBDA, -= 2 for CALL).
 
@@ -2566,15 +2570,9 @@ are allocated from base+18 upward using bump
 allocation; DR5 tracks the current frontier (offset from word 18 to the
 next free word).
 
-**Object garbage collection.** Zone ④ is not individually scanned by the
-hardware GC. The G-bit mark-and-sweep operates at the *Thread object*
-level: when the system GC marks the Thread GT as reachable, the entire
-lump — including Zone ④ — is considered live and is not examined further.
-If the Thread GT becomes unreachable, the whole lump is reclaimed at once.
-The hardware enforces only the outer boundary (the lump limit encoded in
-CR12); all heap memory management within Zone ④ — allocation, object
-layout, compaction, and freeing — is a software concern left to the
-thread's own code.
+The hardware derives and enforces the CR5 boundary. Allocation, object
+layout, compaction, and reclamation within Zone ④ are software policy; the
+Thread binary format does not prescribe a garbage collector.
 
 ---
 
@@ -2589,7 +2587,7 @@ Turing-rights view, never to LOAD/SAVE. A data value cannot be
 reinterpreted as a GT.
 
 By convention **DR5 is the heap allocation pointer** — a raw 32-bit integer
-offset (relative to Zone ④ base, word 17) giving the next free word in the
+offset (relative to Zone ④ base, word 18) giving the next free word in the
 heap. DR5 pairs with CR5 (the Heap GT) to form the complete heap register
 pair: CR5 supplies the access right, DR5 supplies the position. DR5 is
 the only DR with an architecture-level convention beyond DR0; DR1–DR4
@@ -2607,8 +2605,9 @@ software Thread homes.
 
 | Register | Role |
 |----------|------|
-| **CR0–CR11** | GT Word 0 homes at +244…+255 |
+| **CR0–CR11** | GT Word 0 homes at +capsStart…+(capsStart+11) |
 | **DR0–DR15** | Initial/live data-register homes at +1…+16 |
+| **FLAGS/SZ/STO** | Protected indicator at +17 |
 
 **Never touched by CHANGE (system-wide):**
 
@@ -2618,13 +2617,11 @@ software Thread homes.
 | **CR13** | Interrupt handler (Priv zone, system-wide) — one handler for the whole machine; CHANGE must not re-point it |
 | **CR15** | Namespace root |
 | **CR14** | Dynamically reconstructed from the active abstraction header; never persisted |
-| **PC / flags / M state** | Entry begins at code word 1; these are not Thread data words |
+| **NIA / M state** | Entry begins at code word 1; prior NIA and M are not persisted |
 
 CR0–CR11 (Zone ①, the programmer-accessible capability registers) are
-**implicitly** kept in sync by mLoad — every time mLoad loads a GT into
-CR_N it writes the same word back to fixed home `+244+N`. CHANGE does not need to
-explicitly save them; they are always current in the lump. On restore,
-CHANGE reads the incoming thread's GT zone from its lump to reload CR0–CR11.
+persisted at `capsStart+N`, where `capsStart=lumpSize−12`. On restore,
+CHANGE reads the incoming Thread's GT homes to reload CR0–CR11.
 After restore, CHANGE validates CR0 through the Namespace gate, constructs an
 R+X CR14 with base and limit from the selected code LUMP header, and sets NIA
 to the raw LUMP byte base + 4. This transparent entry pushes no CALL frame.
@@ -2697,11 +2694,10 @@ thread's birth capabilities — whatever the application requires. The
 architecture does not prescribe which system GTs go in which CR slot;
 system GTs (Scheduler, Mint, NS write authority, etc.) live in c-list slots
 and are LOADed into general-purpose CRs as needed at runtime. All other
-zones are all-zero in the distributed binary; runtime activity populates
-Stack, Heap, and DR.
-
-Zone ③ must be all-zero in the zip binary. `Mint.Thread` verifies this at
-install time and rejects the binary if any freespace word is non-zero.
+mutable zones are normally zero in a newly-created image; runtime activity
+populates Stack, Heap, DR, and the protected indicator. A Thread has no
+Freespace zone: Mint validates the header-derived geometry rather than
+applying function-lump Freespace rules to any part of the Thread body.
 
 ---
 

@@ -7,7 +7,7 @@ const assert = require('assert');
 const vm = require('vm');
 global.window = { bootConfig: { step1: {
     totalNamespaceWords: 16384, namespaceLumpWords: 1024,
-    threadLumpWords: 256, threadCount: 3,
+    threadLumpWords: 512, threadCount: 3,
 } } };
 const ChurchSimulator = require('./simulator.js');
 // Regenerate the exact three-Thread image inputs used by the IDE. This catches
@@ -17,7 +17,7 @@ const fs = require('fs');
 const { spawnSync } = require('child_process');
 global.window.bootConfig.step1 = {
     totalNamespaceWords: 16384, namespaceLumpWords: 64,
-    threadLumpWords: 256, threadCount: 3,
+    threadLumpWords: 512, threadCount: 3,
 };
 const committed = new ChurchSimulator();
 const generated = spawnSync('python', ['-c', [
@@ -38,11 +38,16 @@ committed._currentThreadSlot = 1;
 assert.deepStrictEqual(committed.configuredThreadSlots(), [1, 11, 12],
     'committed image exposes all three Thread contexts');
 const committedBases = [1, 11, 12].map(slot => committed.readNSEntry(slot).word0_location);
-assert(committedBases[0] + 256 <= committedBases[1] &&
-       committedBases[1] + 256 <= committedBases[2],
-    'committed Thread bodies are non-overlapping');
+const entryLayouts = committedBases.map(base => committed._threadLayoutAtBase(base));
+assert(entryLayouts.every(layout => layout && layout.valid),
+    'committed Thread headers expose valid derived geometry');
+assert(entryLayouts.every(layout => layout.lumpSize === 512),
+    'scheduler fixture exercises supported non-256-word Threads');
+assert(committedBases[0] + entryLayouts[0].lumpSize <= committedBases[1] &&
+       committedBases[1] + entryLayouts[1].lumpSize <= committedBases[2],
+    'committed Thread bodies are non-overlapping at their derived sizes');
 const entryWords = [1, 11, 12].map((slot, i) =>
-    committed.memory[committedBases[i] + 244] >>> 0);
+    committed.memory[committedBases[i] + entryLayouts[i].capsStart] >>> 0);
 const initialEntry = committed.readNSEntry(entryWords[0] & 0xFFFF);
 committed._writeCR(0, entryWords[0], initialEntry);
 committed.dr[1] = 0xA1001001;
@@ -50,7 +55,8 @@ committed.memory[committedBases[1] + 1] = 0xB2000000;
 committed.memory[committedBases[1] + 2] = 0xB2000001;
 committed.memory[committedBases[2] + 1] = 0xC3000000;
 const targetCapsBefore = committed.memory.slice(
-    committedBases[1] + 244, committedBases[1] + 256);
+    committedBases[1] + entryLayouts[1].capsStart,
+    committedBases[1] + entryLayouts[1].capsStart + 12);
 const cr15Before = {...committed.cr[15]};
 committed.halted = true;
 
@@ -122,7 +128,9 @@ assert.strictEqual(committed.cr[6].word3, committed.cr[14].word3,
 assert.deepStrictEqual(committed.cr[15], cr15Before,
     'manual Thread CHANGE does not replace the live Namespace root in CR15');
 assert.deepStrictEqual(
-    committed.memory.slice(committedBases[1] + 244, committedBases[1] + 256),
+    committed.memory.slice(
+        committedBases[1] + entryLayouts[1].capsStart,
+        committedBases[1] + entryLayouts[1].capsStart + 12),
     targetCapsBefore,
     'privileged restore reads the incoming capability homes without rewriting them');
 assert.strictEqual(committed._fetchInstruction().addr,
@@ -165,12 +173,15 @@ assert.strictEqual(preBoot.loadBootImage(image), true,
 preBoot.bootComplete = false;
 preBoot._currentThreadSlot = 1;
 const preBootThread1Base = preBoot.readNSEntry(1).word0_location;
-const preBootThread1EntryGT = preBoot.memory[preBootThread1Base + 244] >>> 0;
+const preBootThread1Layout = preBoot._threadLayoutAtBase(preBootThread1Base);
+const preBootThread1EntryGT = preBoot.memory[
+    preBootThread1Base + preBootThread1Layout.capsStart] >>> 0;
 assert.strictEqual(preBoot.cr[0].word0, 0,
     'pre-boot live CR0 starts reset and does not represent Thread.1');
 assert.strictEqual(preBoot.advanceConfiguredThread().slot, 11,
     'saved Thread images can be selected before the boot ceremony runs');
-assert.strictEqual(preBoot.memory[preBootThread1Base + 244], preBootThread1EntryGT,
+assert.strictEqual(preBoot.memory[
+    preBootThread1Base + preBootThread1Layout.capsStart], preBootThread1EntryGT,
     'pre-boot browsing does not overwrite Thread.1 saved CR0 with reset live state');
 assert.strictEqual(preBoot.advanceConfiguredThread().slot, 12,
     'pre-boot browsing continues to Thread#3');
@@ -187,7 +198,8 @@ assert.strictEqual(deferred.loadBootImage(image), true,
 deferred.bootComplete = true;
 deferred._currentThreadSlot = 1;
 const deferredTargetBase = deferred.readNSEntry(11).word0_location;
-deferred.memory[deferredTargetBase + 244] = 0;
+const deferredTargetLayout = deferred._threadLayoutAtBase(deferredTargetBase);
+deferred.memory[deferredTargetBase + deferredTargetLayout.capsStart] = 0;
 const selectedInvalid = deferred.advanceConfiguredThread();
 assert.strictEqual(selectedInvalid.ok, true,
     'manual selection accepts a saved Thread whose executable CR0 is empty');
@@ -207,7 +219,9 @@ assert.strictEqual(malformed.loadBootImage(image), true,
 malformed.bootComplete = true;
 malformed._currentThreadSlot = 1;
 const malformedTargetBase = malformed.readNSEntry(11).word0_location;
-const malformedEntryGT = malformed.memory[malformedTargetBase + 244] >>> 0;
+const malformedTargetLayout = malformed._threadLayoutAtBase(malformedTargetBase);
+const malformedEntryGT = malformed.memory[
+    malformedTargetBase + malformedTargetLayout.capsStart] >>> 0;
 const malformedCodeEntry = malformed.readNSEntry(
     malformed.parseGT(malformedEntryGT).index);
 malformed.memory[malformedCodeEntry.word0_location] = 0;
@@ -249,7 +263,8 @@ assert.strictEqual(uiSim.loadBootImage(image), true,
 uiSim.bootComplete = true;
 uiSim._currentThreadSlot = 1;
 const uiBootBase = uiSim.readNSEntry(1).word0_location;
-const uiBootEntryGT = uiSim.memory[uiBootBase + 244] >>> 0;
+const uiBootLayout = uiSim._threadLayoutAtBase(uiBootBase);
+const uiBootEntryGT = uiSim.memory[uiBootBase + uiBootLayout.capsStart] >>> 0;
 uiSim._writeCR(0, uiBootEntryGT, uiSim.readNSEntry(uiBootEntryGT & 0xFFFF));
 const button = {
     disabled: false,

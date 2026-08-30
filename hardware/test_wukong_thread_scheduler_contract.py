@@ -9,7 +9,11 @@ from hardware.change import ChurchChange
 from hardware.mload import ChurchMLoad
 from hardware.hw_types import FaultType, GT_TYPE_INFORM
 from server.boot_image import create_gt, integrity32, pack_lump_header, pack_ns_word1
-from hardware.thread_design import THREAD_CAP_WORDS
+from hardware.thread_design import (
+    THREAD_CAP_WORDS,
+    thread_body_words,
+    thread_layout,
+)
 
 
 def test_scheduler_contract_has_no_serialized_entry_context():
@@ -43,11 +47,11 @@ def test_m6_contract_has_synchronizer_debounce_and_fetch_quiesce():
 
 
 @pytest.mark.parametrize(
-    ("thread_n_minus_6", "expect_bounds_fault"),
-    [(2, False), (3, True)],
+    "thread_n_minus_6",
+    [2, 3],
 )
 def test_change_enforces_defined_thread_body_before_restoring_context(
-        thread_n_minus_6, expect_bounds_fault):
+        thread_n_minus_6):
     dut = ChurchChange()
     sim = Simulator(dut)
     sim.add_clock(1e-6)
@@ -63,16 +67,20 @@ def test_change_enforces_defined_thread_body_before_restoring_context(
         mem[slot * 16 + 8] = integrity32(location, authority)
         mem[slot * 16 + 12] = 0
 
-    descriptor(thread_slot, new_base, 255)
+    body_words = thread_body_words(thread_n_minus_6)
+    layout = thread_layout(body_words, 32)
+    assert layout["valid"]
+
+    descriptor(thread_slot, new_base, body_words - 1)
     descriptor(code_slot, code_base, 63)
     mem[new_base] = pack_lump_header(thread_n_minus_6, 32, 12, 2)
     mem[code_base] = pack_lump_header(0, 7, 2, 0)
     entry_gt = create_gt(0, code_slot, {"E": 1}, GT_TYPE_INFORM)
     for i in range(12):
-        mem[new_base + (244 + i) * 4] = entry_gt
+        mem[new_base + (layout["caps_start"] + i) * 4] = entry_gt
     for i in range(16):
         mem[new_base + (1 + i) * 4] = 0xA0000000 | i
-    mem[new_base + 17 * 4] = 243
+    mem[new_base + 17 * 4] = layout["stack_end"]
     mem[new_base + 18 * 4] = 0x18181818
     mem[new_base + 258 * 4] = 0xDEADBEEF
 
@@ -143,12 +151,6 @@ def test_change_enforces_defined_thread_body_before_restoring_context(
         else:
             raise AssertionError("scheduler CHANGE timed out")
 
-        if expect_bounds_fault:
-            assert terminal == "fault"
-            assert ctx.get(dut.fault_type) == FaultType.BOUNDS
-            assert writes == [], "unsupported Thread must fault before context save"
-            return
-
         assert terminal == "complete"
         assert nia == code_base + 4
         assert drs[1] == 0xA0000001
@@ -156,7 +158,7 @@ def test_change_enforces_defined_thread_body_before_restoring_context(
         assert (cr14 & 0xFFFF) == code_slot
         assert ((cr14 >> 32) & 0xFFFFFFFF) == code_base + 4
         assert ((cr14 >> 64) & 0x1FFFFF) == 6
-        assert mem[new_base + 17 * 4] == 243
+        assert mem[new_base + 17 * 4] == layout["stack_end"]
         assert mem[new_base + 18 * 4] == 0x18181818
         assert mem[new_base + 258 * 4] == 0xDEADBEEF
         assert old_base + 17 * 4 in writes
