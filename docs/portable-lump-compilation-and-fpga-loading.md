@@ -84,6 +84,25 @@ The full binary/content digest may also be stored alongside `T`. The compact
 
 None of these values is a local GT.
 
+#### Verification precedence
+
+The verification strength is ordered explicitly:
+
+1. Use `T` as the fast path for cache lookup, Namespace promotion, and
+   accidental-corruption detection.
+2. When `binary_hash` is present, it is authoritative for strong content
+   verification and must be checked before accepting an artifact from an
+   untrusted or adversarial source.
+3. `T` alone is not sufficient to establish authenticity against a malicious
+   counterparty. Its 32-bit collision surface is suitable for fast
+   detection, not as the sole defense against a deliberately crafted
+   substitution.
+
+If a full `binary_hash` is absent, the loader must not silently claim the same
+adversarial verification strength. It must apply the configured trust policy
+for a T-only artifact, such as requiring explicit human/IDE authorization or
+rejecting it in a strong-verification context.
+
 ### 2.3 Local Golden Token binding
 
 A runtime Golden Token contains destination-specific authority, including
@@ -107,6 +126,27 @@ Machine B: church.Bank#1 → NS[12], sequence 8
 ```
 
 The portable LUMP is the same. The target images are different.
+
+### 2.4 Issue-specific dependency binding
+
+A dependency reference to:
+
+```text
+church.Bank#1
+```
+
+means that exact universal issue. Resolution must match the complete universal
+name, including the issue number, and then verify the expected content token
+and content digest.
+
+Another issue with identical content, such as `church.Bank#2`, does not satisfy
+the request merely because it has the same `T`. The content token is
+issue-blind by design; the name supplies the issue-specific identity
+constraint.
+
+If a future feature needs “any trusted issue with this content,” it must use an
+explicit content-oriented dependency policy. It must not weaken ordinary
+universal-name resolution implicitly.
 
 ## 3. Canonical portable representation
 
@@ -284,29 +324,37 @@ Name matching alone is not sufficient. The correct resolution chain is:
 
 ```text
 universal name N
-    → locate candidate
+    → locate candidate with the exact N, including issue
     → obtain candidate token T
-    → verify candidate content against T
+    → use T for fast content screening
+    → verify full binary_hash when present
     → verify full identity/content seals
     → authorize installation
     → allocate or locate local Namespace entry
     → mint local GT
 ```
 
-The loader must reject a candidate that claims the correct name but has
-different content.
+The loader must reject:
+
+- a candidate with a different universal name or issue;
+- a candidate that claims the correct name but has different `T`;
+- a candidate whose content does not match `binary_hash`;
+- a T-only candidate when the active trust policy requires strong
+  verification.
 
 ### 7.1 Resident dependency
 
 For an already-installed dependency:
 
-1. Locate it by universal name.
+1. Locate it by the complete universal name, including the exact issue.
 2. Confirm its stored `T` matches the requesting dependency.
-3. Verify the resident content against `T` and its full digest where present.
-4. Confirm the full trusted identity, including issue.
-5. Check that the resident abstraction grants the requested permissions.
-6. Read its current local slot sequence.
-7. Mint the required local GT.
+3. Use `T` for the fast content check.
+4. If `binary_hash` is present, verify the resident content against it; the
+   full digest is authoritative for strong verification.
+5. Confirm the full trusted identity, including the exact issue.
+6. Check that the resident abstraction grants the requested permissions.
+7. Read its current local slot sequence.
+8. Mint the required local GT.
 
 ### 7.2 Missing dependency and lazy load
 
@@ -316,11 +364,15 @@ For a missing dependency, the loader must use the same trust boundary as any
 Home-Base or lazy-load operation:
 
 1. Fetch the artifact from an authorized source.
-2. Verify the fetched content against the expected `T`.
-3. Verify the full content digest and universal identity.
-4. Apply the human/IDE trust gate required for unverified provenance.
-5. Allocate memory and register the Namespace entry.
-6. Materialize the requesting LUMP's local GT only after installation commits.
+2. Confirm that the fetched artifact has the exact requested universal name,
+   including issue.
+3. Use the expected `T` for fast screening.
+4. Verify the full `binary_hash` when present; do not treat T-only checking as
+   strong adversarial verification.
+5. Verify the full identity seal and any required provenance.
+6. Apply the human/IDE trust gate required for unverified provenance.
+7. Allocate memory and register the Namespace entry.
+8. Materialize the requesting LUMP's local GT only after installation commits.
 
 The registry must never be trusted merely because it returned an object with
 the requested display name. A failed verification or authorization must leave
@@ -337,16 +389,19 @@ For a portable LUMP or boot-image build:
 1. Parse the portable LUMP and relocation metadata.
 2. Verify its universal identity `N`.
 3. Verify its content token `T`.
-4. Verify the full content digest and any required trusted identity.
-5. Resolve every dependency by universal name.
-6. Verify each resolved dependency by its expected `T`, not by name alone.
-7. Apply the required trust/authorization gate for fetched dependencies.
-8. Allocate dynamic Namespace slots where needed.
-9. Read the destination slot sequence/generation.
-10. Mint destination-local GTs with the requested rights and type.
-11. Patch the target image's C-list rows.
-12. Bind and verify the boot entry.
-13. Commit the Namespace records and image atomically.
+4. Verify `binary_hash` when present; the full digest is authoritative for
+   strong content verification.
+5. Verify any required trusted identity.
+6. Resolve every dependency by its complete universal name, including issue.
+7. Verify each resolved dependency by its expected `T` and full
+   `binary_hash` where present, not by name alone.
+8. Apply the required trust/authorization gate for fetched dependencies.
+9. Allocate dynamic Namespace slots where needed.
+10. Read the destination slot sequence/generation.
+11. Mint destination-local GTs with the requested rights and type.
+12. Patch the target image's C-list rows.
+13. Bind and verify the boot entry.
+14. Commit the Namespace records and image atomically.
 
 If any step fails, the load must fail closed and preserve the prior valid
 Namespace state.
@@ -408,16 +463,21 @@ The implementation is correct only if all of these remain true:
 2. Destination Namespace slots may differ without requiring recompilation.
 3. Destination slot sequences/generations may differ without changing `N` or
    `T`.
-4. A candidate with the right name but wrong `T` is rejected.
-5. The issue belongs to `N` and its identity seal, but not to issue-blind `T`.
-6. The symbolic Self identity is portable; its slot-bearing GT is local.
-7. Missing dependencies cannot be silently installed without verification and
+4. Dependencies bind to the exact universal name, including its issue, unless
+   an explicit content-oriented policy says otherwise.
+5. A candidate with the right name but wrong `T` is rejected.
+6. When present, `binary_hash` is authoritative for strong content
+   verification; `T` alone is never sufficient against a malicious source.
+7. The issue belongs to `N` and its identity seal, but not to issue-blind `T`.
+8. The symbolic Self identity is portable; its slot-bearing GT is local.
+9. Missing dependencies cannot be silently installed without verification and
    authorization.
-8. Revocation and slot reuse are enforced through the local sequence/generation.
-9. No canonical LUMP identity depends on a local GT or local NS index.
-10. All C-list relocations are applied atomically before the image becomes
+10. Revocation and slot reuse are enforced through the local
+    sequence/generation.
+11. No canonical LUMP identity depends on a local GT or local NS index.
+12. All C-list relocations are applied atomically before the image becomes
     executable.
-11. The Namespace Table, not a loose catalog, determines what is resident in
+13. The Namespace Table, not a loose catalog, determines what is resident in
     the target image.
 
 ## 10. Acceptance examples
@@ -494,6 +554,8 @@ Expected result:
 
 - `N` and its identity seal change.
 - `T` remains unchanged.
+- `church.Bank#2` does not satisfy a dependency explicitly requesting
+  `church.Bank#1`.
 - The destination may still apply separate trust or ownership policy to the
   new issue.
 

@@ -251,5 +251,5 @@ description = "QMTECH Wukong XC7A100T persistent-flash image. SHA-256: d609e72a5
 id = "b8FcxlmEy17bxaLmEiROH"
 uri = "file://docs/portable-lump-compilation-and-fpga-loading.md"
 type = "text"
-title = "Portable LUMP Compilation and FPGA Loading"
-description = "Architecture draft covering universal names, content token T, local Golden Token bindings, secure dependency verification, IDE behavior, and FPGA/Wukong loading."
+title = "Portable LUMP Compilation and FPGA Loading — Final Draft"
+description = "Finalized architecture with explicit T versus binary_hash verification precedence and exact-issue dependency binding."

@@ -81,3 +81,20 @@ dependencies occupy different slots or are installed later.
 metadata/relocation records; defer registry matching, dynamic-slot allocation, GT
 minting, and c-list patching to save/install/run or FPGA image generation. Report
 missing bindings as load-time errors, not compile-time errors.
+
+## Verification precedence and issue binding
+
+Use compact content token `T` for fast lookup, cache/promotion, and
+accident-detection. When present, full `binary_hash` is authoritative for strong
+content verification; T-only checking is not sufficient against a malicious source.
+Dependency names bind to the exact universal issue in `petname.Abstraction#n`; a
+different issue with the same issue-blind T does not satisfy the request.
+
+**Why:** A 32-bit T has a deliberate collision surface, while the issue is part of
+the universal identity but excluded from T. Leaving either precedence or issue
+specificity implicit would turn a secure portable reference into name-only or
+content-only matching.
+
+**How to apply:** Resolve exact N first, use T as the fast screen, require the full
+digest for strong verification, and only offer any-issue/content-based resolution
+through an explicit future policy.
