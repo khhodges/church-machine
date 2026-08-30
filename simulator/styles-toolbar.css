@@ -994,7 +994,7 @@
     column-gap: 0.32rem;
     min-width: 8.5rem;
     max-width: 13.5rem;
-    padding: 0.24rem 0.42rem;
+    padding: 0.3rem 0.46rem;
     border: 1px solid rgba(58, 134, 255, 0.28);
     border-radius: 5px;
     background: rgba(11, 23, 38, 0.82);
@@ -1028,7 +1028,7 @@
     grid-area: name;
     min-width: 0;
     color: #d7e2f0;
-    font-size: 0.62rem;
+    font-size: 0.74rem;
     font-weight: 700;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1039,6 +1039,7 @@
     grid-area: values;
     display: inline-flex;
     align-items: baseline;
+    flex-wrap: wrap;
     gap: 0.22rem;
     min-width: 0;
     overflow: hidden;
@@ -1049,8 +1050,8 @@
     align-items: baseline;
     gap: 0.22rem;
     min-width: 0;
-    margin-right: 0.4rem;
-    font-size: 0.57rem;
+    margin-right: 0.2rem;
+    font-size: 0.7rem;
     white-space: nowrap;
 }
 
@@ -1060,14 +1061,14 @@
 }
 
 .thread-identity-gt {
-    margin-left: auto;
+    margin-left: 0;
     margin-right: 0;
     overflow: hidden;
 }
 
 .thread-identity-key {
     color: #65778d;
-    font-size: 0.5rem;
+    font-size: 0.58rem;
     font-weight: 700;
     letter-spacing: 0.05em;
 }
@@ -1085,12 +1086,12 @@
 
 @media (max-width: 1180px) {
     .thread-identity-card {
-        min-width: 7.3rem;
-        max-width: 9rem;
+        min-width: 8.5rem;
+        max-width: 10.5rem;
     }
 
     .thread-identity-gt {
-        margin-left: auto;
+        margin-left: 0;
     }
 }
 
