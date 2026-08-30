@@ -338,9 +338,7 @@ class TestValidateStep1ThreadGeometry:
 
     def test_stack_field_drives_boundary_and_heap_is_derived(self):
         step1 = dict(DEFAULT_BOOT_CONFIG["step1"])
-        step1.update({"threadStackWords": 48, "threadHeapWords": 80})
-        assert _validate_step1(DEFAULT_BOOT_CONFIG["targetBoard"], step1) is None
-        step1["threadHeapWords"] = 200
+        step1.update({"threadStackWords": 48})
         assert _validate_step1(DEFAULT_BOOT_CONFIG["targetBoard"], step1) is None
         layout = thread_layout(step1["threadLumpWords"], 48)
         assert layout["heap_words"] == step1["threadLumpWords"] - 18 - 48 - 12

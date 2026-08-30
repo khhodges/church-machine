@@ -51,11 +51,12 @@ test.describe('Builder design pages — Thread Lump & Namespace Lump', () => {
         await expect(panel.locator('.le-design-step').first()).toBeVisible({ timeout: 8000 });
         expect(await panel.locator('.le-design-step').count()).toBeGreaterThan(3);
         const referenceText = await panel.locator('.le-design-step').allInnerTexts();
-        expect(referenceText.join('\n')).toMatch(/Six Regions, One Fixed Private ABI/);
-        expect(referenceText.join('\n')).toMatch(/\+244.*\+255/);
+        expect(referenceText.join('\n')).toMatch(/six memory regions/i);
+        expect(referenceText.join('\n')).toMatch(/capsStart.*lumpSize.*12/i);
         expect(referenceText.join('\n')).toMatch(/CR0.*CR11/);
-        expect(referenceText.join('\n')).toMatch(/larger bodies are rejected/i);
-        expect(referenceText.join('\n')).not.toMatch(/reserved extension/i);
+        expect(referenceText.join('\n')).toMatch(/256.*512.*1024.*2048.*4096.*8192/);
+        expect(referenceText.join('\n')).toMatch(/no Thread Freespace/i);
+        expect(referenceText.join('\n')).toMatch(/CR14.*never persisted/i);
 
         // Interactive editor still present
         await expect(panel.locator('.le-panel')).toBeVisible();
@@ -159,7 +160,12 @@ test.describe('Builder design pages — Thread Lump & Namespace Lump', () => {
         expect(c.header.typ).toBe(2);
         expect(c.thread).toBeTruthy();
         expect(c.thread.size).toBe(Math.pow(2, c.header.n_minus_6 + 6));
-        expect(c.thread.capsOffset).toBe(244);
+        expect(c.thread.size).toBeGreaterThanOrEqual(256);
+        expect(c.thread.size).toBeLessThanOrEqual(8192);
+        expect(c.thread.size & (c.thread.size - 1)).toBe(0);
+        expect(c.header.cw).toBeGreaterThan(0); // `cw` is `sw` for Threads.
+        expect(c.header.cc).toBe(12);
+        expect(c.thread.capsOffset).toBe(c.thread.size - 12);
         expect(c.thread.count).toBeGreaterThanOrEqual(1);
         // CR0 must be a live E-GT targeting the committed boot-entry slot.
         expect(c.thread.cr0Word).not.toBe(0);
@@ -258,7 +264,8 @@ test.describe('Namespace Thread instance details', () => {
                     sim.writeNSEntry(slot, base, 255, 0, 0, 1, 0, 0, 0);
                 });
                 sim.nsLabels[slot] = label;
-                // typ=2, n-6=2 (256 words), cw=32 stack words, cc=12 heap words.
+                // typ=0b10 (2, Thread), n-6=2 (256 words), cw=sw=32,
+                // cc=12 persisted tail capability homes.
                 sim.memory[base] = sim.packLumpHeader(2, 32, 12, 2);
                 sim.memory[base + 1] = marker;
                 sim.memory[base + 17] = marker + 0x16;

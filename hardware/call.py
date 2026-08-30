@@ -9,7 +9,7 @@ from .layouts import (
 from .perm_check import perm_bit
 from .mload_seq import mload_wait_body
 from .stack_frame import stack_slot_addr
-from .thread_design import THREAD_CAPS_OFFSET, THREAD_CAP_WORDS, THREAD_STO_OFFSET
+from .thread_design import THREAD_CAP_WORDS, THREAD_STO_OFFSET
 
 
 class ChurchCall(Elaboratable):
@@ -157,17 +157,21 @@ class ChurchCall(Elaboratable):
         # lifetime of the thread. No memory read needed per CALL.
         thread_hdr_view = View(LUMP_HEADER_LAYOUT, self.thread_hdr)
 
-        # Stack and persisted CR homes remain at their canonical offsets even
-        # while keeping persisted capability homes at their fixed offsets.
-        # Break into two binary subtractions so Yosys does not merge into a
-        # multi-term $macc cell that write_verilog cannot emit as plain Verilog.
+        # The private Thread zones are all header-derived.  Capability homes
+        # occupy the final 12 words; cw is the stack size.
         sp_max      = Signal(15)
         sp_min      = Signal(15)
-        sp_min_base = Signal(15)
+        caps_start  = Signal(15)
+        stack_start = Signal(15)
+        lump_size   = Signal(15)
         m.d.comb += [
-            sp_max.eq(THREAD_CAPS_OFFSET - 1),
-            sp_min_base.eq(THREAD_CAPS_OFFSET + 2),
-            sp_min.eq(sp_min_base - thread_hdr_view.cw),
+            lump_size.eq(Const(1, 15) << (thread_hdr_view.n_minus_6 + 6)),
+            caps_start.eq(lump_size - THREAD_CAP_WORDS),
+            stack_start.eq(caps_start - thread_hdr_view.cw),
+            sp_max.eq(caps_start - 1),
+            # A frame writes STO-1 and STO, so STO must remain one word above
+            # the stack floor. Keep the historical post-frame guard word.
+            sp_min.eq(stack_start + 2),
         ]
 
         # Callee E-GT: the raw 32-bit GT deposited into CR6 by Phase 1 mLoad.
@@ -586,8 +590,7 @@ class ChurchCall(Elaboratable):
                 # Single-cycle domain-crossing register cleanup via parallel mask ports:
                 #   mask bit=1 (null mask) → write NULL to whole register (b_flag → 0 implicitly)
                 #   mask bit=0 (b_clear)   → preserve register, clear only b_flag (bit 31 of GT)
-                # sp_min is derived from thread_hdr.cw; sp_max is the fixed
-                # private-ABI stack ceiling immediately below capability homes.
+                # Both stack bounds are derived from the active Thread header.
                 m.d.comb += [
                     self.cr_null_mask.eq(mask_latched[:THREAD_CAP_WORDS]),
                     self.cr_b_clear_mask.eq(~mask_latched[:THREAD_CAP_WORDS]),
@@ -627,9 +630,9 @@ class ChurchCall(Elaboratable):
                     m.next = "STACK_CHECK"
 
             with m.State("STACK_CHECK"):
-                # Upper bound: STO > fixed sp_max (+243) is corrupt.
+                # Upper bound: STO above the header-derived stack ceiling is corrupt.
                 # Lower bound: STO < sp_min means a CALL would push below the
-                # stack floor derived from header cw/sw (244−sw+2).
+                # header-derived stack floor.
                 with m.If(sp_latched > sp_max):
                     m.d.sync += [
                         fault_latched.eq(1),

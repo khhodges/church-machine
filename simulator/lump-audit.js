@@ -185,10 +185,9 @@ function lumpAudit(words, manifest, lineNums, opts) {
     // typ=10, cw=0 (Namespace): Namespace LUMP — body is the NS Table (binary
     //   data, not code).  cc is the Locator-entry count.  No GT c-list at tail.
     //   (See CM_LUMP_SPECIFICATION.md Appendix B.)
-    // typ=10, cw>0 (Thread): `cw` is reinterpreted as `sw` (stack words) and
-    //   `cc` as `heapWords` (Appendix A).  Mint requires sw > 0, cc > 0, and
-    //   header(1) + DR(16) + protected STO(1) + heapWords + sw +
-    //   caps(12) ≤ lumpSize.
+    // typ=10, cw>0 (Thread): `cw` is reinterpreted as `sw` (stack words);
+    //   `cc` must be exactly 12 persisted CR0-CR11 homes. Heap is derived from
+    //   total size and sw, and occupies every word between +18 and Stack.
     const _isThreadHeader = typ === 2 && cw > 0;
     if (typ === 1 /* data */) {
         // Spec requires both cw and cc to be zero for typ=01 data lumps.
@@ -313,7 +312,7 @@ function lumpAudit(words, manifest, lineNums, opts) {
         // data, not freespace. Applying the generic freespace scan to an NS
         // body would falsely flag valid NS Table entries as dirty.  Skip RFS.
         //
-        // Thread lumps (typ=10, cw>0): freespace is the collision zone
+        // Thread lumps (typ=10, cw>0): the body has no Freespace region.
         // Standard lumps (typ=00/01/11): freespace = words cw+1 .. lumpSize-cc-1.
         // Data lumps (typ=01): payload lives in words 1..cw; the zone after it
         // is freespace and must be all-zero (Mint step 7 — the 0xAB content
@@ -336,7 +335,7 @@ function lumpAudit(words, manifest, lineNums, opts) {
                 severity: 'pass',
                 message: 'No freespace \u2014 lump is fully packed \u2713',
                 detail: typ === 2
-                    ? 'Thread lump freespace zone is empty (heap and stack are adjacent) \u2713'
+                    ? 'Thread has no Freespace region; Heap and Stack are adjacent \u2713'
                     : 'No padding zone \u2014 lump is fully packed \u2713',
             });
         } else {
@@ -344,7 +343,7 @@ function lumpAudit(words, manifest, lineNums, opts) {
             //   • typ=lump AND word[fsStart] bits [31:24] === 0xAB → validate the
             //     self-definition content frame (flags, bounds, pad bytes, zero
             //     remainder) per §Freespace Content and Self-Definition.
-            //   • otherwise (legacy binary, Thread collision zone, or any other
+            //   • otherwise (legacy binary or any other
             //     typ) → every freespace word must be zero.
             const _fsWord0 = words[fsStart] >>> 0;
             const _hasContentFrame = (typ === 0 && !_isThread && ((_fsWord0 >>> 24) === 0xAB));
@@ -436,7 +435,7 @@ function lumpAudit(words, manifest, lineNums, opts) {
     // for capabilities injected at deployment time.
     //
     // For Thread lumps (typ=10): the caps zone is architecture-fixed at 12 words
-    // at +244..+255 (CR0..CR11), regardless of allocation size or cc.
+    // at +(lumpSize-12)..+(lumpSize-1) (CR0..CR11).
     // For standard lumps: the c-list is at lumpSize-cc..lumpSize-1.
     //
     // Namespace LUMPs (typ=10, cw=0): body is the NS Table — no GT c-list at tail.
@@ -738,7 +737,8 @@ function lumpAudit(words, manifest, lineNums, opts) {
     // yields any name at all.  Previously it fired whenever the manifest lacked
     // both pet_names.CR and capabilities[], which caused false positives when the
     // assembler had already baked pet names into the binary as pending sentinels.
-    // Skipped for Thread lumps (typ=10): cc=heapWords, not a c-list slot count.
+    // Skipped for Thread lumps (typ=10): cc names persisted CR homes, not an
+    // executable c-list slot count.
     // Skipped when cc=0 (no c-list) or when binary size/bounds failed.
     if (actualWords === lumpSize && contentWords <= lumpSize && cw >= 1 && cc > 0 &&
             typ !== 2 && typ !== 1 && manifest && typeof manifest === 'object') {

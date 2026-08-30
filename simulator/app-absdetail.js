@@ -149,14 +149,17 @@ function _renderBootNSDecoder(contentEl, abs) {
 
     const ns0 = sim.readNSEntry(0);
     const ns1 = sim.readNSEntry(1);
-    // Authoritative boot-entry source: the E-GT at Thread stack CR0
-    // (threadBase + THREAD_CAPS_OFFSET). setBootEntrySlot() always writes here
+    // Authoritative boot-entry source: the E-GT at the Thread's tail-relative
+    // CR0 home. setBootEntrySlot() always writes here
     // but does NOT update mem[NS_TABLE_BASE-2], so reading that word gives stale data.
     let bootSlot;
     {
-        const capsOff   = (typeof THREAD_CAPS_OFFSET !== 'undefined') ? THREAD_CAPS_OFFSET : 244;
         const ns1Loc    = ns1 ? (ns1.word0_location >>> 0) : 0;
-        const cr0Word   = (ns1Loc && sim.memory) ? (sim.memory[ns1Loc + capsOff] >>> 0) : 0;
+        const layout    = ns1Loc && typeof sim._threadLayoutAtBase === 'function'
+            ? sim._threadLayoutAtBase(ns1Loc) : null;
+        const capsOff   = layout ? layout.capsStart : null;
+        const cr0Word   = (ns1Loc && sim.memory && capsOff != null)
+            ? (sim.memory[ns1Loc + capsOff] >>> 0) : 0;
         if (cr0Word) {
             const cr0GT = sim.parseGT(cr0Word);
             if (cr0GT && cr0GT.type === 1 && cr0GT.permissions && cr0GT.permissions.E) {
@@ -409,11 +412,14 @@ function showAbstractionDetail(index, methodName) {
                         clistLoaded = true;
                         if (hdr.typ === 2) {
                             isThreadLump = true;
-                            const capsOff = (typeof THREAD_CAPS_OFFSET !== 'undefined') ? THREAD_CAPS_OFFSET : 244;
+                            const layout = typeof sim._threadLayoutAtBase === 'function'
+                                ? sim._threadLayoutAtBase(lumpBase) : null;
                             cc = 12;
-                            const clistStart = lumpBase + capsOff;
-                            for (let si = 0; si < 12; si++) {
-                                clistSlots.push(sim.memory[clistStart + si] >>> 0);
+                            if (layout) {
+                                const clistStart = lumpBase + layout.capsStart;
+                                for (let si = 0; si < 12; si++) {
+                                    clistSlots.push(sim.memory[clistStart + si] >>> 0);
+                                }
                             }
                         } else {
                             cc = hdr.cc;

@@ -179,7 +179,7 @@
     // Thread geometry fields are encoded directly in the Thread header:
     // cw/sw = stack words and cc = the 12 capability-home count.
     var state = {
-        thread: { lumpPow2: V20_THREAD_LUMP_POW2, stackFrames: 16, heapWords: 12, count: 1 },
+        thread: { lumpPow2: V20_THREAD_LUMP_POW2, stackFrames: 16, count: 1 },
         ns: { n_minus_6: V20_NS_TOTAL_N, slots: NS_CAP_MIN }
     };
 
@@ -197,9 +197,8 @@
                 if (s.thread.stackFrames !== undefined) {
                     state.thread.stackFrames = clamp(s.thread.stackFrames, 10, 255);
                 }
-                if (s.thread.heapWords !== undefined) {
-                    state.thread.heapWords = clamp(s.thread.heapWords, 1, 255);
-                }
+                // Retired heapWords is intentionally ignored. Thread Heap size
+                // is derived from total size and cw/sw.
                 state.thread.count = (s.thread.count !== undefined) ? clamp(s.thread.count, 1, 9) : 1;
             }
             if (s.ns) {
@@ -303,7 +302,6 @@
                 namespaceLumpWords:  64,
                 threadLumpWords:     threadLumpWords,
                 threadStackWords:    clamp(state.thread.stackFrames, 10, 255) * 2,
-                threadHeapWords:     12,
                 nsSlotsMax:          nsSlotsMax,
                 threadCount:         threadCount
             }
@@ -1640,16 +1638,6 @@
         var num = document.getElementById('le-t-stack-num');
         if (sl  && sl  !== document.activeElement) sl.value  = state.thread.stackFrames;
         if (num && num !== document.activeElement) num.value = state.thread.stackFrames;
-        render();
-    };
-
-    window.lumpEditorThreadHeap = function (v) {
-        state.thread.heapWords = clamp(v, 1, 255);
-        saveState();
-        var sl = document.getElementById('le-t-heap-sl');
-        var num = document.getElementById('le-t-heap-num');
-        if (sl && sl !== document.activeElement) sl.value = state.thread.heapWords;
-        if (num && num !== document.activeElement) num.value = state.thread.heapWords;
         render();
     };
 

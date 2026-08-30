@@ -699,7 +699,11 @@ def build_wukong_upload_image(generic_image, boot_config=None):
             raise ValueError(
                 f"Wukong source Thread#{number} slot {slot} is not a Thread LUMP"
             )
-        if size < 256 or source_base + size > source_total:
+        stack_words = (header >> 10) & 0x1FFF
+        cap_words = header & 0xFF
+        layout = thread_layout(size, stack_words)
+        if (size not in THREAD_SUPPORTED_BODY_WORDS or cap_words != THREAD_CAP_WORDS
+                or not layout["valid"] or source_base + size > source_total):
             raise ValueError(
                 f"Wukong source Thread#{number} slot {slot} has an invalid {size}-word body"
             )
@@ -1038,16 +1042,18 @@ def parse_ns_table_raw(image_bytes):
             "cc":        hdr & 0xFF,
         }
     # Thread.1 memory-truth block: raw header word, the CR0 boot-entry GT at
-    # the fixed +244 capability zone, the boot-entry sentinel, and the
+    # its tail-relative capability-home zone, the boot-entry sentinel, and the
     # committed thread count (sentinel at ns_table_base-4; 0 ⇒ legacy 1).
     thread_block = None
     if header is not None and header["kind"] == "thread":
         _t_size = 1 << (header["n_minus_6"] + 6)
         _t_cnt  = mem[tag_idx - 3] & 0xFF if tag_idx >= 3 else 0
+        _t_layout = thread_layout(_t_size, header["cw"])
+        _cr0_idx = _t_layout["caps_start"] if _t_layout["valid"] else _t_size
         thread_block = {
             "headerWord": hdr,
             "size":       _t_size,
-            "cr0Word":    mem[244] if n_words > 244 else 0,
+            "cr0Word":    mem[_cr0_idx] if n_words > _cr0_idx else 0,
             "capsOffset": 244,
             "count":      _t_cnt if _t_cnt >= 1 else 1,
             "bootSlot":   (mem[tag_idx - 1] & 0xFF) if tag_idx >= 1 else None,

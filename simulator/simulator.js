@@ -1317,9 +1317,9 @@ class ChurchSimulator {
 
     // Return the private-memory geometry for one Namespace-resident Thread.
     // Thread headers deliberately reinterpret the ordinary LUMP cw/cc fields:
-    // cw is the downward-growing stack size, while cc is the upward-growing
-    // heap size.  The data-register and capability regions are architectural
-    // constants.  Keep this decoder close to parseLumpHeader so all UI views
+    // cw is the downward-growing stack size, while cc is exactly the twelve
+    // persisted CR0-CR11 homes. Heap fills every word from +18 to Stack.
+    // Keep this decoder close to parseLumpHeader so all UI views
     // use the selected Namespace body's header rather than live execution
     // registers or a fixed Boot.Thread layout.
     getThreadInstanceLayout(nsIndex) {
@@ -2763,15 +2763,22 @@ class ChurchSimulator {
                 const _threadBase12   = _initThrdEntry.word0_location;
                 const _threadHdrWord12 = this.memory[_threadBase12] >>> 0;
                 const _threadHdr12    = this.parseLumpHeader(_threadHdrWord12);
-                const _threadCC12     = _threadHdr12.valid ? _threadHdr12.cc : 0;
-                const _heapStart12    = THREAD_HEAP_OFFSET;
-                const _heapEnd12      = _heapStart12 + _threadCC12 - 1;
+                const _threadLayout12 = (_threadHdr12.valid && _threadHdr12.typ === 2 &&
+                    _threadHdr12.cc === THREAD_DESIGN.capabilityHomes.words)
+                    ? THREAD_DESIGN.layout(_threadHdr12.lumpSize, _threadHdr12.cw)
+                    : null;
+                if (!_threadLayout12 || !_threadLayout12.valid) {
+                    this.fault('BOOT', 'INIT_HEAP: invalid Thread size-derived geometry');
+                    return false;
+                }
+                const _heapStart12    = _threadLayout12.heapStart;
+                const _heapEnd12      = _threadLayout12.heapEnd;
                 const _seq1h = this.parseNSWord1(_initThrdEntry.word1_limit).gtSeq;
                 const gt5 = this.createGT(_seq1h, BOOT_NS_SLOT_THREAD, {R:1,W:1,X:0,L:0,S:0,E:0}, 1);  // RW Inform GT for the thread lump (Slot 1)
                 this.cr[5] = {
                     word0: gt5 >>> 0,
                     word1: (_threadBase12 + THREAD_HEAP_OFFSET) >>> 0,
-                    word2: Math.max(0, _threadCC12 - 1) >>> 0,
+                    word2: (_threadLayout12.heapWords - 1) >>> 0,
                     word3: 0,
                     m: 0,
                 };
@@ -2919,8 +2926,11 @@ class ChurchSimulator {
                     // silently skipped the write.  Use a typeof check instead.
                     const _b5ThreadBase = _b5ThreadEntry.word0_location >>> 0;
                     const _b5ThreadLayout = this._threadLayoutAtBase(_b5ThreadBase);
-                    const _b5CR0Addr = _b5ThreadBase +
-                        (_b5ThreadLayout ? _b5ThreadLayout.capsStart : THREAD_CAPS_OFFSET);
+                    if (!_b5ThreadLayout) {
+                        this.fault('BOOT', 'INIT_ABSTR: invalid Thread geometry');
+                        return false;
+                    }
+                    const _b5CR0Addr = _b5ThreadBase + _b5ThreadLayout.capsStart;
                     this._writeRuntimeWord(_b5CR0Addr, gt6);
                     // [BOOT] INIT_ABSTR Thread.caps[0] — replaced by per-event trace packets
                 }
@@ -3030,13 +3040,13 @@ class ChurchSimulator {
                 this.sto = sp_max - 2;
 
                 // ── Step 4: cc=0 (direct dispatch) vs cc>0 (saved-lump c-list) ──────────
-                // cc=0: direct dispatch — no c-list.  thread[+244] holds the boot-entry E-GT
+                // cc=0: direct dispatch — no c-list. The tail-relative CR0 home holds the boot-entry E-GT
                 //       written by the boot image or setBootEntrySlot(); NUC_CODE installs it
                 //       directly into CR0.  No CHANGE/TPERM/CALL trampoline.
                 // cc>0: derive CR6 (c-list, E) from lump header (saved-lump path).
                 if (cc === 0) {
                     // Direct dispatch path: no c-list in Boot.Abstr.
-                    // thread[+244] holds the boot-entry E-GT (set by boot image or setBootEntrySlot()).
+                    // The Thread's tail-relative CR0 home holds the boot-entry E-GT.
                     // NUC_CODE (B:07) reads it and installs it directly into CR0 — no CHANGE/TPERM/CALL.
                     // CR6 was written by B:05 INIT_ABSTR with the Boot.Abstr E-GT; that GT is already
                     // snapshotted into the sentinel frame above.  Since cc=0 means there is no c-list,
@@ -3114,7 +3124,7 @@ class ChurchSimulator {
                 this._emitTrace(2, TRACE_EV_CALL_PUSH, 0);
 
                 // ── Read CR0 from Thread.caps[0] — Thread is the authority ───────────────
-                // Thread.caps[0] (memory[threadBase + THREAD_CAPS_OFFSET]) holds the
+                // The Thread's tail-relative CR0 home holds the
                 // boot-entry E-GT written during construction by _initNamespaceTable().
                 // B:07 reads it directly — it must NOT synthesise a new GT from
                 // bootEntrySlot.  The Thread itself carries the boot-entry credential.
@@ -6558,7 +6568,7 @@ class ChurchSimulator {
 
             // ── CHANGE CR12: mirror the hardware RESTORE_CALL FSM ──────────────────
             // During M-elevated boot, hardware loads CR0–CR11 from the
-            // incoming thread's caps zone (thread[+THREAD_CAPS_OFFSET .. +THREAD_CAPS_OFFSET+11]).
+            // incoming thread's tail-relative CR0-CR11 home zone.
             // Without this restore the subsequent TPERM/CALL will see NULL in CR0 and fault.
             //
             // Note: we populate the CRs directly rather than via _writeCR because at this
@@ -7063,12 +7073,19 @@ class ChurchSimulator {
             const hdrRead = this._threadRead(lambdaThreadBase, `LAMBDA CR${crIdx} thread-hdr`);
             if (!hdrRead.ok) return null;
             const threadHdr = this.parseLumpHeader(hdrRead.value);
-            const threadLumpSize = threadHdr.valid ? threadHdr.lumpSize : 256;
-            const threadCC = threadHdr.valid ? threadHdr.cc : 0;
-            const heapEnd = 1 + 16 + threadCC;
-            const sw = (threadHdr.valid && threadHdr.typ === 2) ? threadHdr.cw : 0;
-            const sp_max = threadLumpSize - 12 - 1;
-            const sp_min = sp_max - sw + 1;
+            const threadLayout = (threadHdr.valid && threadHdr.typ === 2 &&
+                threadHdr.cc === THREAD_DESIGN.capabilityHomes.words)
+                ? THREAD_DESIGN.layout(threadHdr.lumpSize, threadHdr.cw)
+                : null;
+            if (!threadLayout || !threadLayout.valid) {
+                this.fault('BOUNDS', `LAMBDA CR${crIdx}: invalid Thread geometry`);
+                return null;
+            }
+            const threadLumpSize = threadLayout.lumpSize;
+            const heapEnd = threadLayout.heapEnd;
+            const sw = threadLayout.stackWords;
+            const sp_max = threadLayout.stackEnd;
+            const sp_min = threadLayout.stackStart;
             const newSTO = (savedSTO - 1) & 0xFFF;
             if (newSTO < sp_min) {
                 this.flags.V = true;

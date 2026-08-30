@@ -263,27 +263,30 @@ are available to the heap allocator; the NS entry for slot 2 is all-zero
 
 ### 4.3 Thread lump — Slot 1, Boot.Thread (base `0x0040`)
 
-Canonical 256-word lump. Header: `0xF900820C` — `magic=0x1F`,
-`n_minus_6=2` → 256w, `cw/sw=32`, `typ=2` (Thread), `cc=12` capability
-homes.
+Canonical **256-word example** lump. Header: `0xF900820C` — `magic=0x1F`,
+`n_minus_6=2` → 256w, `cw/sw=32`, `typ=0b10` (2, Thread), `cc=12`
+capability homes. Thread sizes are 256, 512, 1024, 2048, 4096, or 8192
+words; the +244…+255 offsets below apply only to this 256-word example.
 
 | Offset from base | Word address    | Words | Zone |
 |:-----------------|:----------------|------:|:-----|
-| +0               | `0x0040`        |     1 | **Header** (`0xF9008240`) |
+| +0               | `0x0040`        |     1 | **Header** (`0xF900820C`) |
 | +1 … +16         | `0x0041–0x0050` |    16 | **DR zone** — home locations for DR0–DR15 |
 | +17              | `0x0051`        |     1 | **Protected STO** — machine-only, outside CR5 bounds |
 | +18 … +211       | `0x0052–0x0113` |   194 | **Heap zone** — derived from total size and Stack |
 | +212 … +243      | `0x00D4–0x00F3` |    32 | **Stack** (grows down; STO starts at 243) |
 | +244 … +255      | `0x00F4–0x00FF` |    12 | **Caps zone** — GT home slots for CR0–CR11 |
 
-**Thread lump `cw` and `cc` semantics (typ=2):**
+**Thread lump `cw` and `cc` semantics (typ=0b10 / 2):**
 
-For Thread-type lumps `cw` is `sw`, the stack-word count, and `cc=12` is the
-capability-home count. `n-6` supplies total size. The hardware uses:
+For Thread-type lumps `cw` is `sw`, the stack-word count, and `cc` is
+exactly 12, the capability-home count. `lumpSize = 2^(n_minus_6+6)`;
+`capsStart = lumpSize−12`, `stackStart = capsStart−sw`, and
+`heapWords = lumpSize−sw−30`. The hardware uses:
 
 ```
-sp_min = lumpSize − 12 − sw + 2 = 256 − 12 − 32 + 2 = 214
-sp_max = lumpSize − 13 = 243
+sp_min = capsStart − sw + 2 = 244 − 32 + 2 = 214
+sp_max = capsStart − 1 = 243
 ```
 
 **DR zone and caps zone at boot:** All 28 words (`+1…+16` and `+244…+255`) are
@@ -419,7 +422,7 @@ Status taxonomy:
 | Slot | Name         | Hdr word     | Status      | lumpSize | cw | cc | typ | Notes |
 |-----:|:-------------|:-------------|:------------|:--------:|---:|---:|----:|:------|
 |   0  | Boot.NS      | —            | **ABSENT**  | —        |  — |  — |  —  | location=0; NS root; no standard lump header by design |
-|   1  | Boot.Thread  | `0xF9008240` | **VALID**   | 256      | 32 | 64 |  2  | Thread-type; cw = data-zone size, not code count |
+|   1  | Boot.Thread  | `0xF900820C` | **VALID**   | 256      | 32 | 12 |  2  | Thread-type; `cw=sw`; `cc=12` tail homes |
 |   2  | (free/null)  | `0x00000000` | **ABSENT**  |  —       |  — |  — |  —  | Free slot; no lump written (Task #247) |
 |   3  | Boot.Abstr   | `0xF9004411` | **VALID**   | 256      | 17 | 17 |  0  | Boot ROM; 13 live instructions |
 |   4  | Salvation    | `0x00000000` | **INVALID** | —        |  — |  — |  —  | magic=0x0; lump body not yet loaded |
@@ -470,12 +473,12 @@ Status taxonomy:
 
 ## 8. Code Word Decompilation Tables
 
-### 8.1 Slot 1 — Boot.Thread (base `0x0040`, cw=32)
+### 8.1 Slot 1 — Boot.Thread (base `0x0040`, sw=32)
 
-Words `+1`…`+32` are the **data zone** (DR + heap), not executable code.
-All 32 words are `0x00000000` at boot.  The cw=32 header field marks the
-end of the data zone for hardware stack-boundary computation; the CPU never
-fetches instructions from here.
+Words `+1`…`+32` are Thread data, not executable code.  The `cw=sw=32`
+header field is the stack-word count used with the derived boundaries
+`capsStart=lumpSize−12`, `stackStart=capsStart−sw`, and
+`heapWords=lumpSize−sw−30`; the CPU never fetches instructions from here.
 
 | Offset | Addr    | Hex word   | Mnemonic              | Purpose |
 |-------:|:--------|:-----------|:----------------------|:--------|

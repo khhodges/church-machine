@@ -394,46 +394,37 @@ console.log('\nTest 25: RPN pass (cc=2, both slots named, 0-based keys)');
 
 // ─── Thread lump helpers ──────────────────────────────────────────────────
 
-// Build a Thread lump header (typ=10).
-// cw field = sw (stack words), cc field = heapWords.
-function makeThreadHeader({ nMinus6 = 2, sw = 32, hw = 64 } = {}) {
-    return buildHeader({ nMinus6, cw: sw, typ: 2, cc: hw });
+// Build a Thread lump header (typ=10).  cw is sw and cc is exactly the
+// twelve persisted CR0..CR11 homes; Heap is derived from the selected size.
+function makeThreadHeader({ nMinus6 = 2, sw = 32, cc = 12 } = {}) {
+    return buildHeader({ nMinus6, cw: sw, typ: 2, cc });
 }
 
-// Build a valid 256-word Thread lump (n-6=2 → lumpSize=256, sw=32, hw=64).
-// Layout per CM_LUMP_SPECIFICATION.md Appendix A:
-//   Word 0:      header (magic=0x1F, n-6=2, sw=32, typ=10, heapWords=64)
-//   Words 1..16: DR0..DR15 data registers (may be non-zero for a live thread)
-//   Words 17..80: heap zone (heapWords=64 words; may be non-zero)
-//   Words 81..211: freespace (collision zone; all-zero at creation time)
-//   Words 212..243: stack zone (sw=32 words; fixed ABI; may be non-zero)
-//   Words 244..255: caps zone (12 architecture-fixed GT Word 0 values)
-//
-// fsStart = 18 + heapWords = 18 + 64 = 82
-// fsEnd   = 244 - sw = 212
-function makeValidThread({ sw = 32, hw = 64, nMinus6 = 2 } = {}) {
+// Build a valid Thread body.  Thread sizes are powers of two from 256 through
+// 8192.  Heap occupies every word +18 through stackStart-1; Stack and caps
+// are tail-relative, and Threads have no Freespace region.
+function makeValidThread({ sw = 32, nMinus6 = 2 } = {}) {
     const lumpSize = 1 << (nMinus6 + 6);
     const words = new Array(lumpSize).fill(0);
-    words[0] = makeThreadHeader({ nMinus6, sw, hw });
-    // Non-zero DRs and stack (live thread state — not freespace, so allowed)
+    const stackStart = lumpSize - 12 - sw;
+    words[0] = makeThreadHeader({ nMinus6, sw });
+    // Non-zero DRs, Heap, and Stack are live thread state.
     for (let i = 1; i <= 16; i++) words[i] = 0x12340000 + i;   // DR0..DR15
-    const stackMin = 244 - sw;
-    for (let i = stackMin; i < 244; i++) words[i] = 0xABCD0000 + i; // stack
-    // Caps zone: exactly 12 fixed homes for CR0..CR11, never allocation-tail based.
-    for (let i = 244; i <= 255; i++) words[i] = 0x4A000000 + (i - 244);
-    // Freespace (81..211): all-zero (already zeroed by fill(0))
+    for (let i = 18; i < stackStart; i++) words[i] = 0xBEEF0000 + i; // Heap
+    for (let i = stackStart; i < lumpSize - 12; i++) words[i] = 0xABCD0000 + i; // Stack
+    for (let i = lumpSize - 12; i < lumpSize; i++) words[i] = 0x4A000000 + (i - (lumpSize - 12));
     return words;
 }
 
 // ─── Test 28: Valid Thread lump — all rules pass ──────────────────────────
-console.log('\nTest 28: Valid Thread lump (sw=32, hw=64, non-zero DRs/stack/caps)');
+console.log('\nTest 28: Valid 256-word Thread lump (derived Heap, tail-relative Stack/caps)');
 {
     const words = makeValidThread();
     const results = lumpAudit(words, null);
     assertRule(results, 'RB1', 'pass', 'RB1 pass: Thread geometry valid');
-    assertRule(results, 'RFS', 'pass', 'RFS pass: Thread freespace (words 81..211) zeroed');
     assertRule(results, 'RGT', 'pass', 'RGT pass: Thread caps zone valid');
     assert(!lumpAuditHasErrors(results), 'no errors');
+    assert(!results.find(r => r.ruleId === 'RFS'), 'RFS not emitted: Thread has no Freespace region');
     // RCI should not fire for Thread lumps (DRs are not code)
     assert(!results.find(r => r.ruleId === 'RCI'), 'RCI not emitted for Thread lump');
 }
@@ -443,9 +434,8 @@ console.log('\nTest 28: Valid Thread lump (sw=32, hw=64, non-zero DRs/stack/caps
 // cw=0 is produced when the editor clamps cw on over-capacity; Mint rejects it.
 console.log('\nTest 29: typ=10 cw=0 (zero stack words) — RB1 error');
 {
-    const lumpSize = 64;
-    const words = new Array(lumpSize).fill(0);
-    words[0] = makeThreadHeader({ nMinus6: 0, sw: 0, hw: 4 });  // cw=0,cc=4,typ=10
+    const words = new Array(256).fill(0);
+    words[0] = makeThreadHeader({ sw: 0 });  // cw=0, cc=12, typ=10
     const results = lumpAudit(words, null);
     assertRule(results, 'RB1', 'error', 'RB1 error: typ=10 cw=0 (zero stack words)');
     assert(lumpAuditHasErrors(results), 'has errors');
@@ -453,42 +443,35 @@ console.log('\nTest 29: typ=10 cw=0 (zero stack words) — RB1 error');
     assert(!results.find(r => r.ruleId === 'RCI'), 'RCI not emitted for typ=10');
 }
 
-// ─── Test 30: Thread with cc=0 (heapWords=0) — RB1 error ─────────────────
-console.log('\nTest 30: Thread lump with heapWords=0 — RB1 error');
+// ─── Test 30: Thread cc must be exactly 12 — RB1 error ────────────────────
+console.log('\nTest 30: Thread lump with cc=11 — RB1 error');
 {
-    const lumpSize = 64;
-    const words = new Array(lumpSize).fill(0);
-    words[0] = makeThreadHeader({ nMinus6: 0, sw: 4, hw: 0 });
+    const words = makeValidThread();
+    words[0] = makeThreadHeader({ sw: 32, cc: 11 });
     const results = lumpAudit(words, null);
-    assertRule(results, 'RB1', 'error', 'RB1 error: Thread heapWords=0');
+    assertRule(results, 'RB1', 'error', 'RB1 error: Thread cc must equal 12');
     assert(lumpAuditHasErrors(results), 'has errors');
 }
 
 // ─── Test 31: Thread with zones overflow — RB1 error ─────────────────────
-// sw=20, hw=20 → 29+20+20=69 > lumpSize=64 → geometry doesn't fit.
-console.log('\nTest 31: Thread lump with sw+heap overflow — RB1 error');
+// sw=226 leaves no Heap word in the minimum supported 256-word body.
+console.log('\nTest 31: Thread lump with no derived Heap — RB1 error');
 {
-    const lumpSize = 64;
-    const words = new Array(lumpSize).fill(0);
-    words[0] = makeThreadHeader({ nMinus6: 0, sw: 20, hw: 20 });
+    const words = new Array(256).fill(0);
+    words[0] = makeThreadHeader({ sw: 226 });
     const results = lumpAudit(words, null);
-    assertRule(results, 'RB1', 'error', 'RB1 error: Thread zone overflow');
+    assertRule(results, 'RB1', 'error', 'RB1 error: Thread stack leaves no Heap');
     assert(lumpAuditHasErrors(results), 'has errors');
 }
 
-// ─── Test 32: Thread dirty freespace — RFS error ──────────────────────────
-// Thread with sw=2, hw=4 in a 64-word lump:
-//   freespace = words 21..49 (= 17+4..64-12-2-1+1=50). Dirty word at 30.
-console.log('\nTest 32: Thread lump with dirty freespace — RFS error');
+// ─── Test 32: Heap is not a Freespace region ──────────────────────────────
+console.log('\nTest 32: Thread non-zero derived Heap — no RFS result');
 {
-    const lumpSize = 64;
-    const sw = 2, hw = 4;
-    const words = new Array(lumpSize).fill(0);
-    words[0] = makeThreadHeader({ nMinus6: 0, sw, hw });
-    words[30] = 0xDEADBEEF;  // dirty freespace (words 21..49)
+    const words = makeValidThread();
+    words[100] = 0xDEADBEEF;  // Heap (+18 through stackStart-1)
     const results = lumpAudit(words, null);
-    assertRule(results, 'RFS', 'error', 'RFS error: Thread dirty freespace');
-    assert(lumpAuditHasErrors(results), 'has errors');
+    assert(!results.find(r => r.ruleId === 'RFS'), 'RFS not emitted for non-zero Thread Heap');
+    assert(!lumpAuditHasErrors(results), 'no errors');
 }
 
 // ─── Test 33: Thread with malformed cap (bit26=1) — RGT error ─────────────
@@ -496,7 +479,7 @@ console.log('\nTest 32: Thread lump with dirty freespace — RFS error');
 console.log('\nTest 33: Thread lump with malformed cap GT (bit26=1) — RGT error');
 {
     const words = makeValidThread();
-    words[244] = 0x04000001;  // caps[0]: bit26=1 → spare non-zero → RGT error
+    words[256 - 12] = 0x04000001;  // caps[0]: bit26=1 → spare non-zero → RGT error
     const results = lumpAudit(words, null);
     assertRule(results, 'RGT', 'error', 'RGT error: Thread cap spare bit 26 = 1');
     assert(lumpAuditHasErrors(results), 'has errors');
@@ -573,21 +556,21 @@ console.log('\nTest 38: Thread with RETURN-shaped DR values — RSM not emitted'
     assert(!lumpAuditHasErrors(results), 'no errors');
 }
 
-// ─── Test 39a: Larger Thread bodies are explicitly unsupported ───────────
-console.log('\nTest 39a: 512-word Thread is rejected without inventing a tail region');
+// ─── Test 39a: 512-word Thread uses the same derived, tail-relative layout ──
+console.log('\nTest 39a: Valid 512-word Thread uses derived Heap and tail-relative caps');
 {
-    const words = makeValidThread({ nMinus6: 3, sw: 32, hw: 64 });
-    // A malformed GT at the allocation tail must not be reclassified as CR12,
-    // a thirteenth persisted home, Heap, Stack, Freespace, or any extension.
-    words[500] = 0x04000001;
+    const sw = 64;
+    const words = makeValidThread({ nMinus6: 3, sw });
+    const stackStart = 512 - 12 - sw;
+    // This tail-relative cap must be checked even though it is beyond +255.
+    words[512 - 12] = 0x04000001;
     const results = lumpAudit(words, null);
-    assertRule(results, 'RB1', 'error', 'RB1 rejects unsupported 512-word Thread body');
-    assert(results.find(r => r.ruleId === 'RB1' && /defines no Thread region after \+255/.test(r.detail)),
-        'RB1 explains the explicit supported-size policy');
-    assertRule(results, 'RFS', 'pass', 'RFS pass: only canonical Freespace is scanned');
-    assertRule(results, 'RGT', 'pass', 'RGT pass: only CR0..CR11 fixed homes are capability words');
-    assert(lumpAuditHasErrors(results),
-        'unsupported tail is rejected rather than assigned an architectural meaning');
+    assertRule(results, 'RB1', 'pass', 'RB1 accepts supported 512-word Thread body');
+    assert(results.find(r => r.ruleId === 'RB1').detail.includes(`Heap +18…+${stackStart - 1}`),
+        'RB1 reports Heap derived through stackStart-1');
+    assert(!results.find(r => r.ruleId === 'RFS'), 'RFS not emitted for 512-word Thread');
+    assertRule(results, 'RGT', 'error', 'RGT checks the tail-relative CR0 home');
+    assert(lumpAuditHasErrors(results), 'malformed tail-relative cap is rejected');
 }
 
 // ─── Test 39: Malformed data lump (cw=1, cc=1) — only RB1 fires ──────────

@@ -2182,7 +2182,8 @@ DEFAULT_BOOT_CONFIG = {
     "step1": {
         "totalNamespaceWords": 16384,
         "namespaceLumpWords": 64,
-        # The Thread architecture defines exactly words +0..+255.
+        # The minimum normative Thread body is 256 words; larger supported
+        # power-of-two bodies assign every added word to Heap.
         "threadLumpWords": 256,
     },
     # Step 2 (Task #215): per-lump resident/lazy decision. Empty list =
@@ -3157,7 +3158,11 @@ def _boot_image_is_stale():
                 return True
             _actual_stack_end = struct.unpack_from(
                 "<I", _image_bytes, _sto_idx * 4)[0]
-            _expected_stack_end = _boot_image_gen.THREAD_CAPS_OFFSET - 1
+            _cfg_step1 = (_cfg or DEFAULT_BOOT_CONFIG)["step1"]
+            _layout = _boot_image_gen.thread_layout(
+                int(_cfg_step1["threadLumpWords"]),
+                int(_cfg_step1.get("threadStackWords", 32)))
+            _expected_stack_end = _layout["stack_end"]
             if _actual_stack_end != _expected_stack_end:
                 return True
         _img_mtime = os.path.getmtime(BOOT_IMAGE_PATH)

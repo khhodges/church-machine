@@ -1274,31 +1274,29 @@ console.log('\n--- LLB-19: Truncated buffer (header says 64 words, buffer has 32
             res.ok === false && res.code === 'FS_LEGACY_NONZERO', JSON.stringify(res));
     }
 
-    // ── Thread lumps (typ=10, cw>0): collision-zone bounds, not generic ─────
-    // 256-word Thread: heapWords(cc)=8, stackWords(cw)=4 → collision zone is
-    // words 25..239 (17+8 .. 256-12-4-1).  Live DR/heap/stack/caps state is
-    // non-zero and must NOT be scanned as freespace.
-    function makeThreadWords({ dirtyCollisionZone = false } = {}) {
+    // ── Thread lumps (typ=10, cw>0): no generic Freespace region ────────────
+    // 256-word Thread: cc=12 homes and cw=4 stack words. Heap fills +18..+239.
+    // Live DR/Heap/Stack/capability state must not be scanned as Freespace.
+    function makeThreadWords({ nonZeroHeap = false } = {}) {
         const lumpSize = 256;
-        const heapWords = 8, stackWords = 4;
+        const stackWords = 4;
         const words = new Array(lumpSize).fill(0);
-        words[0] = makeHdr(stackWords, heapWords, 2, 2);   // typ=2 (clist-only/Thread), cw=stack, cc=heap
+        words[0] = makeHdr(stackWords, 12, 2, 2);
         for (let i = 1; i <= 16; i++) words[i] = 0x11110000 + i;             // DR0..DR15 live values
-        for (let i = 18; i < 18 + heapWords; i++) words[i] = 0x22220000 + i; // heap state
+        if (nonZeroHeap) words[100] = 0xBADC0DE1;
         for (let i = lumpSize - 12 - stackWords; i < lumpSize - 12; i++) words[i] = 0x33330000 + i; // stack
         for (let i = lumpSize - 12; i < lumpSize; i++) words[i] = 0x4A000006; // caps zone GTs
-        if (dirtyCollisionZone) words[100] = 0xBADC0DE1;   // inside collision zone
         return words;
     }
     {
         const sim = freshSim();
-        const hdr = sim.parseLumpHeader(makeHdr(4, 8, 2, 2));
+        const hdr = sim.parseLumpHeader(makeHdr(4, 12, 2, 2));
         const okRes = sim.mintStep7Freespace(makeThreadWords(), hdr);
-        check('LLB-20l: mintStep7Freespace accepts Thread with live heap/stack/caps and zero collision zone',
+        check('LLB-20l: mintStep7Freespace accepts Thread with live state and no Freespace scan',
             okRes.ok === true, JSON.stringify(okRes));
-        const badRes = sim.mintStep7Freespace(makeThreadWords({ dirtyCollisionZone: true }), hdr);
-        check('LLB-20m: mintStep7Freespace rejects Thread with non-zero collision-zone word (FS_LEGACY_NONZERO)',
-            badRes.ok === false && badRes.code === 'FS_LEGACY_NONZERO', JSON.stringify(badRes));
+        const heapRes = sim.mintStep7Freespace(makeThreadWords({ nonZeroHeap: true }), hdr);
+        check('LLB-20m: mintStep7Freespace accepts non-zero words anywhere in derived Thread Heap',
+            heapRes.ok === true, JSON.stringify(heapRes));
     }
     {
         // loadLumpBinary end-to-end with the valid Thread binary — must not be

@@ -33,9 +33,9 @@ WORD2_LAYOUT = StructLayout({
 })
 
 LUMP_HEADER_LAYOUT = StructLayout({
-    "cc":        unsigned(8),    # bits  [7:0]  — c-list slot count (0..255); Thread uses 12 persisted CR0-CR11 homes at the LUMP tail
+    "cc":        unsigned(8),    # bits  [7:0]  — c-list slot count (0..255); Thread requires exactly 12 persisted CR0-CR11 homes at its tail
     "typ":       unsigned(2),    # bits  [9:8]  — object type: 00=lump, 01=data, 10=clist-only, 11=Outform
-    "cw":        unsigned(13),   # bits [22:10] — code word count (0..8191)
+    "cw":        unsigned(13),   # bits [22:10] — code words (0..8191); Thread interprets this as stack words
     "n_minus_6": unsigned(4),    # bits [26:23] — lumpSize = 2^(val+6), valid range 0..8
     "magic":     unsigned(5),    # bits [31:27] — always 0x1F; traps if executed
 })

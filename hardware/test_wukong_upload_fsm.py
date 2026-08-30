@@ -586,7 +586,7 @@ def test_projected_multithread_contexts_fit_physical_dmem_model():
         NS_ENTRY_WORDS, build_wukong_upload_image, generate_boot_image,
         generated_thread_slots,
     )
-    from hardware.change import THREAD_CAPS_OFFSET
+    from hardware.thread_design import THREAD_CAPS_OFFSET
 
     class PhysicalPrefixUploadRig(UploadFsmRig):
         # The selected entry plus Thread.1–Thread#3 all fit below this strict

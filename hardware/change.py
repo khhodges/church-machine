@@ -6,7 +6,6 @@ from .layouts import (GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT,
                       LUMP_HEADER_LAYOUT, WORD2_LAYOUT)
 from .mload import ChurchMLoad
 from .thread_design import (
-    THREAD_CAPS_OFFSET,
     THREAD_CAP_WORDS,
     THREAD_DR_OFFSET,
     THREAD_HEAP_OFFSET,
@@ -114,6 +113,7 @@ class ChurchChange(Elaboratable):
         # by every CALL until the next thread switch (zero extra reads per CALL).
         thread_hdr_reg = Signal(32)
         fetch_thr_hdr_active = Signal()  # high during FETCH_THREAD_HDR state
+        restore_homes_after_hdr = Signal()
 
         save_index = Signal(5)
         save_cr_index = Signal(4)
@@ -256,7 +256,14 @@ class ChurchChange(Elaboratable):
         entry_cr14_w2 = View(WORD2_LAYOUT, entry_cr14_view.word2_w2)
         cr5_cap_view = View(CAP_REG_LAYOUT, cr5_cap)
         cr5_new_gt   = View(GT_LAYOUT, cr5_cap_view.word0_gt)
+        thread_lump_size = Signal(15)
+        thread_caps_start = Signal(15)
+        thread_heap_words = Signal(15)
         m.d.comb += [
+            thread_lump_size.eq(Const(1, 15) << (thr_hdr_view.n_minus_6 + 6)),
+            thread_caps_start.eq(thread_lump_size - THREAD_CAP_WORDS),
+            # Heap spans [18, capsStart-cw), so its count is size-cw-30.
+            thread_heap_words.eq(thread_lump_size - thr_hdr_view.cw - 30),
             cr5_new_gt.slot_id.eq(0),
             cr5_new_gt.gt_seq.eq(0),
             cr5_new_gt.gt_type.eq(GT_TYPE_INFORM),
@@ -266,7 +273,7 @@ class ChurchChange(Elaboratable):
             cr5_new_gt.b_flag.eq(0),
             cr5_cap_view.word1_location.eq(
                 restore_base + (THREAD_HEAP_OFFSET << 2)),
-            cr5_cap_view.word2_w2.eq(thr_hdr_view.cc - 1),
+            cr5_cap_view.word2_w2.eq(thread_heap_words - 1),
             entry_cr14_gt.slot_id.eq(entry_gt_view.slot_id),
             entry_cr14_gt.gt_seq.eq(entry_gt_view.gt_seq),
             entry_cr14_gt.gt_type.eq(entry_gt_view.gt_type),
@@ -325,6 +332,7 @@ class ChurchChange(Elaboratable):
             with m.State("IDLE"):
                 m.d.sync += [fault_latched.eq(0), fault_type_latched.eq(FaultType.NONE)]
                 m.d.sync += [mload_done_latched.eq(0), mload_fault_latched.eq(0)]
+                m.d.sync += restore_homes_after_hdr.eq(0)
                 with m.If(self.change_start):
                     m.d.sync += [
                         index_latched.eq(self.index),
@@ -468,8 +476,8 @@ class ChurchChange(Elaboratable):
 
             with m.State("PREFLIGHT_HDR"):
                 # Private body must use a supported Thread allocation before
-                # outgoing DR/CR state is persisted. The shared contract
-                # currently admits only the fully-defined 256-word layout.
+                # outgoing DR/CR state is persisted. cw is stack words and cc
+                # is exactly the twelve persisted CR0--CR11 homes.
                 m.d.comb += preflight_hdr_active.eq(1)
                 # The DMEM read port is shared and synchronous; arm one cycle
                 # before accepting valid so a final Namespace-gate response
@@ -479,17 +487,18 @@ class ChurchChange(Elaboratable):
                     m.d.sync += preflight_rd_armed.eq(0)
                     # A Thread is admitted only when its header conforms to
                     # the normative fixed private ABI.  cw is stack words,
-                    # cc is heap words, and the two zones must leave a
-                    # non-overlapping boundary before capabilities at +244.
+                    # cc is exactly the twelve persisted CR homes. Stack and
+                    # Heap must meet without overlap before the tail homes.
                     with m.If((self.mem_rd_data[27:32] == 0x1F) &
                               (self.mem_rd_data[8:10] == 2) &
                               (self.mem_rd_data[23:27] >= THREAD_MIN_N_MINUS_6) &
                               (self.mem_rd_data[23:27] <= THREAD_MAX_N_MINUS_6) &
-                              (self.mem_rd_data[10:23] > 0) &
-                              (self.mem_rd_data[0:8] > 0) &
-                              ((self.mem_rd_data[10:23] +
-                                self.mem_rd_data[0:8]) <=
-                               (THREAD_CAPS_OFFSET - THREAD_HEAP_OFFSET))):
+                               (self.mem_rd_data[10:23] > 0) &
+                               (self.mem_rd_data[0:8] == THREAD_CAP_WORDS) &
+                               # heapWords = lumpSize - cw - 30 must be > 0.
+                               (self.mem_rd_data[10:23] <
+                                ((Const(1, 15) <<
+                                  (self.mem_rd_data[23:27] + 6)) - 30))):
                         m.next = "SAVE_CR_READ"
                     with m.Else():
                         m.d.sync += [
@@ -511,7 +520,7 @@ class ChurchChange(Elaboratable):
                     self.cr_rd_addr.eq(save_cr_index),
                     mem_wr_en_reg.eq(1),
                     mem_wr_addr_reg.eq(
-                        outgoing_thread_base + ((THREAD_CAPS_OFFSET + save_cr_index) << 2)),
+                        outgoing_thread_base + ((thread_caps_start + save_cr_index) << 2)),
                     mem_wr_data_reg.eq(self.cr_rd_data.as_value()[:32]),
                 ]
                 with m.If(self.mem_wr_done):
@@ -580,28 +589,30 @@ class ChurchChange(Elaboratable):
                       | mload_done_latched | mload_fault_latched))
                 m.d.sync += [mload_done_latched.eq(0), mload_fault_latched.eq(0)]
                 with m.If(u_mload.sub_done):
-                    m.d.sync += mload_done_latched.eq(1)
-                    m.d.sync += fetched_gt_latched.eq(self.cr_rd_data.as_value()[:32])
-                    m.d.sync += incoming_thread_base.eq(u_mload.resolved_base)
-                    m.d.sync += thread_loaded.eq(1)
+                    m.d.sync += [
+                        mload_done_latched.eq(1),
+                        fetched_gt_latched.eq(self.cr_rd_data.as_value()[:32]),
+                        incoming_thread_base.eq(u_mload.resolved_base),
+                        thread_loaded.eq(1),
+                        # Fetch the incoming header before restoring homes:
+                        # capsStart depends on its n_minus_6.
+                        restore_homes_after_hdr.eq(1),
+                    ]
                 with m.If(u_mload.sub_fault):
                     m.d.sync += mload_fault_latched.eq(1)
                     m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(u_mload.sub_fault_type)]
                 with m.If(mload_fault_latched):
                     m.next = "FAULT"
                 with m.Elif(mload_done_latched):
-                    m.d.sync += cr_index.eq(0)
-                    m.next = "RESTORE_CALL"
+                    m.next = "FETCH_THREAD_HDR"
 
             with m.State("RESTORE_CALL"):
                 m.d.comb += [
                     mload_src.eq(8),
                     mload_dst.eq(cr_index),
-                    # Thread.caps[n] is at thread_lump_base + (THREAD_CAPS_OFFSET+n)*4.
+                    # Thread.caps[n] begins at header-derived capsStart.
                     # CR8.word1_location = thread_lump_base (set by LOAD_THREAD ns_gate).
-                    # Using THREAD_CAPS_OFFSET+cr_index addresses caps[0] at word 244
-                    # and caps[n] at word 244+n, matching the hardware thread layout.
-                    mload_index.eq(THREAD_CAPS_OFFSET + cr_index),
+                    mload_index.eq(thread_caps_start + cr_index),
                 ]
                 with m.If(skip_current_cr):
                     m.d.sync += cr_index.eq(cr_index + 1)
@@ -823,7 +834,34 @@ class ChurchChange(Elaboratable):
                         thread_hdr_reg.eq(self.mem_rd_data),
                         restore_rd_armed.eq(0),
                     ]
-                    m.next = "INSTALL_CR5"
+                    # Validate every restored Thread header, not just the
+                    # scheduler's preflight copy.  Its size comes exclusively
+                    # from n_minus_6; cc is never a heap-size field.
+                    with m.If(
+                        (self.mem_rd_data[27:32] == 0x1F) &
+                        (self.mem_rd_data[8:10] == 2) &
+                        (self.mem_rd_data[23:27] >= THREAD_MIN_N_MINUS_6) &
+                        (self.mem_rd_data[23:27] <= THREAD_MAX_N_MINUS_6) &
+                        (self.mem_rd_data[10:23] > 0) &
+                        (self.mem_rd_data[0:8] == THREAD_CAP_WORDS) &
+                        (self.mem_rd_data[10:23] <
+                         ((Const(1, 15) <<
+                           (self.mem_rd_data[23:27] + 6)) - 30))
+                    ):
+                        with m.If(restore_homes_after_hdr):
+                            m.d.sync += [
+                                restore_homes_after_hdr.eq(0),
+                                cr_index.eq(0),
+                            ]
+                            m.next = "RESTORE_CALL"
+                        with m.Else():
+                            m.next = "INSTALL_CR5"
+                    with m.Else():
+                        m.d.sync += [
+                            fault_latched.eq(1),
+                            fault_type_latched.eq(FaultType.BOUNDS),
+                        ]
+                        m.next = "FAULT"
 
             with m.State("INSTALL_CR5"):
                 # Synthesise the Zone ④ heap GT from the incoming thread's lump header
