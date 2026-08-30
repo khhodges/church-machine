@@ -266,6 +266,22 @@ const uiBootBase = uiSim.readNSEntry(1).word0_location;
 const uiBootLayout = uiSim._threadLayoutAtBase(uiBootBase);
 const uiBootEntryGT = uiSim.memory[uiBootBase + uiBootLayout.capsStart] >>> 0;
 uiSim._writeCR(0, uiBootEntryGT, uiSim.readNSEntry(uiBootEntryGT & 0xFFFF));
+uiSim.pc = 0x2A;
+const initialThreadRows = uiSim.threadStatusRows();
+assert.strictEqual(initialThreadRows.length, 3,
+    'Thread status strip shows only the three configured Thread images');
+assert.strictEqual(initialThreadRows[0].active, true,
+    'Thread status strip highlights the selected Thread');
+assert.strictEqual(initialThreadRows[0].nia, 0x2A,
+    'active Thread status uses the live logical NIA');
+assert.strictEqual(initialThreadRows[1].nia, null,
+    'never-selected dormant Threads do not invent a persisted NIA');
+assert(initialThreadRows.every(row => row.gtPetName && row.gtPetName !== 'Invalid GT'),
+    'each configured Thread status resolves a GT pet name');
+assert.strictEqual(uiSim.threadStatusRows(99).length, 3,
+    'Thread status output remains capped by the configured Thread count');
+assert.strictEqual(uiSim.threadStatusRows(2).length, 2,
+    'Thread status output honours a smaller requested display limit');
 const button = {
     disabled: false,
     attrs: {},

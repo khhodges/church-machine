@@ -66,7 +66,7 @@
     <link rel="icon" type="image/svg+xml" sizes="16x16" href="favicon.svg">
     <link rel="stylesheet" href="styles-base.css?v=20260829-reference-viewer1">
     <link rel="stylesheet" href="styles-landing.css?v=20260820-card-dnd2">
-    <link rel="stylesheet" href="styles-toolbar.css?v=20260710a">
+    <link rel="stylesheet" href="styles-toolbar.css?v=20260830-thread-status1">
     <link rel="stylesheet" href="styles-editor.css?v=20260820-petname-help1">
     <link rel="stylesheet" href="styles-dashboard.css?v=20260830-thread-heap-formula1">
     <link rel="stylesheet" href="styles-lumps.css?v=20260820-draft2">
@@ -656,6 +656,7 @@
             <button class="dash-tab" id="dashTab-gatelog" onclick="switchDashTab('gatelog')" data-tooltip="Gate Log — mLoad / mSave from last Step">Gate Log</button>
             <button class="dash-tab" id="dashTab-state" onclick="switchDashTab('state')" data-tooltip="State — Machine Architecture info">State</button>
             <button class="dash-tab" id="dashTab-memstats" onclick="switchDashTab('memstats')" data-tooltip="Memory — Foundation Layer Status">Mem</button>
+            <div id="threadIdentityStrip" class="thread-identity-strip" aria-label="Configured Thread NIA and GT dot pet names" aria-live="polite"></div>
         </div>
         <div id="dashPanel-cr" class="dash-panel active">
             <div class="panel">
@@ -3280,7 +3281,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="abstract_gt_manager.js"></script>
     <script src="thread_design.js?v=20260830-thread-dynamic2"></script>
     <script src="architecture_contracts.js?v=20260830-architecture-contracts1"></script>
-    <script src="simulator.js?v=20260830-thread-dynamic2"></script>
+    <script src="simulator.js?v=20260830-thread-status1"></script>
     <script src="capability_tokens.js?v=20260820-next2"></script>
     <script src="portable_lump_binding.js?v=20260830-v1"></script>
     <script src="assembler.js?v=20260820-named-capability1"></script>
@@ -3329,7 +3330,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="app-editor-find.js?v=20260815a"></script>
     <script src="lump_save_handler.js?v=20260815a"></script>
     <script src="whats-new-feed.js?v=20260823a"></script>
-     <script src="app-run.js?v=20260830-popup-audit1"></script>
+     <script src="app-run.js?v=20260830-thread-status1"></script>
     <script src="app-build-approval.js?v=20260821a"></script>
     <script src="app-source-library.js?v=20260720h"></script>
     <script src="app-invoke.js?v=20260821-modal-trap"></script>

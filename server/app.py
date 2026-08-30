@@ -4741,8 +4741,6 @@ def switch_lifecycle_html():
 
 BOOK_CHAPTERS = [
     ("Getting Started", [
-        {"type": "link", "label": "🎞 IDE Introduction", "artifact_port": 21279, "artifact_path": "/ide-intro/", "production_path": "/ide-intro/"},
-        {"type": "link", "label": "📄 Facilitator Handout", "artifact_port": 21279, "artifact_path": "/ide-intro/handout", "production_path": "/ide-intro/handout"},
         "quick-start.md",
         "board-connectivity.md",
         "cloomc-foundation.md",
@@ -4922,9 +4920,9 @@ def docs_list():
     return jsonify({"docs": flat_docs, "chapters": chapters, "figures": figures})
 
 # Ports that the UI is allowed to probe via /api/artifact-reachable.
-# Derived at import time from BOOK_CHAPTERS so there is a single source of
-# truth; add new artifact ports to BOOK_CHAPTERS, not here.
-_ARTIFACT_ALLOWED_PORTS: "frozenset[int]" = frozenset(
+# The introduction remains reachable from the dedicated Docs toolbar and
+# hamburger controls even though it is intentionally absent from BOOK_CHAPTERS.
+_ARTIFACT_ALLOWED_PORTS: "frozenset[int]" = frozenset({21279}) | frozenset(
     item["artifact_port"]
     for _, entries in BOOK_CHAPTERS
     for item in entries
@@ -4935,7 +4933,7 @@ _ARTIFACT_ALLOWED_PORTS: "frozenset[int]" = frozenset(
 def artifact_reachable():
     """Check whether a known artifact dev server port is accepting connections.
 
-    Only ports explicitly listed in BOOK_CHAPTERS are probed; any other port
+    Only ports used by an explicit IDE artifact control are probed; any other port
     returns the same generic {"ok": false} so the endpoint cannot be used as a
     port-scanning oracle against arbitrary loopback services.
 

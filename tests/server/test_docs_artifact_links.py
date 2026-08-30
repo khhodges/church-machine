@@ -96,7 +96,7 @@ def test_production_links_have_zero_port_and_production_url(client):
 # DAL-2: dev workspace (REPLIT_DEV_DOMAIN is set)
 # ---------------------------------------------------------------------------
 
-def test_dev_links_have_nonzero_port_and_proxy_url(client):
+def test_dev_docs_menu_omits_intro_links(client):
     """With REPLIT_DEV_DOMAIN set, link entries must stay on the IDE origin
     rather than using a reset-sensitive port-prefixed development URL."""
     fake_domain = 'test-domain.replit.dev'
@@ -125,9 +125,9 @@ def test_dev_links_have_nonzero_port_and_proxy_url(client):
             f"got url={entry['url']!r}"
         )
 
-    urls_by_label = {entry['label']: entry['url'] for entry in link_entries}
-    assert urls_by_label['🎞 IDE Introduction'].endswith('/ide-intro/')
-    assert urls_by_label['📄 Facilitator Handout'].endswith('/ide-intro/handout')
+    labels = {entry['label'] for entry in link_entries}
+    assert '🎞 IDE Introduction' not in labels
+    assert '📄 Facilitator Handout' not in labels
 
 
 # ---------------------------------------------------------------------------
@@ -135,7 +135,7 @@ def test_dev_links_have_nonzero_port_and_proxy_url(client):
 # ---------------------------------------------------------------------------
 
 def test_artifact_reachable_rejects_non_allowlisted_port(client):
-    """Ports not in the BOOK_CHAPTERS allowlist must be rejected (400) so the
+    """Ports not used by explicit artifact controls must be rejected (400) so the
     endpoint cannot enumerate arbitrary loopback services."""
     resp = client.get('/api/artifact-reachable?port=5000')
     assert resp.status_code == 400

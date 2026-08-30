@@ -888,6 +888,11 @@ class ChurchSimulator {
         this._instrHistory = [];
         this._currentInstrLabel = null;
         this._currentThreadSlot = 1;
+        // UI-only per-Thread NIA history. Thread images intentionally do not
+        // persist NIA, so this map must never be serialized into a LUMP or used
+        // as execution authority. It only lets the dashboard keep the last
+        // observed NIA visible while another configured Thread is selected.
+        this._threadNias = new Map();
         this.faultViolationData = null;   // populated by B:00 FAULT_RST from last faultLog entry
         // Last complete state received from physical Wukong.  This is kept
         // separately from simulator breakpoint state and includes the raw
@@ -1060,6 +1065,7 @@ class ChurchSimulator {
         this.timerRegs   = [0, 0, 0, 0, 0];
         this.lastSignedReturn = null;
         this._currentInstrLabel = null;
+        if (this._threadNias) this._threadNias.clear();
         this.output += '[PP250] Machine state cleared. Re-entering boot sequence.\n';
         this.emit('stateChange', this.getState());
     }
@@ -4438,6 +4444,77 @@ class ChurchSimulator {
         return slots.concat(generated.map(item => item.slot));
     }
 
+    _rememberActiveThreadNia() {
+        if (!this._threadNias) this._threadNias = new Map();
+        if (Number.isInteger(this._currentThreadSlot) && Number.isInteger(this.pc)) {
+            this._threadNias.set(this._currentThreadSlot, this.pc >>> 0);
+        }
+    }
+
+    _threadDisplayGT(slot, activeSlot) {
+        // CR14 is the live executable GT. A dormant Thread persists CR0–CR11
+        // only, so its CR0 entry GT is the best truthful preview until selected.
+        if (slot === activeSlot) {
+            const liveCodeGT = this.cr && this.cr[14] ? (this.cr[14].word0 >>> 0) : 0;
+            if (liveCodeGT && !ChurchSimulator.isNullGT(liveCodeGT)) return liveCodeGT;
+            const liveEntryGT = this.cr && this.cr[0] ? (this.cr[0].word0 >>> 0) : 0;
+            if (liveEntryGT && !ChurchSimulator.isNullGT(liveEntryGT)) return liveEntryGT;
+        }
+        const entry = this.readNSEntry(slot);
+        if (!entry) return 0;
+        const layout = this._threadLayoutAtBase(entry.word0_location);
+        if (!layout || !Number.isInteger(layout.capsStart)) return 0;
+        return this.memory[entry.word0_location + layout.capsStart] >>> 0;
+    }
+
+    _threadDisplayGTIdentity(gtWord) {
+        gtWord = gtWord >>> 0;
+        if (!gtWord || ChurchSimulator.isNullGT(gtWord)) {
+            return { gtTargetSlot: null, gtPetName: 'No entry GT' };
+        }
+        try {
+            const parsed = this.parseGT(gtWord);
+            if (parsed.type === 3) {
+                return { gtTargetSlot: null, gtPetName: 'Abstract GT' };
+            }
+            const identity = this.getSlotIdentity(parsed.index);
+            return {
+                gtTargetSlot: parsed.index,
+                gtPetName: (identity && identity.dotName) ||
+                    this.nsLabels[parsed.index] || `NS[${parsed.index}]`,
+            };
+        } catch (_e) {
+            return { gtTargetSlot: null, gtPetName: 'Invalid GT' };
+        }
+    }
+
+    threadStatusRows(maxRows = 4) {
+        this._rememberActiveThreadNia();
+        const requested = Number.isInteger(maxRows) ? maxRows : 4;
+        const limit = Math.max(0, Math.min(4, requested));
+        const slots = this.configuredThreadSlots().slice(0, limit);
+        const activeSlot = Number.isInteger(this._currentThreadSlot)
+            ? this._currentThreadSlot : 1;
+        return slots.map((slot, index) => {
+            const active = slot === activeSlot;
+            const gtWord = this._threadDisplayGT(slot, activeSlot);
+            const gtIdentity = this._threadDisplayGTIdentity(gtWord);
+            const hasObservedNia = active || this._threadNias.has(slot);
+            return {
+                slot,
+                name: slot === 1 ? 'Thread.1'
+                    : (this.nsLabels[slot] || `Thread slot ${slot}`),
+                position: index + 1,
+                active,
+                nia: hasObservedNia
+                    ? (active ? (this.pc >>> 0) : (this._threadNias.get(slot) >>> 0))
+                    : null,
+                gtWord,
+                ...gtIdentity,
+            };
+        });
+    }
+
     activeThreadStatus() {
         const slots = this.configuredThreadSlots();
         const activeSlot = Number.isInteger(this._currentThreadSlot)
@@ -4465,6 +4542,7 @@ class ChurchSimulator {
         if (this.running) {
             return { ok: false, reason: 'Pause execution before switching Threads' };
         }
+        this._rememberActiveThreadNia();
         const slots = this.configuredThreadSlots();
         if (!slots.length) return { ok: false, reason: 'No configured Thread context is available' };
         if (slots.length === 1) return { ok: true, unchanged: true, ...this.activeThreadStatus() };

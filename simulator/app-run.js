@@ -1053,6 +1053,7 @@ let _runClickTimer = null;
 function updateThreadControl() {
     const button = document.getElementById('nextThreadBtn');
     const status = document.getElementById('activeThreadStatus');
+    if (typeof updateThreadIdentityStrip === 'function') updateThreadIdentityStrip();
     if (!sim || typeof sim.activeThreadStatus !== 'function') return;
     const state = sim.activeThreadStatus();
     if (status) status.textContent = `${state.name} · ${state.position}/${state.count}`;
@@ -1070,6 +1071,67 @@ function updateThreadControl() {
                 : 'Next Thread — pause execution before switching Threads')
             : `Next Thread — switch to ${state.slots[(state.position % state.count)] === 1 ? 'Thread.1' : (sim.nsLabels[state.slots[(state.position % state.count)]] || 'next Thread')}`);
     }
+}
+
+function updateThreadIdentityStrip() {
+    const strip = document.getElementById('threadIdentityStrip');
+    if (!strip) return;
+    if (!sim || typeof sim.threadStatusRows !== 'function') {
+        strip.replaceChildren();
+        strip.hidden = true;
+        return;
+    }
+
+    const rows = sim.threadStatusRows(4);
+    strip.replaceChildren();
+    strip.hidden = rows.length === 0;
+    rows.forEach((row) => {
+        const card = document.createElement('div');
+        card.className = `thread-identity-card${row.active ? ' is-active' : ''}`;
+        const niaText = Number.isInteger(row.nia)
+            ? `0x${(row.nia >>> 0).toString(16).toUpperCase().padStart(4, '0')}`
+            : '\u2014';
+        const gtName = row.gtPetName || 'No entry GT';
+        card.setAttribute('aria-label',
+            `${row.name}${row.active ? ', active' : ''}; NIA ${niaText}; GT dot pet name ${gtName}`);
+        card.setAttribute('title',
+            `${row.name}${row.active ? ' (active)' : ''}\nNIA ${niaText}\nGT dot pet name: ${gtName}`);
+
+        const marker = document.createElement('span');
+        marker.className = 'thread-identity-marker';
+        marker.setAttribute('aria-hidden', 'true');
+
+        const name = document.createElement('span');
+        name.className = 'thread-identity-name';
+        name.textContent = row.name;
+
+        const nia = document.createElement('span');
+        nia.className = 'thread-identity-value';
+        const niaKey = document.createElement('span');
+        niaKey.className = 'thread-identity-key';
+        niaKey.textContent = 'NIA';
+        const niaCode = document.createElement('code');
+        niaCode.textContent = niaText;
+        nia.append(niaKey, niaCode);
+
+        const values = document.createElement('span');
+        values.className = 'thread-identity-values';
+        values.appendChild(nia);
+
+        const gt = document.createElement('span');
+        gt.className = 'thread-identity-value thread-identity-gt';
+        const gtKey = document.createElement('span');
+        gtKey.className = 'thread-identity-key';
+        gtKey.textContent = 'GT';
+        const gtLabel = document.createElement('span');
+        gtLabel.className = 'thread-identity-petname';
+        gtLabel.textContent = gtName;
+        gt.append(gtKey, gtLabel);
+        values.appendChild(gt);
+
+        card.append(marker, name, values);
+        strip.appendChild(card);
+    });
 }
 
 function nextConfiguredThread() {

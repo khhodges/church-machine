@@ -935,11 +935,13 @@
 
 .dash-tabs {
     display: flex;
+    align-items: center;
     gap: 0.4rem;
     margin-bottom: 0.5rem;
     padding: 0.4rem;
     background: #0d1b2a;
     border-radius: 6px;
+    min-width: 0;
 }
 
 .dash-tab {
@@ -966,6 +968,149 @@
     color: white;
     border-color: var(--accent);
     box-shadow: 0 0 10px rgba(233, 69, 96, 0.4);
+}
+
+.thread-identity-strip {
+    display: flex;
+    align-items: stretch;
+    justify-content: flex-end;
+    gap: 0.32rem;
+    min-width: 0;
+    margin-left: auto;
+    overflow: hidden;
+}
+
+.thread-identity-strip[hidden] {
+    display: none;
+}
+
+.thread-identity-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+        "marker name"
+        "marker values";
+    align-items: center;
+    column-gap: 0.32rem;
+    min-width: 8.5rem;
+    max-width: 13.5rem;
+    padding: 0.24rem 0.42rem;
+    border: 1px solid rgba(58, 134, 255, 0.28);
+    border-radius: 5px;
+    background: rgba(11, 23, 38, 0.82);
+    color: #a9b8cb;
+    font-family: 'Courier New', monospace;
+    line-height: 1.15;
+    overflow: hidden;
+}
+
+.thread-identity-card.is-active {
+    border-color: rgba(218, 165, 32, 0.72);
+    background: linear-gradient(135deg, rgba(77, 56, 12, 0.52), rgba(16, 30, 48, 0.92));
+    box-shadow: 0 0 8px rgba(218, 165, 32, 0.13);
+}
+
+.thread-identity-marker {
+    grid-area: marker;
+    width: 0.38rem;
+    height: 0.38rem;
+    border-radius: 50%;
+    background: #42536a;
+    box-shadow: 0 0 0 2px rgba(66, 83, 106, 0.18);
+}
+
+.thread-identity-card.is-active .thread-identity-marker {
+    background: #daa520;
+    box-shadow: 0 0 7px rgba(218, 165, 32, 0.7);
+}
+
+.thread-identity-name {
+    grid-area: name;
+    min-width: 0;
+    color: #d7e2f0;
+    font-size: 0.62rem;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.thread-identity-values {
+    grid-area: values;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.22rem;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.thread-identity-value {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.22rem;
+    min-width: 0;
+    margin-right: 0.4rem;
+    font-size: 0.57rem;
+    white-space: nowrap;
+}
+
+.thread-identity-value code {
+    color: #8fc8ff;
+    font-size: inherit;
+}
+
+.thread-identity-gt {
+    margin-left: auto;
+    margin-right: 0;
+    overflow: hidden;
+}
+
+.thread-identity-key {
+    color: #65778d;
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
+.thread-identity-petname {
+    min-width: 0;
+    color: #8de3c5;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.thread-identity-card.is-active .thread-identity-name {
+    color: #f0d47b;
+}
+
+@media (max-width: 1180px) {
+    .thread-identity-card {
+        min-width: 7.3rem;
+        max-width: 9rem;
+    }
+
+    .thread-identity-gt {
+        margin-left: auto;
+    }
+}
+
+@media (max-width: 900px) {
+    .dash-tabs {
+        flex-wrap: wrap;
+    }
+
+    .thread-identity-strip {
+        flex: 1 1 100%;
+        justify-content: flex-start;
+        order: 2;
+        overflow-x: auto;
+        padding-top: 0.08rem;
+    }
+
+    .thread-identity-card {
+        flex: 1 0 9rem;
+        max-width: 14rem;
+    }
 }
 
 [data-tooltip] {
