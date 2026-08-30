@@ -246,3 +246,10 @@ uri = "file://build/release-candidate-v17/church_wukong_xc7a100t.mcs"
 type = "unspecified"
 title = "Wukong v17 persistent MCS image"
 description = "QMTECH Wukong XC7A100T persistent-flash image. SHA-256: d609e72a5f0c84ea32b184c4491e36349c103dd75bf84678949f5857b8c17684. Size: 10,521,876 bytes."
+
+[[outputs]]
+id = "b8FcxlmEy17bxaLmEiROH"
+uri = "file://docs/portable-lump-compilation-and-fpga-loading.md"
+type = "text"
+title = "Portable LUMP Compilation and FPGA Loading"
+description = "Architecture draft covering universal names, content token T, local Golden Token bindings, secure dependency verification, IDE behavior, and FPGA/Wukong loading."
