@@ -246,8 +246,8 @@
             if (z.words <= 0) return '';
             var pct = (z.words / total * 100).toFixed(2);
             var clickAttr = z.onclick ? ' onclick="' + z.onclick + '" style="flex:' + z.words + ';cursor:pointer"' : ' style="flex:' + z.words + '"';
-            return '<div class="le-bar-zone ' + esc(z.cls) + '"' + clickAttr + ' title="' + esc(z.label + ': ' + z.words.toLocaleString() + ' words' + (z.onclick ? ' — click to open' : '')) + '">' +
-                   '<span class="le-bar-label">' + esc(z.label) + '</span>' +
+             return '<div class="le-bar-zone ' + esc(z.cls) + '"' + clickAttr + ' title="' + esc(z.label + ': ' + z.words.toLocaleString() + ' words' + (z.onclick ? ' — click to open' : '')) + '">' +
+                    '<span class="le-bar-label">' + esc(z.label) + (z.formula ? '<span class="le-bar-formula">' + esc(z.formula) + '</span>' : '') + '</span>' +
                    '<span class="le-bar-pct">' + esc(pct + '%') + '</span></div>';
         }).join('') + '</div>';
     }
@@ -262,8 +262,8 @@
             var flex = Math.max(z.words, floor);
             var realPct = (z.words / total * 100).toFixed(2);
             var clickAttr = z.onclick ? ' onclick="' + z.onclick + '" style="flex:' + flex + ';cursor:pointer"' : ' style="flex:' + flex + '"';
-            return '<div class="le-bar-zone ' + esc(z.cls) + '"' + clickAttr + ' title="' + esc(z.label + ': ' + z.words.toLocaleString() + ' words  (' + realPct + '%)' + (z.onclick ? ' — click to open' : '')) + '">' +
-                   '<span class="le-bar-label">' + esc(z.label) + '</span>' +
+             return '<div class="le-bar-zone ' + esc(z.cls) + '"' + clickAttr + ' title="' + esc(z.label + ': ' + z.words.toLocaleString() + ' words  (' + realPct + '%)' + (z.onclick ? ' — click to open' : '')) + '">' +
+                    '<span class="le-bar-label">' + esc(z.label) + (z.formula ? '<span class="le-bar-formula">' + esc(z.formula) + '</span>' : '') + '</span>' +
                    '<span class="le-bar-pct">' + esc(z.words.toLocaleString() + ' w') + '</span></div>';
         }).join('') + '</div>';
     }
@@ -927,7 +927,7 @@
             { label: 'Header',    words: 1,           cls: 'le-zone-hdr'   },
             { label: 'Data Regs', words: DR_WORDS,    cls: 'le-zone-dr'    },
             { label: 'Protected STO', words: 1,         cls: 'le-zone-hdr'   },
-            { label: 'Heap',      words: heap,          cls: 'le-zone-heap'  },
+             { label: 'Heap',      words: heap,          cls: 'le-zone-heap', formula: heapFormula },
             { label: 'Stack',     words: stackWords,   cls: 'le-zone-stack' },
             { label: 'Cap Regs',  words: CAP_WORDS,   cls: 'le-zone-caps'  }
         ];

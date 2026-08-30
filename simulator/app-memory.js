@@ -2091,6 +2091,7 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
     const threadHeapStart = TL.protectedStoOffset + 1;
     const threadHeapEnd = threadStackStart - 1;
     const threadHeapWords = Math.max(0, threadHeapEnd - threadHeapStart + 1);
+    const threadHeapFormula = 'HeapWords = 2^((n−6)+6) − cw − 30';
 
     // ── Sticky header block (title + lump header) ─────────────────────────
     const headerWord = TL.headerWord;
@@ -2139,7 +2140,7 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
     for (let i = threadHeapStart; i <= threadHeapEnd; i++) {
         if (sim.memory[slotBase + i]) heapNonZero++;
     }
-    html += secHdr('④', 'Heap ↑', `${threadHeapWords} words · offset +${threadHeapStart} … +${threadHeapEnd} · base ${addrOf(threadHeapStart)} · grows when lump size grows · ${heapNonZero} word${heapNonZero!==1?'s':''} allocated`, '#22c55e', 'thread-zone-4');
+    html += secHdr('④', 'Heap ↑', `${threadHeapWords} words · ${threadHeapFormula} · offset +${threadHeapStart} … +${threadHeapEnd} · base ${addrOf(threadHeapStart)} · grows when lump size grows · ${heapNonZero} word${heapNonZero!==1?'s':''} allocated`, '#22c55e', 'thread-zone-4');
     html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>Offset</th><th>Addr</th><th>Hex</th><th>Decoded</th></tr></thead><tbody>';
     for (let i = 0; i < threadHeapWords; i++) {
         const off  = threadHeapStart + i;

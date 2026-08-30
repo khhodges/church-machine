@@ -1001,6 +1001,17 @@
     max-width: 90%;
 }
 
+.le-bar-formula {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.48rem;
+    line-height: 1.1;
+    font-weight: 400;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+}
+
 .le-bar-pct {
     font-size: 0.58rem;
     color: rgba(255,255,255,0.55);
