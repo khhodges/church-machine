@@ -10,6 +10,6 @@ The lump "Viewing: <name>" label must be updated synchronously at every selectio
 
 **Why:** The historical bug wired the label update to deferred detail-data loading, so on page reload the label flickered or never appeared depending on fetch timing.
 
-**How to apply:** When touching lump list/detail rendering, keep the synchronous label-update call sites; the update helper is idempotent (returns early when the registry has no data yet). Cross-script functions in the classic-script UI are exported explicitly on `window` and called behind a `typeof` guard.
+**How to apply:** When touching lump list/detail rendering, keep the synchronous label-update call sites; the update helper is idempotent (returns early when the registry has no data yet). While CR14 identifies a saved live LUMP, that live token is authoritative over browsing history so the green Live LUMP header and repository “Viewing” detail cannot show different identities. Cross-script functions in the classic-script UI are exported explicitly on `window` and called behind a `typeof` guard.
 
 See also: docs/CM_LUMP_SPECIFICATION.md — Developer Traps and Implementation Rules section.

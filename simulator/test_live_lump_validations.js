@@ -194,5 +194,14 @@ check('fault and recovery rendering remains before the validation section',
     appTools.indexOf('// ── Fault banner') < appTools.indexOf('html += _renderLiveLumpValidations(liveValidations);') &&
     appTools.indexOf('// ── Fault Recovery Timeline') < appTools.indexOf('html += _renderLiveLumpValidations(liveValidations);'));
 
+const appAbstractions = fs.readFileSync(path.join(__dirname, 'app-abstractions.js'), 'utf8');
+const livePriority = appAbstractions.indexOf('if (_liveSaved) {');
+const historyFallback = appAbstractions.indexOf('localStorage.getItem(\'lastSelectedLumpToken\')', livePriority);
+check('live CR14 LUMP is selected before repository browsing history',
+    livePriority >= 0 && historyFallback > livePriority);
+check('live LUMP changes synchronize the repository detail identity',
+    appAbstractions.includes('function _syncLumpRepositoryToLive(state)') &&
+    appAbstractions.includes('_syncLumpRepositoryToLive(state);'));
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

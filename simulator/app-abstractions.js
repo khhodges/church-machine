@@ -820,30 +820,23 @@ async function renderLumps() {
             }
         }
 
-        // Live-state default: browsing history wins over boot state.
+        // Keep the Live LUMP banner and repository detail on one identity.
         // Priority order:
         //   1. Pending token (already consumed above) — highest priority.
-        //   2. lastSelectedLumpToken from localStorage — explicit user pick
-        //      survives reload and is never overridden by the boot CR14 state.
-        //   3. Live CR14 slot via sim.lumpTokenAtSlot() — only when the user
-        //      has never selected a lump in this browser (first-ever visit).
-        if (!_pendingTokenResolved && window.LumpRegistry && !window.LumpRegistry.getCurrent()) {
-            // Check explicit user-selection history before touching live state.
-            let _histToken = null;
-            try { _histToken = localStorage.getItem('lastSelectedLumpToken'); } catch (_e) {}
-            if (_histToken) {
-                window.LumpRegistry.setCurrent(_histToken);
-            } else {
-                // True first-visit fallback: use whatever CR14 currently points
-                // to (may be SelfTest at boot, but that is acceptable when the
-                // user has never chosen anything from the Lumps view before).
-                const _liveState = (typeof _getLiveLumpState === 'function') ? _getLiveLumpState() : null;
-                if (_liveState && _liveState.nsIdx !== null && _liveState.nsIdx !== undefined) {
-                    const _liveToken = (typeof sim !== 'undefined' && sim &&
-                                       typeof sim.lumpTokenAtSlot === 'function')
-                        ? sim.lumpTokenAtSlot(_liveState.nsIdx) : null;
-                    if (_liveToken) window.LumpRegistry.setCurrent(_liveToken);
-                }
+        //   2. Live CR14 token — the green header and "Viewing" detail must agree.
+        //   3. Browsing history — only when there is no live executable LUMP.
+        if (!_pendingTokenResolved && window.LumpRegistry) {
+            const _liveState = (typeof _getLiveLumpState === 'function') ? _getLiveLumpState() : null;
+            const _liveToken = (_liveState && typeof sim !== 'undefined' && sim &&
+                                typeof sim.lumpTokenAtSlot === 'function')
+                ? sim.lumpTokenAtSlot(_liveState.nsIdx) : null;
+            const _liveSaved = _liveToken && lumps.some(l => l.token === _liveToken);
+            if (_liveSaved) {
+                window.LumpRegistry.setCurrent(_liveToken);
+            } else if (!window.LumpRegistry.getCurrent()) {
+                let _histToken = null;
+                try { _histToken = localStorage.getItem('lastSelectedLumpToken'); } catch (_e) {}
+                if (_histToken) window.LumpRegistry.setCurrent(_histToken);
             }
         }
 
@@ -1187,7 +1180,24 @@ window._lumpSortChanged = function(val) {
 // updateDashboard() (no-op when the banner element is not in the DOM).
 
 let _liveLumpLastNsIdx = null;
+let _liveLumpLastToken = null;
 let _liveLumpInputCache = { name: '', version: '' };
+
+function _syncLumpRepositoryToLive(state) {
+    if (!state || !window.LumpRegistry || typeof sim === 'undefined' || !sim ||
+            typeof sim.lumpTokenAtSlot !== 'function') return;
+    const token = sim.lumpTokenAtSlot(state.nsIdx);
+    if (!token || token === _liveLumpLastToken) return;
+    _liveLumpLastToken = token;
+    if (!Array.isArray(_lumpsCache) || !_lumpsCache.some(l => l.token === token)) return;
+    if (window.LumpRegistry.getCurrent() === token) return;
+
+    window.LumpRegistry.setCurrent(token);
+    const picker = document.getElementById('lumpPickerSelect');
+    if (picker) picker.value = token;
+    if (typeof _updateLumpViewingLabel === 'function') _updateLumpViewingLabel(token);
+    if (typeof showLumpDetail === 'function') showLumpDetail(token);
+}
 
 function updateLiveLumpBanner() {
     const el = document.getElementById('liveLumpBanner');
@@ -1197,10 +1207,12 @@ function updateLiveLumpBanner() {
     const state = (typeof _getLiveLumpState === 'function') ? _getLiveLumpState() : null;
     if (!state) {
         _liveLumpLastNsIdx = null;
+        _liveLumpLastToken = null;
         _liveLumpInputCache = { name: '', version: '' };
         el.innerHTML = '<div class="live-lump-banner live-lump-banner-empty">\u2014 simulator not running \u2014</div>';
         return;
     }
+    _syncLumpRepositoryToLive(state);
     const e = _escHtml;
     const nsChanged = (state.nsIdx !== _liveLumpLastNsIdx);
     _liveLumpLastNsIdx = state.nsIdx;
