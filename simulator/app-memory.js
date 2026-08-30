@@ -3619,12 +3619,15 @@ function _nsTableAddConfirm() {
         // Static: use user-specified slot, or fall back to auto-allocate.
         let slot;
         if (slotPolicy === 'dynamic') {
-            slot = sim.allocOrFindNsSlot(token, name);
+            // Probe for a free slot without reserving this token yet.  The
+            // identity and Outform preflight below can still reject the LUMP;
+            // reserving early would make the picker hide a failed install as
+            // though it were already present.
+            slot = sim.allocOrFindNsSlot(null, name);
         } else if (userSlot !== null) {
             slot = userSlot;
-            if (sim._tokenSlotMap) sim._tokenSlotMap.set(token, slot);
         } else {
-            slot = sim.allocOrFindNsSlot(token, name);
+            slot = sim.allocOrFindNsSlot(null, name);
         }
         if (slot === null) return Promise.reject('Namespace table is full');
 
@@ -3667,11 +3670,6 @@ function _nsTableAddConfirm() {
             );
         }
         words = _identity.words;
-
-        const copyLen = Math.min(words.length, EXTENDED_STRIDE);
-        for (let wi = 0; wi < copyLen; wi++) {
-            sim.writePersistentWord(lumpBase + wi, words[wi]);
-        }
 
         // limit17: always hdr.cw (real grant interval) regardless of load mode.
         // For Lazy Load the header word is zeroed after the c-list is written so
@@ -3772,12 +3770,21 @@ function _nsTableAddConfirm() {
             }, { secure: true });
         }
 
+        // All validation has now succeeded.  Only now may the LUMP body or
+        // token map mutate, so a rejected install leaves no hidden picker entry
+        // and no orphaned body in programmable memory.
+        const copyLen = Math.min(words.length, EXTENDED_STRIDE);
+        for (let wi = 0; wi < copyLen; wi++) {
+            sim.writePersistentWord(lumpBase + wi, words[wi]);
+        }
+
         // Write NS entry with the verified identity type. W3 = cache token (T).
         sim.withNamespaceWrite('manual Namespace Add', function() {
             sim.writeNSEntry(slot, lumpBase, limit17, 0, 0, effectiveGtType,
                 _identity.ordinary ? _identity.entry.seq : slotGtSeq, hdr.cc,
                 _identity.ordinary ? _identity.entry.cacheToken : w3CacheToken);
         });
+        if (sim._tokenSlotMap) sim._tokenSlotMap.set(token, slot);
         sim.nsLabels[slot] = name;
 
         // Persist slot→label to boot-config so the label survives hard resets.

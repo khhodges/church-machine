@@ -22,6 +22,7 @@
 //   T106 — _nsPopulateAddMeta pre-selects 'dynamic' when sidecar explicitly
 //           sets ns_slot_policy='dynamic' (even if a slot is also stored)
 //   T107 — _nsPopulateAddMeta sets ns_slot input to empty when ns_slot is null
+//   T108 — failed identity validation cannot reserve a token or copy a body
 
 const vm   = require('vm');
 const fs   = require('fs');
@@ -478,6 +479,21 @@ console.log('\n--- T107: ns_slot input empty when ns_slot is null ---');
     check('T107: _nsSlotInput value is empty string when ns_slot=null',
         nsSlotInputValue(html) === '');
 })().catch(e => { console.error('T107 error:', e); fail++; });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// T108 — reject before any token reservation or persistent body mutation
+// ═══════════════════════════════════════════════════════════════════════════════
+console.log('\n--- T108: failed identity validation leaves no phantom install ---');
+const secureOutformGuardPos = confirmFnSrc.indexOf('Secure Outform requires trusted identity metadata');
+const persistentWritePos = confirmFnSrc.indexOf('sim.writePersistentWord(');
+const namespaceWritePos = confirmFnSrc.indexOf('sim.writeNSEntry(');
+const tokenCommitPos = confirmFnSrc.indexOf('sim._tokenSlotMap.set(token, slot)');
+check('T108a: dynamic allocation probes without reserving the LUMP token',
+    !confirmFnSrc.includes('sim.allocOrFindNsSlot(token, name)'));
+check('T108b: secure Outform validation runs before persistent body writes',
+    secureOutformGuardPos >= 0 && persistentWritePos > secureOutformGuardPos);
+check('T108c: token becomes picker-occupied only after the Namespace entry is written',
+    namespaceWritePos >= 0 && tokenCommitPos > namespaceWritePos);
 
 // ── Final summary ─────────────────────────────────────────────────────────────
 setImmediate(() => setImmediate(() => {
