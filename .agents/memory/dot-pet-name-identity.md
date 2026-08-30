@@ -58,3 +58,26 @@ No UI yet; set manually in browser console. SelfTest sidecar backfilled with `pe
 
 ## Open: hardware resolution
 The self GT bits[24:0] are an identity fingerprint. The hardware resolution path (how the CM uses this GT to verify on CALL) is not yet specified. The IDE-side proof bar works entirely in Python/JS without hardware involvement.
+
+## Portable compilation versus local binding
+
+Universal pet names are the portable capability references. Compilation must preserve
+references such as `petname.Abstraction#n` symbolically and must not require the
+current simulator Namespace/device registry to resolve them. `Self` is an intrinsic
+alias for the current LUMP's own canonical identity, not an ordinary registry lookup.
+
+The destination simulator or FPGA performs the second phase: it matches each
+universal identity against the destination Namespace Table, chooses the destination
+slot and live sequence, and materializes local GT words in the target image. A
+portable LUMP and its destination-specific boot/upload image are therefore different
+representations; local NS slots and GTs must never become the LUMP's identity.
+
+**Why:** Requiring active local bindings during compilation makes transferable LUMPs
+fail with unresolved `Self` or dependency errors and encourages slot numbers to leak
+into artifacts. The same compiled LUMP must be loadable on machines where its
+dependencies occupy different slots or are installed later.
+
+**How to apply:** Keep universal names and required rights in the canonical LUMP
+metadata/relocation records; defer registry matching, dynamic-slot allocation, GT
+minting, and c-list patching to save/install/run or FPGA image generation. Report
+missing bindings as load-time errors, not compile-time errors.
