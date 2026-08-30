@@ -157,3 +157,4 @@
 - [Normative Thread private ABI](normative-thread-private-abi.md) — shared design owns one fixed 256-word layout; larger Thread bodies are rejected, not assigned a tail region
 - [Protected Thread indicator](protected-thread-indicator.md) — word +17 packs FLAGS/SZ/STO outside CR5; frame words save the prior indicator state
 - [Portable LUMP binding boundary](portable-lump-binding-boundary.md) — canonical artifacts carry unresolved N/T/hash locks; only verified destination copies may contain local GTs
+- [Thread object runtime authority](thread-object-runtime-authority.md) — each Thread object alone owns its suspended context; never add parallel per-Thread NIA or context caches

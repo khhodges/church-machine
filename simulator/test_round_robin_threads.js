@@ -143,19 +143,14 @@ assert.strictEqual(selectedStep.physicalPC, firstEntry.word0_location + 1,
     'Step executes the selected Thread entry rather than the outgoing context');
 committed.dr[1] = 0xA2001002;
 committed.pc = 0x2A;
-committed.physicalPC = 0x12345678;
 committed.flags = {N: true, Z: false, C: true, V: false};
 committed.sto = 0xA5;
-committed.callStack = [{returnPC: 0x19, savedSTO: 0xA7, marker: 'Thread#2'}];
-committed.cr[7].m = 1;
 const suspendedThread2 = {
-    cr: JSON.parse(JSON.stringify(committed.cr)),
+    crWords: committed.cr.slice(0, 12).map(reg => reg.word0 >>> 0),
     dr: [...committed.dr],
     pc: committed.pc,
-    physicalPC: committed.physicalPC,
     flags: {...committed.flags},
     sto: committed.sto,
-    callStack: JSON.parse(JSON.stringify(committed.callStack)),
 };
 assert.strictEqual(committed.advanceConfiguredThread().slot, 12);
 assert.strictEqual(committed.cr[12].word1, committedBases[2],
@@ -164,7 +159,11 @@ assert.strictEqual(committed.dr[0], 0xC3000000,
     'the next CHANGE restores Thread#3 live data registers');
 const dormantThread2Row = committed.threadStatusRows().find(row => row.slot === 11);
 assert.strictEqual(dormantThread2Row.nia, 0x2A,
-    'the dormant Thread card reads NIA from the CHANGE-saved runtime context');
+    'the dormant Thread card reads NIA from the CHANGE-saved Thread object');
+const thread2Indicator = committed._unpackProtectedIndicator(
+    committed.memory[committedBases[1] + 17] >>> 0);
+assert.strictEqual(thread2Indicator.nia, 0x2A,
+    'CHANGE writes the outgoing NIA into the Thread object protected context word');
 assert.strictEqual(committed.advanceConfiguredThread().slot, 1);
 assert.strictEqual(committed.cr[0].word0, entryWords[0],
     'committed image restores Thread.1 CR0 entry authority after wraparound');
@@ -177,20 +176,18 @@ assert.strictEqual(committed.cr[12].word1, committedBases[0],
 // after manual CHANGE must therefore retire from the selected Thread too.
 committed.halted = true;
 assert.strictEqual(committed.advanceConfiguredThread().slot, 11);
-assert.deepStrictEqual(JSON.parse(JSON.stringify(committed.cr)), suspendedThread2.cr,
-    'CHANGE restores the suspended Thread full CR bank, including CR14 and M bits');
 assert.deepStrictEqual(committed.dr, suspendedThread2.dr,
-    'CHANGE restores the suspended Thread full DR bank');
+    'CHANGE restores DRs from the selected Thread object');
+assert.deepStrictEqual(
+    committed.cr.slice(0, 12).map(reg => reg.word0 >>> 0),
+    suspendedThread2.crWords,
+    'CHANGE restores CR0–CR11 from the selected Thread object');
 assert.strictEqual(committed.pc, suspendedThread2.pc,
-    'CHANGE resumes the suspended Thread at its exact saved NIA');
-assert.strictEqual(committed.physicalPC, suspendedThread2.physicalPC,
-    'CHANGE restores the suspended Thread physical cursor');
+    'CHANGE resumes at the NIA stored in the selected Thread object');
 assert.deepStrictEqual(committed.flags, suspendedThread2.flags,
-    'CHANGE restores the suspended Thread condition flags');
+    'CHANGE restores condition flags from the selected Thread object');
 assert.strictEqual(committed.sto, suspendedThread2.sto,
-    'CHANGE restores the suspended Thread protected STO');
-assert.deepStrictEqual(committed.callStack, suspendedThread2.callStack,
-    'CHANGE restores the suspended Thread call-frame state');
+    'CHANGE restores protected STO from the selected Thread object');
 const selectedRun = committed.run(1);
 assert.strictEqual(selectedRun.steps, 1,
     'Run retires an instruction after selecting a Thread from HALT');
@@ -306,8 +303,8 @@ assert.strictEqual(initialThreadRows[0].active, true,
     'Thread status strip highlights the selected Thread');
 assert.strictEqual(initialThreadRows[0].nia, 0x2A,
     'active Thread status uses the live logical NIA');
-assert.strictEqual(initialThreadRows[1].nia, null,
-    'never-selected dormant Threads do not invent a persisted NIA');
+assert.strictEqual(initialThreadRows[1].nia, 0,
+    'never-selected dormant Threads expose their Thread object initial NIA');
 assert(initialThreadRows.every(row => row.gtPetName && row.gtPetName !== 'Invalid GT'),
     'each configured Thread status resolves a GT pet name');
 assert.strictEqual(uiSim.threadStatusRows(99).length, 3,
