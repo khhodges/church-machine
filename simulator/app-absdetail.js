@@ -1779,7 +1779,7 @@ function getMethodExamples(abs) {
 LOAD   CR1, Salvation       ; mLoad pipeline validates GT:
                          ;   1. Type != NULL (00=NULL, 01=Inform, 10=Outform, 11=Abstract)
                          ;   2. GT.gt_seq[8:0] == NS[4].word1[29:21]
-                         ;   3. integrity32(word0,word1) == NS[4].word2
+                         ;   3. integrity32(word0,word1) == NS[4].word2  ; Salvation
                          ;   4. Index 4 within NS bounds
                          ;   5. L perm required for LOAD
                          ;   6. F-bit=0 (local, not tunneled)
@@ -1787,7 +1787,7 @@ LOAD   CR1, Salvation       ; mLoad pipeline validates GT:
 ; CR1.word0 = GT: Bind(1)|Perm(3)|Domain(1)|Type(2)|Seq(9)|Slot(16)
 ; CR1.word1 = NS[4].word0 (location)     ; NS[4] = Salvation
 ; CR1.word2 = NS[4].word1 (F|G|seq[8:0]|limit[20:0])
-; NS[4].word2 is the 32-bit unkeyed integrity32 check.`,
+; NS[4].word2 is the 32-bit unkeyed integrity32 check.  ; Salvation`,
             'TPERM': `; Salvation.TPERM — prove GT health check
 ; TPERM checks permissions + validity + bounds in one cycle
 ; Sets Z flag: Z=1 = all passed, Z=0 = something failed
@@ -2116,7 +2116,7 @@ CALL   CR1              ; Mint.Revoke:
 ;
 ; All GTs with old version are now dead:
 ;   any LOAD/CALL with stale GT hits mLoad step 2:
-;   GT.gt_seq[24:16] != NS[50].word1.gt_seq[29:21]
+;   GT.gt_seq[24:16] != NS[50].word1.gt_seq[29:21]  ; Scheduler.IRQ
 ;   -> FAULT: VERSION_MISMATCH
 ; DR1 <- new version number`,
             'Transfer': `; Mint.Transfer — move GT between c-lists

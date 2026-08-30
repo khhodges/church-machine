@@ -22,7 +22,7 @@
 
 ---
 
-### Firmware version compatibility
+### Firmware version compatibility (FW=2 current / FW=3 planned)
 
 | Firmware | Wire protocol | Bridge mode | Encrypted frames |
 |---|---|---|---|
@@ -153,7 +153,7 @@ GT validation and decryption are intentionally in the bridge, not the firmware. 
   subsequent message is decrypted and validated against the source abstraction's
   per-slot key pair.
 - **Keys, not tokens, in the wire.** The 32-bit GT token is a hardware capability
-  handle — too short for cryptography. Each NS slot is extended with a 128-bit
+  handle — too short for cryptography. Each NS slot is extended with a 256-bit
   `K_enc` and `K_mac` that belong exclusively to that abstraction. These keys live
   in the FPGA's protected BRAM and the IDE's NS keystore. The wire carries ciphertext
   and an HMAC tag. The bridge uses the `msg.type` → NS slot mapping from the
@@ -177,13 +177,13 @@ GT validation and decryption are intentionally in the bridge, not the firmware. 
 
 1. **Abstraction identity** — Every capability is identified by its NS slot token (`token_32`), not the board UID. The board is the execution substrate; the abstraction is the identity. A `Fault.Reporter` on any board has the same semantic identity and permission model.
 2. **Encryption service per namespace entry** — Every NS slot has its own `K_enc` and `K_mac`. There is no shared board-level key. Slot 2 cannot read or forge frames from Slot 15. Revoking one slot leaves all others intact.
-3. **Confidentiality goal** — Every FW=3 payload would be ChaCha20-encrypted using the source abstraction's 128-bit `K_enc`.
+3. **Confidentiality goal** — Every FW=3 payload would be ChaCha20-encrypted using the source abstraction's 256-bit `K_enc`.
 4. **Integrity + authentication goal** — Every FW=3 frame would carry an 8-byte HMAC-SHA256 tag keyed with the source abstraction's `K_mac`.
-5. **Replay protection** — Every frame includes a 32-bit monotonic nonce counter per NS slot. The bridge rejects any frame whose nonce ≤ `last_seen_nonce[slot]`.
+5. **Replay protection** — Every frame includes a 64-bit monotonic nonce counter per NS slot. The bridge rejects any frame whose nonce ≤ `last_seen_nonce[slot]`.
 6. **Least privilege** — Each capability is a separate NS slot with its own key pair and its own OGT. A board doing callhome cannot browse unless the `Browse.Client` abstraction was granted and its key bundle was deployed.
 7. **Capability confinement** — `CM.Browse.Client` confines browsing to a parent-approved domain C-list carried inside the abstraction itself. The token IS the permission list.
 8. **Revocability** — Any NS slot and its keys are removed server-side. Takes effect on next bridge connect. No FPGA reflash needed.
-9. **Unforgeability** — GT tokens are SHA-32 hashes; slot keys are 128-bit secrets derived from `board_uid + ns_slot + token_32`. A board cannot fabricate a slot it was not granted, nor derive a key it was not deployed.
+9. **Unforgeability** — GT tokens are SHA-32 hashes; slot keys are 256-bit secrets derived from `board_uid + ns_slot + token_32`. A board cannot fabricate a slot it was not granted, nor derive a key it was not deployed.
 
 ---
 
@@ -526,8 +526,8 @@ ABSTRACTION_ENC = {
     ogt:       "global.Core.FaultReporter.boot",  // THE identity — name, not a number
     token_32:  SHA32(ogt),                        // hardware register value, derived only
     label:     "Fault.Reporter",                  // display name (UI only)
-    K_enc:     <128-bit secret>,                  // ChaCha20 key — this OGT only
-    K_mac:     <128-bit secret>,                  // HMAC key — this OGT only
+    K_enc:     <256-bit secret>,                  // ChaCha20 key — this OGT only
+    K_mac:     <256-bit secret>,                  // HMAC key — this OGT only
     nonce_ctr: 0,                                 // monotonic counter, per-OGT, per-session
     msg_types: [0x02, 0x07],                      // FAULT + BOOT_LOG
     // ns_slot: firmware-private BRAM address — never present at protocol layer
@@ -566,9 +566,9 @@ def mint_abstraction_keys(board_uid: bytes,
     """
     ogt_bytes = ogt.encode("utf-8")
     ikm = hashlib.sha256(board_uid + ogt_bytes).digest()
-    K_enc = HKDF(hashes.SHA256(), 16,
+    K_enc = HKDF(hashes.SHA256(), 32,
                  salt=b"CM_ENC_v3", info=ogt_bytes).derive(ikm)
-    K_mac = HKDF(hashes.SHA256(), 16,
+    K_mac = HKDF(hashes.SHA256(), 32,
                  salt=b"CM_MAC_v3", info=ogt_bytes).derive(ikm)
     return K_enc, K_mac
 ```
@@ -701,8 +701,8 @@ class AbstractionRecord:
 @dataclass
 class Deployment:
     board_uid:  bytes
-    K_enc:      bytes   # 128-bit — mint_abstraction_keys(board_uid, ogt)
-    K_mac:      bytes   # 128-bit
+    K_enc:      bytes   # 256-bit — mint_abstraction_keys(board_uid, ogt)
+    K_mac:      bytes   # 256-bit
     active:     bool    # False once abstraction has migrated away
     # ns_slot is firmware-private — not stored here, not sent over the wire
 ```
@@ -1158,7 +1158,7 @@ revealing anything to a potential attacker on the wire.
 
 ---
 
-## 7. Estimated FW=3 Bandwidth Budget
+## 7. Proposed FW=3 Bandwidth Budget (estimates)
 
 > These are design estimates at proposed baud rates, not measurements of the
 > shipped 57,600-baud Wukong bridge.
@@ -1183,7 +1183,7 @@ firmware changes.
 
 ---
 
-## 8. FW=3 Implementation Plan
+## 8. Proposed FW=3 Implementation Plan
 
 ### Phase 1 — Proposed foundation
 
@@ -1250,7 +1250,7 @@ firmware changes.
 
 ---
 
-## 10. Versioning
+## 10. Versioning — FW=2 current / FW=3 proposal
 
 Protocol version is carried in the `CALLHOME` payload as `"proto":N`.
 
@@ -1301,7 +1301,7 @@ without keys is incomplete and will block the board with GT_NO_KEY.*
 
 ---
 
-## Appendix A — Estimated FW=3 Security Overhead and Dynamic Creation
+## Appendix A — Proposed FW=3 Security Overhead and Dynamic Creation
 
 > These figures are design estimates, not measurements from shipped Wukong
 > firmware. Reclassify them as measured only when a reproducible benchmark and
@@ -1309,7 +1309,7 @@ without keys is incomplete and will block the board with GT_NO_KEY.*
 
 ### A.1 What K_enc and K_mac are
 
-Every abstraction has two independent 128-bit keys derived from a shared root:
+Every abstraction has two independent 256-bit keys derived from a shared root:
 
 ```
 IKM    = SHA256( board_uid ‖ ogt_bytes )

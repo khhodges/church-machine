@@ -256,6 +256,17 @@ args = "node scripts/gen-api-reference.js --check && node scripts/check-run-all-
 outputType = "console"
 
 [[workflows.workflow]]
+name = "check-security-claims"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python3 scripts/check_security_claims.py && python3 scripts/test_check_security_claims.py"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
 name = "sync-guard-tests"
 author = "agent"
 
