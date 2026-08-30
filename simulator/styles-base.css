@@ -60,6 +60,23 @@ header h1 a:hover {
     opacity: 0.75;
 }
 
+.board-manual-link {
+    flex: 0 1 auto;
+    max-width: 17rem;
+    overflow: hidden;
+    color: var(--church-blue);
+    font-size: 0.72rem;
+    line-height: 1.25;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.board-manual-link:hover {
+    color: var(--text-primary);
+    text-decoration: underline;
+}
+
 .btn-swap-sim {
     font-size: 0.75rem;
     padding: 0.25rem 0.5rem;
