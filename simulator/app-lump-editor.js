@@ -913,9 +913,11 @@
             lumpOpts += '<option value="' + e + '"' + (e === lumpPow2 ? ' selected' : '') + '>' + esc(optLabel) + '</option>';
         }
 
+        var heapFormula = 'HeapWords = 2^((n−6)+6) − cw − 30';
         var heapDisplay = overCapacity
             ? '<span class="le-overflow">⚠ over capacity — increase lump size or reduce stack</span>'
             : esc(heap.toLocaleString() + ' words  (+18 … +' + heapEnd + '; derived)');
+        heapDisplay += '<br><span class="le-range-hint">' + esc(heapFormula) + '</span>';
 
         var memStatus = overBudget
             ? '<span class="le-overflow">⚠ ' + esc(fmtWords(totalMem) + ' words — exceeds 50 % budget') + '</span>'
