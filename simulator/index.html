@@ -439,6 +439,9 @@
                             </div>
                         </div>
                         <button class="btn btn-walk sim-icon-btn" id="toolWalkBtn" onclick="walkToggle()" data-tooltip="Walk — Animate step-by-step execution">&#x1F6B6;</button>
+                        <button class="btn btn-view sim-icon-btn wukong-trace-toggle-btn" id="wukongTraceToggleBtn"
+                                onclick="toggleWukongTracePanel()" aria-pressed="true"
+                                data-tooltip="HW Trace — Show or hide the hardware trace popup">&#x26A1; Trace</button>
                         <button class="btn sim-icon-btn" id="nextThreadBtn" onclick="nextConfiguredThread()"
                                 aria-label="Next Thread" data-tooltip="Next Thread — save this Thread and resume the next configured Thread">&#x21BB;</button>
                         <span id="activeThreadStatus" class="fault-free-badge ff-zero" aria-live="polite"

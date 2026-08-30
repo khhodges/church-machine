@@ -16580,8 +16580,7 @@ window._wukongRecordSimulatorStep = _wukongRecordSimulatorStep;
     var closeBtn = document.getElementById('wukong-hw-log-close');
     if (closeBtn) closeBtn.addEventListener('click', function(e) {
         e.stopPropagation();
-        window._wukongHwLogHidden = true;
-        panel.style.display = 'none';
+        _wukongSetTracePanelVisible(false);
     });
     var clearBtn = document.getElementById('wukong-hw-log-clear');
     if (clearBtn) clearBtn.addEventListener('click', function(e) {
@@ -17122,6 +17121,32 @@ function _wukongUpdateToolbarBtn(connected) {
     }
 }
 
+// Keep the popup's visibility under one control so the simulator toolbar
+// button and the popup's own close button cannot drift out of sync.
+function _wukongSetTracePanelVisible(visible) {
+    const panel = document.getElementById('wukong-hw-log');
+    const toggle = document.getElementById('wukongTraceToggleBtn');
+    const isVisible = !!visible;
+    window._wukongHwLogHidden = !isVisible;
+    if (panel) panel.style.display = isVisible ? 'flex' : 'none';
+    if (toggle) {
+        toggle.setAttribute('aria-pressed', isVisible ? 'true' : 'false');
+        toggle.classList.toggle('trace-panel-hidden', !isVisible);
+        toggle.setAttribute('data-tooltip',
+            isVisible ? 'HW Trace — Hide the hardware trace popup'
+                      : 'HW Trace — Show the hardware trace popup');
+    }
+}
+
+function toggleWukongTracePanel() {
+    const panel = document.getElementById('wukong-hw-log');
+    if (!panel) return;
+    const visible = window._wukongHwLogHidden !== true &&
+        panel.style.display !== 'none';
+    _wukongSetTracePanelVisible(!visible);
+}
+window.toggleWukongTracePanel = toggleWukongTracePanel;
+
 // Click handler for the toolbar Wukong button.
 // Connected → reveal, expand, and flash the HW Trace panel.
 // Disconnected → small popover explaining how the bridge works.
@@ -17130,8 +17155,7 @@ function wukongConnBtnClick() {
     if (connected) {
         const panel = document.getElementById('wukong-hw-log');
         if (panel) {
-            window._wukongHwLogHidden = false;
-            panel.style.display = 'flex';
+            _wukongSetTracePanelVisible(true);
             // Expand if collapsed (body hidden).
             const body = document.getElementById('wukong-hw-log-body');
             if (body && body.style.display === 'none') {

@@ -13,6 +13,17 @@
     box-shadow: 0 0 8px rgba(58,134,255,0.5);
 }
 
+.sim-icon-btn.wukong-trace-toggle-btn {
+    color: #f0c040;
+    border-color: rgba(240, 192, 64, 0.45);
+}
+
+.sim-icon-btn.wukong-trace-toggle-btn.trace-panel-hidden {
+    opacity: 0.55;
+    color: #a8a8c8;
+    border-color: rgba(168, 168, 200, 0.35);
+}
+
 /* Fault button — dim when idle, pulse red when a fault fires */
 .sim-icon-btn.fault-idle {
     opacity: 0.35;

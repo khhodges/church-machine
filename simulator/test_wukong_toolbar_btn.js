@@ -18,6 +18,8 @@
 //   WB-9  Click while connected and panel body collapsed → header .click()
 //         fired to expand it
 //   WB-10 Click while connected → no popover is created
+//   WB-11 Simulator Trace button toggles the HW Trace popup hidden/visible
+//   WB-12 Popup visibility state updates the Trace button's aria-pressed state
 //
 // Run with:  node simulator/test_wukong_toolbar_btn.js
 'use strict';
@@ -57,6 +59,7 @@ function makeEnv(opts) {
     const dom = new JSDOM(
         '<!DOCTYPE html><body>' +
         '<button id="toolbarWukongBtn" style="opacity:0.45;">\u26A1 Wukong</button>' +
+        '<button id="wukongTraceToggleBtn" aria-pressed="true">\u26A1; Trace</button>' +
         '<div id="wukong-hw-log" style="display:none;">' +
             '<div id="wukong-hw-log-hdr"></div>' +
             '<div id="wukong-hw-log-body"' + (opts.bodyCollapsed ? ' style="display:none;"' : '') + '></div>' +
@@ -216,6 +219,22 @@ function check(id, desc, cond) {
         flashTimeout.fn();
         check('WB-8f', 'flash cleared → box-shadow restored', !/44dd88/i.test(panel.style.boxShadow));
     }
+})();
+
+// ── WB-11 / WB-12  Run/Step-row Trace toggle -------------------------------
+(function() {
+    const env = makeEnv();
+    vm.runInContext('toggleWukongTracePanel();', env);
+    const panel = env.document.getElementById('wukong-hw-log');
+    const toggle = env.document.getElementById('wukongTraceToggleBtn');
+    check('WB-11a', 'Trace button click → HW Trace popup shown', panel.style.display === 'flex');
+    check('WB-12a', 'shown popup → Trace button aria-pressed=true',
+        toggle.getAttribute('aria-pressed') === 'true');
+    vm.runInContext('toggleWukongTracePanel();', env);
+    check('WB-11b', 'second Trace button click → HW Trace popup hidden',
+        panel.style.display === 'none');
+    check('WB-12b', 'hidden popup → Trace button aria-pressed=false',
+        toggle.getAttribute('aria-pressed') === 'false');
 })();
 
 // ── WB-9  Click while connected with collapsed body → header expand click ────
