@@ -142,11 +142,29 @@ assert(selectedStep,
 assert.strictEqual(selectedStep.physicalPC, firstEntry.word0_location + 1,
     'Step executes the selected Thread entry rather than the outgoing context');
 committed.dr[1] = 0xA2001002;
+committed.pc = 0x2A;
+committed.physicalPC = 0x12345678;
+committed.flags = {N: true, Z: false, C: true, V: false};
+committed.sto = 0xA5;
+committed.callStack = [{returnPC: 0x19, savedSTO: 0xA7, marker: 'Thread#2'}];
+committed.cr[7].m = 1;
+const suspendedThread2 = {
+    cr: JSON.parse(JSON.stringify(committed.cr)),
+    dr: [...committed.dr],
+    pc: committed.pc,
+    physicalPC: committed.physicalPC,
+    flags: {...committed.flags},
+    sto: committed.sto,
+    callStack: JSON.parse(JSON.stringify(committed.callStack)),
+};
 assert.strictEqual(committed.advanceConfiguredThread().slot, 12);
 assert.strictEqual(committed.cr[12].word1, committedBases[2],
     'the next CHANGE moves live CR12 to Thread#3');
 assert.strictEqual(committed.dr[0], 0xC3000000,
     'the next CHANGE restores Thread#3 live data registers');
+const dormantThread2Row = committed.threadStatusRows().find(row => row.slot === 11);
+assert.strictEqual(dormantThread2Row.nia, 0x2A,
+    'the dormant Thread card reads NIA from the CHANGE-saved runtime context');
 assert.strictEqual(committed.advanceConfiguredThread().slot, 1);
 assert.strictEqual(committed.cr[0].word0, entryWords[0],
     'committed image restores Thread.1 CR0 entry authority after wraparound');
@@ -159,6 +177,20 @@ assert.strictEqual(committed.cr[12].word1, committedBases[0],
 // after manual CHANGE must therefore retire from the selected Thread too.
 committed.halted = true;
 assert.strictEqual(committed.advanceConfiguredThread().slot, 11);
+assert.deepStrictEqual(JSON.parse(JSON.stringify(committed.cr)), suspendedThread2.cr,
+    'CHANGE restores the suspended Thread full CR bank, including CR14 and M bits');
+assert.deepStrictEqual(committed.dr, suspendedThread2.dr,
+    'CHANGE restores the suspended Thread full DR bank');
+assert.strictEqual(committed.pc, suspendedThread2.pc,
+    'CHANGE resumes the suspended Thread at its exact saved NIA');
+assert.strictEqual(committed.physicalPC, suspendedThread2.physicalPC,
+    'CHANGE restores the suspended Thread physical cursor');
+assert.deepStrictEqual(committed.flags, suspendedThread2.flags,
+    'CHANGE restores the suspended Thread condition flags');
+assert.strictEqual(committed.sto, suspendedThread2.sto,
+    'CHANGE restores the suspended Thread protected STO');
+assert.deepStrictEqual(committed.callStack, suspendedThread2.callStack,
+    'CHANGE restores the suspended Thread call-frame state');
 const selectedRun = committed.run(1);
 assert.strictEqual(selectedRun.steps, 1,
     'Run retires an instruction after selecting a Thread from HALT');

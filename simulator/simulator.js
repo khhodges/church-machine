@@ -888,11 +888,10 @@ class ChurchSimulator {
         this._instrHistory = [];
         this._currentInstrLabel = null;
         this._currentThreadSlot = 1;
-        // UI-only per-Thread NIA history. Thread images intentionally do not
-        // persist NIA, so this map must never be serialized into a LUMP or used
-        // as execution authority. It only lets the dashboard keep the last
-        // observed NIA visible while another configured Thread is selected.
-        this._threadNias = new Map();
+        // CHANGE owns complete suspended runtime contexts. Thread LUMPs remain
+        // the architectural CR/DR backing store, while this map preserves the
+        // live machine state that has no ordinary Thread data-word home.
+        this._threadContexts = new Map();
         this.faultViolationData = null;   // populated by B:00 FAULT_RST from last faultLog entry
         // Last complete state received from physical Wukong.  This is kept
         // separately from simulator breakpoint state and includes the raw
@@ -1065,7 +1064,7 @@ class ChurchSimulator {
         this.timerRegs   = [0, 0, 0, 0, 0];
         this.lastSignedReturn = null;
         this._currentInstrLabel = null;
-        if (this._threadNias) this._threadNias.clear();
+        if (this._threadContexts) this._threadContexts.clear();
         this.output += '[PP250] Machine state cleared. Re-entering boot sequence.\n';
         this.emit('stateChange', this.getState());
     }
@@ -4444,11 +4443,42 @@ class ChurchSimulator {
         return slots.concat(generated.map(item => item.slot));
     }
 
-    _rememberActiveThreadNia() {
-        if (!this._threadNias) this._threadNias = new Map();
-        if (Number.isInteger(this._currentThreadSlot) && Number.isInteger(this.pc)) {
-            this._threadNias.set(this._currentThreadSlot, this.pc >>> 0);
-        }
+    _cloneThreadRuntimeValue(value) {
+        return value == null ? value : JSON.parse(JSON.stringify(value));
+    }
+
+    _captureThreadRuntimeContext(slot) {
+        return {
+            slot,
+            cr: this.cr.map(reg => ({...reg})),
+            dr: [...this.dr],
+            pc: this.pc >>> 0,
+            physicalPC: this.physicalPC >>> 0,
+            flags: {...this.flags},
+            sto: this.sto >>> 0,
+            callStack: this._cloneThreadRuntimeValue(this.callStack),
+            lambdaActive: !!this.lambdaActive,
+            lambdaReturnPC: this.lambdaReturnPC >>> 0,
+            lambdaCachedFrame: this._cloneThreadRuntimeValue(this.lambdaCachedFrame),
+            mElevation: !!this.mElevation,
+            lastSignedReturn: this._cloneThreadRuntimeValue(this.lastSignedReturn),
+        };
+    }
+
+    _restoreThreadRuntimeContext(context) {
+        this.cr = context.cr.map(reg => ({...reg}));
+        this.dr = [...context.dr];
+        this.pc = context.pc >>> 0;
+        this.physicalPC = context.physicalPC >>> 0;
+        this.flags = {...context.flags};
+        this.sto = context.sto >>> 0;
+        this.callStack = this._cloneThreadRuntimeValue(context.callStack) || [];
+        this.lambdaActive = !!context.lambdaActive;
+        this.lambdaReturnPC = context.lambdaReturnPC >>> 0;
+        this.lambdaCachedFrame = this._cloneThreadRuntimeValue(context.lambdaCachedFrame);
+        this.mElevation = !!context.mElevation;
+        this.lastSignedReturn = this._cloneThreadRuntimeValue(context.lastSignedReturn);
+        this._currentThreadSlot = context.slot;
     }
 
     _threadDisplayGT(slot, activeSlot) {
@@ -4489,7 +4519,6 @@ class ChurchSimulator {
     }
 
     threadStatusRows(maxRows = 4) {
-        this._rememberActiveThreadNia();
         const requested = Number.isInteger(maxRows) ? maxRows : 4;
         const limit = Math.max(0, Math.min(4, requested));
         const slots = this.configuredThreadSlots().slice(0, limit);
@@ -4499,16 +4528,15 @@ class ChurchSimulator {
             const active = slot === activeSlot;
             const gtWord = this._threadDisplayGT(slot, activeSlot);
             const gtIdentity = this._threadDisplayGTIdentity(gtWord);
-            const hasObservedNia = active || this._threadNias.has(slot);
+            const savedContext = this._threadContexts && this._threadContexts.get(slot);
             return {
                 slot,
                 name: slot === 1 ? 'Thread.1'
                     : (this.nsLabels[slot] || `Thread slot ${slot}`),
                 position: index + 1,
                 active,
-                nia: hasObservedNia
-                    ? (active ? (this.pc >>> 0) : (this._threadNias.get(slot) >>> 0))
-                    : null,
+                nia: active ? (this.pc >>> 0)
+                    : (savedContext ? (savedContext.pc >>> 0) : null),
                 gtWord,
                 ...gtIdentity,
             };
@@ -4542,7 +4570,6 @@ class ChurchSimulator {
         if (this.running) {
             return { ok: false, reason: 'Pause execution before switching Threads' };
         }
-        this._rememberActiveThreadNia();
         const slots = this.configuredThreadSlots();
         if (!slots.length) return { ok: false, reason: 'No configured Thread context is available' };
         if (slots.length === 1) return { ok: true, unchanged: true, ...this.activeThreadStatus() };
@@ -6569,8 +6596,6 @@ class ChurchSimulator {
     }
 
     _execChange(d) {
-        this._flushLambdaCache();
-
         // CHANGE CRd, CRs[idx]
         //   CRd  (d.crDst) — destination: must be a privileged register CR12–CR15.
         //   CRs  (d.crSrc) — source capability used to access the NS entry.
@@ -6616,6 +6641,7 @@ class ChurchSimulator {
 
         // ── System-wide registers (CR12/CR13): direct privileged write, no save ──
         if (d.crDst === 12 || d.crDst === 13) {
+            this._flushLambdaCache();
             // Authority check: source cap must carry S-perm and its location must
             // match the target CR's port address in the Church Hardware Address Range.
             // M-elevation during boot (this.mElevation) bypasses this check.
@@ -6698,7 +6724,9 @@ class ChurchSimulator {
 
         // ── Scheduler CHANGE: dormant Thread entry ────────────────────────────────
         // A Thread serializes only DR0–DR15 and the CR0–CR11 GT homes. CR14,
-        // NIA, flags, M state, and STO are not scheduler context words.
+        // NIA, flags, M state, and STO are not ordinary Thread data words, so
+        // CHANGE preserves them in the suspended runtime context object.
+        if (!schedulerSwitch) this._flushLambdaCache();
         const targetHeader = this.parseLumpHeader(this.memory[entry.word0_location] >>> 0);
         // Scheduler admission must use the same complete Thread contract as
         // hardware CHANGE: supported body size, typ=Thread, cc=12, and
@@ -6715,6 +6743,10 @@ class ChurchSimulator {
             return null;
         }
         const outSlot = this._currentThreadSlot ?? null;
+        const outgoingContext = schedulerSwitch && d.saveOutgoing !== false && outSlot !== null
+            ? this._captureThreadRuntimeContext(outSlot)
+            : null;
+        this._flushLambdaCache();
         // Before boot, the live CR/DR banks are reset scratch state rather
         // than the selected Thread's restored context.  Manual image browsing
         // must not overwrite a valid saved Thread with those zero registers.
@@ -6740,7 +6772,19 @@ class ChurchSimulator {
                     outBase + THREAD_STO_OFFSET,
                     this._packProtectedIndicator(
                         this.sto, currentFrame ? currentFrame.sz : 0, this.flags));
+                this._threadContexts.set(outSlot, outgoingContext);
             }
+        }
+
+        const suspendedContext = this._threadContexts.get(targetIdx);
+        if (suspendedContext) {
+            this._restoreThreadRuntimeContext(suspendedContext);
+            const desc = `CHANGE CR${d.crDst} (resumed suspended Thread slot ${targetIdx} at NIA 0x${this.pc.toString(16).toUpperCase()}; full machine context restored)`;
+            this.output += desc + '\n';
+            this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_PUSH, 0);
+            this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_CR12, this.cr[12].word0 >>> 0);
+            this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_CR5, this.cr[5].word0 >>> 0);
+            return { pc: this.pc, instr: d, desc, resumed: true };
         }
 
         const tBase = entry.word0_location;
