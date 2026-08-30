@@ -24,6 +24,27 @@ of the supporting IDE, simulator, and Wukong plumbing exists today; the
 execution-watchdog hardware and authenticated whole-image commit protocol are
 not implied by the presence of an upload timeout or a working boot sequence.
 
+
+### Normative contracts and target profiles
+
+The machine-readable authority for core layouts and target differences is
+[`shared/architecture_contracts.json`](../shared/architecture_contracts.json).
+This document explains those contracts; it does not redefine them.
+
+| Profile | Namespace placement | Location unit | Trace |
+|---------|---------------------|---------------|-------|
+| `simulator-v20` | Configurable table at the memory tail; slots descend from the top | 32-bit word | In-process `simulator-events`; no architectural history |
+| `generic-boot-image-v20` | Same tail-descending image format as the simulator | 32-bit word | None |
+| `wukong-uart-upload-v2` | 64-entry forward table at DMEM word 0; slots ascend | byte | 12-byte `wukong-event-uart-v2` packets |
+| `a7-legacy-v12` | Fixed 256-entry table at the memory tail | byte | No current trace contract |
+
+GT and NS Word 1 packing are shared ISA contracts. Memory size, table
+placement, location units, boot-entry selection, and trace transport are target
+contracts and must never be inferred from another profile.
+Abstract GTs use the separately named `abstractGtWord0` type-specific packing;
+their 7-bit sequence and R/W payload must not be confused with Inform/Outform
+GT `gtWord0`.
+
 ## Artifact Model, Trust Boundary, and Image Handoff
 
 ### Four artifacts, four identities
@@ -439,24 +460,24 @@ Abstractions are not OS calls — they are namespace entries accessed via Golden
 
 Every abstraction — regardless of type or layer — shares the same four structural operations: create, destroy, call, inspect. This uniformity is intentional. The polymorphic interface ensures that creating a math library works the same as creating a hardware driver or a social networking tool. The pattern is repetitive by design.
 
-### Hardware Device Access (L/S Domain)
 
-All hardware devices (UART, LED, Button, Timer, Display) are accessed through Church domain permissions (L/S/E) — NOT Turing domain (R/W). This enforces capability-gated device access:
+### Hardware Device Access
 
-- **L (Load)**: Read data from device (receive bytes, read button state, read timer)
-- **S (Save)**: Write data to device (send bytes, set LEDs, start timer, write display)
-- **E (Enter)**: Call the device abstraction via CALL instruction
-
-R, W, and X permissions are NOT permitted on hardware devices.
+The minimal boot profiles expose direct MMIO windows as **Inform GTs in the
+Turing domain**: UART, LED, and Timer use R+W; Button uses R. The B flag marks
+those physical bindings but is not a permission. Higher-level callable device
+abstractions use Church E capabilities. These are different interfaces and
+must not be collapsed into a universal L/S/E device rule.
 
 ## Golden Token Format
 
+Canonical v2.0 word:
+
 ```
-31 30      28 27 26    25 24        16 15           0
-┌──┬─────────┬──┬────────┬────────────┬───────────────┐
-│B │  perm   │D │gt_type │   gt_seq   │    slot_id    │
-│1 │   3     │1 │   2    │     9      │      16       │
-└──┴─────────┴──┴────────┴────────────┴───────────────┘
+31 30       28 27 26    25 24        16 15                 0
+┌─┬───────────┬──┬────────┬────────────┬────────────────────┐
+│B│ perm[2:0] │dom│gt_type│   gt_seq   │      slot_id       │
+└─┴───────────┴──┴────────┴────────────┴────────────────────┘
 ```
 
 | Bits    | Field       | Width | Description |
@@ -465,32 +486,26 @@ R, W, and X permissions are NOT permitted on hardware devices.
 | [24:16] | `gt_seq`    | 9    | Revocation sequence counter |
 | [26:25] | `gt_type`   | 2    | GT class (NULL / Inform / Outform / Abstract) |
 | [27]    | `dom`       | 1    | 0=Turing, 1=Church |
-| [30:28] | `perm`      | 3    | Domain-selected X/W/R or E/S/L payload |
+| [30:28] | `perm`      | 3    | Domain-selected permission payload |
 | [31]    | `b_flag`    | 1    | Bind flag |
 
 ### gt_seq (9 bits)
 
 Revocation sequence counter. Must match the `gt_seq` stored in NS Entry Word 1
-bits [29:21]. On mismatch, the implemented gate faults the access.
-
+bits [29:21]. On mismatch, the implemented gate faults the access. Incrementing
+that NS generation immediately makes older GTs stale.
 ### slot_id (16 bits)
 
 Points to a namespace slot. Supports up to 65,536 entries.
 
-### Domain-selected permissions (3 bits)
 
-| Bit | Name | Gate | Domain |
-|-----|------|------|--------|
-| 0 | R | DREAD | Turing |
-| 1 | W | DWRITE | Turing |
-| 2 | X | LAMBDA | Church |
-| 3 | L | LOAD | Church |
-| 4 | S | SAVE | Church |
-| 5 | E | CALL | Church |
+### Domain-selected permissions
 
-R and W are pure Turing permissions (data access). L, S, and E are pure Church permissions (capability access). X (Execute) bridges the two domains: it is grouped with R and W for TPERM domain purity enforcement (presets 3–5: X, RX, RWX), but it gates a Church instruction (LAMBDA) because code application is a capability-mediated operation. A code object is DATA (accessed via X), but applying it is Church's function application. This dual nature is by design — X is the permission that connects the Turing computation domain to the Church security domain.
+`dom=0` maps `perm[2:0]` to X/W/R. `dom=1` maps the same bits to
+E/S/L. Mixed-domain GTs cannot be encoded. X is a Turing-domain permission
+even though LAMBDA is the operation that consumes it.
 
-### Type (`gt_type`, bits [24:23])
+### Type (`gt_type`, bits [26:25])
 
 | Value | Type | Meaning |
 |-------|------|---------|
@@ -511,6 +526,11 @@ from the highest entry:
 ```
 NS[slot_id] word address = total_words - (slot_id + 1) × 4
 ```
+
+That formula applies only to the `tail-descending` profiles:
+`simulator-v20`, `generic-boot-image-v20`, and `a7-legacy-v12`. In
+`wukong-uart-upload-v2`, the table is `head-ascending` and the entry starts at
+`slot_id × 4`.
 
 The GT encoding can name up to **65,536 entries** through its 16-bit
 `slot_id`, but a concrete image is bounded by the actual Namespace capacity
@@ -538,19 +558,18 @@ The base address of the memory object (abstraction lump, data object, or device 
 ### Word 1 — Limit + gt_seq (WORD2_LAYOUT)
 
 ```
-31   29 28 27      21 20                  0
-┌──────┬───┬──────────┬────────────────────┐
-│spare │ G │  gt_seq  │   limit_offset     │
-│[2:0] │   │  [6:0]   │     [20:0]         │
-└──────┴───┴──────────┴────────────────────┘
+31 30 29          21 20                  0
+┌──┬──┬──────────────┬────────────────────┐
+│F │G │   gt_seq     │   limit_offset     │
+└──┴──┴──────────────┴────────────────────┘
 ```
 
 | Bits    | Width | Name            | Meaning |
 |---------|-------|----------------|---------|
 | [20:0]  | 21    | `limit_offset`  | Object size in words minus 1 |
-| [27:21] | 7     | `gt_seq`        | Revocation sequence counter; compared against GT `gt_seq` by ChurchNSGate. Increment to revoke all outstanding GTs instantly. |
-| [28]    | 1     | `g_bit`         | GC mark bit — may be set by GC; masked before integrity32 check |
-| [31:29] | 3     | spare           | Reserved |
+| [29:21] | 9     | `gt_seq`        | Revocation sequence counter; compared against GT `gt_seq` by ChurchNSGate. Increment to revoke all outstanding GTs instantly. |
+| [30]    | 1     | `g_bit`         | GC mark bit; masked before integrity32 check |
+| [31]    | 1     | `f_flag`        | Far/locality marker; masked before integrity32 check |
 
 ---
 
@@ -564,7 +583,7 @@ ChurchNSGate recomputes integrity32 over NS Entry Word 0 and Word 1 (`g_bit` cle
 
 #### gt_seq revocation
 
-Revocation: increment `NS Word 1 [27:21]` by 1. All existing GTs for this entry now have a mismatched `gt_seq` and FAULT on next use. No tracking of outstanding GTs is required — revocation is O(1).
+Revocation: increment `NS Word 1 [29:21]` by 1. All existing GTs for this entry now have a mismatched `gt_seq` and FAULT on next use. No tracking of outstanding GTs is required — revocation is O(1).
 
 ---
 
@@ -603,8 +622,8 @@ The c-list count and lump size come from the **lump header** in memory, not from
 ### Complete slot at a glance
 
 ```
-Offset +0   Word 0 — base      [31:0]   Lump base byte address
-Offset +1   Word 1 — authority [31]     f_flag (masked before integrity32)
+Offset +0   Word 0 — base      [31:0]   Profile-unit location (word or byte)
+Offset +1   Word 1 — limit     [31]     f_flag (masked before integrity32)
             (WORD2_LAYOUT)     [30]     g_bit (masked before integrity32)
                                [29:21]  gt_seq (9-bit revocation counter)
                                [20:0]   limit_offset (object size - 1 in words)
@@ -707,12 +726,12 @@ provisioning protocol and security model.
 
 ### Namespace Entries
 
-Each Namespace entry is **4 words (16 bytes)**. Logical slot `n` begins at
-`total_words - (n + 1) × 4`; increasing slot numbers therefore move downward
-from the top of the target image:
+Each Namespace entry is **4 words (16 bytes)**. Placement and Word 0 location
+units come from the selected target profile; tail-descending and head-ascending
+profiles must not reuse each other's address formula:
 
-- **Word 0** (base): 32-bit lump base byte address
-- **Word 1** (WORD2_LAYOUT): `spare[31:29] | g_bit[28] | gt_seq[27:21] | limit_offset[20:0]`
+- **Word 0** (base): 32-bit location in the profile-declared unit
+- **Word 1** (WORD2_LAYOUT): `f_flag[31] | g_bit[30] | gt_seq[29:21] | limit_offset[20:0]`
 - **Word 2** (integrity32 check): 32-bit parallel check over Word 0 and Word 1 (g_bit masked)
 - **Word 3** (`cache_token32`): issue-blind 32-bit lookup/cache value `T`;
   non-authoritative and not covered by `integrity32`
@@ -1025,7 +1044,7 @@ PP250 excludes HALT — the machine always returns to boot sequence. Namespace a
 
 Revocation is instant, global, and unforgeable:
 
-1. Increment `gt_seq` in NS Entry Word 1 bits [27:21]
+1. Increment `gt_seq` in NS Entry Word 1 bits [29:21]
 2. Every outstanding GT referencing that entry now has a mismatched `gt_seq`
 3. Next ChurchNSGate check FAULTs — no need to find or track copies
 4. Re-grant by issuing a new GT with the updated `gt_seq` value

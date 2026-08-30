@@ -1,12 +1,16 @@
 # Church Machine ISA Reference
 
 **Version 2.0 — June 2026**
-**Authoritative sources: `simulator/simulator.js`, `simulator/assembler.js`, `hardware/*.py`**
+**Machine-readable core authority: [`shared/architecture_contracts.json`](../shared/architecture_contracts.json)**
 
 This document is the single definitive specification for all 20 Church Machine
 instructions. Where existing documents conflict with what is stated here, this
 document takes precedence. Simulator/hardware deviations are called out
 explicitly; see `docs/HARDWARE-DEVIATIONS.md` for the full deviation register.
+
+GT and NS Word 1 fields are shared across targets. Memory placement, address
+units, boot slots, and trace transport are selected by an explicit target
+profile and are not universal ISA constants.
 
 ---
 
@@ -133,6 +137,15 @@ dom=1 (Church):  perm[2]=E, perm[1]=S, perm[0]=L
 **Domain purity**: Turing and Church bits are mutually exclusive by construction — `dom` determines the meaning of `perm[2:0]`, making a mixed-domain GT impossible to represent. Ordinary TPERM requests for the other domain fault with `DOMAIN_PURITY`; reserved preset codes still fault with `TPERM_RSV`.
 
 > **Note:** `f_flag` (Far indicator) is **not** a GT word field. It is stored in NS SLOT Word 1 bit [31] — a property of the namespace slot, not the token.
+
+### 3.4 Trace units are target facilities
+
+Trace state is not part of architectural register or memory state.
+`simulator-v20` emits in-process `simulator-events`; its instruction history,
+call-stack snapshots, audit log, and fault log are IDE facilities. Physical
+Wukong uses `wukong-event-uart-v2`: 12-byte big-endian UART packets beginning
+with `0xAA`, with one to three events per retiring instruction. Both profiles
+share event IDs, but neither promises persistent architectural history.
 
 ---
 

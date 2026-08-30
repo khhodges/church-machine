@@ -18,8 +18,9 @@ Strength: 32-bit → forgery probability 1 in 2^32 ≈ 1 in 4.3 billion.
 """
 
 from amaranth import *
+from shared.architecture_contracts import ns_integrity_word1_mask
 
-G_BIT_MASK_32 = 0x3FFFFFFF   # zeroes bit[30] (g_bit) and bit[31] (f_flag) ★v2.0
+G_BIT_MASK_32 = ns_integrity_word1_mask()
 INTEGRITY32_CONST = 0xDEADBEEF
 
 

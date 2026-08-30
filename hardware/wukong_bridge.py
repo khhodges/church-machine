@@ -52,6 +52,37 @@ import threading
 import time
 import uuid
 
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+try:
+    from shared.architecture_contracts import (
+        PROFILES as ARCH_PROFILES,
+        TRACE_UNITS as ARCH_TRACE_UNITS,
+    )
+except ImportError:
+    # Standalone projection for /dl/wukong-bridge, which intentionally serves
+    # this script as one file. tests/test_architecture_contracts.py checks every
+    # projected value against shared/architecture_contracts.json.
+    ARCH_PROFILES = {
+        "wukong-uart-upload-v2": {
+            "totalWords": 16384,
+            "traceUnit": "wukong-event-uart-v2",
+        },
+    }
+    ARCH_TRACE_UNITS = {
+        "wukong-event-uart-v2": {
+            "magic": 170,
+            "packetBytes": 12,
+            "eventIds": {
+                "RESULT": 0, "LOAD_SHADOW": 1, "LOAD_NEW": 2,
+                "CHANGE_PUSH": 3, "CHANGE_CR12": 4, "CHANGE_CR5": 5,
+                "CALL_CR6": 6, "CALL_CR14": 7, "CALL_PUSH": 8,
+                "RETURN_POP": 9, "RETURN_CR6": 10, "RETURN_CR14": 11,
+            },
+        },
+    }
+
 try:
     from .wukong_prefetch import (
         PREFETCH_REQUEST_MAGIC, PREFETCH_INCIDENT_MAGIC, PREFETCH_REQUEST_LEN,
@@ -84,8 +115,11 @@ except ImportError:
     _trace_metadata = None
 
 
-TRACE_MAGIC    = 0xAA
-TRACE_LEN      = 12   # 12-byte per-event packet: magic(1)+NIA(4)+ev_type(1)+payload(4)+flags(1)+fault(1)
+_TRACE_PROFILE = ARCH_PROFILES["wukong-uart-upload-v2"]
+_TRACE_CONTRACT = ARCH_TRACE_UNITS[_TRACE_PROFILE["traceUnit"]]
+WUKONG_DMEM_WORDS = _TRACE_PROFILE["totalWords"]
+TRACE_MAGIC    = _TRACE_CONTRACT["magic"]
+TRACE_LEN      = _TRACE_CONTRACT["packetBytes"]
 
 # Complete architectural stop-state snapshot.  This is deliberately a
 # different magic byte from TRACE_MAGIC so old bridges/IDEs can continue to
@@ -119,18 +153,18 @@ BOOT_Q_TIMEOUT          = 2.0  # seconds; timeout fallback for slow boards
 
 # ── Event type constants ──────────────────────────────────────────────────────
 # Must match _TRACE_EV_* in wukong_top.py and docs/debug-packet-protocol.md.
-TRACE_EV_RESULT      = 0x00  # Single-packet result (DR→DR, SAVE, Function, etc.)
-TRACE_EV_LOAD_SHADOW = 0x01  # LOAD: old CR_dst GT displaced
-TRACE_EV_LOAD_NEW    = 0x02  # LOAD: new GT installed in CR_dst
-TRACE_EV_CHANGE_PUSH = 0x03  # CHANGE: context stack push
-TRACE_EV_CHANGE_CR12 = 0x04  # CHANGE: CR12 ← new thread GT
-TRACE_EV_CHANGE_CR5  = 0x05  # CHANGE: CR5  ← heap GT
-TRACE_EV_CALL_CR6    = 0x06  # CALL:   CR6  ← abstraction GT
-TRACE_EV_CALL_CR14   = 0x07  # CALL:   CR14 ← code / return GT
-TRACE_EV_CALL_PUSH   = 0x08  # CALL:   caller frame stack push
-TRACE_EV_RETURN_POP  = 0x09  # RETURN: caller frame stack pop
-TRACE_EV_RETURN_CR6  = 0x0A  # RETURN: CR6  ← restored from frame
-TRACE_EV_RETURN_CR14 = 0x0B  # RETURN: CR14 ← restored from frame
+TRACE_EV_RESULT      = _TRACE_CONTRACT["eventIds"]["RESULT"]
+TRACE_EV_LOAD_SHADOW = _TRACE_CONTRACT["eventIds"]["LOAD_SHADOW"]
+TRACE_EV_LOAD_NEW    = _TRACE_CONTRACT["eventIds"]["LOAD_NEW"]
+TRACE_EV_CHANGE_PUSH = _TRACE_CONTRACT["eventIds"]["CHANGE_PUSH"]
+TRACE_EV_CHANGE_CR12 = _TRACE_CONTRACT["eventIds"]["CHANGE_CR12"]
+TRACE_EV_CHANGE_CR5  = _TRACE_CONTRACT["eventIds"]["CHANGE_CR5"]
+TRACE_EV_CALL_CR6    = _TRACE_CONTRACT["eventIds"]["CALL_CR6"]
+TRACE_EV_CALL_CR14   = _TRACE_CONTRACT["eventIds"]["CALL_CR14"]
+TRACE_EV_CALL_PUSH   = _TRACE_CONTRACT["eventIds"]["CALL_PUSH"]
+TRACE_EV_RETURN_POP  = _TRACE_CONTRACT["eventIds"]["RETURN_POP"]
+TRACE_EV_RETURN_CR6  = _TRACE_CONTRACT["eventIds"]["RETURN_CR6"]
+TRACE_EV_RETURN_CR14 = _TRACE_CONTRACT["eventIds"]["RETURN_CR14"]
 
 _EV_NAMES = {
     TRACE_EV_RESULT:      'RESULT',
@@ -275,7 +309,7 @@ def _compute_expected_n_init():
     while len(dmem_init) < 256:
         dmem_init.append(0)
     dmem_init += list(WUKONG_DEMO_CLIST)
-    while len(dmem_init) < 16384:
+    while len(dmem_init) < WUKONG_DMEM_WORDS:
         dmem_init.append(0)
     for _i, _v in enumerate(WUKONG_SELFTEST_WORDS):
         dmem_init[WUKONG_SELFTEST_BASE_WORD + _i] = _v
@@ -743,7 +777,7 @@ def try_parse_snapshot_frame(buf, i=0):
 # the real NIA).  validate_trace_frame() applies plausibility checks so such
 # misaligned candidates are rejected and the scanner advances one byte instead.
 
-DMEM_BYTES      = 16384 * 4         # 64 KB DMEM — NIA must be below this
+DMEM_BYTES      = WUKONG_DMEM_WORDS * 4
 _VALID_EV_TYPES = frozenset(_EV_NAMES)
 
 

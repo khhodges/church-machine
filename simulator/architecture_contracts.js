@@ -1,0 +1,317 @@
+// Generated from shared/architecture_contracts.json.
+// Run: node scripts/gen-architecture-contracts.js
+(function (root, factory) {
+    const value = factory();
+    if (typeof module !== 'undefined' && module.exports) module.exports = value;
+    root.ChurchArchitectureContracts = value;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+    return Object.freeze({
+  "schemaVersion": 1,
+  "name": "Church Machine architecture contracts",
+  "canonical": true,
+  "isa": {
+    "gtWord0": {
+      "widthBits": 32,
+      "fields": {
+        "slot_id": [
+          0,
+          15
+        ],
+        "gt_seq": [
+          16,
+          24
+        ],
+        "gt_type": [
+          25,
+          26
+        ],
+        "dom": [
+          27,
+          27
+        ],
+        "perm": [
+          28,
+          30
+        ],
+        "b_flag": [
+          31,
+          31
+        ]
+      },
+      "types": {
+        "NULL": 0,
+        "INFORM": 1,
+        "OUTFORM": 2,
+        "ABSTRACT": 3
+      }
+    },
+    "abstractGtWord0": {
+      "widthBits": 32,
+      "scope": "type-specific packing used only when gt_type is ABSTRACT",
+      "fields": {
+        "ab_data": [
+          0,
+          15
+        ],
+        "gt_seq": [
+          16,
+          22
+        ],
+        "write": [
+          23,
+          23
+        ],
+        "read": [
+          24,
+          24
+        ],
+        "gt_type": [
+          25,
+          26
+        ],
+        "ab_type": [
+          27,
+          31
+        ]
+      }
+    },
+    "permissions": {
+      "logicalOrder": [
+        "R",
+        "W",
+        "X",
+        "L",
+        "S",
+        "E"
+      ],
+      "domains": {
+        "turing": {
+          "dom": 0,
+          "payloadLowToHigh": [
+            "R",
+            "W",
+            "X"
+          ]
+        },
+        "church": {
+          "dom": 1,
+          "payloadLowToHigh": [
+            "L",
+            "S",
+            "E"
+          ]
+        }
+      },
+      "mixedDomainEncoding": "forbidden",
+      "bFlagIsPermission": false
+    },
+    "nsEntry": {
+      "words": 4,
+      "bytes": 16,
+      "locationUnitByProfile": {
+        "simulator-v20": "word",
+        "generic-boot-image-v20": "word",
+        "wukong-uart-upload-v2": "byte",
+        "a7-legacy-v12": "byte"
+      },
+      "word0": "location",
+      "word1": {
+        "name": "authority",
+        "fields": {
+          "limit_offset": [
+            0,
+            20
+          ],
+          "gt_seq": [
+            21,
+            29
+          ],
+          "g_bit": [
+            30,
+            30
+          ],
+          "f_flag": [
+            31,
+            31
+          ]
+        }
+      },
+      "word2": "integrity32",
+      "word3": "non-authoritative-cache-token",
+      "integrity": {
+        "excludedWord1Fields": [
+          "g_bit",
+          "f_flag"
+        ]
+      }
+    }
+  },
+  "boot": {
+    "minimalSlots": {
+      "Boot.NS": 0,
+      "Boot.Thread": 1,
+      "UART_DEV": 2,
+      "LED_DEV": 3,
+      "BTN_DEV": 4,
+      "TIMER_DEV": 5,
+      "SelfTest": 6,
+      "WukongCallHome": 7
+    },
+    "defaultBootEntrySlot": 6,
+    "wukongBootEntrySlot": 7,
+    "namedCatalogSlots": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "devices": {
+      "UART_DEV": {
+        "address": 1073741844,
+        "words": 3,
+        "permissions": [
+          "R",
+          "W"
+        ],
+        "bindable": true
+      },
+      "LED_DEV": {
+        "address": 1073741824,
+        "words": 5,
+        "permissions": [
+          "R",
+          "W"
+        ],
+        "bindable": true
+      },
+      "BTN_DEV": {
+        "address": 1073741864,
+        "words": 1,
+        "permissions": [
+          "R"
+        ],
+        "bindable": true
+      },
+      "TIMER_DEV": {
+        "address": 1073741868,
+        "words": 5,
+        "permissions": [
+          "R",
+          "W"
+        ],
+        "bindable": true
+      }
+    }
+  },
+  "profiles": {
+    "simulator-v20": {
+      "kind": "simulator",
+      "wordBits": 32,
+      "defaultTotalWords": 131072,
+      "namespace": {
+        "placement": "tail-descending",
+        "defaultSlots": 256,
+        "configurableSlots": true,
+        "entryWords": 4,
+        "baseFormula": "totalWords - slots * entryWords"
+      },
+      "deviceAddressSpace": "virtual-mmio",
+      "bootSlots": "minimalSlots",
+      "traceUnit": "simulator-events"
+    },
+    "generic-boot-image-v20": {
+      "kind": "image",
+      "wordBits": 32,
+      "defaultTotalWords": 65536,
+      "namespace": {
+        "placement": "tail-descending",
+        "defaultSlots": 256,
+        "configurableSlots": true,
+        "entryWords": 4,
+        "baseFormula": "totalWords - slots * entryWords"
+      },
+      "deviceAddressSpace": "virtual-mmio",
+      "bootSlots": "minimalSlots",
+      "traceUnit": null
+    },
+    "wukong-uart-upload-v2": {
+      "kind": "physical-board-upload",
+      "wordBits": 32,
+      "totalWords": 16384,
+      "namespace": {
+        "placement": "head-ascending",
+        "baseWord": 0,
+        "slots": 64,
+        "entryWords": 4
+      },
+      "uploadBodyBaseWord": 1280,
+      "maxThreadCount": 3,
+      "deviceAddressSpace": "physical-mmio",
+      "bootSlots": "minimalSlots",
+      "traceUnit": "wukong-event-uart-v2"
+    },
+    "a7-legacy-v12": {
+      "kind": "legacy-hardware",
+      "wordBits": 32,
+      "totalWords": 131072,
+      "namespace": {
+        "placement": "tail-descending",
+        "baseWord": 130048,
+        "slots": 256,
+        "entryWords": 4
+      },
+      "deviceAddressSpace": "physical-mmio",
+      "bootSlots": "legacy-image-defined",
+      "traceUnit": null
+    }
+  },
+  "traceUnits": {
+    "simulator-events": {
+      "transport": "in-process",
+      "serializedPacketBytes": null,
+      "architecturalHistory": false,
+      "eventIds": {
+        "RESULT": 0,
+        "LOAD_SHADOW": 1,
+        "LOAD_NEW": 2,
+        "CHANGE_PUSH": 3,
+        "CHANGE_CR12": 4,
+        "CHANGE_CR5": 5,
+        "CALL_CR6": 6,
+        "CALL_CR14": 7,
+        "CALL_PUSH": 8,
+        "RETURN_POP": 9,
+        "RETURN_CR6": 10,
+        "RETURN_CR14": 11
+      }
+    },
+    "wukong-event-uart-v2": {
+      "transport": "uart-big-endian",
+      "magic": 170,
+      "packetBytes": 12,
+      "architecturalHistory": false,
+      "eventIds": {
+        "RESULT": 0,
+        "LOAD_SHADOW": 1,
+        "LOAD_NEW": 2,
+        "CHANGE_PUSH": 3,
+        "CHANGE_CR12": 4,
+        "CHANGE_CR5": 5,
+        "CALL_CR6": 6,
+        "CALL_CR14": 7,
+        "CALL_PUSH": 8,
+        "RETURN_POP": 9,
+        "RETURN_CR6": 10,
+        "RETURN_CR14": 11
+      }
+    }
+  }
+});
+});

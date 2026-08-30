@@ -11,7 +11,7 @@
 //   WCH-HW-04  words[74..125] — freespace region is entirely zero (52 words)
 //   WCH-HW-05  words[126..127] — c-list entries are present (non-zero)
 //   WCH-HW-06  loadLumpBinary() installs the header at EXTENDED_BASE (0x0400)
-//   WCH-HW-07  NS[bootEntrySlot].word1 encodes limit=73, clistCount=2
+//   WCH-HW-07  NS[bootEntrySlot].word1 encodes limit=73; header encodes cc=2
 //   WCH-HW-08  CR14.word1 = EXTENDED_BASE (0x0400) after load
 //   WCH-HW-09  sim.parseLumpHeader agrees with raw header decode (cw=73, cc=2, lumpSize=128)
 //   WCH-HW-10  Every code word survives the load intact in simulator memory
@@ -357,8 +357,8 @@ console.log('\n--- WCH-HW-06: loadLumpBinary installs header at EXTENDED_BASE (0
         `got 0x${sim.memory[nsBase+0].toString(16)}`);
 }
 
-// ── WCH-HW-07: NS word1 encodes limit=73, clistCount=2 ───────────────────────
-console.log('\n--- WCH-HW-07: NS[bootEntrySlot].word1 encodes limit=73, clistCount=2 ---');
+// ── WCH-HW-07: NS authority has limit; LUMP header has c-list count ──────────
+console.log('\n--- WCH-HW-07: NS word1 encodes limit=73; resident header encodes cc=2 ---');
 {
     const { sim, nsBase } = setupSimForBinary();
     sim.loadLumpBinary(rawWords);
@@ -369,9 +369,10 @@ console.log('\n--- WCH-HW-07: NS[bootEntrySlot].word1 encodes limit=73, clistCou
     check('WCH-HW-07a: NS[bootEntrySlot].word1 limit = 73 (cw)',
         parsed.limit === EXPECTED_CW,
         `got limit=${parsed.limit}`);
-    check('WCH-HW-07b: NS[bootEntrySlot].word1 clistCount = 2 (cc)',
-        parsed.clistCount === EXPECTED_CC,
-        `got clistCount=${parsed.clistCount}`);
+    const residentHeader = sim.parseLumpHeader(sim.memory[EXTENDED_BASE] >>> 0);
+    check('WCH-HW-07b: resident LUMP header cc = 2 (not duplicated in NS word1)',
+        residentHeader.cc === EXPECTED_CC,
+        `got header cc=${residentHeader.cc}`);
 }
 
 // ── WCH-HW-08: CR14.word1 = EXTENDED_BASE after load ────────────────────────

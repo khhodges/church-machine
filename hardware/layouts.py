@@ -1,13 +1,14 @@
 from amaranth import *
 from amaranth.lib.data import StructLayout
+from shared.architecture_contracts import GT_WORD0, NS_ENTRY
+
+
+def _width(field):
+    return field[1] - field[0] + 1
 
 GT_LAYOUT = StructLayout({
-    "slot_id": unsigned(16),   # [15:0]  — namespace slot index
-    "gt_seq":  unsigned(9),    # [24:16] — revocation counter (9-bit; 0–511) ★v2.0
-    "gt_type": unsigned(2),    # [26:25] — 00=NULL 01=Inform 10=Outform 11=Abstract ★v2.0
-    "dom":     unsigned(1),    # [27]    — domain: 0=Turing {X,W,R}, 1=Church {E,S,L}
-    "perm":    unsigned(3),    # [30:28] — 3-bit payload (dom=0: X/W/R; dom=1: E/S/L)
-    "b_flag":  unsigned(1),    # [31]    — bindable override (I/O devices; excluded from CRC)
+    name: unsigned(_width(bits))
+    for name, bits in GT_WORD0["fields"].items()
 })
 
 # GT encoding reference:
@@ -26,10 +27,8 @@ CAP_REG_LAYOUT = StructLayout({
 })
 
 WORD2_LAYOUT = StructLayout({
-    "limit_offset": unsigned(21),  # [20:0]  — lump size boundary
-    "gt_seq":       unsigned(9),   # [29:21] — revocation counter (9-bit; matches GT.gt_seq) ★v2.0
-    "g_bit":        unsigned(1),   # [30]    — GC mark bit (mutable without reseal) ★v2.0
-    "f_flag":       unsigned(1),   # [31]    — Far indicator (moved from GT[25]) ★v2.0
+    name: unsigned(_width(bits))
+    for name, bits in NS_ENTRY["word1"]["fields"].items()
 })
 
 LUMP_HEADER_LAYOUT = StructLayout({

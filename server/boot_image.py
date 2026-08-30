@@ -46,15 +46,25 @@ import json
 import os
 import struct
 import warnings
+from shared.architecture_contracts import (
+    ABSTRACT_GT_WORD0 as ARCH_ABSTRACT_GT_WORD0,
+    BOOT as ARCH_BOOT,
+    GT_WORD0 as ARCH_GT_WORD0,
+    NS_ENTRY as ARCH_NS_ENTRY,
+    PROFILES as ARCH_PROFILES,
+    field_lsb,
+    field_width,
+    ns_integrity_word1_mask,
+)
 try:
     from boot_constants import DEMO_CLIST_SIZE, BOOT_ABSTR_DEFAULT_SIZE
 except ImportError:
     from server.boot_constants import DEMO_CLIST_SIZE, BOOT_ABSTR_DEFAULT_SIZE
 
-NS_ENTRY_WORDS   = 4            # words per NS entry (stride-4, 16 bytes per slot)
+NS_ENTRY_WORDS   = ARCH_NS_ENTRY["words"]
 NS_BUS_WORDS     = 4            # hardware ns_rd_data/ns_wr_data bus width in 32-bit words
 MAX_NS_ENTRIES   = 1024         # V20 cap: 64–1024 slots, power of two (matches app.py MAX_NS_ENTRIES and the designer selector)
-DEFAULT_NS_SLOTS_MAX = 256      # legacy default when step1.nsSlotsMax is absent (A7 v1.2 images)
+DEFAULT_NS_SLOTS_MAX = ARCH_PROFILES["generic-boot-image-v20"]["namespace"]["defaultSlots"]
 NS_TABLE_RESERVE = DEFAULT_NS_SLOTS_MAX * NS_ENTRY_WORDS  # 1024 words = 256 entries × 4 (legacy default reserve)
 SLOT_SIZE        = 0x40         # 64 words
 
@@ -121,10 +131,11 @@ try:
         WUKONG_PHYSICAL_MAX_THREAD_COUNT,
     )
 except ImportError:
-    WUKONG_DMEM_WORDS = 16_384
-    WUKONG_FORWARD_NS_SLOTS = 64
-    WUKONG_UPLOAD_BODY_BASE_WORD = 1_280
-    WUKONG_PHYSICAL_MAX_THREAD_COUNT = 3
+    _wukong_profile = ARCH_PROFILES["wukong-uart-upload-v2"]
+    WUKONG_DMEM_WORDS = _wukong_profile["totalWords"]
+    WUKONG_FORWARD_NS_SLOTS = _wukong_profile["namespace"]["slots"]
+    WUKONG_UPLOAD_BODY_BASE_WORD = _wukong_profile["uploadBodyBaseWord"]
+    WUKONG_PHYSICAL_MAX_THREAD_COUNT = _wukong_profile["maxThreadCount"]
 
 # Direct dispatch: NUC_CODE (B:07) pre-loads CR0 with the boot-entry E-GT.
 # No CHANGE→TPERM→CALL trampoline — 00000600.lump must always be present.
@@ -192,13 +203,15 @@ def create_abstract_gt(ab_type, rw_perms, gt_seq, ab_data):
     # v2.0 layout: gt_type=0b11 at [26:25], R at bit[24], W at bit[23] ★v2.0
     r_bit = 1 if rw_perms.get("R") else 0
     w_bit = 1 if rw_perms.get("W") else 0
+    fields = ARCH_ABSTRACT_GT_WORD0["fields"]
+    mask = lambda name: (1 << field_width(fields[name])) - 1
     return _u32(
-        ((ab_type & 0x1F) << 27) |
-        (0b11             << 25) |   # gt_type=Abstract at [26:25] ★v2.0
-        (r_bit            << 24) |   # R at bit[24] ★v2.0
-        (w_bit            << 23) |   # W at bit[23] ★v2.0
-        ((gt_seq & 0x7F)  << 16) |
-        (ab_data & 0xFFFF)
+        ((ab_type & mask("ab_type")) << field_lsb(fields["ab_type"])) |
+        (0b11 << field_lsb(fields["gt_type"])) |
+        (r_bit << field_lsb(fields["read"])) |
+        (w_bit << field_lsb(fields["write"])) |
+        ((gt_seq & mask("gt_seq")) << field_lsb(fields["gt_seq"])) |
+        (ab_data & mask("ab_data"))
     )
 
 
@@ -211,14 +224,18 @@ def create_abstract_gt(ab_type, rw_perms, gt_seq, ab_data):
 # The ⚡ lightning bolt sets Thread.CR0 to the E-GT of whichever slot the programmer
 # chooses as the boot entry.  Default is SelfTest (slot 6); Wukong boards use slot 7.
 DEFAULT_ABSTRACTION_CATALOG = [
-    ("Boot.NS",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),  # 0
-    ("Boot.Thread",    {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),  # 1
-    ("UART_DEV",       {"R":1,"W":1,"X":0,"L":0,"S":0,"E":0}, False),  # 2  MMIO 0x40000014
-    ("LED_DEV",        {"R":1,"W":1,"X":0,"L":0,"S":0,"E":0}, False),  # 3  MMIO 0x40000000
-    ("BTN_DEV",        {"R":1,"W":0,"X":0,"L":0,"S":0,"E":0}, False),  # 4  MMIO 0x40000028
-    ("TIMER_DEV",      {"R":1,"W":1,"X":0,"L":0,"S":0,"E":0}, False),  # 5  MMIO 0x4000002C
-    ("SelfTest",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 6  default boot entry
-    ("WukongCallHome", {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 7  Wukong coordinator LUMP
+    ("Boot.NS",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),
+    ("Boot.Thread",    {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),
+    *[
+        (
+            name,
+            {p: int(p in ARCH_BOOT["devices"][name]["permissions"]) for p in ("R", "W", "X", "L", "S", "E")},
+            False,
+        )
+        for name in ("UART_DEV", "LED_DEV", "BTN_DEV", "TIMER_DEV")
+    ],
+    ("SelfTest",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
+    ("WukongCallHome", {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
      ("Tunnel",         {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 8  CALL HOME / IDE bridge
     ("Ethernet",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 9  network I/O hardware cap
     ("CapabilityTest",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 10 capability validation LUMP
@@ -285,10 +302,8 @@ def boot_resident_region_end(thread_size, boot_abstr_size, thread_count,
 # Slots 2-5 use physical MMIO addresses — no RAM body is allocated;
 # running_offset is not advanced for these slots.
 _MMIO_SLOT_SPECS = {
-    2: (0x40000014, 2),   # UART_DEV: TX/STATUS/RX (3 words, lim17=2)
-    3: (0x40000000, 4),   # LED_DEV:  LED0-LED4    (5 words, lim17=4)
-    4: (0x40000028, 0),   # BTN_DEV:  state        (1 word,  lim17=0)
-    5: (0x4000002C, 4),   # TIMER_DEV: 5 registers (5 words, lim17=4)
+    ARCH_BOOT["minimalSlots"][name]: (spec["address"], spec["words"] - 1)
+    for name, spec in ARCH_BOOT["devices"].items()
 }
 
 # Service abstraction c-list capability table.
@@ -310,6 +325,25 @@ SERVICE_CLIST_DEFS = {
 
 def _u32(x):
     return x & 0xFFFFFFFF
+
+
+_NS_W1_FIELDS = ARCH_NS_ENTRY["word1"]["fields"]
+
+
+def _field_mask(field):
+    return (1 << field_width(field)) - 1
+
+
+def _ns_word1_get(word, name):
+    field = _NS_W1_FIELDS[name]
+    return (word >> field_lsb(field)) & _field_mask(field)
+
+
+def _ns_word1_replace(word, name, value):
+    field = _NS_W1_FIELDS[name]
+    shifted_mask = _field_mask(field) << field_lsb(field)
+    return _u32((word & ~shifted_mask)
+                | ((value & _field_mask(field)) << field_lsb(field)))
 
 
 def perm_bits(perms):
@@ -335,11 +369,13 @@ def pack_ns_word1(limit_offset, gt_seq=0, g=0, f=0):
       limit_offset[20:0] | gt_seq[29:21] | g_bit[30] | f_flag[31].
     Entry state is carried by the access GT, never by W1.
     """
+    fields = ARCH_NS_ENTRY["word1"]["fields"]
+    mask = lambda name: (1 << field_width(fields[name])) - 1
     return _u32(
-        ((f & 1) << 31)
-        | ((g & 1) << 30)
-        | ((gt_seq & 0x1FF) << 21)
-        | (limit_offset & 0x1FFFFF)
+        ((f & mask("f_flag")) << field_lsb(fields["f_flag"]))
+        | ((g & mask("g_bit")) << field_lsb(fields["g_bit"]))
+        | ((gt_seq & mask("gt_seq")) << field_lsb(fields["gt_seq"]))
+        | (limit_offset & mask("limit_offset"))
     )
 
 
@@ -363,11 +399,13 @@ def create_gt(gt_seq, slot_id, perms, gt_type):
     Note: v1.x layout used gt_type[24:23] and gt_seq[22:16] (7-bit).
     """
     dom, perm3 = _encode_perm(perms)
-    t = ((gt_type & 0x3)  << 25) & 0xFFFFFFFF
-    s = ((gt_seq  & 0x1FF) << 16) & 0xFFFFFFFF
-    d = ((dom     & 0x1)  << 27) & 0xFFFFFFFF
-    p = ((perm3   & 0x7)  << 28) & 0xFFFFFFFF
-    return _u32(d | p | t | s | (slot_id & 0xFFFF))
+    fields = ARCH_GT_WORD0["fields"]
+    mask = lambda name: (1 << field_width(fields[name])) - 1
+    t = (gt_type & mask("gt_type")) << field_lsb(fields["gt_type"])
+    s = (gt_seq & mask("gt_seq")) << field_lsb(fields["gt_seq"])
+    d = (dom & mask("dom")) << field_lsb(fields["dom"])
+    p = (perm3 & mask("perm")) << field_lsb(fields["perm"])
+    return _u32(d | p | t | s | (slot_id & mask("slot_id")))
 
 
 def _rol32(value, amount):
@@ -381,7 +419,7 @@ def integrity32(location, authority):
     G and F are mutable liveness/routing bits, so W1[31:30] are masked before
     the check.  This is corruption detection, not cryptographic authenticity.
     """
-    authority_masked = authority & 0x3FFFFFFF
+    authority_masked = authority & ns_integrity_word1_mask()
     return _u32(
         _rol32(location, 7)
         ^ _rol32(authority_masked, 13)
@@ -556,7 +594,7 @@ def read_boot_entry_info(image_bytes):
     entry_loc = _ns_word0(entry_slot)
     entry_ns_base = _ns_base(entry_slot)
     entry_authority = words[entry_ns_base + 1] if entry_ns_base is not None else 0
-    entry_gt_seq = (entry_authority >> 21) & 0x1FF
+    entry_gt_seq = _ns_word1_get(entry_authority, "gt_seq")
 
     resident = False
     reason = None
@@ -808,7 +846,7 @@ def build_wukong_upload_image(generic_image, boot_config=None):
         ]
         target_ns_base = slot * NS_ENTRY_WORDS
         target_byte = thread_target * 4
-        authority = (descriptor[1] & ~0x1FFFFF) | (size - 1)
+        authority = _ns_word1_replace(descriptor[1], "limit_offset", size - 1)
         mem[target_ns_base:target_ns_base + NS_ENTRY_WORDS] = [
             target_byte,
             authority,
@@ -984,10 +1022,10 @@ def parse_ns_table(image_bytes):
         entries.append({
             "slot":        slot,
             "location":    w0,
-            "f":           (w1 >> 31) & 1,
-            "g":           (w1 >> 30) & 1,
-            "limit17":     w1 & 0x1FFFFF,
-            "seq":         (w1 >> 21) & 0x1FF,
+            "f":           _ns_word1_get(w1, "f_flag"),
+            "g":           _ns_word1_get(w1, "g_bit"),
+            "limit17":     _ns_word1_get(w1, "limit_offset"),
+            "seq":         _ns_word1_get(w1, "gt_seq"),
             "integrity32": w2,
             "integrity_ok": w2 == integrity32(w0, w1),
         })
@@ -1707,7 +1745,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         _ns_n_minus_6(thread_size), thread_stack_words, THREAD_CAP_WORDS, 2)
     mem[thread_loc + THREAD_STO_OFFSET] = layout["stack_end"]
     _boot_entry_ns_base = total - (boot_entry_slot + 1) * NS_ENTRY_WORDS
-    _boot_entry_seq = (mem[_boot_entry_ns_base + 1] >> 21) & 0x1FF
+    _boot_entry_seq = _ns_word1_get(mem[_boot_entry_ns_base + 1], "gt_seq")
     mem[thread_loc + layout["caps_start"]] = create_gt(
         _boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
 

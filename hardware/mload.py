@@ -5,6 +5,7 @@ from .hw_types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, NS_ENTRY_LAYOUT, WORD2_LAYOUT
 from .perm_check import perm_bit
 from .ns_gate import ChurchNSGate
+from shared.architecture_contracts import NS_ENTRY as ARCH_NS_ENTRY, field_lsb
 
 
 class ChurchMLoad(Elaboratable):
@@ -329,7 +330,9 @@ class ChurchMLoad(Elaboratable):
             if self.enable_seal_check:
                 with m.State("RESET_GBIT"):
                     gbit_cleared_w1 = Signal(32)
-                    m.d.comb += gbit_cleared_w1.eq(ns_w1_saved & ~(1 << 30))
+                    m.d.comb += gbit_cleared_w1.eq(
+                        ns_w1_saved & ~(1 << field_lsb(
+                            ARCH_NS_ENTRY["word1"]["fields"]["g_bit"])))
                     m.d.comb += [
                         local_mem_addr.eq(u_ns_gate.ns_entry_addr_out + 4),
                         local_mem_wr_en.eq(1),

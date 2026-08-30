@@ -12,92 +12,23 @@ if (typeof module !== 'undefined' && typeof AbstractGTManager === 'undefined') {
 const THREAD_DESIGN = typeof ThreadDesign !== 'undefined'
     ? ThreadDesign
     : require('./thread_design.js');
-//
-// This is the heart of the browser-based Church Machine IDE.  It implements a
-// cycle-accurate (at the instruction level) simulation of the Church Machine
-// CPU — a capability-based computer architecture targeting the QMTECH Wukong
-// F225 FPGA.
-//
-// PRIMARY CLASS
-//   ChurchSimulator
-//     Instantiated once in app.js as `sim`.  Emits 'stateChange' events so the
-//     IDE UI can re-render after every instruction or boot step.
-//
-// MEMORY MAP  (all addresses are word-addressed 32-bit words, A7 v1.2 layout)
-//   0x00000 – NS_TABLE_BASE−1   Thread LUMP (at 0x00000), Boot.Abstr, dynamic pool
-//   NS_TABLE_BASE – memory.length−1  Namespace (NS) table — 256 × 4-word entries
-//                                    (NS_TABLE_RESERVE=0x400; NS_TABLE_BASE = memory.length − 0x400)
-//   (I/O segment and Boot ROM are overlaid in the lump area at NS-registered addresses)
-//
-// NAMESPACE TABLE (NS)
-//   Each entry is 4 words wide (stride = 16 bytes); layout matches hardware WORD2_LAYOUT: ★v2.0
-//     word0  location   — lump base byte address (32-bit pointer)
-//     word1  authority  — WORD2_LAYOUT: limit_offset[20:0] | gt_seq[29:21] | g_bit[30] | f_flag[31]
-//                         g_bit[30]: GC liveness mark — mutable; masked from integrity32 (no reseal needed)
-//                         f_flag[31]: Far indicator — 0=local, 1=remote IDE node; also masked from integrity32
-//                         Both g_bit and f_flag are NS SLOT properties, not GT word fields. ★v2.0
-//     word2  integrity  — integrity32(word0, word1 with g_bit[30] and f_flag[31] cleared); 32-bit parallel check
-//     word3  cache_token — issue-blind 32-bit lookup/cache value T; non-authoritative
-//
-// THREAD LUMP LAYOUT  (256 words, NS[1] "Boot.Thread")
-//   +0        Header word
-//   +1..+16   Data Registers  DR0–DR15
-//   +17       Protected STO (machine-only)
-//   +18..+81  Heap (64 words)
-//   +82..+211 Free space
-//   +212..+243 Stack (32 words, grows down from +243)
-//   +244..+255 Caps zone — GT home slots for CR0–CR11 (CR6=c-list root)
-//
-// CAPABILITY REGISTERS (CRs)
-//   CR0–CR11   General-purpose GT holders
-//   CR12       Thread stack (privileged, system-wide — unchanged by CHANGE)
-//   CR13       Interrupt handler (privileged, system-wide — unchanged by CHANGE)
-//   CR14       Code register / CLOOMC (privileged, per-thread — set by CALL, saved/restored by CHANGE)
-//   CR15       Namespace root (privileged, per-thread — saved/restored by CHANGE)
-//   CR6        C-list root — points to the abstraction's capability list
-//
-// BOOT SEQUENCE  (_bootStep)
-//   Step 0   CHANGE  — set DR0 to boot sentinel
-//   Step 1   LOAD    — CR15 ← NS[3] (Boot.Kernel)
-//   Step 2   CALL    — push sentinel frame, enter Boot.Kernel
-//   Step 3   ELOADCALL — load+call Boot.Init
-//   Step 4   RETURN  — unwind sentinel frame, boot complete
-//   The full sequence mirrors hardware/boot_rom.py BOOT_PROGRAM exactly.
-//
-// GARBAGE COLLECTOR  (runGC)
-//   Tri-colour mark-sweep over the NS table.
-//   Phase 1 MARK  — flip G-bit on all valid entries → garbage suspects
-//   Phase 2 SCAN  — walk CR0–CR15 + call-stack frames; mark reachable entries live
-//   Phase 3 SWEEP — collect entries still marked garbage
-//   Phase 4 CLEAR — zero NS words + lump words; bump version; flip polarity
-//
-// INSTRUCTION SET  (partial — see assembler.js for full encoding)
-//   LOAD, SAVE, CALL, RETURN, CHANGE, SWITCH, TPERM, LAMBDA
-//   ELOADCALL, XLOADLAMBDA, DREAD, DWRITE
-//   BFEXT, BFINS, MCMP, IADD, ISUB, BRANCH, SHL, SHR
-//
-// KEY METHODS
-//   boot()           — run the full boot sequence to completion
-//   _bootStep()      — execute one boot step (for single-stepping)
-//   step()           — execute one user instruction
-//   runGC()          — run a full GC cycle; returns structured phases[]
-//   readNSEntry(i)   — parse all fields of NS entry i into a plain object
-//   parseGT(word0)   — decode a Golden Token word into index/version/type
-//   parseNSWord1(w)  — decode limit/clistCount/gtType/G-bit from word1
-//   markGarbage(i)   — set G-bit to current garbage polarity
-//   markLive(i)      — set G-bit to current live polarity
-//   isNSEntryValid(i)— true if word0 or word1 is non-zero
-//
-// HARDWARE CROSS-REFERENCE
-//   hardware/boot_rom.py   — Amaranth HDL boot ROM (BOOT_PROGRAM, DEMO_CLIST,
-//                            DEMO_NAMESPACE); _bootStep() mirrors this exactly
-//   hardware/call.py       — CALL/RETURN micro-op implementation
-//
-// -----------------------------------------------------------------------------
 
-// The normative Thread geometry is generated from shared/thread_design.json.
-// Canonical 256-word compatibility offset. Runtime code derives the actual
-// tail-relative home from each Thread header.
+const ARCH_CONTRACTS = typeof ChurchArchitectureContracts !== 'undefined'
+    ? ChurchArchitectureContracts
+    : require('./architecture_contracts.js');
+const ARCH_PROFILE_NAME = 'simulator-v20';
+const ARCH_PROFILE = ARCH_CONTRACTS.profiles[ARCH_PROFILE_NAME];
+const ARCH_BOOT = ARCH_CONTRACTS.boot;
+const ARCH_TRACE = ARCH_CONTRACTS.traceUnits[ARCH_PROFILE.traceUnit];
+const ARCH_GT_FIELDS = ARCH_CONTRACTS.isa.gtWord0.fields;
+const ARCH_ABSTRACT_GT_FIELDS = ARCH_CONTRACTS.isa.abstractGtWord0.fields;
+const ARCH_NS_W1_FIELDS = ARCH_CONTRACTS.isa.nsEntry.word1.fields;
+const archFieldShift = field => field[0];
+const archFieldMask = field => (2 ** (field[1] - field[0] + 1)) - 1;
+const ARCH_NS_INTEGRITY_MASK = ARCH_CONTRACTS.isa.nsEntry.integrity.excludedWord1Fields
+    .reduce((mask, name) => mask & ~(
+        archFieldMask(ARCH_NS_W1_FIELDS[name]) << archFieldShift(ARCH_NS_W1_FIELDS[name])
+    ), 0xFFFFFFFF) >>> 0;
 const THREAD_CAPS_OFFSET =
     THREAD_DESIGN.canonicalBodyWords - THREAD_DESIGN.capabilityHomes.words;
 const THREAD_STO_OFFSET = THREAD_DESIGN.protectedStoOffset;
@@ -119,20 +50,20 @@ const M_BIT_PORT_CR15         = 0xFFFFFF1F; // M-bit authority port for CR15
 const IO_PORT_PET_NAME_WR     = 0xFFFFFF38; // DWRITE to this addr marks c-list slot (value & 0x3F) as named
 // Boot-default named slots — matches hardware/boot_rom.py DEMO_CLIST_NAMED_SLOTS.
 // 11-slot catalog (0-10): hw MMIO 0-5, boot-entry LUMPs 6-7, hardware caps 8-10.
-const BOOT_NAMED_SLOTS = Object.freeze([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+const BOOT_NAMED_SLOTS = Object.freeze(ARCH_BOOT.namedCatalogSlots.slice());
 
-const TRACE_EV_RESULT      = 0x00;  // Single-packet result (DR→DR, SAVE, Function, etc.)
-const TRACE_EV_LOAD_SHADOW = 0x01;  // LOAD: old CR_dst GT displaced
-const TRACE_EV_LOAD_NEW    = 0x02;  // LOAD: new GT installed in CR_dst
-const TRACE_EV_CHANGE_PUSH = 0x03;  // CHANGE: context stack push (payload=0)
-const TRACE_EV_CHANGE_CR12 = 0x04;  // CHANGE: CR12 ← new thread GT
-const TRACE_EV_CHANGE_CR5  = 0x05;  // CHANGE: CR5  ← heap GT
-const TRACE_EV_CALL_CR6    = 0x06;  // CALL:   CR6  ← abstraction GT
-const TRACE_EV_CALL_CR14   = 0x07;  // CALL:   CR14 ← code / return GT
-const TRACE_EV_CALL_PUSH   = 0x08;  // CALL:   caller frame stack push (payload=0)
-const TRACE_EV_RETURN_POP  = 0x09;  // RETURN: caller frame stack pop (payload=0)
-const TRACE_EV_RETURN_CR6  = 0x0A;  // RETURN: CR6  ← restored from frame
-const TRACE_EV_RETURN_CR14 = 0x0B;  // RETURN: CR14 ← restored from frame (caller's code cap)
+const TRACE_EV_RESULT      = ARCH_TRACE.eventIds.RESULT;
+const TRACE_EV_LOAD_SHADOW = ARCH_TRACE.eventIds.LOAD_SHADOW;
+const TRACE_EV_LOAD_NEW    = ARCH_TRACE.eventIds.LOAD_NEW;
+const TRACE_EV_CHANGE_PUSH = ARCH_TRACE.eventIds.CHANGE_PUSH;
+const TRACE_EV_CHANGE_CR12 = ARCH_TRACE.eventIds.CHANGE_CR12;
+const TRACE_EV_CHANGE_CR5  = ARCH_TRACE.eventIds.CHANGE_CR5;
+const TRACE_EV_CALL_CR6    = ARCH_TRACE.eventIds.CALL_CR6;
+const TRACE_EV_CALL_CR14   = ARCH_TRACE.eventIds.CALL_CR14;
+const TRACE_EV_CALL_PUSH   = ARCH_TRACE.eventIds.CALL_PUSH;
+const TRACE_EV_RETURN_POP  = ARCH_TRACE.eventIds.RETURN_POP;
+const TRACE_EV_RETURN_CR6  = ARCH_TRACE.eventIds.RETURN_CR6;
+const TRACE_EV_RETURN_CR14 = ARCH_TRACE.eventIds.RETURN_CR14;
 const SCHEDULER_IRQ_THREAD_SLOT = 41;
 
 
@@ -157,8 +88,8 @@ const SCHEDULER_IRQ_CLIST = [
 // The ONLY two legitimate slot-number literals in the entire simulator
 // navigation stack.  Every other slot reference must go through lumpTokenAtSlot
 // or the NS label index — never a raw integer literal.
-const BOOT_NS_SLOT_HEADER = 0;   // Boot.NS header LUMP (covers entire memory)
-const BOOT_NS_SLOT_THREAD = 1;   // Thread entry LUMP (TCB / boot Thread)
+const BOOT_NS_SLOT_HEADER = ARCH_BOOT.minimalSlots['Boot.NS'];
+const BOOT_NS_SLOT_THREAD = ARCH_BOOT.minimalSlots['Boot.Thread'];
 
 // Direct dispatch: after boot step B:07 NUC_CODE, CR0 is pre-loaded with the
 // boot-entry E-GT (Thread.caps[0]).  No trampoline instructions needed.
@@ -180,9 +111,11 @@ class ChurchSimulator {
         this._listeners = {};
         // NS_TABLE_BASE is recomputed in reset() (and in the binary loaders) to
         // memory.length − NS_TABLE_RESERVE. For a 131072-word A7 space: 0x1FC00.
-        this.NS_TABLE_RESERVE = 0x400;  // A7 v1.2: 256 entries × 4 words = 1024; updated in reset() from binary
+        this.architectureProfile = ARCH_PROFILE_NAME;
+        this.NS_TABLE_RESERVE =
+            ARCH_PROFILE.namespace.defaultSlots * ARCH_PROFILE.namespace.entryWords;
         this.NS_TABLE_BASE = 0x1FC00;   // for 131072-word A7 space: 0x20000 - 0x400; recomputed in reset()
-        this.NS_ENTRY_WORDS = 4;
+        this.NS_ENTRY_WORDS = ARCH_PROFILE.namespace.entryWords;
         this.MAX_NS_ENTRIES = 256;      // A7 v1.2: 256 slots max; updated in reset() to match NS_TABLE_RESERVE
         this.SLOT_SIZE = 0x40;   // 64 words — FPGA minimum slot allocation (boot_rom.py line 339)
 
@@ -215,7 +148,7 @@ class ChurchSimulator {
         // Defaults to 6 (SelfTest); overridden by app.js
         // when the user selects a different boot-entry abstraction.
         // Intentionally NOT reset by reset() — persists across soft resets.
-        this.bootEntrySlot = 6;
+        this.bootEntrySlot = ARCH_BOOT.defaultBootEntrySlot;
 
         // Immutable architectural identity: the canonical Boot.Abstr slot.
         // Captured once at construction from bootEntrySlot and NEVER mutated
@@ -283,7 +216,7 @@ class ChurchSimulator {
                        && window.bootConfig.step1 && window.bootConfig.step1.totalNamespaceWords);
             if (Number.isInteger(t) && t >= 64) return t;
         } catch (_) { /* no window in tests */ }
-        return 131072;
+        return ARCH_PROFILE.defaultTotalWords;
     }
 
     // Task #217: overlay a server-generated boot image onto the namespace
@@ -498,12 +431,13 @@ class ChurchSimulator {
         // Re-write word0 and word1 unconditionally so binary age never affects
         // runtime slot-type behaviour.
         {
-            const _MMIO_REINIT = {
-                2: { addr: 0x40000014, lim17: 2 },   // UART_DEV:  TX/STATUS/RX
-                3: { addr: 0x40000000, lim17: 4 },   // LED_DEV:   LED0-LED4
-                4: { addr: 0x40000028, lim17: 0 },   // BTN_DEV:   state
-                5: { addr: 0x4000002C, lim17: 4 },   // TIMER_DEV: 5 registers
-            };
+            const _MMIO_REINIT = {};
+            for (const [name, spec] of Object.entries(ARCH_BOOT.devices)) {
+                _MMIO_REINIT[ARCH_BOOT.minimalSlots[name]] = {
+                    addr: spec.address,
+                    lim17: spec.words - 1,
+                };
+            }
             for (const [_slotStr, _spec] of Object.entries(_MMIO_REINIT)) {
                 const _slot  = Number(_slotStr);
                 // This is a display/catalog hint, never execution state or authority.
@@ -1229,19 +1163,19 @@ class ChurchSimulator {
         // limit[20:0] | gt_seq[29:21] | G[30] | F[31].
         // State/type and c-list count are never encoded in an NS word.
         return (
-            ((fFlag & 1) << 31) |
-            ((gBit & 1) << 30) |
-            (((gtSeq || 0) & 0x1FF) << 21) |
-            (limitOffset & 0x1FFFFF)
+            ((fFlag & archFieldMask(ARCH_NS_W1_FIELDS.f_flag)) << archFieldShift(ARCH_NS_W1_FIELDS.f_flag)) |
+            ((gBit & archFieldMask(ARCH_NS_W1_FIELDS.g_bit)) << archFieldShift(ARCH_NS_W1_FIELDS.g_bit)) |
+            (((gtSeq || 0) & archFieldMask(ARCH_NS_W1_FIELDS.gt_seq)) << archFieldShift(ARCH_NS_W1_FIELDS.gt_seq)) |
+            (limitOffset & archFieldMask(ARCH_NS_W1_FIELDS.limit_offset))
         ) >>> 0;
     }
 
     parseNSWord1(word1) {
         return {
-            f: (word1 >>> 31) & 1,
-            g: (word1 >>> 30) & 1,
-            gtSeq: (word1 >>> 21) & 0x1FF,
-            limit: word1 & 0x1FFFFF,
+            f: (word1 >>> archFieldShift(ARCH_NS_W1_FIELDS.f_flag)) & archFieldMask(ARCH_NS_W1_FIELDS.f_flag),
+            g: (word1 >>> archFieldShift(ARCH_NS_W1_FIELDS.g_bit)) & archFieldMask(ARCH_NS_W1_FIELDS.g_bit),
+            gtSeq: (word1 >>> archFieldShift(ARCH_NS_W1_FIELDS.gt_seq)) & archFieldMask(ARCH_NS_W1_FIELDS.gt_seq),
+            limit: word1 & archFieldMask(ARCH_NS_W1_FIELDS.limit_offset),
         };
     }
 
@@ -2089,16 +2023,22 @@ class ChurchSimulator {
         return [
             { label: 'Boot.NS',        perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false },  // 0
             { label: 'Boot.Thread',    perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false },  // 1
-            { label: 'UART_DEV',       perms: {R:1,W:1,X:0,L:0,S:0,E:0}, chainable: false },  // 2  MMIO 0x40000014
-            { label: 'LED_DEV',        perms: {R:1,W:1,X:0,L:0,S:0,E:0}, chainable: false },  // 3  MMIO 0x40000000
-            { label: 'BTN_DEV',        perms: {R:1,W:0,X:0,L:0,S:0,E:0}, chainable: false },  // 4  MMIO 0x40000028
-            { label: 'TIMER_DEV',      perms: {R:1,W:1,X:0,L:0,S:0,E:0}, chainable: false },  // 5  MMIO 0x4000002C
+            { label: 'UART_DEV',       perms: this._contractDevicePerms('UART_DEV'), chainable: false },  // 2
+            { label: 'LED_DEV',        perms: this._contractDevicePerms('LED_DEV'), chainable: false },  // 3
+            { label: 'BTN_DEV',        perms: this._contractDevicePerms('BTN_DEV'), chainable: false },  // 4
+            { label: 'TIMER_DEV',      perms: this._contractDevicePerms('TIMER_DEV'), chainable: false },  // 5
             { label: 'SelfTest',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 6  default boot entry
             { label: 'WukongCallHome', perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 7  Wukong coordinator LUMP
             { label: 'Tunnel',         perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 8  CALL HOME / IDE bridge
             { label: 'Ethernet',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 9  network I/O hardware cap
             { label: 'CapabilityTest',        perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 10 capability validation LUMP
         ];
+    }
+
+    _contractDevicePerms(name) {
+        const enabled = new Set(ARCH_BOOT.devices[name].permissions);
+        return Object.fromEntries(['R', 'W', 'X', 'L', 'S', 'E'].map(
+            permission => [permission, enabled.has(permission) ? 1 : 0]));
     }
 
     _initNamespaceTable() {
@@ -2119,12 +2059,10 @@ class ChurchSimulator {
 
         // MMIO device-register NS limits: slots 2-5 use physical MMIO addresses.
         // lim17 = (register_count - 1) for each device.
-        const DEVICE_REG_LIMITS = {
-            2: 2,   // UART_DEV:  3 words (TX/STATUS/RX), lim17=2
-            3: 4,   // LED_DEV:   5 words (LED0-LED4),   lim17=4
-            4: 0,   // BTN_DEV:   1 word  (state),        lim17=0
-            5: 4,   // TIMER_DEV: 5 words (5 regs),       lim17=4
-        };
+        const DEVICE_REG_LIMITS = {};
+        for (const [name, spec] of Object.entries(ARCH_BOOT.devices)) {
+            DEVICE_REG_LIMITS[ARCH_BOOT.minimalSlots[name]] = spec.words - 1;
+        }
 
         // Boot Image Designer Step 1 (Task #214): if a project boot config has
         // been saved by the IDE, use the programmer-chosen lump sizes. Otherwise
@@ -2208,7 +2146,10 @@ class ChurchSimulator {
 
             // MMIO slots 2-5: use physical MMIO byte address; don't advance runningOffset.
             // Step 2 physAddr override replaces runningOffset for resident lump slots.
-            const MMIO_ADDRS = { 2: 0x40000014, 3: 0x40000000, 4: 0x40000028, 5: 0x4000002C };
+            const MMIO_ADDRS = {};
+            for (const [name, spec] of Object.entries(ARCH_BOOT.devices)) {
+                MMIO_ADDRS[ARCH_BOOT.minimalSlots[name]] = spec.address;
+            }
             const overrideLoc = physAddrOverride[i];
             // A7 v1.2 layout: NS LUMP (slot 0) lives at NS_TABLE_BASE (top of memory).
             // Thread LUMP (slot 1) starts at word 0. runningOffset is NOT advanced for
@@ -3221,12 +3162,12 @@ class ChurchSimulator {
         //               ★[26:25]=gt_type  ★[24:16]=gt_seq(9b)  [15:0]=slot_id
         // f_flag is now in the NS SLOT authority word (Word 1 bit[31]), not the GT word.
         gt32 = gt32 >>> 0;
-        const b_flag = (gt32 >>> 31) & 1;
-        const perm3  = (gt32 >>> 28) & 0x7;
-        const dom    = (gt32 >>> 27) & 0x1;
-        const type   = (gt32 >>> 25) & 0x3;   // ★ was [24:23]
-        const gt_seq = (gt32 >>> 16) & 0x1FF; // ★ 9 bits, was 7 bits at [22:16]
-        const index  =  gt32         & 0xFFFF;
+        const b_flag = (gt32 >>> archFieldShift(ARCH_GT_FIELDS.b_flag)) & archFieldMask(ARCH_GT_FIELDS.b_flag);
+        const perm3  = (gt32 >>> archFieldShift(ARCH_GT_FIELDS.perm)) & archFieldMask(ARCH_GT_FIELDS.perm);
+        const dom    = (gt32 >>> archFieldShift(ARCH_GT_FIELDS.dom)) & archFieldMask(ARCH_GT_FIELDS.dom);
+        const type   = (gt32 >>> archFieldShift(ARCH_GT_FIELDS.gt_type)) & archFieldMask(ARCH_GT_FIELDS.gt_type);
+        const gt_seq = (gt32 >>> archFieldShift(ARCH_GT_FIELDS.gt_seq)) & archFieldMask(ARCH_GT_FIELDS.gt_seq);
+        const index  = gt32 & archFieldMask(ARCH_GT_FIELDS.slot_id);
         // Decode permissions from dom+perm3 (mutual exclusion enforced by dom bit).
         const permissions = dom === 0
             ? { B: b_flag, R: (perm3>>>0)&1, W: (perm3>>>1)&1, X: (perm3>>>2)&1,
@@ -3304,10 +3245,12 @@ class ChurchSimulator {
             ? (((perms.X ? 1 : 0) << 2) | ((perms.W ? 1 : 0) << 1) | (perms.R ? 1 : 0))
             : (((perms.E ? 1 : 0) << 2) | ((perms.S ? 1 : 0) << 1) | (perms.L ? 1 : 0));
         const b = (perms.B ? 1 : 0);
-        const p = ((b << 31) | (perm3 << 28) | (dom << 27)) >>> 0;
-        const t = ((type   & 0x3)  << 25) >>> 0; // ★ was << 23
-        const s = ((gt_seq & 0x1FF) << 16) >>> 0; // ★ 9 bits, was 0x7F << 16
-        const i = (slotId  & 0xFFFF)      >>> 0;
+        const p = ((b << archFieldShift(ARCH_GT_FIELDS.b_flag)) |
+            (perm3 << archFieldShift(ARCH_GT_FIELDS.perm)) |
+            (dom << archFieldShift(ARCH_GT_FIELDS.dom))) >>> 0;
+        const t = ((type & archFieldMask(ARCH_GT_FIELDS.gt_type)) << archFieldShift(ARCH_GT_FIELDS.gt_type)) >>> 0;
+        const s = ((gt_seq & archFieldMask(ARCH_GT_FIELDS.gt_seq)) << archFieldShift(ARCH_GT_FIELDS.gt_seq)) >>> 0;
+        const i = (slotId & archFieldMask(ARCH_GT_FIELDS.slot_id)) >>> 0;
         return (p | t | s | i) >>> 0;
     }
 
@@ -3337,23 +3280,23 @@ class ChurchSimulator {
         const rBit = perms.R ? 1 : 0;
         const wBit = perms.W ? 1 : 0;
         return (
-            ((ab_type & 0x1F) << 27) |
-            (0b11             << 25) |   // ★ gt_type=Abstract at [26:25], was [24:23]
-            (rBit             << 24) |   // ★ R at bit[24], was [26]
-            (wBit             << 23) |   // ★ W at bit[23], was [25]
-            ((gt_seq & 0x7F)  << 16) |
-            (ab_data & 0xFFFF)
+            ((ab_type & archFieldMask(ARCH_ABSTRACT_GT_FIELDS.ab_type)) << archFieldShift(ARCH_ABSTRACT_GT_FIELDS.ab_type)) |
+            (0b11 << archFieldShift(ARCH_ABSTRACT_GT_FIELDS.gt_type)) |
+            (rBit << archFieldShift(ARCH_ABSTRACT_GT_FIELDS.read)) |
+            (wBit << archFieldShift(ARCH_ABSTRACT_GT_FIELDS.write)) |
+            ((gt_seq & archFieldMask(ARCH_ABSTRACT_GT_FIELDS.gt_seq)) << archFieldShift(ARCH_ABSTRACT_GT_FIELDS.gt_seq)) |
+            (ab_data & archFieldMask(ARCH_ABSTRACT_GT_FIELDS.ab_data))
         ) >>> 0;
     }
 
     parseAbstractGT(gt32) {
         gt32 = gt32 >>> 0;
-        const ab_type      = (gt32 >>> 27) & 0x1F;
-        const type         = (gt32 >>> 25) & 0x3;   // ★ always 0b11 for Abstract; was [24:23]
-        const R            = (gt32 >>> 24) & 1;      // ★ was [26]
-        const W            = (gt32 >>> 23) & 1;      // ★ was [25]
-        const gt_seq       = (gt32 >>> 16) & 0x7F;
-        const ab_data      = gt32 & 0xFFFF;
+        const ab_type = (gt32 >>> archFieldShift(ARCH_ABSTRACT_GT_FIELDS.ab_type)) & archFieldMask(ARCH_ABSTRACT_GT_FIELDS.ab_type);
+        const type = (gt32 >>> archFieldShift(ARCH_ABSTRACT_GT_FIELDS.gt_type)) & archFieldMask(ARCH_ABSTRACT_GT_FIELDS.gt_type);
+        const R = (gt32 >>> archFieldShift(ARCH_ABSTRACT_GT_FIELDS.read)) & archFieldMask(ARCH_ABSTRACT_GT_FIELDS.read);
+        const W = (gt32 >>> archFieldShift(ARCH_ABSTRACT_GT_FIELDS.write)) & archFieldMask(ARCH_ABSTRACT_GT_FIELDS.write);
+        const gt_seq = (gt32 >>> archFieldShift(ARCH_ABSTRACT_GT_FIELDS.gt_seq)) & archFieldMask(ARCH_ABSTRACT_GT_FIELDS.gt_seq);
+        const ab_data = gt32 & archFieldMask(ARCH_ABSTRACT_GT_FIELDS.ab_data);
         const device_class = (ab_data >>> 8) & 0xFF;
         const device_data  = ab_data & 0xFF;
         return { ab_type, R, W, type, gt_seq, ab_data, device_class, device_data };
@@ -3892,9 +3835,9 @@ class ChurchSimulator {
             const base = this._nsSlotBase(idx);
             const w1 = this.memory[base + 1];
             if (this.gcPolarity === 0) {
-                this.memory[base + 1] = (w1 | (1 << 30)) >>> 0;
+                this.memory[base + 1] = (w1 | (1 << archFieldShift(ARCH_NS_W1_FIELDS.g_bit))) >>> 0;
             } else {
-                this.memory[base + 1] = (w1 & ~(1 << 30)) >>> 0;
+                this.memory[base + 1] = (w1 & ~(1 << archFieldShift(ARCH_NS_W1_FIELDS.g_bit))) >>> 0;
             }
         });
     }
@@ -3905,9 +3848,9 @@ class ChurchSimulator {
             const base = this._nsSlotBase(idx);
             const w1 = this.memory[base + 1];
             if (this.gcPolarity === 0) {
-                this.memory[base + 1] = (w1 & ~(1 << 30)) >>> 0;
+                this.memory[base + 1] = (w1 & ~(1 << archFieldShift(ARCH_NS_W1_FIELDS.g_bit))) >>> 0;
             } else {
-                this.memory[base + 1] = (w1 | (1 << 30)) >>> 0;
+                this.memory[base + 1] = (w1 | (1 << archFieldShift(ARCH_NS_W1_FIELDS.g_bit))) >>> 0;
             }
         });
     }
@@ -4577,7 +4520,7 @@ class ChurchSimulator {
         // Matches hardware/integrity32.py G_BIT_MASK_32 = 0x3FFFFFFF:
         // both g_bit[30] and f_flag[31] are masked from w1 before the check. ★v2.0
         const rol32 = (x, n) => (((x << n) | (x >>> (32 - n))) >>> 0);
-        const w1m = (w1 & 0x3FFFFFFF) >>> 0;
+        const w1m = (w1 & ARCH_NS_INTEGRITY_MASK) >>> 0;
         return (rol32(w0 >>> 0, 7) ^ rol32(w1m, 13) ^ 0xDEADBEEF) >>> 0;
     }
 
@@ -4603,12 +4546,12 @@ class ChurchSimulator {
         const dr13 = this.dr[13] >>> 0;
         const dr14 = this.dr[14] >>> 0;
         // Gate 1: DR11 must be non-NULL (v2.0: gt_type at bits[26:25] != 0b00).
-        const dr11Type = (dr11 >>> 25) & 0x3;   // ★ v2.0: gt_type moved from [24:23] to [26:25]
+        const dr11Type = (dr11 >>> archFieldShift(ARCH_GT_FIELDS.gt_type)) & archFieldMask(ARCH_GT_FIELDS.gt_type);
         // Gate 2: integrity32(DR12, DR13) must equal DR14.
         const computed = this._integrity32(dr12, dr13);
         // Gate 3: gt_seq from DR11[24:16] (v2.0: 9-bit) must match DR13[27:21] (NS seal format).
-        const seqDR11 = (dr11 >>> 16) & 0x1FF;  // ★ v2.0: 9 bits, was 7 bits at [22:16]
-        const seqDR13 = (dr13 >>> 21) & 0x7F;   // NS seal word: stays as simulator abstraction
+        const seqDR11 = (dr11 >>> archFieldShift(ARCH_GT_FIELDS.gt_seq)) & archFieldMask(ARCH_GT_FIELDS.gt_seq);
+        const seqDR13 = this.parseNSWord1(dr13).gtSeq;
         const pass = (dr11Type !== 0) && (computed === dr14) && (seqDR11 === seqDR13);
         this.cr[15].m = 0;
         if (pass) {

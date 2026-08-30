@@ -1,0 +1,54 @@
+{
+  "token": "00aa1234",
+  "abstraction": "Adder",
+  "filename": "Adder.1.2009489d.lump",
+  "sidecar_file": "Adder.1.2009489d.json",
+  "ns_slot": null,
+  "lump_size": 128,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 4,
+  "cc": 1,
+  "profile": "IoT",
+  "language": "cloomc",
+  "author": "",
+  "version": "",
+  "release_notes": "",
+  "methods": [
+    "Add"
+  ],
+  "capabilities": [],
+  "compiler_owned_self": false,
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown",
+    "source_hash": ""
+  },
+  "deployment": {
+    "target_board": "wukong-xc7a100t",
+    "profile": "IoT",
+    "built_at": "2026-08-30T12:20:35.146640Z",
+    "builder": "CLOOMC++ IDE v1.0"
+  },
+  "grants": [
+    "E"
+  ],
+  "source": "",
+  "binary_hash": "bcbc0629bb24efdeec5603adf8a059e94149c9d2dffd6940edf527171cf82e87",
+  "petname": "",
+  "issue_number": 1,
+  "identity_string": "Adder#1",
+  "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f",
+  "identity_seal_location": "c-list[0]",
+  "dot_name": "Adder",
+  "issue_n": 1,
+  "lump_version": 198,
+  "compiled_at": 1788092435.1466858,
+  "sourceStorageTier": 2,
+  "archived_version": 198
+}

@@ -1,4 +1,11 @@
 from enum import IntEnum
+from shared.architecture_contracts import (
+    BOOT as ARCH_BOOT,
+    GT_WORD0 as ARCH_GT,
+    PROFILES as ARCH_PROFILES,
+    field_lsb as _arch_lsb,
+    field_width as _arch_width,
+)
 
 PERM_R = 0
 PERM_W = 1
@@ -30,10 +37,11 @@ NUM_DATA_REGS = 16
 # words through 1279. The physical board keeps Thread.1 plus two uploaded
 # generated Thread contexts (slots 11 and 12); no dedicated hardware scheduler
 # or post-boot LUMP store is allocated for additional slots.
-WUKONG_DMEM_WORDS = 16_384
-WUKONG_FORWARD_NS_SLOTS = 64
-WUKONG_UPLOAD_BODY_BASE_WORD = 1_280
-WUKONG_PHYSICAL_MAX_THREAD_COUNT = 3
+_WUKONG_PROFILE = ARCH_PROFILES["wukong-uart-upload-v2"]
+WUKONG_DMEM_WORDS = _WUKONG_PROFILE["totalWords"]
+WUKONG_FORWARD_NS_SLOTS = _WUKONG_PROFILE["namespace"]["slots"]
+WUKONG_UPLOAD_BODY_BASE_WORD = _WUKONG_PROFILE["uploadBodyBaseWord"]
+WUKONG_PHYSICAL_MAX_THREAD_COUNT = _WUKONG_PROFILE["maxThreadCount"]
 
 CR_HEAP         = 5
 CR_CLIST        = 6
@@ -43,14 +51,14 @@ CR_INTERRUPT    = 13
 CR_CLOOMC       = 14   # CR14: code register / CLOOMC (canonical name)
 CR_NAMESPACE    = 15
 
-GT_SEQ_BITS     = 9
-GT_SLOT_ID_BITS = 16
+GT_SEQ_BITS     = _arch_width(ARCH_GT["fields"]["gt_seq"])
+GT_SLOT_ID_BITS = _arch_width(ARCH_GT["fields"]["slot_id"])
 GT_PERM_BITS    = 4    # dom(1) + perm[2:0](3) — was 6; compressed via Turing/Church mutual exclusion
-GT_TYPE_BITS    = 2
-GT_WIDTH        = 32
+GT_TYPE_BITS    = _arch_width(ARCH_GT["fields"]["gt_type"])
+GT_WIDTH        = ARCH_GT["widthBits"]
 
-GT_TYPE_SHIFT   = 25   # bit position of gt_type[26:25] in GT word
-GT_DOM_BIT      = 27   # bit position of dom   in GT word
+GT_TYPE_SHIFT   = _arch_lsb(ARCH_GT["fields"]["gt_type"])
+GT_DOM_BIT      = _arch_lsb(ARCH_GT["fields"]["dom"])
 
 
 def gt_encode_perm(perms_mask: int) -> tuple:
@@ -112,7 +120,7 @@ MAX_GT_SEQ      = (1 << GT_SEQ_BITS) - 1
 
 NS_LIMIT_MASK  = (1 << GT_SLOT_ID_BITS) - 1
 
-NS_TABLE_BASE  = 0x1FC00   # A7 v1.2: 131072 − 1024 = 0x1FC00
+NS_TABLE_BASE  = ARCH_PROFILES["a7-legacy-v12"]["namespace"]["baseWord"]
 
 FNV_OFFSET_32 = 0x811c9dc5
 FNV_PRIME_32  = 0x01000193
@@ -209,15 +217,15 @@ IRQ_REASON_LAZY_RESOLVE = 2   # NULL GT in c-list slot (ELOADCALL / XLOADLAMBDA)
 # runtime JS or general server code.  JS resolves slot names at runtime via
 # sim._slotByPetName() / sim.nsLabels.
 # ---------------------------------------------------------------------------
-SELFTEST_NS_SLOT             = 6    # SelfTest (boot entry point; minimal boot namespace)
+SELFTEST_NS_SLOT             = ARCH_BOOT["minimalSlots"]["SelfTest"]
 BOOT_ABSTR_NS_SLOT           = SELFTEST_NS_SLOT   # alias: canonical boot-entry slot
 TUNNEL_NS_SLOT               = 22   # Tunnel (call-home I/O channel)
 SLIDERULE_SLOT               = 8    # SlideRule (Layer 3 Mathematics abstraction)
 CONSTANTS_SLOT               = 9    # Constants (Layer 3 read-only)
-MMIO_UART_SLOT               = 2    # UART device (MMIO 0x40000014)
-MMIO_LED_SLOT                = 3    # LED device  (MMIO 0x40000000)
-MMIO_BTN_SLOT                = 4    # Button device (MMIO 0x40000028)
-MMIO_TIMER_SLOT              = 5    # Timer device  (MMIO 0x4000002C)
+MMIO_UART_SLOT               = ARCH_BOOT["minimalSlots"]["UART_DEV"]
+MMIO_LED_SLOT                = ARCH_BOOT["minimalSlots"]["LED_DEV"]
+MMIO_BTN_SLOT                = ARCH_BOOT["minimalSlots"]["BTN_DEV"]
+MMIO_TIMER_SLOT              = ARCH_BOOT["minimalSlots"]["TIMER_DEV"]
 # Church HW Range NS slots 19-22 removed — authority now encoded as a
 # pre-baked Abstract S-perm GT (type=0b11, dom=1, perm3=0b010 → 0x2E000000).
 # No NS entries are needed; the token carries the authority directly.

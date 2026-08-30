@@ -4,6 +4,13 @@ from pathlib import Path
 
 from .hw_types import *
 from .integrity32 import integrity32
+from shared.architecture_contracts import (
+    BOOT as ARCH_BOOT,
+    NS_ENTRY as ARCH_NS_ENTRY,
+    field_lsb,
+    field_width,
+    logical_permission_mask,
+)
 
 
 def encode_church(opcode, cond=CondCode.AL, cr_dst=0, cr_src=0, imm=0):
@@ -340,8 +347,12 @@ def _make_ns_entry(gt_type, perms, slot_id, gt_seq, location, alloc_size, cw=0, 
     CLOOMC listing cross-ref: simulator/secure_boot_tutorial.js §"Boot ROM Cross-Reference"
     GT Word 0 fields: slot_id[15:0], gt_seq[24:16] (9b), gt_type[26:25], dom[27], perm[30:28] ★v2.0
     """
-    limit_offset = max(0, alloc_size - 1) & 0x1FFFFF
-    word1_authority = ((gt_seq & 0x1FF) << 21) | limit_offset  # gt_seq 9b at [29:21] ★v2.0
+    fields = ARCH_NS_ENTRY["word1"]["fields"]
+    mask = lambda name: (1 << field_width(fields[name])) - 1
+    limit_offset = max(0, alloc_size - 1) & mask("limit_offset")
+    word1_authority = (
+        (gt_seq & mask("gt_seq")) << field_lsb(fields["gt_seq"])
+    ) | limit_offset
 
     word2_integrity = integrity32(location, word1_authority)
 
@@ -443,16 +454,16 @@ THREAD_MANAGER_CLIST = [
     make_gt(GT_TYPE_ABSTRACT, PERM_MASK_S, 0, 0),  # idx 0: Abstract S-perm GT (0x2E000000)
 ]
 
-MMIO_LED_ADDR   = 0x40000000   # offsets 0–4: LED0–LED4, bits[2:0]={B,G,R}
-MMIO_UART_ADDR  = 0x40000014   # TX=+0, STATUS=+4, RX=+8 bytes → offsets 0,1,2 words
-MMIO_BTN_ADDR   = 0x40000028
-MMIO_TIMER_ADDR = 0x4000002C
+MMIO_LED_ADDR   = ARCH_BOOT["devices"]["LED_DEV"]["address"]
+MMIO_UART_ADDR  = ARCH_BOOT["devices"]["UART_DEV"]["address"]
+MMIO_BTN_ADDR   = ARCH_BOOT["devices"]["BTN_DEV"]["address"]
+MMIO_TIMER_ADDR = ARCH_BOOT["devices"]["TIMER_DEV"]["address"]
 
 _MMIO_ENTRIES = {
-    MMIO_LED_SLOT:   (MMIO_LED_ADDR,   5,  GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W),
-    MMIO_UART_SLOT:  (MMIO_UART_ADDR,  3,  GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W),
-    MMIO_BTN_SLOT:   (MMIO_BTN_ADDR,   1,  GT_TYPE_INFORM, PERM_MASK_R),
-    MMIO_TIMER_SLOT: (MMIO_TIMER_ADDR, 5,  GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W),
+    MMIO_LED_SLOT:   (MMIO_LED_ADDR,   ARCH_BOOT["devices"]["LED_DEV"]["words"], GT_TYPE_INFORM, logical_permission_mask(ARCH_BOOT["devices"]["LED_DEV"]["permissions"])),
+    MMIO_UART_SLOT:  (MMIO_UART_ADDR,  ARCH_BOOT["devices"]["UART_DEV"]["words"], GT_TYPE_INFORM, logical_permission_mask(ARCH_BOOT["devices"]["UART_DEV"]["permissions"])),
+    MMIO_BTN_SLOT:   (MMIO_BTN_ADDR,   ARCH_BOOT["devices"]["BTN_DEV"]["words"], GT_TYPE_INFORM, logical_permission_mask(ARCH_BOOT["devices"]["BTN_DEV"]["permissions"])),
+    MMIO_TIMER_SLOT: (MMIO_TIMER_ADDR, ARCH_BOOT["devices"]["TIMER_DEV"]["words"], GT_TYPE_INFORM, logical_permission_mask(ARCH_BOOT["devices"]["TIMER_DEV"]["permissions"])),
 }
 
 # ---------------------------------------------------------------------------
@@ -482,13 +493,13 @@ _MMIO_ENTRIES = {
 # Minimal 8-slot boot namespace.
 # Church HW Range authority slots 19-22 removed — authority is now a
 # pre-baked Abstract S-perm GT (0x2E000000) in SCHEDULER_IRQ_CLIST.
-WUKONG_CALLHOME_NS_SLOT = 7   # Wukong boot coordinator LUMP (slot 7)
+WUKONG_CALLHOME_NS_SLOT = ARCH_BOOT["minimalSlots"]["WukongCallHome"]
 _SYSTEM_ABSTRACTION_SLOTS = {
     SELFTEST_NS_SLOT:         ('SelfTest',       PERM_MASK_E),  # boot entry point (slot 6)
     WUKONG_CALLHOME_NS_SLOT:  ('WukongCallHome', PERM_MASK_E),  # Wukong coordinator (slot 7)
 }
 
-NS_SLOT_COUNT = 8   # minimal boot namespace: slots 0-7
+NS_SLOT_COUNT = max(ARCH_BOOT["minimalSlots"].values()) + 1
 
 # ---------------------------------------------------------------------------
 # DEMO_NAMESPACE — minimal 8-slot NS table for hardware boot

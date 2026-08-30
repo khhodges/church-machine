@@ -1,4 +1,4 @@
-# CM Memory Map — Authoritative Reference
+# CM Memory Map — Target-Profile Reference
 
 > **HISTORICAL SNAPSHOT / NON-AUTHORITATIVE.** Despite the retained title, this
 > dump documents an older 7-bit sequence, 17-bit limit, and CRC-16 namespace
@@ -8,14 +8,30 @@
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 
-> **Principle:** The CM is defined by the memory, always, no more and no less.
-> The simulator must follow the memory, no more and no less.
+> **Machine-readable authority:** target memory geometry is defined in
+> [`shared/architecture_contracts.json`](../shared/architecture_contracts.json).
+> This document contains a captured simulator audit plus profile comparisons;
+> captured addresses are not universal ISA constants.
 
-All data in this document are computed from a live simulator run using
+Most detailed tables below were computed from a live simulator run using
 `tests/ctmm_map_dump.js`.  That script boots the simulator, iterates every
 NS entry, checks each lump header, detects address conflicts, and decompiles
 code words via `ChurchAssembler.disassemble()`.  Every table here is
-directly reproducible from the script.
+directly reproducible from the script. They describe the historical captured
+configuration named in each section, not every target.
+
+### Current profile boundary
+
+| Profile | Words | NS placement | NS capacity | NS location unit |
+|---------|------:|--------------|------------:|------------------|
+| `simulator-v20` | configurable; default 131,072 | `tail-descending` | configurable; default 256 | word |
+| `generic-boot-image-v20` | configurable; default 65,536 | `tail-descending` | configurable; default 256 | word |
+| `wukong-uart-upload-v2` | 16,384 | `head-ascending` from word 0 | 64 | byte |
+| `a7-legacy-v12` | 131,072 | `tail-descending` from word `0x1FC00` | 256 | byte |
+
+The generic image must be projected before board upload. A 16,384-word
+simulator image and the 16,384-word Wukong DMEM have the same size but not the
+same Namespace placement or location-address unit.
 
 > **Scope note:** The dump script iterates `nsCount` active entries (47 at
 > boot in the 16 384-word profile) rather than all 256 possible NS table
@@ -39,7 +55,7 @@ between them because lumps are allocated from address 0 upward.
 | Start    | End      | Words  | Region |
 |:---------|:---------|-------:|:-------|
 | `0x0000` | `0xFBFE` | 64 511 | **Lump area** — all object lumps |
-| `0xFBFF` | `0xFBFF` |      1 | **Format tag word** (`0xB0070229`) — boot-image version sentinel |
+| `0xFBFF` | `0xFBFF` |      1 | **Format tag word** (`0xB0072862`) — boot-image version sentinel |
 | `0xFC00` | `0xFFFF` |  1 024 | **NS table** — 256 × 4-word entries (`NS_TABLE_BASE = 0xFC00`) |
 
 `NS_TABLE_BASE = 65536 − NS_TABLE_RESERVE = 65536 − 1024 = 0xFC00`
@@ -52,7 +68,7 @@ between them because lumps are allocated from address 0 upward.
 > 536-word window; there is no separate IO segment or Boot ROM region in the
 > current implementation's memory layout.
 
-### 1.2 Alternate 16 384-word runtime profile (IDE default project)
+### 1.2 Alternate 16 384-word simulator image
 
 When `window.bootConfig.step1.totalNamespaceWords = 16384`:
 
@@ -60,12 +76,14 @@ When `window.bootConfig.step1.totalNamespaceWords = 16384`:
 |:---------|:---------|-------:|:-------|
 | `0x0000` | `0x0D3F` |  3 392 | **Lump area — occupied** (47 active NS slots at boot) |
 | `0x0D40` | `0x3BFE` | 11 967 | **Lump area — free** (unallocated heap space) |
-| `0x3BFF` | `0x3BFF` |      1 | **Format tag word** (`0xB0070229`) |
+| `0x3BFF` | `0x3BFF` |      1 | **Format tag word** (`0xB0072862`) |
 | `0x3C00` | `0x3FFF` |  1 024 | **NS table** — 256 × 4-word entries (`NS_TABLE_BASE = 0x3C00`) |
 
 `NS_TABLE_BASE = 16384 − 1024 = 0x3C00`
 
-> In the 16 384-word profile there is no separate IO segment or Boot ROM shadow.
+> This is still the `simulator-v20` tail-table format. It is **not** the
+> `wukong-uart-upload-v2` head-table format merely because both contain 16,384
+> words. In this simulator image there is no separate IO segment or Boot ROM shadow.
 > Device register windows (UART, LED, Button, Timer) sit inside the lump area
 > at the word addresses stored in their NS table entries.
 
@@ -76,7 +94,7 @@ When `window.bootConfig.step1.totalNamespaceWords = 16384`:
 Base address: `NS_TABLE_BASE` (lowest address of the NS LUMP block).
 Each entry is exactly **4 consecutive 32-bit words**.
 
-### 2.0 Slot-addressing formula
+### 2.0 Slot-addressing formula (`tail-descending` profiles only)
 
 NS entries are numbered **starting from the top of the NS LUMP and counting
 downward**.  Slot 0 occupies the four words at the **highest** address in the
@@ -85,6 +103,11 @@ NS LUMP; slot 1 is immediately below it; and so on.
 ```
 slot_word_address(N) = NS_TABLE_BASE + NS_TABLE_RESERVE − 4 − N × 4
 ```
+
+The physical `wukong-uart-upload-v2` projection instead uses
+`head-ascending`: `slot_word_address(N) = N × 4`, with the table at word 0.
+Its Word 0 locations are byte addresses; simulator/generic-image locations are
+word addresses.
 
 For the **16 384-word runtime profile** (`NS_TABLE_BASE = 0x3C00`,
 `NS_TABLE_RESERVE = 0x400 = 1 024`):
@@ -123,37 +146,14 @@ For the **A7 profile** (`totalNamespaceWords = 131 072 = 0x20000`,
 
 **Word 1 — limit / metadata**
 
-> **Two specifications exist — read carefully.**
->
-> **Hardware canonical (`hardware/layouts.py`):** NS Word 1 uses `WORD2_LAYOUT` —
-> the same bit layout as CR Word 2.  Hardware derives B-flag, F-flag, GT type, and
-> c-list count from the lump header at dispatch time; they are never stored in Word 1.
->
-> **Simulator extension (`packNSWord1` / `parseNSWord1`):** The simulator packs
-> additional fields into Word 1 so that its lazy-loader and GC can work without
-> re-parsing the lump header on every access.  `chainable` is intentionally NOT
-> stored in Word 1 — it lives in the `this.nsChainable[]` side-table.
-
-**Hardware Word 1 layout** (`hardware/layouts.py` `WORD2_LAYOUT`):
+All v2.0 targets use the same canonical Word 1 authority layout:
 
 | Bits    | Field        | Description |
 |:--------|:-------------|:------------|
 | [20:0]  | limit_offset | Addressable limit from lump base in words (21 bits). |
-| [27:21] | gt_seq       | GT version counter (7 bits); bumped each time the entry is reused. |
-| [28]    | g_bit        | GC liveness (1 = live, 0 = garbage suspect). |
-| [31:29] | spare        | Reserved (zero). |
-
-**Simulator Word 1 layout** (`packNSWord1` / `parseNSWord1`):
-
-| Bits    | Field      | Description |
-|:--------|:-----------|:------------|
-| [31]    | B-flag     | `bFlag` — bounds marker set by allocator |
-| [30]    | reserved   | Always zero. **F-flag has moved to GT word bit [25]** (per-token, not per-NS-entry). |
-| [29]    | G-bit      | `gBit` — GC liveness (matches hardware g_bit position) |
-| [28]    | reserved   | Always zero. `chainable` is NOT stored here — see `this.nsChainable[]`. |
-| [27:26] | gtType     | Golden Token type: `00`=Null, `01`=Inform, `10`=Outform, `11`=Abstract |
-| [25:17] | clistCount | C-list slot count (9 bits, 0–511) |
-| [16:0]  | limit      | Addressable limit from lump base in words (17 bits). For a fully loaded lump: `lumpSize − cc − 1`. |
+| [29:21] | gt_seq       | GT version counter (9 bits); bumped each time the entry is reused. |
+| [30]    | g_bit        | GC liveness; masked before integrity validation. |
+| [31]    | f_flag       | Far/locality marker; masked before integrity validation. |
 
 **Word 2 — seals**
 
@@ -597,7 +597,7 @@ These are the only authoritative CM state sources:
 | Memory range | Content |
 |:-------------|:--------|
 | `memory[0 … NS_TABLE_BASE−2]` | All object lumps |
-| `memory[NS_TABLE_BASE−1]` | Boot-image format tag (`0xB0070229`) |
+| `memory[NS_TABLE_BASE−1]` | Boot-image format tag (`0xB0072862`) |
 | `memory[NS_TABLE_BASE … NS_TABLE_BASE + NS_TABLE_RESERVE − 1]` | NS table (256 × 4 words) |
 
 ### 10.2 Legitimate hardware registers (not in DMEM by design)
@@ -687,7 +687,7 @@ total); 131,072 words (512 KB) are allocated to the Church Machine namespace.
 | Start      | End        | Words   | Region |
 |:-----------|:-----------|--------:|:-------|
 | `0x00000`  | `0x1FAFE`  | 129,791 | **Lump area** — all object lumps |
-| `0x1FAFF`  | `0x1FAFF`  |       1 | **Format tag word** (`0xB0070229`) |
+| `0x1FAFF`  | `0x1FAFF`  |       1 | **Format tag word** (`0xB0072862`) |
 | `0x1FB00`  | `0x1FBFF`  |     256 | **Reserved** (gap to NS table base alignment) |
 | `0x1FC00`  | `0x1FFFF`  |   1,024 | **NS table** — 256 × 4-word entries (`NS_TABLE_BASE = 0x1FC00`) |
 

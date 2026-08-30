@@ -121,7 +121,7 @@ register_suite "check-no-ti60-ui" \
     'node scripts/check_no_ti60_ui.js'
 
 register_suite "check-api-reference-stale" \
-    'node scripts/gen-api-reference.js --check && node scripts/gen-thread-design.js --check'
+    'node scripts/gen-api-reference.js --check && node scripts/gen-thread-design.js --check && node scripts/gen-architecture-contracts.js --check && python -m pytest tests/test_architecture_contracts.py -q'
 
 register_suite "check-whats-new-feed" \
     'node scripts/test_sync_whats_new.js && node scripts/sync-whats-new.js --check'

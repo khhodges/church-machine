@@ -58,6 +58,11 @@ from .boot_rom import (BootRom, BOOT_PROGRAM, WUKONG_NUC_PROGRAM, encode_turing,
                        wukong_wch_header)
 from .uart_tx import UartTx
 from .uart_rx import UartRx
+from shared.architecture_contracts import PROFILES as ARCH_PROFILES, TRACE_UNITS as ARCH_TRACE_UNITS
+
+_WUKONG_ARCH_PROFILE = ARCH_PROFILES["wukong-uart-upload-v2"]
+_WUKONG_TRACE_CONTRACT = ARCH_TRACE_UNITS[_WUKONG_ARCH_PROFILE["traceUnit"]]
+_WUKONG_DMEM_WORDS = _WUKONG_ARCH_PROFILE["totalWords"]
 
 # ── Bitstream build version ────────────────────────────────────────────────────
 # Baked into the 4th byte of the boot sentinel (0xBC N_INIT TU_VERSION BUILD_VERSION).
@@ -121,7 +126,7 @@ _dmem_tmp = list(WUKONG_DEMO_NAMESPACE)
 while len(_dmem_tmp) < 256:
     _dmem_tmp.append(0)
 _dmem_tmp += list(WUKONG_DEMO_CLIST)
-while len(_dmem_tmp) < 16384:
+while len(_dmem_tmp) < _WUKONG_DMEM_WORDS:
     _dmem_tmp.append(0)
 for _i, _v in enumerate(WUKONG_SELFTEST_WORDS):
     _dmem_tmp[WUKONG_SELFTEST_BASE_WORD + _i] = _v
@@ -352,7 +357,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         while len(dmem_init) < 256:
             dmem_init.append(0)                    # words 32-255 = zero
         dmem_init += list(WUKONG_DEMO_CLIST)       # words 256-319: full c-list
-        while len(dmem_init) < 16384:
+        while len(dmem_init) < _WUKONG_DMEM_WORDS:
             dmem_init.append(0)
 
         # Canonical SelfTest LUMP at DMEM byte 0x0600 = word 384.
@@ -397,7 +402,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         # 16K-word Python initializer. Keep it for sim_mode accuracy, where
         # tests inspect memory immediately after elaboration.
         dmem = m.submodules.dmem = LibMemory(
-            shape=unsigned(32), depth=16384,
+            shape=unsigned(32), depth=_WUKONG_DMEM_WORDS,
             init=dmem_init if self.sim_mode else [])
         dmem_rd = dmem.read_port(domain="sync")
         # Independent synchronous read port for the stop-state snapshot.
@@ -1201,21 +1206,22 @@ class ChurchWukongXC7A100T(Elaboratable):
         # Must match TRACE_EV_* in wukong_bridge.py and debug-packet-protocol.md.
 
         # ── Event type constants ──────────────────────────────────────────────
-        _TRACE_MAGIC       = 0xAA
-        _TRACE_PKT_LEN     = 12   # bytes per packet (matches wukong_bridge.py TRACE_LEN)
+        _TRACE_MAGIC       = _WUKONG_TRACE_CONTRACT["magic"]
+        _TRACE_PKT_LEN     = _WUKONG_TRACE_CONTRACT["packetBytes"]
 
-        _TRACE_EV_RESULT      = 0x00  # Single-packet result (DR→DR, SAVE, etc.)
-        _TRACE_EV_LOAD_SHADOW = 0x01  # LOAD: old CR_dst GT displaced
-        _TRACE_EV_LOAD_NEW    = 0x02  # LOAD: new GT installed in CR_dst
-        _TRACE_EV_CHANGE_PUSH = 0x03  # CHANGE: context stack push
-        _TRACE_EV_CHANGE_CR12 = 0x04  # CHANGE: CR12 ← new thread GT
-        _TRACE_EV_CHANGE_CR5  = 0x05  # CHANGE: CR5  ← heap GT
-        _TRACE_EV_CALL_CR6    = 0x06  # CALL:   CR6  ← abstraction GT
-        _TRACE_EV_CALL_CR14   = 0x07  # CALL:   CR14 ← code / return GT
-        _TRACE_EV_CALL_PUSH   = 0x08  # CALL:   caller frame stack push
-        _TRACE_EV_RETURN_POP  = 0x09  # RETURN: caller frame stack pop
-        _TRACE_EV_RETURN_CR6  = 0x0A  # RETURN: CR6  ← restored from frame
-        _TRACE_EV_RETURN_CR14 = 0x0B  # RETURN: CR14 ← restored from frame
+        _TRACE_EVENTS = _WUKONG_TRACE_CONTRACT["eventIds"]
+        _TRACE_EV_RESULT      = _TRACE_EVENTS["RESULT"]
+        _TRACE_EV_LOAD_SHADOW = _TRACE_EVENTS["LOAD_SHADOW"]
+        _TRACE_EV_LOAD_NEW    = _TRACE_EVENTS["LOAD_NEW"]
+        _TRACE_EV_CHANGE_PUSH = _TRACE_EVENTS["CHANGE_PUSH"]
+        _TRACE_EV_CHANGE_CR12 = _TRACE_EVENTS["CHANGE_CR12"]
+        _TRACE_EV_CHANGE_CR5  = _TRACE_EVENTS["CHANGE_CR5"]
+        _TRACE_EV_CALL_CR6    = _TRACE_EVENTS["CALL_CR6"]
+        _TRACE_EV_CALL_CR14   = _TRACE_EVENTS["CALL_CR14"]
+        _TRACE_EV_CALL_PUSH   = _TRACE_EVENTS["CALL_PUSH"]
+        _TRACE_EV_RETURN_POP  = _TRACE_EVENTS["RETURN_POP"]
+        _TRACE_EV_RETURN_CR6  = _TRACE_EVENTS["RETURN_CR6"]
+        _TRACE_EV_RETURN_CR14 = _TRACE_EVENTS["RETURN_CR14"]
 
         # ── Event queue: up to 3 events per retire ────────────────────────────
         # tq_type[0..2] / tq_data[0..2]: event type + payload for each slot.
