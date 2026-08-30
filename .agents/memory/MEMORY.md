@@ -156,3 +156,4 @@
 - [Dynamic state uses ISA protection only](dynamic-composite-pola-boundary.md) — dynamic word changes are not POLA-persisted; type, permission, and bounds checks are the complete access rule
 - [Normative Thread private ABI](normative-thread-private-abi.md) — shared design owns one fixed 256-word layout; larger Thread bodies are rejected, not assigned a tail region
 - [Protected Thread indicator](protected-thread-indicator.md) — word +17 packs FLAGS/SZ/STO outside CR5; frame words save the prior indicator state
+- [Portable LUMP binding boundary](portable-lump-binding-boundary.md) — canonical artifacts carry unresolved N/T/hash locks; only verified destination copies may contain local GTs

@@ -4169,6 +4169,17 @@ class ChurchSimulator {
         const issueN       = (meta.issueN != null) ? parseInt(meta.issueN, 10) : NaN;
         const identityHash = this._normHash(meta.identityHash);
         const binaryHash   = this._normHash(meta.binaryHash);
+        const rawGrants = Array.isArray(meta.grants) ? meta.grants :
+            (Array.isArray(meta.rights) ? meta.rights : String(meta.grants || meta.rights || '').split(''));
+        const grants = [...new Set(rawGrants.map(right => String(right).toUpperCase()).filter(Boolean))];
+        const turing = grants.some(right => 'RWX'.includes(right));
+        const church = grants.some(right => 'LSE'.includes(right));
+        const rawCapabilityType = meta.capabilityType ?? meta.capability_type ?? meta.gtType ?? meta.type;
+        const typeNames = { null: 0, inform: 1, outform: 2, abstract: 3 };
+        const capabilityType = typeof rawCapabilityType === 'string' &&
+            rawCapabilityType.toLowerCase() in typeNames
+            ? typeNames[rawCapabilityType.toLowerCase()]
+            : Number(rawCapabilityType);
 
         if (secure) {
             if (!(Number.isInteger(issueN) && issueN > 0)) {
@@ -4183,6 +4194,13 @@ class ChurchSimulator {
             if (!this._is64Hex(binaryHash)) {
                 throw new Error(`registerSlotIdentity(slot ${slot}): secure identity requires a 64-hex binaryHash`);
             }
+            if (grants.length && (grants.some(right => !'RWXLES'.includes(right)) || (turing && church))) {
+                throw new Error(`registerSlotIdentity(slot ${slot}): grants must be one pure capability-rights domain`);
+            }
+            if (Number.isFinite(capabilityType) &&
+                (!Number.isInteger(capabilityType) || capabilityType < 0 || capabilityType > 3)) {
+                throw new Error(`registerSlotIdentity(slot ${slot}): capability type must be 0–3`);
+            }
         }
 
         const rec = {
@@ -4192,6 +4210,12 @@ class ChurchSimulator {
             issueN:       Number.isInteger(issueN) ? issueN : 0,
             identityHash,   // canonical 64-hex string or null
             binaryHash,     // canonical 64-hex string or null
+            // Authorization properties belong to the verified registry record,
+            // never to an importing portable sidecar. Missing values make this
+            // identity ineligible for portable linking.
+            grants,
+            capabilityType: Number.isInteger(capabilityType) ? capabilityType : null,
+            authorized: meta.authorized === true,
             outformWords: Array.isArray(meta.outformWords)
                 ? meta.outformWords.map(w => (w >>> 0))
                 : [0, 0, 0],
@@ -4208,6 +4232,40 @@ class ChurchSimulator {
 
     getSlotIdentity(slot) {
         return (this._slotIdentity && this._slotIdentity.get(slot)) || null;
+    }
+
+    // Portable linking may only target objects which are resident *now*.  This
+    // intentionally does not consume metadata supplied alongside the artifact:
+    // names, T, sequence, and authorization come from the live Namespace plus
+    // the identity record that was verified when its bytes were installed.
+    _portableLiveBindingCandidates() {
+        const candidates = [];
+        if (!this._slotIdentity) return candidates;
+        for (const [slot, identity] of this._slotIdentity.entries()) {
+            if (!identity || identity.secure !== true || !this.isNSEntryValid(slot)) continue;
+            const entry = this.readNSEntry(slot);
+            if (!entry || !this._is64Hex(identity.binaryHash) || !this._is64Hex(identity.identityHash) ||
+                !identity.dotName || !(identity.issueN > 0)) continue;
+            const w1 = this.parseNSWord1(entry.word1_limit >>> 0);
+            if (!Array.isArray(identity.grants) || identity.grants.length === 0 ||
+                !Number.isInteger(identity.capabilityType) ||
+                identity.authorized !== true ||
+                (this._cacheTokenOf(entry) >>> 0) !== (identity.cacheToken >>> 0) ||
+                entry.gtType !== identity.capabilityType) continue;
+            candidates.push({
+                N: `${identity.dotName}#${identity.issueN}`,
+                T: (this._cacheTokenOf(entry) >>> 0).toString(16).padStart(8, '0'),
+                binary_hash: identity.binaryHash,
+                identity_hash: identity.identityHash,
+                rights: identity.grants,
+                type: identity.capabilityType,
+                ns_slot: slot,
+                sequence: w1.gtSeq,
+                authorized: identity.authorized,
+                verified: true,
+            });
+        }
+        return candidates;
     }
 
     // clearSlotIdentity: remove trusted identity so the slot cannot be re-used by
@@ -8547,13 +8605,83 @@ class ChurchSimulator {
             return false;
         }
 
+        // Link portable universal references on a private copy.  Exact name,
+        // T/hash, authorization, rights/type, slot and live sequence all pass
+        // before any LUMP or Namespace word is committed.
+        let portableWords = Array.from(words, word => word >>> 0);
+        if (options.portableBinding) {
+            const binder = (typeof PortableLumpBinding !== 'undefined')
+                ? PortableLumpBinding
+                : (typeof require === 'function' ? require('./portable_lump_binding.js') : null);
+            if (!binder) {
+                this.output += '[loadLumpBinary] ERROR: portable destination binder is unavailable.\n';
+                return false;
+            }
+            const candidates = this._portableLiveBindingCandidates();
+            const owner = options.portableBinding.owner;
+            const ownerCandidate = {
+                N: owner,
+                rights: 'E',
+                type: 'Inform',
+                ns_slot: abstrSlot,
+                sequence: this._nsSequenceForWrite(abstrSlot),
+                authorized: true,
+                verified: !!(options.portableOwnerCandidate &&
+                    options.portableOwnerCandidate.verified === true),
+                binary_hash: options.portableOwnerCandidate && options.portableOwnerCandidate.binary_hash,
+                identity_hash: options.portableOwnerCandidate && options.portableOwnerCandidate.identity_hash,
+            };
+            const clistStart = lumpSize - hdr.cc;
+            const baseRows = {};
+            for (let row = 0; row < hdr.cc; row++) baseRows[row] = portableWords[clistStart + row] >>> 0;
+            const linked = binder.bind(options.portableBinding, candidates, {
+                selfCandidate: ownerCandidate,
+                ownerCandidate,
+                baseWords: baseRows,
+                trustPolicy: options.portableTrustPolicy || 'strong',
+                requireVerifiedCandidates: true,
+                authorizeLegacy: options.authorizeLegacyPortable,
+                mintGT: (sequence, slot, rights, type) => {
+                    const grants = Object.fromEntries(['R', 'W', 'X', 'L', 'S', 'E']
+                        .map(right => [right, rights.includes(right) ? 1 : 0]));
+                    return this.createGT(sequence, slot, grants, type);
+                },
+            });
+            if (!linked.ok) {
+                this.output += `[loadLumpBinary] ERROR: portable binding failed (${linked.code}) — ${linked.message}. LUMP rejected without installation.\n`;
+                return false;
+            }
+            for (const [rowText, word] of Object.entries(linked.words)) {
+                const row = Number(rowText);
+                if (!Number.isInteger(row) || row < 0 || row >= hdr.cc) {
+                    this.output += `[loadLumpBinary] ERROR: portable relocation row ${rowText} is outside the c-list.\n`;
+                    return false;
+                }
+                portableWords[clistStart + row] = word >>> 0;
+            }
+            if (typeof options.validateLinkedWords === 'function') {
+                let linkedValidation;
+                try {
+                    linkedValidation = options.validateLinkedWords(
+                        portableWords.slice(), hdr, linked.bindings.map(binding => ({ ...binding })));
+                } catch (err) {
+                    this.output += `[loadLumpBinary] ERROR: linked c-list validation failed — ${err.message}. LUMP rejected without installation.\n`;
+                    return false;
+                }
+                if (linkedValidation !== true) {
+                    this.output += '[loadLumpBinary] ERROR: linked c-list validation failed. LUMP rejected without installation.\n';
+                    return false;
+                }
+            }
+        }
+
         // Complete the compiler-owned placeholder only after the destination
         // slot and its current sequence are known.  This returns a private copy:
         // all failures above and below this point leave both RAM and the NS table
         // untouched, including when a caller handed us a stale/wrong self GT.
-        const _identity = this._mintOrdinaryLumpIdentity(words, abstrSlot, EXTENDED_BASE, {
+        const _identity = this._mintOrdinaryLumpIdentity(portableWords, abstrSlot, EXTENDED_BASE, {
             architectural: options.architectural === true || hdr.typ !== 0,
-            compilerOwnedSelf: options.compilerOwnedSelf === true,
+            compilerOwnedSelf: options.compilerOwnedSelf === true || !!options.portableBinding,
             remintCompilerOwnedSelf: options.remintCompilerOwnedSelf === true,
             sourceSelfSlot: options.sourceSelfSlot,
             sourceSelfSeq: options.sourceSelfSeq,

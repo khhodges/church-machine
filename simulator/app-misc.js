@@ -1216,7 +1216,9 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 window.bootConfig = (data && data.config) || null;
             }
-            _lumpCatalog = (data && data.lumpCatalog) || [];
+            _lumpCatalog = typeof _normalizeLumpCatalogEntries === 'function'
+                ? _normalizeLumpCatalogEntries((data && data.lumpCatalog) || [])
+                : ((data && data.lumpCatalog) || []);
         })
         .catch(err => { console.warn('[bootConfig] prefetch failed:', err); });
     _bootCfgReady.finally(() => {

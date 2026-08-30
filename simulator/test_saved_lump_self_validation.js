@@ -28,6 +28,7 @@ const sandbox = {
 vm.createContext(sandbox);
 vm.runInContext(appLumps.slice(start, end), sandbox);
 const validateSavedLumpClist = sandbox._validateSavedLumpClist;
+const validateLinkedPortableClist = sandbox._validateLinkedPortableClist;
 
 function header(cw = 4, cc = 1) {
     return (((0x1F << 27) | ((cw & 0x1FFF) << 10) | (cc & 0xFF)) >>> 0);
@@ -79,6 +80,71 @@ console.log('\n--- saved LUMP compiler self validation ---');
     check('SLV-2: validated saved compiler LUMP reaches loader and remints row 0',
         loaded === true && sim.memory[0x400 + 63] === expected,
         `loaded=${loaded} row0=0x${(sim.memory[0x400 + 63] >>> 0).toString(16)}`);
+}
+
+console.log('\n--- portable UI save/load ordering ---');
+{
+    const Binding = require('./portable_lump_binding.js');
+    const sim = new ChurchSimulator();
+    const H = 'a'.repeat(64);
+    const I = 'b'.repeat(64);
+    const words = new Array(64).fill(0);
+    words[0] = header(1, 2);
+    words[62] = ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER;
+    words[63] = 0; // canonical unresolved portable dependency row
+    const contract = Binding.createContract('alice.Bank#7', [
+        { name: '__SELF__', compiler_owned_self: true, rights: 'E', type: 'Inform' },
+        { N: 'church.Buffer#2', T: '1234abcd', binary_hash: H,
+            identity_hash: I, rights: 'RW', type: 'Outform', relocation_row: 1 },
+    ]);
+    const metadata = {
+        capabilities: contract.dependencies,
+        portableBinding: contract,
+    };
+    let preflight;
+    try {
+        preflight = validateSavedLumpClist(
+            words, sim.parseLumpHeader(words[0]), metadata, sim);
+    } catch (err) { preflight = err; }
+    check('SLV-P1: UI preflight accepts unresolved zero portable row before binding',
+        Array.isArray(preflight), String(preflight));
+    const nonPlaceholder = words.slice();
+    nonPlaceholder[63] = 0x1800002a;
+    let placeholderError = '';
+    try {
+        validateSavedLumpClist(
+            nonPlaceholder, sim.parseLumpHeader(nonPlaceholder[0]), metadata, sim);
+    } catch (err) { placeholderError = String(err.message || err); }
+    check('SLV-P1b: UI preflight rejects a supplied GT in a portable dependency row',
+        /zero placeholder/.test(placeholderError), placeholderError);
+
+    sim.registerSlotIdentity(42, {
+        cacheToken: 0x1234abcd, dotName: 'church.Buffer', issueN: 2,
+        identityHash: I, binaryHash: H, grants: ['R', 'W'], capabilityType: 2,
+        authorized: true,
+    }, { secure: true });
+    sim.withNamespaceWrite('portable UI fixture', () => {
+        sim.writeNSEntry(42, 0x200, 4, 0, 0, 2, 5, 0, 0x1234abcd);
+    });
+    let postLinkCalled = false;
+    const loaded = sim.loadLumpBinary(words, 43, {
+        portableBinding: contract,
+        portableOwnerCandidate: {
+            N: 'alice.Bank#7', binary_hash: 'c'.repeat(64),
+            identity_hash: 'd'.repeat(64), verified: true,
+        },
+        validateLinkedWords(linkedWords, linkedHeader, bindings) {
+            postLinkCalled = true;
+            return validateLinkedPortableClist(
+                linkedWords, linkedHeader, bindings, sim);
+        },
+    });
+    const linked = sim.parseGT(sim.memory[0x400 + 63] >>> 0);
+    check('SLV-P2: UI validates linked copy and preserves Turing RW/type',
+        loaded && postLinkCalled && linked.index === 42 && linked.type === 2 &&
+        linked.permissions.R === 1 && linked.permissions.W === 1 &&
+        !linked.permissions.L && !linked.permissions.S && !linked.permissions.E,
+        JSON.stringify(linked));
 }
 
 {

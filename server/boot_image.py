@@ -408,6 +408,68 @@ def create_gt(gt_seq, slot_id, perms, gt_type):
     return _u32(d | p | t | s | (slot_id & mask("slot_id")))
 
 
+def localize_portable_lump_body(lump_words, portable_binding, candidates):
+    """Materialize a portable c-list once destination bindings are available.
+
+    ``candidates`` is keyed by exact ``N`` and each value must include the
+    actual on-disk ``lump_bytes``, live ``ns_slot`` and live ``sequence``.
+    This intentionally does not use a manifest hash as evidence: candidate
+    verification rehashes the actual bytes before a local GT is minted.
+    """
+    try:
+        from portable_binding import (validate_portable_binding, validate_unresolved_clist,
+                                      verify_candidate, mint_gt)
+    except ImportError:
+        from server.portable_binding import (validate_portable_binding, validate_unresolved_clist,
+                                             verify_candidate, mint_gt)
+    if not lump_words:
+        raise ValueError("portable localization requires a LUMP body")
+    header = int(lump_words[0]) & 0xffffffff
+    if ((header >> 27) & 0x1f) != 0x1f:
+        raise ValueError("portable localization requires a valid LUMP header")
+    size = 1 << (((header >> 23) & 0xf) + 6)
+    cc = header & 0xff
+    if len(lump_words) < size or cc > size:
+        raise ValueError("portable localization LUMP body is truncated")
+    contract = validate_portable_binding(portable_binding, cc)
+    validate_unresolved_clist(contract, lump_words)
+    output = list(lump_words[:size])
+    for dep in contract["dependencies"]:
+        candidate = candidates.get(dep["N"]) if isinstance(candidates, dict) else None
+        if dep["symbolic_self"] and candidate is None:
+            candidate = candidates.get(contract["owner"]) if isinstance(candidates, dict) else None
+        raw = candidate.get("lump_bytes") if isinstance(candidate, dict) else None
+        ok, reason = verify_candidate(dep, candidate, raw)
+        if not ok:
+            raise ValueError(f"portable localization {dep['N']}: {reason}")
+        granted = candidate.get("grants", candidate.get("rights", []))
+        granted = {str(right).upper() for right in
+                   (granted if isinstance(granted, list) else str(granted))}
+        if not set(dep["rights"]).issubset(granted):
+            raise ValueError(f"portable localization {dep['N']}: insufficient rights")
+        if _type_value(candidate.get("capability_type", candidate.get("gt_type",
+                                                                       candidate.get("type", 1)))) != dep["capability_type"]:
+            raise ValueError(f"portable localization {dep['N']}: capability type mismatch")
+        slot, sequence = candidate.get("ns_slot"), candidate.get("sequence", candidate.get("gt_seq"))
+        if (isinstance(slot, bool) or not isinstance(slot, int) or not 0 <= slot <= 0xffff or
+                isinstance(sequence, bool) or not isinstance(sequence, int) or not 0 <= sequence <= 0x1ff):
+            raise ValueError(f"portable localization {dep['N']}: invalid live destination")
+        output[size - cc + dep["relocation_row"]] = mint_gt(
+            sequence, slot, dep["rights"], dep["capability_type"])
+    return output
+
+
+def _type_value(value):
+    """Small local type normalizer used by portable localization."""
+    if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 3:
+        return value
+    names = {"null": 0, "inform": 1, "outform": 2, "abstract": 3}
+    try:
+        return names[str(value).lower()]
+    except KeyError:
+        raise ValueError("invalid candidate capability type")
+
+
 def _rol32(value, amount):
     value &= 0xFFFFFFFF
     return ((value << amount) | (value >> (32 - amount))) & 0xFFFFFFFF
@@ -690,6 +752,18 @@ def build_wukong_upload_image(generic_image, boot_config=None):
             f"selected slot {entry_slot} needs {alloc_words} words but cannot fit "
             "in Wukong's available DMEM body region"
         )
+    # Wukong has no lazy linker.  A compiler-owned portable row must have been
+    # localized in the generic image before projection; the unresolved marker
+    # is never safe to upload.  (A zero c-list word remains valid for ordinary
+    # non-portable legacy bodies, so only the portable marker is rejected.)
+    entry_cc = entry_header & 0xFF
+    for _portable_row in source_words[entry_loc + alloc_words - entry_cc:
+                                      entry_loc + alloc_words]:
+        if (_portable_row & 0xffff0000) == 0xfeed0000:
+            raise ValueError(
+                "Wukong upload refuses an unresolved portable c-list row; "
+                "generate a verified localized boot image first"
+            )
 
     # The generic image commits its Thread count immediately before the
     # format tag. Read that image truth instead of an optional saved config:
@@ -1948,6 +2022,71 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
 
     # ----- Resident lump bodies (Step 2) --------------------------------
     token_map = _token_map
+    # Portable artifacts deliberately retain unresolved c-list rows on disk.
+    # Once this image's NS descriptors exist, build a destination view from
+    # their *live* slots/sequences and localize each resident portable body.
+    # Manifest fields identify candidates, but each candidate includes bytes
+    # read from its .lump so localize_portable_lump_body rehashes real content.
+    _portable_candidates = {}
+    _portable_sidecars = {}
+    try:
+        with open(_manifest_path) as _pmf:
+            _portable_manifest = json.load(_pmf)
+        for _pe in _portable_manifest if isinstance(_portable_manifest, list) else []:
+            if not isinstance(_pe, dict) or not _pe.get("dot_name"):
+                continue
+            _ptok = str(_pe.get("token", "")).lower()
+            _p_slots = [slot for slot, selected_token in token_map.items()
+                        if str(selected_token).lower() == _ptok]
+            if len(_p_slots) != 1:
+                continue
+            _pslot = _p_slots[0]
+            _pbase = total - (_pslot + 1) * NS_ENTRY_WORDS
+            if not (0 <= _pbase + 1 < total):
+                continue
+            _pbody = _read_lump_body(lumps_dir, _ptok, _pe.get("filename"))
+            if _pbody is None:
+                continue
+            _praw = struct.pack(f">{len(_pbody)}I", *[x & 0xffffffff for x in _pbody])
+            _pn = f"{_pe['dot_name']}#{int(_pe.get('issue_n') or 0)}"
+            _portable_candidates[_pn] = {
+                "dot_name": _pe["dot_name"], "issue_n": _pe.get("issue_n"),
+                "identity_hash": _pe.get("identity_hash"),
+                "lump_bytes": _praw, "ns_slot": _pslot,
+                "sequence": _ns_word1_get(mem[_pbase + 1], "gt_seq"),
+                "grants": _pe.get("grants", []),
+                "capability_type": _pe.get("capability_type"),
+                "legacy_authorized": _pe.get("legacy_authorized") is True,
+                "authorized": _pe.get("authorized") is True,
+            }
+            _psc = _pe.get("sidecar_file")
+            if _psc:
+                try:
+                    with open(os.path.join(lumps_dir, _psc)) as _pscf:
+                        _portable_sidecars[_ptok] = json.load(_pscf)
+                except (OSError, ValueError, TypeError):
+                    pass
+    except (OSError, ValueError, TypeError):
+        pass
+    # Revisit bodies already placed through the boot-entry and catalog paths.
+    # They are now eligible for the same localization as Step-2 bodies because
+    # every NS descriptor (and therefore every live sequence) exists.
+    for _placed_slot, _placed_token in token_map.items():
+        _placed_sidecar = _portable_sidecars.get(str(_placed_token).lower(), {})
+        _placed_binding = _placed_sidecar.get("portable_binding")
+        _placed_loc = locations.get(_placed_slot)
+        if _placed_binding is None or _placed_loc is None or not (0 <= _placed_loc < total):
+            continue
+        _placed_header = mem[_placed_loc]
+        if ((_placed_header >> 27) & 0x1f) != 0x1f:
+            continue
+        _placed_size = 1 << (((_placed_header >> 23) & 0xf) + 6)
+        if _placed_loc + _placed_size > total:
+            raise ValueError(f"portable boot body at slot {_placed_slot} is truncated")
+        _localized = localize_portable_lump_body(
+            mem[_placed_loc:_placed_loc + _placed_size], _placed_binding,
+            _portable_candidates)
+        mem[_placed_loc:_placed_loc + _placed_size] = _localized
     for e in step2_lumps:
         if not (isinstance(e, dict) and e.get("resident")):
             continue
@@ -1960,6 +2099,12 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             # populate at runtime. Resident reservation still costs the
             # space (NS entry already points here).
             continue
+        _binding = (_portable_sidecars.get(str(token).lower(), {})
+                    .get("portable_binding"))
+        if _binding is not None:
+            # A binding failure is a build failure, never a partially localized
+            # boot image with stale source-local GT words.
+            body = localize_portable_lump_body(body, _binding, _portable_candidates)
         # Honour the lump's declared size bound (don't write past it).
         size_cap = int(e.get("lumpSize") or len(body))
         n = min(len(body), size_cap, total - phys)

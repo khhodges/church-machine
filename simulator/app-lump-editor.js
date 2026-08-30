@@ -395,7 +395,9 @@
             .then(function(data) {
                 _rl.loading = false;
                 _rl.loaded  = true;
-                _rl.catalog = (data && data.lumpCatalog) || [];
+                _rl.catalog = typeof _normalizeLumpCatalogEntries === 'function'
+                    ? _normalizeLumpCatalogEntries((data && data.lumpCatalog) || [])
+                    : ((data && data.lumpCatalog) || []);
                 _rl.limits  = (data && data.limits) || { maxNsEntries: 256, baseNamedNsCount: 47 };
                 var cfg = (data && data.config) || (data && data.defaults) || {};
                 _rlInitStep2(cfg);
@@ -433,7 +435,11 @@
                 abstraction: cat.abstraction,
                 lumpToken:   (saved && saved.lumpToken) || cat.token,
                 binaryHash:  (saved && (saved.binaryHash || saved.binary_hash)) || cat.binaryHash,
-                identityHash:(saved && (saved.identityHash || saved.identity_hash)) || cat.identityHash
+                identityHash:(saved && (saved.identityHash || saved.identity_hash)) || cat.identityHash,
+                grants:      (saved && (saved.grants || saved.rights)) || cat.grants || [],
+                capabilityType: (saved && (saved.capabilityType ?? saved.capability_type ??
+                    saved.gtType ?? saved.type)) ?? cat.capabilityType,
+                authorized:  (saved && saved.authorized === true) || cat.authorized === true
             };
         }
     }

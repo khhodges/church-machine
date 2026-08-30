@@ -110,6 +110,7 @@ if (isMainThread) {
     // Set up global shim before loading the compiler
     global.ChurchAssembler = require(path.join(SIM_DIR, 'assembler.js'));
     const CLOOMCCompiler   = require(path.join(SIM_DIR, 'cloomc_compiler.js'));
+    const PortableBinding  = require(path.join(SIM_DIR, 'portable_lump_binding.js'));
     const { buildLump, embedSelfDefinition, buildApiDefinition } =
         require(path.join(SIM_DIR, 'lump_builder.js'));
 
@@ -138,6 +139,42 @@ if (isMainThread) {
     } catch (err) {
         parentPort.postMessage({ ok: false, language, error: `Compiler threw an exception: ${err.message}` });
         return;
+    }
+
+    // Portable dependency locks are caller-supplied canonical metadata, not
+    // destination Namespace hints. Validate them in the compiler process and
+    // preserve them byte-for-byte for save/install. The compiler never resolves
+    // these names against this IDE's active simulator.
+    let portableBinding = payload.portable_binding || payload.portableBinding || null;
+    if (portableBinding) {
+        if (portableBinding.schema !== PortableBinding.SCHEMA ||
+            !Array.isArray(portableBinding.dependencies)) {
+            parentPort.postMessage({
+                ok: false, language,
+                error: `portable_binding must use ${PortableBinding.SCHEMA}`,
+            });
+            return;
+        }
+        try {
+            PortableBinding.canonicalName(portableBinding.owner);
+            const seenRows = new Set();
+            for (const dep of portableBinding.dependencies) {
+                const normalized = PortableBinding.descriptor(
+                    dep, dep.relocation_row, portableBinding.owner,
+                    { allowLegacyTOnly: portableBinding.compatibility !== 'strong' }
+                );
+                if (seenRows.has(normalized.relocation_row)) {
+                    throw new Error(`duplicate relocation row ${normalized.relocation_row}`);
+                }
+                seenRows.add(normalized.relocation_row);
+            }
+        } catch (err) {
+            parentPort.postMessage({
+                ok: false, language,
+                error: `invalid portable dependency descriptor: ${err.message}`,
+            });
+            return;
+        }
     }
 
     // ── Compile errors ────────────────────────────────────────────────────────
@@ -210,6 +247,8 @@ if (isMainThread) {
         methods,
         words:           Array.from(words),
         lump_binary,
+        portable_binding: portableBinding,
+        portable_status: portableBinding ? 'portable-pinned' : 'legacy-unpinned',
         warnings:        warnings.map(w =>
             (w && typeof w === 'object' && 'message' in w) ? w : { message: String(w) }
         ),

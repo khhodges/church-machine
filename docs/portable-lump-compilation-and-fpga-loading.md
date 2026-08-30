@@ -1,7 +1,15 @@
 # Portable LUMP Compilation and FPGA Loading
 
-**Status:** Architecture draft  
+**Status:** Implemented contract (`church.portable-lump-binding/v1`, August 30, 2026)
 **Normative rule:** **Compile names; verify tokens; load bindings.**
+
+The active compiler accepts pinned portable dependency descriptors, Build/Save
+keeps their C-list rows unresolved, and destination installation performs
+exact-name, `T`, full-content-hash, identity, authorization, rights, type,
+slot, and live-sequence checks before minting any local GT. Legacy artifacts
+without the full descriptor remain explicitly classified as unpinned and
+require an explicit compatibility authorization; they are not reported as
+strongly verified.
 
 ## 1. Purpose
 

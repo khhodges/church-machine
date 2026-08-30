@@ -35,6 +35,7 @@ Coverage
 """
 
 import json
+import hashlib
 import os
 import struct
 import sys
@@ -46,6 +47,50 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 import server.app as _app_module
+
+
+def test_portable_save_detail_petname_identity_and_closed_policy(client, isolated_lumps):
+    target = b"authoritative dependency bytes"
+    target_name = "Library.Target#7"
+    target_dot = "Library.Target"
+    words = [0] * 64
+    words[0] = _hdr(cw=1, cc=2)
+    words[1] = 0x1F000000
+    words[-2] = 0xFEED5E1F
+    binding = {
+        "schema": "church.portable-lump-binding/v1",
+        "owner": "alice.Widget#3",
+        "dependencies": [
+            {"name": "__SELF__", "compiler_owned_self": True,
+             "rights": ["E"], "capability_type": "inform", "relocation_row": 0},
+            {"N": target_name,
+             "T": hashlib.sha256(target_dot.encode() + target).hexdigest()[:8],
+             "binary_hash": hashlib.sha256(target).hexdigest(),
+             "identity_hash": hashlib.sha256(target_name.encode()).hexdigest(),
+             "rights": ["E"], "capability_type": "inform", "relocation_row": 1},
+        ],
+    }
+    response = client.post("/api/lumps/save", json={
+        "binary": words,
+        "metadata": {
+            "token": "ab120003", "abstraction": "Widget", "petname": "alice",
+            "issue_number": 3, "portable_binding": binding,
+            "grants": ["E"], "capability_type": "inform",
+            # authorized intentionally omitted: a fresh save must persist closed.
+        },
+    })
+    assert response.status_code == 200, response.get_data(as_text=True)
+    detail = client.get("/api/lumps/ab120003/detail")
+    assert detail.status_code == 200, detail.get_data(as_text=True)
+    saved = detail.get_json()
+    assert saved["dot_name"] == "alice.Widget"
+    assert saved["issue_n"] == 3
+    assert saved["identity_string"] == "alice.Widget#3"
+    assert saved["identity_hash"] == hashlib.sha256(b"alice.Widget#3").hexdigest()
+    assert saved["portable_binding"]["owner"] == "alice.Widget#3"
+    assert saved["authorized"] is False
+    assert saved["grants"] == ["E"]
+    assert saved["capability_type"] == "inform"
 
 # ---------------------------------------------------------------------------
 # LUMP binary construction helpers

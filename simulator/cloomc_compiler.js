@@ -126,7 +126,12 @@ class CLOOMCCompiler {
 
     compile(source, capabilities) {
         const targetDirective = this._parseTargetDirective(source);
-        const cleanSource = source.replace(/^\s*@target\s+(IoT|Full)\s*$/im, '');
+        const portableDirective = this._parsePortableDirective(source);
+        // Directives are source-level metadata, not statements in any of the
+        // supported frontends.  Strip them before handing the source to a
+        // frontend parser so the grammar is identical for JS, English, Lambda,
+        // Haskell, Symbolic, and PetName.
+        const cleanSource = source.replace(/^\s*@(target\s+(?:IoT|Full)|portable|legacy)\s*$/gim, '');
         const previousReserveSelfRow = this._reserveCompilerSelfRow;
         let result;
         try {
@@ -189,6 +194,10 @@ class CLOOMCCompiler {
                 result.compilerSelfCapability = true;
             }
         }
+        result.portableMode = portableDirective;
+        if (portableDirective === 'portable' || portableDirective === 'conflict') {
+            this._validatePortableCapabilities(result);
+        }
         if (result.errors.length === 0 && result.methods.length > 0) {
             result.profile = detectProfile(result.methods);
             if (targetDirective) {
@@ -248,6 +257,46 @@ class CLOOMCCompiler {
             break;
         }
         return null;
+    }
+
+    _parsePortableDirective(source) {
+        let mode = 'legacy';
+        for (const line of source.split('\n')) {
+            const t = line.trim();
+            if (/^@portable\s*$/i.test(t)) {
+                if (mode === 'explicit-legacy') return 'conflict';
+                mode = 'portable';
+            } else if (/^@legacy\s*$/i.test(t)) {
+                if (mode === 'portable') return 'conflict';
+                mode = 'explicit-legacy';
+            }
+        }
+        return mode;
+    }
+
+    _validatePortableCapabilities(result) {
+        if (result.portableMode === 'conflict') {
+            result.errors.push({ line: null, message: '@portable and @legacy cannot be used together.' });
+            return;
+        }
+        const caps = Array.isArray(result.capabilities) ? result.capabilities : [];
+        for (let row = 1; row < caps.length; row++) {
+            const cap = caps[row] || {};
+            if (!cap.portable_descriptor || cap.portable_error) {
+                result.errors.push({
+                    line: cap.line || null,
+                    message: `@portable requires a pinned descriptor at c-list row ${row}: ` +
+                        'Name#issue T=8hex binary_hash=64hex identity_hash=64hex rights=... type=...'
+                });
+                continue;
+            }
+            if (cap.relocation_row != null && Number(cap.relocation_row) !== row) {
+                result.errors.push({
+                    line: cap.line || null,
+                    message: `portable descriptor ${cap.name} declares row=${cap.relocation_row}; expected c-list row ${row}`
+                });
+            }
+        }
     }
 
     compileJS(source, capabilities) {
@@ -1114,7 +1163,7 @@ class CLOOMCCompiler {
         return rom;
     }
 
-    // Parse a single "NAME [RIGHTS]" capability item from a capabilities { } block.
+    // Parse ordinary "NAME [RIGHTS]" and canonical portable descriptors.
     // Examples: "LED0 RW" → {name:'LED0', rights:['R','W']}
     //           "Memory E" → {name:'Memory', rights:['E']}
     //           "LED0" → {name:'LED0', rights:[]}  (missing rights — caller should warn/error)
@@ -1122,16 +1171,47 @@ class CLOOMCCompiler {
         const tokens = itemStr.trim().split(/\s+/).filter(Boolean);
         if (!tokens.length) return null;
         const name = tokens[0];
-        if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(name)) return null;
+        const universal = /^([A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*)#([1-9][0-9]*)$/;
+        const universalMatch = name.match(universal);
+        if (!universalMatch && !/^[A-Za-z][A-Za-z0-9_]*$/.test(name)) {
+            // Preserve the bad item so @portable can fail closed rather than
+            // silently dropping a malformed dependency.
+            return { name, rights: [], portable_error: true };
+        }
         const rights = [];
+        const fields = {};
         for (const t of tokens.slice(1)) {
-            if (/^[RWXErwxe]+$/.test(t)) {
+            const field = t.match(/^(T|binary_hash|identity_hash|rights|type|row)=(.+)$/i);
+            if (field) {
+                fields[field[1].toLowerCase()] = field[2];
+            } else if (/^[RWXLESrwxles]+$/.test(t)) {
                 for (const c of t.toUpperCase()) {
                     if (!rights.includes(c)) rights.push(c);
                 }
             }
         }
-        return { name, rights };
+        if (!universalMatch) return { name, rights };
+        const suppliedRights = fields.rights || rights.join('');
+        const normalizedRights = String(suppliedRights).toUpperCase();
+        const type = String(fields.type || '').toLowerCase();
+        const valid = /^[0-9a-f]{8}$/i.test(fields.t || '') &&
+            /^[0-9a-f]{64}$/i.test(fields.binary_hash || '') &&
+            /^[0-9a-f]{64}$/i.test(fields.identity_hash || '') &&
+            /^[RWXLES]+$/i.test(normalizedRights) &&
+            /^(null|inform|outform|abstract|[0-3])$/.test(type) &&
+            (fields.row == null || /^[1-9][0-9]*$/.test(fields.row));
+        return {
+            name,
+            N: name,
+            T: fields.t ? fields.t.toLowerCase() : '',
+            binary_hash: fields.binary_hash ? fields.binary_hash.toLowerCase() : '',
+            identity_hash: fields.identity_hash ? fields.identity_hash.toLowerCase() : '',
+            rights: [...new Set(normalizedRights.split(''))],
+            capability_type: fields.type || '',
+            relocation_row: fields.row == null ? null : Number(fields.row),
+            portable_descriptor: valid,
+            portable_error: !valid,
+        };
     }
 
     // Parse a method parameter that is carried by the Church capability path

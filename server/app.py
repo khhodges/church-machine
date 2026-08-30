@@ -2264,6 +2264,38 @@ def _load_lump_catalog(selected_tokens=None):
     out = []
     floating = []
     for entry in raw if isinstance(raw, list) else []:
+        # Manifest is authoritative when it carries a field; the sidecar fills
+        # older manifest records without changing an explicit false/empty
+        # policy into a permissive default.
+        sidecar = {}
+        sc_name = entry.get("sidecar_file")
+        if isinstance(sc_name, str) and sc_name:
+            try:
+                with open(os.path.join(os.path.dirname(LUMPS_MANIFEST_PATH), sc_name), "r") as sc_file:
+                    loaded_sc = json.load(sc_file)
+                if isinstance(loaded_sc, dict):
+                    sidecar = loaded_sc
+            except (OSError, ValueError, TypeError):
+                pass
+
+        def _catalog_value(key, default=None):
+            return entry[key] if key in entry and entry[key] is not None else sidecar.get(key, default)
+
+        def _apply_binding_candidate_fields(record):
+            cache_token = _catalog_value("cache_token", _catalog_value("token"))
+            record["cache_token"] = cache_token
+            record["cacheToken"] = cache_token
+            record["grants"] = _catalog_value("grants", [])
+            record["capability_type"] = _catalog_value("capability_type")
+            record["authorized"] = _catalog_value("authorized", False) is True
+            record["legacy_authorized"] = _catalog_value("legacy_authorized", False) is True
+            for src, dst in (("dot_name", "dotName"), ("issue_n", "issueN"),
+                             ("identity_hash", "identityHash"),
+                             ("binary_hash", "binaryHash")):
+                value = _catalog_value(src)
+                if value is not None:
+                    record[dst] = value
+
         slot = entry.get("ns_slot")
         policy = entry.get("ns_slot_policy", "dynamic" if not isinstance(slot, int) else "static")
         # Pre-bound slots above the built-in catalog are legacy private
@@ -2283,9 +2315,9 @@ def _load_lump_catalog(selected_tokens=None):
                     "nsSlotPolicy": policy,
                     "hasExecutableMethods": bool(entry.get("methods")),
                     "floating": True,
-                    "grants": entry.get("grants", []),
                     "description": entry.get("description"),
                 }
+                _apply_binding_candidate_fields(e)
                 floating.append(e)
             continue
         if slot in RESERVED_NS_SLOTS:
@@ -2304,8 +2336,9 @@ def _load_lump_catalog(selected_tokens=None):
         # headers and raw payload hash.
         for _src, _dst in (("dot_name", "dotName"), ("issue_n", "issueN"),
                             ("identity_hash", "identityHash"), ("binary_hash", "binaryHash")):
-            if entry.get(_src) is not None:
-                e[_dst] = entry[_src]
+            if _catalog_value(_src) is not None:
+                e[_dst] = _catalog_value(_src)
+        _apply_binding_candidate_fields(e)
         if entry.get("media_tags"):
             e["mediaTags"] = entry["media_tags"]
         out.append(e)
@@ -7137,6 +7170,18 @@ def save_lump():
     )
     _SELF_CAPABILITY_PLACEHOLDER = 0xFEED5E1F
     _validated_declared_caps = []
+    _portable_binding_raw = metadata.get("portable_binding", metadata.get("portableBinding"))
+    _portable_binding = None
+    if _portable_binding_raw is not None:
+        try:
+            from portable_binding import validate_portable_binding as _validate_portable_binding
+        except ImportError:
+            from server.portable_binding import validate_portable_binding as _validate_portable_binding
+        try:
+            _portable_binding = _validate_portable_binding(_portable_binding_raw, _sl_cc2)
+        except ValueError as _portable_error:
+            return jsonify({"error": f"Portable binding validation failed: {_portable_error}",
+                            "portable_binding_validation_failed": True}), 422
 
     # ── SelfTest canonical layout guard (ALL token 00000600 saves) ───────────
     # Runs BEFORE the cc=0→1 auto-rewrite so the rewrite cannot be used to
@@ -7227,7 +7272,7 @@ def save_lump():
                 "word_index":            510,
             }), 422
 
-    if _sl_cc2 == 0 and not _has_declared_caps:
+    if _sl_cc2 == 0 and not _has_declared_caps and _portable_binding is None:
         # No c-list yet — open one slot in the padding zone and bump cc to 1.
         # Never reached for the canonical 512-word SelfTest lump: cc=2 is
         # enforced by the guard above before this point.
@@ -7240,12 +7285,22 @@ def save_lump():
         _sl_words.extend([0] * (_sl_lsz - len(_sl_words)))
 
     _clist_row0_idx = _sl_lsz - _sl_cc2
+    if _portable_binding is not None:
+        try:
+            try:
+                from portable_binding import validate_unresolved_clist as _validate_unresolved_clist
+            except ImportError:
+                from server.portable_binding import validate_unresolved_clist as _validate_unresolved_clist
+            _validate_unresolved_clist(_portable_binding, _sl_words)
+        except ValueError as _portable_error:
+            return jsonify({"error": f"Portable binding validation failed: {_portable_error}",
+                            "portable_binding_validation_failed": True}), 422
 
     # Older binaries can reserve several all-zero c-list rows before the
     # server writes the legacy identity seal at row 0. Preserve that inert
     # format, but reject any nonzero undeclared row: it would otherwise carry
     # an unchecked Golden Token (including B-set or pending placeholders).
-    if not _has_declared_caps and _sl_cc2 > 1:
+    if not _has_declared_caps and _portable_binding is None and _sl_cc2 > 1:
         _undeclared_nonzero_rows = [
             _row for _row in range(_sl_cc2)
             if _sl_words[_clist_row0_idx + _row] != 0
@@ -7270,7 +7325,7 @@ def save_lump():
     # identity seal and never persist NULL, pending, malformed, mis-targeted,
     # or over/under-permissioned tokens. The browser performs the same checks,
     # but this endpoint is the final trust boundary.
-    if _has_declared_caps:
+    if _has_declared_caps and _portable_binding is None:
         if len(_declared_caps_raw) != _sl_cc2:
             return jsonify({
                 "error": (
@@ -7478,7 +7533,7 @@ def save_lump():
     # E-GT (validated above) and must not be overwritten with the petname seal.
     # Also skipped when c-list rows belong to declared capabilities; in that
     # case identity_string + identity_hash are the canonical metadata seal.
-    if not _is_selftest_canonical and not _has_declared_caps:
+    if not _is_selftest_canonical and not _has_declared_caps and _portable_binding is None:
         if 0 < _clist_row0_idx < len(_sl_words):
             _sl_words[_clist_row0_idx] = _self_gt
 
@@ -7629,9 +7684,21 @@ def save_lump():
     # Number = sha256(dot_name_utf8 + lump_bytes)[:8]; includes dot_name so
     # identical code compiled under different names produces different Numbers.
     from lump_integrity import to_dot_name as _to_dot_name, compute_number as _compute_number
-    _dot_name_save = _to_dot_name(abs_name)
-    _issue_n_save  = int((_existing_entry or {}).get('issue_n', 1) or 1)
+    _dot_name_save = _to_dot_name(
+        f"{_petname}.{abs_name}" if _petname else abs_name)
+    # The UI's universal owner is petname.Abstraction#issue.  Use the same
+    # issue supplied for identity_string rather than silently retaining an old
+    # manifest issue and creating two contradictory canonical identities.
+    _issue_n_save  = _issue_number
     _number_save   = _compute_number(_dot_name_save, lump_bytes)
+    if _portable_binding is not None:
+        if _portable_binding["owner"] != f"{_dot_name_save}#{_issue_n_save}":
+            return jsonify({"error": "Portable binding validation failed: owner must match "
+                                     "the saved canonical dot_name and issue_n.",
+                            "portable_binding_validation_failed": True}), 422
+        # Portable N is the issued canonical identity, not the old pet-name seal.
+        _identity_string = _portable_binding["owner"]
+        _identity_hash = _hl_id.sha256(_identity_string.encode("utf-8")).hexdigest()
 
     # ── Security: strict allowlist + realpath containment ─────────────────────
     # to_dot_name() preserves '/', '..', and absolute-path prefixes from
@@ -7775,7 +7842,12 @@ def save_lump():
             "built_at":     _dt.datetime.utcnow().isoformat() + "Z",
             "builder":      "CLOOMC++ IDE v1.0"
         },
-        "grants": metadata.get("grants", ["E"]),
+        "grants": metadata.get("grants", [] if _portable_binding is not None else ["E"]),
+        "capability_type": metadata.get("capability_type", "inform"),
+        # Installation is deny-by-default; portable candidate use must be
+        # explicitly authorized by the publisher, never inferred from presence.
+        "authorized": metadata.get("authorized") is True,
+        "legacy_authorized": metadata.get("legacy_authorized") is True,
         "source":        metadata.get("source", ""),
         "binary_hash":   _binary_hash,
         "petname":         _petname,
@@ -7790,6 +7862,8 @@ def save_lump():
         "dot_name":        _dot_name_save,
         "issue_n":         _issue_n_save,
     }
+    if _portable_binding is not None:
+        sidecar["portable_binding"] = _portable_binding
 
     import time as _time_save
     _compiled_at = _time_save.time()
@@ -7826,6 +7900,9 @@ def save_lump():
         "compiled_at":   _compiled_at,
         "methods":       sidecar["methods"],
         "grants":        sidecar["grants"],
+        "capability_type": sidecar["capability_type"],
+        "authorized":    sidecar["authorized"],
+        "legacy_authorized": sidecar["legacy_authorized"],
         "binary_hash":   _binary_hash,
         "petname":       _petname,
         "issue_number":  _issue_number,
@@ -7833,6 +7910,8 @@ def save_lump():
         "dot_name":      _dot_name_save,
         "issue_n":       _issue_n_save,
     }
+    if _portable_binding is not None:
+        new_entry["portable_binding"] = _portable_binding
 
     # Test hook: fires after all per-token I/O (Phase 5/6) but before the lock.
     # In production this is always None.  Tests set it to synchronise threads
@@ -8303,6 +8382,27 @@ def get_lump_detail(token):
             sidecar = json.load(fh)
     except Exception as exc:
         return jsonify({"error": f"Could not read sidecar: {exc}"}), 500
+
+    # Do not hand a malformed/tampered portable contract to an installer.  The
+    # saved sidecar is the durable transport for unresolved relocation rows;
+    # validate it again at this trust boundary rather than treating it as UI
+    # annotation.  Legacy sidecars remain intentionally untouched.
+    if sidecar.get("portable_binding") is not None:
+        try:
+            try:
+                from portable_binding import validate_portable_binding as _detail_validate_binding
+            except ImportError:
+                from server.portable_binding import validate_portable_binding as _detail_validate_binding
+            _detail_binding = _detail_validate_binding(
+                sidecar["portable_binding"], int(sidecar.get("cc", entry.get("cc", 0)) or 0))
+            if (entry.get("dot_name") and entry.get("issue_n") is not None and
+                    _detail_binding["owner"] !=
+                    f"{entry['dot_name']}#{int(entry['issue_n'])}"):
+                raise ValueError("owner does not match manifest canonical identity")
+            sidecar = dict(sidecar)
+            sidecar["portable_binding"] = _detail_binding
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": f"Portable binding validation failed: {exc}"}), 409
 
     # If the 'source' field is a file-path reference (no newlines, ends in .cloomc)
     # rather than actual source text, resolve it to the file's content so the

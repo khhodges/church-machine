@@ -881,6 +881,33 @@ function _materializeLumpCapabilities(caps, words, clistStart, context) {
     };
 }
 
+// Build/save is a portable operation. It writes symbolic rows and content
+// locks only; destination GTs are produced later by loadLumpBinary's binder.
+function _serializePortableLumpCapabilities(caps, words, clistStart) {
+    const allCaps = Array.isArray(caps) ? caps : [];
+    const portableCaps = allCaps.map((cap, row) => {
+        const item = typeof cap === 'string' ? { name: cap } : { ...(cap || {}) };
+        // A source-level portable descriptor may state its intended row.  The
+        // compiler has already checked it in @portable mode; retain the actual
+        // row rather than allowing a caller-side sidecar to relocate it.
+        item.relocation_row = row;
+        item.rights = Array.isArray(item.rights) && item.rights.length
+            ? item.rights : (Array.isArray(item.grants) && item.grants.length ? item.grants : ['E']);
+        item.grants = item.rights.slice();
+        item.nsIndex = null;
+        if (_isCompilerSelfCapability(item)) {
+            words[clistStart + row] = (typeof ChurchSimulator !== 'undefined'
+                ? ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER : 0xFEED5E1F) >>> 0;
+            item.placeholder = true;
+        } else {
+            words[clistStart + row] = 0;
+            item.placeholder = true;
+        }
+        return item;
+    });
+    return { ok: true, errors: [], resolvedCaps: portableCaps };
+}
+
 function compileDraft() {
     const editor = document.getElementById('asmEditor');
     if (!editor) return;
@@ -1451,35 +1478,8 @@ function compileAndBuild() {
         lumpWords[1 + i] = (codeRegion[i] >>> 0);
     }
     const clistStart = lumpSize - cc;
-    if (typeof CapabilityTokens === 'undefined') {
-        if (con) con.textContent = 'Build failed: capability token validator is unavailable; no binary was saved.';
-        if (typeof _showAsmErrors === 'function') {
-            _showAsmErrors([{ line: null, message: '[CAP-GT] Capability token validator is unavailable.' }],
-                'Capability error — code not applied');
-        }
-        return;
-    }
-    const _capTokenContext = {
-        sim,
-        lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) ? _lumpsCache : [],
-    };
-    const _capMaterialized = _materializeLumpCapabilities(
-        caps, lumpWords, clistStart, _capTokenContext);
+    const _capMaterialized = _serializePortableLumpCapabilities(caps, lumpWords, clistStart);
     const resolvedCaps = _capMaterialized.resolvedCaps;
-    if (!_capMaterialized.ok) {
-        const _capErrors = _capMaterialized.errors.map(message => ({ line: null, message: `[CAP-GT] ${message}` }));
-        const _capListing = [
-            `BUILD FAILED — "${absName}"`,
-            '',
-            'Every declared capability must resolve to a valid Golden Token before this LUMP can be saved or run.',
-            ..._capMaterialized.errors.map(message => `  ✗ ${message}`),
-        ].join('\n');
-        if (con) { con.textContent = _capListing; con.scrollTop = 0; }
-        if (typeof _showAsmErrors === 'function') {
-            _showAsmErrors(_capErrors, 'Capability error' + (_capErrors.length !== 1 ? 's' : '') + ' — code not applied');
-        }
-        return;
-    }
     window._lastCLOOMCLump = {
         words: Array.from(lumpWords),
         clistStart,
@@ -1601,6 +1601,25 @@ function compileAndBuild() {
     // Together: petname.Abstraction#n is the globally meaningful identity of this LUMP.
     const _savePetname     = (() => { try { return (localStorage.getItem('church_petname') || '').replace(/[^a-z0-9._-]/gi, ''); } catch (_e) { return ''; } })();
     const _saveIssueNumber = (() => { try { return parseInt(localStorage.getItem('church_issue_number') || '1') || 1; } catch (_e) { return 1; } })();
+    const _portableOwner = (typeof PortableLumpBinding !== 'undefined')
+        ? PortableLumpBinding.deriveOwner({
+            petname: _savePetname, abstraction: absName, issue_number: _saveIssueNumber,
+        })
+        : `${_savePetname ? _savePetname + '.' : ''}${absName}#${_saveIssueNumber}`;
+    let _portableBinding = null;
+    let _portableStatus = 'legacy-unpinned';
+    if (result.portableMode === 'portable' && typeof PortableLumpBinding !== 'undefined') {
+        try {
+            _portableBinding = PortableLumpBinding.createContract(_portableOwner, resolvedCaps);
+            _portableStatus = 'portable-pinned';
+        } catch (_portableErr) {
+            // Existing source forms that name only a local pet name have no T or
+            // full hash to pin. Saving remains possible but the sidecar is
+            // explicitly quarantined as legacy-unpinned rather than pretending
+            // that local resolution made it portable.
+            _portableStatus = 'portable-invalid';
+        }
+    }
 
     const savePayload = {
         binary: lumpWordsArray,
@@ -1630,6 +1649,10 @@ function compileAndBuild() {
             grants:         ['E'],
             petname:        _savePetname,
             issue_number:   _saveIssueNumber,
+            dot_name:       _portableOwner.replace(/#[1-9][0-9]*$/, ''),
+            portable_binding: _portableBinding,
+            portable_status: _portableStatus,
+            portable_mode: result.portableMode || 'legacy',
         }
     };
 
@@ -1643,12 +1666,13 @@ function compileAndBuild() {
     listing += `  C-List:    ${cc} slot${cc !== 1 ? 's' : ''} (cc)\n`;
     listing += `  Freespace: ${freespace} words\n`;
     listing += `  Profile:   ${profile}\n`;
+    listing += `  Binding:   ${_portableStatus === 'portable-pinned' ? 'Portable (destination-local GTs unresolved)' : 'Legacy/unpinned (explicit trust required)'}\n`;
     listing += `  MTBF:      ${mtbfClean}/${mtbfTotal} clean runs (${mtbfStatus})\n`;
 
     // Identity line: show the full dot pet name stamped into this LUMP.
     // When no petname is set, remind the programmer how to set one.
     if (_savePetname) {
-        const _identStr = `${_savePetname}.${absName}#${_saveIssueNumber}`;
+        const _identStr = _portableOwner;
         listing += `  Identity:  ${_identStr}\n`;
     } else {
         listing += `  Identity:  ${absName}#${_saveIssueNumber}  ` +

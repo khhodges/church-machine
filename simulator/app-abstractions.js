@@ -365,10 +365,15 @@ function _initLazyLoadManifest() {
                             catalogEntry.identityHash && catalogEntry.binaryHash) {
                         try {
                             sim.registerSlotIdentity(upload.index, {
+                                cacheToken: catalogEntry.cacheToken,
                                 dotName: catalogEntry.dotName,
                                 issueN: catalogEntry.issueN,
                                 identityHash: catalogEntry.identityHash,
-                                binaryHash: catalogEntry.binaryHash
+                                binaryHash: catalogEntry.binaryHash,
+                                grants: catalogEntry.grants || catalogEntry.rights || [],
+                                capabilityType: catalogEntry.capabilityType ??
+                                    catalogEntry.capability_type ?? catalogEntry.gtType ?? catalogEntry.type,
+                                authorized: catalogEntry.authorized === true
                             });
                         } catch (e) {
                             console.warn(`[bootConfig] preload identity rejected for slot ${upload.index}:`, e);

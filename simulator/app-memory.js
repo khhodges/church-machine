@@ -2468,6 +2468,29 @@ function renderMemoryDump(location, limit, nsIndex) {
 // ---------------------------------------------------------------------------
 let _hardwareProfiles = null;
 let _lumpCatalog = [];          // [{abstraction, nsSlot, lumpSize, token}]
+function _normalizeLumpCatalogEntries(entries) {
+    return (Array.isArray(entries) ? entries : []).map(item => {
+        item = item || {};
+        const rawCacheToken = item.cacheToken ?? item.cache_token ?? item.token;
+        const cacheToken = typeof rawCacheToken === 'string'
+            ? parseInt(rawCacheToken.replace(/^0x/i, ''), 16)
+            : Number(rawCacheToken);
+        return {
+            ...item,
+            dotName: item.dotName || item.dot_name || item.abstraction || '',
+            issueN: item.issueN ?? item.issue_n ?? item.issue_number,
+            identityHash: item.identityHash || item.identity_hash || null,
+            binaryHash: item.binaryHash || item.binary_hash || null,
+            grants: Array.isArray(item.grants) ? item.grants :
+                (Array.isArray(item.rights) ? item.rights : []),
+            capabilityType: item.capabilityType ?? item.capability_type ??
+                item.gtType ?? item.gt_type ?? item.type,
+            cacheToken: Number.isInteger(cacheToken) ? (cacheToken >>> 0) : null,
+            authorized: item.authorized === true || item.authorization === true ||
+                item.install_authorized === true,
+        };
+    });
+}
 let _bdLimits = { maxNsEntries: 256, baseNamedNsCount: 47 };
 // Used by the modal to refresh state. The DOMContentLoaded handler
 // performs the *initial* prefetch so window.bootConfig is set before
@@ -2478,7 +2501,7 @@ function _loadBootConfig() {
         .then(data => {
             _setActiveBootConfig((data && data.config) || null);
             _hardwareProfiles = (data && data.profiles) || {};
-            _lumpCatalog      = (data && data.lumpCatalog) || [];
+            _lumpCatalog      = _normalizeLumpCatalogEntries((data && data.lumpCatalog) || []);
             if (data && data.limits) _bdLimits = data.limits;
             return data;
         })
@@ -2951,6 +2974,13 @@ function updateNamespace() {
             if (Number.isInteger(size)) row.lumpSize = size;
             if (binaryHash) row.binaryHash = binaryHash;
             if (identityHash) row.identityHash = identityHash;
+            row.grants = Array.isArray(src.grants) ? src.grants.slice() :
+                (Array.isArray(src.rights) ? src.rights.slice() : []);
+            row.capabilityType = src.capabilityType ?? src.capability_type ??
+                src.gtType ?? src.gt_type ?? src.type;
+            row.cacheToken = src.cacheToken ?? src.cache_token ?? null;
+            row.authorized = src.authorized === true || src.authorization === true ||
+                src.install_authorized === true;
         }
         delete row.prefetch;
         delete row.prefetchRequired;
@@ -3765,6 +3795,9 @@ function _nsTableAddConfirm() {
                 issueN:       issueN,
                 identityHash: identityHash,   // canonical 64-hex string
                 binaryHash:   binaryHash,     // canonical 64-hex string
+                grants:       Array.isArray(_idMeta.grants) ? _idMeta.grants : [],
+                capabilityType: effectiveGtType,
+                authorized:   _idMeta.authorized === true,
                 outformWords: [_w1, _w2, w3CacheToken],
                 gtSeq:        slotGtSeq,
             }, { secure: true });

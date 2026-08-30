@@ -100,6 +100,7 @@ def _make_cache_key(payload: dict) -> str:
         'source':         payload.get('source', ''),
         'namespace_hint': payload.get('namespace_hint'),
         'tier':           payload.get('tier'),   # V1.3 self-definition tier
+        'portable_binding': payload.get('portable_binding') or payload.get('portableBinding'),
     }
     canonical = json.dumps(key_obj, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(canonical.encode('utf-8')).hexdigest()

@@ -6457,6 +6457,12 @@ async function _loadSavedLumpCapabilities(token, suppliedCaps) {
         binaryHash: detail.binary_hash || null,
         source: typeof detail.source === 'string' ? detail.source : null,
         sourceHash: detail.source_hash || (detail.mtbf && detail.mtbf.source_hash) || null,
+        portableBinding: detail.portable_binding || null,
+        portableStatus: detail.portable_status || 'legacy-unpinned',
+        petname: detail.petname || '',
+        abstraction: detail.abstraction || '',
+        dotName: detail.dot_name || detail.dotName || '',
+        issueNumber: detail.issue_number != null ? detail.issue_number : detail.issue_n,
         // Required when a compiler-owned LUMP was already installed once:
         // its on-disk row 0 is a live GT and must still point at this source slot
         // before the destination loader is allowed to remint it.
@@ -6575,6 +6581,31 @@ function _validateSavedLumpClist(rawWords, header, savedMetadata, simInstance) {
                 validationStart = clistStart + 2;
             }
         }
+        // Portable binaries intentionally carry unresolved zero/placeholder
+        // rows. Their structural metadata was checked above; semantic c-list
+        // validation must run on the private linked copy, not these source
+        // bytes.
+        if (savedMetadata.portableBinding) {
+            const portable = savedMetadata.portableBinding;
+            if (!portable || !Array.isArray(portable.dependencies) ||
+                portable.dependencies.length !== header.cc) {
+                throw new Error('portable binding descriptor count does not match c-list count');
+            }
+            const portableRows = new Set();
+            for (const dependency of portable.dependencies) {
+                const row = Number(dependency && dependency.relocation_row);
+                if (!Number.isInteger(row) || row < 0 || row >= header.cc ||
+                    portableRows.has(row)) {
+                    throw new Error('portable binding has an invalid or duplicate relocation row');
+                }
+                portableRows.add(row);
+                if (row > 0 && (rawWords[clistStart + row] >>> 0) !== 0) {
+                    throw new Error(
+                        `portable unresolved c-list row ${row} must contain the zero placeholder`);
+                }
+            }
+            return savedCaps;
+        }
         const runResolved = CapabilityTokens.resolveCapabilities(capsToValidate, {
             sim: simInstance,
             lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) ? _lumpsCache : [],
@@ -6590,6 +6621,31 @@ function _validateSavedLumpClist(rawWords, header, savedMetadata, simInstance) {
         }
     }
     return savedCaps;
+}
+
+function _validateLinkedPortableClist(linkedWords, header, bindings, simInstance) {
+    if (!Array.isArray(bindings) || bindings.length !== header.cc) {
+        throw new Error('portable binder did not materialize every c-list row');
+    }
+    const start = header.lumpSize - header.cc;
+    for (const binding of bindings) {
+        const row = Number(binding.relocation_row);
+        if (!Number.isInteger(row) || row < 0 || row >= header.cc ||
+            (linkedWords[start + row] >>> 0) !== (binding.B >>> 0)) {
+            throw new Error(`portable c-list row ${row} differs from the linked result`);
+        }
+        const parsed = simInstance.parseGT(linkedWords[start + row] >>> 0);
+        const expectedRights = new Set(binding.rights || []);
+        const actualRights = ['R', 'W', 'X', 'L', 'S', 'E']
+            .filter(right => parsed.permissions && parsed.permissions[right] === 1);
+        if (parsed.index !== binding.ns_slot || parsed.gt_seq !== binding.sequence ||
+            parsed.type !== binding.capability_type ||
+            actualRights.length !== expectedRights.size ||
+            actualRights.some(right => !expectedRights.has(right))) {
+            throw new Error(`portable c-list row ${row} failed post-link GT validation`);
+        }
+    }
+    return true;
 }
 
 // ── Load a saved LUMP binary into the simulator ───────────────────────────────
@@ -6616,6 +6672,32 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
         if (typeof sim === 'undefined' || !sim) throw new Error('Simulator not ready');
         const _runHeader = sim.parseLumpHeader(rawWords[0] >>> 0);
         if (!_runHeader || !_runHeader.valid) throw new Error('Malformed LUMP header');
+        let _portableOwnerCandidate = null;
+        if (_savedMetadata.portableBinding) {
+            // Hash the exact response bytes before linking.  The detail sidecar
+            // is useful provenance, but cannot authorize a replacement binary.
+            const _actualHash = await _executionIdentityHashWords(rawWords);
+            if (!/^[0-9a-f]{64}$/i.test(_actualHash || '')) {
+                throw new Error('portable install requires WebCrypto verification of fetched binary bytes');
+            }
+            if (!/^[0-9a-f]{64}$/i.test(_savedMetadata.binaryHash || '') ||
+                _actualHash.toLowerCase() !== _savedMetadata.binaryHash.toLowerCase()) {
+                throw new Error('fetched binary does not match its saved full content hash');
+            }
+            const _owner = PortableLumpBinding.deriveOwner({
+                petname: _savedMetadata.petname,
+                abstraction: _savedMetadata.abstraction || name,
+                dot_name: _savedMetadata.dotName,
+                issue_number: _savedMetadata.issueNumber,
+            });
+            if (_savedMetadata.portableBinding.owner !== _owner) {
+                throw new Error('portable contract owner does not match the saved artifact identity');
+            }
+            _portableOwnerCandidate = {
+                N: _owner, binary_hash: _actualHash,
+                identity_hash: _savedMetadata.identityHash, verified: true,
+            };
+        }
         const _savedCaps = _validateSavedLumpClist(rawWords, _runHeader, _savedMetadata, sim);
         const _compilerOwnedSelf = !!(_savedCaps[0] &&
             _savedCaps[0].compiler_owned_self === true &&
@@ -6674,6 +6756,15 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
                         ).gtSeq : NaN;
                 })(),
                 privateDataRows: _privateDataRows
+                ,
+                portableBinding: _savedMetadata.portableBinding,
+                portableOwnerCandidate: _portableOwnerCandidate,
+                validateLinkedWords: _savedMetadata.portableBinding
+                    ? (linkedWords, linkedHeader, bindings) => _validateLinkedPortableClist(
+                        linkedWords, linkedHeader, bindings, sim)
+                    : null,
+                portableTrustPolicy: _savedMetadata.portableStatus === 'portable-pinned'
+                    ? 'strong' : 'allow-authorized-t-only'
             }
         );
         if (!loaded) {
