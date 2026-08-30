@@ -1885,7 +1885,11 @@ function _autoLoadDefaultProgram() {
         if (!_bootWords.length) {
             _applyBootLumpPetNames();
         }
-        if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
+        // The user's Lightning Bolt selection is authoritative across reset.
+        // The factory image may temporarily report SelfTest while boot state is
+        // reconstructed; copying that value back into localStorage makes
+        // SelfTest silently take over a deliberately selected CapabilityTest.
+        if (typeof _applyBootEntryToSim === 'function') _applyBootEntryToSim();
         return;
     }
     _defaultProgramLoaded = true;
@@ -1908,6 +1912,7 @@ function _autoLoadDefaultProgram() {
     // lastAssembledWords remains available for an explicit Assemble + Run;
     // boot completion never mutates the selected boot LUMP with cached source.
     _applyBootLumpPetNames();
+    if (typeof _applyBootEntryToSim === 'function') _applyBootEntryToSim();
     if (typeof updateLiveLumpBanner === 'function') updateLiveLumpBanner();
 }
 // ── instantBoot ──────────────────────────────────────────────────────────────

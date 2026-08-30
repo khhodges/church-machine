@@ -14,4 +14,6 @@ continuation label disagree with the generated boot image.
 **How to apply:** Whenever the LightningBolt entry changes, update the live
 SelfTest C-List row 1. Boot-image generation and simulator initialization must
 derive row 1 from the selected boot-entry slot; reject or ignore legacy
-independent Next-target configuration.
+independent Next-target configuration. After reset, reapply the persisted
+LightningBolt selection to the simulator; never sync a temporary factory
+SelfTest slot back into the user's selection.

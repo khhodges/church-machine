@@ -145,6 +145,7 @@ function makeSandbox(sim, initialBootEntrySlot) {
         // ── Stub functions (no-ops; do not affect the sync invariant) ──────
         renderAbstractions:          () => {},
         updateNamespace:             () => {},
+        _applyBootEntryToSim() { sim.bootEntrySlot = sandbox.bootEntrySlot; },
         _reapplyStickyPatches:       () => {},
         _injectClistNow:             () => {},
         _applyBootLumpPetNames:      () => {},
@@ -167,41 +168,39 @@ function makeSandbox(sim, initialBootEntrySlot) {
 
 // ── T201: _autoLoadDefaultProgram path ───────────────────────────────────────
 //
-// After a simulator reset the boot sequence may restore sim.bootEntrySlot from
-// the encoded boot image (a value different from the UI variable).
-// _autoLoadDefaultProgram must call _syncBootEntryFromSim so the Resident panel
-// label immediately reflects the restored slot — with no poll delay.
+// After reset, the factory image may temporarily restore SelfTest into
+// sim.bootEntrySlot. The user's persisted Lightning Bolt remains authoritative.
 //
 // Setup: _defaultProgramLoaded=true (second+ boot cycle), lastAssembledWords=[]
 // (no user program) → _autoLoadDefaultProgram takes the no-assembled-words branch
-// and calls _syncBootEntryFromSim() on line 1227 of app-run.js.
-console.log('\n--- T201: _autoLoadDefaultProgram path — sync after boot-image restore ---');
+// and calls _applyBootEntryToSim().
+console.log('\n--- T201: _autoLoadDefaultProgram preserves Lightning Bolt selection ---');
 {
     const sim = makeTestSim();
     const { ctx, sandbox, lsStore } = makeSandbox(sim, 3);
 
-    // Simulate a boot-image restore: sim.bootEntrySlot updated to 7 (differs from UI's 3)
-    sim.bootEntrySlot = 7;
+    // Simulate factory SelfTest taking over while Lightning Bolt still selects
+    // CapabilityTest in the UI/persisted setting.
+    sim.bootEntrySlot = 6;
     // Second+ boot cycle: _defaultProgramLoaded=true, no assembled program
     sandbox._defaultProgramLoaded = true;
     sandbox.lastAssembledWords    = [];
 
     // Pre-condition: divergence is present before the function runs
-    check('T201a: bootEntrySlot (3) diverges from sim.bootEntrySlot (7) before call',
-        sandbox.bootEntrySlot === 3 && sim.bootEntrySlot === 7);
+    check('T201a: CapabilityTest selection diverges from factory SelfTest before call',
+        sandbox.bootEntrySlot === 3 && sim.bootEntrySlot === 6);
 
-    // Call the production function — it must invoke _syncBootEntryFromSim internally
+    // Call the production function — it must reapply the Lightning Bolt.
     vm.runInContext('_autoLoadDefaultProgram()', ctx);
 
-    // Post-condition: bootEntrySlot must match sim immediately (no poll delay)
-    check('T201b: bootEntrySlot matches sim.bootEntrySlot immediately after _autoLoadDefaultProgram()',
+    check('T201b: simulator matches Lightning Bolt immediately after _autoLoadDefaultProgram()',
         sandbox.bootEntrySlot === sim.bootEntrySlot);
-    check('T201c: bootEntrySlot updated to 7 (the sim-restored slot)',
-        sandbox.bootEntrySlot === 7);
-    check('T201d: localStorage written with new slot string "7"',
-        lsStore['bootEntrySlot'] === '7');
-    check('T201e: sim.bootEntrySlot is 7 — unchanged by the sync (read-only toward sim)',
-        sim.bootEntrySlot === 7);
+    check('T201c: CapabilityTest remains selected',
+        sandbox.bootEntrySlot === 3);
+    check('T201d: SelfTest is not persisted over the selection',
+        lsStore['bootEntrySlot'] !== '6');
+    check('T201e: sim.bootEntrySlot is restored to CapabilityTest',
+        sim.bootEntrySlot === 3);
 }
 
 // ── T201f: cached editor source must not overwrite the boot LUMP ──────────────
@@ -326,28 +325,28 @@ console.log('\n--- T204: sim.loadProgram() preserves sim.bootEntrySlot ---');
 
 // ── T205: Sequential resets — bootEntrySlot tracks across multiple cycles ────
 //
-// Three consecutive _autoLoadDefaultProgram cycles model a real IDE session
-// with multiple resets.  Each cycle changes sim.bootEntrySlot and expects
-// bootEntrySlot to follow immediately.  Catches order-dependent state bugs.
-console.log('\n--- T205: sequential resets — bootEntrySlot tracks across three cycles ---');
+// Three consecutive resets must not let different encoded/factory slots replace
+// the persisted Lightning Bolt selection.
+console.log('\n--- T205: sequential resets preserve the Lightning Bolt selection ---');
 {
     const sim = makeTestSim();
     const { ctx, sandbox, lsStore } = makeSandbox(sim, 3);
     sandbox._defaultProgramLoaded = true;
     sandbox.lastAssembledWords    = [];
 
-    // Cycle 1: boot image restores slot 5
+    // Cycle 1: boot image temporarily reports slot 5
     sim.bootEntrySlot = 5;
     vm.runInContext('_autoLoadDefaultProgram()', ctx);
-    check('T205a: cycle 1 — bootEntrySlot === 5', sandbox.bootEntrySlot === 5);
+    check('T205a: cycle 1 — bootEntrySlot remains 3', sandbox.bootEntrySlot === 3);
     check('T205b: cycle 1 — matches sim',          sandbox.bootEntrySlot === sim.bootEntrySlot);
 
-    // Cycle 2: next reset restores slot 11
+    // Cycle 2: next reset temporarily reports slot 11
     sim.bootEntrySlot = 11;
     vm.runInContext('_autoLoadDefaultProgram()', ctx);
-    check('T205c: cycle 2 — bootEntrySlot === 11', sandbox.bootEntrySlot === 11);
+    check('T205c: cycle 2 — bootEntrySlot remains 3', sandbox.bootEntrySlot === 3);
     check('T205d: cycle 2 — matches sim',           sandbox.bootEntrySlot === sim.bootEntrySlot);
-    check('T205e: cycle 2 — localStorage carries "11"', lsStore['bootEntrySlot'] === '11');
+    check('T205e: cycle 2 — SelfTest/temporary slots are not persisted',
+        lsStore['bootEntrySlot'] !== '11' && lsStore['bootEntrySlot'] !== '6');
 
     // Cycle 3: reset back to slot 3
     sim.bootEntrySlot = 3;
