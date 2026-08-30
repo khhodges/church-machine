@@ -1,5 +1,8 @@
 # Developer Invitation — Email & Social Copy
 
+> **PROMOTIONAL DRAFT / NON-AUTHORITATIVE.** Absolute security claims below are
+> marketing concepts, not claims about proven or shipped guarantees.
+
 **The Church Machine Abstraction Challenge**
 
 ---

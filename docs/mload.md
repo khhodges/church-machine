@@ -1,5 +1,10 @@
 # mLoad — The Single Trusted Gate
 
+> **HISTORICAL DESIGN / NON-AUTHORITATIVE.** This document preserves an older
+> CRC-16 and mLoad-only security model. Current Wukong namespace entries use
+> full 32-bit public, unkeyed `integrity32`, and complete no-bypass or
+> anti-forgery claims require formal or executable evidence.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 

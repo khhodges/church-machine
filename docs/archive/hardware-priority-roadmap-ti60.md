@@ -1,5 +1,8 @@
 # Hardware Priority Roadmap
 
+> **ARCHIVED / NON-AUTHORITATIVE.** Historical Ti60-era roadmap. Completion
+> markers describe old plans, not current Wukong shipping status.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 

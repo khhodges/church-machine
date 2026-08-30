@@ -1,5 +1,8 @@
 # PP250 Fast Boot — Design & Implementation Plan
 
+> **ARCHIVED / NON-AUTHORITATIVE.** Historical Ti60-era plan. “Done” below means
+> status recorded at that time, not current Wukong implementation evidence.
+
 ## Implementation Status (2026-06-07)
 
 | Track | File(s) | Status | Notes |

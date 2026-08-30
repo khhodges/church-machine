@@ -1,8 +1,24 @@
 # CM_MSG — Church Machine UART Messaging Protocol
 
-**Status:** V1 — Released for distribution and review  
-**Date:** 2026-06-10  
+**Status:** Mixed-status document: FW=2 current behavior + FW=3 design proposal
+**Date:** 2026-06-10
 **Scope:** Wukong A7 XC7A100T (current target); architecture applies to all CM-connected boards
+
+> **Read this first — shipped versus planned**
+>
+> - **Shipped/current (FW=2):** plaintext UART messages. No HMAC, no ChaCha20,
+>   no authenticated encryption, and no cryptographic peer authentication on the
+>   serial wire. The physically trusted UART connection is the security boundary.
+> - **Planned (FW=3):** the framed HMAC/ChaCha20/nonce/per-abstraction-key design
+>   below. Sections labeled **FW=3 design** are requirements and goals, not
+>   descriptions of code shipped in this repository.
+> - The shipped bridge defaults to an HTTP localhost IDE and currently disables
+>   certificate verification for HTTPS URLs. `--insecure` also forces
+>   verification off; it does not change or secure UART framing.
+>
+> No section in this document should be read as a formal security proof. A
+> “must,” “never,” or “guarantee” in an FW=3 section is a design requirement
+> until linked to executable or formal evidence.
 
 ---
 
@@ -10,18 +26,17 @@
 
 | Firmware | Wire protocol | Bridge mode | Encrypted frames |
 |---|---|---|---|
-| **FW=2.0** (stable, June 2026 — June 2027+) | Plaintext ASCII JSON over UART | `--insecure` **(correct stable mode)** | **No** — key material derived in private RISC-V RAM but never used on the wire |
-| **FW=3.0** (planned) | Framed binary: ChaCha20 payload + HMAC-8 tag + nonce | *(default, no flag needed)* | Yes — full per-abstraction encryption |
+| **FW=2.0** (current) | Plaintext ASCII JSON/control data over UART | HTTP localhost default; current HTTPS certificate verification is disabled | **No** — no HMAC or ciphertext on the wire |
+| **FW=3.0** (planned) | Framed binary: ChaCha20 payload + HMAC-8 tag + nonce | *(design target)* | Planned per-abstraction encryption |
 
-> **FW=2.0 is frozen for ≥12 months.** The plaintext UART protocol is not a temporary
-> limitation — it is the stable, documented interface for this version. The encrypted
+> The plaintext UART protocol is the documented current interface. The encrypted
 > frame layer described in Sections 1–4 and Section 8 is the **target architecture
 > for FW=3.0+**. Do not expect HMAC tags or ciphertext from any FW=2.0 board.
 > The physical UART cable is the security boundary for FW=2.0 deployments.
 
 ---
 
-## Guiding Principle
+## Guiding Principle (FW=3 design goal)
 
 **Identity belongs to the abstraction — not the hardware.**
 
@@ -51,29 +66,31 @@ whether it is running on board `c0ffee01` or board `deadbeef`. A `Browse.Client`
 abstraction carries its own domain C-list, its own keys, and its own permission set
 — independently of the board it inhabits.
 
-**No message is trusted unless it is authorized, authenticated, and encrypted
-by the Outform Golden Token pair of its source and destination abstractions.**
+**FW=3 design requirement:** no message should be trusted unless it is authorized,
+authenticated, and encrypted by the Outform Golden Token pair of its source and
+destination abstractions.
 
 - **Authorization** — The source abstraction must hold an OGT that names the
   destination service. No OGT = no capability, even over UART.
-- **Authentication** — Every frame carries an HMAC-8 tag keyed by the source
+- **Authentication (planned)** — Every FW=3 frame carries an HMAC-8 tag keyed by the source
   abstraction's `K_mac`. Forgeries are rejected before any handler is invoked.
-- **Encryption** — Every payload is ChaCha20-encrypted with the source
+- **Encryption (planned)** — Every FW=3 payload is ChaCha20-encrypted with the source
   abstraction's `K_enc`. The wire reveals nothing about content or identity.
-- **Encryption service in every namespace entry** — Each NS slot carries its own
+- **Encryption service in every namespace entry (planned)** — Each NS slot carries its own
   `K_enc`, `K_mac`, and nonce counter. There is no shared board-level key.
   Revoking one abstraction's keys leaves all others intact.
 
 This is not an add-on. It is the protocol's reason for existing.
 
 > **FW=2.0 note:** The above describes the full target security model (FW=3.0+).
-> FW=2.0 implements key derivation (K_enc/K_mac stored in private RISC-V RAM)
-> but does not apply encryption or HMAC on the wire. All FW=2.0 frames are
-> plaintext ASCII. Use `callhome_bridge.py --insecure` with FW=2.0 boards.
+> FW=2.0 does not apply encryption or HMAC on the wire. All FW=2.0 frames are
+> plaintext. Use a physically trusted UART connection. The current bridge accepts
+> HTTP and disables HTTPS certificate verification; `--insecure` also forces
+> verification off.
 
 ---
 
-## 1. Trust Architecture
+## 1. Trust Architecture (FW=3 design)
 
 ### 1.1 The chain of trust
 
@@ -98,7 +115,7 @@ This is not an add-on. It is the protocol's reason for existing.
 │  All subsequent frames: encrypted by the SOURCE ABSTRACTION      │
 └──────────────────────────┬───────────────────────────────────────┘
                            │  UART  [0xCE][0xAA][type][seq][flags][len]
-                           │         [nonce:4][ChaCha20(payload)][HMAC-8]
+                           │         [nonce:8][ChaCha20(payload)][HMAC-8]
                            ▼         ↑ keyed by SOURCE ABSTRACTION's token
 ┌──────────────────────────────────────────────────────────────────┐
 │                  Bridge (callhome_bridge.py)                      │
@@ -156,12 +173,12 @@ GT validation and decryption are intentionally in the bridge, not the firmware. 
 | **Suspended** | Admin-suspended board | `0x01 CALLHOME` only (re-registration) |
 | **Revoked slot** | Specific NS slot's keys removed | All other slots still valid and independent |
 
-### 1.4 Security properties guaranteed by this protocol
+### 1.4 Security properties targeted by the FW=3 design
 
 1. **Abstraction identity** — Every capability is identified by its NS slot token (`token_32`), not the board UID. The board is the execution substrate; the abstraction is the identity. A `Fault.Reporter` on any board has the same semantic identity and permission model.
 2. **Encryption service per namespace entry** — Every NS slot has its own `K_enc` and `K_mac`. There is no shared board-level key. Slot 2 cannot read or forge frames from Slot 15. Revoking one slot leaves all others intact.
-3. **Confidentiality** — Every payload is ChaCha20-encrypted using the source abstraction's 128-bit `K_enc`. An observer on the UART wire sees only ciphertext.
-4. **Integrity + Authentication** — Every frame carries an 8-byte HMAC-SHA256 tag keyed with the source abstraction's `K_mac`. A tampered frame is silently dropped before decryption.
+3. **Confidentiality goal** — Every FW=3 payload would be ChaCha20-encrypted using the source abstraction's 128-bit `K_enc`.
+4. **Integrity + authentication goal** — Every FW=3 frame would carry an 8-byte HMAC-SHA256 tag keyed with the source abstraction's `K_mac`.
 5. **Replay protection** — Every frame includes a 32-bit monotonic nonce counter per NS slot. The bridge rejects any frame whose nonce ≤ `last_seen_nonce[slot]`.
 6. **Least privilege** — Each capability is a separate NS slot with its own key pair and its own OGT. A board doing callhome cannot browse unless the `Browse.Client` abstraction was granted and its key bundle was deployed.
 7. **Capability confinement** — `CM.Browse.Client` confines browsing to a parent-approved domain C-list carried inside the abstraction itself. The token IS the permission list.
@@ -170,7 +187,7 @@ GT validation and decryption are intentionally in the bridge, not the firmware. 
 
 ---
 
-## 2. Abstraction Identity & Namespace Encryption Services
+## 2. Abstraction Identity & Namespace Encryption Services (FW=3 design)
 
 Every UART-capable capability is a **namespace entry** — a functional object in the
 NS table with its own token, its own permission set, and its own encryption service.
@@ -606,7 +623,7 @@ preventing an attacker who controls one side from forcing nonce reuse.
 
 | Tier | Frame protection | When | Notes |
 |------|-----------------|------|-------|
-| 0 — Plain | CRC-16 only | Phase 1 | Today's format; no encryption |
+| 0 — Plain | CRC-16 only | FW=3 bootstrap proposal | No encryption |
 | 1 — Authenticated | HMAC-8, no encryption | Phase 2 | Add `flags` byte; HMAC replaces CRC |
 | 2 — Encrypted | ChaCha20 + HMAC-8 | Phase 3 | Full OGT-Encryption |
 
@@ -749,12 +766,13 @@ require explicit administrator action to migrate.
 
 ---
 
-## 3. Wire Format
+## 3. Proposed FW=3 Wire Format
 
-### 3.1 Tier 0 — Plain (Phase 1, no encryption)
+### 3.1 Tier 0 — Plain (FW=3 bootstrap proposal, no encryption)
 
-Used only for the initial `CALLHOME (0x01)` and `PING (0x06)` before the key
-bundle has been deployed. This is the bootstrap frame format.
+This is not the shipped FW=2 wire format. In the FW=3 proposal it is used only
+for the initial `CALLHOME (0x01)` and `PING (0x06)` before the key bundle has
+been deployed.
 
 ```
 [0xCE][0xAA][type:1][seq:2][len:2][payload: len bytes][crc16:2]
@@ -769,7 +787,7 @@ bundle has been deployed. This is the bootstrap frame format.
 | `payload` | len | Plaintext type-specific data |
 | `crc16` | 2 | CRC-16/CCITT over `type+seq+len+payload` |
 
-### 3.2 Tier 1 — Authenticated (Phase 2, HMAC only)
+### 3.2 Tier 1 — Authenticated (FW=3 design, HMAC only)
 
 Tier 0 with CRC replaced by an 8-byte HMAC-SHA256 tag. Payload still plaintext.
 Used when the key bundle has been deployed but the firmware hasn't enabled ChaCha20.
@@ -783,21 +801,21 @@ Used when the key bundle has been deployed but the firmware hasn't enabled ChaCh
 | `flags` | 1 | Bit 0=AUTH, Bit 1=ENC, Bits 2–7 reserved (0) |
 | `hmac8` | 8 | First 8 bytes of HMAC-SHA256(K_mac, type\|\|seq\|\|flags\|\|len\|\|payload) |
 
-### 3.3 Tier 2 — OGT-Encrypted (Phase 3, full protection)
+### 3.3 Tier 2 — OGT-Encrypted (FW=3 design, full protection)
 
-The canonical secure frame. Every payload is encrypted with ChaCha20 keyed by
+The proposed secure frame. Every FW=3 payload would be encrypted with ChaCha20 keyed by
 the source GT's `K_enc`. The HMAC covers the ciphertext, not the plaintext
 (encrypt-then-MAC). The nonce is the per-GT-pair monotonic counter, preventing
 replay.
 
 ```
-[0xCE][0xAA][type:1][seq:2][flags:1][len:2][nonce:4][ciphertext: len bytes][hmac8:8]
+[0xCE][0xAA][type:1][seq:2][flags:1][len:2][nonce:8][ciphertext: len bytes][hmac8:8]
 ```
 
 | Field | Bytes | Description |
 |-------|-------|-------------|
 | `flags` | 1 | `0x03` = AUTH\|ENC |
-| `nonce` | 4 | Per-GT-pair counter (little-endian, monotonically increasing) |
+| `nonce` | 8 | Per-GT-pair 64-bit counter (little-endian, monotonically increasing) |
 | `ciphertext` | len | ChaCha20(K_enc, nonce\|\|seq, plaintext_payload) |
 | `hmac8` | 8 | HMAC-SHA256(K_mac, type\|\|seq\|\|flags\|\|len\|\|nonce\|\|ciphertext)[0:8] |
 
@@ -812,9 +830,9 @@ replay.
 **The HMAC check always comes before decryption.** This is the standard
 encrypt-then-MAC ordering: it prevents padding oracle and length-extension attacks.
 
-Minimum Tier 2 frame size: 9 + 4 + 8 = **21 bytes** (zero-length payload).
+Minimum Tier 2 frame size: 9 + 8 + 8 = **25 bytes** (zero-length payload).
 
-### 3.4 Tier negotiation
+### 3.4 Tier negotiation (FW=3 design)
 
 The `CALLHOME (0x01)` payload includes `"enc": N` where N = 0, 1, or 2:
 - N=0 → Tier 0 only (old firmware, no keys)
@@ -824,7 +842,7 @@ The `CALLHOME (0x01)` payload includes `"enc": N` where N = 0, 1, or 2:
 The bridge responds with `ACK` carrying the agreed tier. Both sides use that tier
 for all subsequent frames in the session.
 
-### 3.5 Firmware API (frozen after first flash)
+### 3.5 Proposed FW=3 firmware API
 
 The entire protocol surface exposed to firmware — encryption included — is four
 functions. Encryption is transparent to the caller:
@@ -854,11 +872,11 @@ to application code in the Church Machine ISA.
 
 ---
 
-## 4. Bridge — Trusted Router
+## 4. Proposed FW=3 Bridge — Trusted Router
 
-`callhome_bridge.py` is the **only** trust enforcement point. No message reaches the
-IDE server without passing through its full verification pipeline:
-**magic → HMAC → replay → decrypt → GT check → handler**.
+In the FW=3 design, `callhome_bridge.py` would be a trust enforcement point.
+The shipped FW=2 bridge does not implement this cryptographic pipeline. The
+planned pipeline is **magic → HMAC → replay → decrypt → GT check → handler**.
 
 The bridge builds a `msg_type → token_32` map from the ns_manifest received in
 CALLHOME. Slot numbers are never used — the token is the identity.
@@ -974,7 +992,7 @@ def on_raw_frame(msg_type, seq, flags, nonce, raw_payload):
 
     # --- Step 3: Decrypt ---
     # ATTACK INDICATOR: silent drop. A decrypt failure with a valid HMAC is
-    # impossible for a legitimate board — it signals key tampering or corruption.
+    # unexpected for a legitimate board — treat as key tampering or corruption.
     if flags & FLAG_ENC:
         payload = chacha20_decrypt(board_uid, gt_name, nonce, raw_payload)
         if payload is None:
@@ -1034,7 +1052,7 @@ revealing anything to a potential attacker on the wire.
 
 ---
 
-## 5. Message Type Registry
+## 5. Proposed FW=3 Message Type Registry
 
 ### 5.1 System — FPGA → IDE
 
@@ -1095,7 +1113,7 @@ revealing anything to a potential attacker on the wire.
 
 ---
 
-## 6. Media Format Codes
+## 6. Proposed FW=3 Media Format Codes
 
 ### 6.1 Documents (`media_type = 0x01`)
 
@@ -1140,7 +1158,10 @@ revealing anything to a potential attacker on the wire.
 
 ---
 
-## 7. Bandwidth Budget
+## 7. Estimated FW=3 Bandwidth Budget
+
+> These are design estimates at proposed baud rates, not measurements of the
+> shipped 57,600-baud Wukong bridge.
 
 At 115200 baud the usable payload throughput is approximately **10 KB/s**.
 
@@ -1162,9 +1183,9 @@ firmware changes.
 
 ---
 
-## 8. Implementation Priorities
+## 8. FW=3 Implementation Plan
 
-### Phase 1 — Foundation (one firmware flash, then frozen)
+### Phase 1 — Proposed foundation
 
 | Item | Files |
 |------|-------|
@@ -1216,7 +1237,7 @@ firmware changes.
 
 ---
 
-## 9. File Inventory
+## 9. Proposed FW=3 File Inventory
 
 | File | Role |
 |------|------|
@@ -1225,7 +1246,7 @@ firmware changes.
 | `server/app.py` | Server — GT records, fault/trace/media endpoints |
 | `server/models.py` | DB — `gt_records`, `fault_events`, `trace_log`, `media_cache` |
 | `simulator/app-misc.js` | IDE — fault popups, trace view, browse UI |
-| `docs/cm-msg-protocol.md` | This document — authoritative spec |
+| `docs/cm-msg-protocol.md` | Mixed-status current-behavior note and FW=3 design proposal |
 
 ---
 
@@ -1235,34 +1256,35 @@ Protocol version is carried in the `CALLHOME` payload as `"proto":N`.
 
 | proto | Firmware | Wire format | Key changes |
 |-------|----------|-------------|-------------|
-| **0** | **FW=2.0 (stable, ≥12 months)** | **Plaintext ASCII JSON** | **No framing, no HMAC, no encryption. `ns_manifest` present. Bridge: `--insecure`. Physical UART cable = security boundary.** |
+| **0** | **FW=2.0 (current)** | **Plaintext ASCII JSON/control data** | **No HMAC and no encryption. Physical UART cable = security boundary. Bridge-to-IDE HTTPS certificate verification is currently disabled.** |
 | 1 | FW=1.x | Tier 0 (CRC only) | `gt_manifest` = list of GT global name strings |
 | 2 | FW=3.0 (planned) | Tier 1/2 (HMAC + ChaCha20) | **`gt_manifest` replaced by `ns_manifest`** — list of `{slot, label, token}` objects; per-slot encryption services; key derivation upgraded from `CM_ENC/MAC_v1` → `v3` (IKM now binds `board_uid + ogt_bytes`); `last_nonce` keyed by `(board_uid, token_32)` |
 
-**FW=2.0 (proto=0):** Bridge runs with `--insecure`. All messages are plaintext.
-`ns_manifest` is present and verified locally by the bridge (sha32 recomputed, no
-wire authentication). Key material (K_enc, K_mac) is derived in firmware and held
-in private RISC-V RAM but never transmitted.
+**FW=2.0 (proto=0):** All messages are plaintext and have no wire authentication.
+The bridge defaults to HTTP localhost and disables certificate verification for
+HTTPS URLs. `--insecure` also forces verification off; it does not describe or
+alter UART protection.
 
 Boards on proto=1 send `gt_manifest` (list of strings); the bridge falls back to
 the old `CM_MSG_TYPE_GT` lookup for those sessions and does not attempt OGT-encryption.
-Boards on proto=2 send `ns_manifest` (list of objects); the bridge builds
-`msg_slot_map` via `build_msg_slot_map()` and enforces per-slot encryption.
+Under the FW=3 proposal, boards on proto=2 send `ns_manifest` (list of objects)
+and the bridge builds `msg_slot_map` via `build_msg_slot_map()` to enforce
+per-slot encryption. This is not shipped FW=2 behavior.
 
-Old bridges receiving `proto:2` see an unknown `ns_manifest` key — they log and
+The intended transition behavior is that old bridges receiving `proto:2` see an unknown `ns_manifest` key — they log and
 fall back to `proto:1` behaviour (Tier 0, name-based GT lookup). This preserves
 interoperability during the transition window.
 
-Old FPGA firmware receiving unknown IDE→FPGA types calls `cm_on_msg` which is a
-no-op by default. Firmware never changes for protocol updates.
+The FW=3 compatibility goal is for old FPGA firmware receiving unknown IDE→FPGA
+types to call a no-op `cm_on_msg` default. This is a design constraint, not a
+guarantee that firmware never changes.
 
 ---
 
-*The security model in Sections 1–4 is not optional infrastructure — it is the
-point of this protocol. Every implementation decision must preserve the nine
-security properties in Section 1.4.*
+*Sections 1–4 specify FW=3 security goals. They do not describe shipped FW=2
+wire protection and do not constitute a formal proof.*
 
-*Three invariants that must never be violated:*
+*Three proposed FW=3 implementation invariants:*
 
 *1. **Pipeline order** (Section 4): HMAC → replay → decrypt → GT → dispatch.
    Swapping any two steps opens an attack vector.*
@@ -1279,7 +1301,11 @@ without keys is incomplete and will block the board with GT_NO_KEY.*
 
 ---
 
-## Appendix A — Security Overhead and Dynamic Creation
+## Appendix A — Estimated FW=3 Security Overhead and Dynamic Creation
+
+> These figures are design estimates, not measurements from shipped Wukong
+> firmware. Reclassify them as measured only when a reproducible benchmark and
+> exact build are linked.
 
 ### A.1 What K_enc and K_mac are
 
@@ -1287,7 +1313,7 @@ Every abstraction has two independent 128-bit keys derived from a shared root:
 
 ```
 IKM    = SHA256( board_uid ‖ ogt_bytes )
-K_enc  = HKDF-SHA256( IKM, salt="CM_ENC_v3", info=ogt_bytes )   — AES-128-CTR
+K_enc  = HKDF-SHA256( IKM, salt="CM_ENC_v3", info=ogt_bytes )   — ChaCha20
 K_mac  = HKDF-SHA256( IKM, salt="CM_MAC_v3", info=ogt_bytes )   — HMAC-SHA256
 ```
 
@@ -1333,7 +1359,7 @@ time, not per message — completely invisible in practice.
 |---|---|---|
 | msg_type → OGT lookup | dictionary lookup | nanoseconds |
 | Nonce check | compare + increment | nanoseconds |
-| AES-128-CTR decrypt | ~1 cycle/byte | ~1 μs (64-byte payload) |
+| ChaCha20 decrypt | design estimate | ~1 μs (64-byte payload; unmeasured) |
 | HMAC-SHA256 tag verify | ~1 cycle/byte | ~2 μs |
 | **Per message total** | | **~3–5 μs IDE-side** |
 
@@ -1455,7 +1481,7 @@ The security overhead of CM_MSG is almost entirely front-loaded:
 - **Key derivation:** paid once per abstraction at session establishment. Negligible
   in absolute terms (microseconds IDE-side, low milliseconds firmware-side).
 - **Per-message crypto:** invisible — the wire is 100–1000× slower than the
-  AES+HMAC operations on every frame.
+  ChaCha20+HMAC operations on every frame.
 - **Fail-safe drops:** constant-time by design. No cheaper path for attackers.
 - **Dynamic creation:** the only meaningful runtime cost — a one-time ~15 ms spike
   per abstraction at 115,200 baud, dropping to ~500 μs at 3 Mbaud.
@@ -1464,7 +1490,7 @@ The security overhead of CM_MSG is almost entirely front-loaded:
 
 ---
 
-## Appendix B — Design Critique Q&A
+## Appendix B — FW=3 Design Critique Q&A
 
 This appendix addresses the questions a hostile reviewer, security auditor, or
 protocol implementor is most likely to raise. Each question is answered honestly:
@@ -1595,19 +1621,17 @@ secrecy must be added and this statement revisited.
 
 ---
 
-### B.7 "Nonce size is not defined — overflow enables replay"
+### B.7 "Nonce size must be defined to prevent replay after wrap"
 
-**The critic is right.**
+**Resolved in this FW=3 proposal; not implemented in FW=2.**
 
-The spec mentions `nonce_ctr` and `last_nonce[(board_uid, ogt)]` but never states
-the nonce width. A 32-bit nonce exhausts in approximately `2³² × 5.6 ms ≈ 277 days`
-of continuous traffic at 115,200 baud — after which it wraps and every subsequent
-message is a replay.
+An earlier draft omitted the nonce width. A 32-bit nonce could exhaust in a
+long-running deployment and then repeat values.
 
-**Required definition:** `nonce_ctr` is a **64-bit unsigned integer**. Wrap at
-2⁶⁴ is physically unreachable at any UART baud rate within any plausible hardware
-lifetime. The bridge must reject any frame where `nonce ≤ last_nonce[(board_uid,
-ogt)]` — strict greater-than only, not equality-only.
+Section 3.3 now defines `nonce_ctr` as a **64-bit unsigned integer** and places
+eight nonce bytes in the proposed frame. The proposed bridge rejects any frame
+where `nonce ≤ last_nonce[(board_uid, ogt)]`. This resolves the design-document
+ambiguity; executable FW=3 evidence is still required.
 
 ---
 
@@ -1680,14 +1704,14 @@ keys across sessions.
 
 ---
 
-### B.11 Critiques that are wrong — and why
+### B.11 Design responses (not implementation evidence)
 
 | Critique | Why it is wrong |
 |---|---|
-| "AES without authentication" | Wrong — the pipeline is MAC-first (Section 4: HMAC → replay → decrypt). Authentication is verified before any decryption occurs. |
-| "Shared keys mean one breach breaks everything" | Wrong — every abstraction has independent K_enc and K_mac. Revoking `CallHistory` touches nothing belonging to `MargaretHodges`. |
-| "8-byte HMAC tag is too short" | 64-bit MACs are standard practice (TLS uses truncated MACs). Combined with strict nonce-ctr replay rejection, the forgery attack surface is negligible. |
-| "AES-CTR produces distinguishable traffic patterns" | AES-CTR with a monotone nonce produces effectively random ciphertext. Traffic analysis can reveal frame timing and size, but not content or abstraction identity. |
+| "Encryption without authentication" | The proposal is MAC-first (Section 4: HMAC → replay → decrypt). This is a design rule, not shipped evidence. |
+| "Shared keys mean one breach breaks everything" | The proposal assigns independent K_enc and K_mac values per abstraction; implementation and key-isolation evidence remain required. |
+| "8-byte HMAC tag is too short" | The proposal uses a 64-bit truncated MAC with replay rejection. Its adequacy requires a documented threat model and review; “negligible” is not established here. |
+| "ChaCha20 hides all traffic patterns" | The proposal encrypts content, but traffic analysis can still reveal frame timing and size. |
 | "`resident` flag can be bypassed by the firmware" | True — but the firmware is in the Trusted Security Base. `resident` is an IDE deployment policy, not a hardware capability constraint. The spec is explicit about this distinction. |
 | "Per-abstraction keys are expensive to manage" | Key management cost is paid once at session establishment (~6 μs per abstraction IDE-side). There is no per-message key management overhead. See Appendix A.2. |
 
@@ -1700,7 +1724,7 @@ keys across sessions.
 | SHA32 undefined | Must fix | Section 2.1 — define as SHA-256 first 4 bytes, big-endian |
 | token_32 collision detection absent | Must fix | Section 2.1 — bridge rejects manifest on collision |
 | board_uid confidentiality not stated | Must fix | Section 2.6 — add hardware secret requirement |
-| Nonce size not specified | Must fix | Section 3/4 — 64-bit, strict greater-than check |
+| Nonce size not specified (earlier draft) | Resolved in design | Section 3.3 — 64-bit, strict greater-than check; implementation evidence pending |
 | Proto downgrade not prevented | Must fix | Section 5 — min_proto rule per board_uid |
 | Replicated nonce semantics ambiguous | Must fix | Section 2.7 — per-(board_uid, ogt) explicit |
 | Ephemeral pool lifecycle undefined | Must fix | Appendix A.5 — session revocation + session nonce |

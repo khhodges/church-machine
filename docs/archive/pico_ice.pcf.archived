@@ -1,3 +1,5 @@
+# ARCHIVED / NON-AUTHORITATIVE — historical unsupported pico-ice constraints.
+# See docs/archive/README.md and docs/HARDWARE.md.
 # Church Machine — pico-ice pin constraints
 # Board: tinyVision.ai pico-ice (iCE40UP5K + RP2040)
 # Clock: 12 MHz from RP2040

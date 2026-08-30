@@ -4,6 +4,11 @@
 **CONFIDENTIAL**
 
 > **Quick API Reference** — For a fast, scannable per-slot method table (slot number, required permission, signature, one-liner) see [`docs/api-reference.md`](api-reference.md). The document below is the authoritative narrative covering lump structure, rationale, and architectural detail.
+>
+> **Status boundary:** Wukong A7 is the current target. Tang references below are
+> legacy context, and encrypted Tunnel/Outform descriptions are design goals, not
+> shipped FW=2 behavior. Security-block language describes intended confinement,
+> not formal proof or cryptographic GT authentication.
 
 ## Canonical Form
 
@@ -470,7 +475,8 @@ Peer-to-peer capability sharing, parent-gated. Request sends a friendship propos
 
 **Methods**: Connect, Send, Receive, Close
 
-Outform GT encrypted tunnel for F-bit networking. Connect establishes a tunnel to a remote namespace. Send/Receive exchange data. Close terminates the connection.
+Planned Outform/F-bit tunnel abstraction. Encryption is not shipped in FW=2.
+Connect/Send/Receive/Close describe the intended API.
 
 ### 32 — Negotiate
 
@@ -514,7 +520,8 @@ Single-step debugger with register and memory inspection. Breakpoint sets a halt
 
 **Methods**: Build, Upload, Verify, Boot
 
-Compiles assembly to binary, uploads to Tang Nano 20K via UART, verifies the upload, and triggers boot.
+Legacy Tang Nano 20K build/upload description; the current hardware release
+target is Wukong A7.
 
 ---
 
@@ -535,7 +542,10 @@ Each approved external resource is an Outform+Far GT pointing to that resource v
 | 41 | Video | Watch, Search, Playlist, Share | Video viewing — only parent-SAVEd channel GTs are watchable |
 | 42 | Email | Compose, Read, Reply, Contacts | Email — only parent-SAVEd email address GTs can be reached |
 
-**Revocation model**: Every GT carries a 7-bit version. Parent revokes via Mint.Revoke — version increment instantly invalidates every outstanding copy. Revocation is instant, global, and unforgeable.
+**Revocation model**: Every GT carries a 9-bit sequence. The intended
+Mint.Revoke flow increments the namespace entry sequence so existing copies fail
+the next implemented sequence check. This is not cryptographic unforgeability or
+proof of instantaneous global revocation across every transport.
 
 ---
 

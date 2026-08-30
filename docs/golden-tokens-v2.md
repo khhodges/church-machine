@@ -3,6 +3,11 @@
 **Draft for review — 24 July 2026**
 **CONFIDENTIAL**
 
+> **EVIDENCE BOUNDARY:** This draft mixes normative design and implementation
+> audit notes. “Unforgeability” is not a cryptographic guarantee: shipped
+> `integrity32` is public, linear, and unkeyed. Current source and executable
+> tests outrank design claims in this document.
+
 *Supersedes the GT sections of `golden-tokens.md` v2.0, `abstract-gt.md` v1.0,
 and the GT description in `cloomc-foundation.md` §2.*
 
@@ -524,9 +529,10 @@ correctly sealed, with its own valid `gt_seq`. Every check passes.
 26 of a GT's 32 bits can be corrupted by a single fault into a token the
 hardware honours, and 16 of them are an unprotected namespace pointer. See
 `hardware-fault-detection.md` for the threat model and the R1/R2 parity and
-ECC requirements. On the current FPGA the unforgeability guarantee holds
-**against software adversaries only** — a limitation the 74-series PP250,
-with address and data parity on every word, did not have.
+ECC requirements. On the current FPGA, implemented access gates provide
+specific checks against software misuse. This is not a general unforgeability
+guarantee, and the unkeyed `integrity32` value is not authentication. Fault
+injection and uncovered paths remain outside that evidence.
 
 ### 6.4 Why there is no aggregate CRC over the c-list
 

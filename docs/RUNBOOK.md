@@ -236,7 +236,7 @@ Discoveries made during real hardware sessions that are easy to miss:
 | **LEDs are active-LOW** | The Wukong A7 LEDs (G21, G20) are active-LOW — write `0` to illuminate, `1` to extinguish. The previous platform used active-HIGH; this is the opposite polarity. |
 | **Single port for everything** | `/dev/ttyUSB0` carries the boot sentinel, per-event trace packets, and CM text output. Do not open it with `screen` or `minicom` while `wukong_bridge.py` is running. |
 | **57,600 baud — not 115,200** | The Wukong UART runs at 57,600 baud. Opening at 115,200 produces garbled output. |
-| **`--insecure` required for local IDE** | `wukong_bridge.py` uses HTTPS by default. Pass `--insecure` when pointing at an HTTP development server. |
+| **Bridge URL/TLS behavior** | The bridge defaults to `http://localhost:5000` and accepts HTTP without a flag. Current HTTPS requests disable certificate verification automatically; `--insecure` also forces verification off. |
 | **`step_mode` init must be 0 in standalone builds** | The CM halts immediately after boot when `step_mode` initialises to `1`. Standalone FPGA builds need `step_mode = 0`. |
 | **`write_bitstream` DRC trap** | Using `launch_runs -to_step write_bitstream` spawns a fresh Vivado session and drops XDC severity overrides (DRC NSTD-1/UCIO-1 errors). The provided TCL script (`hardware/wukong_xc7a100t.tcl`) handles this correctly. |
 | **gen_rtlil output must be copied to hardware/** | `python3 -m hardware.gen_rtlil --wukong` writes to `build/church_wukong_xc7a100t.v`; the TCL script expects it in `hardware/`. Run `cp build/church_wukong_xc7a100t.v hardware/` before running Vivado. |

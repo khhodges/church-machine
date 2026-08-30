@@ -1,5 +1,10 @@
 # Church Machine Boot Permission Rules
 
+> **Status:** Current architecture rule summary, backed by implementation and
+> executable tests for specific paths; not a formal proof of isolation. Wukong A7
+> is the current hardware target. The similarly named file under `docs/archive/`
+> is superseded and non-authoritative.
+
 **v1.1 — 2026-07-23**
 **CONFIDENTIAL**
 
@@ -13,7 +18,7 @@ The M (Meta/Microcode) permission is a **transient hardware elevation** — set 
 
 - **GT permission: none (zero RWXLSE)**
 - **CR elevation: M only**
-- The Namespace is pure metadata. It is not data (no R/W), not code (no X), not a capability container (no L/S/E). M alone grants the microcode access to walk and manage namespace entries. No user instruction can read, write, load, save, or enter the Namespace directly. The Namespace Manager is a secure abstraction that manages the Namespace as secure data block defined by the programmer using the IDE. 
+- The Namespace is pure metadata. It is not data (no R/W), not code (no X), not a capability container (no L/S/E). M alone grants the microcode access to walk and manage namespace entries. The implemented instruction gates do not grant ordinary user instructions direct Namespace read, write, load, save, or enter access. The Namespace Manager is the intended privileged abstraction for programmer-defined Namespace management; this is an enforcement design, not a proof that the abstraction is secure against every path.
 
 ### CR12 — Thread Identity
 
@@ -64,20 +69,24 @@ The M (Meta/Microcode) permission is a **transient hardware elevation** — set 
 
 The architecture defines two mutually exclusive permission domains: **Turing** (R, W, X) for data and code operations, and **Church** (L, S, E) for capability operations through C-Lists and abstraction entry. M is a transient CR15 and CR12 microcode elevation, never stored in the GT. B (Bind) is a permission bit set in the GT that can be bound B=0 for delegated GT used in a CALL/RETURN and F (Far/Foreign) is a trapped NS slot used to allow the IDE to transparently perform Lazy Load or remote invocations not held as a GT permission bits.
 
-### CRC-16/CCITT Integrity Specification
+### Current Namespace-Entry Integrity Specification
 
-The integrity seal is CRC-16/CCITT (polynomial 0x1021, init 0xFFFF) computed over exactly **89 bits** of input however the simulator's computeSeal() covers only location+limit17 (56 bits) as a known approved simplification:
+Each current namespace entry is four 32-bit words:
 
 ```
-Input bits (MSB-first):
-  gt_word0[26:0]  — 27 bits (not including the 5 permissions, B,T+3(RWX or LSE)
-  NS Word 0       — 32 bits (base address)
-  NS Word 1       — 32 bits (spare[31:28] | gt_seq[27:21] | limit_offset[20:0])
-  ─────────────────────────
-  Total: 89 bits
+W0  location
+W1  limit_offset[20:0] | gt_seq[29:21] | g_bit[30] | f_flag[31]
+W2  integrity32(W0, W1 with bits 30 and 31 cleared)
+W3  non-authoritative cache token
 ```
 
-The permission bits `4 perms[30:27]` and the bind flag `B[31]` are **excluded** from the CRC input. This allows TPERM to attenuate permissions without requiring a CRC recomputation. The result is stored in NS Entry Word 2 bits [15:0] and recomputed by ChurchNSGate on every access. A mismatch faults with `SEAL` error.
+`integrity32` is `ROL32(W0, 7) XOR ROL32(masked_W1, 13) XOR 0xDEADBEEF`.
+The simulator and Wukong RTL recompute the 32-bit W2 value at namespace access
+gates and fault on mismatch. The GC and far flags are deliberately masked so
+they can change without resealing. This linear, unkeyed value detects accidental
+corruption and stale metadata; it is not a MAC and does not prevent an actor who
+can alter W0/W1 from recomputing a matching W2. The canonical layout and function
+are in `hardware/layouts.py` and `hardware/integrity32.py`.
 
 ## Boot Sequence Permission Flow
 
@@ -90,7 +99,9 @@ The permission bits `4 perms[30:27]` and the bind flag `B[31]` are **excluded** 
 
 When abstractions creates any new memory object a pet name (e.g., Christine, Matthew, Daniel), function is `Namespace.Mint(name, size, permissions)`:
 
-1. Mint computes the MAC, initializes version to 0, and assigns a chosen, free slot offset and returns the CT in CR0.
+1. Mint initializes the sequence, assigns a chosen free slot, writes the
+   namespace entry, and computes its unkeyed `integrity32` value. This operation
+   does not create a cryptographic MAC.
 2. If Mint is not listed in CR6 the abstraction cannot create new objects.
 
 ## Implications for LOAD Instruction
@@ -99,7 +110,9 @@ When user code executes `LOAD dest src idx`:
 1. The instruction handler checks that src CR is a c-list with L permissions.
 2. The targeted GT is loaded into the dest CR via mLoad and validated.
 
-This is the single trusted path: mLoad is the only gate, the TSB.
+This is the intended trusted path for LOAD. Current evidence is the corresponding
+simulator/RTL implementation and their executable tests; this statement does not
+establish that no bypass exists elsewhere in the system.
 
 ---
 *Confidential — Kenneth Hamer-Hodges — July 2026*

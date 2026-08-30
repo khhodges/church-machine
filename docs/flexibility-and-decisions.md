@@ -1,5 +1,9 @@
 # Flexibility and Decisions
 
+> **DESIGN RATIONALE / NOT SECURITY EVIDENCE.** Statements about inherited
+> guarantees or impossible failures are architectural goals, not formal proof of
+> the shipped system.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 

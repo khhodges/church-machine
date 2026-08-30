@@ -3,12 +3,20 @@
 **v1.2 — 2026-07-23**
 **CONFIDENTIAL**
 
+> **DESIGN PRINCIPLES / NOT SECURITY EVIDENCE.** This document records the
+> intended architecture and historical rationale. Statements such as
+> “unforgeable,” “guarantees,” “cannot,” and “impossible” below are design goals,
+> not formal proofs or descriptions of cryptographic authentication. The shipped
+> namespace check is the public, unkeyed `integrity32` function; use
+> `hardware/layouts.py`, `hardware/integrity32.py`, and executable tests for
+> current implementation evidence.
+
 This document records the design session held in May 2026 between the original PP250 designer and the Church Machine team, updated by KJHH on June 23rd 2026. It explains *why* important decisions were made, not just what the decision might be — so that future followers of this Church Machine movemext understand the constraints to respect and theprinciples to preserve. It starts with the The Six Laws of CLOOMC a one-page summation of the foundational principles of capability-based computer architecture.
 
-1. The Law of Capability where authority flows through unforgeable Golden Tokens
+1. The Law of Capability where authority is intended to flow through validated Golden Tokens
 2. The Law of Namespace Privacy whre every binding lives inside a Golden Token
 3. The Law of Delegation were rights are given, and cnnot be seized
-4. The Law of Confinement that guarantees computation cannot exceed transparent tokens
+4. The Law of Confinement whose goal is to constrain computation to transparent tokens
 5. The Law of Revocation to limit and withdraw any authority previously granted
 6. The Law of Integrity using seals to verify granted origin without disclosure 
 
@@ -27,7 +35,10 @@ The Church Machine is the PP250's direct and architectural complete successor. T
 Three things about flawless computation inherited from the PP250:
 
 1. **The capability model.** Every memory access, indeed every machine instruction is mediated
-by one or mode hardware-validated token. There is no ambient authority; there is no privileged mode that bypasses the check. If you do not hold a valid token, you cannot touch the memory. These laws apply to Boot at the instant power is applied
+by one or more hardware-validated tokens at the implemented access gates. The
+architecture aims to avoid ambient authority and unchecked privileged paths.
+That goal applies from boot onward but is not, by itself, proof that no bypass
+exists.
 
 3. **Hardware-enforced capability keys**, promoted to the digital gold of international cyberspace. The NS table is the direct descendant of the PP250's segment table. Each entry describes a region of memory — its location, its size, and its current version. The hardware recomputes the integrity check on every access and rejects any entry that has been tampered with.
 
@@ -154,8 +165,8 @@ is exactly what Mint wrote and nothing else.
 
 ### The Error Space After Security
 
-Once security is guaranteed — that is, once the capability model is hardware-
-enforced and the GT chain is the sole path to any resource — the error space
+Under the design goal that capability enforcement covers every resource path,
+the remaining error space
 for a running system collapses to exactly two categories:
 
 1. **Specification error** — the abstraction was told to do something the
@@ -175,9 +186,9 @@ contract — the GT defines what the holder can ask for; the hardware enforces
 it; the lump defines what the abstraction does when asked. As long as the
 new lump honours the same contract (same entry points, same permission
 requirements), any holder of the E-GT will see the fix transparently on
-the next CALL. **Regression is impossible by construction**: the new lump
-cannot reach anything the old lump could not reach, because both are
-confined by the same GT chain.
+the next CALL. The intended confinement model limits the replacement to the same
+GT chain; whether a regression can escape that boundary depends on complete
+enforcement and requires executable or formal evidence.
 
 ### The Capability System as Runtime IDE Extension
 

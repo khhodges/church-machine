@@ -1,5 +1,9 @@
 # Prologue — From Lambda Calculus to the Church Machine
 
+> **HISTORICAL/DESIGN NARRATIVE.** Absolute capability-security statements below
+> describe historical systems or architectural intent, not cryptographic or
+> formally proved properties of the shipped Wukong implementation.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 

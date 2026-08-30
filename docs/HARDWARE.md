@@ -1,6 +1,25 @@
 # HARDWARE.md — Church Machine Hardware Reference
 
-Single source of truth for every hardware-setup fact about the QMTECH Wukong A7 devkit. When one value changes, update it here — all other docs point here.
+Maintained setup reference for the current QMTECH Wukong A7 development target.
+It describes repository source and tested workflows; it is not evidence that
+every generated bitstream has been physically validated. Release provenance and
+physical-board results must name the exact build or test record.
+
+## Target Status
+
+| Target | Repository status |
+|:--|:--|
+| **QMTECH Wukong A7 / XC7A100T** | Current development and release target |
+| **Tang Nano 20K** | Legacy/experimental IoT profile; not the current release path |
+| **Ti60 F225** | Retired historical target; documents are under `docs/archive/` |
+| **pico-ice and other legacy boards** | Unsupported historical experiments |
+
+The Wukong UART bridge shipped here is plaintext. It defaults to
+`http://localhost:5000`. Its current URL handling accepts HTTP without a flag and
+disables certificate verification for HTTPS; `--insecure` also forces
+certificate verification off. The flag does not encrypt or authenticate the
+board's serial traffic. See [`cm-msg-protocol.md`](cm-msg-protocol.md) for the
+explicit FW=2 versus planned FW=3 boundary.
 
 For the end-to-end startup sequence and bridge connection procedure, see **[docs/StartupCM.md](StartupCM.md)**.
 
@@ -18,7 +37,7 @@ For the end-to-end startup sequence and bridge connection procedure, see **[docs
 | **User LEDs** | **2** × active-LOW (G21, G20) |
 | **BRAM** | 4.86 Mb (135 × 36 Kb blocks) |
 | **Logic** | ~100 K logic cells |
-| **Synthesis toolchain** | Vivado (Xilinx; not compatible with yosys/nextpnr for production builds) |
+| **Synthesis toolchain** | Vivado (Xilinx; maintained Wukong build path) |
 
 ---
 
@@ -81,7 +100,16 @@ that E-GT in the boot image/build configuration, rebuild, and reflash.
 
 ## 5. Bridge
 
-The bridge (`hardware/wukong_bridge.py`) connects over USB-Serial and provides trace observation and step/run/halt control for a running CM. It does **not** upload boot images or DMEM — all DMEM initialisation is baked into the bitstream at synthesis time.
+The bridge (`hardware/wukong_bridge.py`) connects over USB-Serial and provides
+trace observation, step/run/halt control, and framed boot-image upload supported
+by the current Wukong RTL. The factory DMEM image is baked into the bitstream;
+an uploaded board-native image can replace runtime DMEM contents through the
+documented `u` command path.
+
+**Security status:** this shipped Wukong transport is plaintext and unauthenticated
+on the UART wire (FW=2 class behavior). Keep the serial connection physically
+trusted. FW=3 authenticated encryption is a proposal, not a feature of this
+bridge.
 
 ### Basic invocation
 
@@ -101,10 +129,12 @@ BOOT: board ready — N_INIT=<N> (0xXX) matches source  ✓  TU_VERSION=0x02
 
 If the board sent the boot sentinel before the bridge started, power-cycle the board.
 
-> **`--insecure` flag:** When pointing at a local HTTP development server, pass `--insecure`:
+> **Transport warning:** HTTP works without `--insecure`. The current bridge also
+> disables HTTPS certificate verification automatically. The flag explicitly
+> forces certificate verification off but does not make UART or HTTP secure:
 > ```bash
 > python3 hardware/wukong_bridge.py --port=/dev/ttyUSB0 \
->   --ide=http://localhost:5000 --insecure
+>   --ide=http://localhost:5000
 > ```
 
 For ChromeOS-specific setup (Crostini port forwarding), see `docs/bridge-setup-chromeos.md`.
@@ -144,7 +174,7 @@ The **boot sentinel** is a separate sequence emitted once at power-on, before tr
 |:-----|:-------|
 | **LEDs are active-LOW** | Writing `1` to an LED register turns it OFF. Write `0` to illuminate. |
 | **Single `/dev/ttyUSB0` for everything** | Boot sentinel, trace packets, and CM text output all share one serial port. Do not open it with `screen` or `minicom` while `wukong_bridge.py` is running. |
-| **`--insecure` required for local IDE** | `wukong_bridge.py` uses HTTPS by default. Pass `--insecure` when pointing at an HTTP local server. |
+| **Bridge transport is not certificate-verified** | The default IDE URL is HTTP localhost. HTTPS URLs are currently requested with certificate verification disabled; `--insecure` also disables verification. UART remains plaintext either way. |
 | **`step_mode` must be `0` in standalone builds** | The CM halts immediately after boot when `step_mode` initialises to `1`. Standalone (no-IDE) FPGA builds must use `step_mode = 0`. |
 | **Vivado `write_bitstream` DRC NSTD-1/UCIO-1** | Do not use `launch_runs -to_step write_bitstream` (it spawns a fresh session and drops XDC severity overrides). The provided TCL script uses `open_run` + `write_bitstream` correctly. |
 | **`BUFG` must not be instantiated explicitly** | Vivado's `opt_design` silently drops an explicit `Instance("BUFG")` in Amaranth-generated HDL. Use a direct combinational assign so Vivado auto-infers `IBUF→BUFG`. |
@@ -201,4 +231,6 @@ vivado -mode batch -source wukong_xc7a100t.tcl
 
 ---
 
-*For archived previous-platform content, see [`docs/archive/hardware-ti60-f225-legacy.md`](archive/hardware-ti60-f225-legacy.md).*
+*Archived platform documents are historical snapshots and are not current build
+instructions, even where their preserved body uses words such as “authoritative”
+or “validated.” See [`docs/archive/`](archive/).*

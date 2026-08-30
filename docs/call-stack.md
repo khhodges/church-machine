@@ -184,7 +184,11 @@ Only code that already holds the appropriate PassKey in an instruction-addressab
 
 ### SWITCH PassKeys as Abstract GT I/O Tokens
 
-The two SWITCH PassKeys are the first two entries in the **Abstract Address Space** — the 32-bit `word1_location` range that the IDE owns for all hardware-routed I/O and remote network addressing. Abstract GTs whose `word1_location` falls in this reserved range are the general mechanism for I/O peripherals, encrypted tunnels, and remote services, with the Home Base tunnel (`0xFF000000`) as the primary network gateway.
+The two SWITCH PassKeys are the first two entries in the **Abstract Address
+Space** — the 32-bit `word1_location` range reserved by this design for routed
+I/O and remote addressing. Proposed Abstract-GT tunnel and remote-service uses,
+including Home Base (`0xFF000000`), are design material; encrypted tunnels are
+not shipped in FW=2.
 
 See [Abstract GT I/O and Network Addressing](abstract-io-addressing.md) for the full Abstract Address Space layout and IDE provisioning protocol.
 ---

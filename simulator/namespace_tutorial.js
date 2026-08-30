@@ -330,8 +330,8 @@ ELOADCALL CR8, Constants, Phi   <span style="color:#666">; DR1 &larr; &phi; (gol
 
         let html = '<div class="sr-wrapper">';
         html += '<div class="sr-header">';
-        html += '<h2>Namespace Abstraction</h2>';
-        html += '<p class="sr-tagline">Physical Memory \u00b7 Slot\u202f0 Root \u00b7 NS Table \u00b7 Entry Format \u00b7 CR15 \u00b7 Version &amp; Seal</p>';
+        html += '<h2>Namespace Abstraction \u2014 Legacy Tutorial</h2>';
+        html += '<p class="sr-tagline">Historical design walkthrough \u00b7 non-authoritative field/security descriptions</p>';
         html += '<div class="sr-controls">';
         html += `<button class="btn btn-tutorial" onclick="nsTutorial.stepBack()" ${this.currentStep <= 0 ? 'disabled' : ''}>&laquo; Back</button>`;
         html += `<span class="tutorial-progress">${Math.max(0, this.currentStep + 1)} / ${this.steps.length}</span>`;
@@ -340,6 +340,7 @@ ELOADCALL CR8, Constants, Phi   <span style="color:#666">; DR1 &larr; &phi; (gol
         html += '</div>';
 
         html += '<div class="sr-body">';
+        html += '<div class="sr-key-concept"><div class="sr-concept-title">LEGACY / NON-AUTHORITATIVE</div><p>This preserved tutorial contains obsolete CRC-16, sequence-position, Slot 0, and namespace metadata descriptions. Current NS entries use W0 location, W1 limit/9-bit sequence/GC/far flags, W2 public unkeyed <code>integrity32</code>, and W3 a non-authoritative cache token. Use the live Reference documents and hardware source for shipped behavior.</p></div>';
         if (this.currentStep >= 0 && this.currentStep < this.steps.length) {
             const step = this.steps[this.currentStep];
             html += `<div class="sr-step-container sr-type-${step.type}">`;

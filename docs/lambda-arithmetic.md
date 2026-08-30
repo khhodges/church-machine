@@ -1,5 +1,9 @@
 # The Church Machine — From Integer Arithmetic to Provably Secure Systems
 
+> **DESIGN ESSAY / NOT A FORMAL PROOF.** “Provably,” “impossible,” and
+> “guaranteed” statements below are goals unless they cite a specific executable
+> test or proof. They do not establish cryptographic GT authenticity.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 

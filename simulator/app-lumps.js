@@ -6279,7 +6279,7 @@ function _openGTSlotPicker(lumpToken, slotIndex, chipEl) {
                 label,
                 gtType: gtTypeNum,
                 gtTypeStr: ['NULL', 'Inf', 'Out', 'Abs'][gtTypeNum] || '?',
-                word2: ent.word2_seals >>> 0,
+                word1: ent.word1_limit >>> 0,
             });
         }
     }
@@ -6289,7 +6289,7 @@ function _openGTSlotPicker(lumpToken, slotIndex, chipEl) {
 
     const entriesHtml = entries.length
         ? entries.map(en =>
-            `<div class="gtpick-row" data-slot="${en.slot}" data-type="${en.gtTypeNum}" data-word2="${en.word2}" onclick="_gtPickSelect(${en.slot},${en.word2},'${_e(en.label)}','${en.gtTypeStr}')">` +
+            `<div class="gtpick-row" data-slot="${en.slot}" data-type="${en.gtTypeNum}" data-word1="${en.word1}" onclick="_gtPickSelect(${en.slot},${en.word1},'${_e(en.label)}','${en.gtTypeStr}')">` +
             `<span class="gtpick-slot">#${en.slot}</span>` +
             `<span class="gtpick-badge" style="color:${typeColors[en.gtTypeStr]||'#888'}">${_e(en.gtTypeStr)}</span>` +
             `<span class="gtpick-label">${_e(en.label || `(NS slot ${en.slot})`)}</span>` +
@@ -6351,8 +6351,8 @@ function _openGTSlotPicker(lumpToken, slotIndex, chipEl) {
     document.getElementById('gtpick-search').focus();
 }
 
-function _gtPickSelect(nsSlot, word2, label, typeStr) {
-    window._gtPickState = { nsSlot, gtSeq: (word2 >>> 25) & 0x7F };
+function _gtPickSelect(nsSlot, word1, label, typeStr) {
+    window._gtPickState = { nsSlot, gtSeq: (word1 >>> 21) & 0x1FF };
     const bar    = document.getElementById('gtpick-selected-bar');
     const labEl  = document.getElementById('gtpick-sel-label');
     const slotEl = document.getElementById('gtpick-sel-slot');
@@ -6386,9 +6386,9 @@ async function _gtPickCommit(lumpToken, slotIndex) {
         permsObj[p] = document.getElementById(`gtpick-perm-${p}`)?.checked ? 1 : 0;
     });
 
-    // Build GT word using new dom+perm encoding (v1.1):
-    //   [31]=b_flag [30:28]=perm[2:0] [27]=dom [26]=spare=0 [25]=f_flag=0
-    //   [24:23]=gt_type [22:16]=gt_seq [15:0]=ns_slot
+    // Build GT word using the current canonical encoding:
+    //   [31]=b_flag [30:28]=perm[2:0] [27]=dom
+    //   [26:25]=gt_type [24:16]=gt_seq [15:0]=ns_slot
     //   dom=0 (Turing): perm[2]=X, perm[1]=W, perm[0]=R
     //   dom=1 (Church):  perm[2]=E, perm[1]=S, perm[0]=L
     const hasChurch = permsObj.L || permsObj.S || permsObj.E;
@@ -6397,8 +6397,8 @@ async function _gtPickCommit(lumpToken, slotIndex) {
         ? (((permsObj.X || 0) << 2) | ((permsObj.W || 0) << 1) | (permsObj.R || 0))
         : (((permsObj.E || 0) << 2) | ((permsObj.S || 0) << 1) | (permsObj.L || 0));
     const gt_word = (((perm3 & 0x7) << 28) | ((dom & 1) << 27) |
-                     ((gtType & 0x3) << 23) |
-                     ((state.gtSeq & 0x7F) << 16) | (state.nsSlot & 0xFFFF)) >>> 0;
+                     ((gtType & 0x3) << 25) |
+                     ((state.gtSeq & 0x1FF) << 16) | (state.nsSlot & 0xFFFF)) >>> 0;
 
     const btn = document.getElementById('gtpick-assign-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }

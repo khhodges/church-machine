@@ -1,5 +1,10 @@
 # Deterministic Garbage Collection
 
+> **HISTORICAL DESIGN / NON-AUTHORITATIVE.** This document retains an older
+> 7-bit sequence and namespace-word model. Current GT sequences are 9 bits at
+> GT `[24:16]` and NS authority W1 `[29:21]`; use current source and executable
+> tests for shipped collection behavior.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 

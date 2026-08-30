@@ -3,9 +3,16 @@
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 
-The goal: each namespace protects itself. A private digital shadow is achieved when no
-external actor can reach inside a namespace without holding a valid, unrevoked Inform GT
-with sufficient permissions. Every risk below is tracked to resolution.
+> **Status note:** This is a risk register, not a certification or proof. “Resolved”
+> means the recorded mitigation was accepted at the time; it does not guarantee
+> exploit impossibility. Current shipped hardware is Wukong A7. Tang and Ti60
+> statements are historical unless explicitly revalidated against Wukong.
+
+The goal is for each namespace to protect itself so that an actor without a valid,
+unrevoked Inform GT and sufficient permissions cannot access it. Claims of
+unforgeability, impossibility, or guaranteed isolation require a linked formal
+proof or executable adversarial test; otherwise this document records goals,
+implemented checks, and residual risks.
 
 ## R001: CALL Must Hardcode CR14 and CR6 Permissions When Splitting Lump
 - **Severity**: CRITICAL
@@ -24,19 +31,24 @@ with sufficient permissions. Every risk below is tracked to resolution.
 - **Task**: T002
 - **Status**: RESOLVED
 
-## R002: Seal Strength — 16-bit CRC-16/CCITT
+## R002: Namespace Entry Integrity Is Unkeyed
 - **Severity**: MEDIUM
-- **New**: No — pre-existing. Consequence now worse because clistCount manipulation could
-  cross domain boundaries.
-- **Layer**: NS Table seal (Word 2 bits [15:0])
-- **Risk**: The CRC-16/CCITT seal is 16 bits (65,536 values). A brute-force search is feasible
-  on fast hardware. If an attacker finds a collision, they could forge an NS entry with a
-  manipulated clistCount, extending CR14's limit into the c-list region (capability theft).
-- **Fix**: On Tang Nano 20K at 27MHz, brute-force takes hours — acceptable for the target.
-  In the simulator (JavaScript at GHz speed), consider rate-limiting seal checks or using
-  a stronger hash. Long-term: increase seal width by repurposing Word 2 spare bits.
+- **New**: No — pre-existing.
+- **Layer**: NS Table W2 integrity value
+- **Current behavior**: Wukong RTL and the simulator store a 32-bit
+  `integrity32(W0, W1)` result in NS-entry W2. The function is
+  `ROL32(W0, 7) XOR ROL32(masked_W1, 13) XOR 0xDEADBEEF`; W1's GC and far flags
+  are masked. See `hardware/integrity32.py`, `hardware/layouts.py`, and the
+  matching simulator implementation.
+- **Risk**: `integrity32` is linear, unkeyed, and publicly computable. It catches
+  accidental corruption and stale/mismatched metadata but is not a MAC,
+  authentication mechanism, or anti-forgery boundary. An actor able to modify an
+  NS entry can recompute W2 after changing W0/W1.
+- **Mitigation status**: Do not describe W2 as cryptographic authentication.
+  Use a keyed construction and a documented key/provisioning model before
+  treating malicious namespace-entry modification as prevented.
 - **Task**: Review during T001, monitor
-- **Status**: ACCEPTED (acceptable for target hardware)
+- **Status**: OPEN / ACCEPTED RISK
 
 ## R003: Boot Raw Write — Single Point of Failure
 - **Severity**: LOW
@@ -58,11 +70,10 @@ with sufficient permissions. Every risk below is tracked to resolution.
 - **Risk**: Compiler bugs could produce code with wrong c-list offsets (capability confusion),
   incorrect branch targets (arbitrary execution within lump), misallocated registers (data
   corruption), or invalid instruction encodings.
-- **Key insight**: The compiler CANNOT break security — only correctness. The capability
-  model constrains from below. mLoad + CALL + bounds checking still enforces the lump
-  boundaries. A buggy compiler gives wrong answers within the correct security perimeter,
-  not security breaches. The c-list IS the authority — if it doesn't contain a GT, no
-  compiler bug can conjure one.
+- **Security expectation**: Compiler output is still subject to the implemented
+  mLoad, CALL, and bounds checks. This reduces the classes of compiler error that
+  should cross an object boundary, but no formal proof or complete adversarial
+  test suite establishes that compiler bugs can affect correctness only.
 - **Fix**:
   - Simple compiler, no optimizations initially
   - Emit compilation manifest (source line to instructions) for auditing
@@ -133,34 +144,35 @@ with sufficient permissions. Every risk below is tracked to resolution.
 - **Task**: T005
 - **Status**: RESOLVED
 
-## R009: Namespace Isolation — The Core Guarantee
+## R009: Namespace Isolation — Core Security Goal
 - **Severity**: FOUNDATIONAL
 - **New**: No — this is the core architecture
 - **Layer**: All layers
-- **Guarantee**: Each namespace (sibling) has its own NS table, its own Memory region,
-  its own set of GTs. No external actor can reach inside without a valid, unrevoked
-  Inform GT with sufficient permissions. The parent's c-list is the parental approval.
-  Revoking a GT (incrementing version) instantly cuts access — all copies become invalid.
+- **Security goal**: Each namespace (sibling) has its own NS table, Memory region,
+  and GT set. The intended checks require a valid, unrevoked Inform GT with
+  sufficient permissions for external access, and version changes are intended
+  to invalidate copies. This remains a property to test or prove, not a guarantee
+  established by this register.
 - **How it holds under new changes**:
-  - Single NS entry model: each abstraction's lump is bounded by sealed NS entry — safe
-  - CALL split: CR14 and CR6 have hardcoded domain permissions — safe (R001 RESOLVED)
-  - [CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html)++ compiler: cannot forge GTs, cannot escape lump bounds — safe
-  - Upload validation: Navana validates all capability delegation — safe (R007 RESOLVED)
-  - Boot: one raw write for Navana, all else through Navana.Add — safe (R003 RESOLVED)
-- **Status**: SECURE (all contingencies resolved)
+  - Single NS entry model: implemented bounds and seal checks reduce cross-object access
+  - CALL split: CR14 and CR6 use hardcoded domain permissions (R001 mitigation)
+  - Compiler output remains subject to capability and bounds checks; completeness is unproven
+  - Upload validation: Navana validation is the intended delegation gate (R007 mitigation)
+  - Boot: the raw-write path remains part of the trusted computing base (R003 mitigation)
+- **Status**: MITIGATED / REQUIRES ADVERSARIAL EVIDENCE
 
 ## Resolution Tracking
 
 | Risk | Severity | Task | Status |
 |------|----------|------|--------|
 | R001 | CRITICAL | T002 | RESOLVED |
-| R002 | MEDIUM | T001 | ACCEPTED |
+| R002 | MEDIUM | T001 | OPEN / ACCEPTED RISK |
 | R003 | LOW | T009 | RESOLVED |
 | R004 | HIGH/LOW | T005,T006 | RESOLVED (Phase 1) |
 | R005 | MEDIUM | T005 | RESOLVED |
 | R006 | MEDIUM | T006 | RESOLVED |
 | R007 | HIGH | T010 | RESOLVED |
 | R008 | MEDIUM | T005 | RESOLVED |
-| R009 | FOUNDATIONAL | All | SECURE |
+| R009 | FOUNDATIONAL | All | MITIGATED / EVIDENCE REQUIRED |
 ---
 *Confidential — Kenneth Hamer-Hodges — April 2026*

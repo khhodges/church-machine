@@ -5,7 +5,12 @@
 
 ## Overview
 
-The Church Machine is a capability-secured processor that enforces security at the instruction level. There is no operating system, no privileged mode, no superuser. Every memory access — read or write — passes through a hardware validation gate (mLoad or mSave) that checks an unforgeable Golden Token before permitting the operation.
+The Church Machine is a capability-oriented processor with instruction-level
+validation gates. It has no conventional operating system, privilege ring, or
+superuser model. Implemented capability access paths use gates such as mLoad and
+mSave to check GT fields and namespace metadata. This is not a formal proof that
+every possible access path is covered, and the unkeyed `integrity32` namespace
+check is not cryptographic authentication.
 
 This reference uses four different meanings of “image” and keeps them separate:
 the JTAG-flashed FPGA bitstream, the power-on boot baseline contained by that
@@ -447,31 +452,32 @@ R, W, and X permissions are NOT permitted on hardware devices.
 ## Golden Token Format
 
 ```
-31      25 24  23 22      16 15           0
-┌─────────┬──────┬──────────┬─────────────┐
-│B R W X  │gt_type│  gt_seq │   slot_id   │
-│ L S E   │ [2]  │   [7]    │    [16]     │
-│  [7]    │      │          │             │
-└─────────┴──────┴──────────┴─────────────┘
+31 30      28 27 26    25 24        16 15           0
+┌──┬─────────┬──┬────────┬────────────┬───────────────┐
+│B │  perm   │D │gt_type │   gt_seq   │    slot_id    │
+│1 │   3     │1 │   2    │     9      │      16       │
+└──┴─────────┴──┴────────┴────────────┴───────────────┘
 ```
 
 | Bits    | Field       | Width | Description |
 |---------|------------|-------|-------------|
 | [15:0]  | `slot_id`   | 16   | Namespace slot ID (0–65,535) |
-| [22:16] | `gt_seq`    | 7    | Revocation sequence counter |
-| [24:23] | `gt_type`   | 2    | GT class (NULL / Inform / Outform / Abstract) |
-| [30:25] | `perms`     | 6    | R, W, X, L, S, E |
+| [24:16] | `gt_seq`    | 9    | Revocation sequence counter |
+| [26:25] | `gt_type`   | 2    | GT class (NULL / Inform / Outform / Abstract) |
+| [27]    | `dom`       | 1    | 0=Turing, 1=Church |
+| [30:28] | `perm`      | 3    | Domain-selected X/W/R or E/S/L payload |
 | [31]    | `b_flag`    | 1    | Bind flag |
 
-### gt_seq (7 bits)
+### gt_seq (9 bits)
 
-Revocation sequence counter. Must match the `gt_seq` stored in NS Entry Word 1 bits [27:21]. On mismatch, the GT is stale — access FAULTs. Revocation is instant: increment the NS entry `gt_seq`, and every outstanding GT referencing that entry dies on next use.
+Revocation sequence counter. Must match the `gt_seq` stored in NS Entry Word 1
+bits [29:21]. On mismatch, the implemented gate faults the access.
 
 ### slot_id (16 bits)
 
 Points to a namespace slot. Supports up to 65,536 entries.
 
-### Permissions (6 bits)
+### Domain-selected permissions (3 bits)
 
 | Bit | Name | Gate | Domain |
 |-----|------|------|--------|
@@ -598,9 +604,9 @@ The c-list count and lump size come from the **lump header** in memory, not from
 
 ```
 Offset +0   Word 0 — base      [31:0]   Lump base byte address
-Offset +1   Word 1 — limit     [31:29]  spare
-            (WORD2_LAYOUT)     [28]     g_bit (GC mark; masked before integrity32)
-                               [27:21]  gt_seq (7-bit revocation counter)
+Offset +1   Word 1 — authority [31]     f_flag (masked before integrity32)
+            (WORD2_LAYOUT)     [30]     g_bit (masked before integrity32)
+                               [29:21]  gt_seq (9-bit revocation counter)
                                [20:0]   limit_offset (object size - 1 in words)
 Offset +2   Word 2 — integrity [31:0]   integrity32 parallel check
 Offset +3   Word 3 — cache token [31:0] non-authoritative lookup value T

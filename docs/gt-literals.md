@@ -1,5 +1,11 @@
 # GT Type Field and Domain Separation
 
+> **HISTORICAL DESIGN / NON-AUTHORITATIVE.** This document retains an obsolete
+> 7-bit sequence, 17-bit index, and MAC/unforgeability model. Current GTs use a
+> 16-bit slot, 9-bit sequence, 2-bit type, domain bit, 3-bit domain-selected
+> permissions, and bind bit. Shipped namespace integrity is unkeyed
+> `integrity32`, not a MAC.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 

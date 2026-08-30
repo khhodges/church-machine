@@ -22,16 +22,17 @@ class AbstractGTManager {
         // TokenRecord = { value: uint32, valid: boolean, touched: boolean }
         this._tokens = new Map();
 
-        // 7-bit sequence counter — wraps at 128.
+        // 9-bit sequence counter — matches GT_LAYOUT.gt_seq and wraps at 512.
         this._seqCounter = 0;
 
         // GT type code for Abstract tokens as packed into word0.
         this.GT_TYPE = 3;
 
         // Bit-field layout in word0 for an AGT.
-        // word0 = 0b11_<gt_seq:7>_<reserved:23>
-        this._TYPE_SHIFT = 30;   // bits 31:30 = type (2 bits)
-        this._SEQ_SHIFT  = 23;   // bits 29:23 = gt_seq (7 bits)
+        // Abstract type uses canonical GT_LAYOUT bits [26:25]; sequence is [24:16].
+        // Remaining fields are zero for this manager's host-backed tokens.
+        this._TYPE_SHIFT = 25;
+        this._SEQ_SHIFT  = 16;
     }
 
     // -------------------------------------------------------------------------
@@ -40,17 +41,17 @@ class AbstractGTManager {
 
     _nextSeq() {
         const seq = this._seqCounter;
-        this._seqCounter = (this._seqCounter + 1) & 0x7F;
+        this._seqCounter = (this._seqCounter + 1) & 0x1FF;
         return seq;
     }
 
     _packWord0(seq) {
         return (((this.GT_TYPE & 0x3) << this._TYPE_SHIFT) |
-                ((seq & 0x7F)         << this._SEQ_SHIFT)) >>> 0;
+                ((seq & 0x1FF)        << this._SEQ_SHIFT)) >>> 0;
     }
 
     _unpackSeq(word0) {
-        return (word0 >>> this._SEQ_SHIFT) & 0x7F;
+        return (word0 >>> this._SEQ_SHIFT) & 0x1FF;
     }
 
     _isAGT(word0) {

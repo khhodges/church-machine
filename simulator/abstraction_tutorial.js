@@ -323,8 +323,8 @@ this.createAbstraction(46, 'Circle', 3,
 
         let html = '<div class="sr-wrapper">';
         html += '<div class="sr-header">';
-        html += '<h2>Programmed Abstractions</h2>';
-        html += '<p class="sr-tagline">Code Region \u00b7 C-List \u00b7 E-GT \u00b7 CALL / RETURN \u00b7 CR6 \u00b7 CR14 \u00b7 Three Method-Access Paths</p>';
+        html += '<h2>Programmed Abstractions \u2014 Legacy Tutorial</h2>';
+        html += '<p class="sr-tagline">Historical design walkthrough \u00b7 non-authoritative field/security descriptions</p>';
         html += '<div class="sr-controls">';
         html += `<button class="btn btn-tutorial" onclick="abstrTutorial.stepBack()" ${this.currentStep <= 0 ? 'disabled' : ''}>&laquo; Back</button>`;
         html += `<span class="tutorial-progress">${Math.max(0, this.currentStep + 1)} / ${this.steps.length}</span>`;
@@ -333,6 +333,7 @@ this.createAbstraction(46, 'Circle', 3,
         html += '</div>';
 
         html += '<div class="sr-body">';
+        html += '<div class="sr-key-concept"><div class="sr-concept-title">LEGACY / NON-AUTHORITATIVE</div><p>This preserved tutorial contains obsolete CRC-16, namespace-field, boot-slot, and absolute anti-forgery statements. Current GT layout is 16-bit slot, 9-bit sequence, 2-bit type, 1-bit domain, 3-bit permissions, and 1 bind bit. Current NS W2 is public unkeyed <code>integrity32(W0,W1)</code>, not a MAC. Use the live Reference documents and hardware source for shipped behavior.</p></div>';
         if (this.currentStep >= 0 && this.currentStep < this.steps.length) {
             const step = this.steps[this.currentStep];
             html += `<div class="sr-step-container sr-type-${step.type}">`;

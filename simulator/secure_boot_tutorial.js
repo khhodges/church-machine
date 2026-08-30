@@ -460,8 +460,8 @@ USER_ENTRY:
 
         let html = '<div class="sr-wrapper">';
         html += '<div class="sr-header">';
-        html += '<h2>Secure Boot \u2014 CLOOMC Assembly Listing</h2>';
-        html += '<p class="sr-tagline">LOAD_NS \u00b7 GT Seal Validation \u00b7 C-List Wiring \u00b7 CALL into User Code</p>';
+        html += '<h2>Secure Boot \u2014 Legacy Tutorial</h2>';
+        html += '<p class="sr-tagline">Historical design walkthrough \u00b7 non-authoritative boot/security descriptions</p>';
         html += '<div class="sr-controls">';
         html += `<button class="btn btn-tutorial" onclick="secureBootTutorial.stepBack()" ${this.currentStep <= 0 ? 'disabled' : ''}>&laquo; Back</button>`;
         html += `<span class="tutorial-progress">${Math.max(0, this.currentStep + 1)} / ${this.steps.length}</span>`;
@@ -470,6 +470,7 @@ USER_ENTRY:
         html += '</div>';
 
         html += '<div class="sr-body">';
+        html += '<div class="sr-key-concept"><div class="sr-concept-title">LEGACY / NON-AUTHORITATIVE</div><p>This preserved tutorial contains obsolete CRC-16, old GT-field, old boot-step, and absolute chain-of-trust statements. Current GTs use a 9-bit sequence and domain-selected permissions; NS W2 is public unkeyed <code>integrity32</code>, not cryptographic authentication. Use live boot source, current Reference documents, and executable tests for shipped behavior.</p></div>';
         if (this.currentStep >= 0 && this.currentStep < this.steps.length) {
             const step = this.steps[this.currentStep];
             html += `<div class="sr-step-container sr-type-${step.type}">`;
@@ -479,9 +480,9 @@ USER_ENTRY:
             html += '</div>';
         } else {
             html += '<div class="sr-step-container sr-type-intro">';
-            html += '<div class="sr-step-title">Secure Boot \u2014 CLOOMC Assembly Listing</div>';
+            html += '<div class="sr-step-title">Secure Boot \u2014 Legacy, Non-Authoritative Listing</div>';
             html += '<div class="sr-step-content">';
-            html += '<p>This tutorial presents the canonical CLOOMC assembly listing for secure startup on the Church Machine. It covers LOAD_NS, GT seal validation, C-List wiring, and the first CALL into user code \u2014 using the current GT Word\u202f0 format (slot_id, gt_seq, CRC-16 seal, Inform/Abstract type codes).</p>';
+            html += '<p>This historical tutorial is retained for design context only. Its CRC-16, GT field, boot-step, and security-guarantee descriptions are obsolete and non-authoritative.</p>';
             html += '<p>Click <strong>Next</strong> to begin.</p>';
             html += '</div></div>';
         }

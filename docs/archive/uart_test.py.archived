@@ -1,3 +1,8 @@
+"""ARCHIVED / NON-AUTHORITATIVE historical pico-ice design snapshot.
+
+See docs/archive/README.md and docs/HARDWARE.md for current status.
+"""
+
 """Pico-ice design with UART data loader.
 
 Boot ROM provides constant instruction memory (enables Yosys optimization).

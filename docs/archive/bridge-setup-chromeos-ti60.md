@@ -1,8 +1,11 @@
 # Church Machine Bridge — ChromeOS Setup Guide
 
+> **ARCHIVED / NON-AUTHORITATIVE.** Historical Ti60 procedure. Ti60 is retired;
+> use [`../HARDWARE.md`](../HARDWARE.md) for the current Wukong target.
+
 This guide connects your Ti60 F225 FPGA board to the Church Machine IDE when you are on a Chromebook (ChromeOS / Crostini Linux).
 
-> **Port assignments:** For the canonical USB port map (ttyUSB0–3, baud rates, and the ChromeOS ttyUSB3 console trap), see **[docs/HARDWARE.md § 2. USB Port Map](HARDWARE.md#2-usb-port-map)**.
+> **Historical Ti60 port assignments:** the values below do not apply to Wukong.
 
 ---
 

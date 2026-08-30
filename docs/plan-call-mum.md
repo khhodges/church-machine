@@ -1,5 +1,9 @@
 # Plan: Call Mum
 
+> **PLAN / NOT SHIPPED SECURITY BEHAVIOR.** Encryption and hardware-enforcement
+> statements below describe a proposed application, not current FW=2 transport
+> or proof of isolation.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 

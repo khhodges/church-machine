@@ -330,7 +330,10 @@ The vocabulary is the namespace. The grammar is CLOOMC++.
 
 CLOOMC++ does not merely accept high-level syntax and compile it down. It is the mechanism by which abstraction names are composed into statements, statements into methods, and methods into new sealed abstractions — which then become new words. Every time a developer seals a new abstraction, they add a word to the language. Every time that abstraction is used by another, the new abstraction's author inherits the full, hardware-verified meaning of every word they use.
 
-This is why the growth of a namespace is cumulative in a way that no conventional library ecosystem can match. In a conventional system, a library's public API is advisory — a sufficiently clever or careless caller can bypass it. In a CLOOMC namespace, the public API is the only thing that exists from the outside. There is no bypass, not because bypassing is forbidden by policy, but because the code path to bypass does not exist.
+This is why the growth of a namespace can be cumulative. In the implemented
+capability path, callers reach an abstraction through the capabilities exposed
+by its API. This narrows available entry paths, but it is not a formal proof
+that no bypass exists elsewhere in the implementation.
 
 The destination is a namespace that has become the language of its application — a complete vocabulary for expressing what that application does, backed by hardware-enforced semantics that make every word trustworthy.
 

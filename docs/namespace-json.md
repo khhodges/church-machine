@@ -28,11 +28,11 @@ Every format embeds or references the **entry object**, which is the decoded in-
 |-----------------|---------|----------------|-------------|
 | `word0_location`| number  | Word 0, all 32 bits | Raw base address of the memory object. Matches `location` in the abstraction definition. |
 | `word1_limit`   | number  | Word 1, raw packed | Full 32-bit packed flags word. Decode with `parseNSWord1` to get the fields below. |
-| `word2_seals`   | number  | Word 2, raw packed | Simulator packing: `version[31:25]` (7-bit) `| spare[24:16] | CRC-16[15:0]`. Extract version via `(word2_seals >>> 25) & 0x7F`; extract seal via `word2_seals & 0xFFFF`. Note: hardware NS Entry Word 2 uses a different layout (`crc[15:0] | g_bit[16] | spare[31:17]`) with `gt_seq` in Word 1 instead. |
-| `gBit`          | 0 or 1  | Word 1 [29]    | GC mark bit. Set by the PP250 garbage collector during mark phase. Not meaningful to application code. |
-| `gtType`        | 0–3     | Word 1 [27:26] | Entry type code: `0`=NULL, `1`=Inform, `2`=Outform, `3`=Abstract. When `gtType=2` (Outform), the backing NS slot Words 1–3 hold a **96-bit opaque IDE token** rather than the normal lump descriptor — the Locator reads this token to fetch and inflate the lump on first LOAD. See [locator.md](locator.md). |
-| `clistCount`    | 0–511   | Word 1 [25:17] | Number of c-list GT slots at the top of the lump (9-bit field). `0` = data object; `>0` = abstraction lump. |
-| `chainable`     | boolean | Word 1 [28]    | Whether the chain bit is set. Decoded from the raw `word1_limit`. |
+| `word2_seals`   | number  | Word 2, raw packed | Deprecated field name for the full 32-bit `integrity32(word0_location, word1_limit)` value. It contains no version subfield and is not a cryptographic seal. |
+| `gBit`          | 0 or 1  | Word 1 [30]    | GC mark bit. Masked from `integrity32`. |
+| `gtType`        | 0–3     | UI/catalog metadata | Entry type is obtained from catalog/LUMP context; it is not encoded in NS W1. GT words encode type at bits [26:25]. |
+| `clistCount`    | number  | LUMP header/UI metadata | C-list count comes from the LUMP header, not NS W1. |
+| `chainable`     | boolean | Compatibility/UI metadata | Not a canonical NS W1 bit. |
 | `label`         | string  | `sim.nsLabels` | Human-readable name. Stored separately from the three-word slot; not encoded in the hardware words. |
 
 > **Note:** The `b` (Bind), `f` (Far), and `limit` fields are not surfaced directly in the entry object. To read them, pass `word1_limit` through `parseNSWord1`, which returns `{ b, f, g, chainable, gtType, clistCount, limit }`.
@@ -205,8 +205,8 @@ localStorage.removeItem("church_namespace")
 | `clistCount`      | ✓ (in `entry`) | ✓ | ✗ |
 | `chainable`       | ✓ (in `entry`) | ✓ | ✓ |
 | `label`           | ✓ | ✓ | ✓ |
-| version           | ✓ (decode `word2_seals`) | ✓ | recomputed (0) |
-| CRC-16 seal       | ✓ (decode `word2_seals`) | ✓ | recomputed |
+| sequence/version  | ✓ (decode `word1_limit[29:21]`) | ✓ | recomputed (0) |
+| `integrity32`     | ✓ (`word2_seals`, deprecated name) | ✓ | recomputed |
 | code words        | ✓ | ✓ | ✓ |
 | GT word           | ✓ (`gt` field) | ✓ | ✗ |
 | permissions       | ✓ (decoded from GT) | ✗ | ✗ |

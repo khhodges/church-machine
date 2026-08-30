@@ -1,5 +1,8 @@
 # The Civilisation Crisis — Why Insecure Software Threatens Democracy, Prosperity, and Freedom
 
+> **POSITION PAPER / NOT SECURITY EVIDENCE.** Absolute or predictive statements
+> below are advocacy and design aspirations, not guarantees of shipped behavior.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 

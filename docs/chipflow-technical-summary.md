@@ -1,5 +1,11 @@
 # CM Amaranth HDL — Technical Summary for ChipFlow Integration
 
+> **HISTORICAL / NON-AUTHORITATIVE DESIGN SNAPSHOT.** This pre-Wukong summary
+> contains obsolete GT, register, CRC-16, and implementation-status claims. Do
+> not use it as current hardware or security evidence. Canonical shipped layouts
+> are in `hardware/layouts.py` and `hardware/integrity32.py`; current target
+> status is in `docs/HARDWARE.md`.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 

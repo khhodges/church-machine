@@ -1,3 +1,5 @@
+// ARCHIVED / NON-AUTHORITATIVE — historical Tang Nano constraints.
+// See docs/archive/README.md and docs/HARDWARE.md.
 // Tang Nano 9K pin constraints for Church Machine (IoT profile)
 // Gowin GW1NR-LV9QN88PC6/I5 — 27MHz crystal, CH340 USB-UART, 6 LEDs, 2 buttons
 // Pins 17-18 used by UART; 4 LEDs used (pins 10,11,13,14).

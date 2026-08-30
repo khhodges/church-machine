@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""ARCHIVED / NON-AUTHORITATIVE historical pico-ice upload utility.
+
+See docs/archive/README.md and docs/HARDWARE.md for current status.
+"""
+
 """Standalone upload script for Church Machine pico-ice.
 
 Copy this single file to your machine and run:

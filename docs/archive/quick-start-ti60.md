@@ -1,5 +1,8 @@
 # Quick Start
 
+> **ARCHIVED / NON-AUTHORITATIVE.** Historical Ti60 quick start. Claims of
+> simulator/hardware identity below are not current Wukong evidence.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 

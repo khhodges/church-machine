@@ -1,5 +1,11 @@
 # Trusted Security Base
 
+> **HISTORICAL DESIGN / NON-AUTHORITATIVE.** This document preserves an older
+> mLoad/GT design and contains obsolete 7-bit sequence, six-permission, CRC-16,
+> register-width, and sole-path claims. Do not use it as current Wukong security
+> evidence. Canonical shipped layouts are in `hardware/layouts.py` and
+> `hardware/integrity32.py`; complete no-bypass claims require proof.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 

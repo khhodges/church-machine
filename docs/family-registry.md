@@ -3,7 +3,10 @@
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 
-> **Status**: Architectural design document. Specifies the binding abstraction that creates the Hello Mum namespace entries. February 2026.
+> **Status — PLANNED / NOT SHIPPED**: Architectural design for a future binding
+> abstraction. Matching tunnel keys, secure bidirectional relationships,
+> Outform+Far entries, and no-bypass claims are goals, not current FW=2 behavior
+> or evidence. FW=2 UART transport is plaintext and unauthenticated.
 
 ---
 

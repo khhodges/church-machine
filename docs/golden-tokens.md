@@ -5,7 +5,11 @@
 
 ## What Are Golden Tokens?
 
-Golden Tokens (GTs) are the fundamental unit of access control in the Church Machine architecture. Every access to a resource -- whether loading data, calling a service, or switching privilege levels -- requires a valid Golden Token that grants the necessary permissions. Golden Tokens are unforgeable: they cannot be fabricated by software, only created and managed through hardware-enforced mechanisms.
+Golden Tokens (GTs) are the fundamental unit of access control in the Church
+Machine architecture. Implemented capability paths require a GT with the
+necessary fields and permissions. GTs are not described here as cryptographically
+unforgeable: the current namespace `integrity32` check is public, linear, and
+unkeyed.
 
 A Golden Token encodes three things:
 1. **What** resource it refers to (via `slot_id` — the namespace slot ID)
@@ -13,7 +17,9 @@ A Golden Token encodes three things:
 3. **Whether its local binding is intact and current** (via NS `integrity32`
    plus `gt_seq`; adversarial identity authentication is a separate boundary)
 
-Without a valid Golden Token, no operation proceeds. Any attempt to use an invalid, expired, or insufficient token results in a FAULT.
+On implemented capability paths, an invalid, stale, or insufficient token causes
+a FAULT before the gated operation proceeds. Complete path coverage is an
+engineering property to test, not an absolute guarantee established here.
 
 ---
 
@@ -67,7 +73,10 @@ Encoding:  dom=0 (Turing): perm[2]=X, perm[1]=W, perm[0]=R
 
 ### Domain Purity
 
-A GT carries **either** Turing permissions (R, W, X) **or** Church permissions (L, S, E) — never both. Domain purity is **structurally enforced by the encoding**: the `dom` bit selects which interpretation applies, making a mixed-domain GT impossible to represent. The encoder clamps to Church (dom=1) when any Church bit (L, S, E) is present.
+A GT carries one three-bit permission payload interpreted as either Turing
+(R, W, X) or Church (L, S, E), selected by `dom`. The encoding has no
+simultaneous representation of both permission domains. Whether every producer
+and consumer uses the encoding correctly remains subject to implementation tests.
 
 ### E Isolation
 

@@ -1,4 +1,6 @@
-> **ARCHIVED — Removed from Release 1 scope.** The pico-ice (iCE40UP5K) board is not supported in Release 1. The three approved boards are: Efinix Ti60 F225, Sipeed Tang Nano 20K (IoT), and QMTECH Wukong XC7A100T. This document is kept for historical reference only.
+> **ARCHIVED / NON-AUTHORITATIVE.** The pico-ice (iCE40UP5K) board is unsupported.
+> Any old target list preserved below is historical; Wukong A7 is the current
+> hardware target.
 
 ---
 

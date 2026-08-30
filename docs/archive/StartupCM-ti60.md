@@ -1,5 +1,9 @@
 # Church Machine — Ti60 F225 Startup Sequence
 
+> **ARCHIVED / NON-AUTHORITATIVE.** Historical Ti60 startup procedure. Use
+> [`../StartupCM.md`](../StartupCM.md) and [`../HARDWARE.md`](../HARDWARE.md) for
+> current Wukong behavior.
+
 Complete end-to-end startup: from Efinity synthesis through DMEM loading to the first
 instruction of your chosen abstraction.
 

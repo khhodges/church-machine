@@ -251,7 +251,7 @@ HALT</pre>
         let html = '<div class="sr-wrapper">';
 
         html += '<div class="sr-header">';
-        html += '<h2>The Church Machine Study</h2>';
+        html += '<h2>The Church Machine Study \u2014 Legacy Tutorial</h2>';
         html += '<p class="sr-tagline">Multi-Language Compilation &bull; Capability Security &bull; Universal Target</p>';
         html += '<div class="sr-controls">';
         html += `<button class="btn btn-tutorial" onclick="slideRuleTutorial.stepBack()" ${this.currentStep <= 0 ? 'disabled' : ''}>&laquo; Back</button>`;
@@ -263,6 +263,7 @@ HALT</pre>
         html += '</div>';
 
         html += '<div class="sr-body">';
+        html += '<div class="sr-key-concept"><div class="sr-concept-title">LEGACY / NON-AUTHORITATIVE</div><p>This preserved tutorial contains historical Tang Nano target language and absolute token/security claims. Wukong A7 is the current target. Current GTs are checked capability identifiers but are not cryptographically unforgeable; NS W2 uses public unkeyed <code>integrity32</code>. Use current Reference documents and executable tests for shipped behavior.</p></div>';
         if (this.currentStep >= 0 && this.currentStep < this.steps.length) {
             const step = this.steps[this.currentStep];
             html += `<div class="sr-step-container sr-type-${step.type}">`;

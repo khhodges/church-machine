@@ -1,5 +1,9 @@
 # Ada Lovelace's Note G vs. Church Computer
 
+> **CONCEPTUAL COMPARISON / NOT SECURITY EVIDENCE.** Security-pipeline and
+> isolation statements below illustrate the design and do not establish
+> universal shipped guarantees.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 

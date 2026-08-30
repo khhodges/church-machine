@@ -1,5 +1,12 @@
 # Church Machine Launch Readiness
 
+> **HISTORICAL LAUNCH PLAN / NON-AUTHORITATIVE.** This document preserves an
+> older Tang-targeted launch design with CRC-16 namespace seals and planned
+> encrypted tunnel/attestation claims. Wukong A7 is the current target; shipped
+> FW=2 UART is plaintext and unauthenticated, and NS W2 uses public unkeyed
+> `integrity32`. Treat security guarantees here as goals unless separately
+> supported by current executable or formal evidence.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 
@@ -7,7 +14,7 @@
 
 Launch means a child can receive a Church Machine device, power it on, learn arithmetic, send a message to a parent, receive a reply, have a teacher grant them a new capability, and store their work — all without trusting any external operating system, certificate authority, or centralized server.
 
-This document is the authoritative specification for what that requires.
+This is preserved planning material, not the authoritative shipped specification.
 
 ---
 

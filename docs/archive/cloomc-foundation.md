@@ -1,5 +1,8 @@
 # CLOOMC ISA Foundation Document
 
+> **ARCHIVED / NON-AUTHORITATIVE.** Historical snapshot only. Use
+> [`../cloomc-foundation.md`](../cloomc-foundation.md), current source, and tests.
+
 **v1.2 — 2026-07-23**
 **CONFIDENTIAL**
 

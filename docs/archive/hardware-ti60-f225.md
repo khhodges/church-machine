@@ -1,6 +1,6 @@
 # Efinix Ti60 F225 — Church Machine Hardware Reference (ARCHIVED)
 
-> **⚠️ ARCHIVED — board no longer in active use.**
+> **ARCHIVED / NON-AUTHORITATIVE — board no longer in active use.**
 > The active development board is now the **QMTECH Wukong A7 (XC7A100T)**.
 > This document is retained for historical reference only. All current
 > hardware facts are in **[docs/HARDWARE.md](../HARDWARE.md)**.

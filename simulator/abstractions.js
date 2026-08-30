@@ -333,7 +333,7 @@ class AbstractionRegistry {
 
         this.createAbstraction(11, 'UART', 2,
             ['Send', 'Receive', 'SetBaud'],
-            'Serial communication — Tang Nano 20K BL616 bridge',
+            'Legacy/experimental Tang Nano 20K BL616 bridge (not current Wukong hardware)',
             { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, freedNSSlot: true });
 
         this.createAbstraction(12, 'LED', 2,
@@ -353,7 +353,7 @@ class AbstractionRegistry {
 
         this.createAbstraction(15, 'Display', 2,
             ['Write', 'Clear', 'Scroll'],
-            'HDMI output (Tang Nano 20K has HDMI) — text/graphics display',
+            'Legacy/experimental Tang Nano 20K HDMI display (not available on current Wukong hardware)',
             { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(16, 'SlideRule', 3,
@@ -451,7 +451,7 @@ class AbstractionRegistry {
 
         this.createAbstraction(36, 'Deployer', 6,
             ['Build', 'Upload', 'Verify', 'Boot'],
-            'Compiles + uploads to Tang via UART',
+            'Legacy/experimental Tang compile/upload path (not current Wukong release path)',
             { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(37, 'Browser', 7,

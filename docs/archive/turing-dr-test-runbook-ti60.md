@@ -1,5 +1,8 @@
 # Turing DR Test — Ti60 F225 Hardware Runbook
 
+> **ARCHIVED / NON-AUTHORITATIVE.** Historical Ti60 runbook. A simulation result
+> recorded here is not proof of current Wukong hardware behavior.
+
 **v1.0 — 2026-04-29**
 
 This runbook describes how any team member can build, flash, and interpret the

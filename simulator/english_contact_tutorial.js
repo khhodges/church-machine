@@ -266,7 +266,10 @@ method run [pet name] {
 <tr><td>Security</td><td>None beyond HW</td><td>Seal per platform abstraction</td><td>Seal per domain abstraction</td></tr>
 </table>
 <div class="sr-comp-side-title" style="margin-top:0.75rem">Hardware-Enforced Meaning</div>
-<p>In a conventional system, a library's public API is <em>advisory</em> &mdash; a sufficiently clever or careless caller can bypass it. In a CLOOMC namespace, the public API is the <strong>only thing that exists</strong> from the outside. There is no bypass, not because bypassing is forbidden by policy, but because the code path to bypass does not exist.</p>
+<p>In the implemented CLOOMC capability path, callers reach an abstraction
+through capabilities exposed by its public API. This narrows the available
+entry paths; it is not a formal proof that no bypass exists elsewhere in the
+implementation.</p>
 </div>
 </div>
 </div>`

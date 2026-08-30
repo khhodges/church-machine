@@ -1,6 +1,10 @@
 # IDE Boot Namespace vs Amaranth Hardware Boot Namespace
 
-Authoritative diff produced 2026-06-30 by direct inspection of
+> **ARCHIVED / NON-AUTHORITATIVE.** Historical snapshot only. It may describe
+> retired targets, stale layouts, or unshipped plans. Use current source,
+> tests, `docs/HARDWARE.md`, and non-archive documentation for current behavior.
+
+Historical diff produced 2026-06-30 by direct inspection of
 `boot_rom.py → DEMO_NAMESPACE` (hardware) and `server/lumps/boot-image.bin`
 (IDE simulator binary, patched to 23 slots same date).
 

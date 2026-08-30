@@ -1,5 +1,9 @@
 # Plan: Browser
 
+> **PLAN / NOT SHIPPED SECURITY BEHAVIOR.** This design predates the current
+> Wukong release path. Encryption, tunnel, and target statements below are goals,
+> not evidence of FW=2 behavior.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 

@@ -1,5 +1,10 @@
 # CM Memory Map — Authoritative Reference
 
+> **HISTORICAL SNAPSHOT / NON-AUTHORITATIVE.** Despite the retained title, this
+> dump documents an older 7-bit sequence, 17-bit limit, and CRC-16 namespace
+> layout. Current Wukong layouts are defined by `hardware/layouts.py` and
+> `hardware/integrity32.py`.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 

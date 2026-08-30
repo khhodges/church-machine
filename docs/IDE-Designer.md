@@ -1,5 +1,9 @@
 # IDE Designer Guide
 
+> **EVIDENCE BOUNDARY:** Security and isolation language in this design guide
+> describes intended behavior, not a formal guarantee. Verify shipped behavior
+> against current source and executable tests.
+
 **v1.0 — 2026-04-30**
 **CONFIDENTIAL**
 

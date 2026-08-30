@@ -65,10 +65,12 @@ CALL CR0              ; Enter Salvation (imm=0: fast-path, NIA = lump word 1)
 
 Each CR shows four 32-bit words:
 
-- **GT**: The Golden Token value (version, index, permissions, type)
+- **GT**: The Golden Token value (slot, 9-bit sequence, type/domain,
+  three-bit domain-selected permissions, bind)
 - **Location**: Base address of the referenced object
 - **Limit**: Size bound of the object
-- **Seal**: Integrity check (CRC-16/CCITT)
+- **Integrity**: 32-bit unkeyed `integrity32` check over namespace/capability
+  location and authority metadata; this detects mismatch, not malicious forgery
 
 Click any CR to see its decoded fields (version, index, permissions breakdown).
 
@@ -184,7 +186,7 @@ The server starts on port 5000 and serves the simulator IDE.
 ### Project Layout
 
 ```
-hardware/           Synthesizable Amaranth HDL (Church Machine, Tang Nano 20K target)
+hardware/           Synthesizable Amaranth HDL (current Wukong A7 target; legacy boards retained)
 ctmm_amaranth/      Amaranth HDL hardware implementation (Church Machine)
 simulator/          Web IDE (HTML/JS/CSS)
 server/             Flask backend

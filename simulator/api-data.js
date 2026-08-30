@@ -285,7 +285,7 @@ const API_DATA = [
     {
         slot: 11, name: 'UART', layer: 2,
         perms: 'L S E',
-        description: 'Serial communication via the Tang Nano 20K BL616 USB bridge. Default 115200 baud.',
+        description: 'Legacy/experimental Tang Nano 20K BL616 UART concept (not the current Wukong target).',
         implemented: false, profile: 'IoT',
         methods: [
             { name: 'Send',     signature: 'Send(byte) → ok',     perms: 'S', description: 'Transmit one byte over the serial link.', implemented: false },
@@ -331,7 +331,7 @@ const API_DATA = [
     {
         slot: 15, name: 'Display', layer: 2,
         perms: 'L S E',
-        description: 'HDMI output via Tang Nano 20K HDMI connector. Write text or pixel data.',
+        description: 'Legacy/experimental Tang Nano 20K HDMI concept (not available on the current Wukong target).',
         implemented: false, profile: 'IoT',
         methods: [
             { name: 'Write',  signature: 'Write(data) → ok',   perms: 'S', description: 'Output text or pixel data to the display.', implemented: false },
@@ -575,7 +575,7 @@ const API_DATA = [
     {
         slot: 36, name: 'Deployer', layer: 6,
         perms: 'E',
-        description: 'Compiles assembly to binary, uploads to Tang Nano 20K via UART, verifies, and triggers boot.',
+        description: 'Legacy/experimental Tang Nano 20K compile/upload concept (not the current Wukong release path).',
         implemented: false, profile: 'Full',
         methods: [
             { name: 'Build',  signature: 'Build(srcGT) → binGT',   perms: 'E', description: 'Compile source to binary.', implemented: false },

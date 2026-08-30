@@ -1773,27 +1773,27 @@ function getMethodExamples(abs) {
       RETURN`,
         },
         'Salvation': {
-            'LOAD': `; Salvation.LOAD — prove namespace lookup via mLoad pipeline
-; mLoad 7-step: type check -> version match -> seal verify
+            'LOAD': `; Salvation.LOAD — exercise namespace lookup via mLoad pipeline
+; mLoad path: type check -> sequence match -> integrity verify
 ;   -> bounds check -> perm check -> F-bit -> deliver
 LOAD   CR1, Salvation       ; mLoad pipeline validates GT:
                          ;   1. Type != NULL (00=NULL, 01=Inform, 10=Outform, 11=Abstract)
-                         ;   2. GT.gt_seq == NS[4].word2[31:25]  ; NS[4] = Salvation
-                         ;   3. CRC-16 seal(word0,word1) == word2[15:0]
+                         ;   2. GT.gt_seq[8:0] == NS[4].word1[29:21]
+                         ;   3. integrity32(word0,word1) == NS[4].word2
                          ;   4. Index 4 within NS bounds
                          ;   5. L perm required for LOAD
                          ;   6. F-bit=0 (local, not tunneled)
-                         ;   7. CR1 <- 128-bit capability register
-; CR1.word0 = GT packed: Ver(7)|Idx(17)|Perms(6)|Type(2)
+                         ;   7. CR1 <- capability register
+; CR1.word0 = GT: Bind(1)|Perm(3)|Domain(1)|Type(2)|Seq(9)|Slot(16)
 ; CR1.word1 = NS[4].word0 (location)     ; NS[4] = Salvation
-; CR1.word2 = NS[4].word1 (B|F|G|...|limit[16:0])  ; NS[4] = Salvation
-; CR1.word3 = NS[4].word2 (version[31:25]|seal[24:0])  ; NS[4] = Salvation`,
+; CR1.word2 = NS[4].word1 (F|G|seq[8:0]|limit[20:0])
+; NS[4].word2 is the 32-bit unkeyed integrity32 check.`,
             'TPERM': `; Salvation.TPERM — prove GT health check
 ; TPERM checks permissions + validity + bounds in one cycle
 ; Sets Z flag: Z=1 = all passed, Z=0 = something failed
 ; Never traps — enables conditional execution (try-catch)
 LOAD   CR1, Salvation       ; CR1 holds Salvation GT [E]
-TPERM  CR1, E            ; Check E permission, valid, MAC
+TPERM  CR1, E            ; Check E permission and implemented validity gates
 ; Z=1: permission present, GT valid
 ; Z=0: permission denied or GT invalid
 ; Subsequent EQ instructions skip if Z=0
@@ -1862,16 +1862,17 @@ CALL   CR1              ; Navana.Monitor checks:
 ;     if MTBF < threshold: flag degraded
 ;   DR1 <- total fault count across all blocks
 ;   DR2 <- index of lowest-MTBF abstraction`,
-            'IDS': `; Navana.IDS — Intrusion Detection System
-; Detects GT forgery attempts and version anomalies
+            'IDS': `; Navana.IDS — namespace consistency monitor
+; Detects integrity mismatches and sequence anomalies
 LOAD   CR1, Navana        ; Load Navana E-GT
 CALL   CR1              ; Navana.IDS scans:
 ;   for each active NS entry:
-;     recompute seal = CRC-16(word0, word1)
-;     compare seal vs word2[15:0]
-;     if mismatch: FAULT — tampered entry
-;     check version consistency across all GTs
-;     if GT.version > NS.version: stale/forged
+;     recompute integrity32(word0, word1 with G/F masked)
+;     compare full 32-bit result vs word2
+;     if mismatch: report inconsistent entry
+;     check 9-bit GT sequence against NS word1[29:21]
+;     if mismatched: report stale/inconsistent GT
+;   integrity32 is unkeyed mismatch detection, not authentication
 ;   Report anomalies to Navana.Monitor`,
             'ValidatePassKey': `; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ; LED via Navana PassKey — complete 3-step flow
@@ -1953,9 +1954,9 @@ CALL   CR1                ; Navana.MintPassKey:
 ;      E perm for CALL capability
 ;   4. Store in Navana's private PassKey registry
 ;   5. CR1 <- PassKey GT (ready to grant to thread)
-; PassKey is unforgeable:
-;   - Only Navana can mint (M-elevation required)
-;   - GT index encoding cross-checked against registry
+; PassKey is validated by this implementation path:
+;   - Navana mint path requires M-elevation
+;   - GT slot/fields are cross-checked against the private registry
 ;   - Thread receives but cannot modify or copy`,
         },
         'Mint': {
@@ -1976,10 +1977,10 @@ CALL   CR1                ; Navana.MintPassKey:
 ;   2. CALL Memory.Allocate(size) for backing storage (returns location)
 ;   3. Find free NS entry (Mint manages NS table)
 ;   4. Increment version (never reset — monotonic)
-;   5. Write 4-word NS entry with B/F flags + seal
+;   5. Write 4-word NS entry with F/G flags + integrity32
 ;   6. Pack GT, return ready to use
 ;
-; Returns: GT packed as Version(7)|Index(17)|Perms(6)|Type(2)
+; Returns: GT packed as Bind(1)|Perm(3)|Domain(1)|Type(2)|Seq(9)|Slot(16)
 ; Faults:  DOMAIN_PURITY, OOM, TYPE (NULL not creatable)
 ; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1995,16 +1996,17 @@ CALL   CR1              ; Mint.Encode internally:
 ;      Memory scans NS for free slot (word0=0 AND word1=0)
 ;      skips reserved 0..44, finds e.g. slot 50
 ;      returns { nsIndex: 50, location: 0x3200 }
-;   3. Version increment:
-;      read NS[50].word2, extract ver = (word2>>25)&0x7F  ; NS[50] = example dynamic slot
-;      newVer = (ver + 1) & 0x7F  (never reset to 0)
-;   4. Pack NS entry at NS_TABLE_BASE + 50*3:
+;   3. Sequence increment:
+;      read NS[50].word1, extract seq = (word1>>21)&0x1FF
+;      newSeq = (seq + 1) & 0x1FF
+;   4. Pack the canonical 4-word NS entry:
 ;      word0 = location (0x3200)
-;      word1 = B(0)|F(0)|G(0)|type(01)|...|limit(127)
-;      word2 = (newVer<<25) | CRC16_seal(loc, limit)
+;      word1 = F(0)|G(0)|newSeq[8:0]|limit[20:0]
+;      word2 = integrity32(word0, word1)  ; public, unkeyed mismatch check
+;      word3 = cache token               ; non-authoritative
 ;   5. Pack GT:
-;      GT = (seq<<16)|(50)|(0b000001<<25)|(0b01<<23)
-;         = seq=1, idx=50, R+W, Inform
+;      GT = Bind|Perm|Domain|Type|newSeq|slot
+;         = seq=1, slot=50, R+W, Inform
 ; Result: CR1 <- ready-to-use GT for NS[50]  (dynamic slot chosen at runtime)
 
 ; ── EXAMPLE B: Inform + Turing R,W,X (full data+code) ────
@@ -2105,16 +2107,16 @@ LOAD   CR1, Mint          ; Load Mint E-GT
 DWRITE DR1, #50         ; Target NS slot to revoke
 
 CALL   CR1              ; Mint.Revoke:
-;   base = NS_TABLE_BASE + 50 * 3
-;   word2 = mem[base+2]
-;   oldVer = (word2 >>> 25) & 0x7F     ; extract version
-;   newVer = (oldVer + 1) & 0x7F       ; increment (wraps at 128)
-;   seal = word2 & 0xFFFF               ; preserve CRC-16 seal
-;   mem[base+2] = (newVer << 25) | seal ; write back
+;   base = canonical 4-word base for NS[50]
+;   word1 = mem[base+1]
+;   oldSeq = (word1 >>> 21) & 0x1FF
+;   newSeq = (oldSeq + 1) & 0x1FF
+;   mem[base+1] = word1 with gt_seq[29:21] replaced
+;   mem[base+2] = integrity32(mem[base], mem[base+1])
 ;
 ; All GTs with old version are now dead:
 ;   any LOAD/CALL with stale GT hits mLoad step 2:
-;   GT.version(7 bits) != NS[50].word2.version(7 bits)  ; NS[50] = example dynamic slot
+;   GT.gt_seq[24:16] != NS[50].word1.gt_seq[29:21]
 ;   -> FAULT: VERSION_MISMATCH
 ; DR1 <- new version number`,
             'Transfer': `; Mint.Transfer — move GT between c-lists
@@ -2176,7 +2178,7 @@ CALL   CR1              ; Memory.Resize:
 ;   2. Update the allocation record with new size
 ; NOTE: if an NS entry references this location,
 ; Mint must also update the NS entry's limit field
-; and recompute the CRC-16 seal separately`,
+; and recompute the full 32-bit integrity32 value separately`,
         },
         'Scheduler': {
             'Yield': `; Scheduler.Yield — voluntarily yield time slice
@@ -2930,14 +2932,10 @@ CALL   CR1              ; Friends.Revoke:
 ;   3. Friend's next mLoad hits version mismatch -> FAULT`,
         },
         'Tunnel': {
-            'Register': `; Tunnel.Register — identify this board to the IDE host
-; Replaces the hardwired B:02½ CALL_HOME boot step.
-; Sends the 23-byte call-home packet and awaits ACK.
-;
-; Packet layout (23 bytes):
-;   [0xCE11(2B) · board_type(1B) · fw_version(1B) ·
-;    HMAC-SHA256(4B) · UID(8B) ·
-;    boot_reason(1B) · last_fault(1B) · fault_NIA(4B)]
+            'Register': `; Tunnel.Register — planned board registration abstraction
+; Current Wukong FW=2 uses plaintext UART output/control plus bridge status,
+; trace, snapshot, command, and upload exchanges. It does not ship this proposed
+; HMAC call-home frame; authenticated/encrypted framing is an FW=3 design goal.
 ;
 ; DR1 = boot_reason  (0=cold, 1=warm, 2=fault-recovery)
 ; DR2 = last_fault   (0 if no prior fault)
@@ -2948,11 +2946,11 @@ LOAD   CR1, Tunnel        ; Load Tunnel E-GT (resident, layer 1)
 DWRITE DR1, #0            ; boot_reason = 0 (cold boot)
 DWRITE DR2, #0            ; last_fault  = 0 (none)
 DWRITE DR3, #0x00000000   ; fault_NIA   = 0 (none)
-CALL   CR1                ; Tunnel.Register:
-;   1. Compose 23-byte packet from board ROM + DR args
+CALL   CR1                ; Proposed Tunnel.Register:
+;   1. Compose a versioned registration message
 ;   2. Transmit over UART to IDE bridge
-;   3. Await ACK frame within ≈500 ms timeout
-;   4. If ACK: IDE confirms UID + HMAC valid → DR0 ← 1
+;   3. Await a correlated acknowledgement
+;   4. Authentication remains unimplemented in shipped FW=2
 ;   5. If timeout: offline mode → DR0 ← 0, boot continues`,
             'Send': `; Tunnel.Send — push a self-identifying media packet to the IDE
 ; Every packet carries a 4-byte ASCII FourCC type tag so the
@@ -3042,7 +3040,7 @@ DWRITE DR2, #64             ; Expected: 64 words (one slot)
 CALL   CR1                  ; Tunnel.Fetch:
 ;   1. Transmit fetch request: [0xFE7C · token · expected_words]
 ;   2. Await IDE response: lump header + data words (≤500 ms)
-;   3. Validate: magic=0x1F · size=DR2 · CRC-16 over all words
+;   3. Validate framing and size; cryptographic payload authentication is planned
 ;   4. Write validated words to CR2 base via mSave (W-perm)
 ;   5. Update NS entry: base, limit, version, seal
 ; DR0 ← 0 = lump installed · non-zero = error (timeout/CRC/size)`,
@@ -3129,8 +3127,8 @@ CALL   CR1              ; Editor.Save:
 ;   1. Get editor buffer contents
 ;   2. If no existing slot: Memory.Allocate new DATA slot
 ;   3. DWRITE buffer to mem[location] (W perm required)
-;   4. Recompute seal: CRC-16(word0, word1) for integrity
-;   5. Update word2 = (gt_seq << 25) | newCRC`,
+;   4. Recompute full word2 = integrity32(word0, word1)
+;   5. Keep 9-bit gt_seq in word1[29:21]`,
             'Load': `; Editor.Load — load source from NS slot into editor
 LOAD   CR1, Editor       ; Load Editor E-GT
 DWRITE DR1, #80         ; NS slot containing source

@@ -146,7 +146,10 @@ abstraction Mint {
 
 `Revoke` modifies the version number embedded in a capability word. This operation is an internal bookkeeping step — it increments the version counter that a revocation check compares against. External callers must never trigger version bumps directly; doing so would allow them to revoke capabilities they don't own.
 
-By marking `Revoke` as `private`, the lump seal guarantees that no external caller can reach `Revoke`. The version bump can only occur when `Create` internally calls it via a direct `BRANCH` to `Revoke`'s offset.
+Marking `Revoke` as `private` removes it from the external method table in the
+implemented compiler/runtime path. The unkeyed namespace `integrity32` value
+does not itself guarantee method privacy or prove that no alternate entry path
+exists.
 
 ### Compiled lump layout
 

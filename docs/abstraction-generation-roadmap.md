@@ -1,5 +1,9 @@
 # Church Machine Abstraction Generation Roadmap
 
+> **HISTORICAL ROADMAP / NON-AUTHORITATIVE.** Target-board, encryption, identity,
+> completion, and security statements below are planning material, not shipped
+> Wukong/FW=2 behavior or implementation evidence.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 

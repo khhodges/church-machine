@@ -23,13 +23,45 @@ S-IDE v1 is a simplified entry-point IDE built on the Church Machine codebase, p
 ## System Architecture
 The system integrates an Amaranth HDL-based FPGA hardware with a web IDE (HTML/JS/CSS) and a Flask backend.
 
-**Authoritative Architectural Overview:** `docs/cloomc-foundation.md` is the single document explaining the CLOOMC ISA, the PP250 heritage, the capability model, the reliability model, the Trusted Security Base principle, memory architecture decisions (hardware-forced vs programmer choices vs natural consequences), the old 6-region boot layout and its problems, the 3-LUMP starter kit, and the Wukong A7 board profile. Read this document first when working on the boot image, the memory map, or the ISA. For all Wukong A7 hardware setup facts (USB port map, LED pin assignments, APB3 register map, firmware build steps, callhome bridge usage), see `docs/HARDWARE.md`.
+### Implementation status and evidence policy
+
+- **Current hardware target:** QMTECH Wukong A7 / XC7A100T. Its source, build
+  guards, UART bridge, and active hardware tests are the maintained release path.
+- **Tang Nano 20K:** legacy/experimental IoT profile, not the current hardware
+  release path.
+- **Ti60 F225 and pico-ice:** historical targets. Files under `docs/archive/`
+  are non-authoritative snapshots even when their original text says
+  “authoritative,” “current,” or “validated.”
+- **FW=2 messaging:** shipped wire behavior is plaintext. The bridge defaults to
+  `http://localhost:5000`; its current HTTPS requests also disable certificate
+  verification. `--insecure` forces that same no-verification mode and does not
+  add UART authentication or encryption.
+- **FW=3 messaging:** HMAC/ChaCha20, nonce, per-abstraction key, and encrypted
+  framing text in `docs/cm-msg-protocol.md` is a proposal until executable
+  firmware and bridge evidence is linked there.
+- **Security wording:** “unforgeable,” “impossible,” “guaranteed,” and similar
+  absolute claims require a named formal proof or executable test. Otherwise
+  describe the implemented check or call the property a goal.
+
+**Current documentation entry points:** use `docs/cloomc-foundation.md` for the
+intended CLOOMC architecture and `docs/HARDWARE.md` for the maintained Wukong A7
+setup. Confirm implementation claims against source and tests; architecture text
+may include goals. Never use `docs/archive/cloomc-foundation.md` or another
+archived snapshot as current authority.
 
 **UI/UX Decisions:**
 The web IDE features ten interactive views (Math, Code, Tutorial, Dashboard, Namespace, Abstractions, Pipeline, Reference, Builder, Docs). It includes educational tools like Pure Math calculator, HP-35 Calculator, Abacus, and Slide Rule, all with Church Machine trace. Learning aids comprise a "Math Challenge" sidebar, "History Tab," "Syntax Tab," and a "Visual Namespace Builder" for drag-and-drop deployment topology design. Documentation is presented as an interactive book with educational popups and a global CSS tooltip system. The design is responsive, and editor state, settings, and progress are persisted via localStorage.
 
 **Technical Implementations:**
-The architecture uses a scale-free abstraction model with 47 abstractions in 9 layers for security. Capability-based security is enforced by 32-bit Golden Tokens, validated by the mLoad capability validation pipeline (validates version, CRC seal, bounds, and permissions on every capability access). Domain purity strictly separates capabilities from code/data. The multi-language CLOOMC++ Compiler targets a 20-instruction Church Machine ISA, supporting English, JavaScript, Haskell, Symbolic Math, and Lambda Calculus with automatic detection, producing compiled abstractions. Key optimizations include a LAMBDA NIA Cache for leaf lambda execution. The Locator manages on-demand lump loading, and the Navana Master Controller handles Namespace entries and secure deployment. The Instruction Set is optimized for capability-focused and data manipulation operations. The platform supports the Wukong A7 (XC7A100T), using a USB-Serial bridge for deployment. FPGA Call-Home & Device Management allows FPGAs to register with the IDE, enabling secure remote code deployment and fault-triggered boot diagnostics, with server-side fault logging and MTBF calculation per instruction address.
+The architecture uses a layered abstraction model and 32-bit Golden Tokens.
+Current simulator and RTL paths implement type, version, integrity, bounds, and
+permission checks at defined capability gates; test coverage demonstrates
+specific paths but is not a formal proof of complete isolation. The
+multi-language compiler targets the Church Machine ISA. The maintained hardware
+platform is Wukong A7 (XC7A100T), using a USB-Serial bridge for trace, control,
+image upload, and diagnostics. Current FW=2 UART traffic is plaintext, so remote
+deployment must not be described as cryptographically secure. FW=3 authenticated
+encryption remains planned.
 
 ## External Dependencies
 - **Python/Flask:** Backend web server.

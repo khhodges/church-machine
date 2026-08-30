@@ -1,6 +1,7 @@
 # Boot ROM Layout
 
-> **STALE — describes pre-v1.2 boot layout.** Current layout: Thread at 0x0000, NS LUMP at top (0x1FC00), no slot-3 boot code domain.
+> **ARCHIVED / NON-AUTHORITATIVE.** Stale historical snapshot describing a
+> pre-v1.2 layout. Do not use it to infer current simulator or Wukong behavior.
 
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
