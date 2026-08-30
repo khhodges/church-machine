@@ -7,4 +7,4 @@ The Thread object is the runtime context object and the only authority for one T
 
 **Why:** Parallel context stores can drift from the Thread object and make switching display or restore a state that CHANGE did not actually save.
 
-**How to apply:** CHANGE must save into and restore from the Thread object. Thread status UI must read dormant state from that same object; active state may read the currently installed live machine state.
+**How to apply:** CHANGE must save all DR0–DR15 values and its protected context into the outgoing Thread, validate every non-NULL saved GT through mLoad before mutation, and restore only from the incoming Thread. Thread status UI reads dormant state from that same object.

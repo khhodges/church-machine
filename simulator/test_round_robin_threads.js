@@ -50,10 +50,17 @@ const entryWords = [1, 11, 12].map((slot, i) =>
     committed.memory[committedBases[i] + entryLayouts[i].capsStart] >>> 0);
 const initialEntry = committed.readNSEntry(entryWords[0] & 0xFFFF);
 committed._writeCR(0, entryWords[0], initialEntry);
-committed.dr[1] = 0xA1001001;
-committed.memory[committedBases[1] + 1] = 0xB2000000;
-committed.memory[committedBases[1] + 2] = 0xB2000001;
-committed.memory[committedBases[2] + 1] = 0xC3000000;
+const thread1InitialDRs = Array.from(
+    {length: 16}, (_, i) => (0xA1001000 + i) >>> 0);
+const thread2InitialDRs = Array.from(
+    {length: 16}, (_, i) => (0xB2002000 + i) >>> 0);
+const thread3InitialDRs = Array.from(
+    {length: 16}, (_, i) => (0xC3003000 + i) >>> 0);
+committed.dr.splice(0, 16, ...thread1InitialDRs);
+for (let i = 0; i < 16; i++) {
+    committed.memory[committedBases[1] + 1 + i] = thread2InitialDRs[i];
+    committed.memory[committedBases[2] + 1 + i] = thread3InitialDRs[i];
+}
 const targetCapsBefore = committed.memory.slice(
     committedBases[1] + entryLayouts[1].capsStart,
     committedBases[1] + entryLayouts[1].capsStart + 12);
@@ -89,10 +96,8 @@ assert.strictEqual(committed.cr[12].word1, committedBases[1],
     'manual CHANGE installs the selected Thread base into live CR12');
 assert.strictEqual(committed.parseGT(committed.cr[12].word0).index, 11,
     'manual CHANGE installs the selected Thread identity into live CR12');
-assert.strictEqual(committed.dr[0], 0xB2000000,
-    'manual CHANGE restores saved DR0 into the live register bank');
-assert.strictEqual(committed.dr[1], 0xB2000001,
-    'manual CHANGE restores saved DR1 instead of retaining the outgoing value');
+assert.deepStrictEqual(committed.dr, thread2InitialDRs,
+    'manual CHANGE restores all sixteen saved DRs into the live register bank');
 assert.strictEqual(committed.cr[0].word0, entryWords[1],
     'manual CHANGE restores saved CR0 into the live capability bank');
 assert.strictEqual(committed.pc, 0,
@@ -141,7 +146,9 @@ assert(selectedStep,
     'Step executes after selecting a Thread that was switched from HALT');
 assert.strictEqual(selectedStep.physicalPC, firstEntry.word0_location + 1,
     'Step executes the selected Thread entry rather than the outgoing context');
-committed.dr[1] = 0xA2001002;
+for (let i = 0; i < 16; i++) {
+    committed.dr[i] = (0xD4004000 + i) >>> 0;
+}
 committed.pc = 0x2A;
 committed.flags = {N: true, Z: false, C: true, V: false};
 committed.sto = 0xA5;
@@ -155,8 +162,8 @@ const suspendedThread2 = {
 assert.strictEqual(committed.advanceConfiguredThread().slot, 12);
 assert.strictEqual(committed.cr[12].word1, committedBases[2],
     'the next CHANGE moves live CR12 to Thread#3');
-assert.strictEqual(committed.dr[0], 0xC3000000,
-    'the next CHANGE restores Thread#3 live data registers');
+assert.deepStrictEqual(committed.dr, thread3InitialDRs,
+    'the next CHANGE restores all sixteen Thread#3 data registers');
 const dormantThread2Row = committed.threadStatusRows().find(row => row.slot === 11);
 assert.strictEqual(dormantThread2Row.nia, 0x2A,
     'the dormant Thread card reads NIA from the CHANGE-saved Thread object');
@@ -167,8 +174,8 @@ assert.strictEqual(thread2Indicator.nia, 0x2A,
 assert.strictEqual(committed.advanceConfiguredThread().slot, 1);
 assert.strictEqual(committed.cr[0].word0, entryWords[0],
     'committed image restores Thread.1 CR0 entry authority after wraparound');
-assert.strictEqual(committed.dr[1], 0xA1001001,
-    'committed image restores Thread.1 DR state after wraparound');
+assert.deepStrictEqual(committed.dr, thread1InitialDRs,
+    'committed image restores all sixteen Thread.1 DRs after wraparound');
 assert.strictEqual(committed.cr[12].word1, committedBases[0],
     'wraparound restores Thread.1 as the live CR12 context');
 
@@ -188,6 +195,36 @@ assert.deepStrictEqual(committed.flags, suspendedThread2.flags,
     'CHANGE restores condition flags from the selected Thread object');
 assert.strictEqual(committed.sto, suspendedThread2.sto,
     'CHANGE restores protected STO from the selected Thread object');
+
+// CHANGE must pass every non-NULL saved capability through mLoad before it
+// saves the outgoing context or exposes any incoming register.
+const invalidGT = new ChurchSimulator();
+assert.strictEqual(invalidGT.loadBootImage(image), true,
+    `invalid-GT fixture image must load: ${invalidGT.lastBootImageError || 'unknown error'}`);
+invalidGT.bootComplete = true;
+invalidGT._currentThreadSlot = 1;
+invalidGT.dr.splice(0, 16, ...thread1InitialDRs);
+const invalidTargetBase = invalidGT.readNSEntry(11).word0_location;
+const invalidTargetLayout = invalidGT._threadLayoutAtBase(invalidTargetBase);
+const invalidTargetCR0Addr = invalidTargetBase + invalidTargetLayout.capsStart;
+invalidGT.memory[invalidTargetCR0Addr] =
+    (invalidGT.memory[invalidTargetCR0Addr] ^ 0x00010000) >>> 0;
+const invalidOutgoingDRHomes = invalidGT.memory.slice(
+    committedBases[0] + 1, committedBases[0] + 17);
+const rejectedGT = invalidGT.advanceConfiguredThread();
+assert.strictEqual(rejectedGT.ok, false,
+    'CHANGE rejects a stale-generation GT restored from a Thread capability home');
+assert.strictEqual(invalidGT._currentThreadSlot, 1,
+    'failed mLoad validation does not activate the incoming Thread');
+assert.deepStrictEqual(invalidGT.dr, thread1InitialDRs,
+    'failed mLoad validation leaves all live outgoing DRs unchanged');
+assert.deepStrictEqual(
+    invalidGT.memory.slice(committedBases[0] + 1, committedBases[0] + 17),
+    invalidOutgoingDRHomes,
+    'failed mLoad validation occurs before saving any outgoing DR home');
+assert.strictEqual(invalidGT.faultLog.at(-1).type, 'VERSION',
+    'CHANGE surfaces the ISA mLoad generation fault');
+
 const selectedRun = committed.run(1);
 assert.strictEqual(selectedRun.steps, 1,
     'Run retires an instruction after selecting a Thread from HALT');

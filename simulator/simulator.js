@@ -3652,6 +3652,16 @@ class ChurchSimulator {
             return { ok: false, fault: 'NULL_CAP', message: 'GT is NULL (gt_type=0b00)' };
         }
         const parsed = this.parseGT(gt32);
+        if (parsed.malformed) {
+            return {
+                ok: false,
+                fault: 'DOMAIN_PURITY',
+                message: `malformed GT: ${parsed.malformedReason || 'invalid field encoding'}`,
+            };
+        }
+        const purityCheck = this._validateClistSlotPerms(
+            parsed, Number.isInteger(srcCRIdx) ? srcCRIdx : parsed.index);
+        if (!purityCheck.ok) return purityCheck;
         if (parsed.index >= this.nsCount) {
             return { ok: false, fault: 'BOUNDS', message: `namespace index ${parsed.index} out of bounds` };
         }
@@ -6569,7 +6579,8 @@ class ChurchSimulator {
         //   CR13 (interrupt handler)   system-wide: load GT directly; no per-thread save.
         //   Scheduler: save/restore CR0–CR11 and DR0–DR15 homes, validate
         //      restored CR0, derive transient CR14, and enter at code word 1.
-        // PC, flags, M state, STO, CR14, and CR15 are not Thread data words.
+        // NIA, flags, SZ, and STO use the protected context word. CR14 is
+        // derived from validated CR0; CR15 remains the live Namespace root.
 
         if (d.crDst < 12) {
             this.fault('PRIV_REG', `CHANGE: target CR${d.crDst} is not privileged — CHANGE may only write CR12–CR15`);
@@ -6654,25 +6665,28 @@ class ChurchSimulator {
                         this.fault('BOUNDS', `CHANGE CR12: Namespace slot ${targetIdx} has invalid Thread geometry`);
                         return null;
                     }
+                    const restoredRegs = [];
                     for (let i = 0; i < 12; i++) {
                         const gtWord = this.memory[tBase + restoreLayout.capsStart + i] >>> 0;
                         if (gtWord !== 0) {
-                            const capEntry = this.readNSEntry(this.parseGT(gtWord).index);
-                            if (capEntry) {
-                                this.cr[i] = {
-                                    word0: gtWord,
-                                    word1: capEntry.word0_location >>> 0,
-                                    word2: capEntry.word1_limit >>> 0,
-                                    word3: 0,
-                                    m: 0,
-                                };
-                            } else {
-                                this.cr[i] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
+                            const capCheck = this.mLoad(gtWord, null, i);
+                            if (!capCheck.ok) {
+                                this.fault(capCheck.fault,
+                                    `CHANGE CR12 restore CR${i}: ${capCheck.message}`);
+                                return null;
                             }
+                            restoredRegs[i] = {
+                                word0: gtWord,
+                                word1: capCheck.entry.word0_location >>> 0,
+                                word2: capCheck.entry.word1_limit >>> 0,
+                                word3: 0,
+                                m: 0,
+                            };
                         } else {
-                            this.cr[i] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
+                            restoredRegs[i] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
                         }
                     }
+                    for (let i = 0; i < 12; i++) this.cr[i] = restoredRegs[i];
                 }
             }
 
@@ -6705,6 +6719,50 @@ class ChurchSimulator {
             this.fault('BOUNDS', `NEXT_THREAD: Namespace slot ${targetIdx} is not a valid Thread descriptor`);
             return null;
         }
+        const tBase = entry.word0_location;
+        const threadSeq = this.parseNSWord1(entry.word1_limit).gtSeq;
+        const threadGT = this.createGT(
+            threadSeq, targetIdx,
+            {R:0,W:0,X:0,L:0,S:0,E:0}, 1);
+        const threadCheck = this.mLoad(threadGT, null, 12, tBase);
+        if (!threadCheck.ok) {
+            this.fault(threadCheck.fault,
+                `CHANGE Thread object NS[${targetIdx}]: ${threadCheck.message}`);
+            return null;
+        }
+        const restoredRegs = [];
+        for (let i = 0; i < 12; i++) {
+            const gtWord = this.memory[tBase + targetLayout.capsStart + i] >>> 0;
+            if (gtWord === 0 || ChurchSimulator.isNullGT(gtWord)) {
+                restoredRegs[i] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
+                continue;
+            }
+            const capCheck = this.mLoad(gtWord, null, i);
+            if (!capCheck.ok) {
+                this.fault(capCheck.fault,
+                    `CHANGE restore CR${i} from Thread slot ${targetIdx}: ${capCheck.message}`);
+                return null;
+            }
+            restoredRegs[i] = {
+                word0: gtWord,
+                word1: capCheck.entry.word0_location >>> 0,
+                word2: capCheck.entry.word1_limit >>> 0,
+                word3: 0,
+                m: 0,
+            };
+        }
+        const threadLayout = targetLayout || THREAD_DESIGN.layout(
+            targetHeader.lumpSize, targetHeader.cw, targetHeader.cc);
+        const heapGT = this.createGT(
+            threadSeq, targetIdx,
+            {R:1,W:1,X:0,L:0,S:0,E:0}, 1);
+        const heapCheck = this.mLoad(
+            heapGT, null, 5, tBase + threadLayout.heapStart);
+        if (!heapCheck.ok) {
+            this.fault(heapCheck.fault,
+                `CHANGE restore CR5 heap GT for Thread slot ${targetIdx}: ${heapCheck.message}`);
+            return null;
+        }
         const outSlot = this._currentThreadSlot ?? null;
         this._flushLambdaCache();
         // Before boot, the live CR/DR banks are reset scratch state rather
@@ -6735,14 +6793,9 @@ class ChurchSimulator {
             }
         }
 
-        const tBase = entry.word0_location;
         // CHANGE makes the incoming Thread the active CR12 context before any
         // restored register can be written.  Leaving CR12 on the outgoing
         // Thread makes later CR/DR writes target the wrong saved image.
-        const threadSeq = this.parseNSWord1(entry.word1_limit).gtSeq;
-        const threadGT = this.createGT(
-            threadSeq, targetIdx,
-            {R:0,W:0,X:0,L:0,S:0,E:0}, 1);
         this.cr[12] = {
             word0: threadGT >>> 0,
             word1: tBase >>> 0,
@@ -6755,22 +6808,7 @@ class ChurchSimulator {
         // privileged restore half of CHANGE, not twelve ordinary CR writes:
         // ordinary _writeCR calls would write through CR12 and needlessly
         // mutate the incoming image while it is being restored.
-        for (let i = 0; i < 12; i++) {
-            const gtWord = this.memory[tBase + targetLayout.capsStart + i] >>> 0;
-            if (gtWord !== 0) {
-                const parsed = this.parseGT(gtWord);
-                const capEntry = parsed.type === 3 ? null : this.readNSEntry(parsed.index);
-                this.cr[i] = {
-                    word0: gtWord,
-                    word1: capEntry ? (capEntry.word0_location >>> 0) : 0,
-                    word2: capEntry ? (capEntry.word1_limit >>> 0) : 0,
-                    word3: 0,
-                    m: 0,
-                };
-            } else {
-                this.cr[i] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
-            }
-        }
+        for (let i = 0; i < 12; i++) this.cr[i] = restoredRegs[i];
         for (let i = 0; i < 16; i++) {
             this.dr[i] = this.memory[tBase + 1 + i] >>> 0;
         }
@@ -6786,11 +6824,6 @@ class ChurchSimulator {
         this.lambdaActive = false;
         this.lambdaReturnPC = 0;
         this.lambdaCachedFrame = null;
-        const threadLayout = targetLayout || THREAD_DESIGN.layout(
-            targetHeader.lumpSize, targetHeader.cw, targetHeader.cc);
-        const heapGT = this.createGT(
-            threadSeq, targetIdx,
-            {R:1,W:1,X:0,L:0,S:0,E:0}, 1);
         this.cr[5] = {
             word0: heapGT >>> 0,
             word1: (tBase + threadLayout.heapStart) >>> 0,
