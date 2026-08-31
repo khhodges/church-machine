@@ -38,6 +38,17 @@ _MINIMAL_TCL = """\
     connect_debug_port u_ila_0/probe4 [lsort -dictionary [get_nets {led0 led1}]]
 """
 
+_CONTINUED_TCL = """\
+    connect_debug_port u_ila_0/probe0 \\
+        [get_nets {dbg_boot_complete}]
+    connect_debug_port u_ila_0/probe2 [lsort \\
+        -dictionary [get_nets {dbg_nia[*]}]]
+    connect_debug_port u_ila_0/probe4 [lsort -dictionary \\
+        [get_nets {led0 \\
+            led1}]]
+    set unrelated_nets [get_nets {not_a_probe}]
+"""
+
 _GOOD_GEN = """\
 def generate_rtlil_wukong(output_dir="build"):
     from .wukong_top import ChurchWukongXC7A100T
@@ -105,6 +116,17 @@ check("bus lsort-wrapped expression parsed", PASS,
       probe_list[2] == ('u_ila_0/probe2', ['dbg_nia[*]']))
 check("multi-net lsort-wrapped expression parsed", PASS,
       probe_list[4] == ('u_ila_0/probe4', ['led0', 'led1']))
+
+continued_probe_list = extract_tcl_probe_nets(_CONTINUED_TCL)
+check("extracts 3 probes from continued TCL", PASS, len(continued_probe_list) == 3)
+check("continued scalar direct get_nets expression parsed", PASS,
+      continued_probe_list[0] == ('u_ila_0/probe0', ['dbg_boot_complete']))
+check("continued bus lsort-wrapped expression parsed", PASS,
+      continued_probe_list[1] == ('u_ila_0/probe2', ['dbg_nia[*]']))
+check("continued multi-net expression parsed", PASS,
+      continued_probe_list[2] == ('u_ila_0/probe4', ['led0', 'led1']))
+check("unrelated continued-TCL command is ignored", PASS,
+      all('not_a_probe' not in nets for _, nets in continued_probe_list))
 
 probe_attrs = probe_nets_to_attrs(probe_list)
 all_attrs = {a for attrs in probe_attrs.values() for a in attrs}

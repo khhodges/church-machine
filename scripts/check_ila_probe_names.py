@@ -51,9 +51,11 @@ DEFAULT_TOP = "hardware/wukong_top.py"
 def extract_tcl_probe_nets(tcl_text):
     """Return a list of (probe_port, [net_pattern, ...]) pairs.
 
-    Only ``connect_debug_port`` lines that contain a literal ``get_nets {…}``
-    are processed.  The clock probe (which uses a ``$clk_net`` variable) is
-    skipped intentionally — its net name is not statically knowable.
+    Only ``connect_debug_port`` commands that contain a literal
+    ``get_nets {…}`` are processed.  Tcl backslash-newline continuations are
+    joined before matching so the command can be formatted across lines.  The
+    clock probe (which uses a ``$clk_net`` variable) is skipped intentionally —
+    its net name is not statically knowable.
 
     Example inputs and outputs:
       connect_debug_port u_ila_0/probe0 [get_nets {dbg_boot_complete}]
@@ -64,17 +66,23 @@ def extract_tcl_probe_nets(tcl_text):
         → ('u_ila_0/probe4', ['led0', 'led1'])
     """
     results = []
+    # A backslash immediately followed by a newline is Tcl's command
+    # continuation syntax.  Join only those pairs (and indentation on the
+    # continued line); ordinary newlines must remain command boundaries so an
+    # unrelated get_nets command cannot be attributed to a probe.
+    logical_text = re.sub(r'\\\r?\n[ \t]*', ' ', tcl_text)
+
     # Match: [optional indentation] connect_debug_port <port> … get_nets
     # {<patterns>} … .  Vivado TCL commonly nests these commands inside an
-    # if-block, so allowing leading whitespace is required for real build
-    # scripts.  The same expression handles direct [get_nets …] and
-    # lsort-wrapped [get_nets …] forms.
+    # if-block, so allowing leading horizontal whitespace is required for real
+    # build scripts.  After continuation joining, the same expression handles
+    # direct [get_nets …] and lsort-wrapped [get_nets …] forms.
     # The patterns inside {} may include spaces (multiple nets) or [*] globs.
     pattern = re.compile(
-        r'^\s*connect_debug_port\s+(\S+)\s+.*get_nets\s+\{([^}]+)\}',
+        r'^[ \t]*connect_debug_port[ \t]+(\S+)[ \t]+.*get_nets[ \t]+\{([^}]+)\}',
         re.MULTILINE,
     )
-    for m in pattern.finditer(tcl_text):
+    for m in pattern.finditer(logical_text):
         port   = m.group(1)
         bodies = m.group(2).strip().split()
         results.append((port, bodies))
