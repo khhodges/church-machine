@@ -8,4 +8,4 @@ Start Address      0x00000000
 End Address        0x03FFFFFF
 
 Addr1         Addr2         Date                    File(s)
-0x00000000    0x003A607B    Aug 27 17:31:09 2026    /root/church-machine/hardware/church_wukong_xc7a100t.bit
+0x00000000    0x003A607B    Aug 31 19:15:58 2026    /root/wukong_task3169_20260831T182650Z/hardware/church_wukong_xc7a100t.bit

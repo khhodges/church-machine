@@ -146,3 +146,4 @@
 - [Thread object runtime authority](thread-object-runtime-authority.md) — each Thread object alone owns its suspended context; never add parallel per-Thread NIA or context caches
 - [Lazy retry breakpoint E2E timing](lazy-retry-breakpoint-e2e-timing.md) — hold the mocked download pending, then arm the breakpoint; use retirement stats, not attempt count
 - [Immutable LUMP history transitions](immutable-lump-history-transitions.md) — archive/current/sidecar/manifest commit together under flock; reserve with lexists and revalidate generation
+- [Build checkpoint mutates NS state](build-checkpoint-mutates-ns-state.md) — checkpoint generation can rewrite ns-state.json via boot imports; restore/verify it before final provenance

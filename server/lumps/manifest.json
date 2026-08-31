@@ -2679,62 +2679,6 @@
     "issue_n": 1
   },
   {
-    "token": "00aa9999",
-    "abstraction": "Legacy",
-    "filename": "Legacy.1.8b7fb77f.lump",
-    "sidecar_file": "Legacy.1.8b7fb77f.json",
-    "lump_size": 64,
-    "cw": 1,
-    "cc": 1,
-    "author": "",
-    "version": "",
-    "lump_version": 65,
-    "compiled_at": 1788177522.4418514,
-    "methods": [
-      "Add"
-    ],
-    "grants": [
-      "E"
-    ],
-    "capability_type": "inform",
-    "authorized": false,
-    "legacy_authorized": false,
-    "binary_hash": "388fa4a798890ee62f9745b5168495386ba4894b98cae1b881c2f4d184700865",
-    "petname": "",
-    "issue_number": 1,
-    "identity_hash": "fcf8ef52e2bf2c4ff55e88fcb0be280eca94c05c9540f643251a1641bc8019c9",
-    "dot_name": "Legacy",
-    "issue_n": 1
-  },
-  {
-    "token": "00aa1234",
-    "abstraction": "Adder",
-    "filename": "Adder.1.2009489d.lump",
-    "sidecar_file": "Adder.1.2009489d.json",
-    "lump_size": 128,
-    "cw": 4,
-    "cc": 1,
-    "author": "",
-    "version": "",
-    "lump_version": 218,
-    "compiled_at": 1788177523.6930285,
-    "methods": [
-      "Add"
-    ],
-    "grants": [
-      "E"
-    ],
-    "capability_type": "inform",
-    "authorized": false,
-    "legacy_authorized": false,
-    "binary_hash": "bcbc0629bb24efdeec5603adf8a059e94149c9d2dffd6940edf527171cf82e87",
-    "petname": "",
-    "issue_number": 1,
-    "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f",
-    "dot_name": "Adder",
-    "issue_n": 1
-  },
-  {
     "token": "9ce28c0b",
     "abstraction": "CapabilityTest",
     "filename": "CapabilityTest.1.e4fe164d.lump",
@@ -2786,6 +2730,62 @@
     "issue_number": 1,
     "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
     "dot_name": "CapabilityTest",
+    "issue_n": 1
+  },
+  {
+    "token": "00aa9999",
+    "abstraction": "Legacy",
+    "filename": "Legacy.1.8b7fb77f.lump",
+    "sidecar_file": "Legacy.1.8b7fb77f.json",
+    "lump_size": 64,
+    "cw": 1,
+    "cc": 1,
+    "author": "",
+    "version": "",
+    "lump_version": 66,
+    "compiled_at": 1788199046.789716,
+    "methods": [
+      "Add"
+    ],
+    "grants": [
+      "E"
+    ],
+    "capability_type": "inform",
+    "authorized": false,
+    "legacy_authorized": false,
+    "binary_hash": "388fa4a798890ee62f9745b5168495386ba4894b98cae1b881c2f4d184700865",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "fcf8ef52e2bf2c4ff55e88fcb0be280eca94c05c9540f643251a1641bc8019c9",
+    "dot_name": "Legacy",
+    "issue_n": 1
+  },
+  {
+    "token": "00aa1234",
+    "abstraction": "Adder",
+    "filename": "Adder.1.2009489d.lump",
+    "sidecar_file": "Adder.1.2009489d.json",
+    "lump_size": 128,
+    "cw": 4,
+    "cc": 1,
+    "author": "",
+    "version": "",
+    "lump_version": 222,
+    "compiled_at": 1788199048.9342346,
+    "methods": [
+      "Add"
+    ],
+    "grants": [
+      "E"
+    ],
+    "capability_type": "inform",
+    "authorized": false,
+    "legacy_authorized": false,
+    "binary_hash": "bcbc0629bb24efdeec5603adf8a059e94149c9d2dffd6940edf527171cf82e87",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f",
+    "dot_name": "Adder",
     "issue_n": 1
   }
 ]
