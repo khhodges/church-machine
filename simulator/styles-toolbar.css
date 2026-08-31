@@ -1741,3 +1741,20 @@
     margin: 0;
 }
 
+.step-settings-universal-label {
+    margin-top: 0.55rem;
+}
+
+.universal-breakpoint-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.12rem 0.25rem;
+    margin-top: 0.16rem;
+}
+
+.universal-breakpoint-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+

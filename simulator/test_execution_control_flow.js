@@ -297,8 +297,12 @@ function makeOrdinaryCallFixture() {
     assert.ok(appRun.includes('function _reportBreakpointPause(addr)') &&
               appRun.includes('_consumeOneShotBreakpoint(addr);'),
         'all UI pause reporting shares one-shot breakpoint consumption');
-    assert.ok(appRun.includes('return sim.checkBreakpointBeforeExecute(simBreakpoints);'),
-        'Step and Walk delegate breakpoint policy to the simulator');
+    assert.ok(appRun.includes(
+        'return sim.checkBreakpointBeforeExecute(simBreakpoints, simUniversalBreakpoints);'),
+        'Step and Walk delegate address and universal breakpoint policy to the simulator');
+    assert.ok(appRun.includes(
+        'sim.run(batchMax, breakpoints, simUniversalBreakpoints)'),
+        'Run delegates universal breakpoint policy to the simulator');
     assert.ok(appRun.includes('const breakpoints = simBreakpoints;'),
         'Run keeps the live breakpoint Set across asynchronous batches');
     assert.ok(!appRun.includes('sim._breakpointResumeAddr ='),

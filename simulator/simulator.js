@@ -5172,8 +5172,10 @@ class ChurchSimulator {
     // Return the physical address of a breakpoint that must pause before the
     // next instruction, or null when execution may proceed. This is the sole
     // owner of persistent-breakpoint resume state for Step, Walk, and Run.
-    checkBreakpointBeforeExecute(breakpoints) {
-        if (!breakpoints || breakpoints.size === 0) {
+    checkBreakpointBeforeExecute(breakpoints, universalOpcodes) {
+        const hasAddressBreakpoints = !!(breakpoints && breakpoints.size > 0);
+        const hasUniversalBreakpoints = !!(universalOpcodes && universalOpcodes.size > 0);
+        if (!hasAddressBreakpoints && !hasUniversalBreakpoints) {
             this._breakpointResumeAddr = null;
             return null;
         }
@@ -5187,7 +5189,22 @@ class ChurchSimulator {
             this._breakpointResumeAddr = null;
             return null;
         }
-        if (nextAddr32 != null && breakpoints.has(nextAddr32)) {
+        const addressHit = nextAddr32 != null &&
+            hasAddressBreakpoints && breakpoints.has(nextAddr32);
+        let universalHit = false;
+        if (nextAddr32 != null && hasUniversalBreakpoints &&
+                nextAddr32 < this.memory.length) {
+            const word = this.memory[nextAddr32] >>> 0;
+            const decoded = this.decodeInstruction(word);
+            // Opcode 0 also carries the ISA's special NOP and HALT words.
+            // "Any LOAD" means executable LOAD instructions, not those two
+            // non-LOAD control sentinels.
+            const isLoadSentinel = decoded.opcode === 0 &&
+                (word === 0 || decoded.cond === 15);
+            universalHit = !isLoadSentinel &&
+                universalOpcodes.has(decoded.opcode);
+        }
+        if (addressHit || universalHit) {
             this._breakpointResumeAddr = nextAddr32;
             return nextAddr32;
         }
@@ -9303,7 +9320,7 @@ class ChurchSimulator {
 
     // run() returns { steps, stopReason, breakpointAddr? }
     // stopReason: 'breakpoint' | 'halted' | 'maxSteps' | 'bootExit' | 'stopped'
-    run(maxSteps, breakpoints) {
+    run(maxSteps, breakpoints, universalOpcodes) {
         maxSteps = maxSteps || 10000;
         this.running = true;
         let steps = 0;
@@ -9313,7 +9330,8 @@ class ChurchSimulator {
             // Stop-before-execute breakpoint check. This includes the first
             // instruction in the run so entry breakpoints and resumed runs use
             // exactly the same physical-address rule.
-            const pendingBreakpoint = this.checkBreakpointBeforeExecute(breakpoints);
+            const pendingBreakpoint = this.checkBreakpointBeforeExecute(
+                breakpoints, universalOpcodes);
             if (pendingBreakpoint !== null) {
                 stopReason = 'breakpoint';
                 breakpointAddr = pendingBreakpoint;

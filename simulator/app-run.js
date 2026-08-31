@@ -1652,6 +1652,29 @@ const simBreakpoints = new Set();
 // Breakpoints remain address-based for execution. This sidecar only keeps the
 // best decoded operation label for the settings UI.
 const _breakpointOperations = new Map();
+// Universal Church breakpoints pause before every instruction with one of these
+// opcodes. They are intentionally separate from physical address breakpoints.
+const simUniversalBreakpoints = new Set();
+const _universalBreakpointNames = new Map([
+    [0, 'LOAD'],
+    [1, 'SAVE'],
+    [2, 'CALL'],
+    [3, 'RETURN'],
+    [4, 'CHANGE'],
+    [5, 'SWITCH'],
+    [8, 'ELOADCALL'],
+    [9, 'XLOADCALL'],
+]);
+const _universalBreakpointControls = new Map([
+    [0, 'breakOnLoadChk'],
+    [1, 'breakOnSaveChk'],
+    [2, 'breakOnCallChk'],
+    [3, 'breakOnReturnChk'],
+    [4, 'breakOnChangeChk'],
+    [5, 'breakOnSwitchChk'],
+    [8, 'breakOnEloadcallChk'],
+    [9, 'breakOnXloadcallChk'],
+]);
 // One-shot breakpoints: removed automatically the moment they fire.
 // Used by "Break at entry" so the pause does not persist across later runs.
 const _oneShotBreakpoints = new Set();
@@ -1662,7 +1685,7 @@ const _oneShotBreakpoints = new Set();
 function _breakpointBeforeNextInstruction() {
     if (!sim || sim.halted ||
             typeof sim.checkBreakpointBeforeExecute !== 'function') return null;
-    return sim.checkBreakpointBeforeExecute(simBreakpoints);
+    return sim.checkBreakpointBeforeExecute(simBreakpoints, simUniversalBreakpoints);
 }
 
 function _reportBreakpointPause(addr) {
@@ -1712,7 +1735,7 @@ function _setEntryBreakpoint() {
 function updateBreakpointBtn() {
     const btn = document.getElementById('toolBreakBtn');
     if (!btn) return;
-    const n = simBreakpoints.size;
+    const n = simBreakpoints.size + simUniversalBreakpoints.size;
     btn.textContent = n > 0 ? `\u25CF\u202F${n}` : '\u25CF';
     btn.classList.toggle('break-active', n > 0);
 }
@@ -1724,7 +1747,7 @@ function renderBreakList() {
         el.innerHTML = '<div class="break-empty">No breakpoints set</div>';
         return;
     }
-    el.innerHTML = [...simBreakpoints].sort((a,b) => a-b).map(addr => {
+    const addressItems = [...simBreakpoints].sort((a,b) => a-b).map(addr => {
         const addressText = `0x${addr.toString(16).toUpperCase().padStart(4,'0')}`;
         const operation = _decodedBreakpointOperation(addr);
         const operationHtml = operation
@@ -1738,7 +1761,8 @@ function renderBreakList() {
             </span>
             <button class="btn break-remove-btn" onclick="removeBreakpoint(${addr})" aria-label="Remove breakpoint at ${addressText}${_escapeBreakpointLabel(accessibleOperation)}" title="Remove this breakpoint">&#x1F5D1;</button>
         </div>`;
-    }).join('');
+    });
+    el.innerHTML = addressItems.join('');
 }
 
 function _escapeBreakpointLabel(value) {
@@ -1756,8 +1780,27 @@ function _decodedBreakpointOperation(addr) {
             addr32 >= sim.memory.length) return null;
     const word = sim.memory[addr32] >>> 0;
     const opcode = (word >>> 27) & 0x1F;
-    if (opcode !== 2 && opcode !== 3 && opcode !== 4) return null;
+    if (!_universalBreakpointNames.has(opcode)) return null;
     return typeof sim.opName === 'function' ? sim.opName(opcode) : null;
+}
+
+function updateUniversalBreakpointControls() {
+    _universalBreakpointControls.forEach((id, opcode) => {
+        const checkbox = document.getElementById(id);
+        if (checkbox) checkbox.checked = simUniversalBreakpoints.has(opcode);
+    });
+}
+
+function setUniversalBreakpoint(opcode, enabled) {
+    if (!_universalBreakpointNames.has(opcode)) return;
+    if (enabled) simUniversalBreakpoints.add(opcode);
+    else simUniversalBreakpoints.delete(opcode);
+    if (sim && typeof sim.clearBreakpointResume === 'function') {
+        sim.clearBreakpointResume();
+    }
+    updateBreakpointBtn();
+    renderBreakList();
+    updateDashboard();
 }
 
 function toggleStepSettingsPopover() {
@@ -1768,6 +1811,7 @@ function toggleStepSettingsPopover() {
     const breakBtn = document.getElementById('toolBreakBtn');
     if (breakBtn) breakBtn.setAttribute('aria-expanded', open ? 'false' : 'true');
     if (!open) {
+        updateUniversalBreakpointControls();
         renderBreakList();
         document.getElementById('breakAddrInput')?.focus();
     }
@@ -1818,10 +1862,12 @@ function removeBreakpoint(addr) {
 
 function clearAllBreakpoints() {
     simBreakpoints.clear();
+    simUniversalBreakpoints.clear();
     _breakpointOperations.clear();
     if (sim && typeof sim.clearBreakpointResume === 'function') {
         sim.clearBreakpointResume();
     }
+    updateUniversalBreakpointControls();
     updateBreakpointBtn();
     renderBreakList();
     updateDashboard();
@@ -2342,7 +2388,7 @@ function runSim() {
         }
         try {
             const batchMax = Math.min(BATCH_SIZE, MAX_STEPS - totalSteps);
-            const result   = sim.run(batchMax, breakpoints);
+            const result   = sim.run(batchMax, breakpoints, simUniversalBreakpoints);
             totalSteps += result.steps;
 
             // Update the progress line live
@@ -4223,7 +4269,7 @@ async function triggerLazyLoad(absentResult, mode) {
     // ── 4. Run to HALT / breakpoint (up to 10 000 steps) ────────────────────
     const breakpoints = simBreakpoints;
     const faultsMid = sim.faultLog ? sim.faultLog.length : 0;
-    const runResult = sim.run(10000, breakpoints);
+    const runResult = sim.run(10000, breakpoints, simUniversalBreakpoints);
 
     if (sim.awaitingLump) {
         log(`⟳ Another absent lump — Slot ${sim.awaitingLump.nsIndex}`);

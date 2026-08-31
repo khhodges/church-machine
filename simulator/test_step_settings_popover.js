@@ -2,7 +2,8 @@
 //
 // Verifies that the red-dot ● button (#toolBreakBtn) correctly opens/closes
 // #stepSettingsPopover and that the breakpoint controls (#breakAddrInput,
-// #breakList, #breakAtEntryChk) remain present and accessible inside the panel.
+// #breakList, #breakAtEntryChk, and universal opcode checkboxes) remain present
+// and accessible inside the panel.
 //
 // If this test starts failing it means the toolbar was reorganised and the
 // Step Settings panel has become unreachable.
@@ -19,6 +20,7 @@
 //   SSP-9  openBreakPopoverAt(addr) opens the popover and pre-fills #breakAddrInput
 //   SSP-10 renderBreakList() writes an empty-state message when no breakpoints are set
 //   SSP-11 renderBreakList() renders one entry per breakpoint when breakpoints exist
+//   SSP-12 universal opcode checkboxes are present and wired into the same panel
 //
 // Run with:  node simulator/test_step_settings_popover.js
 'use strict';
@@ -120,6 +122,20 @@ function makeEnv() {
         console:  console,
         // simBreakpoints is a Set used by renderBreakList and addBreakpoint.
         simBreakpoints: new Set(),
+        simUniversalBreakpoints: new Set(),
+        _universalBreakpointNames: new Map([
+            [0, 'LOAD'], [1, 'SAVE'], [2, 'CALL'], [3, 'RETURN'],
+            [4, 'CHANGE'], [5, 'SWITCH'], [8, 'ELOADCALL'], [9, 'XLOADCALL'],
+        ]),
+        _universalBreakpointControls: new Map([
+            [0, 'breakOnLoadChk'], [1, 'breakOnSaveChk'],
+            [2, 'breakOnCallChk'], [3, 'breakOnReturnChk'],
+            [4, 'breakOnChangeChk'], [5, 'breakOnSwitchChk'],
+            [8, 'breakOnEloadcallChk'], [9, 'breakOnXloadcallChk'],
+        ]),
+        updateBreakpointBtn: function() {},
+        updateDashboard: function() {},
+        sim: { clearBreakpointResume: function() {} },
     };
     vm.createContext(sandbox);
     vm.runInContext(STEP_SRC, sandbox, { filename: 'app-run.step-settings.js' });
@@ -148,6 +164,21 @@ check('SSP-2', '#stepSettingsPopover is present in index.html',
     const inp = idoc.getElementById('breakAddrInput');
     check('SSP-3', '#breakAddrInput is a descendant of #stepSettingsPopover',
         !!pop && !!inp && pop.contains(inp));
+})();
+
+// ── SSP-12  Universal Church breakpoint controls stay in the modal ────────────
+(function() {
+    const pop = idoc.getElementById('stepSettingsPopover');
+    const ids = [
+        'breakOnLoadChk', 'breakOnSaveChk', 'breakOnCallChk',
+        'breakOnReturnChk', 'breakOnChangeChk', 'breakOnSwitchChk',
+        'breakOnEloadcallChk', 'breakOnXloadcallChk',
+    ];
+    check('SSP-12', 'all universal Church breakpoint checkboxes are in Step Settings',
+        !!pop && ids.every(id => {
+            const checkbox = idoc.getElementById(id);
+            return !!checkbox && pop.contains(checkbox);
+        }));
 })();
 
 // ── SSP-4  #breakList is inside #stepSettingsPopover ──────────────────────────
