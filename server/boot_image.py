@@ -1248,37 +1248,15 @@ def _load_ns_state_token_map(lumps_dir):
         if not _abstractions:
             return {}
 
-        def _state_file(_name):
-            """Find the newest canonical file for a state entry by dot name."""
-            import re as _re
-            _rx = _re.compile(
-                rf"^{_re.escape(str(_name))}\.(\d+)\.([0-9a-f]{{8}})\.lump$",
-                _re.IGNORECASE)
-            _found = []
-            try:
-                for _fn in os.listdir(lumps_dir):
-                    _m = _rx.match(_fn)
-                    if _m:
-                        _found.append((int(_m.group(1)), _m.group(2).lower(), _fn))
-            except OSError:
-                return None, None
-            if not _found:
-                return None, None
-            _issue, _token, _fn = max(_found)
-            return _token, _fn
-
         out = {}
 
         # New rich-dict format: each element is {"name", "slot", ...}.
         if _abstractions and isinstance(_abstractions[0], dict):
             for _entry in _abstractions:
-                _name = _entry.get("name") or ""
                 _slot = _entry.get("slot")
-                if not _name or not isinstance(_slot, int):
+                if not isinstance(_slot, int):
                     continue
                 _token = _entry.get("token") or _entry.get("cache_token")
-                if not _token:
-                    _token, _ = _state_file(_name)
                 if _token:
                     out[_slot] = str(_token).lower()
             return out
@@ -1373,70 +1351,34 @@ def _load_trusted_cache_token_map(manifest_path):
 
 
 def _load_boot_resident_entries(manifest_path, selected_by_slot=None):
-    """Return resident entries represented by Namespace state.
+    """Return exact resident artifact bindings from committed Namespace state.
 
-    ``filename_or_none`` is the versioned filename (e.g. ``SelfTest_v75.lump``)
-    when the manifest entry carries a ``filename`` field, otherwise ``None``.
-    The caller should pass it to ``_read_lump_body`` so the versioned file is
-    preferred over the legacy token-named fallback.
+    Manifest history must never choose which artifact occupies a live slot.
+    A rich Namespace entry without an exact token is therefore unbound, not an
+    invitation to guess the newest matching filename or manifest record.
     """
     lumps_dir = os.path.dirname(manifest_path)
     try:
         with open(os.path.join(lumps_dir, "ns-state.json")) as f:
             state = json.load(f)
-        with open(manifest_path) as f:
-            manifest = json.load(f)
     except Exception:
-        # Legacy libraries had no rich Namespace state.  Keep them readable,
-        # while never merging these slot claims into a present rich state.
-        try:
-            with open(manifest_path) as f:
-                manifest = json.load(f)
-        except Exception:
-            return []
-        return [
-            (record["ns_slot"], str(record.get("token") or ""), record.get("filename"))
-            for record in manifest
-            if isinstance(record, dict)
-            and isinstance(record.get("ns_slot"), int)
-            and record.get("boot_resident") is True
-            and record.get("token")
-        ]
+        return []
     out = []
     for e in state.get("abstractions", []) if isinstance(state, dict) else []:
         if not isinstance(e, dict) or e.get("type") not in ("Inform", "Resident"):
             continue
         slot = e.get("slot")
         tok  = e.get("token") or e.get("cache_token")
-        if not isinstance(slot, int):
+        if not isinstance(slot, int) or not tok:
             continue
-        name = str(e.get("name") or "")
-        candidates = [
-            record for record in manifest
-            if isinstance(record, dict)
-            and not record.get("archived")
-            and record.get("abstraction") == name
-            and record.get("boot_resident") is True
-        ]
-        if tok:
-            candidates = [
-                record for record in candidates
-                if str(record.get("token") or "").lower() == str(tok).lower()
-            ]
-        if not candidates:
+        if e.get("resident") is False or e.get("boot_resident") is False:
             continue
-        record = max(
-            enumerate(candidates),
-            key=lambda pair: (
-                int(pair[1].get("lump_version") or 0),
-                pair[0],
-            ),
-        )[1]
-        tok = str(record.get("token") or "").lower()
-        filename = record.get("filename") or e.get("filename")
-        if not tok:
-            continue
-        out.append((slot, tok, filename, int(record.get("lump_version") or 0)))
+        out.append((
+            slot,
+            str(tok).lower(),
+            e.get("filename"),
+            int(e.get("lump_version") or e.get("issue_n") or 0),
+        ))
     selected = selected_by_slot or {}
     chosen = {}
     for slot, tok, filename, version in out:
@@ -1509,11 +1451,6 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # boot_image.py reads ns_slot exclusively from manifest.json.  If a partial
     # PATCH left the two stores out of sync the operator would silently boot
     # with the manifest value while the IDE shows the sidecar value.
-    # Emit one UserWarning per divergent entry so callers / test harnesses can
-    # capture or log them without any exception being raised.
-    for _drift_msg in check_ns_slot_drift(lumps_dir):
-        warnings.warn(_drift_msg, UserWarning, stacklevel=2)
-
     if "abstractionLumpWords" in step1:
         print("WARNING: abstractionLumpWords is deprecated and ignored; "
               "Boot.Abstr size is determined by the saved SelfTest lump "

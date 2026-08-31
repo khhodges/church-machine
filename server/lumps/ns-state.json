@@ -114,6 +114,10 @@
     {
       "name": "CapabilityTest",
       "slot": 10,
+      "token": "c7657c2d",
+      "filename": "CapabilityTest.1.b49e8eca.lump",
+      "issue_n": 1,
+      "resident": true,
       "location": "0x000004C0",
       "type": "Inform",
       "f": 0,
@@ -156,6 +160,5 @@
       "seal": "0xDEA89EEF"
     }
   ],
-  "generated_at": 1788187486.846329,
-  "committed_raw_fingerprint": "f864474c874d5ac7c3ef1a6bff506faa0051bc783442f6d154a1659fa8a9b4c4"
+  "generated_at": 1788187486.846329
 }

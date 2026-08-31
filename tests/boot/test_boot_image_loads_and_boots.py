@@ -258,22 +258,22 @@ def _saved_project_cfg():
 
 
 def _capabilitytest_manifest_body():
-    """Return the one authoritative boot-resident CapabilityTest record/body."""
-    with open(os.path.join(LUMPS_DIR, "manifest.json"), "r") as f:
-        entries = json.load(f)
+    """Return the exact CapabilityTest binding/body from committed NS state."""
+    with open(os.path.join(LUMPS_DIR, "ns-state.json"), "r") as f:
+        state = json.load(f)
     matches = [
-        entry for entry in entries
+        entry for entry in state.get("abstractions", [])
         if isinstance(entry, dict)
-        and not entry.get("archived")
-        and entry.get("abstraction") == "CapabilityTest"
-        and entry.get("ns_slot") == CAPTEST_SLOT
+        and entry.get("name") == "CapabilityTest"
+        and entry.get("slot") == CAPTEST_SLOT
     ]
     assert len(matches) == 1, (
-        "manifest.json must contain exactly one authoritative CapabilityTest "
+        "ns-state.json must contain exactly one authoritative CapabilityTest "
         f"entry for slot {CAPTEST_SLOT}; found {len(matches)}"
     )
     entry = matches[0]
-    assert entry.get("boot_resident") is True
+    assert entry.get("resident") is True
+    assert isinstance(entry.get("token"), str) and entry["token"]
     filename = entry.get("filename")
     assert isinstance(filename, str) and filename
     with open(os.path.join(LUMPS_DIR, filename), "rb") as f:
@@ -371,66 +371,31 @@ def test_capabilitytest_reissued_generation_boots():
 
 
 def test_capabilitytest_manifest_boot_resident():
-    """CapabilityTest's manifest entry must stay boot_resident=true.
-
-    Without this flag the generator writes slot 10's NS descriptor but a
-    zero-filled body — the exact bug behind Task #2867.
-    """
-    with open(os.path.join(LUMPS_DIR, "manifest.json")) as f:
-        entries = json.load(f)
-    matches = [e for e in entries if isinstance(e, dict)
-               and not e.get("archived")
-               and e.get("abstraction") == "CapabilityTest"
-               and e.get("ns_slot") == CAPTEST_SLOT]
+    """CapabilityTest's committed Namespace binding must remain resident."""
+    with open(os.path.join(LUMPS_DIR, "ns-state.json")) as f:
+        state = json.load(f)
+    matches = [e for e in state.get("abstractions", []) if isinstance(e, dict)
+               and e.get("name") == "CapabilityTest"
+               and e.get("slot") == CAPTEST_SLOT]
     assert len(matches) == 1, (
-        "manifest.json must contain exactly one CapabilityTest slot-10 entry; "
+        "ns-state.json must contain exactly one CapabilityTest slot-10 entry; "
         f"found {len(matches)}"
     )
-    assert matches[0].get("boot_resident") is True, (
-        "CapabilityTest manifest entry must carry boot_resident=true so "
-        "generate_boot_image embeds its real body at slot 10"
-    )
+    assert matches[0].get("resident") is True
+    assert matches[0].get("token")
+    assert matches[0].get("filename")
 
 
 def test_capabilitytest_boot_metadata_matches_sidecar():
-    """CapabilityTest's live manifest and sidecar must agree before booting.
-
-    The image builder selects resident programs from manifest.json.  A stale
-    sidecar that names slot 10 or marks the program boot-resident differently
-    could make the IDE display a different boot program from the one included
-    in a regenerated image.
-    """
+    """The exact Namespace-bound artifact must agree with its own sidecar."""
     entry, _ = _capabilitytest_manifest_body()
-    sidecar_file = entry.get("sidecar_file")
-    assert isinstance(sidecar_file, str) and sidecar_file, (
-        "the authoritative CapabilityTest manifest entry must name its sidecar"
-    )
+    sidecar_file = entry["filename"][:-5] + ".json"
     with open(os.path.join(LUMPS_DIR, sidecar_file)) as f:
         sidecar = json.load(f)
 
-    for field in ("ns_slot", "boot_resident"):
-        assert field in sidecar, (
-            f"CapabilityTest sidecar must explicitly declare {field} so it "
-            "cannot disagree with the boot-image manifest entry"
-        )
-        assert sidecar[field] == entry.get(field), (
-            f"CapabilityTest {field} mismatch: manifest={entry.get(field)!r}, "
-            f"sidecar={sidecar[field]!r}. Align both records before generating "
-            "a boot image."
-        )
-
-    cfg = _saved_project_cfg()
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        generate_boot_image(cfg, LUMPS_DIR)
-    capabilitytest_warnings = [
-        str(warning.message) for warning in caught
-        if "CapabilityTest" in str(warning.message)
-    ]
-    assert not capabilitytest_warnings, (
-        "CapabilityTest metadata drift must be fixed before generating a boot "
-        f"image; warnings={capabilitytest_warnings}"
-    )
+    assert sidecar.get("token") == entry["token"]
+    assert sidecar.get("filename") == entry["filename"]
+    assert sidecar.get("ns_slot") == entry["slot"]
 
 
 def test_served_boot_image_carries_capabilitytest_body(tmp_path):

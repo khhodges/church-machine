@@ -6534,6 +6534,7 @@ def _bind_saved_lump_to_ns_state(abstraction, ns_slot, token, filename, issue_n)
         entry["token"] = token
         entry["filename"] = filename
         entry["issue_n"] = issue_n
+        entry["resident"] = True
         updated = True
         break
     if updated:
@@ -7993,12 +7994,20 @@ def save_lump():
         try:
             cfg_bi, err_bi = _read_saved_boot_config()
             if not err_bi:
-                blob_bi = _boot_image_gen.generate_boot_image(cfg_bi, LUMPS_DIR)
+                _saved_entry_slot = _read_boot_entry_slot_from_image()
+                blob_bi = _boot_image_gen.generate_boot_image(
+                    cfg_bi,
+                    LUMPS_DIR,
+                    boot_entry_slot=_saved_entry_slot,
+                    require_entry_resident=True,
+                )
                 _write_boot_image_bytes(blob_bi)
                 boot_refreshed = True
                 print(f'[lumps] boot-image.bin regenerated ({len(blob_bi)} bytes)', flush=True)
                 _load_boot_abstr_lump()   # refresh _BOOT_ABSTR_META / LAZY_LUMPS['00000600']
                 _load_boot_ns_lump()      # refresh _BOOT_NS_META from updated boot-image.bin
+                _bind_saved_lump_to_ns_state(
+                    abs_name, ns_slot, token8, lump_filename, _issue_n_save)
             else:
                 boot_refresh_note = f'boot config unavailable: {err_bi}'
         except Exception as _bie:

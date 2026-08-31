@@ -1,9 +1,9 @@
 """
 tests/server/test_boot_image_manifest_ns_slot.py
 
-Regression tests confirming that boot_image.py reads ns_slot exclusively from
-manifest.json, not from the sidecar JSON files, and that check_ns_slot_drift()
-surfaces a warning when the two stores disagree.
+Legacy drift-diagnostic tests plus regressions confirming that boot_image.py
+uses committed Namespace state, not manifest or sidecar history, to select the
+artifact occupying a live slot.
 
 Background
 ----------
@@ -15,7 +15,7 @@ diagnose, so check_ns_slot_drift() exists to surface the discrepancy early.
 
 Coverage
 --------
-  D1 — _load_boot_resident_entries uses manifest ns_slot, ignores sidecar
+  D1 — _load_boot_resident_entries uses the exact ns-state binding
   D2 — _load_boot_resident_entries returns nothing for entries without
        boot_resident=true, regardless of sidecar contents
   D3 — check_ns_slot_drift returns a warning when manifest and sidecar disagree
@@ -32,6 +32,7 @@ import os
 import shutil
 import struct
 import sys
+import warnings
 
 import pytest
 
@@ -66,15 +67,10 @@ def _write_sidecar(lumps_dir, filename, data):
 # D1 — _load_boot_resident_entries uses manifest ns_slot, ignores sidecar
 # ---------------------------------------------------------------------------
 
-class TestLoadBootResidentEntriesManifestWins:
+class TestLoadBootResidentEntriesNamespaceStateWins:
 
-    def test_d1_manifest_slot_wins_over_sidecar(self, tmp_path):
-        """D1 — manifest ns_slot=9 is used; sidecar ns_slot=11 is ignored.
-
-        boot_image.py reads ns_slot from manifest.json only.  A sidecar
-        with a different ns_slot must not affect which slot the lump is
-        placed in during boot-image generation.
-        """
+    def test_d1_namespace_state_wins_over_manifest_and_sidecar(self, tmp_path):
+        """D1 — exact ns-state slot/token/filename binding is authoritative."""
         token = "ab123456"
         sidecar_file = f"{token}.json"
 
@@ -85,7 +81,7 @@ class TestLoadBootResidentEntriesManifestWins:
             "ns_slot": 11,          # ← stale / diverged value
         })
 
-        # Manifest says slot 9 — this is what boot_image.py must use.
+        # Manifest and sidecar are deliberately stale.
         _write_manifest(tmp_path, [{
             "token":         token,
             "abstraction":   "MyAbstr",
@@ -94,23 +90,26 @@ class TestLoadBootResidentEntriesManifestWins:
             "ns_slot":       9,     # ← authoritative value
             "boot_resident": True,
         }])
+        (tmp_path / "ns-state.json").write_text(json.dumps({
+            "abstractions": [{
+                "name": "MyAbstr",
+                "slot": 8,
+                "type": "Inform",
+                "token": "feedbeef",
+                "filename": "MyAbstr.current.lump",
+                "resident": True,
+            }]
+        }))
 
         entries = _load_boot_resident_entries(str(tmp_path / "manifest.json"))
 
-        # Exactly one entry returned, and it carries the manifest slot (9).
         assert len(entries) == 1, (
             f"Expected exactly one boot-resident entry, got {len(entries)}: {entries}"
         )
-        slot, tok, _filename = entries[0]
-        assert slot == 9, (
-            f"Expected manifest ns_slot=9, but _load_boot_resident_entries "
-            f"returned slot={slot!r}.  boot_image.py must read ns_slot from "
-            f"manifest.json, not from the sidecar."
-        )
-        assert tok == token
+        assert entries[0] == (8, "feedbeef", "MyAbstr.current.lump")
 
-    def test_d1_sidecar_slot_does_not_bleed_through(self, tmp_path):
-        """D1 (variant) — sidecar with ns_slot=99 cannot override manifest ns_slot=7."""
+    def test_d1_unbound_namespace_state_does_not_fall_back(self, tmp_path):
+        """D1 — an unbound state row must not be repaired from historical files."""
         token = "cd789012"
         sidecar_file = f"{token}.json"
 
@@ -127,14 +126,16 @@ class TestLoadBootResidentEntriesManifestWins:
             "ns_slot":       7,
             "boot_resident": True,
         }])
+        (tmp_path / "ns-state.json").write_text(json.dumps({
+            "abstractions": [{
+                "name": "OtherAbstr",
+                "slot": 6,
+                "type": "Inform",
+            }]
+        }))
 
         entries = _load_boot_resident_entries(str(tmp_path / "manifest.json"))
-        assert len(entries) == 1
-        slot, _, _ = entries[0]
-        assert slot == 7, (
-            f"Sidecar ns_slot=99 must not override manifest ns_slot=7; "
-            f"got slot={slot!r}"
-        )
+        assert entries == []
 
 
 # ---------------------------------------------------------------------------
@@ -412,15 +413,10 @@ def _seed_lumps_dir_with_selftest(tmp_path):
 
 
 class TestGenerateBootImageDriftWarning:
-    """Integration tests: generate_boot_image emits UserWarning for ns_slot drift."""
+    """Historical drift diagnostics must not influence image generation."""
 
-    def test_d9_warning_emitted_during_generate_boot_image(self, tmp_path):
-        """D9 — generate_boot_image raises a UserWarning when a sidecar's
-        ns_slot disagrees with the manifest during a real image generation.
-
-        This proves the drift detector is wired into the production path, not
-        just callable as a standalone utility.
-        """
+    def test_d9_manifest_sidecar_drift_is_not_boot_authority(self, tmp_path):
+        """D9 — stale historical slot claims are ignored by generation."""
         # Seed the lumps dir with a real SelfTest lump so generate_boot_image
         # can proceed past the Boot.Abstr lookup.
         manifest_entries = _seed_lumps_dir_with_selftest(tmp_path)
@@ -443,8 +439,10 @@ class TestGenerateBootImageDriftWarning:
         _write_manifest(tmp_path, manifest_entries)
 
         cfg = _minimal_cfg()
-        with pytest.warns(UserWarning, match="ns_slot mismatch"):
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
             generate_boot_image(cfg, str(tmp_path))
+        assert not [w for w in caught if "ns_slot mismatch" in str(w.message)]
 
     def test_d9_no_spurious_warning_when_all_slots_agree(self, tmp_path):
         """D9 (negative) — generate_boot_image emits no UserWarning when
