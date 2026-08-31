@@ -53,6 +53,30 @@ if {[catch {exec $readiness_python $readiness_script} readiness_output]} {
 }
 puts $readiness_output
 
+## ── ILA probe-name readiness gate ─────────────────────────────────────────
+## Probe names are resolved by Vivado after synthesis.  A renamed or removed
+## Amaranth signal can therefore leave a connect_debug_port call with an empty
+## net list while the build still succeeds.  Run the repository checker before
+## creating the project so direct Vivado invocations cannot bypass this guard.
+set ila_probe_script [file normalize [file join [file dirname [info script]] .. scripts check_ila_probe_names.py]]
+set ila_probe_tcl    [file normalize [file join [file dirname [info script]] wukong_xc7a100t.tcl]]
+set ila_probe_gen    [file normalize [file join [file dirname [info script]] gen_rtlil.py]]
+set ila_probe_top    [file normalize [file join [file dirname [info script]] wukong_top.py]]
+if {![file exists $ila_probe_script]} {
+    error "ILA probe-name checker not found: $ila_probe_script"
+}
+puts "\n═══ Checking ILA probe names before Vivado ═══"
+if {[catch {
+    exec $readiness_python $ila_probe_script \
+        --tcl $ila_probe_tcl \
+        --gen $ila_probe_gen \
+        --top $ila_probe_top
+} ila_probe_output]} {
+    puts stderr $ila_probe_output
+    error "ILA probe-name check failed; synthesis was not started."
+}
+puts $ila_probe_output
+
 ## ── ILA flag ─────────────────────────────────────────────────────────────────
 ## Set INSERT_ILA to 1 to insert a Xilinx ILA debug core so Vivado Hardware
 ## Manager can probe Church Machine internals live over JTAG.
