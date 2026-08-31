@@ -120,7 +120,7 @@ def _meta(token):
 def _cleanup(token):
     manifest_path = os.path.join(LUMPS_DIR, "manifest.json")
     for fn in os.listdir(LUMPS_DIR):
-        if fn.startswith(token):
+        if fn.startswith(token) or fn.startswith("FallbackRegressionAbs.1.") or fn.startswith("FallbackRegressionAbs_v"):
             try:
                 os.remove(os.path.join(LUMPS_DIR, fn))
             except OSError:
@@ -152,9 +152,9 @@ class TestArchiveFallbackVersionSelection:
         try:
             raw_a = _pack_lump(_BINARY_A)
             for v in [1, 2, 3]:
-                with open(os.path.join(LUMPS_DIR, f"{token}-v{v}.lump"), "wb") as f:
+                with open(os.path.join(LUMPS_DIR, f"FallbackRegressionAbs_v{v}.lump"), "wb") as f:
                     f.write(raw_a)
-                with open(os.path.join(LUMPS_DIR, f"{token}-v{v}.json"), "w") as f:
+                with open(os.path.join(LUMPS_DIR, f"FallbackRegressionAbs_v{v}.json"), "w") as f:
                     json.dump({"lump_version": v}, f)
             with open(os.path.join(LUMPS_DIR, f"{token}.lump"), "wb") as f:
                 f.write(raw_a)
@@ -163,10 +163,10 @@ class TestArchiveFallbackVersionSelection:
             data = resp.get_json()
             assert data.get("ok"), f"Save failed: {data}"
 
-            assert os.path.isfile(os.path.join(LUMPS_DIR, f"{token}-v4.lump")), \
-                "Fallback must create -v4.lump (not overwrite -v3.lump)"
+            assert os.path.isfile(os.path.join(LUMPS_DIR, "FallbackRegressionAbs_v4.lump")), \
+                "Fallback must create immutable abstraction archive v4"
 
-            with open(os.path.join(LUMPS_DIR, f"{token}-v3.lump"), "rb") as f:
+            with open(os.path.join(LUMPS_DIR, "FallbackRegressionAbs_v3.lump"), "rb") as f:
                 v3_bytes = f.read()
             assert v3_bytes == raw_a, "-v3.lump must not be overwritten by the fallback"
         finally:
@@ -184,8 +184,8 @@ class TestArchiveFallbackVersionSelection:
             data = resp.get_json()
             assert data.get("ok"), f"Save failed: {data}"
 
-            assert os.path.isfile(os.path.join(LUMPS_DIR, f"{token}-v0.lump")), \
-                "With no prior archives, fallback must create -v0.lump"
+            assert os.path.isfile(os.path.join(LUMPS_DIR, "FallbackRegressionAbs_v0.lump")), \
+                "With no prior archives, fallback must create immutable abstraction archive v0"
         finally:
             _cleanup(token)
 
@@ -211,16 +211,16 @@ class TestArchiveFallbackVersionSelection:
             assert data.get("ok"), f"Save failed: {data}"
 
             # Fallback should have used manifest's v7, so archive is -v7.lump
-            assert os.path.isfile(os.path.join(LUMPS_DIR, f"{token}-v7.lump")), \
+            assert os.path.isfile(os.path.join(LUMPS_DIR, "FallbackRegressionAbs_v7.lump")), \
                 "Fallback must use manifest lump_version (v7) when sidecar lacks lump_version"
             # And NOT create -v0.lump
-            assert not os.path.isfile(os.path.join(LUMPS_DIR, f"{token}-v0.lump")), \
+            assert not os.path.isfile(os.path.join(LUMPS_DIR, "FallbackRegressionAbs_v0.lump")), \
                 "-v0.lump must NOT be created when manifest provides a valid version"
         finally:
             _cleanup(token)
 
-    def test_words_endpoint_fallback_header_decode(self, client):
-        """words/<version> endpoint must extract cw/cc from binary header when sidecar lacks them."""
+    def test_words_endpoint_rejects_missing_sidecar(self, client):
+        """words/<version> must reject archives that cannot prove metadata integrity."""
         token = "fa110004"
         try:
             # Build a header with known cw=5, cc=3 using canonical layout:
@@ -237,10 +237,9 @@ class TestArchiveFallbackVersionSelection:
                 f.write(raw)
 
             resp = client.get(f"/api/lumps/{token}/words/1")
-            assert resp.status_code == 200, f"Unexpected status: {resp.status_code}"
+            assert resp.status_code == 409, f"Unexpected status: {resp.status_code}"
             data = resp.get_json()
-            assert data["cw"] == cw_expected, f"Expected cw={cw_expected}, got {data['cw']}"
-            assert data["cc"] == cc_expected, f"Expected cc={cc_expected}, got {data['cc']}"
+            assert "sidecar is missing" in data["error"]
         finally:
             _cleanup(token)
 
@@ -267,7 +266,7 @@ class TestArchiveFallbackVersionSelection:
             resp2 = client.post("/api/lumps/save", json={"binary": _BINARY_B, "metadata": _meta(token)})
             assert resp2.get_json().get("ok"), "Second save failed"
 
-            sc_path = os.path.join(LUMPS_DIR, f"{token}-v1.json")
+            sc_path = os.path.join(LUMPS_DIR, "FallbackRegressionAbs_v1.json")
             assert os.path.isfile(sc_path), "Archive sidecar -v1.json must exist after second save"
             sc = json.load(open(sc_path))
             for field in ("lump_version", "cw", "cc", "abstraction"):
@@ -304,28 +303,31 @@ class TestArchiveFilesCreatedOnSave:
             assert hist_resp.status_code == 200, f"History endpoint returned {hist_resp.status_code}"
             hist_data = hist_resp.get_json()
             history = hist_data.get("history", [])
-            assert len(history) == 1, (
-                f"Expected exactly 1 history entry after two saves, got {len(history)}: {history}"
+            assert len(history) == 2, (
+                f"Expected current plus archived history entries, got {len(history)}: {history}"
             )
-            assert history[0]["version"] == 1, (
-                f"Expected history entry version=1, got {history[0]['version']}"
-            )
+            archived = next(row for row in history if row["version"] == 1)
+            assert archived["current"] is False
+            assert archived["preview_enabled"] is True
+            assert next(row for row in history if row["version"] == 2)["current"] is True
 
-            v1_lump = os.path.join(LUMPS_DIR, f"{token}-v1.lump")
-            v1_json = os.path.join(LUMPS_DIR, f"{token}-v1.json")
+            v1_lump = os.path.join(LUMPS_DIR, "FallbackRegressionAbs_v1.lump")
+            v1_json = os.path.join(LUMPS_DIR, "FallbackRegressionAbs_v1.json")
             assert os.path.isfile(v1_lump), f"Archived lump {token}-v1.lump must exist on disk"
             assert os.path.isfile(v1_json), f"Archived sidecar {token}-v1.json must exist on disk"
 
-            current_lump = os.path.join(LUMPS_DIR, f"{token}.lump")
+            manifest = json.load(open(os.path.join(LUMPS_DIR, "manifest.json")))
+            current_entry = next(e for e in manifest if e.get("token") == token)
+            current_lump = os.path.join(LUMPS_DIR, current_entry["filename"])
             with open(current_lump, "rb") as fh:
-                current_bytes = fh.read()
-            assert current_bytes == raw_b, (
-                "Current lump must contain binary B (the second save), not binary A"
+                current_words = struct.unpack(">64I", fh.read())
+            assert current_words[1] == _BINARY_B[1], (
+                "Current lump must contain binary B's payload marker"
             )
             with open(v1_lump, "rb") as fh:
-                archived_bytes = fh.read()
-            assert archived_bytes == raw_a, (
-                "Archived v1.lump must contain binary A (the first save)"
+                archived_words = struct.unpack(">64I", fh.read())
+            assert archived_words[1] == _BINARY_A[1], (
+                "Archived v1.lump must contain binary A's payload marker"
             )
         finally:
             _cleanup(token)

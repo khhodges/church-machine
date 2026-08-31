@@ -9,6 +9,25 @@
   "schemaVersion": 1,
   "name": "Church Machine architecture contracts",
   "canonical": true,
+  "portableLumpBinding": {
+    "schema": "church.portable-lump-binding/v1",
+    "universalName": "dot.name#positive-issue",
+    "contentToken": "sha256(dot_name_utf8 + canonical_lump_bytes)[:8]",
+    "contentTokenExcludesIssue": true,
+    "authoritativeContentHash": "sha256(canonical_lump_bytes)",
+    "symbolicSelf": "__SELF__ at relocation row 0",
+    "canonicalGtWords": "unresolved",
+    "legacyPolicy": "T-only artifacts require explicit authorization and are never strong-verified",
+    "verificationOrder": [
+      "exact universal name and issue",
+      "content token",
+      "full binary hash",
+      "authorization",
+      "rights and capability type",
+      "live destination slot and sequence",
+      "local GT minting"
+    ]
+  },
   "isa": {
     "gtWord0": {
       "widthBits": 32,

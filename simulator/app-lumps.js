@@ -2533,6 +2533,7 @@ async function _fetchAndShowLumpTimeline(token, lump) {
         const telData  = (telResp  && telResp.ok)  ? await telResp.json()  : {};
 
         const history    = histData.history  || [];
+        const missingVersions = histData.missing_versions || [];
         const telRows    = telData.versions  || [];
         const hasTel     = telRows.length > 0;
 
@@ -2555,9 +2556,9 @@ async function _fetchAndShowLumpTimeline(token, lump) {
         }
         const rows = Array.from(versionMap.values()).sort((a, b) => b.ver - a.ver);
 
-        const STABLE_ICONS  = { stable: '\u2705', amber: '\u26a0\ufe0f', red: '\u274c' };
-        const STABLE_LABELS = { stable: 'Stable', amber: 'Tier-3 reboots', red: 'Unrecovered halts' };
-        const STABLE_COLORS = { stable: 'var(--mtbf-green, #22c55e)', amber: '#f59e0b', red: '#ef4444' };
+        const STABLE_ICONS  = { stable: '\u2705', amber: '\u26a0\ufe0f', red: '\u274c', unknown: '\u2014' };
+        const STABLE_LABELS = { stable: 'Stable', amber: 'Tier-3 reboots', red: 'Unrecovered halts', unknown: 'Unknown' };
+        const STABLE_COLORS = { stable: 'var(--mtbf-green, #22c55e)', amber: '#f59e0b', red: '#ef4444', unknown: '#9ca3af' };
 
         let html = '<div class="lump-detail-section">';
         html += '<div class="lump-section-title">Version History</div>';
@@ -2565,6 +2566,9 @@ async function _fetchAndShowLumpTimeline(token, lump) {
         html += 'Binary archive and fleet call-home telemetry. Click a row to preview the hex diff against the current version.';
         if (hasTel) html += ' Fault rates and device counts from FPGA hardware.';
         html += '</div>';
+        if (missingVersions.length > 0) {
+            html += `<div class="lump-history-provenance-note" style="font-size:0.75rem;color:#b45309;margin-bottom:0.5rem;">Archive gap: ${missingVersions.map(v => `v${e(String(v))}`).join(', ')} ${missingVersions.length === 1 ? 'is' : 'are'} not available.</div>`;
+        }
 
         if (rows.length === 0) {
             html += '<div style="color:var(--text-secondary);font-style:italic;padding:0.5rem 0;">No archived versions yet. Each time you save a LUMP, the previous binary is automatically archived here.</div>';
@@ -2578,24 +2582,32 @@ async function _fetchAndShowLumpTimeline(token, lump) {
 
             for (const { ver, hist, tel } of rows) {
                 // "current" = the token this detail panel is showing
-                const isCurrent = tel ? (tel.lump_token === token)
-                                      : (lump.lump_version != null && ver === lump.lump_version);
+                // History is authoritative when present: archived telemetry rows
+                // deliberately share the current abstraction token.
+                const isCurrent = hist
+                    ? hist.current === true
+                    : (lump.lump_version != null && ver === lump.lump_version);
                 const compiledTs = hist ? hist.compiled_at : (tel ? tel.compiled_at : null);
                 const compiledStr = fmtTs(compiledTs) || (ver === 0 ? 'system' : '\u2014');
                 const cwStr   = hist && hist.cw       != null ? hist.cw              : '\u2014';
                 const ccStr   = hist && hist.cc       != null ? hist.cc              : '\u2014';
                 const szStr   = hist && hist.lump_size != null ? `${hist.lump_size}w` : '\u2014';
+                const metadataOnly = Boolean(hist && hist.metadata_only);
+                const validationErrors = hist && Array.isArray(hist.validation_errors)
+                    ? hist.validation_errors : [];
+                const archiveUsable = Boolean(hist && !isCurrent &&
+                    hist.preview_enabled !== false && hist.restore_enabled !== false);
 
                 let _rowAttrs = '';
                 if (isCurrent) {
                     _rowAttrs = ' style="background:var(--bg-selected,rgba(99,102,241,0.08));"';
-                } else if (hist) {
+                } else if (archiveUsable) {
                     _rowAttrs = ` style="cursor:pointer;" onclick="_lumpHistorySelectRow(this,'${e(token)}',${ver},${hist.cw||0},${hist.cc||0},${hist.lump_size||0},'${tk}')"`;
                 }
                 html += `<tr class="lump-history-row" data-version="${ver}"${_rowAttrs}>`;
 
                 // Ver column (version number + current badge only; compiled date is in its own column)
-                html += `<td><strong>v${ver}</strong>${isCurrent ? ' <span style="font-size:0.65rem;color:#818cf8;">(this)</span>' : ''}</td>`;
+                html += `<td><strong>v${ver}</strong>${isCurrent ? ' <span style="font-size:0.65rem;color:#818cf8;">(this)</span>' : ''}${metadataOnly ? ' <span title="Metadata survives, but no immutable binary is available" style="font-size:0.65rem;color:#b45309;">(metadata only)</span>' : ''}</td>`;
 
                 // Binary columns
                 html += `<td style="font-size:0.75rem;">${e(compiledStr)}</td>`;
@@ -2606,14 +2618,19 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                 // Telemetry columns (only rendered when hasTel)
                 if (hasTel) {
                     if (tel) {
+                        const observed = tel.observed !== false &&
+                            (tel.device_count > 0 || tel.total_faults > 0 ||
+                             tel.total_steps > 0 || tel.stable_status !== 'unknown');
                         const rate1k = tel.fault_rate_per_1000 != null ? tel.fault_rate_per_1000
                                      : (tel.fault_rate > 0 ? tel.fault_rate * 1000 : 0);
-                        const faultStr = rate1k > 0 ? `${rate1k.toFixed(4)}/1k` : '0';
-                        const status   = tel.stable_status || 'stable';
+                        const faultStr = observed
+                            ? (rate1k > 0 ? `${rate1k.toFixed(4)}/1k` : '0')
+                            : 'Not observed';
+                        const status   = observed ? (tel.stable_status || 'stable') : 'unknown';
                         const statusIcon  = STABLE_ICONS[status]  || '';
                         const statusLabel = STABLE_LABELS[status] || status;
                         const statusColor = STABLE_COLORS[status] || '#9ca3af';
-                        html += `<td>${tel.device_count}</td>`;
+                        html += `<td>${observed ? tel.device_count : 'Not observed'}</td>`;
                         html += `<td>${e(faultStr)}</td>`;
                         html += `<td><span style="color:${statusColor};font-size:0.8rem;" title="${e(statusLabel)}">${statusIcon} ${e(statusLabel)}</span></td>`;
                     } else {
@@ -2622,9 +2639,14 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                 }
 
                 // Preview + Restore (only for archived binaries)
-                if (hist) {
+                if (archiveUsable) {
                     html += `<td><button class="btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_lumpHistoryPreview('${e(token)}',${ver},${hist.cw||0},${hist.cc||0},${hist.lump_size||0},'${tk}')" title="Preview hex diff of v${ver}">Preview</button></td>`;
                     html += `<td><button class="btn lump-history-restore-btn" id="lumpHistoryRestoreBtn_${tk}_${ver}" style="font-size:0.7rem;padding:2px 8px;" disabled onclick="event.stopPropagation();_restoreLumpFromHistory('${e(token)}',${ver})" title="Preview this version first, then restore">Restore</button></td>`;
+                } else if (hist && !isCurrent) {
+                    const reason = validationErrors.length
+                        ? validationErrors.join('; ')
+                        : 'No immutable validated binary is available';
+                    html += `<td colspan="2"><span class="lump-history-unavailable" title="${e(reason)}">Unavailable</span></td>`;
                 } else {
                     html += '<td></td><td></td>';
                 }

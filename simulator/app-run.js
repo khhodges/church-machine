@@ -968,42 +968,7 @@ function stepSim() {
     // Track RETURN so the watch strip can highlight DR0 (the return value)
     window._lastStepWasReturn = !!(result && result.opName === 'RETURN');
 
-    if (result && result.absent) {
-        // Absent-lump: simulator suspended waiting for a lazy-load fetch.
-        const con = document.getElementById('editorConsole');
-        if (con) {
-            con.textContent += `\n⟳ Absent lump — fetching Slot ${result.nsIndex} (${result.label}) token=0x${result.token}`;
-            con.scrollTop = con.scrollHeight;
-        }
-        updateDashboard();
-        // Stay on the current view (editor/console if from runLazyLoadTest).
-        // triggerLazyLoad() will switch to editor/console when finished.
-        triggerLazyLoad(result, 'step');
-        return;
-    }
-    if (result && result.suspended) {
-        const con = document.getElementById('editorConsole');
-        if (con) {
-            const al = result.awaitingLump;
-            con.textContent += `\n⟳ Still fetching lump for Slot ${al ? al.nsIndex : '?'} — please wait…`;
-            con.scrollTop = con.scrollHeight;
-        }
-        updateDashboard();
-        return;
-    }
-    if (result && result.lazySuspended) {
-        // Lazy-Resolve: thread suspended waiting for IDE to supply a GT (Task #1519).
-        const con = document.getElementById('editorConsole');
-        if (con) {
-            const petName = result.petName || '?';
-            const slot = result.slot !== undefined ? result.slot : '?';
-            con.textContent += `\n⏸ Thread suspended — waiting for '${petName}' (c-list slot ${slot})\n  Link it via the Pending Capabilities panel below to resume.`;
-            con.scrollTop = con.scrollHeight;
-        }
-        _registerLazyResolvePending(result);
-        updateDashboard();
-        return;
-    }
+    if (_handleExecutionSuspension(result, 'step')) return;
     if (result) {
         const con = document.getElementById('editorConsole');
         if (con) {
@@ -1031,6 +996,52 @@ function stepSim() {
     updateDashboard();
     switchView('dashboard');
     openCRDetail(14);
+}
+
+function _handleExecutionSuspension(result, mode, onSuspend) {
+    if (!result || !(result.absent || result.suspended || result.lazySuspended)) {
+        return false;
+    }
+    if (typeof onSuspend === 'function') onSuspend();
+    if (result.absent) {
+        // Absent-lump: simulator suspended waiting for a lazy-load fetch.
+        const con = document.getElementById('editorConsole');
+        if (con) {
+            con.textContent += `\n⟳ Absent lump — fetching Slot ${result.nsIndex} (${result.label}) token=0x${result.token}`;
+            con.scrollTop = con.scrollHeight;
+        }
+        updateDashboard();
+        // Stay on the current view (editor/console if from runLazyLoadTest).
+        // triggerLazyLoad() will switch to editor/console when finished.
+        // Walk resumes through the ordinary one-step retry path after install;
+        // it must not silently switch into an unbounded Run.
+        triggerLazyLoad(result, mode === 'walk' ? 'step' : mode);
+        return true;
+    }
+    if (result.suspended) {
+        const con = document.getElementById('editorConsole');
+        if (con) {
+            const al = result.awaitingLump;
+            con.textContent += `\n⟳ Still fetching lump for Slot ${al ? al.nsIndex : '?'} — please wait…`;
+            con.scrollTop = con.scrollHeight;
+        }
+        updateDashboard();
+        return true;
+    }
+    if (result.lazySuspended) {
+        // Lazy-Resolve: thread suspended waiting for IDE to supply a GT (Task #1519).
+        const con = document.getElementById('editorConsole');
+        if (con) {
+            const petName = result.petName || '?';
+            const slot = result.slot !== undefined ? result.slot : '?';
+            con.textContent += `\n⏸ Thread suspended — waiting for '${petName}' (c-list slot ${slot})\n  Link it via the Pending Capabilities panel below to resume.`;
+            con.scrollTop = con.scrollHeight;
+        }
+        _registerLazyResolvePending(result);
+        updateDashboard();
+        return true;
+    }
+    return false;
 }
 
 let _pendingPipelineBuffer = null;
@@ -1620,7 +1631,6 @@ document.addEventListener('mousedown', function(e) {
 
 // ── Breakpoints ────────────────────────────────────────────────────────────
 const simBreakpoints = new Set();
-
 // One-shot breakpoints: removed automatically the moment they fire.
 // Used by "Break at entry" so the pause does not persist across later runs.
 const _oneShotBreakpoints = new Set();
@@ -1629,12 +1639,9 @@ const _oneShotBreakpoints = new Set();
 // the live CR14+PC context before calling step(). Persistent breakpoints remain
 // installed; only the existing run completion path consumes one-shot entries.
 function _breakpointBeforeNextInstruction() {
-    if (!sim || sim.halted || simBreakpoints.size === 0 ||
-            typeof sim._nextPhysicalAddr !== 'function') return null;
-    const addr = sim._nextPhysicalAddr();
-    if (addr < 0) return null;
-    const addr32 = addr >>> 0;
-    return simBreakpoints.has(addr32) ? addr32 : null;
+    if (!sim || sim.halted ||
+            typeof sim.checkBreakpointBeforeExecute !== 'function') return null;
+    return sim.checkBreakpointBeforeExecute(simBreakpoints);
 }
 
 function _reportBreakpointPause(addr) {
@@ -1648,6 +1655,9 @@ function _reportBreakpointPause(addr) {
 function _consumeOneShotBreakpoint(addr) {
     const addr32 = addr >>> 0;
     if (!_oneShotBreakpoints.has(addr32)) return false;
+    if (sim && typeof sim.clearBreakpointResume === 'function') {
+        sim.clearBreakpointResume(addr32);
+    }
     _oneShotBreakpoints.delete(addr32);
     simBreakpoints.delete(addr32);
     updateBreakpointBtn();
@@ -1743,7 +1753,11 @@ function addBreakpoint(addr) {
 }
 
 function removeBreakpoint(addr) {
-    simBreakpoints.delete(addr >>> 0);
+    const addr32 = addr >>> 0;
+    simBreakpoints.delete(addr32);
+    if (sim && typeof sim.clearBreakpointResume === 'function') {
+        sim.clearBreakpointResume(addr32);
+    }
     updateBreakpointBtn();
     renderBreakList();
     updateDashboard();
@@ -1751,6 +1765,9 @@ function removeBreakpoint(addr) {
 
 function clearAllBreakpoints() {
     simBreakpoints.clear();
+    if (sim && typeof sim.clearBreakpointResume === 'function') {
+        sim.clearBreakpointResume();
+    }
     updateBreakpointBtn();
     renderBreakList();
     updateDashboard();
@@ -1841,6 +1858,12 @@ function walkNext() {
         finishWalk();
         return;
     }
+    _applyPendingSimLoad();
+    if (sim.halted || !sim.bootComplete) {
+        finishWalk();
+        updateDashboard();
+        return;
+    }
     const breakpointAddr = _breakpointBeforeNextInstruction();
     if (breakpointAddr !== null) {
         finishWalk();
@@ -1850,6 +1873,7 @@ function walkNext() {
     }
     const result = sim.step();
     window._lastStepWasReturn = !!(result && result.opName === 'RETURN');
+    if (_handleExecutionSuspension(result, 'walk', finishWalk)) return;
     if (!result) {
         finishWalk();
         return;
@@ -2201,7 +2225,9 @@ function runSim() {
     // paint opportunity, so the progress line and instruction highlights move
     // together instead of collapsing into the final state.
     const VISUAL_STEP_DELAY_MS = BATCH_SIZE === 1 ? 16 : 0;
-    const breakpoints = simBreakpoints.size > 0 ? simBreakpoints : null;
+    // Keep the live Set so breakpoints added between asynchronous batches take
+    // effect immediately, even when Run started with an empty set.
+    const breakpoints = simBreakpoints;
     const con         = document.getElementById('editorConsole');
     const runBtn      = document.getElementById('btnRunSim');
 
@@ -4048,6 +4074,13 @@ async function triggerLazyLoad(absentResult, mode) {
     // ── 3. Auto-retry the LOAD (PC was reset to retryPC by receiveLump) ──────
     const faultsBefore = sim.faultLog ? sim.faultLog.length : 0;
     let retryResult;
+    const retryBreakpoint = _breakpointBeforeNextInstruction();
+    if (retryBreakpoint !== null) {
+        _reportBreakpointPause(retryBreakpoint);
+        log(`[BP] Breakpoint at 0x${retryBreakpoint.toString(16).toUpperCase().padStart(4,'0')} before lazy-load retry.`);
+        updateDashboard(); switchView('dashboard'); openCRDetail(14);
+        return;
+    }
     try {
         retryResult = sim.step();
     } catch (e) {
@@ -4103,7 +4136,7 @@ async function triggerLazyLoad(absentResult, mode) {
     log(`↪ Retry LOAD succeeded — continuing…`);
 
     // ── 4. Run to HALT / breakpoint (up to 10 000 steps) ────────────────────
-    const breakpoints = simBreakpoints.size > 0 ? simBreakpoints : null;
+    const breakpoints = simBreakpoints;
     const faultsMid = sim.faultLog ? sim.faultLog.length : 0;
     const runResult = sim.run(10000, breakpoints);
 
@@ -4120,6 +4153,7 @@ async function triggerLazyLoad(absentResult, mode) {
     // ── 5. Report final outcome ──────────────────────────────────────────────
     const newFaults = sim.faultLog ? sim.faultLog.length - faultsMid : 0;
     if (runResult.stopReason === 'breakpoint' && runResult.breakpointAddr != null) {
+        _reportBreakpointPause(runResult.breakpointAddr);
         log(`[BP] Breakpoint at 0x${runResult.breakpointAddr.toString(16).toUpperCase().padStart(4,'0')} after ${runResult.steps} step(s) post-retry.`);
     } else if (sim.halted && newFaults === 0) {
         const cr3ok = sim.cr[3] && sim.cr[3].word0 !== 0;
@@ -4219,6 +4253,9 @@ function resetSim() {
     // reload the user's compiled program after boot completes so the PC
     // returns to the correct start instruction automatically.
     _bootAuditAccum = [];
+    if (sim && typeof sim.clearBreakpointResume === 'function') {
+        sim.clearBreakpointResume();
+    }
     _clearLumpPetNames();
     if (window.ExecutionIdentity) window.ExecutionIdentity.clear('Reset cleared the previous execution identity');
     sim.reset();
@@ -4241,6 +4278,9 @@ function resetAndStep() {
     if (pipelineViz) pipelineViz.setNIA(null);
     // Do NOT clear _defaultProgramLoaded — see resetSim() comment.
     _bootAuditAccum = [];
+    if (sim && typeof sim.clearBreakpointResume === 'function') {
+        sim.clearBreakpointResume();
+    }
     _clearLumpPetNames();
     if (window.ExecutionIdentity) window.ExecutionIdentity.clear('Reset cleared the previous execution identity');
     sim.reset();

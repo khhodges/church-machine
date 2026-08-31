@@ -25,6 +25,14 @@
 
 const { test, expect } = require('@playwright/test');
 
+test.beforeEach(async ({ page }) => {
+    // History is a software-library view. Live board events can open the fault
+    // modal asynchronously and block otherwise unrelated History controls.
+    await page.route('**/hardware/wukong/status', route => route.abort());
+    await page.route('**/hardware/wukong/events**', route => route.abort());
+    await page.route('**/hardware/wukong/boot-info', route => route.abort());
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared stub data
 // ─────────────────────────────────────────────────────────────────────────────
@@ -122,8 +130,7 @@ const STUB_WORDS_CURRENT = {
 // Navigates to the Lumps view and opens the detail panel for STUB_TOKEN.
 // Callers must already have set up the /api/lumps/list route interceptor.
 async function openLumpDetail(page) {
-    await page.goto('/simulator/');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/simulator/', { waitUntil: 'domcontentloaded' });
     // Wait until app-shell.js has executed and switchView is in scope.
     await page.waitForFunction(() => typeof switchView === 'function');
 
@@ -320,7 +327,7 @@ test.describe('LUMP History tab — save via UI then browse', () => {
         await expect(histBody.locator('tr.lump-history-row')).toHaveCount(1, { timeout: 8000 });
 
         // Click Preview to load the hex dump — this enables the Restore button.
-        await histBody.locator('button[title^="Preview hex dump"]').first().click();
+        await histBody.getByRole('button', { name: 'Preview' }).first().click();
         await waitForHexTable(page);
 
         // Click the Restore button — this is the UI-level save action.
@@ -416,7 +423,7 @@ test.describe('LUMP History tab — Restore fires /api/lumps/save', () => {
         await expect(row).toBeVisible({ timeout: 8000 });
 
         // Click Preview to load the hex dump — this enables the Restore button.
-        await row.locator('button[title^="Preview hex dump"]').click();
+        await row.getByRole('button', { name: 'Preview' }).click();
         await waitForHexTable(page);
 
         // Click Restore.
@@ -508,7 +515,7 @@ test.describe('LUMP History tab — Restore fires /api/lumps/save', () => {
         await expect(row).toBeVisible({ timeout: 8000 });
 
         // Click Preview to enable the Restore button, then click Restore (dialog dismissed).
-        await row.locator('button[title^="Preview hex dump"]').click();
+        await row.getByRole('button', { name: 'Preview' }).click();
         await waitForHexTable(page);
 
         await row.locator('button.lump-history-restore-btn').click();
@@ -591,7 +598,7 @@ test.describe('LUMP History tab — Preview button renders hex dump', () => {
         await expect(row).toBeVisible({ timeout: 8000 });
 
         // Click the Preview button — stopPropagation means only _lumpHistoryPreview fires.
-        const previewBtn = row.locator('button[title^="Preview hex dump"]');
+        const previewBtn = row.getByRole('button', { name: 'Preview' });
         await expect(previewBtn).toBeVisible();
         await previewBtn.click();
 
@@ -615,7 +622,7 @@ test.describe('LUMP History tab — Preview button renders hex dump', () => {
         const row = histBody.locator('tr.lump-history-row').first();
         await expect(row).toBeVisible({ timeout: 8000 });
 
-        await row.locator('button[title^="Preview hex dump"]').click();
+        await row.getByRole('button', { name: 'Preview' }).click();
 
         const previewDiv = await waitForHexTable(page);
         const hexTable = previewDiv.locator('table.lump-hex-table');
@@ -683,4 +690,99 @@ test.describe('LUMP History tab — row onclick triggers hex preview', () => {
         await expect(row).toHaveClass(/lump-hex-hdr-row/, { timeout: 5000 });
     });
 
+});
+
+test.describe('LUMP History tab — current provenance and unobserved health', () => {
+    test('current row shows validated structure and never calls zero observations Stable', async ({ page }) => {
+        test.setTimeout(40000);
+        await page.route('**/api/lumps/list', async route => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify([{ ...STUB_LUMP, lump_version: 10 }]),
+            });
+        });
+        await page.route(`**/api/lumps/${STUB_TOKEN}/history`, async route => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    token: STUB_TOKEN,
+                    missing_versions: [3],
+                    history: [
+                        {
+                            version: 10,
+                            current: true,
+                            compiled_at: COMPILED_AT,
+                            cw: 21,
+                            cc: 5,
+                            lump_size: 512,
+                            binary_valid: true,
+                            preview_enabled: false,
+                            restore_enabled: false,
+                        },
+                        {
+                            version: 9,
+                            current: false,
+                            compiled_at: COMPILED_AT - 3600,
+                            cw: 19,
+                            cc: 4,
+                            lump_size: 128,
+                            binary_valid: true,
+                            preview_enabled: true,
+                            restore_enabled: true,
+                        },
+                    ],
+                }),
+            });
+        });
+        await page.route('**/api/lump/version-telemetry/TestAbs', async route => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    versions: [
+                        {
+                            lump_token: STUB_TOKEN,
+                            lump_version: 10,
+                            device_count: 0,
+                            total_faults: 0,
+                            total_steps: 0,
+                            fault_rate_per_1000: 0,
+                            observed: false,
+                            stable_status: 'unknown',
+                        },
+                        {
+                            lump_token: STUB_TOKEN,
+                            lump_version: 9,
+                            device_count: 2,
+                            total_faults: 0,
+                            total_steps: 1000,
+                            fault_rate_per_1000: 0,
+                            observed: true,
+                            stable_status: 'stable',
+                        },
+                    ],
+                }),
+            });
+        });
+
+        await openLumpDetail(page);
+        await clickHistoryTab(page);
+
+        const body = page.locator(`#lumpHistoryBody_${STUB_TK}`);
+        const row = body.locator('tr.lump-history-row[data-version="10"]');
+        await expect(row).toContainText('21');
+        await expect(row).toContainText('5');
+        await expect(row).toContainText('512w');
+        await expect(row).toContainText('Not observed');
+        await expect(row).toContainText('Unknown');
+        await expect(row).not.toContainText('Stable');
+        await expect(row.locator('button')).toHaveCount(0);
+        const archivedRow = body.locator('tr.lump-history-row[data-version="9"]');
+        await expect(archivedRow).not.toContainText('(this)');
+        await expect(archivedRow.getByRole('button', { name: 'Preview', exact: true })).toBeVisible();
+        await expect(archivedRow.getByRole('button', { name: 'Restore', exact: true })).toBeVisible();
+        await expect(body.locator('.lump-history-provenance-note')).toContainText('v3');
+    });
 });

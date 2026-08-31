@@ -7731,6 +7731,11 @@ def save_lump():
             _shutil.copy2(_existing_lump, _arch_lump_path)
             _arch_sc_out = dict(_arch_sc)
             _arch_sc_out['archived_version'] = _arch_ver
+            _arch_sc_out['filename'] = _arch_lump_fn
+            _arch_sc_out['sidecar_file'] = _arch_sc_fn
+            with open(_arch_lump_path, 'rb') as _arch_fh:
+                _arch_bytes = _arch_fh.read()
+            _arch_sc_out['binary_hash'] = _hl_save.sha256(_arch_bytes).hexdigest()
             with open(_arch_sc_path, 'w') as _afh:
                 json.dump(_arch_sc_out, _afh, indent=2)
             # Migration: delete old token-named file once safely copied to readable name
@@ -8550,15 +8555,110 @@ def get_lump_words(token_hex):
     })
 
 
+def _validate_lump_snapshot(lump_path, sidecar_path):
+    """Validate one binary/sidecar pair and return its decoded structure.
+
+    History, Preview, and Restore must agree on whether an archive is usable.
+    This helper is intentionally read-only and is the sole implementation of
+    the archive-level header, size, metadata, and SHA-256 checks.
+    """
+    sidecar = {}
+    errors = []
+    if sidecar_path and os.path.isfile(sidecar_path):
+        try:
+            with open(sidecar_path, "r") as fh:
+                loaded_sidecar = json.load(fh)
+            if isinstance(loaded_sidecar, dict):
+                sidecar = loaded_sidecar
+            else:
+                errors.append("sidecar root is not a JSON object")
+        except Exception as exc:
+            errors.append(f"sidecar unreadable: {exc}")
+    else:
+        errors.append("sidecar is missing")
+
+    binary_available = bool(lump_path and os.path.isfile(lump_path))
+    result = {
+        "sidecar": sidecar,
+        "errors": errors,
+        "binary_available": binary_available,
+        "raw_bytes": None,
+        "words": [],
+        "cw": None,
+        "cc": None,
+        "lump_size": None,
+        "binary_hash": None,
+        "valid": False,
+    }
+    if not binary_available:
+        errors.append("archived binary is missing")
+        return result
+    try:
+        with open(lump_path, "rb") as fh:
+            raw_bytes = fh.read()
+    except OSError as exc:
+        errors.append(f"binary unreadable: {exc}")
+        return result
+    result["raw_bytes"] = raw_bytes
+    if len(raw_bytes) < 4 or len(raw_bytes) % 4:
+        errors.append("binary length is not a non-empty whole number of words")
+        return result
+
+    lump_size = len(raw_bytes) // 4
+    words = list(_struct.unpack(f">{lump_size}I", raw_bytes))
+    word0 = words[0]
+    magic = (word0 >> 27) & 0x1F
+    header_size = 1 << (((word0 >> 23) & 0xF) + 6)
+    header_cw = (word0 >> 10) & 0x1FFF
+    header_cc = word0 & 0xFF
+    actual_hash = hashlib.sha256(raw_bytes).hexdigest()
+    result.update({
+        "words": words,
+        "cw": header_cw,
+        "cc": header_cc,
+        "lump_size": lump_size,
+        "binary_hash": actual_hash,
+    })
+    if magic != 0x1F:
+        errors.append(f"invalid header magic 0x{magic:02x}")
+    if header_size != lump_size:
+        errors.append(
+            f"header declares {header_size} words but file contains {lump_size}"
+        )
+    for field, actual in (
+        ("cw", header_cw), ("cc", header_cc), ("lump_size", lump_size)
+    ):
+        declared = sidecar.get(field)
+        if declared is None:
+            continue
+        try:
+            declared = int(declared)
+        except (TypeError, ValueError):
+            errors.append(f"sidecar {field} is not an integer")
+            continue
+        if declared != actual:
+            errors.append(
+                f"sidecar {field} declares {declared} but binary has {actual}"
+            )
+    declared_hash = str(sidecar.get("binary_hash") or "").lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", declared_hash):
+        errors.append("sidecar binary_hash is not a full SHA-256 digest")
+    elif declared_hash != actual_hash:
+        errors.append("sidecar binary_hash does not match the binary")
+    result["valid"] = not errors
+    return result
+
+
 @app.route("/api/lumps/<token>/history")
 def get_lump_history(token):
-    """Return archived versions for a LUMP token, newest-first.
+    """Return the current and archived versions for a LUMP token, newest-first.
 
     Response shape (wrapped object — intentional):
         { "token": "<8-char>", "history": [ <entry>, ... ] }
 
-    Each entry: { version, compiled_at, cw, cc, lump_size }
-    Archived files live alongside the current lump as <token>-v<N>.lump + sidecar.
+    Structural fields come from a validated binary header, never unchecked
+    sidecar metadata.  ``preview_enabled`` / ``restore_enabled`` are true only
+    when the referenced immutable archive agrees with its sidecar size/hash.
 
     Note: the response is a wrapped object (not a bare JSON array) so that
     callers can distinguish an empty-history success from a 404 / error response.
@@ -8572,6 +8672,7 @@ def get_lump_history(token):
     # Match both the current filename stem and the stable abstraction-name
     # archive stem. Older archives may predate a tokenized dot-name filename.
     _safe_stems_h = set()
+    _current_manifest_h = None
     _mf_path_h = os.path.join(lumps_dir, 'manifest.json')
     if os.path.isfile(_mf_path_h):
         try:
@@ -8579,6 +8680,7 @@ def get_lump_history(token):
                 _mf_d = json.load(_mf)
             for _e in _mf_d:
                 if _e.get('token') == key8:
+                    _current_manifest_h = _e
                     _fn = _e.get('filename', '')
                     if _fn and _fn.endswith('.lump'):
                         _safe_stems_h.add(_re.sub(r'_v\d+$', '', _fn[:-5]))
@@ -8591,38 +8693,94 @@ def get_lump_history(token):
     pattern_token = _re.compile(rf'^{_re.escape(key8)}-v(\d+)\.lump$')
     pattern_named = [_re.compile(rf'^{_re.escape(_stem)}_v(\d+)\.lump$')
                      for _stem in _safe_stems_h]
-    entries = []
-    for fn in (os.listdir(lumps_dir) if os.path.isdir(lumps_dir) else []):
-        m = pattern_token.match(fn)
-        if not m:
-            m = next((pattern.match(fn) for pattern in pattern_named if pattern.match(fn)), None)
-        if not m:
-            continue
-        ver = int(m.group(1))
-        lump_path_v = os.path.join(lumps_dir, fn)
-        sc_path_v   = os.path.join(lumps_dir, fn[:-5] + '.json')
-        size_words  = os.path.getsize(lump_path_v) // 4
+
+    def _snapshot_entry_h(version, lump_path, sidecar_path, *, current=False):
+        snapshot = _validate_lump_snapshot(lump_path, sidecar_path)
+        sc = snapshot["sidecar"]
+        errors = snapshot["errors"]
         entry = {
-            "version":     ver,
-            "lump_size":   size_words,
-            "compiled_at": None,
-            "cw":          None,
-            "cc":          None,
+            "version": version,
+            "current": current,
+            "compiled_at": sc.get("compiled_at"),
+            "abstraction": sc.get("abstraction"),
+            "cw": snapshot["cw"],
+            "cc": snapshot["cc"],
+            "lump_size": snapshot["lump_size"],
+            "binary_hash": snapshot["binary_hash"],
+            "binary_available": snapshot["binary_available"],
+            "binary_valid": snapshot["valid"],
+            "metadata_only": not snapshot["binary_available"],
+            "preview_enabled": bool(not current and snapshot["valid"]),
+            "restore_enabled": bool(not current and snapshot["valid"]),
+            "validation_errors": errors,
         }
-        if os.path.isfile(sc_path_v):
+        if isinstance(sc.get("mtbf"), dict):
+            entry["mtbf"] = sc["mtbf"]
+        return entry
+
+    entries = []
+    archive_files = {}
+    for fn in (os.listdir(lumps_dir) if os.path.isdir(lumps_dir) else []):
+        if not (fn.endswith(".lump") or fn.endswith(".json")):
+            continue
+        binary_name = fn[:-5] + ".lump" if fn.endswith(".json") else fn
+        m = pattern_token.match(binary_name)
+        if not m:
+            m = next(
+                (pattern.match(binary_name) for pattern in pattern_named
+                 if pattern.match(binary_name)),
+                None,
+            )
+        if m:
+            archive_files.setdefault(int(m.group(1)), binary_name[:-5])
+
+    for ver, stem in archive_files.items():
+        lump_path_v = os.path.join(lumps_dir, stem + ".lump")
+        sc_path_v = os.path.join(lumps_dir, stem + ".json")
+        entries.append(_snapshot_entry_h(ver, lump_path_v, sc_path_v))
+
+    # The live canonical artifact is part of version history too.  Resolve it
+    # only through the manifest and enrich it from its actual sidecar + binary.
+    if _current_manifest_h:
+        _cur_fn = _current_manifest_h.get("filename") or f"{key8}.lump"
+        _cur_sc_fn = _current_manifest_h.get("sidecar_file") or f"{key8}.json"
+        _cur_lp = os.path.join(lumps_dir, _cur_fn)
+        _cur_sp = os.path.join(lumps_dir, _cur_sc_fn)
+        _cur_sc = {}
+        if os.path.isfile(_cur_sp):
             try:
-                with open(sc_path_v, 'r') as fh:
-                    sc = json.load(fh)
-                entry["compiled_at"]  = sc.get("compiled_at")
-                entry["cw"]           = sc.get("cw")
-                entry["cc"]           = sc.get("cc")
-                entry["abstraction"]  = sc.get("abstraction")
-                entry["lump_size"]    = sc.get("lump_size") or size_words
+                with open(_cur_sp) as _fh:
+                    _cur_sc_loaded = json.load(_fh)
+                if isinstance(_cur_sc_loaded, dict):
+                    _cur_sc = _cur_sc_loaded
             except Exception:
                 pass
-        entries.append(entry)
+        _cur_ver = _cur_sc.get(
+            "lump_version", _current_manifest_h.get("lump_version")
+        )
+        if _cur_ver is not None:
+            try:
+                _cur_ver = int(_cur_ver)
+                entries = [e for e in entries if e["version"] != _cur_ver]
+                entries.append(
+                    _snapshot_entry_h(
+                        _cur_ver, _cur_lp, _cur_sp, current=True
+                    )
+                )
+            except (TypeError, ValueError):
+                pass
+
     entries.sort(key=lambda e: e["version"], reverse=True)
-    return jsonify({"token": key8, "history": entries})
+    versions = {entry["version"] for entry in entries}
+    missing_versions = (
+        [ver for ver in range(min(versions), max(versions) + 1) if ver not in versions]
+        if versions else []
+    )
+    return jsonify({
+        "token": key8,
+        "history": entries,
+        "missing_versions": missing_versions,
+    })
 
 
 @app.route("/api/lump/<token>/fork-version", methods=["POST"])
@@ -8709,6 +8867,11 @@ def lump_fork_version(token):
     _shutil_fv.copy2(lump_path, arch_lump)
     arch_sc = dict(sc)
     arch_sc['archived_version'] = cur_version
+    arch_sc['filename'] = os.path.basename(arch_lump)
+    arch_sc['sidecar_file'] = os.path.basename(arch_json)
+    import hashlib as _hashlib_fv
+    with open(arch_lump, 'rb') as _arch_fh:
+        arch_sc['binary_hash'] = _hashlib_fv.sha256(_arch_fh.read()).hexdigest()
     with open(arch_json, 'w') as fh:
         json.dump(arch_sc, fh, indent=2)
 
@@ -8773,36 +8936,28 @@ def get_lump_version_words(token, version):
             pass
     if not os.path.isfile(lump_path_v):
         return jsonify({"error": f"No archived version v{version} for token 0x{key8}"}), 404
-    with open(lump_path_v, 'rb') as fh:
-        data = fh.read()
-    num_words = len(data) // 4
-    words = list(_struct.unpack(f'>{num_words}I', data[:num_words * 4]))
-
-    sc = {}
     sc_path_v = os.path.join(lumps_dir, lump_path_v[len(lumps_dir)+1:-5] + '.json')
-    if os.path.isfile(sc_path_v):
-        try:
-            with open(sc_path_v, 'r') as fh:
-                sc = json.load(fh)
-        except Exception:
-            pass
-
-    hdr_cw  = sc.get('cw')
-    hdr_cc  = sc.get('cc')
-    if hdr_cw is None or hdr_cc is None:
-        if num_words > 0:
-            h0 = words[0]
-            hdr_cw = (h0 >> 10) & 0x1FFF
-            hdr_cc = h0 & 0xFF
+    snapshot = _validate_lump_snapshot(lump_path_v, sc_path_v)
+    sc = snapshot["sidecar"]
+    validation_errors = snapshot["errors"]
+    if validation_errors:
+        return jsonify({
+            "error": (
+                f"Archived version v{version} failed integrity validation: "
+                + "; ".join(validation_errors)
+            )
+        }), 409
 
     return jsonify({
         "token":         key8,
         "version":       version,
-        "words":         words,
-        "count":         num_words,
-        "cw":            hdr_cw,
-        "cc":            hdr_cc,
-        "lump_size":     sc.get('lump_size') or num_words,
+        "words":         snapshot["words"],
+        "count":         snapshot["lump_size"],
+        "cw":            snapshot["cw"],
+        "cc":            snapshot["cc"],
+        "lump_size":     snapshot["lump_size"],
+        "binary_hash":   snapshot["binary_hash"],
+        "binary_valid":  True,
         "ns_slot":       sc.get('ns_slot'),
         "abstraction":   sc.get('abstraction'),
         "compiled_at":   sc.get('compiled_at'),
@@ -11975,13 +12130,16 @@ def _compute_version_telemetry(abstraction_name):
             fault_rate = (total_faults / total_steps) if total_steps > 0 else 0.0
             tier3 = d["tier3"]
             unrecovered = d["unrecovered"]
-            if unrecovered > 0:
+            device_count = dev_counts.get((tok, ver), 0)
+            observed = bool(total_steps > 0 or total_faults > 0 or device_count > 0)
+            if not observed:
+                stable_status = "unknown"
+            elif unrecovered > 0:
                 stable_status = "red"
             elif tier3 > 0:
                 stable_status = "amber"
             else:
                 stable_status = "stable"
-            device_count = dev_counts.get((tok, ver), 0)
             compiled_at = (
                 entry.get("compiled_at")
                 or entry.get("deployment", {}).get("built_at")
@@ -11991,6 +12149,7 @@ def _compute_version_telemetry(abstraction_name):
                 "lump_token": tok,
                 "compiled_at": compiled_at,
                 "device_count": device_count,
+                "observed": observed,
                 "total_faults": total_faults,
                 "fault_rate": round(fault_rate, 6),
                 "fault_rate_per_1000": round(fault_rate * 1000, 4),
@@ -12001,9 +12160,11 @@ def _compute_version_telemetry(abstraction_name):
                 "mtbf": round(total_steps / total_faults, 1) if total_faults > 0 else None,
                 "stable_status": stable_status,
                 "production_stable": (
-                    total_faults == 0
-                    or fault_rate < FAULT_RATE_THRESHOLD
-                    or (tier3 == 0 and unrecovered == 0)
+                    observed and (
+                        total_faults == 0
+                        or fault_rate < FAULT_RATE_THRESHOLD
+                        or (tier3 == 0 and unrecovered == 0)
+                    )
                 ),
             })
         return result

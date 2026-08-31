@@ -135,6 +135,9 @@ register_suite "wukong-relay-deployment-guard" \
 register_suite "lump-consistency" \
     'python -m pytest tests/lump/test_lump_consistency.py -v'
 
+register_suite "lump-history-tests" \
+    'python -m pytest tests/server/test_lump_history_integrity.py tests/server/test_lump_archive_fallback.py tests/server/test_version_telemetry.py -q'
+
 register_suite "lump-v13-freespace-tests" \
     'python -m pytest tests/lump/test_lump_v13_freespace.py -v'
 
@@ -466,7 +469,7 @@ declare -A ALL_GROUPS
 
 ALL_GROUPS["boot"]="boot-image-matches-sim boot-image-loads-and-boots boot-image-upload-endpoint boot-image-serve-endpoints boot-layout-regression boot-entry-hw-image-tests"
 
-ALL_GROUPS["lump"]="lump-consistency lump-v13-freespace-tests lump-binary-tests wukong-callhome-hw-lump-tests lump-roundtrip editor-roundtrip-tests lump-gt-display-tests update-lump-tests lump-meta-patch-validation-tests"
+ALL_GROUPS["lump"]="lump-consistency lump-history-tests lump-v13-freespace-tests lump-binary-tests wukong-callhome-hw-lump-tests lump-roundtrip editor-roundtrip-tests lump-gt-display-tests update-lump-tests lump-meta-patch-validation-tests"
 
 ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests warning-panel-tests bare-space-ns-fallback-tests disasm-panel-tests lump-dir-disasm-tooltip-tests hw-trace-live-movable-tests execution-identity-tests boot-entry-sync-tests install-boot-entry-cr0-tests ns-slot-dynamic-tests rogue-namespace-slot-tests ns-slot-policy-restore-tests ns-slot-modal-persist-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests openin-links-tests open-lump-freshness-tests lump-warning-tests call-cr6-l-perm-tests return-cr6-l-perm-tests load-through-l-perm-cr6-tests return-cr14-trace-tests wukong-cr-update-tests wukong-hw-fault-tests wukong-trace-cr-server-tests return-fetch-lump-tests constants-lump-tests"
 

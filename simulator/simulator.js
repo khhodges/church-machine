@@ -143,6 +143,9 @@ class ChurchSimulator {
         // Keys are numeric register indices (integers), values are name strings.
         this._petNameCRMap = {};
         this._petNameDRMap = {};
+        // A persistent breakpoint is skipped once when any execution mode
+        // resumes from its pause address; the breakpoint remains installed.
+        this._breakpointResumeAddr = null;
 
         // Which NS slot the boot sequence jumps to at B:05/B:06.
         // Defaults to 6 (SelfTest); overridden by app.js
@@ -833,6 +836,7 @@ class ChurchSimulator {
     }
 
     reset() {
+        this._breakpointResumeAddr = null;
         // Dynamic system services hold authority state outside the raw NS
         // words. Retire it before replacing memory so no credential, range
         // guard, or allocator record can survive a same-instance hard reset.
@@ -5161,6 +5165,40 @@ class ChurchSimulator {
         return (cr14.word1 + 1 + this.pc) >>> 0;
     }
 
+    // Return the physical address of a breakpoint that must pause before the
+    // next instruction, or null when execution may proceed. This is the sole
+    // owner of persistent-breakpoint resume state for Step, Walk, and Run.
+    checkBreakpointBeforeExecute(breakpoints) {
+        if (!breakpoints || breakpoints.size === 0) {
+            this._breakpointResumeAddr = null;
+            return null;
+        }
+        const nextAddr = this._nextPhysicalAddr();
+        const nextAddr32 = nextAddr >= 0 ? nextAddr >>> 0 : null;
+        if (this._breakpointResumeAddr != null &&
+                this._breakpointResumeAddr !== nextAddr32) {
+            this._breakpointResumeAddr = null;
+        }
+        if (nextAddr32 != null && this._breakpointResumeAddr === nextAddr32) {
+            this._breakpointResumeAddr = null;
+            return null;
+        }
+        if (nextAddr32 != null && breakpoints.has(nextAddr32)) {
+            this._breakpointResumeAddr = nextAddr32;
+            return nextAddr32;
+        }
+        return null;
+    }
+
+    clearBreakpointResume(addr = null) {
+        const expected = addr == null ? null : addr >>> 0;
+        if (expected === null || this._breakpointResumeAddr === expected) {
+            this._breakpointResumeAddr = null;
+            return true;
+        }
+        return false;
+    }
+
     _fetchInstruction() {
         if (!this.bootComplete) {
             if (this.pc >= this.memory.length) {
@@ -9271,13 +9309,11 @@ class ChurchSimulator {
             // Stop-before-execute breakpoint check. This includes the first
             // instruction in the run so entry breakpoints and resumed runs use
             // exactly the same physical-address rule.
-            if (breakpoints) {
-                const nextAddr = this._nextPhysicalAddr();
-                if (nextAddr >= 0 && breakpoints.has(nextAddr >>> 0)) {
-                    stopReason = 'breakpoint';
-                    breakpointAddr = nextAddr >>> 0;
-                    break;
-                }
+            const pendingBreakpoint = this.checkBreakpointBeforeExecute(breakpoints);
+            if (pendingBreakpoint !== null) {
+                stopReason = 'breakpoint';
+                breakpointAddr = pendingBreakpoint;
+                break;
             }
             const result = this.step();
             if (!result) { stopReason = this.halted ? 'halted' : 'bootExit'; break; }

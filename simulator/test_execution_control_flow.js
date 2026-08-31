@@ -152,6 +152,45 @@ function makeOrdinaryCallFixture() {
         'persistent breakpoint remains installed');
 }
 
+// A second Run resumes past the instruction that caused the persistent
+// breakpoint. The breakpoint remains armed for a later arrival.
+{
+    const { sim } = makeCallFixture(0);
+    const breakpoints = new Set([0x0301]);
+    const first = sim.run(10, breakpoints);
+    assert.strictEqual(first.stopReason, 'breakpoint');
+    const second = sim.run(1, breakpoints);
+    assert.strictEqual(second.stopReason, 'maxSteps',
+        'resumed Run executes instead of re-triggering the same breakpoint');
+    assert.strictEqual(second.steps, 1);
+    assert.strictEqual(breakpoints.has(0x0301), true,
+        'persistent breakpoint remains armed after resume');
+}
+
+// Step/Walk and Run share one breakpoint policy method. Consuming the resume
+// token through the direct pre-execute check must affect the next Run too.
+{
+    const { sim } = makeCallFixture(0);
+    const breakpoints = new Set([0x0301]);
+    assert.strictEqual(sim.checkBreakpointBeforeExecute(breakpoints), 0x0301);
+    const run = sim.run(1, breakpoints);
+    assert.strictEqual(run.stopReason, 'maxSteps',
+        'Run consumes the resume token armed through the shared UI policy');
+    assert.strictEqual(run.steps, 1);
+}
+
+// Reset clears a pending Run resume so returning to the same address pauses
+// again instead of inheriting a bypass from the prior machine state.
+{
+    const { sim } = makeCallFixture(0);
+    const breakpoints = new Set([0x0301]);
+    assert.strictEqual(sim.run(10, breakpoints).stopReason, 'breakpoint');
+    assert.strictEqual(sim._breakpointResumeAddr, 0x0301);
+    sim.reset();
+    assert.strictEqual(sim._breakpointResumeAddr, null,
+        'reset removes the pending one-time breakpoint bypass');
+}
+
 // After ELOADCALL replaces CR14 and PC, Run resolves the callee address and
 // pauses before its first instruction with an independent call frame.
 {
@@ -206,10 +245,28 @@ function makeOrdinaryCallFixture() {
         assert.ok(checkAt >= 0 && stepAt >= 0 && checkAt < stepAt,
             `${name} checks the current physical breakpoint before executing`);
     }
+    const walkStart = appRun.indexOf('function walkNext(');
+    const walkEnd = appRun.indexOf('\nfunction ', walkStart + 1);
+    const walkBody = appRun.slice(walkStart, walkEnd);
+    assert.ok(walkBody.indexOf('_applyPendingSimLoad()') >= 0 &&
+              walkBody.indexOf('_applyPendingSimLoad()') <
+              walkBody.indexOf('_breakpointBeforeNextInstruction()'),
+        'Walk applies pending editor code before breakpoint evaluation');
+    assert.ok(walkBody.includes("_handleExecutionSuspension(result, 'walk', finishWalk)"),
+        'Walk shares Step suspension handling and stops its timer before async resolution');
     assert.ok(appRun.includes('function _consumeOneShotBreakpoint(addr)'),
         'all UI execution modes share one-shot breakpoint consumption');
-    assert.ok(appRun.includes('_reportBreakpointPause(addr) {\n    _consumeOneShotBreakpoint(addr);'),
-        'Step and Walk reporting consumes a fired one-shot breakpoint');
+    assert.ok(appRun.includes('function _reportBreakpointPause(addr)') &&
+              appRun.includes('_consumeOneShotBreakpoint(addr);'),
+        'all UI pause reporting shares one-shot breakpoint consumption');
+    assert.ok(appRun.includes('return sim.checkBreakpointBeforeExecute(simBreakpoints);'),
+        'Step and Walk delegate breakpoint policy to the simulator');
+    assert.ok(appRun.includes('const breakpoints = simBreakpoints;'),
+        'Run keeps the live breakpoint Set across asynchronous batches');
+    assert.ok(!appRun.includes('sim._breakpointResumeAddr ='),
+        'UI paths do not mutate simulator-owned breakpoint resume state');
+    assert.ok(!appRun.includes('let _breakpointResumeAddr'),
+        'the UI must not maintain a second resume-state token');
     assert.ok(appRun.includes("_consumeOneShotBreakpoint(breakpointAddr);\n                status = `Breakpoint"),
         'Run completion consumes a fired one-shot breakpoint');
 }

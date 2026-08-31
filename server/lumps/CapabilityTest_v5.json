@@ -1,8 +1,8 @@
 {
   "token": "9ce28c0b",
   "abstraction": "CapabilityTest",
-  "filename": "CapabilityTest.1.e4fe164d.lump",
-  "sidecar_file": "CapabilityTest.1.e4fe164d.json",
+  "filename": "CapabilityTest_v5.lump",
+  "sidecar_file": "CapabilityTest_v5.json",
   "ns_slot": 10,
   "ns_slot_policy": "static",
   "boot_resident": true,

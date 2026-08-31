@@ -250,7 +250,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node scripts/gen-api-reference.js --check && node scripts/check-run-all-tests-sync.js"
+args = "bash scripts/run-all-tests.sh check-api-reference-stale"
 
 [workflows.workflow.metadata]
 outputType = "console"
