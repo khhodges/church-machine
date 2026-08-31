@@ -64,10 +64,14 @@ def extract_tcl_probe_nets(tcl_text):
         → ('u_ila_0/probe4', ['led0', 'led1'])
     """
     results = []
-    # Match: connect_debug_port <port> … get_nets {<patterns>} …
+    # Match: [optional indentation] connect_debug_port <port> … get_nets
+    # {<patterns>} … .  Vivado TCL commonly nests these commands inside an
+    # if-block, so allowing leading whitespace is required for real build
+    # scripts.  The same expression handles direct [get_nets …] and
+    # lsort-wrapped [get_nets …] forms.
     # The patterns inside {} may include spaces (multiple nets) or [*] globs.
     pattern = re.compile(
-        r'^connect_debug_port\s+(\S+)\s+.*get_nets\s+\{([^}]+)\}',
+        r'^\s*connect_debug_port\s+(\S+)\s+.*get_nets\s+\{([^}]+)\}',
         re.MULTILINE,
     )
     for m in pattern.finditer(tcl_text):

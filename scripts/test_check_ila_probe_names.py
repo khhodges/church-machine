@@ -31,11 +31,11 @@ from check_ila_probe_names import (
 # ---------------------------------------------------------------------------
 
 _MINIMAL_TCL = """\
-connect_debug_port u_ila_0/probe0 [get_nets {dbg_boot_complete}]
-connect_debug_port u_ila_0/probe1 [get_nets {dbg_fault_valid}]
-connect_debug_port u_ila_0/probe2 [lsort -dictionary [get_nets {dbg_nia[*]}]]
-connect_debug_port u_ila_0/probe3 [lsort -dictionary [get_nets {dbg_fault[*]}]]
-connect_debug_port u_ila_0/probe4 [lsort -dictionary [get_nets {led0 led1}]]
+    connect_debug_port u_ila_0/probe0 [get_nets {dbg_boot_complete}]
+    connect_debug_port u_ila_0/probe1 [get_nets {dbg_fault_valid}]
+    connect_debug_port u_ila_0/probe2 [lsort -dictionary [get_nets {dbg_nia[*]}]]
+    connect_debug_port u_ila_0/probe3 [lsort -dictionary [get_nets {dbg_fault[*]}]]
+    connect_debug_port u_ila_0/probe4 [lsort -dictionary [get_nets {led0 led1}]]
 """
 
 _GOOD_GEN = """\
@@ -99,6 +99,12 @@ probe_list = extract_tcl_probe_nets(_MINIMAL_TCL)
 check("extracts 5 probes from minimal TCL", PASS, len(probe_list) == 5)
 check("clock probe skipped (no get_nets literal)", PASS,
       all('clk' not in p for p, _ in probe_list))
+check("scalar direct get_nets expression parsed", PASS,
+      probe_list[0] == ('u_ila_0/probe0', ['dbg_boot_complete']))
+check("bus lsort-wrapped expression parsed", PASS,
+      probe_list[2] == ('u_ila_0/probe2', ['dbg_nia[*]']))
+check("multi-net lsort-wrapped expression parsed", PASS,
+      probe_list[4] == ('u_ila_0/probe4', ['led0', 'led1']))
 
 probe_attrs = probe_nets_to_attrs(probe_list)
 all_attrs = {a for attrs in probe_attrs.values() for a in attrs}
