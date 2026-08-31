@@ -71,8 +71,9 @@ function makeCallFixture(calleeInstruction) {
     sim.cr[12] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
 
     const caller = writeLump(sim, 4, 0x0300, [ELOADCALL_AL_CR0_CR6_ROW1], 2);
-    // Method selector 0 enters at PC=1; word 0 is the method-table position.
-    const callee = writeLump(sim, 6, 0x0600, [RETURN_AL, calleeInstruction], 1);
+    // This is a flat LUMP: selector 0 enters at logical PC=0, which fetches
+    // physical word 1 (base+1+pc).
+    const callee = writeLump(sim, 6, 0x0600, [calleeInstruction], 1);
     const callerSeq = sim.parseNSWord1(sim.readNSEntry(4).word1_limit).gtSeq;
     const calleeSeq = sim.parseNSWord1(sim.readNSEntry(6).word1_limit).gtSeq;
     const callerRX = sim.createGT(callerSeq, 4, { R: 1, X: 1 }, 1);
@@ -83,7 +84,7 @@ function makeCallFixture(calleeInstruction) {
     sim.cr[14] = { word0: callerRX, word1: 0x0300, word2: 63, word3: 0, m: 0 };
     sim.cr[6] = { word0: callerL, word1: caller.clistBase, word2: 63, word3: 0, m: 0 };
     sim.pc = 0;
-    return { sim, callerRX, calleePhysical: 0x0602, callerContinuation: 1 };
+    return { sim, callerRX, calleePhysical: 0x0601, callerContinuation: 1 };
 }
 
 function makeOrdinaryCallFixture() {
@@ -212,7 +213,7 @@ function makeOrdinaryCallFixture() {
     assert.strictEqual(result.steps, 2, 'ELOADCALL and HALT retired');
     assert.strictEqual(sim.halted, true);
     assert.strictEqual(sim.callStack.length, 1, 'HALT did not invent a RETURN');
-    assert.strictEqual(sim.pc, 1, 'HALT left callee PC at its terminal instruction');
+    assert.strictEqual(sim.pc, 0, 'HALT left callee PC at its terminal instruction');
     assert.strictEqual(sim.physicalPC, calleePhysical);
     assert.strictEqual(sim.faultLog.length, 0, 'HALT is clean termination');
 }

@@ -7619,15 +7619,16 @@ class ChurchSimulator {
         this.output += desc + '\n';
         const prevPC_ec = this.pc;
         // Hardware method-table dispatch: mirrors CALL handler (lines 4474–4495).
-        // ecMethodIdx=0: fast path — NIA = lump word 1 (pc=1), same as CALL method-0.
+        // ecMethodIdx=0: fast path — NIA = lump word 1 (pc=0 because fetch is
+        // base+1+pc).
         // ecMethodIdx=k>0: read table entry at lump word k; 0 = private → FAULT.
         //   BRANCH-encoded entry (opcode 23): pc = (k-1) + soff.
         //   Legacy bare-PC entry (< lumpSize): pc = tableEntry.
         //   Unrecognised entry (flat-assembly lump with no method table): fall back
-        //   to fast-path (pc=1) so lumps like SelfTest v53 — whose word-1 is an
+        //   to fast-path (pc=0) so lumps like SelfTest v53 — whose word-1 is an
         //   instruction, not a BRANCH dispatcher — still execute.
         if (ecMethodIdx === 0) {
-            this.pc = 1;
+            this.pc = 0;
         } else {
             const ecMethodEntry = (this.memory[this.cr[14].word1 + ecMethodIdx] || 0) >>> 0;
             if (ecMethodEntry === 0) {
@@ -7648,8 +7649,9 @@ class ChurchSimulator {
                 // Not a BRANCH and not a valid lump-relative PC — this lump has
                 // no method table (flat-assembly binary, e.g. SelfTest v53 where
                 // lump word 1 is code, not a BRANCH dispatcher).  Fall back to the
-                // fast-path entry so the lump still executes.
-                this.pc = 1;
+                // Fast-path entry so the lump still executes. Logical PC 0
+                // fetches lump word 1; PC 1 would silently skip it.
+                this.pc = 0;
                 this.output += `[ELOADCALL] Note: lump word ${ecMethodIdx} (0x${ecMethodEntry.toString(16).padStart(8,'0')}) is not a BRANCH — no method table; using fast-path entry.\n`;
             }
         }
