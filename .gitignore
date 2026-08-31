@@ -48,6 +48,7 @@ __pycache__/
 
 # Loose build artifacts — never commit these
 *.bit
+!build/church_wukong_xc7a100t.bit
 *.zip
 /church_ti60_f225.hex
 bitstreams_that_worked.zip
