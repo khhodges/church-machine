@@ -1793,6 +1793,14 @@ function updateUniversalBreakpointControls() {
         const checkbox = document.getElementById(id);
         if (checkbox) checkbox.checked = simUniversalBreakpoints.has(opcode);
     });
+    const allCheckbox = document.getElementById('breakOnAllChurchChk');
+    if (allCheckbox) {
+        const total = _universalBreakpointNames.size;
+        const enabled = [..._universalBreakpointNames.keys()]
+            .filter(opcode => simUniversalBreakpoints.has(opcode)).length;
+        allCheckbox.checked = total > 0 && enabled === total;
+        allCheckbox.indeterminate = enabled > 0 && enabled < total;
+    }
 }
 
 function setUniversalBreakpoint(opcode, enabled) {
@@ -1802,6 +1810,20 @@ function setUniversalBreakpoint(opcode, enabled) {
     if (sim && typeof sim.clearBreakpointResume === 'function') {
         sim.clearBreakpointResume();
     }
+    updateBreakpointBtn();
+    renderBreakList();
+    updateDashboard();
+}
+
+function setAllUniversalBreakpoints(enabled) {
+    _universalBreakpointNames.forEach((name, opcode) => {
+        if (enabled) simUniversalBreakpoints.add(opcode);
+        else simUniversalBreakpoints.delete(opcode);
+    });
+    if (sim && typeof sim.clearBreakpointResume === 'function') {
+        sim.clearBreakpointResume();
+    }
+    updateUniversalBreakpointControls();
     updateBreakpointBtn();
     renderBreakList();
     updateDashboard();

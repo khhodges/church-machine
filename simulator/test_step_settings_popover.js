@@ -81,6 +81,7 @@ const FIXTURE_HTML = `<!DOCTYPE html><body>
       <label class="break-at-entry-label step-settings-entry" id="breakAtEntryLabel">
         <input type="checkbox" id="breakAtEntryChk"> Break at entry
       </label>
+       <label><input type="checkbox" id="breakOnAllChurchChk"></label>
     </div>
     <div class="step-settings-section">
       <div class="step-settings-label">Breakpoints</div>
@@ -171,6 +172,7 @@ check('SSP-2', '#stepSettingsPopover is present in index.html',
 (function() {
     const pop = idoc.getElementById('stepSettingsPopover');
     const ids = [
+        'breakOnAllChurchChk',
         'breakOnLoadChk', 'breakOnSaveChk', 'breakOnCallChk',
         'breakOnReturnChk', 'breakOnChangeChk', 'breakOnSwitchChk',
         'breakOnTpermChk', 'breakOnLambdaChk',
@@ -181,6 +183,20 @@ check('SSP-2', '#stepSettingsPopover is present in index.html',
             const checkbox = idoc.getElementById(id);
             return !!checkbox && pop.contains(checkbox);
         }));
+})();
+
+// ── SSP-13  Master control updates every universal breakpoint ────────────────
+(function() {
+    const env = makeEnv();
+    vm.runInContext('setAllUniversalBreakpoints(true);', env);
+    check('SSP-13a', 'master control enables every universal opcode',
+        env.simUniversalBreakpoints.size === env._universalBreakpointNames.size);
+    check('SSP-13b', 'master control reports checked when all are enabled',
+        env.document.getElementById('breakOnAllChurchChk').checked === true);
+    vm.runInContext('setAllUniversalBreakpoints(false);', env);
+    check('SSP-13c', 'master control clears every universal opcode',
+        env.simUniversalBreakpoints.size === 0 &&
+        env.document.getElementById('breakOnAllChurchChk').checked === false);
 })();
 
 // ── SSP-4  #breakList is inside #stepSettingsPopover ──────────────────────────
