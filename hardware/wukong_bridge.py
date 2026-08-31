@@ -51,6 +51,7 @@ import sys
 import threading
 import time
 import uuid
+import zlib
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _REPO_ROOT not in sys.path:
@@ -91,12 +92,58 @@ try:
         build_response, parse_request, crc32,
     )
 except ImportError:  # direct invocation: python hardware/wukong_bridge.py
-    from wukong_prefetch import (
-        PREFETCH_REQUEST_MAGIC, PREFETCH_INCIDENT_MAGIC, PREFETCH_REQUEST_LEN,
-        PREFETCH_STATUS_NOT_FOUND, PREFETCH_STATUS_MALFORMED,
-        PREFETCH_STATUS_CRC, PREFETCH_STATUS_TRANSPORT, PREFETCH_MAX_LUMP_WORDS,
-        build_response, parse_request, crc32,
-    )
+    try:
+        from wukong_prefetch import (
+            PREFETCH_REQUEST_MAGIC, PREFETCH_INCIDENT_MAGIC, PREFETCH_REQUEST_LEN,
+            PREFETCH_STATUS_NOT_FOUND, PREFETCH_STATUS_MALFORMED,
+            PREFETCH_STATUS_CRC, PREFETCH_STATUS_TRANSPORT, PREFETCH_MAX_LUMP_WORDS,
+            build_response, parse_request, crc32,
+        )
+    except ImportError:
+        # The /dl/wukong-bridge endpoint intentionally serves one file. Keep
+        # the small wire-format helper embedded here as a final fallback so a
+        # downloaded bridge does not require wukong_prefetch.py beside it.
+        PREFETCH_REQUEST_MAGIC = 0xD7
+        PREFETCH_RESPONSE_MAGIC = 0xD8
+        PREFETCH_INCIDENT_MAGIC = 0xD9
+        PREFETCH_VERSION = 1
+        PREFETCH_REQUEST_LEN = 16
+        PREFETCH_MAX_LUMP_WORDS = 16384
+        PREFETCH_STATUS_NOT_FOUND = 1
+        PREFETCH_STATUS_MALFORMED = 2
+        PREFETCH_STATUS_CRC = 3
+        PREFETCH_STATUS_TRANSPORT = 5
+
+        def crc32(raw):
+            return zlib.crc32(raw) & 0xFFFFFFFF
+
+        def parse_request(frame):
+            if len(frame) != PREFETCH_REQUEST_LEN:
+                return None
+            magic, version, sequence, slot, token, max_words, reserved = \
+                struct.unpack(">BBBBIHH", frame[:12])
+            expected_hash32 = struct.unpack(">I", frame[12:16])[0]
+            if (magic != PREFETCH_REQUEST_MAGIC or version != PREFETCH_VERSION
+                    or reserved or max_words < 1
+                    or max_words > PREFETCH_MAX_LUMP_WORDS):
+                return None
+            return {
+                "sequence": sequence,
+                "slot": slot,
+                "token": token,
+                "max_words": max_words,
+                "expected_hash32": expected_hash32,
+            }
+
+        def build_response(slot, token, words, status=0):
+            raw = struct.pack(">%dI" % len(words), *(
+                w & 0xFFFFFFFF for w in words
+            ))
+            return struct.pack(
+                ">BBBBIII", PREFETCH_RESPONSE_MAGIC, PREFETCH_VERSION,
+                status & 0xFF, slot & 0xFF, token & 0xFFFFFFFF,
+                len(words), crc32(raw)
+            ) + raw
 
 try:
     import serial
