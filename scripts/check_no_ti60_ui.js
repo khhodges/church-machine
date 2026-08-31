@@ -88,7 +88,7 @@ const REQUIRED_WUKONG_STRINGS = [
     { file: 'simulator/index.html', re: /church_wukong_xc7a100t\.bit/ },
     { file: 'simulator/index.html', re: /wukong_xc7a100t\.tcl/ },
     { file: 'simulator/index.html', re: /\/dl\/wukong-zip/ },
-    { file: 'simulator/index.html', re: /\/dl\/wukong-v17-bit/ },
+    { file: 'simulator/index.html', re: /\/dl\/wukong-bit/ },
 ];
 
 // The current release entry in the manifest drives the Startup Wizard's

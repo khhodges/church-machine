@@ -238,6 +238,9 @@ def test_connect_card_exposes_persistent_mcs_download():
     assert "Download .mcs (persistent)" in page
     assert "d.mcs_present" in page
     assert "automatic boot after reset" in page
+    assert 'href="/dl/wukong-bit"' in page
+    assert "/dl/wukong-v17-" not in page
+    assert "versionSuffix = d.version_known" in page
 
 
 def test_bitstream_version_log_keeps_remote_build_and_verified_upload_distinct(

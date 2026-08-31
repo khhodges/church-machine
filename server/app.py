@@ -4431,8 +4431,11 @@ def release_r12_index():
           +String(d.mismatch_message).replace(/&/g,'&amp;').replace(/</g,'&lt;')
           +'</div>';
       }
+      var versionSuffix = d.version_known ? ('_v' + d.firmware_version) : '';
+      var bitName = 'church_wukong_xc7a100t' + versionSuffix + '.bit';
+      var mcsName = 'church_wukong_xc7a100t' + versionSuffix + '.mcs';
       var mcs = d.mcs_present
-        ? '<a href="/dl/wukong-v17-mcs" download="church_wukong_xc7a100t_v17.mcs" style="padding:.4rem 1rem;background:#4c1d95;border-radius:5px;color:#ddd6fe;text-decoration:none;font-size:.82rem;font-weight:700;white-space:nowrap">&#x2B07; Download church_wukong_xc7a100t_v17.mcs (persistent)</a>'
+        ? '<a href="/dl/wukong-mcs" download="'+mcsName+'" style="padding:.4rem 1rem;background:#4c1d95;border-radius:5px;color:#ddd6fe;text-decoration:none;font-size:.82rem;font-weight:700;white-space:nowrap">&#x2B07; Download .mcs (persistent)</a>'
         : '';
       card.innerHTML = '<div style="background:#071a0e;border:1px solid #166534;border-radius:8px;padding:14px 16px;margin-bottom:0">'
         +'<div style="display:flex;align-items:center;gap:14px">'
@@ -4441,7 +4444,7 @@ def release_r12_index():
         +'<div style="font-size:.75rem;color:#64748b;margin-top:2px">'+sz+' &middot; '+fw+(dt?' &middot; built '+dt:'')+'<br>.bit loads once; .mcs programs the board to boot this image after reset.</div></div>'
         +'</div>'
         +'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">'
-        +'<a href="/dl/wukong-v17-bit" download="church_wukong_xc7a100t_v17.bit" style="padding:.4rem 1rem;background:#166534;border-radius:5px;color:#4ade80;text-decoration:none;font-size:.82rem;font-weight:700;white-space:nowrap">&#x2B07; Download church_wukong_xc7a100t_v17.bit (temporary)</a>'
+        +'<a href="/dl/wukong-bit" download="'+bitName+'" style="padding:.4rem 1rem;background:#166534;border-radius:5px;color:#4ade80;text-decoration:none;font-size:.82rem;font-weight:700;white-space:nowrap">&#x2B07; Download current .bit (temporary)</a>'
         +mcs+'</div>'
         +'</div>' + warn;
     } else {
