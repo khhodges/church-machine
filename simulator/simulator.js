@@ -9909,7 +9909,7 @@ class ChurchSimulator {
         } catch (_e) { return null; }
     }
 
-    saveToNamespace(label, words, perms, gtType, caps) {
+    saveToNamespace(label, words, perms, gtType, caps, clistWords) {
         perms = perms || {R:0,W:0,X:1,L:0,S:0,E:0};
         gtType = (gtType !== undefined && gtType !== null) ? gtType : 1;
         let idx = -1;
@@ -9956,11 +9956,25 @@ class ChurchSimulator {
         for (let i = 1 + codeLen; i < lumpSize; i++) {
             this.writePersistentWord(loc + i, 0);
         }
+        // Recompilation already materializes and validates the private c-list.
+        // Preserve those exact GT words in the live Namespace copy; merely
+        // declaring cc in the header while leaving the tail zeroed turns every
+        // named LOAD into a NULL-capability fault.
+        if (cc > 0) {
+            if (!Array.isArray(clistWords) || clistWords.length !== cc) {
+                throw new Error(
+                    `saveToNamespace: expected ${cc} materialized c-list words`);
+            }
+            const clistBase = loc + lumpSize - cc;
+            for (let i = 0; i < cc; i++) {
+                this.writePersistentWord(clistBase + i, clistWords[i] >>> 0);
+            }
+        }
         this.emit('stateChange', this.getState());
         return idx;
     }
 
-    saveToNamespaceAt(idx, label, words, perms, gtType, caps) {
+    saveToNamespaceAt(idx, label, words, perms, gtType, caps, clistWords) {
         perms = perms || {R:0,W:0,X:1,L:0,S:0,E:0};
         gtType = (gtType !== undefined && gtType !== null) ? gtType : 1;
         if (!Number.isInteger(idx) || idx < this.saveNamespaceStartSlot() || idx >= this.MAX_NS_ENTRIES) {
@@ -10009,6 +10023,16 @@ class ChurchSimulator {
         this.writePersistentWord(loc, this.packLumpHeader(n_minus_6, codeLen, cc, 0));
         for (let i = 0; i < codeLen; i++) {
             this.writePersistentWord(loc + 1 + i, words[i]);
+        }
+        if (cc > 0) {
+            if (!Array.isArray(clistWords) || clistWords.length !== cc) {
+                throw new Error(
+                    `saveToNamespaceAt: expected ${cc} materialized c-list words`);
+            }
+            const clistBase = loc + lumpSize - cc;
+            for (let i = 0; i < cc; i++) {
+                this.writePersistentWord(clistBase + i, clistWords[i] >>> 0);
+            }
         }
         this.emit('stateChange', this.getState());
         return idx;

@@ -14213,13 +14213,17 @@ function confirmSaveToNamespace() {
     }
 
     // ── Persist to simulator namespace ────────────────────────────────────────
+    const _svClistWords = (_svBinary && _caps.length > 0)
+        ? _svBinary.slice(_svBinary.length - _caps.length)
+        : [];
     let idx;
     if (slotSel.value === 'new') {
         try {
             // New Entry allocates a slot only when explicitly selected.  When an
             // existing user slot is selected, the save below updates that LUMP
             // in place for a new release build.
-            idx = sim.saveToNamespace(label, _svWords, perms, gtType, _caps);
+            idx = sim.saveToNamespace(
+                label, _svWords, perms, gtType, _caps, _svClistWords);
         } catch (err) {
             console.error('[SaveNS] save failed:', err);
             const _saveErr = err && err.message ? err.message : String(err);
@@ -14255,7 +14259,8 @@ function confirmSaveToNamespace() {
             return;
         }
         try {
-            sim.saveToNamespaceAt(idx, label, _svWords, perms, gtType, _caps);
+            sim.saveToNamespaceAt(
+                idx, label, _svWords, perms, gtType, _caps, _svClistWords);
         } catch (err) {
             console.error('[SaveNS] save failed:', err);
             const _saveErr = err && err.message ? err.message : String(err);

@@ -326,6 +326,39 @@ console.log('\n--- T005: 3-method LUMP dispatch ---');
     check('T005i: memory[lumpBase+1+8] = S2', sim.memory[lumpBase + 1 + pc3] === S2);
 }
 
+// ── T004b: recompilation preserves materialized private c-list GTs ────────────
+console.log('\n--- T004b: recompiled CapabilityTest c-list survives Namespace save ---');
+{
+    const sim = new ChurchSimulator();
+    sim.bootComplete = true;
+    sim.nsCount = Math.max(sim.nsCount, 31);
+
+    const targetSlot = 30;
+    const caps = [
+        { name: 'SelfTest',  rights: ['E'],      nsIndex: 6 },
+        { name: 'LED_DEV',   rights: ['R', 'W'], nsIndex: 3 },
+        { name: 'UART_DEV',  rights: ['R', 'W'], nsIndex: 2 },
+        { name: 'BTN_DEV',   rights: ['R'],      nsIndex: 4 },
+        { name: 'TIMER_DEV', rights: ['R', 'W'], nsIndex: 5 },
+    ];
+    const clistWords = [
+        0x4A000006, 0x32000003, 0x32000002, 0x12000004, 0x32000005,
+    ];
+
+    sim.saveToNamespaceAt(
+        targetSlot, 'CapabilityTest', [0x00000000],
+        { R:0, W:0, X:1, L:0, S:0, E:0 }, 1, caps, clistWords);
+
+    const entry = sim.readNSEntry(targetSlot);
+    const hdr = sim.parseLumpHeader(sim.memory[entry.word0_location] >>> 0);
+    const clistBase = entry.word0_location + hdr.lumpSize - hdr.cc;
+    check('T004b-a: all five declared c-list rows are preserved',
+        clistWords.every((word, row) =>
+            (sim.memory[clistBase + row] >>> 0) === (word >>> 0)));
+    check('T004b-b: TIMER_DEV row is a non-NULL RW Inform GT for NS[5]',
+        (sim.memory[clistBase + 4] >>> 0) === 0x32000005);
+}
+
 // ── T006: Regression guard — old bare entries would fetch the WRONG word ───────
 // This test documents that the pre-fix 'codeOffset+1' bare entries (non-BRANCH)
 // land one word past the body start when used with the legacy dispatcher path.
