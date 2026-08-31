@@ -17,6 +17,48 @@ async function isolateSoftwareSimulator(page) {
     await page.route('**/hardware/wukong/boot-info', route => route.abort());
 }
 
+async function installControlFlowFixture(page) {
+    return page.evaluate(() => {
+        const slot = 30;
+        const base = 0x3000;
+        const words = [
+            sim.encodeInstruction(2, 14, 0, 0, 0),  // CALL
+            sim.encodeInstruction(2, 14, 0, 0, 1),  // CALL
+            sim.encodeInstruction(3, 14, 0, 0, 0),  // RETURN
+            sim.encodeInstruction(3, 14, 0, 0, 1),  // RETURN
+            sim.encodeInstruction(4, 14, 12, 12, 0), // CHANGE
+            sim.encodeInstruction(4, 14, 12, 12, 1), // CHANGE
+        ];
+
+        sim.withNamespaceWrite('control-flow breakpoint e2e fixture', () => {
+            sim.writeNSEntry(slot, base, 63, 0, 0, 1, 0, 1, 0);
+        });
+        sim.nsCount = Math.max(sim.nsCount, slot + 1);
+        sim.nsLabels[slot] = 'Breakpoint.ControlFlow';
+        sim.memory.fill(0, base, base + 64);
+        sim.memory[base] = sim.packLumpHeader(0, words.length, 1, 0);
+        words.forEach((word, index) => { sim.memory[base + 1 + index] = word >>> 0; });
+
+        const entry = sim.readNSEntry(slot);
+        const seq = sim.parseNSWord1(entry.word1_limit).gtSeq;
+        sim.cr[14] = {
+            word0: sim.createGT(seq, slot, { R: 1, X: 1 }, 1),
+            word1: base,
+            word2: 63,
+            word3: 0,
+            m: 0,
+        };
+        sim.pc = 0;
+        sim.physicalPC = base + 1;
+        sim.halted = false;
+        sim.running = false;
+        sim.bootComplete = true;
+        openCRDetail(14);
+        updateCRDetail();
+        return { addresses: words.map((_, index) => base + 1 + index) };
+    });
+}
+
 async function installLazyRetryFixture(page) {
     return page.evaluate(async () => {
         const codeSlot = 30;
@@ -378,6 +420,39 @@ test('one-shot breakpoint pauses before a lazy-load retry and is consumed once',
     expect(resumed.successful).toBe(fixture.initialSuccessful + 1);
     expect(resumed.destinationType).toBe(1);
     expect(resumed.destinationSlot).toBe(fixture.lazySlot);
+});
+
+test('code view directly toggles CALL, RETURN, and CHANGE breakpoints', async ({ page }) => {
+    test.setTimeout(60000);
+    await isolateSoftwareSimulator(page);
+    await loadSimulator(page);
+
+    const fixture = await installControlFlowFixture(page);
+    await expect(page.locator('.code-breakpoint-btn')).toHaveCount(6);
+
+    for (let index = 0; index < 3; index++) {
+        const operation = ['CALL', 'RETURN', 'CHANGE'][index];
+        const button = page.locator(`.code-breakpoint-btn[data-breakpoint-operation="${operation}"]`).first();
+        await expect(button).toHaveAttribute('aria-label', new RegExp(`Set breakpoints for all ${operation} instructions`));
+        await button.click();
+        const expectedCount = (index + 1) * 2;
+        await expect(page.locator('#breakList .break-item')).toHaveCount(expectedCount);
+        await expect(page.locator('#breakList')).toContainText(operation);
+        for (const address of fixture.addresses.slice(index * 2, index * 2 + 2)) {
+            await expect(page.locator('#breakList')).toContainText(formatAddress(address));
+        }
+    }
+
+    const armed = await page.evaluate(() => [...simBreakpoints].sort((a, b) => a - b));
+    expect(armed).toEqual(fixture.addresses);
+
+    // The same operation control removes all matching addresses without
+    // changing the address-based storage contract.
+    const callButton = page.locator('.code-breakpoint-btn[data-breakpoint-operation="CALL"]').first();
+    await expect(callButton).toHaveAttribute('aria-label', /Remove breakpoints for all CALL instructions/);
+    await callButton.click();
+    await expect(page.locator('#breakList .break-item')).toHaveCount(4);
+    expect(await page.evaluate(() => simBreakpoints.size)).toBe(4);
 });
 
 test('Run honors a breakpoint added between asynchronous batches', async ({ page }) => {

@@ -690,6 +690,47 @@
     margin-right: 0.2rem;
 }
 
+/* Control-flow rows have an explicit, keyboard-accessible breakpoint toggle.
+ * The row's existing double-click address action remains available for every
+ * instruction, including these rows. */
+.code-breakpoint-btn {
+    border: 1px solid rgba(239,68,68,0.38);
+    border-radius: 3px;
+    background: rgba(239,68,68,0.07);
+    color: #fca5a5;
+    cursor: pointer;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.72rem;
+    line-height: 1;
+    margin-right: 0.3rem;
+    padding: 2px 4px;
+    vertical-align: middle;
+}
+.code-breakpoint-btn:hover,
+.code-breakpoint-btn:focus-visible {
+    background: rgba(239,68,68,0.2);
+    border-color: #ef4444;
+    color: #fff;
+    outline: none;
+}
+.code-breakpoint-btn.active {
+    background: rgba(239,68,68,0.22);
+    color: #ef4444;
+}
+.break-item-target {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+}
+.break-operation-label {
+    color: #fcd34d;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+
 .btn-walk {
     background: #4a1d96;
     border-color: #a78bfa;

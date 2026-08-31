@@ -1649,6 +1649,9 @@ document.addEventListener('mousedown', function(e) {
 
 // ── Breakpoints ────────────────────────────────────────────────────────────
 const simBreakpoints = new Set();
+// Breakpoints remain address-based for execution. This sidecar only keeps the
+// best decoded operation label for the settings UI.
+const _breakpointOperations = new Map();
 // One-shot breakpoints: removed automatically the moment they fire.
 // Used by "Break at entry" so the pause does not persist across later runs.
 const _oneShotBreakpoints = new Set();
@@ -1721,12 +1724,40 @@ function renderBreakList() {
         el.innerHTML = '<div class="break-empty">No breakpoints set</div>';
         return;
     }
-    el.innerHTML = [...simBreakpoints].sort((a,b) => a-b).map(addr =>
-        `<div class="break-item">
-            <code class="break-addr-label">0x${addr.toString(16).toUpperCase().padStart(4,'0')}</code>
-            <button class="btn break-remove-btn" onclick="removeBreakpoint(${addr})" title="Remove this breakpoint">&#x1F5D1;</button>
-        </div>`
-    ).join('');
+    el.innerHTML = [...simBreakpoints].sort((a,b) => a-b).map(addr => {
+        const addressText = `0x${addr.toString(16).toUpperCase().padStart(4,'0')}`;
+        const operation = _decodedBreakpointOperation(addr);
+        const operationHtml = operation
+            ? `<span class="break-operation-label">${_escapeBreakpointLabel(operation)}</span>`
+            : '';
+        const accessibleOperation = operation ? ` (${operation})` : '';
+        return `<div class="break-item" data-breakpoint-address="${addressText}">
+            <span class="break-item-target">
+                <code class="break-addr-label">${addressText}</code>
+                ${operationHtml}
+            </span>
+            <button class="btn break-remove-btn" onclick="removeBreakpoint(${addr})" aria-label="Remove breakpoint at ${addressText}${_escapeBreakpointLabel(accessibleOperation)}" title="Remove this breakpoint">&#x1F5D1;</button>
+        </div>`;
+    }).join('');
+}
+
+function _escapeBreakpointLabel(value) {
+    return String(value || '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[ch]));
+}
+
+function _decodedBreakpointOperation(addr) {
+    const addr32 = addr >>> 0;
+    const known = typeof _breakpointOperations !== 'undefined'
+        ? _breakpointOperations.get(addr32) : null;
+    if (known) return known;
+    if (typeof sim === 'undefined' || !sim || !sim.memory ||
+            addr32 >= sim.memory.length) return null;
+    const word = sim.memory[addr32] >>> 0;
+    const opcode = (word >>> 27) & 0x1F;
+    if (opcode !== 2 && opcode !== 3 && opcode !== 4) return null;
+    return typeof sim.opName === 'function' ? sim.opName(opcode) : null;
 }
 
 function toggleStepSettingsPopover() {
@@ -1764,7 +1795,10 @@ function openBreakPopoverAt(addr) {
 }
 
 function addBreakpoint(addr) {
-    simBreakpoints.add(addr >>> 0);
+    const addr32 = addr >>> 0;
+    simBreakpoints.add(addr32);
+    const operation = arguments.length > 1 ? arguments[1] : _decodedBreakpointOperation(addr32);
+    if (operation) _breakpointOperations.set(addr32, operation);
     updateBreakpointBtn();
     renderBreakList();
     updateDashboard();
@@ -1773,6 +1807,7 @@ function addBreakpoint(addr) {
 function removeBreakpoint(addr) {
     const addr32 = addr >>> 0;
     simBreakpoints.delete(addr32);
+    _breakpointOperations.delete(addr32);
     if (sim && typeof sim.clearBreakpointResume === 'function') {
         sim.clearBreakpointResume(addr32);
     }
@@ -1783,12 +1818,44 @@ function removeBreakpoint(addr) {
 
 function clearAllBreakpoints() {
     simBreakpoints.clear();
+    _breakpointOperations.clear();
     if (sim && typeof sim.clearBreakpointResume === 'function') {
         sim.clearBreakpointResume();
     }
     updateBreakpointBtn();
     renderBreakList();
     updateDashboard();
+}
+
+function toggleBreakpointAtAddress(addr, operation) {
+    // Control-flow buttons are operation-wide: one click arms (or disarms)
+    // every matching physical row currently represented by the code view.
+    // Generic callers that omit an operation retain the old single-address
+    // behavior.
+    if (operation) {
+        const grouped = typeof window !== 'undefined'
+            ? window._currentCodeControlFlowAddresses?.[operation] : null;
+        const addresses = grouped ? [...grouped] : [];
+        if (addresses.length > 0) {
+            const allArmed = addresses.every(address => simBreakpoints.has(address >>> 0));
+            addresses.forEach(address => {
+                const addr32 = address >>> 0;
+                if (allArmed) {
+                    removeBreakpoint(addr32);
+                } else {
+                    addBreakpoint(addr32, operation);
+                }
+            });
+            return !allArmed;
+        }
+    }
+    const addr32 = addr >>> 0;
+    if (simBreakpoints.has(addr32)) {
+        removeBreakpoint(addr32);
+        return false;
+    }
+    addBreakpoint(addr32, operation || _decodedBreakpointOperation(addr32));
+    return true;
 }
 
 function addBreakpointFromInput() {

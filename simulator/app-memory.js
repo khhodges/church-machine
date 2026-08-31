@@ -79,6 +79,11 @@ function _resolveCListPetName(gtWord) {
 }
 
 function updateCRDetail() {
+    if (typeof window !== 'undefined') {
+        window._currentCodeControlFlowAddresses = {
+            CALL: new Set(), RETURN: new Set(), CHANGE: new Set(),
+        };
+    }
     if (!sim) return;
     if (selectedCR === null) return;
     const titleEl = document.getElementById('crDetailTitle');
@@ -492,6 +497,17 @@ function updateCRDetail() {
                 _methodStartMap.set(offset, method);
             }
         }
+        if (typeof window !== 'undefined') {
+            for (let w = _methodTableCount; w < _codeWords.length; w++) {
+                const opcode = (_codeWords[w] >>> 27) & 0x1F;
+                const operation = opcode === 2 ? 'CALL'
+                    : opcode === 3 ? 'RETURN'
+                    : opcode === 4 ? 'CHANGE' : null;
+                if (operation) {
+                    window._currentCodeControlFlowAddresses[operation].add(codeStart + w);
+                }
+            }
+        }
 
         let hasCodeData = lumpHdr.valid;
         for (let w = 0; w < _codeWords.length; w++) {
@@ -551,7 +567,18 @@ function updateCRDetail() {
 
             const decomp = _decompileWord(word, addr, nsIdx, _lumpClistBase, _crPets3);
             const isCompiler = decomp && decomp.compiler;
+            const _opcode = (word >>> 27) & 0x1F;
+            const _controlFlowName = _opcode === 2 ? 'CALL'
+                : _opcode === 3 ? 'RETURN'
+                : _opcode === 4 ? 'CHANGE' : null;
+            const _controlFlowAddresses = _controlFlowName &&
+                typeof window !== 'undefined'
+                ? window._currentCodeControlFlowAddresses[_controlFlowName] : null;
+            const _operationGroupArmed = !!(_controlFlowAddresses &&
+                _controlFlowAddresses.size > 0 &&
+                [..._controlFlowAddresses].every(address => simBreakpoints.has(address)));
             let rowClass = isPC ? 'code-pc-row' : (isBP ? 'code-bp-row' : (isCompiler ? 'code-row-compiler' : ''));
+            if (_controlFlowName) rowClass = (rowClass ? rowClass + ' ' : '') + 'code-control-flow-row';
             if (isGateHL) rowClass = (rowClass ? rowClass + ' ' : '') + 'code-gate-row';
             const _clobberInfos = _clobberWordMap.get(w);
             if (_clobberInfos) rowClass = (rowClass ? rowClass + ' ' : '') + 'code-row-clobber';
@@ -588,6 +615,13 @@ function updateCRDetail() {
                 decoded = _wrapCListHover(decoded, _lumpClistBase, _lumpHdr.cc || 0);
             }
             const bpDot    = isBP ? '<span class="bp-dot" title="Breakpoint">&#x25CF;</span> ' : '';
+            const _controlFlowButton = _controlFlowName
+                ? `<button type="button" class="code-breakpoint-btn${_operationGroupArmed ? ' active' : ''}" ` +
+                  `onclick="event.stopPropagation();toggleBreakpointAtAddress(${addr},'${_controlFlowName}')" ` +
+                  `data-breakpoint-operation="${_controlFlowName}" data-breakpoint-address="0x${addr.toString(16).toUpperCase().padStart(4,'0')}" ` +
+                  `aria-label="${_operationGroupArmed ? 'Remove' : 'Set'} breakpoints for all ${_controlFlowName} instructions" ` +
+                  `title="${_operationGroupArmed ? 'Remove' : 'Set'} breakpoints for all ${_controlFlowName} instructions">${_operationGroupArmed ? '&#x25CF;' : '&#x25CB;'}</button>`
+                : '';
             const _clobberIcon = _clobberInfos
                 ? `<span class="code-clobber-icon" title="${_clobberInfos.map(c => `CR${c.cr} alias clobbered here (alias set at word\u00A0${c.prevAliasedAtWord})`).join('\n')}">&#x26A0;</span> `
                 : '';
@@ -601,7 +635,7 @@ function updateCRDetail() {
             codeHtml += `<tr class="${rowClass}" style="cursor:pointer;" title="Double-click to set breakpoint" ondblclick="openBreakPopoverAt(${addr})">`;
             codeHtml += `<td class="cr-idx">0x${addr.toString(16).toUpperCase().padStart(4,'0')}</td>`;
             codeHtml += `<td class="cr-gt">0x${word.toString(16).toUpperCase().padStart(8,'0')}</td>`;
-            codeHtml += `<td class="code-disasm">${bpDot}${_clobberIcon}${_clobberOriginIcon}${decoded}</td>`;
+            codeHtml += `<td class="code-disasm">${_controlFlowButton}${bpDot}${_clobberIcon}${_clobberOriginIcon}${decoded}</td>`;
             if (_brArrows.hasBranches) codeHtml += `<td class="br-arrow-col">${_brArrows.html[w]}</td>`;
             codeHtml += decompTd;
             codeHtml += '</tr>';

@@ -233,6 +233,44 @@ function makeOrdinaryCallFixture() {
         'restored CR14 and PC produce the caller continuation');
 }
 
+// Physical breakpoints are decoded by address, not by the current logical PC.
+// This keeps all three Church control-flow opcodes directly selectable even
+// when the instruction has not executed yet.
+{
+    const sim = new ChurchSimulator();
+    const words = [
+        ((2 << 27) | (14 << 23)) >>> 0, // CALL
+        ((3 << 27) | (14 << 23)) >>> 0, // RETURN
+        ((4 << 27) | (14 << 23) | (12 << 19) | (12 << 15)) >>> 0, // CHANGE
+    ];
+    sim.loadProgram(words, 0x0900);
+    sim.bootComplete = true;
+    sim.cr[14] = {
+        word0: sim.createGT(0, 0, { R: 1, X: 1 }, 1),
+        word1: 0x0900,
+        word2: words.length - 1,
+        word3: 0,
+        m: 0,
+    };
+
+    for (const [offset, operation] of [[0, 'CALL'], [1, 'RETURN'], [2, 'CHANGE']]) {
+        sim.pc = offset;
+        sim.physicalPC = 0x0901 + offset;
+        sim.halted = false;
+        sim._breakpointResumeAddr = null;
+        const address = 0x0901 + offset;
+        const breakpoints = new Set([address]);
+        const result = sim.run(1, breakpoints);
+        assert.strictEqual(result.stopReason, 'breakpoint',
+            `${operation} pauses before its physical instruction`);
+        assert.strictEqual(result.breakpointAddr, address);
+        assert.strictEqual(sim.stepCount, 0,
+            `${operation} does not execute while paused`);
+        assert.strictEqual(breakpoints.has(address), true,
+            `${operation} breakpoint remains persistent`);
+    }
+}
+
 // UI Step and Walk must perform their breakpoint check before calling step().
 {
     const appRun = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
