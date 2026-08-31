@@ -1,8 +1,8 @@
 {
-  "token": "9ce28c0b",
+  "token": "c7657c2d",
   "abstraction": "CapabilityTest",
-  "filename": "CapabilityTest.1.e4fe164d.lump",
-  "sidecar_file": "CapabilityTest.1.e4fe164d.json",
+  "filename": "CapabilityTest.1.b49e8eca.lump",
+  "sidecar_file": "CapabilityTest.1.b49e8eca.json",
   "ns_slot": 10,
   "lump_size": 512,
   "typ": 0,
@@ -74,7 +74,7 @@
   "deployment": {
     "target_board": "wukong-xc7a100t",
     "profile": "IoT",
-    "built_at": "2026-08-31T14:41:52.190230Z",
+    "built_at": "2026-08-31T14:44:44.624844Z",
     "builder": "CLOOMC++ IDE v1.0"
   },
   "grants": [
@@ -84,7 +84,7 @@
   "authorized": false,
   "legacy_authorized": false,
   "source": "",
-  "binary_hash": "e2959f33f05e4d045bad90d22c436148aaa6041ebe3c6c6614f8122443cd5345",
+  "binary_hash": "26865648dfb48ecb712b7d455895afd48c9324ecf55145da8c3bf23d86cb7ff9",
   "petname": "",
   "issue_number": 1,
   "identity_string": "CapabilityTest#1",
@@ -92,7 +92,7 @@
   "identity_seal_location": "sidecar",
   "dot_name": "CapabilityTest",
   "issue_n": 1,
-  "lump_version": 11,
-  "compiled_at": 1788187312.1902559,
+  "lump_version": 12,
+  "compiled_at": 1788187484.6248598,
   "sourceStorageTier": 2
 }
