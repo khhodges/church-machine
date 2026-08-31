@@ -265,6 +265,31 @@ def _check_boot_thrd_cr(verilog_text, output_path):
         sys.exit(1)
 
 
+def _sanitize_empty_attributed_case_arms(verilog_text):
+    """Make Amaranth's attributed empty case arms valid Verilog.
+
+    The Amaranth/Yosys Verilog backend can emit an attribute after a case
+    label even when that arm has no statement::
+
+        3'h4:
+            (* full_case = 32'd1 *)
+        endcase
+
+    Yosys accepts the equivalent un-attributed empty statement, but rejects
+    the dangling attribute when parsing the generated Verilog.  Attributes
+    on an arm with no body have no semantic effect, so replace only this
+    backend artifact with the same explicit no-op used by other empty arms.
+    """
+    return re.sub(
+        r"(?m)^(?P<label>\s*[^:\n]+:)\n"
+        r"(?P<attribute_indent>\s*)\(\*[^*\n]*(?:\*(?!\))[^*\n]*)*\*\)\s*\n"
+        r"(?P<blank>\s*\n)*"
+        r"(?P<endcase>\s*endcase\b)",
+        r"\g<label>\n\g<attribute_indent>/* empty */;\n\g<endcase>",
+        verilog_text,
+    )
+
+
 def _patch_clocks(verilog_text):
     """Fix Amaranth's disconnected clocks: thread `clk` through the hierarchy.
 
@@ -377,6 +402,7 @@ def generate_core_verilog(output_dir="build"):
 
     verilog_text = convert(core, ports=ports)
     verilog_text = stamp_text(verilog_text, CORE_SOURCES)
+    verilog_text = _sanitize_empty_attributed_case_arms(verilog_text)
 
     output_path = os.path.join(output_dir, "church_core.v")
     _check_stale_cr7(verilog_text, output_path)
@@ -414,6 +440,7 @@ def generate_core_iot_verilog(output_dir="build"):
 
     verilog_text = convert(core, ports=ports)
     verilog_text = stamp_text(verilog_text, CORE_SOURCES)
+    verilog_text = _sanitize_empty_attributed_case_arms(verilog_text)
 
     output_path = os.path.join(output_dir, "church_core_iot.v")
     _check_stale_cr7(verilog_text, output_path)

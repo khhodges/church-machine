@@ -1,4 +1,4 @@
-# CM-HARDWARE-SOURCES-SHA256: 3ae155768270a43c7e679c42f55e897f527cda73cd816c1439cabc9a79ee7300
+# CM-HARDWARE-SOURCES-SHA256: a63cd753273aadadcccade264a42c2ebcac8bce44aeddb0b47ba7f18531f5122
 attribute \generator "Amaranth"
 attribute \src "/home/runner/workspace/hardware/wukong_top.py:284"
 attribute \top 1
