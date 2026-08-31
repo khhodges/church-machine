@@ -74,7 +74,7 @@
   "deployment": {
     "target_board": "wukong-xc7a100t",
     "profile": "IoT",
-    "built_at": "2026-08-31T11:40:45.444128Z",
+    "built_at": "2026-08-30T23:44:34.394294Z",
     "builder": "CLOOMC++ IDE v1.0"
   },
   "grants": [
@@ -92,7 +92,8 @@
   "identity_seal_location": "sidecar",
   "dot_name": "CapabilityTest",
   "issue_n": 1,
-  "lump_version": 9,
-  "compiled_at": 1788176445.4441483,
-  "sourceStorageTier": 2
+  "lump_version": 8,
+  "compiled_at": 1788133474.3943586,
+  "sourceStorageTier": 2,
+  "archived_version": 8
 }
