@@ -241,6 +241,8 @@ def test_connect_card_exposes_persistent_mcs_download():
     assert 'href="/dl/wukong-bit"' in page
     assert "/dl/wukong-v17-" not in page
     assert "versionSuffix = d.version_known" in page
+    assert 'id="ti60DlBridgeBtn"' in page
+    assert 'href="/dl/wukong-bridge"' in page
 
 
 def test_wukong_download_page_exposes_current_bridge(client):
