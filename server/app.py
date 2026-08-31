@@ -355,6 +355,8 @@ def download_wukong_bridge():
     # Serve the canonical bridge from hardware/ — server/wukong_bridge.py was a
     # stale duplicate that caused users to download an outdated bridge.
     p = os.path.join(os.path.dirname(__file__), "..", "hardware", "wukong_bridge.py")
+    if not os.path.isfile(p):
+        return jsonify({"ok": False, "error": "Wukong bridge is unavailable"}), 404
     return send_file(os.path.abspath(p), as_attachment=True,
                      download_name="wukong_bridge.py",
                      mimetype="text/plain")
@@ -1418,7 +1420,8 @@ def download_wukong_zip():
       church_wukong_xc7a100t.v   — Verilog netlist (add to Vivado project)
       wukong_xc7a100t.xdc        — Vivado pin constraints
       wukong_xc7a100t.tcl        — Vivado batch build script
-      local_bridge.py            — UART bridge helper (reserved for future use)
+      wukong_bridge.py           — native Wukong USB-UART trace/command bridge
+      local_bridge.py            — browser WebSerial bridge helper
 
     If the Verilog has not been generated yet, returns 404 with instructions.
     """
@@ -1453,6 +1456,9 @@ def download_wukong_zip():
             zf.write(tcl, "wukong_xc7a100t.tcl")
         if os.path.exists(flash_guide):
             zf.write(flash_guide, "wukong-vivado-flash-guide.md")
+        wukong_bridge = os.path.join(HW_DIR, "wukong_bridge.py")
+        if os.path.exists(wukong_bridge):
+            zf.write(wukong_bridge, "wukong_bridge.py")
         if os.path.exists(bridge):
             zf.write(bridge, "local_bridge.py")
     buf.seek(0)
@@ -4412,7 +4418,8 @@ def release_r12_index():
   <div class="hero-title">Complete build package &amp; pre-built bitstream</div>
   <div class="hero-sub">One download. Extract, then build with Vivado — or flash the pre-built bitstream below.</div>
   <a class="dl-btn" href="/dl/wukong-zip"><span class="dl-btn-icon">&#x2B07;</span>Download church-wukong-package.zip</a>
-  <div class="hero-meta">Includes Verilog netlist &middot; XDC pin constraints &middot; Vivado build script</div>
+  <a class="dl-btn" href="/dl/wukong-bridge" style="margin-left:.5rem;background:#4c1d95;color:#ddd6fe"><span class="dl-btn-icon">&#x2B07;</span>Download wukong_bridge.py</a>
+  <div class="hero-meta">Includes Verilog netlist &middot; XDC pin constraints &middot; Vivado build script &middot; native USB-UART bridge</div>
 </div>
 
 <div id="r12BitstreamCard" style="margin-bottom:1.6rem"></div>
@@ -4463,6 +4470,7 @@ def release_r12_index():
   <div><span class="file">church_wukong_xc7a100t.il</span><span class="note"> — Amaranth RTLIL source</span></div>
   <div><span class="file">wukong_xc7a100t.xdc</span><span class="note"> — Vivado pin constraints</span></div>
   <div><span class="file">wukong_xc7a100t.tcl</span><span class="note"> — Vivado batch build script</span></div>
+  <div><span class="file">wukong_bridge.py</span><span class="note"> — native USB-UART trace &amp; command bridge</span></div>
   <div><span class="file">BUILD.md</span><span class="note"> — full instructions</span></div>
 </div>
 
@@ -5627,6 +5635,7 @@ def _fpga_paths(board):
         "verilog": os.path.join(build_dir, "church_wukong_xc7a100t.v"),
         "xdc":     os.path.join(hw_dir,    "wukong_xc7a100t.xdc"),
         "tcl":     os.path.join(hw_dir,    "wukong_xc7a100t.tcl"),
+        "wukong_bridge": os.path.join(hw_dir, "wukong_bridge.py"),
     }
     zip_name = "church-wukong-package.zip"
     build_md = BUILD_MD_WUKONG
@@ -5651,7 +5660,7 @@ def _make_fpga_zip(board, paths, zip_name, build_md):
                 zf.write(p, os.path.basename(p))
             elif p:
                 warnings.append(f"{os.path.basename(p)} not found — run Build first")
-        for key in ('xdc', 'tcl'):
+        for key in ('xdc', 'tcl', 'wukong_bridge'):
             p = paths.get(key)
             if p and os.path.isfile(p):
                 zf.write(p, os.path.basename(p))

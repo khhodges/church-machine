@@ -10,6 +10,7 @@ The Wukong zip is built from:
   - build/church_wukong_xc7a100t.il        → church_wukong_xc7a100t.il  (optional)
   - hardware/wukong_xc7a100t.xdc           → wukong_xc7a100t.xdc
   - hardware/wukong_xc7a100t.tcl           → wukong_xc7a100t.tcl
+  - hardware/wukong_bridge.py              → wukong_bridge.py
   - server/local_bridge.py                 → local_bridge.py
   - BUILD.md string (always present)
 """
@@ -46,6 +47,7 @@ class TestWukongZipContents:
         _write_stub(str(build_dir / 'church_wukong_xc7a100t.il'))
         _write_stub(str(hw_dir / 'wukong_xc7a100t.xdc'))
         _write_stub(str(hw_dir / 'wukong_xc7a100t.tcl'))
+        _write_stub(str(hw_dir / 'wukong_bridge.py'))
         _write_stub(str(server_dir / 'local_bridge.py'))
 
         return {
@@ -53,10 +55,11 @@ class TestWukongZipContents:
             'rtlil':   str(build_dir / 'church_wukong_xc7a100t.il'),
             'xdc':     str(hw_dir / 'wukong_xc7a100t.xdc'),
             'tcl':     str(hw_dir / 'wukong_xc7a100t.tcl'),
+            'wukong_bridge': str(hw_dir / 'wukong_bridge.py'),
         }
 
     def test_required_files_present(self, tmp_path):
-        """Verilog, XDC, TCL, local_bridge.py, and BUILD.md are always in the ZIP."""
+        """Verilog, XDC, both bridge helpers, and BUILD.md are always in the ZIP."""
         import unittest.mock as mock
         paths = self._setup_stubs(tmp_path)
         with mock.patch('app.BASE_DIR', str(tmp_path)):
@@ -70,6 +73,7 @@ class TestWukongZipContents:
         assert 'church_wukong_xc7a100t.v' in names
         assert 'wukong_xc7a100t.xdc' in names
         assert 'wukong_xc7a100t.tcl' in names
+        assert 'wukong_bridge.py' in names
         assert 'local_bridge.py' in names
         assert 'BUILD.md' in names
         assert zip_name == 'church-wukong-package.zip'
@@ -95,12 +99,14 @@ class TestWukongZipContents:
         server_dir = tmp_path / 'server'
         _write_stub(str(hw_dir / 'wukong_xc7a100t.xdc'))
         _write_stub(str(hw_dir / 'wukong_xc7a100t.tcl'))
+        _write_stub(str(hw_dir / 'wukong_bridge.py'))
         _write_stub(str(server_dir / 'local_bridge.py'))
         paths = {
             'verilog': str(tmp_path / 'build' / 'church_wukong_xc7a100t.v'),
             'rtlil':   str(tmp_path / 'build' / 'church_wukong_xc7a100t.il'),
             'xdc':     str(hw_dir / 'wukong_xc7a100t.xdc'),
             'tcl':     str(hw_dir / 'wukong_xc7a100t.tcl'),
+            'wukong_bridge': str(hw_dir / 'wukong_bridge.py'),
         }
         with mock.patch('app.BASE_DIR', str(tmp_path)):
             buf, _, warnings = _make_fpga_zip(
@@ -130,6 +136,7 @@ class TestWukongZipContents:
             'church_wukong_xc7a100t.il',
             'wukong_xc7a100t.xdc',
             'wukong_xc7a100t.tcl',
+            'wukong_bridge.py',
             'local_bridge.py',
             'BUILD.md',
         }

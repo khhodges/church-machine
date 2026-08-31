@@ -243,6 +243,15 @@ def test_connect_card_exposes_persistent_mcs_download():
     assert "versionSuffix = d.version_known" in page
 
 
+def test_wukong_download_page_exposes_current_bridge(client):
+    """The public Wukong page must offer the canonical native bridge."""
+    response = client.get("/release/r12")
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert 'href="/dl/wukong-bridge"' in page
+    assert "wukong_bridge.py" in page
+
+
 def test_bitstream_version_log_keeps_remote_build_and_verified_upload_distinct(
         client, tmp_path):
     """A rebuild cannot claim an artifact hash until a matching upload verifies it."""
