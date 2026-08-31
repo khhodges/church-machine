@@ -331,17 +331,31 @@ def test_versions_api_exposes_pending_main_workstream_release(client, tmp_path):
 
 def test_versions_api_accepts_matching_verified_provenance(client, tmp_path):
     """The release check must use the provenance key for the actual .bit file."""
+    import hashlib
+
     commit = "a" * 40
     bit_path = _write_bit(tmp_path, content=b"VERIFIED WUKONG BUILD")
     meta = app_module._write_bitstream_sidecar(
         bit_path, version=17, source_commit=commit
     )
+    mcs = b":020000040000FA\n:00000001FF\n"
+    (tmp_path / MCS_NAME).write_bytes(mcs)
     provenance = {
         "schema_version": 1,
         "source_commit": commit,
         "source_tree_clean": True,
         "release_status": "verified",
-        "artifacts": {BIT_NAME: {"sha256": meta["sha256"]}},
+        "sentinel": {"build_version": 17},
+        "artifacts": {
+            BIT_NAME: {
+                "sha256": meta["sha256"],
+                "size_bytes": len(b"VERIFIED WUKONG BUILD"),
+            },
+            MCS_NAME: {
+                "sha256": hashlib.sha256(mcs).hexdigest(),
+                "size_bytes": len(mcs),
+            },
+        },
     }
     (tmp_path / "church_wukong_xc7a100t.provenance.json").write_text(
         json.dumps(provenance)
@@ -353,7 +367,46 @@ def test_versions_api_accepts_matching_verified_provenance(client, tmp_path):
     assert release["pending"] is False
     assert release["artifact"]["provenance_verified"] is True
 
+def test_bitstream_status_requires_complete_verified_release_bundle(client, tmp_path):
+    """Download status is verified only when bit, sidecar, provenance, and MCS agree."""
+    import hashlib
 
+    commit = "a" * 40
+    bit_path = _write_bit(tmp_path, content=b"VERIFIED WUKONG BUILD")
+    meta = app_module._write_bitstream_sidecar(
+        bit_path, version=17, source_commit=commit
+    )
+    mcs = b":020000040000FA\n:00000001FF\n"
+    (tmp_path / MCS_NAME).write_bytes(mcs)
+    provenance = {
+        "schema_version": 1,
+        "source_commit": commit,
+        "source_tree_clean": True,
+        "release_status": "verified",
+        "sentinel": {"build_version": 17},
+        "artifacts": {
+            BIT_NAME: {
+                "sha256": meta["sha256"],
+                "size_bytes": len(b"VERIFIED WUKONG BUILD"),
+            },
+            MCS_NAME: {
+                "sha256": hashlib.sha256(mcs).hexdigest(),
+                "size_bytes": len(mcs),
+            },
+        },
+    }
+    (tmp_path / "church_wukong_xc7a100t.provenance.json").write_text(
+        json.dumps(provenance)
+    )
+
+    status = client.get("/api/bitstream-status").get_json()
+    assert status["release_verified"] is True
+    assert status["artifact_sha256"] == meta["sha256"]
+    assert status["mcs_sha256"] == hashlib.sha256(mcs).hexdigest()
+
+    (tmp_path / MCS_NAME).write_bytes(mcs + b"tampered")
+    tampered = client.get("/api/bitstream-status").get_json()
+    assert tampered["release_verified"] is False
 def test_versions_view_renders_release_candidate_and_build_action():
     """The Versions tab provides a single path into the existing release flow."""
     index_path = os.path.join(ROOT, "simulator", "index.html")
@@ -441,3 +494,22 @@ def test_successful_push_invalidates_github_diff_cache():
     app_module._invalidate_versions_diff_cache()
     assert app_module._versions_diff_cache["payload"] is None
     assert app_module._versions_diff_cache["key"] is None
+
+def test_bitstream_status_rejects_missing_identity_and_malformed_artifacts(client, tmp_path):
+    """Invalid provenance shapes fail closed without turning status into a 500."""
+    bit_path = _write_bit(tmp_path, content=b"VERIFIED WUKONG BUILD")
+    meta = app_module._write_bitstream_sidecar(bit_path, version=None, source_commit=None)
+    (tmp_path / MCS_NAME).write_bytes(b"MCS")
+    provenance_path = tmp_path / "church_wukong_xc7a100t.provenance.json"
+    provenance_path.write_text(json.dumps({
+        "schema_version": 1,
+        "source_tree_clean": True,
+        "release_status": "verified",
+        "sentinel": {},
+        "artifacts": [],
+    }))
+
+    status = client.get("/api/bitstream-status")
+    assert status.status_code == 200
+    assert status.get_json()["release_verified"] is False
+    assert meta["source_commit"] is None

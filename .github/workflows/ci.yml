@@ -231,6 +231,11 @@ jobs:
       - name: Install JS dependencies
         run: npm install
 
+      - name: Verify tracked Wukong release bundle
+        run: |
+          python3 scripts/wukong_build_provenance.py --verify-release
+          python3 -m pytest scripts/test_wukong_build_provenance.py -q
+
       # --- Python test suites ---
       - name: LUMP consistency
         id: lump_consistency

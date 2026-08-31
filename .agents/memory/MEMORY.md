@@ -116,6 +116,7 @@
 - [Fault snapshot reboot correlation](fault-snapshot-reboot-correlation.md) — auto-reboot only after the exact fault's complete snapshot is durably promoted
 - [Bitstream release candidate baseline](bitstream-release-candidate-baseline.md) — Versions must surface pending hardware commits; never claim an artifact released without a trusted source commit
 - [Wukong release-host staging](wukong-release-host-staging.md) — Build each candidate in a fresh commit-pinned vendor checkout; never reuse stale or dirty historical build directories
+- [Verified binary merge survival](verified-binary-merge-survival.md) — provenance is not a release unless its ignored binary is explicitly tracked and CI verifies the complete bundle
 - [Historical hardware authority chain](historical-hardware-authority-chain.md) — grant saved test context only through an exact build, source, and artifact-digest binding
 - [Testing iframe health regression](testing-iframe-health-regression.md) — isolate live telemetry when verifying health-panel state across persistent Builder-tab navigation
 - [Wukong UI surface ownership](wukong-ui-surface-ownership.md) — physical-board controls live only on Builder > Testing; simulator controls remain software-only

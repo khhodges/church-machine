@@ -132,6 +132,9 @@ register_suite "check-whats-new-feed" \
 register_suite "wukong-relay-deployment-guard" \
     'python -m pytest tests/server/test_primary_publish_config.py -v'
 
+register_suite "wukong-release-bundle" \
+    'python3 scripts/wukong_build_provenance.py --verify-release && python3 -m pytest scripts/test_wukong_build_provenance.py -q'
+
 register_suite "lump-consistency" \
     'python -m pytest tests/lump/test_lump_consistency.py -v'
 

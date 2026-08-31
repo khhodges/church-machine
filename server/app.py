@@ -474,8 +474,67 @@ def _read_bitstream_meta(bit_path):
     except Exception:
         return None
 
+def _read_wukong_release_evidence(build_dir):
+    """Return verified identities for the canonical Wukong release bundle."""
+    bit_name = "church_wukong_xc7a100t.bit"
+    mcs_name = "church_wukong_xc7a100t.mcs"
+    bit_path = os.path.join(build_dir, bit_name)
+    mcs_path = os.path.join(build_dir, mcs_name)
+    provenance_path = os.path.join(
+        build_dir, "church_wukong_xc7a100t.provenance.json"
+    )
+    evidence = {
+        "verified": False,
+        "bit_sha256": _sha256_file(bit_path),
+        "mcs_sha256": _sha256_file(mcs_path),
+    }
+    meta = _read_bitstream_meta(bit_path) if os.path.isfile(bit_path) else None
+    try:
+        with open(provenance_path, encoding="utf-8") as handle:
+            provenance = json.load(handle)
+    except (OSError, ValueError, TypeError):
+        return evidence
+    if not isinstance(provenance, dict) or not isinstance(meta, dict):
+        return evidence
+
+    artifacts = provenance.get("artifacts")
+    if not isinstance(artifacts, dict):
+        return evidence
+    bit_record = artifacts.get(bit_name)
+    mcs_record = artifacts.get(mcs_name)
+    sentinel = provenance.get("sentinel")
+    source_commit = provenance.get("source_commit")
+    build_version = sentinel.get("build_version") if isinstance(sentinel, dict) else None
+    if (
+        not isinstance(bit_record, dict) or
+        not isinstance(mcs_record, dict) or
+        not isinstance(source_commit, str) or
+        not re.fullmatch(r"[0-9a-fA-F]{40}", source_commit) or
+        not isinstance(build_version, int) or
+        isinstance(build_version, bool)
+    ):
+        return evidence
+    evidence["verified"] = bool(
+        provenance.get("schema_version") == 1 and
+        provenance.get("release_status") == "verified" and
+        provenance.get("source_tree_clean") is True and
+        evidence["bit_sha256"] and
+        evidence["mcs_sha256"] and
+        meta.get("sha256") == evidence["bit_sha256"] ==
+        bit_record.get("sha256") and
+        meta.get("size_bytes") == bit_record.get("size_bytes") ==
+        os.path.getsize(bit_path) and
+        meta.get("source_commit") == source_commit and
+        meta.get("version") == build_version and
+        evidence["mcs_sha256"] == mcs_record.get("sha256") and
+        mcs_record.get("size_bytes") == os.path.getsize(mcs_path)
+    )
+    return evidence
+
+
 _BITSTREAM_VERSION_LOG_FILE = "wukong-bitstream-versions.json"
 _bitstream_version_log_lock = threading.Lock()
+
 
 def _bitstream_version_log_path():
     """Return the append-only Wukong build-version log path."""
@@ -553,17 +612,7 @@ def _wukong_bitstream_release_status():
     """
     bit_path = os.path.join(_wukong_build_dir(), "church_wukong_xc7a100t.bit")
     meta = _read_bitstream_meta(bit_path) if os.path.isfile(bit_path) else None
-    provenance_path = os.path.join(
-        _wukong_build_dir(), "church_wukong_xc7a100t.provenance.json"
-    )
-    provenance = None
-    try:
-        with open(provenance_path, encoding="utf-8") as handle:
-            candidate = json.load(handle)
-        if isinstance(candidate, dict):
-            provenance = candidate
-    except (OSError, ValueError, TypeError):
-        pass
+    release_evidence = _read_wukong_release_evidence(_wukong_build_dir())
     head = _git_full_head()
     short_head = head[:12] if head else _git_short_hash()
     source_version = _wukong_build_version()
@@ -576,14 +625,7 @@ def _wukong_bitstream_release_status():
             # Legacy sidecars only carried MD5; they remain usable for download
             # labeling, but never qualify as a release proof.
             artifact_sha = None
-    provenance_matches = bool(
-        provenance and provenance.get("source_commit") == head and
-        provenance.get("source_tree_clean") is True and
-        provenance.get("release_status") == "verified" and
-        provenance.get("artifacts", {}).get("church_wukong_xc7a100t.bit", {})
-        .get("sha256") == _sha256_file(bit_path)
-        if os.path.isfile(bit_path) else False
-    )
+    provenance_matches = release_evidence["verified"]
     baseline_known = bool(
         head and artifact_commit and
         re.fullmatch(r"[0-9a-fA-F]{7,40}", str(artifact_commit))
@@ -963,6 +1005,7 @@ def api_bitstream_status():
     mcs_path = os.path.join(build_dir, "church_wukong_xc7a100t.mcs")
     present = os.path.isfile(bit_path)
     mcs_present = os.path.isfile(mcs_path)
+    release_evidence = _read_wukong_release_evidence(build_dir)
     source_version = _wukong_build_version()
     meta = {}
     bit_version = None
@@ -1014,6 +1057,9 @@ def api_bitstream_status():
         "git_message": meta.get("git_message"),
         "mcs_present": mcs_present,
         "mcs_size_bytes": os.path.getsize(mcs_path) if mcs_present else None,
+        "artifact_sha256": release_evidence["bit_sha256"],
+        "mcs_sha256": release_evidence["mcs_sha256"],
+        "release_verified": release_evidence["verified"],
     })
 
 

@@ -19,6 +19,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -27,12 +28,22 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 BUILD = ROOT / "build"
 DEFAULT_OUTPUT = BUILD / "church_wukong_xc7a100t.provenance.json"
+BITSTREAM_NAME = "church_wukong_xc7a100t.bit"
+MCS_NAME = "church_wukong_xc7a100t.mcs"
 
 sys.path.insert(0, str(ROOT))
 
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _md5(path: Path) -> str:
+    digest = hashlib.md5()
     with path.open("rb") as fh:
         for chunk in iter(lambda: fh.read(1 << 20), b""):
             digest.update(chunk)
@@ -159,6 +170,85 @@ def _write_atomic(path: Path, record: dict) -> None:
     os.replace(temp_name, path)
 
 
+def _verify_release_bundle(path: Path) -> int:
+    """Verify the mergeable release files without rebinding them to current source."""
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"FAIL: cannot read provenance record {path}: {exc}", file=sys.stderr)
+        return 1
+
+    if not isinstance(record, dict):
+        print("FAIL: provenance record must be a JSON object", file=sys.stderr)
+        return 1
+
+    failures = []
+    if record.get("schema_version") != 1:
+        failures.append("schema_version")
+    if record.get("release_status") != "verified":
+        failures.append("release_status")
+    if record.get("source_tree_clean") is not True:
+        failures.append("source_tree_clean")
+
+    source_commit = record.get("source_commit")
+    if not isinstance(source_commit, str) or not re.fullmatch(r"[0-9a-fA-F]{40}", source_commit):
+        failures.append("source_commit")
+    sentinel = record.get("sentinel")
+    build_version = sentinel.get("build_version") if isinstance(sentinel, dict) else None
+    if not isinstance(build_version, int) or isinstance(build_version, bool):
+        failures.append("sentinel:build_version")
+
+    artifacts = record.get("artifacts")
+    if not isinstance(artifacts, dict):
+        artifacts = {}
+        failures.append("artifacts")
+    build_dir = path.parent
+    for name in (BITSTREAM_NAME, MCS_NAME):
+        expected = artifacts.get(name)
+        artifact_path = build_dir / name
+        if not isinstance(expected, dict):
+            failures.append(f"provenance:{name}")
+            continue
+        if not artifact_path.is_file():
+            failures.append(f"missing:{name}")
+            continue
+        if expected.get("sha256") != _sha256(artifact_path):
+            failures.append(f"sha256:{name}")
+        if expected.get("size_bytes") != artifact_path.stat().st_size:
+            failures.append(f"size:{name}")
+
+    bit_path = build_dir / BITSTREAM_NAME
+    sidecar_path = build_dir / f"{BITSTREAM_NAME}.meta.json"
+    try:
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        sidecar = None
+        failures.append(f"missing_or_invalid:{sidecar_path.name}")
+    if not isinstance(sidecar, dict):
+        failures.append(f"invalid_shape:{sidecar_path.name}")
+
+    bit_record = artifacts.get(BITSTREAM_NAME)
+    if not isinstance(bit_record, dict):
+        bit_record = {}
+    if isinstance(sidecar, dict) and bit_path.is_file():
+        if sidecar.get("md5") != _md5(bit_path):
+            failures.append("sidecar:md5")
+        if sidecar.get("sha256") != bit_record.get("sha256"):
+            failures.append("sidecar:sha256")
+        if sidecar.get("size_bytes") != bit_record.get("size_bytes"):
+            failures.append("sidecar:size_bytes")
+        if sidecar.get("source_commit") != source_commit:
+            failures.append("sidecar:source_commit")
+        if sidecar.get("version") != build_version:
+            failures.append("sidecar:version")
+
+    if failures:
+        print("FAIL: release bundle mismatch: " + ", ".join(failures), file=sys.stderr)
+        return 1
+    print(f"OK: verified release bundle: {path}")
+    return 0
+
+
 def _verify(path: Path) -> int:
     try:
         record = json.loads(path.read_text(encoding="utf-8"))
@@ -210,11 +300,18 @@ def main() -> int:
         "--release-verified", action="store_true",
         help="Attest a vendor-built release (only after reviewing Vivado evidence)",
     )
-    parser.add_argument("--verify", action="store_true")
+    verification = parser.add_mutually_exclusive_group()
+    verification.add_argument("--verify", action="store_true")
+    verification.add_argument(
+        "--verify-release", action="store_true",
+        help="Verify the tracked .bit, sidecar, provenance, and .mcs release bundle",
+    )
     args = parser.parse_args()
     output = args.output if args.output.is_absolute() else ROOT / args.output
     if args.verify:
         return _verify(output)
+    if args.verify_release:
+        return _verify_release_bundle(output)
     if args.release_verified and (not args.vivado_version or args.wns is None):
         parser.error("--release-verified requires --vivado-version and --wns")
     _write_atomic(output, _build_record(

@@ -1031,6 +1031,17 @@ task = "shell.exec"
 args = "python -m pytest tests/server/test_primary_publish_config.py -v"
 
 [[workflows.workflow]]
+name = "wukong-release-bundle"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python3 scripts/wukong_build_provenance.py --verify-release && python3 -m pytest scripts/test_wukong_build_provenance.py -q"
+
+[[workflows.workflow]]
 name = "wukong-health-strip-church-only-tests"
 author = "agent"
 
