@@ -433,6 +433,9 @@ register_suite "check-ila-probe-names" \
 register_suite "test-check-ila-probe-names" \
     'python3 scripts/test_check_ila_probe_names.py'
 
+register_suite "wukong-preflight-launcher-tests" \
+    'python3 -m pytest scripts/test_hardware_namespace_thread_readiness_launchers.py -v'
+
 register_suite "check-lumps-guard" \
     'python3 scripts/check_lumps_dir_clean.py --selftest'
 
@@ -475,7 +478,7 @@ ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests 
 
 ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabilities-blocks check-no-ti60-ui check-security-claims check-api-reference-stale check-whats-new-feed wukong-relay-deployment-guard wukong-fault-sentinel callhome-parser-tests check-slot-index-leak check-ila-probe-names test-check-ila-probe-names check-lumps-guard check-ns-word3-contract test-check-ns-word3-contract check-sitemap-figure-count check-verilog-rtlil-stale check-build-lump-sidecar-source check-wukong-callhome-divergence check-build-lump-clist build-selftest-lump-syntax check-book-chapters check-ide-intro-base-path"
 
-ALL_GROUPS["hardware"]="hardware-sim boot-rom-no-false-halt wukong-boot-rom-guard wukong-fault-sentinel check-ila-probe-names test-check-ila-probe-names"
+ALL_GROUPS["hardware"]="hardware-sim boot-rom-no-false-halt wukong-boot-rom-guard wukong-fault-sentinel check-ila-probe-names test-check-ila-probe-names wukong-preflight-launcher-tests"
 
 ALL_GROUPS["e2e"]="e2e-tests"
 
