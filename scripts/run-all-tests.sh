@@ -293,7 +293,7 @@ register_suite "load-through-l-perm-cr6-tests" \
     'node tests/simulator/sim_load_through_l_perm_cr6.js'
 
 register_suite "return-cr14-trace-tests" \
-    'node simulator/test_return_cr14_trace.js'
+    'node simulator/test_return_cr14_trace.js && node simulator/test_execution_control_flow.js'
 
 register_suite "wukong-cr-update-tests" \
     'node simulator/test_wukong_cr_update.js'

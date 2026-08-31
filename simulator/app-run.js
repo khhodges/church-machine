@@ -370,7 +370,7 @@ function assembleAndLoad() {
             const comments = manifestByMethod[m.name] || {};
             for (let i = 0; i < mCode.length; i++) {
                 const w = mCode[i];
-                const mnem = _applyMethodDRNames(w === 0 ? 'NOP' : assembler.disassemble(w), m);
+                const mnem = _applyMethodDRNames(w === 0 ? 'HALT' : assembler.disassemble(w), m);
                 const comment = comments[i];
                 listing += comment ? `${mnem.padEnd(40)}; ${comment}\n` : `${mnem}\n`;
             }
@@ -603,7 +603,7 @@ function assembleAndLoad() {
         (typeof sim !== 'undefined' && sim) ? sim.nsLabels : null);
     let listing = `; Assembled ${result.words.length} instruction${result.words.length !== 1 ? 's' : ''}\n`;
     for (let i = 0; i < result.words.length; i++) {
-        const mnem = result.words[i] === 0 ? 'NOP' : assembler.disassemble(result.words[i], _asmSlotNames);
+        const mnem = result.words[i] === 0 ? 'HALT' : assembler.disassemble(result.words[i], _asmSlotNames);
         const cmt  = _srcComments[i] || '';
         listing += cmt ? `${mnem.padEnd(40)}; ${cmt}\n` : `${mnem}\n`;
     }
@@ -947,6 +947,14 @@ function stepSim() {
     // Apply any pending program load (e.g. from "Load into Sim" button) before
     // the first step so we execute the right code, not whatever was in memory.
     _applyPendingSimLoad();
+    const breakpointAddr = _breakpointBeforeNextInstruction();
+    if (breakpointAddr !== null) {
+        _reportBreakpointPause(breakpointAddr);
+        updateDashboard();
+        switchView('dashboard');
+        openCRDetail(14);
+        return;
+    }
     let result;
     try {
         result = sim.step();
@@ -1617,6 +1625,37 @@ const simBreakpoints = new Set();
 // Used by "Break at entry" so the pause does not persist across later runs.
 const _oneShotBreakpoints = new Set();
 
+// All execution controls ask the simulator for the address it would fetch from
+// the live CR14+PC context before calling step(). Persistent breakpoints remain
+// installed; only the existing run completion path consumes one-shot entries.
+function _breakpointBeforeNextInstruction() {
+    if (!sim || sim.halted || simBreakpoints.size === 0 ||
+            typeof sim._nextPhysicalAddr !== 'function') return null;
+    const addr = sim._nextPhysicalAddr();
+    if (addr < 0) return null;
+    const addr32 = addr >>> 0;
+    return simBreakpoints.has(addr32) ? addr32 : null;
+}
+
+function _reportBreakpointPause(addr) {
+    _consumeOneShotBreakpoint(addr);
+    const con = document.getElementById('editorConsole');
+    if (!con) return;
+    con.textContent += `\n[BP] Breakpoint at 0x${(addr >>> 0).toString(16).toUpperCase().padStart(4,'0')}`;
+    con.scrollTop = con.scrollHeight;
+}
+
+function _consumeOneShotBreakpoint(addr) {
+    const addr32 = addr >>> 0;
+    if (!_oneShotBreakpoints.has(addr32)) return false;
+    _oneShotBreakpoints.delete(addr32);
+    simBreakpoints.delete(addr32);
+    updateBreakpointBtn();
+    renderBreakList();
+    console.log('[breakAtEntry] one-shot BP at', '0x' + addr32.toString(16).padStart(4,'0'), 'fired and cleared');
+    return true;
+}
+
 // _setEntryBreakpoint — called right before runSimGo() after boot completes.
 // If the "Break at entry" checkbox is checked, registers a one-shot breakpoint
 // at the very first instruction address the simulator is about to execute.
@@ -1802,28 +1841,18 @@ function walkNext() {
         finishWalk();
         return;
     }
+    const breakpointAddr = _breakpointBeforeNextInstruction();
+    if (breakpointAddr !== null) {
+        finishWalk();
+        _reportBreakpointPause(breakpointAddr);
+        updateDashboard();
+        return;
+    }
     const result = sim.step();
     window._lastStepWasReturn = !!(result && result.opName === 'RETURN');
     if (!result) {
         finishWalk();
         return;
-    }
-    // Stop-before-execute breakpoint check: after the step, ask the simulator for the
-    // physical address of the NEXT instruction (current this.pc + CR14 lump base).
-    // This gives "stop before executing the instruction at the BP address" semantics,
-    // matching the run() loop in simulator.js.
-    if (simBreakpoints.size > 0 && !sim.halted) {
-        const nextAddr = sim._nextPhysicalAddr();
-        if (nextAddr >= 0 && simBreakpoints.has(nextAddr >>> 0)) {
-            finishWalk();
-            const con2 = document.getElementById('editorConsole');
-            if (con2) {
-                con2.textContent += `\n[BP] Breakpoint at 0x${(nextAddr >>> 0).toString(16).toUpperCase().padStart(4,'0')}`;
-                con2.scrollTop = con2.scrollHeight;
-            }
-            updateDashboard();
-            return;
-        }
     }
     const con = document.getElementById('editorConsole');
     if (con) {
@@ -2308,14 +2337,7 @@ function runSim() {
             } else if (stopReason === 'halted' || sim.halted) {
                 status = sim.faultLog.length > 0 ? 'Faulted.' : 'Done.';
             } else if (stopReason === 'breakpoint' && breakpointAddr != null) {
-                const bpAddr32 = breakpointAddr >>> 0;
-                if (_oneShotBreakpoints.has(bpAddr32)) {
-                    _oneShotBreakpoints.delete(bpAddr32);
-                    simBreakpoints.delete(bpAddr32);
-                    updateBreakpointBtn();
-                    renderBreakList();
-                    console.log('[breakAtEntry] one-shot BP at', '0x' + bpAddr32.toString(16).padStart(4,'0'), 'fired and cleared');
-                }
+                _consumeOneShotBreakpoint(breakpointAddr);
                 status = `Breakpoint at 0x${breakpointAddr.toString(16).toUpperCase().padStart(4,'0')}.`;
             } else if (stopReason === 'maxSteps') {
                 status = `Max steps (${totalSteps}) reached.`;

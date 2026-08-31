@@ -290,12 +290,11 @@ console.log('\n--- LLB-01: NS slot 3 word0/word1 and CR14 wired correctly ---');
 }
 
 // ── LLB-02: step() fetches first code word at 0x0401 without fault ────────────
-// v2.0: word=0 decodes as LOADEQ (conditional NOP), not HALT.  HALT (instrWord===0)
-// was removed in v2.0 — a zero word now executes as LOAD EQ, CR0, CR0[0] which
-// skips silently when Z=0 (the default).  No fault is logged; sim.halted stays false.
+// The all-zero word is the assembler's terminal HALT encoding. It stops cleanly
+// without a fault and without attempting another fetch.
 console.log('\n--- LLB-02: step() fetches first code word without fault ---');
 {
-    const SENTINEL = 0;   // word=0 → LOADEQ (conditional NOP in v2.0, no halt)
+    const SENTINEL = 0;   // word=0 → HALT
     const { sim, nsBase, GT_SEQ } = setupAndLoad({ cw: 4, cc: 1, codeWord: SENTINEL });
 
     // Rebuild CR14.word0 with the gt_seq that loadLumpBinary preserved in NS[3].word2
@@ -327,12 +326,11 @@ console.log('\n--- LLB-02: step() fetches first code word without fault ---');
     check('LLB-02e: faultLog is empty after step() — no fault occurred',
         sim.faultLog.length === 0,
         `faultLog has ${sim.faultLog.length} entry/entries`);
-    check('LLB-02f: sim.halted remains false (word=0 is LOADEQ-skip in v2.0, not HALT)',
-        sim.halted === false,
-        'sim.halted is true unexpectedly');
-    check('LLB-02g: step() result desc reflects LOADEQ conditional execution (not HALT)',
-        result !== null && typeof result.desc === 'string' &&
-            (result.desc.toLowerCase().includes('loadeq') || result.desc.toLowerCase().includes('skipped') || result.desc.toLowerCase().includes('conditional')),
+    check('LLB-02f: sim.halted is true after terminal HALT',
+        sim.halted === true,
+        `sim.halted is ${sim.halted} unexpectedly`);
+    check('LLB-02g: step() result identifies HALT',
+        result !== null && typeof result.desc === 'string' && result.desc.includes('HALT'),
         `desc: "${result ? result.desc : ''}"` );
 }
 

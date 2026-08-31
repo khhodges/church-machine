@@ -1306,9 +1306,11 @@ class ChurchAssembler {
         }
 
         if (opcode === null) {
-            if (mnemonic === 'HALT' || mnemonic === 'NOP') {
-                return 0;
-            }
+            if (mnemonic === 'HALT') return 0;
+            // NOP must remain distinguishable from the all-zero HALT sentinel.
+            // Encode LOADNV CR0, CR0[1]: NV never executes and the non-zero
+            // immediate prevents the word from being mistaken for HALT.
+            if (mnemonic === 'NOP') return ((15 << 23) | 1) >>> 0;
             // MVN/MVNcc is intercepted in pass 1 and never reaches here; listed as a hint
             // for completeness so the suggestion is accurate if this path is ever hit.
             const pseudoHint = ' Pseudo-instructions (handled before encoding): NOP, HALT, MVN, MVNcc (e.g. MVNEQ, MVNNE).';
@@ -2213,7 +2215,7 @@ class ChurchAssembler {
     //     when the target is within the array and has a label.
     //   • Out-of-range BRANCH targets (not covered by a label) fall back to
     //     the numeric offset form produced by disassemble().
-    //   • Word 0x00000000 is emitted as "NOP".
+    //   • Word 0x00000000 is emitted as "HALT".
 
     // _isHardwareCapName(name)
     // Returns true for hardware-fixed capability names whose permissions are defined
@@ -2314,7 +2316,7 @@ class ChurchAssembler {
                     lines.push(asm.disassemble(word, slotNames));
                 }
             } else {
-                lines.push(word === 0 ? 'NOP' : asm.disassemble(word, slotNames));
+                lines.push(word === 0 ? 'HALT' : asm.disassemble(word, slotNames));
             }
         }
         return lines;
@@ -2328,6 +2330,7 @@ class ChurchAssembler {
     disassemble(word, slotNames) {
         word = word >>> 0;
         if (word === 0) return 'HALT';
+        if (word === (((15 << 23) | 1) >>> 0)) return 'NOP';
 
         const opcode = (word >>> 27) & 0x1F;
         const cond   = (word >>> 23) & 0xF;

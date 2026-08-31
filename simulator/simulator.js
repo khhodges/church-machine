@@ -5143,7 +5143,7 @@ class ChurchSimulator {
     }
 
     // Compute the physical memory address of the NEXT instruction to be fetched,
-    // from current this.pc + CR14 lump base, WITHOUT executing anything.
+    // from current this.pc + the live CR14 lump base, WITHOUT executing anything.
     // Used by run() for stop-before-execute breakpoint semantics.
     // Returns -1 if CR14 is invalid or the address cannot be determined.
     _nextPhysicalAddr() {
@@ -5154,9 +5154,11 @@ class ChurchSimulator {
         if (!cr14 || ChurchSimulator.isNullGT(cr14.word0)) return -1;
         const cr14Parsed = this.parseGT(cr14.word0);
         if (!cr14Parsed.permissions.X) return -1;
-        const entry = this.readNSEntry(cr14Parsed.index);
-        if (!entry) return -1;
-        return (entry.word0_location + 1 + this.pc) >>> 0;
+        if (!Number.isInteger(cr14.word1) || !Number.isInteger(this.pc)) return -1;
+        // CR14 is the active execution context. CALL/ELOADCALL/RETURN replace or
+        // restore it before changing PC, so consulting the Namespace entry here
+        // can predict an address from a different context than _fetchInstruction().
+        return (cr14.word1 + 1 + this.pc) >>> 0;
     }
 
     _fetchInstruction() {
@@ -5238,13 +5240,46 @@ class ChurchSimulator {
             return null;
         }
         const instrWord = fetch.word;
-        // v2.0: HALT (instrWord===0) does not exist. A zero word decodes to
-        // LOAD EQ, CR0, CR0[0] — a conditional NOP that executes only when Z=1.
-        // Pre-boot zero-word handling is retained via the boot PC sentinel path.
-        if (instrWord === 0 && !this.bootComplete) {
-            this.output += `[PP250] Zero instruction at PC=${this.pc} (addr=0x${fetch.addr.toString(16)}) — pre-boot zero, returning to boot sequence\n`;
-            this._returnToBoot();
-            return { pc: this.pc, physicalPC: this.physicalPC, instr: null, desc: 'PP250: zero instruction -> reboot' };
+        // HALT is the all-zero pseudo-instruction emitted by both assemblers.
+        // Before boot it remains the PP250 return sentinel. After boot it is a
+        // terminal instruction: it never pops a frame, advances PC, or fetches
+        // a caller continuation.
+        if (instrWord === 0) {
+            if (!this.bootComplete) {
+                this.output += `[PP250] Zero instruction at PC=${this.pc} (addr=0x${fetch.addr.toString(16)}) — pre-boot zero, returning to boot sequence\n`;
+                this._returnToBoot();
+                return { pc: this.pc, physicalPC: this.physicalPC, instr: null, opName: 'HALT', desc: 'PP250: zero instruction -> reboot' };
+            }
+            const haltPC = this.pc;
+            this.stepCount++;
+            this._instrHistory.push({
+                step: this.stepCount,
+                pc: haltPC,
+                physicalPC: fetch.addr,
+                raw: 0,
+                opName: 'HALT',
+                cond: 'AL',
+                crDst: 0,
+                crSrc: 0,
+                imm: 0,
+            });
+            if (this._instrHistory.length > 5) this._instrHistory.shift();
+            this.halted = true;
+            this.running = false;
+            this.executionStats.successful++;
+            const result = {
+                pc: haltPC,
+                physicalPC: fetch.addr,
+                instr: null,
+                opName: 'HALT',
+                tracePackets: [],
+                desc: `HALT at 0x${fetch.addr.toString(16).toUpperCase().padStart(4, '0')}`,
+                auditPipeline: [],
+            };
+            this.output += result.desc + '\n';
+            this.emit('step', result);
+            this.emit('stateChange', this.getState());
+            return result;
         }
 
         const d = this.decodeInstruction(instrWord);
@@ -9233,11 +9268,10 @@ class ChurchSimulator {
         let stopReason = 'stopped';
         let breakpointAddr = null;
         while (this.running && !this.halted && !this.awaitingLump && !this._lazySuspended && this.bootComplete && steps < maxSteps) {
-            // Stop-before-execute breakpoint check: compute the physical address of the NEXT
-            // instruction to be fetched (from this.pc + CR14 lump base) and compare against
-            // the breakpoint set.  Skip on the very first step so we advance past any BP the
-            // simulator is already sitting on at entry to run().
-            if (steps > 0 && breakpoints) {
+            // Stop-before-execute breakpoint check. This includes the first
+            // instruction in the run so entry breakpoints and resumed runs use
+            // exactly the same physical-address rule.
+            if (breakpoints) {
                 const nextAddr = this._nextPhysicalAddr();
                 if (nextAddr >= 0 && breakpoints.has(nextAddr >>> 0)) {
                     stopReason = 'breakpoint';
