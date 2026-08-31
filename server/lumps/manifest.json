@@ -2739,6 +2739,8 @@
     "abstraction": "CapabilityTest",
     "filename": "CapabilityTest.1.e4fe164d.lump",
     "sidecar_file": "CapabilityTest.1.e4fe164d.json",
+    "ns_slot_policy": "static",
+    "boot_resident": true,
     "lump_size": 512,
     "cw": 21,
     "cc": 5,

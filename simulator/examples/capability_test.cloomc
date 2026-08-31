@@ -60,10 +60,11 @@ LOADEQ CR0, LED_DEV   ; SKIP  -- condition EQ not met (Z=0)
 LOADNE CR0, SelfTest  ; EXEC  -- condition NE met (Z=0) -- restore CR0
 
 ; ============================================================
-; TEST 6: SWITCH -- swap two registers and swap back
+; TEST 6: SWITCH -- reserved PassKey operation (not part of this self-test)
 ; ============================================================
-SWITCH CR0, 1         ; CR0 <-> CR1  (CR0=LED_DEV, CR1=SelfTest)
-SWITCH CR0, 1         ; Swap back     (CR0=SelfTest, CR1=LED_DEV)
+; SWITCH is only valid for installing the protected CR13/CR15 PassKey
+; destinations.  These old CR0/CR1 register-swap examples fault with
+; INVALID_OP and must not be assembled into the canonical CapabilityTest.
 
 ; ============================================================
 ; TEST 7: Turing ISA -- integer arithmetic on data registers

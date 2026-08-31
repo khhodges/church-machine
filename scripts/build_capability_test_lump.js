@@ -232,7 +232,7 @@ const sidecar = {
     status:          'wip',
     profile:         'example',
     language:        'assembly',
-    description:     'Capability self-test: LOAD, TPERM, LOADEQ/LOADNE, SWITCH, Turing ISA, ELOADCALL — ' +
+    description:     'Capability self-test: LOAD, TPERM, LOADEQ/LOADNE, Turing ISA, ELOADCALL — ' +
                      'exercises real A7 v1.2 boot-namespace caps (UART_DEV, LED_DEV, BTN_DEV, TIMER_DEV, SelfTest).',
     // "source" must always reflect the exact text of simulator/examples/capability_test.cloomc.
     // Never leave this field empty — check-sidecar-source.js enforces it after every recompile.

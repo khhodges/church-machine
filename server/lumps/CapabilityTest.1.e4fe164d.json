@@ -84,6 +84,7 @@
   "authorized": false,
   "legacy_authorized": false,
   "source": "",
+  "source_file": "simulator/examples/capability_test.cloomc",
   "binary_hash": "e2959f33f05e4d045bad90d22c436148aaa6041ebe3c6c6614f8122443cd5345",
   "petname": "",
   "issue_number": 1,

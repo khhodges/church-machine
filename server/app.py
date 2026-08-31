@@ -6504,6 +6504,33 @@ def _write_ns_state(entries):
                 pass
             raise
 
+
+def _bind_saved_lump_to_ns_state(abstraction, ns_slot, token, filename, issue_n):
+    """Refresh the artifact binding for an already-committed Namespace slot."""
+    if not isinstance(ns_slot, int) or not os.path.isfile(NS_STATE_PATH):
+        return False
+    with open(NS_STATE_PATH, encoding="utf-8") as state_file:
+        state = json.load(state_file)
+    entries = state.get("abstractions") if isinstance(state, dict) else None
+    if not isinstance(entries, list):
+        return False
+    updated = False
+    for entry in entries:
+        if not isinstance(entry, dict) or entry.get("slot") != ns_slot:
+            continue
+        if entry.get("name") != abstraction:
+            raise ValueError(
+                f"NS[{ns_slot}] belongs to {entry.get('name')!r}, not {abstraction!r}"
+            )
+        entry["token"] = token
+        entry["filename"] = filename
+        entry["issue_n"] = issue_n
+        updated = True
+        break
+    if updated:
+        _write_ns_state(entries)
+    return updated
+
 def _ensure_ns_state():
     """Create/migrate ns-state.json to the rich per-slot format on startup.
 
@@ -7913,6 +7940,16 @@ def save_lump():
         "dot_name":      _dot_name_save,
         "issue_n":       _issue_n_save,
     }
+    # Placement is owned by ns-state.json, but residency policy is a manifest
+    # property and must survive every recompile/save of the same abstraction.
+    _prior_boot_resident = (_existing_entry or {}).get("boot_resident")
+    if "boot_resident" in metadata:
+        new_entry["boot_resident"] = metadata.get("boot_resident") is True
+    elif _prior_boot_resident is not None:
+        new_entry["boot_resident"] = bool(_prior_boot_resident)
+    _prior_slot_policy = (_existing_entry or {}).get("ns_slot_policy")
+    if _prior_slot_policy is not None:
+        new_entry["ns_slot_policy"] = _prior_slot_policy
     if _portable_binding is not None:
         new_entry["portable_binding"] = _portable_binding
 
@@ -7946,6 +7983,18 @@ def save_lump():
         _locked_manifest.append(new_entry)
 
         _atomic_write_json(manifest_path, _locked_manifest)
+
+    # A save replaces the artifact bound to an existing Namespace identity.
+    # Record the exact token/filename before regenerating the boot image so the
+    # generator cannot rediscover an older build by filename ordering.
+    try:
+        _bind_saved_lump_to_ns_state(
+            abs_name, ns_slot, token8, lump_filename, _issue_n_save)
+    except Exception as _ns_bind_exc:
+        return jsonify({"error": (
+            "The LUMP was written, but its committed Namespace binding could "
+            f"not be refreshed: {_ns_bind_exc}"
+        )}), 500
 
     print(f'[lumps] Saved {lump_filename} ({len(lump_bytes)} bytes) + {sidecar_filename}', flush=True)
 

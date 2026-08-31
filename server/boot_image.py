@@ -1043,6 +1043,21 @@ def find_lump_file_by_abstraction(lumps_dir, abstraction_name, ns_slot):
                 return os.path.join(lumps_dir, _files[-1])
     except Exception:
         pass
+    # Backward compatibility for libraries created before rich ns-state.json.
+    try:
+        with open(os.path.join(lumps_dir, "manifest.json")) as _f:
+            for _e in json.load(_f):
+                if (_e.get("abstraction") != abstraction_name
+                        or _e.get("ns_slot") != ns_slot):
+                    continue
+                _filename = _e.get("filename")
+                if _filename and os.path.isfile(os.path.join(lumps_dir, _filename)):
+                    return os.path.join(lumps_dir, _filename)
+                _tok = _e.get("token")
+                if _tok and os.path.isfile(os.path.join(lumps_dir, f"{_tok}.lump")):
+                    return os.path.join(lumps_dir, f"{_tok}.lump")
+    except Exception:
+        pass
     return None
 
 def parse_ns_table(image_bytes):
@@ -1369,8 +1384,24 @@ def _load_boot_resident_entries(manifest_path, selected_by_slot=None):
     try:
         with open(os.path.join(lumps_dir, "ns-state.json")) as f:
             state = json.load(f)
+        with open(manifest_path) as f:
+            manifest = json.load(f)
     except Exception:
-        return []
+        # Legacy libraries had no rich Namespace state.  Keep them readable,
+        # while never merging these slot claims into a present rich state.
+        try:
+            with open(manifest_path) as f:
+                manifest = json.load(f)
+        except Exception:
+            return []
+        return [
+            (record["ns_slot"], str(record.get("token") or ""), record.get("filename"))
+            for record in manifest
+            if isinstance(record, dict)
+            and isinstance(record.get("ns_slot"), int)
+            and record.get("boot_resident") is True
+            and record.get("token")
+        ]
     out = []
     for e in state.get("abstractions", []) if isinstance(state, dict) else []:
         if not isinstance(e, dict) or e.get("type") not in ("Inform", "Resident"):
@@ -1379,20 +1410,33 @@ def _load_boot_resident_entries(manifest_path, selected_by_slot=None):
         tok  = e.get("token") or e.get("cache_token")
         if not isinstance(slot, int):
             continue
-        filename = e.get("filename")
-        if not tok:
-            import re as _re
-            rx = _re.compile(
-                rf"^{_re.escape(str(e.get('name') or ''))}\.(\d+)\.([0-9a-f]{{8}})\.lump$",
-                _re.IGNORECASE)
-            found = [(int(m.group(1)), m.group(2).lower(), fn)
-                     for fn in os.listdir(lumps_dir)
-                     if (m := rx.match(fn))]
-            if found:
-                _issue, tok, filename = max(found)
+        name = str(e.get("name") or "")
+        candidates = [
+            record for record in manifest
+            if isinstance(record, dict)
+            and not record.get("archived")
+            and record.get("abstraction") == name
+            and record.get("boot_resident") is True
+        ]
+        if tok:
+            candidates = [
+                record for record in candidates
+                if str(record.get("token") or "").lower() == str(tok).lower()
+            ]
+        if not candidates:
+            continue
+        record = max(
+            enumerate(candidates),
+            key=lambda pair: (
+                int(pair[1].get("lump_version") or 0),
+                pair[0],
+            ),
+        )[1]
+        tok = str(record.get("token") or "").lower()
+        filename = record.get("filename") or e.get("filename")
         if not tok:
             continue
-        out.append((slot, str(tok), filename, int(e.get("issue_n") or 0)))
+        out.append((slot, tok, filename, int(record.get("lump_version") or 0)))
     selected = selected_by_slot or {}
     chosen = {}
     for slot, tok, filename, version in out:
