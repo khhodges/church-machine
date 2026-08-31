@@ -85,9 +85,9 @@
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x0003D",
+      "limit": "0x0003F",
       "seq": 0,
-      "seal": "0xDEA81EEF"
+      "seal": "0xDEA85EEF"
     },
     {
       "name": "Tunnel",
@@ -114,39 +114,35 @@
     {
       "name": "CapabilityTest",
       "slot": 10,
-      "token": "c7657c2d",
-      "filename": "CapabilityTest.1.b49e8eca.lump",
-      "issue_n": 1,
-      "resident": true,
       "location": "0x000004C0",
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x0003F",
+      "limit": "0x001FA",
       "seq": 0,
-      "seal": "0xDEA83EEF"
+      "seal": "0xDE909EEF"
     },
     {
       "name": "Thread#2",
       "slot": 11,
-      "location": "0x00000500",
+      "location": "0x000006C0",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x001FF",
       "seq": 0,
-      "seal": "0xDE90DEEF"
+      "seal": "0xDE913EEF"
     },
     {
       "name": "Thread#3",
       "slot": 12,
-      "location": "0x00000700",
+      "location": "0x000008C0",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x001FF",
       "seq": 0,
-      "seal": "0xDE91DEEF"
+      "seal": "0xDE963EEF"
     },
     {
       "name": "Bridge.Preload",
@@ -160,5 +156,6 @@
       "seal": "0xDEA89EEF"
     }
   ],
-  "generated_at": 1788187486.846329
+  "generated_at": 1788200751.3392465,
+  "committed_raw_fingerprint": "c60e1c046d1d64f7f1c6cfe6ada7499e89401e58081ff3478949a5369ca7c593"
 }
