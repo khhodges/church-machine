@@ -794,9 +794,8 @@ tr.itrace-fault td { color: #ff9999; }
     vertical-align: middle;
     white-space: nowrap;
 }
-.nia-row-last td { color: #7a7060; border-bottom: 1px solid rgba(180,160,100,0.10); }
+.nia-row-last td { border-bottom: 1px solid rgba(180,160,100,0.10); }
 .nia-row-curr td { background: rgba(220,180,40,0.08); border-bottom: 1px solid rgba(180,160,100,0.10); }
-.nia-row-next td { color: #7a7060; }
 
 /* label column */
 .nia-lbl {
@@ -807,21 +806,19 @@ tr.itrace-fault td { color: #ff9999; }
     letter-spacing: 0.04em;
     border-right: 1px solid rgba(180,160,100,0.13);
 }
-.nia-row-last .nia-lbl { color: #8a7a60; }
 .nia-row-curr .nia-lbl { color: #f0d060; }
-.nia-row-next .nia-lbl { color: #8a7a60; }
 
 /* address column */
 .nia-addr { width: 66px; }
-.nia-row-last .nia-addr code { color: #908060; font-family: var(--font-mono, monospace); font-size: 0.82rem; }
 .nia-row-curr .nia-addr code { color: #ffe060; font-family: var(--font-mono, monospace); font-size: 0.84rem; font-weight: 700; }
-.nia-row-next .nia-addr code { color: #908060; font-family: var(--font-mono, monospace); font-size: 0.82rem; }
+.nia-row-last .nia-addr code,
+.nia-row-next .nia-addr code { font-family: var(--font-mono, monospace); font-size: 0.82rem; }
 
 /* disassembly column */
 .nia-disasm { width: 52%; }
-.nia-row-last .nia-disasm code { color: #7a7060; font-family: var(--font-mono, monospace); font-size: 0.80rem; }
 .nia-row-curr .nia-disasm code { color: #d0c890; font-family: var(--font-mono, monospace); font-size: 0.82rem; }
-.nia-row-next .nia-disasm code { color: #7a7060; font-family: var(--font-mono, monospace); font-size: 0.80rem; }
+.nia-row-last .nia-disasm code,
+.nia-row-next .nia-disasm code { font-family: var(--font-mono, monospace); font-size: 0.80rem; }
 
 /* program / offset column */
 .nia-loc { text-align: right; }
@@ -833,9 +830,7 @@ tr.itrace-fault td { color: #ff9999; }
     border-radius: 3px;
     background: rgba(180,160,80,0.10);
 }
-.nia-row-last .nia-loc-text { color: #7a7060; }
 .nia-row-curr .nia-loc-text { color: #c0a840; background: rgba(180,160,80,0.17); }
-.nia-row-next .nia-loc-text { color: #7a7060; }
 
 /* IDE call-home online/offline badge (appears in NIA panel after CALL_HOME step) */
 .nia-ide-badge-row {

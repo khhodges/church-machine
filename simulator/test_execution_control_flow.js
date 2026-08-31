@@ -7,6 +7,8 @@ const path = require('path');
 global.window = {};
 const ChurchSimulator = require('./simulator.js');
 const ChurchAssembler = require('./assembler.js');
+const gateLogCss = fs.readFileSync(
+    path.join(__dirname, 'styles-gatelog.css'), 'utf8');
 
 const RETURN_AL = ((3 << 27) | (14 << 23)) >>> 0;
 const CALL_AL_CR0 = ((2 << 27) | (14 << 23)) >>> 0;
@@ -312,6 +314,14 @@ function makeOrdinaryCallFixture() {
         'the UI must not maintain a second resume-state token');
     assert.ok(appRun.includes("_consumeOneShotBreakpoint(breakpointAddr);\n                status = `Breakpoint"),
         'Run completion consumes a fired one-shot breakpoint');
+    assert.ok(gateLogCss.includes('.nia-row-last td { border-bottom:') &&
+              gateLogCss.includes('.nia-row-next .nia-disasm code { font-family:'),
+        'last/next NIA rows keep their standard text colors');
+    assert.ok(!gateLogCss.includes('.nia-row-last td { color: #7a7060;') &&
+              !gateLogCss.includes('.nia-row-next td { color: #7a7060;') &&
+              !gateLogCss.includes('.nia-row-last .nia-disasm code { color: #7a7060;') &&
+              !gateLogCss.includes('.nia-row-next .nia-disasm code { color: #7a7060;'),
+        'breakpoint NIA styling does not dim last/next instruction text');
 }
 
 console.log('execution control-flow regressions passed');
