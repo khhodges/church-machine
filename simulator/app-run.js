@@ -1662,8 +1662,10 @@ const _universalBreakpointNames = new Map([
     [3, 'RETURN'],
     [4, 'CHANGE'],
     [5, 'SWITCH'],
+    [6, 'TPERM'],
+    [7, 'LAMBDA'],
     [8, 'ELOADCALL'],
-    [9, 'XLOADCALL'],
+    [9, 'XLOADLAMBDA'],
 ]);
 const _universalBreakpointControls = new Map([
     [0, 'breakOnLoadChk'],
@@ -1672,8 +1674,10 @@ const _universalBreakpointControls = new Map([
     [3, 'breakOnReturnChk'],
     [4, 'breakOnChangeChk'],
     [5, 'breakOnSwitchChk'],
+    [6, 'breakOnTpermChk'],
+    [7, 'breakOnLambdaChk'],
     [8, 'breakOnEloadcallChk'],
-    [9, 'breakOnXloadcallChk'],
+    [9, 'breakOnXloadLambdaChk'],
 ]);
 // One-shot breakpoints: removed automatically the moment they fire.
 // Used by "Break at entry" so the pause does not persist across later runs.

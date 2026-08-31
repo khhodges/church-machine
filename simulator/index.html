@@ -432,7 +432,9 @@
                                         <label class="break-at-entry-label universal-breakpoint-label" data-tooltip="Pause before every CHANGE instruction"><input type="checkbox" id="breakOnChangeChk" onchange="setUniversalBreakpoint(4, this.checked)"> Any CHANGE</label>
                                         <label class="break-at-entry-label universal-breakpoint-label" data-tooltip="Pause before every SWITCH instruction"><input type="checkbox" id="breakOnSwitchChk" onchange="setUniversalBreakpoint(5, this.checked)"> Any SWITCH</label>
                                         <label class="break-at-entry-label universal-breakpoint-label" data-tooltip="Pause before every ELOADCALL instruction"><input type="checkbox" id="breakOnEloadcallChk" onchange="setUniversalBreakpoint(8, this.checked)"> Any ELOADCALL</label>
-                                        <label class="break-at-entry-label universal-breakpoint-label" data-tooltip="Pause before every XLOADCALL instruction"><input type="checkbox" id="breakOnXloadcallChk" onchange="setUniversalBreakpoint(9, this.checked)"> Any XLOADCALL</label>
+                                        <label class="break-at-entry-label universal-breakpoint-label" data-tooltip="Pause before every TPERM instruction"><input type="checkbox" id="breakOnTpermChk" onchange="setUniversalBreakpoint(6, this.checked)"> Any TPERM</label>
+                                        <label class="break-at-entry-label universal-breakpoint-label" data-tooltip="Pause before every LAMBDA instruction"><input type="checkbox" id="breakOnLambdaChk" onchange="setUniversalBreakpoint(7, this.checked)"> Any LAMBDA</label>
+                                        <label class="break-at-entry-label universal-breakpoint-label" data-tooltip="Pause before every XLOADLAMBDA instruction"><input type="checkbox" id="breakOnXloadLambdaChk" onchange="setUniversalBreakpoint(9, this.checked)"> Any XLOADLAMBDA</label>
                                         <label class="break-at-entry-label universal-breakpoint-label" data-tooltip="Pause before every SAVE instruction"><input type="checkbox" id="breakOnSaveChk" onchange="setUniversalBreakpoint(1, this.checked)"> Any SAVE</label>
                                         <label class="break-at-entry-label universal-breakpoint-label" data-tooltip="Pause before every LOAD instruction"><input type="checkbox" id="breakOnLoadChk" onchange="setUniversalBreakpoint(0, this.checked)"> Any LOAD</label>
                                     </div>
@@ -3341,7 +3343,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="app-editor-find.js?v=20260815a"></script>
     <script src="lump_save_handler.js?v=20260815a"></script>
     <script src="whats-new-feed.js?v=20260823a"></script>
-    <script src="app-run.js?v=20260831-universal-breakpoints3"></script>
+    <script src="app-run.js?v=20260831-universal-breakpoints4"></script>
     <script src="app-build-approval.js?v=20260821a"></script>
     <script src="app-source-library.js?v=20260720h"></script>
     <script src="app-invoke.js?v=20260821-modal-trap"></script>

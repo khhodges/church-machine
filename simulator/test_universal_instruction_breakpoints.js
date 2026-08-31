@@ -28,8 +28,10 @@ const universalOperations = new Map([
     [3, 'RETURN'],
     [4, 'CHANGE'],
     [5, 'SWITCH'],
+    [6, 'TPERM'],
+    [7, 'LAMBDA'],
     [8, 'ELOADCALL'],
-    [9, 'XLOADCALL'],
+    [9, 'XLOADLAMBDA'],
 ]);
 
 for (const [opcode, operation] of universalOperations) {

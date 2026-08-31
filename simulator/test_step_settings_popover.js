@@ -131,7 +131,8 @@ function makeEnv() {
             [0, 'breakOnLoadChk'], [1, 'breakOnSaveChk'],
             [2, 'breakOnCallChk'], [3, 'breakOnReturnChk'],
             [4, 'breakOnChangeChk'], [5, 'breakOnSwitchChk'],
-            [8, 'breakOnEloadcallChk'], [9, 'breakOnXloadcallChk'],
+            [6, 'breakOnTpermChk'], [7, 'breakOnLambdaChk'],
+            [8, 'breakOnEloadcallChk'], [9, 'breakOnXloadLambdaChk'],
         ]),
         updateBreakpointBtn: function() {},
         updateDashboard: function() {},
@@ -172,7 +173,8 @@ check('SSP-2', '#stepSettingsPopover is present in index.html',
     const ids = [
         'breakOnLoadChk', 'breakOnSaveChk', 'breakOnCallChk',
         'breakOnReturnChk', 'breakOnChangeChk', 'breakOnSwitchChk',
-        'breakOnEloadcallChk', 'breakOnXloadcallChk',
+        'breakOnTpermChk', 'breakOnLambdaChk',
+        'breakOnEloadcallChk', 'breakOnXloadLambdaChk',
     ];
     check('SSP-12', 'all universal Church breakpoint checkboxes are in Step Settings',
         !!pop && ids.every(id => {
