@@ -1111,8 +1111,15 @@ function updateThreadIdentityStrip() {
             ? `0x${(row.nia >>> 0).toString(16).toUpperCase().padStart(4, '0')}`
             : '\u2014';
         const gtName = row.gtPetName || 'No entry GT';
+        const indicatorFlags = row.indicatorFlags &&
+            typeof row.indicatorFlags === 'object' ? row.indicatorFlags : null;
+        const flagText = indicatorFlags
+            ? ['N', 'Z', 'C', 'V'].map((flag) =>
+                `${flag}${indicatorFlags[flag] ? 1 : 0}`).join(' ')
+            : '\u2014';
         card.setAttribute('aria-label',
-            `${row.name}${row.active ? ', active' : ''}; NIA ${niaText}; GT dot pet name ${gtName}`);
+            `${row.name}${row.active ? ', active' : ''}; NIA ${niaText}; ` +
+            `indicator flags ${flagText}; GT dot pet name ${gtName}`);
         card.setAttribute('title',
             `${row.name}${row.active ? ' (active)' : ''}\nNIA ${niaText}\nGT dot pet name: ${gtName}`);
 
@@ -1147,6 +1154,17 @@ function updateThreadIdentityStrip() {
         gtLabel.textContent = gtName;
         gt.append(gtKey, gtLabel);
         values.appendChild(gt);
+
+        const flags = document.createElement('span');
+        flags.className = 'thread-identity-value thread-identity-flags';
+        const flagsKey = document.createElement('span');
+        flagsKey.className = 'thread-identity-key';
+        flagsKey.textContent = 'FLAGS';
+        const flagsCode = document.createElement('code');
+        flagsCode.textContent = flagText;
+        flagsCode.setAttribute('aria-label', `Indicator flags ${flagText}`);
+        flags.append(flagsKey, flagsCode);
+        values.appendChild(flags);
 
         card.append(marker, name, values);
         strip.appendChild(card);

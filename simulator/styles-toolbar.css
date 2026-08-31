@@ -1066,6 +1066,16 @@
     overflow: hidden;
 }
 
+.thread-identity-flags {
+    margin-left: 0;
+    margin-right: 0;
+    color: #d9b85c;
+}
+
+.thread-identity-flags code {
+    color: #f0d27a;
+}
+
 .thread-identity-key {
     color: #65778d;
     font-size: 0.58rem;

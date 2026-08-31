@@ -4514,6 +4514,10 @@ class ChurchSimulator {
                 active,
                 nia: active ? (this.pc >>> 0)
                     : (savedIndicator ? (savedIndicator.nia >>> 0) : null),
+                indicatorFlags: active
+                    ? { ...this.flags }
+                    : (savedIndicator && savedIndicator.flags
+                        ? { ...savedIndicator.flags } : null),
                 gtWord,
                 ...gtIdentity,
             };

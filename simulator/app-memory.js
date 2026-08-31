@@ -518,9 +518,16 @@ function updateCRDetail() {
                 continue;
             }
 
-            const isPC    = lumpHdr.valid
-                ? (addr === baseLoc + 1 + sim.pc)
-                : ((addr === (sim.programBaseAddr || 0) + sim.pc) || (addr === sim.pc));
+            // physicalPC is the NIA used by the execution/trace path. Prefer
+            // it over the logical PC so the highlighted row remains correct
+            // across CR14 changes and call/return transitions.
+            const _liveNIA = Number.isInteger(sim.physicalPC)
+                ? (sim.physicalPC >>> 0) : null;
+            const isPC    = _liveNIA !== null
+                ? addr === _liveNIA
+                : (lumpHdr.valid
+                    ? (addr === baseLoc + 1 + sim.pc)
+                    : ((addr === (sim.programBaseAddr || 0) + sim.pc) || (addr === sim.pc)));
             const isGateHL = _crDetailHighlightPC !== null && (lumpHdr.valid
                 ? (addr === baseLoc + 1 + _crDetailHighlightPC)
                 : ((addr === (sim.programBaseAddr || 0) + _crDetailHighlightPC) || (addr === _crDetailHighlightPC)));
@@ -1627,10 +1634,22 @@ function updateCRDetail() {
         contentEl.classList.remove('crd-content-thread');
     }
     requestAnimationFrame(() => {
-        const scrollTarget = (_crDetailHighlightPC !== null
-            ? contentEl.querySelector('.code-gate-row')
-            : null) || contentEl.querySelector('.code-pc-row');
-        if (scrollTarget) scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // A gate/error highlight is a one-time navigation aid. During live
+        // execution the current NIA must win, otherwise a stale clicked row
+        // keeps the code view parked on the old page.
+        const liveTarget = contentEl.querySelector('.code-pc-row');
+        const scrollTarget = liveTarget ||
+            (_crDetailHighlightPC !== null
+                ? contentEl.querySelector('.code-gate-row')
+                : null);
+        if (scrollTarget) {
+            // Repeated smooth-scroll animations are continuously cancelled by
+            // Run-mode state updates and can leave the view on an old page.
+            scrollTarget.scrollIntoView({
+                behavior: liveTarget ? 'auto' : 'smooth',
+                block: 'center'
+            });
+        }
     });
 }
 
