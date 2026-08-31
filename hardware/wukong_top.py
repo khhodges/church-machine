@@ -211,6 +211,88 @@ class FaultRecoveryControl(Elaboratable):
         return m
 
 
+def _add_upload_fsm_states(
+        m, *, uart_valid, uart_data, up_len_bytes, up_len_cnt, up_byte_cnt,
+        up_word_buf, up_byte_in_word, upload_wr_addr_r, upload_wr_en,
+        upload_wr_addr, upload_wr_data, upload_watchdog, watchdog_limit,
+        upload_ack_req, upload_ack_accepted, debug_state):
+    """Add the production upload states to the caller's command-parser FSM."""
+    with m.State("UPLOAD_LEN"):
+        m.d.comb += debug_state.eq(1)
+        with m.If(uart_valid):
+            m.d.sync += upload_watchdog.eq(0)
+            with m.Switch(up_len_cnt):
+                for byte_index in range(4):
+                    with m.Case(byte_index):
+                        m.d.sync += [
+                            up_len_bytes[byte_index].eq(uart_data),
+                            up_len_cnt.eq(byte_index + 1),
+                        ]
+            with m.If(up_len_cnt == 3):
+                m.next = "UPLOAD_LEN_COMMIT"
+        with m.Else():
+            m.d.sync += upload_watchdog.eq(upload_watchdog + 1)
+            with m.If(upload_watchdog == watchdog_limit - 1):
+                m.d.sync += upload_watchdog.eq(0)
+                m.next = "IDLE"
+
+    with m.State("UPLOAD_LEN_COMMIT"):
+        m.d.comb += debug_state.eq(2)
+        up_len_val = Signal(32, name="up_len_val")
+        m.d.comb += up_len_val.eq(
+            Cat(up_len_bytes[3], up_len_bytes[2],
+                up_len_bytes[1], up_len_bytes[0]))
+        with m.If((up_len_val == 0) | (up_len_val > 65536)):
+            m.next = "IDLE"
+        with m.Else():
+            m.d.sync += [
+                up_byte_cnt.eq(up_len_val[0:17]),
+                up_byte_in_word.eq(0),
+                upload_wr_addr_r.eq(0),
+            ]
+            m.next = "UPLOAD_DATA"
+
+    with m.State("UPLOAD_DATA"):
+        m.d.comb += debug_state.eq(3)
+        with m.If(uart_valid):
+            m.d.sync += upload_watchdog.eq(0)
+            with m.Switch(up_byte_in_word):
+                with m.Case(0):
+                    m.d.sync += up_word_buf[0].eq(uart_data)
+                with m.Case(1):
+                    m.d.sync += up_word_buf[1].eq(uart_data)
+                with m.Case(2):
+                    m.d.sync += up_word_buf[2].eq(uart_data)
+            with m.If(up_byte_in_word == 3):
+                m.d.comb += [
+                    upload_wr_en.eq(1),
+                    upload_wr_addr.eq(upload_wr_addr_r),
+                    upload_wr_data.eq(
+                        Cat(uart_data, up_word_buf[2],
+                            up_word_buf[1], up_word_buf[0])),
+                ]
+                m.d.sync += upload_wr_addr_r.eq(upload_wr_addr_r + 1)
+            m.d.sync += up_byte_cnt.eq(up_byte_cnt - 1)
+            with m.If(up_byte_cnt == 1):
+                m.next = "UPLOAD_ACK"
+            with m.Else():
+                m.d.sync += up_byte_in_word.eq(
+                    Mux(up_byte_in_word == 3, 0, up_byte_in_word + 1))
+        with m.Else():
+            m.d.sync += upload_watchdog.eq(upload_watchdog + 1)
+            with m.If(upload_watchdog == watchdog_limit - 1):
+                m.d.sync += upload_watchdog.eq(0)
+                m.next = "IDLE"
+
+    with m.State("UPLOAD_ACK"):
+        m.d.comb += [
+            debug_state.eq(4),
+            upload_ack_req.eq(1),
+        ]
+        with m.If(upload_ack_accepted):
+            m.next = "IDLE"
+
+
 class ChurchWukongXC7A100T(Elaboratable):
     """Minimal Church Machine top-level for QMTECH Wukong XC7A100T.
 
@@ -235,10 +317,14 @@ class ChurchWukongXC7A100T(Elaboratable):
     """
 
     def __init__(self, clk_freq=50_000_000, baud=57_600, sim_mode=False, build_sig=None,
-                 button_debounce_cycles=None):
+                 button_debounce_cycles=None, sim_dmem_init=True,
+                 upload_watchdog_limit=None, sim_upload_only=False):
         self.clk_freq = clk_freq
         self.baud     = baud
         self.sim_mode = sim_mode
+        self.sim_dmem_init = sim_dmem_init
+        self.upload_watchdog_limit = upload_watchdog_limit
+        self.sim_upload_only = sim_upload_only
         self.button_debounce_cycles = (
             button_debounce_cycles if button_debounce_cycles is not None
             else (4 if sim_mode else 50_000))
@@ -277,10 +363,22 @@ class ChurchWukongXC7A100T(Elaboratable):
         # ports without needing a probe submodule.  Both are driven by elaborate().
         self.step_mode   = Signal(init=0)  # 0 = free-run; 1 = step/halt mode
         self.step_halted = Signal()        # 1 = CM currently held between retires
+        # State: 0=IDLE/other, 1=UPLOAD_LEN, 2=UPLOAD_LEN_COMMIT,
+        # 3=UPLOAD_DATA, 4=UPLOAD_ACK.
+        self.dbg_upload_state = Signal(3)
+        self.dbg_upload_watchdog = Signal(24)
+        self.dbg_upload_len_count = Signal(2)
+        self.dbg_upload_bytes_remaining = Signal(17)
+        self.dbg_upload_write_addr = Signal(14)
         self.dbg_active_thread_slot = Signal(16)
         self.dbg_thread_count = Signal(2, init=1)
 
     def elaborate(self, platform):
+        if self.sim_upload_only:
+            if not self.sim_mode:
+                raise ValueError("sim_upload_only requires sim_mode=True")
+            return self._elaborate_upload_only()
+
         m = Module()
 
         # ── Sync clock domain ──────────────────────────────────────────────────
@@ -403,7 +501,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         # tests inspect memory immediately after elaboration.
         dmem = m.submodules.dmem = LibMemory(
             shape=unsigned(32), depth=_WUKONG_DMEM_WORDS,
-            init=dmem_init if self.sim_mode else [])
+            init=dmem_init if self.sim_mode and self.sim_dmem_init else [])
         dmem_rd = dmem.read_port(domain="sync")
         # Independent synchronous read port for the stop-state snapshot.
         # The snapshot is emitted only while the CM is halted, so this port
@@ -491,8 +589,18 @@ class ChurchWukongXC7A100T(Elaboratable):
         # 20 bytes = 173 600 cycles ≈ 3.5 ms.  This is comfortably wider than
         # any normal inter-byte gap on a local USB-serial link, while still
         # allowing the board to recover quickly after a truncated upload.
-        _UPLOAD_WATCHDOG_LIMIT = max(self.clk_freq // self.baud * 10 * 20, 1000)
+        _UPLOAD_WATCHDOG_LIMIT = (
+            self.upload_watchdog_limit
+            if self.upload_watchdog_limit is not None
+            else max(self.clk_freq // self.baud * 10 * 20, 1000))
         upload_watchdog = Signal(range(_UPLOAD_WATCHDOG_LIMIT + 1))
+        m.d.comb += [
+            self.dbg_upload_state.eq(0),
+            self.dbg_upload_watchdog.eq(upload_watchdog),
+            self.dbg_upload_len_count.eq(up_len_cnt),
+            self.dbg_upload_bytes_remaining.eq(up_byte_cnt),
+            self.dbg_upload_write_addr.eq(upload_wr_addr_r),
+        ]
 
         # ── Boot-triggered / sentinel signals (declared early for arbitrator) ──
         # boot_triggered is driven by the boot FSM below; sentinel_sent latches
@@ -1060,108 +1168,26 @@ class ChurchWukongXC7A100T(Elaboratable):
                 m.d.sync += bp_wr_ptr.eq(bp_wr_ptr + 1)
                 m.next = "IDLE"
 
-            # ── Upload FSM states ('u' = 0x75) ────────────────────────────────
-            with m.State("UPLOAD_LEN"):
-                # Receive 4 big-endian bytes encoding the total payload byte count.
-                with m.If(uart_rx.valid):
-                    m.d.sync += upload_watchdog.eq(0)
-                    with m.Switch(up_len_cnt):
-                        for _i in range(4):
-                            with m.Case(_i):
-                                m.d.sync += [up_len_bytes[_i].eq(uart_rx.data),
-                                             up_len_cnt.eq(_i + 1)]
-                    with m.If(up_len_cnt == 3):
-                        m.next = "UPLOAD_LEN_COMMIT"
-                with m.Else():
-                    m.d.sync += upload_watchdog.eq(upload_watchdog + 1)
-                    with m.If(upload_watchdog == _UPLOAD_WATCHDOG_LIMIT - 1):
-                        # Timed out waiting for length header — abort to IDLE.
-                        # step_mode / step_halted stay at 1 (fail-closed): the
-                        # CM remains halted; the bridge must send an explicit 'r'
-                        # after diagnosing the failure.
-                        m.d.sync += upload_watchdog.eq(0)
-                        m.next = "IDLE"
-
-            with m.State("UPLOAD_LEN_COMMIT"):
-                # Assemble big-endian byte count: byte[0]=MSB .. byte[3]=LSB.
-                # Reject if zero or exceeds DMEM capacity (65536 bytes = 16384 words).
-                up_len_val = Signal(32, name="up_len_val")
-                m.d.comb += up_len_val.eq(
-                    Cat(up_len_bytes[3], up_len_bytes[2],
-                        up_len_bytes[1], up_len_bytes[0]))
-                with m.If((up_len_val == 0) | (up_len_val > 65536)):
-                    # Malformed length: return to IDLE.
-                    # step_mode / step_halted stay at 1 (fail-closed): CM
-                    # remains halted; bridge sends explicit 'r' to resume.
-                    m.next = "IDLE"
-                with m.Else():
-                    m.d.sync += [
-                        up_byte_cnt.eq(up_len_val[0:17]),
-                        up_byte_in_word.eq(0),
-                        upload_wr_addr_r.eq(0),
-                    ]
-                    m.next = "UPLOAD_DATA"
-
-            with m.State("UPLOAD_DATA"):
-                # Receive payload bytes; assemble big-endian 32-bit words and
-                # write each complete word to DMEM as it arrives.
-                # Byte ordering: byte 0 = bits[31:24] (MSB), byte 3 = bits[7:0] (LSB).
-                #
-                # Watchdog: if no byte arrives for _UPLOAD_WATCHDOG_LIMIT cycles
-                # the UART has dropped bytes and we will never see the declared
-                # byte count.  Return to IDLE so subsequent frames are not
-                # silently corrupted by treating later UART traffic as payload.
-                with m.If(uart_rx.valid):
-                    m.d.sync += upload_watchdog.eq(0)
-                    # Buffer bytes 0-2 in registers; byte 3 is used directly from
-                    # uart_rx.data so it doesn't need a separate register.
-                    with m.Switch(up_byte_in_word):
-                        with m.Case(0): m.d.sync += up_word_buf[0].eq(uart_rx.data)
-                        with m.Case(1): m.d.sync += up_word_buf[1].eq(uart_rx.data)
-                        with m.Case(2): m.d.sync += up_word_buf[2].eq(uart_rx.data)
-
-                    # When byte 3 (LSB) arrives, assemble and write the word.
-                    with m.If(up_byte_in_word == 3):
-                        m.d.comb += [
-                            upload_wr_en.eq(1),
-                            upload_wr_addr.eq(upload_wr_addr_r),
-                            # Cat(LSB, b2, b1, MSB) → bits[31:24]=buf[0], bits[7:0]=rx
-                            upload_wr_data.eq(
-                                Cat(uart_rx.data, up_word_buf[2],
-                                    up_word_buf[1], up_word_buf[0])),
-                        ]
-                        m.d.sync += upload_wr_addr_r.eq(upload_wr_addr_r + 1)
-
-                    # Decrement byte counter; advance position or wrap on word boundary.
-                    m.d.sync += up_byte_cnt.eq(up_byte_cnt - 1)
-                    with m.If(up_byte_cnt == 1):
-                        # Last byte received — proceed to ACK state.
-                        m.next = "UPLOAD_ACK"
-                    with m.Else():
-                        m.d.sync += up_byte_in_word.eq(
-                            Mux(up_byte_in_word == 3, 0, up_byte_in_word + 1))
-                with m.Else():
-                    # No byte this cycle — advance watchdog.
-                    m.d.sync += upload_watchdog.eq(upload_watchdog + 1)
-                    with m.If(upload_watchdog == _UPLOAD_WATCHDOG_LIMIT - 1):
-                        # Timed out mid-payload — abort to IDLE so future 'u'
-                        # frames are not silently treated as continuation data.
-                        # step_mode / step_halted stay at 1 (fail-closed): the
-                        # CM remains halted; bridge sends explicit 'r' to resume.
-                        m.d.sync += upload_watchdog.eq(0)
-                        m.next = "IDLE"
-
-            with m.State("UPLOAD_ACK"):
-                # Assert upload_ack_req to inject 0x06 into the TX arbitrator.
-                # Transition to IDLE on the same cycle the start pulse fires
-                # (the byte is already latched into the UART TX shift register).
-                m.d.comb += upload_ack_req.eq(1)
-                # Must mirror the arbitrator's accepted-start condition exactly
-                # (tx_free, not bare ~busy): during UartTx's one-cycle DONE
-                # state busy=0 but start is ignored — leaving on ~busy alone
-                # would drop the 0x06 ACK byte.
-                with m.If(tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req):
-                    m.next = "IDLE"
+            _add_upload_fsm_states(
+                m,
+                uart_valid=uart_rx.valid,
+                uart_data=uart_rx.data,
+                up_len_bytes=up_len_bytes,
+                up_len_cnt=up_len_cnt,
+                up_byte_cnt=up_byte_cnt,
+                up_word_buf=up_word_buf,
+                up_byte_in_word=up_byte_in_word,
+                upload_wr_addr_r=upload_wr_addr_r,
+                upload_wr_en=upload_wr_en,
+                upload_wr_addr=upload_wr_addr,
+                upload_wr_data=upload_wr_data,
+                upload_watchdog=upload_watchdog,
+                watchdog_limit=_UPLOAD_WATCHDOG_LIMIT,
+                upload_ack_req=upload_ack_req,
+                upload_ack_accepted=(
+                    tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req),
+                debug_state=self.dbg_upload_state,
+            )
 
         # Both reboot paths use the same serialized boundary. In particular,
         # sentinel_req cannot preempt a trace or snapshot frame, and reason-2
@@ -1703,5 +1729,84 @@ class ChurchWukongXC7A100T(Elaboratable):
                 core.fault_gt[:21],        # bits[31:11] = fault_gt upper 21 bits
             )),
         ]
+
+        return m
+
+    def _elaborate_upload_only(self):
+        """Elaborate only the production UART upload parser for focused tests.
+
+        The complete top takes minutes to compile into Amaranth's Python
+        simulator even though upload watchdog tests do not exercise the CPU,
+        trace, boot, or snapshot blocks. This profile keeps the production
+        top's public signals and exact upload state transitions while omitting
+        unrelated machinery. It is never selected by hardware generation.
+        """
+        m = Module()
+        uart_rx = m.submodules.uart_rx = UartRx(
+            clk_freq=self.clk_freq, baud=self.baud)
+        m.d.comb += uart_rx.rx.eq(self.uart_rx_pin)
+
+        up_len_bytes = [
+            Signal(8, name=f"sim_up_len_b{i}") for i in range(4)]
+        up_len_cnt = Signal(2)
+        up_byte_cnt = Signal(17)
+        up_word_buf = [
+            Signal(8, name=f"sim_up_word_b{i}") for i in range(3)]
+        up_byte_in_word = Signal(2)
+        upload_wr_addr_r = Signal(14)
+        upload_wr_en = Signal()
+        upload_wr_addr = Signal(14)
+        upload_wr_data = Signal(32)
+        upload_ack_req = Signal()
+        watchdog_limit = (
+            self.upload_watchdog_limit
+            if self.upload_watchdog_limit is not None
+            else max(self.clk_freq // self.baud * 10 * 20, 1000))
+        upload_watchdog = Signal(range(watchdog_limit + 1))
+
+        m.d.comb += [
+            self.uart_tx_pin.eq(1),
+            self.dbg_upload_state.eq(0),
+            self.dbg_upload_watchdog.eq(upload_watchdog),
+            self.dbg_upload_len_count.eq(up_len_cnt),
+            self.dbg_upload_bytes_remaining.eq(up_byte_cnt),
+            self.dbg_upload_write_addr.eq(upload_wr_addr_r),
+            self.dbg_boot_complete.eq(0),
+            self.dbg_fault_valid.eq(0),
+            self.dbg_nia.eq(0),
+            self.dbg_fault.eq(0),
+            self.dbg_active_thread_slot.eq(0),
+            self.dbg_thread_count.eq(1),
+        ]
+
+        with m.FSM(name="upload_only_cmd_parser"):
+            with m.State("IDLE"):
+                with m.If(uart_rx.valid & (uart_rx.data == 0x75)):
+                    m.d.sync += [
+                        self.step_mode.eq(1),
+                        self.step_halted.eq(1),
+                        up_len_cnt.eq(0),
+                    ]
+                    m.next = "UPLOAD_LEN"
+
+            _add_upload_fsm_states(
+                m,
+                uart_valid=uart_rx.valid,
+                uart_data=uart_rx.data,
+                up_len_bytes=up_len_bytes,
+                up_len_cnt=up_len_cnt,
+                up_byte_cnt=up_byte_cnt,
+                up_word_buf=up_word_buf,
+                up_byte_in_word=up_byte_in_word,
+                upload_wr_addr_r=upload_wr_addr_r,
+                upload_wr_en=upload_wr_en,
+                upload_wr_addr=upload_wr_addr,
+                upload_wr_data=upload_wr_data,
+                upload_watchdog=upload_watchdog,
+                watchdog_limit=watchdog_limit,
+                upload_ack_req=upload_ack_req,
+                upload_ack_accepted=1,
+                debug_state=self.dbg_upload_state,
+            )
 
         return m

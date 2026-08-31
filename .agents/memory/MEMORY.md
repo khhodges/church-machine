@@ -85,6 +85,7 @@
 - [mLoad inclusive c-list bounds](mload-inclusive-c-list-bounds.md) — limit_offset stores count−1, so valid index checks must use inclusive `<=`
 - [Wukong RTL generation initializer bottleneck](wukong-rtl-generation-init-bottleneck.md) — fixed 64 KiB DMEM is not proof of a BRAM issue; Amaranth conversion can stall before Yosys/Vivado
 - [Amaranth shape() memoization](amaranth-shape-memoization.md) — Operator/SwitchValue.shape() uncached in 0.5.8; monkey-patch both before convert() for O(n) instead of O(n²)
+- [Wukong focused production simulation](wukong-focused-production-simulation.md) — full-top PySim preparation can exceed minutes; simulate shared production FSM builders through a focused top profile
 - [ns-state snapshot vs raw binary](ns-state-snapshot-vs-raw.md) — ns-state.json fields can be stale vs boot-image.bin; use the endpoint `committed` raw-words block for hex display and fault checks
 - [ELOADCALL frame-push full bounds](eloadcall-frame-push-bounds.md) — ELOADCALL needs thread_hdr+cr12_thread inputs; PUSH_CR5_CR12 before STO read; callee_egt from CALL_P1_DONE CR6 (phase-1), not phase-0 loaded_cap
 - [Sidecar spec vs implementation](sidecar-spec-vs-implementation.md) — mechanical-cache rule is future-normative; verify field/writer claims against server/app.py before spec edits

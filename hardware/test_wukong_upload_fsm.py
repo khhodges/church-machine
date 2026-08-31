@@ -37,6 +37,7 @@ Each UART bit takes 100 cycles; a 10-bit byte frame takes 1000 cycles.
 Run with:  python -m pytest hardware/test_wukong_upload_fsm.py -v
 """
 
+import gc
 import os
 import struct
 import sys
@@ -53,6 +54,98 @@ from amaranth.sim import Simulator
 from hardware.uart_rx import UartRx
 from hardware.uart_tx import UartTx
 from hardware.hw_types import WUKONG_DMEM_WORDS
+
+
+def _install_amaranth_elaboration_caches():
+    """Apply the project's Amaranth 0.5.x large-design performance patches.
+
+    The production Wukong top contains shared expression trees large enough to
+    make uncached recursive elaboration passes effectively unbounded.  These
+    idempotent identity caches mirror hardware/gen_rtlil.py, where they are
+    required for the production build too.
+    """
+    from amaranth.hdl._ast import Operator, SwitchValue
+    import amaranth.hdl._dsl as amaranth_dsl
+    import amaranth.hdl._ir as amaranth_ir
+    from amaranth.hdl._xfrm import DomainCollector, ValueTransformer
+
+    if getattr(Operator.shape, "_wukong_cached", False):
+        gc.disable()
+        return
+
+    original_operator_shape = Operator.shape
+
+    def cached_operator_shape(self):
+        try:
+            return self._shape_cache
+        except AttributeError:
+            self._shape_cache = original_operator_shape(self)
+            return self._shape_cache
+
+    cached_operator_shape._wukong_cached = True
+    Operator.shape = cached_operator_shape
+
+    original_switch_shape = SwitchValue.shape
+
+    def cached_switch_shape(self):
+        try:
+            return self._shape_cache
+        except AttributeError:
+            self._shape_cache = original_switch_shape(self)
+            return self._shape_cache
+
+    SwitchValue.shape = cached_switch_shape
+
+    original_check_rhs = amaranth_dsl._check_rhs
+    checked_rhs_ids = set()
+
+    def cached_check_rhs(value):
+        value_id = id(value)
+        if value_id not in checked_rhs_ids:
+            checked_rhs_ids.add(value_id)
+            original_check_rhs(value)
+
+    amaranth_dsl._check_rhs = cached_check_rhs
+
+    original_domain_on_value = DomainCollector.on_value
+
+    def cached_domain_on_value(self, value):
+        if not hasattr(self, "_wukong_visited_ids"):
+            self._wukong_visited_ids = set()
+        value_id = id(value)
+        if value_id in self._wukong_visited_ids:
+            return
+        self._wukong_visited_ids.add(value_id)
+        return original_domain_on_value(self, value)
+
+    DomainCollector.on_value = cached_domain_on_value
+
+    original_transform_on_value = ValueTransformer.on_value
+
+    def cached_transform_on_value(self, value):
+        if not hasattr(self, "_wukong_value_cache"):
+            self._wukong_value_cache = {}
+        value_id = id(value)
+        if value_id not in self._wukong_value_cache:
+            self._wukong_value_cache[value_id] = original_transform_on_value(
+                self, value)
+        return self._wukong_value_cache[value_id]
+
+    ValueTransformer.on_value = cached_transform_on_value
+
+    original_collect_used = amaranth_ir.Design._collect_used_signals_value
+
+    def cached_collect_used(self, fragment, value):
+        if not hasattr(self, "_wukong_used_signal_ids"):
+            self._wukong_used_signal_ids = set()
+        key = (id(fragment), id(value))
+        if key in self._wukong_used_signal_ids:
+            return
+        self._wukong_used_signal_ids.add(key)
+        return original_collect_used(self, fragment, value)
+
+    amaranth_ir.Design._collect_used_signals_value = cached_collect_used
+    gc.disable()
 
 
 # ── Test-rig ──────────────────────────────────────────────────────────────────
@@ -600,7 +693,9 @@ def test_projected_multithread_contexts_fit_physical_dmem_model():
         "threadLumpWords": 256,
         "threadCount": 3,
     }}
-    generic = generate_boot_image(config, lumps_dir, boot_entry_slot=10,
+    # Use the canonical resident SelfTest entry; this test validates generated
+    # Thread placement and must not depend on an optional user LUMP at slot 10.
+    generic = generate_boot_image(config, lumps_dir, boot_entry_slot=6,
                                   require_entry_resident=True)
     generic_words = list(struct.unpack(f"<{len(generic) // 4}I", generic))
     source_total = len(generic_words)
@@ -723,6 +818,7 @@ def test_full_top_elaborates_with_upload_signals():
     the UART TX mux — should produce valid RTLIL without UnboundLocalError."""
     from amaranth.back.rtlil import convert
     from hardware.wukong_top import ChurchWukongXC7A100T
+    _install_amaranth_elaboration_caches()
     top   = ChurchWukongXC7A100T()
     rtlil = convert(top, ports=[top.clk, top.uart_tx_pin, top.uart_rx_pin,
                                  top.led[0], top.led[1],
@@ -734,25 +830,84 @@ def test_full_top_elaborates_with_upload_signals():
 #
 # These tests exercise the upload FSM in the actual production module so that
 # the rig-vs-production divergence the reviewer identified is covered.
-# They use clk_freq=100, baud=1 (same divisor as the rig) so _send_uart_bytes
-# works without change.
+# They use clk_freq=1, baud=1 so a UART bit takes one simulation cycle. The
+# production watchdog's 1000-cycle floor remains active, preserving the state
+# transitions while keeping the complete full-core simulation bounded.
+_TOP_DIVISOR = 4
+_TOP_WATCHDOG_TICKS = 64
 
-def _run_top(drive_fn, monitor_fn):
-    """Run two concurrent testbenches on a production ChurchWukongXC7A100T.
+
+def _top_sim_ticks(frame):
+    return len(frame) * _TOP_DIVISOR * 10 + 20
+
+def _top_state(ctx, top):
+    return {
+        'upload_state': ctx.get(top.dbg_upload_state),
+        'watchdog': ctx.get(top.dbg_upload_watchdog),
+        'length_bytes': ctx.get(top.dbg_upload_len_count),
+        'bytes_remaining': ctx.get(top.dbg_upload_bytes_remaining),
+        'write_addr': ctx.get(top.dbg_upload_write_addr),
+        'step_mode': ctx.get(top.step_mode),
+        'step_halted': ctx.get(top.step_halted),
+        'boot_complete': ctx.get(top.dbg_boot_complete),
+        'fault_valid': ctx.get(top.dbg_fault_valid),
+        'nia': ctx.get(top.dbg_nia),
+    }
+
+
+def _format_top_state(state):
+    return (
+        f"upload_state={state['upload_state']} watchdog={state['watchdog']} "
+        f"length_bytes={state['length_bytes']} "
+        f"bytes_remaining={state['bytes_remaining']} "
+        f"write_addr={state['write_addr']} step_mode={state['step_mode']} "
+        f"step_halted={state['step_halted']} "
+        f"boot_complete={state['boot_complete']} "
+        f"fault_valid={state['fault_valid']} nia=0x{state['nia']:08X}"
+    )
+
+
+def _run_top(top, drive_fn, monitor_fn, max_cycles, result):
+    """Run bounded testbenches on a production ChurchWukongXC7A100T.
 
     sim_mode=True skips the `m.d.comb += ClockSignal("sync").eq(self.clk)`
     assignment so that sim.add_clock() can drive the sync domain directly
     without a DriverConflict (the physical clk pin is unused in simulation).
     """
-    from hardware.wukong_top import ChurchWukongXC7A100T
-    top = ChurchWukongXC7A100T(clk_freq=100, baud=1, sim_mode=True)
+    _install_amaranth_elaboration_caches()
+    completed = {'drive': False, 'monitor': False}
+
+    async def bounded_drive(ctx):
+        await drive_fn(ctx)
+        completed['drive'] = True
+
+    async def bounded_monitor(ctx):
+        await monitor_fn(ctx)
+        completed['monitor'] = True
+
+    async def cycle_limit(ctx):
+        for cycle in range(max_cycles):
+            if completed['drive'] and completed['monitor']:
+                result['_state'] = _top_state(ctx, top)
+                result['_cycles'] = cycle
+                return
+            await ctx.tick()
+        state = _top_state(ctx, top)
+        pytest.fail(
+            f"production-top simulation exceeded {max_cycles} cycles; "
+            f"drive_done={completed['drive']} monitor_done={completed['monitor']}; "
+            f"{_format_top_state(state)}")
+
     sim = Simulator(top)
     sim.add_clock(1e-6)
-    sim.add_testbench(drive_fn)
-    sim.add_testbench(monitor_fn)
+    sim.add_testbench(bounded_drive)
+    sim.add_testbench(bounded_monitor)
+    sim.add_testbench(cycle_limit)
     with sim.write_vcd('/dev/null'):
-        sim.run()
-    return top
+        sim.run_until(max_cycles * 1e-6)
+    assert completed['drive'] and completed['monitor'], (
+        f"production-top simulation stopped at its {max_cycles}-cycle deadline "
+        f"without completing; state={result.get('_state', 'unavailable')}")
 
 
 def test_production_top_upload_len_watchdog_keeps_halted():
@@ -764,38 +919,39 @@ def test_production_top_upload_len_watchdog_keeps_halted():
     halted and the bridge must send an explicit 'r' to resume execution.
     """
     from hardware.wukong_top import ChurchWukongXC7A100T
-    top = ChurchWukongXC7A100T(clk_freq=100, baud=1, sim_mode=True)
-    _WDG_TICKS = top.clk_freq // top.baud * 10 * 20   # 20 000 cycles
+    top = ChurchWukongXC7A100T(
+        clk_freq=_TOP_DIVISOR, baud=1, sim_mode=True, sim_dmem_init=False,
+        upload_watchdog_limit=_TOP_WATCHDOG_TICKS, sim_upload_only=True)
+    _WDG_TICKS = _TOP_WATCHDOG_TICKS
 
     result = {'step_mode_after': None, 'step_halted_after': None}
 
     async def drive(ctx):
         # Send the 'u' magic byte only — no length header follows.
-        await _send_uart_bytes(ctx, top.uart_rx_pin, bytes([0x75]))
+        await _send_uart_bytes(
+            ctx, top.uart_rx_pin, bytes([0x75]), divisor=_TOP_DIVISOR)
         # Wait well past the watchdog limit for it to fire.
-        for _ in range(_WDG_TICKS + 1000):
+        for _ in range(_WDG_TICKS + 20):
             await ctx.tick()
 
     async def monitor(ctx):
-        total = _sim_ticks_for(bytes([0x75])) + _WDG_TICKS + 1000
+        total = _top_sim_ticks(bytes([0x75])) + _WDG_TICKS + 20
         for _ in range(total):
             await ctx.tick()
         result['step_mode_after']   = ctx.get(top.step_mode)
         result['step_halted_after'] = ctx.get(top.step_halted)
 
-    sim = Simulator(top)
-    sim.add_clock(1e-6)
-    sim.add_testbench(drive)
-    sim.add_testbench(monitor)
-    with sim.write_vcd('/dev/null'):
-        sim.run()
+    max_cycles = _top_sim_ticks(bytes([0x75])) + _WDG_TICKS + 40
+    _run_top(top, drive, monitor, max_cycles, result)
+    state = _format_top_state(result['_state'])
 
     assert result['step_mode_after'] == 1, (
         f"Production top UPLOAD_LEN watchdog: step_mode={result['step_mode_after']} "
-        f"(expected 1 — fail-closed: CM must stay halted after abort)")
+        f"(expected 1 — fail-closed: CM must stay halted after abort); {state}")
     assert result['step_halted_after'] == 1, (
         f"Production top UPLOAD_LEN watchdog: step_halted={result['step_halted_after']} "
-        f"(expected 1 — CM must stay halted so a free-run never starts with corrupt DMEM)")
+        f"(expected 1 — CM must stay halted so a free-run never starts with corrupt DMEM); "
+        f"{state}")
 
 
 def test_production_top_upload_len_commit_zero_length_keeps_halted():
@@ -806,36 +962,36 @@ def test_production_top_upload_len_commit_zero_length_keeps_halted():
     stay halted so the bridge can report the error and let the user retry.
     """
     from hardware.wukong_top import ChurchWukongXC7A100T
-    top = ChurchWukongXC7A100T(clk_freq=100, baud=1, sim_mode=True)
+    top = ChurchWukongXC7A100T(
+        clk_freq=_TOP_DIVISOR, baud=1, sim_mode=True, sim_dmem_init=False,
+        upload_watchdog_limit=_TOP_WATCHDOG_TICKS, sim_upload_only=True)
 
     # Frame: magic byte + 4-byte BE zero length
     zero_frame = bytes([0x75]) + struct.pack('>I', 0)
     result = {'step_mode_after': None, 'step_halted_after': None}
 
     async def drive(ctx):
-        await _send_uart_bytes(ctx, top.uart_rx_pin, zero_frame)
-        for _ in range(2000):
+        await _send_uart_bytes(
+            ctx, top.uart_rx_pin, zero_frame, divisor=_TOP_DIVISOR)
+        for _ in range(20):
             await ctx.tick()
 
     async def monitor(ctx):
-        for _ in range(_sim_ticks_for(zero_frame) + 2000):
+        for _ in range(_top_sim_ticks(zero_frame) + 20):
             await ctx.tick()
         result['step_mode_after']   = ctx.get(top.step_mode)
         result['step_halted_after'] = ctx.get(top.step_halted)
 
-    sim = Simulator(top)
-    sim.add_clock(1e-6)
-    sim.add_testbench(drive)
-    sim.add_testbench(monitor)
-    with sim.write_vcd('/dev/null'):
-        sim.run()
+    max_cycles = _top_sim_ticks(zero_frame) + 40
+    _run_top(top, drive, monitor, max_cycles, result)
+    state = _format_top_state(result['_state'])
 
     assert result['step_mode_after'] == 1, (
         f"Production top zero-length: step_mode={result['step_mode_after']} "
-        f"(expected 1 — CM must stay halted on malformed frame)")
+        f"(expected 1 — CM must stay halted on malformed frame); {state}")
     assert result['step_halted_after'] == 1, (
         f"Production top zero-length: step_halted={result['step_halted_after']} "
-        f"(expected 1)")
+        f"(expected 1); {state}")
 
 
 def test_production_top_upload_data_watchdog_keeps_halted():
@@ -848,39 +1004,39 @@ def test_production_top_upload_data_watchdog_keeps_halted():
     DMEM in an inconsistent state that could fault or execute garbage.
     """
     from hardware.wukong_top import ChurchWukongXC7A100T
-    top = ChurchWukongXC7A100T(clk_freq=100, baud=1, sim_mode=True)
-    _WDG_TICKS = top.clk_freq // top.baud * 10 * 20   # 20 000 cycles
+    top = ChurchWukongXC7A100T(
+        clk_freq=_TOP_DIVISOR, baud=1, sim_mode=True, sim_dmem_init=False,
+        upload_watchdog_limit=_TOP_WATCHDOG_TICKS, sim_upload_only=True)
+    _WDG_TICKS = _TOP_WATCHDOG_TICKS
 
     # Valid header for 8 bytes, then only 1 data byte (truncated)
     truncated = bytes([0x75]) + struct.pack('>I', 8) + bytes([0xAA])
     result = {'step_mode_after': None, 'step_halted_after': None}
 
     async def drive(ctx):
-        await _send_uart_bytes(ctx, top.uart_rx_pin, truncated)
+        await _send_uart_bytes(
+            ctx, top.uart_rx_pin, truncated, divisor=_TOP_DIVISOR)
         # Wait for watchdog to fire in UPLOAD_DATA state
-        for _ in range(_WDG_TICKS + 1000):
+        for _ in range(_WDG_TICKS + 20):
             await ctx.tick()
 
     async def monitor(ctx):
-        total = _sim_ticks_for(truncated) + _WDG_TICKS + 1000
+        total = _top_sim_ticks(truncated) + _WDG_TICKS + 20
         for _ in range(total):
             await ctx.tick()
         result['step_mode_after']   = ctx.get(top.step_mode)
         result['step_halted_after'] = ctx.get(top.step_halted)
 
-    sim = Simulator(top)
-    sim.add_clock(1e-6)
-    sim.add_testbench(drive)
-    sim.add_testbench(monitor)
-    with sim.write_vcd('/dev/null'):
-        sim.run()
+    max_cycles = _top_sim_ticks(truncated) + _WDG_TICKS + 40
+    _run_top(top, drive, monitor, max_cycles, result)
+    state = _format_top_state(result['_state'])
 
     assert result['step_mode_after'] == 1, (
         f"Production top UPLOAD_DATA watchdog: step_mode={result['step_mode_after']} "
-        f"(expected 1 — partial DMEM write: CM must not free-run)")
+        f"(expected 1 — partial DMEM write: CM must not free-run); {state}")
     assert result['step_halted_after'] == 1, (
         f"Production top UPLOAD_DATA watchdog: step_halted={result['step_halted_after']} "
-        f"(expected 1)")
+        f"(expected 1); {state}")
 
 
 if __name__ == '__main__':
