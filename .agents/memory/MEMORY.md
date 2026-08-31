@@ -145,3 +145,4 @@
 - [Portable LUMP binding boundary](portable-lump-binding-boundary.md) — canonical artifacts carry unresolved N/T/hash locks; only verified destination copies may contain local GTs
 - [Thread object runtime authority](thread-object-runtime-authority.md) — each Thread object alone owns its suspended context; never add parallel per-Thread NIA or context caches
 - [Lazy retry breakpoint E2E timing](lazy-retry-breakpoint-e2e-timing.md) — hold the mocked download pending, then arm the breakpoint; use retirement stats, not attempt count
+- [Immutable LUMP history transitions](immutable-lump-history-transitions.md) — archive/current/sidecar/manifest commit together under flock; reserve with lexists and revalidate generation

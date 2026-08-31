@@ -16,6 +16,8 @@ import tempfile
 import gzip as _gzip
 import queue
 import threading
+import contextlib
+import fcntl
 import requests as http_requests
 import html as _html
 
@@ -24,11 +26,10 @@ _sse_clients     = []
 _sse_clients_lock = threading.Lock()
 
 # ── LUMP manifest write lock ───────────────────────────────────────────────────
-# Guards the read/update/write cycle in save_lump() so concurrent saves never
-# clobber each other's manifest entry.  The lump binary and sidecar files are
-# written outside this lock (they are per-token and idempotent); only the
-# shared manifest.json update is serialised.
-_lumps_manifest_lock = threading.Lock()
+# All archive/current/sidecar/manifest transitions use this lock.  Keeping the
+# complete transition serialised is important: the files are a single history
+# record, not independent per-token cache entries.
+_lumps_manifest_lock = threading.RLock()
 
 # Test hook — set to a callable to be invoked inside save_lump() after all
 # per-token file writes (Phase 5/6) complete but BEFORE the manifest lock is
@@ -39,8 +40,7 @@ _lumps_manifest_pre_write_hook: "threading.Callable | None" = None
 import hashlib
 import hmac
 import time
-_BANK_CUSTODY_AAD = b"church-machine-bank-custody-v1"
-_bank_custody_lock = threading.RLock()
+_LUMP_TRANSITION_UNSET = object()
 
 
 def _atomic_write_json(path: str, data) -> None:
@@ -64,6 +64,15 @@ def _atomic_write_json(path: str, data) -> None:
             pass
         raise
 
+def _lump_transition_path(lumps_dir: str, filename: str) -> str:
+    """Return a safe path for an internally-generated LUMP filename."""
+    if not filename or os.path.basename(filename) != filename:
+        raise ValueError(f"Invalid LUMP transition filename: {filename!r}")
+    root = os.path.realpath(os.path.abspath(lumps_dir))
+    path = os.path.abspath(os.path.join(lumps_dir, filename))
+    if not (path == root or path.startswith(root + os.sep)):
+        raise ValueError(f"LUMP transition path escapes library: {filename!r}")
+    return path
 def _bank_custody_key() -> bytes:
     return hashlib.sha256(
         ("ChurchMachine.BankCustody|" + str(app.secret_key)).encode("utf-8")
@@ -7748,88 +7757,9 @@ def save_lump():
                 f'Path traversal detected in {_chk_label} filename — '
                 f'canonical name resolves outside server/lumps/'}), 400
 
-    # ── Phase 4: Archive existing binary with human-readable name ─────────────
-    if os.path.isfile(_existing_lump) and not _is_forked_save:
-        _arch_lump_fn   = f'{safe_name}_v{_arch_ver}.lump'
-        _arch_sc_fn     = f'{safe_name}_v{_arch_ver}.json'
-        _arch_lump_path = os.path.join(lumps_dir, _arch_lump_fn)
-        _arch_sc_path   = os.path.join(lumps_dir, _arch_sc_fn)
-        if os.path.abspath(_existing_lump) != os.path.abspath(_arch_lump_path):
-            _shutil.copy2(_existing_lump, _arch_lump_path)
-            _arch_sc_out = dict(_arch_sc)
-            _arch_sc_out['archived_version'] = _arch_ver
-            _arch_sc_out['filename'] = _arch_lump_fn
-            _arch_sc_out['sidecar_file'] = _arch_sc_fn
-            with open(_arch_lump_path, 'rb') as _arch_fh:
-                _arch_bytes = _arch_fh.read()
-            _arch_sc_out['binary_hash'] = _hl_save.sha256(_arch_bytes).hexdigest()
-            with open(_arch_sc_path, 'w') as _afh:
-                json.dump(_arch_sc_out, _afh, indent=2)
-            # Migration: delete old token-named file once safely copied to readable name
-            if _exist_filename == f'{token8}.lump':
-                try:
-                    os.remove(_existing_lump)
-                    if os.path.isfile(_existing_sc) and _exist_sc_file == f'{token8}.json':
-                        os.remove(_existing_sc)
-                except OSError:
-                    pass
-        print(f'[lumps] Archived {_exist_filename} → {_arch_lump_fn}', flush=True)
-
-        # ── Prune oldest archives beyond LUMP_MAX_ARCHIVE_VERSIONS ────────────
-        _all_arc = []
-        for _fn in (os.listdir(lumps_dir) if os.path.isdir(lumps_dir) else []):
-            for _pp in [
-                _re_arch.compile(rf'^{_re_arch.escape(safe_name)}_v(\d+)\.lump$'),
-                _re_arch.compile(rf'^{_re_arch.escape(token8)}-v(\d+)\.lump$'),
-            ]:
-                _pm = _pp.match(_fn)
-                if _pm:
-                    _all_arc.append((int(_pm.group(1)), _fn))
-        _all_arc.sort()
-        _excess = len(_all_arc) - LUMP_MAX_ARCHIVE_VERSIONS
-        if _excess > 0:
-            for _, _old_fn in _all_arc[:_excess]:
-                _old_lump = os.path.join(lumps_dir, _old_fn)
-                _old_json = os.path.join(lumps_dir, _old_fn[:-5] + '.json')
-                try:
-                    os.remove(_old_lump)
-                    logging.info('[lumps] Pruned old archive %s', _old_fn)
-                except OSError as _e:
-                    logging.warning('[lumps] Could not prune %s: %s', _old_fn, _e)
-                try:
-                    if os.path.isfile(_old_json):
-                        os.remove(_old_json)
-                        logging.info('[lumps] Pruned old archive sidecar %s', _old_json)
-                except OSError as _e:
-                    logging.warning('[lumps] Could not prune sidecar %s: %s', _old_json, _e)
-
-    # ── Phase 5: Write pre-verified binary ────────────────────────────────────
-    # lump_bytes, _binary_hash, _identity_string, _identity_hash, and _self_gt
-    # were all computed and seal-verified in the pre-flight block above, before
-    # any filesystem mutation took place.
-    with open(lump_path, 'wb') as fh:
-        fh.write(lump_bytes)
-
-    LAZY_LUMPS[token8] = lump_bytes
-    LAZY_LUMPS[token8.lstrip('0') or '0'] = lump_bytes
-
-    # ── Backward-compat symlink ───────────────────────────────────────────────
-    # If a previous canonical file existed under a different Number (because the
-    # binary changed), replace it with a symlink to the new canonical name so
-    # any cached URL for the old Number still resolves during the transition.
-    if (_exist_filename and _exist_filename != lump_filename):
-        _old_compat = os.path.join(lumps_dir, _exist_filename)
-        if os.path.isfile(_old_compat) and not os.path.islink(_old_compat):
-            try:
-                os.remove(_old_compat)
-                os.symlink(lump_filename, _old_compat)
-                print(f'[lumps] Backward-compat symlink: {_exist_filename} → {lump_filename}',
-                      flush=True)
-            except OSError as _e:
-                logging.warning('[lumps] Backward-compat symlink %s→%s failed: %s',
-                                _exist_filename, lump_filename, _e)
-
-    # ── Phase 6: Build and write sidecar JSON ─────────────────────────────────
+    # Build the new sidecar and manifest entry entirely in memory.  The shared
+    # transition helper below stages archive/current/sidecar/manifest together
+    # before changing any destination.
     sidecar = {
         "token":         token8,
         "abstraction":   abs_name,
@@ -7908,12 +7838,6 @@ def save_lump():
     if _fs_save is not None:
         sidecar["sourceStorageTier"] = _fs_save["tier"]
 
-    with open(sidecar_path, 'w') as fh:
-        json.dump(sidecar, fh, indent=2)
-
-    # ── Phase 7: Update manifest (serialised) ─────────────────────────────────
-    # Re-read manifest.json inside the lock so any concurrent save that wrote
-    # between Phase 1 and now is not silently discarded.
     new_entry = {
         "token":         token8,
         "abstraction":   abs_name,
@@ -7959,30 +7883,91 @@ def save_lump():
     if _lumps_manifest_pre_write_hook is not None:
         _lumps_manifest_pre_write_hook()  # noqa: not-callable — callable at runtime
 
-    with _lumps_manifest_lock:
-        # Fresh read under lock — picks up any entry written by a concurrent save.
-        try:
-            _locked_manifest = _read_manifest_safe(manifest_path)
-        except ValueError as _mf_lock_err:
-            return jsonify({"error": (
-                "manifest.json is corrupt and cannot be read safely. "
-                "The save has been aborted to prevent overwriting previously-saved LUMPs. "
-                f"Details: {_mf_lock_err}"
-            )}), 500
+    _archive_sidecar = dict(_arch_sc)
+    _remove_after_commit = ()
+    if _exist_filename == f"{token8}.lump":
+        _remove_after_commit = tuple(
+            path for path in (_existing_lump, _existing_sc)
+            if os.path.lexists(path)
+        )
+    _existing_is_archive_pair = bool(
+        _arch_ver is not None
+        and _exist_filename == f"{safe_name}_v{_arch_ver}.lump"
+        and _exist_sc_file == f"{safe_name}_v{_arch_ver}.json"
+    )
+    try:
+        _transition = _commit_lump_history_transition(
+            lumps_dir=lumps_dir,
+            manifest_path=manifest_path,
+            token8=token8,
+            manifest_entry=new_entry,
+            binary_filename=lump_filename,
+            binary_bytes=lump_bytes,
+            sidecar_filename=sidecar_filename,
+            sidecar=sidecar,
+            archive_stem=safe_name if not _is_forked_save else None,
+            archive_version=_arch_ver if not _is_forked_save else None,
+            archive_binary_path=(
+                _existing_lump
+                if os.path.isfile(_existing_lump) and not _is_forked_save
+                else None
+            ),
+            archive_sidecar=_archive_sidecar,
+            archive_sidecar_path=_existing_sc,
+            advance_current_version_from_archive=(
+                os.path.isfile(_existing_lump) and not _is_forked_save
+            ),
+            remove_paths=_remove_after_commit,
+            compat_old_filename=(
+                _exist_filename
+                if os.path.isfile(_existing_lump)
+                and _exist_filename != f"{token8}.lump"
+                and not _existing_is_archive_pair
+                else None
+            ),
+            compat_new_filename=lump_filename,
+            variant_group=f"compiled_{abs_name.lower().replace(' ', '_')}",
+            ns_slot=ns_slot,
+            expected_manifest_entry=_existing_entry,
+        )
+    except _LumpTransitionConflict as _transition_conflict:
+        return jsonify({"error": str(_transition_conflict)}), 409
+    except ValueError as _mf_lock_err:
+        return jsonify({"error": (
+            "manifest.json is corrupt and cannot be read safely. "
+            "The save has been aborted to prevent overwriting previously-saved LUMPs. "
+            f"Details: {_mf_lock_err}"
+        )}), 500
 
-        _locked_manifest = [e for e in _locked_manifest if e.get('token') != token8]
+    LAZY_LUMPS[token8] = lump_bytes
+    LAZY_LUMPS[token8.lstrip('0') or '0'] = lump_bytes
+    next_lump_version = _transition.get("next_version", next_lump_version)
 
-        vg_key = f"compiled_{abs_name.lower().replace(' ', '_')}"
-        if ns_slot is not None:
-            for prev_entry in _locked_manifest:
-                if (prev_entry.get("abstraction") == abs_name
-                        and prev_entry.get("ns_slot") == ns_slot
-                        and not prev_entry.get("variant_group")):
-                    prev_entry["variant_group"] = vg_key
+    if _transition:
+        print(f"[lumps] Archived {_exist_filename} → {_transition['lump']}", flush=True)
 
-        _locked_manifest.append(new_entry)
-
-        _atomic_write_json(manifest_path, _locked_manifest)
+        # Pruning is deliberately after the atomic transition.  A prune failure
+        # cannot invalidate the newly committed current pair or manifest.
+        _all_arc = []
+        for _fn in (os.listdir(lumps_dir) if os.path.isdir(lumps_dir) else []):
+            for _pp in [
+                _re_arch.compile(rf'^{_re_arch.escape(safe_name)}_v(\d+)\.lump$'),
+                _re_arch.compile(rf'^{_re_arch.escape(token8)}-v(\d+)\.lump$'),
+            ]:
+                _pm = _pp.match(_fn)
+                if _pm:
+                    _all_arc.append((int(_pm.group(1)), _fn))
+        _all_arc.sort()
+        for _, _old_fn in _all_arc[:max(0, len(_all_arc) - LUMP_MAX_ARCHIVE_VERSIONS)]:
+            for _old_path in (
+                os.path.join(lumps_dir, _old_fn),
+                os.path.join(lumps_dir, _old_fn[:-5] + '.json'),
+            ):
+                try:
+                    if os.path.isfile(_old_path):
+                        os.remove(_old_path)
+                except OSError as _e:
+                    logging.warning('[lumps] Could not prune %s: %s', _old_path, _e)
 
     # A save replaces the artifact bound to an existing Namespace identity.
     # Record the exact token/filename before regenerating the boot image so the
@@ -8069,9 +8054,7 @@ def save_lump_wip():
     Response: { ok, token, version, filename, sidecar }
     """
     import re as _re_wip
-    import datetime as _dt_wip
     import hashlib as _hl_wip
-    import shutil as _sh_wip
 
     payload     = request.get_json(force=True, silent=True) or {}
     abs_name    = (payload.get('name') or '').strip()
@@ -8133,19 +8116,15 @@ def save_lump_wip():
     lump_path        = os.path.join(lumps_dir, lump_filename)
     sidecar_path     = os.path.join(lumps_dir, sidecar_filename)
 
-    # ── Archive previous live files ───────────────────────────────────────────
+    # Resolve the previous current pair.  The shared transition helper archives
+    # it only after the replacement pair and manifest have all been staged.
+    _prev_lp = None
+    _prev_sp = None
     if existing_entry:
         _prev_fn  = existing_entry.get('filename',     f'{token8}.lump')
         _prev_sfn = existing_entry.get('sidecar_file', f'{token8}.json')
         _prev_lp  = os.path.join(lumps_dir, _prev_fn)
         _prev_sp  = os.path.join(lumps_dir, _prev_sfn)
-        _arch_lp  = os.path.join(lumps_dir, f'{safe_name}_v{cur_version}.lump')
-        _arch_sp  = os.path.join(lumps_dir, f'{safe_name}_v{cur_version}.json')
-        if os.path.isfile(_prev_lp) and os.path.abspath(_prev_lp) != os.path.abspath(_arch_lp):
-            _sh_wip.copy2(_prev_lp, _arch_lp)
-            logging.info('[lumps] WIP archive: %s → %s', _prev_fn, f'{safe_name}_v{cur_version}.lump')
-        if os.path.isfile(_prev_sp) and os.path.abspath(_prev_sp) != os.path.abspath(_arch_sp):
-            _sh_wip.copy2(_prev_sp, _arch_sp)
 
     # ── Build stub binary ─────────────────────────────────────────────────────
     RETURN_AL = 0x1F000000   # RETURN with AL condition (matches _build_lazy_lumps)
@@ -8163,8 +8142,6 @@ def save_lump_wip():
     _wip_words[lump_size - 1] = 0
 
     lump_bytes = _struct.pack(f'>{lump_size}I', *[int(w) & 0xFFFFFFFF for w in _wip_words])
-    with open(lump_path, 'wb') as fh:
-        fh.write(lump_bytes)
 
     # ── Build sidecar methods list ────────────────────────────────────────────
     sidecar_methods = []
@@ -8203,10 +8180,6 @@ def save_lump_wip():
         'lump_version': next_version,
         'compiled_at':  now_ts,
     }
-    with open(sidecar_path, 'w') as fh:
-        json.dump(sidecar, fh, indent=2)
-
-    # ── Update manifest ───────────────────────────────────────────────────────
     new_entry = {
         'token':        token8,
         'abstraction':  abs_name,
@@ -8221,9 +8194,32 @@ def save_lump_wip():
         'status':       'wip',
         'methods':      sidecar_methods,
     }
-    manifest = [e for e in manifest if e.get('token') != token8]
-    manifest.append(new_entry)
-    _atomic_write_json(manifest_path, manifest)
+    try:
+        _transition = _commit_lump_history_transition(
+            lumps_dir=lumps_dir,
+            manifest_path=manifest_path,
+            token8=token8,
+            manifest_entry=new_entry,
+            binary_filename=lump_filename,
+            binary_bytes=lump_bytes,
+            sidecar_filename=sidecar_filename,
+            sidecar=sidecar,
+            archive_stem=safe_name if _prev_lp and os.path.isfile(_prev_lp) else None,
+            archive_version=cur_version if _prev_lp and os.path.isfile(_prev_lp) else None,
+            archive_binary_path=_prev_lp,
+            archive_sidecar_path=_prev_sp,
+            versioned_current_stem=safe_name,
+            current_version=cur_version,
+            expected_manifest_entry=existing_entry,
+        )
+    except _LumpTransitionConflict as _transition_conflict:
+        return jsonify({"error": str(_transition_conflict)}), 409
+    except ValueError as _mf_wip_err:
+        return jsonify({"error": (
+            "manifest.json is corrupt and cannot be read safely. "
+            "The save has been aborted to prevent overwriting previously-saved LUMPs. "
+            f"Details: {_mf_wip_err}"
+        )}), 500
 
     # Cache binary in LAZY_LUMPS so it can be served immediately
     try:
@@ -8231,6 +8227,12 @@ def save_lump_wip():
     except Exception:
         pass
 
+    if _transition:
+        if _transition.get("lump"):
+            logging.info('[lumps] WIP archive: %s → %s', _prev_fn, _transition["lump"])
+        next_version = _transition["next_version"]
+        lump_filename = _transition["current_lump"]
+        sidecar_filename = _transition["current_sidecar"]
     logging.info('[lumps] WIP saved: %s v%d → %s', abs_name, next_version, lump_filename)
     return jsonify({
         'ok':      True,
@@ -8855,12 +8857,13 @@ def lump_fork_version(token):
     sc_path     = os.path.join(lumps_dir, f'{key8}.json')
     _safe_stem_fv = key8
     _mf_path_fv = os.path.join(lumps_dir, 'manifest.json')
+    _existing_entry_fv = None
     if os.path.isfile(_mf_path_fv):
         try:
-            with open(_mf_path_fv) as _f:
-                _mf_fv = json.load(_f)
+            _mf_fv = _read_manifest_safe(_mf_path_fv)
             for _e in _mf_fv:
                 if _e.get('token') == key8:
+                    _existing_entry_fv = dict(_e)
                     _fn = _e.get('filename', '')
                     _sfn = _e.get('sidecar_file', '')
                     if _fn:
@@ -8910,20 +8913,6 @@ def lump_fork_version(token):
     if sc.get('forked'):
         return jsonify({"ok": True, "new_version": cur_version, "prev_version": cur_version - 1, "already_forked": True})
 
-    import shutil as _shutil_fv
-    arch_lump = os.path.join(lumps_dir, f'{_safe_stem_fv}_v{cur_version}.lump')
-    arch_json = os.path.join(lumps_dir, f'{_safe_stem_fv}_v{cur_version}.json')
-    _shutil_fv.copy2(lump_path, arch_lump)
-    arch_sc = dict(sc)
-    arch_sc['archived_version'] = cur_version
-    arch_sc['filename'] = os.path.basename(arch_lump)
-    arch_sc['sidecar_file'] = os.path.basename(arch_json)
-    import hashlib as _hashlib_fv
-    with open(arch_lump, 'rb') as _arch_fh:
-        arch_sc['binary_hash'] = _hashlib_fv.sha256(_arch_fh.read()).hexdigest()
-    with open(arch_json, 'w') as fh:
-        json.dump(arch_sc, fh, indent=2)
-
     # Persist the forked state to the live sidecar so that:
     # 1) Reloading the page won't trigger another fork on the same binary.
     # 2) _lumpIsSealed() (client) sees forked=True and skips re-fork.
@@ -8931,13 +8920,74 @@ def lump_fork_version(token):
     #    and uses this value directly (not +1) so the new binary lands at N+1.
     # The next compile-and-save rewrites the sidecar completely, clearing forked.
     sc['forked'] = True
-    sc['lump_version'] = cur_version + 1
-    with open(sc_path, 'w') as fh:
-        json.dump(sc, fh, indent=2)
+    _fork_current_is_archive_pair = (
+        os.path.basename(lump_path) == f"{_safe_stem_fv}_v{cur_version}.lump"
+        and os.path.basename(sc_path) == f"{_safe_stem_fv}_v{cur_version}.json"
+    )
+    if _fork_current_is_archive_pair:
+        # A WIP current pair already occupies the immutable archive names for
+        # its version.  Preserve that pair byte-for-byte and install a separate
+        # live alias pair for the forked state.
+        with open(lump_path, "rb") as _fork_source_fh:
+            _fork_live_bytes = _fork_source_fh.read()
+        _fork_live_lump_name = f"{key8}.lump"
+        _fork_live_sidecar_name = f"{key8}.json"
+    else:
+        _fork_live_bytes = None
+        _fork_live_lump_name = os.path.basename(lump_path)
+        _fork_live_sidecar_name = os.path.basename(sc_path)
+    _fork_manifest_entry = dict(_existing_entry_fv or {})
+    _fork_manifest_entry.update({
+        'token': key8,
+        'abstraction': sc.get('abstraction', _safe_stem_fv),
+        'filename': _fork_live_lump_name,
+        'sidecar_file': _fork_live_sidecar_name,
+        'forked': True,
+    })
+    try:
+        _transition = _commit_lump_history_transition(
+            lumps_dir=lumps_dir,
+            manifest_path=_mf_path_fv,
+            token8=key8,
+            manifest_entry=_fork_manifest_entry,
+            binary_filename=(
+                _fork_live_lump_name if _fork_current_is_archive_pair else None
+            ),
+            binary_bytes=_fork_live_bytes,
+            sidecar_filename=_fork_live_sidecar_name,
+            sidecar=sc,
+            archive_stem=_safe_stem_fv,
+            archive_version=cur_version,
+            archive_binary_path=lump_path,
+            archive_sidecar=None if _fork_current_is_archive_pair else sc,
+            archive_sidecar_path=sc_path,
+            advance_current_version_from_archive=True,
+            expected_manifest_entry=_existing_entry_fv,
+            idempotent_if_forked=True,
+        )
+        if _transition.get("already_forked"):
+            return jsonify({
+                "ok": True,
+                "new_version": _transition["next_version"],
+                "prev_version": _transition["version"],
+                "already_forked": True,
+            })
+    except _LumpTransitionConflict as _transition_conflict:
+        return jsonify({"error": str(_transition_conflict)}), 409
+    except ValueError as _mf_fv_err:
+        return jsonify({"error": (
+            "manifest.json is corrupt and cannot be read safely. "
+            "The fork has been aborted to prevent overwriting previously-saved LUMPs. "
+            f"Details: {_mf_fv_err}"
+        )}), 500
 
     logging.info('[lumps] Fork: archived %s → %s_v%d.lump (sidecar forked=True written)',
-                 lump_path, _safe_stem_fv, cur_version)
-    return jsonify({"ok": True, "new_version": cur_version + 1, "prev_version": cur_version})
+                 lump_path, _safe_stem_fv, _transition["version"])
+    return jsonify({
+        "ok": True,
+        "new_version": _transition["next_version"],
+        "prev_version": _transition["version"],
+    })
 
 
 @app.route("/api/lumps/<token>/words/<int:version>")
@@ -16684,3 +16734,363 @@ if __name__ == "__main__":
     _port = int(os.environ.get("E2E_PORT", 5000))
     logging.info("Starting Church Machine server on port %d", _port)
     _bind_with_retry(_port)
+
+class _LumpTransitionConflict(RuntimeError):
+    """The current LUMP generation changed before a transition acquired its lock."""
+
+@contextlib.contextmanager
+def _lump_history_transition_lock(lumps_dir: str):
+    """Serialize LUMP transitions across threads and server worker processes."""
+    lock_path = os.path.join(os.path.abspath(lumps_dir), ".history-transition.lock")
+    os.makedirs(lumps_dir, exist_ok=True)
+    with _lumps_manifest_lock:
+        with open(lock_path, "a+") as lock_fh:
+            fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+
+def _commit_lump_history_transition(
+    *,
+    lumps_dir: str,
+    manifest_path: str,
+    token8: str,
+    manifest_entry: dict,
+    binary_filename: str | None = None,
+    binary_bytes: bytes | None = None,
+    sidecar_filename: str | None = None,
+    sidecar: dict | None = None,
+    archive_stem: str | None = None,
+    archive_version: int | None = None,
+    archive_binary_path: str | None = None,
+    archive_sidecar: dict | None = None,
+    archive_sidecar_path: str | None = None,
+    remove_paths: tuple[str, ...] = (),
+    compat_old_filename: str | None = None,
+    compat_new_filename: str | None = None,
+    variant_group: str | None = None,
+    ns_slot=None,
+    advance_current_version_from_archive: bool = False,
+    versioned_current_stem: str | None = None,
+    current_version: int | None = None,
+    expected_manifest_entry=_LUMP_TRANSITION_UNSET,
+    idempotent_if_forked: bool = False,
+) -> dict:
+    """Atomically commit one LUMP history transition.
+
+    Save, WIP, and fork all have the same persistence shape: optionally archive
+    the old current pair, optionally install a new current pair, and replace
+    the manifest entry.  Every destination is staged before any destination is
+    changed.  During commit, existing destinations are moved to private
+    backups; any exception restores those backups and removes newly-created
+    files.  Archive names are never overwritten: a colliding archive version
+    advances to the next unused version.
+
+    The caller supplies already-validated bytes/metadata.  The helper owns only
+    the filesystem transition and manifest replacement, so endpoint response
+    contracts remain endpoint-specific.
+    """
+    if not isinstance(manifest_entry, dict):
+        raise ValueError("manifest_entry must be an object")
+    os.makedirs(lumps_dir, exist_ok=True)
+
+    with _lump_history_transition_lock(lumps_dir):
+        locked_manifest = _read_manifest_safe(manifest_path)
+        locked_entry = next(
+            (entry for entry in locked_manifest if entry.get("token") == token8),
+            None,
+        )
+        if expected_manifest_entry is not _LUMP_TRANSITION_UNSET:
+            expected_state = (
+                None
+                if expected_manifest_entry is None
+                else (
+                    expected_manifest_entry.get("filename"),
+                    expected_manifest_entry.get("sidecar_file"),
+                    expected_manifest_entry.get("lump_version"),
+                )
+            )
+            locked_state = (
+                None
+                if locked_entry is None
+                else (
+                    locked_entry.get("filename"),
+                    locked_entry.get("sidecar_file"),
+                    locked_entry.get("lump_version"),
+                )
+            )
+            if locked_state != expected_state:
+                if idempotent_if_forked and locked_entry is not None:
+                    locked_sidecar_name = locked_entry.get("sidecar_file")
+                    locked_sidecar = {}
+                    if locked_sidecar_name:
+                        locked_sidecar_path = _lump_transition_path(
+                            lumps_dir, locked_sidecar_name
+                        )
+                        if os.path.isfile(locked_sidecar_path):
+                            try:
+                                with open(locked_sidecar_path) as locked_sidecar_fh:
+                                    locked_sidecar = json.load(locked_sidecar_fh)
+                            except (OSError, ValueError, TypeError):
+                                locked_sidecar = {}
+                    if locked_entry.get("forked") or locked_sidecar.get("forked"):
+                        live_version = int(
+                            locked_sidecar.get(
+                                "lump_version",
+                                locked_entry.get("lump_version", 0),
+                            )
+                        )
+                        return {
+                            "version": live_version - 1,
+                            "next_version": live_version,
+                            "already_forked": True,
+                        }
+                raise _LumpTransitionConflict(
+                    f"LUMP {token8} changed while the transition was waiting for its lock"
+                )
+        archive_info = None
+        staged: list[tuple[str, str]] = []
+        backups: list[tuple[str, str]] = []
+        committed: list[str] = []
+        temp_paths: list[str] = []
+
+        def _stage_bytes(data: bytes, suffix: str) -> str:
+            fd, path = tempfile.mkstemp(dir=lumps_dir, prefix=".lump-transition-", suffix=suffix)
+            temp_paths.append(path)
+            try:
+                with os.fdopen(fd, "wb") as fh:
+                    fh.write(data)
+            except Exception:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+                raise
+            return path
+
+        def _stage_json(data: dict) -> str:
+            # _atomic_write_json itself is intentionally used here so a
+            # simulated JSON write failure is observed before any commit.
+            path = _stage_bytes(b"", ".json")
+            os.remove(path)
+            _atomic_write_json(path, data)
+            return path
+
+        def _stage_copy(source: str, suffix: str) -> str:
+            with open(source, "rb") as fh:
+                return _stage_bytes(fh.read(), suffix)
+
+        def _destination(filename: str) -> str:
+            return _lump_transition_path(lumps_dir, filename)
+
+        try:
+            archive_lump_dest = None
+            archive_sidecar_dest = None
+            archive_source = archive_binary_path
+            archive_requested = (
+                archive_stem is not None
+                and archive_version is not None
+                and archive_source is not None
+                and os.path.isfile(archive_source)
+            )
+            if archive_requested:
+                archive_version = int(archive_version)
+                if archive_version < 0:
+                    raise ValueError("archive version must be non-negative")
+                # Reserve a pair together.  A pre-existing binary or sidecar
+                # makes the whole version unavailable; neither is overwritten.
+                while True:
+                    archive_lump_name = f"{archive_stem}_v{archive_version}.lump"
+                    archive_sidecar_name = f"{archive_stem}_v{archive_version}.json"
+                    archive_lump_dest = _destination(archive_lump_name)
+                    archive_sidecar_dest = _destination(archive_sidecar_name)
+                    same_lump = os.path.abspath(archive_source) == os.path.abspath(archive_lump_dest)
+                    same_sidecar = (
+                        archive_sidecar_path is not None
+                        and os.path.abspath(archive_sidecar_path)
+                        == os.path.abspath(archive_sidecar_dest)
+                    )
+                    if (
+                        (not os.path.lexists(archive_lump_dest) or same_lump)
+                        and (not os.path.lexists(archive_sidecar_dest) or same_sidecar)
+                    ):
+                        break
+                    archive_version += 1
+
+                if os.path.abspath(archive_source) != os.path.abspath(archive_lump_dest):
+                    staged.append((archive_lump_dest, _stage_copy(archive_source, ".lump")))
+                if archive_sidecar is not None:
+                    with open(archive_source, "rb") as archive_fh:
+                        archive_bytes = archive_fh.read()
+                    archive_sidecar_out = dict(archive_sidecar)
+                    archive_sidecar_out["archived_version"] = archive_version
+                    archive_sidecar_out["filename"] = archive_lump_name
+                    archive_sidecar_out["sidecar_file"] = archive_sidecar_name
+                    archive_sidecar_out["binary_hash"] = hashlib.sha256(
+                        archive_bytes
+                    ).hexdigest()
+                    staged.append(
+                        (archive_sidecar_dest, _stage_json(archive_sidecar_out))
+                    )
+                elif archive_sidecar_path and os.path.isfile(archive_sidecar_path):
+                    if os.path.abspath(archive_sidecar_path) != os.path.abspath(archive_sidecar_dest):
+                        staged.append(
+                            (archive_sidecar_dest, _stage_copy(archive_sidecar_path, ".json"))
+                        )
+                archive_info = {
+                    "version": archive_version,
+                    "lump": archive_lump_name,
+                    "sidecar": archive_sidecar_name,
+                }
+
+            if versioned_current_stem is not None:
+                version_base = (
+                    archive_info["version"]
+                    if archive_info is not None
+                    else int(current_version or 0)
+                )
+                next_version = version_base + 1
+                while True:
+                    candidate_binary = f"{versioned_current_stem}_v{next_version}.lump"
+                    candidate_sidecar = f"{versioned_current_stem}_v{next_version}.json"
+                    candidate_binary_path = _destination(candidate_binary)
+                    candidate_sidecar_path = _destination(candidate_sidecar)
+                    if (
+                        not os.path.lexists(candidate_binary_path)
+                        and not os.path.lexists(candidate_sidecar_path)
+                    ):
+                        break
+                    next_version += 1
+                binary_filename = candidate_binary
+                sidecar_filename = candidate_sidecar
+                sidecar = dict(sidecar or {})
+                sidecar["filename"] = binary_filename
+                sidecar["sidecar_file"] = sidecar_filename
+                sidecar["lump_version"] = next_version
+                manifest_entry = dict(manifest_entry)
+                manifest_entry["filename"] = binary_filename
+                manifest_entry["sidecar_file"] = sidecar_filename
+                manifest_entry["lump_version"] = next_version
+                if archive_info is None:
+                    archive_info = {}
+                archive_info.update({
+                    "next_version": next_version,
+                    "current_lump": binary_filename,
+                    "current_sidecar": sidecar_filename,
+                })
+            elif advance_current_version_from_archive:
+                if archive_info is None:
+                    raise ValueError("cannot advance current version without an archive")
+                next_version = archive_info["version"] + 1
+                manifest_entry = dict(manifest_entry)
+                manifest_entry["lump_version"] = next_version
+                if sidecar is not None:
+                    sidecar = dict(sidecar)
+                    sidecar["lump_version"] = next_version
+                archive_info["next_version"] = next_version
+
+            if binary_filename is not None:
+                if binary_bytes is None:
+                    raise ValueError("binary_bytes is required with binary_filename")
+                staged.append(
+                    (_destination(binary_filename), _stage_bytes(binary_bytes, ".lump"))
+                )
+            if sidecar_filename is not None:
+                if sidecar is None:
+                    raise ValueError("sidecar is required with sidecar_filename")
+                staged.append(
+                    (_destination(sidecar_filename), _stage_json(sidecar))
+                )
+
+            updated_manifest = [entry for entry in locked_manifest if entry.get("token") != token8]
+            if variant_group is not None and ns_slot is not None:
+                for previous in updated_manifest:
+                    if (
+                        previous.get("abstraction") == manifest_entry.get("abstraction")
+                        and previous.get("ns_slot") == ns_slot
+                        and not previous.get("variant_group")
+                    ):
+                        previous["variant_group"] = variant_group
+            updated_manifest.append(dict(manifest_entry))
+            manifest_stage = _stage_json(updated_manifest)
+            staged.append((_destination(os.path.basename(manifest_path)), manifest_stage))
+
+            # A compatibility alias is installed only after the new canonical
+            # pair has been staged.  It is included in the same rollback set.
+            compat_dest = None
+            if compat_old_filename and compat_new_filename and compat_old_filename != compat_new_filename:
+                compat_dest = _destination(compat_old_filename)
+
+            destinations = []
+            for destination, stage in staged:
+                if destination not in destinations:
+                    destinations.append(destination)
+            if compat_dest and compat_dest not in destinations:
+                destinations.append(compat_dest)
+            for path in remove_paths:
+                if path and os.path.abspath(path) not in destinations:
+                    destinations.append(os.path.abspath(path))
+
+            for destination in destinations:
+                if os.path.lexists(destination):
+                    backup = _stage_copy(destination, ".backup")
+                    # The staged copy must not be treated as a final artifact.
+                    backups.append((destination, backup))
+
+            for destination, stage in staged:
+                os.replace(stage, destination)
+                committed.append(destination)
+
+            if compat_dest:
+                # The old path is backed up above, so replacing it with a
+                # symlink cannot destroy the previous canonical artifact.
+                if os.path.lexists(compat_dest):
+                    os.remove(compat_dest)
+                os.symlink(compat_new_filename, compat_dest)
+                committed.append(compat_dest)
+
+            for path in remove_paths:
+                if path and os.path.lexists(path) and os.path.abspath(path) != compat_dest:
+                    os.remove(path)
+
+            # If the manifest path was not a basename (it normally is), the
+            # staged destination above still uses its basename.  Reject that
+            # configuration rather than silently committing somewhere else.
+            if os.path.abspath(manifest_path) != _destination(os.path.basename(manifest_path)):
+                raise ValueError("manifest_path must be inside lumps_dir")
+        except Exception:
+            # Remove replacements/symlinks first, then restore every original
+            # destination.  Backups remain until the transition succeeds.
+            for destination in reversed(committed):
+                try:
+                    if os.path.lexists(destination):
+                        os.remove(destination)
+                except OSError:
+                    pass
+            for destination, backup in reversed(backups):
+                try:
+                    if os.path.lexists(destination):
+                        os.remove(destination)
+                    if os.path.exists(backup):
+                        os.replace(backup, destination)
+                except OSError:
+                    logging.exception("[lumps] Failed to restore transition backup %s", destination)
+            raise
+        finally:
+            for path in temp_paths:
+                try:
+                    if os.path.lexists(path):
+                        os.remove(path)
+                except OSError:
+                    pass
+
+        # Backups are no longer needed after the full transition succeeded.
+        for _, backup in backups:
+            try:
+                if os.path.lexists(backup):
+                    os.remove(backup)
+            except OSError:
+                logging.warning("[lumps] Could not remove transition backup %s", backup)
+
+        return archive_info or {}
