@@ -18,14 +18,20 @@ def encode_church(opcode, cond=CondCode.AL, cr_dst=0, cr_src=0, imm=0):
            ((cr_dst & 0xF) << 19) | ((cr_src & 0xF) << 15) | (imm & 0x7FFF)
 
 
-def encode_turing(opcode, cond=CondCode.AL, dr_dst=0, dr_src=0, imm=0):
+def encode_turing(opcode, cond=CondCode.AL, dr_dst=0, dr_src=0, imm=0,
+                  register_operand=False):
     """Encode a Turing-domain instruction (IADD, ISUB, BRANCH, DREAD, DWRITE, …).
 
-    For IADD/ISUB: dr_dst = destination DR, dr_src = source DR, imm = 15-bit signed immediate.
+    For IADD/ISUB: dr_dst = destination DR, dr_src = first source DR.
+      By default ``imm`` is a 14-bit unsigned immediate and this helper sets
+      the imm[14] immediate marker. With ``register_operand=True``, ``imm`` is
+      the second source DR index encoded in imm[3:0].
     For BRANCH:    dr_dst/dr_src unused (0), imm = 15-bit signed word offset from current PC.
     For DWRITE:    dr_dst = DR index to read (value), dr_src = CR index (capability), imm = word offset.
     For DREAD:     dr_dst = DR index to write (destination), dr_src = CR index (capability), imm = word offset.
     """
+    if opcode in (TuringOpcode.IADD, TuringOpcode.ISUB):
+        imm = (imm & 0xF) if register_operand else (0x4000 | (imm & 0x3FFF))
     return ((opcode & 0x1F) << 27) | ((cond & 0xF) << 23) | \
            ((dr_dst & 0xF) << 19) | ((dr_src & 0xF) << 15) | (imm & 0x7FFF)
 

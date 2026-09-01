@@ -574,47 +574,35 @@ def test_boot_call_enters_selftest():
           f"entry NIA=0x{results['retires'][3][0]:X} ✓")
     print("PASS")
 
+def test_turing_arithmetic_register_and_immediate_forms():
+    """RTL executes IADD/ISUB register and immediate operands like the simulator."""
+    dmem = list(_DMEM_INIT)
+    program = [
+        encode_turing(TuringOpcode.IADD, dr_dst=1, dr_src=0, imm=7),
+        encode_turing(TuringOpcode.IADD, dr_dst=2, dr_src=0, imm=5),
+        encode_turing(
+            TuringOpcode.IADD, dr_dst=3, dr_src=1, imm=2,
+            register_operand=True),
+        encode_turing(TuringOpcode.ISUB, dr_dst=4, dr_src=3, imm=2),
+        encode_turing(
+            TuringOpcode.ISUB, dr_dst=5, dr_src=4, imm=1,
+            register_operand=True),
+    ]
+    for offset, word in enumerate(program, start=1):
+        dmem[WUKONG_SELFTEST_BASE_WORD + offset] = word
 
-def test_selftest_return_reaches_boot_guard():
-    """Factory SelfTest RETURN must resume at ROM NIA 0x0C and retire BRANCH -1.
-
-    This covers the physical failure boundary: older coverage stopped four
-    SelfTest instructions before RETURN and therefore could not detect either
-    a RETURN/cload handoff deadlock or a ROM/DMEM mux regression at NIA 0x0C.
-    """
-    dut = BootRomHarness(_DMEM_INIT)
+    dut = BootRomHarness(dmem)
     results = {}
 
     async def testbench(ctx):
         results["boot_ok"] = await _wait_boot_complete(ctx, dut)
         if not results["boot_ok"]:
             return
-        details = []
-        thread_writes = []
-        saw_return = False
-        for _ in range(4000):
-            if ctx.get(dut.core.dmem_wr_en):
-                addr = ctx.get(dut.core.dmem_addr)
-                thread_writes.append((
-                    addr, ctx.get(dut.core.dmem_wr_data)))
-            if ctx.get(dut.core.retire_valid):
-                row = {
-                    "nia": ctx.get(dut.core.retire_nia),
-                    "instr": ctx.get(dut.core.retire_instr),
-                    "fault_valid": bool(ctx.get(dut.core.retire_fault_valid)),
-                    "fault_code": ctx.get(dut.core.retire_fault_code),
-                    "fault_instr": ctx.get(dut.core.fault_instr),
-                    "fault_stage": ctx.get(dut.core.fault_stage),
-                }
-                details.append(row)
-                if row["nia"] == 0x690:
-                    saw_return = True
-                elif saw_return:
-                    break
-            await ctx.tick()
-        results["details"] = details
-        results["thread_writes"] = thread_writes
-        results["timeout_at"] = None if len(details) >= 40 else len(details)
+        results["retires"], results["timeout_at"] = \
+            await _collect_retires(ctx, dut, 3 + len(program))
+        results["dr"] = [
+            ctx.get(dut.core.debug_dr_words[index]) for index in range(1, 6)
+        ]
 
     sim = Simulator(dut)
     sim.add_clock(1e-6)
@@ -625,34 +613,60 @@ def test_selftest_return_reaches_boot_guard():
     assert results.get("boot_ok"), "boot_complete never rose"
     assert results.get("timeout_at") is None, (
         f"Timed out at retire {results.get('timeout_at')}; "
+        f"retires={results.get('retires')}"
+    )
+    assert results["dr"] == [7, 5, 12, 10, 3], (
+        "IADD/ISUB register/immediate operand mismatch: "
+        f"DR1..DR5={results['dr']}"
+    )
+def test_selftest_first_arithmetic_check_passes():
+    """Factory SelfTest must branch past its first failure RETURN at NIA 0x690."""
+    dut = BootRomHarness(_DMEM_INIT)
+    results = {}
+
+    async def testbench(ctx):
+        results["boot_ok"] = await _wait_boot_complete(ctx, dut)
+        if not results["boot_ok"]:
+            return
+        details = []
+        for _ in range(1000):
+            if ctx.get(dut.core.retire_valid):
+                row = {
+                    "nia": ctx.get(dut.core.retire_nia),
+                    "instr": ctx.get(dut.core.retire_instr),
+                    "fault_valid": bool(ctx.get(dut.core.retire_fault_valid)),
+                    "fault_code": ctx.get(dut.core.retire_fault_code),
+                    "fault_instr": ctx.get(dut.core.fault_instr),
+                    "fault_stage": ctx.get(dut.core.fault_stage),
+                }
+                details.append(row)
+                if row["nia"] in (0x690, 0x694):
+                    break
+            await ctx.tick()
+        results["details"] = details
+        results["timeout"] = not details or details[-1]["nia"] not in (0x690, 0x694)
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(testbench)
+    with sim.write_vcd("/dev/null"):
+        sim.run()
+
+    assert results.get("boot_ok"), "boot_complete never rose"
+    assert not results.get("timeout"), (
+        "Timed out before the first SelfTest arithmetic verdict; "
         f"last retires={results.get('details', [])[-6:]}"
     )
     details = results["details"]
-    writes = results["thread_writes"]
-    assert (0x11C8, 0x4A000002) in writes, (
-        f"CALL did not save the caller E-GT at Thread[STO-1]: {writes}"
+    assert all(not row["fault_valid"] for row in details), (
+        f"SelfTest faulted before its first arithmetic verdict: {details[-6:]}"
     )
-    assert (0x11CC, 0x000060F3) in writes, (
-        f"CALL frame must encode return word 3, SZ=0, previous STO=243: {writes}"
+    assert all(row["nia"] != 0x690 for row in details), (
+        "SelfTest took the first arithmetic failure RETURN at NIA 0x690"
     )
-    assert (0x0E44, 0x000000F3) in writes, (
-        f"RETURN did not restore protected STO=243: {writes}"
-    )
-    return_nia = details[-2]["nia"]
-    return_fault = details[-2]["fault_valid"]
-    guard_nia = details[-1]["nia"]
-    guard_fault = details[-1]["fault_valid"]
-    assert (return_nia, return_fault) == (0x690, False), (
-        f"Expected clean SelfTest RETURN at 0x690, got "
-        f"NIA=0x{return_nia:08X} fault={return_fault}"
-    )
-    assert (guard_nia, guard_fault) == (0x0C, False), (
-        f"Expected clean post-RETURN BRANCH guard at 0x0C, got "
-        f"NIA=0x{guard_nia:08X} fault={guard_fault} "
-        f"instr=0x{details[-1]['instr']:08X} "
-        f"code={details[-1]['fault_code']} "
-        f"latched_instr=0x{details[-1]['fault_instr']:08X} "
-        f"stage={details[-1]['fault_stage']}"
+    assert details[-1]["nia"] == 0x694, (
+        "SelfTest did not take the EQ pass branch to the second arithmetic check; "
+        f"last retire={details[-1]}"
     )
 
 

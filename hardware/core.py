@@ -1355,18 +1355,23 @@ class ChurchCore(Elaboratable):
             # Port 2 (DRx for indexed mode): read via register port 1
             u_dwrite.dr_rd_data2.eq(u_regs.dr_rd_data1),
         ]
-        # dr_rd_addr2: dwrite source data and BFINS use port 2
+        # dr_rd_addr2: dwrite source data, BFINS, and register-form IADD/ISUB
+        # use port 2. Arithmetic register operands are encoded in imm[3:0]
+        # when the imm[14] immediate marker is clear.
         m.d.comb += u_regs.dr_rd_addr2.eq(
             Mux(u_dwrite.busy, u_dwrite.dr_rd_addr,
-                Mux(bfins_start_sig, cr_dst, 0))
+                Mux(bfins_start_sig, cr_dst,
+                    Mux((iadd_start_sig | isub_start_sig) &
+                        ~u_decoder.immediate[14],
+                        u_decoder.immediate[:4], 0)))
         )
         # dr_rd_addr1: dread DRx, dwrite DRx, IADD/ISUB/SHL/SHR/BFEXT/BFINS/MCMP/CHANGE
         # (dread/dwrite busy is mutually exclusive with the arithmetic ops via any_unit_busy)
 
         # ── IADD / ISUB ──────────────────────────────────────────────────────
-        # Immediate arithmetic on data registers.
-        # DR[dst] = DR[src] + sign_extend(imm)  (IADD)
-        # DR[dst] = DR[src] - sign_extend(imm)  (ISUB)
+        # Arithmetic on data registers.
+        # imm[14]=1: DR[dst] = DR[src] +/- zero_extend(imm[13:0])
+        # imm[14]=0: DR[dst] = DR[src] +/- DR[imm[3:0]]
         # Flags: N = result[31], Z = (result==0), C = carry-out, V = 0.
         # 1-cycle busy after execution prevents double-fire due to ROM pipeline latency.
         # (Signals forward-declared above for use in DR write / nia chains.)
@@ -1382,10 +1387,16 @@ class ChurchCore(Elaboratable):
             isub_busy_reg.eq(isub_start_sig & ~isub_busy_reg),
         ]
 
-        # Sign-extend 15-bit immediate to 32 bits for arithmetic
+        # Strip the immediate-mode marker before extending the operand. The
+        # payload is an unsigned 14-bit value, matching the simulator.
         arith_imm_sx = Signal(32)
         m.d.comb += arith_imm_sx.eq(
-            Cat(u_decoder.immediate, u_decoder.immediate[14].replicate(17))
+            Cat(u_decoder.immediate[:14], C(0, 18))
+        )
+
+        arith_rhs = Signal(32)
+        m.d.comb += arith_rhs.eq(
+            Mux(u_decoder.immediate[14], arith_imm_sx, u_regs.dr_rd_data2)
         )
 
         # Source DR read port 1 — shared by DREAD/DWRITE (indexed DRx), IADD/ISUB,
@@ -1402,8 +1413,8 @@ class ChurchCore(Elaboratable):
 
         # 33-bit results (bit 32 = carry for IADD, borrow for ISUB)
         m.d.comb += [
-            iadd_result.eq(u_regs.dr_rd_data1 + arith_imm_sx),
-            isub_result.eq(u_regs.dr_rd_data1 - arith_imm_sx),
+            iadd_result.eq(u_regs.dr_rd_data1 + arith_rhs),
+            isub_result.eq(u_regs.dr_rd_data1 - arith_rhs),
         ]
 
         iadd_flags_view = View(COND_FLAGS_LAYOUT, iadd_flags_sig)
