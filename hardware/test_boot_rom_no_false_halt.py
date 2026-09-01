@@ -511,11 +511,32 @@ def test_selftest_return_reaches_boot_guard():
         results["boot_ok"] = await _wait_boot_complete(ctx, dut)
         if not results["boot_ok"]:
             return
-        # 3 boot instructions + 35 SelfTest instructions before RETURN
-        # + the RETURN at 0x690 + the first post-RETURN guard retire.
-        results["retires"], results["timeout_at"] = \
-            await _collect_retires(ctx, dut, 3 + 35 + 1 + 1, max_wait=800)
-        results["last_fault_code"] = ctx.get(dut.core.retire_fault_code)
+        details = []
+        thread_writes = []
+        saw_return = False
+        for _ in range(4000):
+            if ctx.get(dut.core.dmem_wr_en):
+                addr = ctx.get(dut.core.dmem_addr)
+                thread_writes.append((
+                    addr, ctx.get(dut.core.dmem_wr_data)))
+            if ctx.get(dut.core.retire_valid):
+                row = {
+                    "nia": ctx.get(dut.core.retire_nia),
+                    "instr": ctx.get(dut.core.retire_instr),
+                    "fault_valid": bool(ctx.get(dut.core.retire_fault_valid)),
+                    "fault_code": ctx.get(dut.core.retire_fault_code),
+                    "fault_instr": ctx.get(dut.core.fault_instr),
+                    "fault_stage": ctx.get(dut.core.fault_stage),
+                }
+                details.append(row)
+                if row["nia"] == 0x690:
+                    saw_return = True
+                elif saw_return:
+                    break
+            await ctx.tick()
+        results["details"] = details
+        results["thread_writes"] = thread_writes
+        results["timeout_at"] = None if len(details) >= 40 else len(details)
 
     sim = Simulator(dut)
     sim.add_clock(1e-6)
@@ -526,12 +547,23 @@ def test_selftest_return_reaches_boot_guard():
     assert results.get("boot_ok"), "boot_complete never rose"
     assert results.get("timeout_at") is None, (
         f"Timed out at retire {results.get('timeout_at')}; "
-        f"last retires={[(hex(n), fv) for n, fv in results.get('retires', [])[-6:]]}; "
-        f"fault_code={results.get('last_fault_code')}"
+        f"last retires={results.get('details', [])[-6:]}"
     )
-    retires = results["retires"]
-    return_nia, return_fault = retires[-2]
-    guard_nia, guard_fault = retires[-1]
+    details = results["details"]
+    writes = results["thread_writes"]
+    assert (0x11C8, 0x1A000002) in writes, (
+        f"CALL did not save the caller E-GT at Thread[STO-1]: {writes}"
+    )
+    assert (0x11CC, 0x000060F3) in writes, (
+        f"CALL frame must encode return word 3, SZ=0, previous STO=243: {writes}"
+    )
+    assert (0x0E44, 0x000000F3) in writes, (
+        f"RETURN did not restore protected STO=243: {writes}"
+    )
+    return_nia = details[-2]["nia"]
+    return_fault = details[-2]["fault_valid"]
+    guard_nia = details[-1]["nia"]
+    guard_fault = details[-1]["fault_valid"]
     assert (return_nia, return_fault) == (0x690, False), (
         f"Expected clean SelfTest RETURN at 0x690, got "
         f"NIA=0x{return_nia:08X} fault={return_fault}"
@@ -539,7 +571,10 @@ def test_selftest_return_reaches_boot_guard():
     assert (guard_nia, guard_fault) == (0x0C, False), (
         f"Expected clean post-RETURN BRANCH guard at 0x0C, got "
         f"NIA=0x{guard_nia:08X} fault={guard_fault} "
-        f"code={results.get('last_fault_code')}"
+        f"instr=0x{details[-1]['instr']:08X} "
+        f"code={details[-1]['fault_code']} "
+        f"latched_instr=0x{details[-1]['fault_instr']:08X} "
+        f"stage={details[-1]['fault_stage']}"
     )
 
 

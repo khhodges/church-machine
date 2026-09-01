@@ -164,6 +164,10 @@ class ChurchReturn(Elaboratable):
         sub_fault_latched = Signal()
         fault_flag        = Signal()
         fault_latched     = Signal(5)  # 5 bits: FaultType values up to 0x18
+        # dmem_rd_valid is shared with the other execution units and is
+        # one-cycle delayed. A valid left over from the preceding bus owner
+        # must not be consumed when entering one of RETURN's read states.
+        rd_armed          = Signal()
 
         with m.FSM(name="ret") as fsm:
 
@@ -172,6 +176,7 @@ class ChurchReturn(Elaboratable):
                     fault_flag.eq(0), fault_latched.eq(FaultType.NONE),
                     sub_done_latched.eq(0), sub_fault_latched.eq(0),
                     callee_egt_latched.eq(0),
+                    rd_armed.eq(0),
                 ]
                 with m.If(self.return_start):
                     with m.If(self.lambda_active):
@@ -226,10 +231,12 @@ class ChurchReturn(Elaboratable):
                     local_mem_rd_addr.eq(protected_sto_addr),
                     local_mem_rd_en.eq(1),
                 ]
-                with m.If(self.mem_rd_valid):
+                m.d.sync += rd_armed.eq(1)
+                with m.If(self.mem_rd_valid & rd_armed):
                     m.d.sync += [
                         sto_indicator.eq(self.mem_rd_data),
                         sto_latched.eq(self.mem_rd_data[:12]),
+                        rd_armed.eq(0),
                     ]
                     m.next = "READ_FRAME"
 
@@ -240,13 +247,15 @@ class ChurchReturn(Elaboratable):
                         ((sto_latched + Mux(sto_indicator[12], 2, 1)) << 2)),
                     local_mem_rd_en.eq(1),
                 ]
-                with m.If(self.mem_rd_valid):
+                m.d.sync += rd_armed.eq(1)
+                with m.If(self.mem_rd_valid & rd_armed):
                     m.d.sync += frame_word.eq(self.mem_rd_data)
                     m.d.sync += [
                         return_pc_latched.eq(self.mem_rd_data[13:28]),
                         prev_sto_latched.eq(self.mem_rd_data[0:12]),
                         prev_sz_latched.eq(self.mem_rd_data[12]),
                         prev_flags_latched.eq(self.mem_rd_data[28:32]),
+                        rd_armed.eq(0),
                     ]
                     with m.If(sto_indicator[12]):
                         m.next = "READ_EGT"
@@ -258,8 +267,12 @@ class ChurchReturn(Elaboratable):
                     local_mem_rd_addr.eq(stack_slot_addr(thread_base_latched, sto_latched, 1)),
                     local_mem_rd_en.eq(1),
                 ]
-                with m.If(self.mem_rd_valid):
-                    m.d.sync += callee_egt_latched.eq(self.mem_rd_data)
+                m.d.sync += rd_armed.eq(1)
+                with m.If(self.mem_rd_valid & rd_armed):
+                    m.d.sync += [
+                        callee_egt_latched.eq(self.mem_rd_data),
+                        rd_armed.eq(0),
+                    ]
                     m.next = "POP_STACK"
 
             with m.State("POP_STACK"):

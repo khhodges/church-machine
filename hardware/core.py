@@ -415,6 +415,12 @@ class ChurchCore(Elaboratable):
         cross_domain_ret = Signal()
         boot_rom_return = Signal()
         cload_pending   = Signal()
+        # Keep decode suppressed for one full IDLE cycle after RETURN changes
+        # NIA. The external synchronous instruction memories and their
+        # registered ROM/DMEM selector otherwise still present the RETURN word
+        # when the return FSM drops busy, causing the same RETURN to execute a
+        # second time and pop the next (empty) frame.
+        return_fetch_settle = Signal()
         m.d.comb += boot_rom_return.eq(u_return.boot_rom_return)
 
         # Early declarations for M-window FSM — CR15 M-flag latch + DR11-DR13 shadow
@@ -448,6 +454,7 @@ class ChurchCore(Elaboratable):
             iadd_busy_reg | isub_busy_reg | branch_busy_reg |
             shl_busy_reg | shr_busy_reg | bfext_busy_reg | bfins_busy_reg | mcmp_busy_reg |
             u_cload.cload_busy | cload_pending |
+            return_fetch_settle |
             fence_pending_reg |
             u_outform.outform_busy |
             mint_busy |
@@ -970,7 +977,9 @@ class ChurchCore(Elaboratable):
                 code_hi_reg.eq(0),
                 fence_pending_reg.eq(0),
             ]
-        with m.Elif(u_return.complete & cross_domain_ret):
+        with m.Elif(
+            u_return.complete & cross_domain_ret & ~boot_rom_return
+        ):
             # Cross-domain RETURN: stall instruction execution until cload restores CR14.
             # Old fence (callee's bounds) is intentionally kept; fetch is blocked by
             # fence_pending_reg contribution to any_unit_busy, so no false BOUNDS fault.
@@ -1210,10 +1219,11 @@ class ChurchCore(Elaboratable):
             u_call.cr5_heap.eq(u_regs.cr5_heap),
             u_call.caller_pc.eq(nia_reg[2:17]),           # CALL word offset (nia_reg >> 2)
             u_call.cr12_thread.eq(u_regs.cr12_thread),
-            u_call.thread_base.eq(Mux(
-                boot_microcode_active,
-                View(CAP_REG_LAYOUT, u_regs.cr12_thread).word1_location,
-                self.active_thread_base)),
+            # Stack frames belong to the active Thread body. CR12 remains the
+            # system Thread root and may have location zero on Wukong; CHANGE
+            # resolves the selected Thread body's relocated backing address
+            # into active_thread_base. CALL and RETURN must use that same base.
+            u_call.thread_base.eq(self.active_thread_base),
             # THREAD_HDR: populated by CHANGE on thread restore, cached for CALL's stack validation
             u_call.thread_hdr.eq(u_change.thread_hdr_out if not self.iot_profile else 0),
             u_call.flags.eq(u_regs.flags),
@@ -1240,6 +1250,11 @@ class ChurchCore(Elaboratable):
 
         with m.If(ret_start_sig):
             m.d.sync += cross_domain_ret.eq(~lambda_active_reg)
+
+        with m.If(u_return.nia_set):
+            m.d.sync += return_fetch_settle.eq(1)
+        with m.Elif(return_fetch_settle & ~u_return.busy):
+            m.d.sync += return_fetch_settle.eq(0)
 
         with m.If(
             u_return.complete & ~u_return.fault_valid &
