@@ -183,6 +183,18 @@ class ChurchCall(Elaboratable):
         # This is the authority RETURN must revalidate to reconstruct the
         # caller's CR6/CR14 context.
         caller_egt_latched = Signal(32)
+        caller_egt_from_cr6 = Signal(32)
+        caller_egt_from_cr6_view = View(GT_LAYOUT, caller_egt_from_cr6)
+        current_cr6_view = View(CAP_REG_LAYOUT, self.cr_rd_data)
+        current_cr6_gt = View(GT_LAYOUT, current_cr6_view.word0_gt)
+        m.d.comb += [
+            caller_egt_from_cr6_view.slot_id.eq(current_cr6_gt.slot_id),
+            caller_egt_from_cr6_view.gt_seq.eq(current_cr6_gt.gt_seq),
+            caller_egt_from_cr6_view.gt_type.eq(current_cr6_gt.gt_type),
+            caller_egt_from_cr6_view.dom.eq(1),
+            caller_egt_from_cr6_view.perm.eq(0b100),
+            caller_egt_from_cr6_view.b_flag.eq(current_cr6_gt.b_flag),
+        ]
 
         # M-GT dispatch latches: populated during M_FETCH_NS0/1/2/3 states.
         # mgt_gt_lat: raw Abstract GT word from src_reg_latched.word0_gt.
@@ -259,22 +271,21 @@ class ChurchCall(Elaboratable):
 
         # M-elevation is permanently asserted: CALL's FSM validates E-perm
         # in CHECK_PERM before any mLoad fires, so CHECK_L is externalised.
+        # CALL consumes an E-GT capability already present in its source CR.
+        # Both phases resolve an E-GT directly: Phase 1 builds CR6 and Phase 2
+        # builds CR14 from the latched CR6 identity. Treating either capability
+        # as an indexable c-list reads a LUMP header as though it were a GT.
+        direct_mload_gt = Signal(32)
         m.d.comb += [
+            direct_mload_gt.eq(
+                Mux(phase, callee_egt_latched, src_view.word0_gt.as_value())),
             self.mload_start.eq(sub_start_reg),
             self.mload_cr_src.eq(mload_src),
             self.mload_cr_dst.eq(mload_dst),
             self.mload_index.eq(mload_index),
-            # Boot-window: BOOT_PROGRAM[2] = CALL CR0 calls THROUGH CR0's own
-            # E-GT (restored from Thread.caps[0] by CHANGE) — there is no
-            # caller c-list to index (Phase 1), and the boot lump carries no
-            # embedded c-list either (Phase 2 would misread the lump header as
-            # a GT).  Resolve the src GT directly in both phases; SET_M_WRITE
-            # then forces X=1 on CR14 so instruction fetch passes PERM_X.
-            # Post-boot CALLs keep the normal c-list-indexed fetch.
-            self.mload_direct.eq(boot_window_lat),
+            self.mload_direct.eq(1),
             self.mload_m_elevated.eq(1),
-            self.mload_direct_gt.eq(
-                Mux(boot_window_lat, src_view.word0_gt.as_value(), 0)),
+            self.mload_direct_gt.eq(direct_mload_gt),
         ]
 
         m.d.comb += [
@@ -449,9 +460,7 @@ class ChurchCall(Elaboratable):
                 # Snapshot the caller's E-GT before Phase 1 mLoad replaces CR6
                 # with the callee's c-list capability.
                 m.d.comb += local_cr_rd_addr.eq(CR6_CLIST)
-                m.d.sync += caller_egt_latched.eq(
-                    View(CAP_REG_LAYOUT, self.cr_rd_data).word0_gt.as_value()
-                )
+                m.d.sync += caller_egt_latched.eq(caller_egt_from_cr6)
                 m.next = "CHECK_PERM"
 
             with m.State("CHECK_PERM"):

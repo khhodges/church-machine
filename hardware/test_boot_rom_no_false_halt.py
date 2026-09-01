@@ -30,7 +30,7 @@ from amaranth.sim import Simulator
 
 from .core import ChurchCore
 from .boot_rom import (
-    BootRom, BOOT_PROGRAM, encode_turing,
+    BootRom, BOOT_PROGRAM, encode_church, encode_turing,
     WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST, WUKONG_NUC_PROGRAM,
     WUKONG_SELFTEST_WORDS, WUKONG_SELFTEST_BASE_WORD, WUKONG_WCH_BASE_WORD,
     WUKONG_THREAD_BASE_WORD, WUKONG_THREAD_HEADER,
@@ -39,9 +39,10 @@ from .boot_rom import (
     WUKONG_WCH_CLIST, WUKONG_WCH_CLIST_WORD, wukong_wch_header,
 )
 from .hw_types import (
-    CondCode, GT_TYPE_INFORM, PERM_MASK_E, PERM_MASK_S,
-    TuringOpcode, make_gt,
+    ChurchOpcode, CondCode, GT_TYPE_INFORM, PERM_MASK_E, PERM_MASK_R,
+    PERM_MASK_S, PERM_MASK_X, TuringOpcode, make_gt,
 )
+from .integrity32 import integrity32
 
 
 # ── DMEM init data (mirrors ChurchWukongXC7A100T.elaborate() exactly) ─────────
@@ -92,6 +93,83 @@ def _build_dmem_init():
     return dmem
 
 _DMEM_INIT = _build_dmem_init()
+
+
+def _lump_header(*, n_minus_6, cw, cc):
+    return (0x1F << 27) | (n_minus_6 << 23) | (cw << 10) | cc
+
+
+def _build_nested_call_dmem():
+    """Factory Thread plus three ordinary namespace-backed call domains."""
+    dmem = list(_DMEM_INIT)
+
+    caller_gt = E_GT_SELFTEST
+    middle_slot = 4
+    leaf_slot = 5
+    middle_gt = make_gt(
+        gt_type=GT_TYPE_INFORM, perms=PERM_MASK_E, slot_id=middle_slot)
+    leaf_gt = make_gt(
+        gt_type=GT_TYPE_INFORM, perms=PERM_MASK_E, slot_id=leaf_slot)
+
+    middle_base = 0x2000
+    leaf_base = 0x2200
+    alloc_words = 64
+    ns_word1 = alloc_words - 1
+    for slot, base in ((middle_slot, middle_base), (leaf_slot, leaf_base)):
+        ns_word = slot * 4
+        dmem[ns_word + 0] = base
+        dmem[ns_word + 1] = ns_word1
+        dmem[ns_word + 2] = integrity32(base, ns_word1)
+        dmem[ns_word + 3] = 0
+
+    # The boot CALL enters SelfTest directly. Its first normal instruction
+    # CALLs through c-list row 0 into the middle domain; after the matching
+    # RETURN, a self-branch provides a stable post-return fetch target.
+    caller_word = WUKONG_SELFTEST_BASE_WORD
+    dmem[caller_word + 0] = _lump_header(n_minus_6=3, cw=3, cc=2)
+    dmem[caller_word + 1] = encode_church(
+        ChurchOpcode.LOAD, CondCode.AL, cr_dst=1, cr_src=6, imm=0)
+    dmem[caller_word + 2] = encode_church(
+        ChurchOpcode.CALL, CondCode.AL, cr_src=1)
+    dmem[caller_word + 3] = encode_turing(
+        TuringOpcode.BRANCH, CondCode.AL, imm=0)
+    caller_clist = caller_word + 512 - 2
+    dmem[caller_clist + 0] = middle_gt
+    dmem[caller_clist + 1] = 0
+
+    # Middle domain immediately CALLs the leaf, then RETURNs to the caller.
+    middle_word = middle_base // 4
+    dmem[middle_word + 0] = _lump_header(n_minus_6=0, cw=4, cc=2)
+    dmem[middle_word + 1] = encode_church(
+        ChurchOpcode.LOAD, CondCode.AL, cr_dst=2, cr_src=6, imm=1)
+    dmem[middle_word + 2] = encode_church(
+        ChurchOpcode.LOAD, CondCode.AL, cr_dst=1, cr_src=6, imm=0)
+    dmem[middle_word + 3] = encode_church(
+        ChurchOpcode.CALL, CondCode.AL, cr_src=1)
+    dmem[middle_word + 4] = encode_church(
+        ChurchOpcode.RETURN, CondCode.AL, cr_src=2)
+    middle_clist = middle_word + alloc_words - 2
+    dmem[middle_clist + 0] = leaf_gt
+    dmem[middle_clist + 1] = middle_gt
+
+    # Leaf domain terminates the nesting with an ordinary cross-domain RETURN.
+    leaf_word = leaf_base // 4
+    dmem[leaf_word + 0] = _lump_header(n_minus_6=0, cw=2, cc=2)
+    dmem[leaf_word + 1] = encode_church(
+        ChurchOpcode.LOAD, CondCode.AL, cr_dst=2, cr_src=6, imm=0)
+    dmem[leaf_word + 2] = encode_church(
+        ChurchOpcode.RETURN, CondCode.AL, cr_src=2)
+    leaf_clist = leaf_word + alloc_words - 2
+    dmem[leaf_clist + 0] = leaf_gt
+    dmem[leaf_clist + 1] = 0
+
+    return dmem, {
+        "caller_gt": caller_gt,
+        "middle_gt": middle_gt,
+        "leaf_gt": leaf_gt,
+        "middle_base": middle_base,
+        "leaf_base": leaf_base,
+    }
 
 # ROM: BOOT_PROGRAM[0..2] + the post-RETURN BRANCH -1 guard + zeros.
 _BRANCH_MINUS_1 = encode_turing(
@@ -551,7 +629,7 @@ def test_selftest_return_reaches_boot_guard():
     )
     details = results["details"]
     writes = results["thread_writes"]
-    assert (0x11C8, 0x1A000002) in writes, (
+    assert (0x11C8, 0x4A000002) in writes, (
         f"CALL did not save the caller E-GT at Thread[STO-1]: {writes}"
     )
     assert (0x11CC, 0x000060F3) in writes, (
@@ -576,6 +654,137 @@ def test_selftest_return_reaches_boot_guard():
         f"latched_instr=0x{details[-1]['fault_instr']:08X} "
         f"stage={details[-1]['fault_stage']}"
     )
+
+
+def test_nested_call_return_without_boot_special_case():
+    """Two ordinary CALLs and RETURNs preserve the real Thread call stack."""
+    dmem, fixture = _build_nested_call_dmem()
+    dut = BootRomHarness(dmem)
+    results = {
+        "retires": [],
+        "writes": [],
+        "cloads": [],
+        "active_bases": [],
+    }
+
+    async def testbench(ctx):
+        results["boot_ok"] = await _wait_boot_complete(ctx, dut)
+        if not results["boot_ok"]:
+            return
+
+        for cycle in range(1600):
+            if ctx.get(dut.core.dmem_wr_en):
+                addr = ctx.get(dut.core.dmem_addr)
+                results["writes"].append((
+                    addr, ctx.get(dut.core.dmem_wr_data),
+                ))
+                thread_base = WUKONG_THREAD_BASE_WORD * 4
+                if thread_base <= addr < thread_base + 256 * 4:
+                    results["active_bases"].append(
+                        ctx.get(dut.core.active_thread_base))
+            if ctx.get(dut.core.retire_trace_return_cr14_valid):
+                results["cloads"].append((
+                    cycle,
+                    ctx.get(dut.core.retire_trace_return_cr14_gt),
+                ))
+            if ctx.get(dut.core.retire_valid):
+                results["retires"].append({
+                    "cycle": cycle,
+                    "nia": ctx.get(dut.core.retire_nia),
+                    "instr": ctx.get(dut.core.retire_instr),
+                    "fault": bool(ctx.get(dut.core.retire_fault_valid)),
+                })
+                if len(results["retires"]) == 12:
+                    break
+            await ctx.tick()
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(testbench)
+    with sim.write_vcd("/dev/null"):
+        sim.run()
+
+    assert results.get("boot_ok"), "boot_complete never rose"
+    retires = results["retires"]
+    assert len(retires) == 12, f"nested sequence stalled: {retires}"
+
+    middle_call_nia = fixture["middle_base"] + 12
+    leaf_return_nia = fixture["leaf_base"] + 8
+    expected_nias = [
+        0x00, 0x04, 0x08,       # boot setup; only this CALL uses boot_window
+        0x604,                   # LOAD middle E-GT from SelfTest c-list
+        0x608,                   # ordinary SelfTest -> middle CALL
+        fixture["middle_base"] + 4,  # LOAD middle's own return E-GT
+        fixture["middle_base"] + 8,  # LOAD leaf E-GT
+        middle_call_nia,         # ordinary middle -> leaf CALL
+        fixture["leaf_base"] + 4,    # LOAD leaf's own return E-GT
+        leaf_return_nia,         # leaf -> middle RETURN
+        fixture["middle_base"] + 16,  # middle -> SelfTest RETURN
+        0x60C,                   # settled caller fetch after both cloads
+    ]
+    assert [row["nia"] for row in retires] == expected_nias, (
+        "unexpected or phantom retirement in nested CALL/RETURN sequence: "
+        f"{retires}"
+    )
+    assert not any(row["fault"] for row in retires), retires
+
+    # Both return targets must be fetched only after a settle interval and the
+    # intervening cLoad commit. A stale RETURN fetch would retire on the next
+    # cycle at the old domain's NIA.
+    assert retires[10]["cycle"] > retires[9]["cycle"] + 1, retires
+    assert retires[11]["cycle"] > retires[10]["cycle"] + 1, retires
+    assert retires[10]["instr"] == encode_church(
+        ChurchOpcode.RETURN, CondCode.AL, cr_src=2)
+    assert retires[11]["instr"] == encode_turing(
+        TuringOpcode.BRANCH, CondCode.AL, imm=0)
+
+    cloads = results["cloads"]
+    assert [gt for _, gt in cloads] == [
+        make_gt(
+            gt_type=GT_TYPE_INFORM,
+            perms=PERM_MASK_R | PERM_MASK_X,
+            slot_id=4,
+        ),
+        make_gt(
+            gt_type=GT_TYPE_INFORM,
+            perms=PERM_MASK_R | PERM_MASK_X,
+            slot_id=6,
+        ),
+    ], f"RETURN cLoad commits missing or out of order: {cloads}"
+    assert retires[9]["cycle"] < cloads[0][0] < retires[10]["cycle"]
+    assert retires[10]["cycle"] < cloads[1][0] < retires[11]["cycle"]
+
+    thread_base = WUKONG_THREAD_BASE_WORD * 4
+    assert results["active_bases"]
+    assert set(results["active_bases"]) == {thread_base}, (
+        f"stack traffic escaped active Thread base 0x{thread_base:X}: "
+        f"{results['active_bases']}"
+    )
+
+    # The boot setup leaves STO=241. The two ordinary pushes create nested
+    # frames at 241 and 239, then the two RETURNs restore 239 and finally 241.
+    def frame_word(prev_sto, return_nia):
+        return (1 << 12) | ((return_nia // 4) << 13) | prev_sto
+
+    expected_stack_writes = [
+        (thread_base + 240 * 4, fixture["caller_gt"]),
+        (thread_base + 241 * 4, frame_word(241, 0x60C)),
+        (thread_base + 17 * 4, 239 | (1 << 12)),
+        (thread_base + 238 * 4, fixture["middle_gt"]),
+        (thread_base + 239 * 4,
+         frame_word(239, fixture["middle_base"] + 16)),
+        (thread_base + 17 * 4, 237 | (1 << 12)),
+        (thread_base + 17 * 4, 239 | (1 << 12)),
+        (thread_base + 17 * 4, 241 | (1 << 12)),
+    ]
+    writes = results["writes"]
+    cursor = 0
+    for expected in expected_stack_writes:
+        try:
+            cursor = writes.index(expected, cursor) + 1
+        except ValueError:
+            raise AssertionError(
+                f"missing ordered stack write {expected}; writes={writes}")
 
 
 # ── Test 5: repeated 'f' reboots stay clean (FAULT_RST wipes unit state) ──────
@@ -663,6 +872,7 @@ if __name__ == "__main__":
         test_boot_rom_no_false_halt,
         test_fault_halt_mechanism,
         test_boot_call_enters_wukong_callhome,
+        test_nested_call_return_without_boot_special_case,
         test_repeated_reboots_stay_clean,
     ):
         try:

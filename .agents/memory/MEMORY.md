@@ -149,3 +149,4 @@
 - [Lazy retry breakpoint E2E timing](lazy-retry-breakpoint-e2e-timing.md) — hold the mocked download pending, then arm the breakpoint; use retirement stats, not attempt count
 - [Immutable LUMP history transitions](immutable-lump-history-transitions.md) — archive/current/sidecar/manifest commit together under flock; reserve with lexists and revalidate generation
 - [Build checkpoint mutates NS state](build-checkpoint-mutates-ns-state.md) — checkpoint generation can rewrite ns-state.json via boot imports; restore/verify it before final provenance
+- [CALL E-GT identity flow](call-egt-identity-flow.md) — CALL resolves source/callee E-GTs directly; RETURN frames must carry normalized caller E authority, never transient CR6 L authority
