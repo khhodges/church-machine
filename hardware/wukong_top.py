@@ -69,7 +69,7 @@ _WUKONG_DMEM_WORDS = _WUKONG_ARCH_PROFILE["totalWords"]
 # Increment this by 1 every time a new bitstream is synthesised and flashed.
 # The bridge reports it to the IDE so the FPGA status page can confirm exactly
 # which build is running — no need to reprogram just to check.
-WUKONG_BUILD_VERSION = 18  # ← bump this before each new synthesis run
+WUKONG_BUILD_VERSION = 19  # ← bump this before each new synthesis run
 # A board advertising this build (or newer) supports M6 round-robin Thread
 # selection for projected multi-Thread uploads.  Keep this explicit rather
 # than treating any arbitrary future build number as an accidental capability.
@@ -96,6 +96,7 @@ WUKONG_THREAD_SCHEDULER_MIN_BUILD = 18
 # The WukongCallHome LUMP body is placed in dmem_init below at byte 0x1200.
 _BRANCH_MINUS_1 = encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=(-1) & 0x7FFF)
 _WUKONG_ROM = list(BOOT_PROGRAM[:3]) + [_BRANCH_MINUS_1] + [0] * (1024 - 4)
+_WUKONG_BOOT_WINDOW_BYTES = 4 * 4
 
 # ── Synthesis-time LUMP overflow guard ────────────────────────────────────────
 # WukongCallHome LUMP alloc = 128 words (n_minus_6=1 → 2^7).
@@ -408,13 +409,15 @@ class ChurchWukongXC7A100T(Elaboratable):
         # ── Boot ROM (instruction fetch — read-only BRAM tile) ─────────────────
         boot_rom = m.submodules.boot_rom = BootRom(_WUKONG_ROM)
         m.d.comb += boot_rom.addr.eq(core.imem_addr[2:12])
-        # imem source mux: NIA 0x0-0xB fetches BOOT_PROGRAM from the 3-word ROM;
-        # everything else fetches from DMEM via a dedicated read port (below),
+        # imem source mux: NIA 0x0-0xF fetches the three boot instructions plus
+        # the BRANCH -1 return guard from ROM; everything else fetches from DMEM
+        # via a dedicated read port (below),
         # so the WukongCallHome LUMP body at word 1152 — and any IDE-uploaded
         # code — actually executes.  Both sources have 1-cycle latency, so the
         # select is registered to stay aligned with the data.
         imem_from_dmem = Signal()
-        m.d.sync += imem_from_dmem.eq(core.imem_addr >= 0xC)
+        m.d.sync += imem_from_dmem.eq(
+            core.imem_addr >= _WUKONG_BOOT_WINDOW_BYTES)
 
         # ── Data memory (BRAM, 16 384 × 32-bit = 64 KB) ───────────────────────
         # init= is used for simulation accuracy only.  On real FPGA hardware the

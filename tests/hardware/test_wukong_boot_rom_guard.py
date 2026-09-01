@@ -34,7 +34,11 @@ import re
 import pytest
 
 from hardware.boot_rom import BOOT_PROGRAM, encode_turing, TuringOpcode, CondCode
-from hardware.wukong_top import _WUKONG_ROM, WUKONG_N_INIT
+from hardware.wukong_top import (
+    _WUKONG_BOOT_WINDOW_BYTES,
+    _WUKONG_ROM,
+    WUKONG_N_INIT,
+)
 
 _IL_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "build", "church_wukong_xc7a100t.il"
@@ -87,6 +91,21 @@ def test_wukong_rom_guard_word_is_not_zero():
     assert _WUKONG_ROM[3] != 0, (
         "_WUKONG_ROM[3] is 0x00000000 — the BRANCH -1 guard word is missing.  "
         "This is the exact defect that caused the v11 hardware fault-loop."
+    )
+
+
+def test_wukong_rom_fetch_window_includes_guard_word():
+    """The instruction mux must fetch ROM word 3 instead of DMEM word 3.
+
+    A boundary of 0x0C makes the BRANCH guard present but unreachable: after
+    SelfTest returns to NIA 0x0C, hardware reads Namespace data from DMEM as an
+    instruction and immediately faults.
+    """
+    guard_nia = 3 * 4
+    assert guard_nia < _WUKONG_BOOT_WINDOW_BYTES, (
+        f"Boot guard NIA 0x{guard_nia:02X} is outside the ROM fetch window "
+        f"ending at 0x{_WUKONG_BOOT_WINDOW_BYTES - 1:02X}. SelfTest RETURN "
+        "would fetch DMEM namespace data instead of BRANCH -1."
     )
 
 
