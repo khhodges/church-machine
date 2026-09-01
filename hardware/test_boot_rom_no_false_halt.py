@@ -30,7 +30,7 @@ from amaranth.sim import Simulator
 
 from .core import ChurchCore
 from .boot_rom import (
-    BootRom, BOOT_PROGRAM,
+    BootRom, BOOT_PROGRAM, encode_turing,
     WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST, WUKONG_NUC_PROGRAM,
     WUKONG_SELFTEST_WORDS, WUKONG_SELFTEST_BASE_WORD, WUKONG_WCH_BASE_WORD,
     WUKONG_THREAD_BASE_WORD, WUKONG_THREAD_HEADER,
@@ -38,7 +38,10 @@ from .boot_rom import (
     WUKONG_THREAD_CAPS0_WORD, WUKONG_THREAD_CAPS12_WORD,
     WUKONG_WCH_CLIST, WUKONG_WCH_CLIST_WORD, wukong_wch_header,
 )
-from .hw_types import GT_TYPE_INFORM, PERM_MASK_E, PERM_MASK_S, make_gt
+from .hw_types import (
+    CondCode, GT_TYPE_INFORM, PERM_MASK_E, PERM_MASK_S,
+    TuringOpcode, make_gt,
+)
 
 
 # ── DMEM init data (mirrors ChurchWukongXC7A100T.elaborate() exactly) ─────────
@@ -90,8 +93,11 @@ def _build_dmem_init():
 
 _DMEM_INIT = _build_dmem_init()
 
-# ROM: BOOT_PROGRAM[0..2] + zeros
-_WUKONG_ROM = list(BOOT_PROGRAM[:3]) + [0] * (1024 - 3)
+# ROM: BOOT_PROGRAM[0..2] + the post-RETURN BRANCH -1 guard + zeros.
+_BRANCH_MINUS_1 = encode_turing(
+    TuringOpcode.BRANCH, CondCode.AL, imm=(-1) & 0x7FFF)
+_WUKONG_ROM = list(BOOT_PROGRAM[:3]) + [_BRANCH_MINUS_1] + [0] * (1024 - 4)
+_WUKONG_BOOT_WINDOW_BYTES = 4 * 4
 
 
 # ── BootRomHarness ─────────────────────────────────────────────────────────────
@@ -129,13 +135,13 @@ class BootRomHarness(Elaboratable):
         # ── Boot ROM (instruction fetch) ───────────────────────────────────────
         boot_rom = m.submodules.boot_rom = BootRom(_WUKONG_ROM)
         m.d.comb += boot_rom.addr.eq(core.imem_addr[2:12])
-        # imem source mux (mirrors wukong_top.py): NIA 0x0-0xB fetches
-        # BOOT_PROGRAM from ROM; everything else fetches from DMEM via a
-        # dedicated read port, so the WukongCallHome LUMP body at word 448
-        # actually executes.  Both sources have 1-cycle latency, so the select
-        # is registered to stay aligned with the data.
+        # imem source mux (mirrors wukong_top.py): NIA 0x0-0xF fetches
+        # BOOT_PROGRAM plus the post-RETURN BRANCH -1 guard from ROM; everything
+        # else fetches from DMEM. Both sources have 1-cycle latency, so the
+        # select is registered to stay aligned with the data.
         imem_from_dmem = Signal()
-        m.d.sync += imem_from_dmem.eq(core.imem_addr >= 0xC)
+        m.d.sync += imem_from_dmem.eq(
+            core.imem_addr >= _WUKONG_BOOT_WINDOW_BYTES)
 
         # ── Data memory (LibMemory, pre-initialised for simulation) ───────────
         dmem = m.submodules.dmem = LibMemory(
@@ -489,6 +495,52 @@ def test_boot_call_enters_selftest():
     print(f"  boot triple + 32 SelfTest retires all clean; "
           f"entry NIA=0x{results['retires'][3][0]:X} ✓")
     print("PASS")
+
+
+def test_selftest_return_reaches_boot_guard():
+    """Factory SelfTest RETURN must resume at ROM NIA 0x0C and retire BRANCH -1.
+
+    This covers the physical failure boundary: older coverage stopped four
+    SelfTest instructions before RETURN and therefore could not detect either
+    a RETURN/cload handoff deadlock or a ROM/DMEM mux regression at NIA 0x0C.
+    """
+    dut = BootRomHarness(_DMEM_INIT)
+    results = {}
+
+    async def testbench(ctx):
+        results["boot_ok"] = await _wait_boot_complete(ctx, dut)
+        if not results["boot_ok"]:
+            return
+        # 3 boot instructions + 35 SelfTest instructions before RETURN
+        # + the RETURN at 0x690 + the first post-RETURN guard retire.
+        results["retires"], results["timeout_at"] = \
+            await _collect_retires(ctx, dut, 3 + 35 + 1 + 1, max_wait=800)
+        results["last_fault_code"] = ctx.get(dut.core.retire_fault_code)
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(testbench)
+    with sim.write_vcd("/dev/null"):
+        sim.run()
+
+    assert results.get("boot_ok"), "boot_complete never rose"
+    assert results.get("timeout_at") is None, (
+        f"Timed out at retire {results.get('timeout_at')}; "
+        f"last retires={[(hex(n), fv) for n, fv in results.get('retires', [])[-6:]]}; "
+        f"fault_code={results.get('last_fault_code')}"
+    )
+    retires = results["retires"]
+    return_nia, return_fault = retires[-2]
+    guard_nia, guard_fault = retires[-1]
+    assert (return_nia, return_fault) == (0x690, False), (
+        f"Expected clean SelfTest RETURN at 0x690, got "
+        f"NIA=0x{return_nia:08X} fault={return_fault}"
+    )
+    assert (guard_nia, guard_fault) == (0x0C, False), (
+        f"Expected clean post-RETURN BRANCH guard at 0x0C, got "
+        f"NIA=0x{guard_nia:08X} fault={guard_fault} "
+        f"code={results.get('last_fault_code')}"
+    )
 
 
 # ── Test 5: repeated 'f' reboots stay clean (FAULT_RST wipes unit state) ──────

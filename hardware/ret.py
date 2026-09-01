@@ -27,6 +27,10 @@ class ChurchReturn(Elaboratable):
 
         self.nia_set = Signal()
         self.nia_value = Signal(32)
+        # Latched return target remains visible through COMPLETE. The reset
+        # boot ROM has no namespace-backed caller capability, so core uses this
+        # to recognize the one valid return to its guard at byte NIA 0x0C.
+        self.boot_rom_return = Signal()
 
         self.mload_start = Signal()
         self.mload_cr_src = Signal(4)
@@ -149,6 +153,7 @@ class ChurchReturn(Elaboratable):
         ]
 
         m.d.comb += self.cload_e_gt.eq(callee_egt_latched)
+        m.d.comb += self.boot_rom_return.eq(return_pc_latched == 3)
         m.d.comb += [
             self.flags_restore_en.eq(0),
             self.flags_restore_data.eq(prev_flags_latched),

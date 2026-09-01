@@ -5,7 +5,7 @@ used by call.py and ret.py.
 
 Stack layout (byte addresses relative to thread_base):
     slot  STO+0   frame word  (FLAGS[4] | return_PC[15] | prior_SZ[1] | prev_STO[12])
-    slot  STO-1   callee E-GT word 0
+    slot  STO-1   caller E-GT word 0
 
 The Stack Top Offset (STO) is a *word* index stored in the machine-protected
 Thread word at offset +17. It is outside CR5's ordinary heap bounds. The byte
@@ -16,12 +16,12 @@ address of a stack slot is:
 where word_offset is a signed Python integer constant (-1, 0, +1, +2, …).
 
 call.py writes:
-    thread_base + (sto - 1) * 4  ← callee E-GT   (word_offset = -1)
+    thread_base + (sto - 1) * 4  ← caller E-GT   (word_offset = -1)
     thread_base + (sto + 0) * 4  ← frame word     (word_offset =  0)
 
 ret.py reads:
     thread_base + (sto + 2) * 4  ← frame word     (word_offset = +2)
-    thread_base + (sto + 1) * 4  ← callee E-GT    (word_offset = +1)
+    thread_base + (sto + 1) * 4  ← caller E-GT    (word_offset = +1)
 """
 
 __all__ = ["stack_slot_addr"]

@@ -179,6 +179,10 @@ class ChurchCall(Elaboratable):
         # Callee E-GT: the raw 32-bit GT deposited into CR6 by Phase 1 mLoad.
         # Latched in PHASE1_DONE (while cr_rd_addr == CR6, combinatorial read-back).
         callee_egt_latched = Signal(32)
+        # Caller E-GT: CR6.word0 as it existed before Phase 1 overwrites CR6.
+        # This is the authority RETURN must revalidate to reconstruct the
+        # caller's CR6/CR14 context.
+        caller_egt_latched = Signal(32)
 
         # M-GT dispatch latches: populated during M_FETCH_NS0/1/2/3 states.
         # mgt_gt_lat: raw Abstract GT word from src_reg_latched.word0_gt.
@@ -439,6 +443,15 @@ class ChurchCall(Elaboratable):
             with m.State("READ_SRC"):
                 m.d.comb += local_cr_rd_addr.eq(self.cr_src)
                 m.d.sync += src_reg_latched.eq(self.cr_rd_data)
+                m.next = "READ_CALLER_CR6"
+
+            with m.State("READ_CALLER_CR6"):
+                # Snapshot the caller's E-GT before Phase 1 mLoad replaces CR6
+                # with the callee's c-list capability.
+                m.d.comb += local_cr_rd_addr.eq(CR6_CLIST)
+                m.d.sync += caller_egt_latched.eq(
+                    View(CAP_REG_LAYOUT, self.cr_rd_data).word0_gt.as_value()
+                )
                 m.next = "CHECK_PERM"
 
             with m.State("CHECK_PERM"):
@@ -655,12 +668,12 @@ class ChurchCall(Elaboratable):
                     m.next = "STACK_WRITE_EGT"
 
             with m.State("STACK_WRITE_EGT"):
-                # Spec: STO-1 holds E-GT Word 0 of the callee.
-                # callee_egt_latched = CR6.word0_gt as read back in PHASE1_DONE.
+                # STO-1 holds the caller's E-GT Word 0. RETURN revalidates this
+                # token to reconstruct the caller's CR6 and CR14.
                 # Byte address = thread_base + (STO-1)*4
                 m.d.comb += [
                     local_mem_wr_addr.eq(stack_slot_addr(self.thread_base, sp_latched, -1)),
-                    local_mem_wr_data.eq(callee_egt_latched),
+                    local_mem_wr_data.eq(caller_egt_latched),
                     local_mem_wr_en.eq(1),
                 ]
                 m.next = "STACK_WRITE_FRAME"

@@ -413,7 +413,9 @@ class ChurchCore(Elaboratable):
 
         any_unit_busy = Signal()
         cross_domain_ret = Signal()
+        boot_rom_return = Signal()
         cload_pending   = Signal()
+        m.d.comb += boot_rom_return.eq(u_return.boot_rom_return)
 
         # Early declarations for M-window FSM — CR15 M-flag latch + DR11-DR13 shadow
         mwin_busy              = Signal()
@@ -917,12 +919,13 @@ class ChurchCore(Elaboratable):
         with m.Elif(
             self.boot_complete & u_decoder.instr_valid & ~any_unit_busy
             & ~call_start_sig
+            & ~ret_start_sig
             & ~fetch_bounds_fault & ~u_outform_fsm.intercept_start
         ):
             # Advance PC for all instructions (including not-taken branches).
-            # ~call_start_sig: a CALL must NOT advance the PC on its issue
-            # cycle — its NIA comes from u_call.nia_set at completion, and an
-            # early +4 makes the nia_set retire show the wrong retire_nia.
+            # CALL and RETURN must NOT advance the PC on their issue cycles.
+            # Their NIAs come from the respective nia_set pulses at completion;
+            # an early +4 creates a phantom retire at the sequential address.
             # ~fetch_bounds_fault ensures nia never advances on a BOUNDS-fault cycle.
             # ~u_outform_fsm.intercept_start holds the PC at the CALL instruction
             # when a Mode 2 Outform intercept fires; the CALL is replayed once the
@@ -933,19 +936,35 @@ class ChurchCore(Elaboratable):
         #
         # Priority (highest first):
         #   1. Reboot / global reset: clear fence + cancel any pending transition.
-        #   2. Cross-domain RETURN: set fence_pending to stall fetch until cload restores
+        #   2. Boot-ROM RETURN: no namespace-backed caller capability exists;
+        #      clear the SelfTest fence so the ROM guard at NIA 0x0C can retire.
+        #   3. Cross-domain RETURN: set fence_pending to stall fetch until cload restores
         #      CR14.  The callee's fence is KEPT (not cleared) so that the BOUNDS check
         #      cannot fire during the stall (any_unit_busy already blocks decode, but
         #      keeping the old fence avoids an inactive-fence window entirely).
-        #   3. Lambda-fast RETURN (~cross_domain_ret): no cload follows, fence goes
+        #   4. Lambda-fast RETURN (~cross_domain_ret): no cload follows, fence goes
         #      inactive immediately (caller's context had no fence at lambda entry).
-        #   4. cload writes CR14: fence_pending cleared, new fence established from the
+        #   5. cload writes CR14: fence_pending cleared, new fence established from the
         #      restored caller code cap.  This is the exclusive path to re-activate the
         #      fence after a cross-domain RETURN.
-        #   5. LAMBDA / ELOADCALL / XLOADLAMBDA: entering unknown code, fence suspended.
-        #   6. CALL completing: establish callee fence from CALL unit outputs.
+        #   6. LAMBDA / ELOADCALL / XLOADLAMBDA: entering unknown code, fence suspended.
+        #   7. CALL completing: establish callee fence from CALL unit outputs.
         with m.If(u_return.reboot_request | clear_all):
             # Reboot or global reset — wipe everything immediately.
+            m.d.sync += [
+                code_lo_reg.eq(0),
+                code_hi_reg.eq(0),
+                fence_pending_reg.eq(0),
+            ]
+        with m.Elif(
+            u_return.nia_set & (u_return.nia_value == 0x0C)
+        ):
+            # The reset ROM is not represented by an NS E-GT, so it cannot be
+            # reconstructed by cLoad. Returning to its fixed guard address is
+            # the one cross-domain return that intentionally has no code fence.
+            # Clear on the SET_NIA pulse, not COMPLETE one cycle later: once
+            # NIA becomes 0x0C the old SelfTest fence would otherwise raise a
+            # combinatorial bounds fault during RETURN's COMPLETE cycle.
             m.d.sync += [
                 code_lo_reg.eq(0),
                 code_hi_reg.eq(0),
@@ -1222,7 +1241,10 @@ class ChurchCore(Elaboratable):
         with m.If(ret_start_sig):
             m.d.sync += cross_domain_ret.eq(~lambda_active_reg)
 
-        with m.If(u_return.complete & ~u_return.fault_valid & ~u_return.reboot_request & cross_domain_ret):
+        with m.If(
+            u_return.complete & ~u_return.fault_valid &
+            ~u_return.reboot_request & cross_domain_ret & ~boot_rom_return
+        ):
             m.d.sync += cload_pending.eq(1)
         with m.Elif(cload_pending):
             m.d.sync += cload_pending.eq(0)
@@ -2571,13 +2593,14 @@ class ChurchCore(Elaboratable):
         # not used internally here — included on ChurchCore for clean API only.
         _ = self.halt_req  # referenced to prevent "unused port" warnings
 
-        # CALL retires via u_call.nia_set, not retire_norm — but call_busy
-        # rises one cycle after call_start (IDLE transition is sync), so
-        # without excluding the issue cycle the CALL retires TWICE (issue +
-        # nia_set), inserting a phantom retire and advancing NIA early.
+        # CALL/RETURN retire via their nia_set pulses, not retire_norm — but each
+        # busy signal rises one cycle after its start (IDLE transition is sync).
+        # Exclude both issue cycles or they retire twice and briefly advance to
+        # a phantom sequential NIA before the control-flow restore completes.
         retire_norm = (
             u_decoder.instr_valid & ~any_unit_busy &
             ~call_start_sig &
+            ~ret_start_sig &
             ~fetch_bounds_fault & ~u_outform_fsm.intercept_start
         )
         retire_conds_base = (
