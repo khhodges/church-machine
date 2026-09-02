@@ -380,10 +380,10 @@ def test_incomplete_frame_waits():
 
 # ── Sentinel bridge-status label guard ───────────────────────────────────────
 
-def test_sentinel_block_emits_run_label_not_halt_label():
+def test_sentinel_block_halts_and_reports_awaiting_first_step():
     """The sentinel handling block in wukong_bridge.py must call
-    _bridge_status('automatic_run_after_sentinel', 'connected', ...) and must
-    NOT use the old 'automatic_halt_after_sentinel' label.
+    _bridge_status('automatic_halt_after_sentinel',
+    'awaiting_first_step', ...) and must not auto-run.
 
     The search is bounded to the sentinel try-block (from its anchor comment to
     the 'if sentinel[stale]' line that follows it) so a stray reference
@@ -394,15 +394,12 @@ def test_sentinel_block_emits_run_label_not_halt_label():
     with open(bridge_path) as f:
         src = f.read()
 
-    # The anchor comment immediately precedes the try-block that writes 'r'
-    # and then calls _bridge_status.  It is a stable, human-maintained
-    # description of the intent; if it moves, this test surfaces the drift.
-    start_marker = "# Send 'r' so the CM keeps running freely after the bridge"
+    start_marker = "# The current RTL powers up in free-run mode."
     end_marker   = "if sentinel['stale']:"
 
     start = src.find(start_marker)
     assert start != -1, (
-        "Sentinel run-block anchor comment not found in wukong_bridge.py — "
+        "Sentinel halt-block anchor comment not found in wukong_bridge.py — "
         "either the sentinel handling was removed or its description changed"
     )
     end = src.find(end_marker, start)
@@ -413,20 +410,10 @@ def test_sentinel_block_emits_run_label_not_halt_label():
 
     block = src[start:end]
 
-    assert "'automatic_run_after_sentinel'" in block, (
-        "Sentinel try-block must call _bridge_status('automatic_run_after_sentinel', ...) "
+    assert "ser.write(b'h')" in block
+    assert "'automatic_halt_after_sentinel'" in block, (
+        "Sentinel try-block must report automatic_halt_after_sentinel "
         "but the string was not found in the bounded block:\n" + block
     )
-    assert "'automatic_halt_after_sentinel'" not in block, (
-        "Stale 'automatic_halt_after_sentinel' label found in the sentinel "
-        "try-block — the bridge must use 'automatic_run_after_sentinel'"
-    )
-    # The state argument must be 'connected' (not 'halted') so the Devices
-    # panel shows the board as running, not stopped.
-    run_call_start = block.find("'automatic_run_after_sentinel'")
-    run_call_end   = block.find(')', run_call_start)
-    run_call       = block[run_call_start:run_call_end]
-    assert "'connected'" in run_call or '"connected"' in run_call, (
-        "_bridge_status('automatic_run_after_sentinel', ...) must pass "
-        "state='connected' but it was not found in: " + run_call
-    )
+    assert "'awaiting_first_step'" in block
+    assert "ser.write(b'r')" not in block

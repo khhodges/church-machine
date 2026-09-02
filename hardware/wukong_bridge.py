@@ -404,7 +404,7 @@ _STANDALONE_WUKONG_WORDS = (
 )
 _STANDALONE_BOOT_WORDS = (0x077F8000, 0x27678001, 0x17000000)
 _STANDALONE_BOOT_DISASSEMBLY = (
-    'LOAD NAMESPACE CD15',
+    'LOAD NAMESPACE CR15',
     'LOAD THREAD+HEAP CR12+, CR5',
 )
 _STANDALONE_CONDS = ('EQ', 'NE', 'CS', 'CC', 'MI', 'PL', 'VS', 'VC',
@@ -1422,7 +1422,7 @@ def try_parse_utf8_sequence(buf, i):
 
 
 def post_command_ack(ide_base, verify_tls, cmd, ok, error='', cmd_id=None,
-                      session_id=None):
+                      session_id=None, trace_counter=None):
     """Report the serial-write result for a dequeued command to the server.
 
     Delivery of the ack is best-effort; a failure to POST never interrupts
@@ -1432,6 +1432,8 @@ def post_command_ack(ide_base, verify_tls, cmd, ok, error='', cmd_id=None,
         payload = {'cmd': cmd, 'ok': ok, 'error': error, 'id': cmd_id}
         if session_id:
             payload['session_id'] = session_id
+        if trace_counter is not None:
+            payload['trace_counter'] = int(trace_counter)
         requests.post(f'{ide_base}/hardware/wukong/command-ack',
                       json=payload,
                       timeout=1, verify=verify_tls)
@@ -1440,7 +1442,8 @@ def post_command_ack(ide_base, verify_tls, cmd, ok, error='', cmd_id=None,
 
 
 def execute_board_command(cmd, data, ser, reopen_serial, buf,
-                          ide_base, verify_tls, session_id=None):
+                          ide_base, verify_tls, session_id=None,
+                          trace_counter=None):
     """Write a dequeued command ('s','r','h','q','b','f') to the board's UART.
 
     Reports success/failure back to the server via POST
@@ -1491,13 +1494,13 @@ def execute_board_command(cmd, data, ser, reopen_serial, buf,
                              cmd_id=cmd_id, session_id=session_id)
             return ser
         post_command_ack(ide_base, verify_tls, cmd, True, cmd_id=cmd_id,
-                         session_id=session_id)
+                         session_id=session_id, trace_counter=trace_counter)
     except Exception as exc:
         print(f'  [command] serial write FAILED for {cmd!r}: {exc}',
               flush=True)
         post_command_ack(ide_base, verify_tls, cmd, False,
                          f'serial write failed: {exc}', cmd_id=cmd_id,
-                         session_id=session_id)
+                         session_id=session_id, trace_counter=trace_counter)
     return ser
 
 
@@ -1633,6 +1636,7 @@ def main():
     last_read_ts = None
     last_write_ts = None
     delivery_worker = FaultDeliveryWorker(ide_base, verify_tls)
+    trace_counter = 0
 
     def _bridge_status(event='heartbeat', state=None, reason='',
                        reconnect_attempt=0, fault_delivery=None):
@@ -1784,8 +1788,6 @@ def main():
     # Raw prefetch responses grant the board exclusive RX ownership. The timer
     # derives the exact serial drain window and defers all control traffic.
     prefetch_busy_until = 0.0
-    _boot_run_pending = False
-    _boot_run_deadline = 0.0
 
     # ── UART ASCII console forwarding ────────────────────────────────────
     # Printable UART bytes (banner text etc.) are line-buffered and POSTed
@@ -1990,6 +1992,9 @@ def main():
                     # packets retain arrival order without blocking UART reads.
                     _console_flush(ide_base, verify_tls)
                     decoded['ts'] = time.time()
+                    trace_counter += 1
+                    decoded['bridge_trace_counter'] = trace_counter
+                    decoded['bridge_session'] = session_id
                     location = _trace_location(decoded['nia'])
                     if location:
                         decoded.update(location)
@@ -2111,31 +2116,33 @@ def main():
                         print(f'BOOT: board ready — N_INIT byte=0x{board_n_init_byte:02X} '
                               f'(validation skipped: boot_rom not importable){tu_str}{bv_str}')
 
-                    # Send 'r' so the CM keeps running freely after the bridge
-                    # attaches.  The hardware fault_halt mechanism (reason=2)
-                    # will pause the CM automatically on any actual fault retire,
-                    # so an unconditional 'h' here is no longer needed.
-                    #
-                    # 'q' (snapshot request) is NOT sent immediately here.
-                    # On a cold board start the CM emits BOOT_TRACE_PACKET_COUNT
-                    # trace packets right after the sentinel (boot-thread CHANGE +
-                    # boot CALL sequence).  Sending 'q' back-to-back with 'r'
-                    # races with those packets: 'q' can arrive at the hardware
-                    # before the boot CALL has been processed, so the snapshot
-                    # captures partial mid-boot register state (CR6/CR14 not yet
-                    # updated) rather than the final settled boot state.
-                    #
-                    # Mitigation: arm the deferred-'q' gate here.  The main
-                    # receive loop sends 'q' after BOOT_TRACE_PACKET_COUNT
-                    # trace packets have been observed — or after BOOT_Q_TIMEOUT
-                    # seconds — whichever comes first.  This guarantees the
-                    # snapshot always reflects post-boot register state.
-                    _boot_run_pending = True
-                    _boot_run_deadline = time.time() + 0.25
+                    # The current RTL powers up in free-run mode.  Fail safe in
+                    # software by halting immediately after a fresh sentinel;
+                    # both control surfaces then require one deliberate Step
+                    # before they enable Run.
+                    startup_state = 'halt_failed'
+                    try:
+                        ser.write(b'h')
+                        last_write_ts = time.time()
+                        startup_state = 'awaiting_first_step'
+                        print('  [boot] halt requested — awaiting first deliberate step',
+                              flush=True)
+                        _bridge_status(
+                            'automatic_halt_after_sentinel',
+                            'awaiting_first_step',
+                            'halt written after boot sentinel; awaiting first deliberate step')
+                    except Exception as exc:
+                        print(f'  [halt send error] {exc}', flush=True)
+                        _bridge_status(
+                            'automatic_halt_failed', 'serial_error', str(exc))
+
+                    # Do not send 'q' back-to-back with the sentinel.  Drain
+                    # trace bytes already in flight before requesting a
+                    # snapshot, or the snapshot can capture partial boot state.
                     _boot_q_pending   = True
                     _boot_q_remaining = BOOT_TRACE_PACKET_COUNT
                     _boot_q_deadline  = time.time() + BOOT_Q_TIMEOUT
-                    print(f'  [boot] deferring run/snapshot until boot traffic '
+                    print(f'  [boot] deferring snapshot until boot traffic '
                           f'settles (timeout={BOOT_Q_TIMEOUT:.1f}s)', flush=True)
 
                     if sentinel['stale']:
@@ -2165,6 +2172,7 @@ def main():
                             'stale_tu': True, 'tu_version': post_tu,
                             'build_version': build_version,
                             'thread_scheduler': bool(sentinel.get('thread_scheduler', False)),
+                            'startup_state': startup_state,
                             'session_id': session_id,
                         })
                     else:
@@ -2173,6 +2181,7 @@ def main():
                             'stale_tu': False, 'tu_version': tu_version,
                             'build_version': build_version,
                             'thread_scheduler': bool(sentinel.get('thread_scheduler', False)),
+                            'startup_state': startup_state,
                             'session_id': session_id,
                         })
 
@@ -2246,16 +2255,6 @@ def main():
             # Apply only completed HTTP results. Network retries remain in the
             # daemon worker and can never stop UART decoding.
             _process_delivery_results()
-            if _boot_run_pending and now >= _boot_run_deadline and now >= prefetch_busy_until:
-                _boot_run_pending = False
-                try:
-                    ser.write(b'r')
-                    last_write_ts = now
-                    _bridge_status('automatic_run_after_sentinel', 'connected',
-                                   'intentional run after boot sentinel')
-                except Exception as exc:
-                    print(f'  [run send error] {exc}')
-                    _bridge_status('automatic_run_failed', 'serial_error', str(exc))
             # Deferred snapshot timeout: if the expected boot trace packets
             # have not all arrived within BOOT_Q_TIMEOUT seconds, send 'q'
             # anyway so the IDE still gets a register snapshot on boards that
@@ -2289,7 +2288,8 @@ def main():
                         if cmd in ('s', 'r', 'h', 'q', 'b', 'f'):
                             ser = execute_board_command(
                                 cmd, data, ser, _reopen_serial, buf,
-                                ide_base, verify_tls, session_id)
+                                ide_base, verify_tls, session_id,
+                                trace_counter=trace_counter)
                         elif cmd == 'u':
                             try:
                                 _leftover = _handle_upload(

@@ -16471,6 +16471,9 @@ function showApiAbstractionDetail(slot) {
 // and the "▶ HW" / "⏸ HW" toolbar button is shown.
 
 let _wukongHWRunning    = false;   // true = board is in free-run mode
+let _wukongRunUnlocked  = false;   // true after a delivered Step retires
+let _wukongStartupTs    = null;    // fresh sentinel resets the step-first gate
+let _wukongPendingExecutionCmd = null; // queued 's'/'r' remains STOP-cancellable
 let _wukongLastTraceTs  = 0;       // unix timestamp (seconds) of last trace packet
 const _WUKONG_STALE_MS  = 10000;   // 10 s without a packet → disconnected
 // Bridge liveness flag: true when the events endpoint reports the bridge has
@@ -16489,6 +16492,7 @@ let _wukongLastHwNIA    = null;    // last hardware NIA seen from trace packets
 let _wukongHwNia        = null;    // retiring NIA of last HW trace packet
 
 let _wukongLastEventSeq = 0;       // cursor into the server-side ordered event queue
+let _wukongLastRetirementSeq = 0;  // trace events only; excludes status/info rows
 const _hwBreakpoints = new Set();
 
 // ── Relay state (mirror from production) ──────────────────────────────────────
@@ -17180,6 +17184,19 @@ async function _wukongRefreshHealthStrip() {
                 ? s.relay_last_rx : null;
         }
         _wukongHandleBridgeAlert(s.bridge_alert);
+        const bi = (s && s.boot_info) || {};
+        if (bi.received_ts && bi.received_ts !== _wukongStartupTs) {
+            _wukongStartupTs = bi.received_ts;
+            if (bi.startup_state === 'awaiting_first_step') {
+                _wukongHWRunning = false;
+                _wukongRunUnlocked = false;
+                _wukongCmdLog('Board halted after boot sentinel \u2014 waiting for the first deliberate Step');
+            }
+        }
+        const pending = s && s.pending_command;
+        _wukongPendingExecutionCmd = pending &&
+            (pending.cmd === 's' || pending.cmd === 'r') ? pending.cmd : null;
+        _wukongUpdateBtn();
         var strip = document.getElementById('wukong-health-strip');
         if (!strip) return;
         var stages = _wukongClassifyPipelineStages(s, _wukongLastEventSeq, _wukongLastTraceTs || null);
@@ -17392,6 +17409,22 @@ function _wukongUpdateBtn() {
     // connection status plus a link to Builder > Testing, where every board
     // control lives.
     _wukongUpdateToolbarBtn(connected);
+
+    // Compatibility for the Wukong control surface when these controls are
+    // mounted by a Testing view.  The simulator itself does not create them.
+    const commandBusy = typeof _wukongCmdBusy !== 'undefined' && _wukongCmdBusy;
+    const runUnlocked = typeof _wukongRunUnlocked === 'undefined' ||
+        _wukongRunUnlocked;
+    const pendingExecution = typeof _wukongPendingExecutionCmd === 'undefined'
+        ? null : _wukongPendingExecutionCmd;
+    const runBtn = document.getElementById('toolHWRunBtn');
+    const stepBtn = document.getElementById('toolHWStepBtn');
+    const stopBtn = document.getElementById('toolHWStopBtn');
+    if (runBtn) runBtn.disabled = commandBusy ||
+        (!_wukongHWRunning && !runUnlocked);
+    if (stepBtn) stepBtn.disabled = commandBusy || _wukongHWRunning;
+    if (stopBtn) stopBtn.disabled = !(_wukongHWRunning ||
+        pendingExecution === 's' || pendingExecution === 'r');
 }
 
 // Update the always-visible "⚡ Wukong" button in the top navigation bar.
@@ -17668,6 +17701,10 @@ async function _wukongDrainEvents() {
     const wasConnected = _wukongIsConnected();
     for (const ev of events) {
         if ((ev.seq || 0) > _wukongLastEventSeq) _wukongLastEventSeq = ev.seq;
+        if (typeof ev.ev_type === 'number' &&
+                (ev.seq || 0) > _wukongLastRetirementSeq) {
+            _wukongLastRetirementSeq = ev.seq;
+        }
         if ((ev.ts  || 0) > _wukongLastTraceTs)  _wukongLastTraceTs  = ev.ts;
     }
     // On reconnect reset local depth (per-event call_depth will re-establish it).
@@ -18011,6 +18048,16 @@ setInterval(async function _wukongPoll() {
         const bi = await fetch('/hardware/wukong/boot-info');
         if (!bi.ok) return;
         const bdata = await bi.json();
+        if (bdata && bdata.received_ts &&
+                bdata.received_ts !== _wukongStartupTs) {
+            _wukongStartupTs = bdata.received_ts;
+            if (bdata.startup_state === 'awaiting_first_step') {
+                _wukongHWRunning = false;
+                _wukongRunUnlocked = false;
+                _wukongCmdLog('Board halted after boot sentinel \u2014 waiting for the first deliberate Step');
+                _wukongUpdateBtn();
+            }
+        }
         if (bdata && bdata.stale_tu) {
             _wukongShowStaleBanner();
         } else if (bdata && Object.keys(bdata).length > 0 && !bdata.stale_tu) {
@@ -18458,12 +18505,14 @@ function _wukongCmdLog(msg) {
 // still being watched would replace A's record and make A's watcher report a
 // false "superseded" even though A was already consumed and written.
 let _wukongCmdBusy = false;
+const _wukongCmdWatches = new Set();
 
 // POST a command; returns the response object {ok, id, overwrote?} on queue
 // success, or null after logging the failure.
 async function _wukongPostCmd(cmd, extra, label) {
     label = label || ("'" + cmd + "'");
-    if (_wukongCmdBusy) {
+    const priorityStop = cmd === 'h';
+    if (_wukongCmdBusy && !priorityStop) {
         _wukongCmdLog(label + ': another board command is still awaiting ' +
                       'delivery confirmation \u2014 try again in a moment');
         return null;
@@ -18490,7 +18539,15 @@ async function _wukongPostCmd(cmd, extra, label) {
         _wukongCmdLog(label + " WARNING: replaced pending '" + d.overwrote +
                       "' command \u2014 that command was never delivered to the board");
     }
-    _wukongCmdBusy = true;   // released by _wukongWatchDelivery
+    if (d.cancelled) {
+        _wukongCmdLog(label + ": cancelled undelivered '" + d.cancelled.cmd +
+                      "' command #" + d.cancelled.id +
+                      ' and queued Halt atomically');
+    }
+    if (cmd === 's' || cmd === 'r') _wukongPendingExecutionCmd = cmd;
+    _wukongCmdWatches.add(d.id);
+    _wukongCmdBusy = true;   // released when all delivery watches finish
+    _wukongUpdateBtn();
     return d;
 }
 
@@ -18501,7 +18558,13 @@ async function _wukongWatchDelivery(id, label, timeoutMs) {
     try {
         return await _wukongWatchDeliveryInner(id, label, timeoutMs);
     } finally {
-        _wukongCmdBusy = false;
+        _wukongCmdWatches.delete(id);
+        _wukongCmdBusy = _wukongCmdWatches.size > 0;
+        if (_wukongPendingExecutionCmd &&
+                !_wukongCmdWatches.has(id)) {
+            _wukongPendingExecutionCmd = null;
+        }
+        _wukongUpdateBtn();
     }
 }
 async function _wukongWatchDeliveryInner(id, label, timeoutMs) {
@@ -18551,7 +18614,6 @@ async function _wukongWatchDeliveryInner(id, label, timeoutMs) {
 
 async function _wukongStep() {
     try {
-        const beforeSeq = _wukongLastEventSeq;
         const d = await _wukongPostCmd('s', null, 'STEP');
         if (!d) return;
         // First require a confirmed serial write — a bridge write failure or
@@ -18563,13 +18625,17 @@ async function _wukongStep() {
         while (Date.now() < deadline) {
             await new Promise(function(res) { setTimeout(res, 30); });
             try {
-                const gotNew = await _wukongDrainEvents();
-                if (gotNew && _wukongLastEventSeq > beforeSeq) {
+                await _wukongDrainEvents();
+                const status = await (await fetch('/hardware/wukong/status')).json();
+                if (status.run_unlocked === true) {
+                    _wukongRunUnlocked = true;
+                    _wukongCmdLog('STEP confirmed \u2014 UART write and fresh retirement observed; Run is now available');
                     _wukongUpdateBtn();
                     return;
                 }
             } catch(e) { break; }
         }
+        _wukongCmdLog('STEP was written, but no fresh retirement was observed \u2014 Run remains locked; check the bridge/board connection');
     } catch(e) {}
 }
 
@@ -18601,6 +18667,10 @@ window._wukongHwFaultReset = _wukongHwFaultReset;
 async function hwRunToggle() {
     const wantRunning = !_wukongHWRunning;
     const label = wantRunning ? 'RUN' : 'PAUSE';
+    if (wantRunning && !_wukongRunUnlocked) {
+        _wukongCmdLog('RUN blocked \u2014 deliver one Step and observe its retirement first');
+        return;
+    }
     // Optimistically flip for responsive UI, but REVERT on any failure —
     // the old code left the button lying about the board's state.
     _wukongHWRunning = wantRunning;
@@ -18621,14 +18691,19 @@ async function hwRunToggle() {
 // The button is disabled optimistically on click and re-enabled if delivery
 // fails or when the board transitions back to running via _wukongUpdateBtn().
 async function hwStop() {
-    if (!_wukongHWRunning) return;   // already halted — nothing to do
+    const pendingExecution = typeof _wukongPendingExecutionCmd === 'undefined'
+        ? null : _wukongPendingExecutionCmd;
+    if (!_wukongHWRunning &&
+            pendingExecution !== 'r' &&
+            pendingExecution !== 's') return;
     const stopBtn = document.getElementById('toolHWStopBtn');
     if (stopBtn) { stopBtn.disabled = true; stopBtn.textContent = '\u23F3 Stopping\u2026'; }
     const d = await _wukongPostCmd('h', null, 'STOP');
     if (!d) {
         // Delivery failed: restore the button if the board is still running.
         if (stopBtn) stopBtn.textContent = '\u23F9 HW';
-        if (_wukongHWRunning && stopBtn) stopBtn.disabled = false;
+        if ((_wukongHWRunning || pendingExecution) && stopBtn)
+            stopBtn.disabled = false;
         return;
     }
     const ok = await _wukongWatchDelivery(d.id, 'STOP', 10000);
@@ -18655,7 +18730,12 @@ function _hwStopShortcutHandler(e) {
     if (!e.shiftKey || e.key !== 'H') return;
     const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
     if (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable)) return;
-    if (!_wukongIsConnected() || !_wukongHWRunning) return;
+    const pendingExecution = typeof _wukongPendingExecutionCmd === 'undefined'
+        ? null : _wukongPendingExecutionCmd;
+    if (!_wukongIsConnected() ||
+            (!_wukongHWRunning &&
+             pendingExecution !== 'r' &&
+             pendingExecution !== 's')) return;
     e.preventDefault();
     hwStop();
 }
@@ -18762,21 +18842,14 @@ async function _wukongLoadToHardware() {
         }
 
         _loadLog('Upload complete \u2014 hardware boot entry is now slot ' +
-                 entrySel + ' \u2014 starting board\u2026');
+                 entrySel + ' \u2014 waiting for bridge halt and first Step\u2026');
 
-        // Step 4: send run command so the board starts executing the new image.
-        _wukongHWRunning = true;
+        // The rebooted board emits a fresh sentinel; the bridge halts it and
+        // re-arms the step-first gate.  Never auto-run a newly uploaded image.
+        _wukongHWRunning = false;
+        _wukongRunUnlocked = false;
         _wukongUpdateBtn();
-        const runD = await _wukongPostCmd('r', null, 'RUN (post-upload)');
-        const runOk = runD ? await _wukongWatchDelivery(runD.id, 'RUN (post-upload)', 10000) : false;
-        if (!runOk) {
-            _wukongHWRunning = false;
-            _wukongUpdateBtn();
-            _loadLog('Upload OK but the RUN command was not confirmed \u2014 press \u25B6 to start the board.');
-            return _loadDone(false);
-        }
-
-        _loadLog('Board running \u2014 waiting for trace\u2026');
+        _loadLog('Board startup is step-first \u2014 press Step once; Run unlocks after a fresh retirement.');
         return _loadDone(true);
 
     } catch(e) {

@@ -87,7 +87,11 @@
       "g": 0,
       "limit": "0x0003F",
       "seq": 0,
-      "seal": "0xDEA85EEF"
+      "seal": "0xDEA85EEF",
+      "token": "7c509001",
+      "filename": "WukongCallHome.1.e99f2ca8.lump",
+      "issue_n": 1,
+      "resident": true
     },
     {
       "name": "Tunnel",
@@ -167,6 +171,5 @@
       "seal": "0xDEA81EEF"
     }
   ],
-  "generated_at": 1788378669.8476498,
-  "committed_raw_fingerprint": "31cdfc66daf5d7532cc2593f2737eb3561a60dbc6e0c5732409ed1574f4f0c53"
+  "generated_at": 1788386008.9942648
 }

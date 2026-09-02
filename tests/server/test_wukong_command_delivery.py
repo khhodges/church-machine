@@ -36,6 +36,10 @@ def _reset_state():
         _app_module._wukong_pending_cmd = None
         _app_module._wukong_cmd_delivery = None
         _app_module._wukong_cmd_id = 0
+        _app_module._wukong_run_unlocked = True
+        _app_module._wukong_step_write_trace_seq = None
+        _app_module._wukong_step_bridge_session = ''
+        _app_module._wukong_bridge_trace_highwater.clear()
     with _app_module._upload_in_flight_lock:
         _app_module._upload_in_flight = False
     with _app_module._wukong_boot_info_lock:
@@ -76,12 +80,25 @@ def _status(client):
     return r.get_json()
 
 
-def _ack(client, cmd, cmd_id, ok, error=''):
+def _ack(client, cmd, cmd_id, ok, error='', session_id='', trace_counter=None):
     body = {'cmd': cmd, 'id': cmd_id, 'ok': ok}
     if error:
         body['error'] = error
+    if session_id:
+        body['session_id'] = session_id
+    if trace_counter is not None:
+        body['trace_counter'] = trace_counter
     return client.post('/hardware/wukong/command-ack',
                        data=json.dumps(body), content_type='application/json')
+
+
+def _trace(client, session_id, counter):
+    return client.post('/hardware/wukong/trace', data=json.dumps({
+        'nia': 0x140, 'ev_type': 0, 'payload_gt': 0, 'flags': 0,
+        'fault_code': 0, 'fault_valid': False, 'bp_hit': False,
+        'ts': time.time(), 'bridge_session': session_id,
+        'bridge_trace_counter': counter,
+    }), content_type='application/json')
 
 
 def _bridge_status(client, **body):
@@ -194,7 +211,9 @@ class TestQueueConsumeAckLifecycle:
         response = client.post(
             '/hardware/wukong/boot-info',
             data=json.dumps({'stale_tu': False, 'tu_version': 3,
-                             'build_version': 7, 'session_id': 'test-session'}),
+                             'build_version': 7,
+                             'startup_state': 'awaiting_first_step',
+                             'session_id': 'test-session'}),
             headers={'Authorization': 'Bearer bridge-report-secret'},
             content_type='application/json')
         assert response.status_code == 200
@@ -462,72 +481,112 @@ class TestBreakpointNiaParsing:
         assert self._pending_nia() is None
 
 
-class TestAutomaticRunAfterSentinelLabel:
-    """Task 3012: the bridge now emits 'automatic_run_after_sentinel' (not the
-    old 'automatic_halt_after_sentinel') after a clean boot sentinel.  Verify
-    that the server surfaces the new label verbatim in bridge_timeline so the
-    Devices panel can distinguish a post-sentinel connected state from a halt."""
-
-    def test_automatic_run_label_appears_in_timeline(self, client):
-        """POSTing the new event label must appear verbatim in bridge_timeline."""
+class TestAutomaticHaltAfterSentinelLabel:
+    def test_automatic_halt_label_appears_in_timeline(self, client):
         r = _bridge_status(
             client,
-            session_id='run-sentinel-test',
-            event='automatic_run_after_sentinel',
-            state='connected',
-            reason='intentional run after boot sentinel',
+            session_id='halt-sentinel-test',
+            event='automatic_halt_after_sentinel',
+            state='awaiting_first_step',
+            reason='halt written after boot sentinel; awaiting first deliberate step',
             serial_port='/dev/ttyUSB0',
         )
         assert r.status_code == 200
         timeline = _status(client)['bridge_timeline']
-        matching = [e for e in timeline if e['event'] == 'automatic_run_after_sentinel']
-        assert matching, (
-            "bridge_timeline must contain an entry with "
-            "event='automatic_run_after_sentinel'"
-        )
+        matching = [e for e in timeline
+                    if e['event'] == 'automatic_halt_after_sentinel']
+        assert matching
         entry = matching[-1]
-        assert entry['state'] == 'connected', (
-            "automatic_run_after_sentinel must carry state='connected'"
-        )
-        assert entry['session_id'] == 'run-sentinel-test'
+        assert entry['state'] == 'awaiting_first_step'
+        assert entry['session_id'] == 'halt-sentinel-test'
 
-    def test_automatic_run_state_connected_not_halted(self, client):
-        """The state field must be 'connected', not 'halted' — the board runs
-        freely after a clean sentinel; only a fault_halt event would set halted."""
-        _bridge_status(
-            client,
-            session_id='s-run',
-            event='automatic_run_after_sentinel',
-            state='connected',
-            reason='intentional run after boot sentinel',
-        )
-        timeline = _status(client)['bridge_timeline']
-        run_entries = [e for e in timeline if e['event'] == 'automatic_run_after_sentinel']
-        assert run_entries, "expected at least one automatic_run_after_sentinel entry"
-        for e in run_entries:
-            assert e['state'] != 'halted', (
-                "automatic_run_after_sentinel must never carry state='halted'; "
-                "got state=%r" % e['state']
-            )
 
-    def test_old_halt_label_absent_from_bridge(self, client):
-        """Regression: the old 'automatic_halt_after_sentinel' label must never
-        be injected by the current bridge — if it appears in the timeline it
-        means a stale bridge is connected."""
-        # Populate the timeline with the correct new event only.
-        _bridge_status(
-            client,
-            session_id='s-new',
-            event='automatic_run_after_sentinel',
-            state='connected',
-            reason='intentional run after boot sentinel',
-        )
-        timeline = _status(client)['bridge_timeline']
-        stale = [e for e in timeline if e['event'] == 'automatic_halt_after_sentinel']
-        assert not stale, (
-            "Found stale 'automatic_halt_after_sentinel' entries in bridge_timeline — "
-            "the bridge must emit 'automatic_run_after_sentinel' instead: %r" % stale
-        )
+class TestPriorityStop:
+    @pytest.mark.parametrize('cmd', ['r', 's'])
+    def test_stop_atomically_replaces_queued_execution_command(self, client, cmd):
+        queued = _post_cmd(client, cmd).get_json()
+        stopped = _post_cmd(client, 'h')
+        assert stopped.status_code == 200
+        body = stopped.get_json()
+        assert body['cancelled'] == {'cmd': cmd, 'id': queued['id']}
+        pending = _status(client)['pending_command']
+        assert pending['cmd'] == 'h'
+        assert pending['id'] == body['id']
+
+    @pytest.mark.parametrize('cmd,extra', [
+        ('f', {}),
+        ('b', {'nia': 16}),
+        ('q', {}),
+        ('h', {}),
+    ])
+    def test_stop_refuses_non_execution_pending_command(self, client, cmd, extra):
+        assert _post_cmd(client, cmd, **extra).status_code == 200
+        stopped = _post_cmd(client, 'h')
+        assert stopped.status_code == 409
+        body = stopped.get_json()
+        assert body['blocked_cmd'] == cmd
+        assert body['blocked_stage'] == 'queued'
+        assert _status(client)['pending_command']['cmd'] == cmd
+
+    def test_stop_refuses_upload_in_progress(self, client):
+        assert _post_cmd(client, 'u', data='YQ==').status_code == 200
+        stopped = _post_cmd(client, 'h')
+        assert stopped.status_code == 409
+        body = stopped.get_json()
+        assert body['blocked_cmd'] == 'u'
+        assert body['blocked_stage'] == 'upload'
+        assert _status(client)['pending_command']['cmd'] == 'u'
+
+    def test_stop_refuses_command_already_consumed(self, client):
+        queued = _post_cmd(client, 'r').get_json()
+        client.get('/hardware/wukong/command')
+        stopped = _post_cmd(client, 'h')
+        assert stopped.status_code == 409
+        body = stopped.get_json()
+        assert body['blocked_cmd'] == 'r'
+        assert body['blocked_stage'] == 'consumed'
+        assert _status(client)['command_delivery']['id'] == queued['id']
+
+
+class TestStepFirstRunGate:
+    def _step_ack(self, client, session='bridge-a', counter=10):
+        step_id = _post_cmd(client, 's').get_json()['id']
+        client.get('/hardware/wukong/command',
+                   headers={'X-Wukong-Session': session})
+        _ack(client, 's', step_id, True, session_id=session,
+             trace_counter=counter)
+
+    def test_direct_run_rejected_before_first_step_progress(self, client):
+        _app_module._wukong_run_unlocked = False
+        response = _post_cmd(client, 'r')
+        assert response.status_code == 409
+        assert response.get_json()['blocked_stage'] == 'awaiting_first_step'
+
+    def test_step_ack_then_newer_same_session_trace_unlocks(self, client):
+        self._step_ack(client)
+        assert _status(client)['run_unlocked'] is False
+        _trace(client, 'bridge-a', 11)
+        assert _status(client)['run_unlocked'] is True
+        assert _post_cmd(client, 'r').status_code == 200
+
+    def test_pre_write_counter_does_not_unlock(self, client):
+        _trace(client, 'bridge-a', 10)
+        self._step_ack(client, counter=10)
+        assert _status(client)['run_unlocked'] is False
+
+    def test_wrong_session_trace_does_not_unlock(self, client):
+        self._step_ack(client)
+        _trace(client, 'bridge-b', 11)
+        assert _status(client)['run_unlocked'] is False
+
+    def test_trace_arriving_before_ack_is_reconciled_from_highwater(self, client):
+        step_id = _post_cmd(client, 's').get_json()['id']
+        client.get('/hardware/wukong/command',
+                   headers={'X-Wukong-Session': 'bridge-a'})
+        _trace(client, 'bridge-a', 11)
+        _ack(client, 's', step_id, True, session_id='bridge-a',
+             trace_counter=10)
+        assert _status(client)['run_unlocked'] is True
 
 
 class TestBootInfoReceivedTs:
@@ -540,10 +599,14 @@ class TestBootInfoReceivedTs:
         response = client.post(
             '/hardware/wukong/boot-info',
             data=json.dumps({'stale_tu': False, 'tu_version': 3,
-                             'build_version': 7, 'session_id': 'test-session'}),
+                             'build_version': 7,
+                             'startup_state': 'awaiting_first_step',
+                             'session_id': 'test-session'}),
             headers={'Authorization': 'Bearer bridge-report-secret'},
             content_type='application/json')
         assert response.status_code == 200
         bi = _status(client)['boot_info']
         assert bi['received_ts'] >= t0 - 1
         assert bi['build_version'] == 7
+        assert bi['startup_state'] == 'awaiting_first_step'
+        assert _status(client)['startup_state'] == 'awaiting_first_step'

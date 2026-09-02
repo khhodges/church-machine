@@ -1,6 +1,10 @@
 """Regression tests for Wukong trace pet-name and disassembly metadata."""
 
-from hardware.wukong_trace_symbols import boot_disassembly, trace_metadata
+from hardware.wukong_trace_symbols import (
+    _BOOT_WORDS,
+    boot_disassembly,
+    trace_metadata,
+)
 
 
 def test_boot_instruction_metadata_uses_word_offset():
@@ -11,9 +15,15 @@ def test_boot_instruction_metadata_uses_word_offset():
 
 
 def test_wukong_boot_instruction_metadata_uses_semantic_operations():
-    assert boot_disassembly(0) == "LOAD NAMESPACE CD15"
+    assert boot_disassembly(0) == "LOAD NAMESPACE CR15"
     assert boot_disassembly(1) == "LOAD THREAD+HEAP CR12+, CR5"
     assert boot_disassembly(2, "SelfTest") == "CALL CR[0] SelfTest"
+
+
+def test_boot_namespace_label_matches_encoded_destination_register():
+    encoded_dst = (_BOOT_WORDS[0] >> 19) & 0xF
+    assert encoded_dst == 15
+    assert boot_disassembly(0).endswith(f"CR{encoded_dst}")
 
 
 def test_wukong_callhome_metadata_uses_word_offset():

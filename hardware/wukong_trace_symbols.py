@@ -66,7 +66,7 @@ _COND_NAMES = ("EQ", "NE", "CS", "CC", "MI", "PL", "VS", "VC",
                "HI", "LS", "GE", "LT", "GT", "LE", "", "NV")
 _BOOT_WORDS = (0x077F8000, 0x27678001, 0x17000000)
 _BOOT_DISASSEMBLY = (
-    "LOAD NAMESPACE CD15",
+    "LOAD NAMESPACE CR15",
     "LOAD THREAD+HEAP CR12+, CR5",
 )
 _OP_NAMES = {

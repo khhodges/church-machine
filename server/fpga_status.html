@@ -602,6 +602,11 @@
   // command racing an upload for that slot.
   var ctlBusy = false;
   var boardRunning = false;
+  var runUnlocked = false;
+  var pendingExecutionCmd = null;
+  var startupSentinelTs = null;
+  var lastRetirementSeq = 0;
+  var firstStepProgressTimer = null;
   var CTL_IDS = ['btnStep', 'btnRun', 'btnStop', 'btnBp', 'btnUpload', 'btnReboot', 'btnWorkspace'];
   function updateRunButton() {
     var btn = document.getElementById('btnRun');
@@ -615,7 +620,9 @@
     var step = document.getElementById('btnStep');
     var stop = document.getElementById('btnStop');
     if (step) step.disabled = ctlBusy || boardRunning;
-    if (stop) stop.disabled = ctlBusy || !boardRunning;
+    btn.disabled = ctlBusy || (!boardRunning && !runUnlocked);
+    if (stop) stop.disabled = !(boardRunning ||
+        pendingExecutionCmd === 'r' || pendingExecutionCmd === 's');
   }
   function setCtlBusy(b) {
     ctlBusy = b;
@@ -623,8 +630,8 @@
     updateRunButton();
   }
   function describeFailure(status, d, bodyText) {
-    if (status === 409) return 'upload in progress — wait for it to finish';
     if (d && d.error) return 'HTTP ' + status + ': ' + d.error;
+    if (status === 409) return 'command conflict — wait for the active operation';
     if (d) return 'HTTP ' + status + ': ' + JSON.stringify(d);
     return 'HTTP ' + status + (bodyText ? ': ' + bodyText.slice(0, 120) : '');
   }
@@ -653,15 +660,16 @@
   // stage: queued → consumed by bridge → written to UART (or a concrete
   // failure).  "Queued for bridge" alone is NOT delivery.
   var cmdWatch = null;   // {t0, id, label, timer, phase, warned}
-  function stopCmdWatch(result) {
+  function stopCmdWatch(result, delivery) {
     if (cmdWatch && cmdWatch.timer) clearInterval(cmdWatch.timer);
     var finished = cmdWatch;
     cmdWatch = null;
+    pendingExecutionCmd = null;
     // Controls stay locked from queue until terminal ACK/timeout so a second
     // command can never replace the single delivery record mid-watch.
     setCtlBusy(false);
     if (finished && typeof finished.onResult === 'function') {
-      finished.onResult(result !== false);
+      finished.onResult(result !== false, delivery || null);
     }
   }
   function cmdWatchTick() {
@@ -688,7 +696,7 @@
           note(w.label + ' FAILED: bridge consumed the command but the serial write failed — ' +
                   (d.write_error || 'unknown error'));
         }
-        stopCmdWatch(!!d.write_ok); return;
+        stopCmdWatch(!!d.write_ok, d); return;
       }
       if (d.consumed_ts) {
         if (w.phase !== 'consumed') {
@@ -721,8 +729,13 @@
                  onResult: onResult,
                  timer: setInterval(cmdWatchTick, 500) };
   }
-  function sendCmd(body, label, onResult) {
-    if (ctlBusy) return;
+  function cancelCmdWatchForStop() {
+    if (cmdWatch && cmdWatch.timer) clearInterval(cmdWatch.timer);
+    cmdWatch = null;
+  }
+  function sendCmd(body, label, onResult, priorityStop) {
+    if (ctlBusy && !priorityStop) return;
+    if (priorityStop) cancelCmdWatchForStop();
     setCtlBusy(true);
     fetch('/hardware/wukong/command', {
       method: 'POST',
@@ -733,9 +746,15 @@
         var d = null;
         try { d = JSON.parse(t); } catch (e) {}
         if (r.ok && d && d.ok) {
+          pendingExecutionCmd =
+            body.cmd === 'r' || body.cmd === 's' ? body.cmd : null;
           note(label + ' queued — watching delivery…' +
                (d.overwrote ? "  WARNING: replaced pending '" + d.overwrote +
                               "' command (it was never delivered)" : ''));
+          if (d.cancelled) {
+            note(label + ": cancelled undelivered '" + d.cancelled.cmd +
+                 "' command #" + d.cancelled.id + ' and queued Halt atomically');
+          }
           // Keep controls locked until the watcher reaches a terminal state
           // (stopCmdWatch releases the lock) — see race note above.
           startCmdWatch(d.id, label, onResult);
@@ -751,9 +770,43 @@
       if (typeof onResult === 'function') onResult(false);
     });
   }
-  document.getElementById('btnStep').onclick   = function () { sendCmd({ cmd: 's' }, 'STEP'); };
+  function awaitFirstStepRetirement() {
+    if (firstStepProgressTimer) clearInterval(firstStepProgressTimer);
+    var deadline = Date.now() + 5000;
+    firstStepProgressTimer = setInterval(function () {
+      fetch('/hardware/wukong/status').then(function (r) { return r.json(); }).then(function (s) {
+        if (s.run_unlocked) {
+          clearInterval(firstStepProgressTimer);
+          firstStepProgressTimer = null;
+          runUnlocked = true;
+          note('STEP confirmed — UART write and fresh retirement observed; Run is now available');
+          updateRunButton();
+        } else if (Date.now() >= deadline) {
+          clearInterval(firstStepProgressTimer);
+          firstStepProgressTimer = null;
+          note('STEP was written, but no fresh retirement was observed — Run remains locked; check the bridge/board connection');
+          updateRunButton();
+        }
+      }).catch(function () {
+        if (Date.now() >= deadline) {
+          clearInterval(firstStepProgressTimer);
+          firstStepProgressTimer = null;
+          note('STEP retirement confirmation failed — Run remains locked; reconnect the bridge and try Step again');
+        }
+      });
+    }, 200);
+  }
+  document.getElementById('btnStep').onclick = function () {
+    sendCmd({ cmd: 's' }, 'STEP', function (ok) {
+      if (ok) awaitFirstStepRetirement();
+    });
+  };
   document.getElementById('btnRun').onclick    = function () {
     var wantRunning = !boardRunning;
+    if (wantRunning && !runUnlocked) {
+      note('RUN blocked — deliver one Step and observe its retirement first');
+      return;
+    }
     sendCmd({ cmd: wantRunning ? 'r' : 's' }, wantRunning ? 'RUN' : 'PAUSE',
       function (ok) {
         if (ok) {
@@ -763,18 +816,21 @@
       });
   };
   document.getElementById('btnStop').onclick = function () {
-    if (!boardRunning) return;
+    if (!boardRunning && pendingExecutionCmd !== 'r' &&
+        pendingExecutionCmd !== 's') return;
     sendCmd({ cmd: 'h' }, 'STOP', function (ok) {
       if (ok) {
         boardRunning = false;
         updateRunButton();
       }
-    });
+    }, true);
   };
   document.addEventListener('keydown', function (e) {
     var tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '';
     if (!e.shiftKey || e.key !== 'H' || tag === 'input' || tag === 'textarea' ||
-        (e.target && e.target.isContentEditable) || !boardRunning || ctlBusy) return;
+        (e.target && e.target.isContentEditable) ||
+        (!boardRunning && pendingExecutionCmd !== 'r' &&
+         pendingExecutionCmd !== 's')) return;
     e.preventDefault();
     document.getElementById('btnStop').click();
   });
@@ -1230,6 +1286,7 @@
       be.className = br.state === 'connected' || !br.state ? 'v good' : 'v fault';
 
       var lt = s.latest_trace || {};
+      if (lt.seq) lastRetirementSeq = lt.seq;
       if (s.last_trace_age !== null && s.last_trace_age !== undefined && s.last_trace_age < 3)
         setState('boardState', 'ok', 'tracing');
       else if (lt.fault_valid)
@@ -1275,9 +1332,20 @@
          (br.reason || 'review bridge timeline')) : 'no active fault';
 
       var bi = s.boot_info || {};
+      if (typeof s.run_unlocked === 'boolean') runUnlocked = s.run_unlocked;
       if (bi.tu_version !== undefined && Object.keys(bi).length) {
+        if (bi.received_ts && bi.received_ts !== startupSentinelTs) {
+          startupSentinelTs = bi.received_ts;
+          if (bi.startup_state === 'awaiting_first_step') {
+            boardRunning = false;
+            runUnlocked = false;
+            note('Board halted after boot sentinel — waiting for the first deliberate Step');
+          }
+        }
         document.getElementById('bootSentinel').textContent =
-          bi.stale_tu ? 'seen — STALE bitstream' : 'seen — current bitstream';
+          bi.startup_state === 'awaiting_first_step'
+            ? 'seen — halted; waiting for first deliberate Step'
+            : (bi.stale_tu ? 'seen — STALE bitstream' : 'seen — current bitstream');
         document.getElementById('bootSentinel').className = bi.stale_tu ? 'v fault' : 'v good';
         document.getElementById('tuVersion').textContent = bi.tu_version;
         if (bi.build_version != null)
@@ -1326,6 +1394,10 @@
       document.getElementById('uploadState').textContent = s.upload_in_flight ? 'YES' : 'no';
       document.getElementById('pendingCmd').textContent =
         s.pending_command ? JSON.stringify(s.pending_command) : 'none';
+      pendingExecutionCmd = s.pending_command &&
+          (s.pending_command.cmd === 'r' || s.pending_command.cmd === 's')
+        ? s.pending_command.cmd : null;
+      updateRunButton();
       var cd = s.command_delivery, cdEl = document.getElementById('cmdDelivery');
       if (!cd) { cdEl.textContent = '—'; cdEl.className = 'v'; }
       else if (cd.write_ts) {

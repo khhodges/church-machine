@@ -42,6 +42,13 @@ check('Testing exposes Step HW control', /id="btnStep"[^>]*>Step HW ▶<\/button
 check('Testing exposes HW run control', /id="btnRun"[^>]*>▶ HW<\/button>/.test(status));
 check('Testing exposes immediate Stop HW control', /id="btnStop"[^>]*>⏹ HW<\/button>/.test(status) &&
       /sendCmd\(\{ cmd: 'h' \}, 'STOP'/.test(status));
+check('Testing locks Run until a Step retirement',
+      /Run remains locked/.test(status) && /latest_trace/.test(status));
+check('Testing STOP can cancel queued Run or Step',
+      /cancelled undelivered/.test(status) && /pendingExecutionCmd/.test(status));
+check('IDE upload path remains step-first',
+      /Never auto-run a newly uploaded image/.test(appRun) &&
+      /_wukongLastRetirementSeq/.test(appRun));
 check('Testing exposes Load control', /id="btnUpload"[^>]*>⚡ Load<\/button>/.test(status));
 check('Testing exposes live HW call depth', /id="toolbarCallDepth"/.test(status));
 check('Testing owns Shift+H emergency stop', /e\.shiftKey/.test(status) && /e\.key !== 'H'/.test(status));

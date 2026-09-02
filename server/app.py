@@ -13404,6 +13404,12 @@ _wukong_bridge_alert = {
 #                 duplicate ack can never be attributed to the wrong command
 _wukong_cmd_delivery = None
 _wukong_cmd_id       = 0     # monotonic; incremented under _wukong_command_lock
+# Fresh boot sentinels close this gate.  A successful Step UART ACK records the
+# current trace watermark; only a later hardware trace re-opens Run.
+_wukong_run_unlocked = True
+_wukong_step_write_trace_seq = None
+_wukong_step_bridge_session = ''
+_wukong_bridge_trace_highwater = {}
 
 
 def _record_wukong_bridge_event(event, state='', reason='', session_id='',
@@ -14175,6 +14181,7 @@ def wukong_trace_post():
         'fault_valid': bool(data.get('fault_valid', False)),
         'bp_hit':      bool(data.get('bp_hit', False)),
         'ts':          float(data.get('ts', 0.0)),
+        'bridge_trace_counter': int(data.get('bridge_trace_counter', -1)),
     }
     incident_id = str(data.get('incident_id', '') or '')
     bridge_session = str(data.get('bridge_session', '') or '')
@@ -14250,6 +14257,19 @@ def wukong_trace_post():
         if len(_wukong_event_queue) > _WUKONG_EVENT_QUEUE_MAXLEN:
             del _wukong_event_queue[:-_WUKONG_EVENT_QUEUE_MAXLEN]
         _wukong_latest_trace = entry
+        global _wukong_run_unlocked, _wukong_step_write_trace_seq, \
+            _wukong_step_bridge_session
+        if bridge_session and entry.get('bridge_trace_counter', -1) >= 0:
+            _wukong_bridge_trace_highwater[bridge_session] = max(
+                entry['bridge_trace_counter'],
+                _wukong_bridge_trace_highwater.get(bridge_session, -1))
+        if (_wukong_step_write_trace_seq is not None and
+                entry.get('bridge_trace_counter', -1) >
+                _wukong_step_write_trace_seq and
+                (not _wukong_step_bridge_session or
+                 bridge_session == _wukong_step_bridge_session)):
+            _wukong_run_unlocked = True
+            _wukong_step_write_trace_seq = None
         # Persist CR GT updates separately so a subsequent CALL_PUSH packet
         # (ev_type=0x08, payload_gt=0) cannot overwrite the CR6/CR14 GTs
         # before the IDE polls GET /hardware/wukong/trace.
@@ -14725,15 +14745,14 @@ def wukong_command_post():
 
     Body JSON: {'cmd': 's'|'r'|'h'|'q'|'b'|'u'|'f', 'nia': <int>, 'data': '<base64>'}
 
-    Only one command is queued at a time.  Overwrite policy (documented):
-    a new POST overwrites any still-pending command, and the response
-    surfaces the overwrite as {'ok': True, 'overwrote': '<prev cmd>'} so
-    the caller can warn the user.  We surface rather than 409-reject so a
-    Reboot ('f') can always displace a stale queued command when no bridge
-    is polling.
+    Only one command is queued at a time.  Halt ('h') is priority-safe: it may
+    atomically replace only an undelivered Run/Step ('r'/'s').  It never
+    cancels upload, reboot, breakpoint, snapshot, another halt, or a command
+    already consumed for serial delivery.  Other commands retain the existing
+    surfaced-overwrite behavior.
     """
     global _wukong_pending_cmd, _upload_in_flight, _wukong_cmd_delivery, \
-        _wukong_cmd_id
+        _wukong_cmd_id, _wukong_run_unlocked
     data = request.get_json(silent=True) or {}
     cmd = str(data.get('cmd', '')).strip()
     if cmd not in ('s', 'r', 'h', 'q', 'b', 'u', 'f'):
@@ -14792,11 +14811,26 @@ def wukong_command_post():
         # s / r / h — reject while any upload is in-flight.
         with _upload_in_flight_lock:
             if _upload_in_flight:
-                return jsonify({'ok': False,
-                                'error': 'upload in progress — retry after upload-ack'}), 409
+                if cmd == 'h':
+                    return jsonify({
+                        'ok': False,
+                        'error': 'STOP cannot cancel upload in progress',
+                        'blocked_cmd': 'u',
+                        'blocked_stage': 'upload',
+                    }), 409
+                return jsonify({
+                    'ok': False,
+                    'error': 'upload in progress — retry after upload-ack',
+                }), 409
 
     now = _wk_time.time()
     with _wukong_command_lock:
+        if cmd == 'r' and not _wukong_run_unlocked:
+            return jsonify({
+                'ok': False,
+                'error': 'RUN locked until a confirmed Step produces a fresh retirement',
+                'blocked_stage': 'awaiting_first_step',
+            }), 409
         # Guard: if the bridge already consumed a command but has not yet
         # confirmed the serial write, refuse to accept the new command.
         # Accepting it would replace the delivery-tracking ID, orphan the
@@ -14808,11 +14842,27 @@ def wukong_command_post():
         if (d is not None and
                 d.get('consumed_ts') is not None and
                 d.get('write_ts') is None):
+            error = (
+                "STOP cannot cancel command %r: bridge write already in progress"
+                % (d.get('cmd'),)
+                if cmd == 'h' else
+                'bridge write in progress — retry after confirmation'
+            )
             return jsonify({
                 'ok': False,
-                'error': 'bridge write in progress — retry after confirmation',
+                'error': error,
+                'blocked_cmd': d.get('cmd'),
+                'blocked_stage': 'consumed',
             }), 409
         prev = _wukong_pending_cmd
+        if cmd == 'h' and prev and prev.get('cmd') not in ('r', 's'):
+            return jsonify({
+                'ok': False,
+                'error': "STOP cannot cancel pending command %r" % (
+                    prev.get('cmd'),),
+                'blocked_cmd': prev.get('cmd'),
+                'blocked_stage': 'queued',
+            }), 409
         _wukong_cmd_id += 1
         entry['id'] = _wukong_cmd_id
         _wukong_pending_cmd = entry
@@ -14830,6 +14880,11 @@ def wukong_command_post():
     resp = {'ok': True, 'id': entry['id']}
     if prev:
         resp['overwrote'] = prev.get('cmd')
+        if cmd == 'h':
+            resp['cancelled'] = {
+                'cmd': prev.get('cmd'),
+                'id': prev.get('id'),
+            }
     return jsonify(resp)
 
 
@@ -14947,6 +15002,8 @@ def wukong_status_get():
         'cr6_gt':             cr_gts.get(6),
         'cr14_gt':            cr_gts.get(14),
         'boot_info':          boot_info,
+        'startup_state':      boot_info.get('startup_state', ''),
+        'run_unlocked':       _wukong_run_unlocked,
         'active_thread':      active_thread,
         # What the hardware will actually run at boot: power-on bitstream
         # default (slot 7, WukongCallHome) until a boot-image upload is
@@ -15049,16 +15106,25 @@ def wukong_command_ack_post():
     for a superseded command (even one with the same letter) or an ack that
     arrives before consumption can never corrupt the lifecycle.
     """
-    global _wukong_cmd_delivery
+    global _wukong_cmd_delivery, _wukong_run_unlocked, \
+        _wukong_step_write_trace_seq, _wukong_step_bridge_session
     data = request.get_json(silent=True) or {}
     cmd  = str(data.get('cmd', '')).strip()
     ok   = bool(data.get('ok', False))
     err  = str(data.get('error', ''))[:400] if not ok else ''
     ack_session = str(data.get('session_id', '') or '')[:128]
     try:
+        ack_trace_counter = int(data.get('trace_counter'))
+    except (TypeError, ValueError):
+        ack_trace_counter = None
+    try:
         ack_id = int(data.get('id'))
     except (TypeError, ValueError):
         ack_id = None
+    with _wukong_trace_lock:
+        trace_seq_at_ack = int(_wukong_latest_trace.get('seq', 0) or 0)
+        trace_counter_at_ack = _wukong_bridge_trace_highwater.get(
+            ack_session, -1)
     with _wukong_command_lock:
         if _wukong_cmd_delivery \
                 and ack_id is not None \
@@ -15071,6 +15137,14 @@ def wukong_command_ack_post():
             _wukong_cmd_delivery['write_ok']    = ok
             _wukong_cmd_delivery['write_error'] = err
             _wukong_cmd_delivery['write_ts']    = _wk_time.time()
+            _wukong_cmd_delivery['trace_seq_at_write'] = trace_seq_at_ack
+            if cmd == 's' and ok:
+                _wukong_run_unlocked = (
+                    ack_trace_counter is not None and
+                    trace_counter_at_ack > ack_trace_counter)
+                _wukong_step_write_trace_seq = (
+                    None if _wukong_run_unlocked else ack_trace_counter)
+                _wukong_step_bridge_session = ack_session
             if ack_session:
                 _wukong_cmd_delivery['bridge_session'] = ack_session
             _record_wukong_bridge_event(
@@ -15291,8 +15365,10 @@ def wukong_boot_info_post():
                      tu_version < TU_VERSION_CALL_3PKT)
         tu_version — raw TU_VERSION byte from the sentinel (0x01 for 0xBB boards)
         thread_scheduler — explicit M6 round-robin scheduler advertisement
+        startup_state — awaiting_first_step after the bridge writes Halt
     """
-    global _wukong_boot_info
+    global _wukong_boot_info, _wukong_run_unlocked, \
+        _wukong_step_write_trace_seq, _wukong_step_bridge_session
     token = os.environ.get('REPORT_TOKEN', '').strip()
     if not token:
         return jsonify({
@@ -15317,6 +15393,7 @@ def wukong_boot_info_post():
         'tu_version':   int(data.get('tu_version', 0)),
         'build_version': int(bv) if bv is not None else None,
         'thread_scheduler': bool(data.get('thread_scheduler', False)),
+        'startup_state': str(data.get('startup_state', '') or '')[:40],
         'session_id':   reported_session,
         'trusted':      True,
         # Server-side receive timestamp: lets the /fpga page confirm a FRESH
@@ -15325,6 +15402,11 @@ def wukong_boot_info_post():
     }
     with _wukong_boot_info_lock:
         _wukong_boot_info = entry
+    if entry.get('startup_state') == 'awaiting_first_step':
+        with _wukong_command_lock:
+            _wukong_run_unlocked = False
+            _wukong_step_write_trace_seq = None
+            _wukong_step_bridge_session = entry.get('session_id', '')
     with _wukong_bridge_lock:
         _wukong_bridge_timeline.append({
             'ts': entry['received_ts'], 'session_id': entry['session_id'],

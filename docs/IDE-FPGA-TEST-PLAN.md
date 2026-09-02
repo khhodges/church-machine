@@ -228,6 +228,11 @@ actually completed may retain their observed pass counts.
 These controls are present in the Builder even though the current supported
 Wukong IDE path uses a pre-built bitstream plus the UART bridge.
 
+Fail-safe step-first startup is a software-only release. Deploy the updated
+IDE/server and update plus restart the Chromebook UART bridge. Do not rebuild
+or flash the Vivado bitstream for this policy change; the existing RTL still
+powers up in free-run and the bridge sends Halt immediately after its sentinel.
+
 | ID | Function/button | Current status | Required proof |
 |---|---|---|---|
 | B-01 | Target board selector | Software coverage incomplete | Select Wukong, reload Builder, verify Wukong remains selected and all labels/routes use Wukong |

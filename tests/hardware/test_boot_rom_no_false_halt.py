@@ -347,7 +347,7 @@ class TestFaultHaltRtlSource:
 
 
 class TestBridgeSentinelHaltOrdering:
-    """Bridge sends 'r' AFTER consuming the sentinel, then arms deferred-q gate.
+    """Bridge sends 'h' AFTER consuming the sentinel, then arms deferred-q gate.
 
     'q' (snapshot request) is NOT sent immediately.  After sentinel detection
     the bridge arms _boot_q_pending so the receive loop sends 'q' only after
@@ -360,37 +360,38 @@ class TestBridgeSentinelHaltOrdering:
             return fh.read()
 
     def test_halt_byte_sent_after_sentinel_consumed(self):
-        """In the bridge main loop, ser.write(b'r') appears AFTER sentinel parsing,
-        not before — so no 'r' byte is injected while boot packets are in flight.
+        """In the bridge main loop, ser.write(b'h') appears after sentinel parsing,
+        so fail-safe Halt is requested only for a validated fresh boot.
         """
         src = self._get_bridge_src()
         # The bridge parses the sentinel in the elif branch for BOOT_SENTINEL_V* bytes.
-        # Find that branch and confirm ser.write(b'r') is inside it (after the sentinel).
+        # Find that branch and confirm ser.write(b'h') is inside it.
         sentinel_branch_idx = src.find("BOOT_SENTINEL_V1, BOOT_SENTINEL_V2")
         assert sentinel_branch_idx != -1, (
             "Cannot locate sentinel branch in wukong_bridge.py "
             "(expected 'BOOT_SENTINEL_V1, BOOT_SENTINEL_V2' in elif)"
         )
-        run_write_idx = src.find("ser.write(b'r')", sentinel_branch_idx)
-        assert run_write_idx != -1, (
-            "ser.write(b'r') not found after the sentinel branch in wukong_bridge.py — "
-            "bridge may not send run command after boot sentinel"
+        halt_write_idx = src.find("ser.write(b'h')", sentinel_branch_idx)
+        assert halt_write_idx != -1, (
+            "ser.write(b'h') not found after the sentinel branch in wukong_bridge.py — "
+            "bridge may not halt after boot sentinel"
         )
-        # Confirm 'r' is sent before any trace-packet forwarding logic
+        # Confirm 'h' is sent from the sentinel branch.
         # by checking it appears in the sentinel elif block, not the trace-packet if block.
         trace_magic_if_idx = src.find("if b == TRACE_MAGIC:")
         assert trace_magic_if_idx < sentinel_branch_idx, (
             "Unexpected structure: TRACE_MAGIC check should appear before the sentinel branch"
         )
-        # run_write_idx must be after the sentinel branch start
-        assert run_write_idx > sentinel_branch_idx, (
-            "ser.write(b'r') must be inside the sentinel branch, after parsing the sentinel"
+        assert halt_write_idx > sentinel_branch_idx, (
+            "ser.write(b'h') must be inside the sentinel branch, after parsing the sentinel"
         )
+        main_end = src.find("\ndef _handle_upload(", sentinel_branch_idx)
+        assert src.find("ser.write(b'r')", sentinel_branch_idx, main_end) == -1
 
-    def test_snapshot_gate_armed_after_run_on_sentinel(self):
+    def test_snapshot_gate_armed_after_halt_on_sentinel(self):
         """Bridge arms the deferred-snapshot gate in the sentinel block.
 
-        'q' is NOT sent immediately after 'r' — that would race with the boot
+        'q' is NOT sent immediately after 'h' — that would race with the boot
         trace packets the CM emits right after boot (CHANGE + CALL sequence),
         causing the snapshot to capture mid-boot register state.
 
@@ -404,20 +405,19 @@ class TestBridgeSentinelHaltOrdering:
         assert sentinel_branch_idx != -1, (
             "Cannot locate sentinel branch in wukong_bridge.py"
         )
-        run_write_idx = src.find("ser.write(b'r')", sentinel_branch_idx)
-        assert run_write_idx != -1, (
-            "ser.write(b'r') not found after the sentinel branch in wukong_bridge.py"
+        halt_write_idx = src.find("ser.write(b'h')", sentinel_branch_idx)
+        assert halt_write_idx != -1, (
+            "ser.write(b'h') not found after the sentinel branch in wukong_bridge.py"
         )
         # The sentinel block must arm the deferred-q gate, not send 'q' directly.
-        # Find the end of the deferred automatic-run try block.
-        sentinel_block_end = src.find("except Exception as exc:", run_write_idx)
+        sentinel_block_end = src.find("if sentinel['stale']:", halt_write_idx)
         assert sentinel_block_end != -1, (
-            "automatic-run exception boundary not found after ser.write(b'r')"
+            "sentinel state boundary not found after ser.write(b'h')"
         )
         sentinel_block = src[sentinel_branch_idx:sentinel_block_end]
         assert '_boot_q_pending' in sentinel_block, (
             "_boot_q_pending not armed in the sentinel try-block — "
-            "the bridge must set _boot_q_pending = True after 'r' so the "
+            "the bridge must set _boot_q_pending = True after 'h' so the "
             "receive loop can send 'q' after boot trace packets settle"
         )
         # 'q' must NOT be written immediately in the sentinel block;

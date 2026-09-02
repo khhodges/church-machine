@@ -42,7 +42,7 @@ def test_reference_listing_uses_hardware_nia_addresses(client):
                      if row['nia_label'] == 'WukongCallHome.1')
     assert wch_first['nia'] == 0x1204
     assert [row['disasm'] for row in data['rows'][:3]] == [
-        'LOAD NAMESPACE CD15',
+        'LOAD NAMESPACE CR15',
         'LOAD THREAD+HEAP CR12+, CR5',
         'CALL CR[0] SelfTest',
     ]
