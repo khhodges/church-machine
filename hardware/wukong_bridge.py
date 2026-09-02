@@ -1156,6 +1156,16 @@ class FaultDeliveryWorker:
         """Stop after any in-flight bounded request; used by bridge shutdown/tests."""
         self._stopped.set()
 
+    def wait_for_idle(self):
+        """Wait until all submitted deliveries have produced a result.
+
+        The bridge's UART loop must never wait for HTTPS, but callers that own
+        the worker (notably deterministic tests) may need to wait for queued
+        deliveries before inspecting their effects.
+        """
+        self._fault_jobs.join()
+        self._telemetry_jobs.join()
+
     def submit(self, kind, payload, priority=None):
         payload = dict(payload)
         critical = kind in (
@@ -1174,6 +1184,7 @@ class FaultDeliveryWorker:
                 except queue.Full:
                     try:
                         target.get_nowait()
+                        target.task_done()
                         target.put_nowait((kind, payload, critical))
                         return True
                     except queue.Empty:
@@ -1210,12 +1221,14 @@ class FaultDeliveryWorker:
 
     def _run(self):
         while not self._stopped.is_set():
+            source = self._fault_jobs
             try:
                 # Wait briefly on the reserved lane rather than blocking on
                 # ordinary telemetry; a fault submitted just after this check
                 # must wake the worker promptly.
                 kind, payload, critical = self._fault_jobs.get(timeout=0.05)
             except queue.Empty:
+                source = self._telemetry_jobs
                 try:
                     kind, payload, critical = self._telemetry_jobs.get_nowait()
                 except queue.Empty:
@@ -1279,6 +1292,8 @@ class FaultDeliveryWorker:
                 # an unbounded backlog.
                 if critical:
                     target.put(result)
+            finally:
+                source.task_done()
 
 def _post_json_retry(url, payload, verify_tls, label, accept_reply,
                      max_attempts=None, timeout=1):

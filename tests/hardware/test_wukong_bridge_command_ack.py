@@ -202,7 +202,7 @@ def test_main_reconnects_after_read_failure_and_acknowledges_after_write(
             return self.body
 
     class FakeRequests:
-        def post(self, url, json=None, timeout=None, verify=None):
+        def post(self, url, json=None, headers=None, timeout=None, verify=None):
             event = ('post', url, dict(json or {}), 1000 + len(timeline))
             timeline.append(event)
             return FakeResponse({})
@@ -233,12 +233,22 @@ def test_main_reconnects_after_read_failure_and_acknowledges_after_write(
 
     fake_time = FakeTime()
     fake_requests = FakeRequests()
+    delivery_workers = []
+    real_delivery_worker = bridge.FaultDeliveryWorker
+
+    class CapturingDeliveryWorker(real_delivery_worker):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            delivery_workers.append(self)
+
     fake_serial_module = types.SimpleNamespace(
         Serial=FakeSerial,
         SerialException=OSError,
     )
     monkeypatch.setattr(bridge, 'serial', fake_serial_module)
     monkeypatch.setattr(bridge, 'requests', fake_requests)
+    monkeypatch.setattr(bridge, 'FaultDeliveryWorker',
+                        CapturingDeliveryWorker)
     monkeypatch.setattr(bridge, 'time', fake_time)
     monkeypatch.setattr(bridge, 'uuid', FakeUUID)
     monkeypatch.setattr(bridge, '_compute_expected_n_init', lambda: None)
@@ -251,6 +261,9 @@ def test_main_reconnects_after_read_failure_and_acknowledges_after_write(
     ])
 
     bridge.main()
+    assert len(delivery_workers) == 1
+    delivery_workers[0].wait_for_idle()
+    delivery_workers[0].close()
 
     assert [ser.port for ser in serials] == [
         '/dev/ttyUSB0', '/dev/ttyUSB1',
@@ -281,5 +294,5 @@ def test_main_reconnects_after_read_failure_and_acknowledges_after_write(
     assert command_index < write_index < ack_index
     assert timeline[ack_index][2] == {
         'cmd': 's', 'ok': True, 'error': '', 'id': 314,
-        'session_id': 'stable-bridge-session',
+        'session_id': 'stable-bridge-session', 'trace_counter': 0,
     }
