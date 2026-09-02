@@ -670,6 +670,40 @@ def test_selftest_first_arithmetic_check_passes():
     )
 
 
+def test_selftest_borrow_sets_c_clear_and_passes_test_27():
+    """0-1 must clear C so SelfTest's BRANCHCC skips failure RETURN 27."""
+    dut = BootRomHarness(_DMEM_INIT)
+    results = {}
+
+    async def testbench(ctx):
+        results["boot_ok"] = await _wait_boot_complete(ctx, dut)
+        if not results["boot_ok"]:
+            return
+        retired = []
+        for _ in range(5000):
+            if ctx.get(dut.core.retire_valid):
+                retired.append(ctx.get(dut.core.retire_nia))
+                if retired[-1] in (0x8DC, 0x8E0, 0x8E4):
+                    break
+            await ctx.tick()
+        results["retired"] = retired
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(testbench)
+    with sim.write_vcd("/dev/null"):
+        sim.run()
+
+    assert results.get("boot_ok"), "boot_complete never rose"
+    retired = results.get("retired", [])
+    assert 0x8DC not in retired and 0x8E0 not in retired, (
+        "SelfTest failed test 27 because BRANCHCC did not recognize the borrow"
+    )
+    assert retired and retired[-1] == 0x8E4, (
+        f"SelfTest did not branch to test 28; last retires={retired[-8:]}"
+    )
+
+
 def test_nested_call_return_without_boot_special_case():
     """Two ordinary CALLs and RETURNs preserve the real Thread call stack."""
     dmem, fixture = _build_nested_call_dmem()

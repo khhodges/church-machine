@@ -50,6 +50,9 @@ from .core import ChurchCore
 from .boot_rom import (BootRom, BOOT_PROGRAM, WUKONG_NUC_PROGRAM, encode_turing,
                        WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST,
                        WUKONG_SELFTEST_WORDS, WUKONG_SELFTEST_BASE_WORD,
+                       CAPABILITY_TEST_NS_SLOT,
+                       WUKONG_CAPABILITY_TEST_BASE_WORD,
+                       WUKONG_CAPABILITY_TEST_WORDS,
                        WUKONG_CALLHOME_BASE_WORD,
                        WUKONG_WCH_CLIST, WUKONG_WCH_CLIST_WORD,
                        WUKONG_THREAD_BASE_WORD, WUKONG_THREAD_HEADER,
@@ -69,7 +72,7 @@ _WUKONG_DMEM_WORDS = _WUKONG_ARCH_PROFILE["totalWords"]
 # Increment this by 1 every time a new bitstream is synthesised and flashed.
 # The bridge reports it to the IDE so the FPGA status page can confirm exactly
 # which build is running — no need to reprogram just to check.
-WUKONG_BUILD_VERSION = 19  # ← bump this before each new synthesis run
+WUKONG_BUILD_VERSION = 20  # CapabilityTest factory entry + corrected ISUB carry
 # A board advertising this build (or newer) supports M6 round-robin Thread
 # selection for projected multi-Thread uploads.  Keep this explicit rather
 # than treating any arbitrary future build number as an accidental capability.
@@ -131,13 +134,16 @@ while len(_dmem_tmp) < _WUKONG_DMEM_WORDS:
     _dmem_tmp.append(0)
 for _i, _v in enumerate(WUKONG_SELFTEST_WORDS):
     _dmem_tmp[WUKONG_SELFTEST_BASE_WORD + _i] = _v
+for _i, _v in enumerate(WUKONG_CAPABILITY_TEST_WORDS):
+    _dmem_tmp[WUKONG_CAPABILITY_TEST_BASE_WORD + _i] = _v
 for _i, _v in enumerate([wukong_wch_header(_wch_cw_mod)] + list(WUKONG_NUC_PROGRAM)):
     _dmem_tmp[WUKONG_CALLHOME_BASE_WORD + _i] = _v
 for _i, _v in enumerate(WUKONG_WCH_CLIST):
     _dmem_tmp[WUKONG_WCH_CLIST_WORD + _i] = _v
 _dmem_tmp[WUKONG_THREAD_BASE_WORD]   = WUKONG_THREAD_HEADER
 _dmem_tmp[WUKONG_THREAD_STO_WORD]    = WUKONG_THREAD_STO_INIT
-_dmem_tmp[WUKONG_THREAD_CAPS0_WORD]  = 0x4A000006
+_dmem_tmp[WUKONG_THREAD_CAPS0_WORD] = make_gt(
+    GT_TYPE_INFORM, PERM_MASK_E, CAPABILITY_TEST_NS_SLOT, 0)
 _dmem_tmp[WUKONG_THREAD_CAPS12_WORD] = make_gt(GT_TYPE_INFORM, PERM_MASK_S, 1, 0)
 WUKONG_N_INIT = sum(1 for v in _dmem_tmp if v != 0)
 del _dmem_tmp, _wch_cw_mod
@@ -465,6 +471,11 @@ class ChurchWukongXC7A100T(Elaboratable):
         for _i, _v in enumerate(WUKONG_SELFTEST_WORDS):
             dmem_init[WUKONG_SELFTEST_BASE_WORD + _i] = _v
 
+        # Factory first abstraction. Its final ELOADCALL enters the resident
+        # SelfTest at slot 6, so both LUMPs remain present in the image.
+        for _i, _v in enumerate(WUKONG_CAPABILITY_TEST_WORDS):
+            dmem_init[WUKONG_CAPABILITY_TEST_BASE_WORD + _i] = _v
+
         # WukongCallHome LUMP body at DMEM byte 0x1200 = word 1152.
         # cc=8 → c-list tail at lump words 120-127 ([5]=LED, [6]=UART); the
         # hardware CALL derives CR6 from the called lump's own header, so a
@@ -486,7 +497,8 @@ class ChurchWukongXC7A100T(Elaboratable):
         #             non-null cap (FETCH_THREAD_HDR faults otherwise).
         dmem_init[WUKONG_THREAD_BASE_WORD]   = WUKONG_THREAD_HEADER
         dmem_init[WUKONG_THREAD_STO_WORD]    = WUKONG_THREAD_STO_INIT
-        dmem_init[WUKONG_THREAD_CAPS0_WORD]  = 0x4A000006  # SelfTest E-GT
+        dmem_init[WUKONG_THREAD_CAPS0_WORD] = make_gt(
+            GT_TYPE_INFORM, PERM_MASK_E, CAPABILITY_TEST_NS_SLOT, 0)
         dmem_init[WUKONG_THREAD_CAPS12_WORD] = make_gt(GT_TYPE_INFORM, PERM_MASK_S, 1, 0)
         # Words 0x47A..0x47F remain zero (padding to 128-word init boundary).
 

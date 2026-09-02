@@ -67,9 +67,11 @@ try:
         WUKONG_WCH_CLIST_WORD, WUKONG_NUC_PROGRAM, WUKONG_THREAD_BASE_WORD,
         WUKONG_THREAD_HEADER, WUKONG_THREAD_STO_WORD, WUKONG_THREAD_STO_INIT,
         WUKONG_THREAD_CAPS0_WORD, WUKONG_THREAD_CAPS12_WORD,
+        CAPABILITY_TEST_NS_SLOT, WUKONG_CAPABILITY_TEST_BASE_WORD,
+        WUKONG_CAPABILITY_TEST_WORDS,
         wukong_wch_header,
     )
-    from hardware.hw_types import GT_TYPE_INFORM, PERM_MASK_S, make_gt
+    from hardware.hw_types import GT_TYPE_INFORM, PERM_MASK_E, PERM_MASK_S, make_gt
 except ImportError as exc:
     print(f"ERROR: cannot import hardware.boot_rom: {exc}", file=sys.stderr)
     sys.exit(2)
@@ -177,6 +179,8 @@ def _compute_dmem_init():
 
     for _i, _v in enumerate(WUKONG_SELFTEST_WORDS):
         dmem_init[WUKONG_SELFTEST_BASE_WORD + _i] = _v
+    for _i, _v in enumerate(WUKONG_CAPABILITY_TEST_WORDS):
+        dmem_init[WUKONG_CAPABILITY_TEST_BASE_WORD + _i] = _v
     for _i, _v in enumerate(
         [wukong_wch_header(len(WUKONG_NUC_PROGRAM))] + list(WUKONG_NUC_PROGRAM)
     ):
@@ -185,7 +189,8 @@ def _compute_dmem_init():
         dmem_init[WUKONG_WCH_CLIST_WORD + _i] = _v
     dmem_init[WUKONG_THREAD_BASE_WORD] = WUKONG_THREAD_HEADER
     dmem_init[WUKONG_THREAD_STO_WORD] = WUKONG_THREAD_STO_INIT
-    dmem_init[WUKONG_THREAD_CAPS0_WORD] = 0x4A000006
+    dmem_init[WUKONG_THREAD_CAPS0_WORD] = make_gt(
+        GT_TYPE_INFORM, PERM_MASK_E, CAPABILITY_TEST_NS_SLOT, 0)
     dmem_init[WUKONG_THREAD_CAPS12_WORD] = make_gt(
         GT_TYPE_INFORM, PERM_MASK_S, 1, 0
     )

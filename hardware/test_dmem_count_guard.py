@@ -25,9 +25,11 @@ from hardware.boot_rom import (
     WUKONG_WCH_CLIST_WORD, WUKONG_NUC_PROGRAM, WUKONG_THREAD_BASE_WORD,
     WUKONG_THREAD_HEADER, WUKONG_THREAD_STO_WORD, WUKONG_THREAD_STO_INIT,
     WUKONG_THREAD_CAPS0_WORD, WUKONG_THREAD_CAPS12_WORD, make_gt,
+    CAPABILITY_TEST_NS_SLOT, WUKONG_CAPABILITY_TEST_BASE_WORD,
+    WUKONG_CAPABILITY_TEST_WORDS,
     wukong_wch_header,
 )
-from hardware.hw_types import GT_TYPE_INFORM, PERM_MASK_S
+from hardware.hw_types import GT_TYPE_INFORM, PERM_MASK_E, PERM_MASK_S
 from hardware.wukong_bridge import _compute_expected_n_init
 
 
@@ -44,6 +46,8 @@ def _build_dmem_init():
         dmem_init.append(0)
     for _i, _v in enumerate(WUKONG_SELFTEST_WORDS):
         dmem_init[WUKONG_SELFTEST_BASE_WORD + _i] = _v
+    for _i, _v in enumerate(WUKONG_CAPABILITY_TEST_WORDS):
+        dmem_init[WUKONG_CAPABILITY_TEST_BASE_WORD + _i] = _v
     for _i, _v in enumerate(
         [wukong_wch_header(len(WUKONG_NUC_PROGRAM))] + list(WUKONG_NUC_PROGRAM)
     ):
@@ -52,7 +56,8 @@ def _build_dmem_init():
         dmem_init[WUKONG_WCH_CLIST_WORD + _i] = _v
     dmem_init[WUKONG_THREAD_BASE_WORD] = WUKONG_THREAD_HEADER
     dmem_init[WUKONG_THREAD_STO_WORD] = WUKONG_THREAD_STO_INIT
-    dmem_init[WUKONG_THREAD_CAPS0_WORD] = 0x4A000006
+    dmem_init[WUKONG_THREAD_CAPS0_WORD] = make_gt(
+        GT_TYPE_INFORM, PERM_MASK_E, CAPABILITY_TEST_NS_SLOT, 0)
     dmem_init[WUKONG_THREAD_CAPS12_WORD] = make_gt(
         GT_TYPE_INFORM, PERM_MASK_S, 1, 0
     )
@@ -88,8 +93,8 @@ def test_n_init_is_positive():
 def test_n_init_fits_in_one_byte():
     """The low-byte N_INIT sentinel encoding must match the current image."""
     n = _compute_n_init()
-    assert n == 610, f"unexpected N_INIT={n}"
-    assert n & 0xFF == 0x62, f"unexpected N_INIT low byte: 0x{n & 0xFF:02X}"
+    assert n == 641, f"unexpected N_INIT={n}"
+    assert n & 0xFF == 0x81, f"unexpected N_INIT low byte: 0x{n & 0xFF:02X}"
 
 
 def test_n_init_matches_bridge_helper():
@@ -138,7 +143,7 @@ def test_reference_file_exists_and_matches():
 def test_n_init_sentinel_byte_value():
     """Smoke-check the current N_INIT sentinel byte value."""
     n = _compute_n_init()
-    assert n & 0xFF == 0x62, (
+    assert n & 0xFF == 0x81, (
         f"N_INIT & 0xFF changed: now 0x{n & 0xFF:02X} (N_INIT={n}). "
         "Update expected value here AND rebuild the Wukong bitstream."
     )

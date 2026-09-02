@@ -1411,7 +1411,9 @@ class ChurchCore(Elaboratable):
                         cr_src, 0)))
         )
 
-        # 33-bit results (bit 32 = carry for IADD, borrow for ISUB)
+        # 33-bit results. IADD bit 32 is carry-out. For ISUB the ISA follows
+        # ARM-style condition semantics: C=1 means no borrow, C=0 means borrow.
+        # The widened subtraction's bit 32 is the borrow indicator, so invert it.
         m.d.comb += [
             iadd_result.eq(u_regs.dr_rd_data1 + arith_rhs),
             isub_result.eq(u_regs.dr_rd_data1 - arith_rhs),
@@ -1426,7 +1428,7 @@ class ChurchCore(Elaboratable):
             iadd_flags_view.V.eq(0),
             isub_flags_view.N.eq(isub_result[31]),
             isub_flags_view.Z.eq(isub_result[:32] == 0),
-            isub_flags_view.C.eq(isub_result[32]),
+            isub_flags_view.C.eq(~isub_result[32]),
             isub_flags_view.V.eq(0),
         ]
 

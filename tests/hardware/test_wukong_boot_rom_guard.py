@@ -16,6 +16,7 @@ Guards
 
    Expected count (WUKONG_N_INIT) breaks down as:
      WUKONG_SELFTEST_WORDS (non-zero subset of 512-word SelfTest LUMP body)
+     + WUKONG_CAPABILITY_TEST_WORDS (factory first abstraction)
      + WukongCallHome header + WUKONG_NUC_PROGRAM (74 words)
      + WUKONG_DEMO_NAMESPACE + WUKONG_DEMO_CLIST (partial occupancy)
      + WUKONG_WCH_CLIST + Boot.Thread header words (4 words)

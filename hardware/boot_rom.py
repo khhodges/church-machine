@@ -662,6 +662,45 @@ assert WUKONG_SELFTEST_WORDS[0] == 0xF987CC02  # cc=2 (Next.GT in slot 1); updat
 # c-list[0] is at word[512-cc] = word[510]; word[511] is c-list[1] (Next.GT, runtime-patched)
 assert WUKONG_SELFTEST_WORDS[510] == 0x4A000006  # c-list[0]: SelfTest E-GT (Church domain, E-perm, NS slot 6) — baked in at compile time
 
+# Factory CapabilityTest is the first abstraction. It remains a separate
+# resident LUMP because its final ELOADCALL deliberately enters SelfTest.
+CAPABILITY_TEST_NS_SLOT = 10
+WUKONG_CAPABILITY_TEST_BASE_BYTE = 0x1400
+WUKONG_CAPABILITY_TEST_BASE_WORD = WUKONG_CAPABILITY_TEST_BASE_BYTE // 4
+WUKONG_CAPABILITY_TEST_ALLOC = 64
+_capability_test_path = (
+    Path(__file__).resolve().parents[1]
+    / "server" / "lumps" / "CapabilityTest.2.c7a66d01.lump"
+)
+try:
+    _capability_test_raw = _capability_test_path.read_bytes()
+except OSError as exc:
+    raise RuntimeError(
+        f"Wukong factory image requires canonical CapabilityTest lump: "
+        f"{_capability_test_path}"
+    ) from exc
+if len(_capability_test_raw) != WUKONG_CAPABILITY_TEST_ALLOC * 4:
+    raise RuntimeError(
+        f"CapabilityTest factory lump must be {WUKONG_CAPABILITY_TEST_ALLOC} words; "
+        f"got {len(_capability_test_raw) // 4}"
+    )
+WUKONG_CAPABILITY_TEST_WORDS = tuple(
+    struct.unpack(f">{WUKONG_CAPABILITY_TEST_ALLOC}I", _capability_test_raw)
+)
+assert WUKONG_CAPABILITY_TEST_WORDS[0] == 0xF8005C05  # 64 words, cw=23, cc=5
+assert WUKONG_CAPABILITY_TEST_WORDS[-5] == 0x4A000006  # SelfTest E-GT
+
+# The generic factory namespace has eight minimal slots. Wukong also carries
+# CapabilityTest at slot 10, so extend its forward table through that slot.
+while len(WUKONG_DEMO_NAMESPACE) < (CAPABILITY_TEST_NS_SLOT + 1) * 4:
+    WUKONG_DEMO_NAMESPACE.append(0)
+_capability_test_word1 = WUKONG_CAPABILITY_TEST_ALLOC - 1
+WUKONG_DEMO_NAMESPACE[CAPABILITY_TEST_NS_SLOT * 4 + 0] = WUKONG_CAPABILITY_TEST_BASE_BYTE
+WUKONG_DEMO_NAMESPACE[CAPABILITY_TEST_NS_SLOT * 4 + 1] = _capability_test_word1
+WUKONG_DEMO_NAMESPACE[CAPABILITY_TEST_NS_SLOT * 4 + 2] = integrity32(
+    WUKONG_CAPABILITY_TEST_BASE_BYTE, _capability_test_word1
+)
+
 # Fix slot 7 (WukongCallHome) alloc from 64 → 128 words and move it after
 # the relocated Thread lump. The old 0x700 location overlapped SelfTest,
 # and the old 0x900 location overlaps the 256-word Thread.
@@ -688,7 +727,7 @@ WUKONG_DEMO_NAMESPACE[WUKONG_CALLHOME_NS_SLOT * 4 + 2] = integrity32(_wch_loc_by
 # image (words 384-895) and before WukongCallHome (words 1152-1279).
 #   header  word 896      : magic, size=256 words, sw(cw)=32, typ=2, cc=12
 #   STO     word 896+17   : 243 (= sp_max = 256 − 12 − 1)
-#   caps[0] word 896+244  : boot-entry E-GT (⚡ SelfTest)
+#   caps[0] word 896+244  : boot-entry E-GT (⚡ CapabilityTest)
 #   caps[12]word 896+256  : S-perm Boot.Thread GT (slot 1) for CR12
 # Slot 1 word1 limit widened to 0xFF (256-word alloc); seal recomputed.
 # ---------------------------------------------------------------------------
@@ -722,7 +761,7 @@ WUKONG_DEMO_NAMESPACE[1 * 4 + 2] = integrity32(_wukong_thr_loc, _wukong_thr_w1)
 #   idx 10 — Constants R-GT cleared: NS slot 9 absent in Wukong 8-slot NS
 # ---------------------------------------------------------------------------
 WUKONG_DEMO_CLIST = make_demo_clist()   # idx 1 = Next.GT (SelfTest self-loop by default)
-WUKONG_DEMO_CLIST[0]  = make_gt(GT_TYPE_INFORM, PERM_MASK_E, SELFTEST_NS_SLOT, 0)
+WUKONG_DEMO_CLIST[0]  = make_gt(GT_TYPE_INFORM, PERM_MASK_E, CAPABILITY_TEST_NS_SLOT, 0)
 WUKONG_DEMO_CLIST[9]  = 0           # SlideRule E-GT cleared: NS slot 8 absent in Wukong 8-slot NS
 WUKONG_DEMO_CLIST[10] = 0           # Constants R-GT cleared: NS slot 9 absent in Wukong 8-slot NS
 

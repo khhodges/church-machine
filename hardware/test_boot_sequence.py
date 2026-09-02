@@ -240,8 +240,10 @@ def test_wukong_boot_triggered():
                            WUKONG_WCH_CLIST_WORD, WUKONG_THREAD_BASE_WORD,
                            WUKONG_THREAD_HEADER, WUKONG_THREAD_STO_WORD,
                            WUKONG_THREAD_STO_INIT, WUKONG_THREAD_CAPS0_WORD,
-                           WUKONG_THREAD_CAPS12_WORD, wukong_wch_header)
-    from .hw_types import make_gt, GT_TYPE_INFORM, PERM_MASK_S
+                           WUKONG_THREAD_CAPS12_WORD, CAPABILITY_TEST_NS_SLOT,
+                           WUKONG_CAPABILITY_TEST_BASE_WORD,
+                           WUKONG_CAPABILITY_TEST_WORDS, wukong_wch_header)
+    from .hw_types import make_gt, GT_TYPE_INFORM, PERM_MASK_E, PERM_MASK_S
 
     # sim_mode=True: skips port-driven comb clock so sim.add_clock() can drive
     # ClockSignal("sync") directly (no DriverConflict with self.clk port).
@@ -259,6 +261,8 @@ def test_wukong_boot_triggered():
         dmem_init.append(0)
     for _i, _v in enumerate(WUKONG_SELFTEST_WORDS):
         dmem_init[WUKONG_SELFTEST_BASE_WORD + _i] = _v
+    for _i, _v in enumerate(WUKONG_CAPABILITY_TEST_WORDS):
+        dmem_init[WUKONG_CAPABILITY_TEST_BASE_WORD + _i] = _v
     # WukongCallHome LUMP body at offset 0x1200 (word 1152) —
     # elaborate() writes [_wch_header] + list(WUKONG_NUC_PROGRAM) there, adding
     # ~74 non-zero DMEM words that the old formula omitted.
@@ -269,7 +273,8 @@ def test_wukong_boot_triggered():
         dmem_init[WUKONG_WCH_CLIST_WORD + _i] = _v
     dmem_init[WUKONG_THREAD_BASE_WORD]   = WUKONG_THREAD_HEADER
     dmem_init[WUKONG_THREAD_STO_WORD]    = WUKONG_THREAD_STO_INIT
-    dmem_init[WUKONG_THREAD_CAPS0_WORD]  = 0x4A000006
+    dmem_init[WUKONG_THREAD_CAPS0_WORD] = make_gt(
+        GT_TYPE_INFORM, PERM_MASK_E, CAPABILITY_TEST_NS_SLOT, 0)
     dmem_init[WUKONG_THREAD_CAPS12_WORD] = make_gt(GT_TYPE_INFORM, PERM_MASK_S, 1, 0)
     hw_init_pairs = [(addr, val) for addr, val in enumerate(dmem_init) if val != 0]
     N_INIT = len(hw_init_pairs)

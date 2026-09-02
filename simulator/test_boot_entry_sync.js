@@ -479,6 +479,9 @@ console.log('\n--- T211: late boot-image arrival replaces fallback CR state ---'
         },
     };
     const sim = new ChurchSimulator();
+    // This regression specifically exercises the canonical resident SelfTest
+    // placeholder, independently of the new CapabilityTest startup default.
+    sim.bootEntrySlot = 6;
 
     function completeBoot(machine) {
         let safety = 0;
