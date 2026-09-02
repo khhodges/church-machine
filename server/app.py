@@ -13403,6 +13403,7 @@ _wukong_bridge_alert = {
 #                 it on dequeue and must echo it in command-ack so a late or
 #                 duplicate ack can never be attributed to the wrong command
 _wukong_cmd_delivery = None
+_WUKONG_HALT_CONFIRM_TIMEOUT = 5.0
 _wukong_cmd_id       = 0     # monotonic; incremented under _wukong_command_lock
 # Fresh boot sentinels close this gate.  A successful Step UART ACK records the
 # current trace watermark; only a later hardware trace re-opens Run.
@@ -13552,14 +13553,27 @@ def _wukong_halt_summary(latest, snapshot, delivery, bridge, now):
     command = delivery or {}
     if command.get('cmd') == 'f' and command.get('write_ok') is None:
         state, reason = 'reboot pending', 'reboot is not proven written to the board'
+    elif command.get('cmd') == 'h' and command.get('write_ok') is True:
+        if command.get('board_halt_confirmed'):
+            state, reason = 'halt confirmed', 'the FPGA emitted halted-state evidence'
+        elif bridge.get('state') in ('reconnecting', 'serial_error'):
+            state, reason = (
+                'halt confirmation unavailable',
+                'the serial link disconnected before board halt evidence arrived')
+        elif now - float(command.get('write_ts') or now) > _WUKONG_HALT_CONFIRM_TIMEOUT:
+            state, reason = (
+                'halt confirmation timed out',
+                'Halt was written, but the FPGA did not emit halted-state evidence within 5 seconds')
+        else:
+            state, reason = (
+                'halt requested',
+                'Halt was written to UART; waiting for board halted-state evidence')
     elif bridge.get('state') in ('reconnecting', 'serial_error'):
         state, reason = 'serial reconnecting', bridge.get('reason') or 'serial link recovery in progress'
     elif fault:
         state, reason = 'fault hold', 'the FPGA reported a fault and is held for snapshot/recovery'
     elif bp:
         state, reason = 'intentional halt', 'execution stopped at a configured breakpoint'
-    elif command.get('cmd') == 'h' and command.get('write_ok') is True:
-        state, reason = 'intentional halt', 'manual halt command was written to the board'
     elif bridge and bridge.get('state') == 'network_error':
         state, reason = 'server/network polling gap', bridge.get('reason') or 'bridge cannot reach the server'
     elif bridge.get('state') == 'silent':
@@ -13583,6 +13597,8 @@ def _wukong_halt_summary(latest, snapshot, delivery, bridge, now):
         'recovery_authorized': bool(delivery and delivery.get('cmd') == 'g' and
                                    delivery.get('write_ok')),
         'last_command_id': command.get('id'),
+        'confirmed_ts': command.get('board_halt_ts'),
+        'evidence_session': command.get('board_halt_session'),
     }
 
 
@@ -14839,6 +14855,17 @@ def wukong_command_post():
         # This prevents the "STEP superseded" trace pattern where a slow serial
         # write causes the user's retry to silently drop the in-flight step.
         d = _wukong_cmd_delivery
+        if (d is not None and d.get('cmd') == 'h' and
+                d.get('write_ok') is True and
+                not d.get('board_halt_confirmed') and
+                now - float(d.get('write_ts') or now) <=
+                _WUKONG_HALT_CONFIRM_TIMEOUT):
+            return jsonify({
+                'ok': False,
+                'error': 'Halt confirmation pending — wait for board evidence',
+                'blocked_cmd': 'h',
+                'blocked_stage': 'awaiting_board_evidence',
+            }), 409
         if (d is not None and
                 d.get('consumed_ts') is not None and
                 d.get('write_ts') is None):
@@ -14874,6 +14901,10 @@ def wukong_command_post():
             'write_ok':    None,
             'write_error': '',
             'write_ts':    None,
+            'board_halt_confirmed': False if cmd == 'h' else None,
+            'board_halt_ts': None,
+            'board_halt_session': '',
+            'board_state_counter': None,
         }
     _record_wukong_bridge_event('command_queued', 'server',
                                 f"command {cmd!r} queued", '', '', 0)
@@ -14978,6 +15009,13 @@ def wukong_status_get():
     bridge_age = (now - _wukong_last_bridge_poll) if _wukong_last_bridge_poll else None
     trace_age  = (now - _wukong_last_trace_post)  if _wukong_last_trace_post  else None
     bridge_alert = _wukong_refresh_bridge_alert(now)
+    if boot_info.get('startup_state') == 'halt_requested':
+        requested_at = float(boot_info.get('received_ts') or now)
+        if bridge_age is None or bridge_age >= 3.0 or bridge_info.get('state') in (
+                'reconnecting', 'serial_error'):
+            boot_info['startup_state'] = 'halt_confirmation_unavailable'
+        elif now - requested_at > _WUKONG_HALT_CONFIRM_TIMEOUT:
+            boot_info['startup_state'] = 'halt_confirmation_timed_out'
     return jsonify({
         # Pipeline-health counters (never reset within a process session).
         # total_trace_posts == 0  → server has never seen a trace packet this session.
@@ -15118,6 +15156,14 @@ def wukong_command_ack_post():
     except (TypeError, ValueError):
         ack_trace_counter = None
     try:
+        ack_state_counter = int(data.get('state_counter'))
+    except (TypeError, ValueError):
+        ack_state_counter = None
+    try:
+        ack_halt_nonce = int(data.get('halt_nonce'))
+    except (TypeError, ValueError):
+        ack_halt_nonce = None
+    try:
         ack_id = int(data.get('id'))
     except (TypeError, ValueError):
         ack_id = None
@@ -15138,6 +15184,8 @@ def wukong_command_ack_post():
             _wukong_cmd_delivery['write_error'] = err
             _wukong_cmd_delivery['write_ts']    = _wk_time.time()
             _wukong_cmd_delivery['trace_seq_at_write'] = trace_seq_at_ack
+            _wukong_cmd_delivery['state_counter_at_write'] = ack_state_counter
+            _wukong_cmd_delivery['halt_nonce'] = ack_halt_nonce
             if cmd == 's' and ok:
                 _wukong_run_unlocked = (
                     ack_trace_counter is not None and
@@ -15152,6 +15200,92 @@ def wukong_command_ack_post():
                 'connected' if ok else 'serial_error', err,
                 ack_session, '', 0)
     return jsonify({'ok': True})
+
+
+@app.route('/hardware/wukong/halt-state', methods=['POST'])
+def wukong_halt_state_post():
+    """Accept board-emitted halt evidence correlated by bridge session/counter."""
+    global _wukong_cmd_delivery, _wukong_run_unlocked, _wukong_boot_info
+    auth_ok, auth_error = _optional_report_token_check()
+    if not auth_ok:
+        return auth_error
+    data = request.get_json(silent=True) or {}
+    if data.get('state') != 'halted' or data.get('reason') != 'explicit_halt':
+        return jsonify({'ok': False, 'accepted': False,
+                        'error': 'invalid halt-state evidence'}), 400
+    session = str(data.get('session_id', '') or '')[:128]
+    try:
+        board_counter = int(data.get('board_state_counter'))
+        write_counter = int(data.get('state_counter_at_write'))
+    except (TypeError, ValueError):
+        return jsonify({'ok': False, 'accepted': False,
+                        'error': 'missing state counters'}), 400
+    if board_counter <= write_counter:
+        return jsonify({'ok': False, 'accepted': False,
+                        'error': 'halt evidence predates request'}), 409
+    now = _wk_time.time()
+    if data.get('automatic'):
+        with _wukong_bridge_lock:
+            current_session = str(_wukong_bridge_info.get('session_id', '') or '')
+        if not session or (current_session and session != current_session):
+            return jsonify({'ok': False, 'accepted': False,
+                            'error': 'bridge session mismatch'}), 409
+        with _wukong_boot_info_lock:
+            if _wukong_boot_info.get('session_id') != session:
+                return jsonify({'ok': False, 'accepted': False,
+                                'error': 'boot session mismatch'}), 409
+            _wukong_boot_info.update({
+                'startup_state': 'awaiting_first_step',
+                'halt_confirmed_ts': now,
+                'halt_evidence_session': session,
+                'board_state_counter': board_counter,
+            })
+        _wukong_run_unlocked = False
+        _queue_wukong_info_event(
+            'halt_confirmed', 'halt_confirmed',
+            'FPGA emitted halted-state evidence after boot',
+            session_id=session, automatic=True,
+            board_state_counter=board_counter)
+        return jsonify({'ok': True, 'accepted': True})
+    try:
+        command_id = int(data.get('command_id'))
+    except (TypeError, ValueError):
+        return jsonify({'ok': False, 'accepted': False,
+                        'error': 'missing command id'}), 400
+    with _wukong_command_lock:
+        d = _wukong_cmd_delivery
+        if not d or d.get('id') != command_id or d.get('cmd') != 'h':
+            return jsonify({'ok': False, 'accepted': False,
+                            'error': 'halt command mismatch'}), 409
+        if d.get('write_ok') is not True:
+            return jsonify({'ok': False, 'accepted': False,
+                            'error': 'halt write not confirmed'}), 409
+        if d.get('bridge_session') and d.get('bridge_session') != session:
+            return jsonify({'ok': False, 'accepted': False,
+                            'error': 'bridge session mismatch'}), 409
+        expected_counter = d.get('state_counter_at_write')
+        if expected_counter is None or write_counter != expected_counter:
+            return jsonify({'ok': False, 'accepted': False,
+                            'error': 'halt counter mismatch'}), 409
+        try:
+            evidence_nonce = int(data.get('halt_nonce'))
+        except (TypeError, ValueError):
+            evidence_nonce = None
+        if evidence_nonce is None or evidence_nonce != d.get('halt_nonce'):
+            return jsonify({'ok': False, 'accepted': False,
+                            'error': 'halt nonce mismatch'}), 409
+        d.update({
+            'board_halt_confirmed': True,
+            'board_halt_ts': now,
+            'board_halt_session': session,
+            'board_state_counter': board_counter,
+        })
+    _queue_wukong_info_event(
+        'halt_confirmed', 'halt_confirmed',
+        'FPGA emitted halted-state evidence for Halt command',
+        session_id=session, command_id=command_id,
+        board_state_counter=board_counter)
+    return jsonify({'ok': True, 'accepted': True})
 
 
 @app.route('/hardware/wukong/upload-ack', methods=['POST'])

@@ -106,7 +106,108 @@ def _bridge_status(client, **body):
                        data=json.dumps(body), content_type='application/json')
 
 
+def _halt_state(client, command_id, session='bridge-a',
+                write_counter=4, board_counter=5, automatic=False,
+                halt_nonce=9):
+    token = os.environ.get('REPORT_TOKEN', '')
+    headers = {'Authorization': f'Bearer {token}'} if token else {}
+    return client.post('/hardware/wukong/halt-state', data=json.dumps({
+        'state': 'halted',
+        'reason': 'explicit_halt',
+        'command_id': command_id,
+        'automatic': automatic,
+        'session_id': session,
+        'state_counter_at_write': write_counter,
+        'board_state_counter': board_counter,
+        'halt_nonce': halt_nonce,
+    }), content_type='application/json', headers=headers)
+
+
 class TestQueueConsumeAckLifecycle:
+    def test_halt_write_is_requested_until_board_evidence_arrives(self, client):
+        qid = _post_cmd(client, 'h').get_json()['id']
+        client.get('/hardware/wukong/command',
+                   headers={'X-Wukong-Session': 'bridge-a'})
+        _ack(client, 'h', qid, True, session_id='bridge-a')
+        status = _status(client)
+        assert status['halt']['state'] == 'halt requested'
+        assert status['command_delivery']['board_halt_confirmed'] is False
+
+    def test_matching_board_halt_evidence_confirms_exact_command(self, client):
+        qid = _post_cmd(client, 'h').get_json()['id']
+        client.get('/hardware/wukong/command',
+                   headers={'X-Wukong-Session': 'bridge-a'})
+        _ack(client, 'h', qid, True, session_id='bridge-a',
+             trace_counter=9)
+        # State counter is independently captured at the serial write.
+        client.post('/hardware/wukong/command-ack', data=json.dumps({
+            'cmd': 'h', 'id': qid, 'ok': True, 'session_id': 'bridge-a',
+            'trace_counter': 9, 'state_counter': 4,
+            'halt_nonce': 9,
+        }), content_type='application/json')
+        response = _halt_state(client, qid)
+        assert response.status_code == 200
+        status = _status(client)
+        assert status['halt']['state'] == 'halt confirmed'
+        assert status['command_delivery']['board_state_counter'] == 5
+
+    def test_stale_or_wrong_session_halt_evidence_is_rejected(self, client):
+        qid = _post_cmd(client, 'h').get_json()['id']
+        client.get('/hardware/wukong/command',
+                   headers={'X-Wukong-Session': 'bridge-a'})
+        client.post('/hardware/wukong/command-ack', data=json.dumps({
+            'cmd': 'h', 'id': qid, 'ok': True, 'session_id': 'bridge-a',
+            'state_counter': 4,
+            'halt_nonce': 9,
+        }), content_type='application/json')
+        assert _halt_state(client, qid, session='bridge-b').status_code == 409
+        assert _halt_state(client, qid, board_counter=4).status_code == 409
+        assert _halt_state(client, qid, halt_nonce=8).status_code == 409
+        assert _status(client)['halt']['state'] == 'halt requested'
+
+    def test_halt_timeout_and_reconnect_remain_unconfirmed(self, client, monkeypatch):
+        qid = _post_cmd(client, 'h').get_json()['id']
+        client.get('/hardware/wukong/command',
+                   headers={'X-Wukong-Session': 'bridge-a'})
+        client.post('/hardware/wukong/command-ack', data=json.dumps({
+            'cmd': 'h', 'id': qid, 'ok': True, 'session_id': 'bridge-a',
+            'state_counter': 4,
+            'halt_nonce': 9,
+        }), content_type='application/json')
+        with _app_module._wukong_command_lock:
+            _app_module._wukong_cmd_delivery['write_ts'] = (
+                time.time() - _app_module._WUKONG_HALT_CONFIRM_TIMEOUT - 1)
+        assert _status(client)['halt']['state'] == 'halt confirmation timed out'
+        _bridge_status(client, session_id='bridge-a', event='reconnect_attempt',
+                       state='reconnecting', reason='USB disconnected')
+        assert _status(client)['halt']['state'] == 'halt confirmation unavailable'
+
+    def test_execution_command_cannot_overtake_pending_halt_evidence(self, client):
+        qid = _post_cmd(client, 'h').get_json()['id']
+        client.get('/hardware/wukong/command',
+                   headers={'X-Wukong-Session': 'bridge-a'})
+        client.post('/hardware/wukong/command-ack', data=json.dumps({
+            'cmd': 'h', 'id': qid, 'ok': True, 'session_id': 'bridge-a',
+            'state_counter': 4,
+            'halt_nonce': 9,
+        }), content_type='application/json')
+        blocked = _post_cmd(client, 's')
+        assert blocked.status_code == 409
+        assert blocked.get_json()['blocked_stage'] == 'awaiting_board_evidence'
+
+    def test_new_command_is_allowed_after_halt_confirmation_timeout(self, client):
+        qid = _post_cmd(client, 'h').get_json()['id']
+        client.get('/hardware/wukong/command',
+                   headers={'X-Wukong-Session': 'bridge-a'})
+        client.post('/hardware/wukong/command-ack', data=json.dumps({
+            'cmd': 'h', 'id': qid, 'ok': True, 'session_id': 'bridge-a',
+            'state_counter': 4,
+        }), content_type='application/json')
+        with _app_module._wukong_command_lock:
+            _app_module._wukong_cmd_delivery['write_ts'] = (
+                time.time() - _app_module._WUKONG_HALT_CONFIRM_TIMEOUT - 1)
+        assert _post_cmd(client, 's').status_code == 200
+
     def test_queue_records_delivery_entry(self, client):
         t0 = time.time()
         r = _post_cmd(client, 'f')

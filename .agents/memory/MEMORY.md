@@ -151,3 +151,4 @@
 - [Build checkpoint mutates NS state](build-checkpoint-mutates-ns-state.md) — checkpoint generation can rewrite ns-state.json via boot imports; restore/verify it before final provenance
 - [CALL E-GT identity flow](call-egt-identity-flow.md) — CALL resolves source/callee E-GTs directly; RETURN frames must carry normalized caller E authority, never transient CR6 L authority
 - [Bridge-causal retirement gates](bridge-causal-retirement-gates.md) — UART write→retirement proofs must use bridge-side counters, not server receive order
+- [Board-state acknowledgement correlation](board-state-ack-correlation.md) — state-changing UART acknowledgements need a request nonce, atomic receive, and bounded partial-frame recovery

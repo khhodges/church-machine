@@ -371,9 +371,9 @@ class TestBridgeSentinelHaltOrdering:
             "Cannot locate sentinel branch in wukong_bridge.py "
             "(expected 'BOOT_SENTINEL_V1, BOOT_SENTINEL_V2' in elif)"
         )
-        halt_write_idx = src.find("ser.write(b'h')", sentinel_branch_idx)
+        halt_write_idx = src.find("ser.write(b'h' + bytes([", sentinel_branch_idx)
         assert halt_write_idx != -1, (
-            "ser.write(b'h') not found after the sentinel branch in wukong_bridge.py — "
+            "nonce-bearing Halt write not found after the sentinel branch in wukong_bridge.py — "
             "bridge may not halt after boot sentinel"
         )
         # Confirm 'h' is sent from the sentinel branch.
@@ -405,9 +405,9 @@ class TestBridgeSentinelHaltOrdering:
         assert sentinel_branch_idx != -1, (
             "Cannot locate sentinel branch in wukong_bridge.py"
         )
-        halt_write_idx = src.find("ser.write(b'h')", sentinel_branch_idx)
+        halt_write_idx = src.find("ser.write(b'h' + bytes([", sentinel_branch_idx)
         assert halt_write_idx != -1, (
-            "ser.write(b'h') not found after the sentinel branch in wukong_bridge.py"
+            "nonce-bearing Halt write not found after the sentinel branch in wukong_bridge.py"
         )
         # The sentinel block must arm the deferred-q gate, not send 'q' directly.
         sentinel_block_end = src.find("if sentinel['stale']:", halt_write_idx)

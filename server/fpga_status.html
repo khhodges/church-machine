@@ -691,6 +691,25 @@
       }
       if (d.write_ts) {
         if (d.write_ok) {
+          if (d.cmd === 'h') {
+            if (d.board_halt_confirmed) {
+              note(w.label + ' confirmed — FPGA emitted halted-state evidence');
+              stopCmdWatch(true, d); return;
+            }
+            if (!s.bridge_connected) {
+              note(w.label + ': Halt was written, but board confirmation is unavailable because the bridge disconnected');
+              stopCmdWatch(false, d); return;
+            }
+            if (elapsed > 5) {
+              note(w.label + ': Halt was written, but no board halt evidence arrived within 5s — state remains unconfirmed');
+              stopCmdWatch(false, d); return;
+            }
+            if (w.phase !== 'awaiting_board') {
+              w.phase = 'awaiting_board';
+              note(w.label + ' requested (serial write OK) — waiting for FPGA halt evidence…');
+            }
+            return;
+          }
           note(w.label + ' delivered to board (serial write OK)');
         } else {
           note(w.label + ' FAILED: bridge consumed the command but the serial write failed — ' +
@@ -818,7 +837,7 @@
   document.getElementById('btnStop').onclick = function () {
     if (!boardRunning && pendingExecutionCmd !== 'r' &&
         pendingExecutionCmd !== 's') return;
-    sendCmd({ cmd: 'h' }, 'STOP', function (ok) {
+      sendCmd({ cmd: 'h' }, 'STOP', function (ok) {
       if (ok) {
         boardRunning = false;
         updateRunButton();
@@ -1339,12 +1358,20 @@
           if (bi.startup_state === 'awaiting_first_step') {
             boardRunning = false;
             runUnlocked = false;
-            note('Board halted after boot sentinel — waiting for the first deliberate Step');
+            note('Board halt confirmed after boot sentinel — waiting for the first deliberate Step');
+          } else if (bi.startup_state === 'halt_requested') {
+            note('Board halt requested after boot sentinel — waiting for FPGA confirmation');
           }
         }
         document.getElementById('bootSentinel').textContent =
           bi.startup_state === 'awaiting_first_step'
-            ? 'seen — halted; waiting for first deliberate Step'
+            ? 'seen — halt confirmed; waiting for first deliberate Step'
+            : bi.startup_state === 'halt_confirmation_timed_out'
+            ? 'seen — Halt written, but board confirmation timed out'
+            : bi.startup_state === 'halt_confirmation_unavailable'
+            ? 'seen — Halt written, but confirmation unavailable after disconnect'
+            : bi.startup_state === 'halt_requested'
+            ? 'seen — halt requested; awaiting board evidence'
             : (bi.stale_tu ? 'seen — STALE bitstream' : 'seen — current bitstream');
         document.getElementById('bootSentinel').className = bi.stale_tu ? 'v fault' : 'v good';
         document.getElementById('tuVersion').textContent = bi.tu_version;
@@ -1402,8 +1429,14 @@
       if (!cd) { cdEl.textContent = '—'; cdEl.className = 'v'; }
       else if (cd.write_ts) {
         cdEl.textContent = "'" + cd.cmd + "' " +
-          (cd.write_ok ? 'written to UART' : 'WRITE FAILED: ' + (cd.write_error || '?'));
-        cdEl.className = cd.write_ok ? 'v good' : 'v fault';
+          (cd.cmd === 'h' && cd.write_ok
+            ? (cd.board_halt_confirmed
+                ? 'halt confirmed by FPGA'
+                : 'written to UART — awaiting FPGA halt evidence')
+            : (cd.write_ok ? 'written to UART' : 'WRITE FAILED: ' + (cd.write_error || '?')));
+        cdEl.className = cd.write_ok
+          ? (cd.cmd === 'h' && !cd.board_halt_confirmed ? 'v warn' : 'v good')
+          : 'v fault';
       } else if (cd.consumed_ts) {
         cdEl.textContent = "'" + cd.cmd + "' consumed by bridge (no write ack yet)";
         cdEl.className = 'v';

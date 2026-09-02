@@ -64,7 +64,40 @@ def _run(cmd, ser, data=None, reopen=None, buf=None):
         buf if buf is not None else bytearray(),
         IDE, True)
 
+class TestHaltStateFrame:
+    def test_valid_halt_frame_is_decoded(self):
+        assert bridge.try_parse_halt_state_frame(
+            bytes([0xAD, 0x01, 0x01, 0x01, 0x09, 0xA5])) == {
+                'state': 'halted',
+                'reason': 'explicit_halt',
+                'version': 1,
+                'nonce': 9,
+            }
 
+    def test_truncated_frame_waits_and_bad_checksum_is_rejected(self):
+        assert bridge.try_parse_halt_state_frame(b'\xAD\x01') is False
+        assert bridge.try_parse_halt_state_frame(
+            bytes([0xAD, 0x01, 0x01, 0x01, 0x09, 0x00])) is None
+
+    def test_halt_write_callback_runs_only_after_successful_write(self, acks):
+        results = []
+        bridge.execute_board_command(
+            'h', {'id': 55, '_halt_nonce': 9}, FakeSerial(), lambda: None, bytearray(),
+            IDE, True, session_id='session-a', state_counter=7,
+            write_result=lambda cmd, data, ok: results.append(
+                (cmd, data['id'], ok)))
+        assert results == [('h', 55, True)]
+        assert acks[-1]['json']['state_counter'] == 7
+        assert acks[-1]['json']['halt_nonce'] == 9
+
+    def test_later_execution_write_can_invalidate_timed_out_halt(self, acks):
+        results = []
+        bridge.execute_board_command(
+            's', {'id': 56}, FakeSerial(), lambda: None, bytearray(),
+            IDE, True, session_id='session-a', state_counter=8,
+            write_result=lambda cmd, data, ok: results.append(
+                (cmd, data['id'], ok)))
+        assert results == [('s', 56, True)]
 class TestWriteSuccess:
     def test_simple_command_write_posts_ok_ack(self, acks):
         ser = FakeSerial()
@@ -295,4 +328,5 @@ def test_main_reconnects_after_read_failure_and_acknowledges_after_write(
     assert timeline[ack_index][2] == {
         'cmd': 's', 'ok': True, 'error': '', 'id': 314,
         'session_id': 'stable-bridge-session', 'trace_counter': 0,
+        'state_counter': 0,
     }

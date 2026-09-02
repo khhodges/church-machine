@@ -127,8 +127,8 @@ def test_full_top_uart_step_pauses_run_and_advances_once():
     )
 
 
-def test_full_top_uart_legacy_halt_still_latches_step_state():
-    """Older bridges may still send ``h``; retain that compatibility path."""
+def test_full_top_uart_halt_emits_board_evidence():
+    """Nonce-bearing Halt latches stop state and drains the evidence frame."""
     clk_freq = 100
     baud = 10
     bit_cycles = clk_freq // baud
@@ -143,16 +143,26 @@ def test_full_top_uart_legacy_halt_still_latches_step_state():
             ctx.set(top.uart_rx_pin, level)
             for _ in range(bit_cycles):
                 await ctx.tick()
+        for level in _uart_frame(0x09):
+            ctx.set(top.uart_rx_pin, level)
+            for _ in range(bit_cycles):
+                await ctx.tick()
         for _ in range(3_000):
             await ctx.tick()
-        result["state"] = (ctx.get(top.step_mode), ctx.get(top.step_halted))
+        result["state"] = (
+            ctx.get(top.step_mode),
+            ctx.get(top.step_halted),
+            ctx.get(top.dbg_halt_state_emitted),
+        )
 
     sim = Simulator(top)
     sim.add_clock(1e-6)
     sim.add_testbench(drive)
     sim.run()
 
-    assert result["state"] == (1, 1)
+    assert result["state"] == (1, 1, 1), (
+        "Halt must latch the stopped state and drain its board-evidence frame"
+    )
 
 
 def test_full_top_uart_reboot_restarts_at_lump_entry():

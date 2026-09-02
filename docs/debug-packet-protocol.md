@@ -219,6 +219,24 @@ it updates displayed CR/DR/flags/STO and the physical hardware cursor without
 calling simulator execution or changing simulator breakpoints. Stored
 suspended-thread fields remain separate from live CR12.
 
+## Halt-state evidence
+
+An explicit `h` command does not become a confirmed stop when the host writes
+the byte. After the command parser has applied `step_mode=1` and
+`step_halted=1`, the FPGA emits this fixed five-byte frame:
+
+```
+AD 01 01 01 NN CC
+```
+
+The fields are magic, protocol version, state (`1` = halted), reason
+(`1` = explicit Halt), the bridge-issued one-byte request nonce, and the XOR
+checksum of the preceding five bytes. The Halt command on the wire is `h NN`.
+The bridge correlates this evidence with the exact pending Halt command and
+bridge session. Until it arrives, user interfaces must say **halt requested**,
+not halted. A five-second wait without evidence is a confirmation timeout;
+a serial reconnect before evidence makes confirmation unavailable.
+
 ---
 
 ## IDE slave mode

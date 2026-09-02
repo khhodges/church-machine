@@ -275,6 +275,13 @@ function extractHwStopCode(srcPath) {
 const UPDATE_BTN_SRC = extractUpdateBtnCode('app-run.js');
 const HW_STOP_SRC    = extractHwStopCode('app-run.js');
 
+check('WB-HALT-EVIDENCE-1', 'IDE waits for FPGA board_halt_confirmed evidence',
+    /board_halt_confirmed/.test(fs.readFileSync(
+        path.resolve(__dirname, 'app-run.js'), 'utf8')));
+check('WB-HALT-EVIDENCE-2', 'status page has an explicit halt-evidence timeout',
+    /no board halt evidence arrived within 5s/.test(fs.readFileSync(
+        path.resolve(__dirname, '..', 'server', 'fpga_status.html'), 'utf8')));
+
 // Build a lightweight env for _wukongUpdateBtn tests.
 // Provides only the globals the function reads; stubs everything it calls that
 // is irrelevant to the stop-button assertions.
@@ -341,6 +348,10 @@ function makeHwStopEnv(opts) {
         _wukongWatchDelivery: async function() {
             return opts.watchFails ? false : true;
         },
+        _wukongCmdLog: function(msg) {
+            sb._logs.push(msg);
+        },
+        _logs: [],
         _updateBtnCallCount: 0,
         _wukongUpdateBtn: function() {
             sb._updateBtnCallCount++;
@@ -454,8 +465,10 @@ const _asyncTests = [];
     _asyncTests.push(p.then(function() {
         check('WB-ST-7a', 'mid-halt disconnect → _wukongUpdateBtn() called',
             env._updateBtnCallCount === 1);
-        check('WB-ST-7b', 'mid-halt disconnect → stop button hidden',
-            stopBtn.style.display === 'none');
+    check('WB-ST-7b', 'mid-halt disconnect → running state remains unknown, not falsely halted',
+        env._wukongHWRunning === true);
+    check('WB-ST-7c', 'mid-halt disconnect → confirmation-unavailable explanation shown',
+        env._logs.some(function(line) { return /confirmation unavailable/.test(line); }));
     }));
 })();
 

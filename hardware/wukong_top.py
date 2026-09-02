@@ -370,6 +370,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         # ports without needing a probe submodule.  Both are driven by elaborate().
         self.step_mode   = Signal(init=0)  # 0 = free-run; 1 = step/halt mode
         self.step_halted = Signal()        # 1 = CM currently held between retires
+        self.dbg_halt_state_emitted = Signal()  # halted-state UART frame drained
         # State: 0=IDLE/other, 1=UPLOAD_LEN, 2=UPLOAD_LEN_COMMIT,
         # 3=UPLOAD_DATA, 4=UPLOAD_ACK.
         self.dbg_upload_state = Signal(3)
@@ -573,6 +574,18 @@ class ChurchWukongXC7A100T(Elaboratable):
         snapshot_tx_ack = Signal()
         snapshot_complete = Signal()
         snapshot_complete_reason = Signal(2)
+        # Board-state evidence frame, emitted only after an explicit Halt has
+        # been applied to step_mode/step_halted:
+        #   AD 01 01 01 AC
+        # magic, version, state=halted, reason=explicit-halt, XOR checksum.
+        halt_state_pending = Signal()
+        halt_state_phase = Signal(3)
+        halt_state_nonce = Signal(8)
+        halt_cmd_wait_nonce = Signal()
+        halt_nonce_wait_cycles = Signal(20)
+        halt_state_req = Signal()
+        halt_state_byte = Signal(8)
+        halt_state_ack = Signal()
         # trace_stall: asserted by TraceUnit while events are pending.
         # OR-ed into halt_req/imem_valid so the CM cannot retire the next
         # instruction until the TraceUnit drains all queued event packets.
@@ -725,7 +738,8 @@ class ChurchWukongXC7A100T(Elaboratable):
         #   1. CM MMIO reg-5 write       — cm_tx_start
         #   2. HW boot banner            — "WUKONG\r\n", sent before boot_start
         #   3. Boot sentinel (4 bytes)   — 0xBC, N_INIT, TU_VERSION, BUILD_VERSION
-        #   4. TraceUnit packets         — fill remaining idle TX cycles
+        #   4. Halt state evidence       — fixed 5-byte 0xAD frame
+        #   5. TraceUnit packets         — fill remaining idle TX cycles
         #
         # cm_tx_start is the raw CM write signal; used by the TraceUnit to avoid
         # colliding with in-flight CM bytes.
@@ -781,6 +795,32 @@ class ChurchWukongXC7A100T(Elaboratable):
                 m.d.sync += sentinel_sent.eq(1)    # BUILD_VERSION byte accepted → done
 
         trace_tx_ack = Signal()  # TraceUnit byte accepted (one-cycle ack)
+        m.d.comb += halt_state_req.eq(halt_state_pending)
+        with m.Switch(halt_state_phase):
+            with m.Case(0):
+                m.d.comb += halt_state_byte.eq(0xAD)
+            with m.Case(1):
+                m.d.comb += halt_state_byte.eq(0x01)
+            with m.Case(2):
+                m.d.comb += halt_state_byte.eq(0x01)
+            with m.Case(3):
+                m.d.comb += halt_state_byte.eq(0x01)
+            with m.Case(4):
+                m.d.comb += halt_state_byte.eq(halt_state_nonce)
+            with m.Default():
+                m.d.comb += halt_state_byte.eq(0xAC ^ halt_state_nonce)
+        m.d.comb += halt_state_ack.eq(
+            halt_state_req & tx_free & ~cm_tx_start & ~sentinel_req &
+            ~banner_req & ~upload_ack_req)
+        with m.If(halt_state_ack):
+            with m.If(halt_state_phase == 5):
+                m.d.sync += [
+                    halt_state_pending.eq(0),
+                    halt_state_phase.eq(0),
+                    self.dbg_halt_state_emitted.eq(1),
+                ]
+            with m.Else():
+                m.d.sync += halt_state_phase.eq(halt_state_phase + 1)
         m.d.comb += [
             uart_tx.data.eq(
                 Mux(cm_tx_start,                              core.dmem_wr_data[0:8],
@@ -790,22 +830,24 @@ class ChurchWukongXC7A100T(Elaboratable):
                 Mux(sentinel_req & (sentinel_phase == 2),    C(_TU_VERSION_CALL_3PKT, 8),
                 Mux(sentinel_req & (sentinel_phase == 3),    C(_BUILD_VERSION & 0xFF, 8),
                 Mux(upload_ack_req,                          C(0x06, 8),
+                Mux(halt_state_req,                          halt_state_byte,
                 Mux(snapshot_tx_req,                         snapshot_tx_byte,
-                                                               trace_tx_byte)))))))))  ,
+                                                               trace_tx_byte))))))))))  ,
             uart_tx.start.eq(
                 cm_tx_start |
                 (banner_req      & tx_free & ~cm_tx_start) |
                 (sentinel_req    & tx_free & ~cm_tx_start & ~banner_req) |
                 (upload_ack_req  & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req) |
-                (snapshot_tx_req & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req & ~upload_ack_req) |
+                (halt_state_req  & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req & ~upload_ack_req) |
+                (snapshot_tx_req & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req & ~upload_ack_req & ~halt_state_req) |
                 (trace_tx_req    & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req &
-                 ~upload_ack_req & ~snapshot_tx_req)),
+                 ~upload_ack_req & ~halt_state_req & ~snapshot_tx_req)),
             trace_tx_ack.eq(
                 trace_tx_req & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req &
-                ~upload_ack_req & ~snapshot_tx_req),
+                ~upload_ack_req & ~halt_state_req & ~snapshot_tx_req),
             snapshot_tx_ack.eq(
                 snapshot_tx_req & tx_free & ~cm_tx_start & ~sentinel_req &
-                ~banner_req & ~upload_ack_req),
+                ~banner_req & ~upload_ack_req & ~halt_state_req),
         ]
 
         is_mmio_read = Signal()
@@ -1095,9 +1137,38 @@ class ChurchWukongXC7A100T(Elaboratable):
         bp_recv_bytes = [Signal(8, name=f"bp_recv_b{i}") for i in range(4)]
         bp_recv_cnt   = Signal(2)
 
+        # A partial Halt command must never change board state or swallow a
+        # later command indefinitely. The server will not issue another
+        # command while Halt is pending, and this short parser timeout restores
+        # IDLE if the nonce byte is lost on the wire.
+        halt_nonce_timeout = max(256, self.clk_freq // 100)  # ~10 ms
+        with m.If(halt_cmd_wait_nonce):
+            with m.If(halt_nonce_wait_cycles >= halt_nonce_timeout - 1):
+                m.d.sync += [
+                    halt_cmd_wait_nonce.eq(0),
+                    halt_nonce_wait_cycles.eq(0),
+                ]
+            with m.Else():
+                m.d.sync += halt_nonce_wait_cycles.eq(
+                    halt_nonce_wait_cycles + 1)
+
         with m.FSM(name="cmd_parser"):
             with m.State("IDLE"):
-                with m.If(uart_rx.valid):
+                with m.If(uart_rx.valid & halt_cmd_wait_nonce):
+                    m.d.sync += [
+                        halt_cmd_wait_nonce.eq(0),
+                        halt_nonce_wait_cycles.eq(0),
+                        halt_state_nonce.eq(uart_rx.data),
+                        halt_state_pending.eq(1),
+                        halt_state_phase.eq(0),
+                        self.dbg_halt_state_emitted.eq(0),
+                        step_mode.eq(1),
+                        step_halted.eq(1),
+                        step_pause_pending.eq(0),
+                        snapshot_pending.eq(1),
+                        snapshot_reason.eq(3),
+                    ]
+                with m.Elif(uart_rx.valid):
                     with m.Switch(uart_rx.data):
                         with m.Case(0x73):  # 's'
                             # 's' is the universal pause/step control.  From
@@ -1122,11 +1193,8 @@ class ChurchWukongXC7A100T(Elaboratable):
                         with m.Case(0x68):  # 'h'
                             with m.If(~recovery_hold):
                                 m.d.sync += [
-                                    step_mode.eq(1),
-                                    step_halted.eq(1),
-                                    step_pause_pending.eq(0),
-                                    snapshot_pending.eq(1),
-                                    snapshot_reason.eq(3),
+                                    halt_cmd_wait_nonce.eq(1),
+                                    halt_nonce_wait_cycles.eq(0),
                                 ]
                         with m.Case(0x62):  # 'b'
                             m.d.sync += bp_recv_cnt.eq(0)

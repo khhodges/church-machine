@@ -16473,6 +16473,7 @@ function showApiAbstractionDetail(slot) {
 let _wukongHWRunning    = false;   // true = board is in free-run mode
 let _wukongRunUnlocked  = false;   // true after a delivered Step retires
 let _wukongStartupTs    = null;    // fresh sentinel resets the step-first gate
+let _wukongLastHaltConfirmationId = null;
 let _wukongPendingExecutionCmd = null; // queued 's'/'r' remains STOP-cancellable
 let _wukongLastTraceTs  = 0;       // unix timestamp (seconds) of last trace packet
 const _WUKONG_STALE_MS  = 10000;   // 10 s without a packet → disconnected
@@ -17184,13 +17185,23 @@ async function _wukongRefreshHealthStrip() {
                 ? s.relay_last_rx : null;
         }
         _wukongHandleBridgeAlert(s.bridge_alert);
+        const haltDelivery = s && s.command_delivery;
+        if (haltDelivery && haltDelivery.cmd === 'h' &&
+                haltDelivery.board_halt_confirmed &&
+                haltDelivery.id !== _wukongLastHaltConfirmationId) {
+            _wukongLastHaltConfirmationId = haltDelivery.id;
+            _wukongHWRunning = false;
+            _wukongCmdLog('STOP confirmed by FPGA board evidence');
+        }
         const bi = (s && s.boot_info) || {};
         if (bi.received_ts && bi.received_ts !== _wukongStartupTs) {
             _wukongStartupTs = bi.received_ts;
             if (bi.startup_state === 'awaiting_first_step') {
                 _wukongHWRunning = false;
                 _wukongRunUnlocked = false;
-                _wukongCmdLog('Board halted after boot sentinel \u2014 waiting for the first deliberate Step');
+                _wukongCmdLog('Board halt confirmed after boot sentinel \u2014 waiting for the first deliberate Step');
+            } else if (bi.startup_state === 'halt_requested') {
+                _wukongCmdLog('Board halt requested after boot sentinel \u2014 waiting for FPGA confirmation');
             }
         }
         const pending = s && s.pending_command;
@@ -18054,7 +18065,7 @@ setInterval(async function _wukongPoll() {
             if (bdata.startup_state === 'awaiting_first_step') {
                 _wukongHWRunning = false;
                 _wukongRunUnlocked = false;
-                _wukongCmdLog('Board halted after boot sentinel \u2014 waiting for the first deliberate Step');
+                _wukongCmdLog('Board halt confirmed after boot sentinel \u2014 waiting for the first deliberate Step');
                 _wukongUpdateBtn();
             }
         }
@@ -18592,7 +18603,18 @@ async function _wukongWatchDeliveryInner(id, label, timeoutMs) {
             }
             if (d.consumed_ts) sawConsumed = true;
             if (d.write_ts) {
-                if (d.write_ok) return true;
+                if (d.write_ok) {
+                    if (d.cmd !== 'h') return true;
+                    if (d.board_halt_confirmed) {
+                        _wukongCmdLog(label + ' confirmed \u2014 FPGA emitted halted-state evidence');
+                        return true;
+                    }
+                    if (!s.bridge_connected) {
+                        _wukongCmdLog(label + ': Halt was written, but board confirmation is unavailable because the bridge disconnected');
+                        return false;
+                    }
+                    continue;
+                }
                 _wukongCmdLog(label + ' FAILED: bridge serial write failed \u2014 ' +
                               (d.write_error || 'unknown error'));
                 return false;
@@ -18607,8 +18629,9 @@ async function _wukongWatchDeliveryInner(id, label, timeoutMs) {
             }
         } catch(e) {}
     }
-    _wukongCmdLog(label + ': no delivery confirmation after ' +
-                  Math.round((timeoutMs || 10000) / 1000) + 's');
+    _wukongCmdLog(label + ': no ' +
+                  (label === 'STOP' ? 'board halt evidence' : 'delivery confirmation') +
+                  ' after ' + Math.round((timeoutMs || 10000) / 1000) + 's');
     return false;
 }
 
@@ -18709,9 +18732,11 @@ async function hwStop() {
     const ok = await _wukongWatchDelivery(d.id, 'STOP', 10000);
     if (!ok) {
         if (!_wukongIsConnected()) {
-            // Bridge disconnected mid-halt: board state is unknown — treat as
-            // halted and let _wukongUpdateBtn hide the controls immediately.
-            _wukongHWRunning = false;
+            // Bridge disconnected mid-halt: board state is unknown. Do not
+            // turn a transport failure into a false "halted" indication.
+            if (typeof _wukongCmdLog === 'function') {
+                _wukongCmdLog('STOP confirmation unavailable after disconnect \u2014 board state is unknown');
+            }
             _wukongUpdateBtn();
         } else if (_wukongHWRunning) {
             // Delivery timed out but bridge still up: re-enable the Stop button.

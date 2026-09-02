@@ -177,6 +177,15 @@ SNAPSHOT_HEADER_LEN = 6       # magic, version, payload length, sequence
 SNAPSHOT_CRC_LEN = 2
 SNAPSHOT_PAYLOAD_LEN = 284
 
+# Board execution-state evidence:
+#   AD 01 01 01 NN CC
+# magic, version, state=halted, reason, request nonce, XOR checksum.
+HALT_STATE_MAGIC = 0xAD
+HALT_STATE_VERSION = 1
+HALT_STATE_HALTED = 1
+HALT_STATE_REASON_EXPLICIT = 1
+HALT_STATE_LEN = 6
+
 # ── Boot trace packet gate ────────────────────────────────────────────────────
 # On a cold board start the CM emits a fixed number of trace packets
 # immediately after the sentinel (boot-thread CHANGE sequence + boot CALL
@@ -324,7 +333,21 @@ def parse_boot_sentinel(buf, i=0):
         }
     return None
 
-
+def try_parse_halt_state_frame(buf, i=0):
+    """Parse and validate one fixed board halt-state evidence frame."""
+    if i >= len(buf) or buf[i] != HALT_STATE_MAGIC:
+        return None
+    if len(buf) - i < HALT_STATE_LEN:
+        return False
+    frame = bytes(buf[i:i + HALT_STATE_LEN])
+    if (frame[1] != HALT_STATE_VERSION or
+            frame[2] != HALT_STATE_HALTED or
+            frame[3] != HALT_STATE_REASON_EXPLICIT or
+            frame[5] != (frame[0] ^ frame[1] ^ frame[2] ^ frame[3] ^
+                         frame[4])):
+        return None
+    return {'state': 'halted', 'reason': 'explicit_halt',
+            'version': frame[1], 'nonce': frame[4]}
 def _compute_expected_n_init():
     """Return the N_INIT value expected from the current boot_rom.py tables.
 
@@ -1258,11 +1281,12 @@ class FaultDeliveryWorker:
                     reply = _post_recovery_authorization(
                         self.ide_base, payload, self.verify_tls,
                         max_attempts=1)
-                elif kind in ('status', 'console', 'boot_info'):
+                elif kind in ('status', 'console', 'boot_info', 'halt_state'):
                     endpoint = {
                         'status': 'bridge-status',
                         'console': 'console',
                         'boot_info': 'boot-info',
+                        'halt_state': 'halt-state',
                     }[kind]
                     timeout = 0.5 if kind == 'status' else 1
                     headers = ({
@@ -1445,7 +1469,8 @@ def try_parse_utf8_sequence(buf, i):
 
 
 def post_command_ack(ide_base, verify_tls, cmd, ok, error='', cmd_id=None,
-                      session_id=None, trace_counter=None):
+                      session_id=None, trace_counter=None, state_counter=None,
+                      halt_nonce=None):
     """Report the serial-write result for a dequeued command to the server.
 
     Delivery of the ack is best-effort; a failure to POST never interrupts
@@ -1457,6 +1482,10 @@ def post_command_ack(ide_base, verify_tls, cmd, ok, error='', cmd_id=None,
             payload['session_id'] = session_id
         if trace_counter is not None:
             payload['trace_counter'] = int(trace_counter)
+        if state_counter is not None:
+            payload['state_counter'] = int(state_counter)
+        if halt_nonce is not None:
+            payload['halt_nonce'] = int(halt_nonce)
         requests.post(f'{ide_base}/hardware/wukong/command-ack',
                       json=payload,
                       timeout=1, verify=verify_tls)
@@ -1466,7 +1495,8 @@ def post_command_ack(ide_base, verify_tls, cmd, ok, error='', cmd_id=None,
 
 def execute_board_command(cmd, data, ser, reopen_serial, buf,
                           ide_base, verify_tls, session_id=None,
-                          trace_counter=None):
+                          trace_counter=None, state_counter=None,
+                          write_result=None):
     """Write a dequeued command ('s','r','h','q','b','f') to the board's UART.
 
     Reports success/failure back to the server via POST
@@ -1509,7 +1539,9 @@ def execute_board_command(cmd, data, ser, reopen_serial, buf,
             ser = reopen_serial()
             buf.clear()
             ser.write(b'f')
-        elif cmd in ('s', 'r', 'h', 'q'):
+        elif cmd == 'h':
+            ser.write(b'h' + bytes([int(data['_halt_nonce']) & 0xFF]))
+        elif cmd in ('s', 'r', 'q'):
             ser.write(cmd.encode('ascii'))
         else:
             post_command_ack(ide_base, verify_tls, cmd, False,
@@ -1517,13 +1549,21 @@ def execute_board_command(cmd, data, ser, reopen_serial, buf,
                              cmd_id=cmd_id, session_id=session_id)
             return ser
         post_command_ack(ide_base, verify_tls, cmd, True, cmd_id=cmd_id,
-                         session_id=session_id, trace_counter=trace_counter)
+                         session_id=session_id, trace_counter=trace_counter,
+                         state_counter=state_counter,
+                         halt_nonce=data.get('_halt_nonce') if cmd == 'h' else None)
+        if write_result:
+            write_result(cmd, data, True)
     except Exception as exc:
         print(f'  [command] serial write FAILED for {cmd!r}: {exc}',
               flush=True)
         post_command_ack(ide_base, verify_tls, cmd, False,
                          f'serial write failed: {exc}', cmd_id=cmd_id,
-                         session_id=session_id, trace_counter=trace_counter)
+                         session_id=session_id, trace_counter=trace_counter,
+                         state_counter=state_counter,
+                         halt_nonce=data.get('_halt_nonce') if cmd == 'h' else None)
+        if write_result:
+            write_result(cmd, data, False)
     return ser
 
 
@@ -1660,6 +1700,24 @@ def main():
     last_write_ts = None
     delivery_worker = FaultDeliveryWorker(ide_base, verify_tls)
     trace_counter = 0
+    state_counter = 0
+    halt_nonce_counter = 0
+    pending_halt = None
+
+    def _command_write_result(cmd, data, ok):
+        nonlocal pending_halt
+        if cmd == 'h':
+            pending_halt = ({
+                'command_id': data.get('id'),
+                'automatic': False,
+                'requested_ts': time.time(),
+                'state_counter_at_write': state_counter,
+                'nonce': data.get('_halt_nonce'),
+            } if ok else None)
+        elif ok and cmd in ('s', 'r', 'b', 'f', 'u'):
+            # Any later board-state mutation makes delayed evidence for the
+            # previous timed-out Halt inapplicable.
+            pending_halt = None
 
     def _bridge_status(event='heartbeat', state=None, reason='',
                        reconnect_attempt=0, fault_delivery=None):
@@ -1835,7 +1893,12 @@ def main():
         After a USB reconnect the device may be renumbered (e.g. ttyUSB0→ttyUSB1).
         We scan /dev/ttyUSB* on each attempt so the renumbered port is found.
         """
-        nonlocal port
+        nonlocal port, pending_halt
+        if pending_halt is not None:
+            pending_halt = None
+            _bridge_status(
+                'halt_confirmation_unavailable', 'reconnecting',
+                'serial reconnect began before halt evidence arrived')
         try:
             ser.close()
         except Exception:
@@ -1890,6 +1953,45 @@ def main():
             i = 0
             while i < len(buf):
                 b = buf[i]
+
+                if b == HALT_STATE_MAGIC:
+                    decoded = try_parse_halt_state_frame(buf, i)
+                    if decoded is False:
+                        break
+                    if decoded is None:
+                        sync.unlock('invalid halt-state frame')
+                        sync.drop_byte()
+                        i += 1
+                        continue
+                    sync.lock('halt-state frame')
+                    state_counter += 1
+                    if pending_halt is not None:
+                        if decoded.get('nonce') != pending_halt.get('nonce'):
+                            print('  [halt] stale nonce ignored', flush=True)
+                            i += HALT_STATE_LEN
+                            continue
+                        payload = dict(decoded)
+                        payload.update({
+                            'command_id': pending_halt.get('command_id'),
+                            'automatic': bool(pending_halt.get('automatic')),
+                            'requested_ts': pending_halt.get('requested_ts'),
+                            'state_counter_at_write': pending_halt.get(
+                                'state_counter_at_write'),
+                            'board_state_counter': state_counter,
+                            'halt_nonce': decoded.get('nonce'),
+                            'session_id': session_id,
+                            'ts': time.time(),
+                        })
+                        delivery_worker.submit('halt_state', payload)
+                        _bridge_status(
+                            'halt_confirmed', 'halt_confirmed',
+                            'board emitted halted-state evidence')
+                        pending_halt = None
+                    else:
+                        print('  [halt] unsolicited board-state frame ignored',
+                              flush=True)
+                    i += HALT_STATE_LEN
+                    continue
 
                 if b == PREFETCH_REQUEST_MAGIC:
                     if len(buf) - i < PREFETCH_REQUEST_LEN:
@@ -2145,15 +2247,23 @@ def main():
                     # before they enable Run.
                     startup_state = 'halt_failed'
                     try:
-                        ser.write(b'h')
+                        halt_nonce_counter = (halt_nonce_counter + 1) & 0xFF
+                        ser.write(b'h' + bytes([halt_nonce_counter]))
                         last_write_ts = time.time()
-                        startup_state = 'awaiting_first_step'
-                        print('  [boot] halt requested — awaiting first deliberate step',
+                        pending_halt = {
+                            'command_id': None,
+                            'automatic': True,
+                            'requested_ts': last_write_ts,
+                            'state_counter_at_write': state_counter,
+                            'nonce': halt_nonce_counter,
+                        }
+                        startup_state = 'halt_requested'
+                        print('  [boot] halt requested — awaiting board confirmation',
                               flush=True)
                         _bridge_status(
                             'automatic_halt_after_sentinel',
-                            'awaiting_first_step',
-                            'halt written after boot sentinel; awaiting first deliberate step')
+                            'halt_requested',
+                            'halt written after boot sentinel; awaiting board evidence')
                     except Exception as exc:
                         print(f'  [halt send error] {exc}', flush=True)
                         _bridge_status(
@@ -2309,10 +2419,16 @@ def main():
                         data = r.json() or {}
                         cmd = data.get('cmd')
                         if cmd in ('s', 'r', 'h', 'q', 'b', 'f'):
+                            if cmd == 'h':
+                                halt_nonce_counter = (
+                                    halt_nonce_counter + 1) & 0xFF
+                                data['_halt_nonce'] = halt_nonce_counter
                             ser = execute_board_command(
                                 cmd, data, ser, _reopen_serial, buf,
                                 ide_base, verify_tls, session_id,
-                                trace_counter=trace_counter)
+                                trace_counter=trace_counter,
+                                state_counter=state_counter,
+                                write_result=_command_write_result)
                         elif cmd == 'u':
                             try:
                                 _leftover = _handle_upload(
