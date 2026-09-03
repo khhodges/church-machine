@@ -224,6 +224,56 @@ db = SQLAlchemy(model_class=Base)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key")
+
+_M_BIT_UNLOCK_COOKIE = "church_m_bit_unlocked"
+_M_BIT_UNLOCK_MAX_AGE = 60 * 60 * 24 * 365
+
+
+def _m_bit_unlock_cookie_value():
+    """Return a revocable cookie proof without exposing the IDE secret."""
+    configured = os.environ.get("M_BIT_IDE_SECRET", "")
+    if not configured:
+        return ""
+    key = str(app.secret_key).encode("utf-8")
+    return hmac.new(
+        key,
+        ("ChurchMachine.MBitIDEUnlock|" + configured).encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _m_bit_ide_is_unlocked():
+    expected = _m_bit_unlock_cookie_value()
+    presented = request.cookies.get(_M_BIT_UNLOCK_COOKIE, "")
+    return bool(expected and presented and hmac.compare_digest(presented, expected))
+
+
+@app.route("/api/m-bit-ide-access", methods=["GET", "POST"])
+def api_m_bit_ide_access():
+    """Check or establish this browser's persistent M_BIT_DEV picker access."""
+    response = None
+    if request.method == "POST":
+        configured = os.environ.get("M_BIT_IDE_SECRET", "")
+        supplied = str((request.get_json(silent=True) or {}).get("secret", ""))
+        # Exact, case-sensitive match.  compare_digest avoids leaking how much
+        # of an incorrect secret matched.
+        if not configured or not hmac.compare_digest(supplied, configured):
+            response = make_response(jsonify({"unlocked": False, "error": "Incorrect IDE secret"}), 403)
+        else:
+            response = make_response(jsonify({"unlocked": True}))
+            response.set_cookie(
+                _M_BIT_UNLOCK_COOKIE,
+                _m_bit_unlock_cookie_value(),
+                max_age=_M_BIT_UNLOCK_MAX_AGE,
+                httponly=True,
+                secure=request.is_secure,
+                samesite="Strict",
+                path="/",
+            )
+    else:
+        response = make_response(jsonify({"unlocked": _m_bit_ide_is_unlocked()}))
+    response.headers["Cache-Control"] = "no-store"
+    return response
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "church_machine.db")

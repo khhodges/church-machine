@@ -26,6 +26,7 @@
     var popupEl      = null;
     var activeEditor = null;
     var focusedRow   = -1;
+    var _mBitUnlocked = false;
 
     // ── User-declared pet names for null c-list slots ─────────────────────────
     // Persisted to localStorage so they survive page reloads and recompilation.
@@ -83,6 +84,13 @@
 
             var addBtn = e.target.closest('[data-action="show-picker"]');
             if (addBtn) { showPicker(); return; }
+
+            var unlockMBitBtn = e.target.closest('[data-action="unlock-m-bit"]');
+            if (unlockMBitBtn) {
+                e.preventDefault();
+                _unlockMBitPicker();
+                return;
+            }
 
             var deleteBtn = e.target.closest('[data-action="delete-capability"]');
             if (deleteBtn) {
@@ -850,6 +858,64 @@
         { name: 'Display0', hint: 'Display \u00b7 device 0', rights: 'W'  },
     ];
 
+    function _mBitUnlockRow() {
+        return '<div class="clist-picker-section-header">Private IDE capability</div>' +
+            '<div class="clist-null-form clist-m-bit-unlock">' +
+            '<label class="clist-null-form-label" for="clistMBitSecret">IDE secret</label>' +
+            '<input id="clistMBitSecret" class="clist-pet-name-input clist-m-bit-secret" ' +
+            'type="password" autocomplete="current-password" placeholder="Enter secret\u2026" />' +
+            '<button class="clist-null-insert-btn" data-action="unlock-m-bit">Unlock M capability</button>' +
+            '<div class="clist-viewer-hint clist-m-bit-error" role="status"></div>' +
+            '</div>';
+    }
+
+    async function _fetchMBitAccess() {
+        try {
+            var response = await fetch('/api/m-bit-ide-access', {
+                credentials: 'same-origin',
+                cache: 'no-store'
+            });
+            var result = response.ok ? await response.json() : {};
+            _mBitUnlocked = result.unlocked === true;
+        } catch (e) {
+            _mBitUnlocked = false;
+        }
+        return _mBitUnlocked;
+    }
+
+    async function _unlockMBitPicker() {
+        var input = popupEl && popupEl.querySelector('.clist-m-bit-secret');
+        var error = popupEl && popupEl.querySelector('.clist-m-bit-error');
+        var secret = input ? input.value : '';
+        if (!secret) {
+            if (error) error.textContent = 'Enter the IDE secret.';
+            if (input) input.focus();
+            return;
+        }
+        try {
+            var response = await fetch('/api/m-bit-ide-access', {
+                method: 'POST',
+                credentials: 'same-origin',
+                cache: 'no-store',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ secret: secret })
+            });
+            var result = await response.json();
+            if (response.ok && result.unlocked === true) {
+                _mBitUnlocked = true;
+                showPicker();
+                return;
+            }
+            if (error) error.textContent = 'Incorrect IDE secret.';
+        } catch (e) {
+            if (error) error.textContent = 'Could not verify the IDE secret.';
+        }
+        if (input) {
+            input.value = '';
+            input.focus();
+        }
+    }
+
     function _pickerLumpDate(lump) {
         var raw = lump && lump.compiled_at;
         var ms = typeof raw === 'number'
@@ -883,6 +949,7 @@
     async function buildPickerContentAsync() {
         var s = (typeof sim !== 'undefined') ? sim : null;
         var bodyRows = '';
+        await _fetchMBitAccess();
 
         // Section 0: NULL — custom named placeholder slot (filled at compile/runtime)
         bodyRows += '<div class="clist-picker-section-header">Custom</div>' +
@@ -951,6 +1018,16 @@
                 '<span class="clist-picker-hint">' + escHtml(d.hint) + (d.rights ? ' \u00b7 ' + d.rights : '') + '</span>' +
                 '</div>';
         });
+        if (_mBitUnlocked) {
+            bodyRows += '<div class="clist-picker-section-header">Private IDE capability</div>' +
+                '<div class="clist-picker-row" data-cap-name="M_BIT_DEV" data-cap-rights="RW">' +
+                '<span class="clist-picker-type clist-picker-type--inform">Inform</span>' +
+                '<span class="clist-picker-name">M_BIT_DEV</span>' +
+                '<span class="clist-picker-hint">NS[13] \u00b7 M-bit I/O register \u00b7 RW</span>' +
+                '</div>';
+        } else {
+            bodyRows += _mBitUnlockRow();
+        }
 
         // Section 3: Outform GTs — from running sim nsTable (F-bit set), if booted
         if (s && s.nsTable && s.nsLabels) {
@@ -1131,6 +1208,10 @@
 
     function _insertCapability(capName, rights) {
         if (!capName) { hideViewer(); return; }
+        if (capName === 'M_BIT_DEV' && !_mBitUnlocked) {
+            _showPolaToast(getOrCreatePopup(), 'M_BIT_DEV requires the private IDE unlock.');
+            return;
+        }
         var ed = activeEditor || document.getElementById('asmEditor');
         if (!ed) { hideViewer(); return; }
         var src = ed.value;

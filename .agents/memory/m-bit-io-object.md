@@ -18,3 +18,14 @@ states. In the Namespace UI, classify its Source as “Resident I/O register” 
 never offer LUMP Source/Identity controls. SWITCH tests and consumes its
 destination bit. Preserve generated
 Thread#2 and Thread#3 at slots 11 and 12; later generated Threads skip slot 13.
+
+The Add Capability picker exposes M_BIT_DEV only after an exact, case-sensitive
+IDE-secret unlock. The server verifies the secret and issues a persistent,
+HTTP-only browser cookie; the secret must never be embedded in browser code.
+
+**Why:** The owner wants this privileged picker entry available continuously on
+their IDE browser without making it generally visible to other IDE users.
+
+**How to apply:** Keep the locked picker form and server verification boundary.
+Changing the configured secret must revoke existing unlock cookies. The unlocked
+row is one Inform RW capability named M_BIT_DEV at NS slot 13.
