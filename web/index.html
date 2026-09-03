@@ -922,11 +922,10 @@ ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
         </div>
         <div class="context-menu-item has-submenu">
             <span class="menu-icon">→</span>
-            <span>Move</span>
+            <span>Data movement</span>
             <span class="submenu-arrow">▶</span>
             <div class="submenu">
-                <div class="context-menu-item" onclick="insertInstruction('MOV', 'dest src')">MOV dest src</div>
-                <div class="context-menu-item" onclick="insertInstruction('MVN', 'dest src')">MVN dest src</div>
+                <div class="context-menu-item" onclick="insertInstruction('IADD', 'dr DR0 #imm')">IADD dr DR0 #imm (load immediate)</div>
             </div>
         </div>
         <div class="context-menu-item has-submenu">
@@ -975,7 +974,7 @@ ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
                 <div class="context-menu-item" onclick="insertInstruction('CALL', 'cr')">CALL cr</div>
                 <div class="context-menu-item" onclick="insertInstruction('RETURN', '')">RETURN</div>
                 <div class="context-menu-item" onclick="insertInstruction('CHANGE', 'offset')">CHANGE offset</div>
-                <div class="context-menu-item" onclick="insertInstruction('SWITCH', 'cr')">SWITCH cr</div>
+                <div class="context-menu-item" onclick="insertInstruction('SWITCH', 'CR13 CR6 #row')">SWITCH isolatedCR sourceCR row</div>
                 <div class="context-menu-item" onclick="insertInstruction('TPERM', 'cr mask')">TPERM cr mask</div>
             </div>
         </div>

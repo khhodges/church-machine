@@ -18,7 +18,7 @@
                 { label: 'CALL cr',               instr: 'CALL',   ops: 'cr' },
                 { label: 'RETURN',                instr: 'RETURN', ops: '' },
                 { label: 'CHANGE offset',         instr: 'CHANGE', ops: 'offset' },
-                { label: 'SWITCH cr',             instr: 'SWITCH', ops: 'cr' },
+                { label: 'SWITCH isolatedCR sourceCR row', instr: 'SWITCH', ops: 'CR13 CR6 #row' },
                 { label: 'TPERM cr mask',             instr: 'TPERM',       ops: 'cr mask' },
                 { label: 'LAMBDA cr',                 instr: 'LAMBDA',      ops: 'cr' },
                 { label: 'ELOADCALL cr name',         instr: 'ELOADCALL',   ops: 'cr name' },
@@ -45,9 +45,8 @@
             ]
         },
         {
-            name: 'Move', icon: '\u2192', items: [
-                { label: 'MOV dest src',        instr: 'MOV',    ops: 'dest src' },
-                { label: 'MVN dest src',        instr: 'MVN',    ops: 'dest src' },
+            name: 'Data movement', icon: '\u2192', items: [
+                { label: 'IADD dr DR0 imm (load immediate)', instr: 'IADD', ops: 'dr DR0 #imm' },
                 { label: 'DREAD dr cr addr',    instr: 'DREAD',  ops: 'dr cr addr' },
                 { label: 'DWRITE dr cr addr',   instr: 'DWRITE', ops: 'dr cr addr' },
             ]

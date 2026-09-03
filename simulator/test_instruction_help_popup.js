@@ -24,8 +24,20 @@ expect(
   'the editor Instructions button must open the picker'
 );
 expect(
-  index.includes('asm-instruction-picker.js?v=20260903-movable1'),
+  index.includes('asm-instruction-picker.js?v=20260903-isa-sync1'),
   'the editor must request the fixed script instead of a cached copy'
+);
+expect(
+  !source.includes("instr: 'MOV'") && !source.includes("instr: 'MVN'"),
+  'the picker must not offer unencoded MOV/MVN instructions'
+);
+expect(
+  source.includes("instr: 'IADD', ops: 'dr DR0 #imm'"),
+  'the picker must show the ISA load-immediate idiom'
+);
+expect(
+  source.includes("instr: 'SWITCH', ops: 'CR13 CR6 #row'"),
+  'the picker must show all three SWITCH operands'
 );
 
 console.log('Instruction help popup regression: PASS');
