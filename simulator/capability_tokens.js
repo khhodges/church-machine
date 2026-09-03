@@ -75,6 +75,12 @@
         const sim = context.sim || null;
         const lumps = Array.isArray(context.lumps) ? context.lumps : [];
         const name = _nameOf(cap);
+        if (cap && typeof cap === 'object' && cap.null_row === true) {
+            return {
+                name: 'NULL', rights: [], grants: [], nsIndex: null,
+                source: 'explicit-null-row', null_row: true, error: null,
+            };
+        }
         let rights;
         try {
             rights = normalizeRights(cap);
@@ -277,6 +283,12 @@
         const name = cap.name || '(unnamed capability)';
         word = word >>> 0;
 
+        if (cap.null_row === true) {
+            const parsed = _parseGT(word, context || {});
+            return word === 0
+                ? { ok: true, error: null, parsed }
+                : { ok: false, error: `C-list NULL row contains nonzero word 0x${word.toString(16).padStart(8, '0')}.`, parsed };
+        }
         if (cap.error) return { ok: false, error: cap.error, parsed: null };
         if ((word >>> 16) === 0xFEED) {
             return { ok: false, error: `Capability "${name}" is still an unresolved placeholder (0x${word.toString(16).padStart(8, '0')}).`, parsed: null };
@@ -335,6 +347,10 @@
             return { ok: false, errors: resolutionErrors, resolvedCaps };
         }
         for (let i = 0; i < resolvedCaps.length; i++) {
+            if (resolvedCaps[i].null_row === true) {
+                words[clistStart + i] = 0;
+                continue;
+            }
             words[clistStart + i] = _createGT(
                 resolvedCaps[i].nsIndex,
                 rightsToPerms(resolvedCaps[i].rights),

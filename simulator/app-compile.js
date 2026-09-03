@@ -891,8 +891,9 @@ function _serializePortableLumpCapabilities(caps, words, clistStart) {
         // compiler has already checked it in @portable mode; retain the actual
         // row rather than allowing a caller-side sidecar to relocate it.
         item.relocation_row = row;
-        item.rights = Array.isArray(item.rights) && item.rights.length
-            ? item.rights : (Array.isArray(item.grants) && item.grants.length ? item.grants : ['E']);
+        const isNullRow = item.null_row === true;
+        item.rights = isNullRow ? [] : (Array.isArray(item.rights) && item.rights.length
+            ? item.rights : (Array.isArray(item.grants) && item.grants.length ? item.grants : ['E']));
         item.grants = item.rights.slice();
         item.nsIndex = null;
         if (_isCompilerSelfCapability(item)) {
@@ -901,7 +902,7 @@ function _serializePortableLumpCapabilities(caps, words, clistStart) {
             item.placeholder = true;
         } else {
             words[clistStart + row] = 0;
-            item.placeholder = true;
+            item.placeholder = !isNullRow;
         }
         return item;
     });
@@ -1501,7 +1502,7 @@ function compileAndBuild() {
         _auditResults = lumpAudit(Array.from(lumpWords), {
             cw, cc, lump_size: lumpSize,
             pet_names:    { CR: _auditPnCR },
-            capabilities: resolvedCaps.map(rc => ({ name: rc.name, rights: rc.rights, grants: rc.grants, nsIndex: rc.nsIndex })),
+            capabilities: resolvedCaps.map(rc => ({ name: rc.name, rights: rc.rights, grants: rc.grants, nsIndex: rc.nsIndex, null_row: rc.null_row === true })),
         }, _lumpLineNums);
         _auditErrors  = _auditResults.filter(r => r.severity === 'error');
         _auditWarns   = _auditResults.filter(r => r.severity === 'warn');
@@ -1634,6 +1635,7 @@ function compileAndBuild() {
             methods:        methodMeta,
             capabilities:   resolvedCaps.map(rc => ({
                 name: rc.name, rights: rc.rights, grants: rc.grants, nsIndex: rc.nsIndex,
+                null_row: rc.null_row === true,
                 compiler_owned_self: rc.compiler_owned_self === true,
                 placeholder: rc.placeholder === true,
             })),
@@ -2057,6 +2059,7 @@ function loadCLOOMCIntoSim() {
             grants: cap.grants.slice(),
             nsIndex: cap.nsIndex,
             token: cap.token >>> 0,
+            null_row: cap.null_row === true,
         }));
         const _cmpTok = window._computeLumpToken(words, _asmCaps);
         if (window.LumpRegistry) {
@@ -2140,6 +2143,7 @@ function loadCLOOMCIntoSim() {
                 grants: cap.grants.slice(),
                 nsIndex: cap.nsIndex,
                 token: cap.token >>> 0,
+                null_row: cap.null_row === true,
             })),
             pet_names: { DR: _globalPetDR, CR: {} }
         };
@@ -2190,6 +2194,9 @@ function compileAndCreateAbstraction() {
     const uploadCaps = (result.capabilities || []).map((cap, idx) => {
         const capName = typeof cap === 'string' ? cap : (cap.name || '');
         const capRights = typeof cap === 'string' ? [] : (cap.rights || []);
+        if (cap && typeof cap === 'object' && cap.null_row === true) {
+            return { target: null, nsIndex: null, name: 'NULL', rights: [], grants: [], null_row: true };
+        }
         let target = -1;
         if (sim.abstractionRegistry) {
             // See note above: abstractions is a plain object keyed by numeric
@@ -2203,7 +2210,7 @@ function compileAndCreateAbstraction() {
             }
         }
         return { target: target, name: capName, grants: capRights.length > 0 ? capRights : ['E'] };
-    }).filter(c => c.target >= 0);
+    }).filter(c => c.null_row === true || c.target >= 0);
 
     const doc = buildDocBlock(result, source);
 

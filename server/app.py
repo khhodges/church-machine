@@ -7538,6 +7538,26 @@ def save_lump():
                 _body.update(_extra)
                 return jsonify(_body), 422
 
+            _cap_is_null_row = (
+                isinstance(_cap_raw, dict)
+                and _cap_raw.get("null_row") is True
+            )
+            if _cap_is_null_row:
+                _cap_word = _sl_words[_clist_row0_idx + _cap_row] & 0xFFFFFFFF
+                if _cap_word != 0:
+                    return _cap_reject(
+                        f"declared NULL row contains nonzero word 0x{_cap_word:08X}.",
+                        actual_word=_cap_word,
+                    )
+                _validated_declared_caps.append({
+                    "name": "NULL",
+                    "rights": [],
+                    "grants": [],
+                    "nsIndex": None,
+                    "null_row": True,
+                })
+                continue
+
             # Row zero is neither caller-declared nor server-editable.  Its
             # placeholder was checked above; the live E-GT is minted only once
             # the selected Namespace slot has a current sequence.

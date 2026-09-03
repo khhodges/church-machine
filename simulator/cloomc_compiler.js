@@ -1150,7 +1150,9 @@ class CLOOMCCompiler {
             });
         }
         for (let i = 0; i < capNames.length; i++) {
-            rom[(typeof capNames[i] === 'string' ? capNames[i] : capNames[i].name || '').toUpperCase()] = i + firstUserRow;
+            const cap = capNames[i];
+            if (cap && typeof cap === 'object' && cap.null_row === true) continue;
+            rom[(typeof cap === 'string' ? cap : cap.name || '').toUpperCase()] = i + firstUserRow;
         }
         if (uploadCaps && uploadCaps.length > 0) {
             for (let i = 0; i < uploadCaps.length; i++) {
@@ -1171,6 +1173,9 @@ class CLOOMCCompiler {
         const tokens = itemStr.trim().split(/\s+/).filter(Boolean);
         if (!tokens.length) return null;
         const name = tokens[0];
+        if (/^NULL$/i.test(name) && tokens.length === 1) {
+            return { name: 'NULL', rights: [], null_row: true };
+        }
         const universal = /^([A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*)#([1-9][0-9]*)$/;
         const universalMatch = name.match(universal);
         if (!universalMatch && !/^[A-Za-z][A-Za-z0-9_]*$/.test(name)) {
