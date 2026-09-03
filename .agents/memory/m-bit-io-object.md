@@ -13,4 +13,5 @@ Namespace table.
 
 **How to apply:** Keep one Inform RW descriptor in the boot Namespace catalog,
 issue it only to Namespace, require Namespace execution identity for hardware
-writes, and have SWITCH test and consume its destination bit.
+writes, and have SWITCH test and consume its destination bit. Preserve generated
+Thread#2 and Thread#3 at slots 11 and 12; later generated Threads skip slot 13.

@@ -313,14 +313,13 @@ def test_generated_thread_namespace_entries_have_stable_slots_and_boot_cr0(count
     entries = {row["slot"]: row for row in raw["entries"]}
     expected_slots = generated_thread_slots(count)
     assert all(slot in entries for slot in (*range(11), 13))
-    assert 11 not in entries
-    assert 12 not in entries
-    assert tuple(slot for slot in entries if slot >= 14) == expected_slots
+    assert tuple(slot for slot in entries if slot in expected_slots) == expected_slots
 
     # N=1 has only the sparse fixed catalog through slot 13. Generated threads begin
     # immediately after the final catalog body and remain physically contiguous.
     if count == 1:
-        assert 14 not in entries
+        assert 11 not in entries
+        assert 12 not in entries
         return
 
     expected_cr0 = create_gt(0, BOOT_ABSTR_NS_SLOT, {"E": 1}, 1)
@@ -349,7 +348,7 @@ def test_generated_thread_slot_collision_and_capacity_are_rejected(tmp_path):
 
     cfg = _cfg_generated_threads(2)
     cfg["step1"]["nsSlotsMax"] = 11
-    with pytest.raises(ValueError, match=r"requires generated Thread slots through 14"):
+    with pytest.raises(ValueError, match=r"requires generated Thread slots through 11"):
         generate_boot_image(cfg, str(tmp_path))
 
 
@@ -422,7 +421,7 @@ def test_committed_ns_state_names_generated_threads_from_image_count(tmp_path, m
     entries = server_app._derive_ns_state_entries()
     names = {entry["slot"]: entry["name"] for entry in entries}
     assert {slot: names[slot] for slot in generated_thread_slots(5)} == {
-        14: "Thread#2", 15: "Thread#3", 16: "Thread#4", 17: "Thread#5",
+        11: "Thread#2", 12: "Thread#3", 14: "Thread#4", 15: "Thread#5",
     }
 
 

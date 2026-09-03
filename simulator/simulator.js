@@ -2084,10 +2084,16 @@ class ChurchSimulator {
         if (THREAD_COUNT < 1 || THREAD_COUNT > 9) {
             throw new Error(`Boot config step1.threadCount must be between 1 and 9 (got ${THREAD_COUNT})`);
         }
-        const GENERATED_THREAD_FIRST_SLOT = abstractions.length;
-        const generatedThreadSlots = Array.from(
-            { length: THREAD_COUNT - 1 },
-            (_, index) => GENERATED_THREAD_FIRST_SLOT + index);
+        const GENERATED_THREAD_FIRST_SLOT = 11;
+        const generatedThreadSlots = [];
+        for (let slot = GENERATED_THREAD_FIRST_SLOT;
+                generatedThreadSlots.length < THREAD_COUNT - 1; slot++) {
+            if (slot !== ARCH_BOOT.minimalSlots.M_BIT_DEV) {
+                generatedThreadSlots.push(slot);
+            }
+        }
+        const generatedThreadOrdinal = new Map(
+            generatedThreadSlots.map((slot, index) => [slot, index + 2]));
         // Boot.Abstr lump size: always 64w in the fallback init path (Task #568).
         // The hardcoded init is only a fallback when no binary boot image is present;
         // loadBootImage() uses the actual size from the generator.  Defaulting to 64w
@@ -2202,17 +2208,17 @@ class ChurchSimulator {
             }
             if (_bcStep2Lumps.some(e => e && (e.nsSlot | 0) === threadSlot)) {
                 throw new Error(
-                    `Boot config NS slot ${threadSlot} is reserved for Thread#${threadSlot - GENERATED_THREAD_FIRST_SLOT + 2} ` +
+                    `Boot config NS slot ${threadSlot} is reserved for Thread#${generatedThreadOrdinal.get(threadSlot)} ` +
                     'and cannot host a Step-2 lump.');
             }
             const threadLoc = runningOffset;
             if (threadLoc + THREAD_LUMP_SIZE > this.NS_TABLE_BASE - 3) {
                 throw new Error(
-                    `Generated Thread#${threadSlot - GENERATED_THREAD_FIRST_SLOT + 2} does not fit below the Namespace table.`);
+                    `Generated Thread#${generatedThreadOrdinal.get(threadSlot)} does not fit below the Namespace table.`);
             }
             this.writeNSEntry(threadSlot, threadLoc, THREAD_LUMP_SIZE - 1,
                 0, 0, 1, 0, 0, 0);
-            this.nsLabels[threadSlot] = `Thread#${threadSlot - GENERATED_THREAD_FIRST_SLOT + 2}`;
+            this.nsLabels[threadSlot] = `Thread#${generatedThreadOrdinal.get(threadSlot)}`;
             this.nsChainable[threadSlot] = false;
             runningOffset += THREAD_LUMP_SIZE;
         }

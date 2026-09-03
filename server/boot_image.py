@@ -245,12 +245,10 @@ DEFAULT_ABSTRACTION_CATALOG = [
 ]
 assert len(DEFAULT_ABSTRACTION_CATALOG) == 14, "catalog drift vs simulator.js"
 
-# Thread.1 is the fixed Boot.Thread entry at NS slot 1.  Configured secondary
-# threads are concrete, resident Thread LUMPs, so they need stable Namespace
-# identities too.  Reserve the slots immediately after the fixed boot catalog:
-# Thread#2 -> 14, Thread#3 -> 15, and so on.  This is deliberately independent
-# of allocation order and of the mutable Step-2 catalog.
-GENERATED_THREAD_FIRST_NS_SLOT = len(DEFAULT_ABSTRACTION_CATALOG)
+# Thread.1 is the fixed Boot.Thread entry at NS slot 1. Configured secondary
+# threads retain their established slots: Thread#2 -> 11, Thread#3 -> 12.
+# Additional generated threads skip the fixed M_BIT_DEV at slot 13.
+GENERATED_THREAD_FIRST_NS_SLOT = 11
 MAX_THREAD_COUNT = 9
 
 
@@ -271,16 +269,22 @@ def generated_thread_slots(thread_count):
         raise ValueError(
             f"threadCount must be an integer between 1 and {MAX_THREAD_COUNT}"
         )
-    return tuple(range(
-        GENERATED_THREAD_FIRST_NS_SLOT,
-        GENERATED_THREAD_FIRST_NS_SLOT + thread_count - 1,
-    ))
+    slots = []
+    candidate = GENERATED_THREAD_FIRST_NS_SLOT
+    while len(slots) < thread_count - 1:
+        if candidate != ARCH_BOOT["minimalSlots"]["M_BIT_DEV"]:
+            slots.append(candidate)
+        candidate += 1
+    return tuple(slots)
 
 
 def generated_thread_label(slot):
     """Return the display pet name for a generated Thread slot, if any."""
-    offset = slot - GENERATED_THREAD_FIRST_NS_SLOT
-    return f"Thread#{offset + 2}" if offset >= 0 else None
+    try:
+        offset = generated_thread_slots(MAX_THREAD_COUNT).index(slot)
+    except ValueError:
+        return None
+    return f"Thread#{offset + 2}"
 
 
 def boot_resident_region_end(thread_size, boot_abstr_size, thread_count,

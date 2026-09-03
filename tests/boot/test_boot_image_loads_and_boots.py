@@ -112,7 +112,7 @@ def _cfg_no_window():
 # expected_ns_count is the exact nsCount loadBootImage() should report:
 #   * The sparse fixed catalog extends through slot 13, including M_BIT_DEV.
 #     Slots 11–12 remain null/free, but slot 13 makes nsCount=14.
-#   * Step-2 resident lumps for slots ≥14 push nsCount up: nsSlot=18 → nsCount=19.
+#   * Generated Thread#2 and Thread#3 retain slots 11 and 12; later Threads skip 13.
 #   * Step-3 emptySlotCount adds reserved-but-empty entries; baseNamedNsCount=51
 #     sets the starting index explicitly → total = 51 + 8 = 59.
 CONFIGS = [
