@@ -340,3 +340,234 @@ def test_protected_rollback_preserves_ordinary_save_already_after_manifest(
     slot10 = next(entry for entry in state["abstractions"] if entry["slot"] == 10)
     assert slot10["filename"] == "old.lump"
     assert boot.read_bytes() == b"ordinary completed boot image"
+
+
+PROTECTED_RESIDENT_CASES = {
+    "SelfTest": {
+        "slot": 6,
+        "token": "00000600",
+        "seq": 0,
+    },
+    "WukongCallHome": {
+        "slot": 7,
+        "token": "00000700",
+        "seq": 0,
+    },
+}
+
+
+def _protected_resident_payload(name):
+    case = PROTECTED_RESIDENT_CASES[name]
+    if name == "SelfTest":
+        words = [_header(cw=1, cc=2) | (3 << 23)] + [0] * 511
+        words[510] = 0x4A000006
+        words[511] = 0x4A000007
+        capabilities = [
+            {"name": "SelfTest", "rights": ["E"], "nsIndex": 6},
+            {"name": "WukongCallHome", "rights": ["E"], "nsIndex": 7},
+        ]
+    else:
+        words = [_header(), 0]
+        capabilities = []
+    return {
+        "binary": words,
+        "metadata": {
+            "token": case["token"],
+            "abstraction": name,
+            "content_type": "code",
+            "language": "assembly",
+            "ns_slot": case["slot"],
+            "grants": ["E"],
+            "capability_type": "inform",
+            "namespace_sequence": case["seq"],
+            "replacement": True,
+            "capabilities": capabilities,
+        },
+    }
+
+
+@pytest.fixture()
+def protected_resident_repository(tmp_path, monkeypatch, request):
+    name = request.param
+    case = PROTECTED_RESIDENT_CASES[name]
+    checked_in_lumps = os.path.join(ROOT, "server", "lumps")
+    with open(os.path.join(checked_in_lumps, "manifest.json")) as manifest_file:
+        checked_in_manifest = json.load(manifest_file)
+    with open(os.path.join(checked_in_lumps, "ns-state.json")) as state_file:
+        checked_in_state = json.load(state_file)
+    manifest_entry = next(
+        dict(row) for row in checked_in_manifest
+        if row.get("token") == case["token"])
+    state_entry = next(
+        dict(row) for row in checked_in_state["abstractions"]
+        if row.get("slot") == case["slot"])
+    assert manifest_entry["abstraction"] == name
+    assert manifest_entry["ns_slot"] == case["slot"]
+    assert manifest_entry["ns_slot_policy"] == "static"
+    assert manifest_entry["boot_resident"] is True
+    assert state_entry["name"] == name
+    assert state_entry["token"] == case["token"]
+    assert state_entry["filename"] == manifest_entry["filename"]
+    assert state_entry["seq"] == case["seq"]
+
+    lumps = tmp_path / "lumps"
+    lumps.mkdir()
+    (lumps / "manifest.json").write_text(json.dumps([manifest_entry]))
+    for filename_key in ("filename", "sidecar_file"):
+        filename = manifest_entry[filename_key]
+        with open(os.path.join(checked_in_lumps, filename), "rb") as source_file:
+            (lumps / filename).write_bytes(source_file.read())
+    (lumps / ".history-transition.lock").write_bytes(b"")
+    ns_state = lumps / "ns-state.json"
+    ns_state.write_text(json.dumps({"abstractions": [state_entry]}))
+    boot = lumps / "boot-image.bin"
+    boot.write_bytes(b"prior boot image")
+
+    monkeypatch.setattr(app_module, "LUMPS_DIR", str(lumps))
+    monkeypatch.setattr(app_module, "LUMPS_MANIFEST_PATH", str(lumps / "manifest.json"))
+    monkeypatch.setattr(app_module, "_LUMPS_DIR", str(lumps))
+    monkeypatch.setattr(app_module, "NS_STATE_PATH", str(ns_state))
+    monkeypatch.setattr(app_module, "BOOT_IMAGE_PATH", str(boot))
+    monkeypatch.setattr(app_module, "_read_saved_boot_config", lambda: ({}, None))
+    monkeypatch.setattr(
+        app_module, "_read_boot_entry_slot_from_image", lambda: case["slot"])
+    monkeypatch.setattr(
+        app_module._boot_image_gen, "generate_boot_image",
+        lambda *args, **kwargs: b"new coherent boot image")
+    monkeypatch.setattr(app_module, "_write_boot_image_bytes", boot.write_bytes)
+    monkeypatch.setattr(app_module, "_load_boot_abstr_lump", lambda: None)
+    monkeypatch.setattr(app_module, "_load_boot_ns_lump", lambda: None)
+    app_module.app.config["TESTING"] = True
+    return name, lumps, ns_state, boot, manifest_entry["filename"]
+
+
+@pytest.mark.parametrize(
+    "protected_resident_repository",
+    ["SelfTest", "WukongCallHome"],
+    indirect=True,
+)
+def test_all_protected_residents_commit_one_coherent_revision(
+        protected_resident_repository):
+    name, lumps, ns_state, boot, _prior_filename = protected_resident_repository
+    case = PROTECTED_RESIDENT_CASES[name]
+    with app_module.app.test_client() as client:
+        response = client.post(
+            "/api/lumps/save", json=_protected_resident_payload(name))
+    assert response.status_code == 200, response.get_data(as_text=True)
+    saved = response.get_json()
+    current = next(
+        row for row in json.loads((lumps / "manifest.json").read_text())
+        if row.get("token") == case["token"])
+    assert current["abstraction"] == name
+    assert current["ns_slot"] == case["slot"]
+    assert current["ns_slot_policy"] == "static"
+    assert current["boot_resident"] is True
+    bound = next(
+        row for row in json.loads(ns_state.read_text())["abstractions"]
+        if row["slot"] == case["slot"])
+    assert bound["filename"] == saved["lump"]
+    assert bound["seq"] == case["seq"]
+    assert boot.read_bytes() == b"new coherent boot image"
+
+
+@pytest.mark.parametrize(
+    "protected_resident_repository",
+    ["SelfTest", "WukongCallHome"],
+    indirect=True,
+)
+def test_all_protected_residents_roll_back_complete_revision(
+        protected_resident_repository, monkeypatch):
+    name, lumps, _ns_state, boot, _prior_filename = protected_resident_repository
+    before = {path.name: path.read_bytes() for path in lumps.iterdir()}
+
+    def fail_boot_write(_blob):
+        boot.write_bytes(b"partial boot")
+        raise OSError("injected protected resident boot failure")
+
+    monkeypatch.setattr(app_module, "_write_boot_image_bytes", fail_boot_write)
+    with app_module.app.test_client() as client:
+        response = client.post(
+            "/api/lumps/save", json=_protected_resident_payload(name))
+    assert response.status_code == 500
+    assert "prior revision restored" in response.get_json()["error"]
+    assert {path.name: path.read_bytes() for path in lumps.iterdir()} == before
+
+
+@pytest.mark.parametrize(
+    "protected_resident_repository",
+    ["SelfTest", "WukongCallHome"],
+    indirect=True,
+)
+def test_all_protected_residents_roll_back_when_namespace_binding_fails(
+        protected_resident_repository, monkeypatch):
+    name, lumps, _ns_state, _boot, _prior_filename = protected_resident_repository
+    before = {path.name: path.read_bytes() for path in lumps.iterdir()}
+    monkeypatch.setattr(
+        app_module,
+        "_bind_saved_lump_to_ns_state",
+        lambda *args, **kwargs: False,
+    )
+    with app_module.app.test_client() as client:
+        response = client.post(
+            "/api/lumps/save", json=_protected_resident_payload(name))
+    assert response.status_code == 500
+    assert "Namespace binding could not be refreshed" in response.get_json()["error"]
+    assert {path.name: path.read_bytes() for path in lumps.iterdir()} == before
+
+
+@pytest.mark.parametrize(
+    "protected_resident_repository",
+    ["SelfTest", "WukongCallHome"],
+    indirect=True,
+)
+def test_all_protected_resident_rollbacks_cannot_cross_concurrent_save(
+        protected_resident_repository, monkeypatch):
+    name, lumps, _ns_state, _boot, prior_filename = protected_resident_repository
+    protected_in_boot = threading.Event()
+    allow_failure = threading.Event()
+
+    def fail_protected_boot(*args, **kwargs):
+        protected_in_boot.set()
+        assert allow_failure.wait(timeout=5)
+        raise OSError("injected protected resident boot failure")
+
+    monkeypatch.setattr(
+        app_module._boot_image_gen, "generate_boot_image", fail_protected_boot)
+    results = {}
+
+    def save_protected():
+        with app_module.app.test_client() as client:
+            response = client.post(
+                "/api/lumps/save", json=_protected_resident_payload(name))
+            results["protected"] = response.status_code
+
+    def save_ordinary():
+        with app_module.app.test_client() as client:
+            response = client.post("/api/lumps/save", json={
+                "binary": [_header(), 0],
+                "metadata": {
+                    "token": "1234abcd",
+                    "abstraction": "ConcurrentWidget",
+                    "capabilities": [],
+                },
+            })
+            results["ordinary"] = response.status_code
+
+    protected_thread = threading.Thread(target=save_protected)
+    protected_thread.start()
+    assert protected_in_boot.wait(timeout=5)
+    ordinary_thread = threading.Thread(target=save_ordinary)
+    ordinary_thread.start()
+    time.sleep(0.1)
+    assert ordinary_thread.is_alive(), (
+        f"ordinary save bypassed {name} transaction lock")
+    allow_failure.set()
+    protected_thread.join(timeout=5)
+    ordinary_thread.join(timeout=5)
+    assert results == {"protected": 500, "ordinary": 200}
+    manifest = json.loads((lumps / "manifest.json").read_text())
+    assert any(row.get("token") == "1234abcd" for row in manifest)
+    current = next(
+        row for row in manifest
+        if row.get("token") == PROTECTED_RESIDENT_CASES[name]["token"])
+    assert current["filename"] == prior_filename

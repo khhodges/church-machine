@@ -1184,9 +1184,8 @@ class TestDeclaredCapabilityClist:
 
     @classmethod
     def _metadata(cls, token=None):
-        meta = _meta(token or cls.TOKEN, "WukongCallHome")
+        meta = _meta(token or cls.TOKEN, "DeclaredCapabilityCaller")
         meta["capabilities"] = [dict(cap) for cap in cls.CAPS]
-        meta["ns_slot"] = 7
         return meta
 
     def test_valid_declared_tokens_are_preserved(self, client, isolated_lumps):
@@ -1230,7 +1229,7 @@ class TestDeclaredCapabilityClist:
         assert data.get("capability_validation_failed") is True
         assert data.get("capability") == name
         assert reason.lower() in data["error"].lower()
-        assert not list(isolated_lumps.glob("WukongCallHome*.lump"))
+        assert not list(isolated_lumps.glob("DeclaredCapabilityCaller*.lump"))
 
     def test_unresolved_named_capability_is_rejected(
             self, client, isolated_lumps):
@@ -1259,7 +1258,7 @@ class TestDeclaredCapabilityClist:
         assert data.get("declared_capability_count") == 0
         assert data.get("cc") == 3
         assert "no capabilities" in data["error"].lower()
-        assert not list(isolated_lumps.glob("WukongCallHome*.lump"))
+        assert not list(isolated_lumps.glob("DeclaredCapabilityCaller*.lump"))
 
     @pytest.mark.parametrize(
         "rights",
@@ -1283,7 +1282,7 @@ class TestDeclaredCapabilityClist:
         assert data.get("capability_validation_failed") is True
         assert data.get("capability") == "LED0"
         assert "permission" in data["error"].lower()
-        assert not list(isolated_lumps.glob("WukongCallHome*.lump"))
+        assert not list(isolated_lumps.glob("DeclaredCapabilityCaller*.lump"))
 
 
 class TestCompilerOwnedSelfCapability:

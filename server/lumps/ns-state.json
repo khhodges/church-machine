@@ -76,7 +76,11 @@
       "limit": "0x001FD",
       "seq": 0,
       "seal": "0xDE931EEF",
-      "boot": true
+      "boot": true,
+      "token": "00000600",
+      "filename": "SelfTest.1.485e71f6.lump",
+      "issue_n": 1,
+      "resident": true
     },
     {
       "name": "WukongCallHome",
@@ -87,7 +91,11 @@
       "g": 0,
       "limit": "0x0003F",
       "seq": 0,
-      "seal": "0xDEA85EEF"
+      "seal": "0xDEA85EEF",
+      "token": "00000700",
+      "filename": "WukongCallHome.1.71c2809c.lump",
+      "issue_n": 1,
+      "resident": true
     },
     {
       "name": "Tunnel",
