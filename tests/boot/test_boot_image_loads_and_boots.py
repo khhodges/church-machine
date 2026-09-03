@@ -44,7 +44,12 @@ import pytest
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)
 
-from server.boot_image import generate_boot_image, integrity32  # noqa: E402
+from server.boot_image import (  # noqa: E402
+    generate_boot_image,
+    integrity32,
+    parse_ns_table,
+    read_boot_entry_info,
+)
 
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
 HARNESS   = os.path.join(ROOT, "tests", "boot", "sim_boot_loader.js")
@@ -368,6 +373,39 @@ def test_capabilitytest_reissued_generation_boots():
     assert status["bootComplete"] is True
     assert ((status["cr0"]["word0"] >> 16) & 0x1FF) == 1
     assert ((status["cr14"]["word0"] >> 16) & 0x1FF) == 1
+
+
+def test_capabilitytest_regeneration_preserves_nonzero_generation(tmp_path):
+    """A replacement rebuild retains slot 10's authoritative generation."""
+    import shutil
+
+    isolated_lumps = tmp_path / "lumps"
+    shutil.copytree(LUMPS_DIR, isolated_lumps)
+    state_path = isolated_lumps / "ns-state.json"
+    state = json.loads(state_path.read_text())
+    cap_entry = next(
+        entry for entry in state["abstractions"]
+        if entry.get("slot") == CAPTEST_SLOT
+    )
+    cap_entry["seq"] = 7
+    state_path.write_text(json.dumps(state))
+
+    cfg = _saved_project_cfg()
+    image = generate_boot_image(
+        cfg, str(isolated_lumps), boot_entry_slot=CAPTEST_SLOT)
+    parsed = parse_ns_table(image)
+    descriptor = next(
+        entry for entry in parsed
+        if entry["slot"] == CAPTEST_SLOT
+    )
+    assert descriptor["seq"] == 7
+    entry_info = read_boot_entry_info(image)
+    assert entry_info["entry_gt_seq"] == 7
+    status = _run_harness(cfg, image)
+    assert status["faultLog"] == [], status["faultLog"]
+    assert status["bootComplete"] is True
+    assert ((status["cr0"]["word0"] >> 16) & 0x1FF) == 7
+    assert ((status["cr14"]["word0"] >> 16) & 0x1FF) == 7
 
 
 def test_capabilitytest_manifest_boot_resident():

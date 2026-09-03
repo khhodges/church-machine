@@ -11529,7 +11529,7 @@ function showSaveToNamespace() {
         ? ''
         : ((_defaultOption && _defaultOption.dataset.nsLabel) || '');
     document.getElementById('saveNSLabel').disabled = false;
-    document.getElementById('saveNSType').value = '0';
+    document.getElementById('saveNSType').value = '1';
     document.getElementById('permR').checked = false;
     document.getElementById('permW').checked = false;
     document.getElementById('permX').checked = false;
@@ -11572,7 +11572,7 @@ function onSlotChange() {
     if (slotSel.value === 'new') {
         labelInput.value = '';
         labelInput.disabled = false;
-        document.getElementById('saveNSType').value = '0';
+        document.getElementById('saveNSType').value = '1';
     } else {
         const idx = parseInt(slotSel.value);
         const entry = sim.readNSEntry(idx);
@@ -11581,7 +11581,7 @@ function onSlotChange() {
             ? (entry.label || '')
             : ((selectedOption && selectedOption.dataset.nsLabel) || '');
         labelInput.disabled = false;
-        document.getElementById('saveNSType').value = String(entry ? (entry.gtType || 0) : 0);
+        document.getElementById('saveNSType').value = String(entry ? (entry.gtType || 1) : 1);
         // Permissions deliberately NOT copied from the existing GT — the
         // user is overwriting that slot with new compiled code, so the
         // default should be E-only, same as a fresh slot.
@@ -14431,26 +14431,23 @@ function confirmSaveToNamespace() {
         }
     }
 
-    // ── Persist to simulator namespace ────────────────────────────────────────
+    // Resolve and validate the target before either durable or browser state is
+    // changed. Slot 10 is a protected resident identity, not a generic overwrite.
     const _svClistWords = (_svBinary && _caps.length > 0)
         ? _svBinary.slice(_svBinary.length - _caps.length)
         : [];
     let idx;
     if (slotSel.value === 'new') {
-        try {
-            // New Entry allocates a slot only when explicitly selected.  When an
-            // existing user slot is selected, the save below updates that LUMP
-            // in place for a new release build.
-            idx = sim.saveToNamespace(
-                label, _svWords, perms, gtType, _caps, _svClistWords);
-        } catch (err) {
-            console.error('[SaveNS] save failed:', err);
-            const _saveErr = err && err.message ? err.message : String(err);
-            if (typeof _showFpgaToast === 'function') {
-                _showFpgaToast('Save to Namespace Failed', _saveErr, 'error', 7000);
-            } else {
-                alert('Save to Namespace failed: ' + _saveErr);
+        idx = null;
+        for (let _candidate = sim.firstUserNsSlot();
+             _candidate < sim.MAX_NS_ENTRIES; _candidate++) {
+            if (!sim.isNSEntryValid(_candidate)) {
+                idx = _candidate;
+                break;
             }
+        }
+        if (!Number.isInteger(idx)) {
+            alert('Save blocked: no free Namespace slot is available.');
             return;
         }
     } else {
@@ -14477,53 +14474,40 @@ function confirmSaveToNamespace() {
             }
             return;
         }
-        try {
-            sim.saveToNamespaceAt(
-                idx, label, _svWords, perms, gtType, _caps, _svClistWords);
-        } catch (err) {
-            console.error('[SaveNS] save failed:', err);
-            const _saveErr = err && err.message ? err.message : String(err);
-            if (typeof _showFpgaToast === 'function') {
-                _showFpgaToast('Save to Namespace Failed', _saveErr, 'error', 7000);
-            } else {
-                alert('Save to Namespace failed: ' + _saveErr);
-            }
+    }
+
+    const _protectedCapabilityTest = idx === 10 || label === 'CapabilityTest';
+    const _existingTarget = sim.readNSEntry(idx);
+    const _targetSequence = _existingTarget
+        ? sim.parseNSWord1(_existingTarget.word1_limit).gtSeq : 0;
+    if (_existingTarget && _svBinary &&
+        (_existingTarget.word0_location + _svBinary.length > sim.memory.length)) {
+        alert(`Save blocked: Namespace slot ${idx} is not backed by enough writable LUMP storage.`);
+        return;
+    }
+    if (_protectedCapabilityTest) {
+        const _onlyE = perms.E === 1 &&
+            ['R', 'W', 'X', 'L', 'S'].every(function(p) { return perms[p] === 0; });
+        const _protectedError =
+            (label !== 'CapabilityTest' && 'canonical name must be CapabilityTest') ||
+            (idx !== 10 && 'CapabilityTest must replace Namespace slot 10') ||
+            (gtType !== 1 && 'CapabilityTest must remain an Inform entry') ||
+            (!_onlyE && 'CapabilityTest requires Church E-only permission') ||
+            (!_existingTarget && 'CapabilityTest slot 10 is not an eligible replacement') ||
+            (_existingTarget && _existingTarget.gtType !== 1 &&
+                'CapabilityTest slot 10 is not an Inform entry');
+        if (_protectedError) {
+            alert('Save blocked: ' + _protectedError + '.');
             return;
         }
     }
-    closeSaveDialog();
-    _persistNamespaceSlotLabel(idx, label);
 
-    // Compute and store the token for the just-saved lump so "Open Lump"
-    // navigates by token after a Save to NS (Step 2 of token-first navigation).
+    // Compute the token without registering browser memory. Protected slot 10
+    // retains its canonical token and generation across replacement.
     let _svTok = null;
-    if (typeof window._computeLumpToken === 'function') {
+    if (_protectedCapabilityTest) _svTok = '00000a00';
+    else if (typeof window._computeLumpToken === 'function')
         _svTok = window._computeLumpToken(_svWords, _caps);
-        if (window.LumpRegistry) {
-            const _svLabel = (sim.nsLabels && sim.nsLabels[idx]) ? sim.nsLabels[idx] : label;
-            window.LumpRegistry.registerMemory(_svTok, _svLabel, _svWords, _caps);
-            window.LumpRegistry.setCurrent(_svTok);
-        }
-        // Mark as freshly saved so _openLastCompiledLump() goes to the
-        // repository rather than reopening the editor.
-        window._lastSavedNsToken = _svTok;
-    }
-
-    const con = document.getElementById('editorConsole');
-    if (con) {
-        const _ccMsg = _caps.length ? ` cc=${_caps.length} (${_caps.map(c=>c.name).join(', ')})` : '';
-        con.textContent += `\nSaved ${_svWords.length} words to namespace[${idx}] "${label}" (cw=${_svWords.length}${_ccMsg})`;
-        con.scrollTop = con.scrollHeight;
-    }
-    updateDashboard();
-
-    // Show a toast with an "Open Lump" shortcut so the user can immediately
-    // inspect the saved lump without navigating away manually.
-    const _toastBody = `NS[${idx}] "${label}" — ${_svWords.length} word${_svWords.length === 1 ? '' : 's'}`;
-    const _toastAction = _svTok && typeof showLumpDetail === 'function'
-        ? { label: '📂 Open Lump', onClick: function() { showLumpDetail(_svTok); } }
-        : null;
-    _showFpgaToast('Lump Saved', _toastBody, 'ok', 9000, _toastAction);
 
     // ── Persist to the server LUMP repository so the LUMP browser reflects the
     // newly compiled lump immediately, without requiring a manual refresh.
@@ -14536,6 +14520,11 @@ function confirmSaveToNamespace() {
                 language:     _svLang,
                 ns_slot:      idx,
                 capabilities: _caps,
+                grants:       Object.keys(perms).filter(function(p) { return perms[p]; }),
+                capability_type: gtType === 1 ? 'inform' :
+                    (gtType === 2 ? 'outform' : 'abstract'),
+                namespace_sequence: _targetSequence,
+                replacement: slotSel.value !== 'new',
                 // Pass the canonical CRC32 token so the server stores the lump
                 // under the same token the format dialog displayed and the
                 // "Open Lump" toast navigates to.  Without this the server falls
@@ -14544,16 +14533,44 @@ function confirmSaveToNamespace() {
                 token:        _svTok || undefined,
             }
         };
-        fetch('/api/lumps/save', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify(_svPayload),
-        }).then(function(r) {
-            return r.json().then(function(resp) {
-                _lumpSaveHandleResponse(r, resp);
-            });
+        _lumpSaveRequest(fetch, '/api/lumps/save', _svPayload, function(resp) {
+            try {
+                // The preflight-selected index is part of the server payload;
+                // commit that exact slot rather than running allocation again.
+                sim.saveToNamespaceAt(
+                    idx, label, _svWords, perms, gtType, _caps, _svClistWords);
+            } catch (err) {
+                console.error('[SaveNS] save failed:', err);
+                _showFpgaToast('Save to Namespace Failed',
+                    'Server committed the save, but simulator update failed: ' + err.message,
+                    'error', 10000);
+                return;
+            }
+            _persistNamespaceSlotLabel(idx, label);
+            if (window.LumpRegistry) {
+                window.LumpRegistry.registerMemory(resp.token, label, _svWords, _caps);
+                window.LumpRegistry.setCurrent(resp.token);
+                window.LumpRegistry.setPending(resp.token);
+            }
+            window._lastSavedNsToken = resp.token;
+            closeSaveDialog();
+            updateDashboard();
+            if (typeof renderLumps === 'function') renderLumps();
+            _showFpgaToast('Lump Saved',
+                `NS[${idx}] "${label}" — ${_svWords.length} word${_svWords.length === 1 ? '' : 's'}`,
+                'ok', 9000);
         }).catch(function(err) {
-            _lumpSaveHandleNetworkError(err);
+            const title = err.kind === 'validation'
+                ? 'LUMP Repository Save Rejected'
+                : (err.kind === 'transport'
+                    ? 'LUMP Repository Network Failure'
+                    : (err.kind === 'server'
+                        ? 'LUMP Repository Server Failure'
+                        : 'LUMP Repository Protocol Failure'));
+            const body = err.kind === 'transport'
+                ? 'Network error — check your connection.'
+                : err.message;
+            _showFpgaToast(title, body, 'error', 10000);
         });
     }
 }

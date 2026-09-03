@@ -1269,6 +1269,31 @@ def _load_ns_state_token_map(lumps_dir):
         return {}
 
 
+def _load_ns_state_sequence_map(lumps_dir):
+    """Return retained Namespace generations keyed by slot.
+
+    Rebuilding a boot image replaces bytes, not Namespace identities.  The
+    authoritative sequence therefore comes from ns-state.json and must be
+    carried into both the descriptor and every GT minted for that slot.
+    """
+    try:
+        with open(os.path.join(lumps_dir, "ns-state.json")) as state_file:
+            state = json.load(state_file)
+        result = {}
+        for entry in state.get("abstractions", []):
+            if not isinstance(entry, dict):
+                continue
+            slot = entry.get("slot")
+            sequence = entry.get("seq")
+            if (isinstance(slot, int) and isinstance(sequence, int)
+                    and not isinstance(sequence, bool)
+                    and 0 <= sequence <= 0x1FF):
+                result[slot] = sequence
+        return result
+    except Exception:
+        return {}
+
+
 def _load_catalog_token_map(manifest_path, selected_by_slot=None):
     """Return slot→token from Namespace state, with config selections overlaid.
 
@@ -1577,6 +1602,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         and e.get("lumpToken")
     }
     trusted_cache_tokens = _load_trusted_cache_token_map(_manifest_path_for_cache)
+    retained_sequences = _load_ns_state_sequence_map(lumps_dir)
     catalog = DEFAULT_ABSTRACTION_CATALOG
     # Resolve boot-resident catalog bodies before assigning any locations.
     # Their declared LUMP allocation, not the historical 64-word catalog
@@ -1630,6 +1656,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             continue
 
         label, perms, chainable, *_bsonly = entry
+        retained_sequence = retained_sequences.get(i, 0)
         bitstream_only = bool(_bsonly and _bsonly[0])
         override = phys_override.get(i)
         if i == 0:
@@ -1669,12 +1696,12 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             # Bitstream-written slot: NS entry provided by FPGA hardware, not boot software.
             # Leave the NS table words as zeros (hardware fills them at power-on).
             # runningOffset already not advanced (loc assignment already skipped above).
-            clist_gts.append(create_gt(0, i, perms, 1))
+            clist_gts.append(create_gt(retained_sequence, i, perms, 1))
             continue
         write_ns_entry(mem, total, NS_ENTRY_WORDS, i, loc, lim17,
-                       0, 0, 1, 0, clist_count,
+                       0, 0, 1, retained_sequence, clist_count,
                        trusted_cache_tokens.get(i, 0))
-        clist_gts.append(create_gt(0, i, perms, 1))
+        clist_gts.append(create_gt(retained_sequence, i, perms, 1))
 
     # Count only non-null catalog entries: the highest non-null slot index + 1.
     # All 11 catalog entries are non-null (slots 0–10). This must match simulator.js nsCount.
@@ -1824,7 +1851,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # by the ⚡ LightningBolt boot-entry control. This keeps the post-SelfTest
     # continuation and Thread.CR0 in lockstep; it is never independently
     # configurable or a stale self-loop.
-    clist_gts[1] = create_gt(0, boot_entry_slot, {"E": 1}, 1)
+    clist_gts[1] = create_gt(_boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
 
     # ── DEMO_CLIST finalisation ─────────────────────────────────────────────────
     # The c-list GT words are managed virtually in clist_gts[].  They are NOT
@@ -1945,7 +1972,12 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
                 _gt = create_abstract_gt(_ab_type, _rw_perms, 0, _ab_data)
             else:  # "inform"
                 _, _ref_slot, _perms = _entry
-                _gt = create_gt(0, _ref_slot, _perms, 1)
+                _gt = create_gt(
+                    retained_sequences.get(_ref_slot, 0),
+                    _ref_slot,
+                    _perms,
+                    1,
+                )
             mem[_loc + _sz - _cc + _ci] = _gt & 0xFFFFFFFF
         # Update NS entry: rewrite with corrected lim17 and cc via the gated helper.
         _svc_ns_base = total - (_cslot + 1) * NS_ENTRY_WORDS
@@ -1998,8 +2030,9 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         _br_lim17 = (_body_sz - _body_cc - 1) & 0x1FFFF
         _br_ns_base = total - (_slot + 1) * NS_ENTRY_WORDS
         _br_cache_token = mem[_br_ns_base + 3]
+        _br_sequence = _ns_word1_get(mem[_br_ns_base + 1], "gt_seq")
         write_ns_entry(mem, total, NS_ENTRY_WORDS, _slot, _phys, _br_lim17,
-                       0, 0, 1, 0, _body_cc, _br_cache_token)
+                       0, 0, 1, _br_sequence, _body_cc, _br_cache_token)
 
     # ----- Resident lump bodies (Step 2) --------------------------------
     token_map = _token_map

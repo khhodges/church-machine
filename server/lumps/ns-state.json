@@ -120,7 +120,11 @@
       "g": 0,
       "limit": "0x0003F",
       "seq": 0,
-      "seal": "0xDEA83EEF"
+      "seal": "0xDEA83EEF",
+      "token": "00000a00",
+      "filename": "CapabilityTest.2.c7a66d01.lump",
+      "issue_n": 1,
+      "resident": true
     },
     {
       "name": "Thread#2",

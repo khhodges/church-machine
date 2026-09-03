@@ -46,6 +46,62 @@ function _lumpSaveHandleNetworkError(err) {
     if (typeof renderLumps === 'function') renderLumps();
 }
 
+/**
+ * POST a save and classify failures without conflating response parsing with
+ * transport.  The commit callback is invoked only for a valid successful JSON
+ * response, allowing callers to keep simulator/UI state unchanged until the
+ * durable server transaction has committed.
+ */
+function _lumpSaveRequest(fetchImpl, url, payload, onCommit) {
+    return fetchImpl(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    }).then(function(r) {
+        return r.text().then(function(body) {
+            var resp;
+            try {
+                resp = JSON.parse(body);
+            } catch (parseError) {
+                var excerpt = String(body || '').replace(/\s+/g, ' ').trim().slice(0, 240);
+                var protocolError = new Error(
+                    'Server/protocol error (HTTP ' + r.status + '): expected JSON' +
+                    (excerpt ? '; received: ' + excerpt : '.'));
+                protocolError.kind = 'protocol';
+                protocolError.status = r.status;
+                throw protocolError;
+            }
+            if (!r.ok || !resp || resp.ok !== true) {
+                var responseError = new Error(
+                    (resp && resp.error) || ('Server rejected save (HTTP ' + r.status + ').'));
+                responseError.kind = r.status >= 500
+                    ? 'server'
+                    : (!r.ok ? 'validation' : 'protocol');
+                responseError.status = r.status;
+                responseError.response = resp;
+                throw responseError;
+            }
+            if (typeof onCommit === 'function') onCommit(resp);
+            return resp;
+        });
+    }).catch(function(err) {
+        if (err && (
+            err.kind === 'validation' ||
+            err.kind === 'protocol' ||
+            err.kind === 'server'
+        )) throw err;
+        var transportError = new Error(
+            'Network error \u2014 the save request did not reach the server.');
+        transportError.kind = 'transport';
+        transportError.cause = err;
+        throw transportError;
+    });
+}
+
 if (typeof module !== 'undefined') {
-    module.exports = { _lumpSaveHandleResponse, _lumpSaveHandleNetworkError };
+    module.exports = {
+        _lumpSaveHandleResponse,
+        _lumpSaveHandleNetworkError,
+        _lumpSaveRequest,
+    };
 }

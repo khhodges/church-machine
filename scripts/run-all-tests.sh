@@ -194,7 +194,7 @@ register_suite "lump-meta-patch-validation-tests" \
     'python -m pytest tests/server/test_lump_meta_patch_validation.py -v'
 
 register_suite "lump-save-error-surface-tests" \
-    'node simulator/test_lump_save_error_surface.js'
+    'python -m pytest tests/server/test_capabilitytest_replacement.py -v && node simulator/test_lump_save_error_surface.js && node simulator/test_capabilitytest_save.js'
 
 register_suite "lump-roundtrip" \
     'node simulator/test_lump_roundtrip.js'

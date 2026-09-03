@@ -30,6 +30,7 @@ _sse_clients_lock = threading.Lock()
 # complete transition serialised is important: the files are a single history
 # record, not independent per-token cache entries.
 _lumps_manifest_lock = threading.RLock()
+_lump_history_lock_state = threading.local()
 
 # Test hook — set to a callable to be invoked inside save_lump() after all
 # per-token file writes (Phase 5/6) complete but BEFORE the manifest lock is
@@ -90,7 +91,10 @@ def _push_device_event(payload: dict):
         for q in dead:
             _sse_clients.remove(q)
 # ─────────────────────────────────────────────────────────────────────────────
-from flask import Flask, jsonify, send_from_directory, send_file, redirect, make_response, request
+from flask import (
+    Flask, after_this_request, jsonify, send_from_directory, send_file,
+    redirect, make_response, request,
+)
 
 # Ensure the server/ directory is on sys.path so local modules (boot_image, etc.)
 # are importable whether the app is started as `python3 server/app.py` (dev) or
@@ -6530,6 +6534,14 @@ def _wukong_update_active_lump_nia(image_bytes, entry_info):
           f'NIA=0x{base_byte:04X}–0x{end_byte:04X}  slot={entry_slot}', flush=True)
 
 
+def _read_boot_entry_slot_from_image():
+    """Return the selected entry slot from the committed boot image."""
+    if not os.path.isfile(BOOT_IMAGE_PATH):
+        return None
+    with open(BOOT_IMAGE_PATH, "rb") as image_file:
+        return _boot_image_gen.read_boot_entry_info(image_file.read()).get("entry_slot")
+
+
 def _read_boot_entry_name_from_image():
     """Return the boot-entry abstraction dot-name derived from the binary sentinel + manifest."""
     _slot = _read_boot_entry_slot_from_image()
@@ -7687,10 +7699,92 @@ def save_lump():
         }), 422
     # ── End pre-flight ────────────────────────────────────────────────────────
 
+    # Protected resident slot preflight. Any request naming CapabilityTest or
+    # targeting slot 10 is treated as an attempted replacement, so misspelling
+    # the name cannot bypass the guard.
+    _is_capabilitytest_save = (
+        abs_name == "CapabilityTest"
+        or ns_slot == 10
+        or (isinstance(ns_slot, str) and ns_slot.strip() == "10")
+    )
+    if _is_capabilitytest_save:
+        def _ct_reject(detail):
+            return jsonify({
+                "error": f"CapabilityTest replacement rejected: {detail}",
+                "protected_slot_validation_failed": True,
+            }), 422
+
+        if abs_name != "CapabilityTest":
+            return _ct_reject("canonical name must be CapabilityTest.")
+        if ns_slot != 10:
+            return _ct_reject("the exact target must be Namespace slot 10.")
+        if str(metadata.get("capability_type", "")).lower() != "inform":
+            return _ct_reject("Golden Token type must be Inform.")
+        if metadata.get("grants") != ["E"]:
+            return _ct_reject("permission must be Church E-only.")
+        if metadata.get("replacement") is not True:
+            return _ct_reject("slot 10 only permits an explicit replacement.")
+        if token8 != "00000a00":
+            return _ct_reject("canonical token 00000a00 must be retained.")
+        try:
+            with open(NS_STATE_PATH, encoding="utf-8") as _ct_state_file:
+                _ct_state = json.load(_ct_state_file)
+            _ct_rows = [
+                row for row in _ct_state.get("abstractions", [])
+                if isinstance(row, dict) and row.get("slot") == 10
+            ]
+        except Exception as _ct_state_error:
+            return _ct_reject(f"committed Namespace state is unavailable: {_ct_state_error}")
+        if len(_ct_rows) != 1 or _ct_rows[0].get("name") != "CapabilityTest":
+            return _ct_reject("slot 10 is not the retained CapabilityTest identity.")
+        _ct_row = _ct_rows[0]
+        if str(_ct_row.get("type", "")).lower() != "inform":
+            return _ct_reject("the retained slot is not Inform.")
+        _ct_seq = _ct_row.get("seq")
+        if (not isinstance(_ct_seq, int)
+                or isinstance(metadata.get("namespace_sequence"), bool)
+                or metadata.get("namespace_sequence") != _ct_seq):
+            return _ct_reject(
+                f"retained sequence must be {_ct_seq}; got "
+                f"{metadata.get('namespace_sequence')!r}.")
+        try:
+            _ct_manifest = _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json"))
+        except Exception as _ct_manifest_error:
+            return _ct_reject(f"manifest is unavailable: {_ct_manifest_error}")
+        _ct_current_entry = next(
+            (entry for entry in _ct_manifest if entry.get("token") == "00000a00"),
+            None,
+        )
+        _ct_eligible = (
+            isinstance(_ct_current_entry, dict)
+            and _ct_current_entry.get("abstraction") == "CapabilityTest"
+            and _ct_current_entry.get("ns_slot") == 10
+            and _ct_current_entry.get("ns_slot_policy") == "static"
+            and _ct_current_entry.get("boot_resident") is True
+        )
+        if not _ct_eligible:
+            return _ct_reject(
+                "the canonical slot-10 artifact is not eligible for resident replacement.")
+        if not os.path.isfile(BOOT_IMAGE_PATH):
+            return _ct_reject(
+                "the committed boot image is unavailable; replacement cannot be atomic.")
+
     # Keep the writable library behind the module-level setting so endpoint
     # tests can use a private temporary library instead of server/lumps/.
     lumps_dir = LUMPS_DIR
     os.makedirs(lumps_dir, exist_ok=True)
+    # Every save can mutate the manifest, Namespace binding, and boot image.
+    # Hold one cross-process lock across that complete lifecycle so a protected
+    # rollback can never restore a snapshot taken midway through another save.
+    # The lock is re-entrant because _commit_lump_history_transition() acquires
+    # it again internally.
+    _save_transaction_guard = _lump_history_transition_lock(lumps_dir)
+    _save_transaction_guard.__enter__()
+
+    @after_this_request
+    def _release_lump_save_transaction(response):
+        _save_transaction_guard.__exit__(None, None, None)
+        return response
 
     import re as _re_arch
     import shutil as _shutil
@@ -7933,6 +8027,12 @@ def save_lump():
     _prior_slot_policy = (_existing_entry or {}).get("ns_slot_policy")
     if _prior_slot_policy is not None:
         new_entry["ns_slot_policy"] = _prior_slot_policy
+    if _is_capabilitytest_save:
+        # Protected replacement retains placement/eligibility; this is an
+        # update of the canonical resident identity, never a floating issue.
+        new_entry["ns_slot"] = 10
+        new_entry["ns_slot_policy"] = "static"
+        new_entry["boot_resident"] = True
     if _portable_binding is not None:
         new_entry["portable_binding"] = _portable_binding
 
@@ -7954,6 +8054,59 @@ def save_lump():
         and _exist_filename == f"{safe_name}_v{_arch_ver}.lump"
         and _exist_sc_file == f"{safe_name}_v{_arch_ver}.json"
     )
+    # CapabilityTest additionally spans Namespace state and the generated boot
+    # image. Snapshot the complete flat repository revision so any later bind
+    # or image-generation failure can restore every artifact (including archive
+    # names and compatibility aliases) rather than leaving a partial commit.
+    _protected_snapshot = None
+    _protected_lock_existed = False
+    if _is_capabilitytest_save:
+        _protected_snapshot = {}
+        _protected_lock_existed = os.path.exists(
+            os.path.join(lumps_dir, ".history-transition.lock"))
+        _snapshot_paths = [
+            os.path.join(lumps_dir, name)
+            for name in os.listdir(lumps_dir)
+            if name != ".history-transition.lock"
+        ]
+        for _extra_path in (NS_STATE_PATH, BOOT_IMAGE_PATH):
+            if _extra_path not in _snapshot_paths:
+                _snapshot_paths.append(_extra_path)
+        for _snapshot_path in _snapshot_paths:
+            if os.path.islink(_snapshot_path):
+                _protected_snapshot[_snapshot_path] = ("link", os.readlink(_snapshot_path))
+            elif os.path.isfile(_snapshot_path):
+                with open(_snapshot_path, "rb") as _snapshot_file:
+                    _protected_snapshot[_snapshot_path] = ("file", _snapshot_file.read())
+
+    def _rollback_protected_save():
+        if _protected_snapshot is None:
+            return
+        current_paths = [
+            os.path.join(lumps_dir, name)
+            for name in os.listdir(lumps_dir)
+            if name != ".history-transition.lock"
+        ]
+        for _current_path in current_paths:
+            if _current_path not in _protected_snapshot and os.path.lexists(_current_path):
+                os.remove(_current_path)
+        for _snapshot_path, (_snapshot_kind, _snapshot_value) in _protected_snapshot.items():
+            if os.path.lexists(_snapshot_path):
+                os.remove(_snapshot_path)
+            os.makedirs(os.path.dirname(_snapshot_path), exist_ok=True)
+            if _snapshot_kind == "link":
+                os.symlink(_snapshot_value, _snapshot_path)
+            else:
+                _snapshot_tmp = _snapshot_path + ".capabilitytest-rollback"
+                with open(_snapshot_tmp, "wb") as _snapshot_file:
+                    _snapshot_file.write(_snapshot_value)
+                os.replace(_snapshot_tmp, _snapshot_path)
+        if not _protected_lock_existed:
+            try:
+                os.remove(os.path.join(lumps_dir, ".history-transition.lock"))
+            except FileNotFoundError:
+                pass
+
     try:
         _transition = _commit_lump_history_transition(
             lumps_dir=lumps_dir,
@@ -7990,16 +8143,22 @@ def save_lump():
             expected_manifest_entry=_existing_entry,
         )
     except _LumpTransitionConflict as _transition_conflict:
+        _rollback_protected_save()
         return jsonify({"error": str(_transition_conflict)}), 409
     except ValueError as _mf_lock_err:
+        _rollback_protected_save()
         return jsonify({"error": (
             "manifest.json is corrupt and cannot be read safely. "
             "The save has been aborted to prevent overwriting previously-saved LUMPs. "
             f"Details: {_mf_lock_err}"
         )}), 500
+    except Exception as _transition_error:
+        _rollback_protected_save()
+        logging.exception("[lumps] save transaction failed")
+        return jsonify({
+            "error": f"LUMP save transaction failed; prior revision restored: {_transition_error}"
+        }), 500
 
-    LAZY_LUMPS[token8] = lump_bytes
-    LAZY_LUMPS[token8.lstrip('0') or '0'] = lump_bytes
     next_lump_version = _transition.get("next_version", next_lump_version)
 
     if _transition:
@@ -8032,20 +8191,24 @@ def save_lump():
     # Record the exact token/filename before regenerating the boot image so the
     # generator cannot rediscover an older build by filename ordering.
     try:
-        _bind_saved_lump_to_ns_state(
+        _bound_saved_lump = _bind_saved_lump_to_ns_state(
             abs_name, ns_slot, token8, lump_filename, _issue_n_save)
+        if _is_capabilitytest_save and not _bound_saved_lump:
+            raise ValueError("the retained slot-10 Namespace row was not found")
     except Exception as _ns_bind_exc:
+        _rollback_protected_save()
         return jsonify({"error": (
-            "The LUMP was written, but its committed Namespace binding could "
-            f"not be refreshed: {_ns_bind_exc}"
+            "CapabilityTest save transaction failed; prior revision restored: "
+            f"Namespace binding could not be refreshed: {_ns_bind_exc}"
         )}), 500
 
     print(f'[lumps] Saved {lump_filename} ({len(lump_bytes)} bytes) + {sidecar_filename}', flush=True)
 
     # ── Auto-regenerate boot-image.bin ────────────────────────────────────────
     # If boot-image.bin already exists and a boot config is present, regenerate
-    # it so the saved lump is persisted across server reboots.  Failures are
-    # non-fatal — the lump is safely on disk regardless.
+    # it so the saved lump is persisted across server reboots. Ordinary LUMP
+    # refresh failures remain non-fatal; protected CapabilityTest replacement
+    # failures roll the complete revision back above.
     boot_refreshed = False
     boot_refresh_note = None
     if os.path.isfile(BOOT_IMAGE_PATH):
@@ -8068,7 +8231,17 @@ def save_lump():
                     abs_name, ns_slot, token8, lump_filename, _issue_n_save)
             else:
                 boot_refresh_note = f'boot config unavailable: {err_bi}'
+                if _is_capabilitytest_save:
+                    raise RuntimeError(boot_refresh_note)
         except Exception as _bie:
+            if _is_capabilitytest_save:
+                _rollback_protected_save()
+                return jsonify({
+                    "error": (
+                        "CapabilityTest save transaction failed; prior revision "
+                        f"restored: boot image could not be regenerated: {_bie}"
+                    )
+                }), 500
             boot_refresh_note = str(_bie)
             logging.warning('[lumps] boot-image.bin regeneration failed: %s', _bie)
 
@@ -8083,6 +8256,9 @@ def save_lump():
     # immediately after every SelfTest save, regardless of boot-image outcome.
     if token8 == '00000600' and not boot_refreshed:
         _load_boot_abstr_lump()
+
+    LAZY_LUMPS[token8] = lump_bytes
+    LAZY_LUMPS[token8.lstrip('0') or '0'] = lump_bytes
 
     resp: dict = {
         "ok":             True,
@@ -17027,11 +17203,21 @@ def _lump_history_transition_lock(lumps_dir: str):
     lock_path = os.path.join(os.path.abspath(lumps_dir), ".history-transition.lock")
     os.makedirs(lumps_dir, exist_ok=True)
     with _lumps_manifest_lock:
-        with open(lock_path, "a+") as lock_fh:
-            fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+        depth = getattr(_lump_history_lock_state, "depth", 0)
+        if depth:
+            _lump_history_lock_state.depth = depth + 1
             try:
                 yield
             finally:
+                _lump_history_lock_state.depth -= 1
+            return
+        with open(lock_path, "a+") as lock_fh:
+            fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+            _lump_history_lock_state.depth = 1
+            try:
+                yield
+            finally:
+                _lump_history_lock_state.depth = 0
                 fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
 
 def _commit_lump_history_transition(
