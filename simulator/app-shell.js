@@ -1414,6 +1414,14 @@ function init() {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ source: asmEd.value })
+                    }).then(function(resp) {
+                        // A WIP may have been archived or deleted in another
+                        // tab. Stop retrying its dead token, but only if it is
+                        // still the active one when this response arrives.
+                        if (resp.status === 404 &&
+                                localStorage.getItem('church_wip_token') === _tok) {
+                            localStorage.removeItem('church_wip_token');
+                        }
                     }).catch(function() {});
                 } catch (_e) {}
             }, 3000);
