@@ -44,6 +44,10 @@
                 var msg = describeNonError(event.reason, 'null/undefined rejection');
                 console.warn('[Church Machine] Caught non-Error rejection:', msg);
                 event.preventDefault();
+                // Replit's artifact monitor treats any later delivery of a malformed
+                // rejection as a fatal runtime crash even after preventDefault().
+                // Contain it here; real Error rejections continue to the monitor.
+                event.stopImmediatePropagation();
             }
         });
         window.addEventListener('error', function(event) {
@@ -54,11 +58,16 @@
                 var msg = event.message || '';
                 if (msg.indexOf('ResizeObserver') !== -1) {
                     event.preventDefault();
+                    event.stopImmediatePropagation();
                     return;
                 }
                 var detail = describeNonError(event.error, msg || '(no message)');
                 console.warn('[Church Machine] Caught non-Error window error:', detail, 'at', event.filename + ':' + event.lineno);
                 event.preventDefault();
+                // preventDefault() suppresses the browser's default reporting, but it
+                // does not stop other window listeners. Keep malformed thrown values
+                // from reaching the artifact-level crash detector.
+                event.stopImmediatePropagation();
             }
         });
     })();
