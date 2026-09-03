@@ -79,6 +79,23 @@ class TestHaltStateFrame:
         assert bridge.try_parse_halt_state_frame(
             bytes([0xAD, 0x01, 0x01, 0x01, 0x09, 0x00])) is None
 
+    def test_corrupt_or_stale_evidence_cannot_match_newer_halt(self):
+        pending = {'nonce': 10}
+        corrupt = bridge.try_parse_halt_state_frame(
+            bytes([0xAD, 0x01, 0x01, 0x01, 0x10, 0x00]))
+        stale = bridge.try_parse_halt_state_frame(
+            bytes([0xAD, 0x01, 0x01, 0x01, 0x09, 0xA5]))
+        current = bridge.try_parse_halt_state_frame(
+            bytes([0xAD, 0x01, 0x01, 0x01, 0x0A, 0xA6]))
+
+        assert corrupt is None
+        assert not bridge.halt_state_evidence_matches_pending(
+            corrupt, pending)
+        assert not bridge.halt_state_evidence_matches_pending(
+            stale, pending)
+        assert bridge.halt_state_evidence_matches_pending(
+            current, pending)
+
     def test_halt_write_callback_runs_only_after_successful_write(self, acks):
         results = []
         bridge.execute_board_command(

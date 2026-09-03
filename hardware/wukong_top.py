@@ -1112,7 +1112,8 @@ class ChurchWukongXC7A100T(Elaboratable):
         #   's' (0x73) — step/pause: from halt, release CM for one retire; from
         #                free-run, enter step mode and halt at the next retire.
         #   'r' (0x72) — run:        clear step_mode; CM runs freely
-        #   'h' (0x68) — legacy halt: assert step_mode + step_halted immediately
+        #   'h' (0x68) — halt: receive one nonce byte, then assert step_mode +
+        #                step_halted and emit nonce-bound board evidence
         #   'b' (0x62) — breakpoint: read 4 big-endian NIA bytes, then arm/disarm
         #   'f' (0x66) — force reboot + sentinel: re-arm the full 4-byte
         #                boot sentinel (0xBC N_INIT TU_VERSION BUILD_VERSION).
@@ -1142,6 +1143,11 @@ class ChurchWukongXC7A100T(Elaboratable):
         # command while Halt is pending, and this short parser timeout restores
         # IDLE if the nonce byte is lost on the wire.
         halt_nonce_timeout = max(256, self.clk_freq // 100)  # ~10 ms
+        halt_nonce_expired = Signal()
+        m.d.comb += halt_nonce_expired.eq(
+            halt_cmd_wait_nonce &
+            (halt_nonce_wait_cycles >= halt_nonce_timeout - 1)
+        )
         with m.If(halt_cmd_wait_nonce):
             with m.If(halt_nonce_wait_cycles >= halt_nonce_timeout - 1):
                 m.d.sync += [
@@ -1154,7 +1160,12 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         with m.FSM(name="cmd_parser"):
             with m.State("IDLE"):
-                with m.If(uart_rx.valid & halt_cmd_wait_nonce):
+                # On the expiry cycle, interpret an arriving byte as a fresh
+                # command rather than as a late nonce.  Without this guard,
+                # the first Step/Run after a lost nonce could accidentally
+                # halt the CM with that command byte as its nonce.
+                with m.If(uart_rx.valid & halt_cmd_wait_nonce &
+                          ~halt_nonce_expired):
                     m.d.sync += [
                         halt_cmd_wait_nonce.eq(0),
                         halt_nonce_wait_cycles.eq(0),

@@ -348,6 +348,23 @@ def try_parse_halt_state_frame(buf, i=0):
         return None
     return {'state': 'halted', 'reason': 'explicit_halt',
             'version': frame[1], 'nonce': frame[4]}
+
+
+def halt_state_evidence_matches_pending(decoded, pending_halt):
+    """Return whether decoded halt evidence belongs to the outstanding Halt.
+
+    A syntactically valid frame is not sufficient to confirm a request: the
+    board must echo the nonce assigned to the currently pending command.
+    Keeping this comparison separate makes it difficult for a delayed frame
+    from an older Halt to confirm a newer one.
+    """
+    return bool(
+        decoded and pending_halt and
+        decoded.get('state') == 'halted' and
+        decoded.get('nonce') == pending_halt.get('nonce')
+    )
+
+
 def _compute_expected_n_init():
     """Return the N_INIT value expected from the current boot_rom.py tables.
 
@@ -1966,7 +1983,8 @@ def main():
                     sync.lock('halt-state frame')
                     state_counter += 1
                     if pending_halt is not None:
-                        if decoded.get('nonce') != pending_halt.get('nonce'):
+                        if not halt_state_evidence_matches_pending(
+                                decoded, pending_halt):
                             print('  [halt] stale nonce ignored', flush=True)
                             i += HALT_STATE_LEN
                             continue
