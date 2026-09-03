@@ -1,4 +1,6 @@
 from amaranth import *
+import hashlib
+import json
 import struct
 from pathlib import Path
 
@@ -397,15 +399,10 @@ def _make_ns_entry(gt_type, perms, slot_id, gt_seq, location, alloc_size, cw=0, 
 #   Slot 17: (empty)
 #   Slot 18: Constants (R)  — Layer 3 read-only constants
 #
-# Church Hardware Address Range capability slots (slots 19–22).
+# Church Hardware Address Range capability slots (slots 19–20).
 #
 # These S-perm authority caps govern privileged CR12/CR13 writes.
 # They are NOT included in DEMO_CLIST (user-space boot c-list).
-# Scheduler.IRQ (NS slot 8) receives E-perm GTs for all four authority
-# objects (slots 19–22) so it can invoke CHANGE CR12/CR13 and M-bit-set.
-# Thread Manager (NS slot 45) receives E-perm GTs for the CR12 caps only
-# (slots 19 and 21); CR13 caps remain IRQ-manager territory.
-# See SCHEDULER_IRQ_CLIST and THREAD_MANAGER_CLIST below.
 #
 #   Slot 19: CR12_PORT_CAP  — 0xFFFFFF0C, S-perm, limit=0
 #             Authority to CHANGE CR12 (thread stack).
@@ -413,21 +410,27 @@ def _make_ns_entry(gt_type, perms, slot_id, gt_seq, location, alloc_size, cw=0, 
 #   Slot 20: CR13_PORT_CAP  — 0xFFFFFF0D, S-perm, limit=0
 #             Authority to CHANGE CR13 (interrupt handler).
 #             Distributed to: Scheduler.IRQ c-list only (E-perm GT; IRQ-manager territory).
-#   Slot 21: CR12_MBIT_CAP  — 0xFFFFFF1C, S-perm, limit=0
-#             Authority to set the M bit on a GT installed into CR12.
-#             Distributed to: Scheduler.IRQ c-list AND Thread Manager c-list (E-perm GTs).
-#   Slot 22: CR13_MBIT_CAP  — 0xFFFFFF1D, S-perm, limit=0
-#             Authority to set the M bit on a GT installed into CR13.
-#             Distributed to: Scheduler.IRQ c-list only (E-perm GT; IRQ-manager territory).
+# M-device descriptors are separate full 96-bit values, not c-list GTs; the
+# protected Namespace identity gate below is the effective custody boundary.
 #
 # Physical LED mapping (R bit = bit 0 of each word):
 #   Tang Nano 20K (6 LEDs active-LOW, led3 pin absent):
 #     offset 0→led0, 1→led1, 2→led2, 3→led4, 4→led5; led3 pin not connected
 # ---------------------------------------------------------------------------
 
-# Church Hardware Address Range NS slot assignments
-# CR12 caps (slots 19, 21) distributed to Scheduler.IRQ AND Thread Manager c-lists.
-# CR13 caps (slots 20, 22) distributed to Scheduler.IRQ c-list only (IRQ-manager territory).
+# Private Namespace M-bit device catalog. A c-list entry holds only word0, and
+# therefore cannot safely carry these location-bound device capabilities.
+# These complete descriptors are deliberately absent from every executable
+# boot c-list. Hardware's effective custody boundary is additionally enforced
+# by DWRITE's protected CR14 Namespace identity gate; this tuple by itself is
+# metadata, not an executable grant. A descriptor is exact only with this
+# S-only Abstract GT, its matching port address, and zero limit.
+NAMESPACE_PRIVATE_MBIT_CAPABILITIES = (
+    (CR_THREAD_STACK, make_gt(GT_TYPE_ABSTRACT, PERM_MASK_S, 0, 0), M_BIT_PORT_CR12, 0),
+    (CR_INTERRUPT,    make_gt(GT_TYPE_ABSTRACT, PERM_MASK_S, 0, 0), M_BIT_PORT_CR13, 0),
+    (CR_CLOOMC,       make_gt(GT_TYPE_ABSTRACT, PERM_MASK_S, 0, 0), M_BIT_PORT_CR14, 0),
+    (CR_NAMESPACE,    make_gt(GT_TYPE_ABSTRACT, PERM_MASK_S, 0, 0), M_BIT_PORT_CR15, 0),
+)
 
 # ---------------------------------------------------------------------------
 # SCHEDULER_IRQ_CLIST — capability list for the Scheduler.IRQ lump (NS slot 8)
@@ -668,10 +671,12 @@ CAPABILITY_TEST_NS_SLOT = 10
 WUKONG_CAPABILITY_TEST_BASE_BYTE = 0x1400
 WUKONG_CAPABILITY_TEST_BASE_WORD = WUKONG_CAPABILITY_TEST_BASE_BYTE // 4
 WUKONG_CAPABILITY_TEST_ALLOC = 64
-_capability_test_path = (
-    Path(__file__).resolve().parents[1]
-    / "server" / "lumps" / "CapabilityTest.2.c7a66d01.lump"
-)
+_lumps_dir = Path(__file__).resolve().parents[1] / "server" / "lumps"
+_capability_test_filename = "CapabilityTest.2.a537aadf.lump"
+_capability_test_sidecar_filename = "CapabilityTest.2.a537aadf.json"
+_capability_test_path = _lumps_dir / _capability_test_filename
+_capability_test_sidecar_path = _lumps_dir / _capability_test_sidecar_filename
+_capability_test_manifest_path = _lumps_dir / "manifest.json"
 try:
     _capability_test_raw = _capability_test_path.read_bytes()
 except OSError as exc:
@@ -687,6 +692,44 @@ if len(_capability_test_raw) != WUKONG_CAPABILITY_TEST_ALLOC * 4:
 WUKONG_CAPABILITY_TEST_WORDS = tuple(
     struct.unpack(f">{WUKONG_CAPABILITY_TEST_ALLOC}I", _capability_test_raw)
 )
+# Bind the factory import to the canonical slot/token/sidecar/manifest entry,
+# not merely to a filename which could silently become stale.
+_capability_test_hash = hashlib.sha256(_capability_test_raw).hexdigest()
+with _capability_test_sidecar_path.open("r", encoding="utf-8") as _fh:
+    _capability_test_sidecar = json.load(_fh)
+with _capability_test_manifest_path.open("r", encoding="utf-8") as _fh:
+    _capability_test_manifest = json.load(_fh)
+_capability_test_manifest_entries = (
+    _capability_test_manifest
+    if isinstance(_capability_test_manifest, list)
+    else _capability_test_manifest.get("lumps", [])
+)
+_capability_test_manifest_entry = next(
+    (
+        _entry for _entry in _capability_test_manifest_entries
+        if _entry.get("filename") == _capability_test_filename
+    ),
+    None,
+)
+if (
+    _capability_test_sidecar.get("filename") != _capability_test_filename
+    or _capability_test_sidecar.get("sidecar_file") != _capability_test_sidecar_filename
+    or _capability_test_sidecar.get("token") != "00000a00"
+    or _capability_test_sidecar.get("ns_slot") != CAPABILITY_TEST_NS_SLOT
+    or _capability_test_sidecar.get("binary_hash") != _capability_test_hash
+    or _capability_test_manifest_entry is None
+    or _capability_test_manifest_entry.get("sidecar_file")
+       != _capability_test_sidecar_filename
+    or _capability_test_manifest_entry.get("token") != "00000a00"
+    or _capability_test_manifest_entry.get("ns_slot")
+       != CAPABILITY_TEST_NS_SLOT
+    or _capability_test_manifest_entry.get("binary_hash")
+       != _capability_test_hash
+):
+    raise RuntimeError(
+        "CapabilityTest factory artifact binding is stale or inconsistent: "
+        f"{_capability_test_filename}"
+    )
 assert WUKONG_CAPABILITY_TEST_WORDS[0] == 0xF8005C05  # 64 words, cw=23, cc=5
 assert WUKONG_CAPABILITY_TEST_WORDS[-5] == 0x4A000006  # SelfTest E-GT
 

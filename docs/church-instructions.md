@@ -13,8 +13,8 @@ All Church instructions that access the namespace route through the **mLoad mast
 
 ## Architectural Principles
 
-1. **CR0-CR11 Only**: Church instructions can only address CR0-CR11 via the 4-bit register field. Privileged registers CR12-CR15 are physically unreachable through instruction encoding (exception: DREAD/DWRITE may use CR14 as source).
-2. **SWITCH Is the Gate**: The only way to write to privileged registers CR12-CR15 is through the privileged SWITCH instruction.
+1. **Ordinary sources CR0-CR11**: Ordinary Church operands use CR0–CR11. SWITCH alone encodes an isolated CR12–CR15 destination.
+2. **SWITCH Is the Gate**: SWITCH is the M-gated special LOAD form for CR12–CR15.
 3. **Permission Domains Are Mutually Exclusive**: Turing (R, W, X) and Church (L, S, E) permissions cannot be mixed within a single operation context.
 4. **Failsafe FAULT**: Every validation failure (permission, bounds, version, MAC) routes to a FAULT handler — except TPERM, which sets Z=0 on failure to enable conditional execution without trapping.
 5. **C-List Mediation**: LOAD and SAVE operate through capability-mediated access, never through raw memory addressing.
@@ -170,32 +170,28 @@ All Church instructions that access the namespace route through the **mLoad mast
 
 ---
 
-### 6. SWITCH — Install PassKey into System Register
+### 6. SWITCH — M-Gated LOAD into an Isolated Register
 
-**Purpose**: Write a PassKey capability into system register CR13 (IRQ Thread) or CR15 (Namespace root). This is the only instruction that can modify these system-wide registers, making it the privilege gate for namespace and interrupt management. CR12 (thread stack) and CR14 (transient code-view) cannot be SWITCH targets.
+**Purpose**: Load a c-list entry into CR12, CR13, CR14, or CR15 when that exact destination's latched M bit authorizes the operation.
 
-**Validation Path**: Two mandatory hardware checks before the write; namespace access via mLoad with G-bit reset.
+**Validation Path**: Operand/M authorization followed by ordinary LOAD validation.
 
 **Operation**:
-1. Decode the 3-bit `Tgt` field; FAULT if Tgt is not CR13 (101₂) or CR15 (111₂)
-2. Check source register is CR0–CR11 (4-bit encoding); FAULT if out of range
-3. **PassKey type check** — CRs.word0_gt.gt_type must equal `11₂` (Abstract GT); FAULT if not
-4. **Sentinel address check** — CRs.word1_location must equal the reserved hardware sentinel for the chosen target; FAULT on mismatch:
-   - Tgt = CR13: sentinel = `0xFFFFFFFE` (all-1s − 1)
-   - Tgt = CR15: sentinel = `0xFFFFFFFF` (all-1s)
-5. Install CRs into the target system register via mLoad; reset G=0 on accessed namespace entries
+1. Require CRd=CR12–CR15 and CRs=CR0–CR11; malformed operands fault `INVALID_OP`
+2. Use the instruction-accepted, latched CRd.M value; clear faults `PERM_L`
+3. Validate L permission, row bounds, version, and integrity exactly as LOAD
+4. Install c-list[row] into CRd and consume (clear) CRd.M
 
-**Mnemonic**: `SWITCH CRs, target`
+**Mnemonic**: `SWITCH CRd, CRs, #row`
 
 | Aspect | Detail |
 |--------|--------|
-| **Valid Targets** | CR13 (Tgt=101₂, IRQ Thread), CR15 (Tgt=111₂, Namespace) — all others FAULT |
-| **PassKey type** | CRs.word0_gt.gt_type must be Abstract (11₂); any other type → FAULT |
-| **Sentinel for CR13** | CRs.word1_location == `0xFFFFFFFE` (all-1s − 1) |
-| **Sentinel for CR15** | CRs.word1_location == `0xFFFFFFFF` (all-1s) |
-| **Sentinel mismatch** | CRs sentinel does not match chosen target → FAULT |
+| **Valid destinations** | CR12–CR15 |
+| **Valid sources** | CR0–CR11, ordinary L-capable c-list capability |
+| **Authorization** | Latched destination M; M-clear → `PERM_L` |
+| **Malformed operands** | Non-isolated destination or isolated source → `INVALID_OP` |
 | **G-bit Reset** | Yes — via mLoad on namespace access |
-| **Not writable by SWITCH** | CR12 (thread stack, system-wide), CR14 (transient cLoad output) |
+| **Success lifecycle** | Destination M is consumed (cleared) |
 
 ---
 

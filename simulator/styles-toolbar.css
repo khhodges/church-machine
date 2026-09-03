@@ -155,20 +155,18 @@
     font-family: var(--font-mono, monospace);
     min-width: 2.5rem;
     text-align: center;
-    border-color: rgba(100, 140, 200, 0.35);
     color: #90b8f0;
     position: relative;
+    border: none;
 }
 
 .cr-cycle-btn:hover {
-    border-color: #90b8f0;
     color: #c8e0ff;
     background: rgba(58, 134, 255, 0.12);
 }
 
 .cr-cycle-btn.cr-cycle-detail {
     background: rgba(58, 134, 255, 0.18);
-    border-color: #3a86ff;
     color: #c8e0ff;
 }
 

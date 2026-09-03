@@ -1,5 +1,11 @@
 # Church Machine Instruction Cross-Reference Matrix
 
+> **HISTORICAL IMPLEMENTATION AUDIT.** Opcode numbering, source line numbers,
+> instruction inventory, and unchecked verification rows in this matrix record
+> an earlier implementation. Use `docs/isa_reference.md` for the current ISA.
+> The SWITCH encoding and authorization section below has been normalized to
+> the current Task 3193 contract.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 
@@ -39,7 +45,7 @@ This document maps each instruction across all implementation layers for verific
 - [ ] CALL: Verify E permission, DR/CR mask handling, DR8-15 auto-clear
 - [ ] RETURN: Verify stack pop, context restore (mask field not implemented — skip mask handling)
 - [ ] CHANGE: Verify thread switch, monitor clearing
-- [ ] SWITCH: Verify C-List context switch
+- [ ] SWITCH: Verify destination-M-gated isolated LOAD
 - [x] TPERM: Flag model Z=1=pass/Z=0=fail confirmed. Valid presets 0-9 (CLEAR through LS). Codes 10-12 unconditionally reserved (RSV3/RSV4/RSV5, FAULT `TPERM_RSV`); code 13 = FRAME (call-stack query: Z=1 if real return frame present; no GT read); code 14 = EXACT (bit-exact identity check: Z=1 iff CRd.word0 == CRs.word0); code 15 = RSV1 (FAULT `TPERM_RSV`). Assembler now rejects reserved presets 10/11/12/15 (and B-variants 26/27/28/31) at compile time with a named error. Conditional execution (EQ/NE etc.) works via standard condition-check gate before dispatch. B-modifier (bit 4 of preset) recognised by assembler and simulator; hardware decoder currently reads only 4 bits — B-modifier clears GT B-bit in software only until the field is widened to silicon. Named B-variants: RB, RWB, XB, RXB, RWXB, LB, SB, EB, LSB.
 - [ ] LOADX: Verify monitor set, same validation as LOAD
 - [ ] SAVEX: Verify monitor check, conditional store, result in DR
@@ -124,12 +130,12 @@ The five-phase boot sequence initializes the privileged zone (CR12–CR15):
 1. **CR15 (Namespace)**: Loaded at B:00 from hardwired boot GT — M permission only; points to the NS table
 2. **CR12 (Thread Stack)**: Loaded at B:02 via mLoad from NS Slot 1 — zero perms, Inform-type; encodes lump base and bounds
 3. **CR14 (Code/[CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html))**: Derived at B:04 from NS Slot 2 metadata — X permission; instruction fetch source
-4. **CR13 (Interrupt)**: Loaded at B:03 or by SWITCH from a PassKey capability — system-wide, unchanged by CHANGE
+4. **CR13 (Interrupt)**: Loaded at B:03 or by destination-M-authorized SWITCH — system-wide, unchanged by CHANGE
 
 After boot:
-- CR12–CR15 are the privileged zone; only accessible via CALL (re-derives CR6/CR14), CHANGE (saves/restores CR14/CR15; CR12/CR13 unchanged), or SWITCH (CR13/CR15 only, with PassKey)
+- CR12–CR15 are the isolated zone. SWITCH can load all four only when the selected destination's latched M bit is set.
 - CR0–CR11 are the programmer-accessible GP registers (4-bit instruction field)
-- SWITCH uses a 3-bit Tgt field (CR8–CR15 address range); only Tgt=101₂ (CR13) and Tgt=111₂ (CR15) are valid
+- SWITCH uses the full four-bit destination field for CR12–CR15 and a CR0–CR11 c-list source.
 
 ### Verification Points
 
@@ -161,7 +167,7 @@ After boot:
 | CR8/CR15 access | JS Simulator | LOAD allows writing to CR8/CR15 - OK for boot, but should be restricted after | DOCUMENTED |
 | Boot GT permissions | JS Simulator | Boot GTs for CR8/CR15 should have M permission only | VERIFY |
 | Boot offsets | JS Simulator | CR15=offset 0, CR8=offset 3 (hardwired) | VERIFY |
-| SWITCH target field | All | 3-bit Tgt field addresses CR8-CR15 (Tgt+8); valid targets: CR13 (Tgt=101₂) and CR15 (Tgt=111₂) only | IMPLEMENTED |
+| SWITCH operand fields | All | fld_a=CR12–CR15 destination, fld_b=CR0–CR11 source, imm15=c-list row | IMPLEMENTED |
 
 ---
 
@@ -171,10 +177,9 @@ After boot:
 ```
 [31:27] = 00101 (Opcode = 5)
 [26:23] = Cond  (4-bit condition code)
-[22:19] = 0     (unused — crDst field; must be zero)
-[18:15] = CRn   (4-bit source register CR0-CR11 — holds the PassKey GT)
-[14:3]  = spare
-[2:0]   = Tgt   (3-bit target selector within privileged zone)
+[22:19] = CRd   (isolated destination CR12–CR15)
+[18:15] = CRs   (c-list source CR0–CR11)
+[14:0]  = row   (c-list row)
 ```
 
 ### CHANGE Format (32 bits)
@@ -196,32 +201,12 @@ After boot:
 | 1110 (14) | 10 | CR14 | Context switch (per-thread save/restore)    |
 | 1111 (15) | 11 | CR15 | Context switch (per-thread save/restore)    |
 
-### Target Field Mapping
+### SWITCH Authorization
 
-Only **CR13** (Tgt=101₂) and **CR15** (Tgt=111₂) are valid SWITCH targets. All other values produce an INVALID_OP fault.
-
-| Tgt[2:0] | Register | SWITCH Validity | Notes |
-|:---------|:---------|:----------------|:------|
-| 000 | CR8 | FAULT — not a valid SWITCH target | CR8 is a GP register; not addressable via SWITCH |
-| 001 | CR9 | FAULT — not a valid SWITCH target | GP register |
-| 010 | CR10 | FAULT — not a valid SWITCH target | GP register |
-| 011 | CR11 | FAULT — not a valid SWITCH target | GP register |
-| 100 | CR12 | FAULT — reserved | Thread stack (system-wide; not writable via SWITCH) |
-| 101 | CR13 | **Valid** — IRQ Thread | Required CRs.word1_location: `0xFFFFFFFE` |
-| 110 | CR14 | FAULT — reserved | Transient (re-derived by cLoad on each CALL) |
-| 111 | CR15 | **Valid** — Namespace | Required CRs.word1_location: `0xFFFFFFFF` |
-
-### PassKey Requirements
-
-SWITCH replaces the old M-permission check with two mandatory PassKey checks on the source register **CRs**:
-
-1. **Abstract GT check**: CRs.word0_gt.gt_type must equal `11₂` (GT_TYPE_ABSTRACT). Any Inform, Outform, or NULL GT faults with INVALID_OP.
-2. **Sentinel address check**: CRs.word1_location must equal the reserved hardware sentinel for the target:
-   - CR13: `0xFFFFFFFE` (all-1s − 1)
-   - CR15: `0xFFFFFFFF` (all-1s)
-   A mismatch (e.g. presenting a CR13 PassKey to the CR15 target) faults with INVALID_OP.
-
-Source must be CR0–CR11 (4-bit field; CR12–CR15 are privileged and require a PassKey).
+CRd must be CR12–CR15 and CRs must be CR0–CR11; either malformed/non-isolated
+operand faults `INVALID_OP`. The instruction latches CRd.M at acceptance.
+M-clear faults `PERM_L`. The source follows ordinary LOAD rules and therefore
+needs L but no M. Success consumes CRd.M.
 
 ---
 

@@ -494,7 +494,7 @@ const SYNTAX_REF = {
                 { syntax: "CALL <em>AbstrName</em>.<em>Method</em>", desc: "Named method selectors (dot-notation form): assembler resolves method index automatically via loaded-CR resolution" },
                 { syntax: "RETURN", desc: "Return from abstraction; restore caller context" },
                 { syntax: "CHANGE CRd, <em>imm</em>", desc: "Context switch — save/load DR0–DR15, swap CR6/CR14/CR15" },
-                { syntax: "SWITCH CRs, <em>imm</em>", desc: "Downgrade privilege level (ARCH→PROG→PRIV, monotonic)" },
+                { syntax: "SWITCH CRd, CRs, <em>row</em>", desc: "M-gated isolated LOAD into CR12–CR15" },
                 { syntax: "TPERM CRd, <em>preset</em>", desc: "Health-check (sets Z) or restrict permissions (monotonic mask)" },
                 { syntax: "LAMBDA CRd, <em>offset</em>", desc: "Capture closure into CRd (offset=0x7FFF = immediate form)" },
                 { syntax: "ELOADCALL CRd, [CRs, <em>off</em>]", desc: "Load GT from lump then CALL in one instruction (E+L perm)" },

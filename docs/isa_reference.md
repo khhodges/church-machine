@@ -82,10 +82,10 @@ which is verified inline and discarded.
 | CR0–CR5  | User CRs             | General-purpose; caller context preserved by CALL |
 | CR6      | C-list root          | L-permission token for current abstraction's c-list; re-synthesised by CALL/RETURN |
 | CR7–CR11 | User CRs             | General-purpose; caller context preserved by CALL |
-| CR12     | Thread stack         | Privileged; system-wide; unchanged by CALL/RETURN; only writeable via CHANGE |
-| CR13     | Interrupt handler    | Privileged; system-wide; only writeable via SWITCH (hardware: PassKey gate) |
+| CR12     | Thread stack         | Isolated; system-wide; SWITCH requires its latched M bit |
+| CR13     | Interrupt handler    | Isolated; system-wide; SWITCH requires its latched M bit |
 | CR14     | Code register (CLOOMC) | Privileged; per-thread; set by CALL, re-derived by RETURN; X-only |
-| CR15     | Namespace root       | Privileged; per-thread; only writeable via SWITCH (hardware: PassKey gate) |
+| CR15     | Namespace root       | Isolated; per-thread; SWITCH requires its latched M bit |
 
 **Privilege zone**: CR12–CR15 cannot appear as operands in LOAD, SAVE, TPERM,
 LAMBDA instructions. CALL, RETURN, CHANGE, and SWITCH are the only Church-domain
@@ -792,39 +792,43 @@ CHANGE AL, CR12, CR12, #7   ; opcode=4, cond=14, fld_a=12, fld_b=12, imm=7
 
 ---
 
-### SWITCH — PassKey-Gated Privileged Write (opcode 5, 0x05)
+### SWITCH — M-Gated Isolated LOAD (opcode 5, 0x05)
 
 ```
-Syntax:  SWITCH CRn, #target
-Encoding: op[4:0]=0x05 | cond[4] | 0[4] | CRn[4] | target[3] | 0[12]
+Syntax:  SWITCH CRd, CRs, #row
+Encoding: op[4:0]=0x05 | cond[4] | CRd[4] | CRs[4] | row[15]
 ```
 
-`target` is a 3-bit value in `imm15[2:0]`. Valid target values: `5` (CR13, interrupt handler) and `7` (CR15, namespace root).
+SWITCH is LOAD with an isolated destination. The full four-bit `fld_a` selects
+CR12, CR13, CR14, or CR15 without truncation. The implementation latches CRd.M
+when accepting the instruction and faults with `PERM_L` when it is clear. CRs
+must be CR0–CR11. It then
+performs normal LOAD validation of `CRs[row]`, including L permission, bounds,
+version, and integrity. Source M is irrelevant and conveys no authority.
 
-**Hardware semantics** (reference: `hardware/switch.py`):
-1. **Target validity check**: `target` must be 5 or 7 — any other value → `FAULT(INVALID_OP)`.
-2. **Source range check**: CRn index (from fld_b) must be in range 0–7.
-3. **PassKey type check**: `CRn` must hold an Abstract GT (`gt_type == 0b11`). Any Inform, Outform, or NULL GT → `FAULT(INVALID_OP)`.
-4. **Sentinel check**: `CRn.word1_location` must equal the hardware-reserved sentinel for the chosen target: `0xFFFFFFFE` for CR13, `0xFFFFFFFF` for CR15. Mismatch → `FAULT(INVALID_OP)`.
-5. On all checks passing: `ChurchMLoad` writes the source capability into the target privileged register with `m_elevated = 1`; G-bit is reset. **The source CR is not cleared** — this is a one-way install, not a swap.
-
-**Simulator semantics** (`_execSwitch`, line ~3836): performs an **atomic CR swap** (`CRn ↔ CR[target]`) with only a NULL check. No PassKey check, no target-validity check, no sentinel check, no mLoad. See D-11 in `HARDWARE-DEVIATIONS.md`.
+On success CRd receives the loaded capability and CRd.M clears. Namespace must
+use its dedicated target-bound M-bit device capability to set that destination
+again. No other abstraction receives this device capability; knowing its port
+is not authority. Missing capability, wrong right, wrong port, or a capability
+bound to another CR fails closed.
 
 **Flags:** N — Z — C — V (no flag writes)
 
-**Faults (hardware only):**
+**Faults:**
 | Fault | Condition |
 |-------|-----------|
-| `INVALID_OP` | target ≠ 5 and target ≠ 7 |
-| `INVALID_OP` | CRn not an Abstract GT |
-| `INVALID_OP` | CRn sentinel address does not match target |
-| `NULL_CAP` | CRn is NULL (simulator only) |
+| `INVALID_OP` | CRd is not CR12–CR15, CRs is not CR0–CR11, or encoding is malformed |
+| `PERM_L` | CRd.M was clear when the instruction was accepted |
+| `PERM_L` | CRs lacks L |
+| `NULL_CAP` / `BOUNDS` / `VERSION` / `SEAL` | Normal LOAD validation failure |
 
-**Example:** Install a PassKey into CR15 (namespace root).
+All failures are atomic: no CR, M bit, namespace entry, or memory changes.
+
+**Example:** Reload CR15 from c-list row 7 after Namespace authorizes CR15.M.
 ```
-SWITCH AL, CR2, #7       ; CRn=CR2 (must be Abstract GT with sentinel 0xFFFFFFFF)
-                          ; opcode=5, cond=14, fld_a=0, fld_b=2, imm=7
-                          ; encoding: 0x2F010007
+SWITCH AL, CR15, CR6, #7
+                          ; opcode=5, cond=14, fld_a=15, fld_b=6, imm=7
+                          ; encoding: 0x2F7B0007
 ```
 
 ---
@@ -1449,7 +1453,7 @@ SHR AL, DR1, DR2, #3, ASR   ; ASR, mode=1; imm = (1 << 5) | 3 = 0x23
 | 2   | 0x02 | CALL        | Church  | CRs    | 0      | method index (0=fast, N+1=user N)      | —             | NULL, PERM, SEAL, PRIVATE_METHOD, STACK_OVERFLOW | — |
 | 3   | 0x03 | RETURN      | Church  | 0      | 0      | mask[11:0] — CRs to NULL on return     | —             | STACK_UNDERFLOW       | —           |
 | 4   | 0x04 | CHANGE      | Church  | CRd    | CRs    | NS index (0–32767)                     | —             | PRIV_REG, PERM, NULL  | —           |
-| 5   | 0x05 | SWITCH      | Church  | 0      | CRn    | target[2:0] (5=CR13, 7=CR15)           | —             | INVALID_OP                      | D-11 closed |
+| 5   | 0x05 | SWITCH      | Church  | CR12–15 | CRs  | c-list row[14:0]                        | —             | PRIV_REG, INVALID_OP, LOAD faults | — |
 | 6   | 0x06 | TPERM       | Church  | CRd    | 0      | preset[4:0] (bit4=B-mod, [3:0]=code)   | N=!Z Z C=0 V=0 | TPERM_RSV            | D-3 (reserved presets) |
 | 7   | 0x07 | LAMBDA      | Church  | CRn    | 0      | 0 (unused)                             | —             | NULL, PERM, BOUNDS    | —           |
 | 8   | 0x08 | ELOADCALL   | Church  | CRd    | CRs    | funct7[6:0]=method_index \| rs2[4:0]=row | —          | NULL, PERM, SEAL, BOUNDS | —        |

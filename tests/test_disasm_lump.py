@@ -229,6 +229,13 @@ class TestDisasmLumpAPI:
         assert result.startswith('???'), \
             f'Expected ??? for unknown opcode, got: {result!r}'
 
+    @pytest.mark.parametrize('dest', [12, 13, 14, 15])
+    def test_switch_preserves_all_isolated_destinations(self, mod, dest):
+        """SWITCH uses fld_a as the full 4-bit destination; none may alias."""
+        word = (5 << 27) | (14 << 23) | (dest << 19) | (6 << 15) | 3
+        assert mod.disassemble_word(word) == \
+            f'SWITCH  CR{dest}, CR6, #0x0003'
+
     # ── Unit: IADD/ISUB immediate is 14-bit UNSIGNED (no sign extension) ──────
 
     def test_iadd_immediate_16383_is_unsigned(self, mod):

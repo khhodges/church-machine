@@ -51,6 +51,10 @@ CR_INTERRUPT    = 13
 CR_CLOOMC       = 14   # CR14: code register / CLOOMC (canonical name)
 CR_NAMESPACE    = 15
 
+# Protected CR14 execution identity allowed to operate Namespace's private
+# M-bit device capabilities.
+NAMESPACE_EXEC_SLOT = 5
+
 GT_SEQ_BITS     = _arch_width(ARCH_GT["fields"]["gt_seq"])
 GT_SLOT_ID_BITS = _arch_width(ARCH_GT["fields"]["slot_id"])
 GT_PERM_BITS    = 4    # dom(1) + perm[2:0](3) — was 6; compressed via Turing/Church mutual exclusion
@@ -151,7 +155,9 @@ CR_PORT_CR14 = 0xFFFFFF0E   # code register        (per-thread)
 CR_PORT_CR15 = 0xFFFFFF0F   # namespace root       (per-thread)
 
 # Segment 2 — M Bit Ports (0xFFFFFF10–0xFFFFFF1F)
-# S-perm → authority to set the M bit on a GT installed into that CR.
+# An exact, target-bound Abstract S capability authorises setting/clearing the
+# M latch associated with one isolated register.  M is register state, not a GT
+# permission bit.
 M_BIT_PORT_BASE = 0xFFFFFF10
 M_BIT_PORT_CR12 = 0xFFFFFF1C
 M_BIT_PORT_CR13 = 0xFFFFFF1D
@@ -188,19 +194,13 @@ IO_PORT_TOUCH_STATUS    = 0xFFFFFF37
 IO_PORT_PET_NAME_WR     = 0xFFFFFF38   # write slot-index N → mark c-list slot N as named
 IO_PORT_NEXT            = 0xFFFFFF39   # next unallocated I/O port
 
-# Segment 4 — Existing Sentinels (0xFFFFFFEF–0xFFFFFFFF)
-# Reserved hardware sentinel addresses used in word1_location of SWITCH PassKeys.
-# These values occupy the I/O peripheral address space — a range no real RAM
-# lump base address can occupy — ensuring no ambiguity with live capabilities.
-#   0xFFFFFFFF  (all-1s)      →  PassKey for CR15 (Namespace)
-#   0xFFFFFFFE  (all-1s − 1)  →  PassKey for CR13 (IRQ Thread)
-SWITCH_PASSKEY_SENTINEL_CR15 = 0xFFFFFFFF
-SWITCH_PASSKEY_SENTINEL_CR13 = 0xFFFFFFFE
-
-# SWITCH Tgt field values — the 3-bit field maps to CR8 + Tgt.
-# Only these two are valid SWITCH targets; all others produce INVALID_OP.
-SWITCH_TGT_CR13 = 5   # 101₂  →  CR13  (IRQ Thread)
-SWITCH_TGT_CR15 = 7   # 111₂  →  CR15  (Namespace)
+# SWITCH destinations are carried in the normal 4-bit CRd field.  Keeping the
+# constants as architectural CR numbers prevents the former 3-bit truncation
+# (CR12/CR14 aliasing CR4/CR6).
+SWITCH_TGT_CR12 = CR_THREAD_STACK
+SWITCH_TGT_CR13 = CR_INTERRUPT
+SWITCH_TGT_CR14 = CR_CLOOMC
+SWITCH_TGT_CR15 = CR_NAMESPACE
 
 # ── Hardware IRQ dispatch — Task #1523 ───────────────────────────────────────
 # Three conditions route to Scheduler.IRQ (NS slot 8) via ChurchIRQDispatch.

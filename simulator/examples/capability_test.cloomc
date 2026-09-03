@@ -60,11 +60,15 @@ LOADEQ CR0, LED_DEV   ; SKIP  -- condition EQ not met (Z=0)
 LOADNE CR0, SelfTest  ; EXEC  -- condition NE met (Z=0) -- restore CR0
 
 ; ============================================================
-; TEST 6: SWITCH -- reserved PassKey operation (not part of this self-test)
+; TEST 6: SWITCH -- isolated-register special LOAD authorization
 ; ============================================================
-; SWITCH is only valid for installing the protected CR13/CR15 PassKey
-; destinations.  These old CR0/CR1 register-swap examples fault with
-; INVALID_OP and must not be assembled into the canonical CapabilityTest.
+; Namespace initialization actually provisions CR12.M through its private,
+; target-bound M-bit device immediately before CapabilityTest execution; it
+; also leaves CR13.M clear for the negative case. This is an explicit
+; initialization step, not an assumed initial state. The source is ordinary
+; L-capable CR6; it neither needs nor receives M authority.
+SWITCH CR12, CR6, #0  ; M-present destination: load c-list[0] into CR12
+SWITCH CR13, CR6, #0  ; M-absent destination: fault, with no state mutation
 
 ; ============================================================
 ; TEST 7: Turing ISA -- integer arithmetic on data registers

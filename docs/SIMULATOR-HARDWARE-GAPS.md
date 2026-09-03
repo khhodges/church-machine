@@ -3,7 +3,9 @@
 > **HISTORICAL DOCUMENT — SUPERSEDED**
 > This report reflects the gap state as of March 2026. The majority of gaps listed have since been
 > closed via tasks #873, #887, #888, #890, and associated hardware deviations. The remaining open
-> gap is D-11 (SWITCH simulator semantics, tracked as Task #880).
+> SWITCH's current authority contract is the destination-M-gated special LOAD
+> described in `isa_reference.md`; the PassKey material below is retained only
+> as historical context and is not normative.
 > Do not use this document as a live gap reference — consult `HARDWARE-DEVIATIONS.md`.
 
 **v1.0 — 2026-04-29**
@@ -122,7 +124,7 @@ type acceptance matrix.
 
 **Broken Features** (all now fixed):
 - ✅ CALL with Abstract GTs (PassKeys) — was FAULTing with TYPE error, now accepts type 3
-- ✅ SWITCH with PassKeys — now works because CALL accepts Abstract GTs
+- Historical PassKey-era SWITCH behavior (superseded by destination-M gating)
 - ✅ Navana.ValidatePassKey — now executes without TYPE fault
 
 **Risk Level**: ✅ **ALL CRITICAL GAPS RESOLVED**

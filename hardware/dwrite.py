@@ -58,6 +58,18 @@ class ChurchDWrite(Elaboratable):
         self.dmem_addr    = Signal(32)
         self.dmem_wr_data = Signal(32)
         self.dmem_wr_en   = Signal()
+        self.m_bit_wr_en = Signal()
+        self.m_bit_wr_target = Signal(2)
+        self.m_bit_wr_value = Signal()
+        # Asserted only while protected CR14 names the canonical Namespace
+        # execution identity. Possession of a device-shaped cap is insufficient.
+        self.namespace_authorized = Signal()
+        # Hidden Namespace-init path. These controls are wired only to the
+        # trusted boot sequencer; no instruction or architectural register can
+        # select/read the private capability bank.
+        self.private_m_start = Signal()
+        self.private_m_target = Signal(2)
+        self.private_m_value = Signal()
 
     def elaborate(self, platform):
         m = Module()
@@ -68,8 +80,22 @@ class ChurchDWrite(Elaboratable):
         addr_reg    = Signal(32)
         dr_data_reg = Signal(32)
         drx_val_reg = Signal(32)   # latched DR[DRx] value for indexed mode
+        namespace_authorized_reg = Signal()
+        private_mode_reg = Signal()
+        private_target_reg = Signal(2)
+        private_value_reg = Signal()
 
-        cr_view = View(CAP_REG_LAYOUT, self.cr_rd_data)
+        private_cap = Signal(CAP_REG_LAYOUT)
+        private_cap_view = View(CAP_REG_LAYOUT, private_cap)
+        m.d.comb += [
+            private_cap_view.word0_gt.eq(
+                make_gt(GT_TYPE_ABSTRACT, PERM_MASK_S, 0, 0)),
+            private_cap_view.word1_location.eq(
+                M_BIT_PORT_CR12 + private_target_reg),
+            private_cap_view.word2_w2.eq(0),
+        ]
+        effective_cap = Mux(private_mode_reg, private_cap, self.cr_rd_data)
+        cr_view = View(CAP_REG_LAYOUT, effective_cap)
         cr_gt   = View(GT_LAYOUT,      cr_view.word0_gt)
         cr_w2   = View(WORD2_LAYOUT,   cr_view.word2_w2)
 
@@ -81,6 +107,10 @@ class ChurchDWrite(Elaboratable):
         # fail the eff_off <= limit (16-bit) bounds check instead of wrapping in-range.
         eff_off      = Signal(33)
         in_bounds    = Signal()
+        exact_m_cap = Signal()
+        m_target = Signal(2)
+        effective_addr = Signal(32)
+        accesses_m_port = Signal()
 
         m.d.comb += [
             gt_null.eq(cr_view.word0_gt.as_value() == 0),
@@ -90,6 +120,19 @@ class ChurchDWrite(Elaboratable):
                            imm_reg[:14],                        # immediate: bits[13:0]
                            (imm_reg[4:14] + drx_val_reg))),     # indexed: base + full DR[DRx]
             in_bounds.eq(eff_off <= limit),
+            exact_m_cap.eq(
+                (cr_gt.gt_type == GT_TYPE_ABSTRACT) &
+                cr_gt.dom & (cr_gt.perm == 0b010) &
+                (cr_w2.limit_offset == 0) &
+                (cr_view.word1_location >= M_BIT_PORT_CR12) &
+                (cr_view.word1_location <= M_BIT_PORT_CR15)
+            ),
+            m_target.eq(cr_view.word1_location[:2]),
+            effective_addr.eq(
+                cr_view.word1_location + Cat(C(0, 2), eff_off[:16])),
+            accesses_m_port.eq(
+                (effective_addr >= M_BIT_PORT_CR12) &
+                (effective_addr <= M_BIT_PORT_CR15)),
         ]
 
         m.d.comb += [
@@ -102,14 +145,18 @@ class ChurchDWrite(Elaboratable):
 
         with m.FSM(name="dwrite_fsm"):
             with m.State("IDLE"):
-                with m.If(self.start):
+                with m.If(self.start | self.private_m_start):
                     m.d.sync += [
                         cr_src_reg.eq(self.cr_src),
                         dr_src_reg.eq(self.dr_src),
-                        imm_reg.eq(self.imm),
+                        imm_reg.eq(Mux(self.private_m_start, 0x4000, self.imm)),
                         drx_val_reg.eq(0),
+                        namespace_authorized_reg.eq(self.namespace_authorized),
+                        private_mode_reg.eq(self.private_m_start),
+                        private_target_reg.eq(self.private_m_target),
+                        private_value_reg.eq(self.private_m_value),
                     ]
-                    with m.If(~self.imm[14]):
+                    with m.If(~self.private_m_start & ~self.imm[14]):
                         # Indexed mode: need one extra cycle to read DR[DRx]
                         m.next = "READ_DRX"
                     with m.Else():
@@ -124,7 +171,22 @@ class ChurchDWrite(Elaboratable):
 
             with m.State("PERM_CHECK"):
                 m.d.comb += self.busy.eq(1)
-                with m.If(gt_null):
+                with m.If(exact_m_cap & (eff_off == 0) &
+                          namespace_authorized_reg):
+                    m.d.sync += dr_data_reg.eq(
+                        Mux(private_mode_reg, private_value_reg,
+                            self.dr_rd_data))
+                    m.next = "M_BIT_WRITE"
+                with m.Elif(exact_m_cap & (eff_off == 0)):
+                    m.d.comb += [self.fault.eq(1), self.fault_type.eq(FaultType.PERM_S)]
+                    m.next = "IDLE"
+                with m.Elif(accesses_m_port):
+                    # Raw address knowledge, a normal W capability, an
+                    # over-broad Abstract capability, or a non-zero offset is
+                    # never authority for the M device.
+                    m.d.comb += [self.fault.eq(1), self.fault_type.eq(FaultType.PERM_S)]
+                    m.next = "IDLE"
+                with m.Elif(gt_null):
                     m.d.comb += [self.fault.eq(1), self.fault_type.eq(FaultType.NULL_CAP)]
                     m.next = "IDLE"
                 with m.Elif(cr_gt.gt_type == GT_TYPE_ABSTRACT):
@@ -140,7 +202,7 @@ class ChurchDWrite(Elaboratable):
                     # eff_off passed bounds (eff_off <= limit where limit ≤ 16 bits);
                     # safe to truncate to 16 bits for byte-address formation.
                     m.d.sync += [
-                        addr_reg.eq(cr_view.word1_location + Cat(C(0, 2), eff_off[:16])),
+                        addr_reg.eq(effective_addr),
                         dr_data_reg.eq(self.dr_rd_data),
                     ]
                     m.next = "MEM_WRITE"
@@ -151,6 +213,16 @@ class ChurchDWrite(Elaboratable):
                     self.dmem_addr.eq(addr_reg),
                     self.dmem_wr_data.eq(dr_data_reg),
                     self.dmem_wr_en.eq(1),
+                    self.done.eq(1),
+                ]
+                m.next = "IDLE"
+
+            with m.State("M_BIT_WRITE"):
+                m.d.comb += [
+                    self.busy.eq(1),
+                    self.m_bit_wr_en.eq(1),
+                    self.m_bit_wr_target.eq(m_target),
+                    self.m_bit_wr_value.eq(dr_data_reg[0]),
                     self.done.eq(1),
                 ]
                 m.next = "IDLE"

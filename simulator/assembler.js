@@ -29,7 +29,7 @@
 //   2  CALL       invoke CR             Enter abstraction, push call frame
 //   3  RETURN     unwind call frame     Return to caller
 //   4  CHANGE     DR ← imm / DR op DR  Integer / immediate data-register op
-//   5  SWITCH     privileged CR install  PassKey-gated one-way install into CR13/CR15
+//   5  SWITCH     isolated-register LOAD  destination-M-gated load into CR12–CR15
 //   6  TPERM      thread permission     Assert / revoke thread privilege
 //   7  LAMBDA     create closure        Mint a new capability from template
 //   8  ELOADCALL  c-list[n] → CALL      Load from c-list and call in one op
@@ -1589,20 +1589,30 @@ class ChurchAssembler {
                 break;
             }
             case 5: {
-                crSrc = this._parseCR(parts[1], lineNum);
-                this._checkPrivCR(crSrc, 'SWITCH', lineNum);
-                // Hardware crSrc is a 3-bit field — CR8–CR11 would silently truncate
-                // (CR8→CR0, CR9→CR1, CR10→CR2, CR11→CR3). CR12–CR15 are already
-                // rejected by _checkPrivCR above.
-                if (crSrc > 7 && crSrc < 12) {
-                    this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, 'CR' + crSrc), message: `SWITCH: CR${crSrc} is out of range — source must be CR0–CR7 (hardware uses a 3-bit crSrc field; CR8–CR11 silently truncate to CR0–CR3)` });
+                // SWITCH is LOAD's isolated-register form:
+                // SWITCH CR12..CR15, CRs, #row.
+                if (parts.length !== 4) {
+                    this.errors.push({
+                        line: lineNum,
+                        message: 'SWITCH expects exactly three operands: SWITCH CR12–CR15, CRsource, #row'
+                    });
                 }
-                // Accept "CRn" as shorthand for "n" in the target-index field so
-                // "SWITCH CR0, CR1" is equivalent to "SWITCH CR0, 1".
-                const _swTgt = /^CR(\d+)$/i.test(parts[2] || '')
-                    ? (parts[2] || '').replace(/^CR/i, '')
-                    : parts[2];
-                imm = this._parseImm(_swTgt, lineNum) & 0x7;
+                crDst = this._parseCR(parts[1], lineNum);
+                if (crDst < 12 || crDst > 15) {
+                    this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, 'CR' + crDst), message: `SWITCH: destination CR${crDst} must be an isolated register CR12–CR15` });
+                }
+                crSrc = this._parseCR(parts[2], lineNum);
+                this._checkPrivCR(crSrc, 'SWITCH source', lineNum);
+                const switchRow = this._parseImm(parts[3], lineNum);
+                if (!Number.isInteger(switchRow) || switchRow < 0 || switchRow > 0x7FFF) {
+                    const rowToken = (parts[3] || '').replace(/,/g, '').trim();
+                    this.errors.push({
+                        line: lineNum,
+                        ...this._tokenCols(this._currentLineText, rowToken),
+                        message: `SWITCH: row ${switchRow} is out of range — must be 0–32767 (no truncation is permitted)`
+                    });
+                }
+                imm = switchRow;
                 break;
             }
             case 6: {
@@ -2424,8 +2434,8 @@ class ChurchAssembler {
                 if (crSrc === 6) return `${mnemonic}  CR${crDst}, ${cdOff(imm)}`;
                 return `${mnemonic}  CR${crDst}, CR${crSrc}[${hexOff(imm)}]`;
             }
-            // SWITCH CRs, #tgt  — PassKey-gated one-way install of CRs into CR13 (tgt=5) or CR15 (tgt=7)
-            case 5: return `${mnemonic}  CR${crSrc}, CR${imm & 0x7}`;
+            // SWITCH CRd, CRs, #row — M-gated special LOAD into CR12–CR15
+            case 5: return `${mnemonic}  CR${crDst}, CR${crSrc}, #${hexOff(imm)}`;
             // TPERM CRd, preset[B]  — assert/attenuate permission
             case 6: {
                 const presetNames = ['CLEAR','R','RW','X','RX','RWX','L','S','E','LS','RSV3','RSV4','RSV5','FRAME','EXACT','RSV1'];

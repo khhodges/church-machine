@@ -197,7 +197,7 @@ Authoritative source: `hw_types.py` `ChurchOpcode` and `TuringOpcode` enums.
 | 2 | 0x02 | CALL | Church | CR (E-GT) | — | method selector |
 | 3 | 0x03 | RETURN | Church | — | — | — |
 | 4 | 0x04 | CHANGE | Church | CR dest | CR src | — |
-| 5 | 0x05 | SWITCH | Church | CR (Abstract PassKey) | CR target | — |
+| 5 | 0x05 | SWITCH | Church | CR0–CR11 L-capable c-list source | CR12–CR15 (latched M required) | row |
 | 6 | 0x06 | TPERM | Church | CR dest | CR src | preset / mask |
 | 7 | 0x07 | LAMBDA | Church | CR (X-GT) | — | — |
 | 8 | 0x08 | ELOADCALL | Church | CR dest | CR src (c-list) | row + selector |

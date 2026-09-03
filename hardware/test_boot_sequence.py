@@ -53,9 +53,10 @@ EXPECTED_CR12_GT = make_gt(gt_type=GT_TYPE_INFORM, perms=0, slot_id=1, gt_seq=0)
 #   tick 2: FAULT_RST → LOAD_NS
 #   tick 3: LOAD_NS  → INIT_THRD
 #   tick 4: INIT_THRD → INIT_CLIST  (CR12 latched here)
-#   tick 5: INIT_CLIST → LOAD_NUC
-#   tick 6: LOAD_NUC → COMPLETE     (boot_complete=1 after this)
-TICKS_TO_COMPLETE = 6
+#   tick 5: INIT_CLIST installs protected Namespace.Init identity
+#   ticks 6-8: hidden-bank DWRITE provisions CR12.M
+#   tick 9: LOAD_NUC → COMPLETE     (boot_complete=1 after this)
+TICKS_TO_COMPLETE = 9
 
 
 def _default_inputs(ctx, dut):

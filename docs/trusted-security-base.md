@@ -72,7 +72,7 @@ The GT stores exactly 6 permission bits. These are access rights, not metadata:
 
 | Item | Where It Lives | Notes |
 |------|---------------|-------|
-| M (Machine/Microcode) | Transient signal during mLoad (`sub_m_elevated`) | Prevents privilege escalation — no user code can set or observe it |
+| M (isolated-register authorization) | Latched state on CR12–CR15 | Set only through Namespace-held, target-bound M-bit device capabilities; not a GT permission |
 | G (Garbage) | NS Entry Word 2 bit [16] (`g_bit`) | Cleared on every ChurchNSGate access to prove liveness for GC |
 
 Note: **B (Bind) IS stored in GT Word 0 bit [31]** (`b_flag` in GT_LAYOUT). It is not a namespace metadata field separate from the GT — it travels with the GT.
@@ -87,7 +87,7 @@ The mLoad + ChurchNSGate validation sequence:
 mLoad(source_capability, required_permission, index, destCR):
 
   1. Permission Check
-     Does the source capability have L or M permission?
+     Does the source capability have L permission?
      Failure → FAULT
 
   2. Bounds Check
@@ -135,7 +135,9 @@ When a stale GT is later used, ChurchNSGate detects the `gt_seq` mismatch and fa
 ### Security Invariants (Church Machine)
 
 1. **No CR Write Without mLoad**: Every capability register write passes through mLoad's validation pipeline. There is no alternative path.
-2. **No Privilege Escalation**: M is a transient signal during microcode execution. No user instruction can set, test, or observe it.
+2. **No Privilege Escalation**: SWITCH uses the accepted destination's latched M state. Source capabilities cannot supply M; only Namespace's target-bound device can set it.
+   CRs is restricted to CR0–CR11 and CRd to CR12–CR15; malformed ranges fault
+   `INVALID_OP`, M-clear faults `PERM_L`, and success consumes CRd.M.
 3. **No NULL Dereference**: mLoad checks GT type before validation. NULL GTs immediately fault.
 4. **No Out-of-Bounds Access**: Every C-List access is bounds-checked. Every namespace offset is validated.
 5. **No Domain Mixing**: TPERM enforces domain purity -- Turing (RWX) xor Church (LSE), never both.
@@ -228,7 +230,8 @@ Two orders of magnitude smaller than seL4. Five orders of magnitude smaller than
 2. **6 permission bits** (R, W, X, L, S, E) stored in the GT
 3. **B flag in GT bit [31]** (`b_flag`) — bind policy travels with the token
 4. **Domain purity** -- Turing xor Church, never both
-5. **M is transient** -- microcode elevation only, never stored
+5. **M is isolated-register state** -- latched from the SWITCH destination and
+   controlled only by Namespace's target-bound M-bit device capabilities
 6. **Single FAULT handler** -- all validation failures, no partial writes
 7. **GC integration** -- every NS access clears g_bit (G=0 = reachable)
 8. **gt_seq-based stale detection** -- prevents use-after-free

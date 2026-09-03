@@ -5,10 +5,11 @@
 // ChurchAssembler (simulator/assembler.js), packs the result into a valid LUMP
 // binary, and writes:
 //
-//   server/lumps/<token>.lump   — binary (big-endian 32-bit words)
-//   server/lumps/<token>.json   — sidecar metadata
+//   server/lumps/CapabilityTest.2.<hash8>.lump — binary
+//   server/lumps/CapabilityTest.2.<hash8>.json — sidecar metadata
 //
-// The token is the CRC-32 of all binary bytes, lower-cased 8-hex-char string.
+// CapabilityTest's protected identity token remains 00000a00. Content is named
+// by the first eight hex digits of its SHA-256 hash.
 //
 // C-List (cc=5) — tail of the lump, 5 slots:
 //   Slot 0  SelfTest   (NS slot 6, E)    — E-perm callable abstraction
@@ -37,6 +38,7 @@
 
 const fs   = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const ROOT        = path.resolve(__dirname, '..');
 const ASSEMBLER   = path.join(ROOT, 'simulator', 'assembler.js');
@@ -49,6 +51,20 @@ const LUMPS_DIR   = (_outDirIdx !== -1 && process.argv[_outDirIdx + 1])
     ? path.resolve(process.argv[_outDirIdx + 1])
     : path.join(ROOT, 'server', 'lumps');
 const MANIFEST    = path.join(LUMPS_DIR, 'manifest.json');
+const NS_STATE    = path.join(LUMPS_DIR, 'ns-state.json');
+const IDENTITY_TOKEN = '00000a00';
+const CHECK_ONLY = process.argv.includes('--check');
+fs.mkdirSync(LUMPS_DIR, { recursive: true });
+
+function stableRepositoryJson(value) {
+    // Match the repository's Python-style JSON convention: two-space indent,
+    // non-ASCII escaped, and no trailing newline. This prevents a focused
+    // CapabilityTest rebuild from rewriting unrelated manifest/state records.
+    return JSON.stringify(value, null, 2).replace(
+        /[^\x00-\x7F]/g,
+        char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`,
+    );
+}
 
 // ── Minimal browser stubs so assembler.js loads in Node.js ──────────────────
 global.localStorage = {
@@ -156,47 +172,78 @@ for (let i = 0; i < lumpSize; i++) {
     bytes.writeUInt32BE(padded[i] >>> 0, i * 4);
 }
 
-// ── Compute CRC-32 for the token ─────────────────────────────────────────────
-function crc32(buf) {
-    const table = (() => {
-        const t = new Uint32Array(256);
-        for (let n = 0; n < 256; n++) {
-            let c = n;
-            for (let k = 0; k < 8; k++) {
-                c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-            }
-            t[n] = c;
-        }
-        return t;
-    })();
-    let crc = 0xFFFFFFFF;
-    for (let i = 0; i < buf.length; i++) {
-        crc = table[(crc ^ buf[i]) & 0xFF] ^ (crc >>> 8);
+const binaryHash = crypto.createHash('sha256').update(bytes).digest('hex');
+const contentId = binaryHash.slice(0, 8);
+const token = IDENTITY_TOKEN;
+const artifactStem = `CapabilityTest.2.${contentId}`;
+console.log(`Identity token: ${token}`);
+console.log(`Binary SHA-256: ${binaryHash}`);
+
+if (CHECK_ONLY) {
+    const expectedLump = path.join(LUMPS_DIR, `${artifactStem}.lump`);
+    const expectedSidecar = path.join(LUMPS_DIR, `${artifactStem}.json`);
+    const failures = [];
+    if (!fs.existsSync(expectedLump) ||
+        !fs.readFileSync(expectedLump).equals(bytes)) {
+        failures.push(`binary missing or stale: ${path.basename(expectedLump)}`);
     }
-    return (crc ^ 0xFFFFFFFF) >>> 0;
+    let sidecar = null;
+    try {
+        sidecar = JSON.parse(fs.readFileSync(expectedSidecar, 'utf8'));
+    } catch (err) {
+        failures.push(`sidecar missing or invalid: ${path.basename(expectedSidecar)}`);
+    }
+    if (sidecar && (sidecar.token !== IDENTITY_TOKEN ||
+                    sidecar.binary_hash !== binaryHash ||
+                    sidecar.source !== source ||
+                    sidecar.ns_slot !== 10)) {
+        failures.push('sidecar identity, hash, source, or slot binding is stale');
+    }
+    let checkedManifest = null;
+    try {
+        checkedManifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
+    } catch (err) {
+        failures.push('manifest is missing or invalid');
+    }
+    if (checkedManifest) {
+        const bindings = checkedManifest.filter(e => e.token === IDENTITY_TOKEN);
+        if (bindings.length !== 1 ||
+            bindings[0].abstraction !== 'CapabilityTest' ||
+            bindings[0].ns_slot !== 10 ||
+            bindings[0].filename !== `${artifactStem}.lump` ||
+            bindings[0].binary_hash !== binaryHash) {
+            failures.push('manifest canonical slot-10 binding is stale');
+        }
+    }
+    if (failures.length) {
+        for (const failure of failures) console.error(`FAIL: ${failure}`);
+        console.error('Run: node scripts/build_capability_test_lump.js');
+        process.exit(1);
+    }
+    console.log('OK: CapabilityTest source, binary, sidecar, and manifest are fresh.');
+    process.exit(0);
 }
 
-const token = crc32(bytes).toString(16).toLowerCase().padStart(8, '0');
-console.log(`Token (CRC-32 of binary): ${token}`);
-
 // ── Remove old CapabilityTest lump files ────────────────────────────────────────────
-const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
-const existingIdx = manifest.findIndex(e => e.abstraction === 'CapabilityTest');
+const manifest = fs.existsSync(MANIFEST)
+    ? JSON.parse(fs.readFileSync(MANIFEST, 'utf8'))
+    : [];
+const existingIdx = manifest.findIndex(e => e.token === IDENTITY_TOKEN);
 if (existingIdx !== -1) {
-    const oldToken = manifest[existingIdx].token;
-    if (oldToken && oldToken !== token) {
-        const oldLump     = path.join(LUMPS_DIR, `${oldToken}.lump`);
-        const oldSidecar  = path.join(LUMPS_DIR, `${oldToken}.json`);
+    const oldLumpName = manifest[existingIdx].filename;
+    const oldSidecarName = manifest[existingIdx].sidecar_file;
+    if (oldLumpName && oldLumpName !== `${artifactStem}.lump`) {
+        const oldLump = path.join(LUMPS_DIR, oldLumpName);
+        const oldSidecar = path.join(LUMPS_DIR, oldSidecarName || '');
         if (fs.existsSync(oldLump))    { fs.unlinkSync(oldLump);    console.log(`Removed old: ${oldLump}`); }
         if (fs.existsSync(oldSidecar)) { fs.unlinkSync(oldSidecar); console.log(`Removed old: ${oldSidecar}`); }
     }
     console.log('\nExisting CapabilityTest entry found — replacing it.');
-    manifest.splice(existingIdx, 1);
 }
 
 // ── Write .lump binary ───────────────────────────────────────────────────────
-const lumpPath    = path.join(LUMPS_DIR, `${token}.lump`);
-const sidecarPath = path.join(LUMPS_DIR, `${token}.json`);
+const lumpPath    = path.join(LUMPS_DIR, `${artifactStem}.lump`);
+const sidecarPath = path.join(LUMPS_DIR, `${artifactStem}.json`);
 
 fs.writeFileSync(lumpPath, bytes);
 console.log(`Written: ${lumpPath} (${bytes.length} bytes)`);
@@ -219,8 +266,8 @@ const capabilitiesJson = CLIST.map(c => ({
 const sidecar = {
     token,
     abstraction:     'CapabilityTest',
-    filename:        `${token}.lump`,
-    sidecar_file:    `${token}.json`,
+    filename:        `${artifactStem}.lump`,
+    sidecar_file:    `${artifactStem}.json`,
     ns_slot:         10,
     ns_slot_policy:  'static',
     boot_resident:   true,
@@ -232,7 +279,7 @@ const sidecar = {
     status:          'wip',
     profile:         'example',
     language:        'assembly',
-    description:     'Capability self-test: LOAD, TPERM, LOADEQ/LOADNE, Turing ISA, ELOADCALL — ' +
+    description:     'Capability self-test: LOAD, TPERM, destination-M-present and M-absent SWITCH, Turing ISA, ELOADCALL — ' +
                      'exercises real A7 v1.2 boot-namespace caps (UART_DEV, LED_DEV, BTN_DEV, TIMER_DEV, SelfTest).',
     // "source" must always reflect the exact text of simulator/examples/capability_test.cloomc.
     // Never leave this field empty — check-sidecar-source.js enforces it after every recompile.
@@ -242,7 +289,8 @@ const sidecar = {
     grants:          ['E'],
     author:          'Church Machine',
     version:         '2.0',
-    lump_version:    1,
+    lump_version:    2,
+    binary_hash:     binaryHash,
 };
 
 fs.writeFileSync(sidecarPath, JSON.stringify(sidecar, null, 2) + '\n');
@@ -257,22 +305,43 @@ for (let i = 0; i < CLIST.length; i++) {
 
 // ── Update manifest.json ──────────────────────────────────────────────────────
 const manifestEntry = {
+    ...(existingIdx !== -1 ? manifest[existingIdx] : {}),
     token,
     abstraction:     'CapabilityTest',
+    filename:        `${artifactStem}.lump`,
+    sidecar_file:    `${artifactStem}.json`,
     ns_slot:         10,
     ns_slot_policy:  'static',
     boot_resident:   true,
-    variant_group:   null,
+    variant_group:   'capabilitytest-history',
     lump_size:       lumpSize,
     cw,
     cc,
     grants:          ['E'],
-    lump_version:    1,
+    lump_version:    2,
+    binary_hash:     binaryHash,
 };
 
-manifest.push(manifestEntry);
-fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 4) + '\n');
+if (existingIdx !== -1) {
+    manifest[existingIdx] = manifestEntry;
+} else {
+    manifest.push(manifestEntry);
+}
+fs.writeFileSync(MANIFEST, stableRepositoryJson(manifest));
 console.log(`Updated: ${MANIFEST}`);
+
+// Preserve the protected slot/token/sequence identity while rebinding its body.
+if (fs.existsSync(NS_STATE)) {
+    const nsState = JSON.parse(fs.readFileSync(NS_STATE, 'utf8'));
+    const bindings = (nsState.abstractions || []).filter(
+        e => e.name === 'CapabilityTest' && e.slot === 10 && e.token === IDENTITY_TOKEN);
+    if (bindings.length !== 1) {
+        throw new Error('ns-state must contain exactly one canonical CapabilityTest slot-10 binding');
+    }
+    bindings[0].filename = `${artifactStem}.lump`;
+    fs.writeFileSync(NS_STATE, stableRepositoryJson(nsState));
+    console.log(`Updated: ${NS_STATE}`);
+}
 
 console.log('\nManifest entry written:');
 console.log(JSON.stringify(manifestEntry, null, 4));

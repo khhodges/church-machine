@@ -5,6 +5,9 @@
 > 16-bit slot, 9-bit sequence, 2-bit type, domain bit, 3-bit domain-selected
 > permissions, and bind bit. Shipped namespace integrity is unkeyed
 > `integrity32`, not a MAC.
+> References below to SWITCH PassKeys or sentinel addresses are also historical.
+> Current SWITCH is gated by latched destination M and does not inspect an
+> Abstract source or sentinel.
 
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**

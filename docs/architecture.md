@@ -512,7 +512,7 @@ even though LAMBDA is the operation that consumes it.
 | 00 | NULL | Zero value — no capability. A zeroed GT (gt_type=00) always faults on use. |
 | 01 | Inform | GT points to memory via an NS entry — abstractions, data objects, lumps |
 | 10 | Outform | GT references an IDE-managed dependency; lazy-loaded via Locator on first LOAD |
-| 11 | Abstract | GT IS the value — constants (pi), immutable credentials, PassKey tokens |
+| 11 | Abstract | Hardware-routed or abstract capability values; not SWITCH authority |
 
 All abstractions use **Inform (01)** GTs. The Inform GT's `slot_id` indexes a namespace slot that holds the lump base address and limit. CALL loads the lump header from `raw_base` via cLoad and reads `cc` (c-list count) and `n_minus_6` (size exponent) to split the lump into code (CR14, privileged) and c-list (CR6) regions.
 
@@ -717,9 +717,14 @@ the IDE-owned reserved range. No real RAM lump can occupy these addresses.
 0xFF000001 – 0xFF0000FE    IDE-allocated tunnel channels (named remote services)
 0xFF0000FF – 0xFFFEFFFF    Reserved for future IDE-defined Abstract resources
 0xFFFF0000 – 0xFFFFFFFD    Reserved for future system Abstract GTs
-0xFFFFFFFE                 SWITCH PassKey for CR13 (IRQ Thread)
-0xFFFFFFFF                 SWITCH PassKey for CR15 (Namespace)
+0xFFFFFFFE – 0xFFFFFFFF    Reserved (not SWITCH authority)
 ```
+
+SWITCH authority is not encoded by an Abstract address or sentinel. It is the
+latched M state of the selected CR12–CR15 destination; the source is an ordinary
+CR0–CR11 L-capable c-list capability. A source or destination outside those
+respective ranges faults `INVALID_OP`; M-clear faults `PERM_L`; success consumes
+the destination M bit.
 
 See [Abstract GT I/O and Network Addressing](abstract-io-addressing.md) for the
 provisioning protocol and security model.

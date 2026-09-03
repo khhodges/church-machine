@@ -5382,7 +5382,7 @@ class ChurchSimulator {
         //   DREAD (opcode 16) / DWRITE (opcode 17): may use CR14 as the source
         //     capability field to access read-only data packed after HALT in the
         //     code lump (`DREAD DR, CR14, offset` pattern).
-        if (d.opcode !== 4) {
+        if (d.opcode !== 4 && d.opcode !== 5) {
             // crDst encodes a CR index only for Church opcodes (0–9).
             // Turing opcodes (16–25) put a DR index in the same bit field — do not fence them.
             const isChurchOp = (d.opcode <= 9);
@@ -6981,62 +6981,91 @@ class ChurchSimulator {
     }
 
     _execSwitch(d) {
-        // Hardware reference: hardware/switch.py — PassKey-gated one-way privileged install.
-        // Three hard checks before any register is touched; source is never modified.
-        // (D-11 CLOSED: simulator now matches hardware behaviour.)
-
-        const target = d.imm & 0x7;
-
-        // 1. Target validity — only Tgt=5 (→CR13) and Tgt=7 (→CR15) are permitted.
-        const SWITCH_TGT_CR13 = 5;
-        const SWITCH_TGT_CR15 = 7;
-        if (target !== SWITCH_TGT_CR13 && target !== SWITCH_TGT_CR15) {
-            this.fault('INVALID_OP', `SWITCH: target ${target} is not a valid SWITCH target (must be 5→CR13 or 7→CR15)`);
+        // SWITCH is LOAD's isolated-register form.  The destination M value is
+        // sampled before any source access and is the sole extra authority.
+        // Source M is deliberately irrelevant and SWITCH never elevates M.
+        if (d.crDst < 12 || d.crDst > 15) {
+            this.fault('INVALID_OP',
+                `SWITCH: destination CR${d.crDst} is not isolated (must be CR12–CR15)`);
             return null;
         }
-        const destCR = (target === SWITCH_TGT_CR13) ? 13 : 15;
-
-        // 2. Source range check — crSrc must be 0–7 (lower CR bank).
-        if (d.crSrc > 7) {
-            this.fault('INVALID_OP', `SWITCH: source CR${d.crSrc} out of range (must be CR0–CR7)`);
-            return null;
-        }
-        const srcCR = this.cr[d.crSrc];
-
-        // 3. PassKey type check — source must be Abstract GT (gt_type == 3).
-        //    NULL (type 0), Inform (type 1), and Outform (type 2) all fault here.
-        if (ChurchSimulator.isNullGT(srcCR.word0)) {
-            this.fault('INVALID_OP', `SWITCH: CR${d.crSrc} is NULL — must be an Abstract PassKey GT`);
-            return null;
-        }
-        const parsed = this.parseGT(srcCR.word0);
-        if (parsed.type !== 3) {
-            this.fault('INVALID_OP', `SWITCH: CR${d.crSrc} is ${parsed.typeName} (type ${parsed.type}) — must be Abstract (type 3) PassKey GT`);
+        if (d.crSrc < 0 || d.crSrc > 11) {
+            this.fault('INVALID_OP',
+                `SWITCH: source CR${d.crSrc} is invalid (must be CR0–CR11)`);
             return null;
         }
 
-        // 4. Sentinel address check — CR.word1 (location) must equal the hardware-reserved
-        //    sentinel for the chosen target: 0xFFFFFFFE for CR13, 0xFFFFFFFF for CR15.
-        const SENTINEL_CR13 = 0xFFFFFFFE;
-        const SENTINEL_CR15 = 0xFFFFFFFF;
-        const expectedSentinel = (destCR === 13) ? SENTINEL_CR13 : SENTINEL_CR15;
-        if ((srcCR.word1 >>> 0) !== expectedSentinel) {
-            const got = (srcCR.word1 >>> 0).toString(16).toUpperCase().padStart(8, '0');
-            const exp = expectedSentinel.toString(16).toUpperCase();
-            this.fault('INVALID_OP', `SWITCH: CR${d.crSrc}.location=0x${got} ≠ sentinel 0x${exp} required for CR${destCR}`);
+        const destinationMAtAccept = this.cr[d.crDst].m === 1;
+        if (!destinationMAtAccept) {
+            this.fault('PERM_L',
+                `SWITCH: destination CR${d.crDst} had M=0 when the instruction was accepted`);
+            return null;
+        }
+        // SWITCH is a special LOAD, not an exemption from the C-list authority
+        // check.  LOAD's historical CR6 fast path does not require L because it
+        // is used for ordinary capability materialisation; an isolated reload
+        // must require the CR6 L capability exactly as hardware mLoad does.
+        if (d.crSrc === 6) {
+            const sourceGT = this.cr[6].word0 >>> 0;
+            const sourceParsed = this.parseGT(sourceGT);
+            if (ChurchSimulator.isNullGT(sourceGT) || sourceParsed.malformed ||
+                    !sourceParsed.permissions.L) {
+                this.fault('PERM_L',
+                    'SWITCH: CR6 requires a valid L capability for an isolated reload');
+                return null;
+            }
+        }
+
+        // _execLoad has a few resolver paths which can update memory before a
+        // later validation fault. SWITCH is architecturally atomic, so retain a
+        // transaction image and restore all architectural stores on failure.
+        const crBefore = this.cr.map(cr => ({ ...cr }));
+        const memoryBefore = this.memory.slice();
+        const nsCountBefore = this.nsCount;
+        const labelsBefore = { ...this.nsLabels };
+        const nsClistBefore = Object.fromEntries(Object.entries(this.nsClistMap || {})
+            .map(([slot, rows]) => [slot, Array.isArray(rows)
+                ? rows.map(row => (row && typeof row === 'object' ? { ...row } : row))
+                : rows]));
+        const runtimeOriginalsBefore = new Map(this._runtimeWordOriginals);
+        const slotIdentityBefore = new Map(this._slotIdentity);
+        const tokenSlotBefore = new Map(this._tokenSlotMap);
+        const nsFreeSequencesBefore = { ...this._nsFreeSequences };
+        const compilerOwnedBefore = { ...this._compilerOwnedSelfSlots };
+        const lazyManifestBefore = Object.fromEntries(Object.entries(this.lazyManifest || {})
+            .map(([slot, entry]) => [slot,
+                entry && typeof entry === 'object' ? { ...entry } : entry]));
+        const pendingBefore = new Map(this._pendingResolves);
+        const suspendedBefore = this._lazySuspended;
+        const petNamesBefore = new Set(this.petNameMemory);
+        const loadResult = this._execLoad(d);
+
+        if (loadResult === null || (loadResult && loadResult.lazySuspended)) {
+            this.cr = crBefore;
+            this.memory.set(memoryBefore);
+            this.nsCount = nsCountBefore;
+            this.nsLabels = labelsBefore;
+            this.nsClistMap = nsClistBefore;
+            this._runtimeWordOriginals = runtimeOriginalsBefore;
+            this._slotIdentity = slotIdentityBefore;
+            this._tokenSlotMap = tokenSlotBefore;
+            this._nsFreeSequences = nsFreeSequencesBefore;
+            this._compilerOwnedSelfSlots = compilerOwnedBefore;
+            this.lazyManifest = lazyManifestBefore;
+            this._pendingResolves = pendingBefore;
+            this._lazySuspended = suspendedBefore;
+            this.petNameMemory = petNamesBefore;
             return null;
         }
 
-        // 5. One-way privileged install — copy source into target; source CR is NOT modified.
-        //    Hardware uses ChurchMLoad with m_elevated=1 which also resets G=0 on the NS entry;
-        //    in the simulator we copy the full CR object straight (NS G-bit is managed by LOAD/mLoad paths).
-        this.cr[destCR] = { ...srcCR };
-
-        const desc = `SWITCH CR${d.crSrc} → CR${destCR} (PassKey install; source unchanged)`;
-        this.output += desc + '\n';
-        this.pc++;
-        this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
-        return { pc: this.pc - 1, instr: d, desc };
+        // Successful isolated reload consumes the pre-existing destination M.
+        // _writeCR normally does this when mElevation is false; force the
+        // architectural result so boot-only elevation cannot leak through.
+        this.cr[d.crDst].m = 0;
+        const desc = `SWITCH CR${d.crDst}, [CR${d.crSrc} + ${d.imm}] (destination M accepted and consumed)`;
+        loadResult.desc = desc;
+        loadResult.instr = d;
+        return loadResult;
     }
 
     _execTperm(d) {

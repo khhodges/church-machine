@@ -6791,10 +6791,13 @@ LOADEQ CR0, LED_DEV   ; SKIP  -- condition EQ not met (Z=0)
 LOADNE CR0, SelfTest  ; EXEC  -- condition NE met (Z=0) -- restore CR0
 
 ; ============================================================
-; TEST 6: SWITCH -- swap two registers and swap back
+; TEST 6: SWITCH -- isolated-register special LOAD authorization
 ; ============================================================
-SWITCH CR0, 1         ; CR0 <-> CR1  (CR0=LED_DEV, CR1=SelfTest)
-SWITCH CR0, 1         ; Swap back     (CR0=SelfTest, CR1=LED_DEV)
+; Namespace initialization uses its private, target-bound M-bit device to
+; leave CR12.M set and CR13.M clear before this test runs.  The source is the
+; ordinary L-capable CR6; it neither needs nor receives M authority.
+SWITCH CR12, CR6, #0  ; M-present destination: load c-list[0] into CR12
+SWITCH CR13, CR6, #0  ; M-absent destination: fault, with no state mutation
 
 ; ============================================================
 ; TEST 7: Turing ISA -- integer arithmetic on data registers
@@ -13406,7 +13409,7 @@ function showReleaseHistory() {
         { date: '2026-05-02 UTC', title: 'Doc Audit, ISA Corrections & Hardware Alignment', changes: [
             'Full 14-item stale-documentation audit completed: all stale claims corrected across docs, simulator comments, and figures',
             'RETURN mask: marked as not implemented in all docs (call-stack.md, church-instructions.md, boot-rom-layout.md, instruction-matrix.md) — mask field silently ignored by hardware; assembler now warns on any non-zero mask (Task #888)',
-            'SWITCH semantics: replaced "atomic CR swap" with correct "PassKey-gated one-way install into CR13/CR15" in assembler.js comments and app-lumps.js disassembler output',
+            'SWITCH semantics: corrected to the destination-M-gated isolated LOAD form for CR12–CR15, with explicit destination, source, and row operands',
             'TPERM D-3 closed: removed 3 stale notes claiming simulator produces Z=0 for reserved preset codes — simulator now faults with TPERM_RSV identical to hardware (Task #873)',
             'ISA reference E-2 corrected: "Assembler should reject" → "Assembler warns" to match Task #888 warn-only implementation',
             'CALL PC entry: replaced all PC=0 claims with hardware method-table dispatch description (method index in imm15; index 0 → word 1) across call-stack.md, architecture.md, and two SVG figures',
@@ -13420,7 +13423,7 @@ function showReleaseHistory() {
             'Task #890 merged: LAMBDA CR6 re-entry simulator test added to gate suite',
             'Task #17 merged: Navana.Init wired as a callable method-table entry — 3-word lump injected at ROM word 320 (NS slot 5); method index 1 → PC=2 → RETURN AL; PRIVATE_METHOD fault eliminated (D-5 CLOSED)',
             'Task #891 merged: boot entry CALL test corrected — PC after a method-index-0 CALL is 1 (word 1, first code word after lump header), not 0; both default and custom_step1 configurations now pass',
-            'Task #880 closed (D-11): simulator SWITCH instruction now matches hardware — PassKey-gated one-way install into CR13/CR15 only; three hard checks enforced: target validity (5→CR13, 7→CR15), Abstract GT type, and sentinel address (0xFFFFFFFE/0xFFFFFFFF); source CR unchanged; all hardware deviations D-1 through D-12 now closed',
+            'SWITCH uses the isolated-register LOAD contract: CR12–CR15 destination, pre-existing destination M authorization, ordinary source LOAD validation, and M consumption only after success',
         ] },
         { date: '2026-04-30 UTC', title: 'Hello Mum Pipeline, Hardware Bridge & LUMP Tokens Tab', changes: [
             'QR code display fixed: identity QR now rendered with a self-contained pure-stdlib generator — no external package required',
@@ -15432,31 +15435,30 @@ const INSTRUCTION_DATA = [
     },
     {
         opcode: 5, mnemonic: 'SWITCH', domain: 'church',
-        mState: 'up', mStateNote: 'Copies the source Abstract PassKey CR (including its .M field) into the target (CR13 or CR15) via an M-elevated mLoad. The HDL sets sub_m_elevated=1 (switch.py:71), causing the mLoad to set M=1 on the target CR.',
-        syntax: 'SWITCH CRs, imm',
-        brief: 'Switch namespace \u2014 reload CR15 with a new namespace root',
-        encoding: 'opcode[5]=00101 | cond[4] | 0[4] | CRs[4] | idx[15]',
+        mState: 'down', mStateNote: 'The destination M bit is latched at acceptance. M=1 authorizes this isolated reload and is consumed on success; M=0 faults unchanged. Source M is irrelevant.',
+        syntax: 'SWITCH CRd, CRs, row',
+        brief: 'M-gated isolated-register LOAD into CR12–CR15',
+        encoding: 'opcode[5]=00101 | cond[4] | CRd[4] | CRs[4] | row[15]',
         fields: [
-            { name: 'CRs', desc: 'GT pointing to the new namespace to switch to' },
-            { name: 'imm', desc: 'Namespace control flags' },
+            { name: 'CRd', desc: 'Isolated destination: CR12, CR13, CR14, or CR15' },
+            { name: 'CRs', desc: 'Source c-list capability; CR6 requires L permission' },
+            { name: 'row', desc: 'Capability row to load' },
         ],
-        permission: 'CRs must point to a valid namespace',
+        permission: 'Destination M must already be set by Namespace’s target-bound M-bit device; normal LOAD authority applies to CRs.',
         flags: 'None',
         details:
             '  31    27│26   23│22   19│18   15│14                0\n'
           + '  ┌──────┬──────┬──────┬──────┬───────────────────┐\n'
-          + '  │00101 │ cond │  ─   │  CRs │      flags        │\n'
+          + '  │00101 │ cond │  CRd │  CRs │       row         │\n'
           + '  └──────┴──────┴──────┴──────┴───────────────────┘\n'
-          + '   5-bit   4-bit  zero   4-bit       15-bit\n\n'
-          + 'CRs   = GT pointing to the new namespace root.\n'
-          + 'dst field is zero (unused).\n'
-          + 'flags = namespace control flags (imm15).\n\n'
-          + 'Atomically reloads CR15 (the namespace root register) with the new\n'
-          + 'namespace. CR15 is the machine\'s view of the entire capability world —\n'
-          + 'all LOADs, SAVEs, and CALLs resolve through it. The switch is the\n'
-          + 'mechanism for domain isolation, sandboxing, and controlled transitions.',
-        example: 'SWITCH CR3, 0        ; Switch namespace root (CR15) to namespace in CR3',
-        mState: { badge: null, note: 'M-neutral — no effect on any CR M-bit.' },
+          + '   5-bit   4-bit  4-bit  4-bit       15-bit\n\n'
+          + 'CRd = isolated destination CR12–CR15.\n'
+          + 'CRs = source capability; its M bit is not authority.\n'
+          + 'row = c-list row.\n\n'
+          + 'SWITCH first checks destination M, then performs ordinary LOAD validation.\n'
+          + 'Success clears M; failure changes no register, Namespace entry, or memory word.',
+        example: 'SWITCH CR15, CR6, #0 ; Reload CR15 only when CR15.M is set',
+        mState: { badge: 'M↓', note: 'Destination M is authorization state, not a GT permission; success consumes it.' },
     },
     {
         opcode: 6, mnemonic: 'TPERM', domain: 'church',
@@ -16287,25 +16289,23 @@ Syntax:  CHANGE CRd, imm     (imm = context-switch mode)`,
     },
     {
         id: 'switch',
-        name: 'SWITCH — Namespace Switch',
-        brief: 'Reload CR15 with a new namespace root GT — changes the machine\'s capability world view.',
-        detail: `SWITCH atomically reloads CR15 (the namespace root register) with the
-namespace GT held in a source CR. CR15 is the machine's view of the
-entire capability namespace — every LOAD, SAVE, and CALL resolves
-through it.
+        name: 'SWITCH — Isolated Reload',
+        brief: 'Special LOAD into CR12–CR15, authorized by the destination register’s pre-existing M latch.',
+        detail: `SWITCH CRd, CRs, row is LOAD's isolated-register form. CRd must be
+CR12, CR13, CR14, or CR15. The machine latches CRd.M before source
+validation; M=1 authorizes the load and M=0 faults. Source M is irrelevant.
 
-SWITCH does NOT change permission bits. The GT permission set
-(R, W, X, L, S, E, B, G, F) of any existing capability register is
-unaffected by a SWITCH. Only the namespace root changes.
+The M latch is controlled only through Namespace's private, target-bound
+M-bit I/O device capability. It is not a GT permission and ordinary
+abstractions cannot mint, discover, or use that capability.
 
-Use cases:
-  — Domain isolation: switch to a restricted sub-namespace for a sandboxed task
-  — Controlled handoff: hand a thread a different view of the capability world
-  — Boot: the boot sequence installs the full namespace via CR15 at B:00
+After a successful reload M is consumed (cleared). Bad destinations, a
+missing destination M latch, invalid source/row/LOAD authority, and every
+other failure leave CRs, CRd.M, Namespace, and memory unchanged.
 
-Syntax:  SWITCH CRs, imm     (CRs = GT for the target namespace; imm = flags)`,
-        example: `; Switch namespace root to the GT in CR3
-SWITCH CR3, 0        ; CR15 <- namespace GT from CR3`
+Syntax:  SWITCH CRd, CRs, row`,
+        example: `; Reload CR15 from c-list row 0 after Namespace set CR15.M
+SWITCH CR15, CR6, #0`
     },
 ];
 

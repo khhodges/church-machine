@@ -276,13 +276,15 @@
     <script>setTimeout(function(){var e=document.getElementById('appLoading');if(e&&!e.classList.contains('hidden')){e.classList.add('hidden');setTimeout(function(){e.style.display='none'},300);}},4000);</script>
     <div class="fixed-toolbar">
         <header>
-            <h1><a href="/" style="color:inherit;text-decoration:none;" data-tooltip="Home — Return to the Capability Security Simulators landing page">&lambda; Church Machine</a></h1>
-            <a class="board-manual-link" href="https://github.com/DavidJRichards/QMTECH_XC7A100T_Wukong_Board/blob/main/Documents/QMTECH_Artix-7_XC7A100T_Wukong_Board_V2_User_Manual(Experiments)-V01.pdf" target="_blank" rel="noopener noreferrer" data-tooltip="Open the QMTECH Wukong board user manual on GitHub">Wukong board manual</a>
+            <div class="brand-group">
+                <h1><a href="/" style="color:inherit;text-decoration:none;" data-tooltip="Home — Return to the Capability Security Simulators landing page">&lambda; Church Machine</a></h1>
+                <a class="board-manual-link" href="https://github.com/DavidJRichards/QMTECH_XC7A100T_Wukong_Board/blob/main/Documents/QMTECH_Artix-7_XC7A100T_Wukong_Board_V2_User_Manual(Experiments)-V01.pdf" target="_blank" rel="noopener noreferrer" data-tooltip="Open the QMTECH Wukong board user manual on GitHub">Wukong board manual</a>
+            </div>
             <nav class="controls">
-                <div class="view-buttons">
-                    <button id="backBtn" class="btn btn-view back-arrow-btn" onclick="goBack()" style="display:none;" data-tooltip="Back — Return to the previous view">&#8592;</button>
+                <div class="nav-cluster view-buttons">
+                    <button id="backBtn" class="nav-cluster-btn" onclick="goBack()" style="display:none;" data-tooltip="Back — Return to the previous view">&#8592;</button>
                     <div class="ham-wrap" id="hamWrap">
-                        <button class="btn btn-view ham-btn" id="hamBtn" onclick="toggleHamburger()" data-tooltip="Menu — Browse all views">&#9776;</button>
+                        <button class="nav-cluster-btn ham-btn" id="hamBtn" onclick="toggleHamburger()" data-tooltip="Menu — Browse all views">&#9776;</button>
                         <div class="ham-dropdown" id="hamDropdown">
                             <div class="ham-bolt-row">
                                 <span id="hamDefaultBolt" class="ham-bolt-drag" draggable="true" data-tooltip="Drag ⚡ onto any page below to set it as your default home page">⚡</span>
@@ -408,11 +410,11 @@
                             </div>
                         </div>
                     </div>
-                </div>
-                <div id="toolbarGroupSim" class="toolbar-group">
-                    <button class="btn btn-view cr-cycle-btn" id="crCycleBtn"
+                    <button class="nav-cluster-btn cr-cycle-btn" id="crCycleBtn"
                             onclick="cycleCRView()"
                             data-tooltip="CR0–15 — Context Registers · click to cycle: CR0-15 → CR14 CLOOMC → CR12 Thread">CRs</button>
+                </div>
+                <div id="toolbarGroupSim" class="toolbar-group">
                     <div class="toolbar-group-divider"></div>
                     <div class="sim-exec-btns">
                         <button class="btn btn-warning sim-icon-btn fault-idle" id="toolFaultBtn" onclick="faultRecall()" data-tooltip="Fault — Click to recall the fault report">&#x26A1;</button>
@@ -3852,7 +3854,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
                 <a href="/docs/figures/single-lump-call-split.html" style="color:#c9d1d9;text-decoration:none;font-size:0.85rem;padding:0.28rem 0.5rem;border-radius:4px;display:block;transition:background 0.15s;" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='transparent'">Figure 25: Single-Lump CALL Split</a>
                 <a href="/docs/figures/stack-frames-diagram.html" style="color:#c9d1d9;text-decoration:none;font-size:0.85rem;padding:0.28rem 0.5rem;border-radius:4px;display:block;transition:background 0.15s;" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='transparent'">Figure 4: Self-Describing Stack Frames — Execution Trace &amp; RETURN Logic</a>
                 <a href="/docs/figures/stack-frames.html" style="color:#c9d1d9;text-decoration:none;font-size:0.85rem;padding:0.28rem 0.5rem;border-radius:4px;display:block;transition:background 0.15s;" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='transparent'">Figure 6: Self-Describing Stack Frames — Nesting Scenario &amp; Tag Format</a>
-                <a href="/docs/figures/switch-lifecycle.html" style="color:#c9d1d9;text-decoration:none;font-size:0.85rem;padding:0.28rem 0.5rem;border-radius:4px;display:block;transition:background 0.15s;" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='transparent'">SWITCH Instruction — Full Lifecycle and Chain of Trust</a>
+                <a href="/docs/figures/switch-lifecycle.html" style="color:#c9d1d9;text-decoration:none;font-size:0.85rem;padding:0.28rem 0.5rem;border-radius:4px;display:block;transition:background 0.15s;" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='transparent'">SWITCH Instruction — M-Gated LOAD Lifecycle</a>
                 <a href="/docs/figures/three-dispatch-styles.html" style="color:#c9d1d9;text-decoration:none;font-size:0.85rem;padding:0.28rem 0.5rem;border-radius:4px;display:block;transition:background 0.15s;" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='transparent'">Figure 14: Three Dispatch Styles</a>
                 <a href="/docs/figures/three-loop-styles-comparison.html" style="color:#c9d1d9;text-decoration:none;font-size:0.85rem;padding:0.28rem 0.5rem;border-radius:4px;display:block;transition:background 0.15s;" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='transparent'">Figure 2: Three Loop Styles — LAMBDA CR6 Dominates</a>
                 <a href="/docs/figures/tunnel-architecture.html" style="color:#c9d1d9;text-decoration:none;font-size:0.85rem;padding:0.28rem 0.5rem;border-radius:4px;display:block;transition:background 0.15s;" onmouseover="this.style.background='#21262d'" onmouseout="this.style.background='transparent'">Figure 8: Encrypted Capability Tunnel Between Meta Machines</a>

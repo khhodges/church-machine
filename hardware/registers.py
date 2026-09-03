@@ -113,6 +113,13 @@ class ChurchRegisters(Elaboratable):
 
         # Current M-flag state
         self.cr15_m_flag = Signal()
+        self.isolated_m_flags = Signal(4)  # bits 0..3 correspond to CR12..CR15
+        self.m_bit_device_wr_en = Signal()
+        self.m_bit_device_target = Signal(2)
+        self.m_bit_device_value = Signal()
+        # Successful SWITCH consumes exactly its accepted destination M bit.
+        self.m_switch_consume_en = Signal()
+        self.m_switch_consume_target = Signal(2)
 
     def elaborate(self, platform):
         m = Module()
@@ -121,8 +128,7 @@ class ChurchRegisters(Elaboratable):
         data_regs = Array([Signal(32, name=f"dr{i}") for i in range(NUM_DATA_REGS)])
         flags_reg = Signal(COND_FLAGS_LAYOUT)
 
-        # M-flag latch — single bit associated with CR15 only
-        cr15_m_reg = Signal()
+        isolated_m_regs = Signal(4)
 
         m.d.comb += self.cr_rd_data.eq(cap_regs[self.cr_rd_addr])
         m.d.comb += self.trace_rd_gt.eq(
@@ -154,7 +160,8 @@ class ChurchRegisters(Elaboratable):
             self.m_dr13.eq(data_regs[13]),
             self.m_dr14.eq(data_regs[14]),
             self.m_dr15.eq(data_regs[15]),
-            self.cr15_m_flag.eq(cr15_m_reg),
+            self.cr15_m_flag.eq(isolated_m_regs[3]),
+            self.isolated_m_flags.eq(isolated_m_regs),
         ]
 
         with m.If(self.clear_all):
@@ -163,7 +170,7 @@ class ChurchRegisters(Elaboratable):
             for i in range(NUM_DATA_REGS):
                 m.d.sync += data_regs[i].eq(0)
             m.d.sync += flags_reg.eq(0)
-            m.d.sync += cr15_m_reg.eq(0)
+            m.d.sync += isolated_m_regs.eq(0)
         with m.Else():
             with m.If(self.cr_wr_en):
                 m.d.sync += cap_regs[self.cr_wr_addr].eq(self.cr_wr_data)
@@ -198,18 +205,28 @@ class ChurchRegisters(Elaboratable):
             # M-set: populate DR11-DR15 from m_set_dr11-15 inputs, set flag.
             # Placed AFTER dr_wr_en so m_set_en takes priority for DR11-DR15.
             with m.If(self.m_set_en):
-                m.d.sync += cr15_m_reg.eq(1)
+                m.d.sync += isolated_m_regs[3].eq(1)
                 m.d.sync += data_regs[11].eq(self.m_set_dr11)
                 m.d.sync += data_regs[12].eq(self.m_set_dr12)
                 m.d.sync += data_regs[13].eq(self.m_set_dr13)
                 m.d.sync += data_regs[14].eq(self.m_set_dr14)
                 m.d.sync += data_regs[15].eq(self.m_set_dr15)
             with m.Elif(self.m_clear_en):
-                m.d.sync += cr15_m_reg.eq(0)
+                m.d.sync += isolated_m_regs[3].eq(0)
             # CHANGE restore: set M-flag to saved value (no DR copy); lower priority
             # than m_set_en/m_clear_en which come from the M-window FSM.
             with m.Elif(self.m_flag_restore_en):
-                m.d.sync += cr15_m_reg.eq(self.m_flag_restore_val)
+                m.d.sync += isolated_m_regs[3].eq(self.m_flag_restore_val)
+
+            # Dedicated target-bound M device.
+            with m.If(self.m_bit_device_wr_en):
+                m.d.sync += isolated_m_regs.bit_select(
+                    self.m_bit_device_target, 1).eq(self.m_bit_device_value)
+            # A successful isolated reload consumes the M state that SWITCH
+            # latched at acceptance. Faulting SWITCH paths never assert this.
+            with m.If(self.m_switch_consume_en):
+                m.d.sync += isolated_m_regs.bit_select(
+                    self.m_switch_consume_target, 1).eq(0)
 
             with m.If(self.flags_wr_en):
                 m.d.sync += flags_reg.eq(self.flags_in)

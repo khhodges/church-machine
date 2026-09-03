@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SWITCH Instruction — Full Lifecycle and Chain of Trust</title>
+<title>SWITCH Instruction — M-Gated LOAD Lifecycle</title>
 <style>
   :root {
     --purple:  #6d28d9;
@@ -409,15 +409,22 @@
 <body>
 <div class="page">
 
-  <h1>SWITCH — Full Lifecycle &amp; Chain of Trust</h1>
-  <p class="subtitle">v1.0 &nbsp;·&nbsp; May 2026 &nbsp;·&nbsp; CONFIDENTIAL &nbsp;·&nbsp; Kenneth Hamer-Hodges</p>
+  <h1>SWITCH — M-Gated LOAD Lifecycle</h1>
+  <p class="subtitle">Current contract &nbsp;·&nbsp; Task 3193</p>
 
   <p>
-    <strong>SWITCH</strong> is the only instruction that can write to the system-wide
-    privileged registers <strong>CR13</strong> (interrupt handler) and <strong>CR15</strong>
-    (namespace root). The hardware FSM checks are necessary but not sufficient —
-    the full security guarantee requires tracing the chain of trust through three phases.
+    <strong>SWITCH CRd, CRs, #row</strong> is the special LOAD into isolated
+    CR12&ndash;CR15. CRs must be CR0&ndash;CR11. A malformed operand faults
+    INVALID_OP; a clear destination M bit faults PERM_L. The source needs normal
+    L authority and no M. Success loads the entry and consumes destination M.
   </p>
+
+  <p><strong>Historical notice:</strong> The expandable diagram below documents
+    the superseded PassKey/sentinel proposal. It is retained for design history
+    and is not the current instruction or security model.</p>
+
+  <details>
+  <summary>Archived PassKey-era lifecycle diagram</summary>
 
   <!-- ═══════════════════════════════════════════════════════ PHASE 0 -->
 
@@ -808,6 +815,7 @@
 
   <div class="confidential">Confidential &mdash; Kenneth Hamer-Hodges &mdash; May 2026</div>
 
+  </details>
 </div>
 </body>
 </html>

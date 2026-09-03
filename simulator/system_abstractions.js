@@ -397,7 +397,10 @@ class SystemAbstractions {
             driverGrantCounter: 0,
             topSecurityObjects: {},
             topSecurityObjectCounter: 0,
-            topSecurityPassKeyCounter: 0
+            topSecurityPassKeyCounter: 0,
+            // Namespace-exclusive, target-bound M-bit device capabilities.
+            // Never copied into an architectural c-list or returned by a method.
+            mBitCapabilities: null
         };
         this._resetNavanaState = () => {
             passKeyCounter = 0;
@@ -414,6 +417,7 @@ class SystemAbstractions {
             navanaState.topSecurityObjects = {};
             navanaState.topSecurityObjectCounter = 0;
             navanaState.topSecurityPassKeyCounter = 0;
+            navanaState.mBitCapabilities = null;
         };
 
         function encodePassKeyIndex(deviceSelector, permMask, pkId) {
@@ -666,6 +670,28 @@ class SystemAbstractions {
         this.registry.bindMethod(5, 'Init', function(sim, args) {
             navanaState.initialized = true;
             const registry = sim.abstractionRegistry;
+            if (!navanaState.mBitCapabilities && sim.deviceAbstractions) {
+                navanaState.mBitCapabilities =
+                    sim.deviceAbstractions.issueNamespaceMBitCapabilities(
+                        registry && registry.abstractions ? registry.abstractions[5] : null);
+            }
+            let mBitReady = false;
+            if (sim.deviceAbstractions && Array.isArray(navanaState.mBitCapabilities) &&
+                    navanaState.mBitCapabilities.length === 4) {
+                const namespaceOwner = registry && registry.abstractions
+                    ? registry.abstractions[5] : null;
+                const mWrites = navanaState.mBitCapabilities.map((capability, offset) =>
+                    sim.deviceAbstractions.writeMBit(
+                        sim, capability, 12 + offset, offset === 0 ? 1 : 0, namespaceOwner));
+                mBitReady = mWrites.every(result => result && result.ok);
+                if (!mBitReady) {
+                    return {
+                        ok: false,
+                        fault: 'PERM_S',
+                        message: 'Navana.Init: target-bound M-bit device initialization failed'
+                    };
+                }
+            }
             if (registry) {
                 const all = registry.getAllAbstractions();
                 navanaState.managedAbstractions = all.map(a => ({ index: a.index, name: a.name, layer: a.layer }));
@@ -771,7 +797,8 @@ class SystemAbstractions {
                     passkeys: { pass: !!ledPK },
                     billing:  { pass: hasSysPgt },
                     bootAlloc: { pass: hasBoot },
-                    keystoneClist0: { pass: keystoneWired }
+                    keystoneClist0: { pass: keystoneWired },
+                    isolatedM: { pass: mBitReady }
                 },
                 b: 0, f: 0,
                 result: (deviceCount > 0 && hasSysPgt && keystoneWired) ? 'pass' : 'warn'

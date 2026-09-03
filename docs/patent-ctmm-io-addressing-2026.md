@@ -1,5 +1,12 @@
 # CONTINUATION-IN-PART: Abstract GT I/O and Network Addressing
 
+> **HISTORICAL PATENT SNAPSHOT / NON-AUTHORITATIVE.** This filing-era text is
+> preserved verbatim as legal/design history. Its SWITCH PassKey and sentinel
+> claims are superseded and must not be read as the current implementation
+> contract. Current SWITCH uses a CR0–CR11 L-capable source, a CR12–CR15
+> destination gated by latched destination M, `INVALID_OP` for malformed
+> operands, `PERM_L` for M-clear, and consumes M on success.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 

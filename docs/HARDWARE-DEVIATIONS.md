@@ -159,16 +159,17 @@ The broader NS Word 1 bit layout is intentionally different between hardware and
 
 ---
 
-## D-11: SWITCH instruction — hardware PassKey design vs. simulator CR swap — CLOSED
+## D-11: Historical SWITCH swap/PassKey divergence — SUPERSEDED
 
-- **Hardware** (`hardware/switch.py`): SWITCH is a privileged capability-transfer instruction with three hard checks before any register is touched:
-  1. **PassKey type check** — `CRs` must hold an Abstract GT (`gt_type == 0b11`). Any other type → `FAULT(INVALID_OP)`.
-  2. **Target validity** — only `Tgt=5` (CR13) and `Tgt=7` (CR15) are permitted destinations. All other target values → `FAULT(INVALID_OP)`.
-  3. **Sentinel address check** — `CRs.word1_location` must equal the hardware-reserved sentinel for the chosen target: `0xFFFFFFFE` for CR13, `0xFFFFFFFF` for CR15. Mismatch → `FAULT(INVALID_OP)`.
-  On all checks passing, `ChurchMLoad` writes the source capability into the target privileged register (CR13 or CR15) with `m_elevated=1`, resetting G=0 on the namespace entry. The source CR is **not** cleared — SWITCH is not a swap, it is a one-way privileged install.
-- **Previous simulator behaviour** (`_execSwitch`, pre-fix): performed an atomic CR swap `cr[crSrc] ↔ cr[target]` with only a NULL check. No PassKey check, target-validity check, sentinel check, or mLoad.
-- **Fix (Task #880, May 2026)**: `simulator/simulator.js` `_execSwitch` replaced with the correct PassKey-gated one-way install. All three hardware checks are enforced in the same order as `hardware/switch.py`. Source CR is not modified. Target restricted to CR13 (Tgt=5) and CR15 (Tgt=7). Sentinel constants `0xFFFFFFFE` / `0xFFFFFFFF` match `hw_types.py`.
-- **Status**: **CLOSED** — simulator now matches hardware.
+This closed deviation records two obsolete models: the early simulator CR swap
+and the later PassKey/sentinel install. Neither is the current ISA contract.
+
+Current SWITCH is the special LOAD form `SWITCH CRd, CRs, #row`: CRd must be
+CR12–CR15, CRs must be CR0–CR11, and malformed operands fault `INVALID_OP`.
+Authorization is the destination's instruction-accepted, latched M bit;
+M-clear faults `PERM_L`. CRs requires ordinary L authority and no source M.
+Success loads the c-list entry and consumes destination M. Any fault leaves CRs,
+M state, namespace entries, and memory unchanged.
 
 ---
 *Confidential — Kenneth Hamer-Hodges — May 2026*

@@ -29,7 +29,7 @@ Church-domain opcodes (0–9):
     2  CALL        invoke CRd (optional method selector in imm)
     3  RETURN      unwind call frame
     4  CHANGE      atomic c-list swap
-    5  SWITCH      PassKey-gated CR13/CR15 install
+    5  SWITCH      M-gated special LOAD into CR12–CR15
     6  TPERM       assert/attenuate GT permission
     7  LAMBDA      create closure from template
     8  ELOADCALL   fused load+call (c-list row in imm[4:0], method in imm[11:5])
@@ -179,7 +179,7 @@ def disassemble_word(word, idx=None, cw=None):
         return f'{mnemonic}  CR{cr_dst}, CR{cr_src}[{_hexoff(imm)}]'
 
     if opcode == 5:       # SWITCH
-        return f'{mnemonic}  CR{cr_src}, CR{imm & 0x7}'
+        return f'{mnemonic}  CR{cr_dst}, CR{cr_src}, #{_hexoff(imm)}'
 
     if opcode == 6:       # TPERM
         b_flag    = (imm >> 4) & 1

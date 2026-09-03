@@ -180,6 +180,7 @@ class ChurchCore(Elaboratable):
             Signal(32, name=f"debug_dr{i}") for i in range(16)
         ]
         self.debug_m_flag = Signal()
+        self.debug_isolated_m_flags = Signal(4)
 
         self.outform_tx_valid = Signal()
         self.outform_tx_data  = Signal(8)
@@ -345,6 +346,7 @@ class ChurchCore(Elaboratable):
         lambda_pc_reg = Signal(32)
 
         boot_state_reg = Signal(3, init=BootState.IDLE)
+        namespace_init_armed = Signal()
 
         m.d.comb += [
             self.boot_state.eq(boot_state_reg),
@@ -357,13 +359,22 @@ class ChurchCore(Elaboratable):
                 with m.If(self.boot_start):
                     m.d.sync += boot_state_reg.eq(BootState.FAULT_RST)
             with m.Case(BootState.FAULT_RST):
-                m.d.sync += boot_state_reg.eq(BootState.LOAD_NS)
+                m.d.sync += [
+                    boot_state_reg.eq(BootState.LOAD_NS),
+                    namespace_init_armed.eq(0),
+                ]
             with m.Case(BootState.LOAD_NS):
                 m.d.sync += boot_state_reg.eq(BootState.INIT_THRD)
             with m.Case(BootState.INIT_THRD):
                 m.d.sync += boot_state_reg.eq(BootState.INIT_CLIST)
             with m.Case(BootState.INIT_CLIST):
-                m.d.sync += boot_state_reg.eq(BootState.LOAD_NUC)
+                # Keep protected CR14 on Namespace identity while its Init
+                # body performs the hidden-bank DWRITE. The first cycle
+                # installs identity; subsequent cycles run/wait for DWRITE.
+                with m.If(~namespace_init_armed):
+                    m.d.sync += namespace_init_armed.eq(1)
+                with m.Elif(u_dwrite.done):
+                    m.d.sync += boot_state_reg.eq(BootState.LOAD_NUC)
             with m.Case(BootState.LOAD_NUC):
                 m.d.sync += boot_state_reg.eq(BootState.COMPLETE)
             with m.Case(BootState.COMPLETE):
@@ -839,6 +850,12 @@ class ChurchCore(Elaboratable):
             # M-window set/clear connect to u_regs controls
             u_regs.m_set_en.eq(mwin_m_set_en),
             u_regs.m_clear_en.eq(mwin_m_clear_en),
+            u_regs.m_bit_device_wr_en.eq(u_dwrite.m_bit_wr_en),
+            u_regs.m_bit_device_target.eq(u_dwrite.m_bit_wr_target),
+            u_regs.m_bit_device_value.eq(u_dwrite.m_bit_wr_value),
+            u_regs.m_switch_consume_en.eq(u_switch.m_consume_en if not self.iot_profile else 0),
+            u_regs.m_switch_consume_target.eq(
+                u_switch.m_consume_target if not self.iot_profile else 0),
             # Expose M-flag and shadow DR reads
             self.cr15_m_flag.eq(u_regs.cr15_m_flag),
             self.dbg_m_dr11.eq(u_regs.m_dr11),
@@ -1022,6 +1039,7 @@ class ChurchCore(Elaboratable):
                     u_regs.debug_cr_words[i][w])
             m.d.comb += self.debug_dr_words[i].eq(u_regs.debug_dr_words[i])
         m.d.comb += self.debug_m_flag.eq(u_regs.cr15_m_flag)
+        m.d.comb += self.debug_isolated_m_flags.eq(u_regs.isolated_m_flags)
 
         boot_wr_en = [Signal(name=f"boot_cap{i}_wr_en") for i in range(16)]
         boot_wr_gt = [Signal(GT_LAYOUT, name=f"boot_cap{i}_wr_gt") for i in range(16)]
@@ -1091,6 +1109,14 @@ class ChurchCore(Elaboratable):
                         C(0x400,      32),  # word1_location = 0x400 (DEMO_CLIST base)
                         C(63,         32),  # word2_w2: limit_offset=63 (64 entries)
                     )),
+                    # Protected execution identity for Namespace.Init. LOAD_NUC
+                    # replaces this with the normal transient boot fence after
+                    # the private device operation completes.
+                    boot_wr_en[14].eq(1),
+                    boot_wr_gt[14].eq(
+                        make_gt(GT_TYPE_INFORM,
+                                PERM_MASK_R | PERM_MASK_X,
+                                NAMESPACE_EXEC_SLOT, 0)),
                 ]
             with m.Case(BootState.LOAD_NUC):
                 # CR14 (code cap): TRANSIENT BOOT FENCE — uses Thread slot (1) as a transient
@@ -1154,21 +1180,18 @@ class ChurchCore(Elaboratable):
         runtime_wr_gt = [Signal(GT_LAYOUT, name=f"rt_cap{i}_wr_gt") for i in range(16)]
 
         if not self.iot_profile:
-            switch_change_active = Signal()
-            m.d.comb += switch_change_active.eq(
+            change_gt_sync_active = Signal()
+            m.d.comb += change_gt_sync_active.eq(
                 self.boot_complete & cond_exec_enable & is_church_op & ~any_unit_busy &
-                ((church_op == ChurchOpcode.SWITCH) | (church_op == ChurchOpcode.CHANGE))
+                (church_op == ChurchOpcode.CHANGE)
             )
 
             switch_src_gt = Signal(GT_LAYOUT)
             m.d.comb += switch_src_gt.eq(cr_rd_data_gt)
 
-            effective_target = Signal(3)
-            m.d.comb += effective_target.eq(Mux(church_op == ChurchOpcode.CHANGE, 0, switch_target[:3]))
-
-            with m.If(switch_change_active):
+            with m.If(change_gt_sync_active):
                 for i in range(8):
-                    with m.If(effective_target == i):
+                    with m.If(i == 0):
                         m.d.comb += [runtime_wr_en[8 + i].eq(1), runtime_wr_gt[8 + i].eq(switch_src_gt)]
 
         for i in range(16):
@@ -1341,6 +1364,16 @@ class ChurchCore(Elaboratable):
         ]
 
         dwrite_start_sig = Signal()
+        namespace_exec_gt = View(
+            GT_LAYOUT, View(CAP_REG_LAYOUT, u_regs.cr14_code).word0_gt)
+        namespace_exec_authorized = Signal()
+        m.d.comb += namespace_exec_authorized.eq(
+            (namespace_exec_gt.gt_type == GT_TYPE_INFORM) &
+            (namespace_exec_gt.slot_id == NAMESPACE_EXEC_SLOT) &
+            ~namespace_exec_gt.dom &
+            (namespace_exec_gt.perm == 0b101) &
+            ~namespace_exec_gt.b_flag
+        )
         m.d.comb += dwrite_start_sig.eq(
             cond_exec_enable & is_dwrite_op & ~any_unit_busy
         )
@@ -1354,6 +1387,12 @@ class ChurchCore(Elaboratable):
             u_dwrite.dr_rd_data.eq(u_regs.dr_rd_data2),
             # Port 2 (DRx for indexed mode): read via register port 1
             u_dwrite.dr_rd_data2.eq(u_regs.dr_rd_data1),
+            u_dwrite.namespace_authorized.eq(namespace_exec_authorized),
+            u_dwrite.private_m_start.eq(
+                (boot_state_reg == BootState.INIT_CLIST) &
+                namespace_init_armed & ~u_dwrite.busy & ~u_dwrite.done),
+            u_dwrite.private_m_target.eq(0),  # Namespace.Init provisions CR12.M
+            u_dwrite.private_m_value.eq(1),
         ]
         # dr_rd_addr2: dwrite source data, BFINS, and register-form IADD/ISUB
         # use port 2. Arithmetic register operands are encoded in imm[3:0]
@@ -1681,9 +1720,18 @@ class ChurchCore(Elaboratable):
             )
             m.d.comb += [
                 u_switch.switch_start.eq(switch_start_sig),
-                u_switch.cr_src.eq(cr_src[:3]),
-                u_switch.target.eq(switch_target[:3]),
+                u_switch.cr_src.eq(cr_src),
+                u_switch.target.eq(cr_dst),
                 u_switch.index.eq(cap_index),
+                # Do not use a subtract-and-bit-select here: malformed CRd
+                # values must not dynamically alias an isolated M latch.
+                u_switch.target_m.eq(
+                    Mux(cr_dst == SWITCH_TGT_CR12, u_regs.isolated_m_flags[0],
+                        Mux(cr_dst == SWITCH_TGT_CR13, u_regs.isolated_m_flags[1],
+                            Mux(cr_dst == SWITCH_TGT_CR14, u_regs.isolated_m_flags[2],
+                                Mux(cr_dst == SWITCH_TGT_CR15,
+                                    u_regs.isolated_m_flags[3], 0))))
+                ),
                 u_switch.cr_rd_data.eq(u_regs.cr_rd_data),
                 u_switch.cr15_namespace.eq(u_regs.cr15_namespace),
                 u_switch.mem_rd_data.eq(self.dmem_rd_data),

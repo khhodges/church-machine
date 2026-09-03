@@ -3839,7 +3839,7 @@ _RELEASE_1_MANIFEST = [
     ("ctmm-r1-08-namespace-security.pdf",   "Namespace Security",               "Security & Capabilities"),
     ("ctmm-r1-09-mint.pdf",                 "Mint & PassKey Issuance",          "Security & Capabilities"),
     ("ctmm-r1-10-mload.pdf",               "Machine Load (mLoad)",             "Security & Capabilities"),
-    ("ctmm-r1-11-switch-lifecycle.pdf",     "SWITCH Lifecycle & PassKey Install","Security & Capabilities"),
+    ("ctmm-r1-11-switch-lifecycle.pdf",     "SWITCH Lifecycle & M-Gated Load",   "Security & Capabilities"),
     ("ctmm-r1-12-boot-rom-layout.pdf",      "Boot ROM Layout",                  "Boot Sequence"),
     ("ctmm-r1-13-boot-permission-rules.pdf","Boot Permission Rules",            "Boot Sequence"),
     ("ctmm-r1-14-hardware-deviations.pdf",  "Hardware Deviations — All Closed", "Conformance"),

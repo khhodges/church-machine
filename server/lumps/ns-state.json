@@ -130,7 +130,7 @@
       "seq": 0,
       "seal": "0xDEA83EEF",
       "token": "00000a00",
-      "filename": "CapabilityTest.2.c7a66d01.lump",
+      "filename": "CapabilityTest.2.a537aadf.lump",
       "issue_n": 1,
       "resident": true
     },
@@ -157,16 +157,27 @@
       "seal": "0xDE91DEEF"
     },
     {
-      "name": "Bridge.Preload",
+      "name": "slot_13",
       "slot": 13,
       "location": "0x00000A00",
-      "type": "Outform",
+      "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x00001",
       "seq": 0,
       "seal": "0xDEA89EEF"
+    },
+    {
+      "name": "Bridge.Preload",
+      "slot": 14,
+      "location": "0x00000B00",
+      "type": "Outform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x00001",
+      "seq": 0,
+      "seal": "0xDEA81EEF"
     }
   ],
-  "generated_at": 1788432451.3638535
+  "generated_at": 1788436847.1820714
 }

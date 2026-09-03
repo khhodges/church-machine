@@ -353,7 +353,7 @@ function _getSyntaxSuggestion(msg) {
         return {
             title: 'Use a CR here, not a DR',
             body: 'This instruction needs a <strong>capability register</strong> (CR0–CR15). Data registers (DR0–DR15) hold plain values; CRs hold Golden Tokens.',
-            example: 'LOAD   CR1, CR0, #5   ; CR in every position\nCALL   CR1, CR0, #0   ; CR as destination and source\nSWITCH CR8            ; CR only'
+            example: 'LOAD   CR1, CR0, #5   ; CR in every position\nCALL   CR1, CR0, #0   ; CR as destination and source\nSWITCH CR12, CR6, #0  ; isolated destination, source, row'
         };
     }
     if (/is a CR alias.*expected a DR/i.test(msg)) {
@@ -2346,7 +2346,7 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets) {
 
     if (opcode === 5) {
         const sTag = _crTag(crSrc, crPets);
-        return { desc: _escDecomp(`switch${cc} ${sTag}, ${imm & 7}${ccDesc}`), compiler: false };
+        return { desc: _escDecomp(`switch${cc} CR${crDst}, ${sTag}, #${imm}${ccDesc}`), compiler: false };
     }
 
     if (opcode === 6) {

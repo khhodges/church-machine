@@ -61,6 +61,11 @@ class DeviceAbstractions {
     constructor(registry) {
         this.registry = registry;
         this.IO_SEGMENT = 0xFE00;
+        // The M-bit device is intentionally not registered as an abstraction
+        // and has no Namespace entry or discoverable address-to-capability
+        // conversion. Capabilities are object identities held only by Namespace.
+        this._mBitNamespaceOwner = null;
+        this._mBitCapabilities = null;
         this._deviceState = {
             uart: { txBuffer: [], rxBuffer: [], baud: 115200 },
             led: { state: 0x00, count: 6 },
@@ -70,6 +75,49 @@ class DeviceAbstractions {
             ethernet: { linkUp: true, txBuffer: [], rxBuffer: [], endpoint: null }
         };
         this._bindAll();
+    }
+
+    issueNamespaceMBitCapabilities(namespaceOwner) {
+        const canonicalOwner = this.registry && this.registry.abstractions
+            ? this.registry.abstractions[5] : null;
+        if (!canonicalOwner || canonicalOwner.name !== 'Navana' ||
+                namespaceOwner !== canonicalOwner || this._mBitCapabilities) {
+            return null;
+        }
+        const ports = [0xFFFFFF1C, 0xFFFFFF1D, 0xFFFFFF1E, 0xFFFFFF1F];
+        const capabilities = ports.map((port, offset) => Object.freeze({
+            device: 'M_BIT',
+            target: 12 + offset,
+            port: port >>> 0,
+            rights: 'S'
+        }));
+        this._mBitNamespaceOwner = namespaceOwner;
+        this._mBitCapabilities = new Set(capabilities);
+        return Object.freeze(capabilities.slice());
+    }
+
+    writeMBit(sim, capability, target, value, namespaceOwner) {
+        const expectedPort = (0xFFFFFF10 + target) >>> 0;
+        if (!this._mBitCapabilities || !this._mBitCapabilities.has(capability) ||
+                namespaceOwner !== this._mBitNamespaceOwner) {
+            return { ok: false, fault: 'PERM_M', message: 'M-bit device capability is absent or not owned by Namespace' };
+        }
+        if (!Number.isInteger(target) || target < 12 || target > 15 ||
+                capability.device !== 'M_BIT' || capability.target !== target ||
+                (capability.port >>> 0) !== expectedPort) {
+            return { ok: false, fault: 'PERM_M', message: 'M-bit device capability target/port mismatch' };
+        }
+        if (capability.rights !== 'S') {
+            return { ok: false, fault: 'PERM_S', message: 'M-bit device requires the exact S right' };
+        }
+        if (value !== 0 && value !== 1) {
+            return { ok: false, fault: 'ARGS', message: 'M-bit device accepts only 0 or 1' };
+        }
+        if (!sim || !sim.cr || !sim.cr[target]) {
+            return { ok: false, fault: 'BOUNDS', message: `M-bit device target CR${target} is unavailable` };
+        }
+        sim.cr[target].m = value;
+        return { ok: true, target, value };
     }
 
     _bindAll() {

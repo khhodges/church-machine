@@ -71,7 +71,7 @@ Every namespace access follows this exact sequence. Any failure at any step trig
 mLoad(source_capability, required_permission, index, destCR):
 
   1. Permission Check (mLoad — CHECK_L state)
-     Does the source capability have L or M permission?
+     Does the source capability have L permission? (M is never source authority.)
      (requiredPerm=null skips this check — used for RETURN context restoration)
      Failure → FAULT
 
@@ -126,7 +126,8 @@ This means:
 - **LOAD**: mLoad validates and writes to CRd
 - **CALL**: cLoad runs NSGate + lump header read → writes CR6 (c-list) and CR14 (code)
 - **RETURN**: mLoad (direct mode: `sub_direct=1`) revalidates saved E-GT against namespace — catches use-after-free
-- **SWITCH**: mLoad validates source GT and writes to privileged register CR12–CR15
+- **SWITCH**: special LOAD into CR12–CR15, gated by the accepted destination's
+  latched M bit. The c-list source still requires normal L permission.
 - **CHANGE**: Saves data registers + PC to thread lump; CRs reloaded via cLoad on next CALL/RETURN
 
 ### Instructions Using mLoad / ChurchNSGate
@@ -191,9 +192,15 @@ The Church Machine enforces the following invariants at all times:
 
 Only CR0–CR11 are addressable through the 4-bit register encoding in Church instructions. Privileged registers CR12–CR15 are physically unreachable through instruction encoding. This is an architectural constraint, not a software convention.
 
-### Privilege Through SWITCH Only
+### Isolated Loads and Namespace M Authority
 
-The SWITCH instruction is the sole mechanism for writing to privileged registers CR12–CR15. It requires appropriate permissions on the source capability.
+SWITCH is the special LOAD mechanism for CR12–CR15. Source L authorizes reading
+the c-list entry, but never authorizes the isolated destination. CRs must be
+CR0–CR11; an isolated source or non-isolated destination faults `INVALID_OP`.
+CRd.M must
+already be set; M-clear faults `PERM_L`. Only Namespace receives the dedicated M-bit I/O capabilities,
+each bound to one target register; wrong rights, ports, targets, or callers
+fail without changing registers, M state, namespace state, or memory.
 
 ### Capability-Mediated Access Through mLoad
 

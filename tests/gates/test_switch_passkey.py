@@ -1,224 +1,255 @@
-"""
-Regression tests for SWITCH instruction PassKey validation (Task #58).
+"""Focused hardware regressions for the corrected isolated SWITCH contract."""
 
-Checks enforced by ChurchSwitch.elaborate() before mLoad is invoked:
+import os
+import sys
 
-  1. Target check  — only Tgt=5 (CR13) and Tgt=7 (CR15) are valid.
-                     All other Tgt values produce INVALID_OP without reading CRs.
-
-  2. PassKey type check  — CRs.word0_gt.gt_type must equal GT_TYPE_ABSTRACT (11₂).
-                           Any Inform, Outform, or NULL GT produces INVALID_OP.
-
-  3. Sentinel address check  — CRs.word1_location must equal the reserved
-                               hardware sentinel for the target register:
-                                 Tgt=CR13 → 0xFFFFFFFE  (all-1s − 1)
-                                 Tgt=CR15 → 0xFFFFFFFF  (all-1s)
-                               A mismatch produces INVALID_OP.
-
-Test matrix (12 scenarios):
-  Fault cases:
-    T1  — invalid target (Tgt=0/CR8)                         → INVALID_OP fault
-    T2  — invalid target (Tgt=4/CR12)                        → INVALID_OP fault
-    T3  — valid target CR13, NULL source GT                   → INVALID_OP fault
-    T4  — valid target CR13, Inform source GT                 → INVALID_OP fault
-    T5  — valid target CR13, Outform source GT                → INVALID_OP fault
-    T6  — valid target CR13, Abstract GT + wrong sentinel     → INVALID_OP fault
-             (CR15 sentinel 0xFFFFFFFF presented to CR13 target)
-    T7  — valid target CR15, Abstract GT + wrong sentinel     → INVALID_OP fault
-             (CR13 sentinel 0xFFFFFFFE presented to CR15 target)
-
-  Valid cases (reach mLoad without prior fault):
-    T8  — valid target CR13, Abstract GT + correct sentinel   → stays busy (mLoad starts)
-    T9  — valid target CR15, Abstract GT + correct sentinel   → stays busy (mLoad starts)
-"""
-
-import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from amaranth import *
-from amaranth.lib.data import View
 from amaranth.sim import Simulator
 
-from hardware.switch import ChurchSwitch
+from hardware.registers import ChurchRegisters
+from hardware.integrity32 import integrity32
 from hardware.hw_types import (
     FaultType,
-    GT_TYPE_NULL, GT_TYPE_INFORM, GT_TYPE_OUTFORM, GT_TYPE_ABSTRACT,
-    SWITCH_PASSKEY_SENTINEL_CR13, SWITCH_PASSKEY_SENTINEL_CR15,
-    SWITCH_TGT_CR13, SWITCH_TGT_CR15,
+    GT_TYPE_INFORM,
+    PERM_MASK_L,
+    SWITCH_TGT_CR12,
+    SWITCH_TGT_CR13,
+    SWITCH_TGT_CR14,
+    SWITCH_TGT_CR15,
+    make_gt,
 )
-from hardware.layouts import GT_LAYOUT, CAP_REG_LAYOUT
+from hardware.switch import ChurchSwitch
 
 
-def _build_gt(gt_type=GT_TYPE_INFORM, slot_id=0, gt_seq=0, perms=0, b_flag=0):
-    """Pack a 32-bit GT word from its fields."""
-    gt  = (slot_id & 0xFFFF)
-    gt |= (gt_seq  & 0x7F) << 16
-    gt |= (gt_type & 0x03) << 23
-    gt |= (perms   & 0x3F) << 25
-    gt |= (b_flag  & 0x01) << 31
-    return gt
+def _cap(*, perms=PERM_MASK_L, location=0x1000, limit=7):
+    return (
+        make_gt(gt_type=GT_TYPE_INFORM, perms=perms, slot_id=1)
+        | (location << 32)
+        | (limit << 64)
+    )
 
 
-def _build_cap(gt_type=GT_TYPE_INFORM, slot_id=0, perms=0,
-               location=0, word2=0, word3=0):
-    """Build a 128-bit CAP_REG value (4 × 32-bit words packed as Python int)."""
-    gt = _build_gt(gt_type=gt_type, slot_id=slot_id, perms=perms)
-    return gt | (location << 32) | (word2 << 64) | (word3 << 96)
-
-
-def _run_switch(tgt, src_cap, max_ticks=20):
-    """
-    Drive ChurchSwitch for up to *max_ticks* after switch_start.
-
-    Returns (first_fault_type, still_busy_at_end).
-
-    first_fault_type is FaultType.NONE if no fault was seen; otherwise it is the
-    fault_type value from the first tick on which switch_fault went high.
-
-    Note: The ChurchSwitch PassKey validation exclusively emits FaultType.INVALID_OP.
-    Any other fault code (e.g. BOUNDS, NULL_CAP) originates from the inner mLoad
-    sub-operation and indicates that all PassKey checks passed.
-    """
+def _run(*, target, target_m, source=None, source_after_start=None, ticks=16):
     dut = ChurchSwitch()
-    first_fault = [FaultType.NONE]
-    still_busy = [False]
+    result = {
+        "fault": FaultType.NONE,
+        "mem_read": False,
+        "mem_write": False,
+        "cr_write": False,
+        "thread_write": False,
+        "read_addresses": [],
+    }
 
-    ns_cap = _build_cap(gt_type=GT_TYPE_INFORM, slot_id=0, location=0x8000)
-
-    async def process(ctx):
-        ctx.set(dut.cr_rd_data.as_value(), src_cap)
-        ctx.set(dut.cr_src, 0)
-        ctx.set(dut.target, tgt)
+    async def bench(ctx):
+        ctx.set(dut.cr_src, 9)
+        ctx.set(dut.target, target)
+        ctx.set(dut.target_m, target_m)
         ctx.set(dut.index, 0)
-        ctx.set(dut.cr15_namespace.as_value(), ns_cap)
-        ctx.set(dut.mem_rd_valid, 1)
-        ctx.set(dut.mem_rd_data, 0)
-
+        ctx.set(dut.cr_rd_data.as_value(), source if source is not None else _cap())
+        ctx.set(dut.cr15_namespace.as_value(), _cap(location=0x2000, limit=0xFFFF))
         ctx.set(dut.switch_start, 1)
         await ctx.tick()
         ctx.set(dut.switch_start, 0)
+        if source_after_start is not None:
+            ctx.set(dut.cr_rd_data.as_value(), source_after_start)
 
-        for _ in range(max_ticks):
+        for _ in range(ticks):
             await ctx.tick()
-            if ctx.get(dut.switch_fault) and first_fault[0] == FaultType.NONE:
-                first_fault[0] = ctx.get(dut.fault_type)
-
-        still_busy[0] = bool(ctx.get(dut.switch_busy))
+            result["mem_read"] |= bool(ctx.get(dut.mem_rd_en))
+            result["cr_write"] |= bool(ctx.get(dut.cr_wr_en))
+            result["thread_write"] |= bool(ctx.get(dut.thread_wr_en))
+            result["read_addresses"].append(ctx.get(dut.cr_rd_addr))
+            if ctx.get(dut.switch_fault):
+                result["fault"] = ctx.get(dut.fault_type)
 
     sim = Simulator(dut)
     sim.add_clock(1e-6)
-    sim.add_testbench(process)
-    with sim.write_vcd("/dev/null"):
+    sim.add_testbench(bench)
+    sim.run()
+    return result
+
+
+def test_all_four_isolated_targets_are_accepted():
+    for target in (
+        SWITCH_TGT_CR12,
+        SWITCH_TGT_CR13,
+        SWITCH_TGT_CR14,
+        SWITCH_TGT_CR15,
+    ):
+        result = _run(target=target, target_m=1)
+        assert result["fault"] != FaultType.INVALID_OP
+        assert result["mem_read"], f"CR{target} did not enter normal mLoad"
+        assert 9 in result["read_addresses"], "full 4-bit CR source was truncated"
+
+
+def test_nonisolated_and_malformed_targets_fault_without_side_effects():
+    for target in range(12):
+        result = _run(target=target, target_m=1)
+        assert result["fault"] == FaultType.INVALID_OP
+        assert not result["mem_read"]
+        assert not result["cr_write"]
+        assert not result["thread_write"]
+
+
+def test_isolated_source_registers_are_malformed_and_never_read():
+    for source_cr in range(12, 16):
+        dut = ChurchSwitch()
+        observed = {"fault": FaultType.NONE, "mem_read": False,
+                    "cr_write": False, "read_addresses": []}
+
+        async def bench(ctx):
+            ctx.set(dut.cr_src, source_cr)
+            ctx.set(dut.target, SWITCH_TGT_CR12)
+            ctx.set(dut.target_m, 1)
+            ctx.set(dut.cr_rd_data.as_value(), _cap())
+            ctx.set(dut.switch_start, 1)
+            await ctx.tick()
+            ctx.set(dut.switch_start, 0)
+            for _ in range(6):
+                await ctx.tick()
+                observed["mem_read"] |= bool(ctx.get(dut.mem_rd_en))
+                observed["cr_write"] |= bool(ctx.get(dut.cr_wr_en))
+                observed["read_addresses"].append(ctx.get(dut.cr_rd_addr))
+                if ctx.get(dut.switch_fault):
+                    observed["fault"] = ctx.get(dut.fault_type)
+
+        sim = Simulator(dut)
+        sim.add_clock(1e-6)
+        sim.add_testbench(bench)
         sim.run()
-
-    return first_fault[0], still_busy[0]
-
-
-def test_invalid_target_cr8():
-    """T1: Tgt=0 (CR8) is not a valid SWITCH target — expect INVALID_OP."""
-    src = _build_cap(gt_type=GT_TYPE_ABSTRACT, location=SWITCH_PASSKEY_SENTINEL_CR15)
-    ftype, _ = _run_switch(tgt=0, src_cap=src)
-    assert ftype == FaultType.INVALID_OP, f"Expected INVALID_OP, got {ftype}"
+        assert observed["fault"] == FaultType.INVALID_OP
+        assert not observed["mem_read"]
+        assert not observed["cr_write"]
+        # mLoad remains idle, so it never presents the malformed source.
+        assert source_cr not in observed["read_addresses"]
 
 
-def test_invalid_target_cr12():
-    """T2: Tgt=4 (CR12) is not a valid SWITCH target — expect INVALID_OP."""
-    src = _build_cap(gt_type=GT_TYPE_ABSTRACT, location=SWITCH_PASSKEY_SENTINEL_CR15)
-    ftype, _ = _run_switch(tgt=4, src_cap=src)
-    assert ftype == FaultType.INVALID_OP, f"Expected INVALID_OP, got {ftype}"
+def test_destination_m_clear_faults_before_source_or_memory_access():
+    result = _run(target=SWITCH_TGT_CR14, target_m=0)
+    assert result["fault"] == FaultType.PERM_L
+    assert not result["mem_read"]
+    assert not result["cr_write"]
+    assert not result["thread_write"]
 
 
-def test_valid_target_cr13_null_gt():
-    """T3: Tgt=CR13, source is NULL GT — expect INVALID_OP (not Abstract)."""
-    src = _build_cap(gt_type=GT_TYPE_NULL, location=SWITCH_PASSKEY_SENTINEL_CR13)
-    ftype, _ = _run_switch(tgt=SWITCH_TGT_CR13, src_cap=src)
-    assert ftype == FaultType.INVALID_OP, f"Expected INVALID_OP, got {ftype}"
+def test_destination_m_is_latched_at_instruction_acceptance():
+    # Clearing the live input after acceptance cannot revoke an already
+    # accepted operation; the accepted value is the authorization decision.
+    dut = ChurchSwitch()
+    observed = {"mem_read": False}
+
+    async def bench(ctx):
+        ctx.set(dut.cr_src, 2)
+        ctx.set(dut.target, SWITCH_TGT_CR12)
+        ctx.set(dut.target_m, 1)
+        ctx.set(dut.index, 0)
+        ctx.set(dut.cr_rd_data.as_value(), _cap())
+        ctx.set(dut.cr15_namespace.as_value(), _cap(location=0x2000, limit=0xFFFF))
+        ctx.set(dut.switch_start, 1)
+        await ctx.tick()
+        ctx.set(dut.switch_start, 0)
+        ctx.set(dut.target_m, 0)
+        for _ in range(12):
+            await ctx.tick()
+            observed["mem_read"] |= bool(ctx.get(dut.mem_rd_en))
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(bench)
+    sim.run()
+    assert observed["mem_read"]
 
 
-def test_valid_target_cr13_inform_gt():
-    """T4: Tgt=CR13, source is Inform GT — expect INVALID_OP (not Abstract)."""
-    src = _build_cap(gt_type=GT_TYPE_INFORM, location=SWITCH_PASSKEY_SENTINEL_CR13)
-    ftype, _ = _run_switch(tgt=SWITCH_TGT_CR13, src_cap=src)
-    assert ftype == FaultType.INVALID_OP, f"Expected INVALID_OP, got {ftype}"
-
-
-def test_valid_target_cr13_outform_gt():
-    """T5: Tgt=CR13, source is Outform GT — expect INVALID_OP (not Abstract)."""
-    src = _build_cap(gt_type=GT_TYPE_OUTFORM, location=SWITCH_PASSKEY_SENTINEL_CR13)
-    ftype, _ = _run_switch(tgt=SWITCH_TGT_CR13, src_cap=src)
-    assert ftype == FaultType.INVALID_OP, f"Expected INVALID_OP, got {ftype}"
-
-
-def test_cr13_passkey_presented_to_cr15_target():
-    """T6: Tgt=CR15 but CRs carries the CR13 sentinel — sentinel mismatch → INVALID_OP."""
-    src = _build_cap(gt_type=GT_TYPE_ABSTRACT, location=SWITCH_PASSKEY_SENTINEL_CR13)
-    ftype, _ = _run_switch(tgt=SWITCH_TGT_CR15, src_cap=src)
-    assert ftype == FaultType.INVALID_OP, f"Expected INVALID_OP (sentinel mismatch), got {ftype}"
-
-
-def test_cr15_passkey_presented_to_cr13_target():
-    """T7: Tgt=CR13 but CRs carries the CR15 sentinel — sentinel mismatch → INVALID_OP."""
-    src = _build_cap(gt_type=GT_TYPE_ABSTRACT, location=SWITCH_PASSKEY_SENTINEL_CR15)
-    ftype, _ = _run_switch(tgt=SWITCH_TGT_CR13, src_cap=src)
-    assert ftype == FaultType.INVALID_OP, f"Expected INVALID_OP (sentinel mismatch), got {ftype}"
-
-
-def test_valid_cr13_switch_reaches_mload():
-    """T8: Valid CR13 SWITCH — Abstract GT + correct sentinel.
-
-    All PassKey checks must pass (no INVALID_OP fault). The inner mLoad may
-    fault with a different code (e.g. BOUNDS) because the Abstract GT has no
-    real NS entry — that is expected and does NOT indicate a PassKey failure.
-    We distinguish by asserting first_fault_type != INVALID_OP.
-    """
-    src = _build_cap(gt_type=GT_TYPE_ABSTRACT, location=SWITCH_PASSKEY_SENTINEL_CR13)
-    ftype, _ = _run_switch(tgt=SWITCH_TGT_CR13, src_cap=src, max_ticks=20)
-    assert ftype != FaultType.INVALID_OP, (
-        f"PassKey validation rejected a valid CR13 PassKey (got INVALID_OP). "
-        f"Any non-INVALID_OP fault comes from mLoad and is acceptable here."
+def test_source_requires_normal_load_l_permission():
+    result = _run(
+        target=SWITCH_TGT_CR15,
+        target_m=1,
+        source=_cap(perms=0),
+        ticks=12,
     )
+    assert result["fault"] == FaultType.PERM_L
+    assert not result["mem_read"]
+    assert not result["cr_write"]
 
 
-def test_valid_cr15_switch_reaches_mload():
-    """T9: Valid CR15 SWITCH — Abstract GT + correct sentinel.
+def test_only_successful_switch_consume_control_clears_accepted_destination_m():
+    """The register-file consume wire is the sole successful-SWITCH lifecycle."""
+    dut = ChurchRegisters()
+    samples = []
 
-    All PassKey checks must pass (no INVALID_OP fault). Same rationale as T8.
-    """
-    src = _build_cap(gt_type=GT_TYPE_ABSTRACT, location=SWITCH_PASSKEY_SENTINEL_CR15)
-    ftype, _ = _run_switch(tgt=SWITCH_TGT_CR15, src_cap=src, max_ticks=20)
-    assert ftype != FaultType.INVALID_OP, (
-        f"PassKey validation rejected a valid CR15 PassKey (got INVALID_OP). "
-        f"Any non-INVALID_OP fault comes from mLoad and is acceptable here."
-    )
+    async def bench(ctx):
+        # Seed CR14's M latch through its dedicated device port.
+        ctx.set(dut.m_bit_device_target, 2)
+        ctx.set(dut.m_bit_device_value, 1)
+        ctx.set(dut.m_bit_device_wr_en, 1)
+        await ctx.tick()
+        ctx.set(dut.m_bit_device_wr_en, 0)
+        samples.append(ctx.get(dut.isolated_m_flags))
+
+        # A fault/no-completion path supplies no consume pulse and preserves M.
+        await ctx.tick()
+        samples.append(ctx.get(dut.isolated_m_flags))
+
+        # A successful SWITCH completion consumes only CR14's M latch.
+        ctx.set(dut.m_switch_consume_target, 2)
+        ctx.set(dut.m_switch_consume_en, 1)
+        await ctx.tick()
+        ctx.set(dut.m_switch_consume_en, 0)
+        samples.append(ctx.get(dut.isolated_m_flags))
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(bench)
+    sim.run()
+    assert samples == [0b0100, 0b0100, 0]
 
 
-if __name__ == "__main__":
-    tests = [
-        ("T1: invalid target CR8",             test_invalid_target_cr8),
-        ("T2: invalid target CR12",            test_invalid_target_cr12),
-        ("T3: CR13 target, NULL GT",           test_valid_target_cr13_null_gt),
-        ("T4: CR13 target, Inform GT",         test_valid_target_cr13_inform_gt),
-        ("T5: CR13 target, Outform GT",        test_valid_target_cr13_outform_gt),
-        ("T6: CR13 PassKey → CR15 target",     test_cr13_passkey_presented_to_cr15_target),
-        ("T7: CR15 PassKey → CR13 target",     test_cr15_passkey_presented_to_cr13_target),
-        ("T8: valid CR13 SWITCH (mLoad busy)", test_valid_cr13_switch_reaches_mload),
-        ("T9: valid CR15 SWITCH (mLoad busy)", test_valid_cr15_switch_reaches_mload),
-    ]
+def test_successful_switch_emits_consumption_for_accepted_target():
+    """Exercise the complete normal mLoad/NS-gate path, not a forced success."""
+    dut = ChurchSwitch()
+    source = _cap(location=0x1000, limit=0)
+    loaded_gt = make_gt(
+        gt_type=GT_TYPE_INFORM, perms=PERM_MASK_L, slot_id=1)
+    ns_w1 = 7
+    memory = {
+        0x1000: loaded_gt,
+        0x2010: 0x3000,
+        0x2014: ns_w1,
+        0x2018: integrity32(0x3000, ns_w1),
+        0x201C: 0,
+    }
+    observed = {"complete": False, "consume": False, "target": None}
 
-    passed = 0
-    failed = 0
-    for name, fn in tests:
-        try:
-            fn()
-            print(f"  PASS  {name}")
-            passed += 1
-        except AssertionError as e:
-            print(f"  FAIL  {name}: {e}")
-            failed += 1
-        except Exception as e:
-            print(f"  ERR   {name}: {type(e).__name__}: {e}")
-            failed += 1
+    async def bench(ctx):
+        ctx.set(dut.cr_src, 6)
+        ctx.set(dut.target, SWITCH_TGT_CR12)
+        ctx.set(dut.target_m, 1)
+        ctx.set(dut.index, 0)
+        ctx.set(dut.cr_rd_data.as_value(), source)
+        ctx.set(
+            dut.cr15_namespace.as_value(),
+            _cap(location=0x2000, limit=1),
+        )
+        ctx.set(dut.switch_start, 1)
+        pending = None
+        await ctx.tick()
+        ctx.set(dut.switch_start, 0)
+        for _ in range(96):
+            ctx.set(dut.mem_rd_valid, int(pending is not None))
+            ctx.set(dut.mem_rd_data, memory.get(pending, 0))
+            await ctx.tick()
+            if ctx.get(dut.switch_complete):
+                observed["complete"] = True
+            if ctx.get(dut.m_consume_en):
+                observed["consume"] = True
+                observed["target"] = ctx.get(dut.m_consume_target)
+            pending = (
+                ctx.get(dut.mem_addr) if ctx.get(dut.mem_rd_en) else None
+            )
 
-    print(f"\n{passed}/{passed + failed} tests passed")
-    if failed:
-        sys.exit(1)
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(bench)
+    sim.run()
+    assert observed == {"complete": True, "consume": True, "target": 0}

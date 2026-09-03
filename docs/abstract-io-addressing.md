@@ -3,10 +3,12 @@
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 
-> **Status**: Architectural specification. The Abstract GT type field (`gt_type = 11₂`) and
-> the SWITCH PassKey mechanism (Task #58) are implemented in hardware. The generalised
-> Abstract Address Space, the Home Base tunnel, and the IDE provisioning protocol are
-> specified here as the canonical extension of that foundation.
+> **HISTORICAL DESIGN / NON-AUTHORITATIVE.** The PassKey/sentinel model in this
+> document is superseded. Current SWITCH uses a CR0–CR11 ordinary L-capable
+> source and a CR12–CR15 destination gated by that destination's latched M bit.
+> M-clear faults `PERM_L`; malformed operands fault `INVALID_OP`; success
+> consumes M. Abstract-address material below is retained as design history and
+> must not be used as the current SWITCH security contract.
 
 ---
 

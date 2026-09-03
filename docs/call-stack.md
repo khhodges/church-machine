@@ -132,7 +132,7 @@ The CHANGE instruction performs thread context switching by modifying the thread
 | **CR14 — Saved/Restored** | Code register — per-thread, saved and restored with each context switch |
 | **CR15 — Saved/Restored** | Namespace root — per-thread, saved and restored with each context switch |
 
-CHANGE performs a full atomic swap of per-thread state: data registers DR0–DR15, the 12 programmer-accessible capability registers CR0–CR11, the hidden STO (Stack Top Offset), PC, condition FLAGS, and LAMBDA state. CR5 (Heap GT) is re-installed automatically from the incoming thread's Zone ④ bounds. CR14 (code register) and CR15 (namespace root) are per-thread and are saved and restored by CHANGE. CR12 (thread stack) and CR13 (interrupt handler) are system-wide and are never touched by CHANGE — they remain constant across all threads. To write CR13 or CR15, code must use SWITCH — the explicit privilege gate — presenting the correct PassKey.
+CHANGE performs a full atomic swap of per-thread state: data registers DR0–DR15, the 12 programmer-accessible capability registers CR0–CR11, the hidden STO (Stack Top Offset), PC, condition FLAGS, and LAMBDA state. CR5 (Heap GT) is re-installed automatically from the incoming thread's Zone ④ bounds. CR14 (code register) and CR15 (namespace root) are per-thread and are saved and restored by CHANGE. CR12 (thread stack) and CR13 (interrupt handler) are system-wide and are never touched by CHANGE. SWITCH is the destination-M-gated special LOAD path for explicitly replacing an isolated register.
 
 ### THREAD_HDR — Hidden Per-Thread Machine Register
 
@@ -158,38 +158,23 @@ This "restore-only from an immutable source" pattern eliminates the save path en
 
 ---
 
-## SWITCH: The Privilege Gate
+## SWITCH: M-Gated Isolated LOAD
 
-SWITCH is the sole mechanism for writing to the two system-wide registers **CR13** (IRQ Thread) and **CR15** (Namespace root). CR12 (thread stack) is a system-wide register that cannot be written by user instructions. CR14 (transient code-view) is re-derived by cLoad on every CALL and is equally off-limits.
+SWITCH loads a c-list entry into CR12–CR15. It uses the destination's
+instruction-accepted, latched M bit as authority.
 
 | Aspect | Detail |
 |--------|--------|
-| **Mnemonic** | `SWITCH CRs, target` |
-| **Valid Targets** | CR13 (Tgt=101₂) and CR15 (Tgt=111₂) only — all others FAULT |
-| **PassKey type check** | CRs.word0_gt.gt_type must equal `11₂` (Abstract GT); any other type → FAULT |
-| **Sentinel for CR13** | CRs.word1_location must equal `0xFFFFFFFE` (all-1s − 1) |
-| **Sentinel for CR15** | CRs.word1_location must equal `0xFFFFFFFF` (all-1s) |
-| **Sentinel mismatch** | CRs sentinel does not match the chosen target → FAULT |
+| **Mnemonic** | `SWITCH CRd, CRs, #row` |
+| **Valid destination** | CR12–CR15 |
+| **Valid source** | CR0–CR11, with ordinary LOAD L authority |
+| **Operand fault** | Non-isolated destination, isolated source, malformed encoding → `INVALID_OP` |
+| **Authorization fault** | Latched destination M clear → `PERM_L` |
+| **Success** | Load c-list[row] into CRd and consume CRd.M |
 
-SWITCH enforces two mandatory checks on the source register **CRs** before installing it into the target:
-
-1. **PassKey type check** — CRs.word0_gt.gt_type must equal `11₂` (Abstract GT). Any non-Abstract capability faults. Abstract GTs used as SWITCH tokens are called *PassKeys*.
-2. **Sentinel address check** — CRs.word1_location must equal the reserved hardware sentinel address for the target register:
-   - Tgt = CR13 (IRQ Thread): sentinel = `0xFFFFFFFE` (all-1s − 1)
-   - Tgt = CR15 (Namespace): sentinel = `0xFFFFFFFF` (all-1s)
-
-The sentinel values occupy the top of the 32-bit Abstract Address Space — a range no real RAM lump can occupy — so there is no ambiguity between a PassKey and a live capability. Presenting a CR13 PassKey to the CR15 target (or vice versa) is a sentinel mismatch and faults immediately.
-
-Only code that already holds the appropriate PassKey in an instruction-addressable register (CR0–CR11) can install it into a system register. This makes SWITCH a one-way privilege gate: without the right PassKey, no code can overwrite a live system register regardless of what other permissions it holds.
-
-### SWITCH PassKeys as Abstract GT I/O Tokens
-
-The two SWITCH PassKeys are the first two entries in the **Abstract Address
-Space** — the 32-bit `word1_location` range reserved by this design for routed
-I/O and remote addressing. Proposed Abstract-GT tunnel and remote-service uses,
-including Home Base (`0xFF000000`), are design material; encrypted tunnels are
-not shipped in FW=2.
-
-See [Abstract GT I/O and Network Addressing](abstract-io-addressing.md) for the full Abstract Address Space layout and IDE provisioning protocol.
+M is destination-register state, not a source permission. Namespace alone
+holds the target-bound M-bit device capabilities used to authorize a later
+SWITCH. Source M is irrelevant. Faults do not mutate CRs, M bits, namespace
+entries, or memory.
 ---
 *Confidential — Kenneth Hamer-Hodges — April 2026*
