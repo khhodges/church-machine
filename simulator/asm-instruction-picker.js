@@ -292,7 +292,10 @@
         pickerBodyEl.className = 'asm-picker-body';
         picker.appendChild(pickerBodyEl);
 
-        renderByCategory(activeCatName);
+        // null is the explicit "All" tab.  Passing it to renderByCategory()
+        // looks for a category literally named null and leaves the popup empty.
+        if (activeCatName === null) renderGrouped();
+        else renderByCategory(activeCatName);
 
         filterInputEl.addEventListener('input', function () {
             renderFiltered(filterInputEl.value);
