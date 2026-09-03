@@ -29,19 +29,25 @@
     <meta property="og:image:alt" content="Church Machine IDE — lambda symbol in Church Gold on dark background">
     <script>
     (function() {
+        function describeNonError(value, fallback) {
+            if (value === null || value === undefined) return fallback || 'null/undefined';
+            if (typeof value !== 'object') return String(value);
+            if (value.message || value.name) return String(value.message || value.name);
+            try {
+                return JSON.stringify(value);
+            } catch (_serializationError) {
+                return Object.prototype.toString.call(value);
+            }
+        }
         window.addEventListener('unhandledrejection', function(event) {
             if (!(event.reason instanceof Error)) {
-                var msg = (event.reason === null || event.reason === undefined)
-                    ? 'null/undefined rejection'
-                    : (typeof event.reason === 'object'
-                        ? (event.reason.message || event.reason.name || JSON.stringify(event.reason))
-                        : String(event.reason));
+                var msg = describeNonError(event.reason, 'null/undefined rejection');
                 console.warn('[Church Machine] Caught non-Error rejection:', msg);
                 event.preventDefault();
             }
         });
         window.addEventListener('error', function(event) {
-            if (!event.error) {
+            if (!(event.error instanceof Error)) {
                 // Suppress the well-known benign ResizeObserver notification — wrapping
                 // ResizeObserver callbacks in requestAnimationFrame is the real fix, but
                 // some browsers still emit this on the first frame; it is never actionable.
@@ -50,7 +56,8 @@
                     event.preventDefault();
                     return;
                 }
-                console.warn('[Church Machine] Caught non-Error window error:', msg || '(no message)', 'at', event.filename + ':' + event.lineno);
+                var detail = describeNonError(event.error, msg || '(no message)');
+                console.warn('[Church Machine] Caught non-Error window error:', detail, 'at', event.filename + ':' + event.lineno);
                 event.preventDefault();
             }
         });
