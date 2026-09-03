@@ -8,6 +8,8 @@ const checks = [
   ['guard prevents artifact crash propagation', source.includes("console.warn('[Church Machine] Caught non-Error window error:'") &&
     source.includes('event.preventDefault();') &&
     source.includes('event.stopImmediatePropagation();')],
+  ['guard observes resource errors in capture phase',
+    /window\.addEventListener\('error',[\s\S]*?\}, true\);/.test(source)],
 ];
 
 for (const [name, ok] of checks) {
