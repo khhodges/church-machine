@@ -5,6 +5,7 @@ const source = fs.readFileSync(path.join(__dirname, 'clist-viewer.js'), 'utf8');
 
 const checks = [
   ["server access check", source.includes("fetch('/api/m-bit-ide-access'")],
+  ["accepted local grant survives fail-closed GET", source.includes("if (!_mBitUnlocked) await _fetchMBitAccess()")],
   ["same-origin secret verification", source.includes("credentials: 'same-origin'")],
   ["strict unlocked response", source.includes("result.unlocked === true")],
   ["private capability name", source.includes('data-cap-name=\"M_BIT_DEV\"')],

@@ -1007,7 +1007,9 @@
     async function buildPickerContentAsync() {
         var s = (typeof sim !== 'undefined') ? sim : null;
         var bodyRows = '';
-        await _fetchMBitAccess();
+        // GET is deliberately fail-closed and never persists an unlock. Do not
+        // let it erase the browser-memory one-click grant just accepted by POST.
+        if (!_mBitUnlocked) await _fetchMBitAccess();
 
         // Section 0: NULL — custom named placeholder slot (filled at compile/runtime)
         bodyRows += '<div class="clist-picker-section-header">Custom</div>' +
