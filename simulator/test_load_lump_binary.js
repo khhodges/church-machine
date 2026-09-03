@@ -1435,6 +1435,51 @@ console.log('\n--- LLB-23: raw assembly keeps its type-0 row-zero layout ---');
         JSON.stringify(rawList.sim._compilerOwnedSelfSlots || {}));
 }
 
+// ── LLB-23b: M authorizes SAVE from isolated registers ─────────────────────
+console.log('\n--- LLB-23b: isolated SAVE requires and consumes source M ---');
+{
+    const makeState = () => {
+        const state = setupAndLoad({ cw: 4, cc: 9, typ: 2, row0: 0 });
+        const { sim, nsBase } = state;
+        const seq = sim.parseNSWord1(sim.memory[nsBase + 1]).gtSeq;
+        const slot = sim.bootEntrySlot;
+        const clistLoc = EXTENDED_BASE + 64 - 9;
+        sim.cr[6] = {
+            word0: sim.createGT(seq, slot, { S: 1, B: 1 }, 1),
+            word1: clistLoc,
+            word2: sim.memory[nsBase + 1],
+            word3: sim.memory[nsBase + 2],
+            m: 0,
+        };
+        sim.cr[12] = {
+            word0: sim.createGT(seq, slot, { E: 1 }, 1),
+            word1: EXTENDED_BASE,
+            word2: sim.memory[nsBase + 1],
+            word3: sim.memory[nsBase + 2],
+            m: 0,
+        };
+        return { ...state, clistLoc };
+    };
+
+    const denied = makeState();
+    const deniedBefore = denied.sim.memory[denied.clistLoc + 7] >>> 0;
+    denied.sim._execSave({ crDst: 12, crSrc: 6, imm: 7 });
+    check('LLB-23b-a: isolated SAVE with M=0 faults without changing its row',
+        denied.sim.memory[denied.clistLoc + 7] === deniedBefore &&
+        denied.sim.faultLog.some(f => f.type === 'PERM_L'),
+        JSON.stringify(denied.sim.faultLog.slice(-1)));
+
+    const accepted = makeState();
+    const expected = accepted.sim.cr[12].word0 >>> 0;
+    accepted.sim.cr[12].m = 1;
+    const result = accepted.sim._execSave({ crDst: 12, crSrc: 6, imm: 7 });
+    check('LLB-23b-b: isolated SAVE with M=1 writes the GT',
+        result !== null && accepted.sim.memory[accepted.clistLoc + 7] === expected,
+        JSON.stringify(accepted.sim.faultLog.slice(-1)));
+    check('LLB-23b-c: successful isolated SAVE consumes source M',
+        accepted.sim.cr[12].m === 0, `M=${accepted.sim.cr[12].m}`);
+}
+
 // ── LLB-24: saved compiler LUMPs remint identity when reinstalled ─────────────
 console.log('\n--- LLB-24: saved compiler LUMPs retain identity provenance ---');
 {

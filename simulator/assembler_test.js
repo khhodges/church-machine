@@ -675,8 +675,9 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
     assert('P11 malformed .pet (missing register): error', b.errors.length > 0, 'expected an error');
 }
 
-// P12: Privilege Zone — CR12–CR15 cannot be a destination for LOAD / SAVE /
-//      ELOADCALL / XLOADLAMBDA. CALL is unrestricted (control-flow only).
+// P12: Privilege Zone — CR12–CR15 cannot be a destination for LOAD /
+//      ELOADCALL / XLOADLAMBDA. SAVE is accepted and checked dynamically
+//      against the source register's M bit. CALL is unrestricted.
 //      Exception: CR14 (Current-Lump, RX) is allowed as the SOURCE of DREAD
 //      so user code can read embedded data constants from the code lump.
 {
@@ -696,12 +697,11 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
         b.errors.some(e => e.message.includes('CR15')),
         b.errors.map(e => e.message).join('; '));
 
-    // P12c: SAVE CR14 → error
+    // P12c: SAVE CR14 is syntactically valid; runtime requires CR14.M
     const c = new ChurchAssembler();
     c.assemble('SAVE CR14, CR6, 0');
-    assert('P12c SAVE CR14: error', c.errors.length > 0, 'expected an error');
-    assert('P12c SAVE CR14: error mentions CR14',
-        c.errors.some(e => e.message.includes('CR14')),
+    assert('P12c SAVE CR14: accepted for runtime M-bit authorization',
+        c.errors.length === 0,
         c.errors.map(e => e.message).join('; '));
 
     // P12d: ELOADCALL CR13 → error
@@ -5706,6 +5706,18 @@ HALT
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('EX1 capability_test produces at least one word',
         result.words.length > 0, `got ${result.words.length}`);
+}
+
+// M-SAVE-1: M-gated SAVE may name isolated CR12–CR15; runtime enforces M.
+{
+    const a = new ChurchAssembler({});
+    const result = a.assemble(`
+SAVE CR12, CR6[7]
+SAVE CR13, CR6[8]
+`);
+    assert('M-SAVE-1 isolated SAVE operands assemble without static privilege errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    assert('M-SAVE-1 emits both SAVE instructions', result.words.length === 2);
 }
 
 // EX2: system_patterns — three sections, raw slot access

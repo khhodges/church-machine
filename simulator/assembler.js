@@ -1349,7 +1349,10 @@ class ChurchAssembler {
             }
             case 1: {
                 crDst = this._parseCR(parts[1], lineNum);
-                this._checkPrivCR(crDst, 'SAVE', lineNum);
+                // SAVE may read CR12–CR15 when that register's M bit authorizes
+                // the access at runtime. The simulator/hardware performs the
+                // dynamic M check and consumes M only after a successful save.
+                if (crDst < 12) this._checkPrivCR(crDst, 'SAVE', lineNum);
                 const res1 = this._resolveNSNameBracket(parts[2], parts[3]);
                 if (res1 !== null && (!parts[3] || res1.consumed)) {
                     crSrc = 6;

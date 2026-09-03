@@ -18,6 +18,10 @@ states. In the Namespace UI, classify its Source as “Resident I/O register” 
 never offer LUMP Source/Identity controls. SWITCH tests and consumes its
 destination bit. Preserve generated
 Thread#2 and Thread#3 at slots 11 and 12; later generated Threads skip slot 13.
+For SAVE, an isolated source CR12–CR15 is readable only when its own M bit is
+set at instruction acceptance. That M authority bypasses the source GT's normal
+B/F export gates, while the destination C-list must still independently grant S.
+Consume the source M bit only after a successful, atomic C-list write.
 The M_BIT_DEV Inform GT must always have B=0 so it cannot be saved into a C-List.
 
 The Add Capability picker exposes M_BIT_DEV only after an exact, case-sensitive

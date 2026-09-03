@@ -5390,7 +5390,7 @@ class ChurchSimulator {
         //   DREAD (opcode 16) / DWRITE (opcode 17): may use CR14 as the source
         //     capability field to access read-only data packed after HALT in the
         //     code lump (`DREAD DR, CR14, offset` pattern).
-        if (d.opcode !== 4 && d.opcode !== 5) {
+        if (d.opcode !== 1 && d.opcode !== 4 && d.opcode !== 5) {
             // crDst encodes a CR index only for Church opcodes (0–9).
             // Turing opcodes (16–25) put a DR index in the same bit field — do not fence them.
             const isChurchOp = (d.opcode <= 9);
@@ -5791,6 +5791,15 @@ class ChurchSimulator {
     }
 
     _execSave(d) {
+        // M is the explicit authority for reading an isolated register.  Keep
+        // ordinary SAVE behavior unchanged; CR12–CR15 require M at acceptance
+        // and consume it only once the c-list write has completed.
+        const isolatedSource = d.crDst >= 12 && d.crDst <= 15;
+        if (isolatedSource && !this.mElevation && this.cr[d.crDst].m !== 1) {
+            this.fault('PERM_L',
+                `SAVE: source CR${d.crDst} had M=0 when the instruction was accepted`);
+            return null;
+        }
         // Hardware rule: CR6 is the active c-list and row 0 is always the
         // resident identity credential.  This must fault before any operand,
         // permission, Namespace, or memory path can mask the violation.
@@ -5834,7 +5843,17 @@ class ChurchSimulator {
         // unreachable for every SAVE instruction (bug).
         const clistGT = this.cr[d.crSrc].word0;
         const clistTargetIdx = (clistGT !== 0) ? this.parseGT(clistGT).index : null;
-        const saveCheck = this.mSave(srcGT, clistTargetIdx, d.crDst);
+        // The accepted source M bit is the passkey for exporting an isolated
+        // register's GT. It bypasses mSave's ordinary B/F transfer gates, while
+        // the destination c-list must still independently authorize S.
+        let saveCheck;
+        const priorMElevation = this.mElevation;
+        if (isolatedSource && !priorMElevation) this.mElevation = true;
+        try {
+            saveCheck = this.mSave(srcGT, clistTargetIdx, d.crDst);
+        } finally {
+            this.mElevation = priorMElevation;
+        }
         if (!saveCheck.ok) {
             this.fault(saveCheck.fault, `SAVE: CR${d.crDst}: ${saveCheck.message}`);
             return null;
@@ -5894,6 +5913,9 @@ class ChurchSimulator {
         }
 
         this._writeRuntimeWord(clistLoc + d.imm, srcGT);
+        if (isolatedSource && !this.mElevation) {
+            this.cr[d.crDst].m = 0;
+        }
         const srcParsed = saveCheck.parsed;
         const clistIdx = clistCheck.parsed.index;
         if (!this.nsClistMap[clistIdx]) {
