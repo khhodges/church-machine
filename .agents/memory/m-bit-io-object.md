@@ -20,12 +20,14 @@ destination bit. Preserve generated
 Thread#2 and Thread#3 at slots 11 and 12; later generated Threads skip slot 13.
 
 The Add Capability picker exposes M_BIT_DEV only after an exact, case-sensitive
-IDE-secret unlock. The server verifies the secret and issues a persistent,
-HTTP-only browser cookie; the secret must never be embedded in browser code.
+IDE-secret unlock. The server verifies the secret without persisting access;
+the secret must never be embedded in browser code.
 
-**Why:** The owner wants this privileged picker entry available continuously on
-their IDE browser without making it generally visible to other IDE users.
+**Why:** The owner requires this privileged entry to be single-use. Any click
+inside the picker after unlock consumes access immediately, regardless of the
+clicked item or whether its action succeeds.
 
 **How to apply:** Keep the locked picker form and server verification boundary.
-Changing the configured secret must revoke existing unlock cookies. The unlocked
-row is one Inform RW capability named M_BIT_DEV at NS slot 13.
+Never issue an unlock cookie. Reveal one Inform RW row named M_BIT_DEV at NS slot
+13 only until the next picker click, then remove it synchronously and require the
+secret again.

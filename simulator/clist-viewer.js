@@ -79,18 +79,32 @@
 
         // ── Delegated click handler: handles row clicks without inline onclick ─
         popupEl.addEventListener('click', function (e) {
-            var backBtn = e.target.closest('[data-action="show-view"]');
-            if (backBtn) { showViewer(); return; }
-
-            var addBtn = e.target.closest('[data-action="show-picker"]');
-            if (addBtn) { showPicker(); return; }
-
             var unlockMBitBtn = e.target.closest('[data-action="unlock-m-bit"]');
             if (unlockMBitBtn) {
                 e.preventDefault();
                 _unlockMBitPicker();
                 return;
             }
+
+            // A successful secret entry grants exactly one subsequent click
+            // anywhere in this popup. Consume it synchronously before handling
+            // that click, even when the target is not M_BIT_DEV or the action
+            // later fails. Preserve the pre-consumption value only so that the
+            // M_BIT_DEV row itself can complete this one authorized click.
+            var mBitClickGrant = _mBitUnlocked;
+            if (mBitClickGrant) {
+                _mBitUnlocked = false;
+                var mBitRow = popupEl.querySelector('.clist-picker-row[data-cap-name="M_BIT_DEV"]');
+                if (mBitRow) mBitRow.remove();
+                var mBitHeader = popupEl.querySelector('.clist-m-bit-private-header');
+                if (mBitHeader) mBitHeader.remove();
+            }
+
+            var backBtn = e.target.closest('[data-action="show-view"]');
+            if (backBtn) { showViewer(); return; }
+
+            var addBtn = e.target.closest('[data-action="show-picker"]');
+            if (addBtn) { showPicker(); return; }
 
             var deleteBtn = e.target.closest('[data-action="delete-capability"]');
             if (deleteBtn) {
@@ -167,7 +181,11 @@
             var pickerRow = e.target.closest('.clist-picker-row[data-cap-name]');
             if (pickerRow) {
                 if (pickerRow.dataset.capName === '__NULL__') { showNullSlotForm(); return; }
-                _insertCapability(pickerRow.dataset.capName, pickerRow.dataset.capRights || '');
+                _insertCapability(
+                    pickerRow.dataset.capName,
+                    pickerRow.dataset.capRights || '',
+                    mBitClickGrant
+                );
                 return;
             }
 
@@ -1019,7 +1037,7 @@
                 '</div>';
         });
         if (_mBitUnlocked) {
-            bodyRows += '<div class="clist-picker-section-header">Private IDE capability</div>' +
+            bodyRows += '<div class="clist-picker-section-header clist-m-bit-private-header">Private IDE capability</div>' +
                 '<div class="clist-picker-row" data-cap-name="M_BIT_DEV" data-cap-rights="RW">' +
                 '<span class="clist-picker-type clist-picker-type--inform">Inform</span>' +
                 '<span class="clist-picker-name">M_BIT_DEV</span>' +
@@ -1206,9 +1224,9 @@
             .filter(function (e) { return e && !/^[;/]/.test(e[0]); });
     }
 
-    function _insertCapability(capName, rights) {
+    function _insertCapability(capName, rights, mBitClickGrant) {
         if (!capName) { hideViewer(); return; }
-        if (capName === 'M_BIT_DEV' && !_mBitUnlocked) {
+        if (capName === 'M_BIT_DEV' && mBitClickGrant !== true) {
             _showPolaToast(getOrCreatePopup(), 'M_BIT_DEV requires the private IDE unlock.');
             return;
         }
