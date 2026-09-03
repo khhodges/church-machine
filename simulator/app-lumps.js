@@ -3050,6 +3050,10 @@ function _buildTextEditor(token, text, bodyEl, lump, renderFn) {
         });
         discardBtn2.addEventListener('click', () => {
             _draftLsDel(tk);
+            delete _lumpEditorDraftText[tk];
+            ta.value = text;
+            livePreview.innerHTML = '';
+            renderFn(livePreview, text);
             restoreBanner.remove();
         });
         editorArea.appendChild(restoreBanner);
@@ -3258,7 +3262,10 @@ function _buildTextEditor(token, text, bodyEl, lump, renderFn) {
             // Toggle open.
             _lumpEditDirty = true;
             _lumpEditorOpen[tk] = true;
-            _draftLsSet(tk, ta.value);
+            // Opening the editor is not an edit.  Persist only content that
+            // actually differs from the saved source; otherwise a simple
+            // open/close manufactures a false "draft restored" state.
+            if (ta.value !== text) _draftLsSet(tk, ta.value);
             preview.style.display = 'none';
             editorArea.style.display = '';
             restoreSplitRatio();
@@ -5487,6 +5494,26 @@ async function openLumpInEditor(token) {
     }
 
     if (window._savedLumpOpenRequestId !== _openRequestId) return;
+
+    // ── Transfer editor ownership to the saved LUMP ───────────────────────
+    // The editor may currently show a built-in example or personal tab. Save
+    // a dirty personal tab before replacing its buffer, then clear all active
+    // tab/example markers. Without this handoff the previous example (for
+    // example Ada Note G) remains highlighted while a different LUMP's draft
+    // is restored, making the draft appear to belong to the wrong document.
+    if (typeof activeUserTabId !== 'undefined' && activeUserTabId &&
+            typeof userTabDirty !== 'undefined' && userTabDirty &&
+            typeof saveActiveUserTab === 'function') {
+        saveActiveUserTab();
+    }
+    if (typeof activeUserTabId !== 'undefined') activeUserTabId = null;
+    if (typeof userTabDirty !== 'undefined') userTabDirty = false;
+    document.querySelectorAll('.example-tab').forEach(function(tab) {
+        tab.classList.remove('active');
+    });
+    if (typeof renderUserTabs === 'function') renderUserTabs();
+    if (typeof updateSaveUserTabBtn === 'function') updateSaveUserTabBtn();
+    window._editorSourceFilePath = null;
 
     // ── Set up editor context ──────────────────────────────────────────────
     _editorCREditActive = true;
