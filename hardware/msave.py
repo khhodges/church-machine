@@ -14,6 +14,10 @@ class ChurchMSave(Elaboratable):
         self.sub_dst_cap = Signal(CAP_REG_LAYOUT)
         self.sub_src_gt = Signal(32)
         self.sub_index = Signal(16)
+        # Accepted per-register M authority permits exporting an isolated CR
+        # without the ordinary source B/F export gates. Destination S and all
+        # Namespace integrity/version checks remain mandatory.
+        self.sub_src_m_elevated = Signal()
         # The generic mSave primitive does not know which CR supplied the
         # destination capability. ChurchSave asserts this only for CR6.
         self.sub_immutable_row0 = Signal()
@@ -41,6 +45,7 @@ class ChurchMSave(Elaboratable):
         src_gt_reg = Signal(32)
         index_reg = Signal(16)
         immutable_row0_reg = Signal()
+        src_m_elevated_reg = Signal()
         fault_type_reg = Signal(5)
 
         dst_view = View(CAP_REG_LAYOUT, dst_cap_reg)
@@ -87,6 +92,7 @@ class ChurchMSave(Elaboratable):
                         src_gt_reg.eq(self.sub_src_gt),
                         index_reg.eq(self.sub_index),
                         immutable_row0_reg.eq(self.sub_immutable_row0),
+                        src_m_elevated_reg.eq(self.sub_src_m_elevated),
                         fault_type_reg.eq(FaultType.NONE),
                     ]
                     m.next = "CHECK_IMMUTABLE_ROW"
@@ -114,6 +120,16 @@ class ChurchMSave(Elaboratable):
                     m.d.sync += fault_type_reg.eq(FaultType.PERM_S)
                     m.next = "FAULT"
                 with m.Else():
+                    m.next = "CHECK_F"
+
+            with m.State("CHECK_F"):
+                # F marks a remote destination c-list. Ordinary SAVE cannot
+                # export into it, while accepted source M authority provides
+                # the explicit isolated-register export override.
+                with m.If(dst_w2.f_flag & ~src_m_elevated_reg):
+                    m.d.sync += fault_type_reg.eq(FaultType.F_BIT)
+                    m.next = "FAULT"
+                with m.Else():
                     m.next = "CHECK_BOUNDS"
 
             with m.State("CHECK_BOUNDS"):
@@ -124,7 +140,7 @@ class ChurchMSave(Elaboratable):
                     m.next = "CHECK_SRC_BOUND"
 
             with m.State("CHECK_SRC_BOUND"):
-                with m.If(~src_gt_view.b_flag):
+                with m.If(~src_gt_view.b_flag & ~src_m_elevated_reg):
                     m.d.sync += fault_type_reg.eq(FaultType.NULL_CAP)
                     m.next = "FAULT"
                 with m.Else():

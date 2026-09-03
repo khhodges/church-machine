@@ -267,6 +267,32 @@ function fail(msg) { ERRORS.push(msg); }
     console.log('[PASS] mSave F_BIT fault fired for far target slot: "' + result.message + '"');
 })();
 
+// ─── Test 6: accepted source M bypasses both B and F export gates ────────────
+
+(function testMSaveSourceMExportOverride() {
+    const sim = bootSim();
+    if (!sim.bootComplete) {
+        fail('Boot did not complete for source-M export override test');
+        return;
+    }
+
+    const slotIdx = sim.bootEntrySlot;
+    const memBase = sim._nsSlotBase(slotIdx);
+    const gtSeq = sim.parseNSWord1(sim.memory[memBase + 1]).gtSeq;
+    const unboundGT = sim.createGT(gtSeq, slotIdx, { E: 1 }, 1);
+    sim.memory[memBase + 1] =
+        (sim.memory[memBase + 1] | 0x80000000) >>> 0;
+
+    const result = sim.mSave(
+        unboundGT, slotIdx, 12, undefined, undefined, true);
+    if (!result.ok) {
+        fail('accepted source M did not bypass B/F export gates: ' +
+             result.fault + ' ' + result.message);
+        return;
+    }
+    console.log('[PASS] accepted source M bypasses B/F export gates');
+})();
+
 // ─── Report ──────────────────────────────────────────────────────────────────
 
 if (ERRORS.length > 0) {

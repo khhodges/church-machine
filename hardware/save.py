@@ -16,6 +16,12 @@ class ChurchSave(Elaboratable):
         self.save_complete = Signal()
         self.save_fault = Signal()
         self.fault_type = Signal(5)
+        # Per-CR M authority is sampled with the accepted instruction.  A
+        # successful isolated SAVE pulses m_consume_en so the register file can
+        # consume exactly that source bit; fault paths never pulse it.
+        self.source_m = Signal()
+        self.m_consume_en = Signal()
+        self.m_consume_target = Signal(2)
 
         self.cr_rd_addr = Signal(4)
         self.cr_rd_data = Signal(CAP_REG_LAYOUT)
@@ -43,6 +49,11 @@ class ChurchSave(Elaboratable):
         dst_reg_latched = Signal(CAP_REG_LAYOUT)
         src_reg_latched = Signal(CAP_REG_LAYOUT)
         immutable_row0_latched = Signal()
+        isolated_source_latched = Signal()
+        source_m_latched = Signal()
+        source_reg_latched = Signal(4)
+        dst_reg_num_latched = Signal(4)
+        index_latched = Signal(16)
         fault_latched = Signal()
         fault_type_latched = Signal(5)
         sub_start = Signal()
@@ -51,7 +62,7 @@ class ChurchSave(Elaboratable):
         sub_fault_latched = Signal()
 
         dst_in_range = Signal()
-        m.d.comb += dst_in_range.eq(self.cr_dst <= MAX_CLIST_REG)
+        m.d.comb += dst_in_range.eq(dst_reg_num_latched <= MAX_CLIST_REG)
 
         src_view = View(CAP_REG_LAYOUT, src_reg_latched)
 
@@ -59,7 +70,9 @@ class ChurchSave(Elaboratable):
             u_msave.sub_start.eq(sub_start),
             u_msave.sub_dst_cap.eq(dst_reg_latched),
             u_msave.sub_src_gt.eq(src_view.word0_gt),
-            u_msave.sub_index.eq(self.index),
+            u_msave.sub_index.eq(index_latched),
+            u_msave.sub_src_m_elevated.eq(
+                isolated_source_latched & source_m_latched),
             # CR6 is the active c-list register. Its row 0 is the immutable
             # resident identity; other architectural c-list registers retain
             # their existing SAVE semantics.
@@ -89,11 +102,29 @@ class ChurchSave(Elaboratable):
                     # Capture the instruction's CR6 identity at acceptance.
                     # Decoder inputs may advance while this multi-cycle SAVE
                     # is running, so the sub-unit must never inspect them live.
-                    m.d.sync += immutable_row0_latched.eq(self.cr_dst == CR_CLIST)
+                    m.d.sync += [
+                        immutable_row0_latched.eq(self.cr_src == CR_CLIST),
+                        isolated_source_latched.eq(
+                            (self.cr_dst >= 12) & (self.cr_dst <= 15)),
+                        source_m_latched.eq(self.source_m),
+                        source_reg_latched.eq(self.cr_dst),
+                        dst_reg_num_latched.eq(self.cr_src),
+                        index_latched.eq(self.index),
+                    ]
+                    m.next = "CHECK_SOURCE_M"
+
+            with m.State("CHECK_SOURCE_M"):
+                with m.If(isolated_source_latched & ~source_m_latched):
+                    m.d.sync += [
+                        fault_latched.eq(1),
+                        fault_type_latched.eq(FaultType.PERM_L),
+                    ]
+                    m.next = "IDLE"
+                with m.Else():
                     m.next = "CHECK_DST_READ"
 
             with m.State("CHECK_DST_READ"):
-                m.d.comb += self.cr_rd_addr.eq(self.cr_dst)
+                m.d.comb += self.cr_rd_addr.eq(dst_reg_num_latched)
                 with m.If(~dst_in_range):
                     m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_S)]
                     m.next = "IDLE"
@@ -101,13 +132,13 @@ class ChurchSave(Elaboratable):
                     m.next = "LATCH_DST"
 
             with m.State("LATCH_DST"):
+                m.d.comb += self.cr_rd_addr.eq(dst_reg_num_latched)
                 m.d.sync += dst_reg_latched.eq(self.cr_rd_data)
-                m.d.comb += self.cr_rd_addr.eq(self.cr_src)
                 m.next = "LATCH_SRC"
 
             with m.State("LATCH_SRC"):
+                m.d.comb += self.cr_rd_addr.eq(source_reg_latched)
                 m.d.sync += src_reg_latched.eq(self.cr_rd_data)
-                m.d.comb += self.cr_rd_addr.eq(self.cr_src)
                 m.d.sync += sub_start_reg.eq(1)
                 m.next = "CALL_SUB"
 
@@ -128,6 +159,10 @@ class ChurchSave(Elaboratable):
             self.save_complete.eq(fsm.ongoing("CALL_SUB") & sub_done_latched),
             self.save_fault.eq(fault_latched),
             self.fault_type.eq(fault_type_latched),
+            self.m_consume_en.eq(
+                fsm.ongoing("CALL_SUB") & sub_done_latched &
+                isolated_source_latched),
+            self.m_consume_target.eq(source_reg_latched - 12),
         ]
 
         return m

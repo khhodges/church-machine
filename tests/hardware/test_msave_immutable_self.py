@@ -87,8 +87,8 @@ def test_save_instruction_wrapper_propagates_immutable_row_zero_fault():
         # The wrapper will read these as null capabilities; index zero must still
         # produce IMMUTABLE_SELF_CAP before operand-dependent fault paths.
         ctx.set(dut.save_start, 1)
-        ctx.set(dut.cr_dst, 6)
-        ctx.set(dut.cr_src, 1)
+        ctx.set(dut.cr_src, 6)
+        ctx.set(dut.cr_dst, 1)
         ctx.set(dut.index, 0)
         ctx.set(dut.cr_rd_data.as_value(), 0)
         await ctx.tick()
@@ -96,7 +96,7 @@ def test_save_instruction_wrapper_propagates_immutable_row_zero_fault():
         # A decoder may present its next instruction while this SAVE is
         # multi-cycle. The CR6 classification must remain bound to the
         # accepted instruction, not this later destination register.
-        ctx.set(dut.cr_dst, 5)
+        ctx.set(dut.cr_src, 5)
 
         for _ in range(14):
             observed["writes"].append(ctx.get(dut.mem_wr_en))
@@ -121,8 +121,8 @@ def test_save_non_cr6_row_zero_retains_existing_bind_fault():
 
     async def testbench(ctx):
         ctx.set(dut.save_start, 1)
-        ctx.set(dut.cr_dst, 5)
-        ctx.set(dut.cr_src, 1)
+        ctx.set(dut.cr_src, 5)
+        ctx.set(dut.cr_dst, 1)
         ctx.set(dut.index, 0)
         ctx.set(dut.cr_rd_data.as_value(), 0)
         await ctx.tick()

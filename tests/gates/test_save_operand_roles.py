@@ -23,19 +23,20 @@ from amaranth.sim import Simulator
 
 from hardware.msave import ChurchMSave
 from hardware.perm_check import ChurchPermCheck
-from hardware.hw_types import FaultType, PERM_MASK_S
+from hardware.hw_types import FaultType, PERM_MASK_S, make_gt
 from hardware.layouts import GT_LAYOUT, CAP_REG_LAYOUT
 
 MAX_TICKS = 100
 
 
 def _build_gt(perms=0, b_flag=0, slot_id=1, gt_seq=1, gt_type=1):
-    gt  = (slot_id & 0xFFFF)
-    gt |= (gt_seq  & 0x7F) << 16
-    gt |= (gt_type & 0x03) << 23
-    gt |= (perms   & 0x3F) << 25
-    gt |= (b_flag  & 0x01) << 31
-    return gt
+    return make_gt(
+        gt_type=gt_type,
+        perms=perms,
+        slot_id=slot_id,
+        gt_seq=gt_seq,
+        b_flag=b_flag,
+    )
 
 
 def _build_cap(gt_word=0, location=0x1000, word2=0x100):

@@ -3763,7 +3763,7 @@ class ChurchSimulator {
         return { ok: true, parsed, entry, index: parsed.index };
     }
 
-    mSave(gt32, targetIdx, srcCRIdx, absoluteAddress, rangeOverride) {
+    mSave(gt32, targetIdx, srcCRIdx, absoluteAddress, rangeOverride, sourceMAuthorized = false) {
         const parsed = this.parseGT(gt32);
         const srcEntry = this.readNSEntry(parsed.index);
         if (!srcEntry) {
@@ -3777,13 +3777,14 @@ class ChurchSimulator {
         const bBit = parsed.permissions.B || 0;
         const fBit = (srcEntry.word1_limit >>> 31) & 1;
 
-        const bindPass = bBit === 1 || this.mElevation;
+        const exportElevated = this.mElevation || sourceMAuthorized;
+        const bindPass = bBit === 1 || exportElevated;
         let farPass = true;
         if (targetIdx !== null && targetIdx !== undefined) {
             const tgtEntry = this.readNSEntry(targetIdx);
             if (tgtEntry) {
                 const tgtWord1 = this.parseNSWord1(tgtEntry.word1_limit);
-                if (tgtWord1.f === 1 && !this.mElevation) farPass = false;
+                if (tgtWord1.f === 1 && !exportElevated) farPass = false;
             }
         }
 
@@ -5795,7 +5796,8 @@ class ChurchSimulator {
         // ordinary SAVE behavior unchanged; CR12–CR15 require M at acceptance
         // and consume it only once the c-list write has completed.
         const isolatedSource = d.crDst >= 12 && d.crDst <= 15;
-        if (isolatedSource && !this.mElevation && this.cr[d.crDst].m !== 1) {
+        const sourceMAuthorized = isolatedSource && this.cr[d.crDst].m === 1;
+        if (isolatedSource && !this.mElevation && !sourceMAuthorized) {
             this.fault('PERM_L',
                 `SAVE: source CR${d.crDst} had M=0 when the instruction was accepted`);
             return null;
@@ -5846,14 +5848,9 @@ class ChurchSimulator {
         // The accepted source M bit is the passkey for exporting an isolated
         // register's GT. It bypasses mSave's ordinary B/F transfer gates, while
         // the destination c-list must still independently authorize S.
-        let saveCheck;
-        const priorMElevation = this.mElevation;
-        if (isolatedSource && !priorMElevation) this.mElevation = true;
-        try {
-            saveCheck = this.mSave(srcGT, clistTargetIdx, d.crDst);
-        } finally {
-            this.mElevation = priorMElevation;
-        }
+        const saveCheck = this.mSave(
+            srcGT, clistTargetIdx, d.crDst, undefined, undefined,
+            sourceMAuthorized);
         if (!saveCheck.ok) {
             this.fault(saveCheck.fault, `SAVE: CR${d.crDst}: ${saveCheck.message}`);
             return null;

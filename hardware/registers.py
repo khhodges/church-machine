@@ -120,6 +120,8 @@ class ChurchRegisters(Elaboratable):
         # Successful SWITCH consumes exactly its accepted destination M bit.
         self.m_switch_consume_en = Signal()
         self.m_switch_consume_target = Signal(2)
+        self.m_save_consume_en = Signal()
+        self.m_save_consume_target = Signal(2)
 
     def elaborate(self, platform):
         m = Module()
@@ -227,6 +229,9 @@ class ChurchRegisters(Elaboratable):
             with m.If(self.m_switch_consume_en):
                 m.d.sync += m_bit_regs.bit_select(
                     self.m_switch_consume_target + 12, 1).eq(0)
+            with m.If(self.m_save_consume_en):
+                m.d.sync += m_bit_regs.bit_select(
+                    self.m_save_consume_target + 12, 1).eq(0)
 
             with m.If(self.flags_wr_en):
                 m.d.sync += flags_reg.eq(self.flags_in)

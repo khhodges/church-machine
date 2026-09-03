@@ -855,6 +855,8 @@ class ChurchCore(Elaboratable):
             u_regs.m_switch_consume_en.eq(u_switch.m_consume_en if not self.iot_profile else 0),
             u_regs.m_switch_consume_target.eq(
                 u_switch.m_consume_target if not self.iot_profile else 0),
+            u_regs.m_save_consume_en.eq(u_save.m_consume_en),
+            u_regs.m_save_consume_target.eq(u_save.m_consume_target),
             # Expose M-flag and shadow DR reads
             self.cr15_m_flag.eq(u_regs.cr15_m_flag),
             self.dbg_m_dr11.eq(u_regs.m_dr11),
@@ -1340,6 +1342,13 @@ class ChurchCore(Elaboratable):
             u_save.cr_src.eq(cr_src),
             u_save.cr_dst.eq(cr_dst),
             u_save.index.eq(cap_index),
+            u_save.source_m.eq(
+                Mux(cr_dst == 12, u_regs.isolated_m_flags[0],
+                    Mux(cr_dst == 13, u_regs.isolated_m_flags[1],
+                        Mux(cr_dst == 14, u_regs.isolated_m_flags[2],
+                            Mux(cr_dst == 15,
+                                u_regs.isolated_m_flags[3], 0))))
+            ),
             u_save.cr_rd_data.eq(u_regs.cr_rd_data),
             u_save.cr15_namespace.eq(u_regs.cr15_namespace),
             u_save.mem_wr_done.eq(1),
