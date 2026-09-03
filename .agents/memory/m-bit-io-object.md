@@ -14,5 +14,7 @@ Namespace table.
 **How to apply:** Keep one Inform RW descriptor in the boot Namespace catalog,
 issue it only to Namespace, and require Namespace execution identity for both
 DREAD and DWRITE. Reads return bits 0–15 zero-extended; writes replace all 16 M
-states. SWITCH tests and consumes its destination bit. Preserve generated
+states. In the Namespace UI, classify its Source as “Resident I/O register” and
+never offer LUMP Source/Identity controls. SWITCH tests and consumes its
+destination bit. Preserve generated
 Thread#2 and Thread#3 at slots 11 and 12; later generated Threads skip slot 13.

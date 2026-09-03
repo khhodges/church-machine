@@ -50,7 +50,15 @@ function _setNsDirty(dirty) {
 // Hardware-capability name matcher used by the NS table render loop to decide
 // whether a row's Source button should be hidden.  Module-level constant so it
 // is compiled once, not once per row per render.
-const _hwCapRe = /^(LED[0-5]?|LED_DEV|UART(_TX|_RX|_DEV)?|BTN|BTN_DEV|Button|SlideRule|Timer|TIMER_DEV|Display|Boot\.NS|Boot\.Nucs|Boot\.Abstr)$/i;
+const _hwCapRe = /^(LED[0-5]?|LED_DEV|UART(_TX|_RX|_DEV)?|BTN|BTN_DEV|Button|SlideRule|Timer|TIMER_DEV|M_BIT_DEV|Display|Boot\.NS|Boot\.Nucs|Boot\.Abstr)$/i;
+
+function _isResidentIORegister(slot) {
+    const contracts = (typeof globalThis !== 'undefined')
+        ? globalThis.ChurchArchitectureContracts : null;
+    const mBitSlot = contracts && contracts.boot && contracts.boot.minimalSlots
+        ? contracts.boot.minimalSlots.M_BIT_DEV : 13;
+    return (slot >= 2 && slot <= 5) || slot === mBitSlot;
+}
 
 function _findSrcLump(slotIdx, slotLabel) {
     if (typeof _lumpsCache === 'undefined' || !Array.isArray(_lumpsCache)) return null;
@@ -2933,9 +2941,11 @@ function updateNamespace() {
     // one policy; transport order, hashes, capacity and bridge details remain
     // derived implementation data.
     function _nsPrefetchRow(slot, manifest) {
-        // The boot catalog occupies slots 0–10.  Those entries are always
-        // resident and are not programmer-configurable; only user LUMP slots
-        // above the catalog expose the load-policy selector.
+        if (_isResidentIORegister(slot)) {
+            return '<span class="ns-fixed-policy" title="Fixed MMIO capability; no LUMP source or identity">Resident I/O register</span>';
+        }
+        // The fixed boot catalog entries are always resident and are not
+        // programmer-configurable; only user LUMP slots expose the selector.
         if (slot <= 10) {
             return '<span class="ns-fixed-policy" title="Boot catalog slots are always resident">Resident</span>';
         }
@@ -2997,7 +3007,7 @@ function updateNamespace() {
     window._nsPrefetchChange = function(slot, value) {
         // Boot catalog slots 0–10 are permanently resident.  Keep this guard
         // at the mutation boundary as well as in the renderer.
-        if (slot <= 10) return;
+        if (slot <= 10 || _isResidentIORegister(slot)) return;
         const cfg = window.bootConfig || {};
         if (!cfg.step2) cfg.step2 = { lumps: [] };
         if (!Array.isArray(cfg.step2.lumps)) cfg.step2.lumps = [];
@@ -3198,7 +3208,8 @@ function updateNamespace() {
         {
             const _srcLump = _findSrcLump(i, e.label);
             const _srcToken = _srcLump ? _srcLump.token : null;
-            const _identityBtn = (i > 10)
+            const _residentIO = _isResidentIORegister(i);
+            const _identityBtn = (i > 10 && !_residentIO)
                 ? `<button type="button" class="btn btn-xs ns-identity-btn" aria-haspopup="dialog" onclick="event.stopPropagation();_nsShowIdentity(${i})" style="background:#27233b;color:#c4a7ff;border:1px solid rgba(196,167,255,0.35);margin-left:5px;font-size:0.65rem;padding:1px 5px;" title="Show canonical dot.name and T-ID">Identity</button>`
                 : '';
             // Show Source for Inform (gtType 1) and Outform (gtType 2) only.
@@ -3213,7 +3224,8 @@ function updateNamespace() {
             //   • Namespace-root entry (Boot.NS)
             const _hideSource = (e.gtType !== 1 && e.gtType !== 2) ||
                                 _isThreadNamespaceSlot(i, e) ||
-                                _hwCapRe.test(e.label || '');
+                                _hwCapRe.test(e.label || '') ||
+                                _residentIO;
             if (codeNotResident) {
                 html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span>${_nsPrefetchRow(i, manifest)}${_identityBtn}</td>`;
             } else {

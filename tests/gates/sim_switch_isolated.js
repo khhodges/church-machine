@@ -4,11 +4,21 @@
 // exercises SWITCH without boot fixtures so authorization and no-mutation
 // guarantees stay local and deterministic.
 global.window = { bootConfig: {} };
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
 const ChurchAssembler = require('../../simulator/assembler.js');
 const ChurchSimulator = require('../../simulator/simulator.js');
 const AbstractionRegistry = require('../../simulator/abstractions.js');
 const SystemAbstractions = require('../../simulator/system_abstractions.js');
 const DeviceAbstractions = require('../../simulator/device_abstractions.js');
+
+const memoryUiSource = fs.readFileSync(
+    path.resolve(__dirname, '../../simulator/app-memory.js'), 'utf8');
+const residentHelper = memoryUiSource.match(
+    /function _isResidentIORegister\(slot\) \{[\s\S]*?\n\}/);
+const policyHelper = memoryUiSource.match(
+    /function _nsPrefetchRow\(slot, manifest\) \{[\s\S]*?\n    \}/);
 
 let failures = 0;
 function check(condition, message) {
@@ -29,6 +39,24 @@ function state(sim) {
         cr: sim.cr, memory: Array.from(sim.memory), nsCount: sim.nsCount,
         labels: sim.nsLabels
     });
+}
+
+// Slot 13 is a fixed resident MMIO register, not a source-backed LUMP.
+check(!!residentHelper && !!policyHelper, 'Namespace resident-I/O helpers are present');
+if (residentHelper && policyHelper) {
+    const uiContext = vm.createContext({
+        globalThis: {
+            ChurchArchitectureContracts: { boot: { minimalSlots: { M_BIT_DEV: 13 } } },
+        },
+    });
+    vm.runInContext(`${residentHelper[0]}\n${policyHelper[0]}`, uiContext);
+    check(vm.runInContext('_isResidentIORegister(13)', uiContext),
+        'M_BIT_DEV is classified as a resident I/O register');
+    check(!vm.runInContext('_isResidentIORegister(14)', uiContext),
+        'ordinary post-catalog slots remain source-backed');
+    check(vm.runInContext('_nsPrefetchRow(13, null)', uiContext)
+        .includes('Resident I/O register'),
+        'M_BIT_DEV Source cell identifies a resident I/O register');
 }
 
 // Full four-bit destination encoding must survive a disassembly round trip.
