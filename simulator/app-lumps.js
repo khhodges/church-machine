@@ -1,3 +1,10 @@
+// Collision-free identity for all per-LUMP UI, editor, and persisted state.
+// encodeURIComponent is reversible and preserves punctuation and case, unlike
+// the historical alphanumeric-only normalization.
+function _lumpTokenIdentity(token) {
+    return encodeURIComponent(String(token == null ? '' : token));
+}
+
 function showLumpDetail(token) {
     _lumpEditDirty = false;
     if (window.LumpRegistry) window.LumpRegistry.setCurrent(token);
@@ -18,7 +25,7 @@ function showLumpDetail(token) {
     const contentEl = document.getElementById('lumpsDetailContent');
     if (!titleEl || !contentEl) return;
 
-    const _tk = token.replace(/[^a-z0-9]/gi, '');
+    const _tk = _lumpTokenIdentity(token);
     const isNamespace = lump.lump_type === 'namespace' || lump.typ === 1;
     const _lumpTitleLabel = _lumpContentTypeLabel(lump);
     // Prefer the canonical dot-name (e.g. "Scheduler.IRQ") over the raw
@@ -420,7 +427,7 @@ function showLumpDetail(token) {
         auditBtn.addEventListener('click', () => {
             const _auditToken = auditBtn.dataset.auditToken;
             const _auditLump  = _lumpsCache.find(l => l.token === _auditToken);
-            const _auditWrap  = document.getElementById(`lumpAuditResults_${_auditToken.replace(/[^a-z0-9]/gi, '')}`);
+            const _auditWrap  = document.getElementById(`lumpAuditResults_${_lumpTokenIdentity(_auditToken)}`);
             if (!_auditWrap) return;
             const _manifest = _auditLump ? { cw: _auditLump.cw, cc: _auditLump.cc, lump_size: _auditLump.lump_size, pet_names: _auditLump.pet_names || null, capabilities: _auditLump.capabilities || [] } : null;
             if (typeof lumpAuditFromServer === 'function') {
@@ -644,7 +651,7 @@ function _computeLumpMethodWordRanges(lump, words) {
 }
 
 async function _fetchAndShowLumpBinary(token, lump) {
-    const tk = (token || '').replace(/[^a-z0-9]/gi, '');
+    const tk = _lumpTokenIdentity(token);
     const bodyEl = document.getElementById(`lumpBinBody_${tk}`);
     if (!bodyEl) return;
 
@@ -1430,7 +1437,7 @@ async function _populateLumpSourceTab(lump, targetId) {
                     _banner.style.display = '';
                     _banner.textContent = `Editing v${lump.lump_version} \u2014 v${_prevVer} compiled binary preserved in History tab`;
                 }
-                const _tk = (lump.token || '').replace(/[^a-z0-9]/gi, '');
+                const _tk = _lumpTokenIdentity(lump.token);
                 const _dot0 = document.getElementById(`lumpTabForkDot_${_tk}`);
                 if (_dot0) _dot0.style.display = '';
                 const _badge = document.getElementById(`lumpVersionBadge_${_tk}`);
@@ -1454,7 +1461,7 @@ async function _populateLumpSourceTab(lump, targetId) {
                             const _prevVer = _fd.prev_version;
                             _banner.style.display = '';
                             _banner.textContent = `Editing v${_newVer} \u2014 v${_prevVer} compiled binary preserved in History tab`;
-                            const _tk = (lump.token || '').replace(/[^a-z0-9]/gi, '');
+                            const _tk = _lumpTokenIdentity(lump.token);
                             const _dot1 = document.getElementById(`lumpTabForkDot_${_tk}`);
                             if (_dot1) _dot1.style.display = '';
                             const _badge = document.getElementById(`lumpVersionBadge_${_tk}`);
@@ -1822,7 +1829,7 @@ function _switchLumpTab(tk, tab) {
             btn.classList.toggle('lump-tab-active', btn.textContent.trim() === labelMap[tab]);
         });
     }
-    const lump = _lumpsCache.find(l => (l.token || '').replace(/[^a-z0-9]/gi, '') === tk);
+    const lump = _lumpsCache.find(l => _lumpTokenIdentity(l.token) === tk);
     const token = lump ? lump.token : tk;
     if (tab === 'api' && lump) {
         _populateLumpApiTab(lump, `lumpTabApi_${tk}`);
@@ -1846,7 +1853,7 @@ function _renderLumpDnaTab(tk) {
     _dnaRendered[tk] = true;
     const el = document.getElementById(`lumpTabDnaContent_${tk}`);
     if (!el) return;
-    const lump = _lumpsCache.find(l => (l.token || '').replace(/[^a-z0-9]/gi, '') === tk);
+    const lump = _lumpsCache.find(l => _lumpTokenIdentity(l.token) === tk);
     if (!lump) return;
     const result = (typeof _buildDnaGraph === 'function') ? _buildDnaGraph(lump, _lumpsCache) : null;
     if (!result) {
@@ -1872,8 +1879,8 @@ function _renderLumpDnaTab(tk) {
 /* ---- DD_GRAPH_UNIT_TEST_EXPORT_START ---- */
 function _deepDiveLumpForToken(token) {
     return (_lumpsCache || []).find(l => l && l.token === token) ||
-        (_lumpsCache || []).find(l => l && (l.token || '').replace(/[^a-z0-9]/gi, '') ===
-            (token || '').replace(/[^a-z0-9]/gi, '')) || null;
+        (_lumpsCache || []).find(l => l && _lumpTokenIdentity(l.token) ===
+            _lumpTokenIdentity(token)) || null;
 }
 
 function _deepDiveTargetToken(entry) {
@@ -1980,7 +1987,7 @@ function _buildLumpDeepDiveGraph(rootLump) {
         svg += `<g class="lump-deep-node lump-deep-node-${node.kind}"><rect x="${p.x}" y="${p.y}" width="178" height="48" rx="5" fill="#08080f" stroke="${color}" stroke-width="${node.kind === 'root' ? 2 : 1.3}"/><text x="${p.x + 7}" y="${p.y + 15}" class="lump-deep-node-kind" fill="${color}">${title}</text><text x="${p.x + 7}" y="${p.y + 31}" class="lump-deep-node-label">${esc((node.label || '').slice(0, 26))}</text>${node.token ? `<text x="${p.x + 171}" y="${p.y + 43}" text-anchor="end" class="lump-deep-node-token">0x${esc(node.token)}</text>` : ''}</g>`;
     });
     svg += '</g></svg>';
-    return { svg, wrapId: `lump-deep-dive-graph-${(rootLump.token || 'root').replace(/[^a-z0-9]/gi, '')}`, nodes, edges };
+    return { svg, wrapId: `lump-deep-dive-graph-${_lumpTokenIdentity(rootLump.token || 'root')}`, nodes, edges };
 }
 /* ---- DD_GRAPH_UNIT_TEST_EXPORT_END ---- */
 
@@ -2453,7 +2460,7 @@ function _jumpToDecompiledInstruction(wordIndex) {
 }
 
 async function _fetchAndShowLumpSavedSource(token, lump, tk) {
-    const _tk = (tk || token || '').replace(/[^a-z0-9]/gi, '');
+    const _tk = tk || _lumpTokenIdentity(token);
     if (_lumpSavedSrcLoaded[_tk]) return;
     _lumpSavedSrcLoaded[_tk] = true;
     const el = document.getElementById(`lumpStoredSourceBody_${_tk}`);
@@ -2508,7 +2515,7 @@ async function _fetchAndShowLumpSavedSource(token, lump, tk) {
 // /api/lump/version-telemetry/{abstraction} (fleet call-home data) in parallel,
 // joins on version number, and renders a single table.
 async function _fetchAndShowLumpTimeline(token, lump) {
-    const tk = (token || '').replace(/[^a-z0-9]/gi, '');
+    const tk = _lumpTokenIdentity(token);
     const bodyEl = document.getElementById(`lumpHistoryBody_${tk}`);
     if (!bodyEl) return;
     const e = _escHtml;
@@ -2711,7 +2718,7 @@ async function _promptUpgradeLump(absName, fromToken, fromVersion, toToken, toVe
         if (data.ok) {
             const n = data.updated_count || 0;
             alert(`Bulk upgrade recorded: ${n} device(s) on ${absName} v${fromVersion} → v${toVersion}.`);
-            const tk = (toToken || '').replace(/[^a-z0-9]/gi, '');
+            const tk = _lumpTokenIdentity(toToken);
             delete _lumpTimelineLoaded[tk];
             const lump = _lumpsCache.find(l => l.token === toToken || l.abstraction === absName);
             if (lump) _fetchAndShowLumpTimeline(toToken, lump);
@@ -2882,7 +2889,7 @@ async function _restoreLumpFromHistory(token, version) {
             _showFpgaToast('Restored', `v${version} of "${displayName}" is now the current LUMP.`, 'ok', 4000);
         }
 
-        const tk = token.replace(/[^a-z0-9]/gi, '');
+        const tk = _lumpTokenIdentity(token);
         delete _lumpTimelineLoaded[tk];
         if (typeof refreshLumps === 'function') refreshLumps();
     } catch (err) {
@@ -2920,10 +2927,10 @@ async function _saveLumpText(token, text, bodyEl, lump) {
         const result = await resp.json();
         if (!resp.ok) throw new Error(result.error || `HTTP ${resp.status}`);
         _lumpEditDirty = false;
-        const _tk = token.replace(/[^a-z0-9]/gi, '');
+        const _tk = _lumpTokenIdentity(token);
         _lumpEditorOpen[_tk] = false;
         delete _lumpEditorDraftText[_tk];
-        _draftLsDel(_tk);
+        _draftLsDel(token);
         if (statusEl) { statusEl.textContent = 'Saved.'; statusEl.style.color = 'var(--accent-green, #4caf50)'; }
         setTimeout(() => _loadLumpContent(token, lump), 800);
     } catch (err) {
@@ -2979,7 +2986,8 @@ async function _saveLumpMeta(token, metaId) {
     }
 }
 
-const _DRAFT_LS_PREFIX = 'cm_lump_draft_';
+const _DRAFT_LS_PREFIX = 'cm_lump_draft_v2_';
+const _LEGACY_DRAFT_LS_PREFIX = 'cm_lump_draft_';
 // _migrateBfextBfinsSyntax(text)
 // One-shot migration for text that may contain the old, never-valid,
 // disassembler-only `BFEXT`/`BFINS ... pos=<N>, w=<N>` argument syntax
@@ -2997,15 +3005,37 @@ function _migrateBfextBfinsSyntax(text) {
 }
 window._migrateBfextBfinsSyntax = _migrateBfextBfinsSyntax;
 
-function _draftLsKey(tk)  { return _DRAFT_LS_PREFIX + tk; }
-function _draftLsGet(tk)  { try { return localStorage.getItem(_draftLsKey(tk)); } catch(_) { return null; } }
-function _draftLsSet(tk, v) { try { localStorage.setItem(_draftLsKey(tk), v); } catch(_) {} }
-function _draftLsDel(tk)  { try { localStorage.removeItem(_draftLsKey(tk)); } catch(_) {} }
+function _draftLsKey(token) { return _DRAFT_LS_PREFIX + _lumpTokenIdentity(token); }
+function _draftLsGet(token) {
+    try {
+        const key = _draftLsKey(token);
+        const current = localStorage.getItem(key);
+        if (current !== null) return current;
+        // The old main-editor path stored the exact raw token. It is safe to
+        // migrate only when punctuation made that key distinct from the old
+        // inline editor's lossy alphanumeric key. Ambiguous legacy keys remain
+        // untouched and recoverable rather than being assigned to the wrong LUMP.
+        const raw = String(token == null ? '' : token);
+        const lossy = raw.replace(/[^a-z0-9]/gi, '');
+        if (raw !== lossy) {
+            const legacyKey = _LEGACY_DRAFT_LS_PREFIX + raw;
+            const legacy = localStorage.getItem(legacyKey);
+            if (legacy !== null) {
+                localStorage.setItem(key, legacy);
+                localStorage.removeItem(legacyKey);
+                return legacy;
+            }
+        }
+    } catch (_) {}
+    return null;
+}
+function _draftLsSet(token, v) { try { localStorage.setItem(_draftLsKey(token), v); } catch(_) {} }
+function _draftLsDel(token) { try { localStorage.removeItem(_draftLsKey(token)); } catch(_) {} }
 
 function _buildTextEditor(token, text, bodyEl, lump, renderFn) {
-    const tk = token.replace(/[^a-z0-9]/gi, '');
+    const tk = _lumpTokenIdentity(token);
     const hasDraft = Object.prototype.hasOwnProperty.call(_lumpEditorDraftText, tk);
-    let lsDraft  = _draftLsGet(tk);
+    let lsDraft  = _draftLsGet(token);
     if (lsDraft !== null) lsDraft = _migrateBfextBfinsSyntax(lsDraft);
     const hasLsDraft = lsDraft !== null && lsDraft !== text;
     const initialText = hasDraft ? _migrateBfextBfinsSyntax(_lumpEditorDraftText[tk]) : text;
@@ -3049,7 +3079,7 @@ function _buildTextEditor(token, text, bodyEl, lump, renderFn) {
             restoreBanner.remove();
         });
         discardBtn2.addEventListener('click', () => {
-            _draftLsDel(tk);
+            _draftLsDel(token);
             delete _lumpEditorDraftText[tk];
             ta.value = text;
             livePreview.innerHTML = '';
@@ -3242,7 +3272,7 @@ function _buildTextEditor(token, text, bodyEl, lump, renderFn) {
     let _debounceTimer = null;
     ta.addEventListener('input', () => {
         _lumpEditorDraftText[tk] = ta.value;
-        _draftLsSet(tk, ta.value);
+        _draftLsSet(token, ta.value);
         clearTimeout(_debounceTimer);
         _debounceTimer = setTimeout(() => {
             livePreview.innerHTML = '';
@@ -3265,7 +3295,7 @@ function _buildTextEditor(token, text, bodyEl, lump, renderFn) {
             // Opening the editor is not an edit.  Persist only content that
             // actually differs from the saved source; otherwise a simple
             // open/close manufactures a false "draft restored" state.
-            if (ta.value !== text) _draftLsSet(tk, ta.value);
+            if (ta.value !== text) _draftLsSet(token, ta.value);
             preview.style.display = 'none';
             editorArea.style.display = '';
             restoreSplitRatio();
@@ -3279,7 +3309,7 @@ function _buildTextEditor(token, text, bodyEl, lump, renderFn) {
         _lumpEditDirty = false;
         _lumpEditorOpen[tk] = false;
         delete _lumpEditorDraftText[tk];
-        _draftLsDel(tk);
+        _draftLsDel(token);
         clearTimeout(_debounceTimer);
         ta.value = text;
         livePreview.innerHTML = '';
@@ -3299,7 +3329,7 @@ function _buildTextEditor(token, text, bodyEl, lump, renderFn) {
 }
 
 async function _loadLumpContent(token, lump) {
-    const tk = token.replace(/[^a-z0-9]/gi, '');
+    const tk = _lumpTokenIdentity(token);
     const bodyEl = document.getElementById(`lumpContentBody_${tk}`);
     if (!bodyEl) return;
     try {
@@ -4158,7 +4188,7 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
 }
 
 async function _loadLumpTokens(token, lump) {
-    const tk     = (token || '').replace(/[^a-z0-9]/gi, '');
+    const tk     = _lumpTokenIdentity(token);
     const bodyEl = document.getElementById(`lumpTokensBody_${tk}`);
     if (!bodyEl) return;
 
@@ -4339,7 +4369,7 @@ function _renderLumpImageContent(bodyEl, lump, dataWords, token) {
         fileInput.type = 'file';
         fileInput.accept = 'image/*';
         fileInput.style.display = 'none';
-        fileInput.id = `lumpReplaceFile_${token.replace(/[^a-z0-9]/gi, '')}`;
+        fileInput.id = `lumpReplaceFile_${_lumpTokenIdentity(token)}`;
         const replaceBtn = document.createElement('button');
         replaceBtn.className = 'btn lump-edit-btn';
         replaceBtn.textContent = 'Replace file';
@@ -5079,7 +5109,7 @@ function _scrollToLumpMethod(tk, methodName, _attempt) {
             // that's the "wrong LUMP version" case, not a genuinely missing
             // method. Name the right version and offer a one-click switch.
             const curLump = (typeof _lumpsCache !== 'undefined')
-                ? _lumpsCache.find(l => (l.token || '').replace(/[^a-z0-9]/gi, '') === tk)
+                ? _lumpsCache.find(l => _lumpTokenIdentity(l.token) === tk)
                 : null;
             const altLump = (curLump && curLump.abstraction && typeof _lumpsCache !== 'undefined')
                 ? _lumpsCache.find(l => l.abstraction === curLump.abstraction
@@ -6466,7 +6496,7 @@ async function _gtPickCommit(lumpToken, slotIndex) {
         // Reload the content tab to reflect the newly assigned GT
         const selLump = _lumpsCache && _lumpsCache.find(l => (l.token || '').toLowerCase() === lumpToken.toLowerCase());
         if (selLump) {
-            const tk = (selLump.token || '').replace(/[^a-z0-9]/gi, '');
+            const tk = _lumpTokenIdentity(selLump.token);
             _lumpContentLoaded[tk] = false;   // force fresh fetch
             _switchLumpTab(tk, 'api');
         }
@@ -7227,7 +7257,7 @@ function _applyLumpNamesToSim(token) {
         return;
     }
     if (!sim.nsLabels) sim.nsLabels = {};
-    const tk     = (token || '').replace(/[^a-z0-9]/gi, '');
+    const tk     = _lumpTokenIdentity(token);
     const bodyEl = document.getElementById(`lumpTokensBody_${tk}`);
     if (!bodyEl) return;
     let count = 0;
@@ -7254,7 +7284,7 @@ function _applyLumpNamesToSim(token) {
 // ── Overview tab CR pet-name inline editing ──────────────────────────────────
 
 async function _lumpOverviewCREdit(token, crSlot, btnEl) {
-    const tk     = (token || '').replace(/[^a-z0-9]/gi, '');
+    const tk     = _lumpTokenIdentity(token);
     const cellId = `lump-pn-cr-cell-${tk}-${crSlot}`;
     const cell   = document.getElementById(cellId);
     if (!cell || cell.querySelector('input')) return;
