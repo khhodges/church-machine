@@ -1041,14 +1041,17 @@ trackAsync((async function t15() {
     assert('T20 template path: header comment includes description',
         editorValue.includes('Geometry via SlideRule'), JSON.stringify(editorValue.slice(0, 200)));
 
-    // 6. capabilities block must be pre-filled with registry entries.
-    assert('T20 template path: capabilities block pre-filled with SlideRule E',
-        editorValue.includes('capabilities { SlideRule E }'),
+    // 6. SELF is visible at row 0; source-declared entries begin at row 1.
+    assert('T20 template path: compiler-owned SELF is shown at cList[0]',
+        editorValue.includes('; cList[0] SELF E  (compiler-owned)'),
+        JSON.stringify(editorValue.slice(0, 240)));
+    assert('T20 template path: capabilities block pre-filled with SlideRule E at cList[1]',
+        editorValue.includes('SlideRule E  ; cList[1]'),
         JSON.stringify(editorValue.slice(0, 200)));
 
-    // 7. The raw empty form must NOT appear when entries exist.
+    // 7. The raw empty placeholder must NOT appear when entries exist.
     assert('T20 template path: empty capabilities { } not emitted when entries present',
-        !editorValue.includes('capabilities { }'), JSON.stringify(editorValue.slice(0, 200)));
+        !editorValue.includes('(capability grants added here)'), JSON.stringify(editorValue.slice(0, 200)));
 
     // 8. Editor must contain one method stub per method in correct selector order.
     const methods = ['Area', 'Circumference'];
@@ -1071,10 +1074,10 @@ trackAsync((async function t15() {
         !editorValue.includes('No LUMP found'), editorValue);
 })();
 
-// ── T20c: _absOpenInEditorByName — empty capabilities stays as capabilities { }
+// ── T20c: _absOpenInEditorByName — empty user capabilities keeps SELF row 0
 // When the registry entry has an empty capabilities array, the block must
-// remain "capabilities { }" — no pre-fill, no crash.  Description is still
-// injected into the header comment.
+// retain compiler-owned SELF plus an editable placeholder — no pre-fill, no
+// crash. Description is still injected into the header comment.
 (async function t20c() {
     const ABACUS_ABS = {
         index: 17,
@@ -1103,8 +1106,10 @@ trackAsync((async function t15() {
         editorValue.includes('; Abacus'), editorValue.slice(0, 80));
     assert('T20c empty caps: description included in header',
         editorValue.includes('32-bit integer arithmetic'), editorValue.slice(0, 200));
-    assert('T20c empty caps: capabilities { } block stays empty',
-        editorValue.includes('capabilities { }'), editorValue.slice(0, 200));
+    assert('T20c empty caps: compiler-owned SELF remains cList[0]',
+        editorValue.includes('; cList[0] SELF E  (compiler-owned)'), editorValue.slice(0, 220));
+    assert('T20c empty caps: editable user-capability placeholder remains',
+        editorValue.includes('; (capability grants added here)'), editorValue.slice(0, 220));
     assert('T20c empty caps: all 6 method stubs present',
         ['Add', 'Sub', 'Mul', 'Div', 'Mod', 'Abs'].every(m => editorValue.includes('method ' + m + ' {')),
         editorValue);

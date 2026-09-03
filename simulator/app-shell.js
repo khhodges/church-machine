@@ -1102,6 +1102,7 @@ function _newAbstractionProforma(name) {
 ; Provides: the functions of ...
 abstraction ${name} {
     capabilities {
+        ; cList[0] SELF E  (compiler-owned)
         ; (capability grants added here)
     }
     method Status {

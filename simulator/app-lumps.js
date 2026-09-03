@@ -4970,9 +4970,17 @@ async function _absOpenInEditorByName(name, methodName) {
             ? abstractionRegistry.getByName(name) : null;
         if (_absEntry) {
             var _capEntries = Array.isArray(_absEntry.capabilities) ? _absEntry.capabilities : [];
-            var _capBlock = _capEntries.length > 0
-                ? 'capabilities { ' + _capEntries.map(function(c) { return c.name + ' ' + c.grants; }).join(', ') + ' }'
-                : 'capabilities { }';
+                var _capLines = [
+                    'capabilities {',
+                    '  ; cList[0] SELF E  (compiler-owned)'
+                ];
+                for (var _ci = 0; _ci < _capEntries.length; _ci++) {
+                    var _ce = _capEntries[_ci];
+                    _capLines.push('  ' + _ce.name + ' ' + _ce.grants + '  ; cList[' + (_ci + 1) + ']');
+                }
+                if (_capEntries.length === 0) _capLines.push('  ; (capability grants added here)');
+                _capLines.push('}');
+                var _capBlock = _capLines.join('\n');
             var _descSuffix = _absEntry.description ? '  \u2014 ' + _absEntry.description : '';
             var _tmplLines = [
                 '; ' + name + _descSuffix + '  (uncompiled \u2014 fill in method bodies and save)',
