@@ -175,7 +175,7 @@
       "TIMER_DEV": 5,
       "SelfTest": 6,
       "WukongCallHome": 7,
-      "M_BIT_DEV": 11
+      "M_BIT_DEV": 13
     },
     "defaultBootEntrySlot": 6,
     "wukongBootEntrySlot": 7,

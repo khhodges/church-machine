@@ -90,7 +90,11 @@ def test_boot_slots_device_permissions_and_hardware_namespace_match_contract():
     assert boot_rom.WUKONG_CALLHOME_NS_SLOT == slots["WukongCallHome"]
     assert boot_rom.NS_SLOT_COUNT == max(slots.values()) + 1
 
-    by_name = {name: perms for name, perms, _ in boot_image.DEFAULT_ABSTRACTION_CATALOG}
+    by_name = {
+        entry[0]: entry[1]
+        for entry in boot_image.DEFAULT_ABSTRACTION_CATALOG
+        if entry is not None
+    }
     for name, spec in BOOT["devices"].items():
         assert boot_rom._MMIO_ENTRIES[slots[name]][0] == spec["address"]
         assert boot_rom._MMIO_ENTRIES[slots[name]][1] == spec["words"]

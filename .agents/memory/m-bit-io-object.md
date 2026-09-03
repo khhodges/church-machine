@@ -3,7 +3,7 @@ name: M-bit I/O object
 description: Canonical representation and custody rule for CR M state.
 ---
 
-M is represented by one 32-bit Namespace-table I/O object. Bits 0–15 map
+M is represented by one 32-bit Namespace-table I/O object at fixed NS slot 13. Bits 0–15 map
 directly to CR0.M–CR15.M; a full-word write sets and clears all sixteen states,
 and bits 16–31 are reserved.
 

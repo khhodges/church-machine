@@ -110,18 +110,17 @@ def _cfg_no_window():
 
 # (config, skip_window, expected_ns_count)
 # expected_ns_count is the exact nsCount loadBootImage() should report:
-#   * Hardware cold-boot catalog has 12 slots (0–11), including M_BIT_DEV.
-#     Slots 0–11 all produce NS entries (slot 8 is bitstreamOnly but still
-#     increments nsCount) → nsCount=12.
-#   * Step-2 resident lumps for slots ≥12 push nsCount up: nsSlot=18 → nsCount=19.
+#   * The sparse fixed catalog extends through slot 13, including M_BIT_DEV.
+#     Slots 11–12 remain null/free, but slot 13 makes nsCount=14.
+#   * Step-2 resident lumps for slots ≥14 push nsCount up: nsSlot=18 → nsCount=19.
 #   * Step-3 emptySlotCount adds reserved-but-empty entries; baseNamedNsCount=51
 #     sets the starting index explicitly → total = 51 + 8 = 59.
 CONFIGS = [
-    pytest.param(_cfg_default(),           False, 12, id="default"),
-    pytest.param(_cfg_custom_step1(),      False, 12, id="custom_step1"),
+    pytest.param(_cfg_default(),           False, 14, id="default"),
+    pytest.param(_cfg_custom_step1(),      False, 14, id="custom_step1"),
     pytest.param(_cfg_step2_resident(),    False, 19, id="step2_resident"),
     pytest.param(_cfg_step3_reservation(), False, 59, id="step3_reservation"),
-    pytest.param(_cfg_no_window(),         True,  12, id="no_window_bootconfig"),
+    pytest.param(_cfg_no_window(),         True,  14, id="no_window_bootconfig"),
 ]
 
 

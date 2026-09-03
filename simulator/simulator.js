@@ -2009,7 +2009,7 @@ class ChurchSimulator {
     }
 
     _getHardwareBootCatalog() {
-        // Hardware cold-boot namespace: 12 slots (0–11).
+        // Sparse hardware cold-boot namespace through slot 13.
         //   0–5   fixed hardware caps (Boot.NS, Boot.Thread, MMIO devices)
         //   6     SelfTest       — default ⚡ boot entry (hardware correctness validator)
         //   7     WukongCallHome — coordinator: SelfTest → Tunnel.Register → IDE RETURN
@@ -2017,7 +2017,8 @@ class ChurchSimulator {
         //   8     Tunnel         — CALL HOME / IDE bridge (hardware E-perm cap)
         //   9     Ethernet       — network I/O hardware cap (E-perm)
         //  10     CapabilityTest        — capability validation LUMP (E-perm, task #2274)
-        //  11     M_BIT_DEV      — Namespace-held one-word I/O object
+        //  11–12  reserved/free
+        //  13     M_BIT_DEV      — Namespace-held one-word I/O object
         // No slot above 1 has special hardware significance — the ⚡ lightning
         // bolt sets Thread.CR0 to whichever slot the programmer chooses.
         // This catalog NEVER derives from abstractionRegistry — the registry is
@@ -2034,7 +2035,9 @@ class ChurchSimulator {
             { label: 'Tunnel',         perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 8  CALL HOME / IDE bridge
             { label: 'Ethernet',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 9  network I/O hardware cap
             { label: 'CapabilityTest',        perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 10 capability validation LUMP
-            { label: 'M_BIT_DEV',      perms: this._contractDevicePerms('M_BIT_DEV'), chainable: false },  // 11
+            null,  // 11 reserved/free
+            null,  // 12 reserved/free
+            { label: 'M_BIT_DEV',      perms: this._contractDevicePerms('M_BIT_DEV'), chainable: false },  // 13
         ];
     }
 

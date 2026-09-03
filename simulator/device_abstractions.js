@@ -85,7 +85,7 @@ class DeviceAbstractions {
         }
         const capability = Object.freeze({
             device: 'M_BIT',
-            nsSlot: 11,
+            nsSlot: 13,
             port: 0xFFFFFF1C,
             words: 1,
             rights: 'RW'
@@ -100,7 +100,7 @@ class DeviceAbstractions {
                 namespaceOwner !== this._mBitNamespaceOwner) {
             return { ok: false, fault: 'PERM_M', message: 'M-bit device capability is absent or not owned by Namespace' };
         }
-        if (capability.device !== 'M_BIT' || capability.nsSlot !== 11 ||
+        if (capability.device !== 'M_BIT' || capability.nsSlot !== 13 ||
                 capability.words !== 1 || (capability.port >>> 0) !== 0xFFFFFF1C) {
             return { ok: false, fault: 'PERM_M', message: 'M-bit device capability identity mismatch' };
         }

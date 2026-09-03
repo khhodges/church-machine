@@ -158,7 +158,7 @@ CR_PORT_CR15 = 0xFFFFFF0F   # namespace root       (per-thread)
 # Bits [15:0] are the M states for CR0..CR15 respectively.  Writing a 1 sets
 # that CR's M bit and writing a 0 clears it.  Bits [31:16] are reserved.
 M_BIT_PORT = 0xFFFFFF1C
-M_BIT_DEVICE_NS_SLOT = 11
+M_BIT_DEVICE_NS_SLOT = 13
 
 # Segment 3 — I/O Device Ports (0xFFFFFF20–0xFFFFFFEE)
 # R-perm → read register.  W-perm → write register.

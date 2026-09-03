@@ -410,7 +410,7 @@ def _make_ns_entry(gt_type, perms, slot_id, gt_seq, location, alloc_size, cw=0, 
 #   Slot 20: CR13_PORT_CAP  — 0xFFFFFF0D, S-perm, limit=0
 #             Authority to CHANGE CR13 (interrupt handler).
 #             Distributed to: Scheduler.IRQ c-list only (E-perm GT; IRQ-manager territory).
-# Slot 11 is the single-word M-bit I/O object. Its low 16 bits map CR0..CR15.
+# Slot 13 is the single-word M-bit I/O object. Its low 16 bits map CR0..CR15.
 # Its capability is held by Namespace and is not present in user c-lists.
 #
 # Physical LED mapping (R bit = bit 0 of each word):
@@ -517,7 +517,7 @@ NS_SLOT_COUNT = max(ARCH_BOOT["minimalSlots"].values()) + 1
 #   Slot 5: TIMER_DEV      — MMIO 0x4000002C, RW, limit=4 (5 words)
 #   Slot 6: SelfTest       — LUMP (base=0x0600, limit=511), E-perm; default ⚡ boot entry
 #   Slot 7: WukongCallHome — LUMP (base=0x1200, limit=127), E-perm; selectable diagnostic entry
-#   Slot 11: M_BIT_DEV     — 0xFFFFFF1C, RW, one 32-bit word; bits 0..15 map CR0.M..CR15.M
+#   Slot 13: M_BIT_DEV     — 0xFFFFFF1C, RW, one 32-bit word; bits 0..15 map CR0.M..CR15.M
 # ---------------------------------------------------------------------------
 # Every resident W3 cache token is 0: built-in ROM has no trusted full identity
 # source, so it never invents authenticity (Task #2862).  cache_token32 defaults
