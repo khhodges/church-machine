@@ -76,11 +76,7 @@
       "limit": "0x001FD",
       "seq": 0,
       "seal": "0xDE931EEF",
-      "boot": true,
-      "token": "00000600",
-      "filename": "SelfTest.1.485e71f6.lump",
-      "issue_n": 1,
-      "resident": true
+      "boot": true
     },
     {
       "name": "WukongCallHome",
@@ -89,95 +85,81 @@
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x0003F",
+      "limit": "0x003FD",
       "seq": 0,
-      "seal": "0xDEA85EEF",
-      "token": "00000700",
-      "filename": "WukongCallHome.1.71c2809c.lump",
-      "issue_n": 1,
-      "resident": true
+      "seal": "0xDED01EEF"
     },
     {
       "name": "Tunnel",
       "slot": 8,
-      "location": "0x00000440",
+      "location": "0x00000800",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x0003F",
       "seq": 0,
-      "seal": "0xDEA87EEF"
+      "seal": "0xDEAE5EEF"
     },
     {
       "name": "Ethernet",
       "slot": 9,
-      "location": "0x00000480",
+      "location": "0x00000840",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x0003F",
       "seq": 0,
-      "seal": "0xDEA81EEF"
+      "seal": "0xDEAE7EEF"
     },
     {
       "name": "CapabilityTest",
       "slot": 10,
-      "location": "0x000004C0",
+      "location": "0x00000880",
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x0003F",
+      "limit": "0x0003A",
       "seq": 0,
-      "seal": "0xDEA83EEF",
-      "token": "00000a00",
-      "filename": "CapabilityTest.2.a537aadf.lump",
+      "seal": "0xDEAEBEEF",
+      "token": "c7425d6c",
+      "filename": "c7425d6c.lump",
       "issue_n": 1,
       "resident": true
     },
     {
       "name": "Thread#2",
       "slot": 11,
-      "location": "0x00000500",
+      "location": "0x000008C0",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x001FF",
       "seq": 0,
-      "seal": "0xDE90DEEF"
+      "seal": "0xDE963EEF"
     },
     {
       "name": "Thread#3",
       "slot": 12,
-      "location": "0x00000700",
+      "location": "0x00000AC0",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x001FF",
       "seq": 0,
-      "seal": "0xDE91DEEF"
+      "seal": "0xDE973EEF"
     },
     {
-      "name": "slot_13",
+      "name": "M_BIT_DEV",
       "slot": 13,
-      "location": "0x00000A00",
+      "location": "0xFFFFFF1C",
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x00001",
+      "limit": "0x00000",
       "seq": 0,
-      "seal": "0xDEA89EEF"
-    },
-    {
-      "name": "Bridge.Preload",
-      "slot": 14,
-      "location": "0x00000B00",
-      "type": "Outform",
-      "f": 0,
-      "g": 0,
-      "limit": "0x00001",
-      "seq": 0,
-      "seal": "0xDEA81EEF"
+      "seal": "0x21523090"
     }
   ],
-  "generated_at": 1788436847.1820714
+  "generated_at": 1788441189.122922,
+  "committed_raw_fingerprint": "ab78db3f57514bd2301fd7d25df8b5c657af7407326fa8ae70f7de3a3e0c7b4d"
 }

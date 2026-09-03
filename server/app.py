@@ -6388,6 +6388,7 @@ def _derive_ns_state_entries():
             2: "UART_DEV", 3: "LED_DEV", 4: "BTN_DEV", 5: "TIMER_DEV",
             6: "SelfTest", 7: "WukongCallHome",
             8: "Tunnel", 9: "Ethernet", 10: "CapabilityTest",
+            13: "M_BIT_DEV",
         }
         # The V20 raw Namespace descriptor carries authority/integrity, not
         # a persisted display type. Boot-image entries are Inform descriptors
