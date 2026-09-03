@@ -116,6 +116,7 @@ class ChurchRegisters(Elaboratable):
         self.isolated_m_flags = Signal(4)  # M-device word bits 12..15
         self.m_bit_device_wr_en = Signal()
         self.m_bit_device_word = Signal(16)
+        self.m_bit_device_state = Signal(16)
         # Successful SWITCH consumes exactly its accepted destination M bit.
         self.m_switch_consume_en = Signal()
         self.m_switch_consume_target = Signal(2)
@@ -161,6 +162,7 @@ class ChurchRegisters(Elaboratable):
             self.m_dr15.eq(data_regs[15]),
             self.cr15_m_flag.eq(m_bit_regs[15]),
             self.isolated_m_flags.eq(m_bit_regs[12:16]),
+            self.m_bit_device_state.eq(m_bit_regs),
         ]
 
         with m.If(self.clear_all):

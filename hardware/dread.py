@@ -59,6 +59,11 @@ class ChurchDRead(Elaboratable):
         self.dmem_addr    = Signal(32)
         self.dmem_rd_en   = Signal()
         self.dmem_rd_data = Signal(32)
+        # Namespace-held M-bit MMIO register. The architectural register is
+        # one 32-bit word; bits 0..15 carry CR0.M..CR15.M and bits 16..31 read
+        # as zero.
+        self.m_bit_rd_word = Signal(16)
+        self.namespace_authorized = Signal()
 
     def elaborate(self, platform):
         m = Module()
@@ -68,6 +73,7 @@ class ChurchDRead(Elaboratable):
         imm_reg     = Signal(15)
         addr_reg    = Signal(32)
         drx_val_reg = Signal(32)   # latched DR[DRx] value for indexed mode
+        namespace_authorized_reg = Signal()
 
         cr_view = View(CAP_REG_LAYOUT, self.cr_rd_data)
         cr_gt   = View(GT_LAYOUT,      cr_view.word0_gt)
@@ -82,6 +88,9 @@ class ChurchDRead(Elaboratable):
         # gives eff_off=0x100000000, which correctly fails eff_off <= limit (16-bit).
         eff_off      = Signal(33)
         in_bounds    = Signal()
+        exact_m_cap = Signal()
+        effective_addr = Signal(32)
+        accesses_m_port = Signal()
 
         m.d.comb += [
             gt_null.eq(cr_view.word0_gt.as_value() == 0),
@@ -91,6 +100,16 @@ class ChurchDRead(Elaboratable):
                            imm_reg[:14],                        # immediate: bits[13:0]
                            (imm_reg[4:14] + drx_val_reg))),     # indexed: base + full DR[DRx]
             in_bounds.eq(eff_off <= limit),
+            exact_m_cap.eq(
+                (cr_gt.gt_type == GT_TYPE_INFORM) &
+                ~cr_gt.dom & cr_gt.perm[PERM_R] &
+                (cr_gt.slot_id == M_BIT_DEVICE_NS_SLOT) &
+                (cr_w2.limit_offset == 0) &
+                (cr_view.word1_location == M_BIT_PORT)
+            ),
+            effective_addr.eq(
+                cr_view.word1_location + Cat(C(0, 2), eff_off[:16])),
+            accesses_m_port.eq(effective_addr == M_BIT_PORT),
         ]
 
         m.d.comb += [
@@ -106,6 +125,7 @@ class ChurchDRead(Elaboratable):
                         dr_dst_reg.eq(self.dr_dst),
                         imm_reg.eq(self.imm),
                         drx_val_reg.eq(0),
+                        namespace_authorized_reg.eq(self.namespace_authorized),
                     ]
                     with m.If(~self.imm[14]):
                         # Indexed mode: need one extra cycle to read DR[DRx]
@@ -122,7 +142,18 @@ class ChurchDRead(Elaboratable):
 
             with m.State("PERM_CHECK"):
                 m.d.comb += self.busy.eq(1)
-                with m.If(gt_null):
+                with m.If(exact_m_cap & (eff_off == 0) &
+                          namespace_authorized_reg):
+                    m.next = "M_BIT_READ"
+                with m.Elif(exact_m_cap & (eff_off == 0)):
+                    m.d.comb += [self.fault.eq(1), self.fault_type.eq(FaultType.PERM_S)]
+                    m.next = "IDLE"
+                with m.Elif(accesses_m_port):
+                    # Raw address knowledge or an over-broad capability is not
+                    # authority for the Namespace-held M register.
+                    m.d.comb += [self.fault.eq(1), self.fault_type.eq(FaultType.PERM_S)]
+                    m.next = "IDLE"
+                with m.Elif(gt_null):
                     m.d.comb += [self.fault.eq(1), self.fault_type.eq(FaultType.NULL_CAP)]
                     m.next = "IDLE"
                 with m.Elif(cr_gt.gt_type == GT_TYPE_ABSTRACT):
@@ -137,8 +168,18 @@ class ChurchDRead(Elaboratable):
                 with m.Else():
                     # eff_off passed bounds (eff_off <= limit where limit ≤ 16 bits);
                     # safe to truncate to 16 bits for byte-address formation.
-                    m.d.sync += addr_reg.eq(cr_view.word1_location + Cat(C(0, 2), eff_off[:16]))
+                    m.d.sync += addr_reg.eq(effective_addr)
                     m.next = "MEM_ACCESS"
+
+            with m.State("M_BIT_READ"):
+                m.d.comb += [
+                    self.busy.eq(1),
+                    self.dr_wr_addr.eq(dr_dst_reg),
+                    self.dr_wr_data.eq(Cat(self.m_bit_rd_word, C(0, 16))),
+                    self.dr_wr_en.eq(dr_dst_reg != 0),
+                    self.done.eq(1),
+                ]
+                m.next = "IDLE"
 
             with m.State("MEM_ACCESS"):
                 m.d.comb += [

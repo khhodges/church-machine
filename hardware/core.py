@@ -1358,6 +1358,7 @@ class ChurchCore(Elaboratable):
             u_dread.imm.eq(u_decoder.immediate),
             u_dread.cr_rd_data.eq(u_regs.cr_rd_data),
             u_dread.dmem_rd_data.eq(self.dmem_rd_data),
+            u_dread.m_bit_rd_word.eq(u_regs.m_bit_device_state),
             # DR read port for indexed-mode DRx: feed from register port 1
             u_dread.dr_rd_data.eq(u_regs.dr_rd_data1),
         ]
@@ -1373,6 +1374,7 @@ class ChurchCore(Elaboratable):
             (namespace_exec_gt.perm == 0b101) &
             ~namespace_exec_gt.b_flag
         )
+        m.d.comb += u_dread.namespace_authorized.eq(namespace_exec_authorized)
         m.d.comb += dwrite_start_sig.eq(
             cond_exec_enable & is_dwrite_op & ~any_unit_busy
         )

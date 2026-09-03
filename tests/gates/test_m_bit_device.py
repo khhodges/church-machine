@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from amaranth.sim import Simulator
 
+from hardware.dread import ChurchDRead
 from hardware.dwrite import ChurchDWrite
 from hardware.hw_types import (
     FaultType,
@@ -62,6 +63,40 @@ def _write(cap, *, imm=0x4000, value=1, namespace_authorized=True,
     return observed
 
 
+def _read(cap, *, imm=0x4000, value=0, namespace_authorized=True,
+          authorization_after_start=None):
+    dut = ChurchDRead()
+    observed = {"m_read": False, "word": None,
+                "mem_read": False, "fault": FaultType.NONE}
+
+    async def bench(ctx):
+        ctx.set(dut.cr_src, 3)
+        ctx.set(dut.dr_dst, 4)
+        ctx.set(dut.imm, imm)
+        ctx.set(dut.cr_rd_data.as_value(), cap)
+        ctx.set(dut.m_bit_rd_word, value & 0xFFFF)
+        ctx.set(dut.namespace_authorized, namespace_authorized)
+        ctx.set(dut.start, 1)
+        await ctx.tick()
+        ctx.set(dut.start, 0)
+        if authorization_after_start is not None:
+            ctx.set(dut.namespace_authorized, authorization_after_start)
+        for _ in range(6):
+            if ctx.get(dut.dr_wr_en):
+                observed["m_read"] = True
+                observed["word"] = ctx.get(dut.dr_wr_data)
+            observed["mem_read"] |= bool(ctx.get(dut.dmem_rd_en))
+            if ctx.get(dut.fault):
+                observed["fault"] = ctx.get(dut.fault_type)
+            await ctx.tick()
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(bench)
+    sim.run()
+    return observed
+
+
 def test_exact_capability_writes_one_low_16_bit_word_without_memory_write():
     cap = _cap(
         GT_TYPE_INFORM,
@@ -73,6 +108,55 @@ def test_exact_capability_writes_one_low_16_bit_word_without_memory_write():
     assert result["word"] == 0xA55A
     assert not result["mem_write"]
     assert result["fault"] == FaultType.NONE
+
+
+def test_exact_capability_reads_zero_extended_m_register_without_memory_read():
+    cap = _cap(
+        GT_TYPE_INFORM,
+        PERM_MASK_R | PERM_MASK_W,
+        M_BIT_PORT,
+    ) | M_BIT_DEVICE_NS_SLOT
+    result = _read(cap, value=0xA55A)
+    assert result["m_read"]
+    assert result["word"] == 0x0000A55A
+    assert not result["mem_read"]
+    assert result["fault"] == FaultType.NONE
+
+
+def test_m_register_read_latches_namespace_authorization_at_acceptance():
+    cap = _cap(
+        GT_TYPE_INFORM,
+        PERM_MASK_R,
+        M_BIT_PORT,
+    ) | M_BIT_DEVICE_NS_SLOT
+    result = _read(
+        cap,
+        value=1 << 12,
+        namespace_authorized=True,
+        authorization_after_start=False,
+    )
+    assert result["m_read"]
+    assert result["word"] == 1 << 12
+    assert result["fault"] == FaultType.NONE
+
+
+def test_other_abstraction_cannot_read_namespace_m_register():
+    cap = _cap(
+        GT_TYPE_INFORM,
+        PERM_MASK_R,
+        M_BIT_PORT,
+    ) | M_BIT_DEVICE_NS_SLOT
+    result = _read(cap, value=0xFFFF, namespace_authorized=False)
+    assert result["fault"] == FaultType.PERM_S
+    assert not result["m_read"]
+    assert not result["mem_read"]
+
+
+def test_raw_read_address_is_not_m_register_authority():
+    result = _read(_cap(GT_TYPE_INFORM, PERM_MASK_R, M_BIT_PORT))
+    assert result["fault"] == FaultType.PERM_S
+    assert not result["m_read"]
+    assert not result["mem_read"]
 
 
 def test_raw_address_with_normal_write_permission_is_not_authority():
