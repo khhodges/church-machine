@@ -581,21 +581,6 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = AbstractionRegistry;
 }
 
-// Cache-busting guard: force navigation to the versioned simulator URL if on the plain
-// /simulator/ path.  This file is always revalidated via ETag so even a long-cached tab
-// will execute this code and be redirected to the versioned URL.
-(function _simulatorCacheBust() {
-    if (typeof window === 'undefined' || !window.location) return;
-    var _VER = 'r20260429e';
-    var _path = window.location.pathname;
-    if (_path.indexOf('/simulator/') === 0 && !_path.startsWith('/simulator/~/' + _VER)) {
-        // Preserve query string (e.g. ?learn=1, ?debug=1) — without this,
-        // any query param a caller attaches is silently dropped on every
-        // simulator page load, since this guard fires on every visit.
-        window.location.replace('/simulator/~/' + _VER + (window.location.search || '') + (window.location.hash || ''));
-    }
-})();
-
 // Failsafe: inject "Turing DR Test ✦" tab if missing from HTML.
 (function _ensureTuringDRTab() {
     if (typeof document === 'undefined') return;

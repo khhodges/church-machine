@@ -1,6 +1,7 @@
 const fs = require('fs');
 
 const source = fs.readFileSync('simulator/index.html', 'utf8');
+const abstractionsSource = fs.readFileSync('simulator/abstractions.js', 'utf8');
 const checks = [
   ['truthy non-Error values are guarded', source.includes('if (!(event.error instanceof Error))')],
   ['non-Error values are normalized', source.includes('function describeNonError(value, fallback)')],
@@ -10,6 +11,9 @@ const checks = [
     source.includes('event.stopImmediatePropagation();')],
   ['guard observes resource errors in capture phase',
     /window\.addEventListener\('error',[\s\S]*?\}, true\);/.test(source)],
+  ['startup does not abort assets with a second client-side version redirect',
+    !abstractionsSource.includes('_simulatorCacheBust') &&
+    !abstractionsSource.includes("window.location.replace('/simulator/~/")],
 ];
 
 for (const [name, ok] of checks) {
