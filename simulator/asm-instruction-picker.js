@@ -237,6 +237,43 @@
 
     // ── DOM helpers ─────────────────────────────────────────────────────────
 
+    function clampPanelToViewport(panel, left, top) {
+        var margin = 8;
+        var width = panel.offsetWidth || 580;
+        var height = panel.offsetHeight || 360;
+        return {
+            left: Math.max(margin, Math.min(left, window.innerWidth - width - margin)),
+            top: Math.max(margin, Math.min(top, window.innerHeight - height - margin))
+        };
+    }
+
+    function makePickerMovable(picker) {
+        picker.addEventListener('pointerdown', function (e) {
+            var header = e.target.closest('.asm-picker-header');
+            if (!header || e.button !== 0) return;
+            e.preventDefault();
+            var rect = picker.getBoundingClientRect();
+            var dx = e.clientX - rect.left;
+            var dy = e.clientY - rect.top;
+            header.classList.add('asm-picker-header--dragging');
+
+            function move(ev) {
+                var pos = clampPanelToViewport(picker, ev.clientX - dx, ev.clientY - dy);
+                picker.style.left = pos.left + 'px';
+                picker.style.top = pos.top + 'px';
+            }
+            function stop() {
+                header.classList.remove('asm-picker-header--dragging');
+                document.removeEventListener('pointermove', move);
+                document.removeEventListener('pointerup', stop);
+                document.removeEventListener('pointercancel', stop);
+            }
+            document.addEventListener('pointermove', move);
+            document.addEventListener('pointerup', stop);
+            document.addEventListener('pointercancel', stop);
+        });
+    }
+
     function getOrCreatePicker() {
         if (!pickerEl) {
             pickerEl = document.createElement('div');
@@ -246,6 +283,7 @@
             pickerEl.setAttribute('aria-label', 'Instruction picker');
             pickerEl.style.display = 'none';
             document.body.appendChild(pickerEl);
+            makePickerMovable(pickerEl);
         }
         return pickerEl;
     }
@@ -595,21 +633,16 @@
     function positionPicker(textarea) {
         var picker = getOrCreatePicker();
         var pos = getCaretPixelPos(textarea);
-        var pickerWidth = 580;
-        var pickerMaxHeight = 300;
-        var viewW = window.innerWidth;
-        var viewH = window.innerHeight;
-
+        var width = picker.offsetWidth || 580;
+        var height = picker.offsetHeight || 360;
         var left = pos.x;
         var top = pos.y;
-
-        if (left + pickerWidth > viewW) left = viewW - pickerWidth - 8;
-        if (left < 4) left = 4;
-        if (top + pickerMaxHeight > viewH) top = pos.y - pickerMaxHeight - 20;
-        if (top < 4) top = 4;
-
-        picker.style.left = left + 'px';
-        picker.style.top = top + 'px';
+        if (top + height + 8 > window.innerHeight) {
+            top = pos.y - height - 24;
+        }
+        var clamped = clampPanelToViewport(picker, left, top);
+        picker.style.left = clamped.left + 'px';
+        picker.style.top = clamped.top + 'px';
     }
 
     // prefill: optional string — pre-populates the filter box and immediately

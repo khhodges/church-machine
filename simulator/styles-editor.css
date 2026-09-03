@@ -1635,7 +1635,8 @@
     border-radius: 6px;
     box-shadow: 0 8px 28px rgba(0,0,0,0.7);
     width: 580px;
-    max-height: 360px;
+    max-width: calc(100vw - 16px);
+    max-height: min(360px, calc(100vh - 16px));
     display: none;
     flex-direction: column;
     animation: asmPickerIn 0.12s ease;
@@ -1655,7 +1656,11 @@
     border-bottom: 1px solid #2a2a4a;
     white-space: nowrap;
     flex-shrink: 0;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
 }
+.asm-picker-header--dragging { cursor: grabbing; }
 
 .asm-picker-body {
     display: flex;
@@ -2083,7 +2088,7 @@
     box-shadow: 0 8px 28px rgba(0,0,0,0.7);
     width: 480px;
     max-width: calc(100vw - 24px);
-    max-height: 320px;
+    max-height: min(320px, calc(100vh - 16px));
     display: none;
     flex-direction: column;
     animation: asmPickerIn 0.12s ease;
@@ -2091,6 +2096,9 @@
 }
 
 .clist-viewer-header {
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -2100,6 +2108,7 @@
     border-bottom: 1px solid #2a2a4a;
     flex-shrink: 0;
 }
+.clist-viewer-header--dragging { cursor: grabbing; }
 
 .clist-viewer-title {
     color: #f4b942;

@@ -69,6 +69,45 @@
     }
 
     // ── DOM helpers ───────────────────────────────────────────────────────────
+    function _clampPopupToViewport(popup, left, top) {
+        var margin = 8;
+        var width = popup.offsetWidth || 480;
+        var height = popup.offsetHeight || 320;
+        return {
+            left: Math.max(margin, Math.min(left, window.innerWidth - width - margin)),
+            top: Math.max(margin, Math.min(top, window.innerHeight - height - margin))
+        };
+    }
+
+    function _makePopupMovable(popup) {
+        popup.addEventListener('pointerdown', function (e) {
+            var header = e.target.closest('.clist-viewer-header');
+            if (!header || e.button !== 0 ||
+                    e.target.closest('button, input, select, textarea, a')) return;
+            e.preventDefault();
+            var rect = popup.getBoundingClientRect();
+            var dx = e.clientX - rect.left;
+            var dy = e.clientY - rect.top;
+            header.classList.add('clist-viewer-header--dragging');
+
+            function move(ev) {
+                var pos = _clampPopupToViewport(
+                    popup, ev.clientX - dx, ev.clientY - dy);
+                popup.style.left = pos.left + 'px';
+                popup.style.top = pos.top + 'px';
+            }
+            function stop() {
+                header.classList.remove('clist-viewer-header--dragging');
+                document.removeEventListener('pointermove', move);
+                document.removeEventListener('pointerup', stop);
+                document.removeEventListener('pointercancel', stop);
+            }
+            document.addEventListener('pointermove', move);
+            document.addEventListener('pointerup', stop);
+            document.addEventListener('pointercancel', stop);
+        });
+    }
+
     function getOrCreatePopup() {
         if (popupEl) return popupEl;
         popupEl = document.createElement('div');
@@ -76,6 +115,7 @@
         popupEl.setAttribute('role', 'listbox');
         popupEl.setAttribute('aria-label', 'C-List viewer');
         document.body.appendChild(popupEl);
+        _makePopupMovable(popupEl);
 
         // ── Delegated click handler: handles row clicks without inline onclick ─
         popupEl.addEventListener('click', function (e) {
@@ -827,15 +867,15 @@
             return;
         }
         var rect = btn.getBoundingClientRect();
-        var popupW = 480;
         var left = rect.left;
         var top  = rect.bottom + 4;
-
-        if (left + popupW > window.innerWidth) left = window.innerWidth - popupW - 8;
-        if (left < 4) left = 4;
-
-        popup.style.left = left + 'px';
-        popup.style.top  = top  + 'px';
+        var popupH = popup.offsetHeight || 320;
+        if (top + popupH + 8 > window.innerHeight) {
+            top = rect.top - popupH - 4;
+        }
+        var clamped = _clampPopupToViewport(popup, left, top);
+        popup.style.left = clamped.left + 'px';
+        popup.style.top  = clamped.top + 'px';
     }
 
     // ── GT Picker ─────────────────────────────────────────────────────────────
