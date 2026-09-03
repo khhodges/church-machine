@@ -33,6 +33,7 @@ function nextTurn() {
     const editor = window.document.getElementById('asmEditor');
     editor.value = [
         'capabilities {',
+        '    SELF E',
         '    WukongCallHome.hw E',
         '    Continue E',
         '    Diagnostics R',
@@ -78,6 +79,7 @@ function nextTurn() {
         popup.querySelector('.clist-row[data-slot="0"] .clist-self-name').textContent === 'SELF',
         popup.innerHTML);
     check('CLD-6: deleting CR1 removes only the source capability at CR1',
+        editor.value.includes('SELF E') &&
         !editor.value.includes('WukongCallHome.hw E') &&
         editor.value.includes('Continue E') &&
         editor.value.includes('Diagnostics R'), editor.value);

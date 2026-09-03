@@ -4972,7 +4972,7 @@ async function _absOpenInEditorByName(name, methodName) {
             var _capEntries = Array.isArray(_absEntry.capabilities) ? _absEntry.capabilities : [];
                 var _capLines = [
                     'capabilities {',
-                    '  ; cList[0] Pet name: SELF  E  (compiler-owned)'
+                    '  SELF E  ; cList[0], compiler-owned'
                 ];
                 for (var _ci = 0; _ci < _capEntries.length; _ci++) {
                     var _ce = _capEntries[_ci];

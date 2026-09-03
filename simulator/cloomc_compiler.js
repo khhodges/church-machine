@@ -184,13 +184,20 @@ class CLOOMCCompiler {
                     message: 'capabilities { } cannot declare __SELF__: c-list row 0 is compiler-owned resident identity.'
                 });
             } else {
+                // New-abstraction templates show `SELF E` as the visible row-0
+                // contract. It is descriptive: the compiler still owns and
+                // materializes that row, so do not append it as a user row.
+                const userDeclared = declared.filter(cap => {
+                    const name = typeof cap === 'string' ? cap : (cap && cap.name);
+                    return String(name || '').trim().toUpperCase() !== 'SELF';
+                });
                 result.capabilities = [{
                     name: '__SELF__',
                     rights: ['E'],
                     grants: ['E'],
                     compiler_owned_self: true,
                     placeholder: true,
-                }, ...declared];
+                }, ...userDeclared];
                 result.compilerSelfCapability = true;
             }
         }

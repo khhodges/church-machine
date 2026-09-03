@@ -26,9 +26,18 @@ assert.ok(unpinned.errors.some(e => /pinned descriptor/.test(e.message)),
     'portable source must fail closed on an unpinned dependency');
 const legacy = compiler.compile(`@legacy
 abstraction Old {
-  capabilities { Audit L }
+  capabilities {
+    SELF E
+    Audit L
+  }
   method run() { return(0); }
 }`, []);
 assert.equal(legacy.errors.length, 0, JSON.stringify(legacy.errors));
 assert.equal(legacy.portableMode, 'explicit-legacy');
+assert.equal(legacy.capabilities.filter(cap => cap && cap.compiler_owned_self).length, 1,
+    'visible SELF E must materialize exactly one compiler-owned SELF row');
+assert.equal(legacy.capabilities.some(cap => String(cap && cap.name).toUpperCase() === 'SELF'), false,
+    'visible SELF E must not survive as a duplicate user capability');
+assert.equal(legacy.capabilities[1].name, 'Audit',
+    'first user capability must remain at c-list row 1');
 console.log('portable descriptor compiler tests passed');

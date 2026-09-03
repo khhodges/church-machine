@@ -631,6 +631,10 @@
         var removedNames = [];
         entries.forEach(function (entry) {
             var name = entry[0];
+            if (String(name).toUpperCase() === 'SELF') {
+                kept.push(entry);
+                return;
+            }
             var escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             var usedRe = new RegExp('\\b' + escaped + '\\b');
             if (usedRe.test(restOfSource)) {
@@ -673,14 +677,20 @@
         }
 
         var entries = _parseCapEntries(cm[1]);
-        if (sourceIndex >= entries.length) {
+        var selfEntries = entries.filter(function (entry) {
+            return String(entry[0]).toUpperCase() === 'SELF';
+        });
+        var userEntries = entries.filter(function (entry) {
+            return String(entry[0]).toUpperCase() !== 'SELF';
+        });
+        if (sourceIndex >= userEntries.length) {
             _showPolaToast(popup, 'C-List row CR' + displaySlot + ' is no longer present.');
             return;
         }
 
-        var removed = entries[sourceIndex][0];
-        entries.splice(sourceIndex, 1);
-        var newBlock = _formatCapBlock(entries);
+        var removed = userEntries[sourceIndex][0];
+        userEntries.splice(sourceIndex, 1);
+        var newBlock = _formatCapBlock(selfEntries.concat(userEntries));
         ed.value = src.slice(0, cm.index) + newBlock + src.slice(cm.index + cm[0].length);
         ed.dispatchEvent(new Event('input', { bubbles: true }));
         showViewer('\u2702 Deleted CR' + displaySlot + ' (' + removed + ') from the source C-List.');
@@ -715,7 +725,11 @@
                         var rights = tokens.slice(1).filter(function (t) { return KNOWN_RIGHTS.test(t); });
                         return name ? { name: name, rights: rights } : null;
                     })
-                    .filter(Boolean);
+                    .filter(function (cap) {
+                        // `SELF E` is the visible template declaration for the
+                        // compiler-owned row 0, which is rendered separately.
+                        return cap && String(cap.name).toUpperCase() !== 'SELF';
+                    });
                 // A capabilities { } block exists in the source — always treat
                 // this as the authoritative view, even when it is now empty
                 // (e.g. right after POLA removed every unused entry). Falling
