@@ -410,26 +410,20 @@ def _make_ns_entry(gt_type, perms, slot_id, gt_seq, location, alloc_size, cw=0, 
 #   Slot 20: CR13_PORT_CAP  — 0xFFFFFF0D, S-perm, limit=0
 #             Authority to CHANGE CR13 (interrupt handler).
 #             Distributed to: Scheduler.IRQ c-list only (E-perm GT; IRQ-manager territory).
-# M-device descriptors are separate full 96-bit values, not c-list GTs; the
-# protected Namespace identity gate below is the effective custody boundary.
+# Slot 11 is the single-word M-bit I/O object. Its low 16 bits map CR0..CR15.
+# Its capability is held by Namespace and is not present in user c-lists.
 #
 # Physical LED mapping (R bit = bit 0 of each word):
 #   Tang Nano 20K (6 LEDs active-LOW, led3 pin absent):
 #     offset 0→led0, 1→led1, 2→led2, 3→led4, 4→led5; led3 pin not connected
 # ---------------------------------------------------------------------------
 
-# Private Namespace M-bit device catalog. A c-list entry holds only word0, and
-# therefore cannot safely carry these location-bound device capabilities.
-# These complete descriptors are deliberately absent from every executable
-# boot c-list. Hardware's effective custody boundary is additionally enforced
-# by DWRITE's protected CR14 Namespace identity gate; this tuple by itself is
-# metadata, not an executable grant. A descriptor is exact only with this
-# S-only Abstract GT, its matching port address, and zero limit.
-NAMESPACE_PRIVATE_MBIT_CAPABILITIES = (
-    (CR_THREAD_STACK, make_gt(GT_TYPE_ABSTRACT, PERM_MASK_S, 0, 0), M_BIT_PORT_CR12, 0),
-    (CR_INTERRUPT,    make_gt(GT_TYPE_ABSTRACT, PERM_MASK_S, 0, 0), M_BIT_PORT_CR13, 0),
-    (CR_CLOOMC,       make_gt(GT_TYPE_ABSTRACT, PERM_MASK_S, 0, 0), M_BIT_PORT_CR14, 0),
-    (CR_NAMESPACE,    make_gt(GT_TYPE_ABSTRACT, PERM_MASK_S, 0, 0), M_BIT_PORT_CR15, 0),
+# Complete descriptor for the Namespace-held M-bit I/O object.
+NAMESPACE_MBIT_CAPABILITY = (
+    make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W,
+            M_BIT_DEVICE_NS_SLOT, 0, b_flag=1),
+    M_BIT_PORT,
+    0,
 )
 
 # ---------------------------------------------------------------------------
@@ -473,6 +467,8 @@ _MMIO_ENTRIES = {
     MMIO_UART_SLOT:  (MMIO_UART_ADDR,  ARCH_BOOT["devices"]["UART_DEV"]["words"], GT_TYPE_INFORM, logical_permission_mask(ARCH_BOOT["devices"]["UART_DEV"]["permissions"])),
     MMIO_BTN_SLOT:   (MMIO_BTN_ADDR,   ARCH_BOOT["devices"]["BTN_DEV"]["words"], GT_TYPE_INFORM, logical_permission_mask(ARCH_BOOT["devices"]["BTN_DEV"]["permissions"])),
     MMIO_TIMER_SLOT: (MMIO_TIMER_ADDR, ARCH_BOOT["devices"]["TIMER_DEV"]["words"], GT_TYPE_INFORM, logical_permission_mask(ARCH_BOOT["devices"]["TIMER_DEV"]["permissions"])),
+    MMIO_M_BIT_SLOT: (M_BIT_PORT, 1, GT_TYPE_INFORM,
+                      PERM_MASK_R | PERM_MASK_W),
 }
 
 # ---------------------------------------------------------------------------
@@ -521,6 +517,7 @@ NS_SLOT_COUNT = max(ARCH_BOOT["minimalSlots"].values()) + 1
 #   Slot 5: TIMER_DEV      — MMIO 0x4000002C, RW, limit=4 (5 words)
 #   Slot 6: SelfTest       — LUMP (base=0x0600, limit=511), E-perm; default ⚡ boot entry
 #   Slot 7: WukongCallHome — LUMP (base=0x1200, limit=127), E-perm; selectable diagnostic entry
+#   Slot 11: M_BIT_DEV     — 0xFFFFFF1C, RW, one 32-bit word; bits 0..15 map CR0.M..CR15.M
 # ---------------------------------------------------------------------------
 # Every resident W3 cache token is 0: built-in ROM has no trusted full identity
 # source, so it never invents authenticity (Task #2862).  cache_token32 defaults
@@ -548,7 +545,7 @@ for _i in range(NS_SLOT_COUNT):
 # make_demo_clist — factory for the boot abstraction c-list (SelfTest, Slot 6)
 #
 # Aligned with simulator boot c-list (simulator.js _initNamespaceTable).
-# Minimal 11-entry layout matching the 8-slot namespace.
+# Minimal boot c-list. M_BIT_DEV is intentionally absent: only Namespace owns it.
 #
 #   idx  0: make_gt(Inform, R|X, slot_id=6, gt_seq=0)         — boot-internal: SelfTest code/constants R|X
 #   idx  1: make_gt(Inform, E,   next_slot, gt_seq=0)         — Next.GT: SelfTest calls here at done:

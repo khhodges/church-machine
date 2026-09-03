@@ -21,12 +21,12 @@ aliasing or truncation. Source M is never consulted.
 ## M-bit device and custody
 
 M is per-register machine state, not a seventh GT permission and not part of
-the `{R,W,X,L,S,E}` field. A dedicated I/O device exposes target-bound controls
-for CR12, CR13, CR14, and CR15. Each control capability names exactly one
-destination. The device requires the exact capability, target, port, and write
-right; raw address knowledge supplies no authority.
+the `{R,W,X,L,S,E}` field. A dedicated I/O object exposes one 32-bit register.
+Bits 0 through 15 are CR0.M through CR15.M; writing 1 sets the corresponding M
+bit and writing 0 clears it. Bits 16 through 31 are reserved.
 
-Only the Namespace abstraction receives these device capabilities during
+The object has one Namespace-table entry like the other hardware I/O registers.
+Only the Namespace abstraction receives its capability during
 initialization. Ordinary abstractions cannot mint, discover, attenuate into, or
 use them. A capability missing from the caller's c-list, issued to another
 abstraction, bound to another CR, addressed at the wrong port, or lacking the
@@ -34,8 +34,7 @@ required right fails closed without changing M.
 
 ## Operation lifecycle
 
-1. Namespace presents the target-bound M-bit device capability and sets M for
-   one isolated destination.
+1. Namespace presents the M-bit I/O capability and writes the complete M word.
 2. The instruction decoder accepts `SWITCH`, latching CRd and CRd.M.
 3. The destination and encoding are validated.
 4. The ordinary LOAD pipeline validates `CRs[row]`. No source-M bypass exists.

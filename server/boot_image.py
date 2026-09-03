@@ -220,7 +220,7 @@ def create_abstract_gt(ab_type, rw_perms, gt_seq, ab_data):
 # image is produced from this canonical list so server and simulator
 # agree on what the default boot ROM contains.
 #
-# Minimal 11-slot boot namespace (slots 0-10), followed by user-deployed abstractions.
+# Minimal 12-slot boot namespace (slots 0-11), followed by user-deployed abstractions.
 # The ⚡ lightning bolt sets Thread.CR0 to the E-GT of whichever slot the programmer
 # chooses as the boot entry.  Default is SelfTest (slot 6); Wukong boards use slot 7.
 DEFAULT_ABSTRACTION_CATALOG = [
@@ -239,13 +239,14 @@ DEFAULT_ABSTRACTION_CATALOG = [
      ("Tunnel",         {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 8  CALL HOME / IDE bridge
     ("Ethernet",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 9  network I/O hardware cap
     ("CapabilityTest",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 10 capability validation LUMP
+    ("M_BIT_DEV",      {p: int(p in ARCH_BOOT["devices"]["M_BIT_DEV"]["permissions"]) for p in ("R", "W", "X", "L", "S", "E")}, False),  # 11 Namespace-held one-word M register
 ]
-assert len(DEFAULT_ABSTRACTION_CATALOG) == 11, "catalog drift vs simulator.js"
+assert len(DEFAULT_ABSTRACTION_CATALOG) == 12, "catalog drift vs simulator.js"
 
 # Thread.1 is the fixed Boot.Thread entry at NS slot 1.  Configured secondary
 # threads are concrete, resident Thread LUMPs, so they need stable Namespace
 # identities too.  Reserve the slots immediately after the fixed boot catalog:
-# Thread#2 -> 11, Thread#3 -> 12, and so on.  This is deliberately independent
+# Thread#2 -> 12, Thread#3 -> 13, and so on.  This is deliberately independent
 # of allocation order and of the mutable Step-2 catalog.
 GENERATED_THREAD_FIRST_NS_SLOT = len(DEFAULT_ABSTRACTION_CATALOG)
 MAX_THREAD_COUNT = 9
@@ -290,10 +291,15 @@ def boot_resident_region_end(thread_size, boot_abstr_size, thread_count,
     bodies must begin at or after this address.
     """
     catalog_slot_sizes = catalog_slot_sizes or {}
+    mmio_slots = {
+        ARCH_BOOT["minimalSlots"][name]
+        for name in ARCH_BOOT["devices"]
+    }
     trailing_catalog_words = sum(
         catalog_slot_sizes.get(slot, SLOT_SIZE)
         for slot in range(BOOT_ABSTR_NS_SLOT + 1,
                           len(DEFAULT_ABSTRACTION_CATALOG))
+        if slot not in mmio_slots
     )
     return thread_size * thread_count + boot_abstr_size + trailing_catalog_words
 

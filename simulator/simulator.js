@@ -43,10 +43,7 @@ const CR_PORT_CR12            = 0xFFFFFF0C; // CHANGE CR12 authority port (threa
 const CR_PORT_CR13            = 0xFFFFFF0D; // CHANGE CR13 authority port (interrupt handler)
 const CR_PORT_CR14            = 0xFFFFFF0E; // CHANGE CR14 authority port (code register)
 const CR_PORT_CR15            = 0xFFFFFF0F; // CHANGE CR15 authority port (namespace root)
-const M_BIT_PORT_CR12         = 0xFFFFFF1C; // M-bit authority port for CR12
-const M_BIT_PORT_CR13         = 0xFFFFFF1D; // M-bit authority port for CR13
-const M_BIT_PORT_CR14         = 0xFFFFFF1E; // M-bit authority port for CR14
-const M_BIT_PORT_CR15         = 0xFFFFFF1F; // M-bit authority port for CR15
+const M_BIT_PORT              = 0xFFFFFF1C; // one word; bits 0..15 map CR0.M..CR15.M
 const IO_PORT_PET_NAME_WR     = 0xFFFFFF38; // DWRITE to this addr marks c-list slot (value & 0x3F) as named
 // Boot-default named slots — matches hardware/boot_rom.py DEMO_CLIST_NAMED_SLOTS.
 // 11-slot catalog (0-10): hw MMIO 0-5, boot-entry LUMPs 6-7, hardware caps 8-10.
@@ -2012,7 +2009,7 @@ class ChurchSimulator {
     }
 
     _getHardwareBootCatalog() {
-        // Hardware cold-boot namespace: 11 slots (0–10).
+        // Hardware cold-boot namespace: 12 slots (0–11).
         //   0–5   fixed hardware caps (Boot.NS, Boot.Thread, MMIO devices)
         //   6     SelfTest       — default ⚡ boot entry (hardware correctness validator)
         //   7     WukongCallHome — coordinator: SelfTest → Tunnel.Register → IDE RETURN
@@ -2020,6 +2017,7 @@ class ChurchSimulator {
         //   8     Tunnel         — CALL HOME / IDE bridge (hardware E-perm cap)
         //   9     Ethernet       — network I/O hardware cap (E-perm)
         //  10     CapabilityTest        — capability validation LUMP (E-perm, task #2274)
+        //  11     M_BIT_DEV      — Namespace-held one-word I/O object
         // No slot above 1 has special hardware significance — the ⚡ lightning
         // bolt sets Thread.CR0 to whichever slot the programmer chooses.
         // This catalog NEVER derives from abstractionRegistry — the registry is
@@ -2036,6 +2034,7 @@ class ChurchSimulator {
             { label: 'Tunnel',         perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 8  CALL HOME / IDE bridge
             { label: 'Ethernet',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 9  network I/O hardware cap
             { label: 'CapabilityTest',        perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 10 capability validation LUMP
+            { label: 'M_BIT_DEV',      perms: this._contractDevicePerms('M_BIT_DEV'), chainable: false },  // 11
         ];
     }
 

@@ -180,8 +180,7 @@ def test_only_successful_switch_consume_control_clears_accepted_destination_m():
 
     async def bench(ctx):
         # Seed CR14's M latch through its dedicated device port.
-        ctx.set(dut.m_bit_device_target, 2)
-        ctx.set(dut.m_bit_device_value, 1)
+        ctx.set(dut.m_bit_device_word, 1 << 14)
         ctx.set(dut.m_bit_device_wr_en, 1)
         await ctx.tick()
         ctx.set(dut.m_bit_device_wr_en, 0)

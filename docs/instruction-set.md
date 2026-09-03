@@ -145,7 +145,8 @@ latched M bit must already be set when the instruction is accepted. `CRs` is
 an ordinary c-list capability and must pass normal LOAD validation, including
 L permission; the source does not need M. On success the selected c-list entry
 replaces CRd and CRd.M is cleared, so every later SWITCH requires Namespace to
-re-authorize that exact destination through the target-bound M-bit device.
+re-authorize that exact destination through the corresponding bit in the
+single-word M-bit I/O object.
 
 M is register state, not a GT permission. Only Namespace receives the dedicated
 M-bit device capabilities for CR12–CR15. Wrong destinations, malformed

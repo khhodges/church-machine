@@ -173,7 +173,7 @@ instruction-accepted, latched M bit as authority.
 | **Success** | Load c-list[row] into CRd and consume CRd.M |
 
 M is destination-register state, not a source permission. Namespace alone
-holds the target-bound M-bit device capabilities used to authorize a later
+holds the single M-bit I/O capability used to authorize a later
 SWITCH. Source M is irrelevant. Faults do not mutate CRs, M bits, namespace
 entries, or memory.
 ---

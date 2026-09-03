@@ -154,15 +154,11 @@ CR_PORT_CR13 = 0xFFFFFF0D   # interrupt handler    (system-wide)
 CR_PORT_CR14 = 0xFFFFFF0E   # code register        (per-thread)
 CR_PORT_CR15 = 0xFFFFFF0F   # namespace root       (per-thread)
 
-# Segment 2 — M Bit Ports (0xFFFFFF10–0xFFFFFF1F)
-# An exact, target-bound Abstract S capability authorises setting/clearing the
-# M latch associated with one isolated register.  M is register state, not a GT
-# permission bit.
-M_BIT_PORT_BASE = 0xFFFFFF10
-M_BIT_PORT_CR12 = 0xFFFFFF1C
-M_BIT_PORT_CR13 = 0xFFFFFF1D
-M_BIT_PORT_CR14 = 0xFFFFFF1E
-M_BIT_PORT_CR15 = 0xFFFFFF1F
+# Segment 2 — M-bit I/O object (one 32-bit register).
+# Bits [15:0] are the M states for CR0..CR15 respectively.  Writing a 1 sets
+# that CR's M bit and writing a 0 clears it.  Bits [31:16] are reserved.
+M_BIT_PORT = 0xFFFFFF1C
+M_BIT_DEVICE_NS_SLOT = 11
 
 # Segment 3 — I/O Device Ports (0xFFFFFF20–0xFFFFFFEE)
 # R-perm → read register.  W-perm → write register.
@@ -226,6 +222,7 @@ MMIO_UART_SLOT               = ARCH_BOOT["minimalSlots"]["UART_DEV"]
 MMIO_LED_SLOT                = ARCH_BOOT["minimalSlots"]["LED_DEV"]
 MMIO_BTN_SLOT                = ARCH_BOOT["minimalSlots"]["BTN_DEV"]
 MMIO_TIMER_SLOT              = ARCH_BOOT["minimalSlots"]["TIMER_DEV"]
+MMIO_M_BIT_SLOT              = M_BIT_DEVICE_NS_SLOT
 # Church HW Range NS slots 19-22 removed — authority now encoded as a
 # pre-baked Abstract S-perm GT (type=0b11, dom=1, perm3=0b010 → 0x2E000000).
 # No NS entries are needed; the token carries the authority directly.

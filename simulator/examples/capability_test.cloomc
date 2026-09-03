@@ -63,7 +63,7 @@ LOADNE CR0, SelfTest  ; EXEC  -- condition NE met (Z=0) -- restore CR0
 ; TEST 6: SWITCH -- isolated-register special LOAD authorization
 ; ============================================================
 ; Namespace initialization actually provisions CR12.M through its private,
-; target-bound M-bit device immediately before CapabilityTest execution; it
+; single-word M-bit I/O object immediately before CapabilityTest execution; it
 ; also leaves CR13.M clear for the negative case. This is an explicit
 ; initialization step, not an assumed initial state. The source is ordinary
 ; L-capable CR6; it neither needs nor receives M authority.

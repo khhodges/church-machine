@@ -61,9 +61,8 @@ class DeviceAbstractions {
     constructor(registry) {
         this.registry = registry;
         this.IO_SEGMENT = 0xFE00;
-        // The M-bit device is intentionally not registered as an abstraction
-        // and has no Namespace entry or discoverable address-to-capability
-        // conversion. Capabilities are object identities held only by Namespace.
+        // Namespace owns one capability for one 32-bit M-bit I/O object.
+        // Bits 0..15 map directly to CR0.M..CR15.M.
         this._mBitNamespaceOwner = null;
         this._mBitCapabilities = null;
         this._deviceState = {
@@ -77,47 +76,45 @@ class DeviceAbstractions {
         this._bindAll();
     }
 
-    issueNamespaceMBitCapabilities(namespaceOwner) {
+    issueNamespaceMBitCapability(namespaceOwner) {
         const canonicalOwner = this.registry && this.registry.abstractions
             ? this.registry.abstractions[5] : null;
         if (!canonicalOwner || canonicalOwner.name !== 'Navana' ||
                 namespaceOwner !== canonicalOwner || this._mBitCapabilities) {
             return null;
         }
-        const ports = [0xFFFFFF1C, 0xFFFFFF1D, 0xFFFFFF1E, 0xFFFFFF1F];
-        const capabilities = ports.map((port, offset) => Object.freeze({
+        const capability = Object.freeze({
             device: 'M_BIT',
-            target: 12 + offset,
-            port: port >>> 0,
-            rights: 'S'
-        }));
+            nsSlot: 11,
+            port: 0xFFFFFF1C,
+            words: 1,
+            rights: 'RW'
+        });
         this._mBitNamespaceOwner = namespaceOwner;
-        this._mBitCapabilities = new Set(capabilities);
-        return Object.freeze(capabilities.slice());
+        this._mBitCapabilities = new Set([capability]);
+        return capability;
     }
 
-    writeMBit(sim, capability, target, value, namespaceOwner) {
-        const expectedPort = (0xFFFFFF10 + target) >>> 0;
+    writeMBitWord(sim, capability, value, namespaceOwner) {
         if (!this._mBitCapabilities || !this._mBitCapabilities.has(capability) ||
                 namespaceOwner !== this._mBitNamespaceOwner) {
             return { ok: false, fault: 'PERM_M', message: 'M-bit device capability is absent or not owned by Namespace' };
         }
-        if (!Number.isInteger(target) || target < 12 || target > 15 ||
-                capability.device !== 'M_BIT' || capability.target !== target ||
-                (capability.port >>> 0) !== expectedPort) {
-            return { ok: false, fault: 'PERM_M', message: 'M-bit device capability target/port mismatch' };
+        if (capability.device !== 'M_BIT' || capability.nsSlot !== 11 ||
+                capability.words !== 1 || (capability.port >>> 0) !== 0xFFFFFF1C) {
+            return { ok: false, fault: 'PERM_M', message: 'M-bit device capability identity mismatch' };
         }
-        if (capability.rights !== 'S') {
-            return { ok: false, fault: 'PERM_S', message: 'M-bit device requires the exact S right' };
+        if (capability.rights !== 'RW') {
+            return { ok: false, fault: 'PERM_W', message: 'M-bit I/O object requires its exact RW capability' };
         }
-        if (value !== 0 && value !== 1) {
-            return { ok: false, fault: 'ARGS', message: 'M-bit device accepts only 0 or 1' };
+        if (!Number.isInteger(value) || value < 0 || value > 0xFFFFFFFF) {
+            return { ok: false, fault: 'ARGS', message: 'M-bit device requires one 32-bit word' };
         }
-        if (!sim || !sim.cr || !sim.cr[target]) {
-            return { ok: false, fault: 'BOUNDS', message: `M-bit device target CR${target} is unavailable` };
+        if (!sim || !sim.cr || sim.cr.length < 16) {
+            return { ok: false, fault: 'BOUNDS', message: 'M-bit device requires CR0–CR15' };
         }
-        sim.cr[target].m = value;
-        return { ok: true, target, value };
+        for (let cr = 0; cr < 16; cr++) sim.cr[cr].m = (value >>> cr) & 1;
+        return { ok: true, value: value >>> 0 };
     }
 
     _bindAll() {

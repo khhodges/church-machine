@@ -174,7 +174,8 @@
       "BTN_DEV": 4,
       "TIMER_DEV": 5,
       "SelfTest": 6,
-      "WukongCallHome": 7
+      "WukongCallHome": 7,
+      "M_BIT_DEV": 11
     },
     "defaultBootEntrySlot": 6,
     "wukongBootEntrySlot": 7,
@@ -221,6 +222,15 @@
       "TIMER_DEV": {
         "address": 1073741868,
         "words": 5,
+        "permissions": [
+          "R",
+          "W"
+        ],
+        "bindable": true
+      },
+      "M_BIT_DEV": {
+        "address": 4294967068,
+        "words": 1,
         "permissions": [
           "R",
           "W"

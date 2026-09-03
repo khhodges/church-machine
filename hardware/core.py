@@ -851,8 +851,7 @@ class ChurchCore(Elaboratable):
             u_regs.m_set_en.eq(mwin_m_set_en),
             u_regs.m_clear_en.eq(mwin_m_clear_en),
             u_regs.m_bit_device_wr_en.eq(u_dwrite.m_bit_wr_en),
-            u_regs.m_bit_device_target.eq(u_dwrite.m_bit_wr_target),
-            u_regs.m_bit_device_value.eq(u_dwrite.m_bit_wr_value),
+            u_regs.m_bit_device_word.eq(u_dwrite.m_bit_wr_word),
             u_regs.m_switch_consume_en.eq(u_switch.m_consume_en if not self.iot_profile else 0),
             u_regs.m_switch_consume_target.eq(
                 u_switch.m_consume_target if not self.iot_profile else 0),
@@ -1391,8 +1390,9 @@ class ChurchCore(Elaboratable):
             u_dwrite.private_m_start.eq(
                 (boot_state_reg == BootState.INIT_CLIST) &
                 namespace_init_armed & ~u_dwrite.busy & ~u_dwrite.done),
-            u_dwrite.private_m_target.eq(0),  # Namespace.Init provisions CR12.M
-            u_dwrite.private_m_value.eq(1),
+            # Namespace.Init writes the complete M-bit object: CR12 on, all
+            # other CR M bits off.
+            u_dwrite.private_m_word.eq(1 << CR_THREAD_STACK),
         ]
         # dr_rd_addr2: dwrite source data, BFINS, and register-form IADD/ISUB
         # use port 2. Arithmetic register operands are encoded in imm[3:0]

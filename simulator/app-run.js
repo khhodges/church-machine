@@ -6793,7 +6793,7 @@ LOADNE CR0, SelfTest  ; EXEC  -- condition NE met (Z=0) -- restore CR0
 ; ============================================================
 ; TEST 6: SWITCH -- isolated-register special LOAD authorization
 ; ============================================================
-; Namespace initialization uses its private, target-bound M-bit device to
+; Namespace initialization uses its single-word M-bit I/O object to
 ; leave CR12.M set and CR13.M clear before this test runs.  The source is the
 ; ordinary L-capable CR6; it neither needs nor receives M authority.
 SWITCH CR12, CR6, #0  ; M-present destination: load c-list[0] into CR12
@@ -15444,7 +15444,7 @@ const INSTRUCTION_DATA = [
             { name: 'CRs', desc: 'Source c-list capability; CR6 requires L permission' },
             { name: 'row', desc: 'Capability row to load' },
         ],
-        permission: 'Destination M must already be set by Namespace’s target-bound M-bit device; normal LOAD authority applies to CRs.',
+        permission: 'Destination M must already be set by Namespace’s single-word M-bit I/O object; normal LOAD authority applies to CRs.',
         flags: 'None',
         details:
             '  31    27│26   23│22   19│18   15│14                0\n'

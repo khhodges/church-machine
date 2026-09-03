@@ -398,7 +398,7 @@ class SystemAbstractions {
             topSecurityObjects: {},
             topSecurityObjectCounter: 0,
             topSecurityPassKeyCounter: 0,
-            // Namespace-exclusive, target-bound M-bit device capabilities.
+            // Namespace-exclusive capability for the single M-bit I/O word.
             // Never copied into an architectural c-list or returned by a method.
             mBitCapabilities: null
         };
@@ -672,23 +672,21 @@ class SystemAbstractions {
             const registry = sim.abstractionRegistry;
             if (!navanaState.mBitCapabilities && sim.deviceAbstractions) {
                 navanaState.mBitCapabilities =
-                    sim.deviceAbstractions.issueNamespaceMBitCapabilities(
+                    sim.deviceAbstractions.issueNamespaceMBitCapability(
                         registry && registry.abstractions ? registry.abstractions[5] : null);
             }
             let mBitReady = false;
-            if (sim.deviceAbstractions && Array.isArray(navanaState.mBitCapabilities) &&
-                    navanaState.mBitCapabilities.length === 4) {
+            if (sim.deviceAbstractions && navanaState.mBitCapabilities) {
                 const namespaceOwner = registry && registry.abstractions
                     ? registry.abstractions[5] : null;
-                const mWrites = navanaState.mBitCapabilities.map((capability, offset) =>
-                    sim.deviceAbstractions.writeMBit(
-                        sim, capability, 12 + offset, offset === 0 ? 1 : 0, namespaceOwner));
-                mBitReady = mWrites.every(result => result && result.ok);
+                const mWrite = sim.deviceAbstractions.writeMBitWord(
+                    sim, navanaState.mBitCapabilities, 1 << 12, namespaceOwner);
+                mBitReady = !!(mWrite && mWrite.ok);
                 if (!mBitReady) {
                     return {
                         ok: false,
                         fault: 'PERM_S',
-                        message: 'Navana.Init: target-bound M-bit device initialization failed'
+                        message: 'Navana.Init: single-word M-bit I/O initialization failed'
                     };
                 }
             }

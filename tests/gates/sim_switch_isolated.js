@@ -95,26 +95,26 @@ for (const [setup, expectedFault] of [
     check(state(sim) === before, 'failed SWITCH leaves CR/M/NS/memory unchanged');
 }
 
-// M-bit I/O device capabilities are exact identities, Namespace-owned and
-// target-bound. Copies, wrong ownership/rights/port/target/value all fail
-// closed without changing the selected M latch.
+// The M-bit device is one Namespace-owned 32-bit I/O object. Bits 0..15 map
+// directly to CR0.M..CR15.M.
 const namespace = { name: 'Navana' };
 const device = new DeviceAbstractions({ abstractions: { 5: namespace }, bindMethod() {} });
 const deviceSim = { cr: Array.from({ length: 16 }, () => ({ m: 0 })) };
-const caps = device.issueNamespaceMBitCapabilities(namespace);
-check(Array.isArray(caps) && caps.length === 4, 'Namespace receives four private M capabilities');
-check(device.writeMBit(deviceSim, caps[0], 12, 1, namespace).ok, 'exact Namespace M capability works');
-for (const [cap, target, value, owner] of [
-    [{ ...caps[0] }, 12, 0, namespace],
-    [caps[0], 13, 0, namespace],
-    [caps[0], 12, 0, { name: 'ordinary' }],
-    [Object.freeze({ ...caps[0], rights: 'W' }), 12, 0, namespace],
-    [Object.freeze({ ...caps[0], port: 0xFFFFFF1D }), 12, 0, namespace],
-    [caps[0], 12, 2, namespace],
+const cap = device.issueNamespaceMBitCapability(namespace);
+check(!!cap && cap.words === 1, 'Namespace receives one single-word M capability');
+check(device.writeMBitWord(deviceSim, cap, 0xA55A, namespace).ok, 'exact Namespace M capability works');
+check(deviceSim.cr.every((cr, n) => cr.m === ((0xA55A >>> n) & 1)),
+    'low 16 bits map directly to CR0.M through CR15.M');
+for (const [candidate, value, owner] of [
+    [{ ...cap }, 0, namespace],
+    [cap, 0, { name: 'ordinary' }],
+    [Object.freeze({ ...cap, rights: 'W' }), 0, namespace],
+    [Object.freeze({ ...cap, port: 0xFFFFFF1D }), 0, namespace],
+    [cap, -1, namespace],
 ]) {
-    const before = deviceSim.cr[12].m;
-    check(!device.writeMBit(deviceSim, cap, target, value, owner).ok, 'invalid M device access fails closed');
-    check(deviceSim.cr[12].m === before, 'invalid M device access does not mutate M');
+    const before = deviceSim.cr.map(cr => cr.m).join(',');
+    check(!device.writeMBitWord(deviceSim, candidate, value, owner).ok, 'invalid M device access fails closed');
+    check(deviceSim.cr.map(cr => cr.m).join(',') === before, 'invalid M device access does not mutate M');
 }
 
 // Real boot reaches the existing Navana.Init dispatch in _bootStep. Init uses

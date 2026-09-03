@@ -10,13 +10,10 @@ from amaranth.sim import Simulator
 from hardware.dwrite import ChurchDWrite
 from hardware.hw_types import (
     FaultType,
-    GT_TYPE_ABSTRACT,
     GT_TYPE_INFORM,
-    M_BIT_PORT_CR12,
-    M_BIT_PORT_CR13,
-    M_BIT_PORT_CR14,
-    M_BIT_PORT_CR15,
-    PERM_MASK_S,
+    M_BIT_DEVICE_NS_SLOT,
+    M_BIT_PORT,
+    PERM_MASK_R,
     PERM_MASK_W,
     make_gt,
 )
@@ -31,9 +28,9 @@ def _cap(gt_type, perms, location, limit=0):
 
 
 def _write(cap, *, imm=0x4000, value=1, namespace_authorized=True,
-           private=False, private_target=0):
+           private=False):
     dut = ChurchDWrite()
-    observed = {"m_write": False, "target": None, "value": None,
+    observed = {"m_write": False, "word": None,
                 "mem_write": False, "fault": FaultType.NONE}
 
     async def bench(ctx):
@@ -43,8 +40,7 @@ def _write(cap, *, imm=0x4000, value=1, namespace_authorized=True,
         ctx.set(dut.cr_rd_data.as_value(), cap)
         ctx.set(dut.dr_rd_data, value)
         ctx.set(dut.namespace_authorized, namespace_authorized)
-        ctx.set(dut.private_m_target, private_target)
-        ctx.set(dut.private_m_value, value)
+        ctx.set(dut.private_m_word, value & 0xFFFF)
         ctx.set(dut.private_m_start, private)
         ctx.set(dut.start, not private)
         await ctx.tick()
@@ -53,8 +49,7 @@ def _write(cap, *, imm=0x4000, value=1, namespace_authorized=True,
         for _ in range(6):
             if ctx.get(dut.m_bit_wr_en):
                 observed["m_write"] = True
-                observed["target"] = ctx.get(dut.m_bit_wr_target)
-                observed["value"] = ctx.get(dut.m_bit_wr_value)
+                observed["word"] = ctx.get(dut.m_bit_wr_word)
             observed["mem_write"] |= bool(ctx.get(dut.dmem_wr_en))
             if ctx.get(dut.fault):
                 observed["fault"] = ctx.get(dut.fault_type)
@@ -67,21 +62,21 @@ def _write(cap, *, imm=0x4000, value=1, namespace_authorized=True,
     return observed
 
 
-def test_exact_capability_controls_each_target_without_memory_write():
-    ports = (M_BIT_PORT_CR12, M_BIT_PORT_CR13,
-             M_BIT_PORT_CR14, M_BIT_PORT_CR15)
-    for target, port in enumerate(ports):
-        result = _write(_cap(GT_TYPE_ABSTRACT, PERM_MASK_S, port),
-                        value=target & 1)
-        assert result["m_write"]
-        assert result["target"] == target
-        assert result["value"] == (target & 1)
-        assert not result["mem_write"]
-        assert result["fault"] == FaultType.NONE
+def test_exact_capability_writes_one_low_16_bit_word_without_memory_write():
+    cap = _cap(
+        GT_TYPE_INFORM,
+        PERM_MASK_R | PERM_MASK_W,
+        M_BIT_PORT,
+    ) | M_BIT_DEVICE_NS_SLOT
+    result = _write(cap, value=0xA55A)
+    assert result["m_write"]
+    assert result["word"] == 0xA55A
+    assert not result["mem_write"]
+    assert result["fault"] == FaultType.NONE
 
 
 def test_raw_address_with_normal_write_permission_is_not_authority():
-    result = _write(_cap(GT_TYPE_INFORM, PERM_MASK_W, M_BIT_PORT_CR14))
+    result = _write(_cap(GT_TYPE_INFORM, PERM_MASK_W, M_BIT_PORT))
     assert result["fault"] == FaultType.PERM_S
     assert not result["m_write"]
     assert not result["mem_write"]
@@ -89,8 +84,8 @@ def test_raw_address_with_normal_write_permission_is_not_authority():
 
 def test_wrong_rights_or_attenuation_cannot_use_device():
     cases = (
-        _cap(GT_TYPE_ABSTRACT, 0, M_BIT_PORT_CR12),
-        _cap(GT_TYPE_ABSTRACT, PERM_MASK_S, M_BIT_PORT_CR13, limit=1),
+        _cap(GT_TYPE_INFORM, 0, M_BIT_PORT) | M_BIT_DEVICE_NS_SLOT,
+        _cap(GT_TYPE_INFORM, PERM_MASK_W, M_BIT_PORT, limit=1) | M_BIT_DEVICE_NS_SLOT,
     )
     for cap in cases:
         result = _write(cap)
@@ -101,7 +96,7 @@ def test_wrong_rights_or_attenuation_cannot_use_device():
 
 def test_other_abstraction_cannot_use_exact_namespace_device_capability():
     result = _write(
-        _cap(GT_TYPE_ABSTRACT, PERM_MASK_S, M_BIT_PORT_CR15),
+        _cap(GT_TYPE_INFORM, PERM_MASK_W, M_BIT_PORT) | M_BIT_DEVICE_NS_SLOT,
         namespace_authorized=False,
     )
     assert result["fault"] == FaultType.PERM_S
@@ -114,7 +109,6 @@ def test_other_abstraction_cannot_select_hidden_private_bank():
         0,
         namespace_authorized=False,
         private=True,
-        private_target=2,
     )
     assert result["fault"] == FaultType.PERM_S
     assert not result["m_write"]

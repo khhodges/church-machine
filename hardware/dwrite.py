@@ -59,8 +59,7 @@ class ChurchDWrite(Elaboratable):
         self.dmem_wr_data = Signal(32)
         self.dmem_wr_en   = Signal()
         self.m_bit_wr_en = Signal()
-        self.m_bit_wr_target = Signal(2)
-        self.m_bit_wr_value = Signal()
+        self.m_bit_wr_word = Signal(16)
         # Asserted only while protected CR14 names the canonical Namespace
         # execution identity. Possession of a device-shaped cap is insufficient.
         self.namespace_authorized = Signal()
@@ -68,8 +67,7 @@ class ChurchDWrite(Elaboratable):
         # trusted boot sequencer; no instruction or architectural register can
         # select/read the private capability bank.
         self.private_m_start = Signal()
-        self.private_m_target = Signal(2)
-        self.private_m_value = Signal()
+        self.private_m_word = Signal(16)
 
     def elaborate(self, platform):
         m = Module()
@@ -82,16 +80,15 @@ class ChurchDWrite(Elaboratable):
         drx_val_reg = Signal(32)   # latched DR[DRx] value for indexed mode
         namespace_authorized_reg = Signal()
         private_mode_reg = Signal()
-        private_target_reg = Signal(2)
-        private_value_reg = Signal()
+        private_word_reg = Signal(16)
 
         private_cap = Signal(CAP_REG_LAYOUT)
         private_cap_view = View(CAP_REG_LAYOUT, private_cap)
         m.d.comb += [
             private_cap_view.word0_gt.eq(
-                make_gt(GT_TYPE_ABSTRACT, PERM_MASK_S, 0, 0)),
-            private_cap_view.word1_location.eq(
-                M_BIT_PORT_CR12 + private_target_reg),
+                make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W,
+                        M_BIT_DEVICE_NS_SLOT, 0, b_flag=1)),
+            private_cap_view.word1_location.eq(M_BIT_PORT),
             private_cap_view.word2_w2.eq(0),
         ]
         effective_cap = Mux(private_mode_reg, private_cap, self.cr_rd_data)
@@ -108,7 +105,6 @@ class ChurchDWrite(Elaboratable):
         eff_off      = Signal(33)
         in_bounds    = Signal()
         exact_m_cap = Signal()
-        m_target = Signal(2)
         effective_addr = Signal(32)
         accesses_m_port = Signal()
 
@@ -121,18 +117,16 @@ class ChurchDWrite(Elaboratable):
                            (imm_reg[4:14] + drx_val_reg))),     # indexed: base + full DR[DRx]
             in_bounds.eq(eff_off <= limit),
             exact_m_cap.eq(
-                (cr_gt.gt_type == GT_TYPE_ABSTRACT) &
-                cr_gt.dom & (cr_gt.perm == 0b010) &
+                (cr_gt.gt_type == GT_TYPE_INFORM) &
+                ~cr_gt.dom & cr_gt.perm[PERM_W] &
+                (cr_gt.slot_id == M_BIT_DEVICE_NS_SLOT) &
                 (cr_w2.limit_offset == 0) &
-                (cr_view.word1_location >= M_BIT_PORT_CR12) &
-                (cr_view.word1_location <= M_BIT_PORT_CR15)
+                (cr_view.word1_location == M_BIT_PORT)
             ),
-            m_target.eq(cr_view.word1_location[:2]),
             effective_addr.eq(
                 cr_view.word1_location + Cat(C(0, 2), eff_off[:16])),
             accesses_m_port.eq(
-                (effective_addr >= M_BIT_PORT_CR12) &
-                (effective_addr <= M_BIT_PORT_CR15)),
+                effective_addr == M_BIT_PORT),
         ]
 
         m.d.comb += [
@@ -153,8 +147,7 @@ class ChurchDWrite(Elaboratable):
                         drx_val_reg.eq(0),
                         namespace_authorized_reg.eq(self.namespace_authorized),
                         private_mode_reg.eq(self.private_m_start),
-                        private_target_reg.eq(self.private_m_target),
-                        private_value_reg.eq(self.private_m_value),
+                        private_word_reg.eq(self.private_m_word),
                     ]
                     with m.If(~self.private_m_start & ~self.imm[14]):
                         # Indexed mode: need one extra cycle to read DR[DRx]
@@ -174,7 +167,7 @@ class ChurchDWrite(Elaboratable):
                 with m.If(exact_m_cap & (eff_off == 0) &
                           namespace_authorized_reg):
                     m.d.sync += dr_data_reg.eq(
-                        Mux(private_mode_reg, private_value_reg,
+                        Mux(private_mode_reg, Cat(private_word_reg, C(0, 16)),
                             self.dr_rd_data))
                     m.next = "M_BIT_WRITE"
                 with m.Elif(exact_m_cap & (eff_off == 0)):
@@ -221,8 +214,7 @@ class ChurchDWrite(Elaboratable):
                 m.d.comb += [
                     self.busy.eq(1),
                     self.m_bit_wr_en.eq(1),
-                    self.m_bit_wr_target.eq(m_target),
-                    self.m_bit_wr_value.eq(dr_data_reg[0]),
+                    self.m_bit_wr_word.eq(dr_data_reg[:16]),
                     self.done.eq(1),
                 ]
                 m.next = "IDLE"

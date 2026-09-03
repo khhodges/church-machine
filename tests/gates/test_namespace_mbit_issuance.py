@@ -12,45 +12,39 @@ from amaranth.sim import Simulator
 
 from hardware.boot_rom import (
     DEMO_CLIST,
-    NAMESPACE_PRIVATE_MBIT_CAPABILITIES,
+    NAMESPACE_MBIT_CAPABILITY,
     SCHEDULER_IRQ_CLIST,
     THREAD_MANAGER_CLIST,
     WUKONG_DEMO_CLIST,
     WUKONG_CAPABILITY_TEST_WORDS,
 )
 from hardware.hw_types import (
-    CR_CLOOMC,
-    CR_INTERRUPT,
-    CR_NAMESPACE,
-    CR_THREAD_STACK,
-    GT_TYPE_ABSTRACT,
-    M_BIT_PORT_CR12,
-    M_BIT_PORT_CR13,
-    M_BIT_PORT_CR14,
-    M_BIT_PORT_CR15,
-    PERM_MASK_S,
+    GT_TYPE_INFORM,
+    M_BIT_DEVICE_NS_SLOT,
+    M_BIT_PORT,
+    PERM_MASK_R,
+    PERM_MASK_W,
     make_gt,
 )
 from hardware.core import ChurchCore
 
 
-def test_namespace_catalog_issues_all_and_only_exact_mbit_capabilities():
-    assert NAMESPACE_PRIVATE_MBIT_CAPABILITIES == (
-        (CR_THREAD_STACK, make_gt(GT_TYPE_ABSTRACT, PERM_MASK_S), M_BIT_PORT_CR12, 0),
-        (CR_INTERRUPT, make_gt(GT_TYPE_ABSTRACT, PERM_MASK_S), M_BIT_PORT_CR13, 0),
-        (CR_CLOOMC, make_gt(GT_TYPE_ABSTRACT, PERM_MASK_S), M_BIT_PORT_CR14, 0),
-        (CR_NAMESPACE, make_gt(GT_TYPE_ABSTRACT, PERM_MASK_S), M_BIT_PORT_CR15, 0),
+def test_namespace_catalog_issues_one_mbit_io_capability():
+    assert NAMESPACE_MBIT_CAPABILITY == (
+        make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W,
+                M_BIT_DEVICE_NS_SLOT, b_flag=1),
+        M_BIT_PORT,
+        0,
     )
 
 
 def test_ordinary_boot_abstractions_do_not_receive_or_discover_mbit_caps():
     # Full device capabilities include a target location. No ordinary c-list
     # contains them; an S-only word alone is insufficient device authority.
-    full_words = {tuple(cap[1:]) for cap in NAMESPACE_PRIVATE_MBIT_CAPABILITIES}
     for clist in (DEMO_CLIST, WUKONG_DEMO_CLIST,
                   SCHEDULER_IRQ_CLIST, THREAD_MANAGER_CLIST):
         assert all(not isinstance(word, tuple) for word in clist)
-        assert all((word,) not in full_words for word in clist)
+        assert NAMESPACE_MBIT_CAPABILITY[0] not in clist
 
 
 def test_factory_capability_test_import_is_bound_to_canonical_artifact():

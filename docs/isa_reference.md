@@ -807,7 +807,7 @@ performs normal LOAD validation of `CRs[row]`, including L permission, bounds,
 version, and integrity. Source M is irrelevant and conveys no authority.
 
 On success CRd receives the loaded capability and CRd.M clears. Namespace must
-use its dedicated target-bound M-bit device capability to set that destination
+use its dedicated single-word M-bit I/O capability to set that destination bit
 again. No other abstraction receives this device capability; knowing its port
 is not authority. Missing capability, wrong right, wrong port, or a capability
 bound to another CR fails closed.
