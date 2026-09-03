@@ -9333,7 +9333,6 @@ SelfTest Run
     const code = examples[name];
     if (code) {
         editor.value = code;
-        saveEditorState();
         updateLineNumbers();
         document.querySelectorAll('.example-tab').forEach(t => {
             t.classList.toggle('active', t.dataset.example === name);
@@ -9345,6 +9344,7 @@ SelfTest Run
             const cloomcLangs = window._cloomcExampleLanguages || {};
             sel.value = cloomcLangs[name] || 'assembly';
         }
+        saveEditorState();
         if (typeof historySetCodeExample === 'function') historySetCodeExample(name);
     }
     const noticeBar = document.getElementById('presetNoticeBar');
@@ -11209,14 +11209,57 @@ function _updateEditorCodeName(name) {
     if (el) el.textContent = name || '';
 }
 
+const _EDITOR_DOCUMENT_STATE_KEY = 'church_editor_document_v1';
+
+function _clearEditorOwnerMarkers() {
+    document.querySelectorAll('.example-tab').forEach(function(tab) {
+        tab.classList.remove('active');
+    });
+}
+
+function _currentEditorOwner() {
+    if (typeof activeUserTabId !== 'undefined' && activeUserTabId) {
+        return { type: 'personal', id: activeUserTabId };
+    }
+    if (window._editorOpenLumpToken) {
+        return { type: 'lump', id: window._editorOpenLumpToken };
+    }
+    if (window._editorSourceFilePath) {
+        return { type: 'source', id: window._editorSourceFilePath };
+    }
+    const activeExample = document.querySelector('.example-tab.active:not(.user-tab)');
+    if (activeExample && activeExample.dataset && activeExample.dataset.example) {
+        return { type: 'example', id: activeExample.dataset.example };
+    }
+    return { type: 'buffer' };
+}
+
 function saveEditorState() {
     const editor = document.getElementById('asmEditor');
-    if (editor) {
-        localStorage.setItem('church_editor_code', editor.value);
-    }
     const sel = document.getElementById('langSelector');
-    if (sel) {
-        localStorage.setItem('church_editor_lang', sel.value);
+    const code = editor ? editor.value : '';
+    const lang = sel ? sel.value : 'cloomc';
+    const state = {
+        owner: _currentEditorOwner(),
+        code: code,
+        lang: lang
+    };
+    localStorage.setItem(_EDITOR_DOCUMENT_STATE_KEY, JSON.stringify(state));
+    // Keep the legacy keys during migration for older cached clients.
+    if (editor) localStorage.setItem('church_editor_code', code);
+    if (sel) localStorage.setItem('church_editor_lang', lang);
+}
+
+function _readEditorDocumentState() {
+    try {
+        const raw = localStorage.getItem(_EDITOR_DOCUMENT_STATE_KEY);
+        if (!raw) return null;
+        const state = JSON.parse(raw);
+        if (!state || typeof state.code !== 'string' || typeof state.lang !== 'string' ||
+                !state.owner || typeof state.owner.type !== 'string') return null;
+        return state;
+    } catch (e) {
+        return null;
     }
 }
 
@@ -11235,6 +11278,15 @@ function _isLegacyPostFlashSelftestTpermSource(source) {
 
 function loadEditorState() {
     const editor = document.getElementById('asmEditor');
+    const documentState = _readEditorDocumentState();
+    window._restoredEditorOwnerPending = !!documentState;
+    let restoredPersonalTab = null;
+    if (documentState && documentState.owner.type === 'personal' &&
+            typeof userTabs !== 'undefined') {
+        restoredPersonalTab = userTabs.find(function(tab) {
+            return tab.id === documentState.owner.id;
+        }) || null;
+    }
     if (editor) {
         // The primary code editor always contains editable source.  Earlier
         // compiled-LUMP flows could leave a readOnly property on this textarea
@@ -11245,7 +11297,12 @@ function loadEditorState() {
         editor.readOnly = false;
         if (editor.classList) editor.classList.remove('cm-editor-sealed');
         try { localStorage.removeItem('cm_sealed_lump'); } catch (e) {}
-        let saved = localStorage.getItem('church_editor_code');
+        // A saved personal owner gets its content from the personal-tab store,
+        // never from the generic editor snapshot. This keeps owner and buffer
+        // consistent even if an older generic auto-save happened later.
+        let saved = restoredPersonalTab
+            ? documentState.code
+            : (documentState ? documentState.code : localStorage.getItem('church_editor_code'));
         if (saved) {
             // Before strict same-domain TPERM enforcement, an old built-in
             // Post-Flash SelfTest checked X against CR0's Church E-GT. That
@@ -11285,7 +11342,9 @@ function loadEditorState() {
         }
     }
     const sel = document.getElementById('langSelector');
-    const savedLang = localStorage.getItem('church_editor_lang');
+    const savedLang = restoredPersonalTab
+        ? 'personal'
+        : (documentState ? documentState.lang : localStorage.getItem('church_editor_lang'));
     if (sel && savedLang) {
         sel.value = savedLang;
         onLangChange(true);
@@ -11294,13 +11353,50 @@ function loadEditorState() {
         onLangChange(false);
     }
     if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
-    // Restore code name label from active user tab or active example tab
-    if (typeof activeUserTabId !== 'undefined' && activeUserTabId) {
-        const tab = (typeof userTabs !== 'undefined') && userTabs.find(t => t.id === activeUserTabId);
-        if (tab) _updateEditorCodeName(tab.name);
+    _clearEditorOwnerMarkers();
+    if (restoredPersonalTab) {
+        activeUserTabId = restoredPersonalTab.id;
+        userTabDirty = documentState.code !== restoredPersonalTab.code;
+        window._editorSourceFilePath = null;
+        _updateEditorCodeName(restoredPersonalTab.name);
+        if (typeof renderUserTabs === 'function') renderUserTabs();
+        if (typeof updateSaveUserTabBtn === 'function') updateSaveUserTabBtn();
+    } else if (documentState && documentState.owner.type === 'example' &&
+            documentState.owner.id) {
+        activeUserTabId = null;
+        const activeEx = Array.from(document.querySelectorAll('.example-tab:not(.user-tab)'))
+            .find(function(tab) {
+                return tab.dataset && tab.dataset.example === documentState.owner.id;
+            });
+        if (activeEx) {
+            activeEx.classList.add('active');
+            _updateEditorCodeName(activeEx.textContent.trim());
+        } else {
+            _updateEditorCodeName('');
+        }
     } else {
-        const activeEx = document.querySelector('.example-tab.active');
-        if (activeEx) _updateEditorCodeName(activeEx.textContent.trim());
+        activeUserTabId = null;
+        if (documentState && documentState.owner.type === 'source') {
+            window._editorSourceFilePath = documentState.owner.id || null;
+            if (documentState.owner.id) {
+                _updateEditorCodeName(documentState.owner.id.split('/').pop().replace(/\.cloomc$/i, ''));
+            }
+        } else if (documentState && documentState.owner.type === 'lump') {
+            window._editorSourceFilePath = null;
+            if (typeof window._restoreSavedLumpEditorOwnership === 'function') {
+                window._restoreSavedLumpEditorOwnership(documentState.owner.id, editor);
+            } else {
+                window._editorOpenLumpToken = documentState.owner.id || null;
+                if (window.LumpRegistry && documentState.owner.id) {
+                    window.LumpRegistry.setCurrent(documentState.owner.id);
+                }
+            }
+            _updateEditorCodeName(documentState.owner.id || '');
+        } else {
+            window._editorSourceFilePath = null;
+            _updateEditorCodeName('');
+        }
+        if (typeof renderUserTabs === 'function') renderUserTabs();
     }
 }
 

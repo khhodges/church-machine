@@ -22,6 +22,7 @@
 //   T-ER04 — reconstructSource() returns null when table entry is not BRANCH
 //   T-ER05 — Empty method body reconstructs to "; (empty)" and re-compiles
 //   T-ER06 — re-assembleLump of re-compiled code produces binary-equal table
+//   T-ER08 — startup restores a saved personal owner before a stale generic buffer
 
 const fs   = require('fs');
 const path = require('path');
@@ -386,6 +387,10 @@ console.log('\n--- T-ER07: legacy SelfTest editor-state migration ---');
     const _LEGACY_SELFTEST_TPERM_BACKUP_KEY = 'church_editor_legacy_selftest_tperm_backup_v1';
     const _isLegacyPostFlashSelftestTpermSource =
         eval('(' + extractFunction(appRunSrc, '_isLegacyPostFlashSelftestTpermSource') + ')');
+    const _readEditorDocumentState =
+        eval('(' + extractFunction(appRunSrc, '_readEditorDocumentState') + ')');
+    const _clearEditorOwnerMarkers =
+        eval('(' + extractFunction(appRunSrc, '_clearEditorOwnerMarkers') + ')');
     const loadEditorState =
         eval('(' + extractFunction(appRunSrc, 'loadEditorState') + ')');
 
@@ -398,10 +403,12 @@ console.log('\n--- T-ER07: legacy SelfTest editor-state migration ---');
     const editor = { value: '' };
     global.document = {
         getElementById: function(id) { return id === 'asmEditor' ? editor : null; },
+        querySelectorAll: function() { return []; },
         querySelector: function() { return null; },
     };
     global.window = {};
     global.activeUserTabId = null;
+    global._updateEditorCodeName = function() {};
     global.updateSavePseudoBtn = function() {};
     let selectedExample = null;
     global.loadExample = function(name) {
@@ -435,6 +442,115 @@ console.log('\n--- T-ER07: legacy SelfTest editor-state migration ---');
         _isLegacyPostFlashSelftestTpermSource(stored.church_editor_code) === false);
     check('T-ER07g: ordinary user TPERM-X source is restored unchanged',
         selectedExample === null && editor.value === '; User experiment\nTPERM CR0, X\n');
+}
+
+// ── T-ER08: explicit personal owner wins over generic editor snapshot ─────────
+console.log('\n--- T-ER08: personal-tab owner restore ordering ---');
+{
+    const appRunSrc = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
+    const _EDITOR_DOCUMENT_STATE_KEY = 'church_editor_document_v1';
+    const _readEditorDocumentState =
+        eval('(' + extractFunction(appRunSrc, '_readEditorDocumentState') + ')');
+    const _clearEditorOwnerMarkers =
+        eval('(' + extractFunction(appRunSrc, '_clearEditorOwnerMarkers') + ')');
+    const _currentEditorOwner =
+        eval('(' + extractFunction(appRunSrc, '_currentEditorOwner') + ')');
+    const saveEditorState =
+        eval('(' + extractFunction(appRunSrc, 'saveEditorState') + ')');
+    const loadEditorState =
+        eval('(' + extractFunction(appRunSrc, 'loadEditorState') + ')');
+    const appLumpsSrc = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8');
+    const _restoreSavedLumpEditorOwnership =
+        eval('(' + extractFunction(appLumpsSrc, '_restoreSavedLumpEditorOwnership') + ')');
+
+    const stored = Object.create(null);
+    const personal = { id: 'ut_personal', name: 'My Program', lang: 'assembly', code: '; personal owner\nRETURN\n' };
+    stored.church_user_tabs = JSON.stringify([personal]);
+    stored.church_editor_code = '; stale generic buffer\nHALT\n';
+    stored.church_editor_lang = 'cloomc';
+    stored[_EDITOR_DOCUMENT_STATE_KEY] = JSON.stringify({
+        owner: { type: 'personal', id: personal.id },
+        code: personal.code,
+        lang: 'personal'
+    });
+    global.localStorage = {
+        getItem: function(key) { return Object.prototype.hasOwnProperty.call(stored, key) ? stored[key] : null; },
+        setItem: function(key, value) { stored[key] = String(value); },
+        removeItem: function(key) { delete stored[key]; },
+    };
+    const editor = { value: '', readOnly: true, classList: { remove: function() {} } };
+    const selector = { value: '' };
+    const personalMarker = { classList: { active: false, remove: function() { this.active = false; } } };
+    const exampleMarker = { classList: { active: true, remove: function() { this.active = false; } } };
+    global.document = {
+        getElementById: function(id) {
+            if (id === 'asmEditor') return editor;
+            if (id === 'langSelector') return selector;
+            return null;
+        },
+        querySelectorAll: function(q) {
+            return q === '.example-tab' ? [personalMarker, exampleMarker] : [];
+        },
+        querySelector: function() { return null; },
+    };
+    global.window = {};
+    global.userTabs = [personal];
+    global.activeUserTabId = null;
+    global.userTabDirty = true;
+    global.onLangChange = function() {};
+    global.updateSavePseudoBtn = function() {};
+    global.updateSaveUserTabBtn = function() {};
+    global.renderUserTabs = function() { personalMarker.classList.active = activeUserTabId === personal.id; };
+    global._updateEditorCodeName = function(name) { global.__restoredCodeName = name; };
+    global._isLegacyPostFlashSelftestTpermSource = function() { return false; };
+
+    loadEditorState();
+    check('T-ER08a: saved personal owner restores tab content instead of generic buffer',
+        editor.value === personal.code);
+    check('T-ER08b: saved personal owner restores identity and personal selector',
+        activeUserTabId === personal.id && selector.value === 'personal');
+    check('T-ER08c: restored personal owner clears conflicting built-in marker',
+        personalMarker.classList.active === true && exampleMarker.classList.active === false);
+    check('T-ER08d: restored personal owner restores its label and clean state',
+        global.__restoredCodeName === personal.name && userTabDirty === false);
+
+    const lumpToken = 'deadbeef';
+    let lumpDraft = null;
+    let lumpInputListener = null;
+    stored[_EDITOR_DOCUMENT_STATE_KEY] = JSON.stringify({
+        owner: { type: 'lump', id: lumpToken },
+        code: '; restored LUMP source\nRETURN\n',
+        lang: 'assembly'
+    });
+    editor.value = '';
+    editor.addEventListener = function(type, listener) {
+        if (type === 'input') lumpInputListener = listener;
+    };
+    editor.removeEventListener = function() {};
+    global._draftLsSet = function(token, code) { lumpDraft = { token: token, code: code }; };
+    global.window = {
+        LumpRegistry: {
+            current: null,
+            setCurrent: function(token) { this.current = token; }
+        }
+    };
+    window._restoreSavedLumpEditorOwnership = _restoreSavedLumpEditorOwnership;
+    loadEditorState();
+    check('T-ER08e: saved LUMP owner restores its token and registry context',
+        window._editorOpenLumpToken === lumpToken &&
+        window.LumpRegistry.current === lumpToken &&
+        window._editorLumpDirtyToken === lumpToken &&
+        window._savedLumpEditorMode === true);
+    editor.value = '; edited after reload\nRETURN\n';
+    if (lumpInputListener) lumpInputListener();
+    saveEditorState();
+    const resavedLumpState = JSON.parse(stored[_EDITOR_DOCUMENT_STATE_KEY]);
+    check('T-ER08f: editing after reload keeps the atomic snapshot LUMP-owned',
+        resavedLumpState.owner.type === 'lump' &&
+        resavedLumpState.owner.id === lumpToken &&
+        resavedLumpState.code === editor.value);
+    check('T-ER08g: restored LUMP context keeps draft autosave active',
+        lumpDraft && lumpDraft.token === lumpToken && lumpDraft.code === editor.value);
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

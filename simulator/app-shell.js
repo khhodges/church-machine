@@ -466,6 +466,7 @@ function deleteUserTab(id) {
         if (editor) editor.value = '';
         const sel = document.getElementById('langSelector');
         if (sel) showIntro(sel.value);
+        if (typeof saveEditorState === 'function') saveEditorState();
     }
     renderUserTabs();
     updateSaveUserTabBtn();
@@ -504,6 +505,7 @@ function selectUserTab(id) {
     updateLineNumbers();
     const outputEl = document.getElementById('assemblyOutput');
     if (outputEl) outputEl.innerHTML = '';
+    if (typeof saveEditorState === 'function') saveEditorState();
 }
 
 function saveActiveUserTab() {
@@ -519,6 +521,7 @@ function saveActiveUserTab() {
     saveUserTabsToStorage();
     renderUserTabs();
     updateSaveUserTabBtn();
+    if (typeof saveEditorState === 'function') saveEditorState();
 }
 
 function updateSaveUserTabBtn() {
@@ -759,6 +762,13 @@ function openSourceFile(path) {
                 typeof saveActiveUserTab === 'function') {
                 saveActiveUserTab();
             }
+            activeUserTabId = null;
+            userTabDirty = false;
+            document.querySelectorAll('.example-tab').forEach(function(tab) {
+                tab.classList.remove('active');
+            });
+            if (typeof renderUserTabs === 'function') renderUserTabs();
+            if (typeof updateSaveUserTabBtn === 'function') updateSaveUserTabBtn();
             ed.value = code;
             window._editorSourceFilePath = path;
             // Show filename in the editor header
@@ -2307,9 +2317,11 @@ function switchView(viewId) {
     // A saved LUMP owns the right-hand editor pane only while it is open.
     // Any navigation away restores the ordinary console/reference interface.
     if ((viewId !== 'editor' || !window._committingSavedLumpOpen) &&
+            !(viewId === 'editor' && window._restoredEditorOwnerPending) &&
             typeof window.exitSavedLumpEditorMode === 'function') {
         window.exitSavedLumpEditorMode();
     }
+    if (viewId !== 'editor') window._restoredEditorOwnerPending = false;
     if (viewId !== currentView && currentView === 'devices' && typeof stopDeviceTunnelPolling === 'function') {
         stopDeviceTunnelPolling();
     }
@@ -2364,7 +2376,9 @@ function switchView(viewId) {
     }
     if (viewId === 'devices') { loadDeviceList(); _startCallhomeLog(); _startUartLog(); _cmFetchWordCaches(); }
     if (viewId === 'editor') {
-        if (!_editorCREditActive) {
+        const preserveRestoredOwner = !!window._restoredEditorOwnerPending;
+        window._restoredEditorOwnerPending = false;
+        if (!_editorCREditActive && !preserveRestoredOwner) {
             if (activeUserTabId && userTabDirty) saveActiveUserTab();
             activeUserTabId = null;
             userTabDirty = false;

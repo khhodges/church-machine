@@ -1598,6 +1598,27 @@ function exitSavedLumpEditorMode() {
 }
 window.exitSavedLumpEditorMode = exitSavedLumpEditorMode;
 
+function _restoreSavedLumpEditorOwnership(token, editor) {
+    if (!token) return;
+    window._savedLumpEditorMode = true;
+    window._editorOpenLumpToken = token;
+    window._editorOpenLumpMeta = null;
+    if (window.LumpRegistry) window.LumpRegistry.setCurrent(token);
+    if (window._editorLumpDirtyListener && window._editorLumpDirtyListenerEl) {
+        window._editorLumpDirtyListenerEl.removeEventListener(
+            'input', window._editorLumpDirtyListener);
+    }
+    window._editorLumpDirtyToken = token;
+    window._editorLumpDirtyListenerEl = editor || null;
+    window._editorLumpDirtyListener = function() {
+        var activeToken = window._editorLumpDirtyToken;
+        if (!activeToken || !editor) return;
+        _draftLsSet(activeToken, editor.value);
+    };
+    if (editor) editor.addEventListener('input', window._editorLumpDirtyListener);
+}
+window._restoreSavedLumpEditorOwnership = _restoreSavedLumpEditorOwnership;
+
 function _resolveSavedLumpEditorSource(embeddedSource, sidecarSource) {
     if (typeof embeddedSource === 'string') {
         return { source: embeddedSource, restored: true, origin: 'embedded' };
@@ -5779,6 +5800,7 @@ async function openLumpInEditor(token) {
     window._pseudoEditContext = null;
     if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
     if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
+    if (typeof saveEditorState === 'function') saveEditorState();
 }
 
 // ── Save an already-persisted LUMP as a new dated version ────────────────────
