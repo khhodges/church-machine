@@ -87,7 +87,7 @@ class ChurchDWrite(Elaboratable):
         m.d.comb += [
             private_cap_view.word0_gt.eq(
                 make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W,
-                        M_BIT_DEVICE_NS_SLOT, 0, b_flag=1)),
+                        M_BIT_DEVICE_NS_SLOT, 0, b_flag=0)),
             private_cap_view.word1_location.eq(M_BIT_PORT),
             private_cap_view.word2_w2.eq(0),
         ]

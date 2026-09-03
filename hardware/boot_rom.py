@@ -421,7 +421,7 @@ def _make_ns_entry(gt_type, perms, slot_id, gt_seq, location, alloc_size, cw=0, 
 # Complete descriptor for the Namespace-held M-bit I/O object.
 NAMESPACE_MBIT_CAPABILITY = (
     make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W,
-            M_BIT_DEVICE_NS_SLOT, 0, b_flag=1),
+            M_BIT_DEVICE_NS_SLOT, 0, b_flag=0),
     M_BIT_PORT,
     0,
 )

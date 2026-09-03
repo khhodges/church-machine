@@ -32,10 +32,11 @@ from hardware.core import ChurchCore
 def test_namespace_catalog_issues_one_mbit_io_capability():
     assert NAMESPACE_MBIT_CAPABILITY == (
         make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W,
-                M_BIT_DEVICE_NS_SLOT, b_flag=1),
+                M_BIT_DEVICE_NS_SLOT, b_flag=0),
         M_BIT_PORT,
         0,
     )
+    assert (NAMESPACE_MBIT_CAPABILITY[0] >> 31) & 1 == 0
 
 
 def test_ordinary_boot_abstractions_do_not_receive_or_discover_mbit_caps():
