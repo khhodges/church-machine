@@ -900,24 +900,12 @@ ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
             <span>Arithmetic</span>
             <span class="submenu-arrow">▶</span>
             <div class="submenu">
-                <div class="context-menu-item" onclick="insertInstruction('ADD', 'dest src')">ADD dest src</div>
-                <div class="context-menu-item" onclick="insertInstruction('SUB', 'dest src')">SUB dest src</div>
-                <div class="context-menu-item" onclick="insertInstruction('MUL', 'dest src')">MUL dest src</div>
-                <div class="context-menu-item" onclick="insertInstruction('NEG', 'dest src')">NEG dest src</div>
-                <div class="context-menu-item" onclick="insertInstruction('ADDI', 'dest imm')">ADDI dest imm</div>
-                <div class="context-menu-item" onclick="insertInstruction('SUBI', 'dest imm')">SUBI dest imm</div>
-            </div>
-        </div>
-        <div class="context-menu-item has-submenu">
-            <span class="menu-icon">&amp;</span>
-            <span>Logic</span>
-            <span class="submenu-arrow">▶</span>
-            <div class="submenu">
-                <div class="context-menu-item" onclick="insertInstruction('AND', 'dest src')">AND dest src</div>
-                <div class="context-menu-item" onclick="insertInstruction('ORR', 'dest src')">ORR dest src</div>
-                <div class="context-menu-item" onclick="insertInstruction('EOR', 'dest src')">EOR dest src</div>
-                <div class="context-menu-item" onclick="insertInstruction('BIC', 'dest src')">BIC dest src</div>
-                <div class="context-menu-item" onclick="insertInstruction('NOT', 'dest src')">NOT dest src</div>
+                <div class="context-menu-item" onclick="insertInstruction('IADD', 'DRd DRs DRt')">IADD DRd DRs DRt</div>
+                <div class="context-menu-item" onclick="insertInstruction('IADD', 'DRd DRs #imm')">IADD DRd DRs #imm</div>
+                <div class="context-menu-item" onclick="insertInstruction('ISUB', 'DRd DRs DRt')">ISUB DRd DRs DRt</div>
+                <div class="context-menu-item" onclick="insertInstruction('ISUB', 'DRd DRs #imm')">ISUB DRd DRs #imm</div>
+                <div class="context-menu-item" onclick="insertInstruction('MCMP', 'DRd DRs')">MCMP DRd DRs</div>
+                <div class="context-menu-item" onclick="insertInstruction('MVN', 'DRd DRs')">MVN DRd DRs (pseudo)</div>
             </div>
         </div>
         <div class="context-menu-item has-submenu">
@@ -925,7 +913,12 @@ ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
             <span>Data movement</span>
             <span class="submenu-arrow">▶</span>
             <div class="submenu">
-                <div class="context-menu-item" onclick="insertInstruction('IADD', 'dr DR0 #imm')">IADD dr DR0 #imm (load immediate)</div>
+                <div class="context-menu-item" onclick="insertInstruction('IADD', 'DRd DR0 #imm')">IADD DRd DR0 #imm (load immediate)</div>
+                <div class="context-menu-item" onclick="insertInstruction('DREAD', 'DRd CRs #offset')">DREAD DRd CRs #offset</div>
+                <div class="context-menu-item" onclick="insertInstruction('DWRITE', 'DRd CRs #offset')">DWRITE DRd CRs #offset</div>
+                <div class="context-menu-item" onclick="insertInstruction('BFEXT', 'DRd DRs #pos #width')">BFEXT DRd DRs #pos #width</div>
+                <div class="context-menu-item" onclick="insertInstruction('BFINS', 'DRd DRs #pos #width')">BFINS DRd DRs #pos #width</div>
+                <div class="context-menu-item" onclick="insertInstruction('WORD', 'value')">WORD value</div>
             </div>
         </div>
         <div class="context-menu-item has-submenu">
@@ -933,21 +926,9 @@ ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
             <span>Shift</span>
             <span class="submenu-arrow">▶</span>
             <div class="submenu">
-                <div class="context-menu-item" onclick="insertInstruction('LSL', 'dest src amt')">LSL dest src amt</div>
-                <div class="context-menu-item" onclick="insertInstruction('LSR', 'dest src amt')">LSR dest src amt</div>
-                <div class="context-menu-item" onclick="insertInstruction('ASR', 'dest src amt')">ASR dest src amt</div>
-                <div class="context-menu-item" onclick="insertInstruction('ROR', 'dest src amt')">ROR dest src amt</div>
-            </div>
-        </div>
-        <div class="context-menu-item has-submenu">
-            <span class="menu-icon">=</span>
-            <span>Compare</span>
-            <span class="submenu-arrow">▶</span>
-            <div class="submenu">
-                <div class="context-menu-item" onclick="insertInstruction('CMP', 'r1 r2')">CMP r1 r2</div>
-                <div class="context-menu-item" onclick="insertInstruction('CMN', 'r1 r2')">CMN r1 r2</div>
-                <div class="context-menu-item" onclick="insertInstruction('TST', 'r1 r2')">TST r1 r2</div>
-                <div class="context-menu-item" onclick="insertInstruction('TEQ', 'r1 r2')">TEQ r1 r2</div>
+                <div class="context-menu-item" onclick="insertInstruction('SHL', 'DRd DRs #amount')">SHL DRd DRs #amount</div>
+                <div class="context-menu-item" onclick="insertInstruction('SHR', 'DRd DRs #amount')">SHR DRd DRs #amount</div>
+                <div class="context-menu-item" onclick="insertInstruction('SHR', 'DRd DRs #amount ASR')">SHR DRd DRs #amount ASR</div>
             </div>
         </div>
         <div class="context-menu-item has-submenu">
@@ -955,12 +936,11 @@ ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
             <span>Branch</span>
             <span class="submenu-arrow">▶</span>
             <div class="submenu">
-                <div class="context-menu-item" onclick="insertInstruction('B', 'offset')">B offset</div>
-                <div class="context-menu-item" onclick="insertInstruction('B', 'EQ offset')">B EQ offset</div>
-                <div class="context-menu-item" onclick="insertInstruction('B', 'NE offset')">B NE offset</div>
-                <div class="context-menu-item" onclick="insertInstruction('B', 'GT offset')">B GT offset</div>
-                <div class="context-menu-item" onclick="insertInstruction('B', 'LT offset')">B LT offset</div>
-                <div class="context-menu-item" onclick="insertInstruction('BL', 'offset')">BL offset</div>
+                <div class="context-menu-item" onclick="insertInstruction('BRANCH', 'AL target')">BRANCH AL target</div>
+                <div class="context-menu-item" onclick="insertInstruction('BRANCH', 'EQ target')">BRANCH EQ target</div>
+                <div class="context-menu-item" onclick="insertInstruction('BRANCH', 'NE target')">BRANCH NE target</div>
+                <div class="context-menu-item" onclick="insertInstruction('BRANCH', 'GT target')">BRANCH GT target</div>
+                <div class="context-menu-item" onclick="insertInstruction('BRANCH', 'LT target')">BRANCH LT target</div>
             </div>
         </div>
         <div class="context-menu-separator"></div>
@@ -969,13 +949,25 @@ ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
             <span>Capability</span>
             <span class="submenu-arrow">▶</span>
             <div class="submenu">
-                <div class="context-menu-item" onclick="insertInstruction('LOAD', 'destCR srcCR idx')">LOAD destCR srcCR idx</div>
-                <div class="context-menu-item" onclick="insertInstruction('SAVE', 'destCR srcDR')">SAVE destCR srcDR</div>
-                <div class="context-menu-item" onclick="insertInstruction('CALL', 'cr')">CALL cr</div>
+                <div class="context-menu-item" onclick="insertInstruction('LOAD', 'CRd CRs #row')">LOAD CRd CRs #row</div>
+                <div class="context-menu-item" onclick="insertInstruction('SAVE', 'CRd CRs #row')">SAVE CRd CRs #row</div>
+                <div class="context-menu-item" onclick="insertInstruction('CALL', 'CRs')">CALL CRs</div>
                 <div class="context-menu-item" onclick="insertInstruction('RETURN', '')">RETURN</div>
-                <div class="context-menu-item" onclick="insertInstruction('CHANGE', 'offset')">CHANGE offset</div>
-                <div class="context-menu-item" onclick="insertInstruction('SWITCH', 'CR13 CR6 #row')">SWITCH isolatedCR sourceCR row</div>
-                <div class="context-menu-item" onclick="insertInstruction('TPERM', 'cr mask')">TPERM cr mask</div>
+                <div class="context-menu-item" onclick="insertInstruction('CHANGE', 'CR12 CR12 #row')">CHANGE CR12 CR12 #row</div>
+                <div class="context-menu-item" onclick="insertInstruction('SWITCH', 'CR15 CR6 #row')">SWITCH CR15 CR6 #row</div>
+                <div class="context-menu-item" onclick="insertInstruction('TPERM', 'CRd preset')">TPERM CRd preset</div>
+                <div class="context-menu-item" onclick="insertInstruction('LAMBDA', 'CRd')">LAMBDA CRd</div>
+                <div class="context-menu-item" onclick="insertInstruction('ELOADCALL', 'CRd CRs #row')">ELOADCALL CRd CRs #row</div>
+                <div class="context-menu-item" onclick="insertInstruction('XLOADLAMBDA', 'CRd CRs #row')">XLOADLAMBDA CRd CRs #row</div>
+            </div>
+        </div>
+        <div class="context-menu-item has-submenu">
+            <span class="menu-icon">■</span>
+            <span>Control</span>
+            <span class="submenu-arrow">▶</span>
+            <div class="submenu">
+                <div class="context-menu-item" onclick="insertInstruction('NOP', '')">NOP</div>
+                <div class="context-menu-item" onclick="insertInstruction('HALT', '')">HALT</div>
             </div>
         </div>
         <div class="context-menu-separator"></div>

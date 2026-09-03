@@ -13,68 +13,58 @@
     var INSTR_CATEGORIES = [
         {
             name: 'Capability', icon: '\uD83D\uDD11', items: [
-                { label: 'LOAD destCR srcCR idx', instr: 'LOAD',   ops: 'destCR srcCR idx' },
-                { label: 'SAVE destCR srcDR',     instr: 'SAVE',   ops: 'destCR srcDR' },
-                { label: 'CALL cr',               instr: 'CALL',   ops: 'cr' },
+                { label: 'LOAD CRd CRs #row',     instr: 'LOAD',   ops: 'CRd CRs #row' },
+                { label: 'SAVE CRd CRs #row',     instr: 'SAVE',   ops: 'CRd CRs #row' },
+                { label: 'CALL CRs',              instr: 'CALL',   ops: 'CRs' },
                 { label: 'RETURN',                instr: 'RETURN', ops: '' },
-                { label: 'CHANGE offset',         instr: 'CHANGE', ops: 'offset' },
-                { label: 'SWITCH isolatedCR sourceCR row', instr: 'SWITCH', ops: 'CR13 CR6 #row' },
-                { label: 'TPERM cr mask',             instr: 'TPERM',       ops: 'cr mask' },
-                { label: 'LAMBDA cr',                 instr: 'LAMBDA',      ops: 'cr' },
-                { label: 'ELOADCALL cr name',         instr: 'ELOADCALL',   ops: 'cr name' },
-                { label: 'XLOADLAMBDA cr name',       instr: 'XLOADLAMBDA', ops: 'cr name' },
+                { label: 'CHANGE CR12 CR12 #row', instr: 'CHANGE', ops: 'CR12 CR12 #row' },
+                { label: 'SWITCH CR15 CR6 #row',  instr: 'SWITCH', ops: 'CR15 CR6 #row' },
+                { label: 'TPERM CRd preset',      instr: 'TPERM',  ops: 'CRd preset' },
+                { label: 'LAMBDA CRd',            instr: 'LAMBDA', ops: 'CRd' },
+                { label: 'ELOADCALL CRd CRs #row', instr: 'ELOADCALL', ops: 'CRd CRs #row' },
+                { label: 'XLOADLAMBDA CRd CRs #row', instr: 'XLOADLAMBDA', ops: 'CRd CRs #row' },
             ]
         },
         {
             name: 'Arithmetic', icon: '+', items: [
-                { label: 'ADD dest src',   instr: 'ADD',  ops: 'dest src' },
-                { label: 'SUB dest src',   instr: 'SUB',  ops: 'dest src' },
-                { label: 'MUL dest src',   instr: 'MUL',  ops: 'dest src' },
-                { label: 'NEG dest src',   instr: 'NEG',  ops: 'dest src' },
-                { label: 'ADDI dest imm',  instr: 'ADDI', ops: 'dest imm' },
-                { label: 'SUBI dest imm',  instr: 'SUBI', ops: 'dest imm' },
-            ]
-        },
-        {
-            name: 'Logic', icon: '&', items: [
-                { label: 'AND dest src', instr: 'AND', ops: 'dest src' },
-                { label: 'ORR dest src', instr: 'ORR', ops: 'dest src' },
-                { label: 'EOR dest src', instr: 'EOR', ops: 'dest src' },
-                { label: 'BIC dest src', instr: 'BIC', ops: 'dest src' },
-                { label: 'NOT dest src', instr: 'NOT', ops: 'dest src' },
+                { label: 'IADD DRd DRs DRt', instr: 'IADD', ops: 'DRd DRs DRt' },
+                { label: 'IADD DRd DRs #imm', instr: 'IADD', ops: 'DRd DRs #imm' },
+                { label: 'ISUB DRd DRs DRt', instr: 'ISUB', ops: 'DRd DRs DRt' },
+                { label: 'ISUB DRd DRs #imm', instr: 'ISUB', ops: 'DRd DRs #imm' },
+                { label: 'MCMP DRd DRs', instr: 'MCMP', ops: 'DRd DRs' },
+                { label: 'MVN DRd DRs (pseudo)', instr: 'MVN', ops: 'DRd DRs' },
             ]
         },
         {
             name: 'Data movement', icon: '\u2192', items: [
-                { label: 'IADD dr DR0 imm (load immediate)', instr: 'IADD', ops: 'dr DR0 #imm' },
-                { label: 'DREAD dr cr addr',    instr: 'DREAD',  ops: 'dr cr addr' },
-                { label: 'DWRITE dr cr addr',   instr: 'DWRITE', ops: 'dr cr addr' },
+                { label: 'IADD DRd DR0 #imm (load immediate)', instr: 'IADD', ops: 'DRd DR0 #imm' },
+                { label: 'DREAD DRd CRs #offset', instr: 'DREAD', ops: 'DRd CRs #offset' },
+                { label: 'DWRITE DRd CRs #offset', instr: 'DWRITE', ops: 'DRd CRs #offset' },
+                { label: 'BFEXT DRd DRs #pos #width', instr: 'BFEXT', ops: 'DRd DRs #pos #width' },
+                { label: 'BFINS DRd DRs #pos #width', instr: 'BFINS', ops: 'DRd DRs #pos #width' },
+                { label: 'WORD value', instr: 'WORD', ops: 'value' },
             ]
         },
         {
             name: 'Shift', icon: '\u27f7', items: [
-                { label: 'LSL dest src amt', instr: 'LSL', ops: 'dest src amt' },
-                { label: 'LSR dest src amt', instr: 'LSR', ops: 'dest src amt' },
-                { label: 'ASR dest src amt', instr: 'ASR', ops: 'dest src amt' },
-                { label: 'ROR dest src amt', instr: 'ROR', ops: 'dest src amt' },
-            ]
-        },
-        {
-            name: 'Compare', icon: '=', items: [
-                { label: 'CMP r1 r2', instr: 'CMP', ops: 'r1 r2' },
-                { label: 'CMN r1 r2', instr: 'CMN', ops: 'r1 r2' },
-                { label: 'TST r1 r2', instr: 'TST', ops: 'r1 r2' },
-                { label: 'TEQ r1 r2', instr: 'TEQ', ops: 'r1 r2' },
+                { label: 'SHL DRd DRs #amount', instr: 'SHL', ops: 'DRd DRs #amount' },
+                { label: 'SHR DRd DRs #amount', instr: 'SHR', ops: 'DRd DRs #amount' },
+                { label: 'SHR DRd DRs #amount ASR', instr: 'SHR', ops: 'DRd DRs #amount ASR' },
             ]
         },
         {
             name: 'Branch', icon: '\u21b7', items: [
-                { label: 'B offset',      instr: 'B',  ops: 'offset' },
-                { label: 'B EQ offset',   instr: 'B',  ops: 'EQ offset' },
-                { label: 'B NE offset',   instr: 'B',  ops: 'NE offset' },
-                { label: 'B GT offset',   instr: 'B',  ops: 'GT offset' },
-                { label: 'B LT offset',   instr: 'B',  ops: 'LT offset' },
-                { label: 'BL offset',     instr: 'BL', ops: 'offset' },
+                { label: 'BRANCH AL target', instr: 'BRANCH', ops: 'AL target' },
+                { label: 'BRANCH EQ target', instr: 'BRANCH', ops: 'EQ target' },
+                { label: 'BRANCH NE target', instr: 'BRANCH', ops: 'NE target' },
+                { label: 'BRANCH GT target', instr: 'BRANCH', ops: 'GT target' },
+                { label: 'BRANCH LT target', instr: 'BRANCH', ops: 'LT target' },
+            ]
+        },
+        {
+            name: 'Control', icon: '\u25a0', items: [
+                { label: 'NOP', instr: 'NOP', ops: '' },
+                { label: 'HALT', instr: 'HALT', ops: '' },
             ]
         },
         {
