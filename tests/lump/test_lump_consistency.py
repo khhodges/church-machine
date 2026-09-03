@@ -19,7 +19,9 @@ R10  Every manifest entry with lump_size declared has a .lump file on disk.
 R11  Every manifest entry with an explicit sidecar_file field has that file on
      disk.  Entries with lump_size but no sidecar_file emit a pytest warning so
      the gap stays visible without blocking CI.
-R14  Every archive binary has a matching sidecar .json (both old <token>-vN and new <Name>_vN).
+R14  Every archive binary has a matching sidecar .json whose archived_version
+     matches the version encoded in its archive filename (both old <token>-vN
+     and new <Name>_vN).
 R16  A statically-slotted, system-baseline lump's `abstraction` field must name a
      currently-live entry in simulator/abstractions.js (catches abstraction-name
      drift after a rename, at build/merge time instead of only as a runtime toast).
@@ -1059,9 +1061,12 @@ class TestR16_AbstractionNameMatchesRegistry:
 
 
 class TestR14_ArchiveSidecarsExist:
-    """R14: Every archive binary has a matching sidecar .json.
+    """R14: Every archive binary has an explicitly-versioned matching sidecar.
 
     Supports both legacy <token>-vN.lump and new <AbsName>_vN.lump archive patterns.
+    The matching ``archived_version`` marker is what distinguishes an intentional
+    archive pair from a current binary whose manifest entry or canonical filename
+    was accidentally removed.
     """
 
     def test_archive_lumps_have_sidecars(self):
@@ -1077,6 +1082,40 @@ class TestR14_ArchiveSidecarsExist:
                 )
         assert not missing, (
             "Archive binaries missing their sidecar .json:\n  " + "\n  ".join(missing)
+        )
+
+    def test_archive_sidecars_declare_matching_version(self):
+        """Archive sidecars must explicitly match the version in their filenames."""
+        invalid = []
+        for stem in ARCHIVE_LUMP_STEMS:
+            sidecar_path = os.path.join(LUMPS_DIR, f"{stem}.json")
+            if not os.path.exists(sidecar_path):
+                continue  # The companion existence check reports this more clearly.
+
+            match = _re.search(r"(?:-v|_v)(\d+)$", stem, _re.IGNORECASE)
+            assert match is not None, f"Internal error: archive stem did not encode a version: {stem}"
+            expected_version = int(match.group(1))
+
+            try:
+                with open(sidecar_path) as f:
+                    sidecar = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                continue  # Existing JSON validity checks provide the primary diagnostic.
+
+            actual_version = sidecar.get("archived_version")
+            if actual_version != expected_version:
+                invalid.append(
+                    f"{stem}.json — archived_version={actual_version!r}, "
+                    f"expected {expected_version} from {stem}.lump"
+                )
+
+        assert not invalid, (
+            "Archive sidecars missing an explicit matching archived_version:\n  "
+            + "\n  ".join(invalid)
+            + "\n\n"
+            "A filename pattern alone is not enough to exempt a tracked LUMP from\n"
+            "current manifest coverage. Set archived_version to the version encoded\n"
+            "in the archive filename, or restore the file as a current manifest entry."
         )
 
 
@@ -3032,13 +3071,13 @@ class TestR25_GitTrackedLumpsInManifest:
 
 
 class TestR25b_GitTrackedArchiveLumpsWarning:
-    """R25b: Git-tracked archive .lump files with valid headers emit a pytest warning.
+    """R25b: Unconfirmed git-tracked archive .lump files emit a pytest warning.
 
     Archives (<token>-vN.lump and <Name>_vN.lump) are intentional historical
     copies, exempt from the manifest-coverage requirement enforced by R25.
-    However, a git-tracked archive that carries a valid LUMP header was once
-    a "current" binary; a logged warning keeps it visible to reviewers and
-    reminds operators to use ``--archive-cleanup`` before any sweep removes it.
+    A matching sidecar ``archived_version`` explicitly confirms that status.
+    Archive-shaped files without that matching marker remain visible to reviewers
+    so a missing current manifest entry cannot be silently excused by its name.
 
     An archive that is NOT currently tracked by git (never committed, or already
     removed from the index) is silently ignored — only committed archives that
@@ -3067,11 +3106,10 @@ class TestR25b_GitTrackedArchiveLumpsWarning:
         return sorted(names)
 
     def test_git_tracked_archive_lumps_warn(self):
-        """Git-tracked archive .lump files with valid headers emit a pytest warning.
+        """Unconfirmed git-tracked archive .lump files with valid headers warn.
 
-        This does not block CI — it surfaces archives that were once current
-        binaries so reviewers can confirm they are intentionally obsolete before
-        any cleanup sweep removes them.
+        Correctly paired archives are accepted quietly. This does not block CI
+        because R14 separately hard-fails missing or mismatched archive metadata.
         """
         tracked = set(self._git_tracked_lump_filenames())
         if not tracked:
@@ -3081,6 +3119,17 @@ class TestR25b_GitTrackedArchiveLumpsWarning:
             stem = basename[:-5]  # strip .lump
             if not _is_archive_stem(stem):
                 continue  # non-archives are handled by R25
+
+            match = _re.search(r"(?:-v|_v)(\d+)$", stem, _re.IGNORECASE)
+            expected_version = int(match.group(1)) if match else None
+            sidecar_path = os.path.join(LUMPS_DIR, f"{stem}.json")
+            try:
+                with open(sidecar_path) as fh:
+                    sidecar = json.load(fh)
+            except (OSError, json.JSONDecodeError):
+                sidecar = {}
+            if sidecar.get("archived_version") == expected_version:
+                continue  # Explicitly confirmed intentional archive.
 
             path = os.path.join(LUMPS_DIR, basename)
             if not os.path.isfile(path):
@@ -3103,12 +3152,11 @@ class TestR25b_GitTrackedArchiveLumpsWarning:
                 continue  # invalid header — safe to ignore
 
             warnings.warn(
-                f"R25b: git-tracked archive {basename!r} carries a valid LUMP header "
-                f"(magic=0x1F, cw={cw}, cc={cc}) and is absent from manifest.json.\n"
-                "  This archive was once a current binary.  Confirm it is intentionally\n"
-                "  demoted before any cleanup sweep removes it.\n"
-                "  To review all such archives:  "
-                "python3 scripts/migrate_lump_names.py --archive-cleanup [--dry-run]",
+                f"R25b: git-tracked archive-shaped file {basename!r} carries a valid "
+                f"LUMP header (magic=0x1F, cw={cw}, cc={cc}) but its sidecar does not "
+                f"declare archived_version={expected_version!r}.\n"
+                "  Either add the matching archive marker to confirm it is historical,\n"
+                "  or restore it as a current manifest entry.",
                 UserWarning,
                 stacklevel=2,
             )
