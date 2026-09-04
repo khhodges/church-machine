@@ -310,7 +310,7 @@ class CLOOMCCompiler {
         this._syncRegisteredMethodConventions();
         const errors = [];
         // Auto-wrap code that has no abstraction/method declaration
-        if (!/^\s*abstraction\s+\w+/m.test(source)) {
+        if (!/^\s*abstraction\s+[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*/m.test(source)) {
             const hasMethod = /^\s*(?:public\s+|private\s+)?method\s+\w+/m.test(source);
             const nameMatch = source.match(/^\s*(?:public\s+|private\s+)?method\s+(\w+)/m);
             const autoName = nameMatch ? nameMatch[1].charAt(0).toUpperCase() + nameMatch[1].slice(1) + 'Abstraction' : 'MyAbstraction';
@@ -451,7 +451,7 @@ class CLOOMCCompiler {
             const line = lines[i].trim();
             if (!line || line.startsWith('--')) { i++; continue; }
 
-            const absMatch = line.match(/^abstraction\s+(\w+)\s*\{/i);
+            const absMatch = line.match(/^abstraction\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*\{/i);
             if (absMatch) {
                 result.name = absMatch[1];
                 i++;
@@ -460,7 +460,7 @@ class CLOOMCCompiler {
             }
             // No-braces form: "abstraction Name" on its own line — treat the
             // rest of the source as the body (no closing } required).
-            const absNobraceMatch = line.match(/^abstraction\s+(\w+)\s*$/i);
+            const absNobraceMatch = line.match(/^abstraction\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*$/i);
             if (absNobraceMatch) {
                 result.name = absNobraceMatch[1];
                 i++;
@@ -1044,7 +1044,7 @@ class CLOOMCCompiler {
         for (const line of lines) {
             const t = line.trim();
             if (!t || t.startsWith('//') || t.startsWith('--') || t.startsWith(';')) continue;
-            if (/^abstraction\s+\w+/i.test(t)) return true;
+            if (/^abstraction\s+[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*/i.test(t)) return true;
             if (/^(?:public\s+|private\s+)?method\s+\w+/i.test(t)) return true;
         }
         return false;
@@ -1258,7 +1258,7 @@ class CLOOMCCompiler {
 
     _parseAbstraction(source, errors) {
         // Auto-wrap code that has no abstraction declaration
-        if (!/^\s*abstraction\s+\w+/m.test(source)) {
+        if (!/^\s*abstraction\s+[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*/m.test(source)) {
             const hasMethod = /^\s*method\s+\w+/m.test(source);
             const nameMatch = source.match(/^\s*method\s+(\w+)/m);
             const autoName = nameMatch ? nameMatch[1].charAt(0).toUpperCase() + nameMatch[1].slice(1) + 'Abstraction' : 'MyAbstraction';
@@ -1277,7 +1277,7 @@ class CLOOMCCompiler {
             const line = lines[i].trim();
             if (!line || line.startsWith('//')) { i++; continue; }
 
-            const absMatch = line.match(/^abstraction\s+(\w+)\s*\{/i);
+            const absMatch = line.match(/^abstraction\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*\{/i);
             if (absMatch) {
                 result.name = absMatch[1];
                 i++;
@@ -2453,7 +2453,7 @@ class CLOOMCCompiler {
             const line = lines[i].trim();
             if (!line || line.startsWith('--')) { i++; continue; }
 
-            const absMatch = line.match(/^abstraction\s+(\w+)\s*\{/i);
+            const absMatch = line.match(/^abstraction\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*\{/i);
             if (absMatch) {
                 result.name = absMatch[1];
                 i++;

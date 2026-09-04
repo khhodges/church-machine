@@ -67,6 +67,28 @@ console.log('\n--- JS1: JS method body with bare return literal ---');
     }
 }
 
+// ── JS-DOT: canonical dotted abstraction name ────────────────────────────────
+console.log('\n--- JS-DOT: dotted abstraction name from New template ---');
+{
+    const c = new CLOOMCCompiler();
+    const src = `abstraction ide.testMbit {
+    capabilities {
+        SELF E
+    }
+    method Status() {
+        return 0
+    }
+}`;
+    const result = c.compile(src, []);
+    check('JS-DOT-a: compiles without declaration errors',
+        result.errors.length === 0, errMsg(result));
+    check('JS-DOT-b: preserves the complete dotted abstraction name',
+        result.abstractionName === 'ide.testMbit', result.abstractionName);
+    check('JS-DOT-c: emits exactly one compiler-owned SELF row',
+        result.capabilities.filter(cap => cap && cap.compiler_owned_self).length === 1,
+        JSON.stringify(result.capabilities));
+}
+
 // ── JS2: return parameter ─────────────────────────────────────────────────────
 console.log('\n--- JS2: JS method body with bare return parameter ---');
 {
