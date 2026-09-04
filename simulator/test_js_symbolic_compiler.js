@@ -28,6 +28,7 @@ const path = require('path');
 global.ChurchAssembler = require(path.join(__dirname, 'assembler.js'));
 const CLOOMCCompiler = require(path.join(__dirname, 'cloomc_compiler.js'));
 const { buildLump }  = require(path.join(__dirname, 'lump_builder.js'));
+const { lumpAudit, lumpAuditHasErrors } = require(path.join(__dirname, 'lump-audit.js'));
 
 let pass = 0;
 let fail = 0;
@@ -122,6 +123,48 @@ abstraction ide.testMbit {
             (words[1] & 0x4000) !== 0 &&
             (words[1] & 0x3FFF) === 0x3000,
             words[1] !== undefined ? '0x' + (words[1] >>> 0).toString(16) : 'missing');
+    }
+}
+
+console.log('\n--- JS-SAVE: local SAVE rows extend the compiled C-List ---');
+{
+    const c = new CLOOMCCompiler();
+    const src = `abstraction ide.testMbit {
+    capabilities {
+        SELF E
+        M_BIT_DEV RW
+    }
+    method Status() {
+        LOAD CR0, M_BIT_DEV
+        IADD DR1, DR0, #0x3000
+        DWRITE DR1, CR0, #0
+        SAVE CR12, CR6[7]
+        SAVE CR13, CR6[8]
+        RETURN DR1
+    }
+}`;
+    const result = c.compile(src, []);
+    check('JS-SAVE-a: isolated SAVE source compiles without errors',
+        result.errors.length === 0, errMsg(result));
+    check('JS-SAVE-b: SAVE rows 7 and 8 extend cc to 9',
+        result.capabilities.length === 9,
+        'cc=' + result.capabilities.length);
+    check('JS-SAVE-c: intervening rows are canonical NULL entries',
+        result.capabilities.slice(2, 9).every(cap => cap && cap.null_row === true),
+        JSON.stringify(result.capabilities));
+    if (result.errors.length === 0) {
+        const built = buildLump(result);
+        const audit = lumpAudit(
+            built.words,
+            { cw: built.cw, cc: built.cc, lump_size: built.lumpSize },
+            null,
+            { skipRnc: true }
+        );
+        check('JS-SAVE-d: built LUMP passes the RCI capability-range audit',
+            !lumpAuditHasErrors(audit),
+            audit.filter(item => item.severity === 'error')
+                .map(item => `[${item.ruleId}] ${item.detail}`)
+                .join('; '));
     }
 }
 

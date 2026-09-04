@@ -201,6 +201,14 @@ class CLOOMCCompiler {
                 result.compilerSelfCapability = true;
             }
         }
+        // A numeric SAVE into this abstraction's own CR6 C-List is also a
+        // declaration of writable storage.  CLOOMC++ has no separate `cc`
+        // directive, so reserve any intervening rows as canonical NULL entries
+        // before the LUMP header is built.  Do not do this for LOAD/ELOADCALL:
+        // silently creating empty read targets would hide missing capabilities.
+        if (result.language !== 'assembly') {
+            this._reserveLocalSaveRows(result);
+        }
         result.portableMode = portableDirective;
         if (portableDirective === 'portable' || portableDirective === 'conflict') {
             this._validatePortableCapabilities(result);
@@ -1178,6 +1186,48 @@ class CLOOMCCompiler {
             }
         }
         return rom;
+    }
+
+    _reserveLocalSaveRows(result) {
+        if (!result || !Array.isArray(result.methods)) return;
+        const caps = Array.isArray(result.capabilities)
+            ? result.capabilities
+            : (result.capabilities = []);
+        let highestSaveRow = -1;
+        let outOfRangeRow = -1;
+
+        for (const method of result.methods) {
+            for (const rawWord of (method && Array.isArray(method.code) ? method.code : [])) {
+                const word = rawWord >>> 0;
+                const opcode = (word >>> 27) & 0x1F;
+                const clistCR = (word >>> 15) & 0xF;
+                if (opcode !== this.opcodes.SAVE || clistCR !== 6) continue;
+                const row = word & 0x7FFF;
+                if (row >= 32) {
+                    outOfRangeRow = outOfRangeRow < 0 ? row : Math.min(outOfRangeRow, row);
+                } else {
+                    highestSaveRow = Math.max(highestSaveRow, row);
+                }
+            }
+        }
+
+        if (outOfRangeRow >= 0) {
+            result.errors.push({
+                line: null,
+                message: `SAVE targets C-List row ${outOfRangeRow}, but ordinary abstractions have only rows 0–31.`
+            });
+            return;
+        }
+
+        while (caps.length <= highestSaveRow) {
+            caps.push({
+                name: 'NULL',
+                rights: [],
+                grants: [],
+                null_row: true,
+                compiler_reserved_save_row: true,
+            });
+        }
     }
 
     // Parse ordinary "NAME [RIGHTS]" and canonical portable descriptors.
