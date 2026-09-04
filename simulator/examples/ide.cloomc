@@ -1,0 +1,74 @@
+; Provides: the functions of ...
+abstraction ide.testMbit {
+    capabilities {
+    SELF E
+    M_BIT_DEV RW
+}
+    method Status {; ============================================================
+; TEST 6: M-authorized swap of CR12 and CR13, then swap back
+;
+; Requirements:
+;   - CR6 must have S authority for SAVE
+;   - CR6 must have L authority for SWITCH
+;   - Rows 7 and 8 begin as canonical NULL rows
+; ============================================================
+; Load authority for the M-bit I/O word
+LOAD    CR0, M_BIT_DEV
+; Arm CR12.M and CR13.M:
+;   bit 12 = 0x1000
+;   bit 13 = 0x2000
+IADD    DR1, DR0, #0x3000
+DWRITE  DR1, CR0, #0
+; Save the original isolated-register GTs.
+; Each successful SAVE consumes its source register's M bit.
+SAVE    CR12, CR6[7]
+SAVE    CR13, CR6[8]
+; Re-arm both M bits for SWITCH
+DWRITE  DR1, CR0, #0
+; Swap the registers
+SWITCH  CR12, CR6, #8
+SWITCH  CR13, CR6, #7
+; Re-arm both M bits because SWITCH consumed them
+DWRITE  DR1, CR0, #0
+; Swap back to the original state
+SWITCH  CR12, CR6, #7
+SWITCH  CR13, CR6, #8
+        RETURN
+    }
+    method Close_Fist {
+        ; Close all fingers
+        ; Depends on: self
+        ; TODO: write your code here
+        RETURN
+    }
+    method Open_Hand {
+        ; Extend all fingers
+        ; Depends on: self
+        ; TODO: write your code here
+        RETURN
+    }
+    method Grip {
+        ; Close as a fist
+        ; Depends on: self
+        ; TODO: write your code here
+        RETURN
+    }
+    method Point {
+        ; Point with forefinger
+        ; Depends on: self
+        ; TODO: write your code here
+        RETURN
+    }
+    method Count {
+        ; Display fingers as a number
+        ; Depends on: self
+        ; TODO: write your code here
+        RETURN
+    }
+    method Pinch {
+        ; Close the thumb and finger to touch each other
+        ; Depends on: self
+        ; TODO: write your code here
+        RETURN
+    }
+}

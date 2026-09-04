@@ -909,6 +909,32 @@ function _serializePortableLumpCapabilities(caps, words, clistStart) {
     return { ok: true, errors: [], resolvedCaps: portableCaps };
 }
 
+// Save endpoints normally return JSON, including validation failures. If an
+// unexpected server exception or proxy error returns HTML/text instead, turn it
+// into a useful error object rather than exposing Response.json()'s parse error.
+function _readLumpSaveResponse(response) {
+    return response.text().then(text => {
+        if (text) {
+            try {
+                return JSON.parse(text);
+            } catch (_jsonError) {
+                const contentType = response.headers
+                    ? (response.headers.get('content-type') || '')
+                    : '';
+                const kind = contentType.includes('text/html') ? 'HTML error page' : 'non-JSON response';
+                return {
+                    ok: false,
+                    error: `Server returned an ${kind} (HTTP ${response.status}). Check the server log for the underlying save error.`,
+                };
+            }
+        }
+        return {
+            ok: false,
+            error: `Server returned an empty response (HTTP ${response.status}).`,
+        };
+    });
+}
+
 function compileDraft() {
     const editor = document.getElementById('asmEditor');
     if (!editor) return;
@@ -1190,7 +1216,7 @@ function _doWipVersionSave() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(savePayload)
-    }).then(r => r.json()).then(resp => {
+    }).then(_readLumpSaveResponse).then(resp => {
         if (resp.ok) {
             const _lv  = resp.lump_version != null ? resp.lump_version : _autoVer;
             const _dlN = `${absName}_v${_lv}.lump`;
@@ -1316,7 +1342,7 @@ function _confirmLumpRelease() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data.savePayload)
-    }).then(r => r.json()).then(resp => {
+    }).then(_readLumpSaveResponse).then(resp => {
         if (resp.ok) {
             const _lumpVer = resp.lump_version != null ? resp.lump_version : ver;
             const _dlName = `${data.absName}_v${_lumpVer}.lump`;
@@ -1803,7 +1829,7 @@ function compileAndBuild() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(savePayload)
-        }).then(function(r) { return r.json(); }).then(function(resp) {
+        }).then(_readLumpSaveResponse).then(function(resp) {
             _wipSaveDone(resp && resp.ok ? resp.token : null);
         }).catch(function() {
             _wipSaveDone(null);
@@ -1815,7 +1841,7 @@ function compileAndBuild() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(savePayload)
-    }).then(r => r.json()).then(resp => {
+    }).then(_readLumpSaveResponse).then(resp => {
         if (resp.ok) {
             const _lumpVer = resp.lump_version != null ? resp.lump_version : _autoVer;
             const _dlName = `${absName}_v${_lumpVer}.lump`;

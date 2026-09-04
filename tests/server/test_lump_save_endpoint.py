@@ -49,6 +49,14 @@ if ROOT not in sys.path:
 import server.app as _app_module
 
 
+def test_direct_server_startup_happens_after_lump_transition_helpers():
+    """Direct execution must define save helpers before entering app.run()."""
+    source = open(os.path.join(ROOT, "server", "app.py"), encoding="utf-8").read()
+    helper_pos = source.index("def _lump_history_transition_lock")
+    startup_pos = source.index('if __name__ == "__main__":')
+    assert helper_pos < startup_pos
+
+
 def test_portable_save_detail_petname_identity_and_closed_policy(client, isolated_lumps):
     target = b"authoritative dependency bytes"
     target_name = "Library.Target#7"

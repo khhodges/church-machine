@@ -17284,11 +17284,6 @@ def _bank_custody_authorize_request(vault_id, data):
     return row, state, None
 
 
-if __name__ == "__main__":
-    _port = int(os.environ.get("E2E_PORT", 5000))
-    logging.info("Starting Church Machine server on port %d", _port)
-    _bind_with_retry(_port)
-
 class _LumpTransitionConflict(RuntimeError):
     """The current LUMP generation changed before a transition acquired its lock."""
 
@@ -17658,3 +17653,9 @@ def _commit_lump_history_transition(
                 logging.warning("[lumps] Could not remove transition backup %s", backup)
 
         return archive_info or {}
+
+
+if __name__ == "__main__":
+    _port = int(os.environ.get("E2E_PORT", 5000))
+    logging.info("Starting Church Machine server on port %d", _port)
+    _bind_with_retry(_port)
