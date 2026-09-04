@@ -1,8 +1,8 @@
 {
   "token": "00aa9999",
   "abstraction": "Legacy",
-  "filename": "Legacy.1.8b7fb77f.lump",
-  "sidecar_file": "Legacy.1.8b7fb77f.json",
+  "filename": "Legacy_v85.lump",
+  "sidecar_file": "Legacy_v85.json",
   "ns_slot": null,
   "lump_size": 64,
   "typ": 0,
@@ -32,7 +32,7 @@
   "deployment": {
     "target_board": "wukong-xc7a100t",
     "profile": "IoT",
-    "built_at": "2026-08-31T11:38:39.313295Z",
+    "built_at": "2026-09-04T14:52:35.252413Z",
     "builder": "CLOOMC++ IDE v1.0"
   },
   "grants": [
@@ -50,7 +50,7 @@
   "identity_seal_location": "c-list[0]",
   "dot_name": "Legacy",
   "issue_n": 1,
-  "lump_version": 64,
-  "compiled_at": 1788176319.3133109,
-  "archived_version": 64
+  "lump_version": 85,
+  "compiled_at": 1788533555.2524264,
+  "archived_version": 85
 }

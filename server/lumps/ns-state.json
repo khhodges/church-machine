@@ -118,9 +118,9 @@
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x0003A",
+      "limit": "0x0003F",
       "seq": 0,
-      "seal": "0xDEA89EEF"
+      "seal": "0xDEA83EEF"
     },
     {
       "name": "Thread#2",
@@ -167,6 +167,6 @@
       "seal": "0xDEA89EEF"
     }
   ],
-  "generated_at": 1788534159.3980055,
-  "committed_raw_fingerprint": "93249868249ce8c448012f5172a560aad4062d638d50b0dee7a186f2782c8928"
+  "generated_at": 1788553044.8193846,
+  "committed_raw_fingerprint": "699469809e2d92956e698e9c222697ff2bcd4ae8e560411f804a1cb354080991"
 }
