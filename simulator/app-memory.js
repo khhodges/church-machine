@@ -1763,12 +1763,20 @@ function updateFlagsDisplay() {
     // chip while the board is connected; sim.halted applies only when no board
     // is present.
     const statusHalted = _hwFaulted || (!_hwConnected && sim.halted);
+    const statusExplanation = statusHalted
+        ? 'Execution is halted; inspect the fault log or reset to continue.'
+        : '';
     const cap = sim.lastCapability;
 
     // ── Compact status chip in the flags-led-row ──────────────────────────
     container.innerHTML =
         (bootLabel ? `<span class="flag-info flag-boot">${bootLabel}</span>` : '') +
-        `<span class="flag-info flag-status${statusHalted ? ' flag-status-halted' : ''}">${statusLabel}</span>`;
+        `<span class="flag-info flag-status${statusHalted ? ' flag-status-halted' : ''}">` +
+        `<strong>${statusHalted ? 'FAULT' : statusLabel}</strong>` +
+        (statusExplanation
+            ? `<span class="flag-status-explanation">${statusExplanation}</span>`
+            : '') +
+        `</span>`;
 
     // ── Flags popover (anchored below step button, shown on hover) ─────────
     const flagsPop = document.getElementById('flagsPopover');

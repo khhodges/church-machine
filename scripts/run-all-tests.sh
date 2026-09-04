@@ -230,7 +230,7 @@ register_suite "ns-slot-modal-persist-tests" \
     'node simulator/test_ns_slot_modal_persist.js'
 
 register_suite "thread-instance-zone-tests" \
-    'node simulator/test_thread_instance_zones.js'
+    'node simulator/test_thread_instance_zones.js && node simulator/test_thread_indicator_display.js && node simulator/test_thread_dashboard_tab.js'
 
 register_suite "warning-panel-tests" \
     'node simulator/test_asm_warning_panel.js'
@@ -308,7 +308,7 @@ register_suite "wukong-hw-fault-tests" \
     'node simulator/test_wukong_hw_fault.js'
 
 register_suite "wukong-reconnect-halt-badge-tests" \
-    'node simulator/test_wukong_reconnect_halt_badge.js'
+    'node simulator/test_wukong_reconnect_halt_badge.js && node simulator/test_fault_lamp_explanation.js'
 
 register_suite "wukong-turing-filter-badge-tests" \
     'node simulator/test_wukong_turing_filter_badge.js'

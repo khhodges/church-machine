@@ -675,22 +675,22 @@
                     <span class="hw-led-name">G21<br><span class="hw-led-role">Boot/User</span></span>
                 </div>
                 <div class="hw-led-item">
-                    <div class="hw-led hw-led-red" id="hw-led1"></div>
-                    <span class="hw-led-name">G20<br><span class="hw-led-role">Fault/HB</span></span>
+                    <div class="hw-led hw-led-red" id="hw-led1" role="img" aria-label="Fault lamp off"></div>
+                    <span class="hw-led-name">G20<br><span class="hw-led-role">Fault</span></span>
                 </div>
                 <span class="hw-led-hint">← DWRITE LED[0]</span>
             </div>
             <div id="flagsDisplay" class="flags-bar"></div>
         </div>
-        <div class="dash-tabs">
-            <button class="dash-tab active" id="dashTab-cr" onclick="switchDashTab('cr')" data-tooltip="CRs — Context Registers CR0–CR15">CRs</button>
-            <button class="dash-tab" id="dashTab-dr" onclick="switchDashTab('dr')" data-tooltip="DRs — Data Registers DR0–DR15">DRs</button>
-            <button class="dash-tab" id="dashTab-gatelog" onclick="switchDashTab('gatelog')" data-tooltip="Gate Log — mLoad / mSave from last Step">Gate Log</button>
-            <button class="dash-tab" id="dashTab-state" onclick="switchDashTab('state')" data-tooltip="State — Machine Architecture info">State</button>
-            <button class="dash-tab" id="dashTab-memstats" onclick="switchDashTab('memstats')" data-tooltip="Memory — Foundation Layer Status">Mem</button>
-            <div id="threadIdentityStrip" class="thread-identity-strip" aria-label="Configured Thread NIA and GT dot pet names" aria-live="polite"></div>
+        <div class="dash-tabs" role="tablist" aria-label="Dashboard panels" onkeydown="handleDashTabKeydown(event)">
+            <button class="dash-tab active" role="tab" aria-selected="true" aria-controls="dashPanel-cr" tabindex="0" id="dashTab-cr" onclick="switchDashTab('cr')" data-tooltip="CRs — Context Registers CR0–CR15">CRs</button>
+            <button class="dash-tab" role="tab" aria-selected="false" aria-controls="dashPanel-dr" tabindex="-1" id="dashTab-dr" onclick="switchDashTab('dr')" data-tooltip="DRs — Data Registers DR0–DR15">DRs</button>
+            <button class="dash-tab" role="tab" aria-selected="false" aria-controls="dashPanel-gatelog" tabindex="-1" id="dashTab-gatelog" onclick="switchDashTab('gatelog')" data-tooltip="Gate Log — mLoad / mSave from last Step">Gate Log</button>
+            <button class="dash-tab" role="tab" aria-selected="false" aria-controls="dashPanel-state" tabindex="-1" id="dashTab-state" onclick="switchDashTab('state')" data-tooltip="State — Machine Architecture info">State</button>
+            <button class="dash-tab" role="tab" aria-selected="false" aria-controls="dashPanel-memstats" tabindex="-1" id="dashTab-memstats" onclick="switchDashTab('memstats')" data-tooltip="Memory — Foundation Layer Status">Mem</button>
+            <button class="dash-tab" role="tab" aria-selected="false" aria-controls="dashPanel-thread" tabindex="-1" id="dashTab-thread" onclick="switchDashTab('thread')" data-tooltip="Thread — Configured Thread contexts">Thread</button>
         </div>
-        <div id="dashPanel-cr" class="dash-panel active">
+        <div id="dashPanel-cr" class="dash-panel active" role="tabpanel" aria-labelledby="dashTab-cr">
             <div class="panel">
                 <div class="panel-title">CR0-CR15 -- 128-bit Context Registers (4 x 32-bit words)</div>
                 <div id="crRegs"></div>
@@ -702,14 +702,14 @@
                 <div id="crDetailContent"></div>
             </div>
         </div>
-        <div id="dashPanel-dr" class="dash-panel">
+        <div id="dashPanel-dr" class="dash-panel" role="tabpanel" aria-labelledby="dashTab-dr">
             <div class="panel">
                 <div class="panel-title">DR0-DR15 -- 32-bit Values (DR0 = zero)</div>
                 <div id="watchStrip"></div>
                 <div id="drRegs"></div>
             </div>
         </div>
-        <div id="dashPanel-gatelog" class="dash-panel">
+        <div id="dashPanel-gatelog" class="dash-panel" role="tabpanel" aria-labelledby="dashTab-gatelog">
             <div class="panel">
                 <div class="gate-log-titlebar">
                     <span class="panel-title">Gate Log &mdash; Live LUMP validation &amp; capability gates</span>
@@ -718,16 +718,22 @@
                 <div id="gateLogContent"></div>
             </div>
         </div>
-        <div id="dashPanel-state" class="dash-panel">
+        <div id="dashPanel-state" class="dash-panel" role="tabpanel" aria-labelledby="dashTab-state">
             <div class="panel">
                 <div class="panel-title">Machine Architecture</div>
                 <div id="machineInfo"></div>
             </div>
         </div>
-        <div id="dashPanel-memstats" class="dash-panel">
+        <div id="dashPanel-memstats" class="dash-panel" role="tabpanel" aria-labelledby="dashTab-memstats">
             <div class="panel">
                 <div class="panel-title">Memory &mdash; Foundation Layer Status</div>
                 <div id="memStatsContent"></div>
+            </div>
+        </div>
+        <div id="dashPanel-thread" class="dash-panel" role="tabpanel" aria-labelledby="dashTab-thread">
+            <div class="panel thread-panel">
+                <div class="panel-title">Configured Threads</div>
+                <div id="threadIdentityStrip" class="thread-identity-strip" aria-label="Configured Thread NIA and GT dot pet names" aria-live="polite"></div>
             </div>
         </div>
     </div>

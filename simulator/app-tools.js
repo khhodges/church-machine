@@ -139,15 +139,38 @@ function selectTutorial(which) {
 }
 
 function switchDashTab(tabId) {
-    document.querySelectorAll('.dash-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.dash-panel').forEach(p => p.classList.remove('active'));
-
     const tab = document.getElementById('dashTab-' + tabId);
     const panel = document.getElementById('dashPanel-' + tabId);
-    if (tab) tab.classList.add('active');
-    if (panel) panel.classList.add('active');
+    if (!panel) return;
+
+    // CR Detail is an internal panel without its own tab. Keep the previously
+    // selected dashboard tab reachable while that drill-down is displayed.
+    if (tab) {
+        document.querySelectorAll('.dash-tab').forEach((item) => {
+            const selected = item === tab;
+            item.classList.toggle('active', selected);
+            item.setAttribute('aria-selected', String(selected));
+            item.tabIndex = selected ? 0 : -1;
+        });
+    }
+    document.querySelectorAll('.dash-panel').forEach((item) => {
+        item.classList.toggle('active', item === panel);
+    });
 
     updateDashboard();
+}
+
+function handleDashTabKeydown(event) {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const tabs = Array.from(event.currentTarget.querySelectorAll('.dash-tab'))
+        .filter(tab => !tab.hidden && !tab.disabled);
+    const current = tabs.indexOf(document.activeElement);
+    if (current < 0 || tabs.length === 0) return;
+    event.preventDefault();
+    let next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 :
+        (current + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    tabs[next].focus();
+    tabs[next].click();
 }
 
 function _ensureTutorialObjects() {
@@ -265,8 +288,17 @@ function updateLedStrip() {
     const hw1 = document.getElementById('hw-led1');
     if (hw1) {
         const booting = !complete && bits > 0;
+        const hwConnected = (typeof window._wukongGetHwConnected === 'function')
+            && window._wukongGetHwConnected();
+        const hwFaulted = hwConnected
+            && (typeof window._wukongGetHwFaulted === 'function')
+            && window._wukongGetHwFaulted();
+        const faulted = !booting && !!(hwConnected ? hwFaulted : (sim.faultLatch || sim.halted));
         hw1.classList.toggle('hw-led-heartbeat', booting);
-        hw1.classList.toggle('on', !booting && !!(sim.faultLatch));
+        hw1.classList.toggle('on', faulted);
+        hw1.setAttribute('aria-label', booting
+            ? 'Fault lamp pulsing during boot'
+            : (faulted ? 'Fault lamp on: execution is halted' : 'Fault lamp off'));
     }
 
     const readoutEl   = document.getElementById('ledDR0Readout');

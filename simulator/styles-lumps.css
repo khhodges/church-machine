@@ -2814,7 +2814,9 @@
     }
 
     .dash-tab {
-        padding: 0.35rem 0.8rem;
+        min-width: 3.4rem;
+        min-height: 1.7rem;
+        padding: 0.25rem 0.55rem;
         font-size: 0.72rem;
     }
 

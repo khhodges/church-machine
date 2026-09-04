@@ -891,6 +891,9 @@
 
 /* ── Compact status chip (flags-led-row) ─────────────────────────────── */
 .flag-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
     font-size: 0.68rem;
     color: var(--text-secondary);
     font-weight: 600;
@@ -898,6 +901,11 @@
 }
 .flag-status-halted {
     color: #ef4444;
+}
+.flag-status-explanation {
+    color: #d5dbea;
+    font-weight: 400;
+    letter-spacing: normal;
 }
 
 /* ── Toolbar floating popovers (flags + cap) ─────────────────────────── */
@@ -943,8 +951,10 @@
 }
 
 .dash-tab {
-    padding: 0.5rem 1.2rem;
-    font-size: 0.82rem;
+    min-width: 3.6rem;
+    min-height: 1.8rem;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.75rem;
     background: #1b2d45;
     color: #e0e0e0;
     border: 2px solid #3a86ff;
@@ -968,14 +978,18 @@
     box-shadow: 0 0 10px rgba(233, 69, 96, 0.4);
 }
 
+.dash-tab:focus-visible {
+    outline: 2px solid #8fc8ff;
+    outline-offset: 2px;
+}
+
 .thread-identity-strip {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
     align-items: stretch;
-    justify-content: flex-end;
-    gap: 0.32rem;
+    gap: 0.55rem;
+    width: 100%;
     min-width: 0;
-    margin-left: auto;
-    overflow: hidden;
 }
 
 .thread-identity-strip[hidden] {
@@ -990,9 +1004,9 @@
         "marker values";
     align-items: center;
     column-gap: 0.32rem;
-    min-width: 8.5rem;
-    max-width: 13.5rem;
-    padding: 0.3rem 0.46rem;
+    min-width: 0;
+    width: 100%;
+    padding: 0.55rem 0.65rem;
     border: 1px solid rgba(58, 134, 255, 0.28);
     border-radius: 5px;
     background: rgba(11, 23, 38, 0.82);
@@ -1094,8 +1108,7 @@
 
 @media (max-width: 1180px) {
     .thread-identity-card {
-        min-width: 8.5rem;
-        max-width: 10.5rem;
+        min-width: 0;
     }
 
     .thread-identity-gt {
@@ -1109,16 +1122,11 @@
     }
 
     .thread-identity-strip {
-        flex: 1 1 100%;
-        justify-content: flex-start;
-        order: 2;
-        overflow-x: auto;
-        padding-top: 0.08rem;
+        grid-template-columns: repeat(auto-fit, minmax(min(13rem, 100%), 1fr));
     }
 
     .thread-identity-card {
-        flex: 1 0 9rem;
-        max-width: 14rem;
+        min-width: 0;
     }
 }
 
