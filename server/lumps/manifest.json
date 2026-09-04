@@ -2788,5 +2788,72 @@
     "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f",
     "dot_name": "Adder",
     "issue_n": 1
+  },
+  {
+    "token": "072454a8",
+    "abstraction": "ide.testMbit",
+    "filename": "ide.testMbit.1.d5046b90.lump",
+    "sidecar_file": "ide.testMbit.1.d5046b90.json",
+    "lump_size": 64,
+    "cw": 18,
+    "cc": 9,
+    "author": "",
+    "version": "2026.09.04",
+    "lump_version": 1,
+    "compiled_at": 1788524021.0854387,
+    "methods": [
+      {
+        "name": "Status",
+        "offset": 0,
+        "length": 12
+      },
+      {
+        "name": "Close_Fist",
+        "offset": 12,
+        "length": 1
+      },
+      {
+        "name": "Open_Hand",
+        "offset": 13,
+        "length": 1,
+        "aliasOf": "Close_Fist"
+      },
+      {
+        "name": "Grip",
+        "offset": 14,
+        "length": 1,
+        "aliasOf": "Close_Fist"
+      },
+      {
+        "name": "Point",
+        "offset": 15,
+        "length": 1,
+        "aliasOf": "Close_Fist"
+      },
+      {
+        "name": "Count",
+        "offset": 16,
+        "length": 1,
+        "aliasOf": "Close_Fist"
+      },
+      {
+        "name": "Pinch",
+        "offset": 17,
+        "length": 1,
+        "aliasOf": "Close_Fist"
+      }
+    ],
+    "grants": [
+      "E"
+    ],
+    "capability_type": "inform",
+    "authorized": false,
+    "legacy_authorized": false,
+    "binary_hash": "7f7049a605ce9ebdeb1ed2bf61ec33dec1cb1fe4a3aaf51be0e72791e57e051e",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "b432ac859e082447c92b775c3a00ea59040cb8ba8e2770d7281fa2f34ea36788",
+    "dot_name": "ide.testMbit",
+    "issue_n": 1
   }
 ]

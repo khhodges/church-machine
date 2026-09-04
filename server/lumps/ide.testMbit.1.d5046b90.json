@@ -1,0 +1,166 @@
+{
+  "token": "072454a8",
+  "abstraction": "ide.testMbit",
+  "filename": "ide.testMbit.1.d5046b90.lump",
+  "sidecar_file": "ide.testMbit.1.d5046b90.json",
+  "ns_slot": null,
+  "lump_size": 64,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 18,
+  "cc": 9,
+  "profile": "Full",
+  "language": "javascript",
+  "author": "",
+  "version": "2026.09.04",
+  "release_notes": "",
+  "methods": [
+    {
+      "name": "Status",
+      "offset": 0,
+      "length": 12
+    },
+    {
+      "name": "Close_Fist",
+      "offset": 12,
+      "length": 1
+    },
+    {
+      "name": "Open_Hand",
+      "offset": 13,
+      "length": 1,
+      "aliasOf": "Close_Fist"
+    },
+    {
+      "name": "Grip",
+      "offset": 14,
+      "length": 1,
+      "aliasOf": "Close_Fist"
+    },
+    {
+      "name": "Point",
+      "offset": 15,
+      "length": 1,
+      "aliasOf": "Close_Fist"
+    },
+    {
+      "name": "Count",
+      "offset": 16,
+      "length": 1,
+      "aliasOf": "Close_Fist"
+    },
+    {
+      "name": "Pinch",
+      "offset": 17,
+      "length": 1,
+      "aliasOf": "Close_Fist"
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "__SELF__",
+      "rights": [
+        "E"
+      ],
+      "grants": [
+        "E"
+      ],
+      "compiler_owned_self": true
+    },
+    {
+      "name": "M_BIT_DEV",
+      "rights": [
+        "R",
+        "W"
+      ],
+      "grants": [],
+      "nsIndex": 13,
+      "null_row": false,
+      "compiler_owned_self": false,
+      "placeholder": false
+    },
+    {
+      "name": "NULL",
+      "rights": [],
+      "grants": [],
+      "nsIndex": null,
+      "null_row": true
+    },
+    {
+      "name": "NULL",
+      "rights": [],
+      "grants": [],
+      "nsIndex": null,
+      "null_row": true
+    },
+    {
+      "name": "NULL",
+      "rights": [],
+      "grants": [],
+      "nsIndex": null,
+      "null_row": true
+    },
+    {
+      "name": "NULL",
+      "rights": [],
+      "grants": [],
+      "nsIndex": null,
+      "null_row": true
+    },
+    {
+      "name": "NULL",
+      "rights": [],
+      "grants": [],
+      "nsIndex": null,
+      "null_row": true
+    },
+    {
+      "name": "NULL",
+      "rights": [],
+      "grants": [],
+      "nsIndex": null,
+      "null_row": true
+    },
+    {
+      "name": "NULL",
+      "rights": [],
+      "grants": [],
+      "nsIndex": null,
+      "null_row": true
+    }
+  ],
+  "compiler_owned_self": true,
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown",
+    "source_hash": "d56b9ae2"
+  },
+  "deployment": {
+    "target_board": "wukong-xc7a100t",
+    "profile": "Full",
+    "built_at": "2026-09-04T12:13:41.085414Z",
+    "builder": "CLOOMC++ IDE v1.0"
+  },
+  "grants": [
+    "E"
+  ],
+  "capability_type": "inform",
+  "authorized": false,
+  "legacy_authorized": false,
+  "source": "; Provides: the functions of ...\nabstraction ide.testMbit {\n    capabilities {\n    SELF E\n    M_BIT_DEV RW\n}\n    method Status {; ============================================================\n; TEST 6: M-authorized swap of CR12 and CR13, then swap back\n;\n; Requirements:\n;   - CR6 must have S authority for SAVE\n;   - CR6 must have L authority for SWITCH\n;   - Rows 7 and 8 begin as canonical NULL rows\n; ============================================================\n; Load authority for the M-bit I/O word\nLOAD    CR0, M_BIT_DEV\n; Arm CR12.M and CR13.M:\n;   bit 12 = 0x1000\n;   bit 13 = 0x2000\nIADD    DR1, DR0, #0x3000\nDWRITE  DR1, CR0, #0\n; Save the original isolated-register GTs.\n; Each successful SAVE consumes its source register's M bit.\nSAVE    CR12, CR6[7]\nSAVE    CR13, CR6[8]\n; Re-arm both M bits for SWITCH\nDWRITE  DR1, CR0, #0\n; Swap the registers\nSWITCH  CR12, CR6, #8\nSWITCH  CR13, CR6, #7\n; Re-arm both M bits because SWITCH consumed them\nDWRITE  DR1, CR0, #0\n; Swap back to the original state\nSWITCH  CR12, CR6, #7\nSWITCH  CR13, CR6, #8\n        RETURN\n    }\n    method Close_Fist {\n        ; Close all fingers\n        ; Depends on: self\n        ; TODO: write your code here\n        RETURN\n    }\n    method Open_Hand {\n        ; Extend all fingers\n        ; Depends on: self\n        ; TODO: write your code here\n        RETURN\n    }\n    method Grip {\n        ; Close as a fist\n        ; Depends on: self\n        ; TODO: write your code here\n        RETURN\n    }\n    method Point {\n        ; Point with forefinger\n        ; Depends on: self\n        ; TODO: write your code here\n        RETURN\n    }\n    method Count {\n        ; Display fingers as a number\n        ; Depends on: self\n        ; TODO: write your code here\n        RETURN\n    }\n    method Pinch {\n        ; Close the thumb and finger to touch each other\n        ; Depends on: self\n        ; TODO: write your code here\n        RETURN\n    }\n}",
+  "binary_hash": "7f7049a605ce9ebdeb1ed2bf61ec33dec1cb1fe4a3aaf51be0e72791e57e051e",
+  "petname": "",
+  "issue_number": 1,
+  "identity_string": "ide.testMbit#1",
+  "identity_hash": "b432ac859e082447c92b775c3a00ea59040cb8ba8e2770d7281fa2f34ea36788",
+  "identity_seal_location": "sidecar",
+  "dot_name": "ide.testMbit",
+  "issue_n": 1,
+  "lump_version": 1,
+  "compiled_at": 1788524021.0854387
+}
