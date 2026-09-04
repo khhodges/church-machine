@@ -67,6 +67,82 @@ _WUKONG_ARCH_PROFILE = ARCH_PROFILES["wukong-uart-upload-v2"]
 _WUKONG_TRACE_CONTRACT = ARCH_TRACE_UNITS[_WUKONG_ARCH_PROFILE["traceUnit"]]
 _WUKONG_DMEM_WORDS = _WUKONG_ARCH_PROFILE["totalWords"]
 
+
+class TraceEventDecoder(Elaboratable):
+    """Production opcode-to-trace-event queue decoder.
+
+    Kept separate from the UART/FSM wrapper so focused RTL simulations can
+    verify fused-instruction decoding without elaborating the full FPGA top.
+    """
+
+    def __init__(self):
+        self.instr = Signal(32)
+        self.load_shadow_gt = Signal(32)
+        self.load_new_gt = Signal(32)
+        self.cr12_gt = Signal(32)
+        self.cr5_gt = Signal(32)
+        self.cr6_gt = Signal(32)
+        self.cr14_gt = Signal(32)
+
+        self.event_count = Signal(2)
+        self.event_type = [Signal(8, name=f"event_type{i}") for i in range(3)]
+        self.event_data = [Signal(32, name=f"event_data{i}") for i in range(3)]
+
+    def elaborate(self, platform):
+        m = Module()
+        events = _WUKONG_TRACE_CONTRACT["eventIds"]
+
+        m.d.comb += [
+            self.event_count.eq(1),
+            self.event_type[0].eq(events["RESULT"]),
+            self.event_type[1].eq(0),
+            self.event_type[2].eq(0),
+            self.event_data[0].eq(0),
+            self.event_data[1].eq(0),
+            self.event_data[2].eq(0),
+        ]
+
+        with m.Switch(self.instr[27:32]):
+            with m.Case(ChurchOpcode.LOAD):
+                m.d.comb += [
+                    self.event_count.eq(2),
+                    self.event_type[0].eq(events["LOAD_SHADOW"]),
+                    self.event_data[0].eq(self.load_shadow_gt),
+                    self.event_type[1].eq(events["LOAD_NEW"]),
+                    self.event_data[1].eq(self.load_new_gt),
+                ]
+            with m.Case(ChurchOpcode.CHANGE):
+                m.d.comb += [
+                    self.event_count.eq(3),
+                    self.event_type[0].eq(events["CHANGE_PUSH"]),
+                    self.event_type[1].eq(events["CHANGE_CR12"]),
+                    self.event_data[1].eq(self.cr12_gt),
+                    self.event_type[2].eq(events["CHANGE_CR5"]),
+                    self.event_data[2].eq(self.cr5_gt),
+                ]
+            with m.Case(ChurchOpcode.CALL, ChurchOpcode.ELOADCALL,
+                        ChurchOpcode.XLOADLAMBDA):
+                m.d.comb += [
+                    self.event_count.eq(3),
+                    self.event_type[0].eq(events["CALL_CR6"]),
+                    self.event_data[0].eq(self.cr6_gt),
+                    self.event_type[1].eq(events["CALL_CR14"]),
+                    self.event_data[1].eq(self.cr14_gt),
+                    self.event_type[2].eq(events["CALL_PUSH"]),
+                ]
+            with m.Case(ChurchOpcode.RETURN):
+                m.d.comb += [
+                    self.event_count.eq(3),
+                    self.event_type[0].eq(events["RETURN_POP"]),
+                    self.event_type[1].eq(events["RETURN_CR6"]),
+                    self.event_data[1].eq(self.cr6_gt),
+                    self.event_type[2].eq(events["RETURN_CR14"]),
+                    self.event_data[2].eq(self.cr14_gt),
+                ]
+
+        return m
+
+
 # ── Bitstream build version ────────────────────────────────────────────────────
 # Baked into the 4th byte of the boot sentinel (0xBC N_INIT TU_VERSION BUILD_VERSION).
 # Increment this by 1 every time a new bitstream is synthesised and flashed.
@@ -1358,6 +1434,18 @@ class ChurchWukongXC7A100T(Elaboratable):
         tq_flags = Signal(8,  name="tq_flags")   # bits[3:0]=NZCV; bits[7:4]=0
         tq_fault = Signal(8,  name="tq_fault")   # {bp_hit[7], fault_valid[6], 0[5], fault_code[4:0]}
 
+        trace_decode = TraceEventDecoder()
+        m.submodules.trace_decode = trace_decode
+        m.d.comb += [
+            trace_decode.instr.eq(core.retire_instr),
+            trace_decode.load_shadow_gt.eq(core.retire_trace_load_shadow_gt),
+            trace_decode.load_new_gt.eq(core.retire_trace_load_new_gt),
+            trace_decode.cr12_gt.eq(core.retire_trace_cr12_gt),
+            trace_decode.cr5_gt.eq(core.retire_trace_cr5_gt),
+            trace_decode.cr6_gt.eq(core.retire_trace_cr6_gt),
+            trace_decode.cr14_gt.eq(core.retire_trace_cr14_gt),
+        ]
+
         # Current event's type and payload (combinatorial mux of tq_ptr)
         _cur_ev_type = Signal(8,  name="cur_ev_type")
         _cur_ev_data = Signal(32, name="cur_ev_data")
@@ -1394,79 +1482,15 @@ class ChurchWukongXC7A100T(Elaboratable):
                     # Turing opcodes onto Church opcodes: DREAD (16/10000b)
                     # becomes LOAD (0/0000b), which incorrectly emits the
                     # two LOAD packets for one DREAD retire.
-                    with m.Switch(core.retire_instr[27:32]):
-                        with m.Case(ChurchOpcode.LOAD):    # 0b0000
-                            m.d.sync += [
-                                tq_len.eq(2),
-                                tq_type[0].eq(_TRACE_EV_LOAD_SHADOW),
-                                tq_data[0].eq(core.retire_trace_load_shadow_gt),
-                                tq_type[1].eq(_TRACE_EV_LOAD_NEW),
-                                tq_data[1].eq(core.retire_trace_load_new_gt),
-                            ]
-                        with m.Case(ChurchOpcode.CHANGE):  # 0b0100
-                            m.d.sync += [
-                                tq_len.eq(3),
-                                tq_type[0].eq(_TRACE_EV_CHANGE_PUSH),
-                                tq_data[0].eq(0),
-                                tq_type[1].eq(_TRACE_EV_CHANGE_CR12),
-                                tq_data[1].eq(core.retire_trace_cr12_gt),
-                                tq_type[2].eq(_TRACE_EV_CHANGE_CR5),
-                                tq_data[2].eq(core.retire_trace_cr5_gt),
-                            ]
-                        with m.Case(ChurchOpcode.CALL):    # 0b0010
-                            m.d.sync += [
-                                tq_len.eq(3),
-                                tq_type[0].eq(_TRACE_EV_CALL_CR6),
-                                tq_data[0].eq(core.retire_trace_cr6_gt),
-                                tq_type[1].eq(_TRACE_EV_CALL_CR14),
-                                tq_data[1].eq(core.retire_trace_cr14_gt),
-                                tq_type[2].eq(_TRACE_EV_CALL_PUSH),
-                                tq_data[2].eq(0),
-                            ]
-                        with m.Case(ChurchOpcode.ELOADCALL):    # 0b1000
-                            # ELOADCALL modifies CR6 and CR14 identically to CALL
-                            # (fused LOAD+TPERM(E)+CALL); emit the same 3-event sequence.
-                            m.d.sync += [
-                                tq_len.eq(3),
-                                tq_type[0].eq(_TRACE_EV_CALL_CR6),
-                                tq_data[0].eq(core.retire_trace_cr6_gt),
-                                tq_type[1].eq(_TRACE_EV_CALL_CR14),
-                                tq_data[1].eq(core.retire_trace_cr14_gt),
-                                tq_type[2].eq(_TRACE_EV_CALL_PUSH),
-                                tq_data[2].eq(0),
-                            ]
-                        with m.Case(ChurchOpcode.XLOADLAMBDA):  # 0b1001
-                            # XLOADLAMBDA modifies CR6 and CR14 identically to CALL
-                            # (fused LOAD+TPERM(X)+LAMBDA); emit the same 3-event sequence.
-                            m.d.sync += [
-                                tq_len.eq(3),
-                                tq_type[0].eq(_TRACE_EV_CALL_CR6),
-                                tq_data[0].eq(core.retire_trace_cr6_gt),
-                                tq_type[1].eq(_TRACE_EV_CALL_CR14),
-                                tq_data[1].eq(core.retire_trace_cr14_gt),
-                                tq_type[2].eq(_TRACE_EV_CALL_PUSH),
-                                tq_data[2].eq(0),
-                            ]
-                        with m.Case(ChurchOpcode.RETURN):  # 0b0011
-                            # Always emit 3 events: RETURN_POP + RETURN_CR6 + RETURN_CR14.
-                            # tq_data[2] is seeded with the current (callee's) CR14 here;
-                            # the SEND state patches it with the correct restored caller
-                            # CR14 when retire_trace_return_cr14_valid fires (cload commit).
-                            m.d.sync += [
-                                tq_len.eq(3),
-                                tq_type[0].eq(_TRACE_EV_RETURN_POP),
-                                tq_data[0].eq(0),
-                                tq_type[1].eq(_TRACE_EV_RETURN_CR6),
-                                tq_data[1].eq(core.retire_trace_cr6_gt),
-                                tq_type[2].eq(_TRACE_EV_RETURN_CR14),
-                                tq_data[2].eq(core.retire_trace_cr14_gt),
-                            ]
-                        with m.Default():
-                            m.d.sync += [
-                                tq_len.eq(1),
-                                tq_type[0].eq(_TRACE_EV_RESULT),
-                                tq_data[0].eq(0),
-                            ]
+                    m.d.sync += [
+                        tq_len.eq(trace_decode.event_count),
+                        tq_type[0].eq(trace_decode.event_type[0]),
+                        tq_data[0].eq(trace_decode.event_data[0]),
+                        tq_type[1].eq(trace_decode.event_type[1]),
+                        tq_data[1].eq(trace_decode.event_data[1]),
+                        tq_type[2].eq(trace_decode.event_type[2]),
+                        tq_data[2].eq(trace_decode.event_data[2]),
+                    ]
                     m.next = "SEND"
 
             with m.State("SEND"):

@@ -1,40 +1,15 @@
-"""TraceUnit FSM — ELOADCALL / XLOADLAMBDA emit 3-event packet sequence.
-
-Verifies that ELOADCALL (opcode 0b1000) and XLOADLAMBDA (opcode 0b1001) are
-handled by the TraceUnit FSM as 3-event sequences (CALL_CR6 + CALL_CR14 +
-CALL_PUSH), not as single RESULT packets.
-
-The test does NOT instantiate the full ChurchWukongXC7A100T (which needs BRAM
-init and UART arbitration); instead it exercises only the switch decode logic
-inside the TraceUnit FSM by checking that the tq_len / tq_type registers are
-loaded with the CALL 3-event values when the retiring instruction word encodes
-ELOADCALL or XLOADLAMBDA in bits[31:27].
-
-Approach
---------
-We simulate the opcode-switch decode in Python using the same bit-field
-extraction used by the Amaranth FSM:
-
-    opcode_field = retire_instr[27:32]   # full 5-bit opcode
-
-Then we verify that the switch body for ELOADCALL (0b1000) and XLOADLAMBDA
-(0b1001) maps to tq_len=3 and tq_type[0]=CALL_CR6, tq_type[1]=CALL_CR14,
-tq_type[2]=CALL_PUSH — matching the CALL case — rather than tq_len=1 /
-tq_type[0]=RESULT (the Default fallthrough).
-
-The golden opcode values come from hw_types.ChurchOpcode. Trace event
-identifiers come from the shared architecture contract consumed by both the
-hardware producer and bridge, without importing Amaranth at collection time.
-"""
+"""Focused production-RTL trace decoder regressions."""
 
 import sys
 import os
 import pytest
+from amaranth.sim import Simulator
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)
 
 from hardware.hw_types import ChurchOpcode
+from hardware.wukong_top import TraceEventDecoder
 from shared.architecture_contracts import PROFILES as ARCH_PROFILES, TRACE_UNITS
 
 # ── Canonical trace event identifiers ─────────────────────────────────────────
@@ -89,6 +64,57 @@ def _encode_instr(opcode: int, cond: int = 14) -> int:
     # Format: opcode[5] | cond[4] | dst[4] | src[4] | imm[15]
     # Bits[31:27]=opcode, bits[26:23]=cond.
     return ((opcode & 0x1F) << 27) | ((cond & 0xF) << 23)
+
+
+@pytest.mark.parametrize(
+    ("opcode", "expected_count", "expected_types", "expected_data"),
+    [
+        pytest.param(
+            ChurchOpcode.ELOADCALL,
+            3,
+            [_TRACE_EV_CALL_CR6, _TRACE_EV_CALL_CR14, _TRACE_EV_CALL_PUSH],
+            [0x12345678, 0x9ABCDEF0, 0],
+            id="eloadcall",
+        ),
+        pytest.param(
+            ChurchOpcode.XLOADLAMBDA,
+            3,
+            [_TRACE_EV_CALL_CR6, _TRACE_EV_CALL_CR14, _TRACE_EV_CALL_PUSH],
+            [0x12345678, 0x9ABCDEF0, 0],
+            id="xloadlambda",
+        ),
+        pytest.param(
+            16,  # Turing DREAD: full 5-bit decode must not alias Church LOAD.
+            1,
+            [_TRACE_EV_RESULT, 0, 0],
+            [0, 0, 0],
+            id="dread-result-fallback",
+        ),
+    ],
+)
+def test_production_trace_decoder_queue(
+    opcode, expected_count, expected_types, expected_data
+):
+    """Actual production signals preserve event count, order, and fallback."""
+    dut = TraceEventDecoder()
+    observed = {}
+
+    async def bench(ctx):
+        ctx.set(dut.instr, _encode_instr(opcode))
+        ctx.set(dut.cr6_gt, 0x12345678)
+        ctx.set(dut.cr14_gt, 0x9ABCDEF0)
+        await ctx.delay(1e-9)
+        observed["count"] = ctx.get(dut.event_count)
+        observed["types"] = [ctx.get(signal) for signal in dut.event_type]
+        observed["data"] = [ctx.get(signal) for signal in dut.event_data]
+
+    sim = Simulator(dut)
+    sim.add_testbench(bench)
+    sim.run()
+
+    assert observed["count"] == expected_count
+    assert observed["types"] == expected_types
+    assert observed["data"] == expected_data
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
@@ -216,32 +242,6 @@ class TestTraceUnitEloadcall:
         assert "ChurchOpcode.XLOADLAMBDA" in src, (
             "TraceUnit FSM in wukong_top.py is missing a Case for ChurchOpcode.XLOADLAMBDA"
         )
-
-    def test_eloadcall_case_in_trace_unit_fsm(self):
-        """The ELOADCALL case in wukong_top.py is inside the TraceUnit FSM block
-        (after the '# ── TraceUnit FSM ──' marker), not elsewhere in the file."""
-        with open(_WUKONG_TOP_PATH) as fh:
-            src = fh.read()
-        trace_fsm_start = src.find("# ── TraceUnit FSM ──")
-        assert trace_fsm_start != -1, "TraceUnit FSM marker not found in wukong_top.py"
-        eloadcall_pos = src.find("ChurchOpcode.ELOADCALL", trace_fsm_start)
-        assert eloadcall_pos != -1, (
-            "ChurchOpcode.ELOADCALL case not found inside the TraceUnit FSM block"
-        )
-
-    def test_eloadcall_case_emits_call_cr6_in_source(self):
-        """The ELOADCALL arm in wukong_top.py sets tq_type[0] to _TRACE_EV_CALL_CR6."""
-        with open(_WUKONG_TOP_PATH) as fh:
-            src = fh.read()
-        # Find the ELOADCALL case block and confirm CALL_CR6 appears in it
-        eloadcall_idx = src.find("ChurchOpcode.ELOADCALL")
-        xloadlambda_idx = src.find("ChurchOpcode.XLOADLAMBDA")
-        # The CALL_CR6 assignment must appear between the ELOADCALL and XLOADLAMBDA cases
-        call_cr6_in_eloadcall = "_TRACE_EV_CALL_CR6" in src[eloadcall_idx:xloadlambda_idx]
-        assert call_cr6_in_eloadcall, (
-            "ELOADCALL case in wukong_top.py must assign _TRACE_EV_CALL_CR6 to tq_type[0]"
-        )
-
 
 class TestReturnCr14Trace:
     """RETURN trace: RETURN_CR14 event carries the restored *caller* CR14, not the callee's.
