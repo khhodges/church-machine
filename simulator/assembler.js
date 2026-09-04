@@ -1882,8 +1882,8 @@ class ChurchAssembler {
                         crSrc = this._parseDR(parts[2], lineNum);
                         const p3 = (parts[3] || '').replace(/,/g, '').trim();
                         if (p3.startsWith('#')) {
-                            const immVal = parseInt(p3.substring(1), 10);
-                            imm = 0x4000 | ((isNaN(immVal) ? 0 : immVal) & 0x3FFF);
+                            const immVal = this._parseImm(p3, lineNum);
+                            imm = 0x4000 | (immVal & 0x3FFF);
                         } else {
                             imm = this._parseDR(parts[3], lineNum);
                         }
@@ -1913,8 +1913,8 @@ class ChurchAssembler {
                         crSrc = this._parseDR(parts[2], lineNum);
                         const p3 = (parts[3] || '').replace(/,/g, '').trim();
                         if (p3.startsWith('#')) {
-                            const immVal = parseInt(p3.substring(1), 10);
-                            imm = 0x4000 | ((isNaN(immVal) ? 0 : immVal) & 0x3FFF);
+                            const immVal = this._parseImm(p3, lineNum);
+                            imm = 0x4000 | (immVal & 0x3FFF);
                         } else {
                             imm = this._parseDR(parts[3], lineNum);
                         }

@@ -14,5 +14,6 @@ a source-array index.
 deleting later rows then removes the wrong declaration and corrupts the editor.
 
 **How to apply:** Render synthetic CR0 separately and filter the visible
-`SELF E` marker out of user-row indexing. Give each user row both its display
-slot and source index, and preserve CR0 through Delete, Add, and POLA rewrites.
+`SELF E` marker out of user-row indexing and out of the compiler's ROM/C-List
+map before encoding named loads. Give each user row both its display slot and
+source index, and preserve CR0 through Delete, Add, and POLA rewrites.

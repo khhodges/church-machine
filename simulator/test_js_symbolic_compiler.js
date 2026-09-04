@@ -90,6 +90,42 @@ console.log('\n--- JS-DOT: dotted abstraction name from New template ---');
 }
 
 // ── JS2: return parameter ─────────────────────────────────────────────────────
+console.log('\n--- JS-ASM: native instructions inside CLOOMC++ methods ---');
+{
+    const c = new CLOOMCCompiler();
+    const src = `/* JavaScript / CLOOMC++ */
+abstraction ide.testMbit {
+    capabilities {
+        SELF E
+        M_BIT_DEV RW
+    }
+    method Status() {
+        LOAD CR0, M_BIT_DEV
+        IADD DR1, DR0, #0x3000
+        RETURN DR1
+    }
+}`;
+    const result = c.compile(src, []);
+    check('JS-ASMa: named LOAD and hexadecimal IADD compile without errors',
+        result.errors.length === 0, errMsg(result));
+    if (result.errors.length === 0 && result.methods.length === 1) {
+        const words = result.methods[0].code;
+        check('JS-ASMb: named LOAD resolves M_BIT_DEV to source C-List row 1',
+            words.length >= 1 &&
+            ((words[0] >>> 19) & 0xF) === 0 &&
+            ((words[0] >>> 15) & 0xF) === 6 &&
+            (words[0] & 0x7FFF) === 1,
+            words[0] !== undefined ? '0x' + (words[0] >>> 0).toString(16) : 'missing');
+        check('JS-ASMc: IADD preserves hexadecimal immediate 0x3000',
+            words.length >= 2 &&
+            ((words[1] >>> 27) & 0x1F) === 21 &&
+            (words[1] & 0x4000) !== 0 &&
+            (words[1] & 0x3FFF) === 0x3000,
+            words[1] !== undefined ? '0x' + (words[1] >>> 0).toString(16) : 'missing');
+    }
+}
+
+// ── JS2: return parameter ─────────────────────────────────────────────────────
 console.log('\n--- JS2: JS method body with bare return parameter ---');
 {
     const c = new CLOOMCCompiler();

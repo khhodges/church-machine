@@ -1144,7 +1144,15 @@ class CLOOMCCompiler {
         // appends the __SELF__ metadata record.  Encode user caps at row one,
         // but do not discard the first declared user capability in that phase.
         const hasCompilerSelf = this._reserveCompilerSelfRow === true || declaredCompilerSelf;
-        const capNames = declaredCompilerSelf ? allCaps.slice(1) : allCaps;
+        const sourceCaps = declaredCompilerSelf ? allCaps.slice(1) : allCaps;
+        // `SELF E` is the visible marker for compiler-owned row zero, not a
+        // second user capability. Remove it before assigning source rows.
+        const capNames = hasCompilerSelf
+            ? sourceCaps.filter(cap => {
+                const name = typeof cap === 'string' ? cap : (cap && cap.name);
+                return String(name || '').trim().toUpperCase() !== 'SELF';
+            })
+            : sourceCaps;
         // Only compiler-owned ordinary abstractions reserve row zero.  Assembly
         // deliberately retains the full 32-row architectural c-list layout.
         const firstUserRow = hasCompilerSelf ? 1 : 0;
@@ -1670,6 +1678,11 @@ class CLOOMCCompiler {
     _resolveExpr(expr, code, locals, rom, errors, lineNum, method, rawLine = null) {
         expr = expr.trim();
 
+        const explicitDR = expr.match(/^DR(1[0-5]|[0-9])$/i);
+        if (explicitDR) {
+            return parseInt(explicitDR[1], 10);
+        }
+
         const numMatch = expr.match(/^(0x[0-9a-fA-F]+|\d+)$/);
         if (numMatch) {
             const val = parseInt(numMatch[1]);
@@ -1929,6 +1942,51 @@ class CLOOMCCompiler {
             }
             manifest.push({ src: stmt.lineNum, addr: code.length, desc: 'RETURN' });
             code.push(this.encode(this.opcodes.RETURN, 14, 0, 0, 0));
+            return;
+        }
+
+        // CLOOMC++ method bodies may contain native Church Machine instructions.
+        // Keep the assembler as the single owner of instruction syntax/encoding,
+        // but resolve the convenient two-operand named LOAD form against this
+        // abstraction's C-List before handing the statement over.
+        const rawInstruction = /^(LOAD|SAVE|CALL|CHANGE|SWITCH|TPERM|LAMBDA|ELOADCALL|XLOADLAMBDA|DREAD|DWRITE|BFEXT|BFINS|MCMP|IADD|ISUB|BRANCH(?:EQ|NE|CS|CC|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|NV)?|SHL|SHR|ASR|HALT|NOP)\b/i;
+        if (rawInstruction.test(text)) {
+            let asmText = text;
+            const namedLoad = text.match(/^LOAD\s+(CR(?:1[0-5]|[0-9]))\s*,\s*([A-Za-z_][A-Za-z0-9_]*)$/i);
+            if (namedLoad) {
+                const capName = namedLoad[2];
+                const row = rom[capName.toUpperCase()];
+                if (row === undefined) {
+                    errors.push({
+                        line: stmt.lineNum,
+                        message: `Unknown capability '${capName}' — declare it in the capabilities block before loading it.`,
+                        ...CLOOMCCompiler._tokenCols(stmt.rawLine, capName),
+                    });
+                    return;
+                }
+                asmText = `LOAD ${namedLoad[1].toUpperCase()}, CR6, #${row}`;
+            }
+
+            const AsmClass = typeof ChurchAssembler !== 'undefined'
+                ? ChurchAssembler
+                : (typeof require !== 'undefined' ? require('./assembler.js') : null);
+            if (!AsmClass) {
+                errors.push({ line: stmt.lineNum, message: 'Church Machine assembler is unavailable.' });
+                return;
+            }
+            const asmResult = new AsmClass().assemble(asmText);
+            if (asmResult.errors && asmResult.errors.length > 0) {
+                for (const error of asmResult.errors) {
+                    errors.push({
+                        line: stmt.lineNum,
+                        message: error.message,
+                        ...CLOOMCCompiler._tokenCols(stmt.rawLine, text.split(/\s+/)[0]),
+                    });
+                }
+                return;
+            }
+            manifest.push({ src: stmt.lineNum, addr: code.length, desc: text });
+            for (const word of asmResult.words || []) code.push(word);
             return;
         }
 
