@@ -77,5 +77,6 @@
   "issue_n": 2,
   "identity_string": "CapabilityTest#2",
   "identity_hash": "c4acababbd32765ff6257164a137c459d42d7eb284e850aa105e280d89d43017",
+  "identity_seal_location": "sidecar",
   "binary_hash": "a537aadfad31fbc65592b7a7b78b7f7a3b3b16b58f36bad412d94e04f538f4c3"
 }

@@ -4,6 +4,7 @@
   "filename": "ide.testMbit.1.d5046b90.lump",
   "sidecar_file": "ide.testMbit.1.d5046b90.json",
   "ns_slot": null,
+  "ns_slot_policy": "dynamic",
   "lump_size": 64,
   "typ": 0,
   "content_type": "code",
@@ -130,6 +131,13 @@
     }
   ],
   "compiler_owned_self": true,
+  "allocation_time_placeholders": [
+    {
+      "row": 0,
+      "role": "identity",
+      "word": "0xFEED5E1F"
+    }
+  ],
   "pet_names": {
     "DR": {},
     "CR": {}
