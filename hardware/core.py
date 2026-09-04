@@ -209,6 +209,8 @@ class ChurchCore(Elaboratable):
         self.dbg_cr_wr_en   = Signal()
         self.dbg_cr_wr_addr = Signal(4)
         self.dbg_cr_wr_data = Signal(CAP_REG_LAYOUT)
+        self.dbg_m_bit_wr_en = Signal()
+        self.dbg_m_bit_word = Signal(16)
 
         # dbg_outform_done_inject / dbg_outform_result_gt — fake a completed
         #   Mode 2 outform download in test harnesses without driving the full
@@ -251,6 +253,7 @@ class ChurchCore(Elaboratable):
         # CR8 must remain NULL (0x00000000) after boot — it is never written by the FSM.
         self.dbg_cr12_gt = Signal(32)   # CR12 thread-stack GT word0 — INFORM(slot=1) after boot
         self.dbg_cr8_gt  = Signal(32)   # CR8 GT word0 — must remain NULL (0) after boot
+        self.dbg_isolated_m_flags = Signal(4)  # CR12..CR15 accepted M latches
 
     def elaborate(self, platform):
         m = Module()
@@ -502,6 +505,7 @@ class ChurchCore(Elaboratable):
         tperm_start_sig = Signal()
         call_start_sig = Signal()
         ret_start_sig = Signal()
+        switch_start_sig = Signal()
 
         if not self.iot_profile:
             cr_rd_addr_default = Mux(u_eloadcall.busy, u_eloadcall.cr_rd_addr,
@@ -850,8 +854,11 @@ class ChurchCore(Elaboratable):
             # M-window set/clear connect to u_regs controls
             u_regs.m_set_en.eq(mwin_m_set_en),
             u_regs.m_clear_en.eq(mwin_m_clear_en),
-            u_regs.m_bit_device_wr_en.eq(u_dwrite.m_bit_wr_en),
-            u_regs.m_bit_device_word.eq(u_dwrite.m_bit_wr_word),
+            u_regs.m_bit_device_wr_en.eq(
+                u_dwrite.m_bit_wr_en | self.dbg_m_bit_wr_en),
+            u_regs.m_bit_device_word.eq(
+                Mux(self.dbg_m_bit_wr_en,
+                    self.dbg_m_bit_word, u_dwrite.m_bit_wr_word)),
             u_regs.m_switch_consume_en.eq(u_switch.m_consume_en if not self.iot_profile else 0),
             u_regs.m_switch_consume_target.eq(
                 u_switch.m_consume_target if not self.iot_profile else 0),
@@ -866,6 +873,7 @@ class ChurchCore(Elaboratable):
             self.dbg_m_dr15.eq(u_regs.m_dr15),
             # Test-observability: CR12 GT word0 — must be INFORM(slot=1) after boot
             self.dbg_cr12_gt.eq(View(CAP_REG_LAYOUT, u_regs.cr12_thread).word0_gt),
+            self.dbg_isolated_m_flags.eq(u_regs.isolated_m_flags),
         ]
         # Test-observability: CR8 GT word0 via the cr_word_rd port (unused at runtime).
         # cr_word_rd_addr/sel are driven statically here; no runtime logic uses this port.
@@ -927,6 +935,11 @@ class ChurchCore(Elaboratable):
                 m.d.sync += nia_reg.eq(u_lambda.nia_value)
             with m.Elif(u_xloadlambda.nia_set):
                 m.d.sync += nia_reg.eq(u_xloadlambda.nia_value)
+            with m.Elif(u_switch.switch_complete):
+                # SWITCH owns its issuing NIA until its authorization/load FSM
+                # reaches a successful terminal event. Faults leave NIA here
+                # for fault retirement; success advances exactly once.
+                m.d.sync += nia_reg.eq(nia_reg + 4)
         with m.Elif(u_return.nia_set):
             m.d.sync += nia_reg.eq(u_return.nia_value)
         with m.Elif(u_call.nia_set):
@@ -945,6 +958,7 @@ class ChurchCore(Elaboratable):
             self.boot_complete & u_decoder.instr_valid & ~any_unit_busy
             & ~call_start_sig
             & ~ret_start_sig
+            & ~(switch_start_sig if not self.iot_profile else 0)
             & ~fetch_bounds_fault & ~u_outform_fsm.intercept_start
         ):
             # Advance PC for all instructions (including not-taken branches).
@@ -1725,7 +1739,6 @@ class ChurchCore(Elaboratable):
                 self.thread_switch_fault.eq(u_change.change_fault & scheduler_inflight),
             ]
 
-            switch_start_sig = Signal()
             m.d.comb += switch_start_sig.eq(
                 cond_exec_enable & is_church_op & (church_op == ChurchOpcode.SWITCH) & ~any_unit_busy
             )
@@ -2688,6 +2701,7 @@ class ChurchCore(Elaboratable):
             u_decoder.instr_valid & ~any_unit_busy &
             ~call_start_sig &
             ~ret_start_sig &
+            ~(switch_start_sig if not self.iot_profile else 0) &
             ~fetch_bounds_fault & ~u_outform_fsm.intercept_start
         )
         retire_conds_base = (
@@ -2703,6 +2717,7 @@ class ChurchCore(Elaboratable):
                 u_lambda.nia_set |
                 u_xloadlambda.nia_set |
                 u_eloadcall.nia_set |
+                u_switch.switch_complete |
                 u_irq_dispatch.nia_set
             )
         else:
@@ -2847,6 +2862,13 @@ class ChurchCore(Elaboratable):
                     self.dmem_addr.eq(u_change.mem_wr_addr),
                     self.dmem_wr_data.eq(u_change.mem_wr_data),
                     self.dmem_wr_en.eq(1),
+                ]
+            with m.Elif(u_switch.mem_rd_en):
+                # SWITCH delegates its normal LOAD path to a private mLoad, so
+                # its reads do not pass through u_shared_mload above.
+                m.d.comb += [
+                    self.dmem_addr.eq(u_switch.mem_addr),
+                    self.dmem_rd_en.eq(1),
                 ]
             with m.Elif(u_eloadcall.mem_rd_en):
                 # ELOADCALL PUSH_ARM / PUSH_READ_STO: read protected STO before

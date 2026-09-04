@@ -39,8 +39,9 @@ from .boot_rom import (
     WUKONG_WCH_CLIST, WUKONG_WCH_CLIST_WORD, wukong_wch_header,
 )
 from .hw_types import (
-    ChurchOpcode, CondCode, GT_TYPE_INFORM, PERM_MASK_E, PERM_MASK_R,
-    PERM_MASK_S, PERM_MASK_X, TuringOpcode, make_gt,
+    ChurchOpcode, CondCode, FaultType, GT_TYPE_INFORM, PERM_MASK_E, PERM_MASK_R,
+    PERM_MASK_L, PERM_MASK_S, PERM_MASK_X, SWITCH_TGT_CR12, SWITCH_TGT_CR13,
+    TuringOpcode, make_gt,
 )
 from .integrity32 import integrity32
 
@@ -293,9 +294,6 @@ class BootRomHarness(Elaboratable):
             core.free_run_nia.eq(0),
             core.gc_start.eq(0),
             # Debug ports: unused in this harness.
-            core.dbg_cr_wr_en.eq(0),
-            core.dbg_cr_wr_addr.eq(0),
-            core.dbg_cr_wr_data.eq(0),
             core.dbg_outform_done_inject.eq(0),
             core.dbg_outform_result_gt.eq(0),
         ]
@@ -472,6 +470,147 @@ def test_boot_rom_no_false_halt():
 
     print(f"  All 3 boot instructions retired cleanly — fault_halt never fired ✓")
     print("PASS")
+
+
+def test_consecutive_switch_fault_stays_on_first_issuer():
+    """A missing-M SWITCH faults atomically without exposing its successor."""
+    dmem = list(_DMEM_INIT)
+    first_nia = _SELFTEST_ENTRY_NIA
+    first_instr = encode_church(
+        ChurchOpcode.SWITCH, CondCode.AL,
+        cr_dst=SWITCH_TGT_CR12, cr_src=6, imm=0)
+    second_instr = encode_church(
+        ChurchOpcode.SWITCH, CondCode.AL,
+        cr_dst=SWITCH_TGT_CR13, cr_src=6, imm=0)
+    dmem[first_nia // 4] = first_instr
+    dmem[first_nia // 4 + 1] = second_instr
+
+    dut = BootRomHarness(dmem)
+    observed = {"retires": [], "fault_instr": None}
+
+    async def testbench(ctx):
+        initial_cr12 = None
+        cleared_boot_m = False
+        for _ in range(700):
+            if (ctx.get(dut.core.imem_addr) == first_nia and
+                    not cleared_boot_m):
+                # The boot microcode deliberately seeds CR12.M. Clear the
+                # device-owned M word during the synchronous-fetch settle
+                # bubble so both consecutive SWITCH destinations lack M.
+                ctx.set(dut.core.dbg_m_bit_wr_en, 1)
+                ctx.set(dut.core.dbg_m_bit_word, 0)
+                cleared_boot_m = True
+            else:
+                ctx.set(dut.core.dbg_m_bit_wr_en, 0)
+            if ctx.get(dut.boot_complete) and initial_cr12 is None:
+                initial_cr12 = ctx.get(dut.core.dbg_cr12_gt)
+            if ctx.get(dut.core.retire_valid):
+                observed["retires"].append((
+                    ctx.get(dut.core.retire_nia),
+                    ctx.get(dut.core.retire_instr),
+                    bool(ctx.get(dut.core.retire_fault_valid)),
+                    ctx.get(dut.core.retire_fault_code),
+                ))
+                if ctx.get(dut.core.retire_fault_valid):
+                    observed["cr12_before"] = initial_cr12
+                    observed["cr12_after"] = ctx.get(dut.core.dbg_cr12_gt)
+                    observed["m_after"] = ctx.get(dut.core.dbg_isolated_m_flags)
+                    await ctx.tick()
+                    observed["fault_instr"] = ctx.get(dut.core.fault_instr)
+                    return
+            await ctx.tick()
+        observed["timeout"] = True
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(testbench)
+    sim.run()
+
+    assert not observed.get("timeout")
+    faults = [retire for retire in observed["retires"] if retire[2]]
+    assert faults == [(first_nia, first_instr, True, FaultType.PERM_L)]
+    assert not any(nia == first_nia + 4 for nia, _, _, _ in observed["retires"])
+    assert observed["fault_instr"] == first_instr
+    assert observed["cr12_after"] == observed["cr12_before"]
+    assert observed["m_after"] == 0
+
+
+def test_successful_switch_retires_once_then_advances():
+    """A successful SWITCH commits once before its following instruction."""
+    dmem = list(_DMEM_INIT)
+    first_nia = _SELFTEST_ENTRY_NIA
+    first_instr = encode_church(
+        ChurchOpcode.SWITCH, CondCode.AL,
+        cr_dst=SWITCH_TGT_CR12, cr_src=6, imm=0)
+    second_instr = encode_church(
+        ChurchOpcode.SWITCH, CondCode.AL,
+        cr_dst=SWITCH_TGT_CR13, cr_src=6, imm=0)
+    dmem[first_nia // 4] = first_instr
+    dmem[first_nia // 4 + 1] = second_instr
+
+    # Install a minimal c-list source and valid destination Namespace entry.
+    source_addr = 0x3400
+    destination_base = 0x3600
+    destination_slot = 4
+    loaded_gt = make_gt(
+        gt_type=GT_TYPE_INFORM, perms=PERM_MASK_L, slot_id=destination_slot)
+    source_cap = (
+        make_gt(gt_type=GT_TYPE_INFORM, perms=PERM_MASK_L, slot_id=1)
+        | (source_addr << 32)
+    )
+    dmem[source_addr // 4] = loaded_gt
+    ns_word = destination_slot * 4
+    ns_word1 = 63
+    dmem[ns_word + 0] = destination_base
+    dmem[ns_word + 1] = ns_word1
+    dmem[ns_word + 2] = integrity32(destination_base, ns_word1)
+    dmem[ns_word + 3] = 0
+
+    dut = BootRomHarness(dmem)
+    observed = {"retires": []}
+
+    async def testbench(ctx):
+        installed_source = False
+        for _ in range(700):
+            if (ctx.get(dut.core.imem_addr) == first_nia and
+                    not installed_source):
+                # Install CR6 while instruction fetch settles. CR12.M remains
+                # set by boot, while CR13.M remains clear for the successor.
+                ctx.set(dut.core.dbg_cr_wr_en, 1)
+                ctx.set(dut.core.dbg_cr_wr_addr, 6)
+                ctx.set(dut.core.dbg_cr_wr_data.as_value(), source_cap)
+                installed_source = True
+            else:
+                ctx.set(dut.core.dbg_cr_wr_en, 0)
+            if ctx.get(dut.core.retire_valid):
+                observed["retires"].append((
+                    ctx.get(dut.core.retire_nia),
+                    ctx.get(dut.core.retire_instr),
+                    bool(ctx.get(dut.core.retire_fault_valid)),
+                    ctx.get(dut.core.retire_fault_code),
+                ))
+                if (ctx.get(dut.core.retire_fault_valid) and
+                        ctx.get(dut.core.retire_nia) == first_nia + 4):
+                    observed["cr12_after"] = ctx.get(dut.core.dbg_cr12_gt)
+                    observed["m_after"] = ctx.get(
+                        dut.core.dbg_isolated_m_flags)
+                    return
+            await ctx.tick()
+        observed["timeout"] = True
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(testbench)
+    sim.run()
+
+    assert not observed.get("timeout")
+    first_retires = [
+        retire for retire in observed["retires"] if retire[0] == first_nia]
+    assert first_retires == [(first_nia, first_instr, False, FaultType.NONE)]
+    assert observed["retires"][-1] == (
+        first_nia + 4, second_instr, True, FaultType.PERM_L)
+    assert observed["cr12_after"] == loaded_gt
+    assert observed["m_after"] == 0
 
 
 # ── Shared retire-collection helper for Tests 4/5 ─────────────────────────────
