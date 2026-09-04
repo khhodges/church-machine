@@ -22,48 +22,33 @@ Then we verify that the switch body for ELOADCALL (0b1000) and XLOADLAMBDA
 tq_type[2]=CALL_PUSH — matching the CALL case — rather than tq_len=1 /
 tq_type[0]=RESULT (the Default fallthrough).
 
-The golden constant values come from hw_types.ChurchOpcode and the
-_TRACE_EV_* literals defined in wukong_top.py (mirrored here to avoid
-importing Amaranth at test collection time).
+The golden opcode values come from hw_types.ChurchOpcode. Trace event
+identifiers come from the shared architecture contract consumed by both the
+hardware producer and bridge, without importing Amaranth at collection time.
 """
 
 import sys
 import os
-import ast
-import re
-
 import pytest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)
 
 from hardware.hw_types import ChurchOpcode
+from shared.architecture_contracts import PROFILES as ARCH_PROFILES, TRACE_UNITS
 
-# ── Mirror the _TRACE_EV_* constants from wukong_top.py ──────────────────────
-# These are defined as local variables inside elaborate(), so we parse them
-# from the source rather than importing Amaranth.
+# ── Canonical trace event identifiers ─────────────────────────────────────────
 _WUKONG_TOP_PATH = os.path.join(ROOT, "hardware", "wukong_top.py")
+_WUKONG_PROFILE = ARCH_PROFILES["wukong-uart-upload-v2"]
+_TRACE_EVENTS = TRACE_UNITS[_WUKONG_PROFILE["traceUnit"]]["eventIds"]
 
-def _extract_trace_ev_constants():
-    """Return a dict of _TRACE_EV_* name → int from wukong_top.py source."""
-    consts = {}
-    pattern = re.compile(r'(_TRACE_EV_\w+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)')
-    with open(_WUKONG_TOP_PATH) as fh:
-        for line in fh:
-            m = pattern.search(line)
-            if m:
-                consts[m.group(1)] = int(m.group(2), 0)
-    return consts
-
-_EV = _extract_trace_ev_constants()
-
-_TRACE_EV_RESULT     = _EV["_TRACE_EV_RESULT"]
-_TRACE_EV_CALL_CR6   = _EV["_TRACE_EV_CALL_CR6"]
-_TRACE_EV_CALL_CR14  = _EV["_TRACE_EV_CALL_CR14"]
-_TRACE_EV_CALL_PUSH  = _EV["_TRACE_EV_CALL_PUSH"]
-_TRACE_EV_RETURN_POP  = _EV["_TRACE_EV_RETURN_POP"]
-_TRACE_EV_RETURN_CR6  = _EV["_TRACE_EV_RETURN_CR6"]
-_TRACE_EV_RETURN_CR14 = _EV["_TRACE_EV_RETURN_CR14"]
+_TRACE_EV_RESULT      = _TRACE_EVENTS["RESULT"]
+_TRACE_EV_CALL_CR6    = _TRACE_EVENTS["CALL_CR6"]
+_TRACE_EV_CALL_CR14   = _TRACE_EVENTS["CALL_CR14"]
+_TRACE_EV_CALL_PUSH   = _TRACE_EVENTS["CALL_PUSH"]
+_TRACE_EV_RETURN_POP  = _TRACE_EVENTS["RETURN_POP"]
+_TRACE_EV_RETURN_CR6  = _TRACE_EVENTS["RETURN_CR6"]
+_TRACE_EV_RETURN_CR14 = _TRACE_EVENTS["RETURN_CR14"]
 
 _CORE_PY_PATH = os.path.join(ROOT, "hardware", "core.py")
 
@@ -120,7 +105,7 @@ class TestTraceUnitEloadcall:
         assert int(ChurchOpcode.XLOADLAMBDA) == 0b1001
 
     def test_trace_ev_constants_present(self):
-        """All four CALL-sequence _TRACE_EV_* constants are found in wukong_top.py."""
+        """The canonical contract preserves the CALL-sequence event identifiers."""
         assert _TRACE_EV_CALL_CR6  == 0x06
         assert _TRACE_EV_CALL_CR14 == 0x07
         assert _TRACE_EV_CALL_PUSH == 0x08
