@@ -481,6 +481,13 @@ function _showAsmErrors(errors, titleOverride) {
     var panel = document.getElementById('asmErrorPanel');
     if (!panel) return;
     if (!errors || errors.length === 0) { _clearAsmErrors(); return; }
+    // In saved-LUMP split mode, compiled disassembly and compiler diagnostics
+    // share the right pane. Never render both flex surfaces at once: the error
+    // panel temporarily replaces disassembly instead of visually overwriting it.
+    if (window._savedLumpEditorMode) {
+        var disassemblyPanel = document.getElementById('savedLumpDisassemblyPanel');
+        if (disassemblyPanel) disassemblyPanel.style.display = 'none';
+    }
     var count = errors.length;
     var title = titleOverride || ('Assembly error' + (count > 1 ? 's' : '') + ' \u2014 code not applied');
     var html = '<div class="asm-error-panel-header">'
@@ -569,6 +576,10 @@ function _clearAsmErrors() {
     _activeAsmErrors = [];
     _highlightAsmErrorLines([]);
     _hideCompileFailedBanner();
+    if (window._savedLumpEditorMode) {
+        var disassemblyPanel = document.getElementById('savedLumpDisassemblyPanel');
+        if (disassemblyPanel) disassemblyPanel.style.display = 'flex';
+    }
 }
 
 function _highlightAsmErrorLines(errors) {

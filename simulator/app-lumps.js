@@ -1544,8 +1544,9 @@ function _enterSavedLumpEditorMode(compiledDisasm, lumpName) {
     var title = document.getElementById('savedLumpDisassemblyTitle');
     var text = document.getElementById('savedLumpDisassembly');
     if (tabs) tabs.style.display = 'none';
+    if (typeof _clearAsmErrors === 'function') _clearAsmErrors();
     ['codeConsoleContent', 'codeHistoryPanel', 'codeSyntaxPanel', 'codeJsPanel',
-        'asmErrorPanel', 'asmWarningPanel'].forEach(function(id) {
+        'asmWarningPanel'].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
