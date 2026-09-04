@@ -118,13 +118,9 @@
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x0003F",
+      "limit": "0x0003A",
       "seq": 0,
-      "seal": "0xDEA83EEF",
-      "token": "00000a00",
-      "filename": "CapabilityTest.2.4dc5c64e.lump",
-      "issue_n": 2,
-      "resident": true
+      "seal": "0xDEA89EEF"
     },
     {
       "name": "Thread#2",
@@ -160,38 +156,17 @@
       "seal": "0x21523090"
     },
     {
-      "name": "slot_14",
+      "name": "Bridge.Preload",
       "slot": 14,
       "location": "0x00000A00",
-      "type": "Inform",
-      "f": 0,
-      "g": 0,
-      "limit": "0x00001",
-      "seq": 0,
-      "seal": "0xDEA89EEF"
-    },
-    {
-      "name": "slot_15",
-      "slot": 15,
-      "location": "0x00000B00",
-      "type": "Inform",
-      "f": 0,
-      "g": 0,
-      "limit": "0x00001",
-      "seq": 0,
-      "seal": "0xDEA81EEF"
-    },
-    {
-      "name": "Bridge.Preload",
-      "slot": 16,
-      "location": "0x00000C00",
       "type": "Outform",
       "f": 0,
       "g": 0,
       "limit": "0x00001",
       "seq": 0,
-      "seal": "0xDEAB9EEF"
+      "seal": "0xDEA89EEF"
     }
   ],
-  "generated_at": 1788525248.9759638
+  "generated_at": 1788534159.3980055,
+  "committed_raw_fingerprint": "93249868249ce8c448012f5172a560aad4062d638d50b0dee7a186f2782c8928"
 }
