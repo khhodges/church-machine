@@ -2809,15 +2809,12 @@
     }
 
     .dash-tabs {
+        --dash-tab-min-width: 3.4rem;
+        --dash-tab-min-height: 1.7rem;
+        --dash-tab-padding: 0.25rem 0.55rem;
+        --dash-tab-font-size: 0.72rem;
         flex-wrap: wrap;
         gap: 0.25rem;
-    }
-
-    .dash-tab {
-        min-width: 3.4rem;
-        min-height: 1.7rem;
-        padding: 0.25rem 0.55rem;
-        font-size: 0.72rem;
     }
 
     .flags-bar {

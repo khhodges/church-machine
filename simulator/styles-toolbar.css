@@ -940,6 +940,10 @@
 }
 
 .dash-tabs {
+    --dash-tab-min-width: 3.6rem;
+    --dash-tab-min-height: 1.8rem;
+    --dash-tab-padding: 0.25rem 0.6rem;
+    --dash-tab-font-size: 0.75rem;
     display: flex;
     align-items: center;
     gap: 0.4rem;
@@ -951,10 +955,10 @@
 }
 
 .dash-tab {
-    min-width: 3.6rem;
-    min-height: 1.8rem;
-    padding: 0.25rem 0.6rem;
-    font-size: 0.75rem;
+    min-width: var(--dash-tab-min-width);
+    min-height: var(--dash-tab-min-height);
+    padding: var(--dash-tab-padding);
+    font-size: var(--dash-tab-font-size);
     background: #1b2d45;
     color: #e0e0e0;
     border: 2px solid #3a86ff;
