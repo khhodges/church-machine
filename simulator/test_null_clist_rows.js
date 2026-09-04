@@ -1,6 +1,8 @@
 'use strict';
 
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const ChurchAssembler = require('./assembler.js');
 const CLOOMCCompiler = require('./cloomc_compiler.js');
 const CapabilityTokens = require('./capability_tokens.js');
@@ -56,5 +58,37 @@ const validation = CapabilityTokens.validateClist(
 );
 assert.strictEqual(validation.ok, false);
 assert.match(validation.errors[0], /NULL row contains nonzero word/);
+
+// Legacy saves bind named capabilities to the active Namespace. M_BIT_DEV is
+// fixed at NS[13], while compiler-reserved SAVE rows remain canonical NULLs.
+const legacyWords = new Uint32Array(8);
+const legacyMaterialized = CapabilityTokens.materialize(
+    [
+        { name: 'M_BIT_DEV', rights: ['R', 'W'] },
+        { name: 'NULL', rights: [], null_row: true },
+    ],
+    legacyWords,
+    0,
+    {
+        sim: {
+            nsLabels: { 13: 'M_BIT_DEV' },
+            abstractionRegistry: { abstractions: {} },
+        },
+        lumps: [],
+    }
+);
+assert.strictEqual(legacyMaterialized.ok, true, legacyMaterialized.errors.join('; '));
+assert.strictEqual(legacyMaterialized.resolvedCaps[0].nsIndex, 13);
+assert.strictEqual(legacyWords[0] & 0xFFFF, 13);
+assert.notStrictEqual(legacyWords[0], 0);
+assert.strictEqual(legacyWords[1], 0);
+
+// Guard the build-mode split: only explicit portable source may use the
+// unresolved serializer. Ordinary builds use active materialization.
+const appCompileSource = fs.readFileSync(path.join(__dirname, 'app-compile.js'), 'utf8');
+assert.match(
+    appCompileSource,
+    /result\.portableMode === 'portable'\s*\?\s*_serializePortableLumpCapabilities[\s\S]*?:\s*_materializeLumpCapabilities/
+);
 
 console.log('NULL C-list row regression: PASS');

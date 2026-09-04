@@ -1479,7 +1479,35 @@ function compileAndBuild() {
         lumpWords[1 + i] = (codeRegion[i] >>> 0);
     }
     const clistStart = lumpSize - cc;
-    const _capMaterialized = _serializePortableLumpCapabilities(caps, lumpWords, clistStart);
+    const _capContext = {
+        sim: (typeof sim !== 'undefined' ? sim : null),
+        lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache))
+            ? _lumpsCache
+            : [],
+    };
+    // Portable artifacts intentionally keep destination-local GTs unresolved.
+    // Legacy builds, however, are validated and saved against the active
+    // Namespace, so they must carry both the resolved nsIndex metadata and the
+    // matching Inform GT in each non-NULL C-List row.
+    const _capMaterialized = result.portableMode === 'portable'
+        ? _serializePortableLumpCapabilities(caps, lumpWords, clistStart)
+        : _materializeLumpCapabilities(caps, lumpWords, clistStart, _capContext);
+    if (!_capMaterialized.ok) {
+        const _capErrors = (_capMaterialized.errors || []).map(message => ({
+            line: null,
+            message,
+        }));
+        if (con) {
+            con.textContent = 'Capability validation failed — code not applied:\n' +
+                (_capMaterialized.errors || []).join('\n');
+            con.scrollTop = 0;
+        }
+        if (typeof _showAsmErrors === 'function') {
+            _showAsmErrors(_capErrors, 'Capability validation failed — code not applied');
+        }
+        showNextSteps('error');
+        return;
+    }
     const resolvedCaps = _capMaterialized.resolvedCaps;
     window._lastCLOOMCLump = {
         words: Array.from(lumpWords),
