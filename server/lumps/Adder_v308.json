@@ -1,8 +1,8 @@
 {
   "token": "00aa1234",
   "abstraction": "Adder",
-  "filename": "Adder_v289.lump",
-  "sidecar_file": "Adder_v289.json",
+  "filename": "Adder_v308.lump",
+  "sidecar_file": "Adder_v308.json",
   "ns_slot": null,
   "lump_size": 128,
   "typ": 0,
@@ -32,7 +32,7 @@
   "deployment": {
     "target_board": "wukong-xc7a100t",
     "profile": "IoT",
-    "built_at": "2026-09-03T20:48:02.083658Z",
+    "built_at": "2026-09-04T21:22:52.325359Z",
     "builder": "CLOOMC++ IDE v1.0"
   },
   "grants": [
@@ -50,8 +50,8 @@
   "identity_seal_location": "c-list[0]",
   "dot_name": "Adder",
   "issue_n": 1,
-  "lump_version": 289,
-  "compiled_at": 1788468482.0836778,
+  "lump_version": 308,
+  "compiled_at": 1788556972.3253794,
   "sourceStorageTier": 2,
-  "archived_version": 289
+  "archived_version": 308
 }
