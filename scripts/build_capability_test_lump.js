@@ -8,8 +8,8 @@
 //   server/lumps/CapabilityTest.2.<hash8>.lump — binary
 //   server/lumps/CapabilityTest.2.<hash8>.json — sidecar metadata
 //
-// CapabilityTest's protected identity token remains 00000a00. Content is named
-// by the first eight hex digits of its SHA-256 hash.
+// CapabilityTest's protected slot lookup token remains 00000a00. Content is
+// named by sha256(dot_name_utf8 + lump_bytes)[:8], per lump_integrity.py.
 //
 // C-List (cc=5) — tail of the lump, 5 slots:
 //   Slot 0  SelfTest   (NS slot 6, E)    — E-perm callable abstraction
@@ -53,6 +53,12 @@ const LUMPS_DIR   = (_outDirIdx !== -1 && process.argv[_outDirIdx + 1])
 const MANIFEST    = path.join(LUMPS_DIR, 'manifest.json');
 const NS_STATE    = path.join(LUMPS_DIR, 'ns-state.json');
 const IDENTITY_TOKEN = '00000a00';
+const DOT_NAME = 'CapabilityTest';
+const ISSUE_N = 2;
+const IDENTITY_STRING = `${DOT_NAME}#${ISSUE_N}`;
+const IDENTITY_HASH = crypto.createHash('sha256')
+    .update(IDENTITY_STRING, 'utf8')
+    .digest('hex');
 const CHECK_ONLY = process.argv.includes('--check');
 fs.mkdirSync(LUMPS_DIR, { recursive: true });
 
@@ -173,9 +179,13 @@ for (let i = 0; i < lumpSize; i++) {
 }
 
 const binaryHash = crypto.createHash('sha256').update(bytes).digest('hex');
-const contentId = binaryHash.slice(0, 8);
+const contentId = crypto.createHash('sha256')
+    .update(DOT_NAME, 'utf8')
+    .update(bytes)
+    .digest('hex')
+    .slice(0, 8);
 const token = IDENTITY_TOKEN;
-const artifactStem = `CapabilityTest.2.${contentId}`;
+const artifactStem = `${DOT_NAME}.${ISSUE_N}.${contentId}`;
 console.log(`Identity token: ${token}`);
 console.log(`Binary SHA-256: ${binaryHash}`);
 
@@ -195,6 +205,10 @@ if (CHECK_ONLY) {
     }
     if (sidecar && (sidecar.token !== IDENTITY_TOKEN ||
                     sidecar.binary_hash !== binaryHash ||
+                    sidecar.dot_name !== DOT_NAME ||
+                    sidecar.issue_n !== ISSUE_N ||
+                    sidecar.identity_string !== IDENTITY_STRING ||
+                    sidecar.identity_hash !== IDENTITY_HASH ||
                     sidecar.source !== source ||
                     sidecar.ns_slot !== 10)) {
         failures.push('sidecar identity, hash, source, or slot binding is stale');
@@ -211,6 +225,8 @@ if (CHECK_ONLY) {
             bindings[0].abstraction !== 'CapabilityTest' ||
             bindings[0].ns_slot !== 10 ||
             bindings[0].filename !== `${artifactStem}.lump` ||
+            bindings[0].issue_n !== ISSUE_N ||
+            bindings[0].identity_hash !== IDENTITY_HASH ||
             bindings[0].binary_hash !== binaryHash) {
             failures.push('manifest canonical slot-10 binding is stale');
         }
@@ -290,6 +306,10 @@ const sidecar = {
     author:          'Church Machine',
     version:         '2.0',
     lump_version:    2,
+    dot_name:        DOT_NAME,
+    issue_n:         ISSUE_N,
+    identity_string: IDENTITY_STRING,
+    identity_hash:   IDENTITY_HASH,
     binary_hash:     binaryHash,
 };
 
@@ -319,6 +339,9 @@ const manifestEntry = {
     cc,
     grants:          ['E'],
     lump_version:    2,
+    dot_name:        DOT_NAME,
+    issue_n:         ISSUE_N,
+    identity_hash:   IDENTITY_HASH,
     binary_hash:     binaryHash,
 };
 
@@ -339,6 +362,7 @@ if (fs.existsSync(NS_STATE)) {
         throw new Error('ns-state must contain exactly one canonical CapabilityTest slot-10 binding');
     }
     bindings[0].filename = `${artifactStem}.lump`;
+    bindings[0].issue_n = ISSUE_N;
     fs.writeFileSync(NS_STATE, stableRepositoryJson(nsState));
     console.log(`Updated: ${NS_STATE}`);
 }

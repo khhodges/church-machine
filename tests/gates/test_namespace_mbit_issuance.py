@@ -51,16 +51,18 @@ def test_ordinary_boot_abstractions_do_not_receive_or_discover_mbit_caps():
 def test_factory_capability_test_import_is_bound_to_canonical_artifact():
     root = Path(__file__).resolve().parents[2]
     lumps = root / "server" / "lumps"
-    filename = "CapabilityTest.2.a537aadf.lump"
+    filename = "CapabilityTest.2.4dc5c64e.lump"
     raw = (lumps / filename).read_bytes()
     sidecar = json.loads(
-        (lumps / "CapabilityTest.2.a537aadf.json").read_text(encoding="utf-8"))
+        (lumps / "CapabilityTest.2.4dc5c64e.json").read_text(encoding="utf-8"))
     manifest = json.loads(
         (lumps / "manifest.json").read_text(encoding="utf-8"))
     digest = hashlib.sha256(raw).hexdigest()
     entry = next(item for item in manifest if item.get("filename") == filename)
     assert sidecar["token"] == entry["token"] == "00000a00"
     assert sidecar["ns_slot"] == entry["ns_slot"] == 10
+    assert sidecar["issue_n"] == entry["issue_n"] == 2
+    assert sidecar["identity_hash"] == entry["identity_hash"]
     assert sidecar["binary_hash"] == entry["binary_hash"] == digest
     assert len(WUKONG_CAPABILITY_TEST_WORDS) == 64
 

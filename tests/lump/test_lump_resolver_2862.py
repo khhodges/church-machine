@@ -26,6 +26,7 @@ import json
 import os
 import sys
 import struct
+from pathlib import Path
 
 import pytest
 
@@ -419,6 +420,25 @@ class TestEndpointTokenFormat:
 
 
 class TestEndpointTrustHeaders:
+    def test_capabilitytest_lookup_alias_serves_canonical_issue_two_bytes(self):
+        """The protected slot token remains a readable lookup alias.
+
+        CapabilityTest's canonical content token is filename-derived, so the
+        slot token must serve the verified bytes as untrusted rather than
+        falsely claiming that the alias itself is the promotable cache token.
+        """
+        from server.app import app as _flask_app
+
+        filename = "CapabilityTest.2.4dc5c64e.lump"
+        raw = (Path(LUMPS_DIR) / filename).read_bytes()
+        with _flask_app.test_client() as client:
+            resp = client.get("/api/lump/00000a00")
+
+        assert resp.status_code == 200
+        assert resp.data[4:] == raw
+        assert resp.headers.get("X-Lump-Trust") == "untrusted"
+        assert resp.headers.get("X-Lump-Cache-Token") == "4dc5c64e"
+
     def test_canonical_entry_serves_trusted_headers(self):
         """A valid canonical entry loaded at startup returns 200 with
         X-Lump-Trust: canonical plus the identity-binding headers."""

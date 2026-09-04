@@ -1,8 +1,8 @@
 {
   "token": "00000a00",
   "abstraction": "CapabilityTest",
-  "filename": "CapabilityTest.2.a537aadf.lump",
-  "sidecar_file": "CapabilityTest.2.a537aadf.json",
+  "filename": "CapabilityTest.2.4dc5c64e.lump",
+  "sidecar_file": "CapabilityTest.2.4dc5c64e.json",
   "ns_slot": 10,
   "ns_slot_policy": "static",
   "boot_resident": true,
@@ -73,5 +73,9 @@
   "author": "Church Machine",
   "version": "2.0",
   "lump_version": 2,
+  "dot_name": "CapabilityTest",
+  "issue_n": 2,
+  "identity_string": "CapabilityTest#2",
+  "identity_hash": "c4acababbd32765ff6257164a137c459d42d7eb284e850aa105e280d89d43017",
   "binary_hash": "a537aadfad31fbc65592b7a7b78b7f7a3b3b16b58f36bad412d94e04f538f4c3"
 }
