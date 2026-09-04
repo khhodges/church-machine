@@ -120,7 +120,11 @@
       "g": 0,
       "limit": "0x0003F",
       "seq": 0,
-      "seal": "0xDEA83EEF"
+      "seal": "0xDEA83EEF",
+      "token": "00000a00",
+      "filename": "CapabilityTest.1.35644e24.lump",
+      "issue_n": 1,
+      "resident": true
     },
     {
       "name": "Thread#2",
@@ -189,5 +193,6 @@
       "seal": "0xDEAB9EEF"
     }
   ],
-  "generated_at": 1788523980.9739354
+  "generated_at": 1788525248.9759638,
+  "committed_raw_fingerprint": "b11a48bcc252052b2fc74f630f4aaed3e5def4beab307211a6c50a81848713fa"
 }
