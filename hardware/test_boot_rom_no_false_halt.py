@@ -23,6 +23,7 @@ Run with:  python -m hardware.test_boot_rom_no_false_halt
 """
 
 import sys
+import pytest
 from amaranth import *
 from amaranth.lib.data import StructLayout, unsigned
 from amaranth.lib.memory import Memory as LibMemory
@@ -41,7 +42,7 @@ from .boot_rom import (
 from .hw_types import (
     ChurchOpcode, CondCode, FaultType, GT_TYPE_INFORM, PERM_MASK_E, PERM_MASK_R,
     PERM_MASK_L, PERM_MASK_S, PERM_MASK_X, SWITCH_TGT_CR12, SWITCH_TGT_CR13,
-    TuringOpcode, make_gt,
+    TpermPreset, TuringOpcode, make_gt,
 )
 from .integrity32 import integrity32
 
@@ -611,6 +612,255 @@ def test_successful_switch_retires_once_then_advances():
         first_nia + 4, second_instr, True, FaultType.PERM_L)
     assert observed["cr12_after"] == loaded_gt
     assert observed["m_after"] == 0
+
+
+_DELAYED_FAULT_CASES = [
+    pytest.param(
+        "CALL",
+        encode_church(
+            ChurchOpcode.CALL, CondCode.AL,
+            cr_src=1),
+        FaultType.PERM_E,
+        make_gt(GT_TYPE_INFORM, 0, slot_id=1),
+        False,
+        id="call-permission",
+    ),
+    pytest.param(
+        "RETURN",
+        encode_church(
+            ChurchOpcode.RETURN, CondCode.AL,
+            cr_src=1),
+        FaultType.PERM_E,
+        make_gt(GT_TYPE_INFORM, 0, slot_id=1),
+        False,
+        id="return-permission",
+    ),
+    pytest.param(
+        "SWITCH",
+        encode_church(
+            ChurchOpcode.SWITCH, CondCode.AL,
+            cr_dst=SWITCH_TGT_CR12, cr_src=6, imm=0),
+        FaultType.PERM_L,
+        None,
+        True,
+        id="switch-missing-m",
+    ),
+    pytest.param(
+        "LOAD",
+        encode_church(
+            ChurchOpcode.LOAD, CondCode.AL,
+            cr_dst=2, cr_src=6, imm=0x7FFF),
+        FaultType.BOUNDS,
+        None,
+        False,
+        id="load-bounds",
+    ),
+    pytest.param(
+        "SAVE",
+        encode_church(
+            ChurchOpcode.SAVE, CondCode.AL,
+            cr_dst=12, cr_src=1, imm=0),
+        FaultType.PERM_L,
+        make_gt(GT_TYPE_INFORM, PERM_MASK_R, slot_id=4),
+        True,
+        id="save-missing-m",
+    ),
+    pytest.param(
+        "TPERM",
+        encode_church(
+            ChurchOpcode.TPERM, CondCode.AL,
+            cr_dst=1, cr_src=1, imm=TpermPreset.R),
+        FaultType.DOMAIN_PURITY,
+        make_gt(GT_TYPE_INFORM, PERM_MASK_L, slot_id=4),
+        False,
+        id="tperm-domain-purity",
+    ),
+    pytest.param(
+        "CHANGE",
+        encode_church(
+            ChurchOpcode.CHANGE, CondCode.AL,
+            cr_dst=14, cr_src=1, imm=0),
+        FaultType.PERM_L,
+        make_gt(GT_TYPE_INFORM, PERM_MASK_R, slot_id=4),
+        False,
+        id="change-permission",
+    ),
+    pytest.param(
+        "ELOADCALL",
+        encode_church(
+            ChurchOpcode.ELOADCALL, CondCode.AL,
+            cr_dst=2, cr_src=6, imm=0),
+        FaultType.PERM_L,
+        None,
+        False,
+        id="eloadcall-structural-source",
+    ),
+    pytest.param(
+        "XLOADLAMBDA",
+        encode_church(
+            ChurchOpcode.XLOADLAMBDA, CondCode.AL,
+            cr_dst=2, cr_src=6, imm=4),
+        FaultType.NULL_CAP,
+        None,
+        False,
+        id="xloadlambda-null-cap",
+    ),
+    pytest.param(
+        "DREAD",
+        encode_turing(
+            TuringOpcode.DREAD, CondCode.AL,
+            dr_dst=1, dr_src=1, imm=0x4000),
+        FaultType.NULL_CAP,
+        None,
+        False,
+        id="dread-null-cap",
+    ),
+    pytest.param(
+        "DWRITE",
+        encode_turing(
+            TuringOpcode.DWRITE, CondCode.AL,
+            dr_dst=1, dr_src=1, imm=0x4000),
+        FaultType.NULL_CAP,
+        None,
+        False,
+        id="dwrite-null-cap",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    "name,instruction,expected_fault,cr1_value,clear_m",
+    _DELAYED_FAULT_CASES,
+)
+def test_delayed_fault_retires_on_issuing_instruction(
+        name, instruction, expected_fault, cr1_value, clear_m):
+    """Every delayed-fault class reports its own NIA and instruction word."""
+    dmem = list(_DMEM_INIT)
+    first_nia = _SELFTEST_ENTRY_NIA
+    dmem[first_nia // 4] = instruction
+    dmem[first_nia // 4 + 1] = encode_turing(
+        TuringOpcode.IADD, CondCode.AL, dr_dst=1, dr_src=0, imm=1)
+
+    dut = BootRomHarness(dmem)
+    observed = {"retires": [], "owned_nias": []}
+
+    async def testbench(ctx):
+        configured = False
+        issuer_seen = False
+        for _ in range(800):
+            at_issuer = ctx.get(dut.core.imem_addr) == first_nia
+            if at_issuer and not configured:
+                if cr1_value is not None:
+                    ctx.set(dut.core.dbg_cr_wr_en, 1)
+                    ctx.set(dut.core.dbg_cr_wr_addr, 1)
+                    ctx.set(dut.core.dbg_cr_wr_data.as_value(), cr1_value)
+                if clear_m:
+                    ctx.set(dut.core.dbg_m_bit_wr_en, 1)
+                    ctx.set(dut.core.dbg_m_bit_word, 0)
+                configured = True
+                issuer_seen = True
+            else:
+                ctx.set(dut.core.dbg_cr_wr_en, 0)
+                ctx.set(dut.core.dbg_m_bit_wr_en, 0)
+
+            if issuer_seen and not observed.get("fault_seen"):
+                observed["owned_nias"].append(ctx.get(dut.core.nia))
+
+            if ctx.get(dut.core.retire_valid):
+                retire = (
+                    ctx.get(dut.core.retire_nia),
+                    ctx.get(dut.core.retire_instr),
+                    bool(ctx.get(dut.core.retire_fault_valid)),
+                    ctx.get(dut.core.retire_fault_code),
+                )
+                observed["retires"].append(retire)
+                if retire[2]:
+                    observed["fault_seen"] = True
+                    await ctx.tick()
+                    observed["fault_instr"] = ctx.get(dut.core.fault_instr)
+                    return
+            await ctx.tick()
+        observed["timeout"] = True
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(testbench)
+    sim.run()
+
+    assert not observed.get("timeout"), f"{name} never fault-retired"
+    faults = [retire for retire in observed["retires"] if retire[2]]
+    assert faults == [
+        (first_nia, instruction, True, expected_fault)
+    ], f"{name} fault was not attributed to its issuer"
+    assert observed["fault_instr"] == instruction
+    assert set(observed["owned_nias"]) == {first_nia}
+    assert not any(
+        nia == first_nia + 4 for nia, _, _, _ in observed["retires"]
+    ), f"{name} exposed its successor before the delayed fault"
+
+
+def test_successful_xloadlambda_retires_once_and_clears_namespace_g_bit():
+    """A successful fused load commits once and preserves GC liveness."""
+    dmem = list(_DMEM_INIT)
+    first_nia = _SELFTEST_ENTRY_NIA
+    target_nia = 0x3000
+    slot = 4
+    x_gt = make_gt(GT_TYPE_INFORM, PERM_MASK_X, slot_id=slot)
+    word1_with_g = 63 | (1 << 30)
+    word1_without_g = word1_with_g & ~(1 << 30)
+
+    dmem[first_nia // 4] = encode_church(
+        ChurchOpcode.XLOADLAMBDA, CondCode.AL,
+        cr_dst=2, cr_src=6, imm=0)
+    dmem[target_nia // 4] = encode_turing(
+        TuringOpcode.IADD, CondCode.AL, dr_dst=1, dr_src=0, imm=1)
+
+    # CR6 names SelfTest's c-list at the tail of its fixed 512-word body.
+    selftest_clist_word = WUKONG_SELFTEST_BASE_WORD + 512 - 2
+    dmem[selftest_clist_word] = x_gt
+    ns_word = slot * 4
+    dmem[ns_word + 0] = target_nia
+    dmem[ns_word + 1] = word1_with_g
+    dmem[ns_word + 2] = integrity32(target_nia, word1_with_g)
+    dmem[ns_word + 3] = 0x12345678
+
+    dut = BootRomHarness(dmem)
+    observed = {"retires": [], "gbit_writes": []}
+
+    async def testbench(ctx):
+        for _ in range(900):
+            if ctx.get(dut.core.dmem_wr_en):
+                observed["gbit_writes"].append((
+                    ctx.get(dut.core.dmem_addr),
+                    ctx.get(dut.core.dmem_wr_data),
+                ))
+            if ctx.get(dut.core.retire_valid):
+                retire = (
+                    ctx.get(dut.core.retire_nia),
+                    ctx.get(dut.core.retire_instr),
+                    bool(ctx.get(dut.core.retire_fault_valid)),
+                )
+                observed["retires"].append(retire)
+                if retire[0] == target_nia:
+                    return
+            await ctx.tick()
+        observed["timeout"] = True
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(testbench)
+    sim.run()
+
+    assert not observed.get("timeout")
+    issuing_retires = [
+        retire for retire in observed["retires"] if retire[0] == first_nia
+    ]
+    assert issuing_retires == [(
+        first_nia, dmem[first_nia // 4], False
+    )]
+    assert observed["gbit_writes"].count((
+        slot * 16 + 4, word1_without_g
+    )) == 1
 
 
 # ── Shared retire-collection helper for Tests 4/5 ─────────────────────────────

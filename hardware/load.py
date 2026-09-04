@@ -30,11 +30,10 @@ class ChurchLoad(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
-        # Latch operands at load_start.  The core retires a LOAD on its issue
-        # cycle and the decoder immediately moves to the next instruction, so
-        # if the shared mload grants this unit's request late (e.g. right
-        # after a CALL releases the bus), comb-wired operands would belong to
-        # the WRONG instruction (observed: LOAD CR3 executed with dst=CR4).
+        # Latch operands at load_start. The core now retains the issuing NIA
+        # until this wrapper completes, but the shared mload can still grant
+        # the request later; operands must remain transaction-owned rather
+        # than following live decoder inputs.
         cr_src_lat = Signal(4)
         cr_dst_lat = Signal(4)
         index_lat  = Signal(16)

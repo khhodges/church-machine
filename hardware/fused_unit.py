@@ -575,6 +575,8 @@ class ChurchXLoadLambda(Elaboratable):
         self.mem_rd_en = Signal()
         self.mem_rd_data = Signal(32)
         self.mem_rd_valid = Signal()
+        self.mem_wr_en = Signal()
+        self.mem_wr_data = Signal(32)
 
         self.thread_wr_en = Signal()
         self.thread_wr_idx = Signal(4)
@@ -638,6 +640,8 @@ class ChurchXLoadLambda(Elaboratable):
             self.cr_wr_en.eq(u_mload.cr_wr_en),
             self.mem_addr.eq(u_mload.mem_addr),
             self.mem_rd_en.eq(u_mload.mem_rd_en),
+            self.mem_wr_en.eq(u_mload.mem_wr_en),
+            self.mem_wr_data.eq(u_mload.mem_wr_data),
             self.thread_wr_en.eq(u_mload.thread_wr_en),
             self.thread_wr_idx.eq(u_mload.thread_wr_idx),
             self.thread_wr_data.eq(u_mload.thread_wr_data),

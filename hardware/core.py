@@ -506,6 +506,14 @@ class ChurchCore(Elaboratable):
         call_start_sig = Signal()
         ret_start_sig = Signal()
         switch_start_sig = Signal()
+        load_start_sig = Signal()
+        save_start_sig = Signal()
+        dread_start_sig = Signal()
+        dwrite_start_sig = Signal()
+        change_start_sig = Signal()
+        eloadcall_start_sig = Signal()
+        xloadlambda_start_sig = Signal()
+        scheduler_inflight = Signal()
 
         if not self.iot_profile:
             cr_rd_addr_default = Mux(u_eloadcall.busy, u_eloadcall.cr_rd_addr,
@@ -949,6 +957,20 @@ class ChurchCore(Elaboratable):
                 m.d.sync += nia_reg.eq(u_eloadcall.nia_value)
             with m.Elif(u_irq_dispatch.nia_set):
                 m.d.sync += nia_reg.eq(u_irq_dispatch.nia_value)
+        # Non-control-flow multi-cycle instructions advance only at successful
+        # completion.  Their issue cycle is excluded from the generic +4 path.
+        delayed_complete = (
+            u_load.load_complete |
+            u_save.save_complete |
+            u_tperm.tperm_complete |
+            u_dread.done |
+            u_dwrite.done
+        )
+        if not self.iot_profile:
+            delayed_complete = delayed_complete | (
+                u_change.change_complete & ~scheduler_inflight)
+        with m.Elif(self.boot_complete & delayed_complete):
+            m.d.sync += nia_reg.eq(nia_reg + 4)
         with m.Elif(branch_taken & ~fetch_bounds_fault):
             # PC-relative branch: nia += sign_extend(imm) * 4.
             # Gated by ~fetch_bounds_fault: if the *current* nia is already out-of-range
@@ -958,7 +980,16 @@ class ChurchCore(Elaboratable):
             self.boot_complete & u_decoder.instr_valid & ~any_unit_busy
             & ~call_start_sig
             & ~ret_start_sig
+            & ~load_start_sig
+            & ~save_start_sig
+            & ~tperm_start_sig
+            & ~dread_start_sig
+            & ~dwrite_start_sig
             & ~(switch_start_sig if not self.iot_profile else 0)
+            & ~(change_start_sig if not self.iot_profile else 0)
+            & ~(lambda_start_sig if not self.iot_profile else 0)
+            & ~(eloadcall_start_sig if not self.iot_profile else 0)
+            & ~(xloadlambda_start_sig if not self.iot_profile else 0)
             & ~fetch_bounds_fault & ~u_outform_fsm.intercept_start
         ):
             # Advance PC for all instructions (including not-taken branches).
@@ -1347,7 +1378,6 @@ class ChurchCore(Elaboratable):
             u_tperm.stack_has_frame.eq(0),
         ]
 
-        save_start_sig = Signal()
         m.d.comb += save_start_sig.eq(
             cond_exec_enable & is_church_op & (church_op == ChurchOpcode.SAVE) & ~any_unit_busy
         )
@@ -1370,7 +1400,6 @@ class ChurchCore(Elaboratable):
             u_save.mem_rd_valid.eq(self.dmem_rd_valid),
         ]
 
-        dread_start_sig = Signal()
         m.d.comb += dread_start_sig.eq(
             cond_exec_enable & is_dread_op & ~any_unit_busy
         )
@@ -1386,7 +1415,6 @@ class ChurchCore(Elaboratable):
             u_dread.dr_rd_data.eq(u_regs.dr_rd_data1),
         ]
 
-        dwrite_start_sig = Signal()
         namespace_exec_gt = View(
             GT_LAYOUT, View(CAP_REG_LAYOUT, u_regs.cr14_code).word0_gt)
         namespace_exec_authorized = Signal()
@@ -1655,7 +1683,6 @@ class ChurchCore(Elaboratable):
             Cat(u_decoder.immediate, u_decoder.immediate[14].replicate(17))
         )
 
-        load_start_sig = Signal()
         m.d.comb += load_start_sig.eq(
             cond_exec_enable & is_church_op & (church_op == ChurchOpcode.LOAD) & ~any_unit_busy
         )
@@ -1672,6 +1699,12 @@ class ChurchCore(Elaboratable):
             u_load.index.eq(cap_index),
         ]
 
+        # Multi-cycle instructions own the fetched instruction and its NIA from
+        # issue until a terminal complete/fault pulse.  The shared instruction/
+        # data memory can present unrelated words while an execution unit is
+        # busy, so retain the issuer word for retirement and fault telemetry.
+        delayed_issuer_instr = Signal(32)
+
         # ── TraceUnit support: trace read port + LOAD shadow latch ─────────────
         # The trace port always mirrors cr_dst so the old GT is readable.
         # At load_start_sig time (one cycle before the first mload bus access),
@@ -1684,11 +1717,9 @@ class ChurchCore(Elaboratable):
             m.d.sync += _trace_load_shadow_gt.eq(u_regs.trace_rd_gt)
 
         if not self.iot_profile:
-            scheduler_inflight = Signal()
             thread_switch_start_sig = Signal()
             m.d.comb += thread_switch_start_sig.eq(
                 self.thread_switch_req & self.boot_complete & ~any_unit_busy)
-            change_start_sig = Signal()
             m.d.comb += change_start_sig.eq(
                 (cond_exec_enable & is_church_op & (church_op == ChurchOpcode.CHANGE) & ~any_unit_busy) |
                 thread_switch_start_sig
@@ -1762,7 +1793,6 @@ class ChurchCore(Elaboratable):
                 u_switch.mem_rd_valid.eq(self.dmem_rd_valid),
             ]
 
-            eloadcall_start_sig = Signal()
             m.d.comb += eloadcall_start_sig.eq(
                 cond_exec_enable & is_church_op & (church_op == ChurchOpcode.ELOADCALL) & ~any_unit_busy
             )
@@ -1786,7 +1816,6 @@ class ChurchCore(Elaboratable):
                 u_eloadcall.flags.eq(u_regs.flags),
             ]
 
-            xloadlambda_start_sig = Signal()
             m.d.comb += xloadlambda_start_sig.eq(
                 cond_exec_enable & is_church_op & (church_op == ChurchOpcode.XLOADLAMBDA) & ~any_unit_busy
             )
@@ -2634,9 +2663,9 @@ class ChurchCore(Elaboratable):
         fault_stage_w = Signal(4)
         with m.If(fetch_bounds_fault):
             m.d.comb += fault_stage_w.eq(0)
-        with m.Elif(u_decoder.fault_valid):
+        with m.Elif(u_decoder.fault_valid & ~any_unit_busy):
             m.d.comb += fault_stage_w.eq(1)
-        with m.Elif(u_perm.fault_valid):
+        with m.Elif(u_perm.fault_valid & ~any_unit_busy):
             m.d.comb += fault_stage_w.eq(2)
         if not self.iot_profile:
             with m.Elif(u_lambda.lambda_fault):
@@ -2655,11 +2684,36 @@ class ChurchCore(Elaboratable):
         # ── fault telemetry latch registers ────────────────────────────────────
         # Latched when fault_valid fires; cleared on FAULT_RST (clear_all).
         # fault_gt / fault_cr14 reserved (zero) — sub-unit wiring in future pass.
+        delayed_issue = (
+            load_start_sig | save_start_sig | tperm_start_sig |
+            dread_start_sig | dwrite_start_sig |
+            call_start_sig | ret_start_sig
+        )
+        delayed_fault = (
+            u_load.load_fault | u_save.save_fault | u_tperm.tperm_fault |
+            u_dread.fault | u_dwrite.fault |
+            u_call.call_fault | u_return.fault_valid
+        )
+        if not self.iot_profile:
+            delayed_issue = delayed_issue | (
+                change_start_sig | switch_start_sig | lambda_start_sig |
+                eloadcall_start_sig | xloadlambda_start_sig
+            )
+            delayed_fault = delayed_fault | (
+                u_change.change_fault | u_switch.switch_fault |
+                u_lambda.lambda_fault |
+                u_eloadcall.fault | u_xloadlambda.fault
+            )
+
+        with m.If(delayed_issue):
+            m.d.sync += delayed_issuer_instr.eq(self.imem_data)
+
         fault_instr_latch = Signal(32)
         fault_stage_latch = Signal(4)
         with m.If(self.fault_valid):
             m.d.sync += [
-                fault_instr_latch.eq(self.imem_data),
+                fault_instr_latch.eq(
+                    Mux(delayed_fault, delayed_issuer_instr, self.imem_data)),
                 fault_stage_latch.eq(fault_stage_w),
             ]
         with m.Elif(clear_all):
@@ -2693,21 +2747,30 @@ class ChurchCore(Elaboratable):
         # not used internally here — included on ChurchCore for clean API only.
         _ = self.halt_req  # referenced to prevent "unused port" warnings
 
-        # CALL/RETURN retire via their nia_set pulses, not retire_norm — but each
-        # busy signal rises one cycle after its start (IDLE transition is sync).
-        # Exclude both issue cycles or they retire twice and briefly advance to
-        # a phantom sequential NIA before the control-flow restore completes.
+        # Multi-cycle instructions retire via their terminal complete, fault, or
+        # nia_set pulses, not retire_norm. Their busy signals rise one cycle
+        # after start, so every issue pulse is excluded explicitly.
         retire_norm = (
             u_decoder.instr_valid & ~any_unit_busy &
             ~call_start_sig &
             ~ret_start_sig &
+            ~load_start_sig &
+            ~save_start_sig &
+            ~tperm_start_sig &
+            ~dread_start_sig &
+            ~dwrite_start_sig &
             ~(switch_start_sig if not self.iot_profile else 0) &
+            ~(change_start_sig if not self.iot_profile else 0) &
+            ~(lambda_start_sig if not self.iot_profile else 0) &
+            ~(eloadcall_start_sig if not self.iot_profile else 0) &
+            ~(xloadlambda_start_sig if not self.iot_profile else 0) &
             ~fetch_bounds_fault & ~u_outform_fsm.intercept_start
         )
         retire_conds_base = (
             self.fault_valid |
             u_call.nia_set |
             u_return.nia_set |
+            delayed_complete |
             (branch_taken & ~fetch_bounds_fault) |
             retire_norm
         )
@@ -2726,7 +2789,9 @@ class ChurchCore(Elaboratable):
         m.d.comb += [
             self.retire_valid.eq(self.boot_complete & retire_conds),
             self.retire_nia.eq(nia_reg),
-            self.retire_instr.eq(self.imem_data),
+            self.retire_instr.eq(
+                Mux(delayed_complete | delayed_fault,
+                    delayed_issuer_instr, self.imem_data)),
             self.retire_flags.eq(u_regs.flags),
             self.retire_fault_code.eq(self.fault),
             self.retire_fault_valid.eq(self.fault_valid & self.boot_complete),
@@ -2885,6 +2950,17 @@ class ChurchCore(Elaboratable):
                     self.dmem_addr.eq(u_eloadcall.mem_wr_addr),
                     self.dmem_wr_data.eq(u_eloadcall.mem_wr_data),
                     self.dmem_wr_en.eq(1),
+                ]
+            with m.Elif(u_xloadlambda.mem_rd_en | u_xloadlambda.mem_wr_en):
+                # XLOADLAMBDA owns a private mLoad just like ELOADCALL. Route
+                # its c-list/Namespace traffic onto the shared DMEM bus. The
+                # write channel is required for the successful load's G-bit
+                # reset, not just for reaching terminal completion.
+                m.d.comb += [
+                    self.dmem_addr.eq(u_xloadlambda.mem_addr),
+                    self.dmem_rd_en.eq(u_xloadlambda.mem_rd_en),
+                    self.dmem_wr_data.eq(u_xloadlambda.mem_wr_data),
+                    self.dmem_wr_en.eq(u_xloadlambda.mem_wr_en),
                 ]
         with m.Elif(u_call.mem_rd_en):
             # CALL FETCH_LUMP / STACK_READ_SP: data memory read
