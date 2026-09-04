@@ -1,4 +1,5 @@
 """Focused contract coverage for Wukong's physical Thread scheduler."""
+import ast
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,40 @@ from hardware.thread_design import (
     thread_body_words,
     thread_layout,
 )
+
+
+def _eq_dependencies(source):
+    """Return normalized signal dependencies expressed through Amaranth eq()."""
+    dependencies = {}
+    for node in ast.walk(ast.parse(source)):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "eq"
+            and len(node.args) == 1
+        ):
+            continue
+        target = ast.unparse(node.func.value)
+        dependencies.setdefault(target, set()).update(
+            ast.unparse(value)
+            for value in ast.walk(node.args[0])
+            if isinstance(value, (ast.Name, ast.Attribute))
+        )
+    return dependencies
+
+
+def _depends_on(dependencies, target, source):
+    pending = [target]
+    seen = set()
+    while pending:
+        signal = pending.pop()
+        if signal == source:
+            return True
+        if signal in seen:
+            continue
+        seen.add(signal)
+        pending.extend(dependencies.get(signal, ()))
+    return False
 
 
 def test_scheduler_contract_has_no_serialized_entry_context():
@@ -174,9 +209,14 @@ def test_change_enforces_defined_thread_body_before_restoring_context(
 
 def test_all_frame_paths_follow_the_scheduler_active_thread_base():
     core_source = Path("hardware/core.py").read_text()
-    assert "u_call.thread_base.eq(Mux(" in core_source
-    assert "boot_microcode_active" in core_source
-    assert "u_return.thread_base.eq(self.active_thread_base)" in core_source
-    assert "u_eloadcall.thread_base.eq(self.active_thread_base)" in core_source
+    dependencies = _eq_dependencies(core_source)
+    for frame_path in (
+        "u_call.thread_base",
+        "u_return.thread_base",
+        "u_eloadcall.thread_base",
+    ):
+        assert _depends_on(
+            dependencies, frame_path, "self.active_thread_base"
+        ), f"{frame_path} must use the scheduler-selected active Thread base"
     return_source = Path("hardware/ret.py").read_text()
     assert "thread_base_latched.eq(self.thread_base)" in return_source
