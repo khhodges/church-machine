@@ -812,7 +812,8 @@ again. No other abstraction receives this device capability; knowing its port
 is not authority. Missing capability, wrong right, wrong port, or a capability
 bound to another CR fails closed.
 
-**Flags:** N — Z — C — V (no flag writes)
+**Flags:** N — Z — C — V (no flag writes). Any FLAGS shown after SWITCH are
+the current machine flags retained from earlier execution, not SWITCH results.
 
 **Faults:**
 | Fault | Condition |

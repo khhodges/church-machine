@@ -4510,6 +4510,7 @@ class ChurchSimulator {
             const active = slot === activeSlot;
             const gtWord = this._threadDisplayGT(slot, activeSlot);
             const gtIdentity = this._threadDisplayGTIdentity(gtWord);
+            const nextPhysicalAddr = active ? this._nextPhysicalAddr() : -1;
             const entry = this.readNSEntry(slot);
             const savedIndicator = entry
                 ? this._unpackProtectedIndicator(
@@ -4523,6 +4524,8 @@ class ChurchSimulator {
                 active,
                 nia: active ? (this.pc >>> 0)
                     : (savedIndicator ? (savedIndicator.nia >>> 0) : null),
+                physicalAddress: active && nextPhysicalAddr >= 0
+                    ? (nextPhysicalAddr >>> 0) : null,
                 indicatorFlags: active
                     ? { ...this.flags }
                     : (savedIndicator && savedIndicator.flags

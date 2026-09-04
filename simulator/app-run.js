@@ -1110,7 +1110,12 @@ function updateThreadIdentityStrip() {
         const niaText = Number.isInteger(row.nia)
             ? `0x${(row.nia >>> 0).toString(16).toUpperCase().padStart(4, '0')}`
             : '\u2014';
+        const physicalText = Number.isInteger(row.physicalAddress)
+            ? `0x${(row.physicalAddress >>> 0).toString(16).toUpperCase().padStart(4, '0')}`
+            : '\u2014';
         const gtName = row.gtPetName || 'No entry GT';
+        const gtKeyText = row.active ? 'Executing code' : 'Saved entry code';
+        const flagsKeyText = row.active ? 'Current FLAGS' : 'Saved FLAGS';
         const indicatorFlags = row.indicatorFlags &&
             typeof row.indicatorFlags === 'object' ? row.indicatorFlags : null;
         const flagText = indicatorFlags
@@ -1118,10 +1123,13 @@ function updateThreadIdentityStrip() {
                 `${flag}${indicatorFlags[flag] ? 1 : 0}`).join(' ')
             : '\u2014';
         card.setAttribute('aria-label',
-            `${row.name}${row.active ? ', active' : ''}; NIA ${niaText}; ` +
-            `indicator flags ${flagText}; GT dot pet name ${gtName}`);
+            `Thread context ${row.name}${row.active ? ', active' : ''}; ` +
+            `LUMP-relative NIA ${niaText}; physical instruction address ${physicalText}; ` +
+            `${flagsKeyText} ${flagText}; ${gtKeyText} ${gtName}`);
         card.setAttribute('title',
-            `${row.name}${row.active ? ' (active)' : ''}\nNIA ${niaText}\nGT dot pet name: ${gtName}`);
+            `Thread context: ${row.name}${row.active ? ' (active)' : ''}\n` +
+            `${gtKeyText}: ${gtName}\nLUMP-relative NIA: ${niaText}\n` +
+            `Physical instruction address: ${physicalText}\n${flagsKeyText}: ${flagText}`);
 
         const marker = document.createElement('span');
         marker.className = 'thread-identity-marker';
@@ -1130,12 +1138,13 @@ function updateThreadIdentityStrip() {
         const name = document.createElement('span');
         name.className = 'thread-identity-name';
         name.textContent = row.name;
+        name.setAttribute('title', 'Thread context identity (the saved register and indicator state)');
 
         const nia = document.createElement('span');
         nia.className = 'thread-identity-value';
         const niaKey = document.createElement('span');
         niaKey.className = 'thread-identity-key';
-        niaKey.textContent = 'NIA';
+        niaKey.textContent = 'LUMP-relative NIA';
         const niaCode = document.createElement('code');
         niaCode.textContent = niaText;
         nia.append(niaKey, niaCode);
@@ -1144,11 +1153,24 @@ function updateThreadIdentityStrip() {
         values.className = 'thread-identity-values';
         values.appendChild(nia);
 
+        const physical = document.createElement('span');
+        physical.className = 'thread-identity-value thread-identity-physical';
+        const physicalKey = document.createElement('span');
+        physicalKey.className = 'thread-identity-key';
+        physicalKey.textContent = 'Physical address';
+        const physicalCode = document.createElement('code');
+        physicalCode.textContent = physicalText;
+        physical.setAttribute('title', row.active
+            ? 'Disassembly address = executing code LUMP base + 1 header word + relative NIA'
+            : 'Only the active Thread has a live executing code capability');
+        physical.append(physicalKey, physicalCode);
+        values.appendChild(physical);
+
         const gt = document.createElement('span');
         gt.className = 'thread-identity-value thread-identity-gt';
         const gtKey = document.createElement('span');
         gtKey.className = 'thread-identity-key';
-        gtKey.textContent = 'GT';
+        gtKey.textContent = gtKeyText;
         const gtLabel = document.createElement('span');
         gtLabel.className = 'thread-identity-petname';
         gtLabel.textContent = gtName;
@@ -1159,10 +1181,13 @@ function updateThreadIdentityStrip() {
         flags.className = 'thread-identity-value thread-identity-flags';
         const flagsKey = document.createElement('span');
         flagsKey.className = 'thread-identity-key';
-        flagsKey.textContent = 'FLAGS';
+        flagsKey.textContent = flagsKeyText;
         const flagsCode = document.createElement('code');
         flagsCode.textContent = flagText;
-        flagsCode.setAttribute('aria-label', `Indicator flags ${flagText}`);
+        flagsCode.setAttribute('aria-label', `${flagsKeyText} ${flagText}`);
+        flags.setAttribute('title', row.active
+            ? 'Current machine condition flags; SWITCH does not write FLAGS'
+            : 'Retained condition flags read from this dormant Thread object');
         flags.append(flagsKey, flagsCode);
         values.appendChild(flags);
 

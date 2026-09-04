@@ -167,6 +167,8 @@ assert.deepStrictEqual(committed.dr, thread3InitialDRs,
 const dormantThread2Row = committed.threadStatusRows().find(row => row.slot === 11);
 assert.strictEqual(dormantThread2Row.nia, 0x2A,
     'the dormant Thread card reads NIA from the CHANGE-saved Thread object');
+assert.deepStrictEqual(dormantThread2Row.indicatorFlags, suspendedThread2.flags,
+    'the dormant Thread card reads FLAGS from its own CHANGE-saved Thread object');
 const thread2Indicator = committed._unpackProtectedIndicator(
     committed.memory[committedBases[1] + 17] >>> 0);
 assert.strictEqual(thread2Indicator.nia, 0x2A,
@@ -340,6 +342,26 @@ assert.strictEqual(initialThreadRows[0].active, true,
     'Thread status strip highlights the selected Thread');
 assert.strictEqual(initialThreadRows[0].nia, 0x2A,
     'active Thread status uses the live logical NIA');
+const capabilityTestParsed = uiSim.parseGT(uiBootEntryGT);
+const capabilityTestGT = uiSim.createGT(
+    capabilityTestParsed.gt_seq,
+    capabilityTestParsed.index,
+    {R: 1, W: 0, X: 1, L: 0, S: 0, E: 0},
+    capabilityTestParsed.type);
+uiSim.cr[14] = {
+    ...uiSim.cr[14],
+    word0: capabilityTestGT,
+    word1: 0x0D00,
+};
+uiSim.nsLabels[capabilityTestParsed.index] = 'CapabilityTest';
+uiSim.pc = 0x000C;
+const capabilityTestRows = uiSim.threadStatusRows();
+assert.strictEqual(capabilityTestRows[0].gtPetName, 'CapabilityTest',
+    'active Thread card distinguishes the executing CapabilityTest identity');
+assert.strictEqual(capabilityTestRows[0].physicalAddress, 0x0D0D,
+    'CapabilityTest base 0x0D00 + header + relative NIA 0x000C is 0x0D0D');
+assert.strictEqual(capabilityTestRows[1].physicalAddress, null,
+    'dormant Thread cards do not synthesize a physical address from live code state');
 assert.strictEqual(initialThreadRows[1].nia, 0,
     'never-selected dormant Threads expose their Thread object initial NIA');
 assert(initialThreadRows.every(row => row.gtPetName && row.gtPetName !== 'Invalid GT'),
@@ -477,6 +499,8 @@ const nonElevated = new ChurchSimulator();
 nonElevated.bootComplete = true;
 nonElevated.mElevation = false;
 nonElevated.cr[0] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
+nonElevated.flags = {N: true, Z: false, C: true, V: false};
+const flagsBeforeRejectedSwitch = {...nonElevated.flags};
 const rejectedChange = nonElevated._execChange({
     crDst: 12, crSrc: 0, imm: 1, scheduler: false, mnemonic: 'CHANGE',
 });
@@ -485,4 +509,6 @@ assert.strictEqual(rejectedChange, null,
 assert(nonElevated.faultLog.length > 0 &&
        nonElevated.faultLog[nonElevated.faultLog.length - 1].type === 'NULL_CAP',
     'non-elevated CHANGE CR12 records an architecture fault');
+assert.deepStrictEqual(nonElevated.flags, flagsBeforeRejectedSwitch,
+    'failed isolated context switch preserves the retained machine FLAGS');
 console.log('PASS round-robin Thread scheduler');
