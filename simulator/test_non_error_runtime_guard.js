@@ -11,6 +11,8 @@ const checks = [
     source.includes('event.stopImmediatePropagation();')],
   ['guard observes resource errors in capture phase',
     /window\.addEventListener\('error',[\s\S]*?\}, true\);/.test(source)],
+  ['guard observes malformed promise rejections in capture phase',
+    /window\.addEventListener\('unhandledrejection',[\s\S]*?\}, true\);/.test(source)],
   ['startup does not abort assets with a second client-side version redirect',
     !abstractionsSource.includes('_simulatorCacheBust') &&
     !abstractionsSource.includes("window.location.replace('/simulator/~/")],

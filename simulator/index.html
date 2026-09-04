@@ -49,7 +49,7 @@
                 // Contain it here; real Error rejections continue to the monitor.
                 event.stopImmediatePropagation();
             }
-        });
+        }, true);
         window.addEventListener('error', function(event) {
             if (!(event.error instanceof Error)) {
                 // Suppress the well-known benign ResizeObserver notification — wrapping
