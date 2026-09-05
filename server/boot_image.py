@@ -96,6 +96,7 @@ try:
     from hardware.thread_design import (
         THREAD_CAP_WORDS,
         THREAD_CAPS_OFFSET,
+        THREAD_CODE_IDENTITY_OFFSET,
         THREAD_MIN_WORDS,
         THREAD_STO_OFFSET,
         THREAD_SUPPORTED_BODY_WORDS,
@@ -105,6 +106,7 @@ except ImportError:
     from thread_design import (
         THREAD_CAP_WORDS,
         THREAD_CAPS_OFFSET,
+        THREAD_CODE_IDENTITY_OFFSET,
         THREAD_MIN_WORDS,
         THREAD_STO_OFFSET,
         THREAD_SUPPORTED_BODY_WORDS,
@@ -249,7 +251,7 @@ assert len(DEFAULT_ABSTRACTION_CATALOG) == 14, "catalog drift vs simulator.js"
 # threads retain their established slots: Thread#2 -> 11, Thread#3 -> 12.
 # Additional generated threads skip the fixed M_BIT_DEV at slot 13.
 GENERATED_THREAD_FIRST_NS_SLOT = 11
-MAX_THREAD_COUNT = 9
+MAX_THREAD_COUNT = 10
 
 
 def configured_thread_count(step1):
@@ -616,6 +618,54 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
                 f"(word0=0x{word0:08x}, word1=0x{word1:08x}); "
                 "the boot image is invalid and would cause a BOOT fault at runtime"
             )
+
+    # Each Thread owns an explicit executable identity at +18.  It is not a
+    # UI hint or a CR0 alias: reject stale/null/non-executable identities
+    # before an image can be served or installed.
+    thread_count = words[tag_idx - 3] if tag_idx >= 3 else 0
+    ns_capacity = ns_table_reserve // NS_ENTRY_WORDS
+    if not 1 <= thread_count <= MAX_THREAD_COUNT:
+        raise ValueError(
+            f"validate_boot_image: encoded Thread count {thread_count} is outside "
+            f"1..{MAX_THREAD_COUNT}")
+    thread_slots = [1]
+    candidate = GENERATED_THREAD_FIRST_NS_SLOT
+    while len(thread_slots) < thread_count:
+        if candidate != ARCH_BOOT["minimalSlots"]["M_BIT_DEV"]:
+            if candidate >= ns_capacity:
+                raise ValueError(
+                    f"validate_boot_image: encoded Thread count {thread_count} "
+                    f"exceeds Namespace table capacity {ns_capacity}")
+            thread_slots.append(candidate)
+        candidate += 1
+    gt_fields = ARCH_GT_WORD0["fields"]
+    gt_type_lsb = field_lsb(gt_fields["gt_type"])
+    gt_seq_lsb = field_lsb(gt_fields["gt_seq"])
+    gt_slot_lsb = field_lsb(gt_fields["slot_id"])
+    for thread_slot in thread_slots:
+        tbase = _ns_base = n_words - (thread_slot + 1) * NS_ENTRY_WORDS
+        if tbase < 0:
+            raise ValueError(f"validate_boot_image: Thread slot {thread_slot} is missing")
+        thread_loc = words[tbase]
+        if thread_loc >= n_words:
+            raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has invalid location")
+        hdr = words[thread_loc]
+        size = 1 << (((hdr >> 23) & 0xF) + 6)
+        if ((hdr >> 27) & 0x1F) != 0x1F or ((hdr >> 8) & 3) != 2 or thread_loc + size > n_words:
+            raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has invalid header")
+        identity = words[thread_loc + THREAD_CODE_IDENTITY_OFFSET]
+        gt_type = (identity >> gt_type_lsb) & _field_mask(gt_fields["gt_type"])
+        code_slot = (identity >> gt_slot_lsb) & _field_mask(gt_fields["slot_id"])
+        code_seq = (identity >> gt_seq_lsb) & _field_mask(gt_fields["gt_seq"])
+        code_ns = n_words - (code_slot + 1) * NS_ENTRY_WORDS
+        if (identity == 0 or gt_type != 1 or code_ns < 0 or code_ns + 1 >= n_words):
+            raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has stale or invalid executable identity")
+        code_auth = words[code_ns + 1]
+        if code_seq != _ns_word1_get(code_auth, "gt_seq"):
+            raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has stale executable identity")
+        code_loc = words[code_ns]
+        if code_loc >= n_words or ((words[code_loc] >> 27) & 0x1F) != 0x1F or ((words[code_loc] >> 10) & 0x1FFF) == 0:
+            raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has non-executable code identity")
 
     # Do not infer Inform/Outform from any NS word.  State belongs exclusively
     # to access GTs, which are outside this raw table validator.
@@ -1843,6 +1893,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     _boot_entry_seq = _ns_word1_get(mem[_boot_entry_ns_base + 1], "gt_seq")
     mem[thread_loc + layout["caps_start"]] = create_gt(
         _boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
+    mem[thread_loc + THREAD_CODE_IDENTITY_OFFSET] = create_gt(
+        _boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
 
     # ----- Generated Thread bodies (Thread#2 .. Thread#N) ----------------
     # Their Namespace descriptors were emitted above.  Initialise each body
@@ -1853,6 +1905,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             _ns_n_minus_6(thread_size), thread_stack_words, THREAD_CAP_WORDS, 2)
         mem[_thread_loc + THREAD_STO_OFFSET] = layout["stack_end"]
         mem[_thread_loc + layout["caps_start"]] = create_gt(
+            _boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
+        mem[_thread_loc + THREAD_CODE_IDENTITY_OFFSET] = create_gt(
             _boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
 
     # Memory-manager GT at c-list[0]: R|W capability over NS slot 0 (full namespace).
@@ -1999,10 +2053,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
 
     # Thread-count sentinel (Task #2563): stored at NS_TABLE_BASE - 4 so the
     # designer's memory-truth drill-down can verify the committed thread count.
-    # Only written when > 1 so single-thread images stay byte-identical to
-    # pre-#2562 images (the word was previously always zero; 0 ⇒ 1 thread).
-    if _thread_count > 1:
-        mem[ns_table_base - 4] = _thread_count & 0xFF
+    # Explicit in every new image; zero is invalid rather than a legacy alias.
+    mem[ns_table_base - 4] = _thread_count & 0xFF
 
     # Boot-entry slot: stored at NS_TABLE_BASE - 2 so that loadBootImage()
     # can restore the user's selected boot entry when loading the image.

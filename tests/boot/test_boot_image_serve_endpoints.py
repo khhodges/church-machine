@@ -27,8 +27,10 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)
 
 from server.boot_image import (  # noqa: E402
+    MAX_THREAD_COUNT,
     NS_TABLE_RESERVE,
     generate_boot_image,
+    validate_boot_image,
 )
 
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
@@ -80,6 +82,38 @@ def _write_valid(path):
     with open(path, "wb") as f:
         f.write(valid)
     return valid
+
+
+@pytest.mark.parametrize("slot", [0, 1, 2, 3, 4, 5, 6, 10])
+def test_binary_rejects_zeroed_mandatory_descriptor(client, temp_image_path, slot):
+    words = list(struct.unpack("<16384I", _make_valid_image()))
+    base = 16384 - (slot + 1) * 4
+    words[base] = words[base + 1] = 0
+    tampered = struct.pack("<16384I", *words)
+    with pytest.raises(ValueError, match="mandatory NS slot"):
+        validate_boot_image(tampered, 16384)
+    with open(temp_image_path, "wb") as image_file:
+        image_file.write(tampered)
+    with patch("server.app._auto_regen_boot_image") as regenerate:
+        response = client.get("/api/boot-image/binary")
+    assert response.status_code == 500
+    regenerate.assert_not_called()
+
+
+@pytest.mark.parametrize("count", [0, MAX_THREAD_COUNT + 1, 0xFFFFFFFF])
+def test_binary_rejects_untrusted_thread_count(client, temp_image_path, count):
+    words = list(struct.unpack("<16384I", _make_valid_image()))
+    ns_base = 16384 - NS_TABLE_RESERVE
+    words[ns_base - 4] = count
+    tampered = struct.pack("<16384I", *words)
+    with pytest.raises(ValueError, match="Thread count"):
+        validate_boot_image(tampered, 16384)
+    with open(temp_image_path, "wb") as image_file:
+        image_file.write(tampered)
+    with patch("server.app._auto_regen_boot_image") as regenerate:
+        response = client.get("/api/boot-image/binary")
+    assert response.status_code == 500
+    regenerate.assert_not_called()
 
 
 def _write_retired_tail_relative_thread_image(path):

@@ -10,6 +10,7 @@ global.window = { bootConfig: { step1: {
     threadLumpWords: 512, threadCount: 3,
 } } };
 const ChurchSimulator = require('./simulator.js');
+const ThreadDesign = require('./thread_design.js');
 // Regenerate the exact three-Thread image inputs used by the IDE. This catches
 // a later boot-resident catalog embedding pass overwriting Thread#2/#3 without
 // depending on the workspace-only, ignored boot-image.bin file.
@@ -233,6 +234,42 @@ assert.strictEqual(selectedRun.steps, 1,
 assert.strictEqual(committed.cr[12].word1, committedBases[1],
     'Run keeps the selected Thread installed as the live context');
 
+// CapabilityTest's first LOAD is permitted to replace CR0 with SelfTest while
+// execution remains in CapabilityTest.  The separate +18 code word must make
+// that split survive a complete scheduler round trip.
+const selfTestGT = entryWords[0];
+const capEntry = committed.readNSEntry(10);
+const capGT = committed.createGT(
+    committed.parseNSWord1(capEntry.word1_limit).gtSeq, 10, {E: 1}, 1);
+const capHeader = committed.parseLumpHeader(committed.memory[capEntry.word0_location]);
+committed._installLumpHeaderContext(committed.parseGT(capGT), 10, capEntry, capHeader);
+committed._writeCR(0, selfTestGT, committed.readNSEntry(selfTestGT & 0xFFFF));
+committed.dr[3] = 0xCAFE0003;
+committed.cr[2] = {...committed.cr[0]};
+committed.pc = 0x1B;
+committed.flags = {N: true, Z: true, C: false, V: true};
+committed.sto = 0x81;
+const capabilityPrivate = {
+    dr3: committed.dr[3], cr2: committed.cr[2].word0, pc: committed.pc,
+    flags: {...committed.flags}, sto: committed.sto,
+};
+assert.strictEqual(committed.cr[0].word0 & 0xFFFF, 6,
+    'CapabilityTest first LOAD leaves CR0 at SelfTest');
+assert.strictEqual(committed.cr[14].word0 & 0xFFFF, 10,
+    'CapabilityTest execution identity remains CR14');
+assert.strictEqual(committed.advanceConfiguredThread().slot, 12);
+assert.strictEqual(committed.advanceConfiguredThread().slot, 1);
+assert.strictEqual(committed.advanceConfiguredThread().slot, 11);
+assert.strictEqual(committed.cr[0].word0 & 0xFFFF, 6,
+    'switch-back retains the independently mutated CR0 identity');
+assert.strictEqual(committed.cr[14].word0 & 0xFFFF, 10,
+    'switch-back restores CapabilityTest code identity from +18');
+assert.strictEqual(committed.dr[3], capabilityPrivate.dr3);
+assert.strictEqual(committed.cr[2].word0, capabilityPrivate.cr2);
+assert.strictEqual(committed.pc, capabilityPrivate.pc);
+assert.deepStrictEqual(committed.flags, capabilityPrivate.flags);
+assert.strictEqual(committed.sto, capabilityPrivate.sto);
+
 // Switching saved images is a memory-image operation, not a boot-phase
 // operation. It must work while the loaded image is stopped before boot.
 const preBoot = new ChurchSimulator();
@@ -260,26 +297,21 @@ assert.strictEqual(preBoot.cr[0].word0, preBootThread1EntryGT,
 assert.strictEqual(preBoot.faultLog.length, 0,
     'cycling among stopped saved images never raises a machine fault');
 
-const deferred = new ChurchSimulator();
-assert.strictEqual(deferred.loadBootImage(image), true,
-    `deferred-entry fixture image must load: ${deferred.lastBootImageError || 'unknown error'}`);
-deferred.bootComplete = true;
-deferred._currentThreadSlot = 1;
-const deferredTargetBase = deferred.readNSEntry(11).word0_location;
-const deferredTargetLayout = deferred._threadLayoutAtBase(deferredTargetBase);
-deferred.memory[deferredTargetBase + deferredTargetLayout.capsStart] = 0;
-const selectedInvalid = deferred.advanceConfiguredThread();
-assert.strictEqual(selectedInvalid.ok, true,
-    'manual selection accepts a saved Thread whose executable CR0 is empty');
-assert.strictEqual(selectedInvalid.result.entryReady, false,
-    'manual selection reports that entry validation was deferred');
-assert.strictEqual(deferred.faultLog.length, 0,
-    'manual selection alone does not raise an architectural fault');
-assert.strictEqual(deferred.halted, false,
-    'an invalid selected entry still releases HALT so execution can report its fault');
-deferred.step();
-assert(deferred.faultLog.length > 0,
-    'the first attempted instruction raises the deferred entry fault');
+const invalidCodeIdentity = new ChurchSimulator();
+assert.strictEqual(invalidCodeIdentity.loadBootImage(image), true,
+    `code-identity fixture image must load: ${invalidCodeIdentity.lastBootImageError || 'unknown error'}`);
+invalidCodeIdentity.bootComplete = true;
+invalidCodeIdentity._currentThreadSlot = 1;
+const invalidCodeTargetBase = invalidCodeIdentity.readNSEntry(11).word0_location;
+const invalidCodeDRBefore = [...invalidCodeIdentity.dr];
+invalidCodeIdentity.memory[invalidCodeTargetBase + ThreadDesign.codeIdentityOffset] = 0;
+const rejectedCodeIdentity = invalidCodeIdentity.advanceConfiguredThread();
+assert.strictEqual(rejectedCodeIdentity.ok, false,
+    'canonical CHANGE rejects an invalid stored executable identity immediately');
+assert.strictEqual(invalidCodeIdentity._currentThreadSlot, 1,
+    'invalid code identity leaves the outgoing Thread selected');
+assert.deepStrictEqual(invalidCodeIdentity.dr, invalidCodeDRBefore,
+    'invalid code identity is checked before outgoing state is saved');
 
 const malformed = new ChurchSimulator();
 assert.strictEqual(malformed.loadBootImage(image), true,
@@ -295,25 +327,17 @@ const malformedCodeEntry = malformed.readNSEntry(
 malformed.memory[malformedCodeEntry.word0_location] = 0;
 malformed.halted = true;
 const malformedSelection = malformed.advanceConfiguredThread();
-assert.strictEqual(malformedSelection.ok, true,
-    'manual selection accepts a non-null entry whose LUMP header is malformed');
-assert.strictEqual(malformedSelection.result.entryReady, false,
-    'malformed entry-header validation remains deferred until execution');
-assert.strictEqual(malformed.faultLog.length, 0,
-    'malformed LUMP selection alone raises no architectural fault');
-assert.strictEqual(malformed.cr[6].word0, 0,
-    'deferred malformed header does not expose a stale CR6 c-list view');
-assert.strictEqual(malformed.cr[14].word0, 0,
-    'deferred malformed header does not expose a stale CR14 code view');
-malformed.step();
+assert.strictEqual(malformedSelection.ok, false,
+    'canonical CHANGE rejects a malformed executable LUMP before selection');
 assert(malformed.faultLog.length > 0,
-    'the first attempted instruction reports the malformed selected LUMP');
+    'malformed executable identity produces an immediate architecture fault');
 
 // The browser declares `let sim` in app-shell.js. Top-level `let` bindings are
 // not mirrored onto window, so the toolbar handler must use the lexical `sim`
 // binding rather than silently returning when window.sim is absent.
 function functionSource(source, name) {
-    const start = source.indexOf(`function ${name}(`);
+    const functionStart = source.indexOf(`function ${name}(`);
+    const start = functionStart >= 0 ? functionStart : source.indexOf(`${name}() {`);
     assert(start >= 0, `${name} must exist in app-run.js`);
     const brace = source.indexOf('{', start);
     let depth = 0;
@@ -325,6 +349,12 @@ function functionSource(source, name) {
 }
 
 const appRunSource = fs.readFileSync(__dirname + '/app-run.js', 'utf8');
+const simulatorSource = fs.readFileSync(__dirname + '/simulator.js', 'utf8');
+const advanceSource = functionSource(simulatorSource, 'advanceConfiguredThread');
+assert(advanceSource.includes("crDst: 14, crSrc: 15, imm: target, mnemonic: 'CHANGE'"),
+    'manual advance invokes the decoded CHANGE descriptor shape');
+assert(!/\b(scheduler|saveOutgoing|deferEntryFault)\s*:/.test(advanceSource),
+    'manual advance carries no alternate scheduler/save/defer semantics');
 const uiSim = new ChurchSimulator();
 assert.strictEqual(uiSim.loadBootImage(image), true,
     `UI fixture image must load: ${uiSim.lastBootImageError || 'unknown error'}`);
@@ -448,11 +478,7 @@ const walkContextBefore = {
     running: uiSim.running,
     stepCount: uiSim.stepCount,
 };
-const directWalkSwitch = uiSim.advanceConfiguredThread();
-assert.strictEqual(directWalkSwitch.ok, false,
-    'direct Thread switches are rejected between Walk ticks');
-assert.match(directWalkSwitch.reason, /Walk/,
-    'the rejected direct switch explains that Walk must stop first');
+uiContext.nextConfiguredThread();
 assert.deepStrictEqual({
     slot: uiSim.activeThreadStatus().slot,
     cr: JSON.parse(JSON.stringify(uiSim.cr)),
@@ -463,7 +489,7 @@ assert.deepStrictEqual({
     running: uiSim.running,
     stepCount: uiSim.stepCount,
 }, walkContextBefore,
-    'a rejected between-ticks switch does not mutate the live Thread context');
+    'the UI guard rejects a between-ticks switch without mutating its Thread context');
 
 vm.runInContext('walkToggle();', uiContext);
 assert.strictEqual(uiSim.walkActive, false,
@@ -494,6 +520,26 @@ assert.strictEqual(status.textContent, 'Thread.1 · 1/3',
     'toolbar status wraps to the boot Thread');
 assert.strictEqual(dashboardUpdates - dashboardUpdatesBeforeThreadClicks, 3,
     'each Next Thread click refreshes the dashboard');
+
+// The configured maximum is architectural Namespace order, not a four-card UI
+// limit: every Thread.1..Thread.10 resolves through the identical CHANGE path.
+global.window.bootConfig.step1 = {
+    totalNamespaceWords: 32768, namespaceLumpWords: 1024,
+    threadLumpWords: 256, threadCount: 10,
+};
+const maxThreads = new ChurchSimulator();
+maxThreads.bootComplete = false; // canonical boot rule: no reset-bank save
+maxThreads._currentThreadSlot = 1;
+const maxSlots = maxThreads.configuredThreadSlots();
+assert.strictEqual(maxSlots.length, 10, 'maximum configuration exposes Thread.1 through Thread.10');
+const visitedMaxSlots = [];
+for (let i = 0; i < maxSlots.length; i++) {
+    const switched = maxThreads.advanceConfiguredThread();
+    assert.strictEqual(switched.ok, true, `canonical CHANGE selects maximum Thread ${i + 2}`);
+    visitedMaxSlots.push(switched.slot);
+}
+assert.deepStrictEqual(visitedMaxSlots, maxSlots.slice(1).concat(maxSlots[0]),
+    'maximum Thread configuration cycles once through every Namespace-selected context');
 
 const nonElevated = new ChurchSimulator();
 nonElevated.bootComplete = true;

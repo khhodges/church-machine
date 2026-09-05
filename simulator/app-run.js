@@ -1198,6 +1198,18 @@ function updateThreadIdentityStrip() {
 
 function nextConfiguredThread() {
     if (!sim || typeof sim.advanceConfiguredThread !== 'function') return;
+    // Run/Walk ownership belongs to the UI control plane, not CHANGE
+    // architecture.  Programmatic/decoded CHANGE remains canonical.
+    if (sim.walkActive || sim.running) {
+        const consoleEl = document.getElementById('editorConsole');
+        if (consoleEl) {
+            consoleEl.textContent += `\n⊿ ${sim.walkActive
+                ? 'Stop Walk before switching Threads'
+                : 'Pause execution before switching Threads'}`;
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+        return;
+    }
     const outcome = sim.advanceConfiguredThread();
     const consoleEl = document.getElementById('editorConsole');
     if (consoleEl && outcome.reason) {

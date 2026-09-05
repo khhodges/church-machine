@@ -138,14 +138,14 @@
 - [Execution identity provenance](execution-identity-provenance.md) — empty source is comparable; opaque cross-algorithm source hashes never prove editor freshness
 - [Release LUMP replacement](lump-release-replacement.md) — release rebuilds replace the selected user slot by default; New Entry is explicit, while fixed system slots stay protected
 - [Save picker visibility](save-namespace-picker-visibility.md) — display every known NS slot; only Boot.NS and Boot.Thread are disabled in the picker
-- [Stopped Thread image selection](stopped-thread-image-selection.md) — saved Thread images may be cycled before or after boot whenever execution is not running
-- [Halted Thread activation order](halted-thread-activation-order.md) — install incoming CR12 before live CR/DR restore; HALT and call-frame state never cross a manual Thread switch
+- [Stopped Thread image selection](stopped-thread-image-selection.md) — stopped UI selection invokes exact CHANGE; invalid images fault atomically before outgoing state changes
+- [Halted Thread activation order](halted-thread-activation-order.md) — canonical CHANGE prevalidates +18, saves outgoing state, installs CR12, then restores private state
 - [Namespace upload composite integrity](namespace-upload-composite-integrity.md) — validate each LUMP, then bind slots, layout, boot entry, and hashes into one exact upload image
 - [Dynamic state uses ISA protection only](dynamic-composite-pola-boundary.md) — dynamic word changes are not POLA-persisted; type, permission, and bounds checks are the complete access rule
-- [Normative Thread private ABI](normative-thread-private-abi.md) — shared design owns one fixed 256-word layout; larger Thread bodies are rejected, not assigned a tail region
+- [Normative Thread private ABI](normative-thread-private-abi.md) — size-derived layout uses context +17, executable identity +18, Heap +19, stack, and 12 CR homes
 - [Protected Thread indicator](protected-thread-indicator.md) — word +17 packs FLAGS/SZ/STO outside CR5; frame words save the prior indicator state
 - [Portable LUMP binding boundary](portable-lump-binding-boundary.md) — canonical artifacts carry unresolved N/T/hash locks; only verified destination copies may contain local GTs
-- [Thread object runtime authority](thread-object-runtime-authority.md) — each Thread object alone owns its suspended context; never add parallel per-Thread NIA or context caches
+- [Thread object runtime authority](thread-object-runtime-authority.md) — each Thread owns suspended context, including executable identity at +18; never add parallel host caches
 - [Lazy retry breakpoint E2E timing](lazy-retry-breakpoint-e2e-timing.md) — hold the mocked download pending, then arm the breakpoint; use retirement stats, not attempt count
 - [Immutable LUMP history transitions](immutable-lump-history-transitions.md) — archive/current/sidecar/manifest commit together under flock; reserve with lexists and revalidate generation
 - [Build checkpoint mutates NS state](build-checkpoint-mutates-ns-state.md) — checkpoint generation can rewrite ns-state.json via boot imports; restore/verify it before final provenance

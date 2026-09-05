@@ -3299,10 +3299,18 @@ def _boot_image_is_stale():
                 return True
             _actual_stack_end = struct.unpack_from(
                 "<I", _image_bytes, _sto_idx * 4)[0]
-            _cfg_step1 = (_cfg or DEFAULT_BOOT_CONFIG)["step1"]
+            # Validate the Thread's self-describing geometry, not whichever
+            # boot configuration happens to be saved by this server. A valid
+            # temporary/downloaded image can legitimately have a different
+            # Thread allocation than the local designer configuration.
+            _thread_header = struct.unpack_from(
+                "<I", _image_bytes, _thread_loc * 4)[0]
+            _thread_words = 1 << (((_thread_header >> 23) & 0xF) + 6)
+            _thread_stack_words = (_thread_header >> 10) & 0x1FFF
             _layout = _boot_image_gen.thread_layout(
-                int(_cfg_step1["threadLumpWords"]),
-                int(_cfg_step1.get("threadStackWords", 32)))
+                _thread_words, _thread_stack_words)
+            if not _layout["valid"]:
+                return True
             _expected_stack_end = _layout["stack_end"]
             if _actual_stack_end != _expected_stack_end:
                 return True
@@ -3343,17 +3351,28 @@ def boot_image_binary():
     it as an ArrayBuffer at boot without triggering a download dialog."""
     if not os.path.isfile(BOOT_IMAGE_PATH):
         return jsonify({"error": "boot-image.bin not generated yet"}), 404
+    # Fail closed before considering freshness regeneration.  A malformed or
+    # tampered artifact is not a stale-but-known-good cache candidate; letting
+    # the mtime/content freshness path regenerate it first can mask corruption
+    # and serve a replacement with HTTP 200.
+    with open(BOOT_IMAGE_PATH, "rb") as _f:
+        _existing_image_bytes = _f.read()
+    _cfg, _cfg_err = _read_saved_boot_config()
+    _configured_words = (
+        int(_cfg["step1"]["totalNamespaceWords"])
+        if _cfg_err is None and _cfg is not None else None
+    )
+    try:
+        _boot_image_gen.validate_boot_image(_existing_image_bytes, _configured_words)
+    except ValueError as _e:
+        logging.error("boot_image_binary: stale or invalid boot image on disk: %s", _e)
+        return jsonify({"error": f"Boot image on disk is stale or invalid: {_e}"}), 500
     if _boot_image_is_stale():
         _new_bytes, _regen_err = _auto_regen_boot_image()
         if _regen_err:
             logging.warning("boot_image_binary: staleness regen failed (%s); cached copy remains unavailable", _regen_err)
     with open(BOOT_IMAGE_PATH, "rb") as _f:
         _image_bytes = _f.read()
-    _cfg, _cfg_err = _read_saved_boot_config()
-    _configured_words = (
-        int(_cfg["step1"]["totalNamespaceWords"])
-        if _cfg_err is None and _cfg is not None else None
-    )
     try:
         _boot_image_gen.validate_boot_image(_image_bytes, _configured_words)
     except ValueError as _e:

@@ -32,6 +32,7 @@ const ARCH_NS_INTEGRITY_MASK = ARCH_CONTRACTS.isa.nsEntry.integrity.excludedWord
 const THREAD_CAPS_OFFSET =
     THREAD_DESIGN.canonicalBodyWords - THREAD_DESIGN.capabilityHomes.words;
 const THREAD_STO_OFFSET = THREAD_DESIGN.protectedStoOffset;
+const THREAD_CODE_IDENTITY_OFFSET = THREAD_DESIGN.codeIdentityOffset;
 const THREAD_HEAP_OFFSET = THREAD_DESIGN.heapOffset;
 
 // ── Church Hardware Address Range (0xFFFFFF00 – 0xFFFFFFFF) ─────────────────
@@ -2081,8 +2082,8 @@ class ChurchSimulator {
         const THREAD_CC = THREAD_DESIGN.capabilityHomes.words;
         const THREAD_COUNT = (_bcStep1 && Number.isInteger(_bcStep1.threadCount))
             ? _bcStep1.threadCount : 1;
-        if (THREAD_COUNT < 1 || THREAD_COUNT > 9) {
-            throw new Error(`Boot config step1.threadCount must be between 1 and 9 (got ${THREAD_COUNT})`);
+        if (THREAD_COUNT < 1 || THREAD_COUNT > 10) {
+            throw new Error(`Boot config step1.threadCount must be between 1 and 10 (got ${THREAD_COUNT})`);
         }
         const GENERATED_THREAD_FIRST_SLOT = 11;
         const generatedThreadSlots = [];
@@ -2314,9 +2315,7 @@ class ChurchSimulator {
         // The count marker at -4 is legacy-zero for the default one-thread
         // layout.  Multi-thread images use it to identify the deterministic
         // Thread#2+ Namespace slots during committed-image inspection.
-        if (THREAD_COUNT > 1) {
-            this.memory[this.NS_TABLE_BASE - 4] = THREAD_COUNT >>> 0;
-        }
+        this.memory[this.NS_TABLE_BASE - 4] = THREAD_COUNT >>> 0;
 
         // n_minus_6 is derived from the actual lump size so a programmer
         // -chosen THREAD_LUMP_SIZE > 256 gets a header that describes the
@@ -2347,11 +2346,15 @@ class ChurchSimulator {
             ? this.parseNSWord1(_initialBootEntry.word1_limit).gtSeq : 0;
         this.memory[threadLoc + THREAD_LAYOUT.capsStart] =
             this.createGT(_initialBootSeq, this.bootEntrySlot, {E: 1}, 1);
+        this.memory[threadLoc + THREAD_CODE_IDENTITY_OFFSET] =
+            this.createGT(_initialBootSeq, this.bootEntrySlot, {E: 1}, 1);
         for (const threadSlot of generatedThreadSlots) {
             const generatedThreadLoc = this.memory[this._nsSlotBase(threadSlot)] >>> 0;
             this.memory[generatedThreadLoc] = this.packLumpHeader(
                 THREAD_N_MINUS_6, THREAD_SW, THREAD_CC, 2);
             this.memory[generatedThreadLoc + THREAD_LAYOUT.capsStart] =
+                this.createGT(_initialBootSeq, this.bootEntrySlot, {E: 1}, 1);
+            this.memory[generatedThreadLoc + THREAD_CODE_IDENTITY_OFFSET] =
                 this.createGT(_initialBootSeq, this.bootEntrySlot, {E: 1}, 1);
             this.memory[generatedThreadLoc + THREAD_STO_OFFSET] = THREAD_STACK_BOUNDARY;
         }
@@ -4454,8 +4457,8 @@ class ChurchSimulator {
         const generated = [];
         for (let slot = 0; slot < this.nsCount; slot++) {
             const label = String(this.nsLabels[slot] || '');
-            const match = /^Thread#([2-9]\d*)$/.exec(label);
-            if (match && this.isNSEntryValid(slot)) {
+            const match = /^Thread#(\d+)$/.exec(label);
+            if (match && Number(match[1]) >= 2 && this.isNSEntryValid(slot)) {
                 generated.push({ slot, number: Number(match[1]) });
             }
         }
@@ -4464,8 +4467,8 @@ class ChurchSimulator {
     }
 
     _threadDisplayGT(slot, activeSlot) {
-        // CR14 is the live executable GT. A dormant Thread persists CR0–CR11
-        // only, so its CR0 entry GT is the best truthful preview until selected.
+        // CR14 is the live executable GT; dormant Thread objects retain the
+        // same identity in their dedicated code-home word (independent of CR0).
         if (slot === activeSlot) {
             const liveCodeGT = this.cr && this.cr[14] ? (this.cr[14].word0 >>> 0) : 0;
             if (liveCodeGT && !ChurchSimulator.isNullGT(liveCodeGT)) return liveCodeGT;
@@ -4476,7 +4479,7 @@ class ChurchSimulator {
         if (!entry) return 0;
         const layout = this._threadLayoutAtBase(entry.word0_location);
         if (!layout || !Number.isInteger(layout.capsStart)) return 0;
-        return this.memory[entry.word0_location + layout.capsStart] >>> 0;
+        return this.memory[entry.word0_location + THREAD_CODE_IDENTITY_OFFSET] >>> 0;
     }
 
     _threadDisplayGTIdentity(gtWord) {
@@ -4557,12 +4560,6 @@ class ChurchSimulator {
     // authority for this local control, and the target is validated before
     // any outgoing state is written.
     advanceConfiguredThread() {
-        if (this.walkActive) {
-            return { ok: false, reason: 'Stop Walk before switching Threads' };
-        }
-        if (this.running) {
-            return { ok: false, reason: 'Pause execution before switching Threads' };
-        }
         const slots = this.configuredThreadSlots();
         if (!slots.length) return { ok: false, reason: 'No configured Thread context is available' };
         if (slots.length === 1) return { ok: true, unchanged: true, ...this.activeThreadStatus() };
@@ -4580,15 +4577,7 @@ class ChurchSimulator {
         }
 
         const result = this._execChange({
-            crDst: 14, crSrc: 15, imm: target, scheduler: true,
-            // A reset/pre-boot live bank is not an activated Thread context.
-            // Browse the saved images without persisting that scratch state.
-            saveOutgoing: this.bootComplete,
-            // Selection itself is not instruction execution.  If a saved
-            // image has no executable CR0, expose it and let the first Step
-            // raise the architectural fault.
-            deferEntryFault: true,
-            mnemonic: 'NEXT_THREAD',
+            crDst: 14, crSrc: 15, imm: target, mnemonic: 'CHANGE',
         });
         if (!result) return { ok: false, reason: 'Thread switch was rejected' };
         // A successful manual CHANGE selects a runnable stopped context.  HALT
@@ -6711,7 +6700,9 @@ class ChurchSimulator {
             return null;
         }
 
-        const schedulerSwitch = d.scheduler === true;
+        // CR14/CR15 destinations name the Thread-context CHANGE operation.
+        // This is ISA semantics, never a UI-only scheduler flag.
+        const schedulerSwitch = d.crDst === 14 || d.crDst === 15;
         const srcGT = this.cr[d.crSrc].word0;
         if (!schedulerSwitch && srcGT === 0) {
             this.fault('NULL_CAP', `CHANGE: CR${d.crSrc} (source) is NULL`);
@@ -6840,7 +6831,7 @@ class ChurchSimulator {
                 ? THREAD_DESIGN.layout(targetHeader.lumpSize, targetHeader.cw)
                 : null);
         if (schedulerSwitch && (!targetLayout || !targetLayout.valid)) {
-            this.fault('BOUNDS', `NEXT_THREAD: Namespace slot ${targetIdx} is not a valid Thread descriptor`);
+            this.fault('BOUNDS', `CHANGE: Namespace slot ${targetIdx} is not a valid Thread descriptor`);
             return null;
         }
         const tBase = entry.word0_location;
@@ -6887,12 +6878,33 @@ class ChurchSimulator {
                 `CHANGE restore CR5 heap GT for Thread slot ${targetIdx}: ${heapCheck.message}`);
             return null;
         }
+        // CR14 is not CR0: an executing abstraction may deliberately replace
+        // CR0 while retaining its code view.  The Thread object therefore owns
+        // a separate executable identity word.  Old zero images may use CR0
+        // only while first activated from the reset/boot state.
+        let codeGT = this.memory[tBase + THREAD_CODE_IDENTITY_OFFSET] >>> 0;
+        const codeCheck = this.mLoad(codeGT, null, 14);
+        if (!codeCheck.ok) {
+            this.fault(codeCheck.fault,
+                `CHANGE executable identity from Thread slot ${targetIdx}: ${codeCheck.message}`);
+            return null;
+        }
+        const codeParsed = this.parseGT(codeGT);
+        const codeEntry = codeCheck.entry;
+        const codeHeader = this.parseLumpHeader(this.memory[codeEntry.word0_location] >>> 0);
+        if (!codeHeader.valid || codeHeader.cw === 0) {
+            this.fault('BOUNDS',
+                'CHANGE executable identity does not name executable code');
+            return null;
+        }
         const outSlot = this._currentThreadSlot ?? null;
         this._flushLambdaCache();
         // Before boot, the live CR/DR banks are reset scratch state rather
         // than the selected Thread's restored context.  Manual image browsing
         // must not overwrite a valid saved Thread with those zero registers.
-        if (schedulerSwitch && d.saveOutgoing !== false && outSlot !== null) {
+        // Reset-bank state preceding boot is not a Thread context and is never
+        // serialized.  This is an architectural boot-state rule.
+        if (schedulerSwitch && this.bootComplete && outSlot !== null) {
             const outEntry = this.readNSEntry(outSlot);
             if (outEntry) {
                 const outBase = outEntry.word0_location;
@@ -6909,6 +6921,15 @@ class ChurchSimulator {
                         outBase + outLayout.capsStart + i,
                         this.cr[i].word0);
                 }
+                // A live activated context always has CR14.  Preserve the
+                // explicitly seeded dormant identity if a legacy host has
+                // selected CR0 by hand without performing its initial
+                // activation (rather than destroying it with reset scratch).
+                const liveCodeGT = this.cr[14].word0 >>> 0;
+                this._writeRuntimeWord(outBase + THREAD_CODE_IDENTITY_OFFSET,
+                    liveCodeGT && !ChurchSimulator.isNullGT(liveCodeGT)
+                        ? liveCodeGT
+                        : (this.memory[outBase + THREAD_CODE_IDENTITY_OFFSET] >>> 0));
                 const currentFrame = this.callStack[this.callStack.length - 1];
                 this._writeRuntimeWord(
                     outBase + THREAD_STO_OFFSET,
@@ -6956,50 +6977,8 @@ class ChurchSimulator {
             m: 0,
         };
 
-        // Restored CR0 is the sole entry authority. Validate it through mLoad,
-        // then derive the same executable CR14 shape as a CALL index 0.
-        const entryGT = this.cr[0].word0 >>> 0;
-        const entryParsed = this.parseGT(entryGT);
-        const entryCheck = this.mLoad(entryGT, 'E', 14);
-        if (!entryCheck.ok) {
-            if (schedulerSwitch && d.deferEntryFault === true) {
-                this.cr[6] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
-                this.cr[14] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
-                this._currentThreadSlot = targetIdx;
-                this.pc = restoredIndicator.nia;
-                const desc = `Selected dormant Thread slot ${targetIdx}; CR0 entry validation deferred until execution`;
-                this.output += desc + '\n';
-                return { pc: 0, instr: d, desc, entryReady: false };
-            }
-            this.fault(entryCheck.fault, `CHANGE dormant entry CR0: ${entryCheck.message}`);
-            return null;
-        }
-        const codeEntry = entryCheck.entry;
-        const codeHeaderCheck = this.mLoad(
-            entryGT, 'E', 14, codeEntry.word0_location);
-        const codeHeader = codeHeaderCheck.ok
-            ? this.parseLumpHeader(this.memory[codeEntry.word0_location] >>> 0)
-            : null;
-        if (!codeHeaderCheck.ok || !codeHeader || !codeHeader.valid ||
-                codeHeader.cw === 0 || codeHeader.cc === 0) {
-            if (schedulerSwitch && d.deferEntryFault === true) {
-                this.cr[6] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
-                this.cr[14] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
-                this._currentThreadSlot = targetIdx;
-                this.pc = restoredIndicator.nia;
-                const desc = `Selected dormant Thread slot ${targetIdx}; executable CR0 entry validation deferred until execution`;
-                this.output += desc + '\n';
-                return { pc: 0, instr: d, desc, entryReady: false };
-            }
-            const faultType = !codeHeaderCheck.ok ? codeHeaderCheck.fault : 'BOUNDS';
-            const faultMessage = !codeHeaderCheck.ok
-                ? codeHeaderCheck.message
-                : 'CHANGE dormant entry CR0 does not name executable code with a c-list';
-            this.fault(faultType, faultMessage);
-            return null;
-        }
         const headerContext = this._installLumpHeaderContext(
-            entryParsed, entryParsed.index, codeEntry, codeHeader);
+            codeParsed, codeParsed.index, codeEntry, codeHeader);
         this._currentThreadSlot = targetIdx;
         const desc = `CHANGE CR${d.crDst} (Thread object restored for slot ${targetIdx}; ${headerContext.desc}; resuming at NIA 0x${restoredIndicator.nia.toString(16).toUpperCase()})`;
         this.output += desc + '\n';

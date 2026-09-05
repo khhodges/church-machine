@@ -7,6 +7,7 @@ from .layouts import (GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT,
 from .mload import ChurchMLoad
 from .thread_design import (
     THREAD_CAP_WORDS,
+    THREAD_CODE_IDENTITY_OFFSET,
     THREAD_DR_OFFSET,
     THREAD_HEAP_OFFSET,
     THREAD_STO_OFFSET,
@@ -82,6 +83,7 @@ class ChurchChange(Elaboratable):
         self.nia_restore_en = Signal()
         self.nia_restore_val = Signal(32)
         self.flags_in = Signal(COND_FLAGS_LAYOUT)
+        self.nia_current = Signal(32)
         # NIA is separate core state. CHANGE does not persist the outgoing NIA;
         # an incoming Thread starts at the CR0-selected abstraction's word 1.
         # FLAGS/SZ/STO are persisted independently in protected Thread word +17.
@@ -237,6 +239,7 @@ class ChurchChange(Elaboratable):
         preflight_hdr_active = Signal()
         preflight_base = Signal(32)
         preflight_rd_armed = Signal()
+        preflight_cap_word = Signal(32)
         restore_rd_armed = Signal()
         restore_word = Signal(32)
         indicator_word = Signal(32)
@@ -257,6 +260,10 @@ class ChurchChange(Elaboratable):
         entry_cr14_view = View(CAP_REG_LAYOUT, entry_cr14)
         entry_cr14_gt = View(GT_LAYOUT, entry_cr14_view.word0_gt)
         entry_cr14_w2 = View(WORD2_LAYOUT, entry_cr14_view.word2_w2)
+        entry_cr6 = Signal(CAP_REG_LAYOUT)
+        entry_cr6_view = View(CAP_REG_LAYOUT, entry_cr6)
+        entry_cr6_gt = View(GT_LAYOUT, entry_cr6_view.word0_gt)
+        entry_cr6_w2 = View(WORD2_LAYOUT, entry_cr6_view.word2_w2)
         cr5_cap_view = View(CAP_REG_LAYOUT, cr5_cap)
         cr5_new_gt   = View(GT_LAYOUT, cr5_cap_view.word0_gt)
         thread_lump_size = Signal(15)
@@ -265,8 +272,9 @@ class ChurchChange(Elaboratable):
         m.d.comb += [
             thread_lump_size.eq(Const(1, 15) << (thr_hdr_view.n_minus_6 + 6)),
             thread_caps_start.eq(thread_lump_size - THREAD_CAP_WORDS),
-            # Heap spans [18, capsStart-cw), so its count is size-cw-30.
-            thread_heap_words.eq(thread_lump_size - thr_hdr_view.cw - 30),
+            # Heap spans [THREAD_HEAP_OFFSET, capsStart-cw).
+            thread_heap_words.eq(thread_lump_size - thr_hdr_view.cw -
+                                 (THREAD_HEAP_OFFSET + THREAD_CAP_WORDS - 1)),
             cr5_new_gt.slot_id.eq(0),
             cr5_new_gt.gt_seq.eq(0),
             cr5_new_gt.gt_type.eq(GT_TYPE_INFORM),
@@ -288,6 +296,20 @@ class ChurchChange(Elaboratable):
             entry_cr14_w2.gt_seq.eq(entry_gt_view.gt_seq),
             entry_cr14_w2.g_bit.eq(0),
             entry_cr14_w2.f_flag.eq(0),
+            entry_cr6_gt.slot_id.eq(entry_gt_view.slot_id),
+            entry_cr6_gt.gt_seq.eq(entry_gt_view.gt_seq),
+            entry_cr6_gt.gt_type.eq(entry_gt_view.gt_type),
+            entry_cr6_gt.dom.eq(1),
+            entry_cr6_gt.perm.eq(0b001),
+            entry_cr6_gt.b_flag.eq(entry_gt_view.b_flag),
+            entry_cr6_view.word1_location.eq(
+                entry_raw_base +
+                ((Const(1, 32) << (entry_hdr_view.n_minus_6 + 6)) -
+                 entry_hdr_view.cc) * 4),
+            entry_cr6_w2.limit_offset.eq(entry_hdr_view.cc - 1),
+            entry_cr6_w2.gt_seq.eq(entry_gt_view.gt_seq),
+            entry_cr6_w2.g_bit.eq(0),
+            entry_cr6_w2.f_flag.eq(0),
         ]
 
         m.d.comb += [
@@ -342,14 +364,17 @@ class ChurchChange(Elaboratable):
                         mask_latched.eq(self.change_mask),
                         cr_src_latched.eq(self.cr_src),
                         cr_dst_latched.eq(self.cr_dst),
-                        scheduler_mode_lat.eq(self.scheduler_mode),
+                        # Thread context CHANGE is selected by its privileged
+                        # destination (CR14/CR15), never by a UI/scheduler
+                        # side-band semantic flag.
+                        scheduler_mode_lat.eq((self.cr_dst == 14) | (self.cr_dst == 15)),
                         cr_index.eq(0),
                         save_index.eq(0),
                         save_cr_index.eq(0),
                         restore_cr8_final.eq(0),
                         boot_window_lat.eq(self.boot_window),
                         outgoing_thread_base.eq(
-                            Mux(self.scheduler_mode, self.active_thread_base,
+                            Mux((self.cr_dst == 14) | (self.cr_dst == 15), self.active_thread_base,
                                 cr12_view.word1_location)),
                         thread_loaded.eq(0),
                     ]
@@ -498,16 +523,118 @@ class ChurchChange(Elaboratable):
                               (self.mem_rd_data[23:27] <= THREAD_MAX_N_MINUS_6) &
                                (self.mem_rd_data[10:23] > 0) &
                                (self.mem_rd_data[0:8] == THREAD_CAP_WORDS) &
-                               # heapWords = lumpSize - cw - 30 must be > 0.
-                               (self.mem_rd_data[10:23] <
+                                # Heap must begin after the code identity word.
+                                (self.mem_rd_data[10:23] <
                                 ((Const(1, 15) <<
-                                  (self.mem_rd_data[23:27] + 6)) - 30))):
-                        m.next = "SAVE_CR_READ"
+                                  (self.mem_rd_data[23:27] + 6)) -
+                                  (THREAD_HEAP_OFFSET + THREAD_CAP_WORDS - 1)))):
+                        m.d.sync += [thread_hdr_reg.eq(self.mem_rd_data),
+                                     cr_index.eq(0), restore_rd_armed.eq(0)]
+                        m.next = "PREFLIGHT_CAP_READ"
                     with m.Else():
                         m.d.sync += [
                             fault_latched.eq(1),
                             fault_type_latched.eq(FaultType.BOUNDS),
                         ]
+                        m.next = "FAULT"
+
+            # Read-only admission pass.  This deliberately precedes every
+            # SAVE_* state: mLoad is validate_only, so an incoming stale home
+            # cannot partially serialize the outgoing Thread.
+            with m.State("PREFLIGHT_CAP_READ"):
+                m.d.comb += [
+                    direct_rd_active.eq(1),
+                    direct_rd_addr.eq(preflight_base +
+                        ((thread_caps_start + cr_index) << 2)),
+                ]
+                with m.If(~restore_rd_armed):
+                    m.d.sync += restore_rd_armed.eq(1)
+                with m.Elif(self.mem_rd_valid):
+                    m.d.sync += [preflight_cap_word.eq(self.mem_rd_data),
+                                 restore_rd_armed.eq(0)]
+                    with m.If((self.mem_rd_data == 0) | (cr_index >= THREAD_CAP_WORDS)):
+                        m.next = "PREFLIGHT_CAP_NEXT"
+                    with m.Else():
+                        m.next = "PREFLIGHT_CAP_VALIDATE"
+
+            with m.State("PREFLIGHT_CAP_VALIDATE"):
+                m.d.comb += [
+                    mload_dst.eq(14),
+                    mload_direct.eq(1),
+                    mload_direct_gt.eq(preflight_cap_word),
+                    u_mload.sub_validate_only.eq(1),
+                ]
+                m.d.sync += mload_start_reg.eq(
+                    ~(u_mload.sub_done | u_mload.sub_fault |
+                      mload_done_latched | mload_fault_latched))
+                m.d.sync += [mload_done_latched.eq(0), mload_fault_latched.eq(0)]
+                with m.If(u_mload.sub_done):
+                    m.d.sync += mload_done_latched.eq(1)
+                with m.If(u_mload.sub_fault):
+                    m.d.sync += [mload_fault_latched.eq(1), fault_latched.eq(1),
+                                 fault_type_latched.eq(u_mload.sub_fault_type)]
+                with m.If(mload_fault_latched):
+                    m.next = "FAULT"
+                with m.Elif(mload_done_latched):
+                    m.next = "PREFLIGHT_CAP_NEXT"
+
+            with m.State("PREFLIGHT_CAP_NEXT"):
+                with m.If(cr_index >= THREAD_CAP_WORDS - 1):
+                    m.d.sync += restore_rd_armed.eq(0)
+                    m.next = "PREFLIGHT_CODE_READ"
+                with m.Else():
+                    m.d.sync += cr_index.eq(cr_index + 1)
+                    m.next = "PREFLIGHT_CAP_READ"
+
+            with m.State("PREFLIGHT_CODE_READ"):
+                m.d.comb += [
+                    direct_rd_active.eq(1),
+                    direct_rd_addr.eq(preflight_base +
+                        (THREAD_CODE_IDENTITY_OFFSET << 2)),
+                ]
+                with m.If(~restore_rd_armed):
+                    m.d.sync += restore_rd_armed.eq(1)
+                with m.Elif(self.mem_rd_valid):
+                    m.d.sync += [entry_gt_latched.eq(self.mem_rd_data),
+                                 restore_rd_armed.eq(0)]
+                    m.next = "PREFLIGHT_CODE_VALIDATE"
+
+            with m.State("PREFLIGHT_CODE_VALIDATE"):
+                with m.If(entry_gt_view.gt_type == GT_TYPE_NULL):
+                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.NULL_CAP)]
+                    m.next = "FAULT"
+                with m.Else():
+                    m.d.comb += [mload_dst.eq(14), mload_direct.eq(1),
+                                 mload_direct_gt.eq(entry_gt_latched),
+                                 u_mload.sub_validate_only.eq(1)]
+                    m.d.sync += mload_start_reg.eq(
+                        ~(u_mload.sub_done | u_mload.sub_fault |
+                          mload_done_latched | mload_fault_latched))
+                    m.d.sync += [mload_done_latched.eq(0), mload_fault_latched.eq(0)]
+                    with m.If(u_mload.sub_done):
+                        m.d.sync += [mload_done_latched.eq(1),
+                                     entry_raw_base.eq(u_mload.resolved_base)]
+                    with m.If(u_mload.sub_fault):
+                        m.d.sync += [mload_fault_latched.eq(1), fault_latched.eq(1),
+                                     fault_type_latched.eq(u_mload.sub_fault_type)]
+                    with m.If(mload_fault_latched):
+                        m.next = "FAULT"
+                    with m.Elif(mload_done_latched):
+                        m.d.sync += restore_rd_armed.eq(0)
+                        m.next = "PREFLIGHT_CODE_HEADER"
+
+            with m.State("PREFLIGHT_CODE_HEADER"):
+                m.d.comb += [direct_rd_active.eq(1), direct_rd_addr.eq(entry_raw_base)]
+                with m.If(~restore_rd_armed):
+                    m.d.sync += restore_rd_armed.eq(1)
+                with m.Elif(self.mem_rd_valid):
+                    m.d.sync += [entry_header.eq(self.mem_rd_data),
+                                 restore_rd_armed.eq(0)]
+                    with m.If((self.mem_rd_data[27:32] == 0x1F) &
+                              (self.mem_rd_data[10:23] != 0)):
+                        m.next = "SAVE_CR_READ"
+                    with m.Else():
+                        m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.BOUNDS)]
                         m.next = "FAULT"
 
             with m.State("SAVE_CR_READ"):
@@ -528,10 +655,27 @@ class ChurchChange(Elaboratable):
                 ]
                 with m.If(self.mem_wr_done):
                     with m.If(save_cr_index == THREAD_CAP_WORDS - 1):
-                        m.next = "SAVE_DR"
+                        m.next = "SAVE_CODE_READ"
                     with m.Else():
                         m.d.sync += save_cr_index.eq(save_cr_index + 1)
                         m.next = "SAVE_CR_READ"
+
+            with m.State("SAVE_CODE_READ"):
+                # CR14 is Thread-private executable identity but is deliberately
+                # not one of the CR0--CR11 capability homes.
+                m.d.comb += self.cr_rd_addr.eq(14)
+                m.next = "SAVE_CODE_WRITE"
+
+            with m.State("SAVE_CODE_WRITE"):
+                m.d.comb += [
+                    self.cr_rd_addr.eq(14),
+                    mem_wr_en_reg.eq(1),
+                    mem_wr_addr_reg.eq(
+                        outgoing_thread_base + (THREAD_CODE_IDENTITY_OFFSET << 2)),
+                    mem_wr_data_reg.eq(self.cr_rd_data.as_value()[:32]),
+                ]
+                with m.If(self.mem_wr_done):
+                    m.next = "SAVE_DR"
 
             with m.State("SAVE_DR"):
                 m.d.comb += self.dr_rd_addr.eq(save_index[:4])
@@ -569,7 +713,7 @@ class ChurchChange(Elaboratable):
                     mem_wr_addr_reg.eq(
                         outgoing_thread_base + (THREAD_STO_OFFSET << 2)),
                     mem_wr_data_reg.eq(Cat(
-                        indicator_word[:13], Const(0, 15),
+                        indicator_word[:13], self.nia_current[2:17],
                         self.flags_in.as_value())),
                 ]
                 with m.If(self.mem_wr_done):
@@ -720,28 +864,35 @@ class ChurchChange(Elaboratable):
                     m.next = "RESTORE_INDICATOR_COMMIT"
 
             with m.State("RESTORE_INDICATOR_COMMIT"):
-                m.d.comb += self.flags_restore_en.eq(1)
+                m.d.comb += [
+                    self.flags_restore_en.eq(1),
+                    self.nia_restore_en.eq(1),
+                    self.nia_restore_val.eq(indicator_word[13:28] << 2),
+                ]
                 m.next = "ENTRY_CR0_READ"
 
             with m.State("ENTRY_CR0_READ"):
-                m.d.comb += self.cr_rd_addr.eq(0)
-                m.next = "ENTRY_CR0_LATCH"
-
-            with m.State("ENTRY_CR0_LATCH"):
-                m.d.comb += self.cr_rd_addr.eq(0)
-                m.d.sync += entry_gt_latched.eq(
-                    View(CAP_REG_LAYOUT, self.cr_rd_data).word0_gt.as_value())
-                m.next = "ENTRY_VALIDATE"
+                # Resume identity is the dedicated protected Thread word, not
+                # CR0: executable code may intentionally mutate CR0.
+                m.d.comb += [
+                    direct_rd_active.eq(1),
+                    direct_rd_addr.eq(
+                        restore_base + (THREAD_CODE_IDENTITY_OFFSET << 2)),
+                ]
+                with m.If(~restore_rd_armed):
+                    m.d.sync += restore_rd_armed.eq(1)
+                with m.Elif(self.mem_rd_valid):
+                    m.d.sync += [
+                        entry_gt_latched.eq(self.mem_rd_data),
+                        restore_rd_armed.eq(0),
+                    ]
+                    m.next = "ENTRY_VALIDATE"
 
             with m.State("ENTRY_VALIDATE"):
-                with m.If(
-                    (entry_gt_view.gt_type != GT_TYPE_INFORM) |
-                    ~entry_gt_view.dom |
-                    ~entry_gt_view.perm[2]
-                ):
+                with m.If(entry_gt_view.gt_type == GT_TYPE_NULL):
                     m.d.sync += [
                         fault_latched.eq(1),
-                        fault_type_latched.eq(FaultType.PERM_E),
+                        fault_type_latched.eq(FaultType.NULL_CAP),
                     ]
                     m.next = "FAULT"
                 with m.Else():
@@ -802,8 +953,14 @@ class ChurchChange(Elaboratable):
                     self.cr_wr_addr.eq(14),
                     self.cr_wr_data.eq(entry_cr14),
                     self.cr_wr_en.eq(1),
-                    self.nia_restore_en.eq(1),
-                    self.nia_restore_val.eq(entry_raw_base + 4),
+                ]
+                m.next = "ENTRY_CR6_COMMIT"
+
+            with m.State("ENTRY_CR6_COMMIT"):
+                m.d.comb += [
+                    self.cr_wr_addr.eq(6),
+                    self.cr_wr_data.eq(entry_cr6),
+                    self.cr_wr_en.eq(1),
                 ]
                 m.next = "FETCH_THREAD_HDR"
 

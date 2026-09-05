@@ -18,6 +18,7 @@ THREAD_HEADER_OFFSET = THREAD_DESIGN["headerOffset"]
 THREAD_DR_OFFSET = THREAD_DESIGN["dataRegisters"]["offset"]
 THREAD_DR_WORDS = THREAD_DESIGN["dataRegisters"]["words"]
 THREAD_STO_OFFSET = THREAD_DESIGN["protectedStoOffset"]
+THREAD_CODE_IDENTITY_OFFSET = THREAD_DESIGN["codeIdentityOffset"]
 THREAD_HEAP_OFFSET = THREAD_DESIGN["heapOffset"]
 # Compatibility name for older importers. The word is protected Thread state,
 # not part of the ordinary heap described by CR5.
@@ -47,7 +48,7 @@ def thread_layout(lump_size: int, stack_words: int) -> dict:
     stack_end = caps_start - 1
     stack_start = caps_start - stack_words
     heap_end = stack_start - 1
-    heap_words = lump_size - stack_words - 30
+    heap_words = heap_end - heap_start + 1
     return {
         "valid": (
             size_supported
@@ -62,6 +63,7 @@ def thread_layout(lump_size: int, stack_words: int) -> dict:
         "dr_start": THREAD_DR_OFFSET,
         "dr_end": THREAD_DR_OFFSET + THREAD_DR_WORDS - 1,
         "sto_offset": THREAD_STO_OFFSET,
+        "code_identity_offset": THREAD_CODE_IDENTITY_OFFSET,
         "heap_start": heap_start,
         "heap_end": heap_end,
         "heap_words": heap_words,

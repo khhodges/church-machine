@@ -1768,6 +1768,7 @@ class ChurchCore(Elaboratable):
                 u_change.dr_rd_data.eq(u_regs.dr_rd_data1),
                 u_change.boot_window.eq(boot_microcode_active),
                 u_change.flags_in.eq(u_regs.flags),
+                u_change.nia_current.eq(nia_reg),
             ]
             with m.If(clear_all):
                 m.d.sync += [

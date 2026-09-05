@@ -12,6 +12,7 @@ from hardware.hw_types import FaultType, GT_TYPE_INFORM
 from server.boot_image import create_gt, integrity32, pack_lump_header, pack_ns_word1
 from hardware.thread_design import (
     THREAD_CAP_WORDS,
+    THREAD_CODE_IDENTITY_OFFSET,
     thread_body_words,
     thread_layout,
 )
@@ -51,17 +52,27 @@ def _depends_on(dependencies, target, source):
     return False
 
 
-def test_scheduler_contract_has_no_serialized_entry_context():
+def test_scheduler_contract_has_serialized_executable_identity():
     source = open("hardware/change.py").read()
     assert 'm.next = "PREFLIGHT"' in source
     assert 'SCHEDULER_RESTORE_MASK = (1 << THREAD_CAP_WORDS) - 1' in source
     assert THREAD_CAP_WORDS == 12
     assert 'm.next = "ENTRY_CR0_READ"' in source
     assert 'mload_direct_gt.eq(entry_gt_latched)' in source
-    assert "entry_gt_view.gt_type != GT_TYPE_INFORM" in source
-    assert "~entry_gt_view.dom" in source
-    assert "~entry_gt_view.perm[2]" in source
-    assert 'self.nia_restore_val.eq(entry_raw_base + 4)' in source
+    assert "THREAD_CODE_IDENTITY_OFFSET" in source
+    assert 'm.next = "SAVE_CODE_READ"' in source
+    assert "restore_base + (THREAD_CODE_IDENTITY_OFFSET << 2)" in source
+    assert 'self.nia_restore_val.eq(indicator_word[13:28] << 2)' in source
+    assert 'self.nia_current[2:17]' in source
+    assert 'with m.State("PREFLIGHT_CAP_READ")' in source
+    assert 'with m.State("PREFLIGHT_CODE_VALIDATE")' in source
+    # Scheduler preflight's only successful edge into write-capable SAVE_*
+    # states is after the code-header check; its fault edges terminate.
+    preflight = source[source.index('with m.State("PREFLIGHT_HDR")'):
+                       source.index('with m.State("SAVE_CR_READ")')]
+    assert 'm.next = "SAVE_CR_READ"' in preflight
+    assert preflight.index('m.next = "SAVE_CR_READ"') > preflight.index(
+        'with m.State("PREFLIGHT_CODE_HEADER")')
     for stale in (
         "cr7_base", "PACKED_PC_OFFSET", "M_FLAG_OFFSET", "SAVE_PACKED_PC",
         "SAVE_M_FLAG", "RESTORE_PC", "RESTORE_M_FLAG",
@@ -85,8 +96,9 @@ def test_m6_contract_has_synchronizer_debounce_and_fetch_quiesce():
     "thread_n_minus_6",
     [2, 3],
 )
+@pytest.mark.parametrize("corruption", [None, "stale_cap", "null_code", "stale_code"])
 def test_change_enforces_defined_thread_body_before_restoring_context(
-        thread_n_minus_6):
+        thread_n_minus_6, corruption):
     dut = ChurchChange()
     sim = Simulator(dut)
     sim.add_clock(1e-6)
@@ -116,7 +128,13 @@ def test_change_enforces_defined_thread_body_before_restoring_context(
     for i in range(16):
         mem[new_base + (1 + i) * 4] = 0xA0000000 | i
     mem[new_base + 17 * 4] = layout["stack_end"]
-    mem[new_base + 18 * 4] = 0x18181818
+    mem[new_base + THREAD_CODE_IDENTITY_OFFSET * 4] = entry_gt
+    if corruption == "stale_cap":
+        mem[new_base + layout["caps_start"] * 4] = entry_gt ^ (1 << 16)
+    elif corruption == "null_code":
+        mem[new_base + THREAD_CODE_IDENTITY_OFFSET * 4] = 0
+    elif corruption == "stale_code":
+        mem[new_base + THREAD_CODE_IDENTITY_OFFSET * 4] = entry_gt ^ (1 << 16)
     mem[new_base + 258 * 4] = 0xDEADBEEF
 
     crs = [0] * 16
@@ -125,11 +143,12 @@ def test_change_enforces_defined_thread_body_before_restoring_context(
     writes = []
     reads = []
     nia = None
+    flags_written = False
     previous_read_en = False
     previous_read_addr = 0
 
     async def bench(ctx):
-        nonlocal previous_read_en, previous_read_addr, nia
+        nonlocal previous_read_en, previous_read_addr, nia, flags_written
         ctx.set(dut.cr_src, 15)
         ctx.set(dut.cr_dst, 14)
         ctx.set(dut.scheduler_mode, 1)
@@ -140,7 +159,7 @@ def test_change_enforces_defined_thread_body_before_restoring_context(
         ctx.set(dut.mem_wr_done, 1)
 
         async def cycle():
-            nonlocal previous_read_en, previous_read_addr, nia
+            nonlocal previous_read_en, previous_read_addr, nia, flags_written
             await ctx.delay(1e-9)
             ctx.set(dut.cr_rd_data.as_value(), crs[ctx.get(dut.cr_rd_addr)])
             ctx.set(dut.dr_rd_data, drs[ctx.get(dut.dr_rd_addr)])
@@ -158,6 +177,8 @@ def test_change_enforces_defined_thread_body_before_restoring_context(
             if next_read_en:
                 reads.append(next_read_addr)
             nia_write = (ctx.get(dut.nia_restore_en), ctx.get(dut.nia_restore_val))
+            if ctx.get(dut.flags_restore_en):
+                flags_written = True
             await ctx.tick()
             if cr_write[0]:
                 crs[cr_write[1]] = cr_write[2]
@@ -186,20 +207,28 @@ def test_change_enforces_defined_thread_body_before_restoring_context(
         else:
             raise AssertionError("scheduler CHANGE timed out")
 
+        if corruption is not None:
+            assert terminal == "fault"
+            assert writes == []
+            assert crs[14] == 0
+            assert drs == [0xB0000000 | i for i in range(16)]
+            assert nia is None
+            assert not flags_written
+            return
         assert terminal == "complete"
-        assert nia == code_base + 4
+        assert nia == 0
         assert drs[1] == 0xA0000001
         cr14 = crs[14]
         assert (cr14 & 0xFFFF) == code_slot
         assert ((cr14 >> 32) & 0xFFFFFFFF) == code_base + 4
         assert ((cr14 >> 64) & 0x1FFFFF) == 6
         assert mem[new_base + 17 * 4] == layout["stack_end"]
-        assert mem[new_base + 18 * 4] == 0x18181818
+        assert mem[new_base + THREAD_CODE_IDENTITY_OFFSET * 4] == entry_gt
         assert mem[new_base + 258 * 4] == 0xDEADBEEF
         assert old_base + 17 * 4 in writes
         forbidden = {
-            old_base + 18 * 4, old_base + 258 * 4,
-            new_base + 17 * 4, new_base + 18 * 4, new_base + 258 * 4,
+            old_base + 258 * 4,
+            new_base + 17 * 4, new_base + THREAD_CODE_IDENTITY_OFFSET * 4, new_base + 258 * 4,
         }
         assert forbidden.isdisjoint(writes)
 

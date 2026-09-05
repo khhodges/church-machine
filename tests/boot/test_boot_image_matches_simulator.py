@@ -362,9 +362,13 @@ def test_generated_thread_body_overlap_and_nondefault_boot_entry_are_rejected_or
     with pytest.raises(ValueError, match=r"overlaps the fixed boot and generated Thread region"):
         generate_boot_image(colliding, str(tmp_path))
 
-    image = generate_boot_image(_cfg_generated_threads(5), str(tmp_path), boot_entry_slot=7)
+    with pytest.raises(ValueError, match=r"non-executable code identity"):
+        generate_boot_image(
+            _cfg_generated_threads(5), str(tmp_path), boot_entry_slot=7)
+
+    image = generate_boot_image(_cfg_generated_threads(5), str(tmp_path), boot_entry_slot=300)
     entries = {row["slot"]: row for row in parse_ns_table_raw(image)["entries"]}
-    expected = create_gt(0, 7, {"E": 1}, 1)
+    expected = create_gt(0, 300, {"E": 1}, 1)
     for slot in generated_thread_slots(5):
         location = entries[slot]["w0"]
         assert struct.unpack_from("<I", image, (location + THREAD_CAPS_OFFSET) * 4)[0] == expected
@@ -494,7 +498,6 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
             "token": saved_token,
         }]
     }))
-
     cfg = {
         "step1": {
             "totalNamespaceWords": 16384,
@@ -544,8 +547,8 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
 
 @pytest.mark.parametrize("lightning_slot,stale_next_config", [
     (6,   None),  # default LightningBolt target: SelfTest
-    (7,   6),     # LightningBolt target must beat stale self-loop config
-    (8,   300),   # LightningBolt target must beat any stale configured target
+    (300, 6),     # valid nondefault target must beat stale self-loop config
+    (300, 8),     # valid nondefault target must beat any stale configured target
     (300, 7),     # validates the 16-bit slot_id encoding above the default NS limit
 ])
 def test_boot_image_next_gt_follows_lightning_bolt(tmp_path, lightning_slot, stale_next_config):

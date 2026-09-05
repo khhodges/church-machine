@@ -22,6 +22,7 @@ global.window = {
     },
 };
 const ChurchSimulator = require('./simulator.js');
+const ThreadDesign = require('./thread_design.js');
 const sim = new ChurchSimulator();
 
 const dom = new JSDOM('<!doctype html><body><div id="namespaceTable"></div><div id="crRegs"></div></body>');
@@ -142,10 +143,14 @@ const thread3 = sim.getThreadInstanceLayout(12);
 assert(thread2.valid && thread3.valid, 'generated Thread bodies must decode as resident Threads');
 assert.strictEqual(thread2.base, sim.readNSEntry(11).word0_location);
 assert.strictEqual(thread3.base, sim.readNSEntry(12).word0_location);
-assert.strictEqual(thread2.heapWords, 194, '256-word Thread Heap fills every word before a 32-word stack');
+assert.strictEqual(thread2.heapWords, 193, '256-word Thread Heap begins after the code identity word');
 assert.strictEqual(thread2.stackWords, 32, 'Thread header cw defines its stack size');
 assert.strictEqual(thread2.capsStart, 244, 'capabilities remain at the Thread body tail');
 assert.strictEqual(thread2.header.cc, 12, 'Thread header cc counts persisted CR0\u2013CR11 homes');
+assert.strictEqual(thread2.codeIdentityOffset, 18, 'Thread reserves +18 for executable identity');
+assert.strictEqual(sim.memory[thread2.base + thread2.codeIdentityOffset],
+    sim.memory[thread2.base + thread2.capsStart],
+    'new dormant Thread images explicitly seed executable identity from selected entry');
 
 // Runtime register/capability writes update the live Thread image, but the
 // persistence snapshot must retain the pre-execution words and header.
@@ -211,9 +216,10 @@ function assertThreadTableColumns(html, layout, base, label) {
     const tables = [...view.querySelectorAll('.thread-zone-table, .abs-clist-table')];
     const zoneTables = [...view.querySelectorAll('.thread-zone-table')];
     assert.strictEqual(layout.protectedStoOffset, 17, `${label} keeps protected STO at +17`);
-    assert.strictEqual(layout.heapStart, 18, `${label} starts ordinary heap at +18`);
-    assert.strictEqual(tables.length, 5, `${label} renders one table for each non-header memory zone`);
-    assert.strictEqual(zoneTables.length, 4, `${label} renders Data, protected STO, Heap, and Stack tables`);
+    assert.strictEqual(layout.codeIdentityOffset, 18, `${label} reserves code identity at +18`);
+    assert.strictEqual(layout.heapStart, 19, `${label} starts ordinary heap at +19`);
+    assert.strictEqual(tables.length, 6, `${label} renders one table for each non-header memory zone`);
+    assert.strictEqual(zoneTables.length, 5, `${label} renders Data, STO, code identity, Heap, and Stack tables`);
     const stoRow = view.querySelector('#thread-zone-sto + .thread-zone-body tbody tr');
     assert(stoRow, `${label} renders protected STO separately`);
     assert.strictEqual(stoRow.cells[0].textContent.trim(), '+17',
@@ -245,8 +251,8 @@ function assertThreadTableColumns(html, layout, base, label) {
         .map(header => header.textContent.replace(/\s+/g, ' ').trim().replace(/^[▼▶]/, ''));
     assert.deepStrictEqual(
         sectionLabels.map(label => label.replace(/\s+.*$/, '')),
-        ['⑤', '◆', '④', '②', '①'],
-        `${label} keeps Data Registers, Protected STO, Heap, Stack, Capabilities order`
+        ['⑤', '◆', '◇', '④', '②', '①'],
+        `${label} keeps Data Registers, Protected STO, code identity, Heap, Stack, Capabilities order`
     );
     assert(sectionLabels[1].includes('Protected STO') &&
            sectionLabels[1].includes('offset +17') &&
@@ -254,10 +260,10 @@ function assertThreadTableColumns(html, layout, base, label) {
         `${label} identifies +17 as the machine-protected STO word`);
     const stackStart = layout.lumpSize - 12 - layout.stackWords;
     const heapEnd = stackStart - 1;
-    const heapWords = heapEnd - 18 + 1;
-    assert(sectionLabels[2].includes('offset +18') &&
-           sectionLabels[2].includes(`${heapWords} words`),
-        `${label} starts Heap at +18 and shows its size-derived extent`);
+    const heapWords = heapEnd - 19 + 1;
+    assert(sectionLabels[3].includes('offset +19') &&
+           sectionLabels[3].includes(`${heapWords} words`),
+        `${label} starts Heap at +19 and shows its size-derived extent`);
     assert.deepStrictEqual(
         [firstRow(zoneTables[0]).cells[0].textContent.trim(),
          firstRow(zoneTables[0]).cells[1].textContent.trim()],
@@ -265,8 +271,8 @@ function assertThreadTableColumns(html, layout, base, label) {
         `${label} Data Registers starts at its selected-lump offset and address`
     );
     assert.deepStrictEqual(
-        [lastRow(zoneTables[2]).cells[0].textContent.trim(),
-         lastRow(zoneTables[2]).cells[1].textContent.trim()],
+         [lastRow(zoneTables[3]).cells[0].textContent.trim(),
+          lastRow(zoneTables[3]).cells[1].textContent.trim()],
          [`+${heapEnd}`, expectedAddress(heapEnd)],
          `${label} Heap ends immediately before Stack`
     );
@@ -290,8 +296,8 @@ function assertThreadTableColumns(html, layout, base, label) {
         `${label} lump header places its physical address second`);
     assert.strictEqual(
         1 + zoneTables.length + (capabilityTable ? 1 : 0),
-        6,
-        `${label} displays Header, DR, Protected Indicator, Heap, Stack, and Capabilities`
+        7,
+        `${label} displays Header, DR, Protected Indicator, code identity, Heap, Stack, and Capabilities`
     );
     const capRows = [...capabilityTable.querySelectorAll('tbody tr')];
     assert.strictEqual(capRows.length, 12, `${label} displays exactly twelve persisted capability homes`);
@@ -322,9 +328,8 @@ const tutorialMap = vm.runInContext('new ThreadTutorial()._memMap(null)', sandbo
 const tutorialText = vm.runInContext(
     'new ThreadTutorial().steps.map(step => step.content).join("\\n")', sandbox);
 assert(tutorialMap.includes('◆ Protected STO') &&
-       tutorialMap.includes('Machine-protected Thread word +17') &&
-       tutorialMap.includes('word 18'),
-    'Thread tutorial map shows protected STO at +17 and Heap at +18');
+        tutorialMap.includes('Machine-protected Thread word +17'),
+    'Thread tutorial map shows protected STO at +17');
 assert(tutorialText.includes('0xF900_820C') &&
        tutorialText.includes('cc=12') &&
        tutorialText.includes('n\u22126=2'),
@@ -393,7 +398,7 @@ const wideThread = wideSim.getThreadInstanceLayout(11);
 assert(wideThread.valid, 'a 512-word generated Thread body is supported');
 assert.strictEqual(wideThread.sizeSupported, true, 'layout accepts the n-6-selected size');
 assert.strictEqual(wideThread.lumpSize, 512, 'selected header retains its full allocated size');
-assert.strictEqual(wideThread.heapWords, 450, 'additional Thread words are assigned to Heap');
+assert.strictEqual(wideThread.heapWords, 449, 'additional Thread words are assigned to Heap');
 assert.strictEqual(wideThread.capsStart, 500, 'CR0 home remains twelve words from the Thread tail');
 assert.strictEqual(wideThread.capsEnd, 511, 'CR11 occupies the final Thread word');
 
