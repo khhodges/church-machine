@@ -2803,34 +2803,6 @@
     "issue_n": 1
   },
   {
-    "token": "00aa1234",
-    "abstraction": "Adder",
-    "filename": "Adder.1.2009489d.lump",
-    "sidecar_file": "Adder.1.2009489d.json",
-    "lump_size": 128,
-    "cw": 4,
-    "cc": 1,
-    "author": "",
-    "version": "",
-    "lump_version": 314,
-    "compiled_at": 1788607327.0712714,
-    "methods": [
-      "Add"
-    ],
-    "grants": [
-      "E"
-    ],
-    "capability_type": "inform",
-    "authorized": false,
-    "legacy_authorized": false,
-    "binary_hash": "bcbc0629bb24efdeec5603adf8a059e94149c9d2dffd6940edf527171cf82e87",
-    "petname": "",
-    "issue_number": 1,
-    "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f",
-    "dot_name": "Adder",
-    "issue_n": 1
-  },
-  {
     "token": "00000a00",
     "abstraction": "CapabilityTest",
     "filename": "CapabilityTest.2.4dc5c64e.lump",
@@ -2890,5 +2862,33 @@
     "ns_slot_policy": "static",
     "variant_group": "capabilitytest-history",
     "ns_slot": 10
+  },
+  {
+    "token": "00aa1234",
+    "abstraction": "Adder",
+    "filename": "Adder.1.2009489d.lump",
+    "sidecar_file": "Adder.1.2009489d.json",
+    "lump_size": 128,
+    "cw": 4,
+    "cc": 1,
+    "author": "",
+    "version": "",
+    "lump_version": 317,
+    "compiled_at": 1788626203.650386,
+    "methods": [
+      "Add"
+    ],
+    "grants": [
+      "E"
+    ],
+    "capability_type": "inform",
+    "authorized": false,
+    "legacy_authorized": false,
+    "binary_hash": "bcbc0629bb24efdeec5603adf8a059e94149c9d2dffd6940edf527171cf82e87",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f",
+    "dot_name": "Adder",
+    "issue_n": 1
   }
 ]
