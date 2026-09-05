@@ -4129,9 +4129,15 @@ window._nsTableSave = async function(btn) {
         // but it can recover a missing/stale saved image safely.  Persist the
         // selected build config first (which may invalidate the old image),
         // then regenerate and validate the server image through loadBootImage.
-        if (!window.bootImage || !window.bootImageAvailable) {
+        // A config POST can invalidate the cached browser buffer while the
+        // simulator still holds the last validated image in live memory.
+        // Preserve that image for this explicit Namespace save; regenerating
+        // here would discard unsaved slot locations and resident artifacts.
+        const hasLiveBootImage = sim._bootImageLoaded === true;
+        if ((!window.bootImage || !window.bootImageAvailable) && !hasLiveBootImage) {
             await window._ensureNamespaceBuildConfig();
-            if (!window.bootImage || !window.bootImageAvailable) {
+            if ((!window.bootImage || !window.bootImageAvailable) &&
+                    sim._bootImageLoaded !== true) {
                 const _genResp = await fetch('/api/boot-image/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -4218,6 +4224,14 @@ window._nsTableSave = async function(btn) {
         const _hex8  = v => '0x' + ((v >>> 0).toString(16).toUpperCase().padStart(8, '0'));
         const _hex5  = v => '0x' + ((v >>> 0).toString(16).toUpperCase().padStart(5, '0'));
         const _hex4  = v => '0x' + ((v >>> 0).toString(16).toUpperCase().padStart(4, '0'));
+        const _savedBySlot = new Map();
+        const _savedEntries = window._nsState &&
+            Array.isArray(window._nsState.abstractions)
+            ? window._nsState.abstractions : [];
+        for (const _saved of _savedEntries) {
+            if (!_saved || !Number.isInteger(_saved.slot)) continue;
+            _savedBySlot.set(_saved.slot, _saved);
+        }
         const nsAbstractions = [];
         for (let _si = 0; _si < sim.nsCount; _si++) {
             const _e = sim.readNSEntry(_si);
@@ -4247,6 +4261,22 @@ window._nsTableSave = async function(btn) {
                 seq:      _seq,
                 seal:     _hex8(_seal),
             };
+            // Artifact identity is sidecar/catalog metadata, not part of the
+            // four-word Namespace entry.  Preserve it when the same slot and
+            // abstraction are still present; otherwise a save can leave a
+            // perfectly valid resident LUMP impossible for the resolver to
+            // locate on the next regeneration.
+            const _saved = _savedBySlot.get(_si);
+            if (_saved && _saved.name === _lbl) {
+                for (const _key of [
+                    'token', 'filename', 'issue_n', 'resident',
+                    'binaryHash', 'identityHash', 'cacheToken'
+                ]) {
+                    if (_saved[_key] !== undefined && _saved[_key] !== null) {
+                        _rich[_key] = _saved[_key];
+                    }
+                }
+            }
             if (_si === bootEntrySlot) _rich.boot = true;
             nsAbstractions.push(_rich);
         }

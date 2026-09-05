@@ -53,6 +53,13 @@ check('Namespace save regenerates and validates a missing boot image before snap
     save.indexOf("fetch('/api/boot-image/generate'") !== -1 &&
     save.indexOf("sim.loadBootImage(_generated)") !== -1 &&
     save.indexOf("fetch('/api/boot-image/generate'") < saveRaw);
+check('Namespace save preserves a validated live image after cache invalidation',
+    save.includes('sim._bootImageLoaded === true') &&
+    save.includes('sim._bootImageLoaded !== true'));
+check('Namespace save preserves resident artifact locators for unchanged rows',
+    save.includes('_savedBySlot') &&
+    save.includes("'token', 'filename', 'issue_n'") &&
+    save.includes("_saved.name === _lbl"));
 
 const editorSource = fs.readFileSync(path.join(__dirname, 'app-lump-editor.js'), 'utf8');
 const step1Start = editorSource.indexOf('function _postStep1(');

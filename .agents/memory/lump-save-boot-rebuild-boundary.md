@@ -18,3 +18,21 @@ approved only CapabilityTest.
 artifact being mutated. Treat composite boot-image generation as a separate
 authority transition whose failure is surfaced without revoking the completed
 artifact save.
+
+## Namespace save boundary
+
+An invalidated browser boot-image cache does not mean the simulator's live
+Namespace image is invalid. If the current simulator memory came from a
+validated boot image, an explicit Namespace Save must serialize that live image
+instead of regenerating from the server snapshot. Preserve sidecar locators
+(token and canonical filename) for unchanged slot/name pairs.
+
+**Why:** Saving build configuration before Namespace serialization can clear the
+browser cache while leaving the user's selected slot locations and resident
+LUMPs in live simulator memory. Regenerating at that point silently saves a
+different Namespace and drops metadata that is not present in the four-word NS
+entry.
+
+**How to apply:** Track validated image provenance separately from the cached
+browser buffer. Regenerate only when neither source is available, and merge
+existing artifact bindings defensively at the server commit boundary.

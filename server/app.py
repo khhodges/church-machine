@@ -3874,6 +3874,32 @@ def boot_image_save_ns():
             _a for _a in _raw_abs
             if isinstance(_a, dict) and _a.get("name") and isinstance(_a.get("slot"), int)
         ]
+        # The four-word NS entry does not carry the resident artifact locator.
+        # Preserve an existing locator when an older/browser client submits the
+        # same slot and name without the sidecar fields.  This prevents a
+        # successful Namespace save from making an otherwise valid resident
+        # LUMP undiscoverable on the next boot-image regeneration.
+        _old_by_slot = {}
+        if os.path.isfile(NS_STATE_PATH):
+            try:
+                with open(NS_STATE_PATH, encoding="utf-8") as _old_state_fh:
+                    _old_state = json.load(_old_state_fh)
+                for _old_entry in (_old_state.get("abstractions") or []):
+                    if (isinstance(_old_entry, dict)
+                            and isinstance(_old_entry.get("slot"), int)):
+                        _old_by_slot[_old_entry["slot"]] = _old_entry
+            except (OSError, ValueError, TypeError):
+                _old_by_slot = {}
+        for _entry in _ns_entries:
+            _old_entry = _old_by_slot.get(_entry["slot"])
+            if not _old_entry or _old_entry.get("name") != _entry.get("name"):
+                continue
+            for _key in (
+                "token", "filename", "issue_n", "resident",
+                "binaryHash", "identityHash", "cacheToken",
+            ):
+                if _entry.get(_key) is None and _old_entry.get(_key) is not None:
+                    _entry[_key] = _old_entry[_key]
         with _namespace_commit_guard():
             old_image = None
             if os.path.isfile(BOOT_IMAGE_PATH):

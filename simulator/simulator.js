@@ -549,6 +549,7 @@ class ChurchSimulator {
         }
 
         this.output += `[BOOTIMG] Loaded ${n}-word boot image; ${count} NS entries active.\n`;
+        this._bootImageLoaded = true;
         this.emit('stateChange', this.getState());
         return true;
     }
@@ -890,6 +891,11 @@ class ChurchSimulator {
     }
 
     reset() {
+        // A build-config save can invalidate the cached browser buffer while
+        // the live simulator still contains the user's validated Namespace
+        // image. Namespace Save uses this flag to avoid replacing that image
+        // with a newly generated server image.
+        this._bootImageLoaded = false;
         this._breakpointResumeAddr = null;
         // Dynamic system services hold authority state outside the raw NS
         // words. Retire it before replacing memory so no credential, range
