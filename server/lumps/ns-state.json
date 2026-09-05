@@ -86,8 +86,7 @@
       "g": 0,
       "limit": "0x0003F",
       "seq": 0,
-      "seal": "0xDEABDEEF",
-      "boot": true
+      "seal": "0xDEABDEEF"
     },
     {
       "name": "Tunnel",
@@ -120,7 +119,8 @@
       "g": 0,
       "limit": "0x001F9",
       "seq": 0,
-      "seal": "0xDE937EEF"
+      "seal": "0xDE937EEF",
+      "boot": true
     },
     {
       "name": "Thread#2",
@@ -156,6 +156,6 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1788651547.1569989,
+  "generated_at": 1788652042.6925082,
   "committed_raw_fingerprint": "0fd57d1638c3eec866a9e1d7ef92766fc5f449ddbaa96402c61c7da26e436b64"
 }
