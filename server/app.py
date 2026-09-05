@@ -13682,6 +13682,9 @@ _wukong_run_unlocked = True
 _wukong_step_write_trace_seq = None
 _wukong_step_bridge_session = ''
 _wukong_bridge_trace_highwater = {}
+_WUKONG_SKIP_COMPLETION_TIMEOUT = 10.0
+# Exact in-process disposition for a k write. Protected by command lock.
+_wukong_skip_pending = None
 
 
 def _record_wukong_bridge_event(event, state='', reason='', session_id='',
@@ -14543,7 +14546,9 @@ def wukong_trace_post():
         _wukong_event_queue.append(entry)
         if len(_wukong_event_queue) > _WUKONG_EVENT_QUEUE_MAXLEN:
             del _wukong_event_queue[:-_WUKONG_EVENT_QUEUE_MAXLEN]
-        _wukong_latest_trace = entry
+        # Never alias the immutable execution-history event: live status may
+        # later be cleared only after board-originated skip completion proof.
+        _wukong_latest_trace = dict(entry)
         global _wukong_run_unlocked, _wukong_step_write_trace_seq, \
             _wukong_step_bridge_session
         if bridge_session and entry.get('bridge_trace_counter', -1) >= 0:
@@ -15030,7 +15035,7 @@ def wukong_console_post():
 def wukong_command_post():
     """IDE enqueues a command for the bridge to forward to the board.
 
-    Body JSON: {'cmd': 's'|'r'|'h'|'q'|'b'|'u'|'f', 'nia': <int>, 'data': '<base64>'}
+    Body JSON: {'cmd': 's'|'r'|'h'|'q'|'b'|'u'|'f'|'k', 'nia': <int>, 'data': '<base64>'}
 
     Only one command is queued at a time.  Halt ('h') is priority-safe: it may
     atomically replace only an undelivered Run/Step ('r'/'s').  It never
@@ -15042,10 +15047,38 @@ def wukong_command_post():
         _wukong_cmd_id, _wukong_run_unlocked
     data = request.get_json(silent=True) or {}
     cmd = str(data.get('cmd', '')).strip()
-    if cmd not in ('s', 'r', 'h', 'q', 'b', 'u', 'f'):
+    if cmd not in ('s', 'r', 'h', 'q', 'b', 'u', 'f', 'k'):
         return jsonify({'ok': False, 'error': 'unknown cmd'}), 400
 
     entry = {'cmd': cmd}
+
+    if cmd == 'k':
+        # Testing-only Skip Fault is fail-closed at the server as well as RTL.
+        # Require the current fault trace and its exact promoted reason-2
+        # snapshot. Historical fault records remain untouched.
+        with _wukong_trace_lock:
+            current_fault = dict(_wukong_latest_trace)
+            current_snapshot = dict(_wukong_latest_snapshot)
+        incident_id = str(current_fault.get('incident_id', '') or '')
+        skip_available = bool(
+            current_fault.get('fault_valid') and incident_id and
+            current_snapshot.get('reason') == 2 and
+            current_snapshot.get('incident_id') == incident_id and
+            current_snapshot.get('fault_trace_seq') == current_fault.get('seq') and
+            current_snapshot.get('promotion_status') == 'promoted')
+        if not skip_available:
+            return jsonify({
+                'ok': False,
+                'error': 'Skip Fault requires the current correlated hardware fault snapshot',
+                'blocked_stage': 'no_current_hardware_fault',
+            }), 409
+        entry['incident_id'] = incident_id
+        # `snapshot_seq` preserves the fixed-frame hardware sequence; `seq`
+        # is subsequently replaced by the server event sequence.
+        fault_snapshot_seq = int(current_snapshot.get(
+            'snapshot_seq', current_snapshot.get('seq', 0))) & 0xFFFF
+        entry['expected_skip_snapshot_seq'] = (
+            fault_snapshot_seq + 1) & 0xFFFF
 
     if cmd == 'b':
         # Accept int, decimal string, '0x…' hex string, or bare hex string.
@@ -15095,7 +15128,7 @@ def wukong_command_post():
             _upload_in_flight = True
 
     else:
-        # s / r / h — reject while any upload is in-flight.
+        # s / r / h / k — reject while any upload is in-flight.
         with _upload_in_flight_lock:
             if _upload_in_flight:
                 if cmd == 'h':
@@ -15112,6 +15145,14 @@ def wukong_command_post():
 
     now = _wk_time.time()
     with _wukong_command_lock:
+        if cmd == 'k' and _wukong_skip_pending and \
+                _wukong_skip_pending.get('state') in (
+                    'awaiting_board_evidence', 'indeterminate'):
+            return jsonify({
+                'ok': False,
+                'error': 'Skip Fault disposition is pending or indeterminate; Reboot is required',
+                'blocked_stage': _wukong_skip_pending.get('state'),
+            }), 409
         if cmd == 'r' and not _wukong_run_unlocked:
             return jsonify({
                 'ok': False,
@@ -15177,6 +15218,11 @@ def wukong_command_post():
             'board_halt_session': '',
             'board_state_counter': None,
         }
+        if cmd == 'k':
+            _wukong_cmd_delivery['incident_id'] = entry['incident_id']
+            _wukong_cmd_delivery['expected_skip_snapshot_seq'] = (
+                entry['expected_skip_snapshot_seq'])
+            _wukong_cmd_delivery['skip_completion'] = False
     _record_wukong_bridge_event('command_queued', 'server',
                                 f"command {cmd!r} queued", '', '', 0)
     resp = {'ok': True, 'id': entry['id']}
@@ -15268,6 +15314,7 @@ def wukong_status_get():
     with _wukong_command_lock:
         pending   = dict(_wukong_pending_cmd) if _wukong_pending_cmd else None
         delivery  = dict(_wukong_cmd_delivery) if _wukong_cmd_delivery else None
+        skip_pending = dict(_wukong_skip_pending) if _wukong_skip_pending else None
     if pending and 'data' in pending:
         # Type-safe payload summary: never embed the payload, and never raise
         # (a TypeError here would turn the read-only status poll into a 500).
@@ -15277,6 +15324,21 @@ def wukong_status_get():
     with _wukong_bridge_lock:
         bridge_info = dict(_wukong_bridge_info)
         bridge_timeline = list(_wukong_bridge_timeline[-32:])
+    if skip_pending and skip_pending.get('state') == 'awaiting_board_evidence':
+        indeterminate = (
+            now - float(skip_pending.get('write_ts') or now) >
+            _WUKONG_SKIP_COMPLETION_TIMEOUT or
+            bridge_info.get('state') in ('reconnecting', 'serial_error') or
+            (bridge_info.get('session_id') and
+             bridge_info.get('session_id') != skip_pending.get('bridge_session')))
+        if indeterminate:
+            with _wukong_command_lock:
+                if (_wukong_skip_pending and
+                        _wukong_skip_pending.get('command_id') ==
+                        skip_pending.get('command_id')):
+                    _wukong_skip_pending['state'] = 'indeterminate'
+                    _wukong_skip_pending['action'] = 'Reboot required'
+                    skip_pending = dict(_wukong_skip_pending)
     bridge_age = (now - _wukong_last_bridge_poll) if _wukong_last_bridge_poll else None
     trace_age  = (now - _wukong_last_trace_post)  if _wukong_last_trace_post  else None
     bridge_alert = _wukong_refresh_bridge_alert(now)
@@ -15313,6 +15375,14 @@ def wukong_status_get():
         'boot_info':          boot_info,
         'startup_state':      boot_info.get('startup_state', ''),
         'run_unlocked':       _wukong_run_unlocked,
+        'skip_fault_available': bool(
+            latest.get('fault_valid') and latest.get('incident_id') and
+            snapshot.get('reason') == 2 and
+            snapshot.get('incident_id') == latest.get('incident_id') and
+            snapshot.get('fault_trace_seq') == latest.get('seq') and
+            snapshot.get('promotion_status') == 'promoted' and
+            not skip_pending),
+        'skip_fault': skip_pending,
         'active_thread':      active_thread,
         # What the hardware will actually run at boot: power-on bitstream
         # default (slot 7, WukongCallHome) until a boot-image upload is
@@ -15406,7 +15476,7 @@ def wukong_command_ack_post():
 
     Body JSON:
         id    — the command ID received on dequeue (GET /hardware/wukong/command)
-        cmd   — the command char it attempted to write ('s','r','h','b','f')
+        cmd   — the command char it attempted to write ('s','r','h','b','f','k')
         ok    — true when the UART write succeeded
         error — human-readable failure string when ok=false
 
@@ -15416,7 +15486,8 @@ def wukong_command_ack_post():
     arrives before consumption can never corrupt the lifecycle.
     """
     global _wukong_cmd_delivery, _wukong_run_unlocked, \
-        _wukong_step_write_trace_seq, _wukong_step_bridge_session
+        _wukong_step_write_trace_seq, _wukong_step_bridge_session, \
+        _wukong_skip_pending
     data = request.get_json(silent=True) or {}
     cmd  = str(data.get('cmd', '')).strip()
     ok   = bool(data.get('ok', False))
@@ -15466,11 +15537,104 @@ def wukong_command_ack_post():
                 _wukong_step_bridge_session = ack_session
             if ack_session:
                 _wukong_cmd_delivery['bridge_session'] = ack_session
+            if cmd == 'k' and ok:
+                if not ack_session or ack_state_counter is None:
+                    _wukong_cmd_delivery['write_ok'] = False
+                    _wukong_cmd_delivery['write_error'] = (
+                        'bridge omitted skip session/counter correlation')
+                else:
+                    _wukong_cmd_delivery['skip_state'] = 'awaiting_board_evidence'
+                    _wukong_skip_pending = {
+                        'state': 'awaiting_board_evidence',
+                        'command_id': ack_id,
+                        'incident_id': _wukong_cmd_delivery.get('incident_id'),
+                        'bridge_session': ack_session,
+                        'expected_skip_snapshot_seq':
+                            _wukong_cmd_delivery.get(
+                                'expected_skip_snapshot_seq'),
+                        'write_ts': _wukong_cmd_delivery['write_ts'],
+                    }
+            elif cmd == 'f' and ok:
+                _wukong_skip_pending = None
             _record_wukong_bridge_event(
                 'command_write_ok' if ok else 'command_write_failed',
                 'connected' if ok else 'serial_error', err,
                 ack_session, '', 0)
     return jsonify({'ok': True})
+
+
+@app.route('/hardware/wukong/skip-fault-completion', methods=['POST'])
+def wukong_skip_fault_completion_post():
+    """Accept post-skip reason-3 board evidence, never a write-ACK surrogate."""
+    global _wukong_latest_trace, _wukong_skip_pending
+    token = os.environ.get('REPORT_TOKEN', '').strip()
+    if not token:
+        return jsonify({
+            'accepted': False, 'decision': 'auth_unavailable',
+            'error': 'REPORT_TOKEN is not configured',
+        }), 503
+    supplied = request.headers.get('Authorization', '')
+    if not hmac.compare_digest(supplied, f'Bearer {token}'):
+        return jsonify({
+            'accepted': False, 'decision': 'unauthorized',
+            'error': 'Unauthorized',
+        }), 401
+    data = request.get_json(silent=True) or {}
+    try:
+        command_id = int(data.get('command_id'))
+        nia = int(data.get('nia')) & 0xFFFFFFFF
+        fault_nia = int(data.get('fault_nia')) & 0xFFFFFFFF
+        reason = int(data.get('reason'))
+        version = int(data.get('version', 0))
+        snapshot_seq = int(data.get('seq')) & 0xFFFF
+    except (TypeError, ValueError):
+        return jsonify({'accepted': False, 'decision': 'invalid_completion'}), 400
+    incident_id = str(data.get('incident_id', '') or '')
+    completion_session = str(data.get('bridge_session', '') or '')[:128]
+    if (data.get('snapshot') is not True or version != 1 or
+            data.get('crc_valid') is not True or reason != 3 or
+            nia != ((fault_nia + 4) & 0xFFFFFFFF)):
+        return jsonify({'accepted': False, 'decision': 'invalid_completion'}), 409
+    # Lock order matches command ACK and command admission: trace, then command.
+    with _wukong_trace_lock:
+        with _wukong_command_lock:
+            delivery = _wukong_cmd_delivery
+            valid_delivery = bool(
+                delivery and delivery.get('id') == command_id and
+                delivery.get('cmd') == 'k' and delivery.get('write_ok') is True and
+                delivery.get('incident_id') == incident_id and
+                completion_session and
+                delivery.get('bridge_session') == completion_session and
+                _wukong_skip_pending and
+                _wukong_skip_pending.get('state') == 'awaiting_board_evidence' and
+                _wukong_skip_pending.get('command_id') == command_id and
+                _wukong_skip_pending.get('bridge_session') == completion_session and
+                _wukong_skip_pending.get('expected_skip_snapshot_seq') ==
+                snapshot_seq and delivery.get('expected_skip_snapshot_seq') ==
+                snapshot_seq)
+            if not valid_delivery:
+                return jsonify({'accepted': False, 'decision': 'command_mismatch'}), 409
+            live = _wukong_latest_trace
+            if not (live.get('fault_valid') and
+                    live.get('incident_id') == incident_id and
+                    int(live.get('nia', -1)) == fault_nia):
+                return jsonify({'accepted': False, 'decision': 'fault_mismatch'}), 409
+            # Replace live status, never mutate the queued immutable event.
+            _wukong_latest_trace = dict(live)
+            _wukong_latest_trace['fault_valid'] = False
+            _wukong_latest_trace['skip_fault_consumed'] = True
+            _wukong_latest_trace['skip_completion_nia'] = nia
+            delivery['skip_completion'] = True
+            delivery['skip_completion_nia'] = nia
+            delivery['skip_completion_ts'] = _wk_time.time()
+            delivery['skip_state'] = 'completed'
+            _wukong_skip_pending = {
+                'state': 'completed', 'command_id': command_id,
+                'incident_id': incident_id,
+                'bridge_session': completion_session,
+                'expected_skip_snapshot_seq': snapshot_seq,
+            }
+    return jsonify({'accepted': True, 'decision': 'skip_completed'})
 
 
 @app.route('/hardware/wukong/halt-state', methods=['POST'])

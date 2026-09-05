@@ -32,6 +32,15 @@ from server.app import app
 
 
 def _reset_state():
+    with _app_module._wukong_trace_lock:
+        _app_module._wukong_latest_trace = {}
+        _app_module._wukong_latest_snapshot = {}
+        _app_module._wukong_event_queue.clear()
+        _app_module._wukong_fault_incidents.clear()
+        _app_module._wukong_fault_candidate = {
+            'state': 'unavailable', 'decision': 'missing_trace',
+            'incident_id': '',
+        }
     with _app_module._wukong_command_lock:
         _app_module._wukong_pending_cmd = None
         _app_module._wukong_cmd_delivery = None
@@ -40,6 +49,7 @@ def _reset_state():
         _app_module._wukong_step_write_trace_seq = None
         _app_module._wukong_step_bridge_session = ''
         _app_module._wukong_bridge_trace_highwater.clear()
+        _app_module._wukong_skip_pending = None
     with _app_module._upload_in_flight_lock:
         _app_module._upload_in_flight = False
     with _app_module._wukong_boot_info_lock:
@@ -80,7 +90,8 @@ def _status(client):
     return r.get_json()
 
 
-def _ack(client, cmd, cmd_id, ok, error='', session_id='', trace_counter=None):
+def _ack(client, cmd, cmd_id, ok, error='', session_id='', trace_counter=None,
+         state_counter=None):
     body = {'cmd': cmd, 'id': cmd_id, 'ok': ok}
     if error:
         body['error'] = error
@@ -88,6 +99,8 @@ def _ack(client, cmd, cmd_id, ok, error='', session_id='', trace_counter=None):
         body['session_id'] = session_id
     if trace_counter is not None:
         body['trace_counter'] = trace_counter
+    if state_counter is not None:
+        body['state_counter'] = state_counter
     return client.post('/hardware/wukong/command-ack',
                        data=json.dumps(body), content_type='application/json')
 
@@ -688,6 +701,161 @@ class TestStepFirstRunGate:
         _ack(client, 's', step_id, True, session_id='bridge-a',
              trace_counter=10)
         assert _status(client)['run_unlocked'] is True
+
+
+class TestTestingOnlySkipFault:
+    """The `k` command is available only for the exact live promoted incident."""
+
+    def _seed_fault(self, promoted=True, matching=True):
+        incident = 'a' * 32
+        with _app_module._wukong_trace_lock:
+            fault_event = {
+                'seq': 41, 'fault_valid': True, 'incident_id': incident,
+                'nia': 0x140, 'fault_code': 1,
+            }
+            _app_module._wukong_event_queue[:] = [fault_event]
+            _app_module._wukong_latest_trace = dict(fault_event)
+            _app_module._wukong_latest_snapshot = {
+                'reason': 2,
+                'snapshot_seq': 12,
+                'incident_id': incident if matching else 'b' * 32,
+                'fault_trace_seq': 41,
+                'promotion_status': 'promoted' if promoted else 'pending',
+            }
+        return incident
+
+    def test_skip_rejects_stale_or_unpromoted_fault_evidence(self, client):
+        self._seed_fault(promoted=False)
+        rejected = _post_cmd(client, 'k')
+        assert rejected.status_code == 409
+        assert rejected.get_json()['blocked_stage'] == 'no_current_hardware_fault'
+        self._seed_fault(promoted=True, matching=False)
+        assert _post_cmd(client, 'k').status_code == 409
+
+    def test_skip_accepts_exact_promoted_live_incident_and_ack_clears_live_only(self, client):
+        incident = self._seed_fault()
+        queued = _post_cmd(client, 'k')
+        assert queued.status_code == 200
+        cmd_id = queued.get_json()['id']
+        assert _status(client)['skip_fault_available'] is True
+        got = client.get('/hardware/wukong/command').get_json()
+        assert got['cmd'] == 'k' and got['incident_id'] == incident
+        assert _ack(client, 'k', cmd_id, True, session_id='bridge-a',
+                    state_counter=7).status_code == 200
+        # UART ACK alone is not board acceptance and must not hide the fault.
+        assert _status(client)['latest_trace']['fault_valid'] is True
+        assert _post_cmd(client, 'k').status_code == 409
+        token = os.environ.get('REPORT_TOKEN', '')
+        report_headers = (
+            {'Authorization': f'Bearer {token}'} if token else {})
+        rejected = client.post('/hardware/wukong/skip-fault-completion',
+                               data=json.dumps({
+                                   'command_id': cmd_id, 'incident_id': incident,
+                                   'fault_nia': 0x140, 'nia': 0x140, 'reason': 3,
+                                   'snapshot': True, 'version': 1, 'crc_valid': True,
+                                   'bridge_session': 'bridge-a',
+                                   'seq': 13,
+                               }), content_type='application/json',
+                               headers=report_headers)
+        assert rejected.status_code == 409
+        complete = client.post('/hardware/wukong/skip-fault-completion',
+                               data=json.dumps({
+                                   'command_id': cmd_id, 'incident_id': incident,
+                                   'fault_nia': 0x140, 'nia': 0x144, 'reason': 3,
+                                   'snapshot': True, 'version': 1, 'crc_valid': True,
+                                   'bridge_session': 'bridge-a',
+                                   'seq': 13,
+                               }), content_type='application/json',
+                               headers=report_headers)
+        assert complete.status_code == 200
+        status = _status(client)
+        assert status['latest_trace']['fault_valid'] is False
+        assert status['latest_trace']['skip_fault_consumed'] is True
+        # Snapshot remains a durable historical record; only live status clears.
+        assert status['latest_snapshot']['incident_id'] == incident
+        assert status['latest_snapshot']['promotion_status'] == 'promoted'
+        assert status['skip_fault_available'] is False
+        # The historical event is immutable and still records the real fault.
+        assert _app_module._wukong_event_queue[0]['fault_valid'] is True
+        assert client.post('/hardware/wukong/skip-fault-completion',
+                           data=json.dumps({
+                               'command_id': cmd_id, 'incident_id': incident,
+                               'fault_nia': 0x140, 'nia': 0x144, 'reason': 3,
+                               'snapshot': True, 'version': 1, 'crc_valid': True,
+                               'bridge_session': 'bridge-a',
+                               'seq': 13,
+                           }), content_type='application/json',
+                           headers=report_headers).status_code == 409
+
+    def test_completion_requires_auth_session_and_exact_hardware_sequence(
+            self, client, monkeypatch):
+        monkeypatch.setenv('REPORT_TOKEN', 'report-secret')
+        incident = self._seed_fault()
+        cmd_id = _post_cmd(client, 'k').get_json()['id']
+        client.get('/hardware/wukong/command',
+                   headers={'X-Wukong-Session': 'bridge-a'})
+        _ack(client, 'k', cmd_id, True, session_id='bridge-a',
+             state_counter=7)
+        body = {
+            'command_id': cmd_id, 'incident_id': incident,
+            'fault_nia': 0x140, 'nia': 0x144, 'reason': 3,
+            'snapshot': True, 'version': 1, 'crc_valid': True,
+            'bridge_session': 'bridge-a',
+            'seq': 13,
+        }
+        assert client.post('/hardware/wukong/skip-fault-completion',
+                           json=body).status_code == 401
+        headers = {'Authorization': 'Bearer report-secret'}
+        wrong_session = dict(body, bridge_session='bridge-b')
+        assert client.post('/hardware/wukong/skip-fault-completion',
+                           json=wrong_session, headers=headers).status_code == 409
+        stale = dict(body, seq=12)
+        assert client.post('/hardware/wukong/skip-fault-completion',
+                           json=stale, headers=headers).status_code == 409
+        assert client.post('/hardware/wukong/skip-fault-completion',
+                           json=body, headers=headers).status_code == 200
+
+    def test_completion_is_unavailable_without_report_token(
+            self, client, monkeypatch):
+        monkeypatch.delenv('REPORT_TOKEN', raising=False)
+        response = client.post('/hardware/wukong/skip-fault-completion',
+                               json={})
+        assert response.status_code == 503
+        assert response.get_json()['decision'] == 'auth_unavailable'
+
+    def test_reconnect_makes_skip_indeterminate_and_reboot_clears_it(self, client):
+        self._seed_fault()
+        cmd_id = _post_cmd(client, 'k').get_json()['id']
+        client.get('/hardware/wukong/command',
+                   headers={'X-Wukong-Session': 'bridge-a'})
+        _ack(client, 'k', cmd_id, True, session_id='bridge-a',
+             state_counter=2)
+        _bridge_status(client, session_id='bridge-b', event='reconnect_attempt',
+                       state='reconnecting')
+        status = _status(client)
+        assert status['skip_fault']['state'] == 'indeterminate'
+        assert status['skip_fault']['action'] == 'Reboot required'
+        assert _post_cmd(client, 'k').status_code == 409
+        reboot_id = _post_cmd(client, 'f').get_json()['id']
+        client.get('/hardware/wukong/command',
+                   headers={'X-Wukong-Session': 'bridge-b'})
+        _ack(client, 'f', reboot_id, True, session_id='bridge-b')
+        assert _status(client)['skip_fault'] is None
+
+    def test_completion_timeout_is_indeterminate_and_requires_reboot(self, client):
+        self._seed_fault()
+        cmd_id = _post_cmd(client, 'k').get_json()['id']
+        client.get('/hardware/wukong/command',
+                   headers={'X-Wukong-Session': 'bridge-a'})
+        _ack(client, 'k', cmd_id, True, session_id='bridge-a',
+             state_counter=3)
+        with _app_module._wukong_command_lock:
+            _app_module._wukong_skip_pending['write_ts'] = (
+                time.time() - _app_module._WUKONG_SKIP_COMPLETION_TIMEOUT - 1)
+        status = _status(client)
+        assert status['skip_fault']['state'] == 'indeterminate'
+        assert status['skip_fault']['action'] == 'Reboot required'
+        assert status['latest_trace']['fault_valid'] is True
 
 
 class TestBootInfoReceivedTs:

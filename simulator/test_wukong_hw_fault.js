@@ -432,6 +432,32 @@ function makeTransitionDetector() {
     assert('T5k: _wukongHwFaultReset posts the "f" command',
         fnBody.indexOf("'f'") !== -1,
         '"f" command not found in _wukongHwFaultReset body');
+
+// ── T5l–o: testing-only Skip Fault UI contract ───────────────────────────────
+{
+    const skipIdx = appRunSrc.indexOf('async function _wukongHwSkipFault(');
+    const skipBody = skipIdx !== -1
+        ? appRunSrc.slice(skipIdx, appRunSrc.indexOf('\n}', skipIdx) + 2)
+        : '';
+    assert('T5l: _wukongHwSkipFault function is present',
+        skipIdx !== -1, 'testing-only skip action missing');
+    assert('T5m: Skip Fault requires live correlated hardware status',
+        skipBody.indexOf('_wukongHwFaulted') !== -1 &&
+        skipBody.indexOf('skip_fault_available') !== -1 &&
+        skipBody.indexOf('active_fault') !== -1,
+        'live status gate missing');
+    assert('T5n: Skip Fault posts distinct k command and warns operator',
+        skipBody.indexOf("'k'") !== -1 &&
+        skipBody.indexOf('Testing only: skip exactly the failed hardware instruction') !== -1,
+        'distinct command or warning missing');
+    assert('T5n2: Skip Fault waits for board completion evidence, not UART ACK',
+        appRunSrc.indexOf("d.cmd === 'k'") !== -1 &&
+        appRunSrc.indexOf('d.skip_completion === true') !== -1,
+        'post-skip completion gate missing');
+    assert('T5o: fault panel labels skip action as testing-only',
+        appRunSrc.indexOf('Skip failed instruction (testing only)') !== -1,
+        'testing-only panel label missing');
+}
 }
 
 // ── T6: Machine-status label logic ───────────────────────────────────────────

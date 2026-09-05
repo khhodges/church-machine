@@ -132,6 +132,35 @@ class TestWriteSuccess:
         assert acks[-1]['json'] == {'cmd': 'q', 'ok': True, 'error': '',
                                     'id': 42}
 
+    def test_testing_only_skip_fault_forwards_k_and_posts_correlated_ack(self, acks):
+        ser = FakeSerial()
+        _run('k', ser, data={'id': 77, 'incident_id': 'fault-incident'})
+        assert ser.written == [b'k']
+        assert acks[-1]['json'] == {'cmd': 'k', 'ok': True, 'error': '',
+                                    'id': 77}
+
+    def test_skip_completion_rejects_buffered_wrong_hardware_seq(self):
+        pending = {
+            'fault_nia': 0x140,
+            'expected_skip_snapshot_seq': 0x1235,
+        }
+        buffered_old = {
+            'crc_valid': True, 'reason': 3, 'seq': 0x1234, 'nia': 0x144,
+        }
+        exact_next = dict(buffered_old, seq=0x1235)
+        assert not bridge.skip_snapshot_matches_pending(buffered_old, pending)
+        assert bridge.skip_snapshot_matches_pending(exact_next, pending)
+
+    def test_skip_completion_is_not_sent_without_report_token(
+            self, monkeypatch):
+        monkeypatch.delenv('REPORT_TOKEN', raising=False)
+        called = []
+        monkeypatch.setattr(bridge.requests, 'post',
+                            lambda *a, **k: called.append((a, k)))
+        assert bridge._post_skip_fault_completion(
+            IDE, {'seq': 1}, True, max_attempts=1) is None
+        assert called == []
+
     def test_breakpoint_command_writes_nia(self, acks):
         ser = FakeSerial()
         _run('b', ser, data={'nia': 0x200})

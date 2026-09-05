@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 from amaranth.sim import Simulator
 from hardware import wukong_bridge as wb
 from hardware.wukong_top import FaultRecoveryControl
+from hardware.core import ChurchCore
 
 
 def _frame():
@@ -308,6 +309,119 @@ def test_fault_recovery_hardware_is_fail_closed_and_frame_serialized():
     sim.run()
 
 
+def test_fault_skip_is_snapshot_gated_one_shot_and_does_not_remove_reboot():
+    """Skip Fault is rejected before evidence, waits for UART safety, and fires once."""
+    dut = FaultRecoveryControl()
+
+    async def bench(ctx):
+        ctx.set(dut.reboot_safe, 0)
+        ctx.set(dut.fault_halt, 1)
+        await ctx.tick()
+        ctx.set(dut.fault_halt, 0)
+
+        # A speculative command before the complete reason-2 snapshot is lost.
+        ctx.set(dut.skip_fault_cmd, 1)
+        await ctx.tick()
+        ctx.set(dut.skip_fault_cmd, 0)
+        assert ctx.get(dut.skip_fault_pending) == 0
+        assert ctx.get(dut.skip_fault_pulse) == 0
+
+        ctx.set(dut.snapshot_reason, 2)
+        ctx.set(dut.snapshot_complete, 1)
+        await ctx.tick()
+        ctx.set(dut.snapshot_complete, 0)
+        assert ctx.get(dut.snapshot_drained) == 1
+
+        # A valid request remains held until the serialized output boundary.
+        ctx.set(dut.skip_fault_cmd, 1)
+        await ctx.tick()
+        ctx.set(dut.skip_fault_cmd, 0)
+        assert ctx.get(dut.skip_fault_pending) == 1
+        assert ctx.get(dut.hold) == 1
+        assert ctx.get(dut.skip_fault_pulse) == 0
+        ctx.set(dut.reboot_safe, 1)
+        await ctx.delay(1e-9)
+        assert ctx.get(dut.skip_fault_pulse) == 1
+        assert ctx.get(dut.reboot_pulse) == 0
+        await ctx.tick()
+        assert ctx.get(dut.skip_fault_pulse) == 0
+        assert ctx.get(dut.skip_fault_pending) == 0
+        assert ctx.get(dut.hold) == 0
+
+        # A new fault can still take the established explicit reboot path.
+        ctx.set(dut.reboot_safe, 0)
+        ctx.set(dut.fault_halt, 1)
+        await ctx.tick()
+        ctx.set(dut.fault_halt, 0)
+        ctx.set(dut.manual_reboot_cmd, 1)
+        await ctx.tick()
+        ctx.set(dut.manual_reboot_cmd, 0)
+        ctx.set(dut.reboot_safe, 1)
+        await ctx.delay(1e-9)
+        assert ctx.get(dut.reboot_pulse) == 1
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(bench)
+    sim.run()
+
+
+def test_core_deferred_fault_hold_preserves_nia_while_legacy_core_resets():
+    """Integrated core regression for the opt-in fault preservation contract."""
+    async def boot_and_fault(ctx, dut, defer):
+        for signal, value in (
+            (dut.boot_start, 0), (dut.imem_valid, 0), (dut.imem_data, 0),
+            (dut.ns_rd_data, 0), (dut.dbg_cr_wr_en, 0),
+            (dut.dbg_cr_wr_addr, 0), (dut.dbg_outform_done_inject, 0),
+            (dut.dbg_outform_result_gt, 0), (dut.defer_fault_reset, defer),
+        ):
+            ctx.set(signal, value)
+        await ctx.tick()
+        ctx.set(dut.boot_start, 1)
+        await ctx.tick()
+        ctx.set(dut.boot_start, 0)
+        for _ in range(8):
+            await ctx.tick()
+        assert ctx.get(dut.boot_complete) == 1
+        # Opcode 31 is rejected by the real decoder. NIA begins at 0 here.
+        ctx.set(dut.imem_data, 0xF8000000)
+        ctx.set(dut.imem_valid, 1)
+        await ctx.delay(1e-9)
+        assert ctx.get(dut.fault_valid) == 1
+        assert ctx.get(dut.retire_nia) == 0
+        fault_nia = ctx.get(dut.imem_addr)
+        await ctx.tick()
+        if defer:
+            # Model the top fetch gate: skipping advances the held NIA without
+            # giving the rejected instruction another execute opportunity.
+            ctx.set(dut.imem_valid, 0)
+            ctx.set(dut.halt_req, 1)
+            ctx.set(dut.skip_fault_req, 1)
+            await ctx.tick()
+            ctx.set(dut.skip_fault_req, 0)
+        return ctx.get(dut.boot_state), ctx.get(dut.imem_addr), fault_nia
+
+    legacy = ChurchCore(iot_profile=True)
+    held = ChurchCore(iot_profile=True)
+    legacy_result, held_result = {}, {}
+
+    async def legacy_bench(ctx):
+        legacy_result['result'] = await boot_and_fault(ctx, legacy, 0)
+
+    async def held_bench(ctx):
+        held_result['result'] = await boot_and_fault(ctx, held, 1)
+
+    for dut, bench in ((legacy, legacy_bench), (held, held_bench)):
+        sim = Simulator(dut)
+        sim.add_clock(1e-6)
+        sim.add_testbench(bench)
+        sim.run()
+    # Legacy reset starts at NIA 0 too, but leaves COMPLETE; held Wukong mode
+    # retains COMPLETE and the faulting NIA without taking FAULT_RST.
+    assert legacy_result['result'][0] != held_result['result'][0]
+    assert held_result['result'][1] == held_result['result'][2] + 4
+
+
 def test_fault_recovery_control_is_wired_into_top_execution_and_uart_gates():
     """Keep the focused controller connected to production fetch and framing."""
     source = (Path(__file__).resolve().parents[2] / 'hardware' /
@@ -323,7 +437,14 @@ def test_fault_recovery_control_is_wired_into_top_execution_and_uart_gates():
                             source.index('core.free_run_start.eq(0)')]
     assert '~sentinel_req & ~recovery_hold' in execution_gate
     assert 'core.halt_req.eq(step_halted | trace_stall | recovery_hold)' in execution_gate
+    assert 'core.defer_fault_reset.eq(1)' in source
+    assert 'with m.Case(0x6B)' in source
     assert 'pf_hold' not in execution_gate
+
+    core_source = (Path(__file__).resolve().parents[2] / 'hardware' /
+                   'core.py').read_text()
+    assert 'self.defer_fault_reset = Signal()' in core_source
+    assert '~self.defer_fault_reset' in core_source
 
     snapshot_final_byte = source.index(
         'with m.If(snap_bidx == _SNAP_FRAME_LEN - 1):')

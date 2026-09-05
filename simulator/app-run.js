@@ -18742,6 +18742,13 @@ async function _wukongWatchDeliveryInner(id, label, timeoutMs) {
             if (d.consumed_ts) sawConsumed = true;
             if (d.write_ts) {
                 if (d.write_ok) {
+                    if (d.cmd === 'k') {
+                        // A serial ACK proves only transport. Do not hide an
+                        // active fault until the board's correlated reason-3
+                        // post-skip snapshot has been accepted by the server.
+                        if (d.skip_completion === true) return true;
+                        continue;
+                    }
                     if (d.cmd !== 'h') return true;
                     if (d.board_halt_confirmed) {
                         _wukongCmdLog(label + ' confirmed \u2014 FPGA emitted halted-state evidence');
@@ -18824,6 +18831,44 @@ async function _wukongHwFaultReset() {
     } catch(e) {}
 }
 window._wukongHwFaultReset = _wukongHwFaultReset;
+
+// Testing-only one-shot escape hatch. Both the IDE and server require a live,
+// correlated physical-board fault; RTL still waits for the reason-2 snapshot
+// to drain. The failed instruction is not retried: NIA advances once and the
+// board remains step-halted at the following instruction.
+async function _wukongHwSkipFault() {
+    try {
+        const response = await fetch('/hardware/wukong/status');
+        const status = response.ok ? await response.json() : null;
+        if (!_wukongHwFaulted || !status ||
+                status.skip_fault_available !== true ||
+                !status.halt || status.halt.active_fault !== true) {
+            _wukongCmdLog('SKIP FAULT blocked \u2014 no current correlated physical hardware fault');
+            return false;
+        }
+        if (!window.confirm(
+                'Testing only: skip exactly the failed hardware instruction without executing it. ' +
+                'The board will remain halted at the next instruction. Continue?')) {
+            return false;
+        }
+        const d = await _wukongPostCmd('k', null, 'SKIP FAULT');
+        if (!d) return false;
+        const ok = await _wukongWatchDelivery(d.id, 'SKIP FAULT', 10000);
+        if (ok) {
+            _wukongHwFaulted = false;
+            _wukongPrevFaultValid = false;
+            _wukongHideFaultPanel();
+            _wukongCmdLog('SKIP FAULT consumed \u2014 one failed instruction was skipped; hardware is halted at the next instruction');
+            if (typeof updateFlagsDisplay === 'function') updateFlagsDisplay();
+        } else {
+            _wukongCmdLog('SKIP FAULT is indeterminate — no correlated board completion snapshot arrived; fault stays visible and Reboot is required');
+        }
+        return ok;
+    } catch(e) {
+        return false;
+    }
+}
+window._wukongHwSkipFault = _wukongHwSkipFault;
 
 async function hwRunToggle() {
     const wantRunning = !_wukongHWRunning;
@@ -19209,6 +19254,28 @@ function _wukongShowFaultPanel(data) {
         })();
     });
     body.appendChild(rebootBtn);
+
+    const skipBtn = document.createElement('button');
+    skipBtn.className = 'wukong-fault-skip-btn';
+    skipBtn.textContent = '\u26A0 Skip failed instruction (testing only)';
+    skipBtn.title = 'Skip exactly this failed instruction and remain halted at the next instruction';
+    skipBtn.disabled = !_wukongHwFaulted;
+    skipBtn.addEventListener('click', function() {
+        if (skipBtn.disabled || !_wukongHwFaulted) return;
+        skipBtn.disabled = true;
+        skipBtn.style.opacity = '0.5';
+        (async function() {
+            try {
+                await _wukongHwSkipFault();
+            } finally {
+                if (_wukongHwFaulted) {
+                    skipBtn.disabled = false;
+                    skipBtn.style.opacity = '';
+                }
+            }
+        })();
+    });
+    body.appendChild(skipBtn);
 
     panel.appendChild(header);
     panel.appendChild(body);

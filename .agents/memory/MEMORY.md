@@ -154,3 +154,4 @@
 - [Board-state acknowledgement correlation](board-state-ack-correlation.md) — state-changing UART acknowledgements need a request nonce, atomic receive, and bounded partial-frame recovery
 - [M-bit I/O object](m-bit-io-object.md) — one Namespace-held 32-bit I/O word; bits 0–15 map CR0.M–CR15.M and full-word writes set/clear all bits
 - [Browser resource-error containment](browser-resource-error-containment.md) — malformed/resource window errors must be intercepted in capture phase before the artifact crash monitor
+- [Wukong one-shot Skip Fault](wukong-skip-fault-protocol.md) — explicit post-snapshot skip needs authenticated FPGA-sequence proof; lost correlation requires reboot

@@ -864,6 +864,17 @@ def try_parse_snapshot_frame(buf, i=0):
         return None
 
 
+def skip_snapshot_matches_pending(decoded, pending):
+    """Match only the exact next hardware snapshot for one delivered k."""
+    return bool(
+        pending and decoded.get('crc_valid') is True and
+        int(decoded.get('reason', -1)) == 3 and
+        int(decoded.get('seq', -1)) ==
+        int(pending.get('expected_skip_snapshot_seq', -2)) and
+        int(decoded.get('nia', -1)) ==
+        ((int(pending.get('fault_nia', -5)) + 4) & 0xFFFFFFFF))
+
+
 # ── Trace frame validation / resync ───────────────────────────────────────────
 # The 0xAA magic byte can also appear inside packet payloads (NIA bytes, GT
 # bytes).  If the parser loses byte alignment — mid-stream attach, a dropped
@@ -1048,8 +1059,8 @@ class FaultRecovery:
     board emits a complete ``0xAC`` stop snapshot immediately afterwards. Keep
     it halted until that snapshot is accepted, then send the dedicated ``g``
     authorization. The RTL accepts it only after a reason-2 snapshot has fully
-    drained, and then reboots with a fresh sentinel. Explicit snapshots use
-    reason 3 and never satisfy this gate.
+    drained. Promotion records durable evidence but intentionally does not
+    reboot: fault disposition is an explicit operator Reboot or Skip Fault.
     """
 
     FAULT_SNAPSHOT_REASON = 2
@@ -1217,7 +1228,8 @@ class FaultDeliveryWorker:
     def submit(self, kind, payload, priority=None):
         payload = dict(payload)
         critical = kind in (
-            'trace_fault', 'snapshot_fault', 'recovery_authorization')
+            'trace_fault', 'snapshot_fault', 'recovery_authorization',
+            'skip_fault_completion')
         target = self._fault_jobs if critical else self._telemetry_jobs
         if critical:
             # The board can have only one recovery-eligible fault at a time.
@@ -1298,6 +1310,10 @@ class FaultDeliveryWorker:
                     reply = _post_recovery_authorization(
                         self.ide_base, payload, self.verify_tls,
                         max_attempts=1)
+                elif kind == 'skip_fault_completion':
+                    reply = _post_skip_fault_completion(
+                        self.ide_base, payload, self.verify_tls,
+                        max_attempts=1)
                 elif kind in ('status', 'console', 'boot_info', 'halt_state'):
                     endpoint = {
                         'status': 'bridge-status',
@@ -1345,7 +1361,7 @@ class FaultDeliveryWorker:
                 source.task_done()
 
 def _post_json_retry(url, payload, verify_tls, label, accept_reply,
-                     max_attempts=None, timeout=1):
+                     max_attempts=None, timeout=1, headers=None):
     """Retry one frozen JSON payload until accepted or explicitly rejected.
 
     Network failures and HTTP 5xx responses are transient.  HTTP 4xx and a
@@ -1356,8 +1372,11 @@ def _post_json_retry(url, payload, verify_tls, label, accept_reply,
     while max_attempts is None or attempt < max_attempts:
         attempt += 1
         try:
-            response = requests.post(
-                url, json=payload, timeout=timeout, verify=verify_tls)
+            request_args = {
+                'json': payload, 'timeout': timeout, 'verify': verify_tls}
+            if headers is not None:
+                request_args['headers'] = headers
+            response = requests.post(url, **request_args)
             try:
                 reply = response.json()
             except Exception:
@@ -1411,6 +1430,23 @@ def _post_recovery_authorization(ide_base, payload, verify_tls,
             reply.get('accepted') and
             reply.get('decision') in ('recovery_authorized', 'duplicate')),
         max_attempts=max_attempts)
+
+
+def _post_skip_fault_completion(ide_base, payload, verify_tls,
+                                max_attempts=None):
+    """Record board-originated post-skip snapshot evidence."""
+    token = os.environ.get('REPORT_TOKEN', '').strip()
+    if not token:
+        print('  [skip completion] REPORT_TOKEN absent; completion remains fail-closed',
+              flush=True)
+        return None
+    return _post_json_retry(
+        f'{ide_base}/hardware/wukong/skip-fault-completion', payload,
+        verify_tls, 'skip completion POST',
+        lambda reply: bool(reply.get('accepted') and
+                           reply.get('decision') == 'skip_completed'),
+        max_attempts=max_attempts,
+        headers={'Authorization': f'Bearer {token}'})
 
 
 def _authorize_fault_recovery(ser):
@@ -1514,7 +1550,7 @@ def execute_board_command(cmd, data, ser, reopen_serial, buf,
                           ide_base, verify_tls, session_id=None,
                           trace_counter=None, state_counter=None,
                           write_result=None):
-    """Write a dequeued command ('s','r','h','q','b','f') to the board's UART.
+    """Write a dequeued command ('s','r','h','q','b','f','k') to the board's UART.
 
     Reports success/failure back to the server via POST
     /hardware/wukong/command-ack so a consumed-but-unwritten command is
@@ -1558,7 +1594,7 @@ def execute_board_command(cmd, data, ser, reopen_serial, buf,
             ser.write(b'f')
         elif cmd == 'h':
             ser.write(b'h' + bytes([int(data['_halt_nonce']) & 0xFF]))
-        elif cmd in ('s', 'r', 'q'):
+        elif cmd in ('s', 'r', 'q', 'k'):
             ser.write(cmd.encode('ascii'))
         else:
             post_command_ack(ide_base, verify_tls, cmd, False,
@@ -1718,8 +1754,13 @@ def main():
     delivery_worker = FaultDeliveryWorker(ide_base, verify_tls)
     trace_counter = 0
     state_counter = 0
+    # Monotonic parse counter retained for diagnostics only. Authorization uses
+    # the exact expected 16-bit sequence already carried by the v1 hardware
+    # snapshot frame.
+    snapshot_counter = 0
     halt_nonce_counter = 0
     pending_halt = None
+    pending_skip = [None]  # {command_id, incident_id, fault_nia}, until reason-3 proof
 
     def _command_write_result(cmd, data, ok):
         nonlocal pending_halt
@@ -1731,10 +1772,23 @@ def main():
                 'state_counter_at_write': state_counter,
                 'nonce': data.get('_halt_nonce'),
             } if ok else None)
-        elif ok and cmd in ('s', 'r', 'b', 'f', 'u'):
+        elif ok and cmd in ('s', 'r', 'b', 'f', 'u', 'k'):
             # Any later board-state mutation makes delayed evidence for the
             # previous timed-out Halt inapplicable.
             pending_halt = None
+            if cmd == 'k':
+                # A write only proves UART delivery. Wait for the RTL's
+                # post-skip reason-3 snapshot before declaring success.
+                pending_skip[0] = {
+                    'command_id': data.get('id'),
+                    'incident_id': data.get('incident_id'),
+                    'fault_nia': int((fault_recovery.trace_payload or {}).get(
+                        'nia', 0)),
+                    'expected_skip_snapshot_seq': int(
+                        data.get('expected_skip_snapshot_seq', -1)),
+                    'bridge_session': session_id,
+                }
+                fault_recovery.clear_pending()
 
     def _bridge_status(event='heartbeat', state=None, reason='',
                        reconnect_attempt=0, fault_delivery=None):
@@ -1825,28 +1879,17 @@ def main():
                           flush=True)
                     continue
                 accepted = bool(reply)
-                if fault_recovery.should_reboot_after_snapshot(
-                        snapshot, accepted):
-                    if _authorize_fault_recovery(ser):
-                        authorization_payload = (
-                            fault_recovery.authorization_payload())
-                        fault_recovery.mark_reboot_sent()
-                        delivery_worker.submit(
-                            'recovery_authorization', authorization_payload)
-                        print('  [fault recovery] complete fault snapshot '
-                              'stored — authorizing Boot.0 recovery',
-                              flush=True)
-                        _bridge_status(
-                            'fault_snapshot_correlated', 'fault_recovery',
-                            'complete fault snapshot promoted; recovery authorized',
-                            fault_delivery={
-                                'state': 'fully_correlated',
-                                'incident_id': authorization_payload['incident_id'],
-                                'correlation_status': 'fully correlated',
-                                'promotion_status': 'promoted',
-                            })
-                    else:
-                        fault_recovery.clear_pending()
+                if accepted:
+                    # Fail closed: promotion is durable evidence only. Do not
+                    # emit `g` automatically; an operator must explicitly
+                    # choose Reboot (`f`) or testing-only Skip (`k`).
+                    print('  [fault recovery] complete fault snapshot stored '
+                          '— board remains held awaiting operator disposition',
+                          flush=True)
+                    _bridge_status(
+                        'fault_snapshot_correlated', 'fault_hold',
+                        'complete fault snapshot promoted; awaiting operator disposition',
+                        fault_delivery=_fault_delivery_status())
                 else:
                     # A failed network attempt keeps the active, correlated
                     # incident armed for an exact snapshot retry. A server
@@ -1865,6 +1908,14 @@ def main():
                 # participate in the automatic recovery gate.
                 if reply is None:
                     print('  [snapshot POST error] delivery deferred',
+                          flush=True)
+            elif kind == 'skip_fault_completion':
+                if reply:
+                    pending_skip[0] = None
+                    print('  [skip fault] board completion snapshot correlated',
+                          flush=True)
+                else:
+                    print('  [skip fault] completion delivery failed; fault remains visible',
                           flush=True)
             elif kind == 'recovery_authorization':
                 if reply:
@@ -2061,8 +2112,21 @@ def main():
                         i += 1
                         continue
                     sync.lock('snapshot frame')
+                    snapshot_counter += 1
                     _console_flush(ide_base, verify_tls)
                     decoded['ts'] = time.time()
+                    # The RTL emits this reason-3 frame only after the
+                    # accepted skip pulse advanced NIA. Bind it to the exact
+                    # UART command and fault incident before any ordinary
+                    # snapshot handling.
+                    skip = pending_skip[0]
+                    if skip_snapshot_matches_pending(decoded, skip):
+                        completion = dict(decoded)
+                        completion.update(skip)
+                        delivery_worker.submit(
+                            'skip_fault_completion', completion)
+                        i += SNAPSHOT_HEADER_LEN + decoded['payload_len'] + SNAPSHOT_CRC_LEN
+                        continue
                     snapshot_payload = fault_recovery.snapshot_payload(decoded)
                     if decoded.get('reason') == FaultRecovery.FAULT_SNAPSHOT_REASON:
                         # The fault trace worker is ahead of this snapshot, but
@@ -2436,7 +2500,7 @@ def main():
                     if r.status_code == 200:
                         data = r.json() or {}
                         cmd = data.get('cmd')
-                        if cmd in ('s', 'r', 'h', 'q', 'b', 'f'):
+                        if cmd in ('s', 'r', 'h', 'q', 'b', 'f', 'k'):
                             if cmd == 'h':
                                 halt_nonce_counter = (
                                     halt_nonce_counter + 1) & 0xFF
@@ -2445,7 +2509,9 @@ def main():
                                 cmd, data, ser, _reopen_serial, buf,
                                 ide_base, verify_tls, session_id,
                                 trace_counter=trace_counter,
-                                state_counter=state_counter,
+                                state_counter=(snapshot_counter
+                                               if cmd == 'k'
+                                               else state_counter),
                                 write_result=_command_write_result)
                         elif cmd == 'u':
                             try:

@@ -239,10 +239,12 @@ class FaultRecoveryControl(Elaboratable):
         self.snapshot_reason = Signal(2)
         self.manual_reboot_cmd = Signal()
         self.authorize_recovery_cmd = Signal()
+        self.skip_fault_cmd = Signal()
         self.reboot_safe = Signal()
 
         self.hold = Signal()
         self.reboot_pulse = Signal()
+        self.skip_fault_pulse = Signal()
         self.rearm_sentinel = Signal()
 
         # Exposed for focused cycle-level regression tests.
@@ -250,6 +252,7 @@ class FaultRecoveryControl(Elaboratable):
         self.snapshot_drained = Signal()
         self.manual_reboot_pending = Signal()
         self.authorized_reboot_pending = Signal()
+        self.skip_fault_pending = Signal()
 
     def elaborate(self, platform):
         m = Module()
@@ -260,6 +263,11 @@ class FaultRecoveryControl(Elaboratable):
                 self.reboot_safe &
                 (self.manual_reboot_pending |
                  self.authorized_reboot_pending)),
+            self.skip_fault_pulse.eq(
+                self.reboot_safe & self.fault_pending &
+                self.snapshot_drained & self.skip_fault_pending &
+                ~self.manual_reboot_pending &
+                ~self.authorized_reboot_pending),
             self.rearm_sentinel.eq(self.reboot_pulse),
         ]
 
@@ -281,6 +289,20 @@ class FaultRecoveryControl(Elaboratable):
                   self.fault_pending & self.snapshot_drained):
             m.d.sync += self.authorized_reboot_pending.eq(1)
 
+        # Reject pre-snapshot requests. This is deliberately stricter than
+        # merely deferring them: an operator must act on the correlated,
+        # complete fault snapshot, never a speculative fault indication.
+        with m.If(self.skip_fault_cmd & self.fault_pending &
+                  self.snapshot_drained):
+            m.d.sync += self.skip_fault_pending.eq(1)
+
+        with m.If(self.skip_fault_pulse):
+            m.d.sync += [
+                self.fault_pending.eq(0),
+                self.snapshot_drained.eq(0),
+                self.skip_fault_pending.eq(0),
+            ]
+
         # Keep this assignment last: an explicit reboot intentionally overrides
         # a same-cycle fault hold once the shared UART boundary is safe.
         with m.If(self.reboot_pulse):
@@ -289,6 +311,7 @@ class FaultRecoveryControl(Elaboratable):
                 self.snapshot_drained.eq(0),
                 self.manual_reboot_pending.eq(0),
                 self.authorized_reboot_pending.eq(0),
+                self.skip_fault_pending.eq(0),
             ]
 
         return m
@@ -1001,8 +1024,18 @@ class ChurchWukongXC7A100T(Elaboratable):
         # ── Core control signals ───────────────────────────────────────────────
         fault_latched = Signal()
         cm_reboot     = Signal()   # 1-cycle serialized reboot pulse from 'f' or authorized 'g'
-        m.d.sync += fault_latched.eq(~cm_reboot & (fault_latched | core.fault_valid))
-        m.d.comb += core.reboot_req.eq(cm_reboot)
+        fault_skip_pulse = Signal()
+        m.d.sync += fault_latched.eq(
+            ~(cm_reboot | fault_skip_pulse) &
+            (fault_latched | core.fault_valid))
+        m.d.comb += [
+            core.reboot_req.eq(cm_reboot),
+            core.skip_fault_req.eq(fault_skip_pulse),
+            # ChurchCore remains legacy fail-reset by default for every other
+            # integration. Physical Wukong deliberately preserves fault state
+            # until its complete reason-2 snapshot is serialized.
+            core.defer_fault_reset.eq(1),
+        ]
 
         # ── M6 round-robin Thread button ──────────────────────────────────────
         # M6 is active-low.  Two synchronizer flops keep this asynchronous board
@@ -1083,6 +1116,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         snapshot_busy = Signal()
         manual_reboot_cmd = Signal()
         authorize_recovery_cmd = Signal()
+        skip_fault_cmd = Signal()
         reboot_safe = Signal()
 
         # ── Breakpoints: 4 NIA slots ──────────────────────────────────────────
@@ -1117,8 +1151,10 @@ class ChurchWukongXC7A100T(Elaboratable):
             recovery.snapshot_reason.eq(snapshot_complete_reason),
             recovery.manual_reboot_cmd.eq(manual_reboot_cmd),
             recovery.authorize_recovery_cmd.eq(authorize_recovery_cmd),
+            recovery.skip_fault_cmd.eq(skip_fault_cmd),
             recovery.reboot_safe.eq(reboot_safe),
             cm_reboot.eq(recovery.reboot_pulse),
+            fault_skip_pulse.eq(recovery.skip_fault_pulse),
         ]
         # Use the registered pending state at the fetch gate.  recovery.hold
         # also includes the same-cycle fault_halt input, which feeds back
@@ -1149,6 +1185,14 @@ class ChurchWukongXC7A100T(Elaboratable):
             m.d.sync += [
                 snapshot_pending.eq(1),
                 snapshot_reason.eq(Mux(bp_hit, 1, Mux(fault_halt, 2, 0))),
+            ]
+        # Skip advances NIA while fetch is still held. Emit a fresh reason-3
+        # snapshot from that post-skip boundary so the bridge can prove board
+        # acceptance (a UART write ACK alone is not such proof).
+        with m.If(fault_skip_pulse):
+            m.d.sync += [
+                snapshot_pending.eq(1),
+                snapshot_reason.eq(3),
             ]
         # A completed M6 switch is observable in the IDE through the normal
         # complete architectural snapshot.  This carries the restored CR12
@@ -1196,6 +1240,9 @@ class ChurchWukongXC7A100T(Elaboratable):
         #   'g' (0x67) — authorize fault recovery after the bridge has durably
         #                promoted the correlated reason-2 snapshot. Ignored
         #                unless that exact snapshot has drained.
+        #   'k' (0x6B) — testing-only one-shot Skip Fault. It is accepted only
+        #                for the currently held fault after its reason-2
+        #                snapshot drains; NIA advances by one and remains halted.
         #   'u' (0x75) — upload:     receive 4-byte big-endian byte-count header,
         #                            then N raw bytes (big-endian 32-bit words).
         #                            Halts CM, writes words to DMEM starting at word 0,
@@ -1293,6 +1340,8 @@ class ChurchWukongXC7A100T(Elaboratable):
                             m.d.comb += manual_reboot_cmd.eq(1)
                         with m.Case(0x67):  # 'g' — promoted fault recovery
                             m.d.comb += authorize_recovery_cmd.eq(1)
+                        with m.Case(0x6B):  # 'k' — testing-only one-shot fault skip
+                            m.d.comb += skip_fault_cmd.eq(1)
                         with m.Case(0x75):  # 'u' — upload
                             # Halt the CM immediately; it stays halted until
                             # UPLOAD_ACK sends the 0x06 completion byte and the

@@ -91,6 +91,14 @@ class ChurchCore(Elaboratable):
         #   Held here as a named port so the interface is explicit even though
         #   the halt logic lives in the top-level.
         self.halt_req = Signal()      # input: held by top when step-halted
+        # Legacy-safe default: standalone/non-Wukong integrations retain the
+        # historical immediate FAULT_RST behavior. Wukong explicitly asserts
+        # this while it holds a fault long enough to emit a snapshot.
+        self.defer_fault_reset = Signal()
+        # Testing-only, one-shot fault skip. The platform may pulse this only
+        # while the faulting instruction is externally held. It advances NIA
+        # without re-decoding or executing the instruction.
+        self.skip_fault_req = Signal()
 
         # retire_valid: one-cycle pulse when an instruction commits (NIA changes)
         #   or when a fault is taken.  Fires on the same cycle as the NIA update.
@@ -147,8 +155,9 @@ class ChurchCore(Elaboratable):
         self.free_run_start = Signal()   # pulse high for 1 cycle to jump to free_run_nia
         self.free_run_nia   = Signal(32) # target byte address when free_run_start fires
 
-        # External reboot request: pulse high for 1 cycle to force the same
-        # FAULT_RST path a post-boot fault takes — clear_all wipes registers,
+        # External reboot request: pulse high for 1 cycle to force FAULT_RST.
+        # Post-boot faults themselves are held without entering this path so a
+        # complete architectural snapshot can be taken first. clear_all wipes registers,
         # the boot ladder re-runs (LOAD_NS→INIT_THRD→INIT_CLIST→LOAD_NUC),
         # and execution restarts at NIA=0.  REBOOT and FAULT both zero the NIA.
         self.reboot_req     = Signal()
@@ -929,11 +938,26 @@ class ChurchCore(Elaboratable):
             ),
         ]
 
+        # Faults retire in place.  The physical top-level immediately gates
+        # fetch and preserves the complete architectural state for its reason-2
+        # snapshot.  Recovery remains an explicit reboot_req; it is no longer
+        # possible for the fault edge itself to destroy the state being
+        # reported.  A testing-only skip advances exactly one instruction while
+        # fetch remains gated, so none of that instruction's decode/execute
+        # side effects can run again.
         with m.If(u_return.reboot_request | self.reboot_req |
-                  (self.fault_valid & self.boot_complete)):
+                  (self.fault_valid & self.boot_complete &
+                   ~self.defer_fault_reset)):
             m.d.sync += [boot_state_reg.eq(BootState.FAULT_RST), nia_reg.eq(0)]
+        # Wukong's opt-in deferred path must hold the failing NIA. Without an
+        # explicit branch here the ordinary retire/increment chain below would
+        # advance it on the same fault cycle.
+        with m.Elif(self.fault_valid & self.boot_complete):
+            m.d.sync += nia_reg.eq(nia_reg)
         with m.Elif(clear_all):
             m.d.sync += nia_reg.eq(0)
+        with m.Elif(self.skip_fault_req & self.boot_complete):
+            m.d.sync += nia_reg.eq(nia_reg + 4)
         with m.Elif(self.free_run_start):
             m.d.sync += nia_reg.eq(self.free_run_nia)
         if not self.iot_profile:
@@ -2731,7 +2755,7 @@ class ChurchCore(Elaboratable):
         # chain above but expressed combinatorially.
         #
         # Included conditions (in priority order matching nia update chain):
-        #   fault_valid — fault taken (NIA resets to 0 on next cycle)
+        #   fault_valid — fault recorded (NIA is held for snapshot/recovery)
         #   u_call.nia_set — CALL / ELOADCALL complete (callee NIA set)
         #   u_return.nia_set — RETURN complete (caller NIA restored)
         #   branch_taken — BRANCH instruction (NIA += offset)
@@ -2751,7 +2775,7 @@ class ChurchCore(Elaboratable):
         # nia_set pulses, not retire_norm. Their busy signals rise one cycle
         # after start, so every issue pulse is excluded explicitly.
         retire_norm = (
-            u_decoder.instr_valid & ~any_unit_busy &
+            u_decoder.instr_valid & ~self.halt_req & ~any_unit_busy &
             ~call_start_sig &
             ~ret_start_sig &
             ~load_start_sig &
