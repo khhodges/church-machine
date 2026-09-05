@@ -18,9 +18,9 @@
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x001FF",
+      "limit": "0x000FF",
       "seq": 0,
-      "seal": "0xDE925EEF"
+      "seal": "0xDEB25EEF"
     },
     {
       "name": "UART_DEV",
@@ -69,86 +69,80 @@
     {
       "name": "SelfTest",
       "slot": 6,
-      "token": "00000600",
-      "filename": "SelfTest.1.485e71f6.lump",
-      "location": "0x00000200",
+      "location": "0x00000100",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x001FD",
       "seq": 0,
-      "seal": "0xDE931EEF",
-      "boot": true
+      "seal": "0xDE929EEF"
     },
     {
       "name": "WukongCallHome",
       "slot": 7,
-      "location": "0x00000400",
+      "location": "0x00000300",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x0003F",
       "seq": 0,
-      "seal": "0xDEA85EEF"
+      "seal": "0xDEABDEEF",
+      "boot": true
     },
     {
       "name": "Tunnel",
       "slot": 8,
-      "location": "0x00000440",
+      "location": "0x00000340",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x0003F",
       "seq": 0,
-      "seal": "0xDEA87EEF"
+      "seal": "0xDEABFEEF"
     },
     {
       "name": "Ethernet",
       "slot": 9,
-      "location": "0x00000480",
+      "location": "0x00000380",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x0003F",
       "seq": 0,
-      "seal": "0xDEA81EEF"
+      "seal": "0xDEAB9EEF"
     },
     {
       "name": "CapabilityTest",
       "slot": 10,
-      "token": "00000a00",
-      "filename": "CapabilityTest.1.2d9ec45d.lump",
-      "resident": true,
-      "location": "0x000004C0",
+      "location": "0x000003C0",
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x0003F",
+      "limit": "0x001F9",
       "seq": 0,
-      "seal": "0xDEA83EEF",
-      "issue_n": 1
+      "seal": "0xDE937EEF"
     },
     {
       "name": "Thread#2",
       "slot": 11,
-      "location": "0x00000500",
+      "location": "0x000005C0",
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x001FF",
+      "limit": "0x000FF",
       "seq": 0,
-      "seal": "0xDE90DEEF"
+      "seal": "0xDEB0BEEF"
     },
     {
       "name": "Thread#3",
       "slot": 12,
-      "location": "0x00000700",
+      "location": "0x000006C0",
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x001FF",
+      "limit": "0x000FF",
       "seq": 0,
-      "seal": "0xDE91DEEF"
+      "seal": "0xDEB13EEF"
     },
     {
       "name": "M_BIT_DEV",
@@ -160,29 +154,8 @@
       "limit": "0x00000",
       "seq": 0,
       "seal": "0x21523090"
-    },
-    {
-      "name": "slot_14",
-      "slot": 14,
-      "location": "0x00000A00",
-      "type": "Inform",
-      "f": 0,
-      "g": 0,
-      "limit": "0x00001",
-      "seq": 0,
-      "seal": "0xDEA89EEF"
-    },
-    {
-      "name": "Bridge.Preload",
-      "slot": 15,
-      "location": "0x00000B00",
-      "type": "Outform",
-      "f": 0,
-      "g": 0,
-      "limit": "0x00001",
-      "seq": 0,
-      "seal": "0xDEA81EEF"
     }
   ],
-  "generated_at": 1788647326.4147646
+  "generated_at": 1788651547.1569989,
+  "committed_raw_fingerprint": "0fd57d1638c3eec866a9e1d7ef92766fc5f449ddbaa96402c61c7da26e436b64"
 }
