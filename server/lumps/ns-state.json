@@ -114,8 +114,8 @@
     {
       "name": "CapabilityTest",
       "slot": 10,
-      "token": "9ce28c0b",
-      "filename": "CapabilityTest.1.e4fe164d.lump",
+      "token": "00000a00",
+      "filename": "CapabilityTest.1.b98a03c4.lump",
       "resident": true,
       "location": "0x000004C0",
       "type": "Inform",
@@ -123,7 +123,8 @@
       "g": 0,
       "limit": "0x0003F",
       "seq": 0,
-      "seal": "0xDEA83EEF"
+      "seal": "0xDEA83EEF",
+      "issue_n": 1
     },
     {
       "name": "Thread#2",
@@ -181,5 +182,5 @@
       "seal": "0xDEA81EEF"
     }
   ],
-  "generated_at": 1788558990.5361288
+  "generated_at": 1788613583.8433428
 }
