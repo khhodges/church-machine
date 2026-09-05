@@ -6355,9 +6355,17 @@ def _authoritative_lump_library_generation(lumps_dir, manifest_path, manifest):
         for entry in manifest:
             if not isinstance(entry, dict):
                 raise ValueError("manifest entry is not an object")
+            token = entry.get("token")
             filename = entry.get("filename")
             if not isinstance(filename, str) or not filename:
-                raise ValueError("manifest entry has no filename")
+                if not isinstance(token, str) or not re.fullmatch(
+                        r"[0-9a-fA-F]{8}", token):
+                    raise ValueError(
+                        "manifest entry has neither a filename nor a valid token")
+                # Historical canonical entries select their artifact by token.
+                # This is the same fail-closed fallback used by list/detail and
+                # boot-image readers; the selected file must still exist below.
+                filename = f"{token.lower()}.lump"
             path = _lump_transition_path(lumps_dir, filename)
             with open(path, "rb") as source:
                 selected.append((entry, hashlib.sha256(source.read()).hexdigest()))

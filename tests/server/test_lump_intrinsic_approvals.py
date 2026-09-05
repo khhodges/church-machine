@@ -106,6 +106,30 @@ def test_invalid_first_consumer_burns_approval_intent():
     assert intent not in app_module._LUMP_APPROVAL_INTENTS
 
 
+def test_library_generation_supports_canonical_token_named_manifest_entry(tmp_path):
+    token = "501a76a0"
+    binary = _lump()
+    (tmp_path / f"{token}.lump").write_bytes(binary)
+    manifest = [{
+        "token": token,
+        "abstraction": "PostFlashSelftest",
+        "lump_version": 0,
+    }]
+
+    generation = app_module._authoritative_lump_library_generation(
+        str(tmp_path), str(tmp_path / "manifest.json"), manifest)
+
+    assert len(generation) == 64
+    assert all(character in "0123456789abcdef" for character in generation)
+
+
+def test_library_generation_rejects_entry_without_filename_or_valid_token(tmp_path):
+    with pytest.raises(ValueError, match="neither a filename nor a valid token"):
+        app_module._authoritative_lump_library_generation(
+            str(tmp_path), str(tmp_path / "manifest.json"),
+            [{"abstraction": "Broken"}])
+
+
 def _approved_library(root, binary):
     from server.lump_integrity import compute_number
     digest = hashlib.sha256(binary).hexdigest()
