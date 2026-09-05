@@ -529,13 +529,21 @@ def test_full_core_thread_switch_resume_nia_contract(decoded_change):
             for _, instruction, _ in observed
         ) == 1
 
-def test_full_core_thread_switch_preserves_flags_for_next_branch():
-    """A resumed conditional branch consumes the flags saved before switching."""
+@pytest.mark.parametrize(
+    ("flag_name", "saved_flags", "condition"),
+    [
+        ("Z", 0b0010, CondCode.EQ),
+        ("N", 0b0001, CondCode.MI),
+        ("C", 0b0100, CondCode.CS),
+        ("V", 0b1000, CondCode.VS),
+    ],
+)
+def test_full_core_thread_switch_preserves_flags_for_next_branch(
+        flag_name, saved_flags, condition):
+    """A resumed conditional branch consumes canonical NZCV from its frame."""
     (dmem, source_first, _, target_first, _, source_instr, _) = \
         _thread_switch_core_image(False)
     target_word = (target_first - 4) // 4
-    set_zero = encode_turing(
-        TuringOpcode.ISUB, CondCode.AL, dr_dst=1, dr_src=0, imm=0)
     change_back = encode_church(
         ChurchOpcode.CHANGE,
         CondCode.AL,
@@ -543,16 +551,21 @@ def test_full_core_thread_switch_preserves_flags_for_next_branch():
         cr_src=15,
         imm=1,
     )
-    branch_eq = encode_turing(TuringOpcode.BRANCH, CondCode.EQ, imm=3)
+    branch_on_restored_flag = encode_turing(
+        TuringOpcode.BRANCH, condition, imm=3)
     fallthrough = encode_turing(
         TuringOpcode.IADD, CondCode.AL, dr_dst=3, dr_src=3, imm=1)
     taken = encode_turing(
         TuringOpcode.IADD, CondCode.AL, dr_dst=4, dr_src=4, imm=1)
     loop = encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=0)
-    dmem[target_word] = pack_lump_header(6, target_word + 6, 1, 0)
-    dmem[target_word + 1:target_word + 7] = [
-        set_zero, change_back, branch_eq, fallthrough, loop, taken,
+    dmem[target_word] = pack_lump_header(5, target_word + 5, 1, 0)
+    dmem[target_word + 1:target_word + 6] = [
+        change_back, branch_on_restored_flag, fallthrough, loop, taken,
     ]
+    target_thread_word = 0x7000 // 4
+    target_layout = thread_layout(thread_body_words(2), 32)
+    target_frame_word = target_thread_word + target_layout["stack_end"]
+    dmem[target_frame_word] |= saved_flags << 28
     dut = BootRomHarness(dmem)
     observed = []
     flag_snapshots = {}
@@ -584,6 +597,12 @@ def test_full_core_thread_switch_preserves_flags_for_next_branch():
         switched_out = False
         resume_requested = False
         for _ in range(5000):
+            if (
+                "before_switch" not in flag_snapshots
+                and ctx.get(dut.core.nia) == target_first
+            ):
+                flag_snapshots["before_switch"] = ctx.get(
+                    dut.core.flags.as_value())
             if ctx.get(dut.core.retire_valid):
                 event = (
                     ctx.get(dut.core.retire_nia),
@@ -592,14 +611,7 @@ def test_full_core_thread_switch_preserves_flags_for_next_branch():
                 )
                 observed.append(event)
                 retired_flags = ctx.get(dut.core.retire_flags.as_value())
-                if event[:2] == (target_first, set_zero):
-                    # Arithmetic flags commit on this retirement edge; sample
-                    # the architectural register immediately after that edge.
-                    await ctx.tick()
-                    flag_snapshots["before_switch"] = ctx.get(
-                        dut.core.flags.as_value())
-                    continue
-                if event[:2] == (target_first + 4, change_back):
+                if event[:2] == (target_first, change_back):
                     switched_out = True
                 if (
                     switched_out
@@ -616,11 +628,12 @@ def test_full_core_thread_switch_preserves_flags_for_next_branch():
                     await request_target_thread()
                     resume_requested = True
                     continue
-                if event[:2] == (target_first + 8, branch_eq):
+                if event[:2] == (
+                        target_first + 4, branch_on_restored_flag):
                     flag_snapshots["branch_retire"] = retired_flags
                     flag_snapshots["after_resume_branch"] = ctx.get(
                         dut.core.flags.as_value())
-                if event[:2] == (target_first + 20, taken):
+                if event[:2] == (target_first + 16, taken):
                     await ctx.tick()
                     break
                 if event[2]:
@@ -630,7 +643,7 @@ def test_full_core_thread_switch_preserves_flags_for_next_branch():
             await ctx.tick()
         else:
             raise AssertionError(
-                "Z-set branch did not reach taken path after round trip: "
+                f"{flag_name}-set branch did not reach taken path after round trip: "
                 f"{observed[-12:]}")
         assert switched_out
         assert resume_requested
@@ -649,33 +662,31 @@ def test_full_core_thread_switch_preserves_flags_for_next_branch():
     sim.add_testbench(bench)
     sim.run()
 
-    change_back_event = (target_first + 4, change_back, False)
-    branch_nia = target_first + 8
+    change_back_event = (target_first, change_back, False)
+    branch_nia = target_first + 4
     assert not [event for event in observed if event[2]], observed
-    assert [
-        event for event in observed if event[:2] == (target_first, set_zero)
-    ] == [(target_first, set_zero, False)]
     assert [
         event for event in observed if event[:2] == change_back_event[:2]
     ] == [change_back_event]
     assert [
-        event for event in observed if event[:2] == (branch_nia, branch_eq)
-    ] == [(branch_nia, branch_eq, False)]
+        event for event in observed
+        if event[:2] == (branch_nia, branch_on_restored_flag)
+    ] == [(branch_nia, branch_on_restored_flag, False)]
     assert [
         event for event in observed
-        if event[:2] == (target_first + 12, fallthrough)
+        if event[:2] == (target_first + 8, fallthrough)
     ] == []
     assert [
         event for event in observed
-        if event[:2] == (target_first + 20, taken)
-    ] == [(target_first + 20, taken, False)]
-    set_zero_pos = observed.index((target_first, set_zero, False))
+        if event[:2] == (target_first + 16, taken)
+    ] == [(target_first + 16, taken, False)]
     change_back_pos = observed.index(change_back_event)
-    branch_pos = observed.index((branch_nia, branch_eq, False))
-    assert set_zero_pos < change_back_pos < branch_pos
-    assert flag_snapshots["before_switch"] == 0b0110
-    assert flag_snapshots["intervening_thread"] != 0b0110
-    assert flag_snapshots["branch_retire"] == 0b0110
+    branch_pos = observed.index(
+        (branch_nia, branch_on_restored_flag, False))
+    assert change_back_pos < branch_pos
+    assert flag_snapshots["before_switch"] == saved_flags
+    assert flag_snapshots["intervening_thread"] != saved_flags
+    assert flag_snapshots["branch_retire"] == saved_flags
     assert (
         flag_snapshots["after_resume_branch"] ==
         flag_snapshots["before_switch"]
