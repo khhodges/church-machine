@@ -8579,7 +8579,17 @@ def save_lump():
         try:
             cfg_bi, err_bi = _read_saved_boot_config()
             if not err_bi:
-                _saved_entry_slot = _read_boot_entry_slot_from_image()
+                # The saved boot configuration is authoritative for the
+                # Lightning Bolt selection.  The image being replaced may be
+                # stale specifically because its format predates the current
+                # reader, so regeneration must not depend on decoding it.
+                _saved_entry_slot = cfg_bi.get(
+                    "bootEntrySlot", DEFAULT_BOOT_CONFIG["bootEntrySlot"])
+                if (not isinstance(_saved_entry_slot, int)
+                        or isinstance(_saved_entry_slot, bool)
+                        or not 0 <= _saved_entry_slot < MAX_NS_ENTRIES):
+                    raise ValueError(
+                        "saved boot config has an invalid bootEntrySlot")
                 blob_bi = _boot_image_gen.generate_boot_image(
                     cfg_bi,
                     LUMPS_DIR,

@@ -51,8 +51,13 @@ def repository(tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, "LUMPS_MANIFEST_PATH", str(tmp_path / "manifest.json"))
     monkeypatch.setattr(app_module, "NS_STATE_PATH", str(state))
     monkeypatch.setattr(app_module, "BOOT_IMAGE_PATH", str(boot))
-    monkeypatch.setattr(app_module, "_read_saved_boot_config", lambda: ({}, None))
-    monkeypatch.setattr(app_module, "_read_boot_entry_slot_from_image", lambda: 10)
+    monkeypatch.setattr(
+        app_module, "_read_saved_boot_config",
+        lambda: ({"bootEntrySlot": 10}, None))
+    monkeypatch.setattr(
+        app_module, "_read_boot_entry_slot_from_image",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("regeneration must not read the stale boot image")))
     monkeypatch.setattr(app_module._boot_image_gen, "generate_boot_image",
                         lambda *a, **k: b"new boot")
     monkeypatch.setattr(app_module, "_write_boot_image_bytes", boot.write_bytes)
