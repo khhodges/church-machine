@@ -753,7 +753,7 @@
 
 .flags-led-row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     flex-wrap: nowrap;
     gap: 0.5rem;
     margin-bottom: 0.5rem;
@@ -765,6 +765,67 @@
     padding-top: 0.2rem;
     padding-bottom: 0.3rem;
     margin-top: -0.25rem;
+}
+
+.flags-led-row.dashboard-menu-open {
+    overflow: visible;
+}
+
+.dashboard-status-main {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.dashboard-heading-row,
+.dashboard-machine-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.dashboard-machine-row {
+    flex-wrap: wrap;
+}
+
+.dashboard-menu-wrap {
+    position: relative;
+}
+
+.dashboard-menu-button {
+    padding: 0 0.2rem;
+    font-size: 1.2rem;
+    line-height: 1;
+    background: none;
+    color: var(--text-primary);
+    border: none;
+}
+
+.dashboard-menu-button:hover,
+.dashboard-menu-button[aria-expanded="true"] {
+    background: rgba(58, 134, 255, 0.18);
+    color: #fff;
+}
+
+.crd-menu-dropdown.dashboard-menu-dropdown {
+    top: calc(100% + 4px);
+    right: auto;
+    left: 0;
+    z-index: 200;
+    min-width: 220px;
+    max-height: min(70vh, 34rem);
+    overflow-y: auto;
+}
+
+.dashboard-active-label {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--church-gold);
+    font-size: 0.9rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .flags-led-row .flags-bar {
@@ -939,52 +1000,11 @@
     font-size: 0.75rem;
 }
 
-.dash-tabs {
-    --dash-tab-min-width: 3.6rem;
-    --dash-tab-min-height: 1.8rem;
-    --dash-tab-padding: 0.25rem 0.6rem;
-    --dash-tab-font-size: 0.75rem;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    margin-bottom: 0.5rem;
-    padding: 0.4rem;
-    background: #0d1b2a;
-    border-radius: 6px;
-    min-width: 0;
-}
-
-.dash-tab {
-    min-width: var(--dash-tab-min-width);
-    min-height: var(--dash-tab-min-height);
-    padding: var(--dash-tab-padding);
-    font-size: var(--dash-tab-font-size);
-    background: #1b2d45;
-    color: #e0e0e0;
-    border: 2px solid #3a86ff;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-weight: 600;
-    letter-spacing: 0.3px;
-}
-
-.dash-tab:hover {
-    background: #3a86ff;
-    border-color: #3a86ff;
-    color: white;
-}
-
-.dash-tab.active {
-    background: var(--accent);
-    color: white;
-    border-color: var(--accent);
-    box-shadow: 0 0 10px rgba(233, 69, 96, 0.4);
-}
-
+/* Dashboard tabs are now rendered inside the dash hamburger dropdown.
+   Focus-visible logic is maintained for accessibility. */
 .dash-tab:focus-visible {
     outline: 2px solid #8fc8ff;
-    outline-offset: 2px;
+    outline-offset: -2px;
 }
 
 .thread-identity-strip {

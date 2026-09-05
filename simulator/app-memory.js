@@ -277,38 +277,76 @@ function updateCRDetail() {
         crDetailTab === 'lump'     ? 'Lump'     :
         crDetailTab === 'register' ? 'Register' :
         crDetailTab === 'binary'   ? 'Binary'   : 'Code';
-    let html = '';
-    html += '<div class="crd-menu-bar">';
+
     const _headingText = _absLabel
         ? (_activeTabLabel && _activeTabLabel !== 'Code' ? `${_absLabel} \u2014 ${_activeTabLabel}` : _absLabel)
         : _activeTabLabel;
-    html += `<span class="crd-menu-active-label" id="crdMenuActiveLabel" data-abs-label="${_absLabel.replace(/"/g,'&quot;')}">${_headingText}</span>`;
-    if (showCode) {
-        html += '<div class="crd-tab-strip">';
-        html += `<button class="crd-tab${crDetailTab==='code'?' active':''}" onclick="switchCRDetailTab('code')">Code</button>`;
-        html += `<button class="crd-tab${crDetailTab==='clist'?' active':''}" onclick="switchCRDetailTab('clist')">C-List</button>`;
-        html += `<button class="crd-tab${crDetailTab==='api'?' active':''}" onclick="switchCRDetailTab('api')">API</button>`;
-        html += `<button class="crd-tab${crDetailTab==='lump'?' active':''}" onclick="switchCRDetailTab('lump')">Lump</button>`;
-        if (showEditButton) {
-            html += `<button class="crd-action-btn" onclick="editCRCodeInEditor()" title="Edit \u2014 Load this code lump into the assembly editor">\u270E\u202FEdit</button>`;
-            html += `<button class="crd-action-btn" onclick="patchSimulator()" title="Patch \u2014 Assemble editor code and write it directly into simulator memory at this lump\u2019s base address.">\u21A9\u202FPatch</button>`;
-        }
-        if (_lumpHdr.valid) {
-            const _cmpLsz = _lumpHdr.lumpSize;
-            let _cmpMin = 64;
-            while (_cmpMin < (1 + _lumpHdr.cw + _lumpHdr.cc)) _cmpMin <<= 1;
-            const _canCmp2 = _cmpMin < _cmpLsz;
-            html += `<button class="crd-action-btn crd-action-btn-compress${_canCmp2 ? '' : ' crd-action-btn-dim'}" ` +
-                    `onclick="${_canCmp2 ? `lumpCompress(${nsIdx})` : ''}" ` +
-                    `${_canCmp2 ? '' : 'disabled '}` +
-                    `title="${_canCmp2 ? `Compress \u2014 shrink freespace + trim unused c-list GTs, then auto-save` : 'Already at minimum size \u2014 no freespace or unused GTs'}">\u2913\u202FCompress</button>`;
-            html += `<button class="crd-action-btn crd-action-btn-compress" ` +
-                    `onclick="lumpSaveLump(${nsIdx})" ` +
-                    `title="Save Lump \u2014 persist the current lump binary to server/lumps/ so it survives restarts">\u2193\u202FSave</button>`;
-        }
-        html += '</div>';
+
+    const activeLabelEl = document.getElementById('crdMenuActiveLabel');
+    if (activeLabelEl) {
+        activeLabelEl.textContent = _headingText;
+        activeLabelEl.setAttribute('data-abs-label', _absLabel ? _absLabel.replace(/"/g,'&quot;') : '');
     }
+
+    let dynMenuHtml = '';
+
+    // Abstraction Views
+    dynMenuHtml += '<div class="crd-menu-divider"></div>';
+    dynMenuHtml += '<div class="crd-menu-section-label">Inspect Abstraction</div>';
+    if (showCode) {
+        dynMenuHtml += `<button class="crd-menu-item${crDetailTab==='code'?' crd-menu-item-active':''}" data-tab="code" onclick="switchCRDetailTab('code'); toggleDashMenu()">Code</button>`;
+    }
+    dynMenuHtml += `<button class="crd-menu-item${crDetailTab==='clist'?' crd-menu-item-active':''}" data-tab="clist" onclick="switchCRDetailTab('clist'); toggleDashMenu()">C-List</button>`;
+    dynMenuHtml += `<button class="crd-menu-item${crDetailTab==='api'?' crd-menu-item-active':''}" data-tab="api" onclick="switchCRDetailTab('api'); toggleDashMenu()">API</button>`;
+    dynMenuHtml += `<button class="crd-menu-item${crDetailTab==='lump'?' crd-menu-item-active':''}" data-tab="lump" onclick="switchCRDetailTab('lump'); toggleDashMenu()">Lump</button>`;
+    dynMenuHtml += `<button class="crd-menu-item${crDetailTab==='register'?' crd-menu-item-active':''}" data-tab="register" onclick="switchCRDetailTab('register'); toggleDashMenu()">Register</button>`;
+    dynMenuHtml += `<button class="crd-menu-item${crDetailTab==='binary'?' crd-menu-item-active':''}" data-tab="binary" onclick="switchCRDetailTab('binary'); toggleDashMenu()">Binary</button>`;
+
+    // Actions
+    let actionItems = '';
+    if (showCode && showEditButton) {
+        actionItems += `<button class="crd-menu-item crd-menu-item-action" onclick="editCRCodeInEditor(); toggleDashMenu()" title="Edit \u2014 Load this code lump into the assembly editor">Edit Source</button>`;
+        actionItems += `<button class="crd-menu-item crd-menu-item-action" onclick="patchSimulator(); toggleDashMenu()" title="Patch \u2014 Assemble editor code and write it directly into simulator memory at this lump\u2019s base address.">Patch Memory</button>`;
+    }
+    if (showCode && _lumpHdr.valid) {
+        const _cmpLsz = _lumpHdr.lumpSize;
+        let _cmpMin = 64;
+        while (_cmpMin < (1 + _lumpHdr.cw + _lumpHdr.cc)) _cmpMin <<= 1;
+        const _canCmp2 = _cmpMin < _cmpLsz;
+        actionItems += `<button class="crd-menu-item crd-menu-item-action${_canCmp2 ? '' : ' crd-action-btn-dim'}" ` +
+                `onclick="${_canCmp2 ? `lumpCompress(${nsIdx}); toggleDashMenu()` : ''}" ` +
+                `${_canCmp2 ? '' : 'disabled '}` +
+                `title="${_canCmp2 ? `Compress \u2014 shrink freespace + trim unused c-list GTs, then auto-save` : 'Already at minimum size \u2014 no freespace or unused GTs'}">Compress Lump</button>`;
+        actionItems += `<button class="crd-menu-item crd-menu-item-action" ` +
+                `onclick="lumpSaveLump(${nsIdx}); toggleDashMenu()" ` +
+                `title="Save Lump \u2014 persist the current lump binary to server/lumps/ so it survives restarts">Save Lump</button>`;
+    }
+
+    if (actionItems) {
+        dynMenuHtml += '<div class="crd-menu-divider"></div>';
+        dynMenuHtml += '<div class="crd-menu-section-label">Modify Abstraction</div>';
+        dynMenuHtml += actionItems;
+    }
+
+    if (showEditButton) {
+        dynMenuHtml += '<div class="crd-menu-divider"></div>';
+        dynMenuHtml += '<div class="crd-menu-section-label">Deploy &amp; Share</div>';
+        dynMenuHtml += `<button class="crd-menu-item crd-menu-item-fpga" onclick="patchFPGA();toggleDashMenu()" title="Patch FPGA \u2014 Runs Patch Simulator first, then uploads the updated lump to the FPGA board over WebSerial (UART). Requires an active hardware connection.">&#x21A9; Patch FPGA</button>`;
+        dynMenuHtml += `<button class="crd-menu-item crd-menu-item-fpga" onclick="exportPatchFile();toggleDashMenu()" title="Export Patch \u2014 Assembles the code and downloads a .patch file with UART frames, CRC, and RUN sentinel. Flash with: python3 patch_fpga.py /dev/ttyUSB1 file.patch">&#x2B73; Export Patch</button>`;
+        dynMenuHtml += `<button class="crd-menu-item crd-menu-item-fpga" onclick="exportLumpAsPatch();toggleDashMenu()" title="Lump\u2192Patch \u2014 Pick a pre-built .lump binary, validate its header, and wrap it into a .patch UART frame file for FPGA flashing.">&#x2B73; Lump\u2192Patch</button>`;
+        dynMenuHtml += '<div class="crd-menu-divider"></div>';
+        dynMenuHtml += `<button class="crd-menu-item crd-menu-item-publish" onclick="publishToLibrary();toggleDashMenu()" title="Publish \u2014 Compile and publish this abstraction to the Mum Tunnel Library on GitHub, including machine words, c-list, source, and metadata.">&#x21E1; Publish to Library</button>`;
+    }
+
+    const dynMenuEl = document.getElementById('dynamicAbstractionMenu');
+    if (dynMenuEl) {
+        dynMenuEl.innerHTML = dynMenuHtml;
+        dynMenuEl.style.display = 'block';
+    }
+
+    let html = '';
     if (showThread) {
+        html += '<div class="crd-menu-bar" style="margin-bottom:0.5rem;padding:0.25rem 0.5rem;border:1px solid var(--border);border-radius:6px;background:rgba(0,0,0,0.2);">';
         html += `<span class="crd-zone-nav" title="Jump to zone \u00b7 hover for live data">`;
         html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone('hdr')" onmouseenter="showZonePopup(event,'hdr',${nsIdx})" onmouseleave="hideZonePopup()">Hdr</button>`;
         html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(5)" onmouseenter="showZonePopup(event,5,${nsIdx})" onmouseleave="hideZonePopup()">⑤\u202FDR</button>`;
@@ -317,36 +355,8 @@ function updateCRDetail() {
         html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(2)" onmouseenter="showZonePopup(event,2,${nsIdx})" onmouseleave="hideZonePopup()">②\u202FStack</button>`;
         html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(1)" onmouseenter="showZonePopup(event,1,${nsIdx})" onmouseleave="hideZonePopup()">①\u202FCaps</button>`;
         html += `</span>`;
+        html += '</div>';
     }
-    html += '<div class="crd-hamburger-wrap">';
-    html += `<button class="crd-hamburger" onclick="toggleCRDetailMenu(event)" title="Views &amp; Actions">&#x2630;</button>`;
-    html += '<div class="crd-menu-dropdown" id="crdMenuDropdown" style="display:none">';
-    if (!showCode) {
-        html += '<div class="crd-menu-section-label">View</div>';
-        html += `<button class="crd-menu-item${crDetailTab==='clist'?' crd-menu-item-active':''}" data-tab="clist" onclick="switchCRDetailTab('clist');toggleCRDetailMenu()">C-List</button>`;
-        html += `<button class="crd-menu-item${crDetailTab==='lump'?' crd-menu-item-active':''}" data-tab="lump" onclick="switchCRDetailTab('lump');toggleCRDetailMenu()">Lump</button>`;
-        html += `<button class="crd-menu-item${crDetailTab==='register'?' crd-menu-item-active':''}" data-tab="register" onclick="switchCRDetailTab('register');toggleCRDetailMenu()">Register</button>`;
-        html += `<button class="crd-menu-item${crDetailTab==='binary'?' crd-menu-item-active':''}" data-tab="binary" onclick="switchCRDetailTab('binary');toggleCRDetailMenu()">Binary</button>`;
-        html += `<button class="crd-menu-item${crDetailTab==='api'?' crd-menu-item-active':''}" data-tab="api" onclick="switchCRDetailTab('api');toggleCRDetailMenu()">API</button>`;
-    }
-    if (showEditButton) {
-        html += '<div class="crd-menu-divider"></div>';
-        html += '<div class="crd-menu-section-label">FPGA</div>';
-        html += `<button class="crd-menu-item crd-menu-item-fpga" onclick="patchFPGA();toggleCRDetailMenu()" title="Patch FPGA \u2014 Runs Patch Simulator first, then uploads the updated lump to the FPGA board over WebSerial (UART). Requires an active hardware connection.">&#x21A9; Patch FPGA</button>`;
-        html += `<button class="crd-menu-item crd-menu-item-fpga" onclick="exportPatchFile();toggleCRDetailMenu()" title="Export Patch \u2014 Assembles the code and downloads a .patch file with UART frames, CRC, and RUN sentinel. Flash with: python3 patch_fpga.py /dev/ttyUSB1 file.patch">&#x2B73; Export Patch</button>`;
-        html += `<button class="crd-menu-item crd-menu-item-fpga" onclick="exportLumpAsPatch();toggleCRDetailMenu()" title="Lump\u2192Patch \u2014 Pick a pre-built .lump binary, validate its header, and wrap it into a .patch UART frame file for FPGA flashing.">&#x2B73; Lump\u2192Patch</button>`;
-    }
-    html += '<div class="crd-menu-divider"></div>';
-    html += '<div class="crd-menu-section-label">Debug</div>';
-    html += `<button class="crd-menu-item${crDetailTab==='register'?' crd-menu-item-active':''}" data-tab="register" id="crdTab-register" onclick="switchCRDetailTab('register');toggleCRDetailMenu()">Register</button>`;
-    html += `<button class="crd-menu-item${crDetailTab==='binary'?' crd-menu-item-active':''}" data-tab="binary" id="crdTab-binary" onclick="switchCRDetailTab('binary');toggleCRDetailMenu()">Binary</button>`;
-    if (showEditButton) {
-        html += '<div class="crd-menu-divider"></div>';
-        html += `<button class="crd-menu-item crd-menu-item-publish" onclick="publishToLibrary();toggleCRDetailMenu()" title="Publish \u2014 Compile and publish this abstraction to the Mum Tunnel Library on GitHub, including machine words, c-list, source, and metadata.">&#x21E1; Publish</button>`;
-    }
-    html += '</div>';
-    html += '</div>';
-    html += '</div>';
 
     // Pre-compute clobber analysis once (only when a panel that needs it will render);
     // reused by both the Code and C-List panels.

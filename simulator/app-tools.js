@@ -138,17 +138,55 @@ function selectTutorial(which) {
     }
 }
 
+function _setDashMenuOpen(open) {
+    const dropdown = document.getElementById('dashMenuDropdown');
+    const btn = document.getElementById('dashHamburgerBtn');
+    if (!dropdown || !btn) return;
+    dropdown.style.display = open ? 'block' : 'none';
+    btn.setAttribute('aria-expanded', String(open));
+    const statusRow = btn.closest('.flags-led-row');
+    if (statusRow) statusRow.classList.toggle('dashboard-menu-open', open);
+}
+
+function toggleDashMenu(event) {
+    if (event) event.stopPropagation();
+    const dropdown = document.getElementById('dashMenuDropdown');
+    if (!dropdown) return;
+    _setDashMenuOpen(dropdown.style.display === 'none' || dropdown.style.display === '');
+}
+
+if (typeof document !== 'undefined') {
+    document.addEventListener('click', function(e) {
+        const dropdown = document.getElementById('dashMenuDropdown');
+        const wrap = document.getElementById('dashHamburgerWrap');
+        if (dropdown && dropdown.style.display === 'block') {
+            if (wrap && !wrap.contains(e.target)) {
+                _setDashMenuOpen(false);
+            }
+        }
+    });
+    document.addEventListener('keydown', function(event) {
+        if (event.key !== 'Escape') return;
+        const dropdown = document.getElementById('dashMenuDropdown');
+        if (!dropdown || dropdown.style.display !== 'block') return;
+        _setDashMenuOpen(false);
+        const btn = document.getElementById('dashHamburgerBtn');
+        if (btn) {
+            btn.focus();
+        }
+    });
+}
+
 function switchDashTab(tabId) {
     const tab = document.getElementById('dashTab-' + tabId);
     const panel = document.getElementById('dashPanel-' + tabId);
     if (!panel) return;
 
-    // CR Detail is an internal panel without its own tab. Keep the previously
-    // selected dashboard tab reachable while that drill-down is displayed.
     if (tab) {
         document.querySelectorAll('.dash-tab').forEach((item) => {
             const selected = item === tab;
             item.classList.toggle('active', selected);
+            item.classList.toggle('crd-menu-item-active', selected);
             item.setAttribute('aria-selected', String(selected));
             item.tabIndex = selected ? 0 : -1;
         });
@@ -161,16 +199,19 @@ function switchDashTab(tabId) {
 }
 
 function handleDashTabKeydown(event) {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const tabs = Array.from(event.currentTarget.querySelectorAll('.dash-tab'))
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+    const container = event.currentTarget.closest('[role="tablist"]');
+    if (!container) return;
+    const tabs = Array.from(container.querySelectorAll('.dash-tab'))
         .filter(tab => !tab.hidden && !tab.disabled);
     const current = tabs.indexOf(document.activeElement);
     if (current < 0 || tabs.length === 0) return;
     event.preventDefault();
     let next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 :
-        (current + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
-    tabs[next].focus();
-    tabs[next].click();
+        (current + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : -1) + tabs.length) % tabs.length;
+    const nextTab = tabs[next];
+    nextTab.focus();
+    switchDashTab(nextTab.dataset.dashboardTab);
 }
 
 function _ensureTutorialObjects() {
@@ -342,7 +383,22 @@ function updateDashboard() {
     updateFlagsDisplay();
     updateInfoDisplay();
     updateGateLog();
-    if (selectedCR !== null) updateCRDetail();
+
+    const crDetailActive = document.getElementById('dashPanel-crdetail')?.classList.contains('active');
+    if (selectedCR !== null && crDetailActive) {
+        if (typeof updateCRDetail === 'function') updateCRDetail();
+    } else {
+        const dynMenuEl = document.getElementById('dynamicAbstractionMenu');
+        if (dynMenuEl) dynMenuEl.style.display = 'none';
+
+        const activeLabelEl = document.getElementById('crdMenuActiveLabel');
+        const activeTab = document.querySelector('.dash-tab.active');
+        if (activeLabelEl && activeTab) {
+            activeLabelEl.textContent = activeTab.textContent;
+            activeLabelEl.setAttribute('data-abs-label', '');
+        }
+    }
+
     if (pipelineViz && !pipelineViz.animating) pipelineViz.render();
     _refreshSignedReturnReadout();
     if (typeof updateLiveLumpBanner === 'function') updateLiveLumpBanner();

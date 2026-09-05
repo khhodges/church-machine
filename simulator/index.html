@@ -82,7 +82,7 @@
     <link rel="icon" type="image/svg+xml" sizes="16x16" href="favicon.svg">
     <link rel="stylesheet" href="styles-base.css?v=20260905-visual-viewport1">
     <link rel="stylesheet" href="styles-landing.css?v=20260820-card-dnd2">
-    <link rel="stylesheet" href="styles-toolbar.css?v=20260905-thread-stack1">
+    <link rel="stylesheet" href="styles-toolbar.css?v=20260905-dashboard-menu1">
     <link rel="stylesheet" href="styles-editor.css?v=20260820-petname-help1">
     <link rel="stylesheet" href="styles-dashboard.css?v=20260830-thread-heap-formula1">
     <link rel="stylesheet" href="styles-lumps.css?v=20260820-draft2">
@@ -668,29 +668,43 @@
 
     <div id="dashboard" class="view">
         <div class="flags-led-row">
-            <div id="hwLedBar" class="hw-led-bar hw-led-bar-left">
-                <span class="hw-led-label" id="hwLedBoardLabel">Wukong A7</span>
-                <div class="hw-led-item">
-                    <div class="hw-led hw-led-green" id="hw-led0"></div>
-                    <span class="hw-led-name">G21<br><span class="hw-led-role">Boot/User</span></span>
+            <div class="dashboard-status-main">
+                <div class="dashboard-heading-row">
+                    <div class="crd-hamburger-wrap dashboard-menu-wrap" id="dashHamburgerWrap">
+                        <button class="crd-hamburger dashboard-menu-button" id="dashHamburgerBtn" onclick="toggleDashMenu(event)" aria-haspopup="true" aria-expanded="false" aria-controls="dashMenuDropdown" title="Dashboard and abstraction activities">&#x2630;</button>
+                        <div class="crd-menu-dropdown dashboard-menu-dropdown" id="dashMenuDropdown" style="display:none;" role="menu" aria-label="Dashboard and abstraction activities">
+                            <div class="crd-menu-section-label">Inspect Machine</div>
+                            <div role="tablist" aria-orientation="vertical">
+                                <button class="crd-menu-item dash-tab active crd-menu-item-active" role="tab" aria-selected="true" aria-controls="dashPanel-cr" data-dashboard-tab="cr" id="dashTab-cr" tabindex="0" onclick="switchDashTab('cr'); toggleDashMenu()" onkeydown="handleDashTabKeydown(event)">Context Registers</button>
+                                <button class="crd-menu-item dash-tab" role="tab" aria-selected="false" aria-controls="dashPanel-dr" data-dashboard-tab="dr" id="dashTab-dr" tabindex="-1" onclick="switchDashTab('dr'); toggleDashMenu()" onkeydown="handleDashTabKeydown(event)">Data Registers</button>
+                                <button class="crd-menu-item dash-tab" role="tab" aria-selected="false" aria-controls="dashPanel-gatelog" data-dashboard-tab="gatelog" id="dashTab-gatelog" tabindex="-1" onclick="switchDashTab('gatelog'); toggleDashMenu()" onkeydown="handleDashTabKeydown(event)">Gate Log</button>
+                                <button class="crd-menu-item dash-tab" role="tab" aria-selected="false" aria-controls="dashPanel-state" data-dashboard-tab="state" id="dashTab-state" tabindex="-1" onclick="switchDashTab('state'); toggleDashMenu()" onkeydown="handleDashTabKeydown(event)">Machine State</button>
+                                <button class="crd-menu-item dash-tab" role="tab" aria-selected="false" aria-controls="dashPanel-memstats" data-dashboard-tab="memstats" id="dashTab-memstats" tabindex="-1" onclick="switchDashTab('memstats'); toggleDashMenu()" onkeydown="handleDashTabKeydown(event)">Memory Status</button>
+                            </div>
+                            <div id="dynamicAbstractionMenu" style="display:none;"></div>
+                        </div>
+                    </div>
+                    <span class="crd-menu-active-label dashboard-active-label" id="crdMenuActiveLabel">Context Registers</span>
                 </div>
-                <div class="hw-led-item">
-                    <div class="hw-led hw-led-red" id="hw-led1" role="img" aria-label="Fault lamp off"></div>
-                    <span class="hw-led-name">G20<br><span class="hw-led-role">Fault</span></span>
+                <div class="dashboard-machine-row">
+                    <div id="hwLedBar" class="hw-led-bar hw-led-bar-left">
+                        <span class="hw-led-label" id="hwLedBoardLabel">Wukong A7</span>
+                        <div class="hw-led-item">
+                            <div class="hw-led hw-led-green" id="hw-led0"></div>
+                            <span class="hw-led-name">G21<br><span class="hw-led-role">Boot/User</span></span>
+                        </div>
+                        <div class="hw-led-item">
+                            <div class="hw-led hw-led-red" id="hw-led1" role="img" aria-label="Fault lamp off"></div>
+                            <span class="hw-led-name">G20<br><span class="hw-led-role">Fault</span></span>
+                        </div>
+                        <span class="hw-led-hint">← DWRITE LED[0]</span>
+                    </div>
+                    <div id="flagsDisplay" class="flags-bar"></div>
                 </div>
-                <span class="hw-led-hint">← DWRITE LED[0]</span>
             </div>
-            <div id="flagsDisplay" class="flags-bar"></div>
             <div id="threadIdentityStrip" class="thread-identity-strip"
                  aria-label="Configured Thread NIA and GT dot pet names"
                  aria-live="polite"></div>
-        </div>
-        <div class="dash-tabs" role="tablist" aria-label="Dashboard panels" onkeydown="handleDashTabKeydown(event)">
-            <button class="dash-tab active" role="tab" aria-selected="true" aria-controls="dashPanel-cr" tabindex="0" id="dashTab-cr" onclick="switchDashTab('cr')" data-tooltip="CRs — Context Registers CR0–CR15">CRs</button>
-            <button class="dash-tab" role="tab" aria-selected="false" aria-controls="dashPanel-dr" tabindex="-1" id="dashTab-dr" onclick="switchDashTab('dr')" data-tooltip="DRs — Data Registers DR0–DR15">DRs</button>
-            <button class="dash-tab" role="tab" aria-selected="false" aria-controls="dashPanel-gatelog" tabindex="-1" id="dashTab-gatelog" onclick="switchDashTab('gatelog')" data-tooltip="Gate Log — mLoad / mSave from last Step">Gate Log</button>
-            <button class="dash-tab" role="tab" aria-selected="false" aria-controls="dashPanel-state" tabindex="-1" id="dashTab-state" onclick="switchDashTab('state')" data-tooltip="State — Machine Architecture info">State</button>
-            <button class="dash-tab" role="tab" aria-selected="false" aria-controls="dashPanel-memstats" tabindex="-1" id="dashTab-memstats" onclick="switchDashTab('memstats')" data-tooltip="Memory — Foundation Layer Status">Mem</button>
         </div>
         <div id="dashPanel-cr" class="dash-panel active" role="tabpanel" aria-labelledby="dashTab-cr">
             <div class="panel">
@@ -3361,12 +3375,12 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script defer src="app-startup-wizard.js?v=20260619a"></script>
     <script src="lump-registry.js?v=20260719g"></script>
     <script src="app-shell.js?v=20260903-stale-wip-guard1"></script>
-    <script src="app-tools.js?v=20260826-lump-validations"></script>
+    <script src="app-tools.js?v=20260905-dashboard-menu1"></script>
     <script src="app-cr-display.js?v=20260521a"></script>
     <script src="app-cr-detail.js?v=20260820-named-capability1"></script>
     <script src="tab-correction.js?v=20260501a"></script>
     <script src="pet_name_audit.js"></script>
-    <script src="app-memory.js?v=20260831-cr14-run-follow1"></script>
+    <script src="app-memory.js?v=20260905-dashboard-menu1"></script>
     <script src="app-abstractions.js?v=20260830-live-lump-sync1"></script>
     <script src="app-ns-dna.js"></script>
     <script src="lump-audit.js?v=20260724c"></script>
