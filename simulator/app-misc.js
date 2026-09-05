@@ -1129,6 +1129,15 @@ function syncVisualViewportTop() {
     adjustViewTop();
 }
 
+function observeToolbarHeight() {
+    const toolbar = document.querySelector('.fixed-toolbar');
+    if (!toolbar || toolbar._viewTopResizeObserver || typeof ResizeObserver !== 'function') return;
+    toolbar._viewTopResizeObserver = new ResizeObserver(function() {
+        requestAnimationFrame(adjustViewTop);
+    });
+    toolbar._viewTopResizeObserver.observe(toolbar);
+}
+
 window.addEventListener('resize', syncVisualViewportTop);
 if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', syncVisualViewportTop);
@@ -1258,6 +1267,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         initAllTabOverflows();
+        observeToolbarHeight();
         syncVisualViewportTop();
         initCodeCopyButtons();
         updateFPGAStatusBtn();

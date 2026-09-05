@@ -7,6 +7,7 @@ const assert = require('assert');
 const html = fs.readFileSync('simulator/index.html', 'utf8');
 const tools = fs.readFileSync('simulator/app-tools.js', 'utf8');
 const run = fs.readFileSync('simulator/app-run.js', 'utf8');
+const misc = fs.readFileSync('simulator/app-misc.js', 'utf8');
 const css = fs.readFileSync('simulator/styles-toolbar.css', 'utf8');
 const lumpCss = fs.readFileSync('simulator/styles-lumps.css', 'utf8');
 
@@ -47,5 +48,7 @@ assert.match(css, /\.dash-tab:focus-visible/,
     'keyboard focus remains clearly visible');
 assert.match(run, /function updateThreadIdentityStrip\(\)[\s\S]*replaceChildren\(\)[\s\S]*row\.active/,
     'live Thread updates and active highlighting still render through the original strip');
+assert.match(misc, /function observeToolbarHeight\(\)[\s\S]*new ResizeObserver[\s\S]*requestAnimationFrame\(adjustViewTop\)[\s\S]*observe\(toolbar\)/,
+    'dashboard content follows late toolbar height changes so Thread.1 cannot be covered');
 
 console.log('PASS: persistent right-side Thread stack contracts');
