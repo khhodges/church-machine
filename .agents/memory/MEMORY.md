@@ -153,3 +153,4 @@
 - [M-bit I/O object](m-bit-io-object.md) — one Namespace-held 32-bit I/O word; bits 0–15 map CR0.M–CR15.M and full-word writes set/clear all bits
 - [Browser resource-error containment](browser-resource-error-containment.md) — malformed/resource window errors must be intercepted in capture phase before the artifact crash monitor
 - [Wukong one-shot Skip Fault](wukong-skip-fault-protocol.md) — explicit post-snapshot skip needs authenticated FPGA-sequence proof; lost correlation requires reboot
+- [LUMP output profile stability](lump-output-profile-stability.md) — persist API/Compact/Full per abstraction; allocation changes reflect embedded content, not code size alone

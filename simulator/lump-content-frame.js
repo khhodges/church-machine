@@ -218,6 +218,33 @@ function lumpDecodeContentFrameApi(serverWords) {
 }
 
 /**
+ * Return the output profile encoded by a valid 0xAB content frame.
+ * This is deliberately synchronous so Save/History UI can preserve and label
+ * the allocation choice without decoding or inflating the embedded source.
+ */
+function lumpContentFrameProfile(serverWords) {
+    try {
+        if (!serverWords || serverWords.length === 0) return null;
+        var _bhdr = serverWords[0] >>> 0;
+        var _cw = (_bhdr >>> 10) & 0x1FFF;
+        var _cc = _bhdr & 0xFF;
+        var _sz = 64 << ((_bhdr >>> 23) & 0x0F);
+        var _start = 1 + _cw;
+        var _end = _sz - _cc;
+        if (_start >= _end || _start >= serverWords.length) return null;
+        var _frameHeader = serverWords[_start] >>> 0;
+        if (((_frameHeader >>> 24) & 0xFF) !== 0xAB) return null;
+        var _flags = (_frameHeader >>> 16) & 0xFF;
+        if (_flags === 0x00) return 'api';
+        if (_flags === 0x01 || _flags === 0x05) return 'compact';
+        if (_flags === 0x03 || _flags === 0x07) return 'full';
+        return null;
+    } catch (_e) {
+        return null;
+    }
+}
+
+/**
  * Parse the 0xAB content frame from a complete LUMP word array and return the
  * embedded source string, or null when absent, malformed, or on any error.
  *
@@ -283,6 +310,7 @@ var _lcfExports = {
     lumpFrameStripComments: lumpFrameStripComments,
     lumpFrameDeflateRaw:   lumpFrameDeflateRaw,
     lumpBuildContentFrame: lumpBuildContentFrame,
+    lumpContentFrameProfile: lumpContentFrameProfile,
     lumpDecodeContentFrameApi: lumpDecodeContentFrameApi,
     lumpDecodeContentFrame: lumpDecodeContentFrame,
 };

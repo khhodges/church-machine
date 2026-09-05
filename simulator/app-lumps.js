@@ -2620,7 +2620,13 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                 const compiledStr = fmtTs(compiledTs) || (ver === 0 ? 'system' : '\u2014');
                 const cwStr   = hist && hist.cw       != null ? hist.cw              : '\u2014';
                 const ccStr   = hist && hist.cc       != null ? hist.cc              : '\u2014';
-                const szStr   = hist && hist.lump_size != null ? `${hist.lump_size}w` : '\u2014';
+                const profileLabel = hist && hist.content_profile === 'api'
+                    ? 'API only'
+                    : (hist && hist.content_profile === 'compact'
+                        ? 'Compact source'
+                        : (hist && hist.content_profile === 'full' ? 'Full source' : 'Legacy'));
+                const szStr   = hist && hist.lump_size != null
+                    ? `${hist.lump_size}w \u00b7 ${profileLabel}` : '\u2014';
                 const metadataOnly = Boolean(hist && hist.metadata_only);
                 const validationErrors = hist && Array.isArray(hist.validation_errors)
                     ? hist.validation_errors : [];
@@ -5357,6 +5363,15 @@ async function openLumpInEditor(token) {
     if (serverWords && serverWords.length > 0) {
         var _lcfDec = (typeof LumpContentFrame !== 'undefined') ? LumpContentFrame : null;
         if (_lcfDec) {
+            if (typeof _lcfDec.lumpContentFrameProfile === 'function') {
+                var _openedOutputProfile = _lcfDec.lumpContentFrameProfile(serverWords);
+                if (_openedOutputProfile) {
+                    window._editorOpenLumpOutputProfile = {
+                        token: token,
+                        profile: _openedOutputProfile
+                    };
+                }
+            }
             try { _binaryFrameSource = await _lcfDec.lumpDecodeContentFrame(serverWords); }
             catch (_bfe) { /* fall through */ }
         }
@@ -6117,6 +6132,14 @@ function _selectFormatLumpProfile(profile) {
     var pending = window._pendingLumpData;
     if (!pending || !pending.candidates || !pending.candidates[profile]) return;
     pending.selectedProfile = profile;
+    if (pending.abstractionName) {
+        try {
+            localStorage.setItem(
+                'lumpOutputProfile:' + encodeURIComponent(pending.abstractionName),
+                profile
+            );
+        } catch (_e) {}
+    }
     _renderFormatLumpCandidate(pending);
 }
 window._selectFormatLumpProfile = _selectFormatLumpProfile;
@@ -6215,7 +6238,31 @@ window.showFormatLump = async function() {
     // Store immutable candidates for Step 2; confirmSaveToNamespace retains its
     // registeredAt freshness guard before it reuses the selected binary.
     var _svRegisteredAt = (_regMem && _regMem.memory) ? (_regMem.memory.registeredAt || 0) : 0;
-    var _selectedProfile = _candidates.full ? 'full' : 'api';
+    // Keep the output choice stable between saves. Previously every new Save
+    // dialog returned to Full source, which could turn an unchanged API-only
+    // 64-word LUMP into a 512-word LUMP merely by saving it again.
+    var _preferredProfile = null;
+    try {
+        _preferredProfile = localStorage.getItem(
+            'lumpOutputProfile:' + encodeURIComponent(_absName)
+        );
+    } catch (_e) {}
+    var _openedProfile = window._editorOpenLumpOutputProfile;
+    if (!_preferredProfile && _openedProfile &&
+            _openedProfile.token === window.LumpRegistry.getCurrent()) {
+        _preferredProfile = _openedProfile.profile;
+    }
+    var _selectedProfile = _preferredProfile && _candidates[_preferredProfile]
+        ? _preferredProfile
+        : (_candidates.full ? 'full' : 'api');
+    // Persist inferred/default selections too. A programmer should not have to
+    // re-click an already-selected profile merely to keep it for the next save.
+    try {
+        localStorage.setItem(
+            'lumpOutputProfile:' + encodeURIComponent(_absName),
+            _selectedProfile
+        );
+    } catch (_e) {}
     var _selectedCandidate = _candidates[_selectedProfile];
     _caps = _selectedCandidate.caps;
     window._pendingLumpData = {
@@ -6226,6 +6273,7 @@ window.showFormatLump = async function() {
         registeredAt: _svRegisteredAt,
         candidates: _candidates,
         selectedProfile: _selectedProfile,
+        abstractionName: _absName,
         sourceText: _srcText,
         api: _apiObj
     };

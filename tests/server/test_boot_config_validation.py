@@ -35,6 +35,7 @@ from hardware.thread_design import thread_layout
 from server.app import (
     DEFAULT_BOOT_CONFIG,
     HARDWARE_PROFILES,
+    MAX_NS_ENTRIES,
     _validate_step1,
     _validate_step2,
 )
@@ -299,6 +300,71 @@ class TestValidateStep2General:
             response = client.post("/api/boot-config", json=payload)
         assert response.status_code == 400
         assert "does not match its canonical catalog record" in response.get_json()["error"]
+
+    def test_boot_entry_slot_is_saved_with_the_boot_config(self, monkeypatch, tmp_path):
+        """The Lightning Bolt selection must survive beyond browser-local state."""
+        config_path = tmp_path / "boot-config.json"
+        monkeypatch.setattr(_app_module, "BOOT_CONFIG_PATH", str(config_path))
+        payload = {
+            "targetBoard": TI60_BOARD,
+            "bootEntrySlot": 10,
+            "step1": dict(DEFAULT_BOOT_CONFIG["step1"]),
+            "step2": {"lumps": []},
+            "step3": {"emptySlotCount": 0},
+        }
+        with _app_module.app.test_client() as client:
+            response = client.post("/api/boot-config", json=payload)
+            loaded = client.get("/api/boot-config")
+        assert response.status_code == 200, response.get_json()
+        assert response.get_json()["config"]["bootEntrySlot"] == 10
+        assert json.loads(config_path.read_text())["bootEntrySlot"] == 10
+        assert loaded.get_json()["config"]["bootEntrySlot"] == 10
+
+    @pytest.mark.parametrize("invalid_slot", [True, -1, MAX_NS_ENTRIES])
+    def test_boot_entry_slot_rejects_invalid_values(
+            self, monkeypatch, tmp_path, invalid_slot):
+        monkeypatch.setattr(
+            _app_module, "BOOT_CONFIG_PATH", str(tmp_path / "boot-config.json"))
+        payload = {
+            "targetBoard": TI60_BOARD,
+            "bootEntrySlot": invalid_slot,
+            "step1": dict(DEFAULT_BOOT_CONFIG["step1"]),
+            "step2": {"lumps": []},
+            "step3": {"emptySlotCount": 0},
+        }
+        with _app_module.app.test_client() as client:
+            response = client.post("/api/boot-config", json=payload)
+        assert response.status_code == 400
+        assert "bootEntrySlot must be an integer" in response.get_json()["error"]
+
+    def test_generation_uses_saved_boot_entry_when_request_omits_it(self, monkeypatch):
+        """Generate after Save must use the saved first abstraction."""
+        captured = {}
+        cfg = {
+            "targetBoard": TI60_BOARD,
+            "bootEntrySlot": 10,
+            "step1": dict(DEFAULT_BOOT_CONFIG["step1"]),
+            "step2": {"lumps": []},
+            "step3": {"emptySlotCount": 0},
+        }
+
+        def fake_generate(config, lumps_dir, boot_entry_slot=None,
+                          require_entry_resident=False):
+            captured["config"] = config
+            captured["entry_slot"] = boot_entry_slot
+            return b"\x00" * 64
+
+        monkeypatch.setattr(_app_module, "_read_saved_boot_config", lambda: (cfg, None))
+        monkeypatch.setattr(
+            _app_module._boot_image_gen, "generate_boot_image", fake_generate)
+        monkeypatch.setattr(_app_module, "_write_boot_image_bytes", lambda blob: None)
+        monkeypatch.setattr(_app_module, "_load_boot_abstr_lump", lambda: None)
+        monkeypatch.setattr(_app_module, "_load_boot_ns_lump", lambda: None)
+
+        with _app_module.app.test_client() as client:
+            response = client.post("/api/boot-image/generate", json={})
+        assert response.status_code == 200, response.get_json()
+        assert captured["entry_slot"] == 10
 
 
 # ---------------------------------------------------------------------------

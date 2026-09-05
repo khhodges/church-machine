@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 const { _lumpSaveRequest } = require('./lump_save_handler.js');
 
 let passed = 0;
@@ -86,6 +87,61 @@ function response(status, body) {
         body.includes('LUMP Repository Network Failure') &&
         body.includes('LUMP Repository Protocol Failure') &&
         body.includes('LUMP Repository Server Failure'));
+
+    const editorSource = fs.readFileSync(path.join(__dirname, 'app-lump-editor.js'), 'utf8');
+    function extractFunction(name) {
+        const marker = `function ${name}(`;
+        const start = editorSource.indexOf(marker);
+        if (start < 0) throw new Error(`missing ${name}`);
+        const brace = editorSource.indexOf('{', start);
+        let depth = 0;
+        for (let i = brace; i < editorSource.length; i++) {
+            if (editorSource[i] === '{') depth++;
+            if (editorSource[i] === '}' && --depth === 0) return editorSource.slice(start, i + 1);
+        }
+        throw new Error(`unterminated ${name}`);
+    }
+    const residentContext = {};
+    vm.createContext(residentContext);
+    vm.runInContext(
+        'var FIXED_BOOT_STEP2_SLOT_COUNT = 11;\n' +
+        extractFunction('_isFixedBootStep2Slot') + '\n' +
+        extractFunction('_rlBuildStep2Lumps'),
+        residentContext);
+    const step2Rows = residentContext._rlBuildStep2Lumps({
+        10: {
+            loadPolicy: 'Resident', abstraction: 'CapabilityTest',
+            lumpToken: '00000a00', physAddr: 2048, lumpSize: 512
+        },
+        11: {
+            loadPolicy: 'Resident', abstraction: 'UserProgram',
+            lumpToken: '12345678', physAddr: 4096, lumpSize: 64
+        }
+    });
+    check('CapabilityTest fixed slot 10 is omitted from Step-2 payload',
+        step2Rows.length === 1 && step2Rows[0].nsSlot === 11);
+    check('valid programmer resident row remains in Step-2 payload',
+        step2Rows[0].abstraction === 'UserProgram' &&
+        step2Rows[0].physAddr === 4096 && step2Rows[0].lumpSize === 64);
+
+    const saveStart = editorSource.indexOf('window.lumpEditorRLSave = function ()');
+    const saveEnd = editorSource.indexOf('window.lumpEditorRLGenerate', saveStart);
+    const saveBody = editorSource.slice(saveStart, saveEnd);
+    check('Resident Save rejects duplicate clicks while request is unresolved',
+        saveBody.includes('if (_rl.saveInFlight) return;') &&
+        saveBody.includes('_rl.saveInFlight = true;'));
+    check('Resident Save clears in-flight state for every terminal outcome',
+        saveBody.includes('.finally(function()') &&
+        saveBody.includes('_rl.saveInFlight = false;'));
+    check('Resident Save surfaces HTTP and malformed-response failures',
+        saveBody.includes('res.body.error') &&
+        saveBody.includes('server returned an invalid response'));
+    check('Resident Save persists the selected Lightning Bolt slot with the config',
+        saveBody.includes('bootEntrySlot: (function ()') &&
+        saveBody.includes("localStorage.getItem('bootEntrySlot')"));
+    check('Resident config load restores a server-saved Lightning Bolt on a fresh browser',
+        editorSource.includes('var savedBootSlot = cfg && cfg.bootEntrySlot;') &&
+        editorSource.includes('setBootEntrySlot(savedBootSlot);'));
 
     console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
     if (failed) process.exit(1);

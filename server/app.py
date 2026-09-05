@@ -2281,6 +2281,9 @@ def _migrate_legacy_board(cfg):
 DEFAULT_BOOT_CONFIG = {
     "schemaVersion": BOOT_CONFIG_SCHEMA_VERSION,
     "targetBoard": "wukong-xc7a100t",
+    # The selected Lightning Bolt / first executable abstraction.  Older
+    # configs omit this field and retain the architectural SelfTest default.
+    "bootEntrySlot": 6,
     "step1": {
         "totalNamespaceWords": 16384,
         "namespaceLumpWords": 64,
@@ -2913,9 +2916,34 @@ def boot_config_post():
     err3 = _validate_step3(step3, step1, step2)
     if err3:
         return jsonify({"ok": False, "error": err3}), 400
+    # Load the previous config once so clients that predate bootEntrySlot do
+    # not erase a saved Lightning Bolt selection or Namespace slot labels.
+    existing = {}
+    if os.path.exists(BOOT_CONFIG_PATH):
+        try:
+            with open(BOOT_CONFIG_PATH) as existing_file:
+                loaded_existing = json.load(existing_file)
+            if isinstance(loaded_existing, dict):
+                existing = loaded_existing
+        except Exception:
+            pass
+    boot_entry_slot = data.get(
+        "bootEntrySlot",
+        existing.get("bootEntrySlot", DEFAULT_BOOT_CONFIG["bootEntrySlot"]),
+    )
+    if (not isinstance(boot_entry_slot, int) or isinstance(boot_entry_slot, bool)
+            or boot_entry_slot < 0 or boot_entry_slot >= MAX_NS_ENTRIES):
+        return jsonify({
+            "ok": False,
+            "error": (
+                "bootEntrySlot must be an integer between 0 and "
+                f"{MAX_NS_ENTRIES - 1}"
+            ),
+        }), 400
     cfg = {
         "schemaVersion": BOOT_CONFIG_SCHEMA_VERSION,
         "targetBoard": target_board,
+        "bootEntrySlot": boot_entry_slot,
         "step1": {
             "totalNamespaceWords": int(step1["totalNamespaceWords"]),
             "namespaceLumpWords": int(step1["namespaceLumpWords"]),
@@ -2970,14 +2998,8 @@ def boot_config_post():
     # Preserve slotLabels from the existing file — they are written by the
     # /api/boot-config/slot-label endpoint and must not be wiped by a
     # Boot Image Designer save that doesn't include them.
-    if os.path.exists(BOOT_CONFIG_PATH):
-        try:
-            with open(BOOT_CONFIG_PATH) as _f:
-                _existing = json.load(_f)
-            if isinstance(_existing.get("slotLabels"), dict):
-                cfg["slotLabels"] = _existing["slotLabels"]
-        except Exception:
-            pass
+    if isinstance(existing.get("slotLabels"), dict):
+        cfg["slotLabels"] = existing["slotLabels"]
     # Next.GT is derived from the LightningBolt boot entry when generating an
     # image. A separately saved continuation target is obsolete and must not
     # survive a Boot Image Designer save.
@@ -3207,7 +3229,10 @@ def boot_image_generate():
     if err:
         return jsonify({"ok": False, "error": err}), 400
     body = request.get_json(silent=True) or {}
-    entry_slot = body.get("entrySlot", None)
+    # Explicit requests win; otherwise generation uses the Lightning Bolt
+    # selection saved with the Boot Image Designer config.
+    entry_slot = body.get("entrySlot", cfg.get(
+        "bootEntrySlot", DEFAULT_BOOT_CONFIG["bootEntrySlot"]))
     if entry_slot is not None:
         try:
             entry_slot = max(0, min(255, int(entry_slot)))
@@ -9000,6 +9025,7 @@ def _validate_lump_snapshot(lump_path, sidecar_path):
         "cw": None,
         "cc": None,
         "lump_size": None,
+        "content_profile": None,
         "binary_hash": None,
         "valid": False,
     }
@@ -9032,6 +9058,18 @@ def _validate_lump_snapshot(lump_path, sidecar_path):
         "lump_size": lump_size,
         "binary_hash": actual_hash,
     })
+    frame_start = 1 + header_cw
+    frame_end = lump_size - header_cc
+    if frame_start < frame_end and frame_start < len(words):
+        frame_header = words[frame_start]
+        if ((frame_header >> 24) & 0xFF) == 0xAB:
+            frame_flags = (frame_header >> 16) & 0xFF
+            if frame_flags == 0x00:
+                result["content_profile"] = "api"
+            elif frame_flags in (0x03, 0x07):
+                result["content_profile"] = "full"
+            elif frame_flags in (0x01, 0x05):
+                result["content_profile"] = "compact"
     if magic != 0x1F:
         errors.append(f"invalid header magic 0x{magic:02x}")
     if header_size != lump_size:
@@ -9119,6 +9157,7 @@ def get_lump_history(token):
             "cw": snapshot["cw"],
             "cc": snapshot["cc"],
             "lump_size": snapshot["lump_size"],
+            "content_profile": snapshot["content_profile"],
             "binary_hash": snapshot["binary_hash"],
             "binary_available": snapshot["binary_available"],
             "binary_valid": snapshot["valid"],

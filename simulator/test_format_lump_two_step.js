@@ -33,6 +33,7 @@ function check(label, cond, detail) {
 const appRunSrc   = fs.readFileSync(path.join(__dirname, 'app-run.js'),   'utf8');
 const appLumpsSrc = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8');
 const indexSrc    = fs.readFileSync(path.join(__dirname, 'index.html'),   'utf8');
+const LumpContentFrame = require('./lump-content-frame.js');
 
 // ── T1: binary decision block precedes registerMemory inside confirmSaveToNamespace ──
 // The critical ordering requirement: _pendingCanReuse / _svBinary selection must
@@ -103,6 +104,33 @@ const indexSrc    = fs.readFileSync(path.join(__dirname, 'index.html'),   'utf8'
     check('T2c output selection writes the selected candidate into pending save data',
         appLumpsSrc.includes('function _selectFormatLumpProfile(profile)') &&
         appLumpsSrc.includes('pending.binary = _candidate.binary'));
+}
+
+// ── T2e: output profile remains stable across repeated saves ──────────────────
+{
+    check('T2e selected output profile is persisted per abstraction',
+        appLumpsSrc.includes("'lumpOutputProfile:' + encodeURIComponent(pending.abstractionName)") &&
+        appLumpsSrc.includes("localStorage.setItem("));
+    check('T2f next Save restores the persisted output profile',
+        appLumpsSrc.includes("'lumpOutputProfile:' + encodeURIComponent(_absName)") &&
+        appLumpsSrc.includes('_preferredProfile && _candidates[_preferredProfile]') &&
+        appLumpsSrc.includes("'lumpOutputProfile:' + encodeURIComponent(_absName),\n            _selectedProfile"));
+
+    function framedWords(flags) {
+        const words = new Array(64).fill(0);
+        const cw = 2;
+        words[0] = ((0x1F << 27) | (cw << 10)) >>> 0;
+        words[1 + cw] = ((0xAB << 24) | ((flags & 0xFF) << 16) | 2) >>> 0;
+        return words;
+    }
+    check('T2g API-only frame profile is decoded',
+        LumpContentFrame.lumpContentFrameProfile(framedWords(0x00)) === 'api');
+    check('T2h compact compressed frame profile is decoded',
+        LumpContentFrame.lumpContentFrameProfile(framedWords(0x05)) === 'compact');
+    check('T2i full compressed frame profile is decoded',
+        LumpContentFrame.lumpContentFrameProfile(framedWords(0x07)) === 'full');
+    check('T2j unknown frame flags are not mislabeled',
+        LumpContentFrame.lumpContentFrameProfile(framedWords(0x09)) === null);
 }
 
 // ── T2c: Save-to-NS lists every known slot; bootstrap slots are disabled ───────

@@ -371,13 +371,26 @@
 
     // ── Resident Lumps panel state ────────────────────────────────────────────
 
+    // Must match server/app.py BASE_NAMED_NS_COUNT / RESERVED_NS_SLOTS.
+    // Slots 0..10 are foundational boot objects and MMIO.  They may appear in
+    // the catalog (and may be selected as the Lightning Bolt entry), but Step 2
+    // must never serialize them as programmer-configurable resident LUMPs.
+    var FIXED_BOOT_STEP2_SLOT_COUNT = 11;
+
+    function _isFixedBootStep2Slot(slot) {
+        slot = Number(slot);
+        return Number.isInteger(slot) && slot >= 0 && slot < FIXED_BOOT_STEP2_SLOT_COUNT;
+    }
+
     var _rl = {
         catalog:        [],
         step2State:     {},
         emptySlotCount: 0,
+        bootEntrySlot:  6,
         limits:         { maxNsEntries: 256, baseNamedNsCount: 47 },
         loaded:         false,
         loading:        false,
+        saveInFlight:   false,
         errorMsg:       '',
         statusMsg:      ''
     };
@@ -400,6 +413,18 @@
                     : ((data && data.lumpCatalog) || []);
                 _rl.limits  = (data && data.limits) || { maxNsEntries: 256, baseNamedNsCount: 47 };
                 var cfg = (data && data.config) || (data && data.defaults) || {};
+                var localBootSlot = parseInt(localStorage.getItem('bootEntrySlot'), 10);
+                var savedBootSlot = cfg && cfg.bootEntrySlot;
+                if (Number.isInteger(localBootSlot) && localBootSlot >= 0) {
+                    _rl.bootEntrySlot = localBootSlot;
+                } else if (Number.isInteger(savedBootSlot) && savedBootSlot >= 0) {
+                    _rl.bootEntrySlot = savedBootSlot;
+                    if (typeof setBootEntrySlot === 'function') {
+                        setBootEntrySlot(savedBootSlot);
+                    } else {
+                        localStorage.setItem('bootEntrySlot', String(savedBootSlot));
+                    }
+                }
                 _rlInitStep2(cfg);
                 var s3 = cfg.step3 || {};
                 _rl.emptySlotCount = Number.isFinite(s3.emptySlotCount) ? s3.emptySlotCount : 0;
@@ -423,6 +448,7 @@
         for (var j = 0; j < _rl.catalog.length; j++) {
             var cat = _rl.catalog[j];
             if (cat.nsSlotPolicy === 'dynamic' || cat.floating || cat.nsSlot == null) continue;
+            if (_isFixedBootStep2Slot(cat.nsSlot)) continue;
             var saved = savedMap[cat.nsSlot];
             _rl.step2State[cat.nsSlot] = {
                 // The catalog owns all transport and binary metadata.  This
@@ -481,6 +507,7 @@
         var usable = total - nsReserveV;
         var occ = [];
         for (var slotStr in _rl.step2State) {
+            if (_isFixedBootStep2Slot(slotStr)) continue;
             var st = _rl.step2State[slotStr];
             if (st.loadPolicy !== 'Resident') continue;
             var lbl = (st.abstraction || '?') + ' (NS ' + slotStr + ')';
@@ -527,6 +554,11 @@
 
     function _rlOnChange(ev) {
         var slot  = parseInt(ev.target.getAttribute('data-rl-slot'), 10);
+        if (_isFixedBootStep2Slot(slot)) {
+            _rl.errorMsg = 'NS slot ' + slot + ' is a fixed boot artifact and cannot be configured in Step 2.';
+            renderResidentPanel();
+            return;
+        }
         var field = ev.target.getAttribute('data-rl-field');
         var st    = _rl.step2State[slot] || {};
         if (field === 'loadPolicy') {
@@ -556,7 +588,7 @@
 
         // 3-LUMP starter kit — always shown at top, locked as Boot
         var bootSlot = parseInt(localStorage.getItem('bootEntrySlot'), 10);
-        if (!Number.isFinite(bootSlot) || bootSlot < 0) bootSlot = 3;
+        if (!Number.isFinite(bootSlot) || bootSlot < 0) bootSlot = _rl.bootEntrySlot;
         var bootCatEntry = null;
         for (var bi = 0; bi < _rl.catalog.length; bi++) {
             if (_rl.catalog[bi].nsSlot === bootSlot) { bootCatEntry = _rl.catalog[bi]; break; }
@@ -677,25 +709,24 @@
         } else {
             for (var i = 0; i < _fixedCatalog.length; i++) {
                 var cat = _fixedCatalog[i];
+                var isFixedBoot = _isFixedBootStep2Slot(cat.nsSlot);
                 var st  = _rl.step2State[cat.nsSlot] || {};
                 var isResident = st.loadPolicy === 'Resident';
                 var physVal = (st.physAddr != null && Number.isFinite(st.physAddr))
                               ? st.physAddr : '';
-                rows +=
-                    '<tr class="le-rl-row">' +
-                    '<td class="le-rl-td">' + esc(cat.abstraction || '?') + '</td>' +
-                    '<td class="le-rl-td le-rl-td-num">' + esc(String(cat.nsSlot)) + '</td>' +
-                    '<td class="le-rl-td le-rl-td-num">' + esc(cat.lumpSize != null ? String(cat.lumpSize) : '?') + '</td>' +
-                    '<td class="le-rl-td"><select class="le-rl-policy"' +
+                var policyCell = isFixedBoot
+                    ? '<span class="le-rl-badge le-rl-badge-bootable" data-tooltip="Foundational boot artifact; not configured in Step 2">Fixed boot</span>'
+                    : '<select class="le-rl-policy"' +
                       ' data-rl-slot="' + cat.nsSlot + '" data-rl-field="loadPolicy"' +
                       ' aria-label="Load policy for ' + esc(cat.abstraction || ('slot ' + cat.nsSlot)) + '">' +
                       '<option value="Empty"' + (st.loadPolicy === 'Empty' ? ' selected' : '') + '>Empty</option>' +
                       '<option value="Resident"' + (isResident ? ' selected' : '') + '>Resident</option>' +
                       '<option value="Preload"' + (st.loadPolicy === 'Preload' ? ' selected' : '') + '>Preload</option>' +
                       '<option value="Lazy"' + (st.loadPolicy === 'Lazy' ? ' selected' : '') + '>Lazy load</option>' +
-                    '</select></td>' +
-                    '<td class="le-rl-td">' +
-                      '<input type="number" min="' + addrRange.min + '" max="' + addrRange.max + '" step="1"' +
+                      '</select>';
+                var addressCell = isFixedBoot
+                    ? '<span class="le-rl-addr-na">\u2014</span>'
+                    : '<input type="number" min="' + addrRange.min + '" max="' + addrRange.max + '" step="1"' +
                         ' class="le-rl-addr"' +
                         ' data-rl-slot="' + cat.nsSlot + '"' +
                         ' data-rl-field="physAddr"' +
@@ -703,8 +734,14 @@
                         (isResident ? '' : ' disabled') + '>' +
                       '<div class="le-rl-addr-hint' + (isResident ? '' : ' le-rl-addr-hint-inactive') + '">' +
                         esc(addrHintText) +
-                      '</div>' +
-                    '</td>' +
+                      '</div>';
+                rows +=
+                    '<tr class="le-rl-row">' +
+                    '<td class="le-rl-td">' + esc(cat.abstraction || '?') + '</td>' +
+                    '<td class="le-rl-td le-rl-td-num">' + esc(String(cat.nsSlot)) + '</td>' +
+                    '<td class="le-rl-td le-rl-td-num">' + esc(cat.lumpSize != null ? String(cat.lumpSize) : '?') + '</td>' +
+                    '<td class="le-rl-td">' + policyCell + '</td>' +
+                    '<td class="le-rl-td">' + addressCell + '</td>' +
                     '<td class="le-rl-td le-rl-td-boot">' + _bootBadge(cat) + '</td>' +
                     '</tr>';
             }
@@ -802,8 +839,8 @@
             '<div id="le-rl-save-status" class="le-rl-status" style="min-height:1.2em;"></div>' +
             '<div id="le-rl-gen-result" class="le-rl-status" style="min-height:1em;"></div>' +
             '<div class="le-save-row le-rl-btn-row">' +
-                '<button class="le-save-btn"' + (err ? ' disabled' : '') + ' onclick="lumpEditorRLSave()">' +
-                    '\u2714\ufe0e Save boot config' +
+                '<button class="le-save-btn"' + ((err || _rl.saveInFlight) ? ' disabled' : '') + ' onclick="lumpEditorRLSave()">' +
+                    (_rl.saveInFlight ? 'Saving\u2026' : '\u2714\ufe0e Save boot config') +
                 '</button>' +
                 '<button class="le-rl-gen-btn" id="le-rl-gen-btn" onclick="lumpEditorRLGenerate()"' +
                     ' title="Generate the binary boot image from the saved config and produce a downloadable .bin">' +
@@ -1701,6 +1738,7 @@
 
     window.lumpEditorBootEntryChange = function (nsSlot) {
         if (!Number.isFinite(nsSlot) || nsSlot < 0) return;
+        _rl.bootEntrySlot = nsSlot;
         if (typeof setBootEntrySlot === 'function') {
             setBootEntrySlot(nsSlot);
         } else {
@@ -1778,18 +1816,17 @@
         } else {
             renderResidentPanel();
         }
-        if (saveBtn) saveBtn.disabled = !!err;
+        if (saveBtn) saveBtn.disabled = !!err || _rl.saveInFlight;
     };
 
-    window.lumpEditorRLSave = function () {
-        var err = _rlValidate();
-        if (err) return;
-
+    function _rlBuildStep2Lumps(step2State) {
         var step2Lumps = [];
-        for (var slotStr in _rl.step2State) {
-            var st = _rl.step2State[slotStr];
+        for (var slotStr in step2State) {
+            var slot = parseInt(slotStr, 10);
+            if (_isFixedBootStep2Slot(slot)) continue;
+            var st = step2State[slotStr];
             var row = {
-                nsSlot: parseInt(slotStr, 10),
+                nsSlot: slot,
                 loadPolicy: ['Empty', 'Resident', 'Preload', 'Lazy'].indexOf(st.loadPolicy) >= 0
                     ? st.loadPolicy : 'Lazy',
                 abstraction: st.abstraction,
@@ -1806,32 +1843,56 @@
             }
             step2Lumps.push(row);
         }
+        return step2Lumps;
+    }
+
+    window.lumpEditorRLSave = function () {
+        if (_rl.saveInFlight) return;
+        var err = _rlValidate();
+        if (err) {
+            _rl.errorMsg = err;
+            renderResidentPanel();
+            return;
+        }
+        var step2Lumps = _rlBuildStep2Lumps(_rl.step2State);
 
         var p = _getStep1Payload();
         var payload = {
             targetBoard: p.targetBoard,
+            bootEntrySlot: (function () {
+                var selected = parseInt(localStorage.getItem('bootEntrySlot'), 10);
+                return Number.isInteger(selected) && selected >= 0
+                    ? selected : _rl.bootEntrySlot;
+            }()),
             step1:       p.step1,
             step2:       { lumps: step2Lumps },
             step3:       { emptySlotCount: _rl.emptySlotCount || 0 }
         };
 
-        var statusEl = document.getElementById('le-rl-save-status');
-        var errEl    = document.querySelector('#lumpResidentPanel .le-error-banner');
-        if (statusEl) statusEl.textContent = 'Saving\u2026';
-        if (errEl)    errEl.textContent    = '';
+        _rl.saveInFlight = true;
+        _rl.statusMsg = 'Saving\u2026';
+        _rl.errorMsg = '';
+        renderResidentPanel();
 
         fetch('/api/boot-config', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify(payload)
         })
-        .then(function(r) { return r.json().then(function(j) { return { ok: r.ok, body: j }; }); })
+        .then(function(r) {
+            return r.text().then(function(text) {
+                var body;
+                try {
+                    body = text ? JSON.parse(text) : {};
+                } catch (parseErr) {
+                    throw new Error('Save failed: server returned an invalid response (HTTP ' + r.status + ').');
+                }
+                return { ok: r.ok, body: body };
+            });
+        })
         .then(function(res) {
             if (!res.ok || res.body.ok === false) {
-                if (statusEl) statusEl.textContent = '';
-                _rl.errorMsg = (res.body && res.body.error) || 'Save failed.';
-                renderResidentPanel();
-                return;
+                throw new Error((res.body && res.body.error) || 'Save failed.');
             }
             if (typeof window._setActiveBootConfig === 'function') {
                 window._setActiveBootConfig(
@@ -1842,10 +1903,14 @@
             }
             _rl.statusMsg = 'Saved. Reset the simulator to apply the new boot config.';
             _rl.errorMsg  = '';
-            renderResidentPanel();
         })
         .catch(function(saveErr) {
-            _rl.errorMsg = 'Save failed: ' + saveErr;
+            var message = saveErr && saveErr.message ? saveErr.message : String(saveErr);
+            _rl.statusMsg = '';
+            _rl.errorMsg = /^Save failed:/.test(message) ? message : 'Save failed: ' + message;
+        })
+        .finally(function() {
+            _rl.saveInFlight = false;
             renderResidentPanel();
         });
     };
