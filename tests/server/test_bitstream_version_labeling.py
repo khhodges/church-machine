@@ -18,6 +18,7 @@ Covers:
 
 import json
 import os
+import subprocess
 import sys
 from unittest.mock import patch
 
@@ -56,6 +57,68 @@ def _upload(client, version=None, content=b"\xff\x00BITSTREAM"):
         data["version"] = str(version)
     return client.post("/upload/wukong-bit?token=bitstream-version-test-token", data=data,
                        content_type="multipart/form-data")
+
+
+def _select_ui_firmware_display(cases):
+    """Run the browser-independent Versions-card selector in Node."""
+    run_path = os.path.join(ROOT, "simulator", "app-run.js")
+    with open(run_path, encoding="utf-8") as handle:
+        source = handle.read()
+    start = source.index("function _selectBitstreamFirmwareDisplay")
+    end = source.index("\n\n// ── Versions view", start)
+    selector = source[start:end]
+    script = (
+        selector + "\n"
+        f"const cases = {json.dumps(cases)};\n"
+        "console.log(JSON.stringify(cases.map(c => "
+        "_selectBitstreamFirmwareDisplay(c.bs, c.status))));\n"
+    )
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=ROOT,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    return json.loads(result.stdout)
+
+
+def _render_ui_bitstream(bs, status):
+    """Run the actual Bitstream-card renderer with a minimal DOM in Node."""
+    run_path = os.path.join(ROOT, "simulator", "app-run.js")
+    with open(run_path, encoding="utf-8") as handle:
+        source = handle.read()
+    selector_start = source.index("function _selectBitstreamFirmwareDisplay")
+    selector_end = source.index("\n\n// ── Versions view", selector_start)
+    method_start = source.index("    _renderBitstream(bs, status) {")
+    method_end = source.index("\n    },\n\n    _renderBitstreamRelease", method_start) + 6
+    selector = source[selector_start:selector_end]
+    method = source[method_start:method_end]
+    method = method.replace(
+        "    _renderBitstream(bs, status) {",
+        "function _renderBitstream(bs, status) {",
+        1,
+    )
+    script = (
+        selector + "\n" + method + "\n"
+        "const element = {innerHTML: ''};\n"
+        "global.document = {getElementById: () => element};\n"
+        "const context = {\n"
+        "  _badge: (kind, label) => `<span data-kind=\"${kind}\">${label}</span>`,\n"
+        "  _esc: value => String(value == null ? '' : value),\n"
+        "  _age: () => '',\n"
+        "};\n"
+        f"_renderBitstream.call(context, {json.dumps(bs)}, {json.dumps(status)});\n"
+        "console.log(JSON.stringify(element.innerHTML));\n"
+    )
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=ROOT,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    return json.loads(result.stdout)
 
 
 # ---------------------------------------------------------------------------
@@ -303,10 +366,134 @@ def test_versions_view_uses_board_sentinel_when_local_bit_metadata_is_unknown():
     with open(run_path, encoding="utf-8") as handle:
         run = handle.read()
 
-    assert "artifactVersionKnown" in run
-    assert "boardVersionKnown" in run
+    assert "_selectBitstreamFirmwareDisplay(bs, status)" in run
     assert "Running board matches v" in run
+    assert "running board" in run
     assert "Local bitstream metadata is unverified" in run
+
+
+def test_versions_view_firmware_precedence_and_qualifiers():
+    """Artifact, board, source, then unknown are selected without collapsing identities."""
+    displays = _select_ui_firmware_display([
+        {
+            "bs": {
+                "firmware_version": 17,
+                "version_known": True,
+                "source_version": 20,
+            },
+            "status": {"boot_info": {"build_version": 19}},
+        },
+        {
+            "bs": {
+                "firmware_version": None,
+                "version_known": False,
+                "source_version": 20,
+            },
+            "status": {"boot_info": {"build_version": 19}},
+        },
+        {
+            "bs": {
+                "firmware_version": None,
+                "version_known": False,
+                "source_version": 20,
+            },
+            "status": {"boot_info": None},
+        },
+        {
+            "bs": {
+                "firmware_version": None,
+                "version_known": False,
+                "source_version": None,
+            },
+            "status": {"boot_info": None},
+        },
+    ])
+
+    assert displays[0]["fw"] == "17"
+    assert displays[0]["qualifier"] == ""
+    assert displays[0]["boardFw"] == "19"
+    assert displays[1]["fw"] == "19"
+    assert displays[1]["qualifier"] == "running board"
+    assert displays[2]["fw"] == "20"
+    assert displays[2]["qualifier"] == "source expectation"
+    assert displays[3]["fw"] == "?"
+    assert displays[3]["qualifier"] == ""
+
+
+def test_versions_view_renders_source_expectation_when_no_bitstream_exists():
+    """A missing physical artifact must not hide the independent source version."""
+    html = _render_ui_bitstream(
+        {
+            "ok": True,
+            "present": False,
+            "firmware_version": None,
+            "version_known": False,
+            "source_version": 20,
+        },
+        {"boot_info": None, "expected_build_version": 20},
+    )
+
+    assert "firmware v20" in html
+    assert "(source expectation)" in html
+    assert "No bitstream built" in html
+    assert "no downloadable bitstream or running-board version is available" in html
+
+
+def test_versions_view_renders_unknown_when_no_bitstream_or_source_exists():
+    """The no-artifact state remains unknown when every version source is absent."""
+    html = _render_ui_bitstream(
+        {
+            "ok": True,
+            "present": False,
+            "firmware_version": None,
+            "version_known": False,
+            "source_version": None,
+        },
+        {"boot_info": None, "expected_build_version": None},
+    )
+
+    assert "firmware v?" in html
+    assert "No bitstream built" in html
+    assert "source expectation" not in html
+
+
+def test_versions_view_qualifies_source_fallback_and_keeps_it_on_one_line():
+    """Source identifies the expected build, never the unverified physical artifact."""
+    run_path = os.path.join(ROOT, "simulator", "app-run.js")
+    styles_path = os.path.join(ROOT, "simulator", "styles-base.css")
+    with open(run_path, encoding="utf-8") as handle:
+        run = handle.read()
+    with open(styles_path, encoding="utf-8") as handle:
+        styles = handle.read()
+
+    assert "source expectation" in run
+    assert "Source expectation only; the downloadable bitstream metadata is unverified" in run
+    assert ".versions-value-qualifier" in styles
+    assert "white-space: nowrap" in styles
+
+
+def test_bitstream_status_exposes_source_version_even_without_trusted_artifact(
+        client, tmp_path):
+    """An unverified artifact still carries the independent source expectation."""
+    _write_bit(tmp_path)
+    with patch.object(app_module, "_wukong_build_version", return_value=20):
+        status = client.get("/api/bitstream-status").get_json()
+
+    assert status["firmware_version"] is None
+    assert status["version_known"] is False
+    assert status["source_version"] == 20
+
+
+def test_bitstream_status_keeps_unknown_source_version_unknown(client, tmp_path):
+    """The UI can retain firmware v? when artifact, board, and source are unknown."""
+    _write_bit(tmp_path)
+    with patch.object(app_module, "_wukong_build_version", return_value=None):
+        status = client.get("/api/bitstream-status").get_json()
+
+    assert status["firmware_version"] is None
+    assert status["version_known"] is False
+    assert status["source_version"] is None
+    assert status["version_mismatch"] is False
 
 
 def test_versions_api_exposes_pending_main_workstream_release(client, tmp_path):

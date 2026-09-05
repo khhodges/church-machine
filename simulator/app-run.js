@@ -12282,6 +12282,33 @@ function switchBuilderViewTab(tab) {
     }
 }
 
+function _selectBitstreamFirmwareDisplay(bs, status) {
+    bs = bs || {};
+    const artifactFw = bs.firmware_version != null
+        ? String(bs.firmware_version).replace(/^v+/i, '') : '';
+    const boardFw = status && status.boot_info && status.boot_info.build_version != null
+        ? String(status.boot_info.build_version).replace(/^v+/i, '') : '';
+    const sourceFw = bs.source_version != null
+        ? String(bs.source_version).replace(/^v+/i, '') : '';
+    const artifactVersionKnown = Boolean(bs.version_known) && /^\d+$/.test(artifactFw);
+    const boardVersionKnown = /^\d+$/.test(boardFw);
+    const sourceVersionKnown = /^\d+$/.test(sourceFw);
+    const usingBoardVersion = !artifactVersionKnown && boardVersionKnown;
+    const usingSourceVersion = !artifactVersionKnown && !boardVersionKnown && sourceVersionKnown;
+    return {
+        artifactFw,
+        boardFw,
+        artifactVersionKnown,
+        boardVersionKnown,
+        usingBoardVersion,
+        usingSourceVersion,
+        fw: artifactVersionKnown ? artifactFw
+            : (boardVersionKnown ? boardFw : (sourceVersionKnown ? sourceFw : '?')),
+        qualifier: usingBoardVersion ? 'running board'
+            : (usingSourceVersion ? 'source expectation' : ''),
+    };
+}
+
 // ── Versions view (Builder ▸ Versions tab) ────────────────────────────────
 // Three cards: IDE (running server), GitHub (latest remote commit), and the
 // attached FPGA (sentinel-reported tu_version/build_version).  Data comes
@@ -12769,24 +12796,21 @@ const VersionsView = {
                 '<div class="versions-note">Could not read the bitstream metadata.</div>';
             return;
         }
-        if (!bs.present) {
-            el.innerHTML = this._badge('warn', 'No bitstream built') +
-                '<div class="versions-note">No pre-built Wukong bitstream found yet \u2014 upload one from a Vivado build.</div>';
-            return;
-        }
         // The download sidecar is the only proof of the local .bit's version.
-        // If it is missing or stale, a connected board's boot sentinel can
-        // still truthfully identify the bitstream that is running right now.
-        const artifactFw = bs.firmware_version != null
-            ? String(bs.firmware_version).replace(/^v+/i, '') : '';
-        const boardFw = status && status.boot_info && status.boot_info.build_version != null
-            ? String(status.boot_info.build_version).replace(/^v+/i, '') : '';
-        const artifactVersionKnown = Boolean(bs.version_known) && /^\d+$/.test(artifactFw);
-        const boardVersionKnown = /^\d+$/.test(boardFw);
-        const usingBoardVersion = !artifactVersionKnown && boardVersionKnown;
-        const fw = artifactVersionKnown ? artifactFw : (boardVersionKnown ? boardFw : '?');
-        const letter = bs.build_letter ? ` (build ${this._esc(bs.build_letter)})` : '';
+        // If the artifact is absent or its metadata is untrusted, a connected
+        // board's boot sentinel can still truthfully identify what is running.
+        // Source is the final fallback, and must remain visibly qualified as
+        // an expectation rather than physical-artifact provenance.
+        const display = _selectBitstreamFirmwareDisplay(bs, status);
+        const {
+            artifactFw, boardFw, artifactVersionKnown, boardVersionKnown,
+            usingBoardVersion, usingSourceVersion, fw, qualifier,
+        } = display;
+        const letter = artifactVersionKnown && bs.build_letter
+            ? ` (build ${this._esc(bs.build_letter)})` : '';
         const expected = status ? status.expected_build_version : null;
+        const availabilityBadge = !bs.present
+            ? this._badge('warn', 'No bitstream built') : '';
         let badge = '';
         if (expected != null && boardVersionKnown) {
             badge = Number(boardFw) === Number(expected)
@@ -12801,15 +12825,24 @@ const VersionsView = {
             ? `<div class="versions-note">Board sentinel reports the running bitstream as v${this._esc(boardFw)}.</div>`
             : '';
         const metadataNote = usingBoardVersion
-            ? '<div class="versions-note">Local bitstream metadata is unverified; regenerate its sidecar after the next verified upload.</div>'
+            ? (!bs.present
+                ? '<div class="versions-note">No pre-built Wukong bitstream is available; this version comes only from the running-board sentinel.</div>'
+                : '<div class="versions-note">Local bitstream metadata is unverified; regenerate its sidecar after the next verified upload.</div>')
+            : (usingSourceVersion
+                ? (!bs.present
+                    ? '<div class="versions-note">Source expectation only; no downloadable bitstream or running-board version is available.</div>'
+                    : '<div class="versions-note">Source expectation only; the downloadable bitstream metadata is unverified and no running-board version is available.</div>')
+                : '');
+        const availabilityNote = !bs.present
+            ? '<div class="versions-note">No pre-built Wukong bitstream found yet \u2014 upload one from a Vivado build.</div>'
             : '';
         el.innerHTML =
-            `<div class="versions-value">firmware v${this._esc(fw)}${usingBoardVersion ? ' (running board)' : ''}${letter}</div>` +
-            badge +
+            `<div class="versions-value">firmware v${this._esc(fw)}${qualifier ? ` <span class="versions-value-qualifier">(${qualifier})</span>` : ''}${letter}</div>` +
+            availabilityBadge + badge +
             (bs.git_sha ? `<div class="versions-note">Built from <code>${this._esc(String(bs.git_sha).slice(0, 7))}</code>` +
                 (bs.git_message ? ` &middot; ${this._esc(bs.git_message)}` : '') + '</div>' : '') +
             (bs.built_at ? `<div class="versions-note">Built ${this._esc(this._age(bs.built_at) || bs.built_at)}</div>` : '') +
-            runningNote + metadataNote;
+            runningNote + metadataNote + availabilityNote;
     },
 
     _renderBitstreamRelease(release) {

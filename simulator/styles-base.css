@@ -2086,6 +2086,7 @@ details[open] .ti60-advanced-summary::before { transform: rotate(90deg); }
     font-weight: 600;
 }
 .versions-value { font-size: 1.05rem; margin-bottom: 0.4rem; color: #eee; }
+.versions-value-qualifier { color: #aeb6c8; font-size: 0.78em; white-space: nowrap; }
 .versions-value code { background: #2a2a35; padding: 0.1rem 0.35rem; border-radius: 3px; }
 .versions-value a { color: #8ab4f8; text-decoration: none; }
 .versions-value a:hover { text-decoration: underline; }
