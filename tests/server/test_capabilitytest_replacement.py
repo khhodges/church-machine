@@ -104,12 +104,20 @@ def test_replacement_updates_binary_approval_namespace_and_boot(repository):
         for p in root.glob("*.json"))
 
 
-def test_boot_failure_restores_complete_repository(repository, monkeypatch):
+def test_boot_failure_keeps_approved_capabilitytest_save_and_old_boot(
+        repository, monkeypatch):
     root, _state, boot = repository
     before = {p.name: p.read_bytes() for p in root.iterdir()}
     monkeypatch.setattr(app_module._boot_image_gen, "generate_boot_image",
                         lambda *a, **k: (_ for _ in ()).throw(OSError("boot failure")))
     with app_module.app.test_client() as client:
         response = client.post("/api/lumps/save", json=_payload(client))
-    assert response.status_code == 500
-    assert {p.name: p.read_bytes() for p in root.iterdir()} == before
+    assert response.status_code == 200, response.get_data(as_text=True)
+    result = response.get_json()
+    assert result["boot_image_refreshed"] is False
+    assert "boot failure" in result["boot_image_note"]
+    assert boot.read_bytes() == before["boot-image.bin"]
+    assert (root / result["lump"]).read_bytes() == _raw(2)
+    current = json.loads((root / "manifest.json").read_text())
+    assert next(entry for entry in current
+                if entry["token"] == "00000a00")["filename"] == result["lump"]

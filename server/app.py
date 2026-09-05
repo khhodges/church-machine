@@ -8571,8 +8571,11 @@ def save_lump():
 
     # ── Auto-regenerate boot-image.bin ────────────────────────────────────────
     # If boot-image.bin already exists and a boot config is present, regenerate
-    # it so the saved lump is persisted across server reboots. Ordinary LUMP
-    # Any refresh failure rolls the complete revision back.
+    # it so the saved lump is available to the next boot. Saving a LUMP and
+    # building a whole boot image are separate authority transitions: a failure
+    # in an unchanged foundational LUMP must not revoke the user's approved save
+    # of this exact artifact. The existing image remains guarded by the normal
+    # stale-image validation and the response reports that it was not refreshed.
     boot_refreshed = False
     boot_refresh_note = None
     if os.path.isfile(BOOT_IMAGE_PATH):
@@ -8605,13 +8608,10 @@ def save_lump():
                 boot_refresh_note = f'boot config unavailable: {err_bi}'
                 raise RuntimeError(boot_refresh_note)
         except Exception as _bie:
-            _rollback_protected_save()
-            return jsonify({
-                "error": (
-                    "LUMP save transaction failed; prior revision restored: "
-                    f"boot image could not be regenerated: {_bie}"
-                )
-            }), 500
+            boot_refresh_note = f"boot image was not regenerated: {_bie}"
+            logging.warning(
+                "[lumps] saved %s but boot image refresh was deferred: %s",
+                lump_filename, _bie)
 
     # ── SelfTest metadata always refreshed on token 00000600 save ────────────
     # generate_boot_image() locates the SelfTest lump via ns_slot in the
