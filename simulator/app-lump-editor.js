@@ -315,8 +315,15 @@
         return fetch('/api/boot-config')
         .then(function(r) { return r.json(); })
         .then(function(current) {
+            var selected = parseInt(localStorage.getItem('bootEntrySlot'), 10);
+            var savedBootEntry = current && current.config && current.config.bootEntrySlot;
+            var bootEntrySlot = Number.isInteger(selected) && selected >= 0
+                ? selected
+                : (Number.isInteger(savedBootEntry) && savedBootEntry >= 0
+                    ? savedBootEntry : 6);
             var merged = {
                 targetBoard: s1payload.targetBoard,
+                bootEntrySlot: bootEntrySlot,
                 step1:       s1payload.step1,
                 step2:       (current && current.config && current.config.step2) || { lumps: [] },
                 step3:       (current && current.config && current.config.step3) || { emptySlotCount: 0 }
@@ -415,15 +422,19 @@
                 var cfg = (data && data.config) || (data && data.defaults) || {};
                 var localBootSlot = parseInt(localStorage.getItem('bootEntrySlot'), 10);
                 var savedBootSlot = cfg && cfg.bootEntrySlot;
-                if (Number.isInteger(localBootSlot) && localBootSlot >= 0) {
-                    _rl.bootEntrySlot = localBootSlot;
-                } else if (Number.isInteger(savedBootSlot) && savedBootSlot >= 0) {
+                // The server is authoritative when the panel is loaded after a
+                // page reload.  localStorage may contain a stale selection from
+                // an older session; use it only when the server has no valid
+                // persisted value yet.
+                if (Number.isInteger(savedBootSlot) && savedBootSlot >= 0) {
                     _rl.bootEntrySlot = savedBootSlot;
                     if (typeof setBootEntrySlot === 'function') {
                         setBootEntrySlot(savedBootSlot);
                     } else {
                         localStorage.setItem('bootEntrySlot', String(savedBootSlot));
                     }
+                } else if (Number.isInteger(localBootSlot) && localBootSlot >= 0) {
+                    _rl.bootEntrySlot = localBootSlot;
                 }
                 _rlInitStep2(cfg);
                 var s3 = cfg.step3 || {};

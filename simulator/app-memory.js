@@ -3078,6 +3078,13 @@ function updateNamespace() {
     window._ensureNamespaceBuildConfig = async function() {
         const localCfg = (window.bootConfig && typeof window.bootConfig === 'object')
             ? window.bootConfig : {};
+        let selectedBootEntry = null;
+        try {
+            const storedBootEntry = Number.parseInt(localStorage.getItem('bootEntrySlot'), 10);
+            if (Number.isInteger(storedBootEntry) && storedBootEntry >= 0) {
+                selectedBootEntry = storedBootEntry;
+            }
+        } catch (_) {}
         let serverData = null;
         if (!localCfg.step1) {
             const configResponse = await fetch('/api/boot-config');
@@ -3089,6 +3096,11 @@ function updateNamespace() {
         const baseCfg = (serverData && (serverData.config || serverData.defaults)) || {};
         const cfg = {
             targetBoard: localCfg.targetBoard || baseCfg.targetBoard || 'wukong-xc7a100t',
+            bootEntrySlot: selectedBootEntry != null
+                ? selectedBootEntry
+                : (Number.isInteger(localCfg.bootEntrySlot)
+                    ? localCfg.bootEntrySlot
+                    : (Number.isInteger(baseCfg.bootEntrySlot) ? baseCfg.bootEntrySlot : 6)),
             step1: localCfg.step1 || baseCfg.step1,
             step2: localCfg.step2 || baseCfg.step2 || { lumps: [] },
             step3: localCfg.step3 || baseCfg.step3 || { emptySlotCount: 0 }
@@ -3101,6 +3113,7 @@ function updateNamespace() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 targetBoard: cfg.targetBoard,
+                bootEntrySlot: cfg.bootEntrySlot,
                 step1: cfg.step1,
                 step2: cfg.step2 || { lumps: [] },
                 step3: cfg.step3 || { emptySlotCount: 0 }

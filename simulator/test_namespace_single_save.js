@@ -34,6 +34,9 @@ check('fresh projects load defaults before saving Namespace build settings',
     helper.includes('serverData.config || serverData.defaults'));
 check('Namespace build settings are persisted through the boot-config endpoint',
     helper.includes("method: 'POST'") && helper.includes("fetch('/api/boot-config'"));
+check('Namespace save carries the selected Lightning Bolt boot entry',
+    helper.includes('bootEntrySlot: cfg.bootEntrySlot') &&
+    helper.includes("localStorage.getItem('bootEntrySlot')"));
 
 const saveStart = source.indexOf('window._nsTableSave = async function(btn)');
 const saveEnd = source.indexOf('// ── NS Table Load', saveStart);
@@ -45,6 +48,25 @@ check('single save writes the Namespace table before next-build settings',
     saveRaw !== -1 && saveConfig > saveRaw);
 check('single save clears the dirty indicator only after both writes',
     clearDirty > saveConfig);
+
+const editorSource = fs.readFileSync(path.join(__dirname, 'app-lump-editor.js'), 'utf8');
+const step1Start = editorSource.indexOf('function _postStep1(');
+const step1End = editorSource.indexOf('function _rlLoad()', step1Start);
+const step1Save = editorSource.slice(step1Start, step1End);
+check('Step 1 save also carries the selected Lightning Bolt boot entry',
+    step1Save.includes('bootEntrySlot:') &&
+    step1Save.includes("localStorage.getItem('bootEntrySlot')"));
+check('Step 1 save falls back to the server boot entry before slot 6',
+    step1Save.includes('savedBootEntry') &&
+    step1Save.includes('savedBootEntry : 6'));
+
+const loadStart = editorSource.indexOf('function _rlLoad()');
+const loadEnd = editorSource.indexOf('function _rlInitStep2(', loadStart);
+const residentLoad = editorSource.slice(loadStart, loadEnd);
+check('Resident LUMP load prefers the persisted server boot entry',
+    residentLoad.includes('The server is authoritative') &&
+    residentLoad.indexOf('if (Number.isInteger(savedBootSlot)') <
+        residentLoad.indexOf('else if (Number.isInteger(localBootSlot)'));
 
 const addStart = source.indexOf('const _doInstall = async function(words)');
 const addEnd = source.indexOf('const _onError = function(err)', addStart);
