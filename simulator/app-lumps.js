@@ -6658,13 +6658,36 @@ function _formatLumpSavePlan(plan) {
     throw new Error('Invalid save-plan consequence');
 }
 
+async function _readLumpMutationJson(resp, operation) {
+    let text = '';
+    if (resp && typeof resp.text === 'function') {
+        text = await resp.text();
+    } else if (resp && typeof resp.json === 'function') {
+        return resp.json();
+    }
+    if (!text) {
+        throw new Error(`${operation} returned an empty response (HTTP ${resp.status}).`);
+    }
+    try {
+        return JSON.parse(text);
+    } catch (_error) {
+        const contentType = resp.headers && typeof resp.headers.get === 'function'
+            ? (resp.headers.get('content-type') || '') : '';
+        const detail = contentType.includes('text/html')
+            ? 'The browser and server may be running different revisions.'
+            : 'The server did not return JSON.';
+        throw new Error(
+            `${operation} returned an invalid response (HTTP ${resp.status}). ${detail}`);
+    }
+}
+
 async function _requestLumpSavePlan(words, metadata) {
     const resp = await fetch('/api/lumps/save-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ binary: words, metadata: metadata || {} })
     });
-    const result = await resp.json();
+    const result = await _readLumpMutationJson(resp, 'LUMP save planning');
     const planId = result && (result.plan_id || result.id);
     if (!resp.ok || !planId || !result ||
         (result.action !== 'save' && result.action !== 'replace') ||
@@ -6696,7 +6719,7 @@ async function _requestLumpApprovalIntent(words, action, metadata, savePlan) {
             approval: _lumpApprovalView(metadata)
         })
     });
-    const result = await resp.json();
+    const result = await _readLumpMutationJson(resp, 'LUMP approval');
     if (!resp.ok || !result.intent || result.digest !== digest || result.action !== action) {
         throw new Error(result.error || 'Invalid approval-intent response');
     }

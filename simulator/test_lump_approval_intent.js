@@ -117,6 +117,20 @@ vm.runInContext(source.slice(start, end), sandbox);
             .some(key => key in requests[2].body.approval));
     check('server one-time intent is returned to mutation caller',
         result.intent === 'one-time-intent' && result.digest === expected);
+    let malformedResponseError = '';
+    try {
+        await sandbox._readLumpMutationJson({
+            status: 404,
+            headers: { get: () => 'text/html; charset=utf-8' },
+            text: async () => '<!doctype html><title>Not Found</title>'
+        }, 'LUMP save planning');
+    } catch (error) {
+        malformedResponseError = error.message;
+    }
+    check('HTML route mismatch reports a useful error instead of a JSON character error',
+        malformedResponseError.includes('HTTP 404') &&
+        malformedResponseError.includes('different revisions') &&
+        !malformedResponseError.includes('Unexpected token'));
     check('server plan determines create/replace display, including named current LUMP',
         sandbox.window._formatLumpSavePlan({
             action: 'save', consequence: 'create'
