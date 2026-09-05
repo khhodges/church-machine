@@ -42,12 +42,17 @@ const saveStart = source.indexOf('window._nsTableSave = async function(btn)');
 const saveEnd = source.indexOf('// ── NS Table Load', saveStart);
 const save = source.slice(saveStart, saveEnd);
 const saveRaw = save.indexOf("fetch('/api/boot-image/save-ns'");
-const saveConfig = save.indexOf('await window._ensureNamespaceBuildConfig()');
+const saveConfig = save.lastIndexOf('await window._ensureNamespaceBuildConfig()');
 const clearDirty = save.indexOf('_setNsDirty(false)');
 check('single save writes the Namespace table before next-build settings',
     saveRaw !== -1 && saveConfig > saveRaw);
 check('single save clears the dirty indicator only after both writes',
     clearDirty > saveConfig);
+
+check('Namespace save regenerates and validates a missing boot image before snapshotting',
+    save.indexOf("fetch('/api/boot-image/generate'") !== -1 &&
+    save.indexOf("sim.loadBootImage(_generated)") !== -1 &&
+    save.indexOf("fetch('/api/boot-image/generate'") < saveRaw);
 
 const editorSource = fs.readFileSync(path.join(__dirname, 'app-lump-editor.js'), 'utf8');
 const step1Start = editorSource.indexOf('function _postStep1(');

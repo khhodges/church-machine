@@ -2,6 +2,18 @@
   "version": 1,
   "algorithm": "sha256",
   "approvals": {
+    "61198bd843124c4f06f8a5d7a13d84e6d9568925bbd28685453de95a7b3173d1": {
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "61198bd843124c4f06f8a5d7a13d84e6d9568925bbd28685453de95a7b3173d1",
+      "dot_name": "SelfTest",
+      "issue_n": 1,
+      "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25",
+      "filename": "SelfTest.1.485e71f6.lump"
+    },
     "19943df0ea2dd6dbceb5569aa23ce2e075ac18d1f904be6294b71b817bbd6fc1": {
       "abstraction": "CapabilityTest",
       "grants": [

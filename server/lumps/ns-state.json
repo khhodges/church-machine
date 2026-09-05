@@ -69,6 +69,8 @@
     {
       "name": "SelfTest",
       "slot": 6,
+      "token": "00000600",
+      "filename": "SelfTest.1.485e71f6.lump",
       "location": "0x00000200",
       "type": "Inform",
       "f": 0,

@@ -4121,20 +4121,42 @@ function _nsTableClear(slot) {
 window._nsTableSave = async function(btn) {
     if (!sim) return false;
 
-    // Check a boot image binary has actually been loaded (NS_TABLE_BASE must
-    // have been set by loadBootImage — the default 0xF000 is valid too, but
-    // if no binary was ever applied the upload would overwrite the server with
-    // an uninitialised memory image).
-    if (!window.bootImage || !window.bootImageAvailable) {
-        const msg = 'No boot image loaded — reset the simulator first, or upload a boot-image.bin from the Boot Image Designer.';
-        if (btn) { const _orig = btn.textContent; btn.textContent = '\u26a0\ufe0f ' + msg; btn.style.color = '#f87171'; setTimeout(() => { btn.textContent = _orig; btn.style.color = ''; }, 4000); }
-        return false;
-    }
-
     const origText = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; btn.style.color = '#ccc'; }
 
     try {
+        // A Namespace save must never snapshot the simulator's fallback memory,
+        // but it can recover a missing/stale saved image safely.  Persist the
+        // selected build config first (which may invalidate the old image),
+        // then regenerate and validate the server image through loadBootImage.
+        if (!window.bootImage || !window.bootImageAvailable) {
+            await window._ensureNamespaceBuildConfig();
+            if (!window.bootImage || !window.bootImageAvailable) {
+                const _genResp = await fetch('/api/boot-image/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ entrySlot: bootEntrySlot }),
+                });
+                const _genBody = await _genResp.json();
+                if (!_genResp.ok || _genBody.ok === false) {
+                    throw new Error((_genBody && _genBody.error) || `HTTP ${_genResp.status}`);
+                }
+                const _generated = await _probeBootImage();
+                if (!_generated) {
+                    throw new Error('Generated boot image could not be loaded.');
+                }
+                if (sim.loadBootImage(_generated) !== true) {
+                    throw new Error(sim.lastBootImageError || 'Generated boot image was rejected.');
+                }
+                window.bootImage = _generated;
+                window.bootImageAvailable = true;
+                _applyBootEntryToSim();
+                if (typeof window._clearBootImageStickyPatches === 'function') {
+                    window._clearBootImageStickyPatches(sim.nsCount || 0);
+                }
+            }
+        }
+
         // Add/Save label writes and the binary commit form one canonical save.
         // Wait for every in-flight label update so a quick Save→reload cannot
         // observe the occupied slot before its committed custom label.
