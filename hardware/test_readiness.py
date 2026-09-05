@@ -28,6 +28,17 @@ from scripts.check_hardware_namespace_thread_readiness import (
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# The checked synthesis inputs are committed build artifacts. Keep this list
+# aligned with scripts/check_verilog_rtlil_stale.py so a source-only RTL
+# change cannot leave the active FPGA/core Verilog behind.
+_GENERATED_ARTIFACTS = (
+    ("build/church_core.v", CORE_SOURCES),
+    ("build/church_core_iot.v", CORE_SOURCES),
+    ("verilog/church_core.v", CORE_SOURCES),
+    ("build/church_wukong_xc7a100t.il", WUKONG_SOURCES),
+    ("build/church_wukong_xc7a100t.v", WUKONG_SOURCES),
+)
+
 
 # ---------------------------------------------------------------------------
 # Namespace/thread pre-synthesis contract
@@ -54,6 +65,16 @@ def test_generated_stamp_matches_sources(tmp_path: Path):
     artifact.write_text(stamp_text("module generated;\n", CORE_SOURCES), encoding="utf-8")
     fresh, _ = artifact_is_fresh(artifact, CORE_SOURCES)
     assert fresh
+
+
+def test_committed_synthesis_artifacts_are_fresh():
+    """Committed core and Wukong synthesis inputs carry current fingerprints."""
+    stale = []
+    for relative, sources in _GENERATED_ARTIFACTS:
+        fresh, detail = artifact_is_fresh(ROOT / relative, sources)
+        if not fresh:
+            stale.append(f"{relative}: {detail}")
+    assert not stale, "Regenerate stale synthesis artifacts:\n" + "\n".join(stale)
 
 
 # ---------------------------------------------------------------------------

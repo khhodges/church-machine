@@ -1757,7 +1757,6 @@ class ChurchCore(Elaboratable):
                 ),
                 u_change.index.eq(Mux(thread_switch_start_sig, self.thread_switch_index, cap_index)),
                 u_change.change_mask.eq(Mux(thread_switch_start_sig, 0x0FFF, u_decoder.call_mask)),
-                u_change.scheduler_mode.eq(thread_switch_start_sig),
                 u_change.active_thread_base.eq(self.active_thread_base),
                 u_change.cr_rd_data.eq(u_regs.cr_rd_data),
                 u_change.cr12_thread.eq(u_regs.cr12_thread),
@@ -1768,7 +1767,12 @@ class ChurchCore(Elaboratable):
                 u_change.dr_rd_data.eq(u_regs.dr_rd_data1),
                 u_change.boot_window.eq(boot_microcode_active),
                 u_change.flags_in.eq(u_regs.flags),
-                u_change.nia_current.eq(nia_reg),
+                # ChurchChange encodes the decoded instruction's return NIA by
+                # adding one word. An external M6 request already arrives at an
+                # instruction boundary, so bias its input back one word and
+                # preserve the exact next NIA in the canonical frame.
+                u_change.nia_current.eq(
+                    Mux(thread_switch_start_sig, nia_reg - 4, nia_reg)),
             ]
             with m.If(clear_all):
                 m.d.sync += [

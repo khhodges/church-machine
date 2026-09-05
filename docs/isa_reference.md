@@ -437,15 +437,15 @@ Flag-writing summary across all 20 instructions:
 
 ### A.12–A.14 — Call stack: CALL frame layout, LAMBDA SZ=0, M-window writeback
 
-> **A.12 — CALL pushes exactly 2 words to thread memory; no CRs or DRs.**
+> **A.12 — CALL and CHURCH suspension use the canonical 2-word frame; no CRs or DRs are embedded in it.**
 >
 > When CALL executes, it writes two words into the current thread's lump memory
 > at the stack pointer (STO):
 >
 > | Word offset (from STO) | Contents |
 > |------------------------|----------|
-> | STO      | Frame word: packed (returnPC[14:0] \| sz[12] \| flags[11:8] \| savedSTO[7:0]) |
-> | STO − 1  | Caller's E-GT (CR6 value before the call) |
+> | STO      | Frame word: `FLAGS[31:28] \| NIA[27:13] \| prior_SZ[12] \| prior_STO[11:0]` |
+> | STO − 1  | Normalized Church Enter GT identifying the suspended/calling abstraction |
 >
 > `sz = 1` distinguishes CALL frames from LAMBDA frames (sz = 0). No capability
 > registers or data registers are written to thread memory — the callee inherits
@@ -455,6 +455,12 @@ Flag-writing summary across all 20 instructions:
 > The JS-side simulator call stack (`callStack[]`) additionally holds a snapshot
 > of all saved registers for state inspection, but this is not part of the
 > hardware frame format.
+>
+> Thread suspension through CHURCH writes this same frame to the outgoing
+> Thread's private stack. It is not a new instruction or frame type. Resumption
+> performs RETURN-equivalent validation of the saved Enter GT and reconstructs
+> CR6/CR14 before restoring NIA and flags. Thread offset +18 remains Heap and
+> never stores executable identity.
 
 > **A.13 — LAMBDA pushes a SZ=0 (1-word) frame; RETURN identifies it by sz.**
 >
@@ -725,20 +731,24 @@ Syntax:  RETURN [#mask]
 Encoding: op[4:0]=0x03 | cond[4] | 0[4] | 0[4] | mask[12] | 0[3]
 ```
 
-`mask` is a 12-bit field in `imm15[11:0]`. **Bit N = 1 → preserve CR_N** (callee's value is kept as a return value to the caller). Bit N = 0 → restore the caller's saved CR_N, or scrub to NULL if not saved. Bit 6 is architecturally reserved (CR6 is always re-synthesised as an L-GT by CALL; the mask bit is ignored). Bare `RETURN` (mask = 0) is the secure default — all callee CRs revert to the caller's context.
+`mask` is a reserved 12-bit field in `imm15[11:0]`. It is not implemented by
+current hardware or the simulator; nonzero values are ignored and the
+assembler warns. Bit 6 is reserved because CR6 is always reconstructed from
+the saved Enter GT. Use bare `RETURN` (`mask = 0`).
 
 **Semantics** (see A.12, A.13):
 1. M-window writeback fires; faults `INVALID_OP` if writeback fails.
 2. Call stack is checked; empty stack or sentinel frame → `STACK_UNDERFLOW`.
 3. All M-bits are reset across all CRs (`_resetAllMBits`).
-4. For each CR0–CR11 in one combined pass:
-   - **bit set (preserve):** callee's CR_N is kept — it carries a return value.
-   - **bit clear + saved:** caller's saved CR_N is restored from the frame snapshot.
-   - **bit clear + not saved:** CR_N is scrubbed to NULL.
-5. DRs are always restored from the caller's saved snapshot.
-6. Caller's FLAGS and STO are restored from the frame.
-7. PC ← returnPC.
+4. The saved Enter GT is revalidated and used to reconstruct CR6 and CR14.
+5. Caller's FLAGS and STO are restored from the packed frame word.
+6. PC ← returnPC.
    - **SZ = 0 (LAMBDA frame):** PC is restored from `lambdaReturnPC` cache without a memory read (O(1) fast path). `lambdaActive` is cleared.
+
+No CR0–CR5, CR7–CR13, CR15, or DR snapshot exists in the architectural
+two-word frame. Those registers retain the values left by the callee. A
+simulator inspection snapshot is not architectural state and cannot affect
+RETURN.
 
 **Flags:** N — Z — C — V (no flag writes; caller's flags are restored from the saved snapshot)
 
@@ -748,15 +758,9 @@ Encoding: op[4:0]=0x03 | cond[4] | 0[4] | 0[4] | mask[12] | 0[3]
 | `STACK_UNDERFLOW` | Call stack empty, or RETURN through boot sentinel frame (NIA = 0x7FFF) |
 | `INVALID_OP` | M-window writeback failed before frame pop |
 
-**Example:** Return a capability in CR0 (preserve CR0; mask = 0b000000000001 = 0x001).
+**Example:**
 ```
-RETURN 0x001             ; bit 0 set → CR0 preserved (return value)
-                          ; all other CRs restored from caller's saved snapshot
-                          ; opcode=3, cond=14, fld_a=0, fld_b=0, imm=1
-```
-Bare return (no clearing):
-```
-RETURN AL                 ; mask=0 → restore all caller CRs (secure default, no callee CRs preserved)
+RETURN AL                 ; mask=0; other CRs and DRs retain callee values
                           ; encoding: 0x1F000000
 ```
 
@@ -773,7 +777,19 @@ Encoding: op[4:0]=0x04 | cond[4] | CRd[4] | CRs[4] | idx[15]
 
 **Semantics by destination register (hardware):**
 - **CR12 or CR13** (system-wide): Load GT directly from c-list at `CRs[idx]`; no per-thread save/restore.
-- **Scheduler CHANGE**: save CR0–CR11 to words +244…+255 and DR0–DR15 to +1…+16, then restore those homes from the selected dormant Thread. Restored CR0 is validated as the entry E-GT; hardware derives executable CR14 from its code LUMP header and begins at word 1 (raw LUMP byte base + 4). The transition pushes no CALL frame. PC, flags, M state, STO, CR14, and CR15 are not serialized in Thread data.
+- **Thread handoff**: retain the established DR0–DR15 homes at +1…+16 and
+  CR0–CR11 homes at `capsStart…capsStart+11`. CHURCH suspension writes the
+  canonical two-word frame to the outgoing private stack. Incoming execution
+  resumes by RETURN-equivalent validation of that frame's Enter GT, which
+  reconstructs CR6/CR14 and restores NIA/flags from the packed frame word.
+  Offset +18 is Heap; no independent executable-identity word is read or
+  written.
+
+The Thread handoff is atomic with respect to validation: a malformed, stale, or
+underflowing incoming frame faults before outgoing state is corrupted or
+partially restored incoming state becomes visible. Initial dormant Threads
+therefore carry a valid initial CHURCH frame. CR0 is an ordinary persisted
+capability home and is not interpreted as the resume identity.
 
 **Flags:** N — Z — C — V (no flag writes)
 

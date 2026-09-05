@@ -51,7 +51,7 @@ const SLOT_SIZE = sim.SLOT_SIZE;               // 64
 const regions = [
     { name: 'Lump area',        start: 0,              end: NS_TABLE_BASE - 3,  notes: 'All object lumps (NS, thread, abstraction, entry, code lumps, etc.)' },
     { name: 'Boot-entry slot word', start: NS_TABLE_BASE - 2, end: NS_TABLE_BASE - 2, notes: 'boot_entry_slot — NS slot to boot from (Task #355)' },
-    { name: 'Format tag word',  start: NS_TABLE_BASE - 1, end: NS_TABLE_BASE - 1, notes: 'BOOT_IMAGE_FORMAT_TAG (0xB0070355) — version sentinel' },
+    { name: 'Format tag word',  start: NS_TABLE_BASE - 1, end: NS_TABLE_BASE - 1, notes: 'BOOT_IMAGE_FORMAT_TAG (0xB0073224) — version sentinel' },
     { name: 'NS table',         start: NS_TABLE_BASE,   end: NS_TABLE_BASE + NS_TABLE_RESERVE - 1, notes: `Up to ${NS_TABLE_RESERVE / NS_ENTRY_WORDS} × 4-word entries` },
 ];
 // MMIO: only relevant in the historical 65536-word space; note it anyway

@@ -3,8 +3,8 @@ name: Thread object runtime authority
 description: Defines the single-source-of-truth rule for suspended Thread execution state.
 ---
 
-The Thread object is the runtime context object and the only authority for one Thread's suspended execution state. Its executable GT lives at +18 independently of mutable CR0. Do not add host-side maps, UI history, or cloned context records that duplicate NIA or machine context. Hardware CALL and RETURN must both address stack state through the resolved active Thread-body base; never substitute the CR12 root capability's location during boot.
+The Thread object is the runtime context object and the only authority for one Thread's suspended execution state. Executable context lives in the canonical two-word CHURCH frame on its private stack, independently of mutable CR0; +18 is Heap. Do not add host-side maps, UI history, or cloned identity records that duplicate NIA or executable context. Hardware CALL, RETURN, suspension, and resumption address stack state through the resolved active Thread-body base.
 
-**Why:** Parallel context stores can drift from the Thread object and make switching display or restore a state that CHANGE did not actually save. Deriving CR14 from CR0 similarly resumes the wrong code after a program uses CR0 normally. On Wukong, mixing the CR12 root base with the relocated active body also sends stack frames to the wrong object.
+**Why:** Parallel context stores can drift from the Thread object and make switching display or restore a state that CHANGE did not actually save. Deriving CR14 from CR0 similarly resumes the wrong code after a program uses CR0 normally.
 
-**How to apply:** Canonical CHANGE must prevalidate every non-NULL CR home and the +18 executable GT before mutation; then save DR0–DR15, CR0–CR11, +18, and protected context into the outgoing Thread and restore only from the incoming Thread. Thread status reads the same object. Hardware persists NIA as a word offset and restores its byte address.
+**How to apply:** Preserve the existing DR0–DR15 and CR0–CR11 homes. Suspend by pushing the normalized current Enter GT plus packed NIA/FLAGS/SZ/STO; resume with RETURN-equivalent validation and CR6/CR14 reconstruction. Invalid or absent frames fault before handoff mutation.

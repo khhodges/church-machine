@@ -55,7 +55,7 @@ between them because lumps are allocated from address 0 upward.
 | Start    | End      | Words  | Region |
 |:---------|:---------|-------:|:-------|
 | `0x0000` | `0xFBFE` | 64 511 | **Lump area** — all object lumps |
-| `0xFBFF` | `0xFBFF` |      1 | **Format tag word** (`0xB0072862`) — boot-image version sentinel |
+| `0xFBFF` | `0xFBFF` |      1 | **Format tag word** (`0xB0073224`) — Task 3224 canonical-Thread-frame boot-image sentinel |
 | `0xFC00` | `0xFFFF` |  1 024 | **NS table** — 256 × 4-word entries (`NS_TABLE_BASE = 0xFC00`) |
 
 `NS_TABLE_BASE = 65536 − NS_TABLE_RESERVE = 65536 − 1024 = 0xFC00`
@@ -76,7 +76,7 @@ When `window.bootConfig.step1.totalNamespaceWords = 16384`:
 |:---------|:---------|-------:|:-------|
 | `0x0000` | `0x0D3F` |  3 392 | **Lump area — occupied** (47 active NS slots at boot) |
 | `0x0D40` | `0x3BFE` | 11 967 | **Lump area — free** (unallocated heap space) |
-| `0x3BFF` | `0x3BFF` |      1 | **Format tag word** (`0xB0072862`) |
+| `0x3BFF` | `0x3BFF` |      1 | **Format tag word** (`0xB0073224`) — Task 3224 canonical-Thread-frame boot-image sentinel |
 | `0x3C00` | `0x3FFF` |  1 024 | **NS table** — 256 × 4-word entries (`NS_TABLE_BASE = 0x3C00`) |
 
 `NS_TABLE_BASE = 16384 − 1024 = 0x3C00`
@@ -597,7 +597,7 @@ These are the only authoritative CM state sources:
 | Memory range | Content |
 |:-------------|:--------|
 | `memory[0 … NS_TABLE_BASE−2]` | All object lumps |
-| `memory[NS_TABLE_BASE−1]` | Boot-image format tag (`0xB0072862`) |
+| `memory[NS_TABLE_BASE−1]` | Boot-image format tag (`0xB0073224`) |
 | `memory[NS_TABLE_BASE … NS_TABLE_BASE + NS_TABLE_RESERVE − 1]` | NS table (256 × 4 words) |
 
 ### 10.2 Legitimate hardware registers (not in DMEM by design)
@@ -687,7 +687,7 @@ total); 131,072 words (512 KB) are allocated to the Church Machine namespace.
 | Start      | End        | Words   | Region |
 |:-----------|:-----------|--------:|:-------|
 | `0x00000`  | `0x1FAFE`  | 129,791 | **Lump area** — all object lumps |
-| `0x1FAFF`  | `0x1FAFF`  |       1 | **Format tag word** (`0xB0072862`) |
+| `0x1FAFF`  | `0x1FAFF`  |       1 | **Format tag word** (`0xB0073224`) |
 | `0x1FB00`  | `0x1FBFF`  |     256 | **Reserved** (gap to NS table base alignment) |
 | `0x1FC00`  | `0x1FFFF`  |   1,024 | **NS table** — 256 × 4-word entries (`NS_TABLE_BASE = 0x1FC00`) |
 

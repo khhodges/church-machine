@@ -122,10 +122,10 @@ def test_ab_type_constants():
 
 # ── BOOT_IMAGE_FORMAT_TAG ────────────────────────────────────────────────────
 
-def test_boot_image_format_tag_is_task_568():
-    """BOOT_IMAGE_FORMAT_TAG was bumped to 0xB0070563 for Task #568 (dynamic Boot.Abstr)."""
-    assert BOOT_IMAGE_FORMAT_TAG == 0xB0070563, (
-        f"Expected 0xB0070563, got 0x{BOOT_IMAGE_FORMAT_TAG:08X}"
+def test_boot_image_format_tag_is_current_thread_abi():
+    """The current tag marks the canonical two-word Thread suspension ABI."""
+    assert BOOT_IMAGE_FORMAT_TAG == 0xB0073224, (
+        f"Expected 0xB0073224, got 0x{BOOT_IMAGE_FORMAT_TAG:08X}"
     )
 
 
@@ -136,7 +136,7 @@ def test_boot_image_contains_correct_format_tag():
         "namespaceLumpWords": 64,
         "threadLumpWords": 256,
     }}
-    img = generate_boot_image(cfg, _EMPTY_LUMPS_DIR)
+    img = generate_boot_image(cfg, LUMPS_DIR)
     words = struct.unpack(f"<{len(img)//4}I", img)
     total = len(words)
     tag_idx = total - NS_TABLE_RESERVE - 1

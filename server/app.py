@@ -3281,9 +3281,8 @@ def _boot_image_is_stale():
                 return True
         # Generator source changes do not necessarily make any LUMP/config
         # input newer than an existing image.  Check the normative Thread
-        # stack-pointer backing word by content so retired tail-relative
-        # images (for example +499 in a 512-word allocation) regenerate even
-        # when all file mtimes otherwise look current.
+        # CHURCH-frame stack pointer by content so retired images regenerate
+        # even when all file mtimes otherwise look current.
         with open(BOOT_IMAGE_PATH, "rb") as _image_file:
             _image_bytes = _image_file.read()
         _total_words = len(_image_bytes) // 4
@@ -3297,7 +3296,7 @@ def _boot_image_is_stale():
             )
             if not 0 <= _sto_idx < _total_words:
                 return True
-            _actual_stack_end = struct.unpack_from(
+            _actual_resume_sto = struct.unpack_from(
                 "<I", _image_bytes, _sto_idx * 4)[0]
             # Validate the Thread's self-describing geometry, not whichever
             # boot configuration happens to be saved by this server. A valid
@@ -3311,8 +3310,8 @@ def _boot_image_is_stale():
                 _thread_words, _thread_stack_words)
             if not _layout["valid"]:
                 return True
-            _expected_stack_end = _layout["stack_end"]
-            if _actual_stack_end != _expected_stack_end:
+            _expected_resume_sto = _layout["stack_end"] - 2
+            if (_actual_resume_sto & 0xFFF) != _expected_resume_sto:
                 return True
         _img_mtime = os.path.getmtime(BOOT_IMAGE_PATH)
         _lumps_dir = os.path.dirname(BOOT_IMAGE_PATH)

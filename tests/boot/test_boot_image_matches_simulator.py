@@ -39,14 +39,12 @@ from server.boot_image import (  # noqa: E402
     BOOT_ABSTR_NS_SLOT,
     NS_ENTRY_WORDS,
     NS_TABLE_RESERVE,
+    THREAD_CAPS_OFFSET,
+    THREAD_STO_OFFSET,
     create_gt,
     generate_boot_image,
     generated_thread_slots,
     parse_ns_table_raw,
-)
-from hardware.thread_design import (  # noqa: E402
-    THREAD_CAPS_OFFSET,
-    THREAD_STO_OFFSET,
 )
 
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
@@ -362,7 +360,7 @@ def test_generated_thread_body_overlap_and_nondefault_boot_entry_are_rejected_or
     with pytest.raises(ValueError, match=r"overlaps the fixed boot and generated Thread region"):
         generate_boot_image(colliding, str(tmp_path))
 
-    with pytest.raises(ValueError, match=r"non-executable code identity"):
+    with pytest.raises(ValueError, match=r"non-executable CHURCH Enter identity"):
         generate_boot_image(
             _cfg_generated_threads(5), str(tmp_path), boot_entry_slot=7)
 
@@ -385,7 +383,7 @@ def test_default_thread_count_remains_byte_compatible(tmp_path):
 
 
 def test_generated_threads_use_fixed_stack_boundary(tmp_path):
-    """Every generated Thread must use fixed private-ABI stack geometry."""
+    """Every generated Thread starts with one canonical CHURCH resume frame."""
     _write_synthetic_boot_abstr_lump(str(tmp_path))
     cfg = _cfg_generated_threads(3)
     generated = generate_boot_image(cfg, str(tmp_path))
@@ -395,19 +393,21 @@ def test_generated_threads_use_fixed_stack_boundary(tmp_path):
     words = struct.unpack(f"<{total}I", generated)
     thread_count = int(step1.get("threadCount") or 1)
     slots = [1, *generated_thread_slots(thread_count)]
-    expected_boundary = THREAD_CAPS_OFFSET - 1
+    stack_end = THREAD_CAPS_OFFSET - 1
+    expected_sto = stack_end - 2
     assert THREAD_STO_OFFSET == 17
-    assert expected_boundary == 0xF3
+    assert stack_end == 0xF3
 
     for slot in slots:
         ns_base = total - (slot + 1) * NS_ENTRY_WORDS
         thread_loc = words[ns_base]
-        actual_boundary = words[thread_loc + THREAD_STO_OFFSET]
-        assert actual_boundary == expected_boundary, (
-            f"NS slot {slot} Thread boundary at +"
-            f"{THREAD_STO_OFFSET} is 0x{actual_boundary:08X}; "
-            f"expected fixed +243 (0x{expected_boundary:08X})"
-        )
+        actual_sto = words[thread_loc + THREAD_STO_OFFSET] & 0xFFF
+        assert actual_sto == expected_sto
+        enter_gt = words[thread_loc + actual_sto + 1]
+        packed = words[thread_loc + actual_sto + 2]
+        assert enter_gt == create_gt(0, BOOT_ABSTR_NS_SLOT, {"E": 1}, 1)
+        assert (packed >> 12) & 1 == 1
+        assert packed & 0xFFF == stack_end
 
 
 def test_committed_ns_state_names_generated_threads_from_image_count(tmp_path, monkeypatch):

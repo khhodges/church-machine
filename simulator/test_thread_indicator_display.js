@@ -17,7 +17,7 @@ function check(condition, message) {
 }
 
 check(
-  /indicatorFlags: active[\s\S]{0,180}savedIndicator\.flags/.test(sim),
+  /indicatorFlags: active[\s\S]{0,180}savedFrame\.flags/.test(sim),
   'Thread status rows expose live or saved indicator flags'
 );
 check(

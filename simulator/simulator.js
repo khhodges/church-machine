@@ -32,7 +32,6 @@ const ARCH_NS_INTEGRITY_MASK = ARCH_CONTRACTS.isa.nsEntry.integrity.excludedWord
 const THREAD_CAPS_OFFSET =
     THREAD_DESIGN.canonicalBodyWords - THREAD_DESIGN.capabilityHomes.words;
 const THREAD_STO_OFFSET = THREAD_DESIGN.protectedStoOffset;
-const THREAD_CODE_IDENTITY_OFFSET = THREAD_DESIGN.codeIdentityOffset;
 const THREAD_HEAP_OFFSET = THREAD_DESIGN.heapOffset;
 
 // ── Church Hardware Address Range (0xFFFFFF00 – 0xFFFFFFFF) ─────────────────
@@ -261,7 +260,7 @@ class ChurchSimulator {
         // so we discover the reserve by finding the tag rather than using a
         // hardcoded offset. Scan limit: 8192 words covers up to 1024-slot NS tables
         // (4096 words) plus the 2 sentinel words and future headroom.
-        const BOOT_IMAGE_FORMAT_TAG = 0xB0072862;  // must match boot_image.py; bumped for Task #2862 (W3=cache_token migration; W1||W2||W3 Outform token)
+        const BOOT_IMAGE_FORMAT_TAG = 0xB0073224;  // canonical two-word CHURCH Thread suspension frame; must match boot_image.py
         let tagIdx = -1;
         const scanLimit = Math.min(8192, src.length);
         for (let _si = 1; _si <= scanLimit; _si++) {
@@ -317,6 +316,63 @@ class ChurchSimulator {
                 const _op1       = (_bodyWord1 >>> 27) & 0x1F;
                 if (_op1 === 4 /* CHANGE */) {
                     this.lastBootImageError = `Stale trampoline-era boot image: Boot.Abstr lump (slot ${discoveredBootEntrySlot}) first body word is CHANGE (0x${_bodyWord1.toString(16).padStart(8, '0')}). This image pre-dates direct-dispatch and must be regenerated.`;
+                    this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected.\n`;
+                    return false;
+                }
+            }
+        }
+
+        // Thread images must carry the sole resume identity in a canonical
+        // two-word CHURCH frame. The format-tag check above rejects the retired
+        // +18 layout; this pass rejects malformed current-format frames before
+        // changing simulator state.
+        {
+            const encodedThreadCount = tagIdx >= 3 ? (src[tagIdx - 3] >>> 0) : 0;
+            if (encodedThreadCount < 1 || encodedThreadCount > 10) {
+                this.lastBootImageError =
+                    `Encoded Thread count ${encodedThreadCount} is outside 1..10.`;
+                this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected.\n`;
+                return false;
+            }
+            const threadSlots = [1];
+            for (let candidate = 11;
+                    threadSlots.length < encodedThreadCount;
+                    candidate++) {
+                if (candidate !== ARCH_BOOT.minimalSlots.M_BIT_DEV) {
+                    threadSlots.push(candidate);
+                }
+            }
+            for (const threadSlot of threadSlots) {
+                if (threadSlot >= discoveredMaxNsEntries) break;
+                const nsBase = src.length - (threadSlot + 1) * this.NS_ENTRY_WORDS;
+                const threadBase = src[nsBase] >>> 0;
+                const header = this.parseLumpHeader(src[threadBase] >>> 0);
+                const layout = header.valid && header.typ === 2
+                    ? THREAD_DESIGN.layout(header.lumpSize, header.cw) : null;
+                if (!layout || !layout.valid) continue;
+                const protectedWord = src[threadBase + THREAD_STO_OFFSET] >>> 0;
+                const resumeSTO = protectedWord & 0xFFF;
+                const enterGT = src[threadBase + resumeSTO + 1] >>> 0;
+                const packed = src[threadBase + resumeSTO + 2] >>> 0;
+                const parsedEnter = this.parseGT(enterGT);
+                const savedSTO = packed & 0xFFF;
+                const nia = (packed >>> 13) & 0x7FFF;
+                const codeNsBase = src.length -
+                    (parsedEnter.index + 1) * this.NS_ENTRY_WORDS;
+                const codeBase = codeNsBase >= 0 ? (src[codeNsBase] >>> 0) : src.length;
+                const codeHeader = codeBase < discoveredNsTableBase
+                    ? this.parseLumpHeader(src[codeBase] >>> 0) : null;
+                if (((protectedWord >>> 12) & 1) !== 1 ||
+                        resumeSTO < layout.stackStart - 1 ||
+                        resumeSTO + 2 > layout.stackEnd ||
+                        parsedEnter.type !== 1 || !parsedEnter.permissions.E ||
+                        !codeHeader || !codeHeader.valid || codeHeader.cw === 0 ||
+                        ((packed >>> 12) & 1) !== 1 ||
+                        savedSTO < layout.stackStart + 1 ||
+                        savedSTO > layout.stackEnd ||
+                        resumeSTO !== savedSTO - 2 || nia >= codeHeader.cw) {
+                    this.lastBootImageError =
+                        `Thread slot ${threadSlot} lacks a canonical two-word CHURCH resume frame.`;
                     this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected.\n`;
                     return false;
                 }
@@ -2330,7 +2386,9 @@ class ChurchSimulator {
         const THREAD_STACK_BOUNDARY = THREAD_LAYOUT.stackEnd;
         const threadLoc = this.memory[this._nsSlotBase(1)];
         this.memory[threadLoc] = this.packLumpHeader(THREAD_N_MINUS_6, THREAD_SW, THREAD_CC, 2);
-        this.memory[threadLoc + THREAD_STO_OFFSET] = THREAD_STACK_BOUNDARY;
+        const _initialResumeSTO = THREAD_STACK_BOUNDARY - 2;
+        this.memory[threadLoc + THREAD_STO_OFFSET] =
+            this._packProtectedIndicator(_initialResumeSTO, 1, {}, 0);
 
         // Thread caps zone — CR0 home slot at the Thread tail is pre-set to an Enter-GT
         // for bootEntrySlot (the ⚡ lightning-bolt selection, e.g. LED Flash at slot 10).
@@ -2344,19 +2402,22 @@ class ChurchSimulator {
         const _initialBootEntry = this.readNSEntry(this.bootEntrySlot);
         const _initialBootSeq = _initialBootEntry
             ? this.parseNSWord1(_initialBootEntry.word1_limit).gtSeq : 0;
-        this.memory[threadLoc + THREAD_LAYOUT.capsStart] =
+        const _initialEntryGT =
             this.createGT(_initialBootSeq, this.bootEntrySlot, {E: 1}, 1);
-        this.memory[threadLoc + THREAD_CODE_IDENTITY_OFFSET] =
-            this.createGT(_initialBootSeq, this.bootEntrySlot, {E: 1}, 1);
+        this.memory[threadLoc + THREAD_LAYOUT.capsStart] = _initialEntryGT;
+        this.memory[threadLoc + _initialResumeSTO + 1] = _initialEntryGT;
+        this.memory[threadLoc + _initialResumeSTO + 2] =
+            this._packFrameWordRaw(0, 1, THREAD_STACK_BOUNDARY);
         for (const threadSlot of generatedThreadSlots) {
             const generatedThreadLoc = this.memory[this._nsSlotBase(threadSlot)] >>> 0;
             this.memory[generatedThreadLoc] = this.packLumpHeader(
                 THREAD_N_MINUS_6, THREAD_SW, THREAD_CC, 2);
-            this.memory[generatedThreadLoc + THREAD_LAYOUT.capsStart] =
-                this.createGT(_initialBootSeq, this.bootEntrySlot, {E: 1}, 1);
-            this.memory[generatedThreadLoc + THREAD_CODE_IDENTITY_OFFSET] =
-                this.createGT(_initialBootSeq, this.bootEntrySlot, {E: 1}, 1);
-            this.memory[generatedThreadLoc + THREAD_STO_OFFSET] = THREAD_STACK_BOUNDARY;
+            this.memory[generatedThreadLoc + THREAD_LAYOUT.capsStart] = _initialEntryGT;
+            this.memory[generatedThreadLoc + _initialResumeSTO + 1] = _initialEntryGT;
+            this.memory[generatedThreadLoc + _initialResumeSTO + 2] =
+                this._packFrameWordRaw(0, 1, THREAD_STACK_BOUNDARY);
+            this.memory[generatedThreadLoc + THREAD_STO_OFFSET] =
+                this._packProtectedIndicator(_initialResumeSTO, 1, {}, 0);
         }
 
         // Memory-manager GT at c-list[0]: R|W Inform capability over NS slot 0 (full namespace).
@@ -2486,7 +2547,7 @@ class ChurchSimulator {
         // stale binaries. Bumped to 0x563 (Task #568) — Boot.Abstr placement is now
         // dynamic (64w default or saved lump size); abstractionLumpWords deprecated.
         // Must match boot_image.py BOOT_IMAGE_FORMAT_TAG and loadBootImage().
-        const BOOT_IMAGE_FORMAT_TAG_INIT = 0xB0072862;  // bumped for Task #2862 (W3=cache_token migration; W1||W2||W3 Outform token)
+        const BOOT_IMAGE_FORMAT_TAG_INIT = 0xB0073224;  // canonical two-word CHURCH Thread suspension frame
         this.memory[this.NS_TABLE_BASE - 1] = BOOT_IMAGE_FORMAT_TAG_INIT >>> 0;
 
         // Restore NS write guard: boot-load is complete; no further auto-writes permitted.
@@ -4446,7 +4507,99 @@ class ChurchSimulator {
         return true;
     }
 
-    // The configured scheduler order is intentionally derived from the
+    _readThreadResumeFrame(threadBase, layout, threadSlot) {
+        const protectedState = this._unpackProtectedIndicator(
+            this.memory[threadBase + THREAD_STO_OFFSET] >>> 0);
+        const frameBase = protectedState.sto;
+        if (protectedState.sz !== 1 ||
+                frameBase < layout.stackStart - 1 ||
+                frameBase + 2 > layout.stackEnd) {
+            this.fault('BOUNDS',
+                `CHANGE Thread slot ${threadSlot}: invalid CHURCH frame STO ${frameBase}`);
+            return null;
+        }
+        const enterGT = this.memory[threadBase + frameBase + 1] >>> 0;
+        const packedWord = this.memory[threadBase + frameBase + 2] >>> 0;
+        let parsed;
+        try {
+            parsed = this.parseGT(enterGT);
+        } catch (_e) {
+            this.fault('TYPE',
+                `CHANGE Thread slot ${threadSlot}: malformed CHURCH Enter GT`);
+            return null;
+        }
+        if (parsed.type !== 1 || !parsed.permissions.E) {
+            this.fault('PERM_E',
+                `CHANGE Thread slot ${threadSlot}: CHURCH frame requires an Inform E-GT`);
+            return null;
+        }
+        const checked = this.mLoad(enterGT, 'E', 14);
+        if (!checked.ok) {
+            this.fault(checked.fault,
+                `CHANGE Thread slot ${threadSlot} CHURCH Enter: ${checked.message}`);
+            return null;
+        }
+        const frame = this._unpackFrameWord(packedWord);
+        if (frame.sz !== 1 || frame.savedSTO < layout.stackStart + 1 ||
+                frame.savedSTO > layout.stackEnd ||
+                frameBase !== frame.savedSTO - 2) {
+            this.fault('TYPE',
+                `CHANGE Thread slot ${threadSlot}: malformed CHURCH frame`);
+            return null;
+        }
+        const codeHeader = this.parseLumpHeader(
+            this.memory[checked.entry.word0_location] >>> 0);
+        if (!codeHeader.valid || codeHeader.cw === 0) {
+            this.fault('BOUNDS',
+                `CHANGE Thread slot ${threadSlot}: CHURCH Enter does not name executable code`);
+            return null;
+        }
+        if (frame.returnPC >= codeHeader.cw) {
+            this.fault('BOUNDS',
+                `CHANGE Thread slot ${threadSlot}: CHURCH frame NIA ${frame.returnPC} exceeds code extent ${codeHeader.cw}`);
+            return null;
+        }
+        return { enterGT, parsed, checked, codeHeader, frame };
+    }
+
+    _prepareThreadSuspendFrame(threadBase, layout, threadSlot) {
+        const savedSTO = this.sto >>> 0;
+        if (savedSTO < layout.stackStart + 1 || savedSTO > layout.stackEnd) {
+            this.fault('BOUNDS',
+                `CHANGE: outgoing Thread slot ${threadSlot} has no room for CHURCH frame`);
+            return null;
+        }
+        let liveCode;
+        try {
+            liveCode = this.parseGT(this.cr[14].word0 >>> 0);
+        } catch (_e) {
+            this.fault('TYPE',
+                `CHANGE: outgoing Thread slot ${threadSlot} has a malformed CR14 code GT`);
+            return null;
+        }
+        if (liveCode.type !== 1) {
+            this.fault('TYPE',
+                `CHANGE: outgoing Thread slot ${threadSlot} has a non-Inform CR14 code GT`);
+            return null;
+        }
+        const enterGT = this.createGT(liveCode.gt_seq, liveCode.index, {E: 1}, 1);
+        const checked = this.mLoad(enterGT, 'E', 14);
+        if (!checked.ok) {
+            this.fault(checked.fault,
+                `CHANGE outgoing Thread slot ${threadSlot} CHURCH Enter: ${checked.message}`);
+            return null;
+        }
+        const header = this.parseLumpHeader(
+            this.memory[checked.entry.word0_location] >>> 0);
+        if (!header.valid || header.cw === 0) {
+            this.fault('BOUNDS',
+                `CHANGE: outgoing Thread slot ${threadSlot} CR14 does not name executable code`);
+            return null;
+        }
+        return { savedSTO, enterGT };
+    }
+
+    // The configured Thread order is intentionally derived from the
     // Namespace table rather than browser-only designer state.  This keeps a
     // restored boot image, a freshly generated image, and the visible UI on
     // one contract: Thread.1 is the fixed primary context, followed by the
@@ -4467,8 +4620,8 @@ class ChurchSimulator {
     }
 
     _threadDisplayGT(slot, activeSlot) {
-        // CR14 is the live executable GT; dormant Thread objects retain the
-        // same identity in their dedicated code-home word (independent of CR0).
+        // CR14 is the live executable GT; dormant Thread objects retain their
+        // Enter identity in the canonical CHURCH resume frame.
         if (slot === activeSlot) {
             const liveCodeGT = this.cr && this.cr[14] ? (this.cr[14].word0 >>> 0) : 0;
             if (liveCodeGT && !ChurchSimulator.isNullGT(liveCodeGT)) return liveCodeGT;
@@ -4479,7 +4632,9 @@ class ChurchSimulator {
         if (!entry) return 0;
         const layout = this._threadLayoutAtBase(entry.word0_location);
         if (!layout || !Number.isInteger(layout.capsStart)) return 0;
-        return this.memory[entry.word0_location + THREAD_CODE_IDENTITY_OFFSET] >>> 0;
+        const protectedState = this._unpackProtectedIndicator(
+            this.memory[entry.word0_location + THREAD_STO_OFFSET] >>> 0);
+        return this.memory[entry.word0_location + protectedState.sto + 1] >>> 0;
     }
 
     _threadDisplayGTIdentity(gtWord) {
@@ -4519,6 +4674,10 @@ class ChurchSimulator {
                 ? this._unpackProtectedIndicator(
                     this.memory[entry.word0_location + THREAD_STO_OFFSET] >>> 0)
                 : null;
+            const savedFrame = entry && savedIndicator
+                ? this._unpackFrameWord(
+                    this.memory[entry.word0_location + savedIndicator.sto + 2] >>> 0)
+                : null;
             return {
                 slot,
                 name: slot === 1 ? 'Thread.1'
@@ -4526,13 +4685,13 @@ class ChurchSimulator {
                 position: index + 1,
                 active,
                 nia: active ? (this.pc >>> 0)
-                    : (savedIndicator ? (savedIndicator.nia >>> 0) : null),
+                    : (savedFrame ? (savedFrame.returnPC >>> 0) : null),
                 physicalAddress: active && nextPhysicalAddr >= 0
                     ? (nextPhysicalAddr >>> 0) : null,
                 indicatorFlags: active
                     ? { ...this.flags }
-                    : (savedIndicator && savedIndicator.flags
-                        ? { ...savedIndicator.flags } : null),
+                    : (savedFrame && savedFrame.flags
+                        ? { ...savedFrame.flags } : null),
                 gtWord,
                 ...gtIdentity,
             };
@@ -4554,11 +4713,7 @@ class ChurchSimulator {
         };
     }
 
-    // Scheduler-only CHANGE entry point.  It shares CHANGE's complete
-    // context-save/restore implementation while deliberately bypassing a
-    // user-program capability: the configured Namespace itself is the
-    // authority for this local control, and the target is validated before
-    // any outgoing state is written.
+    // Select the next configured Thread through the architectural CHANGE path.
     advanceConfiguredThread() {
         const slots = this.configuredThreadSlots();
         if (!slots.length) return { ok: false, reason: 'No configured Thread context is available' };
@@ -6226,7 +6381,7 @@ class ChurchSimulator {
         return { pc: prevPC, instr: d, desc, pipeline: this._callPipeline(d, label) };
     }
 
-    // CALL and scheduler CHANGE use the same header-load microcode. A single
+    // CALL and Thread CHANGE use the same header-load microcode. A single
     // validated LUMP header establishes the RX code view in CR14 and the
     // L-only c-list view in CR6 simultaneously.
     _installLumpHeaderContext(sourceParsed, nsIndex, nsEntry, hdr) {
@@ -6690,10 +6845,9 @@ class ChurchSimulator {
         // Semantics by destination:
         //   CR12 (thread stack)  system-wide: load GT directly; no per-thread save.
         //   CR13 (interrupt handler)   system-wide: load GT directly; no per-thread save.
-        //   Scheduler: save/restore CR0–CR11 and DR0–DR15 homes, validate
-        //      restored CR0, derive transient CR14, and enter at code word 1.
-        // NIA, flags, SZ, and STO use the protected context word. CR14 is
-        // derived from validated CR0; CR15 remains the live Namespace root.
+        //   Thread CHANGE: preserve CR0–CR11 and DR0–DR15 homes, suspend with
+        //      a two-word CHURCH frame, then resume solely from that frame.
+        // CR15 remains the live Namespace root.
 
         if (d.crDst < 12) {
             this.fault('PRIV_REG', `CHANGE: target CR${d.crDst} is not privileged — CHANGE may only write CR12–CR15`);
@@ -6701,10 +6855,16 @@ class ChurchSimulator {
         }
 
         // CR14/CR15 destinations name the Thread-context CHANGE operation.
-        // This is ISA semantics, never a UI-only scheduler flag.
-        const schedulerSwitch = d.crDst === 14 || d.crDst === 15;
+        // This is the architectural Thread-switch form of CHANGE.
+        const threadSwitch = d.crDst === 14 || d.crDst === 15;
         const srcGT = this.cr[d.crSrc].word0;
-        if (!schedulerSwitch && srcGT === 0) {
+        if (threadSwitch && d.crSrc !== 15 &&
+                !this.parseGT(srcGT).permissions.L) {
+            this.fault('PERM_L',
+                `CHANGE: source CR${d.crSrc} lacks L-permission`);
+            return null;
+        }
+        if (!threadSwitch && srcGT === 0) {
             this.fault('NULL_CAP', `CHANGE: CR${d.crSrc} (source) is NULL`);
             return null;
         }
@@ -6719,7 +6879,7 @@ class ChurchSimulator {
             return null;
         }
         let gt = 0;
-        if (!schedulerSwitch) {
+        if (!threadSwitch) {
             const gtRead = this._capRead(d.crSrc, entry.word0_location, null, `CHANGE CR${d.crDst}`);
             if (!gtRead.ok) {
                 this.fault(gtRead.fault, gtRead.message);
@@ -6814,23 +6974,22 @@ class ChurchSimulator {
             return { pc: this.pc - 1, instr: d, desc };
         }
 
-        // ── Scheduler CHANGE: dormant Thread entry ────────────────────────────────
-        // A Thread serializes only DR0–DR15 and the CR0–CR11 GT homes. CR14,
-        // NIA, flags, SZ, and STO share the protected context word in the
-        // Thread object; CR and DR values live in that same object's homes.
-        if (!schedulerSwitch) this._flushLambdaCache();
+        // ── Thread CHANGE: dormant Thread entry ───────────────────────────────────
+        // DR0–DR15 and CR0–CR11 live in fixed homes. Resume identity, NIA,
+        // flags, and STO come only from the canonical CHURCH frame.
+        if (!threadSwitch) this._flushLambdaCache();
         const targetHeader = this.parseLumpHeader(this.memory[entry.word0_location] >>> 0);
-        // Scheduler admission must use the same complete Thread contract as
+        // Admission must use the complete Thread contract:
         // hardware CHANGE: supported body size, typ=Thread, cc=12, and
         // header-derived non-overlapping Heap/Stack geometry. Do not derive a
         // layout from size/cw alone, or malformed cc=0 images can be activated
         // and have capability homes restored from the wrong tail.
-        const targetLayout = schedulerSwitch
+        const targetLayout = threadSwitch
             ? this._threadLayoutAtBase(entry.word0_location)
             : (targetHeader.valid && targetHeader.typ === 2
                 ? THREAD_DESIGN.layout(targetHeader.lumpSize, targetHeader.cw)
                 : null);
-        if (schedulerSwitch && (!targetLayout || !targetLayout.valid)) {
+        if (threadSwitch && (!targetLayout || !targetLayout.valid)) {
             this.fault('BOUNDS', `CHANGE: Namespace slot ${targetIdx} is not a valid Thread descriptor`);
             return null;
         }
@@ -6878,63 +7037,57 @@ class ChurchSimulator {
                 `CHANGE restore CR5 heap GT for Thread slot ${targetIdx}: ${heapCheck.message}`);
             return null;
         }
-        // CR14 is not CR0: an executing abstraction may deliberately replace
-        // CR0 while retaining its code view.  The Thread object therefore owns
-        // a separate executable identity word.  Old zero images may use CR0
-        // only while first activated from the reset/boot state.
-        let codeGT = this.memory[tBase + THREAD_CODE_IDENTITY_OFFSET] >>> 0;
-        const codeCheck = this.mLoad(codeGT, null, 14);
-        if (!codeCheck.ok) {
-            this.fault(codeCheck.fault,
-                `CHANGE executable identity from Thread slot ${targetIdx}: ${codeCheck.message}`);
-            return null;
-        }
-        const codeParsed = this.parseGT(codeGT);
-        const codeEntry = codeCheck.entry;
-        const codeHeader = this.parseLumpHeader(this.memory[codeEntry.word0_location] >>> 0);
-        if (!codeHeader.valid || codeHeader.cw === 0) {
-            this.fault('BOUNDS',
-                'CHANGE executable identity does not name executable code');
-            return null;
-        }
+        const resume = this._readThreadResumeFrame(tBase, targetLayout, targetIdx);
+        if (!resume) return null;
+        const codeParsed = resume.parsed;
+        const codeEntry = resume.checked.entry;
+        const codeHeader = resume.codeHeader;
         const outSlot = this._currentThreadSlot ?? null;
+        // Complete outgoing geometry, frame-space, and CR14-to-Enter-GT
+        // admission before touching either Thread image. CHANGE is atomic:
+        // a rejected target or source leaves every home word intact.
+        let suspend = null;
+        let outBase = null;
+        let outLayout = null;
+        if (threadSwitch && this.bootComplete && outSlot !== null) {
+            const outEntry = this.readNSEntry(outSlot);
+            if (!outEntry) {
+                this.fault('BOUNDS', `CHANGE: outgoing Thread slot ${outSlot} is unavailable`);
+                return null;
+            }
+            outBase = outEntry.word0_location;
+            outLayout = this._threadLayoutAtBase(outBase);
+            if (!outLayout || !outLayout.valid) {
+                this.fault('BOUNDS', `CHANGE: outgoing Thread slot ${outSlot} has invalid Thread geometry`);
+                return null;
+            }
+            suspend = this._prepareThreadSuspendFrame(outBase, outLayout, outSlot);
+            if (!suspend) return null;
+        }
         this._flushLambdaCache();
         // Before boot, the live CR/DR banks are reset scratch state rather
         // than the selected Thread's restored context.  Manual image browsing
         // must not overwrite a valid saved Thread with those zero registers.
         // Reset-bank state preceding boot is not a Thread context and is never
         // serialized.  This is an architectural boot-state rule.
-        if (schedulerSwitch && this.bootComplete && outSlot !== null) {
-            const outEntry = this.readNSEntry(outSlot);
-            if (outEntry) {
-                const outBase = outEntry.word0_location;
+        if (threadSwitch && this.bootComplete && outSlot !== null) {
+            if (outBase !== null) {
                 for (let i = 0; i < 16; i++) {
                     this._writeRuntimeWord(outBase + 1 + i, this.dr[i]);
-                }
-                const outLayout = this._threadLayoutAtBase(outBase);
-                if (!outLayout) {
-                    this.fault('BOUNDS', `NEXT_THREAD: outgoing Namespace slot ${outSlot} has invalid Thread geometry`);
-                    return null;
                 }
                 for (let i = 0; i < 12; i++) {
                     this._writeRuntimeWord(
                         outBase + outLayout.capsStart + i,
                         this.cr[i].word0);
                 }
-                // A live activated context always has CR14.  Preserve the
-                // explicitly seeded dormant identity if a legacy host has
-                // selected CR0 by hand without performing its initial
-                // activation (rather than destroying it with reset scratch).
-                const liveCodeGT = this.cr[14].word0 >>> 0;
-                this._writeRuntimeWord(outBase + THREAD_CODE_IDENTITY_OFFSET,
-                    liveCodeGT && !ChurchSimulator.isNullGT(liveCodeGT)
-                        ? liveCodeGT
-                        : (this.memory[outBase + THREAD_CODE_IDENTITY_OFFSET] >>> 0));
-                const currentFrame = this.callStack[this.callStack.length - 1];
+                const frameWord = this._packFrameWord(
+                    this.pc, 1, suspend.savedSTO);
+                this._writeRuntimeWord(outBase + suspend.savedSTO - 1, suspend.enterGT);
+                this._writeRuntimeWord(outBase + suspend.savedSTO, frameWord);
                 this._writeRuntimeWord(
                     outBase + THREAD_STO_OFFSET,
                     this._packProtectedIndicator(
-                        this.sto, currentFrame ? currentFrame.sz : 0, this.flags));
+                        suspend.savedSTO - 2, 1, this.flags, 0));
             }
         }
 
@@ -6957,14 +7110,13 @@ class ChurchSimulator {
         for (let i = 0; i < 16; i++) {
             this.dr[i] = this.memory[tBase + 1 + i] >>> 0;
         }
-        // STO is protected per-Thread state at +17. Host-only frame objects,
-        // flags, and Lambda cache state remain transient.
-        this.flags = { N: false, Z: false, C: false, V: false };
-        const restoredIndicator = this._unpackProtectedIndicator(
-            this.memory[tBase + THREAD_STO_OFFSET] >>> 0);
-        this.sto = restoredIndicator.sto;
-        this.flags = restoredIndicator.flags;
-        this.pc = restoredIndicator.nia;
+        // Pop the canonical CHURCH frame; it is the sole resume source.
+        this.sto = resume.frame.savedSTO;
+        this.flags = resume.frame.flags;
+        this.pc = resume.frame.returnPC;
+        this._writeRuntimeWord(
+            tBase + THREAD_STO_OFFSET,
+            this._packProtectedIndicator(this.sto, 1, this.flags, 0));
         this.callStack = [];
         this.lambdaActive = false;
         this.lambdaReturnPC = 0;
@@ -6980,9 +7132,9 @@ class ChurchSimulator {
         const headerContext = this._installLumpHeaderContext(
             codeParsed, codeParsed.index, codeEntry, codeHeader);
         this._currentThreadSlot = targetIdx;
-        const desc = `CHANGE CR${d.crDst} (Thread object restored for slot ${targetIdx}; ${headerContext.desc}; resuming at NIA 0x${restoredIndicator.nia.toString(16).toUpperCase()})`;
+        const desc = `CHANGE CR${d.crDst} (Thread object restored for slot ${targetIdx}; ${headerContext.desc}; CHURCH frame NIA 0x${resume.frame.returnPC.toString(16).toUpperCase()})`;
         this.output += desc + '\n';
-        this.pc = restoredIndicator.nia;
+        this.pc = resume.frame.returnPC;
         this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_PUSH, 0);
         this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_CR12, this.cr[12].word0 >>> 0);
         this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_CR5,  this.cr[5].word0  >>> 0);

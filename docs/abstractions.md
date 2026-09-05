@@ -111,12 +111,14 @@ The body of a Namespace lump is **not** a code section or a GT c-list — it is 
 
 The Thread lump holds the live execution state of a suspended thread — capability registers (CR0–CR11), a LIFO call stack, a heap, and data registers (DR0–DR15). It is never executed. PC never enters the Thread lump. CHANGE saves and restores it atomically.
 
-The `cw` (code word count) field is **reinterpreted** as `sw` (stack words) because a Thread carries no code. The `cc` field is repurposed as `heapWords`.
+The `cw` (code word count) field is **reinterpreted** as `sw` (stack words)
+because a Thread carries no code. The `cc` field is fixed at 12 for the
+persisted CR0–CR11 homes.
 
 ```
 31      27 26    23 22                10 9   8 7              0
 +──────────+────────+──────────────────+──────+────────────────+
-│ 0x1F [5] │ n-6[4] │      sw [13]     │10[2] │  heapWords[8]  │
+│ 0x1F [5] │ n-6[4] │      sw [13]     │10[2] │     cc=12      │
 +──────────+────────+──────────────────+──────+────────────────+
 ```
 
@@ -126,31 +128,35 @@ The `cw` (code word count) field is **reinterpreted** as `sw` (stack words) beca
 | n-6      | IDE     | From ZIP `uncompressed_size`: same derivation as Namespace. Determines total thread lump size. |
 | sw       | IDE     | **Stack words** — the `cw` field reinterpreted for `typ=10`. IDE sets the LIFO stack depth at thread creation. |
 | typ      | IDE     | Always `10` (clist-only) — Mint does not look for a code section |
-| heapWords| IDE     | **Heap words** — the `cc` field repurposed. IDE sets max heap depth. The caps zone (CR0–CR11, 12 words) is architecture-fixed; `heapWords` controls Zone ④. |
+| cc       | HW spec | **12 capability homes** — CR0–CR11 occupy the size-derived tail of the Thread |
 
 **ZIP size → header:**
 ```
 MyApp.thread.zip uncompressed_size = 1 024 bytes  →  n = 8  →  n-6 = 2
 ```
 
-**Memory zones** (all offsets from lump base, IDE-parameterised via `sw` and `heapWords`):
+**Memory zones** (all offsets from lump base, with Stack size selected by `sw`):
 
 ```
-Word 0:          Header (typ=10, sw, heapWords)       [never executed]
+Word 0:          Header (typ=10, sw, cc=12)           [never executed]
 Words 1..16:     ⑤ Data Registers DR0–DR15            [16 words, fixed]
-Words 17..16+heapWords:   ④ Heap ↑                   [IDE: heapWords]
-Words 18+heapWords..sp_max: ③ Freespace              [zero at creation]
-Words sp_max+1..lumpSize-13: ② LIFO Stack ↓          [IDE: sw words]
+Word 17:          Protected FLAGS/NIA/SZ/STO           [machine-only]
+Words 18..stackStart-1: ④ Heap ↑                       [derived remainder]
+Words stackStart..lumpSize-13: ② LIFO Stack ↓          [sw words]
 Words lumpSize-12..lumpSize-1: ① Capabilities CR0–CR11 [12 words, fixed]
 ```
 
 **Example header words:**
 ```
-Boot.Thread (n-6=2, sw=32, heapWords=64, typ=10):  0xF900_8240
-Thread      (n-6=2, sw=32, heapWords=64, typ=10):  0xF900_8240
+Boot.Thread (n-6=2, sw=32, cc=12, typ=10):  0xF900_820C
+Thread      (n-6=2, sw=32, cc=12, typ=10):  0xF900_820C
 ```
 
-The IDE populates Zone ① (the capabilities tail) at compile time with the thread's birth GTs — CR0–CR11 initial values. All other zones are all-zero in the distributed binary.
+The IDE populates Zone ① (the capabilities tail) with the Thread's birth GTs.
+Heap starts at +18. A dormant Thread's private Stack contains a canonical
+two-word CHURCH frame (current Enter GT plus packed NIA/FLAGS/SZ/STO) for first
+resume; there is no executable-identity word in the Thread body. Resumption
+revalidates that frame as RETURN does and reconstructs CR6/CR14.
 
 ---
 
@@ -202,7 +208,7 @@ The IDE pre-populates every c-list row with either an Inform GT (resident depend
 | Type      | typ | cw field meaning | cc field meaning | ZIP → n derivation |
 |-----------|-----|-----------------|------------------|--------------------|
 | Namespace | 10  | always 0 (no code) | Locator count  | `n = log₂(size/4)`; `n-6` in [26:23] |
-| Thread    | 10  | `sw` — stack words (IDE) | `heapWords` (IDE) | same |
+| Thread    | 10  | `sw` — stack words (IDE) | 12 persisted CR homes | same |
 | Function  | 00  | `cw` — code word count (IDE) | c-list rows (IDE) | same |
 
 All three use `magic=0x1F`, power-of-2 lump sizes (minimum 64 words), and the same CRC-16/CCITT integrity check in the NS entry. The ZIP `uncompressed_size` field is the single authoritative source for lump size — Mint cross-checks the header word's `n-6` against the physical binary length.

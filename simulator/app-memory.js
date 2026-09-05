@@ -2167,11 +2167,10 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
     const threadCapsEnd = TL.lumpSize - 1;
     const threadStackEnd = threadCapsStart - 1;
     const threadStackStart = threadStackEnd - TL.stackWords + 1;
-    const threadCodeIdentityOffset = TL.codeIdentityOffset;
     const threadHeapStart = TL.heapStart;
     const threadHeapEnd = threadStackStart - 1;
     const threadHeapWords = Math.max(0, threadHeapEnd - threadHeapStart + 1);
-    const threadHeapFormula = 'HeapWords = 2^((n−6)+6) − cw − 31';
+    const threadHeapFormula = 'HeapWords = 2^((n−6)+6) − cw − 30';
 
     // ── Sticky header block (title + lump header) ─────────────────────────
     const headerWord = TL.headerWord;
@@ -2215,17 +2214,7 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
     html += '</tbody></table>';
     html += secBody();
 
-    // ── Executable identity (+18) ─────────────────────────────────────────
-    const codeIdentityWord = sim.memory[slotBase + threadCodeIdentityOffset] >>> 0;
-    html += secHdr('◇', 'Executable Code Identity',
-        `1 Thread-owned executable GT · offset +${threadCodeIdentityOffset} · restored into CR14 independently of CR0`,
-        '#38bdf8', 'thread-zone-code');
-    html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>Offset</th><th>Addr</th><th>Code GT</th></tr></thead><tbody>';
-    html += `<tr><td class="thread-offset-cell" style="color:#38bdf8;">+${threadCodeIdentityOffset}</td><td class="thread-address-cell">${addrOf(threadCodeIdentityOffset)}</td><td>${hexOf(codeIdentityWord)}</td></tr>`;
-    html += '</tbody></table>';
-    html += secBody();
-
-    // ── Zone ④: Heap (starts after code identity) ─────────────────────────
+    // ── Zone ④: Heap ───────────────────────────────────────────────────────
     let heapNonZero = 0;
     for (let i = threadHeapStart; i <= threadHeapEnd; i++) {
         if (sim.memory[slotBase + i]) heapNonZero++;

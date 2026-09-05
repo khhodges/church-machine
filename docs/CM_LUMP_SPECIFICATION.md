@@ -2533,7 +2533,7 @@ empty-stack sentinel at the top of Zone ②); the first word pushed lands at
 ```
 CALL frame (SZ=1 — 2 words):      STO -= 2 after push
   STO+0:  Frame word: FLAGS[4] | return_PC[15] | prior_SZ[1] | prev_STO[12]
-  STO-1:  E-GT Word 0 of the callee  (Golden Token, Church-side)
+  STO-1:  Normalized E-GT Word 0 of the caller/suspended abstraction
 
 LAMBDA frame (SZ=0 — 1 word):     STO -= 1 after push
   STO+0:  Frame word: SZ[1]=0 | lambda_arg[15] | prev_STO[16]
@@ -2542,6 +2542,10 @@ LAMBDA frame (SZ=0 — 1 word):     STO -= 1 after push
 The RETURN instruction pops the frame, restores STO to the saved
 `prev_STO` value, and jumps to `return_PC` in the caller's code section.
 No kernel involvement.
+
+CHURCH Thread suspension uses this same two-word format and placement. Resume
+applies RETURN-equivalent validation to the saved Enter GT before reconstructing
+CR6/CR14 and restoring the packed state.
 
 ### Stack Depth and Hardware Bounds
 
@@ -2596,7 +2600,7 @@ the simulator writes 0 to DR0 unconditionally after every instruction.
 
 ---
 
-## CHANGE Context Save
+## CHANGE Context Save and CHURCH Suspension
 
 On every scheduler **CHANGE**, hardware saves and restores only the ordinary
 software Thread homes.
@@ -2608,6 +2612,7 @@ software Thread homes.
 | **CR0–CR11** | GT Word 0 homes at +capsStart…+(capsStart+11) |
 | **DR0–DR15** | Initial/live data-register homes at +1…+16 |
 | **FLAGS/SZ/STO** | Protected indicator at +17 |
+| **Executing abstraction** | Canonical two-word CHURCH frame on the private Stack |
 
 **Never touched by CHANGE (system-wide):**
 
@@ -2616,15 +2621,23 @@ software Thread homes.
 | **CR12** | Thread stack (Priv zone, system-wide) — shared across all threads; cannot be written by CHANGE |
 | **CR13** | Interrupt handler (Priv zone, system-wide) — one handler for the whole machine; CHANGE must not re-point it |
 | **CR15** | Namespace root |
-| **CR14** | Dynamically reconstructed from the active abstraction header; never persisted |
-| **NIA / M state** | Entry begins at code word 1; prior NIA and M are not persisted |
+| **CR14** | Reconstructed from the validated Enter GT in the CHURCH frame; never given a separate Thread-body home |
+| **NIA / FLAGS** | Persisted in the canonical packed frame, not in Heap or a host-side cache |
 
 CR0–CR11 (Zone ①, the programmer-accessible capability registers) are
 persisted at `capsStart+N`, where `capsStart=lumpSize−12`. On restore,
 CHANGE reads the incoming Thread's GT homes to reload CR0–CR11.
-After restore, CHANGE validates CR0 through the Namespace gate, constructs an
-R+X CR14 with base and limit from the selected code LUMP header, and sets NIA
-to the raw LUMP byte base + 4. This transparent entry pushes no CALL frame.
+Before handoff, CHURCH pushes the current abstraction's normalized Enter GT and
+the packed NIA/FLAGS/SZ/STO word onto the outgoing Thread's private stack using
+the ordinary two-word downward-stack rules. After the ordinary homes are
+restored, resumption consumes that frame through RETURN-equivalent Namespace
+validation and reconstructs CR6 and CR14 from the saved Enter GT. CR0 remains
+an ordinary mutable capability register and is not a resume-code alias.
+
+There is no executable-identity field between protected context and Heap:
+Thread word +18 is the first Heap word. Dormant Thread images are born with a
+valid initial CHURCH frame; an absent, malformed, or stale frame faults rather
+than being reinterpreted from Heap.
 
 ---
 
@@ -2676,7 +2689,8 @@ MyApp.thread.zip
                            Words 1..16:   Zone ⑤ — DR0..DR15 (all zero at creation)
                             Word 17:       Protected STO
                             Words 18..stackStart-1: Zone ④ — Heap
-                            Words stackStart..capsStart-1: Zone ② — LIFO Stack
+                             Words stackStart..capsStart-1: Zone ② — LIFO Stack
+                               includes initial canonical two-word CHURCH frame
                             Words capsStart..lumpSize-1: Zone ① — CR0..CR11 GT homes
 ```
 
@@ -2693,9 +2707,10 @@ that the Thread will hold in CR0..CR11 on first context-load. These are the
 thread's birth capabilities — whatever the application requires. The
 architecture does not prescribe which system GTs go in which CR slot;
 system GTs (Scheduler, Mint, NS write authority, etc.) live in c-list slots
-and are LOADed into general-purpose CRs as needed at runtime. All other
-mutable zones are normally zero in a newly-created image; runtime activity
-populates Stack, Heap, DR, and the protected indicator. A Thread has no
+and are LOADed into general-purpose CRs as needed at runtime. Heap is normally
+zero in a newly-created image. The Stack contains the canonical initial CHURCH
+frame required for first resume; runtime activity subsequently updates Stack,
+Heap, DR, and the protected indicator. A Thread has no
 Freespace zone: Mint validates the header-derived geometry rather than
 applying function-lump Freespace rules to any part of the Thread body.
 

@@ -92,26 +92,45 @@ try:
     from hardware.hw_types import BOOT_ABSTR_NS_SLOT
 except ImportError:
     BOOT_ABSTR_NS_SLOT = 6   # fallback: hardware.hw_types not on path (standalone runner)
-try:
-    from hardware.thread_design import (
-        THREAD_CAP_WORDS,
-        THREAD_CAPS_OFFSET,
-        THREAD_CODE_IDENTITY_OFFSET,
-        THREAD_MIN_WORDS,
-        THREAD_STO_OFFSET,
-        THREAD_SUPPORTED_BODY_WORDS,
-        thread_layout,
-    )
-except ImportError:
-    from thread_design import (
-        THREAD_CAP_WORDS,
-        THREAD_CAPS_OFFSET,
-        THREAD_CODE_IDENTITY_OFFSET,
-        THREAD_MIN_WORDS,
-        THREAD_STO_OFFSET,
-        THREAD_SUPPORTED_BODY_WORDS,
-        thread_layout,
-    )
+with open(os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                       "shared", "thread_design.json"), encoding="utf-8") as _thread_design_file:
+    _THREAD_DESIGN = json.load(_thread_design_file)
+THREAD_CAP_WORDS = _THREAD_DESIGN["capabilityHomes"]["words"]
+THREAD_CAPS_OFFSET = (
+    _THREAD_DESIGN["canonicalBodyWords"] - THREAD_CAP_WORDS
+)
+THREAD_MIN_WORDS = _THREAD_DESIGN["canonicalBodyWords"]
+THREAD_STO_OFFSET = _THREAD_DESIGN["protectedStoOffset"]
+THREAD_HEAP_OFFSET = _THREAD_DESIGN["heapOffset"]
+THREAD_SUPPORTED_BODY_WORDS = tuple(_THREAD_DESIGN["supportedBodyWords"])
+
+
+def thread_layout(lump_size, stack_words):
+    """Derive the normative Thread zones from the shared contract."""
+    caps_start = lump_size - THREAD_CAP_WORDS
+    caps_end = lump_size - 1
+    stack_end = caps_start - 1
+    stack_start = caps_start - stack_words
+    heap_start = THREAD_HEAP_OFFSET
+    heap_end = stack_start - 1
+    heap_words = max(0, heap_end - heap_start + 1)
+    return {
+        "valid": (lump_size in THREAD_SUPPORTED_BODY_WORDS
+                  and stack_words > 0 and heap_words > 0
+                  and heap_end + 1 == stack_start
+                  and caps_end == lump_size - 1),
+        "lump_size": lump_size,
+        "sto_offset": THREAD_STO_OFFSET,
+        "heap_start": heap_start,
+        "heap_end": heap_end,
+        "heap_words": heap_words,
+        "stack_start": stack_start,
+        "stack_end": stack_end,
+        "stack_words": stack_words,
+        "caps_start": caps_start,
+        "caps_end": caps_end,
+        "caps_words": THREAD_CAP_WORDS,
+    }
 
 # Mandatory NS slots — every valid boot image must have a non-zero entry here.
 # Minimal boot trio: NS root (0), Thread (1), SelfTest/boot-entry (6).
@@ -121,7 +140,10 @@ _MANDATORY_NS_SLOTS = (0, 1, 2, 3, 4, 5, BOOT_ABSTR_NS_SLOT, CAPABILITY_TEST_NS_
 
 # Format-version tag written to mem[NS_TABLE_BASE - 1] so loadBootImage()
 # can reject stale binaries.
-BOOT_IMAGE_FORMAT_TAG = 0xB0072862  # Task #2862: resident NS Word3 is cache_token32; must match simulator.js
+# Thread suspension ABI version. Images with the retired +18 executable-
+# identity layout carry an older tag and are rejected before any Thread words
+# are interpreted. Must match simulator.js.
+BOOT_IMAGE_FORMAT_TAG = 0xB0073224
 
 # Wukong's physical-memory contract is shared with the hardware ABI so the
 # image projection cannot drift from the synthesized board limits.
@@ -619,9 +641,11 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
                 "the boot image is invalid and would cause a BOOT fault at runtime"
             )
 
-    # Each Thread owns an explicit executable identity at +18.  It is not a
-    # UI hint or a CR0 alias: reject stale/null/non-executable identities
-    # before an image can be served or installed.
+    # A dormant Thread resumes exclusively through the canonical two-word
+    # CHURCH frame at STO+1/STO+2: Enter E-GT followed by packed NIA/flags.
+    # Retired +18-layout images are rejected by BOOT_IMAGE_FORMAT_TAG above;
+    # Heap contents are unconstrained and must never be used as a version
+    # heuristic.
     thread_count = words[tag_idx - 3] if tag_idx >= 3 else 0
     ns_capacity = ns_table_reserve // NS_ENTRY_WORDS
     if not 1 <= thread_count <= MAX_THREAD_COUNT:
@@ -653,19 +677,43 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
         size = 1 << (((hdr >> 23) & 0xF) + 6)
         if ((hdr >> 27) & 0x1F) != 0x1F or ((hdr >> 8) & 3) != 2 or thread_loc + size > n_words:
             raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has invalid header")
-        identity = words[thread_loc + THREAD_CODE_IDENTITY_OFFSET]
+        layout = thread_layout(size, (hdr >> 10) & 0x1FFF)
+        if not layout["valid"]:
+            raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has invalid geometry")
+        protected = words[thread_loc + THREAD_STO_OFFSET]
+        resume_sto = protected & 0xFFF
+        if (((protected >> 12) & 1) != 1
+                or resume_sto < layout["stack_start"] - 1
+                or resume_sto + 2 > layout["stack_end"]):
+            raise ValueError(
+                f"validate_boot_image: Thread slot {thread_slot} has invalid CHURCH frame STO")
+        identity = words[thread_loc + resume_sto + 1]
+        packed_resume = words[thread_loc + resume_sto + 2]
         gt_type = (identity >> gt_type_lsb) & _field_mask(gt_fields["gt_type"])
         code_slot = (identity >> gt_slot_lsb) & _field_mask(gt_fields["slot_id"])
         code_seq = (identity >> gt_seq_lsb) & _field_mask(gt_fields["gt_seq"])
         code_ns = n_words - (code_slot + 1) * NS_ENTRY_WORDS
         if (identity == 0 or gt_type != 1 or code_ns < 0 or code_ns + 1 >= n_words):
-            raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has stale or invalid executable identity")
+            raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has stale or invalid CHURCH Enter identity")
+        perm_lsb = field_lsb(gt_fields["perm"])
+        perm = (identity >> perm_lsb) & _field_mask(gt_fields["perm"])
+        dom = (identity >> field_lsb(gt_fields["dom"])) & _field_mask(gt_fields["dom"])
+        if dom != 1 or perm != 0b100:
+            raise ValueError(f"validate_boot_image: Thread slot {thread_slot} CHURCH frame does not contain an Enter E-GT")
         code_auth = words[code_ns + 1]
         if code_seq != _ns_word1_get(code_auth, "gt_seq"):
-            raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has stale executable identity")
+            raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has stale CHURCH Enter identity")
         code_loc = words[code_ns]
-        if code_loc >= n_words or ((words[code_loc] >> 27) & 0x1F) != 0x1F or ((words[code_loc] >> 10) & 0x1FFF) == 0:
-            raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has non-executable code identity")
+        code_cw = ((words[code_loc] >> 10) & 0x1FFF) if code_loc < n_words else 0
+        resume_nia = (packed_resume >> 13) & 0x7FFF
+        if (code_loc >= n_words or ((words[code_loc] >> 27) & 0x1F) != 0x1F or code_cw == 0 or resume_nia >= code_cw):
+            raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has non-executable CHURCH Enter identity")
+        saved_sto = packed_resume & 0xFFF
+        if ((packed_resume >> 12) & 1) != 1 or (
+                saved_sto < layout["stack_start"] + 1
+                or saved_sto > layout["stack_end"]
+                or resume_sto != saved_sto - 2):
+            raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has malformed CHURCH resume frame")
 
     # Do not infer Inform/Outform from any NS word.  State belongs exclusively
     # to access GTs, which are outside this raw table validator.
@@ -1888,13 +1936,16 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             f"{', '.join(map(str, THREAD_SUPPORTED_BODY_WORDS))}")
     mem[thread_loc] = pack_lump_header(
         _ns_n_minus_6(thread_size), thread_stack_words, THREAD_CAP_WORDS, 2)
-    mem[thread_loc + THREAD_STO_OFFSET] = layout["stack_end"]
     _boot_entry_ns_base = total - (boot_entry_slot + 1) * NS_ENTRY_WORDS
     _boot_entry_seq = _ns_word1_get(mem[_boot_entry_ns_base + 1], "gt_seq")
-    mem[thread_loc + layout["caps_start"]] = create_gt(
-        _boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
-    mem[thread_loc + THREAD_CODE_IDENTITY_OFFSET] = create_gt(
-        _boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
+    _entry_gt = create_gt(_boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
+    _resume_sto = layout["stack_end"] - 2
+    mem[thread_loc + THREAD_STO_OFFSET] = (1 << 12) | _resume_sto
+    mem[thread_loc + layout["caps_start"]] = _entry_gt
+    mem[thread_loc + _resume_sto + 1] = _entry_gt
+    mem[thread_loc + _resume_sto + 2] = (
+        (1 << 12) | layout["stack_end"]
+    )
 
     # ----- Generated Thread bodies (Thread#2 .. Thread#N) ----------------
     # Their Namespace descriptors were emitted above.  Initialise each body
@@ -1903,11 +1954,12 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     for _thread_loc in extra_thread_locs:
         mem[_thread_loc] = pack_lump_header(
             _ns_n_minus_6(thread_size), thread_stack_words, THREAD_CAP_WORDS, 2)
-        mem[_thread_loc + THREAD_STO_OFFSET] = layout["stack_end"]
-        mem[_thread_loc + layout["caps_start"]] = create_gt(
-            _boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
-        mem[_thread_loc + THREAD_CODE_IDENTITY_OFFSET] = create_gt(
-            _boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
+        mem[_thread_loc + THREAD_STO_OFFSET] = (1 << 12) | _resume_sto
+        mem[_thread_loc + layout["caps_start"]] = _entry_gt
+        mem[_thread_loc + _resume_sto + 1] = _entry_gt
+        mem[_thread_loc + _resume_sto + 2] = (
+            (1 << 12) | layout["stack_end"]
+        )
 
     # Memory-manager GT at c-list[0]: R|W capability over NS slot 0 (full namespace).
     mem_mgr_gt = create_gt(0, 0, {"R":1, "W":1}, 1)

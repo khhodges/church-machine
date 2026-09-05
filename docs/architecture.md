@@ -993,6 +993,29 @@ RETURN:
 3. cLoad re-runs lump split on caller's lump header → re-derives CR6 (c-list) and CR14 (code)
 4. Restore PC from NIA (Word 1) and machine indicators from Word 1
 
+### Thread suspension uses the same Church frame
+
+The architectural Thread handoff path does not serialize executable identity in
+a dedicated Thread-body word. In particular, offset `+18` is the first Heap
+word, not an executable GT or CR14 home. Suspending a Thread through CHURCH
+pushes the same canonical two-word context used by CALL: the normalized Church
+Enter GT identifying the current abstraction, followed by the packed
+NIA/FLAGS/SZ/STO frame word. This is a use of the existing context-switch path,
+not an additional opcode or hidden ISA field.
+
+Resumption is RETURN-equivalent. Before any incoming execution state is
+exposed, the saved Enter GT is revalidated through the ordinary Namespace gate
+and used to reconstruct the L-only CR6 c-list view and X-only CR14 code view.
+NIA, flags, and stack state are restored from the packed word. A stale,
+malformed, or missing frame faults; it is never replaced by CR0, a host-side
+map, or an identity cache.
+
+The frame supplements rather than replaces the established Thread homes:
+DR0–DR15 remain at offsets `+1…+16`, CR0–CR11 remain in the twelve
+size-derived tail homes, protected context remains at `+17`, and Heap remains
+`+18…stackStart−1`. This matters when CR0 is used normally and no longer names
+the abstraction currently executing in CR14.
+
 ### Method Dispatch Modes
 
 CALL supports three method dispatch modes, determined by the instruction's `imm` and `CRd` fields:

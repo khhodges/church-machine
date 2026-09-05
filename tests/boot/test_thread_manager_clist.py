@@ -32,6 +32,7 @@ from hardware.hw_types import (  # noqa: E402
     make_gt,
 )
 from server.boot_image import (  # noqa: E402
+    BOOT_IMAGE_FORMAT_TAG,
     generate_boot_image,
     NS_ENTRY_WORDS,
     NS_TABLE_RESERVE,
@@ -148,7 +149,7 @@ def _thread_manager_lump_base(boot_words_list):
     assert 0 <= tag_idx < total, (
         f"boot image too small for NS_TABLE_RESERVE={NS_TABLE_RESERVE}: total={total}"
     )
-    assert boot_words_list[tag_idx] == 0xB0070563, (
+    assert boot_words_list[tag_idx] == BOOT_IMAGE_FORMAT_TAG, (
         f"BOOT_IMAGE_FORMAT_TAG not found at expected index {tag_idx}; "
         f"got 0x{boot_words_list[tag_idx]:08X}"
     )

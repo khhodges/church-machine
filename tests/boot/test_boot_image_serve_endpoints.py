@@ -116,6 +116,24 @@ def test_binary_rejects_untrusted_thread_count(client, temp_image_path, count):
     regenerate.assert_not_called()
 
 
+def test_validator_allows_enter_shaped_word_at_heap_start():
+    words = list(struct.unpack("<16384I", _make_valid_image()))
+    thread_ns_base = 16384 - (2 * 4)
+    thread_loc = words[thread_ns_base]
+    words[thread_loc + 18] = 0x4A000006
+    image = struct.pack("<16384I", *words)
+    validate_boot_image(image, 16384)
+
+
+def test_validator_rejects_retired_thread_abi_by_format_tag():
+    words = list(struct.unpack("<16384I", _make_valid_image()))
+    ns_base = 16384 - NS_TABLE_RESERVE
+    words[ns_base - 1] = 0xB0072862
+    stale = struct.pack("<16384I", *words)
+    with pytest.raises(ValueError, match="BOOT_IMAGE_FORMAT_TAG"):
+        validate_boot_image(stale, 16384)
+
+
 def _write_retired_tail_relative_thread_image(path):
     stale = bytearray(_make_valid_image())
     total = len(stale) // 4
@@ -188,24 +206,19 @@ def test_binary_valid_image_returns_200(client, temp_image_path):
     )
 
 
-def test_binary_regenerates_retired_tail_relative_thread_boundary(
+def test_binary_rejects_retired_tail_relative_thread_boundary(
         client, temp_image_path):
     stale_bytes = _write_retired_tail_relative_thread_image(temp_image_path)
     valid_bytes = _make_valid_image()
 
-    def regenerate_image():
-        with open(temp_image_path, "wb") as image_file:
-            image_file.write(valid_bytes)
-        return valid_bytes, None
-
     with patch("server.app._auto_regen_boot_image",
-               side_effect=regenerate_image) as regenerate:
+               return_value=(valid_bytes, None)) as regenerate:
         resp = client.get("/api/boot-image/binary")
 
     assert stale_bytes != valid_bytes
-    regenerate.assert_called_once_with()
-    assert resp.status_code == 200
-    assert resp.data == valid_bytes
+    regenerate.assert_not_called()
+    assert resp.status_code == 500
+    assert "CHURCH frame" in resp.get_json()["error"]
 
 
 def test_binary_regenerates_when_authoritative_ns_state_is_newer(

@@ -1,6 +1,6 @@
 'use strict';
 
-// Round-robin scheduler regression: the UI operation must use the generated
+// Round-robin Thread regression: the UI operation must use the generated
 // Namespace order, wrap exactly once, preserve private state, and fail before
 // mutating the current context when a target descriptor is invalid.
 const assert = require('assert');
@@ -34,8 +34,19 @@ const image = generated.stdout.buffer.slice(
     generated.stdout.byteOffset + generated.stdout.byteLength);
 assert.strictEqual(committed.loadBootImage(image), true,
     `committed image must load: ${committed.lastBootImageError || 'unknown error'}`);
+const retiredIdentityImage = image.slice(0);
+const retiredIdentityWords = new Uint32Array(retiredIdentityImage);
+const retiredTagIndex = retiredIdentityWords.lastIndexOf(0xB0073224);
+assert(retiredTagIndex >= 0, 'current Thread ABI tag is present');
+retiredIdentityWords[retiredTagIndex] = 0xB0072862;
+const retiredIdentitySim = new ChurchSimulator();
+assert.strictEqual(retiredIdentitySim.loadBootImage(retiredIdentityImage), false,
+    'boot loader rejects the retired Thread ABI format tag');
+assert(retiredIdentitySim.lastBootImageError.includes('BOOT_IMAGE_FORMAT_TAG'),
+    'retired Thread ABI rejection requests regeneration');
 committed.bootComplete = true;
 committed._currentThreadSlot = 1;
+committed.cr[15].word0 = 0x1A000000;
 assert.deepStrictEqual(committed.configuredThreadSlots(), [1, 11, 12],
     'committed image exposes all three Thread contexts');
 const committedBases = [1, 11, 12].map(slot => committed.readNSEntry(slot).word0_location);
@@ -43,7 +54,7 @@ const entryLayouts = committedBases.map(base => committed._threadLayoutAtBase(ba
 assert(entryLayouts.every(layout => layout && layout.valid),
     'committed Thread headers expose valid derived geometry');
 assert(entryLayouts.every(layout => layout.lumpSize === 512),
-    'scheduler fixture exercises supported non-256-word Threads');
+    'Thread fixture exercises supported non-256-word Threads');
 assert(committedBases[0] + entryLayouts[0].lumpSize <= committedBases[1] &&
        committedBases[1] + entryLayouts[1].lumpSize <= committedBases[2],
     'committed Thread bodies are non-overlapping at their derived sizes');
@@ -51,6 +62,12 @@ const entryWords = [1, 11, 12].map((slot, i) =>
     committed.memory[committedBases[i] + entryLayouts[i].capsStart] >>> 0);
 const initialEntry = committed.readNSEntry(entryWords[0] & 0xFFFF);
 committed._writeCR(0, entryWords[0], initialEntry);
+const initialHeader = committed.parseLumpHeader(
+    committed.memory[initialEntry.word0_location] >>> 0);
+committed._installLumpHeaderContext(
+    committed.parseGT(entryWords[0]), entryWords[0] & 0xFFFF,
+    initialEntry, initialHeader);
+committed.sto = committed._readProtectedSto(committedBases[0]);
 const thread1InitialDRs = Array.from(
     {length: 16}, (_, i) => (0xA1001000 + i) >>> 0);
 const thread2InitialDRs = Array.from(
@@ -68,7 +85,7 @@ const targetCapsBefore = committed.memory.slice(
 const cr15Before = {...committed.cr[15]};
 committed.halted = true;
 
-// Simulator scheduler admission must reject exactly the malformed Thread
+// Simulator Thread admission must reject exactly the malformed Thread
 // geometries rejected by hardware CHANGE preflight, before saving live state.
 const targetHeaderOriginal = committed.memory[committedBases[1]] >>> 0;
 const malformedThreadHeaders = [
@@ -82,7 +99,7 @@ for (const malformed of malformedThreadHeaders) {
     const drBeforeReject = [...committed.dr];
     const rejected = committed.advanceConfiguredThread();
     assert.strictEqual(rejected.ok, false,
-        `${malformed.name} Thread is rejected by scheduler admission`);
+        `${malformed.name} Thread is rejected by CHANGE admission`);
     assert.deepStrictEqual(committed.dr, drBeforeReject,
         `${malformed.name} rejection occurs before outgoing context save`);
     assert.strictEqual(committed._currentThreadSlot, 1,
@@ -152,7 +169,7 @@ for (let i = 0; i < 16; i++) {
 }
 committed.pc = 0x2A;
 committed.flags = {N: true, Z: false, C: true, V: false};
-committed.sto = 0xA5;
+committed.sto = entryLayouts[1].stackEnd - 4;
 const suspendedThread2 = {
     crWords: committed.cr.slice(0, 12).map(reg => reg.word0 >>> 0),
     dr: [...committed.dr],
@@ -172,8 +189,10 @@ assert.deepStrictEqual(dormantThread2Row.indicatorFlags, suspendedThread2.flags,
     'the dormant Thread card reads FLAGS from its own CHANGE-saved Thread object');
 const thread2Indicator = committed._unpackProtectedIndicator(
     committed.memory[committedBases[1] + 17] >>> 0);
-assert.strictEqual(thread2Indicator.nia, 0x2A,
-    'CHANGE writes the outgoing NIA into the Thread object protected context word');
+const thread2ResumeFrame = committed._unpackFrameWord(
+    committed.memory[committedBases[1] + thread2Indicator.sto + 2] >>> 0);
+assert.strictEqual(thread2ResumeFrame.returnPC, 0x2A,
+    'CHANGE writes the outgoing NIA into the canonical CHURCH frame');
 assert.strictEqual(committed.advanceConfiguredThread().slot, 1);
 assert.strictEqual(committed.cr[0].word0, entryWords[0],
     'committed image restores Thread.1 CR0 entry authority after wraparound');
@@ -234,9 +253,8 @@ assert.strictEqual(selectedRun.steps, 1,
 assert.strictEqual(committed.cr[12].word1, committedBases[1],
     'Run keeps the selected Thread installed as the live context');
 
-// CapabilityTest's first LOAD is permitted to replace CR0 with SelfTest while
-// execution remains in CapabilityTest.  The separate +18 code word must make
-// that split survive a complete scheduler round trip.
+// CapabilityTest's first LOAD may replace CR0 with SelfTest while execution
+// remains in CapabilityTest. The CHURCH frame preserves that split.
 const selfTestGT = entryWords[0];
 const capEntry = committed.readNSEntry(10);
 const capGT = committed.createGT(
@@ -246,9 +264,9 @@ committed._installLumpHeaderContext(committed.parseGT(capGT), 10, capEntry, capH
 committed._writeCR(0, selfTestGT, committed.readNSEntry(selfTestGT & 0xFFFF));
 committed.dr[3] = 0xCAFE0003;
 committed.cr[2] = {...committed.cr[0]};
-committed.pc = 0x1B;
+committed.pc = 0;
 committed.flags = {N: true, Z: true, C: false, V: true};
-committed.sto = 0x81;
+committed.sto = entryLayouts[1].stackEnd - 6;
 const capabilityPrivate = {
     dr3: committed.dr[3], cr2: committed.cr[2].word0, pc: committed.pc,
     flags: {...committed.flags}, sto: committed.sto,
@@ -263,7 +281,7 @@ assert.strictEqual(committed.advanceConfiguredThread().slot, 11);
 assert.strictEqual(committed.cr[0].word0 & 0xFFFF, 6,
     'switch-back retains the independently mutated CR0 identity');
 assert.strictEqual(committed.cr[14].word0 & 0xFFFF, 10,
-    'switch-back restores CapabilityTest code identity from +18');
+    'switch-back restores CapabilityTest through its CHURCH Enter frame');
 assert.strictEqual(committed.dr[3], capabilityPrivate.dr3);
 assert.strictEqual(committed.cr[2].word0, capabilityPrivate.cr2);
 assert.strictEqual(committed.pc, capabilityPrivate.pc);
@@ -297,21 +315,116 @@ assert.strictEqual(preBoot.cr[0].word0, preBootThread1EntryGT,
 assert.strictEqual(preBoot.faultLog.length, 0,
     'cycling among stopped saved images never raises a machine fault');
 
-const invalidCodeIdentity = new ChurchSimulator();
-assert.strictEqual(invalidCodeIdentity.loadBootImage(image), true,
-    `code-identity fixture image must load: ${invalidCodeIdentity.lastBootImageError || 'unknown error'}`);
-invalidCodeIdentity.bootComplete = true;
-invalidCodeIdentity._currentThreadSlot = 1;
-const invalidCodeTargetBase = invalidCodeIdentity.readNSEntry(11).word0_location;
-const invalidCodeDRBefore = [...invalidCodeIdentity.dr];
-invalidCodeIdentity.memory[invalidCodeTargetBase + ThreadDesign.codeIdentityOffset] = 0;
-const rejectedCodeIdentity = invalidCodeIdentity.advanceConfiguredThread();
+const invalidResumeFrame = new ChurchSimulator();
+assert.strictEqual(invalidResumeFrame.loadBootImage(image), true,
+    `resume-frame fixture image must load: ${invalidResumeFrame.lastBootImageError || 'unknown error'}`);
+invalidResumeFrame.bootComplete = true;
+invalidResumeFrame._currentThreadSlot = 1;
+const invalidCodeTargetBase = invalidResumeFrame.readNSEntry(11).word0_location;
+const invalidCodeLayout = invalidResumeFrame._threadLayoutAtBase(invalidCodeTargetBase);
+const invalidResumeSTO = invalidResumeFrame.memory[
+    invalidCodeTargetBase + invalidCodeLayout.protectedStoOffset] & 0xFFF;
+const invalidCodeDRBefore = [...invalidResumeFrame.dr];
+invalidResumeFrame.memory[invalidCodeTargetBase + invalidResumeSTO + 1] = 0;
+const rejectedCodeIdentity = invalidResumeFrame.advanceConfiguredThread();
 assert.strictEqual(rejectedCodeIdentity.ok, false,
-    'canonical CHANGE rejects an invalid stored executable identity immediately');
-assert.strictEqual(invalidCodeIdentity._currentThreadSlot, 1,
-    'invalid code identity leaves the outgoing Thread selected');
-assert.deepStrictEqual(invalidCodeIdentity.dr, invalidCodeDRBefore,
-    'invalid code identity is checked before outgoing state is saved');
+    'canonical CHANGE rejects an invalid CHURCH Enter frame immediately');
+assert.strictEqual(invalidResumeFrame._currentThreadSlot, 1,
+    'invalid CHURCH frame leaves the outgoing Thread selected');
+assert.deepStrictEqual(invalidResumeFrame.dr, invalidCodeDRBefore,
+    'invalid CHURCH frame is checked before outgoing state is saved');
+
+const longNiaImage = image.slice(0);
+const longNiaWords = new Uint32Array(longNiaImage);
+const longThreadBase = committedBases[1];
+const longLayout = entryLayouts[1];
+const longResumeSTO =
+    longNiaWords[longThreadBase + longLayout.protectedStoOffset] & 0xFFF;
+const longEnterGT = longNiaWords[longThreadBase + longResumeSTO + 1] >>> 0;
+const longCodeNsBase =
+    longNiaWords.length - ((longEnterGT & 0xFFFF) + 1) * 4;
+const longCodeBase = longNiaWords[longCodeNsBase] >>> 0;
+longNiaWords[longCodeBase] = (
+    (longNiaWords[longCodeBase] & ~(0x1FFF << 10)) | (48 << 10)
+) >>> 0;
+const longPackedAddr = longThreadBase + longResumeSTO + 2;
+longNiaWords[longPackedAddr] = (
+    (longNiaWords[longPackedAddr] & ~(0x7FFF << 13)) | (40 << 13)
+) >>> 0;
+const longNiaSim = new ChurchSimulator();
+assert.strictEqual(longNiaSim.loadBootImage(longNiaImage), true,
+    'boot loader accepts a valid resume NIA beyond the Thread stack-word count');
+const outOfCodeImage = longNiaImage.slice(0);
+const outOfCodeWords = new Uint32Array(outOfCodeImage);
+outOfCodeWords[longPackedAddr] = (
+    (outOfCodeWords[longPackedAddr] & ~(0x7FFF << 13)) | (48 << 13)
+) >>> 0;
+assert.strictEqual((outOfCodeWords[longPackedAddr] >>> 13) & 0x7FFF, 48);
+assert.strictEqual((outOfCodeWords[longCodeBase] >>> 10) & 0x1FFF, 48);
+const outOfCodeSim = new ChurchSimulator();
+assert.strictEqual(outOfCodeSim.loadBootImage(outOfCodeImage), false,
+    'boot loader rejects a resume NIA outside the Enter target code extent');
+
+const underflowFrame = new ChurchSimulator();
+assert.strictEqual(underflowFrame.loadBootImage(image), true);
+underflowFrame.bootComplete = true;
+underflowFrame._currentThreadSlot = 1;
+const underflowTargetBase = underflowFrame.readNSEntry(11).word0_location;
+const underflowLayout = underflowFrame._threadLayoutAtBase(underflowTargetBase);
+underflowFrame.memory[underflowTargetBase + underflowLayout.protectedStoOffset] =
+    0x1000 | (underflowLayout.stackStart - 2);
+const underflowOutgoingHomes = underflowFrame.memory.slice(1, 17);
+const underflowOutgoingCaps = underflowFrame.memory.slice(
+    entryLayouts[0].capsStart, entryLayouts[0].capsEnd + 1);
+assert.strictEqual(underflowFrame.advanceConfiguredThread().ok, false,
+    'CHANGE rejects an underflowed CHURCH resume-frame pointer');
+assert.deepStrictEqual(underflowFrame.memory.slice(1, 17), underflowOutgoingHomes,
+    'incoming frame rejection is atomic for outgoing DR homes');
+assert.deepStrictEqual(
+    underflowFrame.memory.slice(entryLayouts[0].capsStart, entryLayouts[0].capsEnd + 1),
+    underflowOutgoingCaps,
+    'incoming frame rejection is atomic for outgoing CR homes');
+
+const malformedSavedSTO = new ChurchSimulator();
+assert.strictEqual(malformedSavedSTO.loadBootImage(image), true);
+malformedSavedSTO.bootComplete = true;
+malformedSavedSTO._currentThreadSlot = 1;
+const malformedFrameBase = malformedSavedSTO.readNSEntry(11).word0_location;
+const malformedFrameLayout = malformedSavedSTO._threadLayoutAtBase(malformedFrameBase);
+const malformedFramePointer = malformedSavedSTO.memory[
+    malformedFrameBase + malformedFrameLayout.protectedStoOffset] & 0xFFF;
+malformedSavedSTO.memory[malformedFrameBase + malformedFramePointer + 2] =
+    0x1000 | malformedFrameLayout.stackStart;
+const malformedSourceDRHomes = malformedSavedSTO.memory.slice(1, 17);
+assert.strictEqual(malformedSavedSTO.advanceConfiguredThread().ok, false,
+    'CHANGE rejects a CHURCH frame with an unpaired saved STO');
+assert.deepStrictEqual(malformedSavedSTO.memory.slice(1, 17), malformedSourceDRHomes,
+    'malformed packed saved STO rejects atomically before DR-home save');
+
+const outgoingUnderflow = new ChurchSimulator();
+assert.strictEqual(outgoingUnderflow.loadBootImage(image), true);
+outgoingUnderflow.bootComplete = true;
+outgoingUnderflow._currentThreadSlot = 1;
+const outgoingEntry = outgoingUnderflow.readNSEntry(entryWords[0] & 0xFFFF);
+const outgoingHeader = outgoingUnderflow.parseLumpHeader(
+    outgoingUnderflow.memory[outgoingEntry.word0_location] >>> 0);
+outgoingUnderflow._writeCR(0, entryWords[0], outgoingEntry);
+outgoingUnderflow._installLumpHeaderContext(
+    outgoingUnderflow.parseGT(entryWords[0]), entryWords[0] & 0xFFFF,
+    outgoingEntry, outgoingHeader);
+const outgoingLayout = outgoingUnderflow._threadLayoutAtBase(0);
+outgoingUnderflow.sto = outgoingLayout.stackStart;
+const outgoingSourceDRHomes = outgoingUnderflow.memory.slice(1, 17);
+const outgoingSourceCaps = outgoingUnderflow.memory.slice(
+    outgoingLayout.capsStart, outgoingLayout.capsEnd + 1);
+assert.strictEqual(outgoingUnderflow.advanceConfiguredThread().ok, false,
+    'CHANGE rejects an outgoing Thread without two-word frame space');
+assert.deepStrictEqual(outgoingUnderflow.memory.slice(1, 17), outgoingSourceDRHomes,
+    'outgoing frame-space rejection is atomic for DR homes');
+assert.deepStrictEqual(
+    outgoingUnderflow.memory.slice(outgoingLayout.capsStart, outgoingLayout.capsEnd + 1),
+    outgoingSourceCaps,
+    'outgoing frame-space rejection is atomic for CR homes');
 
 const malformed = new ChurchSimulator();
 assert.strictEqual(malformed.loadBootImage(image), true,
@@ -330,7 +443,7 @@ const malformedSelection = malformed.advanceConfiguredThread();
 assert.strictEqual(malformedSelection.ok, false,
     'canonical CHANGE rejects a malformed executable LUMP before selection');
 assert(malformed.faultLog.length > 0,
-    'malformed executable identity produces an immediate architecture fault');
+    'malformed CR14 code GT produces an immediate architecture fault');
 
 // The browser declares `let sim` in app-shell.js. Top-level `let` bindings are
 // not mirrored onto window, so the toolbar handler must use the lexical `sim`
@@ -354,7 +467,7 @@ const advanceSource = functionSource(simulatorSource, 'advanceConfiguredThread')
 assert(advanceSource.includes("crDst: 14, crSrc: 15, imm: target, mnemonic: 'CHANGE'"),
     'manual advance invokes the decoded CHANGE descriptor shape');
 assert(!/\b(scheduler|saveOutgoing|deferEntryFault)\s*:/.test(advanceSource),
-    'manual advance carries no alternate scheduler/save/defer semantics');
+    'manual advance carries no alternate save/defer semantics');
 const uiSim = new ChurchSimulator();
 assert.strictEqual(uiSim.loadBootImage(image), true,
     `UI fixture image must load: ${uiSim.lastBootImageError || 'unknown error'}`);
@@ -364,6 +477,7 @@ const uiBootBase = uiSim.readNSEntry(1).word0_location;
 const uiBootLayout = uiSim._threadLayoutAtBase(uiBootBase);
 const uiBootEntryGT = uiSim.memory[uiBootBase + uiBootLayout.capsStart] >>> 0;
 uiSim._writeCR(0, uiBootEntryGT, uiSim.readNSEntry(uiBootEntryGT & 0xFFFF));
+uiSim.sto = uiSim._readProtectedSto(uiBootBase);
 uiSim.pc = 0x2A;
 const initialThreadRows = uiSim.threadStatusRows();
 assert.strictEqual(initialThreadRows.length, 3,
@@ -548,7 +662,7 @@ nonElevated.cr[0] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
 nonElevated.flags = {N: true, Z: false, C: true, V: false};
 const flagsBeforeRejectedSwitch = {...nonElevated.flags};
 const rejectedChange = nonElevated._execChange({
-    crDst: 12, crSrc: 0, imm: 1, scheduler: false, mnemonic: 'CHANGE',
+    crDst: 12, crSrc: 0, imm: 1, mnemonic: 'CHANGE',
 });
 assert.strictEqual(rejectedChange, null,
     'non-elevated CHANGE CR12 returns an architecture fault instead of throwing');
@@ -557,4 +671,4 @@ assert(nonElevated.faultLog.length > 0 &&
     'non-elevated CHANGE CR12 records an architecture fault');
 assert.deepStrictEqual(nonElevated.flags, flagsBeforeRejectedSwitch,
     'failed isolated context switch preserves the retained machine FLAGS');
-console.log('PASS round-robin Thread scheduler');
+console.log('PASS round-robin Thread switching');

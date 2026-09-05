@@ -40,7 +40,6 @@ const output = `'use strict';
             drEnd: raw.dataRegisters.offset + raw.dataRegisters.words - 1,
             drWords: raw.dataRegisters.words,
             protectedStoOffset: raw.protectedStoOffset,
-            codeIdentityOffset: raw.codeIdentityOffset,
             protectedIndicator: raw.protectedIndicator,
             heapStart: heapStart,
             heapEnd: heapEnd,

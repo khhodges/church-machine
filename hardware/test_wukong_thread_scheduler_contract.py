@@ -12,7 +12,8 @@ from hardware.hw_types import FaultType, GT_TYPE_INFORM
 from server.boot_image import create_gt, integrity32, pack_lump_header, pack_ns_word1
 from hardware.thread_design import (
     THREAD_CAP_WORDS,
-    THREAD_CODE_IDENTITY_OFFSET,
+    THREAD_HEAP_OFFSET,
+    THREAD_STO_OFFSET,
     thread_body_words,
     thread_layout,
 )
@@ -52,27 +53,28 @@ def _depends_on(dependencies, target, source):
     return False
 
 
-def test_scheduler_contract_has_serialized_executable_identity():
+def test_change_contract_uses_canonical_church_suspension_frame():
     source = open("hardware/change.py").read()
     assert 'm.next = "PREFLIGHT"' in source
     assert 'SCHEDULER_RESTORE_MASK = (1 << THREAD_CAP_WORDS) - 1' in source
     assert THREAD_CAP_WORDS == 12
-    assert 'm.next = "ENTRY_CR0_READ"' in source
+    assert THREAD_HEAP_OFFSET == 18
     assert 'mload_direct_gt.eq(entry_gt_latched)' in source
-    assert "THREAD_CODE_IDENTITY_OFFSET" in source
-    assert 'm.next = "SAVE_CODE_READ"' in source
-    assert "restore_base + (THREAD_CODE_IDENTITY_OFFSET << 2)" in source
-    assert 'self.nia_restore_val.eq(indicator_word[13:28] << 2)' in source
-    assert 'self.nia_current[2:17]' in source
+    assert "THREAD_CODE_IDENTITY_OFFSET" not in source
+    assert 'with m.State("SAVE_EGT_WRITE")' in source
+    assert 'with m.State("SAVE_FRAME")' in source
+    assert 'stack_slot_addr(' in source
+    assert 'self.nia_restore_val.eq(incoming_frame[13:28] << 2)' in source
+    assert '(self.nia_current[2:17] + 1)[:15]' in source
     assert 'with m.State("PREFLIGHT_CAP_READ")' in source
-    assert 'with m.State("PREFLIGHT_CODE_VALIDATE")' in source
+    assert 'with m.State("PREFLIGHT_EGT_VALIDATE")' in source
     # Scheduler preflight's only successful edge into write-capable SAVE_*
-    # states is after the code-header check; its fault edges terminate.
+    # states is after frame/GT/header and outgoing-stack checks.
     preflight = source[source.index('with m.State("PREFLIGHT_HDR")'):
                        source.index('with m.State("SAVE_CR_READ")')]
     assert 'm.next = "SAVE_CR_READ"' in preflight
     assert preflight.index('m.next = "SAVE_CR_READ"') > preflight.index(
-        'with m.State("PREFLIGHT_CODE_HEADER")')
+        'with m.State("PREFLIGHT_OUT_INDICATOR")')
     for stale in (
         "cr7_base", "PACKED_PC_OFFSET", "M_FLAG_OFFSET", "SAVE_PACKED_PC",
         "SAVE_M_FLAG", "RESTORE_PC", "RESTORE_M_FLAG",
@@ -84,27 +86,33 @@ def test_scheduler_contract_has_serialized_executable_identity():
 
 def test_m6_contract_has_synchronizer_debounce_and_fetch_quiesce():
     source = open("hardware/wukong_top.py").read()
+    core_source = open("hardware/core.py").read()
     assert 'm6_sync = Signal(2' in source
     assert 'm6_stable_pressed' in source
     assert 'm6_click.eq(1)' in source
     assert 'thread_switch_pending' in source
     assert '~core.thread_switch_busy' in source
     assert 'snap_thread_base.eq(core.active_thread_base)' in source
+    assert 'Mux(thread_switch_start_sig, nia_reg - 4, nia_reg)' in core_source
 
 
 @pytest.mark.parametrize(
     "thread_n_minus_6",
     [2, 3],
 )
-@pytest.mark.parametrize("corruption", [None, "stale_cap", "null_code", "stale_code"])
+@pytest.mark.parametrize(
+    "corruption",
+    [None, "stale_cap", "null_egt", "stale_egt", "malformed_frame",
+     "nia_oob", "underflow", "outgoing_overflow"],
+)
 def test_change_enforces_defined_thread_body_before_restoring_context(
         thread_n_minus_6, corruption):
     dut = ChurchChange()
     sim = Simulator(dut)
     sim.add_clock(1e-6)
 
-    old_base, new_base, code_base = 0x2000, 0x3000, 0x5000
-    thread_slot, code_slot = 11, 21
+    old_base, new_base, code_base, cr0_code_base = 0x2000, 0x3000, 0x5000, 0x6000
+    thread_slot, code_slot, cr0_code_slot = 11, 21, 22
     mem = {}
 
     def descriptor(slot, location, limit, seq=0):
@@ -120,26 +128,56 @@ def test_change_enforces_defined_thread_body_before_restoring_context(
 
     descriptor(thread_slot, new_base, body_words - 1)
     descriptor(code_slot, code_base, 63)
+    descriptor(cr0_code_slot, cr0_code_base, 63)
     mem[new_base] = pack_lump_header(thread_n_minus_6, 32, 12, 2)
-    mem[code_base] = pack_lump_header(0, 7, 2, 0)
+    mem[old_base] = pack_lump_header(thread_n_minus_6, 32, 12, 2)
+    mem[code_base] = pack_lump_header(0, 48, 2, 0)
+    mem[cr0_code_base] = pack_lump_header(0, 5, 1, 0)
     entry_gt = create_gt(0, code_slot, {"E": 1}, GT_TYPE_INFORM)
+    cr0_gt = create_gt(0, cr0_code_slot, {"E": 1}, GT_TYPE_INFORM)
     for i in range(12):
         mem[new_base + (layout["caps_start"] + i) * 4] = entry_gt
+    # CR0 is an ordinary mutable home. It deliberately diverges from the
+    # suspended E-GT, which alone reconstructs CR6/CR14 on resume.
+    mem[new_base + layout["caps_start"] * 4] = cr0_gt
     for i in range(16):
         mem[new_base + (1 + i) * 4] = 0xA0000000 | i
-    mem[new_base + 17 * 4] = layout["stack_end"]
-    mem[new_base + THREAD_CODE_IDENTITY_OFFSET * 4] = entry_gt
+    suspended_sto = layout["stack_end"] - 2
+    return_pc = 40
+    return_flags = 0xA
+    mem[new_base + THREAD_STO_OFFSET * 4] = suspended_sto | (1 << 12)
+    mem[new_base + (suspended_sto + 1) * 4] = entry_gt
+    mem[new_base + (suspended_sto + 2) * 4] = (
+        layout["stack_end"] | (return_pc << 13) | (return_flags << 28)
+    )
+    mem[old_base + THREAD_STO_OFFSET * 4] = layout["stack_end"]
     if corruption == "stale_cap":
-        mem[new_base + layout["caps_start"] * 4] = entry_gt ^ (1 << 16)
-    elif corruption == "null_code":
-        mem[new_base + THREAD_CODE_IDENTITY_OFFSET * 4] = 0
-    elif corruption == "stale_code":
-        mem[new_base + THREAD_CODE_IDENTITY_OFFSET * 4] = entry_gt ^ (1 << 16)
+        mem[new_base + layout["caps_start"] * 4] = cr0_gt ^ (1 << 16)
+    elif corruption == "null_egt":
+        mem[new_base + (suspended_sto + 1) * 4] = 0
+    elif corruption == "stale_egt":
+        mem[new_base + (suspended_sto + 1) * 4] = entry_gt ^ (1 << 16)
+    elif corruption == "malformed_frame":
+        mem[new_base + (suspended_sto + 2) * 4] = layout["stack_start"] - 1
+    elif corruption == "nia_oob":
+        mem[new_base + (suspended_sto + 2) * 4] = (
+            layout["stack_end"] | (48 << 13) | (return_flags << 28)
+        )
+    elif corruption == "underflow":
+        mem[new_base + THREAD_STO_OFFSET * 4] = layout["stack_end"]
+    elif corruption == "outgoing_overflow":
+        mem[old_base + THREAD_STO_OFFSET * 4] = layout["stack_start"] + 1
     mem[new_base + 258 * 4] = 0xDEADBEEF
 
     crs = [0] * 16
-    crs[15] = pack_ns_word1(63) << 64
+    crs[6] = entry_gt
+    crs[15] = (
+        create_gt(0, 0, {"L": 1}, GT_TYPE_INFORM) |
+        (pack_ns_word1(63) << 64)
+    )
+    outgoing_cr_gts = [crs[i] & 0xFFFFFFFF for i in range(12)]
     drs = [0xB0000000 | i for i in range(16)]
+    outgoing_drs = list(drs)
     writes = []
     reads = []
     nia = None
@@ -151,7 +189,6 @@ def test_change_enforces_defined_thread_body_before_restoring_context(
         nonlocal previous_read_en, previous_read_addr, nia, flags_written
         ctx.set(dut.cr_src, 15)
         ctx.set(dut.cr_dst, 14)
-        ctx.set(dut.scheduler_mode, 1)
         ctx.set(dut.m_elevated, 0)
         ctx.set(dut.index, thread_slot)
         ctx.set(dut.active_thread_base, old_base)
@@ -216,19 +253,32 @@ def test_change_enforces_defined_thread_body_before_restoring_context(
             assert not flags_written
             return
         assert terminal == "complete"
-        assert nia == 0
-        assert drs[1] == 0xA0000001
+        assert nia == return_pc * 4
+        assert drs == [0xA0000000 | i for i in range(16)]
         cr14 = crs[14]
+        assert (crs[0] & 0xFFFF) == cr0_code_slot
         assert (cr14 & 0xFFFF) == code_slot
         assert ((cr14 >> 32) & 0xFFFFFFFF) == code_base + 4
-        assert ((cr14 >> 64) & 0x1FFFFF) == 6
-        assert mem[new_base + 17 * 4] == layout["stack_end"]
-        assert mem[new_base + THREAD_CODE_IDENTITY_OFFSET * 4] == entry_gt
+        assert ((cr14 >> 64) & 0x1FFFFF) == 47
+        assert mem[new_base + THREAD_STO_OFFSET * 4] == (
+            layout["stack_end"] | (return_flags << 28)
+        )
         assert mem[new_base + 258 * 4] == 0xDEADBEEF
-        assert old_base + 17 * 4 in writes
+        assert old_base + THREAD_STO_OFFSET * 4 in writes
+        assert mem[old_base + (layout["stack_end"] - 1) * 4] == entry_gt
+        assert mem[old_base + layout["stack_end"] * 4] == (
+            layout["stack_end"] | (1 << 13)
+        )
+        assert mem[old_base + THREAD_STO_OFFSET * 4] == (
+            (layout["stack_end"] - 2) | (1 << 12)
+        )
+        for i, gt in enumerate(outgoing_cr_gts):
+            assert mem[old_base + (layout["caps_start"] + i) * 4] == gt
+        for i, value in enumerate(outgoing_drs):
+            assert mem[old_base + (1 + i) * 4] == value
         forbidden = {
             old_base + 258 * 4,
-            new_base + 17 * 4, new_base + THREAD_CODE_IDENTITY_OFFSET * 4, new_base + 258 * 4,
+            new_base + 258 * 4,
         }
         assert forbidden.isdisjoint(writes)
 

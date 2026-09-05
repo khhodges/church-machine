@@ -116,23 +116,47 @@ The Church Machine prevents stack overflow with a hardware-enforced 256-frame li
 
 ---
 
-## CHANGE: Thread Context Switching
+## CHANGE and CHURCH Thread Suspension
 
-The CHANGE instruction performs thread context switching by modifying the thread identity.
+CHANGE selects a Thread through the existing architectural instruction path.
+Thread suspension and resumption reuse the ordinary Church call-stack contract;
+they do not add a second executable-identity field or a scheduler-private
+context format. **CHURCH suspension is an operation of the existing handoff
+path, not a new opcode.**
 
 | Aspect | Detail |
 |--------|--------|
 | **Mnemonic** | `CHANGE CRs` |
 | **Required Permission** | E (Enter) on source CR |
-| **Operation** | Full atomic thread swap via thread table |
-| **Context Saved** | DR0-DR15, CR0-CR11, STO, PC, FLAGS, LAMBDA state |
-| **Context Loaded** | Incoming thread's DR0-DR15, CR0-CR11, STO, PC, FLAGS, LAMBDA state; CR5 re-installed from incoming Zone ④ bounds |
-| **CR12 — Unchanged** | Thread stack — system-wide, shared by all threads |
-| **CR13 — Unchanged** | Interrupt handler — system-wide, shared by all threads |
-| **CR14 — Saved/Restored** | Code register — per-thread, saved and restored with each context switch |
-| **CR15 — Saved/Restored** | Namespace root — per-thread, saved and restored with each context switch |
+| **Operation** | Atomic Thread handoff through the architectural CHANGE path |
+| **Ordinary homes** | Save/restore DR0–DR15 at Thread +1…+16 and CR0–CR11 at the size-derived tail homes |
+| **Suspension identity** | Canonical 2-word CHURCH frame on the outgoing Thread's private stack |
+| **Resume validation** | RETURN-equivalent revalidation of the saved Enter GT, then reconstruction of CR6 and CR14 |
+| **Heap** | Begins at Thread +18; CR5 is re-installed for the incoming Thread's Heap bounds |
+| **No private identity word** | Thread +18 is Heap, never an executable GT, CR14 home, or resume cache |
 
-CHANGE performs a full atomic swap of per-thread state: data registers DR0–DR15, the 12 programmer-accessible capability registers CR0–CR11, the hidden STO (Stack Top Offset), PC, condition FLAGS, and LAMBDA state. CR5 (Heap GT) is re-installed automatically from the incoming thread's Zone ④ bounds. CR14 (code register) and CR15 (namespace root) are per-thread and are saved and restored by CHANGE. CR12 (thread stack) and CR13 (interrupt handler) are system-wide and are never touched by CHANGE. SWITCH is the destination-M-gated special LOAD path for explicitly replacing an isolated register.
+On suspension, the outgoing Thread's current abstraction is recorded exactly as
+an ordinary CALL return context: the current abstraction's normalized Church
+Enter GT and the packed NIA/FLAGS/SZ/STO frame word are written to its private
+downward-growing stack. The frame costs two words and updates STO by the same
+rules as CALL. CR0 is not the executing-abstraction identity and may contain an
+unrelated capability.
+
+On resume, the incoming Thread's top CHURCH frame is consumed as if by RETURN.
+The saved Enter GT passes the same Namespace generation, integrity, permission,
+and bounds checks used by RETURN. Only after that validation succeeds is it
+used to reconstruct the abstraction's L-only CR6 c-list view and X-only CR14
+code view; NIA, flags, and prior stack state come from the packed frame word.
+Malformed, stale, or absent frames fault without exposing a partially restored
+Thread.
+
+The established DR and CR homes remain independent of this frame: CHANGE
+persists DR0–DR15 and CR0–CR11 in their existing Thread locations. CR5 is
+re-installed automatically from the incoming Thread's Zone ④ bounds. Heap
+starts at +18. No word was inserted between protected context at +17 and Heap,
+and neither host-side state nor a hidden scheduler identity cache may substitute
+for the canonical frame. SWITCH remains the destination-M-gated special LOAD
+path for explicitly replacing an isolated register.
 
 ### THREAD_HDR — Hidden Per-Thread Machine Register
 

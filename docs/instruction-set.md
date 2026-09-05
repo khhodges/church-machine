@@ -104,21 +104,21 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a 12-bit field in bits [11:0]. **Set bit = PRESERVE that CR** (keep the callee's value as a return value to the caller). Clear bit = restore the caller's saved state, or scrub to NULL if the caller had nothing saved. Bare `RETURN` (mask=0) is the secure default — all callee CRs are scrubbed and the caller's saved state is fully restored. Bit 6 is **reserved and must be 0**: CR6 is always re-derived from the E-GT regardless of the mask.
-
-**The mask is computed automatically by the toolchain** — programmers never write it manually:
-- **CLOOMC++ compiler**: derives the mask from the method's return type (`void` → mask=0; returns one capability → mask=0b000000000001; etc.)
-- **Raw assembler**: emits the programmer-supplied literal (e.g. `RETURN 0b000000000001`); bare `RETURN` emits mask=0 (secure default, clear all)
+`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
+simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
+remain zero because CR6 is always reconstructed from the saved Enter GT. Use
+bare `RETURN` (`mask=0`).
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. For each CR0–CR11: if mask bit set → preserve callee's value (return value); else → restore caller's saved snapshot, or scrub to NULL if not saved
+4. Leave other CRs and DRs as the callee left them
 
-Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds when a thread is resumed; it is not saved or restored by CALL/RETURN. DRs are always restored from the caller's saved snapshot unconditionally.
-
-**Why set=preserve**: GTs are first-class values — a callee may legitimately return a GT in CR0. The bit marks which CRs carry outbound return values. All others revert to the caller's context or are scrubbed, so callee-internal GTs can never leak to the caller by accident. Shared between Church and Turing domains.
+Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
+when a thread is resumed; it is not saved or restored by CALL/RETURN. The
+12-bit RETURN mask is not implemented; nonzero values are ignored and the
+assembler warns. The architectural frame contains no hidden CR or DR snapshot.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -132,7 +132,14 @@ Privileged register write. Reads the GT at index `idx` in CRs's c-list and insta
 
 - **CR12** (system-wide thread stack): direct privileged load; not a scheduler context snapshot.
 - **CR13** (system-wide interrupt handler): direct write; no context switch. Installs the IRQ thread GT for use by Tier 3 fault recovery.
-- **Scheduler CHANGE**: saves/restores CR0–CR11 and DR0–DR15 homes, validates restored CR0, derives transient CR14, and enters at code word 1 without a CALL frame.
+- **Thread handoff**: saves/restores the existing CR0–CR11 and DR0–DR15
+  homes. CHURCH suspension pushes the canonical two-word Enter-GT and packed
+  NIA/FLAGS/SZ/STO frame on the outgoing private Stack. Resume applies
+  RETURN-equivalent validation to that frame and reconstructs CR6/CR14. CR0
+  is not a resume-code alias, and Thread +18 remains the first Heap word.
+
+CHURCH suspension names the existing handoff operation; it does not define an
+additional opcode, Thread-body executable-identity field, or host-side cache.
 
 ### SWITCH (opcode 5)
 

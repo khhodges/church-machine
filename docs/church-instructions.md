@@ -155,18 +155,23 @@ All Church instructions that access the namespace route through the **mLoad mast
 
 **Operation**:
 1. Index CRd at offset idx; verify the GT has E permission — FAULT on fail
-2. Suspend outgoing thread: save per-thread state (DR0–DR15, CR0–CR11, STO, PC, FLAGS) into its thread lump; CR13, CR14, CR15 are never touched
-3. Activate incoming thread: restore per-thread state from its thread lump
-4. The suspended thread resumes exactly where it left off
+2. Suspend the outgoing Thread through CHURCH: save DR0–DR15 and CR0–CR11 to their existing homes and push the canonical two-word Enter-GT plus packed-state frame on its private Stack
+3. Validate the incoming Thread and its top frame before exposing restored state
+4. Restore its existing CR/DR homes, then consume the frame with RETURN-equivalent validation to reconstruct CR6/CR14 and restore NIA/flags
 
 **Mnemonic**: `CHANGE CRd, idx`
 
 | Aspect | Detail |
 |--------|--------|
 | **Permission Check** | E (Enter) on Thread Abstraction GT at CRd[idx] |
-| **Per-Thread Saved/Restored** | DR0–DR15, CR0–CR11, CR14 (code register), CR15 (namespace root), STO, PC, FLAGS |
-| **System-Wide Unchanged** | CR12 (thread stack), CR13 (IRQ handler) |
+| **Per-Thread Saved/Restored** | Existing DR0–DR15 and CR0–CR11 homes; NIA/FLAGS/SZ/STO and current Enter GT through the canonical Stack frame |
+| **Resume identity** | Saved Enter GT, revalidated exactly as RETURN and used to reconstruct CR6/CR14 |
+| **Thread +18** | First Heap word; never an executable-identity field |
 | **G-bit Reset** | Yes — on accessed namespace entries |
+
+CHURCH suspension is part of this existing handoff path, not a new opcode,
+operand, hidden Thread field, or scheduler-private cache. CR0 remains an
+ordinary mutable capability register and is not the resume identity.
 
 ---
 

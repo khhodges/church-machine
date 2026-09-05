@@ -27,9 +27,9 @@ function check(label, condition, detail = '') {
     }
 }
 
-function lumpHeader(cw, cc, nMinus6 = 0) {
+function lumpHeader(cw, cc, nMinus6 = 0, typ = 0) {
     return ((0x1F << 27) | ((nMinus6 & 0xF) << 23) |
-        ((cw & 0x1FFF) << 10) | (cc & 0xFF)) >>> 0;
+        ((cw & 0x1FFF) << 10) | ((typ & 3) << 8) | (cc & 0xFF)) >>> 0;
 }
 
 function instruction(sim, opcode, dst, src, imm) {
@@ -37,22 +37,28 @@ function instruction(sim, opcode, dst, src, imm) {
 }
 
 function installLump(sim, slot, base, cw = 8, cc = 1) {
-    sim.writeNSEntry(slot, base, 63, 0, 0, 1, 0, cc, 0);
+    sim.withNamespaceWrite('thread-base-zero fixture', () => {
+        sim.writeNSEntry(slot, base, 63, 0, 0, 1, 0, cc, 0);
+    });
     sim.memory[base] = lumpHeader(cw, cc);
 }
 
 function makeSim() {
     const sim = new ChurchSimulator();
-    sim.bootComplete = true;
+    sim.bootComplete = false;
 
     // Slot 1's Thread LUMP is deliberately resident at address zero.
-    sim.writeNSEntry(THREAD_SLOT, 0, 255, 0, 0, 1, 0, 0, 0);
-    sim.memory[0] = lumpHeader(0, 0, 2); // 256-word Thread LUMP
+    sim.withNamespaceWrite('thread-base-zero fixture', () => {
+        sim.writeNSEntry(THREAD_SLOT, 0, 255, 0, 0, 1, 0, 0, 0);
+    });
+    sim.memory[0] = lumpHeader(32, 12, 2, 2); // canonical 256-word Thread LUMP
     const threadGT = sim.createGT(0, THREAD_SLOT, {R: 1, W: 1}, 1);
     sim.cr[12] = { word0: threadGT, word1: 0, word2: 255, word3: 0, m: 0 };
 
     installLump(sim, CODE_SLOT, CODE_BASE, 8, 1);
-    sim.writeNSEntry(LED_SLOT, LED_BASE, 4, 0, 0, 1, 0, 0, 0);
+    sim.withNamespaceWrite('thread-base-zero fixture', () => {
+        sim.writeNSEntry(LED_SLOT, LED_BASE, 4, 0, 0, 1, 0, 0, 0);
+    });
     installLump(sim, CALLEE_SLOT, CALLEE_BASE, 8, 1);
 
     const codeGT = sim.createGT(0, CODE_SLOT, {R: 1, X: 1}, 1);
@@ -66,7 +72,14 @@ function makeSim() {
         m: 0,
     };
     sim.memory[CODE_BASE + 63] = sim.createGT(0, LED_SLOT, {R: 1, W: 1}, 1);
+    // Dormant Thread identity is the canonical downward CHURCH frame:
+    // indicator STO=241, Enter E-GT at +242, packed frame at +243.
+    const enterGT = sim.createGT(0, CODE_SLOT, {E: 1}, 1);
+    sim.memory[17] = 0x1000 | 241;
+    sim.memory[242] = enterGT;
+    sim.memory[243] = 0x1000 | 243;
     sim.sto = 243;
+    sim.bootComplete = true;
     return sim;
 }
 
@@ -106,8 +119,8 @@ console.log('\n--- Thread base zero: frame and capability persistence ---');
     const call = sim._execCall({ crDst: 0, imm: 0 });
     check('TBZ-09: CALL accepts Thread base zero', call !== null && !sim.halted, sim.faultInfo?.message);
     check('TBZ-10: CALL persists both frame words at Thread base zero',
-        sim.memory[243] === sim.callStack[0]?.frameWord &&
-        sim.memory[242] === sim.callStack[0]?.savedCRs[6].word0);
+        sim.memory[241] === sim.callStack[0]?.frameWord &&
+        sim.memory[240] === sim.callStack[0]?.savedCRs[6].word0);
 
     const returned = sim._execReturn({ imm: 0 });
     check('TBZ-11: RETURN restores capability homes at Thread base zero',
@@ -121,6 +134,7 @@ console.log('\n--- Thread base zero: deferred LAMBDA frame ---');
     const lambdaGT = sim.createGT(0, CALLEE_SLOT, {X: 1}, 1);
     sim.cr[0] = { word0: lambdaGT, word1: CALLEE_BASE, word2: 63, word3: 0, m: 0 };
     sim.sto = 240;
+    sim.memory[17] = 0x1000 | 240;
     const lambda = sim._execLambda({ crDst: 0 });
     const cachedFrame = sim.lambdaCachedFrame?.word;
     sim._flushLambdaCache();

@@ -18,8 +18,10 @@ THREAD_HEADER_OFFSET = THREAD_DESIGN["headerOffset"]
 THREAD_DR_OFFSET = THREAD_DESIGN["dataRegisters"]["offset"]
 THREAD_DR_WORDS = THREAD_DESIGN["dataRegisters"]["words"]
 THREAD_STO_OFFSET = THREAD_DESIGN["protectedStoOffset"]
-THREAD_CODE_IDENTITY_OFFSET = THREAD_DESIGN["codeIdentityOffset"]
-THREAD_HEAP_OFFSET = THREAD_DESIGN["heapOffset"]
+# The protected STO is the final fixed word.  There is no separately
+# serialized executable identity: suspended execution is represented by the
+# same two-word CHURCH frame used by CALL/RETURN.
+THREAD_HEAP_OFFSET = THREAD_STO_OFFSET + 1
 # Compatibility name for older importers. The word is protected Thread state,
 # not part of the ordinary heap described by CR5.
 THREAD_STACK_POINTER_HOME_OFFSET = THREAD_STO_OFFSET
@@ -63,7 +65,6 @@ def thread_layout(lump_size: int, stack_words: int) -> dict:
         "dr_start": THREAD_DR_OFFSET,
         "dr_end": THREAD_DR_OFFSET + THREAD_DR_WORDS - 1,
         "sto_offset": THREAD_STO_OFFSET,
-        "code_identity_offset": THREAD_CODE_IDENTITY_OFFSET,
         "heap_start": heap_start,
         "heap_end": heap_end,
         "heap_words": heap_words,

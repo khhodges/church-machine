@@ -29,7 +29,6 @@
         "words": 16
     },
     "protectedStoOffset": 17,
-    "codeIdentityOffset": 18,
     "protectedIndicator": {
         "stoBits": [
             0,
@@ -45,7 +44,7 @@
             31
         ]
     },
-    "heapOffset": 19,
+    "heapOffset": 18,
     "capabilityHomes": {
         "firstRegister": 0,
         "lastRegister": 11,
@@ -62,7 +61,6 @@
         "Header",
         "Data Registers",
         "Protected STO",
-        "Executable Code Identity",
         "Heap",
         "LIFO Stack",
         "Capabilities"
@@ -94,7 +92,6 @@
             drEnd: raw.dataRegisters.offset + raw.dataRegisters.words - 1,
             drWords: raw.dataRegisters.words,
             protectedStoOffset: raw.protectedStoOffset,
-            codeIdentityOffset: raw.codeIdentityOffset,
             protectedIndicator: raw.protectedIndicator,
             heapStart: heapStart,
             heapEnd: heapEnd,

@@ -3,8 +3,8 @@ name: Normative Thread private ABI
 description: Durable ownership and size-derived rules for Church Machine Thread geometry.
 ---
 
-The shared Thread design is the normative source for every producer and consumer. A Thread has no Freespace: word +17 stores protected context, +18 stores executable identity, Heap fills from +19 to the stack, stack size comes from cw/sw, and 12 capability homes occupy the LUMP tail.
+Thread suspension identity belongs only to the canonical two-word CHURCH return frame on the private stack. Never add a separate executable-identity word to the Thread body; Heap begins immediately after protected context.
 
-**Why:** The user rejected the fixed-256 assumption, and CapabilityTest proves CR0 is mutable state rather than a reliable resume-code alias. The n-6 field owns total LUMP size; cc still records the 12 persisted CR0–CR11 homes.
+**Why:** The user rejected the invented executable-identity field. CR0 is mutable state and can intentionally name a different abstraction from the code being resumed.
 
-**How to apply:** Derive capsStart=lumpSize-12, stackStart=capsStart-sw, and Heap=+19..stackStart-1. Keep protected context at +17 outside CR5. Seed, validate, save, and restore the executable GT independently at +18.
+**How to apply:** Use the shared Thread layout for geometry. Seed, suspend, and resume through the established CHURCH frame and RETURN-equivalent Enter-GT/NIA validation while preserving the existing private CR/DR homes.

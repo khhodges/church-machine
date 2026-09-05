@@ -20,8 +20,8 @@ def _slot_words(words, slot):
     return words[base:base + NS_ENTRY_WORDS]
 
 
-def test_format_tag_marks_cache_token_word3_images():
-    assert BOOT_IMAGE_FORMAT_TAG == 0xB0072862
+def test_format_tag_marks_canonical_thread_frame_images():
+    assert BOOT_IMAGE_FORMAT_TAG == 0xB0073224
 
 
 def test_trusted_cache_map_uses_current_ns_state_not_stale_manifest_slots():
