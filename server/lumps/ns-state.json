@@ -115,7 +115,7 @@
       "name": "CapabilityTest",
       "slot": 10,
       "token": "00000a00",
-      "filename": "CapabilityTest.1.ac2b4b1b.lump",
+      "filename": "CapabilityTest.1.2d9ec45d.lump",
       "resident": true,
       "location": "0x000004C0",
       "type": "Inform",
@@ -182,5 +182,5 @@
       "seal": "0xDEA81EEF"
     }
   ],
-  "generated_at": 1788646264.2186282
+  "generated_at": 1788647326.4147646
 }
