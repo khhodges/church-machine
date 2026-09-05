@@ -38,3 +38,16 @@ If a genuinely time-sensitive freshness question exists (e.g. "do these
 binary artifact *contents* match what was just built"), guard that
 separately with a content hash (sha256) comparison — content questions need
 content answers, not a timestamp proxy for them.
+
+The same rule applies when writing an output invalidates optional metadata in
+an input-side state file. If the invalidation marker is already absent, the
+invalidation must be a true no-op rather than rewriting the state file.
+
+**Why:** Rewriting an unchanged source immediately after producing an artifact
+makes that source newer than the artifact, so the next read regenerates again
+forever.
+
+**How to apply:** Include authoritative state in artifact freshness checks, but
+make post-write invalidation conditional on an actual content change. Confirm
+stability with two consecutive reads: the second must return identical bytes
+without changing the artifact timestamp.

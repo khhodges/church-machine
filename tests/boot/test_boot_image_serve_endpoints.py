@@ -174,6 +174,45 @@ def test_binary_regenerates_retired_tail_relative_thread_boundary(
     assert resp.data == valid_bytes
 
 
+def test_binary_regenerates_when_authoritative_ns_state_is_newer(
+        client, temp_image_path):
+    valid_bytes = _write_valid(temp_image_path)
+    ns_state_path = os.path.join(
+        os.path.dirname(temp_image_path), "ns-state.json")
+    with open(ns_state_path, "w", encoding="utf-8") as state_file:
+        state_file.write('{"abstractions":[]}')
+    image_mtime = os.path.getmtime(temp_image_path)
+    os.utime(ns_state_path, (image_mtime + 1, image_mtime + 1))
+
+    def regenerate_image():
+        with open(temp_image_path, "wb") as image_file:
+            image_file.write(valid_bytes)
+        return valid_bytes, None
+
+    with patch("server.app._auto_regen_boot_image",
+               side_effect=regenerate_image) as regenerate:
+        resp = client.get("/api/boot-image/binary")
+
+    regenerate.assert_called_once_with()
+    assert resp.status_code == 200
+    assert resp.data == valid_bytes
+
+
+def test_raw_binding_invalidation_does_not_touch_unchanged_ns_state(tmp_path):
+    from server.app import _invalidate_ns_state_raw_binding
+
+    state_path = tmp_path / "ns-state.json"
+    original = '{"abstractions":[{"name":"CapabilityTest","slot":10}]}'
+    state_path.write_text(original)
+    before_mtime = state_path.stat().st_mtime_ns
+
+    with patch("server.app.NS_STATE_PATH", str(state_path)):
+        _invalidate_ns_state_raw_binding()
+
+    assert state_path.read_text() == original
+    assert state_path.stat().st_mtime_ns == before_mtime
+
+
 def test_binary_never_serves_cached_image_for_different_memory_size(
         client, temp_image_path):
     with open(temp_image_path, "wb") as image_file:

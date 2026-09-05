@@ -114,6 +114,9 @@
     {
       "name": "CapabilityTest",
       "slot": 10,
+      "token": "9ce28c0b",
+      "filename": "CapabilityTest.1.e4fe164d.lump",
+      "resident": true,
       "location": "0x000004C0",
       "type": "Inform",
       "f": 0,

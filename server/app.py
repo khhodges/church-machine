@@ -3145,6 +3145,11 @@ def _invalidate_ns_state_raw_binding():
         state = json.load(state_file)
     if not isinstance(state, dict):
         raise ValueError("Namespace metadata is invalid")
+    # Avoid rewriting semantically unchanged state.  Besides unnecessary I/O,
+    # touching this authoritative generator input after writing boot-image.bin
+    # would make the new image immediately appear stale again.
+    if "committed_raw_fingerprint" not in state:
+        return
     state.pop("committed_raw_fingerprint", None)
     tmp_state = NS_STATE_PATH + ".tmp"
     with open(tmp_state, "w", encoding="utf-8") as state_file:
@@ -3261,9 +3266,10 @@ def boot_image_download():
 def _boot_image_is_stale():
     """Return True if the image size or any tracked source is stale.
 
-    Checked files: 00000600.lump (Boot.Abstr binary) and manifest.json
-    (controls boot_resident flag).  If boot-image.bin does not exist the
-    function returns False so callers fall through to their own 404 path.
+    Checked files: 00000600.lump (Boot.Abstr binary), manifest.json
+    (controls boot_resident policy), and ns-state.json (authoritative slot,
+    artifact, and generation bindings).  If boot-image.bin does not exist
+    the function returns False so callers fall through to their own 404 path.
     """
     if not os.path.isfile(BOOT_IMAGE_PATH):
         return False
@@ -3302,7 +3308,7 @@ def _boot_image_is_stale():
                 return True
         _img_mtime = os.path.getmtime(BOOT_IMAGE_PATH)
         _lumps_dir = os.path.dirname(BOOT_IMAGE_PATH)
-        for _fname in ("00000600.lump", "manifest.json"):
+        for _fname in ("00000600.lump", "manifest.json", "ns-state.json"):
             _p = os.path.join(_lumps_dir, _fname)
             if os.path.isfile(_p) and os.path.getmtime(_p) > _img_mtime:
                 return True
