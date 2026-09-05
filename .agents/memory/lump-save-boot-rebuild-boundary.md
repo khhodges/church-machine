@@ -36,3 +36,19 @@ entry.
 **How to apply:** Track validated image provenance separately from the cached
 browser buffer. Regenerate only when neither source is available, and merge
 existing artifact bindings defensively at the server commit boundary.
+
+## Build Approval validation boundary
+
+Structural LUMP header decoding must remain independent from approval-ledger
+membership. A valid released resident binary may be readable before a separate
+approval record exists; report trust state separately rather than as bad magic.
+Canonical SelfTest's extended-ISA terminal opcode 8 is an expected passing form.
+
+**Why:** Treating missing approval as unreadable hid valid WukongCallHome
+headers, while the generic opcode warning made the approved canonical SelfTest
+look unresolved even though its current source and regression tests expect
+opcode 8.
+
+**How to apply:** Use binary structure for header/cw/cc display and reserve
+approval checks for trust/build policy. Keep generic opcode checks strict, then
+normalize only the canonical SelfTest validation path.
