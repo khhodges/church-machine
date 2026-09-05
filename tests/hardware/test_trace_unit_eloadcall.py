@@ -18,6 +18,11 @@ _WUKONG_PROFILE = ARCH_PROFILES["wukong-uart-upload-v2"]
 _TRACE_EVENTS = TRACE_UNITS[_WUKONG_PROFILE["traceUnit"]]["eventIds"]
 
 _TRACE_EV_RESULT      = _TRACE_EVENTS["RESULT"]
+_TRACE_EV_LOAD_SHADOW = _TRACE_EVENTS["LOAD_SHADOW"]
+_TRACE_EV_LOAD_NEW    = _TRACE_EVENTS["LOAD_NEW"]
+_TRACE_EV_CHANGE_PUSH = _TRACE_EVENTS["CHANGE_PUSH"]
+_TRACE_EV_CHANGE_CR12 = _TRACE_EVENTS["CHANGE_CR12"]
+_TRACE_EV_CHANGE_CR5  = _TRACE_EVENTS["CHANGE_CR5"]
 _TRACE_EV_CALL_CR6    = _TRACE_EVENTS["CALL_CR6"]
 _TRACE_EV_CALL_CR14   = _TRACE_EVENTS["CALL_CR14"]
 _TRACE_EV_CALL_PUSH   = _TRACE_EVENTS["CALL_PUSH"]
@@ -70,18 +75,39 @@ def _encode_instr(opcode: int, cond: int = 14) -> int:
     ("opcode", "expected_count", "expected_types", "expected_data"),
     [
         pytest.param(
+            ChurchOpcode.LOAD,
+            2,
+            [_TRACE_EV_LOAD_SHADOW, _TRACE_EV_LOAD_NEW, 0],
+            [0x11111111, 0x22222222, 0],
+            id="load",
+        ),
+        pytest.param(
+            ChurchOpcode.CHANGE,
+            3,
+            [_TRACE_EV_CHANGE_PUSH, _TRACE_EV_CHANGE_CR12, _TRACE_EV_CHANGE_CR5],
+            [0, 0x33333333, 0x44444444],
+            id="change",
+        ),
+        pytest.param(
             ChurchOpcode.ELOADCALL,
             3,
             [_TRACE_EV_CALL_CR6, _TRACE_EV_CALL_CR14, _TRACE_EV_CALL_PUSH],
-            [0x12345678, 0x9ABCDEF0, 0],
+            [0x55555555, 0x66666666, 0],
             id="eloadcall",
         ),
         pytest.param(
             ChurchOpcode.XLOADLAMBDA,
             3,
             [_TRACE_EV_CALL_CR6, _TRACE_EV_CALL_CR14, _TRACE_EV_CALL_PUSH],
-            [0x12345678, 0x9ABCDEF0, 0],
+            [0x55555555, 0x66666666, 0],
             id="xloadlambda",
+        ),
+        pytest.param(
+            ChurchOpcode.RETURN,
+            3,
+            [_TRACE_EV_RETURN_POP, _TRACE_EV_RETURN_CR6, _TRACE_EV_RETURN_CR14],
+            [0, 0x55555555, 0x66666666],
+            id="return",
         ),
         pytest.param(
             16,  # Turing DREAD: full 5-bit decode must not alias Church LOAD.
@@ -101,8 +127,14 @@ def test_production_trace_decoder_queue(
 
     async def bench(ctx):
         ctx.set(dut.instr, _encode_instr(opcode))
-        ctx.set(dut.cr6_gt, 0x12345678)
-        ctx.set(dut.cr14_gt, 0x9ABCDEF0)
+        # Distinct sentinels prove each occupied queue slot uses its intended
+        # production payload source; zero-payload slots are asserted as well.
+        ctx.set(dut.load_shadow_gt, 0x11111111)
+        ctx.set(dut.load_new_gt, 0x22222222)
+        ctx.set(dut.cr12_gt, 0x33333333)
+        ctx.set(dut.cr5_gt, 0x44444444)
+        ctx.set(dut.cr6_gt, 0x55555555)
+        ctx.set(dut.cr14_gt, 0x66666666)
         await ctx.delay(1e-9)
         observed["count"] = ctx.get(dut.event_count)
         observed["types"] = [ctx.get(signal) for signal in dut.event_type]
