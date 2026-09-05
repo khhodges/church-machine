@@ -8,6 +8,7 @@ from amaranth.sim import Simulator
 
 from hardware.change import ChurchChange
 from hardware.boot_rom import encode_church, encode_turing
+from hardware.decoder import ChurchDecoder
 from hardware.test_boot_rom_no_false_halt import BootRomHarness, _build_dmem_init
 from hardware.mload import ChurchMLoad
 from hardware.hw_types import (
@@ -529,6 +530,55 @@ def test_full_core_thread_switch_resume_nia_contract(decoded_change):
             for _, instruction, _ in observed
         ) == 1
 
+def test_condition_decoder_matches_complete_nzcv_truth_table():
+    """Every condition code matches the architectural truth table for all NZCV."""
+    truth_table = {
+        CondCode.EQ: lambda n, z, c, v: z,
+        CondCode.NE: lambda n, z, c, v: not z,
+        CondCode.CS: lambda n, z, c, v: c,
+        CondCode.CC: lambda n, z, c, v: not c,
+        CondCode.MI: lambda n, z, c, v: n,
+        CondCode.PL: lambda n, z, c, v: not n,
+        CondCode.VS: lambda n, z, c, v: v,
+        CondCode.VC: lambda n, z, c, v: not v,
+        CondCode.HI: lambda n, z, c, v: c and not z,
+        CondCode.LS: lambda n, z, c, v: not c or z,
+        CondCode.GE: lambda n, z, c, v: n == v,
+        CondCode.LT: lambda n, z, c, v: n != v,
+        CondCode.GT: lambda n, z, c, v: not z and n == v,
+        CondCode.LE: lambda n, z, c, v: z or n != v,
+        CondCode.AL: lambda n, z, c, v: True,
+        CondCode.NV: lambda n, z, c, v: False,
+    }
+    assert len(CondCode) == 16
+    assert set(truth_table) == set(CondCode)
+
+    dut = ChurchDecoder()
+
+    async def bench(ctx):
+        ctx.set(dut.instr_valid, 1)
+        for condition, expected_for_flags in truth_table.items():
+            ctx.set(
+                dut.instruction,
+                encode_turing(TuringOpcode.BRANCH, condition, imm=0),
+            )
+            for flags in range(16):
+                n = bool(flags & 0b0001)
+                z = bool(flags & 0b0010)
+                c = bool(flags & 0b0100)
+                v = bool(flags & 0b1000)
+                ctx.set(dut.flags, {"N": n, "Z": z, "C": c, "V": v})
+                await ctx.delay(1e-9)
+                assert bool(ctx.get(dut.exec_enable)) == expected_for_flags(
+                    n, z, c, v
+                ), (
+                    f"{condition.name} mismatch for "
+                    f"N={int(n)} Z={int(z)} C={int(c)} V={int(v)}"
+                )
+
+    sim = Simulator(dut)
+    sim.add_testbench(bench)
+    sim.run()
 @pytest.mark.parametrize(
     ("condition_name", "saved_flags", "condition"),
     [
