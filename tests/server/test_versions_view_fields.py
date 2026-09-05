@@ -51,6 +51,7 @@ def test_status_exposes_version_fields():
     assert 'expected_build_version' in data
     assert 'min_tu_version' in data
     assert data['expected_build_version'] == _app_module._wukong_build_version()
+    assert data['latest_bridge_version'] == _app_module._wukong_bridge_version()
     assert data['min_tu_version'] == _app_module._wukong_min_tu_version()
     # Both should be ints when the source file is present (it is, in-repo).
     assert isinstance(data['expected_build_version'], int)
@@ -63,6 +64,7 @@ def test_status_remains_readonly_with_new_fields():
     d1 = client.get('/hardware/wukong/status').get_json()
     d2 = client.get('/hardware/wukong/status').get_json()
     assert d1['expected_build_version'] == d2['expected_build_version']
+    assert d1['latest_bridge_version'] == d2['latest_bridge_version']
     assert d1['min_tu_version'] == d2['min_tu_version']
 
 
@@ -100,15 +102,15 @@ def test_production_deployment_id_is_not_compared_to_a_local_git_commit(monkeypa
     assert data['comparison'] == 'not_comparable'
 
 
-def test_standalone_bridge_version_matches_wukong_build():
+def test_standalone_bridge_version_is_the_downloadable_version():
     bridge_path = os.path.join(ROOT, 'hardware', 'wukong_bridge.py')
     with open(bridge_path, encoding='utf-8') as handle:
         bridge = handle.read()
     match = re.search(r"^\s*BRIDGE_VERSION\s*=\s*(\d+)", bridge, re.MULTILINE)
     assert match, "BRIDGE_VERSION missing from hardware/wukong_bridge.py"
-    assert int(match.group(1)) == _app_module._wukong_build_version(), (
-        "The standalone Windows bridge must advertise the same version as "
-        "hardware/wukong_top.py"
+    assert int(match.group(1)) == _app_module._wukong_bridge_version(), (
+        "The status endpoint must expose the canonical downloadable bridge "
+        "version, not the FPGA build version"
     )
 
 
@@ -123,8 +125,12 @@ def test_bridge_version_is_exposed_in_versions_view():
     assert 'id="versionsBridgeBody"' in index
     assert '_renderBridge(status)' in app_run
     assert 'bridge.bridge_version' in app_run
-    assert 'Matches build v' in app_run
-    assert 'Not directly comparable' in app_run
+    assert 'latest_bridge_version' in app_run
+    assert 'New version available' in app_run
+    assert 'Bridge newer than IDE' in app_run
+    assert 'Up to date' in app_run
+    assert 'Download current bridge.py' in app_run
+    assert 'separate from bridge updates' in app_run
 
 
 def test_connect_view_clarifies_jtag_and_usb_uart_connections():

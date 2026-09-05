@@ -12479,23 +12479,35 @@ const VersionsView = {
         // Bridge build identity
         const bridgeInfo = status && status.bridge ? status.bridge : {};
         const bridgeVersion = bridgeInfo.bridge_version;
-        const expectedBridgeVersion = status ? status.expected_build_version : null;
+        const latestBridgeVersion = status
+            ? (status.latest_bridge_version != null
+                ? status.latest_bridge_version
+                : status.expected_build_version)
+            : null;
         if (status && status.bridge_connected && bridgeVersion == null) {
             add('warn', 'Bridge version is unavailable',
                 [
                     'Download the current Wukong bridge from the Connect tab or the IDE download link.',
                     'Replace the old wukong_bridge.py on the Windows host and restart it.',
                     'Refresh this Versions view and confirm the bridge reports its version.'
-                ], 'Stop if the bridge version cannot be confirmed against the build.');
+                ], 'Stop if the bridge version cannot be confirmed against the current downloadable bridge.');
         } else if (status && status.bridge_connected &&
-                   expectedBridgeVersion != null && bridgeVersion != null &&
-                   Number(bridgeVersion) !== Number(expectedBridgeVersion)) {
-            add('warn', `Bridge v${bridgeVersion} \u2260 repo build v${expectedBridgeVersion}`,
+                   latestBridgeVersion != null && bridgeVersion != null &&
+                   Number(bridgeVersion) < Number(latestBridgeVersion)) {
+            add('warn', `New bridge version available (running v${bridgeVersion}, latest v${latestBridgeVersion})`,
                 [
                     'Download the current Wukong bridge from the Connect tab or the IDE download link.',
                     'Replace the old wukong_bridge.py on the Windows host and restart it.',
-                    'Refresh this Versions view and confirm the bridge version matches the repo build.'
-                ], 'Stop until the bridge and FPGA build identities match.');
+                    'Refresh this Versions view and confirm the bridge reports the latest downloadable version.'
+                ], 'Update the host bridge before relying on bridge-side behavior that requires the latest version.');
+        } else if (status && status.bridge_connected &&
+                   latestBridgeVersion != null && bridgeVersion != null &&
+                   Number(bridgeVersion) > Number(latestBridgeVersion)) {
+            add('warn', `Bridge v${bridgeVersion} is newer than the IDE's downloadable v${latestBridgeVersion}`,
+                [
+                    'Confirm that the IDE server and downloaded bridge come from the same release.',
+                    'If the host bridge is intentional, keep a copy of this version before replacing it.'
+                ], 'Do not assume an unrecognized newer bridge is compatible with this IDE.');
         }
 
         // Bitstream metadata
@@ -13014,23 +13026,37 @@ const VersionsView = {
         }
         const bridge = status.bridge || {};
         const version = bridge.bridge_version;
-        const expected = status.expected_build_version;
+        // Older servers did not expose latest_bridge_version. Falling back to
+        // expected_build_version preserves their old comparison behavior while
+        // current servers compare only against the downloadable bridge.
+        const latest = status.latest_bridge_version != null
+            ? status.latest_bridge_version
+            : status.expected_build_version;
         const versionKnown = version != null && /^\d+$/.test(String(version));
+        const latestKnown = latest != null && /^\d+$/.test(String(latest));
         let badge;
         if (!status.bridge_connected) {
             badge = this._badge('bad', 'Offline');
         } else if (!versionKnown) {
             badge = this._badge('unknown', 'Version unavailable');
-        } else if (expected == null) {
-            badge = this._badge('unknown', 'Build expectation unavailable');
-        } else if (Number(version) === Number(expected)) {
-            badge = this._badge('ok', `Matches build v${this._esc(expected)}`);
+        } else if (!latestKnown) {
+            badge = this._badge('unknown', 'Latest version unavailable');
+        } else if (Number(version) < Number(latest)) {
+            badge = this._badge('warn', 'New version available');
+        } else if (Number(version) === Number(latest)) {
+            badge = this._badge('ok', 'Up to date');
         } else {
-            badge = this._badge('warn', `Does not match build v${this._esc(expected)}`);
+            badge = this._badge('warn', 'Bridge newer than IDE');
         }
         const versionLine = versionKnown
-            ? `<div class="versions-value">bridge v${this._esc(version)}</div>`
+            ? `<div class="versions-value">Running bridge v${this._esc(version)}</div>`
             : '<div class="versions-value">bridge version unknown</div>';
+        const latestLine = latestKnown
+            ? `<div class="versions-note">Latest downloadable bridge v${this._esc(latest)}</div>`
+            : '';
+        const expectedLine = status.expected_build_version != null
+            ? `<div class="versions-note">FPGA build expectation v${this._esc(status.expected_build_version)} (separate from bridge updates)</div>`
+            : '';
         const portLine = bridge.serial_port
             ? `<div class="versions-note">Serial port <code>${this._esc(bridge.serial_port)}</code></div>`
             : '';
@@ -13040,7 +13066,10 @@ const VersionsView = {
         const offlineNote = !status.bridge_connected
             ? '<div class="versions-note">Start the Windows Wukong bridge, then refresh this view.</div>'
             : '';
-        el.innerHTML = versionLine + badge + portLine + ageLine + offlineNote;
+        const downloadLine =
+            '<div class="versions-note"><a href="/dl/wukong-bridge" download="wukong_bridge.py">Download current bridge.py</a></div>';
+        el.innerHTML = versionLine + latestLine + badge + expectedLine +
+            portLine + ageLine + offlineNote + downloadLine;
     },
 
     _namespaceMatchLine(match) {

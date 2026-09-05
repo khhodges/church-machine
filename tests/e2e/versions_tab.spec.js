@@ -60,6 +60,42 @@ test.describe('Builder ▸ Versions tab', () => {
         }
     });
 
+    test('bridge card distinguishes update, current, newer, and offline states', async ({ page }) => {
+        await openVersionsTab(page);
+        const render = status => page.evaluate(s => {
+            window.VersionsView._renderBridge(s);
+            return document.getElementById('versionsBridgeBody').innerText;
+        }, status);
+
+        await expect.poll(() => render({
+            bridge_connected: true,
+            bridge: { bridge_version: 17 },
+            latest_bridge_version: 18,
+            expected_build_version: 20,
+        })).toMatch(/Running bridge v17[\s\S]*Latest downloadable bridge v18[\s\S]*New version available/);
+
+        await expect.poll(() => render({
+            bridge_connected: true,
+            bridge: { bridge_version: 18 },
+            latest_bridge_version: 18,
+            expected_build_version: 20,
+        })).toMatch(/Up to date/);
+
+        await expect.poll(() => render({
+            bridge_connected: true,
+            bridge: { bridge_version: 19 },
+            latest_bridge_version: 18,
+            expected_build_version: 20,
+        })).toMatch(/Bridge newer than IDE/);
+
+        await expect.poll(() => render({
+            bridge_connected: false,
+            bridge: {},
+            latest_bridge_version: 18,
+            expected_build_version: 20,
+        })).toMatch(/Latest downloadable bridge v18[\s\S]*Offline[\s\S]*Download current bridge\.py/);
+    });
+
     test('manual refresh updates last-checked stamp', async ({ page }) => {
         await openVersionsTab(page);
         await expect(page.locator('#versionsLastChecked')).not.toHaveText('', { timeout: 15000 });

@@ -253,8 +253,9 @@ BOOT_SENTINEL_V2  = 0xBC   # current 3-byte sentinel magic
 SENTINEL_V1_LEN   = 2      # 0xBB  N_INIT&0xFF
 SENTINEL_V2_LEN   = 4      # 0xBC  N_INIT&0xFF  TU_VERSION  BUILD_VERSION
 # The bridge is distributed as a standalone file, so it cannot import the
-# FPGA source's WUKONG_BUILD_VERSION when it runs on Windows. Keep this
-# advertised bridge/build identity in lockstep with wukong_top.py.
+# FPGA source's WUKONG_BUILD_VERSION when it runs on Windows. This is the
+# downloadable host-bridge version, intentionally tracked separately from
+# the FPGA build version.
 BRIDGE_VERSION    = 18
 
 # Minimum TU_VERSION required to guarantee correct ELOADCALL/XLOADLAMBDA trace.

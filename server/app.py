@@ -416,6 +416,20 @@ def _wukong_build_version():
         pass
     return None
 
+def _wukong_bridge_version():
+    """Read the version of the canonical downloadable bridge (best-effort)."""
+    try:
+        bridge = os.path.join(os.path.dirname(__file__), "..", "hardware",
+                              "wukong_bridge.py")
+        with open(os.path.abspath(bridge)) as f:
+            for line in f:
+                m = re.match(r"\s*BRIDGE_VERSION\s*=\s*(\d+)", line)
+                if m:
+                    return int(m.group(1))
+    except Exception:
+        pass
+    return None
+
 def _wukong_build_dir():
     """Directory holding the pre-built Wukong bitstream (patchable in tests)."""
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "build"))
@@ -14337,6 +14351,10 @@ def wukong_status_get():
         # Repo-side expectations so the Versions view can compare against the
         # sentinel-reported build_version / tu_version without extra requests.
         'expected_build_version': _wukong_build_version(),
+        # This is intentionally separate from expected_build_version: the
+        # bridge is a downloadable host script and may be released on a
+        # different cadence from the FPGA bitstream.
+        'latest_bridge_version': _wukong_bridge_version(),
         'min_tu_version':         _wukong_min_tu_version(),
         'min_thread_scheduler_build': _wukong_min_thread_scheduler_build(),
         # Relay state — active when a dev IDE is mirroring from a remote server.
