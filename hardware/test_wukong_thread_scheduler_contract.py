@@ -530,16 +530,22 @@ def test_full_core_thread_switch_resume_nia_contract(decoded_change):
         ) == 1
 
 @pytest.mark.parametrize(
-    ("flag_name", "saved_flags", "condition"),
+    ("condition_name", "saved_flags", "condition"),
     [
         ("Z", 0b0010, CondCode.EQ),
         ("N", 0b0001, CondCode.MI),
         ("C", 0b0100, CondCode.CS),
         ("V", 0b1000, CondCode.VS),
+        ("HI", 0b0100, CondCode.HI),
+        ("LS", 0b0110, CondCode.LS),
+        ("GE", 0b1001, CondCode.GE),
+        ("LT", 0b0001, CondCode.LT),
+        ("GT", 0b1101, CondCode.GT),
+        ("LE", 0b0010, CondCode.LE),
     ],
 )
 def test_full_core_thread_switch_preserves_flags_for_next_branch(
-        flag_name, saved_flags, condition):
+        condition_name, saved_flags, condition):
     """A resumed conditional branch consumes canonical NZCV from its frame."""
     (dmem, source_first, _, target_first, _, source_instr, _) = \
         _thread_switch_core_image(False)
@@ -643,7 +649,7 @@ def test_full_core_thread_switch_preserves_flags_for_next_branch(
             await ctx.tick()
         else:
             raise AssertionError(
-                f"{flag_name}-set branch did not reach taken path after round trip: "
+                f"{condition_name} branch did not reach taken path after round trip: "
                 f"{observed[-12:]}")
         assert switched_out
         assert resume_requested
