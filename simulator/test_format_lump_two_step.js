@@ -78,6 +78,18 @@ const LumpContentFrame = require('./lump-content-frame.js');
             nullifyIdx !== -1 && nullifyIdx < registerMemoryIdx,
             `nullify@${nullifyIdx} registerMemory@${registerMemoryIdx}`
         );
+
+        const fallbackFrameBuildIdx = fnBody.indexOf(
+            'LumpContentFrame.lumpBuildContentFrame');
+        const fallbackFrameCopyIdx = fnBody.indexOf(
+            '_svBinary[_fallbackFrameStart + _svFrameI]');
+        check(
+            'T1d stale/direct-save fallback preserves the V1.3 content frame',
+            fallbackFrameBuildIdx !== -1 && fallbackFrameCopyIdx !== -1 &&
+            fallbackFrameBuildIdx < fallbackFrameCopyIdx &&
+            fallbackFrameCopyIdx < registerMemoryIdx,
+            `frameBuild@${fallbackFrameBuildIdx} frameCopy@${fallbackFrameCopyIdx} registerMemory@${registerMemoryIdx}`
+        );
     }
 }
 

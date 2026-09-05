@@ -1,47 +1,333 @@
 [
-  {"token":"00001200","abstraction":"Constants","version":"1.0","lump_version":0,"filename":"Constants.1.e494696f.lump"},
-  {"token":"00001001","abstraction":"SlideRule.Haskell","variant_group":null,"lump_version":0,"filename":"SlideRule.Haskell.1.3542a2db.lump"},
-  {"token":"ab1e86af","abstraction":"WordString","version":"3.0.0","lump_version":0,"filename":"WordString.1.a1682b26.lump"},
-  {"token":"00001f00","abstraction":"Tunnel","lump_version":0,"filename":"Tunnel.1.8770bf03.lump"},
-  {"token":"00002000","abstraction":"Keystone","version":"1.0","lump_version":0,"filename":"Keystone.1.86b853a1.lump"},
-  {"token":"b169bba4","abstraction":"Ethernet","version":"1.1.0","lump_version":0,"filename":"Ethernet.1.b169bba4.lump"},
-  {"token":"cb8739cf","abstraction":"GT.Encoding.v1.1.Hardware.Self-Test","version":"2026.05.16","lump_version":1,"compiled_at":1778972781.9372587,"filename":"GT.Encoding.v1.1.Hardware.Self-Test.1.254f3542.lump"},
-  {"token":"ab3de4fd","abstraction":"Salvation","version":"2026.05.17","lump_version":1,"compiled_at":1779016560.4863155,"filename":"Salvation.1.6be43a9d.lump"},
-  {"token":"5a93ce79","abstraction":"BernoulliNumbers","version":"2026.05.19","lump_version":2,"compiled_at":1779196707.4638784,"filename":"BernoulliNumbers.1.656dd0e4.lump"},
-  {"token":"50ce4c64","abstraction":"StringOps","version":"2026.05.19","lump_version":1,"compiled_at":1779196739.8008907,"filename":"StringOps.1.05b56245.lump"},
-  {"token":"d9454529","abstraction":"EnglishLoops","version":"2026.05.19","lump_version":1,"compiled_at":1779196746.7156434,"filename":"EnglishLoops.1.19366291.lump"},
-  {"token":"19d3e599","abstraction":"IntegerOps","version":"2026.05.19","lump_version":5,"compiled_at":1779210603.7170122,"filename":"IntegerOps.1.54c9a1e9.lump"},
-  {"token":"04a720f8","abstraction":"NoteG","filename":"NoteG.1.04a720f8.lump","version":"","lump_version":6,"compiled_at":1779886993.949057},
-  {"token":"97cc8047","abstraction":"Human.Hand","filename":"Human.Hand.1.e88911d6.lump","lump_version":13,"compiled_at":1781626299.266924},
-  {"token":"b3076308","abstraction":"EventRouter","version":"1.0.0","lump_version":0,"filename":"EventRouter.1.032ca4ee.lump"},
-  {"token":"c3963aed","abstraction":"Memory","filename":"Memory.1.3359e86e.lump","version":"2026.07.09","lump_version":1,"compiled_at":1783630782.9145057},
-  {"token":"00000800","abstraction":"Scheduler.IRQ","version":"2026.07.23","lump_version":1,"filename":"Scheduler.IRQ.1.439e0ddd.lump"},
-  {"token":"00130000","abstraction":"Loader","filename":"Loader.1.19ba3a9d.lump","lump_version":1,"compiled_at":1785333917.725582},
-  {"token":"55f1a32f","abstraction":"LEDFlash","filename":"LEDFlash.1.55f1a32f.lump","lump_version":3,"compiled_at":1785334347.719854},
-  {"token":"e186c4ec","abstraction":"WukongCallHome","filename":"WukongCallHome.1.2f3d7d46.lump","variant_group":"WukongCallHome","version":"1.0","lump_version":1},
-  {"token":"1dcb7b09","abstraction":"WukongCallHome.hw","filename":"WukongCallHome.hw.1.1dcb7b09.lump","variant_group":"WukongCallHome","version":"1.0","lump_version":1},
-  {"token":"d78f751b","abstraction":"MorseCmOk","filename":"MorseCmOk.1.eb20fe01.lump","version":"2026.08.03","lump_version":4,"compiled_at":1785802519.915584},
-  {"token":"00001000","abstraction":"SlideRule","filename":"SlideRule.1.d960f531.lump","version":"2026.08.13","lump_version":2,"compiled_at":1786659063.1567092},
-  {"token":"00000600","abstraction":"SelfTest","filename":"SelfTest.1.485e71f6.lump","version":"1.2","lump_version":76,"variant_group":"compiled_selftest"},
-  {"token":"00000700","abstraction":"WukongCallHome","filename":"WukongCallHome.1.71c2809c.lump","variant_group":"WukongCallHome","version":"","lump_version":6,"compiled_at":1787099291.9433396},
-  {"token":"46738c7a","abstraction":"WukongCallHome","filename":"WukongCallHome.1.2fa83c3d.lump","version":"","lump_version":7,"compiled_at":1787142997.7081983,"variant_group":"WukongCallHome"},
-  {"token":"8f7520e5","abstraction":"WukongCallHome","filename":"WukongCallHome.1.9089ba84.lump","version":"","lump_version":7,"compiled_at":1787174128.0646396,"variant_group":"WukongCallHome"},
-  {"token":"c7425d6c","abstraction":"CapabilityTest","filename":"c7425d6c.lump","archived":true,"variant_group":"capabilitytest-history","lump_version":1},
-  {"token":"fe9c6e42","abstraction":"NoteGAssembly","filename":"NoteGAssembly.1.fed6f911.lump","version":"","lump_version":1,"compiled_at":1787419584.8995218},
-  {"token":"4ea370af","abstraction":"Abstraction:  NoteGAssembly","filename":"NoteGAssembly.1.f2e2eb3e.lump","version":"2026.08.22","lump_version":2,"compiled_at":1787428755.1996982},
-  {"token":"7c58f0f4","abstraction":"Bank","filename":"Bank.1.7c58f0f4.lump"},
-  {"token":"00003600","abstraction":"Bank","filename":"Bank.1.a4327568.lump","version":"2026.08.25","lump_version":1,"compiled_at":1787693049.1390812},
-  {"token":"501a76a0","abstraction":"PostFlashSelftest","variant_group":null,"lump_version":0},
-  {"token":"0f8ad81b","abstraction":"MyAbstraction","filename":"MyAbstraction.1.827cfd7c.lump","version":"2026.08.26","lump_version":5,"compiled_at":1787756643.8760083},
-  {"token":"56096905","abstraction":"SelfTest","filename":"SelfTest.1.199d8c30.lump","version":"","lump_version":78,"compiled_at":1787782122.8900723},
-  {"token":"13812cdf","abstraction":"Church Machine Post-Flash Exhaustive Self-Test v1.1","filename":"Church.Machine.Post-Flash.Exhaustive.Self-Test.v1.1.1.777cc8d3.lump","version":"2026.08.29","lump_version":3,"compiled_at":1788014967.3553412},
-  {"token":"9ce28c0b","abstraction":"CapabilityTest","filename":"CapabilityTest.1.e4fe164d.lump","version":"","lump_version":11,"compiled_at":1788187312.1902559},
-  {"token":"c7657c2d","abstraction":"CapabilityTest","filename":"CapabilityTest.1.b49e8eca.lump","version":"","lump_version":12,"compiled_at":1788187484.6248598},
-  {"token":"072454a8","abstraction":"ide.testMbit","filename":"ide.testMbit.1.d5046b90.lump","version":"2026.09.04","lump_version":1,"compiled_at":1788524021.0854387},
-  {"token":"00aa9999","abstraction":"Legacy","filename":"Legacy.1.8b7fb77f.lump","version":"","lump_version":90,"compiled_at":1788638922.2078648},
-  {"token":"00000a00","abstraction":"CapabilityTest","filename":"CapabilityTest.2.4dc5c64e.lump","version":"","lump_version":2,"compiled_at":1786924012.3060646,"variant_group":"capabilitytest-history","archived":true},
-  {"token":"00000a00","abstraction":"CapabilityTest","filename":"CapabilityTest.1.b98a03c4.lump","version":"","lump_version":14,"compiled_at":1788613579.3748727,"variant_group":"capabilitytest-history"},
-  {"token":"00aa1234","abstraction":"Adder","filename":"Adder.1.2009489d.lump","version":"","lump_version":321,"compiled_at":1788638923.3473098},
-  {"token":"1eec355e","abstraction":"ide.Alice","filename":"ide.Alice.1.1eec355e.lump"},
-  {"token":"0ca567b5","abstraction":"ide.Mallory","filename":"ide.Mallory.1.0ca567b5.lump"}
+  {
+    "token": "00001200",
+    "abstraction": "Constants",
+    "version": "1.0",
+    "lump_version": 0,
+    "filename": "Constants.1.e494696f.lump"
+  },
+  {
+    "token": "00001001",
+    "abstraction": "SlideRule.Haskell",
+    "variant_group": null,
+    "lump_version": 0,
+    "filename": "SlideRule.Haskell.1.3542a2db.lump"
+  },
+  {
+    "token": "ab1e86af",
+    "abstraction": "WordString",
+    "version": "3.0.0",
+    "lump_version": 0,
+    "filename": "WordString.1.a1682b26.lump"
+  },
+  {
+    "token": "00001f00",
+    "abstraction": "Tunnel",
+    "lump_version": 0,
+    "filename": "Tunnel.1.8770bf03.lump"
+  },
+  {
+    "token": "00002000",
+    "abstraction": "Keystone",
+    "version": "1.0",
+    "lump_version": 0,
+    "filename": "Keystone.1.86b853a1.lump"
+  },
+  {
+    "token": "b169bba4",
+    "abstraction": "Ethernet",
+    "version": "1.1.0",
+    "lump_version": 0,
+    "filename": "Ethernet.1.b169bba4.lump"
+  },
+  {
+    "token": "cb8739cf",
+    "abstraction": "GT.Encoding.v1.1.Hardware.Self-Test",
+    "version": "2026.05.16",
+    "lump_version": 1,
+    "compiled_at": 1778972781.9372587,
+    "filename": "GT.Encoding.v1.1.Hardware.Self-Test.1.254f3542.lump"
+  },
+  {
+    "token": "ab3de4fd",
+    "abstraction": "Salvation",
+    "version": "2026.05.17",
+    "lump_version": 1,
+    "compiled_at": 1779016560.4863155,
+    "filename": "Salvation.1.6be43a9d.lump"
+  },
+  {
+    "token": "5a93ce79",
+    "abstraction": "BernoulliNumbers",
+    "version": "2026.05.19",
+    "lump_version": 2,
+    "compiled_at": 1779196707.4638784,
+    "filename": "BernoulliNumbers.1.656dd0e4.lump"
+  },
+  {
+    "token": "50ce4c64",
+    "abstraction": "StringOps",
+    "version": "2026.05.19",
+    "lump_version": 1,
+    "compiled_at": 1779196739.8008907,
+    "filename": "StringOps.1.05b56245.lump"
+  },
+  {
+    "token": "d9454529",
+    "abstraction": "EnglishLoops",
+    "version": "2026.05.19",
+    "lump_version": 1,
+    "compiled_at": 1779196746.7156434,
+    "filename": "EnglishLoops.1.19366291.lump"
+  },
+  {
+    "token": "19d3e599",
+    "abstraction": "IntegerOps",
+    "version": "2026.05.19",
+    "lump_version": 5,
+    "compiled_at": 1779210603.7170122,
+    "filename": "IntegerOps.1.54c9a1e9.lump"
+  },
+  {
+    "token": "04a720f8",
+    "abstraction": "NoteG",
+    "filename": "NoteG.1.04a720f8.lump",
+    "version": "",
+    "lump_version": 6,
+    "compiled_at": 1779886993.949057
+  },
+  {
+    "token": "97cc8047",
+    "abstraction": "Human.Hand",
+    "filename": "Human.Hand.1.e88911d6.lump",
+    "lump_version": 13,
+    "compiled_at": 1781626299.266924
+  },
+  {
+    "token": "b3076308",
+    "abstraction": "EventRouter",
+    "version": "1.0.0",
+    "lump_version": 0,
+    "filename": "EventRouter.1.032ca4ee.lump"
+  },
+  {
+    "token": "c3963aed",
+    "abstraction": "Memory",
+    "filename": "Memory.1.3359e86e.lump",
+    "version": "2026.07.09",
+    "lump_version": 1,
+    "compiled_at": 1783630782.9145057
+  },
+  {
+    "token": "00000800",
+    "abstraction": "Scheduler.IRQ",
+    "version": "2026.07.23",
+    "lump_version": 1,
+    "filename": "Scheduler.IRQ.1.439e0ddd.lump"
+  },
+  {
+    "token": "00130000",
+    "abstraction": "Loader",
+    "filename": "Loader.1.19ba3a9d.lump",
+    "lump_version": 1,
+    "compiled_at": 1785333917.725582
+  },
+  {
+    "token": "55f1a32f",
+    "abstraction": "LEDFlash",
+    "filename": "LEDFlash.1.55f1a32f.lump",
+    "lump_version": 3,
+    "compiled_at": 1785334347.719854
+  },
+  {
+    "token": "e186c4ec",
+    "abstraction": "WukongCallHome",
+    "filename": "WukongCallHome.1.2f3d7d46.lump",
+    "variant_group": "WukongCallHome",
+    "version": "1.0",
+    "lump_version": 1
+  },
+  {
+    "token": "1dcb7b09",
+    "abstraction": "WukongCallHome.hw",
+    "filename": "WukongCallHome.hw.1.1dcb7b09.lump",
+    "variant_group": "WukongCallHome",
+    "version": "1.0",
+    "lump_version": 1
+  },
+  {
+    "token": "d78f751b",
+    "abstraction": "MorseCmOk",
+    "filename": "MorseCmOk.1.eb20fe01.lump",
+    "version": "2026.08.03",
+    "lump_version": 4,
+    "compiled_at": 1785802519.915584
+  },
+  {
+    "token": "00001000",
+    "abstraction": "SlideRule",
+    "filename": "SlideRule.1.d960f531.lump",
+    "version": "2026.08.13",
+    "lump_version": 2,
+    "compiled_at": 1786659063.1567092
+  },
+  {
+    "token": "00000600",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.1.485e71f6.lump",
+    "version": "1.2",
+    "lump_version": 76,
+    "variant_group": "compiled_selftest"
+  },
+  {
+    "token": "00000700",
+    "abstraction": "WukongCallHome",
+    "filename": "WukongCallHome.1.71c2809c.lump",
+    "variant_group": "WukongCallHome",
+    "version": "",
+    "lump_version": 6,
+    "compiled_at": 1787099291.9433396
+  },
+  {
+    "token": "46738c7a",
+    "abstraction": "WukongCallHome",
+    "filename": "WukongCallHome.1.2fa83c3d.lump",
+    "version": "",
+    "lump_version": 7,
+    "compiled_at": 1787142997.7081983,
+    "variant_group": "WukongCallHome"
+  },
+  {
+    "token": "8f7520e5",
+    "abstraction": "WukongCallHome",
+    "filename": "WukongCallHome.1.9089ba84.lump",
+    "version": "",
+    "lump_version": 7,
+    "compiled_at": 1787174128.0646396,
+    "variant_group": "WukongCallHome"
+  },
+  {
+    "token": "c7425d6c",
+    "abstraction": "CapabilityTest",
+    "filename": "c7425d6c.lump",
+    "archived": true,
+    "variant_group": "capabilitytest-history",
+    "lump_version": 1
+  },
+  {
+    "token": "fe9c6e42",
+    "abstraction": "NoteGAssembly",
+    "filename": "NoteGAssembly.1.fed6f911.lump",
+    "version": "",
+    "lump_version": 1,
+    "compiled_at": 1787419584.8995218
+  },
+  {
+    "token": "4ea370af",
+    "abstraction": "Abstraction:  NoteGAssembly",
+    "filename": "NoteGAssembly.1.f2e2eb3e.lump",
+    "version": "2026.08.22",
+    "lump_version": 2,
+    "compiled_at": 1787428755.1996982
+  },
+  {
+    "token": "7c58f0f4",
+    "abstraction": "Bank",
+    "filename": "Bank.1.7c58f0f4.lump"
+  },
+  {
+    "token": "00003600",
+    "abstraction": "Bank",
+    "filename": "Bank.1.a4327568.lump",
+    "version": "2026.08.25",
+    "lump_version": 1,
+    "compiled_at": 1787693049.1390812
+  },
+  {
+    "token": "501a76a0",
+    "abstraction": "PostFlashSelftest",
+    "variant_group": null,
+    "lump_version": 0
+  },
+  {
+    "token": "0f8ad81b",
+    "abstraction": "MyAbstraction",
+    "filename": "MyAbstraction.1.827cfd7c.lump",
+    "version": "2026.08.26",
+    "lump_version": 5,
+    "compiled_at": 1787756643.8760083
+  },
+  {
+    "token": "56096905",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.1.199d8c30.lump",
+    "version": "",
+    "lump_version": 78,
+    "compiled_at": 1787782122.8900723
+  },
+  {
+    "token": "13812cdf",
+    "abstraction": "Church Machine Post-Flash Exhaustive Self-Test v1.1",
+    "filename": "Church.Machine.Post-Flash.Exhaustive.Self-Test.v1.1.1.777cc8d3.lump",
+    "version": "2026.08.29",
+    "lump_version": 3,
+    "compiled_at": 1788014967.3553412
+  },
+  {
+    "token": "9ce28c0b",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.1.e4fe164d.lump",
+    "version": "",
+    "lump_version": 11,
+    "compiled_at": 1788187312.1902559
+  },
+  {
+    "token": "c7657c2d",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.1.b49e8eca.lump",
+    "version": "",
+    "lump_version": 12,
+    "compiled_at": 1788187484.6248598
+  },
+  {
+    "token": "072454a8",
+    "abstraction": "ide.testMbit",
+    "filename": "ide.testMbit.1.d5046b90.lump",
+    "version": "2026.09.04",
+    "lump_version": 1,
+    "compiled_at": 1788524021.0854387
+  },
+  {
+    "token": "00aa9999",
+    "abstraction": "Legacy",
+    "filename": "Legacy.1.8b7fb77f.lump",
+    "version": "",
+    "lump_version": 90,
+    "compiled_at": 1788638922.2078648
+  },
+  {
+    "token": "00aa1234",
+    "abstraction": "Adder",
+    "filename": "Adder.1.2009489d.lump",
+    "version": "",
+    "lump_version": 321,
+    "compiled_at": 1788638923.3473098
+  },
+  {
+    "token": "1eec355e",
+    "abstraction": "ide.Alice",
+    "filename": "ide.Alice.1.1eec355e.lump"
+  },
+  {
+    "token": "0ca567b5",
+    "abstraction": "ide.Mallory",
+    "filename": "ide.Mallory.1.0ca567b5.lump"
+  },
+  {
+    "token": "00000a00",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.1.ac2b4b1b.lump",
+    "lump_version": 15,
+    "compiled_at": 1788646263.991351
+  }
 ]

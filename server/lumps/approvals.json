@@ -1,5 +1,18 @@
 {
   "version": 1,
   "algorithm": "sha256",
-  "approvals": {}
+  "approvals": {
+    "19943df0ea2dd6dbceb5569aa23ce2e075ac18d1f904be6294b71b817bbd6fc1": {
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "19943df0ea2dd6dbceb5569aa23ce2e075ac18d1f904be6294b71b817bbd6fc1",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
+      "filename": "CapabilityTest.1.ac2b4b1b.lump"
+    }
+  }
 }

@@ -14552,10 +14552,46 @@ async function confirmSaveToNamespace() {
         } else {
             // Fallback: build from scratch (direct Save-to-NS, or a recompile
             // invalidated the pending binary between Format Lump and Proceed).
+            // This path must build the same V1.3 self-definition frame as the
+            // Format dialog. Previously it rebuilt only header/code/c-list,
+            // silently discarding source and even the API frame.
             var _svCC = _caps.length;
             var _svCW = _svWords.length;
+            var _fallbackSourceEl = document.getElementById('asmEditor');
+            var _fallbackSourceText = _fallbackSourceEl
+                ? (_fallbackSourceEl.value || '') : '';
+            var _fallbackProfile = _snapshotPending &&
+                ['api', 'compact', 'full'].includes(_snapshotPending.selectedProfile)
+                ? _snapshotPending.selectedProfile : null;
+            if (!_fallbackProfile) {
+                try {
+                    _fallbackProfile = localStorage.getItem(
+                        'lumpOutputProfile:' + encodeURIComponent(_svAbsName));
+                } catch (_e) {}
+            }
+            if (!_fallbackSourceText.trim()) {
+                _fallbackProfile = 'api';
+            } else if (!['api', 'compact', 'full'].includes(_fallbackProfile)) {
+                _fallbackProfile = 'full';
+            }
+            if (typeof LumpContentFrame === 'undefined' ||
+                    typeof LumpContentFrame.lumpBuildContentFrame !== 'function' ||
+                    typeof _formatLumpApiDefinition !== 'function') {
+                alert('Save blocked: the embedded content-frame builder is unavailable.');
+                return;
+            }
+            var _fallbackFrame = await LumpContentFrame.lumpBuildContentFrame(
+                _formatLumpApiDefinition(_svAbsName, _caps),
+                _fallbackSourceText,
+                { profile: _fallbackProfile }
+            );
+            var _fallbackFrameWords = _fallbackFrame.frameWords;
+            var _fallbackFrameStart = 1 + _svCW;
             var _svLumpSize = 64;
-            while (_svLumpSize < 1 + _svCW + _svCC) _svLumpSize = _svLumpSize << 1;
+            while ((_svLumpSize - _svCC - _fallbackFrameStart) <
+                    _fallbackFrameWords.length) {
+                _svLumpSize = _svLumpSize << 1;
+            }
             var _svNm6 = 0;
             while ((64 << _svNm6) < _svLumpSize) _svNm6++;
             var _svHdr = (((0x1F & 0x1F) << 27) |
@@ -14566,6 +14602,10 @@ async function confirmSaveToNamespace() {
             _svBinary = new Array(_svLumpSize).fill(0);
             _svBinary[0] = _svHdr;
             for (var _svI = 0; _svI < _svCW; _svI++) _svBinary[1 + _svI] = (_svWords[_svI] >>> 0);
+            for (var _svFrameI = 0; _svFrameI < _fallbackFrameWords.length; _svFrameI++) {
+                _svBinary[_fallbackFrameStart + _svFrameI] =
+                    _fallbackFrameWords[_svFrameI] >>> 0;
+            }
             if (typeof CapabilityTokens === 'undefined') {
                 alert('Save blocked: capability token validator is unavailable.');
                 return;
