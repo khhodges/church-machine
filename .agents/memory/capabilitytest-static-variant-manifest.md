@@ -30,15 +30,15 @@ silently restore obsolete instructions.
 **How to apply:** Keep archival artifacts for provenance, but never expose
 their filename as a runnable LUMP alias.
 
-The physical Wukong factory CapabilityTest is a fixed 64-word image even when
-the active Namespace slot 10 record is replaced by a larger simulator LUMP.
-A release must not repoint the factory alias at the active larger binary or
-drop the factory variant's archived manifest binding.
+The Wukong standalone boot default must use the exact CapabilityTest selected
+by the IDE's live Namespace state. Historical variants may remain archived for
+provenance, but none has a privileged size, filename, issue, or executable
+alias.
 
-**Why:** A slot-10 replacement redirected the factory alias to a 512-word
-binary. The main server then failed during `boot_rom` import before opening its
-port.
+**Why:** A historical 64-word artifact was incorrectly promoted into a
+factory rule. Replacing the active slot-10 program with a valid 512-word LUMP
+then prevented the server from starting.
 
-**How to apply:** Treat the physical factory image and the active Namespace
-record as separate same-slot variants; preserve the exact factory
-binary/sidecar/hash binding through every replacement.
+**How to apply:** Resolve the live slot-10 filename from Namespace state,
+validate its binary against its sidecar and manifest record, and derive its
+allocation from the LUMP header. Never hardcode a historical CapabilityTest.

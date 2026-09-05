@@ -16,6 +16,7 @@ from hardware.boot_rom import (
     SCHEDULER_IRQ_CLIST,
     THREAD_MANAGER_CLIST,
     WUKONG_DEMO_CLIST,
+    WUKONG_CAPABILITY_TEST_FILENAME,
     WUKONG_CAPABILITY_TEST_WORDS,
 )
 from hardware.hw_types import (
@@ -48,23 +49,33 @@ def test_ordinary_boot_abstractions_do_not_receive_or_discover_mbit_caps():
         assert NAMESPACE_MBIT_CAPABILITY[0] not in clist
 
 
-def test_factory_capability_test_import_is_bound_to_canonical_artifact():
+def test_boot_default_uses_ide_selected_capability_test():
     root = Path(__file__).resolve().parents[2]
     lumps = root / "server" / "lumps"
-    filename = "CapabilityTest.2.4dc5c64e.lump"
+    ns_state = json.loads(
+        (lumps / "ns-state.json").read_text(encoding="utf-8"))
+    selected = [
+        item for item in ns_state["abstractions"]
+        if item.get("name") == "CapabilityTest" and item.get("slot") == 10
+    ]
+    assert len(selected) == 1
+    filename = selected[0]["filename"]
     raw = (lumps / filename).read_bytes()
     sidecar = json.loads(
-        (lumps / "CapabilityTest.2.4dc5c64e.json").read_text(encoding="utf-8"))
+        (lumps / Path(filename).with_suffix(".json")).read_text(encoding="utf-8"))
     manifest = json.loads(
         (lumps / "manifest.json").read_text(encoding="utf-8"))
     digest = hashlib.sha256(raw).hexdigest()
     entry = next(item for item in manifest if item.get("filename") == filename)
-    assert sidecar["token"] == entry["token"] == "00000a00"
+    assert WUKONG_CAPABILITY_TEST_FILENAME == filename
+    assert sidecar["token"] == entry["token"] == selected[0]["token"]
     assert sidecar["ns_slot"] == entry["ns_slot"] == 10
-    assert sidecar["issue_n"] == entry["issue_n"] == 2
+    assert sidecar["issue_n"] == entry["issue_n"] == selected[0]["issue_n"]
     assert sidecar["identity_hash"] == entry["identity_hash"]
     assert sidecar["binary_hash"] == entry["binary_hash"] == digest
-    assert len(WUKONG_CAPABILITY_TEST_WORDS) == 64
+    assert len(WUKONG_CAPABILITY_TEST_WORDS) == len(raw) // 4
+    header = WUKONG_CAPABILITY_TEST_WORDS[0]
+    assert len(WUKONG_CAPABILITY_TEST_WORDS) == 1 << (((header >> 23) & 0xF) + 6)
 
 
 def test_trusted_boot_invokes_namespace_init_and_sets_only_cr12_m():

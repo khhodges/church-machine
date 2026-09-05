@@ -148,7 +148,7 @@ class TraceEventDecoder(Elaboratable):
 # Increment this by 1 every time a new bitstream is synthesised and flashed.
 # The bridge reports it to the IDE so the FPGA status page can confirm exactly
 # which build is running — no need to reprogram just to check.
-WUKONG_BUILD_VERSION = 20  # CapabilityTest factory entry + corrected ISUB carry
+WUKONG_BUILD_VERSION = 20  # CapabilityTest boot default + corrected ISUB carry
 # A board advertising this build (or newer) supports M6 round-robin Thread
 # selection for projected multi-Thread uploads.  Keep this explicit rather
 # than treating any arbitrary future build number as an accidental capability.
