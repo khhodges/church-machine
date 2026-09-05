@@ -763,7 +763,7 @@ function smartCompile() {
 }
 
 // Auto-fill rights for capabilities with no declared rights, sourcing defaults
-// from the sidecar grants in _lumpsCache.  Mutates caps in place so that
+// from the matching approved capability grants in _lumpsCache.  Mutates caps in place so that
 // downstream draft text and _checkCapAccessRights both see the filled rights.
 // Returns {filled: [{name, defaults}]}.  Call before building draft text.
 function _autoFillCapRights(caps) {
@@ -804,7 +804,7 @@ function _autoFillCapRights(caps) {
 // caps: array of {name, rights} objects (as produced by the assembler/compiler).
 // Returns { errors: string[], warnings: string[] }.
 // Errors: missing rights, invalid right letters.
-// Warnings: rights exceed what the known type (sidecar) grants.
+// Warnings: rights exceed what the approved type grants.
 function _checkCapAccessRights(caps) {
     const errors = [], warnings = [];
     const VALID = new Set(['R', 'W', 'X', 'E']);
@@ -820,7 +820,7 @@ function _checkCapAccessRights(caps) {
             errors.push(`[ACL] ${name}: invalid rights "${bad.join('')}" — valid letters: R W X E`);
             continue;
         }
-        // Type check: compare declared rights against any known sidecar entry for this name.
+        // Type check: compare declared rights against an approved entry for this name.
         if (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) {
             let knownGrants = null;
             for (const lump of _lumpsCache) {
@@ -889,7 +889,7 @@ function _serializePortableLumpCapabilities(caps, words, clistStart) {
         const item = typeof cap === 'string' ? { name: cap } : { ...(cap || {}) };
         // A source-level portable descriptor may state its intended row.  The
         // compiler has already checked it in @portable mode; retain the actual
-        // row rather than allowing a caller-side sidecar to relocate it.
+        // row rather than allowing caller-provided metadata to relocate it.
         item.relocation_row = row;
         const isNullRow = item.null_row === true;
         item.rights = isNullRow ? [] : (Array.isArray(item.rights) && item.rights.length
@@ -1015,7 +1015,7 @@ function compileDraft() {
     draft += `  Code (cw):  ${codeSize} words\n`;
     draft += `  Lump size:  ${allocSize} words (power-of-2, ≥64)\n`;
     draft += `  Freespace:  ${freespace} words\n`;
-    draft += `  (Method offsets for FPGA dispatch: in sidecar metadata, not in binary)\n`;
+    draft += `  (Method offsets are recovered from the inspected binary content frame)\n`;
 
     draft += `\n  CALL split preview:\n`;
     if (clistCount > 0) {
@@ -1088,7 +1088,7 @@ function compileDraft() {
                 _aclExtraC += `\n═══════════════════════════════════════════════════\n`;
             }
             if (_afResultC && _afResultC.filled.length > 0) {
-                _aclExtraC += `  Auto-filled Permissions (from sidecar grants):\n`;
+                _aclExtraC += `  Auto-filled Permissions (from approved capability grants):\n`;
                 for (const f of _afResultC.filled)
                     _aclExtraC += `    \u2139 ${f.name}: [${f.defaults.join('')}] inserted automatically\n`;
             }
@@ -1204,7 +1204,7 @@ function _lumpSummaryLabel(absName, ver, nsSlot, cw) {
     return `${absName} v${ver}${_nsPart} ${cw}w \u00b7 ${_dateStr}`;
 }
 
-function _doWipVersionSave() {
+async function _doWipVersionSave() {
     if (!_pendingWipSave) return;
     const { savePayload, listing, con, binaryBuf, sizeBytes, absName, _autoVer } = _pendingWipSave;
     _pendingWipSave   = null;
@@ -1212,6 +1212,9 @@ function _doWipVersionSave() {
     // Clear WIP token — this abstraction is now a proper released version
     try { localStorage.removeItem('church_wip_token'); } catch (_e) {}
 
+    const _wipIntent = await window._requestLumpApprovalIntent(
+        savePayload.binary, 'replace', savePayload.metadata);
+    savePayload.metadata.approval_intent = _wipIntent.intent;
     fetch('/api/lumps/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1237,7 +1240,7 @@ function _doWipVersionSave() {
             let _fl = listing;
             _fl += `  Version:    v${_autoVer} (auto)\n`;
             _fl += `\n  Downloaded: ${_dlN} (${sizeBytes} bytes)\n`;
-            _fl += `  Saved to:   server/lumps/ (binary + metadata sidecar)\n`;
+            _fl += `  Saved as:   immutable binary + hash-bound approval record\n`;
             if (con) {
                 con.innerHTML = _capRightsHTML(_fl);
                 con.classList.remove('cmp-html');
@@ -1323,7 +1326,7 @@ function _cancelLumpRelease() {
     if (overlay) overlay.style.display = 'none';
 }
 
-function _confirmLumpRelease() {
+async function _confirmLumpRelease() {
     if (!_pendingLumpRelease) return;
     const versionEl = document.getElementById('lumpReleaseVersion');
     const ver = versionEl ? versionEl.value.trim() : '';
@@ -1337,6 +1340,12 @@ function _confirmLumpRelease() {
 
     data.savePayload.metadata.version = ver;
     if (notes) data.savePayload.metadata.release_notes = notes;
+    const _releaseExisting = typeof _lumpsCache !== 'undefined' &&
+        _lumpsCache.some(l => l.abstraction === data.absName);
+    const _releaseIntent = await window._requestLumpApprovalIntent(
+        data.savePayload.binary, _releaseExisting ? 'replace' : 'save',
+        data.savePayload.metadata);
+    data.savePayload.metadata.approval_intent = _releaseIntent.intent;
 
     fetch('/api/lumps/save', {
         method: 'POST',
@@ -1362,7 +1371,7 @@ function _confirmLumpRelease() {
             listing += `  Version:   v${ver}\n`;
             if (notes) listing += `  Notes:     ${notes}\n`;
             listing += `\n  Downloaded: ${_dlName} (${data.sizeBytes} bytes)\n`;
-            listing += `  Saved to: server/lumps/ (binary + metadata sidecar)\n`;
+            listing += `  Saved as: immutable binary + hash-bound approval record\n`;
             if (data.con) { data.con.innerHTML = _capRightsHTML(listing); data.con.scrollTop = 0; }
             if (data.trackKey) trackAction(data.trackKey, data.trackData);
             if (data.appendMsg) appendOutput(data.appendMsg + ` \u00b7 v${ver}`, 'info');
@@ -1374,7 +1383,7 @@ function _confirmLumpRelease() {
     });
 }
 
-function compileAndBuild() {
+async function compileAndBuild() {
     const editor = document.getElementById('asmEditor');
     if (!editor || !cloomcCompiler) return;
     const source = editor.value;
@@ -1669,7 +1678,7 @@ function compileAndBuild() {
             _portableStatus = 'portable-pinned';
         } catch (_portableErr) {
             // Existing source forms that name only a local pet name have no T or
-            // full hash to pin. Saving remains possible but the sidecar is
+            // full hash to pin. Saving remains possible but approval metadata is
             // explicitly quarantined as legacy-unpinned rather than pretending
             // that local resolution made it portable.
             _portableStatus = 'portable-invalid';
@@ -1801,6 +1810,13 @@ function compileAndBuild() {
         return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
     })();
     savePayload.metadata.version = _autoVer;
+    if (!confirm(`Save "${absName}" as a new immutable LUMP?\n\n` +
+        'Approval will be bound to the exact SHA-256 of the compiled binary.')) return;
+    const _existingArtifact = typeof _lumpsCache !== 'undefined' &&
+        Array.isArray(_lumpsCache) && _lumpsCache.some(l => l.abstraction === absName);
+    const _buildIntent = await window._requestLumpApprovalIntent(
+        savePayload.binary, _existingArtifact ? 'replace' : 'save', savePayload.metadata);
+    savePayload.metadata.approval_intent = _buildIntent.intent;
 
     // ── WIP version gate ──────────────────────────────────────────────────────
     // If a WIP token is stored (programmer came from the /start page), defer
@@ -1860,7 +1876,7 @@ function compileAndBuild() {
             let _finalListing = listing;
             _finalListing += `  Version:    v${_autoVer} (auto)\n`;
             _finalListing += `\n  Downloaded: ${_dlName} (${sizeBytes} bytes)\n`;
-            _finalListing += `  Saved to:   server/lumps/ (binary + metadata sidecar)\n`;
+            _finalListing += `  Saved as:   immutable binary + hash-bound approval record\n`;
             if (con) {
                 con.innerHTML = _capRightsHTML(_finalListing);
                 con.scrollTop = 0;

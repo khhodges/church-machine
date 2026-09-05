@@ -5,7 +5,7 @@
 // Bank is dynamic: its SELF c-list identity chooses the proof-bound system
 // implementation, but never grants custody authority itself. The browser uses
 // the generated identity projection; Node tooling can additionally validate
-// the full manifest/sidecar/binary artifact before accepting that projection.
+// the full binary, hash-bound approval, and Namespace deployment record.
 
 (function exposeBankLumpBinding(root) {
     const DOT_NAME = 'Bank';
@@ -31,7 +31,7 @@
         return { ok: false, fault: 'BANK_LUMP_IDENTITY', message };
     }
 
-    function validateProjection(identity) {
+    function validateProjection(identity, requireDeploymentProjection = true) {
         if (!identity || typeof identity !== 'object') return fail('missing generated identity projection');
         if (identity.dot_name !== DOT_NAME || identity.issue_n !== ISSUE_N) {
             return fail('dot-name or issue does not identify Bank#1');
@@ -40,8 +40,9 @@
             identity.identity_hash !== IDENTITY_HASH) {
             return fail('projection does not match the canonical Bank#1 seals');
         }
-        if (identity.ns_slot !== null || identity.ns_slot_policy !== 'dynamic' ||
-            identity.boot_resident !== false) {
+        if (requireDeploymentProjection &&
+            (identity.ns_slot !== null || identity.ns_slot_policy !== 'dynamic' ||
+             identity.boot_resident !== false)) {
             return fail('Bank must remain a dynamic, non-resident LUMP');
         }
         const binding = identity.runtime_binding || {};
@@ -93,36 +94,35 @@
             policy.T3_3 === 'deferred-not-verified; human-IDE-vouched provenance only';
     }
 
-    function validateArtifact({ manifestEntry, sidecar, binary }) {
-        const projection = validateProjection(manifestEntry);
-        if (!projection.ok) return projection;
-        if (!sidecar || !binary || typeof binary.length !== 'number') {
-            return fail('manifest, sidecar, and binary are all required');
+    function validateArtifact({ manifestEntry, approval, namespaceRecord, binary }) {
+        if (!approval || !namespaceRecord || !binary || typeof binary.length !== 'number') {
+            return fail('binary, hash-bound approval, and Namespace deployment record are required');
         }
         const token = sha256(Buffer.concat([Buffer.from(DOT_NAME, 'utf8'), binary])).slice(0, 8);
         const identityHash = sha256(`${DOT_NAME}#${ISSUE_N}`);
         const binaryHash = sha256(binary);
-        if (token !== manifestEntry.token || binaryHash !== manifestEntry.binary_hash ||
-            identityHash !== manifestEntry.identity_hash) {
-            return fail('canonical manifest seals do not match the binary');
+        // A manifest entry is only a locator/projection. It may select a file,
+        // but none of its mutable fields can establish deployment or security.
+        if (manifestEntry && manifestEntry.token != null && manifestEntry.token !== token) {
+            return fail('manifest locator does not select the inspected binary');
         }
-        for (const field of ['token', 'binary_hash', 'identity_hash', 'ns_slot', 'ns_slot_policy', 'boot_resident']) {
-            if (sidecar[field] !== manifestEntry[field]) return fail(`sidecar ${field} disagrees with manifest`);
+        if (approval.approved !== true ||
+            approval.token !== token ||
+            approval.binary_hash !== binaryHash ||
+            approval.identity_hash !== identityHash) {
+            return fail('approval is not strictly bound to the inspected Bank binary');
         }
-        if (sidecar.genesis_authority !== manifestEntry.genesis_authority ||
-            sidecar.genesis_certificate_verification !== manifestEntry.genesis_certificate_verification) {
-            return fail('sidecar T3.3 authority decision disagrees with manifest');
+        const projection = validateProjection(approval, false);
+        if (!projection.ok) return projection;
+        const intrinsic = validateLump({ binary, metadata: approval });
+        if (!intrinsic.ok) return intrinsic;
+        if (namespaceRecord.token !== token ||
+            namespaceRecord.ns_slot_policy !== 'dynamic' ||
+            namespaceRecord.boot_resident !== false ||
+            namespaceRecord.ns_slot !== null) {
+            return fail('Namespace deployment record does not describe dynamic non-resident Bank');
         }
-        if (JSON.stringify(sidecar.runtime_binding) !== JSON.stringify(manifestEntry.runtime_binding)) {
-            return fail('sidecar runtime binding disagrees with manifest');
-        }
-        if (sidecar.identity_string !== `${DOT_NAME}#${ISSUE_N}` ||
-            binary.length < 8 || binary.readUInt32BE(binary.length - 4) !== manifestEntry.self_gt ||
-            !sidecar.permissions || !sidecar.permissions.c_list_row_0 ||
-            sidecar.permissions.c_list_row_0.gt !== `0x${manifestEntry.self_gt.toString(16).padStart(8, '0')}`) {
-            return fail('sidecar identity or binary SELF c-list row is invalid');
-        }
-        return { ok: true, result: manifestEntry };
+        return { ok: true, result: { approval, namespaceRecord } };
     }
 
     // Validate a LUMP value before Bank allocates private custody for it.

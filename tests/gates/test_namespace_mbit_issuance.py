@@ -61,18 +61,15 @@ def test_boot_default_uses_ide_selected_capability_test():
     assert len(selected) == 1
     filename = selected[0]["filename"]
     raw = (lumps / filename).read_bytes()
-    sidecar = json.loads(
-        (lumps / Path(filename).with_suffix(".json")).read_text(encoding="utf-8"))
     manifest = json.loads(
         (lumps / "manifest.json").read_text(encoding="utf-8"))
     digest = hashlib.sha256(raw).hexdigest()
     entry = next(item for item in manifest if item.get("filename") == filename)
     assert WUKONG_CAPABILITY_TEST_FILENAME == filename
-    assert sidecar["token"] == entry["token"] == selected[0]["token"]
-    assert sidecar["ns_slot"] == entry["ns_slot"] == 10
-    assert sidecar["issue_n"] == entry["issue_n"] == selected[0]["issue_n"]
-    assert sidecar["identity_hash"] == entry["identity_hash"]
-    assert sidecar["binary_hash"] == entry["binary_hash"] == digest
+    assert entry["token"] == selected[0]["token"]
+    assert entry["ns_slot"] == 10
+    assert entry["issue_n"] == selected[0]["issue_n"]
+    assert entry["binary_hash"] == digest
     assert len(WUKONG_CAPABILITY_TEST_WORDS) == len(raw) // 4
     header = WUKONG_CAPABILITY_TEST_WORDS[0]
     assert len(WUKONG_CAPABILITY_TEST_WORDS) == 1 << (((header >> 23) & 0xF) + 6)

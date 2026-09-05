@@ -2,10 +2,7 @@
 // scripts/build_event_router_lump.js
 //
 // Compiles simulator/cloomc/EventRouter.cloomc using CLOOMCCompiler,
-// packs the result into a valid LUMP binary with buildLump(), and writes:
-//
-//   server/lumps/<token>.lump   — binary (big-endian 32-bit words)
-//   server/lumps/<token>.json   — sidecar metadata
+// packs the result into a valid LUMP binary with buildLump(), and writes it.
 //
 // The token is the CRC-32 of all binary bytes (lower-cased 8-hex-char string).
 // Also updates server/lumps/manifest.json with the new entry.
@@ -29,7 +26,7 @@ const COMPILER    = path.join(ROOT, 'simulator', 'cloomc_compiler.js');
 const LUMP_BUILDER = path.join(ROOT, 'simulator', 'lump_builder.js');
 const SOURCE      = path.join(ROOT, 'simulator', 'cloomc', 'EventRouter.cloomc');
 
-// --out-dir <path>: redirect .lump/.json/manifest writes to a different
+// --out-dir <path>: redirect .lump/manifest writes to a different
 // directory (used by CI to validate without touching server/lumps/).
 const _outDirIdx  = process.argv.indexOf('--out-dir');
 const LUMPS_DIR   = (_outDirIdx !== -1 && process.argv[_outDirIdx + 1])
@@ -49,7 +46,7 @@ global.localStorage = {
 
 // Load CLOOMCCompiler (Node-style export)
 const CLOOMCCompiler = require(COMPILER);
-const { buildLump }  = require(LUMP_BUILDER);
+const { buildLump, buildApiDefinition, embedSelfDefinition } = require(LUMP_BUILDER);
 
 // ── Compile EventRouter.cloomc ───────────────────────────────────────────────
 const source = fs.readFileSync(SOURCE, 'utf8');
@@ -72,6 +69,9 @@ for (const m of result.methods) {
 
 // ── Pack LUMP binary via buildLump ────────────────────────────────────────────
 const packed = buildLump(result, { allocationWords: 64 });
+packed.words = embedSelfDefinition(
+    packed.words, buildApiDefinition(result, packed.words), source, 2);
+packed.lumpSize = packed.words.length;
 console.log(`\nLUMP packed:`);
 console.log(`  lumpSize=${packed.lumpSize}  cw=${packed.cw}  cc=${packed.cc}`);
 console.log(`  clistStart=${packed.clistStart}`);
@@ -112,7 +112,6 @@ console.log(`LUMP header: 0x${headerHex}`);
 
 // ── Write .lump binary ───────────────────────────────────────────────────────
 const lumpPath    = path.join(LUMPS_DIR, `${token}.lump`);
-const sidecarPath = path.join(LUMPS_DIR, `${token}.json`);
 
 fs.writeFileSync(lumpPath, bytes);
 console.log(`\nWritten: ${lumpPath} (${bytes.length} bytes)`);
@@ -146,31 +145,6 @@ function methodDesc(name) {
     };
     return descs[name] || '';
 }
-
-// ── Write sidecar .json ───────────────────────────────────────────────────────
-const sidecar = {
-    token,
-    abstraction: 'EventRouter',
-    ns_slot: NS_SLOT,
-    ns_slot_policy: 'static',
-    boot_resident: true,
-    lump_size: lumpSize,
-    cw: packed.cw,
-    cc: packed.cc,
-    methods: methodEntries,
-    grants: ['E'],
-    author: 'SIPantic',
-    version: '1.0.0',
-    lump_version: 0,
-    description: 'Event-to-handler routing table. Maps event Golden Tokens to handler capabilities. Public: Add, Remove, Resolve, List, Methods. Private helpers enforce internal access control (dispatch entry=0).',
-    // "source" must always reflect the exact text of simulator/cloomc/EventRouter.cloomc.
-    // Never leave this field empty — the build CI guard enforces it after every recompile.
-    source:      source,
-    source_file: 'simulator/cloomc/EventRouter.cloomc',
-};
-
-fs.writeFileSync(sidecarPath, JSON.stringify(sidecar, null, 2) + '\n');
-console.log(`Written: ${sidecarPath}`);
 
 // ── Update manifest.json ──────────────────────────────────────────────────────
 const manifestEntry = {

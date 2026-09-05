@@ -12,7 +12,10 @@ MANIFEST = LUMPS / "manifest.json"
 
 def _binding():
     entries = json.loads(MANIFEST.read_text())
-    bindings = [entry for entry in entries if entry.get("token") == "00000a00"]
+    bindings = [
+        entry for entry in entries
+        if entry.get("token") == "00000a00" and entry.get("issue_n") == 2
+    ]
     assert len(bindings) == 1
     binding = bindings[0]
     assert binding["abstraction"] == "CapabilityTest"
@@ -53,13 +56,10 @@ def test_all_switch_destinations_round_trip_without_aliasing():
         assert word & 0x7FFF == 3
 
 
-def test_sidecar_and_manifest_are_bound_to_exact_binary_and_source():
+def test_catalogue_is_bound_to_exact_binary():
     binding = _binding()
     binary = (LUMPS / binding["filename"]).read_bytes()
-    sidecar = json.loads((LUMPS / binding["sidecar_file"]).read_text())
     digest = hashlib.sha256(binary).hexdigest()
     assert binding["binary_hash"] == digest
-    assert sidecar["binary_hash"] == digest
-    assert sidecar["source"] == SOURCE.read_text()
-    assert sidecar["token"] == "00000a00"
-    assert sidecar["ns_slot"] == 10
+    assert binding["token"] == "00000a00"
+    assert binding["ns_slot"] == 10

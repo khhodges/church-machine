@@ -7,7 +7,7 @@
 //
 // Logic under test lives in simulator/app-memory.js:
 //   _nsSlotPolicyResolve  — overlay + defaults block in _nsPopulateAddMeta
-//   _nsSlotPersistRecord  — PATCH-body / cache-write block in _nsTableAddConfirm
+//   _nsSlotPersistRecord  — Namespace-state cache-write block in _nsTableAddConfirm
 //
 // Both helpers are exported via the NS_SLOT_PERSIST_UNIT_TEST_EXPORT marker so
 // the test exercises the real production logic without any DOM or fetch dependency.
@@ -18,15 +18,15 @@
 //   T01 — Export marker is present in app-memory.js (structural guard)
 //   T02 — confirm: static/slot=9 writes patchedPolicy='static', patchedSlot=9
 //   T03 — confirm: dynamic writes patchedPolicy='dynamic', patchedSlot=null
-//   T04 — cache path: persisted {static, 9} overrides stale server sidecar
-//   T05 — fresh-fetch path: server sidecar {static, 9} is used when cache is empty
+//   T04 — cache path: persisted {static, 9} overrides stale server detail
+//   T05 — fresh-fetch path: server detail {static, 9} is used when cache is empty
 //   T06 — cache path: persisted values override server's dynamic/null defaults
 //   T07 — legacy high slot from server is ignored without a saved choice
-//   T08 — fresh-fetch path: server sidecar {dynamic, null} yields policy=dynamic, nsSlotVal=''
+//   T08 — fresh-fetch path: server detail {dynamic, null} yields policy=dynamic, nsSlotVal=''
 //   T09 — cache path: after dynamic install the modal shows policy=dynamic, no slot
-//   T10 — resolve: sidecar with ns_slot=0 yields nsSlotVal='0' (falsy-zero guard)
-//   T11 — resolve: sidecar with no ns_slot_policy and no slot defaults to dynamic
-//   T12 — resolve: sidecar with no ns_slot_policy but slot present infers static
+//   T10 — resolve: detail with ns_slot=0 yields nsSlotVal='0' (falsy-zero guard)
+//   T11 — resolve: detail with no ns_slot_policy and no slot defaults to dynamic
+//   T12 — resolve: detail with no ns_slot_policy but slot present infers static
 
 const fs   = require('fs');
 const path = require('path');
@@ -55,6 +55,8 @@ const MARKER_START = 'NS_SLOT_PERSIST_UNIT_TEST_EXPORT_START';
 const MARKER_END   = 'NS_SLOT_PERSIST_UNIT_TEST_EXPORT_END';
 check('T01 export markers present in app-memory.js',
     src.includes(MARKER_START) && src.includes(MARKER_END));
+check('T01b app-memory never calls retired LUMP metadata PATCH',
+    !src.includes('/meta'));
 
 // Extract the block between the markers.
 const startIdx = src.indexOf('/* ---- ' + MARKER_START);
@@ -98,26 +100,26 @@ try {
 // _nsSlotPolicyResolve — cache path (same session)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// T04 — cache path: persisted {static, 9} overrides stale server sidecar
+// T04 — cache path: persisted {static, 9} overrides stale server detail
 // Scenario: server still returns dynamic/null (not yet updated), but the browser
 // cache has the fresh install record.  The modal must show static/9.
 {
     const token = 'deadbeef';
-    const serverSidecar = { token, ns_slot_policy: 'dynamic', ns_slot: null };
+    const serverDetail = { token, ns_slot_policy: 'dynamic', ns_slot: null };
     const cache = { [token]: { ns_slot_policy: 'static', ns_slot: 9 } };
-    const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverSidecar, token, cache);
+    const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverDetail, token, cache);
     check('T04 cache path: policy=static', policy    === 'static', policy);
     check('T04 cache path: nsSlotVal=9',  nsSlotVal === '9',      nsSlotVal);
 }
 
 // T05 — fresh-fetch path: server returns {static, 9}, cache is empty (page reload)
 // Scenario: user reloaded the page, _nsPersistedSlotMeta is {}. The detail endpoint
-// returns the sidecar updated by the previous PATCH.
+// returns the deployment detail updated by the previous PATCH.
 {
     const token = 'deadbeef';
-    const serverSidecar = { token, ns_slot_policy: 'static', ns_slot: 9 };
+    const serverDetail = { token, ns_slot_policy: 'static', ns_slot: 9 };
     const cache = {};
-    const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverSidecar, token, cache);
+    const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverDetail, token, cache);
     check('T05 fresh-fetch path: policy=static', policy    === 'static', policy);
     check('T05 fresh-fetch path: nsSlotVal=9',   nsSlotVal === '9',      nsSlotVal);
 }
@@ -125,9 +127,9 @@ try {
 // T06 — cache path overrides server dynamic/null with persisted static/9
 {
     const token = 'aabbccdd';
-    const serverSidecar = { token, ns_slot_policy: 'dynamic', ns_slot: null };
+    const serverDetail = { token, ns_slot_policy: 'dynamic', ns_slot: null };
     const cache = { [token]: { ns_slot_policy: 'static', ns_slot: 9 } };
-    const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverSidecar, token, cache);
+    const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverDetail, token, cache);
     check('T06 cache override policy=static', policy    === 'static', policy);
     check('T06 cache override nsSlotVal=9',  nsSlotVal === '9',      nsSlotVal);
 }
@@ -135,9 +137,9 @@ try {
 // T07 — a legacy high slot must not become a modal default.
 {
     const token = 'cafe1234';
-    const serverSidecar = { token, ns_slot_policy: 'static', ns_slot: 15 };
+    const serverDetail = { token, ns_slot_policy: 'static', ns_slot: 15 };
     const cache = {};
-    const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverSidecar, token, cache);
+    const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverDetail, token, cache);
     check('T07 legacy high slot: policy=dynamic', policy === 'dynamic', policy);
     check('T07 legacy high slot: nsSlotVal empty', nsSlotVal === '', nsSlotVal);
 }
@@ -146,12 +148,12 @@ try {
 // _nsSlotPolicyResolve — fresh-fetch path (post-reload / no cache)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// T08 — server sidecar dynamic/null → policy=dynamic, nsSlotVal=''
+// T08 — server detail dynamic/null → policy=dynamic, nsSlotVal=''
 {
     const token = 'deadbeef';
-    const serverSidecar = { token, ns_slot_policy: 'dynamic', ns_slot: null };
+    const serverDetail = { token, ns_slot_policy: 'dynamic', ns_slot: null };
     const cache = {};
-    const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverSidecar, token, cache);
+    const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverDetail, token, cache);
     check('T08 server dynamic/null: policy=dynamic',  policy    === 'dynamic', policy);
     check('T08 server dynamic/null: nsSlotVal empty', nsSlotVal === '',         nsSlotVal);
 }
@@ -162,8 +164,8 @@ try {
     // After dynamic install, _nsSlotPersistRecord returns { patchedPolicy:'dynamic', patchedSlot:null }
     const { patchedPolicy, patchedSlot } = _nsSlotPersistRecord('dynamic', 12);
     const cache = { [token]: { ns_slot_policy: patchedPolicy, ns_slot: patchedSlot } };
-    const serverSidecar = { token };   // server not yet updated
-    const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverSidecar, token, cache);
+    const serverDetail = { token };   // server not yet updated
+    const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverDetail, token, cache);
     check('T09 dynamic install cache: policy=dynamic',  policy    === 'dynamic', policy);
     check('T09 dynamic install cache: nsSlotVal empty', nsSlotVal === '',         nsSlotVal);
 }
@@ -175,26 +177,26 @@ try {
 // T10 — ns_slot=0 must not be treated as falsy (falsy-zero guard)
 {
     const token = 'zero0000';
-    const serverSidecar = { token, ns_slot_policy: 'static', ns_slot: 0 };
-    const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverSidecar, token, {});
+    const serverDetail = { token, ns_slot_policy: 'static', ns_slot: 0 };
+    const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverDetail, token, {});
     check('T10 ns_slot=0 falsy guard: nsSlotVal=0',  nsSlotVal === '0',      nsSlotVal);
     check('T10 ns_slot=0 falsy guard: policy=static', policy    === 'static', policy);
 }
 
-// T11 — sidecar with no policy and no slot: defaults to dynamic
+// T11 — detail with no policy and no slot: defaults to dynamic
 {
     const token = 'nochoice';
-    const serverSidecar = { token };
-    const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverSidecar, token, {});
+    const serverDetail = { token };
+    const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverDetail, token, {});
     check('T11 no policy/slot: policy=dynamic',  policy    === 'dynamic', policy);
     check('T11 no policy/slot: nsSlotVal empty', nsSlotVal === '',         nsSlotVal);
 }
 
-// T12 — sidecar has slot but no explicit policy: infer static from slot presence
+// T12 — detail has slot but no explicit policy: infer static from slot presence
 {
     const token = 'slotonly';
-    const serverSidecar = { token, ns_slot: 7 };  // no ns_slot_policy field
-    const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverSidecar, token, {});
+    const serverDetail = { token, ns_slot: 7 };  // no ns_slot_policy field
+    const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverDetail, token, {});
     check('T12 slot only: nsSlotVal=7',       nsSlotVal === '7',      nsSlotVal);
     check('T12 slot only: policy inferred static', policy === 'static', policy);
 }

@@ -58,8 +58,7 @@
         return TYPE_NAMES[key];
     }
 
-    function descriptor(cap, row, ownerName, options) {
-        options = options || {};
+    function descriptor(cap, row, ownerName) {
         cap = cap || {};
         const self = cap.symbolic_self === true || cap.compiler_owned_self === true ||
             String(cap.name || '').toUpperCase() === SELF_SYMBOL;
@@ -71,13 +70,13 @@
         const identityHash = cap.identity_hash == null ? null :
             String(cap.identity_hash).toLowerCase();
         if (!self && !HEX8.test(token)) throw new Error(`${n.name} requires expected T (8 lowercase hex)`);
-        if (!self && !HEX64.test(binaryHash) && !(options.allowLegacyTOnly && binaryHash === '')) {
+        if (!HEX64.test(binaryHash)) {
             throw new Error(`${n.name} requires authoritative binary_hash (64 lowercase hex)`);
         }
         if (identityHash !== null && !HEX64.test(identityHash)) {
             throw new Error(`${n.name} has malformed identity_hash`);
         }
-        if (!self && options.requireIdentityHash && !HEX64.test(identityHash || '')) {
+        if (!HEX64.test(identityHash || '')) {
             throw new Error(`${n.name} requires authoritative identity_hash (64 lowercase hex)`);
         }
         const relocationRow = cap.relocation_row == null ? row : Number(cap.relocation_row);
@@ -89,7 +88,7 @@
             dot_name: n.dot_name,
             issue_n: n.issue_n,
             T: self ? null : token,
-            binary_hash: self ? null : (binaryHash || null),
+            binary_hash: binaryHash,
             identity_hash: identityHash,
             rights: normalizeRights(self ? ['E'] : (cap.rights || cap.grants)),
             capability_type: normalizeType(cap.capability_type ?? cap.gt_type ?? cap.type),
@@ -102,9 +101,7 @@
         options = options || {};
         const ownerN = canonicalName(owner);
         const dependencies = (capabilities || []).map((cap, row) =>
-            descriptor(cap, row, ownerN.name, {
-                requireIdentityHash: (options.compatibility || 'strong') === 'strong',
-            }));
+            descriptor(cap, row, ownerN.name));
         const rows = new Set();
         for (const dep of dependencies) {
             if (rows.has(dep.relocation_row)) throw new Error(`duplicate relocation row ${dep.relocation_row}`);
@@ -153,7 +150,6 @@
 
     function bind(contract, destination, options) {
         options = options || {};
-        const strong = options.trustPolicy !== 'allow-authorized-t-only';
         if (!contract || contract.schema !== SCHEMA || !Array.isArray(contract.dependencies)) {
             return failure('INVALID_CONTRACT', `portable binding schema must be ${SCHEMA}`);
         }
@@ -165,7 +161,7 @@
         // an arbitrary supplied GT can become the object's identity.
         let ownerRow;
         try {
-            ownerRow = descriptor(contract.dependencies[0], 0, owner.name, { allowLegacyTOnly: true });
+            ownerRow = descriptor(contract.dependencies[0], 0, owner.name);
         } catch (err) {
             return failure('INVALID_SELF', err.message, 0);
         }
@@ -176,15 +172,15 @@
                 'portable contract requires compiler-owned __SELF__ as Inform E-only relocation row 0', 0);
         }
         if (contract.dependencies.slice(1).some(dep => {
-            try { return descriptor(dep, dep.relocation_row, owner.name, { allowLegacyTOnly: true }).symbolic_self; }
-            catch (_) { return true; }
+            try { return descriptor(dep, dep.relocation_row, owner.name).symbolic_self; }
+            catch (_) { return false; }
         })) {
             return failure('INVALID_SELF', 'portable contract may contain __SELF__ only at relocation row 0');
         }
         const relocationRows = new Set();
         for (let index = 0; index < contract.dependencies.length; index++) {
             let checked;
-            try { checked = descriptor(contract.dependencies[index], index, owner.name, { allowLegacyTOnly: true }); }
+            try { checked = descriptor(contract.dependencies[index], index, owner.name); }
             catch (err) { return failure('INVALID_DESCRIPTOR', err.message, index); }
             if (relocationRows.has(checked.relocation_row)) {
                 return failure('DUPLICATE_RELOCATION_ROW',
@@ -202,7 +198,7 @@
             return failure('OWNER_IDENTITY_MISMATCH',
                 `installed artifact owner must be verified as exact ${owner.name}`, 0);
         }
-        if (options.requireVerifiedCandidates && ownerCandidate.verified !== true) {
+            if (ownerCandidate.verified !== true || ownerCandidate.approved !== true) {
             return failure('OWNER_UNVERIFIED',
                 `installed artifact owner ${owner.name} has no verified content record`, 0);
         }
@@ -220,10 +216,7 @@
             const row = dep.relocation_row;
             let normalized;
             try {
-                normalized = descriptor(dep, row, owner.name, {
-                    allowLegacyTOnly: true,
-                    requireIdentityHash: strong,
-                });
+                normalized = descriptor(dep, row, owner.name);
             }
             catch (err) { return failure('INVALID_DESCRIPTOR', err.message, row); }
             let candidate;
@@ -233,7 +226,7 @@
                 candidate = candidates.find(c => candidateName(c) === normalized.N);
             }
             if (!candidate) return failure('EXACT_ISSUE_NOT_FOUND', `no destination object matches ${normalized.N}`, row);
-            if (options.requireVerifiedCandidates && candidate.verified !== true) {
+            if (candidate.verified !== true || candidate.approved !== true) {
                 return failure('UNVERIFIED_DESTINATION',
                     `${normalized.N} is not backed by verified registry bytes and a live Namespace entry`, row);
             }
@@ -245,23 +238,12 @@
                 return failure('TOKEN_MISMATCH', `${normalized.N} expected T ${normalized.T}, got ${actualT || '(missing)'}`, row);
             }
             const actualHash = String(candidate.binary_hash || candidate.content_hash || '').toLowerCase();
-            if (!normalized.symbolic_self && normalized.binary_hash && actualHash !== normalized.binary_hash) {
+            if (!HEX64.test(actualHash) || actualHash !== normalized.binary_hash) {
                 return failure('BINARY_HASH_MISMATCH', `${normalized.N} full content hash mismatch`, row);
             }
             const actualIdentityHash = String(candidate.identity_hash || '').toLowerCase();
-            if (normalized.identity_hash && actualIdentityHash !== normalized.identity_hash) {
+            if (!HEX64.test(actualIdentityHash) || actualIdentityHash !== normalized.identity_hash) {
                 return failure('IDENTITY_HASH_MISMATCH', `${normalized.N} identity hash mismatch`, row);
-            }
-            if (!normalized.symbolic_self && strong && !HEX64.test(normalized.binary_hash)) {
-                return failure('LEGACY_T_ONLY', `${normalized.N} is T-only and strong verification is required`, row);
-            }
-            if (!normalized.symbolic_self && !normalized.binary_hash &&
-                !(options.authorizeLegacy && options.authorizeLegacy(normalized, candidate) === true)) {
-                return failure('LEGACY_UNAUTHORIZED', `${normalized.N} T-only binding was not explicitly authorized`, row);
-            }
-            if (candidate.authorized === false ||
-                (candidate.dynamic === true && candidate.authorized !== true)) {
-                return failure('UNAUTHORIZED_DYNAMIC_FETCH', `${normalized.N} is not authorized for installation`, row);
             }
             const grants = new Set(grantedRights(candidate));
             const missing = normalized.rights.filter(r => !grants.has(r));

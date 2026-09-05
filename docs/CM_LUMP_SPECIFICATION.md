@@ -337,7 +337,6 @@ Every lump is named on disk using the canonical form:
 
 ```
 dot.name.issue.token.lump        ← the logical lump (self-defining binary)
-dot.name.issue.token.json        ← sidecar (optional local administrative metadata)
 dot.name.issue.token.zip         ← distribution zip (if present)
 ```
 
@@ -348,17 +347,16 @@ Where:
 - `token` — 8 hex digits (the 32-bit token value computed above)
 
 **The logical lump is the binary alone.** It is self-defining: its API definition is embedded
-in the freespace (see Freespace Content and Self-Definition). The sidecar is optional
-local administrative metadata and is never
-transported across cyberspace boundaries.
+in freespace (see Freespace Content and Self-Definition). A legacy `.json` sidecar may
+remain on disk only as audit evidence; it is not a current file-set member or runtime input.
 
 > **Transition note — freespace invariant.** The freespace content format is now
 > specified (see Freespace Content and Self-Definition, and the revised Mint validation
 > step 7): a `0xAB`-tagged content header delimits the embedded API/source region, with
 > the remainder of freespace staying zero. Binaries compiled before this format have
 > all-zero freespace and are **legacy** — a transitional state resolved by recompilation,
-> not a permanent category. Tooling that has not yet adopted the format continues to
-> deliver the API definition via the sidecar until it is migrated; new tooling must never
+> not a permanent category. Tooling that has not yet adopted the format requires separately
+> supplied API information; legacy sidecars are never an API fallback. New tooling must never
 > produce legacy (all-zero-freespace) `typ=lump` binaries.
 
 A separate `.api.json` file may be extracted from the binary by tooling (compiler, IDE) as
@@ -368,7 +366,7 @@ Flat names such as `00000600.lump` are legacy aliases only; they must not appear
 or documentation.
 
 **Scope and legacy exceptions.** The canonical form governs the on-disk lump file set (the
-`.lump` binary, its optional sidecar, and its distribution zip). The following forms elsewhere
+`.lump` binary and its distribution zip). The following forms elsewhere
 in this specification are *intentional legacy or out-of-scope exceptions*, retained until their
 own protocol sections are revised:
 - `*.bin` members inside `namespace.zip` bundles and the `manifest.json` `file` fields — the
@@ -547,10 +545,10 @@ scheme. Under content-addressing, a better seal is simply a new identity.
 
 ---
 
-## The Sidecar — IDE-Local Administrative Metadata
+## Legacy Sidecars — Audit Evidence Only
 
-**The sidecar is optional administrative metadata local to an IDE region.** It is not part of
-the logical lump and is never transported across cyberspace boundaries.
+Legacy sidecars are retained audit evidence only. They are not part of the logical lump,
+the current repository file set, distribution, or any runtime path.
 
 The logical lump is the binary alone (`dot.name.issue.token.lump`). It is self-defining:
 the API definition is embedded in its freespace (see Freespace Content and
@@ -559,170 +557,31 @@ recompilation). A `.api.json` file may be extracted from the binary by
 tooling (compiler, IDE) as a convenience — it is a hidden implementation detail, not a
 named artifact and not part of the logical lump.
 
-The sidecar (`dot.name.issue.token.json`) is entirely separate from the binary. It is
-IDE-local, never distributed, and not required for the lump to function. It exists solely
-to serve the IDE's local discovery, cataloguing, and validation workflows. If a sidecar is
-lost, binary-derived fields can be recomputed from the binary. A lump binary is complete
-without a sidecar.
+The binary is complete without a sidecar. Retained JSON is inspected only by
+`scripts/audit_legacy_lump_sidecars.py`, a one-time operator tool. Its default mode is
+read-only. Import requires `--write` and an exact, repeatable `--accept FILE.json` for every
+reviewed file. There is no bulk acceptance, startup migration, automatic approval, or deletion.
 
-### Sidecar Authorship Rule
+Accepted non-intrinsic human decisions are written to `server/lumps/approvals.json`. The
+canonical store has a `version: 1`, `algorithm: "sha256"` envelope and an `approvals` object
+whose exact lowercase 64-hex SHA-256 keys identify the approved binary bytes. Every record
+repeats the same digest in `binary_hash`. Source, API, binary intrinsics, and deployment/control
+fields are never imported through this legacy channel.
 
-The sidecar is a **pure mechanical cache** — every field is derived from the binary
-(including the API/source content embedded in its freespace per Freespace Content and
-Self-Definition, once tooling adopts it) by tooling. There is exactly one write path: `POST /api/lumps/save`,
-which reads the binary and writes all fields. Sidecar files must never be edited by hand.
+### Metadata Authority Hierarchy
 
-There are no curatorial fields. The former `group` and `doc_refs` fields are **removed
-from this specification** — they added no value and introduced a drift risk. Any field
-not derivable from the binary does not belong in the sidecar.
+1. **`.lump` bytes** are authoritative for all intrinsic facts: header/layout, code, c-list,
+   content framing, embedded API, and embedded source.
+2. **The committed Namespace Table and boot configuration** are authoritative for deployment:
+   image membership, slot assignment, and residency.
+3. **`approvals.json`** records explicit non-intrinsic user decisions, bound to the exact
+   binary SHA-256. An approval for other bytes never matches.
+4. **Manifest, catalogue, and UI projections** are disposable caches/views. They confer no
+   identity, validity, deployment membership, or approval.
 
-> **Transition note — authorship rule enforcement status.** The single-write-path rule is
-> *future-normative*, like the embedded-API freespace format it depends on (see the
-> freespace transition note in "Canonical Filename Form and File Set"). In the current
-> release:
->
-> - `POST /api/lumps/save` populates most sidecar fields from the request's `metadata`
->   object (supplied by the compiler/IDE at save time), not by re-deriving them from the
->   binary — because the binary does not yet embed its API/source in freespace.
-> - Additional server write paths still exist and remain in service until this rule is
->   enforced. Sidecar-creating: `POST /api/lumps/save-wip` (work-in-progress save),
->   `POST /api/lumps/import` (base64 data-lump import), `POST /api/lumps/upload-lump`
->   (raw binary upload; sidecar generated from the parsed header), and the namespace-build
->   path (writes the Boot.NS sidecar with `namespace_meta`). Sidecar-mutating:
->   `PATCH /api/lump/<token>/meta` (in-place field updates),
->   `PATCH /api/lump/<token>/wip-source` (updates `source` and `last_edited_at`),
->   `PUT /api/lump/<token>/content` (data-lump rewrites),
->   `POST /api/lump/<token>/resize` (updates `lump_size` after freespace removal),
->   `POST /api/lump/<token>/fork-version` (version promotion; also marks the live
->   sidecar with a transient `forked: true` flag), and
->   `POST /api/lump/<token>/mtbf` (mutates the `mtbf` telemetry object in place).
->   Under the enforced rule, each of these either retires or reduces to a
->   recompile-and-save flow through `POST /api/lumps/save` (telemetry and catalogue
->   state moving to the IDE-local stores noted in the field tables below).
-> - Sidecars on disk may still carry `group` and `doc_refs`, and some readers still consume
->   them; they are scheduled for removal from the writers, the readers, and the on-disk
->   files as part of the T7 migration.
->
-> The freespace content format is now specified (Freespace Content and Self-Definition);
-> once tooling adopts it and binaries are self-defining, the save path switches to
-> deriving all fields from the binary, the auxiliary write paths are retired or reduced
-> to recompile-and-save flows, and the rule above becomes enforced behaviour.
-
-### Sidecar JSON Fields
-
-The tables below list every sidecar field: its on-disk JSON key, type, and meaning
-(actual sidecars live under `server/lumps/`).
-Under the target authorship rule all of these are binary-derived; the grouping notes
-which are decoded from the binary structure today versus recorded from save-time
-`metadata` pending the T7 migration.
-
-#### Identity and structure (decoded from the binary header and file naming)
-
-| Field | Type | Meaning |
-|:------|:-----|:--------|
-| `token` | string | 8-hex-digit token (32-bit lump identity; see The Token — Lump Identity). |
-| `abstraction` | string | Abstraction name (the `name` input to the token hash). |
-| `dot_name` | string | Canonical dot-form name component used in the filename. |
-| `issue_n` | integer | Publication issue number (the `issue` filename component; not part of the token hash). |
-| `lump_size` | integer | Total word count, `2^n`. Must equal the header `n-6` field. |
-| `cw` | integer | Code word count. Must match header bits 22:10. |
-| `cc` | integer | C-list slot count. Must match header bits 7:0. |
-| `typ` | integer | Header object type (bits 9:8): 0=lump, 1=data, 2=clist-only, 3=Outform. |
-| `dw` | integer | Data word count embedded inside the code section. |
-| `data_offset` | integer | Word index (from lump base) of the first data word. |
-| `data_word_names` | string[] | Human names for each data word, in order. |
-| `content_type` | string | Semantic sub-classification of `typ=0` lumps (`"code"`, `"text"`, `"markdown"`, `"image"`, `"grayscale"`, …). |
-| `lump_type` | string | Alternative semantic type label used by some import flows (e.g. `"application_namespace"`). |
-| `filename` | string | Name of the `.lump` binary file (canonical `dot.name.issue.token.lump` form). |
-| `sidecar_file` | string | Name of this sidecar file (canonical `dot.name.issue.token.json` form). |
-
-#### Integrity (computed over the binary)
-
-| Field | Type | Meaning |
-|:------|:-----|:--------|
-| `binary_hash` | string | SHA-256 hex digest computed over the binary at save time — the checksum used by staleness and consistency checks. |
-| `capBlockHash` | string | *Reserved (not yet emitted by the save path):* hash over the c-list block alone, for c-list drift detection. |
-
-#### Capability and namespace metadata (today: from save-time `metadata` and boot registration; target: decoded from the binary c-list)
-
-| Field | Type | Meaning |
-|:------|:-----|:--------|
-| `ns_slot` | integer\|null | Assigned NS slot (Resident / Lazy-load), or `null` (Dynamic / NULL). See NS Slot Assignment. |
-| `ns_slot_policy` | string | `"static"` or `"dynamic"` (absent with `ns_slot: null` = dynamic; R9 retired). |
-| `variant_group` | string | Declares alternative implementations sharing an `ns_slot` (rule R8). |
-| `boot_resident` | boolean | `true` if the lump is part of the boot image. |
-| `grants` | string[] | Top-level permissions this lump confers (usually `["E"]`). |
-| `self_data_r` | boolean | `true` if c-list row 0 is a self-referential read-only data capability. |
-| `capabilities` | object[] | C-list row descriptors: `row`, `name`, `grants`/`rights`, `gt`, `note`. |
-| `clist_note` | string | Free-text note on the c-list layout, extracted at compile time. |
-| `domain` | string | Security domain label (e.g. `"Church"`). |
-| `domain_perms` | string | Permission string granted within the domain (e.g. `"L+S+E"`). |
-| `media_tags` | object | Tag registry for data lumps: tag name → `{hex, description}` (e.g. `"TEXT": {"hex": "0x54455854", ...}`). |
-| `image_width` | integer | Pixel width of an imported image data lump (written by `POST /api/lumps/import`; decodable from the image payload). |
-| `image_height` | integer | Pixel height of an imported image data lump (written by `POST /api/lumps/import`; decodable from the image payload). |
-| `namespace_meta` | object | Boot.NS (Namespace lump) only: decoded NS-table view (`entries[]` of slot/label/state), derived from the namespace binary by the namespace-build path. |
-| `permBits` | string | *Reserved (not yet emitted by the save path):* canonical permission-bit summary of the lump's own GT. |
-| `gtWord0` | string | *Reserved (not yet emitted by the save path):* the lump's own GT Word 0 (c-list slot 0 self-GT), as hex. |
-
-#### API and source (today: recorded from save-time `metadata`; target: extracted from the embedded freespace content)
-
-| Field | Type | Meaning |
-|:------|:-----|:--------|
-| `methods` | object[] | Method descriptors: `name`, `offset`, `length`, `description`, `inputs`, `outputs`, `comments`, `pet_names`, `aliasOf`. |
-| `pet_names` | object | Register aliases: `{"DR": {...}, "CR": {...}}`. |
-| `language` | string | Source language: `"cloomc"`, `"assembly"`, `"haskell"`, `"lambda"`, `"ISA"`, `"unknown"`. |
-| `source` | string | Full source text as carried by the binary. Omitted from list projections. |
-| `sourceStorageTier` | integer (0, 1, or 2) | Written by API / compiler. Tier of the embedded freespace content. `0` = API only, `1` = API + minimal source, `2` = API + full source. Absent = legacy (all-zero freespace, not self-defining). See Freespace Content and Self-Definition. |
-
-#### Build and lifecycle metadata (recorded at save time; not binary-derived today)
-
-These fields are **not derivable from the binary in the current release** — they are
-recorded from save-time `metadata` or updated by the server. Their target disposition
-under the mechanical-cache rule is stated per field: fields whose content becomes part of
-the source carried in freespace (T7) become binary-derived; the remainder are IDE-local
-lifecycle/telemetry annotations that migrate **out of the sidecar** to a separate
-IDE-local store when the authorship rule is enforced.
-
-| Field | Type | Meaning | Target disposition |
-|:------|:-----|:--------|:-------------------|
-| `author` | string | Creator name recorded at compile time. | Embedded in the source tier (T7) → binary-derived. |
-| `version` | string | Human version string (e.g. `"2.0"`). | Embedded in the source tier (T7) → binary-derived. |
-| `release_notes` | string\|object | Change description per version. | Embedded in the source tier (T7) → binary-derived. |
-| `compiled_at` | float | Unix timestamp of compilation. | Embedded in the source tier (T7) → binary-derived. |
-| `lump_version` | integer | Monotonic compile counter, bumped by `POST /api/lumps/save`. | Migrates to the IDE-local catalogue store. |
-| `status` | string | Lifecycle status label (e.g. `"stable"`, `"released"`, `"wip"`). *Legacy/catalogue-curated: present on disk but not emitted by the current save path.* | Migrates to the IDE-local catalogue store. |
-| `description` | string | One-line description of the abstraction. *Legacy/catalogue-curated: present on disk but not emitted by the current save path.* | Embedded in the source tier (T7) → binary-derived. |
-| `source_file` | string | Repository path of the source file the binary was compiled from. *Legacy/catalogue-curated: present on disk but not emitted by the current save path.* | Superseded by embedded source (T7); dropped. |
-| `forked` | boolean | Transient marker written to the live sidecar by `POST /api/lump/<token>/fork-version`; cleared on the next save. | Migrates to the IDE-local catalogue store. |
-| `profile` | string | Target hardware profile (e.g. `"IoT"`, `"wukong-a7"`, `"example"`). | Embedded in the source tier (T7) → binary-derived. |
-| `last_edited_at` | float | Unix timestamp of the most recent save. | Migrates to the IDE-local catalogue store. |
-| `deployment` | object | Build environment metadata: `target_board`, `profile`, `built_at`, `builder`. | Migrates to the IDE-local catalogue store. |
-| `mtbf` | object | Mutable reliability telemetry: `status`, `consecutive_clean`, `total_runs`, `source_hash`. | Migrates to the IDE-local telemetry store (mutable data can never live in a mechanical cache). |
-
-#### Pet-name identity fields (written by the save path when a pet name is supplied)
-
-The dual-seal identity scheme records both an identity seal (over the pet-name identity
-string) and the content checksum (`binary_hash` above). These fields are emitted by
-`POST /api/lumps/save` and appear in canonical sidecars as well as archived snapshots.
-
-| Field | Type | Meaning |
-|:------|:-----|:--------|
-| `petname` | string | Global pet-name identity component (`petname.Abstraction#n`). |
-| `issue_number` | integer | Issue component of the identity string (alias of `issue_n` in this role). |
-| `identity_string` | string | The exact identity input string, `petname.Abstraction#issue` (or `Abstraction#issue` when no pet name is set). |
-| `identity_hash` | string | SHA-256 hex digest of `identity_string` — the identity seal. |
-
-#### Archive-only fields (present only in archived `*_vN` sidecars written by the fork-version path)
-
-| Field | Type | Meaning |
-|:------|:-----|:--------|
-| `archived_version` | integer | Version number of this archived snapshot. |
-| `archive_note` | string | Reason the version was archived. |
-
-> **Removed fields.** `group` and `doc_refs` are removed from the sidecar schema in this
-> specification. They were curatorial (not derivable from the binary) and introduced a
-> drift risk. Sidecars on disk still carrying them, and readers still consuming them, are
-> cleaned up as part of the T7 migration (see the authorship-rule transition note above).
+Legacy sidecars are outside this hierarchy. Runtime, API, validation, save, restore, history,
+and UI paths never read them as fallback. Retention is solely to permit deliberate audit; after
+review, deletion is a separate operator decision.
 
 ---
 
@@ -763,18 +622,13 @@ NS slot assignment is a property of the committed Namespace Table, not of the bi
 manifest. Manifest fields that mirror deployment configuration (`ns_slot`, `ns_slot_policy`,
 `boot_resident`, `variant_group`) are therefore projections, not directives. Regeneration
 rebuilds binary-derived fields from the binaries and reapplies build metadata from the
-Namespace Table. Sidecars may carry a convenient copy for local lookup, but they cannot
-establish membership, slot assignment, residency, or content identity.
+ Namespace Table. No legacy metadata file can establish membership, slot assignment,
+ residency, content identity, API, or source.
 
-> **Transition note — mechanical regeneration status.** The freespace content format is
-> now specified (Freespace Content and Self-Definition), but full regeneration from
-> binaries is gated on tooling adopting it. Binaries compiled before the format have
-> all-zero (legacy) freespace, so API/source fields cannot be read from them; the
-> manifest may be maintained incrementally by the save/delete API during this transition
-> (see the sidecar authorship-rule transition note above). That incremental cache update
-> does not grant the manifest authority: Namespace Table build metadata and binary structural
-> fields remain authoritative. As recompilation retires legacy binaries, the regeneration
-> rule above becomes enforced behaviour.
+The server may maintain the manifest incrementally, but this does not grant it authority.
+Current read routes inspect each binary and match an exact SHA-256 approval before projecting
+approved metadata. A stale or missing cache must be repaired from binary and deployment
+authorities, never from a legacy sidecar.
 
 ### Why Tokens Do Not Cross Cyberspace Boundaries
 
@@ -796,26 +650,25 @@ from the shared source.
 
 > **Transition note — source extraction status.** The freespace layout for embedded
 > source is now specified (Freespace Content and Self-Definition, Tier 1/2). For legacy
-> binaries (all-zero freespace) the source still travels in the sidecar's `source`
-> field / the save-time `metadata`, so an export of a legacy lump takes the source from
-> the sidecar until recompilation retires it. The exchange model itself (pet name +
+> binaries (all-zero freespace) require separately supplied source before recompilation.
+> Legacy sidecars are audit evidence only, never a source fallback. The exchange model itself (pet name +
 > source out, local compile + local token in) is unchanged by this transition.
 
 ---
 
 ## Publication and Distribution
 
-**The binary is the single source of truth.** All other representations (sidecar, manifest)
-are mechanically derived by tools. There are no curatorial fields, no approval documents,
-no sync scripts, and no ghost entries. Any representation that could drift from the binary
-is eliminated.
+**The binary is the authority for intrinsic LUMP facts.** Legacy sidecars are audit evidence
+only; explicitly accepted human decisions live in SHA-256-keyed `approvals.json`, never in a
+manifest pointer or runtime fallback. Namespace and boot configuration remain the deployment
+authority.
 
 1. **Compiler output** — the CLOOMC++ compiler produces one file: `dot.name.issue.token.lump`.
    The binary is self-defining; freespace contains the API definition (all tiers) and
    optionally source (Tier 1 and 2). No companion files are required.
 
 2. **Publication** — placing the binary in `server/lumps/` makes it available. The manifest
-   and sidecar are derived mechanically from the binary by tooling. No editorial gate.
+   indexes the binary; no sidecar is produced or consumed.
 
 3. **Manifest** — regenerated from the lumps directory on demand. A binary on disk not yet
    in the manifest is not yet indexed; regeneration adds it.
@@ -823,25 +676,21 @@ is eliminated.
 4. **Distribution** — the distribution unit depends on the boundary crossed:
 
    - **Within a region** (same hardware target, same cyberspace region): the binary alone
-     is the distribution unit: `dot.name.issue.token.lump`. The sidecar stays in the home
-     region. The recipient derives its own sidecar and manifest entry from the received
+      is the distribution unit: `dot.name.issue.token.lump`. The recipient derives its own
+      manifest entry from the received
      binary — except NS slot assignment, which is deployment configuration and must be
      supplied by the recipient's own configuration, never read from the binary (see
      Manifest Architecture).
    - **Across regions** (different hardware target or cyberspace region): the binary does
      not travel. The exchange is pet name + source (see "Why Tokens Do Not Cross
      Cyberspace Boundaries"): the recipient compiles locally, obtains a locally-valid
-     token and binary, derives its own sidecar and manifest entry from that local binary,
+      token and binary, derives its own manifest entry from that local binary,
      and assigns any NS slot from its own deployment configuration.
 
-> **Transition note — publication workflow status.** Steps 1–4 describe the target
-> workflow and are *future-normative*, gated on tooling adopting the freespace content
-> format (Freespace Content and Self-Definition) and the sidecar single-write-path rule
-> (see the authorship-rule transition note). Until compilers emit self-defining binaries,
-> publication runs through `POST /api/lumps/save` with compiler-supplied `metadata`, and
-> the sidecar/manifest are written from that metadata rather than re-derived from the
-> binary. NS slot assignment remains deployment configuration in both the current and
-> target workflows — it is never derived from the binary (see Manifest Architecture).
+`POST /api/lumps/save` publishes the binary and records eligible explicit user decisions
+in `approvals.json` under that binary's SHA-256. It does not create a legacy companion
+metadata file. NS slot assignment remains deployment configuration and is never derived
+from a manifest or approval.
 
 ---
 
@@ -1517,7 +1366,7 @@ bounded Inform capability, and `Create` may validate that returned complete
 LUMP into a distinct Bank variable. No nested value receives an implicit
 alias to the parent’s private storage.
 
-The packaged manifest/binary/sidecar are validated during Bank artifact build,
+The packaged manifest and binary are validated during Bank artifact build,
 then emit a browser runtime identity projection. `SystemAbstractions` binds the
 Bank methods only when that generated projection still names the canonical
 dynamic Bank LUMP and matches the dynamic registry descriptor. A bad identity
@@ -1546,8 +1395,8 @@ dot.SlideRule.1.a3f9c2b1.zip
                                        header + code + freespace + c-list
 ```
 
-The logical lump is the binary alone; the optional `.json` sidecar is local
-administrative metadata and is never included in the distribution zip.
+The logical lump is the binary alone; legacy `.json` audit evidence is never included in
+the distribution zip.
 
 ### Single Thread Upload
 
@@ -1617,17 +1466,17 @@ The per-type distribution containers are:
 **The distribution unit for an abstraction lump is the binary alone:**
 `dot.name.issue.token.lump`.
 
-- **No sidecar is included** — the `.json` sidecar is local administrative
-  metadata and stays in the home region; it never crosses a distribution
-  boundary.
+- **No sidecar is included** — retained legacy JSON is audit evidence only and
+  never crosses a distribution boundary.
 - **No `.api.json` file is included** — the API definition is embedded in
   the binary's freespace (see Freespace Content and Self-Definition). The
   binary is self-defining; a recipient needs no companion file to
   understand the interface.
-- **The recipient region derives its own sidecar and manifest entry
-  mechanically from the received binary.** NS slot assignment remains the
-  recipient's own deployment configuration and is never read from the
-  binary (see Manifest Architecture).
+- **The recipient region inspects the binary and may derive disposable catalogue
+  projections from it.** Any non-intrinsic decision requires a local, explicit
+  SHA-256-bound approval in `approvals.json`. NS slot assignment remains the
+  recipient's deployment configuration and is never read from the binary
+  (see Manifest Architecture).
 
 Any older file-set description listing sidecars, `.api.json` files, or other
 companion members inside a distribution zip is superseded by the binary-only
@@ -1914,8 +1763,9 @@ are read-only windows onto binary-derived data.
 ### LUMP Detail Panel
 
 Reached via the **Lumps tab** in the full IDE. Selecting any LUMP from the sidebar opens the
-detail view, which is split into eight sub-tabs plus a header strip, all reading
-binary-derived data.
+detail view, which is split into eight sub-tabs plus a header strip. It combines inspected
+binary facts, Namespace/boot deployment facts, and an exact hash-matched approval; it never
+falls back to legacy JSON.
 
 #### Header Strip
 
@@ -1931,12 +1781,12 @@ Always visible. Shows:
 | **Edit** button | Opens the source editor preloaded with this LUMP's source. |
 | **Audit** button | Runs all lump-audit rules against the binary (see Lump Audit Rules). |
 | **Run** button | Loads the binary into the simulator and boots. |
-| **Shrink** button | Calls `/api/lump/<token>/resize` to remove freespace. |
+| **Shrink** button | Removed/disabled: in-place resize is retired (`410`); a resized binary must be published as a new hash-approved revision. |
 
 #### Sub-Tab: Overview
 
-Shows identity and authorship metadata — pet names (DR/CR register aliases) and NS table
-slot/state/hash.
+Shows binary identity, hash-matched approved labels (including pet names), and
+Namespace/boot-derived slot/state. Pet names are never recovered from a legacy sidecar.
 
 **For code LUMPs:**
 - Author, version, compiled date
@@ -1964,16 +1814,16 @@ Renders the LUMP's logical content (binary content breakdown) based on `content_
 | Content Type | Rendering |
 |:-------------|:----------|
 | `code` | Disassembled instructions with semantic comments, branch-target arrows, method-boundary markers, and stub-method warnings (amber) for bare-`RETURN` methods. |
-| `text` / `markdown` | Plain text editor or formatted Markdown render. |
-| `image` / `grayscale` | Reconstructed image canvas + "Replace file" utility. |
+| `text` / `markdown` | Plain-text or formatted Markdown render. Editing requires publishing a new revision. |
+| `image` / `grayscale` | Reconstructed image canvas. Replacement requires publishing a new revision. |
 | `thread` | Thread state: PC, call depth, all 16 Data Registers. |
 
 #### Sub-Tab: Tokens *(MyGoldenTokens)*
 
-C-List viewer and POLA editor.
+C-List and POLA inspection view.
 
 - **GT chips**: one chip per C-List row, showing the raw GT word, permissions, object_id, and pet name.
-- **POLA tools**: strip excess permissions from individual rows (Principle of Least Authority).
+- **POLA guidance**: identifies excess permissions. In-place row mutation is retired; fixes require a new revision.
 - **Push Names**: writes this LUMP's pet names into the running simulator's namespace so the Memory and GT views use them.
 
 #### Sub-Tab: Source
@@ -1995,7 +1845,9 @@ Archived `.lump` binaries stored as `<token>-v<N>.lump`.
 
 - Lists every archived version with timestamp and word count.
 - **Preview**: fetches the old binary and renders its hex dump.
-- **Restore**: promotes the archived version to the active binary (writes it back as `<token>.lump` and updates the sidecar).
+- **Restore**: promotes archived bytes through the binary/history transition. Metadata is
+  accepted only if an approval bound to the restored bytes' SHA-256 already exists; restore
+  never updates or consults a legacy sidecar.
 
 #### Sub-Tab: Hex Dump
 
@@ -2006,7 +1858,7 @@ Raw binary view of the `.lump` file, with inline header decode.
   - **Code** (words 1–cw): blue/white
   - **Freespace**: dim grey
   - **C-List** (tail cc words): amber
-- ASCII sidecar alongside each word.
+- ASCII rendering column alongside each word.
 - Header decode panel: expands `magic`, `n-6`, `cw`, `typ`, `cc` inline.
 
 ### DNA Viewer (`app-gt-view.js`)
@@ -2044,7 +1896,7 @@ available lumps.
 | **Memory View** | `app-memory.js` | Physical address space map — shows where each LUMP is loaded as a coloured block with its token and size. |
 | **CR Detail** | `app-cr-detail.js` | Deep inspection of a specific Capability Register: resolves the underlying LUMP token, base, limit, and permissions. |
 | **Namespace tab** | Main IDE sidebar | Shows all NS slots with their resident LUMP token, state (loaded/absent/outform), and size. |
-| **Lesson 5 form** | `/start` (starter IDE) | "Start from an existing abstraction" picker: populates `absName`, `absDesc`, and method rows from a selected LUMP's sidecar data via `/api/lumps/list`. |
+| **Lesson 5 form** | `/start` (starter IDE) | "Start from an existing abstraction" picker: uses the inspected-binary plus hash-matched-approval projection returned by `/api/lumps/list`. |
 
 All views are read-only tools derived from binary truth. No view is an editorial gate.
 
@@ -2058,8 +1910,8 @@ All lump-related HTTP endpoints are served by the Flask backend (`server/app.py`
 
 | Method | Path | Description |
 |:-------|:-----|:------------|
-| `GET` | `/api/lumps/list` | JSON array of all lumps (sidecar minus `source`). Includes `binary_valid` flag. |
-| `GET` | `/api/lumps/<token>/detail` | Full sidecar JSON including `source`. |
+| `GET` | `/api/lumps/list` | Catalogue rows reconciled with inspected binary facts and exact SHA-256-matched approvals. Includes `binary_valid` and `approved`; it never reads legacy sidecars. |
+| `GET` | `/api/lumps/<token>/detail` | Inspected binary facts (including embedded API/source) plus the matching canonical approval. Fails closed when no approval matches the bytes. |
 | `GET` | `/api/lump/<token_hex>` | Raw binary (`application/octet-stream`). Falls back to Mum Tunnel Library on GitHub. `X-Lump-Source` header indicates origin. |
 | `GET` | `/api/lump/<token_hex>/words` | `{token, words: uint32[], count}` — word array as JSON. |
 | `GET` | `/api/lump-source/<name>` | `{name, source}` for the named abstraction. Returns `{binary_only: true}` if no source exists. |
@@ -2070,25 +1922,28 @@ All lump-related HTTP endpoints are served by the Flask backend (`server/app.py`
 
 | Method | Path | Description |
 |:-------|:-----|:------------|
-| `POST` | `/api/lumps/save` | Save a compiled LUMP. Body: `{binary: uint32[], metadata: {...}}`. Runs c-list bounds check. Returns `{token, lump_path, sidecar_path}`. |
-| `POST` | `/api/lumps/import` | Pack a base64 file into a data LUMP. Body: `{name, content_type, data_b64, width?, height?}`. |
-| `POST` | `/api/lumps/upload-lump` | Import a raw `.lump` binary. Body: `{name, data_b64}`. Parses header to generate sidecar. |
+| `POST` | `/api/lumps/save` | Save a compiled LUMP and an explicit approval bound to its binary SHA-256. Body: `{binary: uint32[], metadata: {...}}`. Intrinsic facts are inspected from the bytes. |
+| `POST` | `/api/lumps/import` | Pack a base64 file into a data LUMP and record a SHA-256-bound approval. Body: `{name, content_type, data_b64, width?, height?}`. |
+| `POST` | `/api/lumps/upload-lump` | Import and inspect a raw `.lump` binary and record explicitly supplied non-intrinsic decisions as a SHA-256-bound approval. |
 
 ### Update / Modify
 
 | Method | Path | Description |
 |:-------|:-----|:------------|
-| `PUT` | `/api/lump/<token>/content` | Overwrite the content of a data/text LUMP in-place. Body: `{text?} \| {data_b64?}`. Returns `{cw, lump_size}`. |
-| `PATCH` | `/api/lump/<token>/meta` | Update sidecar fields (`author`, `version`, `pet_names`, etc.). |
-| `PATCH` | `/api/lump/<token_hex>/clist/<row>` | Write one GT word into a specific C-List row. Body: `{gt_word: uint32}`. |
-| `POST` | `/api/lump/<token_hex>/resize` | Repack to minimum power-of-2, removing freespace. Returns `{old_size, new_size, saved_words}`. |
+| `PUT` | `/api/lump/<token>/content` | **Retired:** returns `410`; publish a new hash-approved revision instead of mutating bytes in place. |
+| `PATCH` | `/api/lump/<token>/meta` | **Retired:** returns `410`; save a new canonical approval rather than patching legacy metadata. |
+| `PATCH` | `/api/lump/<token>/wip-source` | **Retired:** returns `410`; source must be intrinsic to a new `.lump` revision. |
+| `POST` | `/api/lump/<token>/mtbf` | **Retired:** returns `410`; mutable telemetry is not LUMP metadata. |
+| `PATCH` | `/api/lump/<token_hex>/clist/<row>` | **Retired:** returns `410`; publish a new hash-approved revision instead of mutating the c-list. |
+| `POST` | `/api/lump/<token_hex>/resize` | **Retired:** returns `410`; resizing changes bytes and requires a new revision. |
 | `POST` | `/api/lump/<token>/fork-version` | Archive current binary as `-vN`, promote new compile as primary. |
+| `POST` | `/api/lumps/save-wip` | **Retired:** returns `410`; save a self-defining `.lump` revision. |
 
 ### Delete
 
 | Method | Path | Description |
 |:-------|:-----|:------------|
-| `DELETE` | `/api/lumps/<token>` | Remove binary, sidecar, and manifest entry. Returns list of deleted files. |
+| `DELETE` | `/api/lumps/<token>` | Remove the binary and its disposable manifest entry. Returns the list of deleted files. |
 
 ### Telemetry
 
@@ -2104,10 +1959,9 @@ The audit system (`simulator/lump-audit.js`) runs structural consistency checks 
 binaries. Invoked from the **Audit** button in the IDE detail-panel header strip and by
 its direct test consumers.
 
-The auditor operates in two modes:
-
-- **Manifest-guided**: sidecar metadata is available; all rules apply.
-- **Binary-only**: no sidecar; only binary-derivable rules apply (R0, R1, R2, RB1, RB2, RFS, RCI, RNC).
+The auditor validates the binary. Intrinsic rules consume only `.lump` bytes. A UI may
+add display/documentation checks from an exact SHA-256-matched canonical approval, but
+manifest or legacy-sidecar availability never changes binary validity.
 
 | Rule ID | Name | What it checks | Failure means |
 |:--------|:-----|:---------------|:--------------|
@@ -2117,10 +1971,10 @@ The auditor operates in two modes:
 | **RB1** | Code Word Count | `cw >= 1` — at least one code word must exist. | The lump declares no code section; nothing can execute at PC = 1. |
 | **RB2** | Layout Bounds | `1 + cw + cc <= lump_size` — header + code + c-list must fit. | Declared regions overflow the lump; header fields are inconsistent. |
 | **RFS** | Freespace Zone | For `typ=lump`, freespace must either begin with a valid `0xAB` content header whose framing passes Mint validation step 7 (bounds + zero remainder), or be entirely zero (legacy binary). For all other `typ` values, all freespace words must be zero. | Freespace fails both forms — a malformed content frame, non-zero trailing words after the declared content, or non-zero words in a legacy/non-lump binary; corruption or an out-of-bounds write; Mint would reject the lump at load time. |
-| **RMC** | Manifest Coherence | If a sidecar is provided, its `cw`, `cc`, and `lump_size` must exactly match the binary header. | The sidecar has drifted from the binary; the binary header is ground truth. |
+| **RMC** | Cache Coherence | If a disposable catalogue projection is supplied, cached `cw`, `cc`, and `lump_size` must match the binary header. | The cache is stale; regenerate it from the binary. |
 | **RCI** | Instruction Range | `LOAD`/`SAVE`/`ELOADCALL`/`XLOADLAMBDA` must reference rows `0 … cc-1`. `BRANCH` targets must land within the code section. | Code references a c-list row or branch target outside the lump's declared bounds — a fault at runtime. |
 | **RNC** | NULL GT Check | Warns if code accesses a C-List row that holds a NULL (all-zero) Golden Token. | The row is expected to be filled at runtime (Lazy Load or a system abstraction returning a `B=1` GT); if it is not, the access faults. |
-| **RPN** | Pet Name Coverage | Every C-List row referenced by code must have a corresponding pet name in the sidecar. | The sidecar's documentation of the c-list is incomplete. |
+| **RPN** | Pet Name Coverage | When a matching canonical approval supplies pet names, every C-List row referenced by code should have one. | The approved documentation is incomplete; binary validity is unaffected. |
 | **RSM** | Stub Method | Detects methods whose entire body is a single bare `RETURN` with no implementation. Flagged as amber warnings in the Content sub-tab. | A declared method has no real body — likely unfinished code. |
 
 Failures at R0–RFS are hard errors; RMC–RPN are reported as warnings that block merge
@@ -2179,20 +2033,28 @@ manifest entry enables rebuild only when that source is assembler-level.
 **Outputs written (on success):**
 
 - the rebuilt `.lump` binary (header + new code words + zero pad + preserved c-list)
-- the sidecar JSON — `cw` / `cc` / `lump_size` fields only; all other fields preserved
-- the matching `manifest.json` entry — same three fields
 
 On success it prints `Updated <token>: cw=N cc=N lump_size=N` and exits 0. Any failure
 detected before the write phase (missing token, undiscoverable source, assembly error,
-oversized code) exits non-zero with a clear message and writes nothing. The writes
-themselves are sequential (binary, then sidecar, then manifest), not transactional; if a
-write fails partway, re-run the script — a rebuild is idempotent — or run `--check` plus
-the consistency gate to confirm the three files agree.
+oversized code) exits non-zero with a clear message and writes nothing. It never writes,
+creates, or repairs a sidecar or manifest record. Header values and the preserved c-list
+are read from the binary itself, so a catalogue cannot become an operational build input.
 
 **Flags:** `--token <hex>` (required) selects the lump. `--check` assembles the source and
 compares the result against the current binary on disk without writing anything — exit 0
 if identical, exit 1 with a `DRIFT` message if different; designed for CI / pre-commit
 drift detection.
+
+### One-time legacy sidecar audit/import
+
+`scripts/audit_legacy_lump_sidecars.py` inventories retained local sidecars without
+making them authoritative. Its default mode is read-only. An operator may record only
+reviewed human annotations in `server/lumps/approvals.json` by naming each file with
+`--accept <filename.json>` and also supplying `--write`. There is intentionally no
+accept-all or automatic/startup mode. The tool re-derives binary identity/header data,
+does not retain source or API data, and never reads or writes manifest records. It does
+not delete sidecars; removal requires separate verification that no code still depends
+on them.
 
 After rebuilding, run the consistency gate to confirm the output is gate-clean:
 `python -m pytest tests/lump/test_lump_consistency.py -v` (or
@@ -2223,15 +2085,10 @@ assembler test suite.
 
 ### `scripts/sync_lump_viewer_to_sidecars.py` — **removed (V1.3)**
 
-This script copied `group` and `doc_refs` fields from the Lump Viewer HTML
-(`docs/figures/lumps-directory.html`) into per-lump sidecar JSONs, treating the Viewer as
-an authoritative curatorial source. Both fields and the Lump Viewer approval role have
-been removed from this specification: under the specified model the binary is the single
-source of truth and the sidecar carries no curatorial fields. The script and its tests
-have been deleted, the live catalogue's sidecars no longer carry `group`/`doc_refs`, and
-the server runs an idempotent startup migration that strips the two keys from any sidecar
-that reappears with them. CI enforces the invariant with a check that no live sidecar
-carries either key.
+This former script copied `group` and `doc_refs` from the Lump Viewer HTML
+(`docs/figures/lumps-directory.html`) into legacy per-lump JSON files. It and its tests
+were removed. There is no startup migration and no current metadata write path: retained
+legacy files are audit evidence only and are never runtime input.
 
 ### `simulator/lump-audit.js` — audit engine
 
@@ -2239,8 +2096,8 @@ The audit rules engine. It is a library, not a standalone CLI: it is invoked fro
 **Audit** button in the IDE detail-panel header strip and loaded as a module by its
 direct test consumers. (The separate `lump-consistency` CI gate,
 `tests/lump/test_lump_consistency.py`, implements its own independent checks and does
-not invoke this engine.) The full rule list (R0–RSM, both manifest-guided and
-binary-only modes) lives in the **Lump Audit Rules** section above.
+not invoke this engine.) The full rule list (R0–RSM) lives in the **Lump Audit
+Rules** section above.
 
 ---
 
@@ -3173,7 +3030,7 @@ already owns.
 > The former `Lump-Architecture.md`, `foundation-lump-design.md`, `lump-reference.md`, and
 > `lump-tooling.md` documents have been consolidated into this specification and archived
 > as redirect stubs (2026-08-18). Their content lives in the sections above (object model,
-> lump design, sidecar/manifest field reference, and Developer Tooling respectively).
+> lump design, metadata authority hierarchy, and Developer Tooling respectively).
 
 ---
 
@@ -3271,17 +3128,13 @@ call sites robust to script load order and future module/scoping changes.
 
 ## Trap: Staleness guards are keyed by the exact abstraction-name string (case-sensitive)
 
-Per-lump staleness/build scripts find "the" lump by matching
-`manifest.entry.abstraction === '<ExactName>'`. A casing mismatch between the sidecar's
-`abstraction` field and the registry key hides an orphaned lump from all staleness checks
-permanently — it sits in `server/lumps/` and `manifest.json` forever, fully "consistent" by
-the consistency-gate rules, but semantically dead and loadable by anyone browsing lumps.
-(Every recompile mints a brand-new token; nothing deletes the previous one, and the build
-scripts only replace an entry whose name string matches exactly.)
+Per-lump staleness/build scripts must identify every manifest `filename` independently and
+preserve its exact case. Token-only indexing is insufficient because legacy catalogues can
+contain more than one filename for a token. A cache-name mismatch must not hide an orphaned
+binary from staleness checks.
 
-**Rule:** when adding or renaming a lump, verify that the sidecar/manifest `abstraction` field exactly
-matches the registry key — character for character. When a lump's disassembly or behaviour
-looks wrong or dated, suspect a stale duplicate before assuming the disassembler is broken:
-use the lump's `check_*_stale.js` script to find the actual canonical token, and grep the
-tree for the token you were viewing. Also grep UI code for hardcoded lump tokens — these can
-independently rot to a no-longer-existent token when the lump is rebuilt.
+**Rule:** when adding or renaming a lump, verify the canonical binary filename character for
+character and regenerate disposable catalogue projections from the binary. When disassembly
+or behaviour looks dated, suspect a stale duplicate before assuming the disassembler is
+broken: use the lump's `check_*_stale.js` script and grep for the viewed token and exact
+filename. Also grep UI code for hardcoded tokens, which can independently become stale.

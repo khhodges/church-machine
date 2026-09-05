@@ -300,18 +300,16 @@ if (violations > 0) {
     console.log(`check-capabilities-blocks: all ${files.length} file(s) pass.`);
 }
 
-// ── sidecar source guard ──────────────────────────────────────────────────────
-// Ensure every sidecar whose abstraction has a canonical .cloomc source file
-// carries the exact canonical source (catches blank or stale archived copies).
-const sidecarResult = spawnSync(
+// ── embedded binary content guard ─────────────────────────────────────────────
+const contentResult = spawnSync(
     'node',
-    [path.join(ROOT, 'scripts', 'check-sidecar-source.js')],
+    [path.join(ROOT, 'scripts', 'check-lump-embedded-content.js')],
     { encoding: 'utf8', cwd: ROOT }
 );
-if (sidecarResult.stdout) process.stdout.write(sidecarResult.stdout);
-if (sidecarResult.stderr) process.stderr.write(sidecarResult.stderr);
-if (sidecarResult.status !== 0) {
-    process.exit(sidecarResult.status || 1);
+if (contentResult.stdout) process.stdout.write(contentResult.stdout);
+if (contentResult.stderr) process.stderr.write(contentResult.stderr);
+if (contentResult.status !== 0) {
+    process.exit(contentResult.status || 1);
 }
 
 // ── audit_clist guard ─────────────────────────────────────────────────────────

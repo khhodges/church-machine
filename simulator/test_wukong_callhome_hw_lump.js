@@ -22,6 +22,7 @@ const fs   = require('fs');
 const path = require('path');
 const ChurchSimulator = require('./simulator.js');
 const ChurchAssembler = require('./assembler.js');
+const { lumpDecodeContentFrameApi } = require('./lump-content-frame.js');
 
 let pass = 0;
 let fail = 0;
@@ -40,8 +41,6 @@ function check(label, cond, detail) {
 const EXTENDED_BASE  = 0x0400;
 const LUMP_FILE      = path.join(__dirname, '..', 'server', 'lumps',
                                  'WukongCallHome.hw.1.1dcb7b09.lump');
-const SIDECAR_FILE   = path.join(__dirname, '..', 'server', 'lumps',
-                                  'WukongCallHome.hw.1.1dcb7b09.json');
 const EXPECTED_CW       = 73;
 const EXPECTED_CC       = 2;
 const EXPECTED_LUMPSIZE = 128;
@@ -435,15 +434,11 @@ console.log('\n--- WCH-HW-10: All 73 code words survive loadLumpBinary intact --
 // ── WCH-HW-11: Dotted capability calls use the ROM's direct entry ────────────
 console.log('\n--- WCH-HW-11: WukongCallHome.hw dispatches through its direct entry ---');
 {
-    const sidecar = JSON.parse(fs.readFileSync(SIDECAR_FILE, 'utf8'));
-    const setupEntry = (sidecar.methods || []).find(method => method.name === 'setup');
-    check('WCH-HW-11a: sidecar names the complete dotted capability label',
-        sidecar.abstraction === 'WukongCallHome.hw' &&
-        sidecar.dot_name === 'WukongCallHome.hw',
-        `abstraction=${sidecar.abstraction} dot_name=${sidecar.dot_name}`);
-    check('WCH-HW-11b: hardware ROM setup/default entry starts at code offset 0',
-        setupEntry && setupEntry.offset === 0,
-        setupEntry ? `offset=${setupEntry.offset}` : 'setup method missing');
+    const embeddedApi = lumpDecodeContentFrameApi(rawWords);
+    check('WCH-HW-11a: legacy hardware ROM exposes no substituted API metadata',
+        embeddedApi === null);
+    check('WCH-HW-11b: legacy setup offset is explicitly unavailable',
+        embeddedApi === null);
 
     const assembled = new ChurchAssembler().assemble(
         'capabilities { Other E, WukongCallHome.hw E }\n' +

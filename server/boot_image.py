@@ -43,6 +43,11 @@ Boot.Abstr occupies NS slot 6 (SelfTest) and sits immediately after the
 Thread lump body at physAddr = threadLumpWords.
 """
 import json
+import hashlib
+from server.lump_approvals import read_approvals
+from server.lump_integrity import (
+    compute_number, parse_canonical_filename,
+)
 import os
 import struct
 import warnings
@@ -1117,6 +1122,23 @@ def _read_lump_body(lumps_dir, token_hex, filename=None):
             return list(struct.unpack(f">{n}I", raw[: n * 4]))
     if not token_hex:
         return None
+    try:
+        with open(os.path.join(lumps_dir, "manifest.json")) as source:
+            locators = json.load(source)
+        matches = [row.get("filename") for row in locators
+                   if isinstance(row, dict)
+                   and str(row.get("token", "")).lower() == str(token_hex).lower()
+                   and isinstance(row.get("filename"), str)]
+        if len(matches) == 1:
+            path = os.path.join(lumps_dir, matches[0])
+            if os.path.isfile(path):
+                with open(path, "rb") as source:
+                    raw = source.read()
+                if len(raw) % 4:
+                    return None
+                return list(struct.unpack(f">{len(raw) // 4}I", raw))
+    except (OSError, ValueError, TypeError):
+        return None
     path = os.path.join(lumps_dir, f"{token_hex}.lump")
     if not os.path.isfile(path):
         return None
@@ -1129,10 +1151,9 @@ def _read_lump_body(lumps_dir, token_hex, filename=None):
 def find_lump_file_by_abstraction(lumps_dir, abstraction_name, ns_slot):
     """Find the canonical lump assigned to a Namespace-state slot.
 
-    Reads ``manifest.json`` and returns the full path to the first matching
-    entry's lump file.  Prefers the versioned ``filename`` field; falls back to
-    ``{token}.lump`` when ``filename`` is absent or missing on disk.  Returns
-    ``None`` when no matching entry is found or no file exists.
+    Namespace state selects the slot/token and may provide its exact filename.
+    Otherwise the token must have one unique manifest locator. Directory scans
+    and token-named aliases are deliberately not consulted.
     """
     try:
         with open(os.path.join(lumps_dir, "ns-state.json")) as _f:
@@ -1143,33 +1164,133 @@ def find_lump_file_by_abstraction(lumps_dir, abstraction_name, ns_slot):
             if _e.get("slot") != ns_slot:
                 continue
             _tok = _e.get("token") or _e.get("cache_token")
-            if _tok and os.path.isfile(os.path.join(lumps_dir, f"{_tok}.lump")):
-                return os.path.join(lumps_dir, f"{_tok}.lump")
-            import re as _re
-            _rx = _re.compile(
-                rf"^{_re.escape(str(abstraction_name))}\.\d+\.[0-9a-f]{{8}}\.lump$",
-                _re.IGNORECASE)
-            _files = sorted(fn for fn in os.listdir(lumps_dir) if _rx.match(fn))
-            if _files:
-                return os.path.join(lumps_dir, _files[-1])
-    except Exception:
-        pass
-    # Backward compatibility for libraries created before rich ns-state.json.
-    try:
-        with open(os.path.join(lumps_dir, "manifest.json")) as _f:
-            for _e in json.load(_f):
-                if (_e.get("abstraction") != abstraction_name
-                        or _e.get("ns_slot") != ns_slot):
-                    continue
-                _filename = _e.get("filename")
-                if _filename and os.path.isfile(os.path.join(lumps_dir, _filename)):
-                    return os.path.join(lumps_dir, _filename)
-                _tok = _e.get("token")
-                if _tok and os.path.isfile(os.path.join(lumps_dir, f"{_tok}.lump")):
-                    return os.path.join(lumps_dir, f"{_tok}.lump")
+            _state_filename = _e.get("filename")
+            if (_tok and isinstance(_state_filename, str)
+                    and os.path.basename(_state_filename) == _state_filename):
+                _located = os.path.join(lumps_dir, _state_filename)
+                if os.path.isfile(_located):
+                    _require_approved_executable_lump(
+                        _located, lumps_dir, abstraction_name)
+                    return _located
+            if _tok:
+                try:
+                    with open(os.path.join(lumps_dir, "manifest.json")) as _mf:
+                        _rows = json.load(_mf)
+                    _matches = [
+                        row.get("filename") for row in _rows
+                        if isinstance(row, dict)
+                        and str(row.get("token", "")).lower() == str(_tok).lower()
+                        and isinstance(row.get("filename"), str)
+                    ]
+                    if len(_matches) == 1:
+                        _located = os.path.join(lumps_dir, _matches[0])
+                        if os.path.isfile(_located):
+                            _require_approved_executable_lump(
+                                _located, lumps_dir, abstraction_name)
+                            return _located
+                except ValueError:
+                    # Approval/identity failures from the exact located body
+                    # are execution diagnostics, not a missing-locator result.
+                    raise
+                except (OSError, TypeError):
+                    pass
+    except ValueError:
+        raise
     except Exception:
         pass
     return None
+
+
+def _resolve_selected_lump_locator(lumps_dir, slot, token):
+    """Resolve one selected slot/token without aliases or directory guessing."""
+    normalized = str(token or "").lower()
+    if not normalized:
+        raise ValueError(
+            f"generate_boot_image: resident slot {slot} has no selected token")
+    try:
+        with open(os.path.join(lumps_dir, "ns-state.json")) as source:
+            state = json.load(source)
+    except (OSError, ValueError, TypeError) as exc:
+        raise ValueError(
+            f"generate_boot_image: Namespace state is unreadable: {exc}") from exc
+    matches = [
+        row for row in state.get("abstractions", [])
+        if isinstance(row, dict) and row.get("slot") == slot
+        and str(row.get("token") or row.get("cache_token") or "").lower() == normalized
+    ]
+    if len(matches) > 1:
+        raise ValueError(
+            f"generate_boot_image: resident slot {slot} has ambiguous Namespace state")
+    if matches:
+        filename = matches[0].get("filename")
+        if isinstance(filename, str) and os.path.basename(filename) == filename:
+            path = os.path.join(lumps_dir, filename)
+            if os.path.isfile(path):
+                return path
+            raise ValueError(
+                f"generate_boot_image: Namespace-selected resident locator {filename} is missing")
+    try:
+        with open(os.path.join(lumps_dir, "manifest.json")) as source:
+            manifest = json.load(source)
+    except (OSError, ValueError, TypeError) as exc:
+        raise ValueError(
+            f"generate_boot_image: resident manifest is unreadable: {exc}") from exc
+    locators = [
+        row.get("filename") for row in manifest
+        if isinstance(row, dict)
+        and str(row.get("token") or "").lower() == normalized
+        and isinstance(row.get("filename"), str)
+        and os.path.basename(row["filename"]) == row["filename"]
+    ]
+    if len(locators) != 1:
+        raise ValueError(
+            f"generate_boot_image: resident token {normalized} requires one exact locator")
+    path = os.path.join(lumps_dir, locators[0])
+    if not os.path.isfile(path):
+        raise ValueError(
+            f"generate_boot_image: resident locator {locators[0]} is missing")
+    return path
+
+
+def _require_approved_executable_lump(path, lumps_dir, label):
+    """Return exact words only for a canonically named, hash-approved body."""
+    if not path or not os.path.isfile(path):
+        raise ValueError(
+            f"generate_boot_image: {label} approval-required executable LUMP is missing")
+    try:
+        with open(path, "rb") as source:
+            raw = source.read()
+        if len(raw) < 4 or len(raw) % 4:
+            raise ValueError("binary length is not a whole number of words")
+        words = list(struct.unpack(f">{len(raw) // 4}I", raw))
+        header = words[0]
+        declared = 1 << (((header >> 23) & 0xF) + 6)
+        cw, cc, typ = (header >> 10) & 0x1FFF, header & 0xFF, (header >> 8) & 3
+        if ((header >> 27) & 0x1F) != 0x1F or declared != len(words):
+            raise ValueError("invalid header or non-exact declared allocation")
+        if 1 + cw + cc > declared or typ != 0 or cw == 0:
+            raise ValueError("body is not a structurally valid executable LUMP")
+        digest = hashlib.sha256(raw).hexdigest()
+        approvals = read_approvals(os.path.join(lumps_dir, "approvals.json"))
+        approval = approvals.get(digest)
+        filename = os.path.basename(path)
+        parsed = parse_canonical_filename(filename)
+        if approval is None:
+            raise ValueError("no approval matches the exact SHA-256")
+        if approval.get("filename") != filename or parsed is None:
+            raise ValueError("approval filename is missing or not canonical")
+        dot_name, issue_n, number = parsed
+        identity_hash = hashlib.sha256(
+            f"{dot_name}#{issue_n}".encode("utf-8")).hexdigest()
+        if (compute_number(dot_name, raw) != number
+                or approval.get("dot_name") != dot_name
+                or approval.get("issue_n") != issue_n
+                or approval.get("identity_hash") != identity_hash):
+            raise ValueError("approval canonical identity/filename does not match bytes")
+        return words
+    except (OSError, ValueError) as exc:
+        raise ValueError(
+            f"generate_boot_image: {label} exact hash-bound approval required: {exc}") from exc
 
 def parse_ns_table(image_bytes):
     """Parse the NS table from a boot image binary.
@@ -1427,7 +1548,7 @@ def _load_catalog_token_map(manifest_path, selected_by_slot=None):
 def _load_trusted_cache_token_map(manifest_path):
     """Return slot→cache_token32 for canonical, fully verified lump records.
 
-    The external manifest/sidecar is the trusted full-identity source.  W3 only
+    The exact hash-bound approval is the trusted full-identity source. W3 only
     receives its issue-blind 32-bit cache value after the exact on-disk bytes
     satisfy the same resolver checks as ``GET /api/lump/<token>``.  Legacy or
     incomplete records intentionally produce W3=0 rather than learning trust
@@ -1438,8 +1559,6 @@ def _load_trusted_cache_token_map(manifest_path):
     # merge stale manifest ns_slot aliases into it: that could place a valid
     # token for one abstraction into a slot now owned by another abstraction.
     slot_tokens = _load_ns_state_token_map(lumps_dir)
-    if not slot_tokens:
-        slot_tokens = _load_catalog_token_map(manifest_path)
     try:
         from lump_integrity import resolve_canonical_lump
     except ImportError:
@@ -1464,7 +1583,6 @@ def _load_trusted_cache_token_map(manifest_path):
             e for e in entries if isinstance(e, dict)
             and not e.get("archived")
             and str(e.get("token", "")).lower() == token
-            and e.get("dot_name")
         ]
         if len(matches) != 1:
             continue
@@ -1583,26 +1701,31 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         )
     NS_TABLE_RESERVE = ns_table_reserve_words(_ns_slots_max)   # local, shadows module constant
 
-    # ── Preflight: warn when manifest and sidecar ns_slot disagree ───────────
-    # boot_image.py reads ns_slot exclusively from manifest.json.  If a partial
-    # PATCH left the two stores out of sync the operator would silently boot
-    # with the manifest value while the IDE shows the sidecar value.
+    # Namespace placement is sourced from ns-state and boot configuration.
     if "abstractionLumpWords" in step1:
         print("WARNING: abstractionLumpWords is deprecated and ignored; "
               "Boot.Abstr size is determined by the saved SelfTest lump "
               "(from manifest.json) or defaults to 64 words.")
 
     # ── Load saved Boot.Abstr lump (SelfTest, looked up via manifest.json) ───
-    # The saved lump is written big-endian by /api/lumps/save.  If it passes
-    # all validation checks its declared size becomes the actual Boot.Abstr
-    # allocation; otherwise the hardcoded default (64 words) is used.
+    # The saved lump is written big-endian by /api/lumps/save. Only exact bytes
+    # with a matching strict approval and canonical filename may determine the
+    # Boot.Abstr allocation; failure aborts image generation.
     # The lump is located by searching manifest.json for the entry whose
-    # abstraction name is "SelfTest" at BOOT_ABSTR_NS_SLOT, preferring the
-    # versioned filename (e.g. SelfTest_v75.lump) over any token-named copy.
+    # abstraction name is "SelfTest" at BOOT_ABSTR_NS_SLOT. Resolution uses an
+    # exact Namespace-state filename or one unique token-bound manifest locator.
     _boot_saved_path = find_lump_file_by_abstraction(
         lumps_dir, "SelfTest", BOOT_ABSTR_NS_SLOT)
     actual_abstr_size = BOOT_ABSTR_DEFAULT_SIZE
     abstr_words = None
+    if _boot_saved_path is None:
+        raise ValueError(
+            "generate_boot_image: SelfTest approval-required executable LUMP is missing")
+    # Validation is deliberately outside the legacy parsing guard below:
+    # approval, filename, hash, or structural failures must never fall back to
+    # a generated executable body.
+    _require_approved_executable_lump(
+        _boot_saved_path, lumps_dir, "SelfTest")
     if _boot_saved_path is not None:
         try:
             with open(_boot_saved_path, "rb") as _bsf:
@@ -1668,8 +1791,10 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
                         # POLA-finalized c-list: embed with actual cc so the
                         # simulator's LAZY guard (clistCount === 0) does not fire.
                         abstr_words = list(_bswords[:_bssz])
-        except Exception:
-            pass  # Fall back to default 64w Boot.Abstr silently.
+        except Exception as exc:
+            raise ValueError(
+                "generate_boot_image: SelfTest executable body could not be "
+                f"embedded after approval validation: {exc}") from exc
 
     # Memory image (Python ints, packed at the end).
     mem = [0] * total
@@ -1730,7 +1855,9 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             continue
         _body = _read_lump_body(lumps_dir, _tok, _filename)
         if _body is None:
-            continue
+            raise ValueError(
+                f"generate_boot_image: boot-resident catalog slot {_slot} "
+                "approval-required executable LUMP is missing")
         if not _body or ((_body[0] >> 27) & 0x1F) != 0x1F:
             raise ValueError(
                 f"generate_boot_image: boot-resident catalog slot {_slot} "
@@ -1741,6 +1868,31 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
                 f"generate_boot_image: boot-resident catalog slot {_slot} "
                 f"declares {_declared_words} words but its file contains only "
                 f"{len(_body)}")
+        _cw = (_body[0] >> 10) & 0x1FFF
+        _typ = (_body[0] >> 8) & 0x3
+        if _typ == 0 and _cw > 0:
+            _body_path = (
+                os.path.join(lumps_dir, _filename)
+                if _filename and os.path.isfile(os.path.join(lumps_dir, _filename))
+                else None
+            )
+            if _body_path is None:
+                try:
+                    with open(_manifest_path_for_cache) as _source:
+                        _manifest_rows = json.load(_source)
+                    _matches = [
+                        row.get("filename") for row in _manifest_rows
+                        if isinstance(row, dict)
+                        and str(row.get("token", "")).lower() == str(_tok).lower()
+                        and isinstance(row.get("filename"), str)
+                    ]
+                    if len(_matches) == 1:
+                        _body_path = os.path.join(lumps_dir, _matches[0])
+                except (OSError, ValueError, TypeError):
+                    _body_path = None
+            _body = _require_approved_executable_lump(
+                _body_path, lumps_dir, f"boot-resident catalog slot {_slot}")
+            _declared_words = len(_body)
         _boot_resident_bodies[_slot] = _body[:_declared_words]
         _boot_resident_allocations[_slot] = _declared_words
     slot_sizes = {
@@ -1985,11 +2137,11 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # ----- Boot.Abstr lump (NS slot 6 = SelfTest) -------------------------
     # The Boot Abstraction: directly loaded by B:06 (INIT_ABSTR), no director hop.
     #
-    # Resident mode (boot_resident=true, default):
+    # Resident mode is selected only by Namespace state / boot configuration:
     #   The saved SelfTest lump body (00000600.lump) is copied into the image at
     #   boot_entry_loc.  The simulator executes it immediately on first Run.
     #
-    # Lazy mode (boot_resident=false in manifest):
+    # Lazy mode is never inferred from artifact manifest metadata.
     #   A minimal CODE_NOT_RESIDENT stub header (magic=0x1F, cw=0, cc=0) is written
     #   at boot_entry_loc.  The simulator detects cw=0 on the first execution attempt
     #   and triggers a lazy fetch of the canonical SelfTest lump (4c7380cb.lump).
@@ -1998,21 +2150,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     boot_entry_loc  = locations[BOOT_ABSTR_NS_SLOT]
     entry_ns_base   = total - (BOOT_ABSTR_NS_SLOT + 1) * NS_ENTRY_WORDS
 
-    # Read manifest to determine whether SelfTest is lazy-load or boot-resident.
-    _mf_path_bi = os.path.join(lumps_dir, "manifest.json")
+    # SelfTest residency is not inferred from the artifact manifest.
     _selftest_lazy = False
-    if os.path.isfile(_mf_path_bi):
-        try:
-            with open(_mf_path_bi) as _mf_bi:
-                for _me in json.load(_mf_bi):
-                    if (isinstance(_me, dict)
-                            and _me.get("ns_slot") == BOOT_ABSTR_NS_SLOT
-                            and _me.get("ns_slot_policy") == "static"
-                            and _me.get("boot_resident") is False):
-                        _selftest_lazy = True
-                        break
-        except Exception:
-            pass
 
     # Preserve the cache_token32 word3 that the catalog loop wrote for Boot.Abstr.
     # The lazy/resident paths below only need to update word1 (limit/authority) and
@@ -2159,52 +2298,78 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # Manifest fields identify candidates, but each candidate includes bytes
     # read from its .lump so localize_portable_lump_body rehashes real content.
     _portable_candidates = {}
-    _portable_sidecars = {}
+    _portable_approvals = {}
     try:
+        _approvals = read_approvals(os.path.join(lumps_dir, "approvals.json"))
         with open(_manifest_path) as _pmf:
             _portable_manifest = json.load(_pmf)
-        for _pe in _portable_manifest if isinstance(_portable_manifest, list) else []:
-            if not isinstance(_pe, dict) or not _pe.get("dot_name"):
-                continue
-            _ptok = str(_pe.get("token", "")).lower()
-            _p_slots = [slot for slot, selected_token in token_map.items()
-                        if str(selected_token).lower() == _ptok]
-            if len(_p_slots) != 1:
-                continue
-            _pslot = _p_slots[0]
-            _pbase = total - (_pslot + 1) * NS_ENTRY_WORDS
-            if not (0 <= _pbase + 1 < total):
-                continue
-            _pbody = _read_lump_body(lumps_dir, _ptok, _pe.get("filename"))
-            if _pbody is None:
-                continue
-            _praw = struct.pack(f">{len(_pbody)}I", *[x & 0xffffffff for x in _pbody])
-            _pn = f"{_pe['dot_name']}#{int(_pe.get('issue_n') or 0)}"
-            _portable_candidates[_pn] = {
-                "dot_name": _pe["dot_name"], "issue_n": _pe.get("issue_n"),
-                "identity_hash": _pe.get("identity_hash"),
-                "lump_bytes": _praw, "ns_slot": _pslot,
-                "sequence": _ns_word1_get(mem[_pbase + 1], "gt_seq"),
-                "grants": _pe.get("grants", []),
-                "capability_type": _pe.get("capability_type"),
-                "legacy_authorized": _pe.get("legacy_authorized") is True,
-                "authorized": _pe.get("authorized") is True,
-            }
-            _psc = _pe.get("sidecar_file")
-            if _psc:
-                try:
-                    with open(os.path.join(lumps_dir, _psc)) as _pscf:
-                        _portable_sidecars[_ptok] = json.load(_pscf)
-                except (OSError, ValueError, TypeError):
-                    pass
-    except (OSError, ValueError, TypeError):
-        pass
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"portable catalog is unreadable: {exc}") from exc
+    if not isinstance(_portable_manifest, list):
+        raise ValueError("portable catalog manifest must be an array")
+    for _pe in _portable_manifest:
+        if not isinstance(_pe, dict):
+            raise ValueError("portable catalog contains a non-object locator")
+        _ptok = str(_pe.get("token", "")).lower()
+        _p_slots = [slot for slot, selected_token in token_map.items()
+                    if str(selected_token).lower() == _ptok]
+        if len(_p_slots) != 1:
+            continue
+        _pslot = _p_slots[0]
+        _pbase = total - (_pslot + 1) * NS_ENTRY_WORDS
+        if not (0 <= _pbase + 1 < total):
+            raise ValueError(f"portable token {_ptok} has an invalid Namespace slot")
+        _pbody = _read_lump_body(lumps_dir, _ptok, _pe.get("filename"))
+        if _pbody is None:
+            print(f"[boot-image] portable token {_ptok}: located binary unavailable",
+                  flush=True)
+            continue
+        _praw = struct.pack(f">{len(_pbody)}I", *[x & 0xffffffff for x in _pbody])
+        _digest = hashlib.sha256(_praw).hexdigest()
+        _approval = _approvals.get(_digest)
+        if not isinstance(_approval, dict):
+            print(f"[boot-image] portable token {_ptok}: exact approval missing",
+                  flush=True)
+            continue
+        _dot = _approval.get("dot_name")
+        _issue = _approval.get("issue_n")
+        _identity = _approval.get("identity_hash")
+        _binding = _approval.get("portable_binding")
+        if (not isinstance(_dot, str) or not _dot
+                or not isinstance(_issue, int) or _issue < 1
+                or _identity != hashlib.sha256(
+                    f"{_dot}#{_issue}".encode("utf-8")).hexdigest()
+                or not isinstance(_binding, dict)):
+            print(f"[boot-image] portable token {_ptok}: approval binding invalid",
+                  flush=True)
+            continue
+        try:
+            try:
+                from portable_binding import validate_portable_binding
+            except ImportError:
+                from server.portable_binding import validate_portable_binding
+            validate_portable_binding(_binding, cc=_pbody[0] & 0xff)
+        except ValueError as exc:
+            print(f"[boot-image] portable token {_ptok}: invalid portable binding: {exc}",
+                  flush=True)
+            continue
+        _pn = f"{_dot}#{_issue}"
+        _portable_candidates[_pn] = {
+            "dot_name": _dot, "issue_n": _issue,
+            "identity_hash": _identity,
+            "binary_hash": _digest,
+            "lump_bytes": _praw, "ns_slot": _pslot,
+            "sequence": _ns_word1_get(mem[_pbase + 1], "gt_seq"),
+            "grants": _approval.get("grants", []),
+            "capability_type": _approval.get("capability_type"),
+        }
+        _portable_approvals[_ptok] = _approval
     # Revisit bodies already placed through the boot-entry and catalog paths.
     # They are now eligible for the same localization as Step-2 bodies because
     # every NS descriptor (and therefore every live sequence) exists.
     for _placed_slot, _placed_token in token_map.items():
-        _placed_sidecar = _portable_sidecars.get(str(_placed_token).lower(), {})
-        _placed_binding = _placed_sidecar.get("portable_binding")
+        _placed_binding = (_portable_approvals.get(
+            str(_placed_token).lower(), {}).get("portable_binding"))
         _placed_loc = locations.get(_placed_slot)
         if _placed_binding is None or _placed_loc is None or not (0 <= _placed_loc < total):
             continue
@@ -2224,13 +2389,11 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         slot = int(e["nsSlot"])
         phys = int(e["physAddr"])
         token = token_map.get(slot)
-        body = _read_lump_body(lumps_dir, token)
-        if body is None:
-            # No on-disk body — leave region zeroed; lazy loader will
-            # populate at runtime. Resident reservation still costs the
-            # space (NS entry already points here).
-            continue
-        _binding = (_portable_sidecars.get(str(token).lower(), {})
+        body_path = _resolve_selected_lump_locator(
+            lumps_dir, slot, token)
+        body = _require_approved_executable_lump(
+            body_path, lumps_dir, f"Step-2 resident slot {slot}")
+        _binding = (_portable_approvals.get(str(token).lower(), {})
                     .get("portable_binding"))
         if _binding is not None:
             # A binding failure is a build failure, never a partially localized
@@ -2287,52 +2450,9 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
 
 
 # ---------------------------------------------------------------------------
-# Manifest / sidecar drift detector
+# Namespace placement is solely ns-state/boot configuration.
 # ---------------------------------------------------------------------------
 
 def check_ns_slot_drift(lumps_dir):
-    """Compare ns_slot in manifest.json against each entry's sidecar file.
-
-    boot_image.py reads ns_slot exclusively from manifest.json.  If the
-    manifest and the sidecar diverge (e.g. after a partial PATCH failure or
-    a hand-edit) the IDE would boot with the manifest value while the detail
-    view shows the sidecar value, silently hiding the discrepancy.
-
-    Returns a list of human-readable warning strings (one per divergent
-    entry); returns [] when every sidecar agrees with its manifest entry or
-    when the sidecar file cannot be read.  Does NOT raise — callers may log
-    or surface the warnings as they see fit.
-    """
-    warnings = []
-    mf_path = os.path.join(lumps_dir, "manifest.json")
-    try:
-        with open(mf_path) as _f:
-            entries = json.load(_f)
-    except Exception:
-        return warnings
-
-    for e in entries if isinstance(entries, list) else []:
-        if not isinstance(e, dict):
-            continue
-        sidecar_file = e.get("sidecar_file")
-        token = e.get("token", "<unknown>")
-        abstraction = e.get("abstraction", "<unknown>")
-        manifest_slot = e.get("ns_slot")
-        if not sidecar_file:
-            continue
-        sc_path = os.path.join(lumps_dir, sidecar_file)
-        try:
-            with open(sc_path) as _sf:
-                sc = json.load(_sf)
-        except Exception:
-            continue
-        if not isinstance(sc, dict):
-            continue
-        sidecar_slot = sc.get("ns_slot")
-        if manifest_slot != sidecar_slot:
-            warnings.append(
-                f"ns_slot mismatch for '{abstraction}' (token={token}): "
-                f"manifest={manifest_slot!r} but sidecar={sidecar_slot!r}. "
-                f"boot_image.py will use the manifest value ({manifest_slot!r})."
-            )
-    return warnings
+    """Retained compatibility hook; there is no second placement authority."""
+    return []

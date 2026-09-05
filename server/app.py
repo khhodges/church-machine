@@ -26,13 +26,13 @@ _sse_clients     = []
 _sse_clients_lock = threading.Lock()
 
 # ── LUMP manifest write lock ───────────────────────────────────────────────────
-# All archive/current/sidecar/manifest transitions use this lock.  Keeping the
+# All archive/current/approval/manifest transitions use this lock. Keeping the
 # complete transition serialised is important: the files are a single history
 # record, not independent per-token cache entries.
 _lumps_manifest_lock = threading.RLock()
 _lump_history_lock_state = threading.local()
 
-# Canonical identities whose replacement must commit binary, sidecar, manifest,
+# Canonical identities whose replacement must commit binary, approval, manifest,
 # Namespace binding, and boot image as one protected-resident transaction.
 _PROTECTED_RESIDENT_REPLACEMENT_POLICIES = {
     "SelfTest": {
@@ -110,7 +110,7 @@ def _push_device_event(payload: dict):
 # ─────────────────────────────────────────────────────────────────────────────
 from flask import (
     Flask, after_this_request, jsonify, send_from_directory, send_file,
-    redirect, make_response, request,
+    redirect, make_response, request, session,
 )
 
 # Ensure the server/ directory is on sys.path so local modules (boot_image, etc.)
@@ -2349,60 +2349,60 @@ LUMPS_MANIFEST_PATH = os.path.join(
 )
 
 def _load_lump_catalog(selected_tokens=None):
-    """Return the subset of server/lumps/manifest.json suitable for Step 2.
-
-    Fixed-slot lumps (ns_slot is an integer) and entries that target reserved
-    slots (foundational + device MMIO) are dropped. The rest is what the
-    programmer can choose to bake in.
-
-    Floating lumps (ns_slot_policy == "dynamic", ns_slot == null) are included
-    with a "floating": True flag and nsSlot: None so the IDE can surface them
-    in diagnostic/utility catalog sections without treating them as Step 2
-    resident candidates (the _validate_step2 path still filters by nsSlot).
-    """
+    """Catalog exact binaries; manifest supplies locator/history fields only."""
     try:
         with open(LUMPS_MANIFEST_PATH, "r") as f:
             raw = json.load(f)
     except Exception:
         return []
     selected_tokens = selected_tokens or {}
+    _deployed_by_token = {}
+    try:
+        with open(NS_STATE_PATH, encoding="utf-8") as _ns_fh:
+            for _row in json.load(_ns_fh).get("abstractions", []):
+                if isinstance(_row, dict) and _row.get("token"):
+                    _deployed_by_token[str(_row["token"]).lower().zfill(8)] = _row
+    except (OSError, ValueError, TypeError):
+        _deployed_by_token = {}
     out = []
     floating = []
     for entry in raw if isinstance(raw, list) else []:
-        # Manifest is authoritative when it carries a field; the sidecar fills
-        # older manifest records without changing an explicit false/empty
-        # policy into a permissive default.
-        sidecar = {}
-        sc_name = entry.get("sidecar_file")
-        if isinstance(sc_name, str) and sc_name:
-            try:
-                with open(os.path.join(os.path.dirname(LUMPS_MANIFEST_PATH), sc_name), "r") as sc_file:
-                    loaded_sc = json.load(sc_file)
-                if isinstance(loaded_sc, dict):
-                    sidecar = loaded_sc
-            except (OSError, ValueError, TypeError):
-                pass
+        # Only an approval bound to the exact current bytes may supplement the
+        # manifest.  A neighbouring JSON sidecar is never an authority.
+        approval = {}
+        try:
+            binary = _inspect_lump_binary(os.path.join(
+                os.path.dirname(LUMPS_MANIFEST_PATH),
+                entry.get("filename") or f"{entry.get('token', '')}.lump"))
+            approval = _matching_lump_approval(
+                os.path.dirname(LUMPS_MANIFEST_PATH), binary["binary_hash"]) or {}
+        except (OSError, ValueError):
+            continue
 
-        def _catalog_value(key, default=None):
-            return entry[key] if key in entry and entry[key] is not None else sidecar.get(key, default)
+        _api = binary.get("api_definition") or {}
+        _token = str(entry.get("token") or "").lower().zfill(8)
+        _filename_label = os.path.basename(
+            entry.get("filename") or f"{_token}.lump").removesuffix(".lump")
+        _approved_name = (approval.get("display_name") or approval.get("dot_name")
+                          or approval.get("abstraction"))
+        _label = _approved_name or _filename_label
 
         def _apply_binding_candidate_fields(record):
-            cache_token = _catalog_value("cache_token", _catalog_value("token"))
-            record["cache_token"] = cache_token
-            record["cacheToken"] = cache_token
-            record["grants"] = _catalog_value("grants", [])
-            record["capability_type"] = _catalog_value("capability_type")
-            record["authorized"] = _catalog_value("authorized", False) is True
-            record["legacy_authorized"] = _catalog_value("legacy_authorized", False) is True
+            record["cache_token"] = _token
+            record["cacheToken"] = _token
+            record["grants"] = approval.get("grants", [])
+            record["capability_type"] = approval.get("capability_type")
             for src, dst in (("dot_name", "dotName"), ("issue_n", "issueN"),
                              ("identity_hash", "identityHash"),
                              ("binary_hash", "binaryHash")):
-                value = _catalog_value(src)
+                value = (binary["binary_hash"] if src == "binary_hash"
+                         else approval.get(src))
                 if value is not None:
                     record[dst] = value
 
-        slot = entry.get("ns_slot")
-        policy = entry.get("ns_slot_policy", "dynamic" if not isinstance(slot, int) else "static")
+        _deployment = _deployed_by_token.get(_token, {})
+        slot = _deployment.get("slot")
+        policy = "static" if isinstance(slot, int) else "dynamic"
         # Pre-bound slots above the built-in catalog are legacy private
         # identities, not programmer selections.  Expose those lumps as
         # dynamically allocated so they cannot reserve user capacity.
@@ -2411,16 +2411,19 @@ def _load_lump_catalog(selected_tokens=None):
             policy = "dynamic"
         if not isinstance(slot, int):
             # Floating lump — include in catalog with floating flag
-            if policy == "dynamic" and entry.get("token"):
+            if policy == "dynamic" and _token:
                 e = {
-                    "abstraction": entry.get("abstraction"),
+                    "abstraction": _label,
                     "nsSlot": None,
-                    "lumpSize": entry.get("lump_size"),
-                    "token": entry.get("token"),
+                    "lumpSize": binary["lump_size"],
+                    "cw": binary["cw"], "cc": binary["cc"],
+                    "token": _token,
                     "nsSlotPolicy": policy,
-                    "hasExecutableMethods": bool(entry.get("methods")),
+                    "hasExecutableMethods": binary["typ"] == 0 and binary["cw"] > 0,
                     "floating": True,
-                    "description": entry.get("description"),
+                    "description": approval.get("documentation"),
+                    "contentProfile": binary.get("content_profile"),
+                    "profile": approval.get("profile") or _api.get("profile"),
                 }
                 _apply_binding_candidate_fields(e)
                 floating.append(e)
@@ -2428,24 +2431,26 @@ def _load_lump_catalog(selected_tokens=None):
         if slot in RESERVED_NS_SLOTS:
             continue
         e = {
-            "abstraction": entry.get("abstraction"),
+            "abstraction": _label,
             "nsSlot": slot,
-            "lumpSize": entry.get("lump_size"),
-            "token": entry.get("token"),
+            "lumpSize": binary["lump_size"],
+            "cw": binary["cw"], "cc": binary["cc"],
+            "token": _token,
             "lumpVersion": entry.get("lump_version", 0),
             "nsSlotPolicy": policy,
-            "hasExecutableMethods": bool(entry.get("methods")),
+            "hasExecutableMethods": binary["typ"] == 0 and binary["cw"] > 0,
+            "contentProfile": binary.get("content_profile"),
+            "profile": approval.get("profile") or _api.get("profile"),
         }
         # Expose the canonical binding needed by host-side prefetch.  These
         # values are informational until receiveLump() verifies the response
         # headers and raw payload hash.
         for _src, _dst in (("dot_name", "dotName"), ("issue_n", "issueN"),
                             ("identity_hash", "identityHash"), ("binary_hash", "binaryHash")):
-            if _catalog_value(_src) is not None:
-                e[_dst] = _catalog_value(_src)
+            _value = binary["binary_hash"] if _src == "binary_hash" else approval.get(_src)
+            if _value is not None:
+                e[_dst] = _value
         _apply_binding_candidate_fields(e)
-        if entry.get("media_tags"):
-            e["mediaTags"] = entry["media_tags"]
         out.append(e)
 
     # A namespace slot is an abstraction identity, not an archive-version
@@ -6315,6 +6320,229 @@ def _extract_clist_from_lump_file(lump_path):
         return []
 
 
+_LUMP_APPROVALS_FILENAME = "approvals.json"
+from server.lump_approvals import read_approvals as _shared_read_approvals
+from server.lump_approvals import write_approvals as _shared_write_approvals
+_LUMP_APPROVAL_INTENTS = {}
+_LUMP_APPROVAL_INTENTS_LOCK = threading.Lock()
+_LUMP_APPROVAL_INTENT_FIELDS = frozenset({
+    "abstraction", "author", "version", "release_notes", "history_note",
+    "display_name", "documentation", "annotations",
+    "pet_name", "pet_names", "grants", "capability_type", "portable_binding",
+})
+
+
+def _parse_intrinsic_lump_content(words):
+    """Parse the byte-embedded V1.3 API/source frame; return None for legacy."""
+    if not words:
+        return None
+    header = words[0] & 0xFFFFFFFF
+    size = 1 << (((header >> 23) & 0xF) + 6)
+    cw, typ, cc = (header >> 10) & 0x1FFF, (header >> 8) & 3, header & 0xFF
+    start, end = 1 + cw, size - cc
+    if typ != 0 or start >= end or start >= len(words):
+        return None
+    frame_header = words[start] & 0xFFFFFFFF
+    flags, api_len = (frame_header >> 16) & 0xFF, frame_header & 0xFFFF
+    tiers = {0x00: 0, 0x01: 1, 0x03: 2, 0x05: 1, 0x07: 2}
+    if (frame_header >> 24) != 0xAB or flags not in tiers or not api_len:
+        return None
+    api_words = (api_len + 3) // 4
+    if start + 1 + api_words > end:
+        return None
+    try:
+        api_raw = _struct.pack(
+            f">{api_words}I", *words[start + 1:start + 1 + api_words])[:api_len]
+        api = json.loads(api_raw.decode("utf-8"))
+        if not isinstance(api, dict):
+            return None
+    except (ValueError, UnicodeDecodeError, _struct.error):
+        return None
+    source = None
+    content_words = 1 + api_words
+    if flags & 1:
+        pos = start + 1 + api_words
+        if pos >= end:
+            return None
+        source_len = words[pos] & 0xFFFFFFFF
+        source_words = (source_len + 3) // 4
+        if not source_len or pos + 1 + source_words > end:
+            return None
+        packed = _struct.pack(
+            f">{source_words}I", *words[pos + 1:pos + 1 + source_words])[:source_len]
+        import zlib
+        try:
+            if flags & 4:
+                source_bytes = zlib.decompress(packed, wbits=-15)
+                if len(source_bytes) > 1 << 18:
+                    return None
+            else:
+                source_bytes = packed
+            source = source_bytes.decode("utf-8")
+        except (ValueError, UnicodeDecodeError, zlib.error):
+            return None
+        content_words += 1 + source_words
+    return {"tier": tiers[flags], "flags": flags, "api_len": api_len,
+            "content_words": content_words, "source": source,
+            "api_definition": api}
+
+
+def _inspect_lump_binary(binary_or_path):
+    """Return intrinsic facts from one LUMP, or raise ValueError.
+
+    This is the common parser used by catalogue, detail, history, preview and
+    approval code.  No JSON metadata participates in structural validation.
+    """
+    if isinstance(binary_or_path, (bytes, bytearray)):
+        raw = bytes(binary_or_path)
+    else:
+        with open(binary_or_path, "rb") as fh:
+            raw = fh.read()
+    if len(raw) < 4 or len(raw) % 4:
+        raise ValueError("binary length is not a non-empty whole number of words")
+    words = list(_struct.unpack(f">{len(raw) // 4}I", raw))
+    header = words[0]
+    magic = (header >> 27) & 0x1F
+    if magic != 0x1F:
+        raise ValueError(f"invalid header magic 0x{magic:02x}")
+    declared_size = 1 << (((header >> 23) & 0xF) + 6)
+    cw = (header >> 10) & 0x1FFF
+    typ = (header >> 8) & 0x3
+    cc = header & 0xFF
+    if declared_size != len(words):
+        raise ValueError(
+            f"header declares {declared_size} words but file contains {len(words)}"
+        )
+    if 1 + cw + cc > declared_size:
+        raise ValueError(
+            f"header regions exceed allocation: 1+cw({cw})+cc({cc}) > {declared_size}"
+        )
+    frame = _parse_intrinsic_lump_content(words)
+    content_profile = None
+    if frame:
+        content_profile = (
+            "api" if frame["flags"] == 0
+            else "full" if frame["flags"] in (0x03, 0x07)
+            else "compact"
+        )
+    return {
+        "raw_bytes": raw,
+        "words": words,
+        "header": header,
+        "cw": cw,
+        "cc": cc,
+        "typ": typ,
+        "lump_size": declared_size,
+        "binary_hash": hashlib.sha256(raw).hexdigest(),
+        "content_profile": content_profile,
+        "sourceStorageTier": frame["tier"] if frame else None,
+        "api_definition": frame["api_definition"] if frame else None,
+        "source": frame["source"] if frame else None,
+        "clist_entries": _extract_clist_from_words(words),
+    }
+
+
+def _read_lump_approvals(lumps_dir):
+    """Read the canonical, SHA-256-keyed approval store, failing closed."""
+    path = os.path.join(lumps_dir, _LUMP_APPROVALS_FILENAME)
+    try:
+        return _shared_read_approvals(path)
+    except Exception as exc:
+        raise ValueError(f"LUMP approval store is unreadable: {exc}") from exc
+
+
+def _matching_lump_approval(lumps_dir, binary_hash):
+    approval = _read_lump_approvals(lumps_dir).get(binary_hash)
+    return dict(approval) if approval is not None else None
+
+
+def _write_lump_approval(lumps_dir, binary_hash, metadata):
+    """Record reviewed extrinsic metadata under the exact binary digest."""
+    with _lump_history_transition_lock(lumps_dir):
+        approvals = _read_lump_approvals(lumps_dir)
+        approval = {
+            key: value for key, value in dict(metadata or {}).items()
+            if key not in {"cw", "cc", "typ", "lump_size", "binary_hash",
+                           "source", "api_definition", "sourceStorageTier"}
+        }
+        approval["binary_hash"] = binary_hash
+        approvals[binary_hash] = approval
+        _shared_write_approvals(
+            os.path.join(lumps_dir, _LUMP_APPROVALS_FILENAME), approvals)
+
+
+@app.route("/api/lumps/approval-intent", methods=["POST"])
+def create_lump_approval_intent():
+    """Issue a one-time, session-bound approval intent after UI confirmation.
+
+    Request: {digest, action, confirmation:true, approval:{...allowed fields...}}.
+    The returned intent must accompany the matching mutation as
+    metadata.approval_intent.  Intents are consumed exactly once.
+    """
+    payload = request.get_json(force=True, silent=True) or {}
+    digest = str(payload.get("digest", "")).lower()
+    action = str(payload.get("action", "")).lower()
+    supplied = payload.get("approval", {})
+    if not re.fullmatch(r"[0-9a-f]{64}", digest):
+        return jsonify({"error": "digest must be an exact lowercase SHA-256"}), 400
+    if action not in {"save", "replace", "fork", "restore", "deploy", "import-approval"}:
+        return jsonify({"error": "unsupported approval action"}), 400
+    if payload.get("confirmation") is not True or not isinstance(supplied, dict):
+        return jsonify({"error": "explicit confirmation and approval object are required"}), 400
+    if set(supplied) - _LUMP_APPROVAL_INTENT_FIELDS:
+        return jsonify({"error": "approval contains fields outside the strict allowlist"}), 400
+    session_id = session.setdefault("_lump_approval_session", secrets.token_urlsafe(24))
+    intent = secrets.token_urlsafe(32)
+    with _LUMP_APPROVAL_INTENTS_LOCK:
+        _LUMP_APPROVAL_INTENTS[intent] = {
+            "session": session_id, "digest": digest, "action": action,
+            "approval": dict(supplied), "expires": time.time() + 300,
+        }
+    return jsonify({"intent": intent, "digest": digest, "action": action,
+                    "expires_in": 300}), 201
+
+
+def _consume_lump_approval_intent(intent, digest, action):
+    # This process-local lock makes removal atomic among all server threads.
+    # Deployments with multiple workers must provide shared process-safe intent
+    # storage rather than routing one intent between workers.
+    with _LUMP_APPROVAL_INTENTS_LOCK:
+        record = _LUMP_APPROVAL_INTENTS.pop(str(intent or ""), None)
+    session_id = session.get("_lump_approval_session")
+    if (not record or record["expires"] < time.time() or
+            record["session"] != session_id or record["digest"] != digest or
+            record["action"] != action):
+        raise ValueError("a valid, unexpired session-bound approval intent is required")
+    return record["approval"]
+
+
+@app.route("/api/lumps/deploy-authorize", methods=["POST"])
+def authorize_lump_simulator_deploy():
+    """One-time, no-write authorization gate for ephemeral simulator deployment."""
+    payload = request.get_json(force=True, silent=True) or {}
+    token = str(payload.get("token", "")).lower().removeprefix("0x").zfill(8)
+    if not re.fullmatch(r"[0-9a-f]{8}", token):
+        return jsonify({"error": "token must be 1-8 hexadecimal digits"}), 400
+    try:
+        with _lump_history_transition_lock(LUMPS_DIR):
+            entries = _read_manifest_safe(LUMPS_MANIFEST_PATH)
+            rows = [e for e in entries if isinstance(e, dict) and e.get("token") == token]
+            if len(rows) != 1:
+                return jsonify({"error": "current immutable artifact is unavailable"}), 404
+            facts = _inspect_lump_binary(os.path.join(
+                LUMPS_DIR, rows[0].get("filename") or f"{token}.lump"))
+            digest = facts["binary_hash"]
+            if _matching_lump_approval(LUMPS_DIR, digest) is None:
+                return jsonify({"error": "exact hash-bound approval is required"}), 403
+            _consume_lump_approval_intent(payload.get("approval_intent"), digest, "deploy")
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 403
+    except OSError:
+        return jsonify({"error": "current immutable artifact is unavailable"}), 404
+    return jsonify({"ok": True, "token": token, "binary_hash": digest,
+                    "authorization": "ephemeral-simulator-deploy"})
+
+
 def _lump_with_crc(raw_lump_bytes):
     """Prepend a big-endian CRC-32 word to *raw_lump_bytes* and return the result.
 
@@ -6421,7 +6649,7 @@ def _load_bundled_lumps():
             print(f'[lumps] manifest pass error: {exc}', flush=True)
 
 def _derive_ns_state_entries():
-    """Build rich NS-entry list from boot-image.bin + manifest (cold-start fallback).
+    """Build hardwired NS rows from boot-image.bin (cold-start fallback).
 
     Reads the binary to get all column values; consults the manifest and
     hardware boot catalog for slot names.  Returns a list of dicts matching
@@ -6437,21 +6665,8 @@ def _derive_ns_state_entries():
         if not _rows:
             return []
 
-        # Build slot→name from manifest ns_slot fields.
+        # Only architecture constants may name rows when canonical state is absent.
         _slot_names = {}
-        _mf = os.path.join(LUMPS_DIR, "manifest.json")
-        try:
-            with open(_mf) as _mf_fh:
-                _mf_entries = json.load(_mf_fh)
-            for _me in (_mf_entries if isinstance(_mf_entries, list) else []):
-                _ms = _me.get("ns_slot")
-                _mn = _me.get("abstraction")
-                if isinstance(_ms, int) and isinstance(_mn, str) and _mn:
-                    _slot_names.setdefault(_ms, _mn)
-        except Exception:
-            pass
-
-        # Hardware boot catalog names for fixed slots (fallback when not in manifest).
         _HW_CATALOG = {
             0: "Boot.NS", 1: "Boot.Thread",
             2: "UART_DEV", 3: "LED_DEV", 4: "BTN_DEV", 5: "TIMER_DEV",
@@ -6535,47 +6750,23 @@ _BOOT_NS_META    = {}   # populated by _load_boot_ns_lump();    empty means not 
 # ── ns-state.json helpers ────────────────────────────────────────────────────
 # ns-state.json records the LOGICAL state of the namespace as an ordered list
 # of abstraction dot-names plus the boot-entry name.  Slot numbers are a
-# synthesis detail owned by boot_image.py (via manifest ns_slot fields) and
-# are NOT stored here.
+# synthesis detail owned by canonical Namespace state and boot configuration.
 
 def _derive_ns_state_names():
-    """Build ordered dot-name list from manifest.json ns_slot fields (cold-start fallback)."""
-    _out = {}   # slot → name (collect then sort for stable ordering)
-    _mf  = os.path.join(LUMPS_DIR, "manifest.json")
-    if not os.path.isfile(_mf):
-        return []
-    try:
-        with open(_mf) as _fh:
-            _entries = json.load(_fh)
-        for _e in (_entries if isinstance(_entries, list) else []):
-            _slot = _e.get("ns_slot")
-            _name = _e.get("abstraction")
-            if isinstance(_slot, int) and isinstance(_name, str) and _name:
-                _out[_slot] = _name
-    except Exception:
-        pass
-    return [_out[k] for k in sorted(_out)]
+    """Return architecture-defined names only when canonical state is absent."""
+    return ["Boot.NS", "Boot.Thread", "UART_DEV", "LED_DEV", "BTN_DEV",
+            "TIMER_DEV", "SelfTest", "WukongCallHome", "Tunnel", "Ethernet",
+            "CapabilityTest", "M_BIT_DEV"]
 
 
 def _wukong_lump_name_for_slot(slot):
-    """Return the abstraction name for NS *slot* from ns-state.json or manifest."""
+    """Return the abstraction name for NS *slot* from canonical Namespace state."""
     try:
         with open(NS_STATE_PATH) as _fh:
             _ns = json.load(_fh)
         for _e in _ns.get('abstractions', []):
             if isinstance(_e, dict) and _e.get('slot') == slot:
                 _n = _e.get('name')
-                if _n:
-                    return _n
-    except Exception:
-        pass
-    try:
-        _mf = os.path.join(LUMPS_DIR, 'manifest.json')
-        with open(_mf) as _fh:
-            _entries = json.load(_fh)
-        for _e in (_entries if isinstance(_entries, list) else []):
-            if _e.get('ns_slot') == slot:
-                _n = _e.get('abstraction')
                 if _n:
                     return _n
     except Exception:
@@ -6630,20 +6821,12 @@ def _read_boot_entry_slot_from_image():
 
 
 def _read_boot_entry_name_from_image():
-    """Return the boot-entry abstraction dot-name derived from the binary sentinel + manifest."""
+    """Return the boot-entry name from binary selection plus canonical NS state."""
     _slot = _read_boot_entry_slot_from_image()
     if _slot is None:
         return None
-    _mf = os.path.join(LUMPS_DIR, "manifest.json")
-    try:
-        with open(_mf) as _fh:
-            _entries = json.load(_fh)
-        for _e in (_entries if isinstance(_entries, list) else []):
-            if _e.get("ns_slot") == _slot:
-                return _e.get("abstraction") or None
-    except Exception:
-        pass
-    return None
+    name = _wukong_lump_name_for_slot(_slot)
+    return None if name == f"Slot{_slot}" else name
 
 def _write_ns_state(entries):
     """Write ns-state.json atomically — rich list of NS row objects."""
@@ -6734,48 +6917,6 @@ def _ensure_ns_state():
               f"{len(_entries)} occupied slots", flush=True)
     except Exception as _exc:
         print(f"[ns-state] cold-start creation failed: {_exc}", flush=True)
-
-
-def _migrate_sidecars_drop_group_doc_refs():
-    """One-pass idempotent migration (Lump V1.3): remove the removed curatorial
-    fields 'group' and 'doc_refs' from every live sidecar JSON in server/lumps/.
-
-    V1.3 removed these fields from the sidecar schema — the binary is the sole
-    source of truth and the sidecar carries no curatorial fields.  Runs at
-    startup; a clean catalogue is a no-op.  In debug mode a leftover key after
-    migration is treated as an assertion failure.
-    """
-    lumps_dir = LUMPS_DIR
-    if not os.path.isdir(lumps_dir):
-        return
-    cleaned = 0
-    for fn in sorted(os.listdir(lumps_dir)):
-        if not fn.endswith('.json') or fn == 'manifest.json':
-            continue
-        path = os.path.join(lumps_dir, fn)
-        try:
-            with open(path) as fh:
-                data = json.load(fh)
-        except Exception:
-            continue  # non-object / unreadable sidecars are out of scope here
-        if not isinstance(data, dict):
-            continue
-        if 'group' in data or 'doc_refs' in data:
-            data.pop('group', None)
-            data.pop('doc_refs', None)
-            _atomic_write_json(path, data)
-            cleaned += 1
-            print(f'[lumps-migrate] removed group/doc_refs from {fn}', flush=True)
-        if app.debug:
-            assert 'group' not in data and 'doc_refs' not in data, (
-                f'sidecar {fn} still carries group/doc_refs after V1.3 migration'
-            )
-    if cleaned:
-        print(f'[lumps-migrate] V1.3 sidecar cleanup: {cleaned} file(s) cleaned',
-              flush=True)
-
-
-_migrate_sidecars_drop_group_doc_refs()
 
 
 def _load_boot_abstr_lump():
@@ -6872,15 +7013,21 @@ def _load_boot_abstr_lump():
                         if _fn_mo and os.path.isfile(_np_mo):
                             with open(_np_mo, 'rb') as _fh_mo:
                                 _d_mo = _fh_mo.read()
-                            _n_mo = len(_d_mo) // 4
-                            if _n_mo >= 1:
-                                _h_mo = _struct.unpack('>I', _d_mo[:4])[0]
-                                if (_h_mo >> 27) & 0x1F == 0x1F:
+                            try:
+                                _facts_mo = _inspect_lump_binary(_d_mo)
+                                _approval_mo = _matching_lump_approval(
+                                    _lumps_dir_mo, _facts_mo["binary_hash"])
+                            except (OSError, ValueError):
+                                _facts_mo = None
+                                _approval_mo = None
+                            if _facts_mo is not None and _approval_mo is not None:
+                                    _n_mo = len(_facts_mo["words"])
+                                    _h_mo = _facts_mo["header"]
                                     LAZY_LUMPS['00000600'] = _d_mo
                                     LAZY_LUMPS['600'] = _d_mo
-                                    _cw_mo  = (_h_mo >> 10) & 0x1FFF
-                                    _cc_mo  = _h_mo & 0xFF
-                                    _ls_mo  = 1 << (((_h_mo >> 23) & 0xF) + 6)
+                                    _cw_mo = _facts_mo["cw"]
+                                    _cc_mo = _facts_mo["cc"]
+                                    _ls_mo = _facts_mo["lump_size"]
                                     _BOOT_ABSTR_META.update({
                                         'cw': _cw_mo, 'cc': _cc_mo, 'lump_size': _ls_mo,
                                         'lump_version': _me_mo.get('lump_version', 0),
@@ -6892,40 +7039,17 @@ def _load_boot_abstr_lump():
                                             for _ci in range(_cc_mo)
                                         ]
                                     _canonical_loaded = True
+                                    for _fld in ('author', 'version', 'pet_names',
+                                                 'capabilities', 'description', 'methods'):
+                                        if _approval_mo.get(_fld) is not None:
+                                            _BOOT_ABSTR_META[_fld] = _approval_mo[_fld]
+                                    _BOOT_ABSTR_META['has_source'] = bool(
+                                        _facts_mo.get("source"))
                                     print(f'[boot] SelfTest canonical binary loaded: {_fn_mo} '
                                           f'cw={_cw_mo} cc={_cc_mo}', flush=True)
-                        # Merge sidecar annotation fields from the manifest-designated sidecar
-                        _sc_mo_file = _me_mo.get('sidecar_file', '')
-                        _sc_mo_path = os.path.join(_lumps_dir_mo, _sc_mo_file) if _sc_mo_file else ''
-                        if _sc_mo_path and os.path.isfile(_sc_mo_path):
-                            try:
-                                with open(_sc_mo_path) as _sc_mo_f:
-                                    _sc_mo = json.load(_sc_mo_f)
-                                for _fld in ('author', 'version', 'pet_names', 'capabilities',
-                                             'description', 'methods'):
-                                    if _fld in _sc_mo and _sc_mo[_fld] is not None:
-                                        _BOOT_ABSTR_META[_fld] = _sc_mo[_fld]
-                                _BOOT_ABSTR_META['has_source'] = bool(
-                                    (_sc_mo.get('source', '') or '').strip()
-                                )
-                            except Exception:
-                                pass
                         break
             except Exception as _e_mo:
                 print(f'[boot] manifest override for 00000600 failed: {_e_mo}', flush=True)
-        if not _canonical_loaded:
-            # Fall back to annotation-only merge from legacy sidecar files
-            _lumps_dir_sc = os.path.dirname(__file__)
-            _sidecar_003 = os.path.join(_lumps_dir_sc, 'lumps', '00000003.json')
-            if os.path.isfile(_sidecar_003):
-                try:
-                    with open(_sidecar_003) as _s03f:
-                        _s03 = json.load(_s03f)
-                    for _f03 in ('author', 'version', 'pet_names', 'capabilities'):
-                        if _f03 in _s03:
-                            _BOOT_ABSTR_META[_f03] = _s03[_f03]
-                except Exception:
-                    pass
     except Exception as exc:
         print(f'[boot] Failed to extract Boot.Abstr lump: {exc}', flush=True)
 
@@ -7106,8 +7230,9 @@ def get_lump(token_hex):
     The response includes both a CRC-32 preamble word (prepended to the payload
     by _lump_with_crc) for corruption detection and an X-Lump-Hash: sha256:<hex>
     response header carrying the SHA-256 of the raw lump bytes (before CRC prefix).
-    The caller can verify the lump is authentic by computing sha256(raw_lump_bytes)
-    and comparing against the X-Lump-Hash header value.
+    The caller can verify byte integrity by computing sha256(raw_lump_bytes)
+    and comparing against X-Lump-Hash.  X-Lump-Trust remains ``untrusted``
+    unless an exact canonical approval also validates.
     """
     from flask import Response
     # ── Token format validation (fail-closed) ──────────────────────────────
@@ -7123,8 +7248,34 @@ def get_lump(token_hex):
     key8   = tok["key8"]
     key    = key8.lstrip('0') or '0'
 
-    data   = LAZY_LUMPS.get(key) or LAZY_LUMPS.get(key8)
+    data = None
     source = 'local'
+
+    # A manifest row is a locator.  Always inspect the bytes at that exact
+    # locator rather than a process cache which may predate a replacement.
+    try:
+        _raw_manifest = _read_manifest_safe(
+            os.path.join(LUMPS_DIR, "manifest.json"))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 409
+    _located_rows = [
+        row for row in _raw_manifest
+        if isinstance(row, dict) and row.get("token") == key8
+    ]
+    if len(_located_rows) > 1:
+        return jsonify({"error": f"Duplicate manifest token {key8}"}), 409
+    if _located_rows:
+        _located_name = _located_rows[0].get("filename")
+        if not isinstance(_located_name, str) or not _located_name:
+            return jsonify({"error": "Manifest locator has no filename"}), 409
+        try:
+            data = _inspect_lump_binary(
+                os.path.join(LUMPS_DIR, _located_name))["raw_bytes"]
+        except (OSError, ValueError) as exc:
+            return jsonify({"error": f"Lump integrity failure: {exc}"}), 409
+        source = "manifest"
+    else:
+        data = LAZY_LUMPS.get(key) or LAZY_LUMPS.get(key8)
 
     if data is None:
         # Fall back to the Mum Tunnel Library
@@ -7147,9 +7298,28 @@ def get_lump(token_hex):
     #   ok=True, trusted=False → legacy/untrusted; serve raw but mark untrusted
     #                            so secure simulator promotion can reject.
     _gl_lumps_dir = LUMPS_DIR
-    _gl_res = _resolve_canonical_lump(_gl_lumps_dir, key8, data)
-    if not _gl_res.get("ok"):
-        return jsonify({"error": _gl_res.get("error", "Lump integrity failure")}), 409
+    try:
+        _gl_inspected = _inspect_lump_binary(data)
+        data = _gl_inspected["raw_bytes"]
+        _canonical_error = _check_lump_canonical_integrity(
+            _gl_lumps_dir, key8, data)
+        if isinstance(_canonical_error, str):
+            return jsonify({"error": _canonical_error}), 409
+        _gl_approval = _matching_lump_approval(
+            _gl_lumps_dir, _gl_inspected["binary_hash"])
+    except (OSError, ValueError) as exc:
+        return jsonify({"error": f"Lump integrity failure: {exc}"}), 409
+    if _gl_approval is None:
+        _gl_res = {
+            "binary_hash": _gl_inspected["binary_hash"],
+            "trusted": False,
+            "cache_token": key8,
+        }
+    else:
+        _gl_res = _resolve_canonical_lump(
+            _gl_lumps_dir, key8, _gl_inspected["raw_bytes"])
+        if not _gl_res.get("ok"):
+            return jsonify({"error": _gl_res.get("error")}), 409
 
     payload = _lump_with_crc(data)
     _headers = {
@@ -7217,7 +7387,7 @@ def get_lump_bundle():
 
 @app.route("/api/lumps/save", methods=["POST"])
 def save_lump():
-    """Save a compiled LUMP binary + metadata sidecar to server/lumps/.
+    """Save a compiled LUMP binary and hash-bound approval.
 
     Expects JSON body with:
       binary   — array of uint32 words (big-endian will be packed server-side)
@@ -7916,9 +8086,6 @@ def save_lump():
         _protected_eligible = (
             isinstance(_protected_current_entry, dict)
             and _protected_current_entry.get("abstraction") == _protected_name
-            and _protected_current_entry.get("ns_slot") == _protected_slot
-            and _protected_current_entry.get("ns_slot_policy") == "static"
-            and _protected_current_entry.get("boot_resident") is True
         )
         if not _protected_eligible:
             return _protected_reject(
@@ -7952,25 +8119,17 @@ def save_lump():
 
     _existing_entry = next((e for e in manifest if e.get('token') == token8), None)
     _exist_filename = (_existing_entry or {}).get('filename', f'{token8}.lump')
-    _exist_sc_file  = (_existing_entry or {}).get('sidecar_file', f'{token8}.json')
     _existing_lump  = os.path.join(lumps_dir, _exist_filename)
-    _existing_sc    = os.path.join(lumps_dir, _exist_sc_file)
+    _existing_sc    = None
 
     # ── Phase 2: Determine current version number ──────────────────────────────
     _is_forked_save = False
     _arch_ver = None
     _arch_sc  = {}
     if os.path.isfile(_existing_lump):
-        if os.path.isfile(_existing_sc):
-            try:
-                with open(_existing_sc, 'r') as _sfh:
-                    _arch_sc = json.load(_sfh)
-                _raw_ver = _arch_sc.get('lump_version')
-                if _raw_ver is not None:
-                    _arch_ver = int(_raw_ver)
-            except Exception:
-                pass
-        if _arch_sc.get('forked'):
+        if _existing_entry and _existing_entry.get("lump_version") is not None:
+            _arch_ver = int(_existing_entry["lump_version"])
+        if (_existing_entry or {}).get('forked'):
             _is_forked_save = True
             print(f'[lumps] Forked compile: skipping re-archive for {token8}'
                   f' (already archived by fork-version)', flush=True)
@@ -8041,142 +8200,29 @@ def save_lump():
     # ── End security block ────────────────────────────────────────────────────
 
     lump_filename    = f'{_dot_name_save}.{_issue_n_save}.{_number_save}.lump'
-    sidecar_filename = f'{_dot_name_save}.{_issue_n_save}.{_number_save}.json'
     lump_path        = os.path.join(lumps_dir, lump_filename)
-    sidecar_path     = os.path.join(lumps_dir, sidecar_filename)
 
     # Containment check — must follow path construction so realpath can resolve
-    for _chk_path, _chk_label in ((lump_path, 'lump'), (sidecar_path, 'sidecar')):
+    for _chk_path, _chk_label in ((lump_path, 'lump'),):
         if not os.path.realpath(_chk_path).startswith(_lumps_dir_real + os.sep):
             return jsonify({'error':
                 f'Path traversal detected in {_chk_label} filename — '
                 f'canonical name resolves outside server/lumps/'}), 400
 
-    # Build the new sidecar and manifest entry entirely in memory.  The shared
-    # transition helper below stages archive/current/sidecar/manifest together
+    # Build the new approval and manifest entry entirely in memory. The shared
+    # transition helper stages archive/current/approval/manifest together
     # before changing any destination.
-    sidecar = {
-        "token":         token8,
-        "abstraction":   abs_name,
-        "filename":      lump_filename,
-        "sidecar_file":  sidecar_filename,
-        "ns_slot":       ns_slot,
-        "lump_size":     len(_sl_words),
-        "typ":           hdr_typ,
-        "content_type":  content_type,
-        # Use values read directly from the verified binary header — never the
-        # client-supplied metadata, which can be stale or zero even when the
-        # binary has real instructions.
-        "cw":            _binary_cw,
-        "cc":            _binary_cc,
-        "profile":       metadata.get("profile", "IoT"),
-        "language":      metadata.get("language", "unknown"),
-        "author":        metadata.get("author", ""),
-        "version":       metadata.get("version", ""),
-        "release_notes": metadata.get("release_notes", ""),
-        "methods":       metadata.get("methods", []),
-        "capabilities":  (
-            _validated_declared_caps
-            if _has_declared_caps
-            else metadata.get("capabilities", [])
-        ),
-        "compiler_owned_self": _compiler_self_row,
-        "pet_names": {
-            "DR": metadata.get("pet_names_dr", {}),
-            "CR": metadata.get("pet_names_cr", {})
-        },
-        "mtbf": {
-            "consecutive_clean": metadata.get("mtbf_clean_runs", 0),
-            "total_runs":        metadata.get("mtbf_total_runs", 0),
-            "status":            metadata.get("mtbf_status", "unknown"),
-            "source_hash":       metadata.get("source_hash", "")
-        },
-        "deployment": {
-            "target_board": metadata.get("target_board", "wukong-xc7a100t"),
-            "profile":      metadata.get("profile", "IoT"),
-            "built_at":     _dt.datetime.utcnow().isoformat() + "Z",
-            "builder":      "CLOOMC++ IDE v1.0"
-        },
-        "grants": metadata.get("grants", [] if _portable_binding is not None else ["E"]),
-        "capability_type": metadata.get("capability_type", "inform"),
-        # Installation is deny-by-default; portable candidate use must be
-        # explicitly authorized by the publisher, never inferred from presence.
-        "authorized": metadata.get("authorized") is True,
-        "legacy_authorized": metadata.get("legacy_authorized") is True,
-        "source":        metadata.get("source", ""),
-        "binary_hash":   _binary_hash,
-        "petname":         _petname,
-        "issue_number":    _issue_number,
-        "identity_string": _identity_string,
-        "identity_hash":   _identity_hash,
-        "identity_seal_location": (
-            "sidecar"
-            if _has_declared_caps
-            else ("canonical-c-list" if _is_selftest_canonical else "c-list[0]")
-        ),
-        "dot_name":        _dot_name_save,
-        "issue_n":         _issue_n_save,
-    }
-    if _portable_binding is not None:
-        sidecar["portable_binding"] = _portable_binding
-
     import time as _time_save
     _compiled_at = _time_save.time()
-    sidecar["lump_version"] = next_lump_version
-    sidecar["compiled_at"]  = _compiled_at
-
-    # V1.3: derive sourceStorageTier from the binary's freespace content
-    # header (word cw+1), read back from the bytes just written.  Absent =
-    # legacy (all-zero freespace, not self-defining).
-    _fs_save = _lump_freespace_content(
-        list(_struct.unpack(f'>{len(lump_bytes) // 4}I', lump_bytes)))
-    if _fs_save is not None:
-        sidecar["sourceStorageTier"] = _fs_save["tier"]
 
     new_entry = {
         "token":         token8,
         "abstraction":   abs_name,
         "filename":      lump_filename,
-        "sidecar_file":  sidecar_filename,
-        # ns_slot intentionally omitted from new entries — ns-state.json is now
-        # the authoritative slot→token map; existing entries left as-is.
-        "lump_size":     len(_sl_words),  # padded size (matches on-disk file)
-        "cw":            sidecar["cw"],
-        "cc":            sidecar["cc"],
-        "author":        sidecar.get("author", ""),
-        "version":       sidecar.get("version", ""),
         "lump_version":  next_lump_version,
         "compiled_at":   _compiled_at,
-        "methods":       sidecar["methods"],
-        "grants":        sidecar["grants"],
-        "capability_type": sidecar["capability_type"],
-        "authorized":    sidecar["authorized"],
-        "legacy_authorized": sidecar["legacy_authorized"],
-        "binary_hash":   _binary_hash,
-        "petname":       _petname,
-        "issue_number":  _issue_number,
-        "identity_hash": _identity_hash,
-        "dot_name":      _dot_name_save,
-        "issue_n":       _issue_n_save,
     }
-    # Placement is owned by ns-state.json, but residency policy is a manifest
-    # property and must survive every recompile/save of the same abstraction.
-    _prior_boot_resident = (_existing_entry or {}).get("boot_resident")
-    if "boot_resident" in metadata:
-        new_entry["boot_resident"] = metadata.get("boot_resident") is True
-    elif _prior_boot_resident is not None:
-        new_entry["boot_resident"] = bool(_prior_boot_resident)
-    _prior_slot_policy = (_existing_entry or {}).get("ns_slot_policy")
-    if _prior_slot_policy is not None:
-        new_entry["ns_slot_policy"] = _prior_slot_policy
-    if _is_protected_resident_save:
-        # Protected replacement retains placement/eligibility; this is an
-        # update of the canonical resident identity, never a floating issue.
-        new_entry["ns_slot"] = _protected_policy["slot"]
-        new_entry["ns_slot_policy"] = "static"
-        new_entry["boot_resident"] = True
-    if _portable_binding is not None:
-        new_entry["portable_binding"] = _portable_binding
+    # Namespace state and boot configuration are the sole deployment authority.
 
     # Test hook: fires after all per-token I/O (Phase 5/6) but before the lock.
     # In production this is always None.  Tests set it to synchronise threads
@@ -8184,26 +8230,42 @@ def save_lump():
     if _lumps_manifest_pre_write_hook is not None:
         _lumps_manifest_pre_write_hook()  # noqa: not-callable — callable at runtime
 
-    _archive_sidecar = dict(_arch_sc)
+    try:
+        _approval_action = metadata.get(
+            "approval_action", "replace" if _existing_entry else "save")
+        _intent_approval = _consume_lump_approval_intent(
+            metadata.get("approval_intent"), _binary_hash, _approval_action)
+    except ValueError as _intent_error:
+        return jsonify({"error": str(_intent_error)}), 403
+    # Only explicit-intent allowlisted extrinsic fields are retained. Every
+    # structural/identity fact is derived from the exact inspected binary.
+    approval = {
+        key: value for key, value in _intent_approval.items()
+        if key in _LUMP_APPROVAL_INTENT_FIELDS
+    }
+    approval.update({
+        "binary_hash": _binary_hash, "dot_name": _dot_name_save,
+        "issue_n": _issue_n_save, "identity_hash": _identity_hash,
+        "abstraction": abs_name, "filename": lump_filename,
+    })
+
     _remove_after_commit = ()
     if _exist_filename == f"{token8}.lump":
         _remove_after_commit = tuple(
-            path for path in (_existing_lump, _existing_sc)
+            path for path in (_existing_lump,)
             if os.path.lexists(path)
         )
     _existing_is_archive_pair = bool(
         _arch_ver is not None
         and _exist_filename == f"{safe_name}_v{_arch_ver}.lump"
-        and _exist_sc_file == f"{safe_name}_v{_arch_ver}.json"
     )
     # Protected residents additionally span Namespace state and the generated boot
     # image. Snapshot the complete flat repository revision so any later bind
     # or image-generation failure can restore every artifact (including archive
     # names and compatibility aliases) rather than leaving a partial commit.
-    _protected_snapshot = None
+    _protected_snapshot = {}
     _protected_lock_existed = False
-    if _is_protected_resident_save:
-        _protected_snapshot = {}
+    if True:
         _protected_lock_existed = os.path.exists(
             os.path.join(lumps_dir, ".history-transition.lock"))
         _snapshot_paths = [
@@ -8257,8 +8319,8 @@ def save_lump():
             manifest_entry=new_entry,
             binary_filename=lump_filename,
             binary_bytes=lump_bytes,
-            sidecar_filename=sidecar_filename,
-            sidecar=sidecar,
+            approval_hash=_binary_hash,
+            approval=approval,
             archive_stem=safe_name if not _is_forked_save else None,
             archive_version=_arch_ver if not _is_forked_save else None,
             archive_binary_path=(
@@ -8266,8 +8328,6 @@ def save_lump():
                 if os.path.isfile(_existing_lump) and not _is_forked_save
                 else None
             ),
-            archive_sidecar=_archive_sidecar,
-            archive_sidecar_path=_existing_sc,
             advance_current_version_from_archive=(
                 os.path.isfile(_existing_lump) and not _is_forked_save
             ),
@@ -8302,7 +8362,6 @@ def save_lump():
         }), 500
 
     next_lump_version = _transition.get("next_version", next_lump_version)
-
     if _transition:
         print(f"[lumps] Archived {_exist_filename} → {_transition['lump']}", flush=True)
 
@@ -8319,15 +8378,12 @@ def save_lump():
                     _all_arc.append((int(_pm.group(1)), _fn))
         _all_arc.sort()
         for _, _old_fn in _all_arc[:max(0, len(_all_arc) - LUMP_MAX_ARCHIVE_VERSIONS)]:
-            for _old_path in (
-                os.path.join(lumps_dir, _old_fn),
-                os.path.join(lumps_dir, _old_fn[:-5] + '.json'),
-            ):
-                try:
-                    if os.path.isfile(_old_path):
-                        os.remove(_old_path)
-                except OSError as _e:
-                    logging.warning('[lumps] Could not prune %s: %s', _old_path, _e)
+            _old_path = os.path.join(lumps_dir, _old_fn)
+            try:
+                if os.path.isfile(_old_path):
+                    os.remove(_old_path)
+            except OSError as _e:
+                logging.warning('[lumps] Could not prune %s: %s', _old_path, _e)
 
     # A save replaces the artifact bound to an existing Namespace identity.
     # Record the exact token/filename before regenerating the boot image so the
@@ -8342,17 +8398,16 @@ def save_lump():
     except Exception as _ns_bind_exc:
         _rollback_protected_save()
         return jsonify({"error": (
-            f"{_protected_policy['name']} save transaction failed; prior revision restored: "
+            f"LUMP save transaction failed; prior revision restored: "
             f"Namespace binding could not be refreshed: {_ns_bind_exc}"
         )}), 500
 
-    print(f'[lumps] Saved {lump_filename} ({len(lump_bytes)} bytes) + {sidecar_filename}', flush=True)
+    print(f'[lumps] Saved {lump_filename} ({len(lump_bytes)} bytes)', flush=True)
 
     # ── Auto-regenerate boot-image.bin ────────────────────────────────────────
     # If boot-image.bin already exists and a boot config is present, regenerate
     # it so the saved lump is persisted across server reboots. Ordinary LUMP
-    # refresh failures remain non-fatal; protected resident replacement
-    # failures roll the complete revision back above.
+    # Any refresh failure rolls the complete revision back.
     boot_refreshed = False
     boot_refresh_note = None
     if os.path.isfile(BOOT_IMAGE_PATH):
@@ -8371,23 +8426,17 @@ def save_lump():
                 print(f'[lumps] boot-image.bin regenerated ({len(blob_bi)} bytes)', flush=True)
                 _load_boot_abstr_lump()   # refresh _BOOT_ABSTR_META / LAZY_LUMPS['00000600']
                 _load_boot_ns_lump()      # refresh _BOOT_NS_META from updated boot-image.bin
-                _bind_saved_lump_to_ns_state(
-                    abs_name, ns_slot, token8, lump_filename, _issue_n_save)
             else:
                 boot_refresh_note = f'boot config unavailable: {err_bi}'
-                if _is_protected_resident_save:
-                    raise RuntimeError(boot_refresh_note)
+                raise RuntimeError(boot_refresh_note)
         except Exception as _bie:
-            if _is_protected_resident_save:
-                _rollback_protected_save()
-                return jsonify({
-                    "error": (
-                        f"{_protected_policy['name']} save transaction failed; prior revision "
-                        f"restored: boot image could not be regenerated: {_bie}"
-                    )
-                }), 500
-            boot_refresh_note = str(_bie)
-            logging.warning('[lumps] boot-image.bin regeneration failed: %s', _bie)
+            _rollback_protected_save()
+            return jsonify({
+                "error": (
+                    "LUMP save transaction failed; prior revision restored: "
+                    f"boot image could not be regenerated: {_bie}"
+                )
+            }), 500
 
     # ── SelfTest metadata always refreshed on token 00000600 save ────────────
     # generate_boot_image() locates the SelfTest lump via ns_slot in the
@@ -8409,7 +8458,6 @@ def save_lump():
         "token":          token8,
         "lump":           lump_filename,
         "lump_path":      f'server/lumps/{lump_filename}',
-        "sidecar":        sidecar_filename,
         "size_bytes":     len(lump_bytes),
         "lump_version":   next_lump_version,
         "boot_image_refreshed": boot_refreshed,
@@ -8424,320 +8472,56 @@ def save_lump():
 
 @app.route("/api/lumps/save-wip", methods=["POST"])
 def save_lump_wip():
-    """Save a WIP (work-in-progress) LUMP skeleton — no compiled code yet.
-
-    Called by the /start page 'Code Edit →' button.  Creates a minimal stub
-    binary (one RETURN per declared method) + a sidecar JSON with status='wip'
-    and the CLOOMC++ source text embedded.  Subsequent compile-and-save will
-    overwrite the live binary and clear the wip status.
-
-    Body JSON:
-      name        – abstraction name (required)
-      source      – CLOOMC++ skeleton text
-      description – one-line description
-      methods     – [{name, desc, deps}, ...]
-      token       – existing 8-hex token (optional; omit for new abstractions)
-
-    Response: { ok, token, version, filename, sidecar }
-    """
-    import re as _re_wip
-    import hashlib as _hl_wip
-
-    payload     = request.get_json(force=True, silent=True) or {}
-    abs_name    = (payload.get('name') or '').strip()
-    source_text = payload.get('source', '')
-    description = payload.get('description', '')
-    methods_in  = payload.get('methods') or []
-    token_hint  = (payload.get('token') or '').strip().lower()
-
-    if not abs_name:
-        return jsonify({'error': 'name is required'}), 400
-
-    def _safe_stem_wip(name):
-        s = _re_wip.sub(r'[^\w.\-]', '_', str(name).strip())
-        return _re_wip.sub(r'_+', '_', s).strip('_') or 'lump'
-
-    safe_name = _safe_stem_wip(abs_name)
-
-    if token_hint and _re_wip.fullmatch(r'[0-9a-f]{8}', token_hint):
-        token8 = token_hint
-    else:
-        token8 = _hl_wip.sha256(abs_name.encode()).hexdigest()[:8]
-
-    # ── Load manifest ─────────────────────────────────────────────────────────
-    lumps_dir     = LUMPS_DIR
-    os.makedirs(lumps_dir, exist_ok=True)
-    manifest_path = os.path.join(lumps_dir, 'manifest.json')
-    try:
-        manifest = _read_manifest_safe(manifest_path)
-    except ValueError as _mf_wip_err:
-        return jsonify({"error": (
-            "manifest.json is corrupt and cannot be read safely. "
-            "The save has been aborted to prevent overwriting previously-saved LUMPs. "
-            f"Details: {_mf_wip_err}"
-        )}), 500
-
-    existing_entry = next((e for e in manifest if e.get('token') == token8), None)
-
-    # ── Determine next version ────────────────────────────────────────────────
-    cur_version = None
-    if existing_entry:
-        v = existing_entry.get('lump_version')
-        if v is not None:
-            cur_version = int(v)
-    if cur_version is None:
-        _av = []
-        for _fn in (os.listdir(lumps_dir) if os.path.isdir(lumps_dir) else []):
-            for _pp in [
-                _re_wip.compile(rf'^{_re_wip.escape(safe_name)}_v(\d+)\.(lump|json)$'),
-                _re_wip.compile(rf'^{_re_wip.escape(token8)}-v(\d+)\.lump$'),
-            ]:
-                _mm = _pp.match(_fn)
-                if _mm:
-                    _av.append(int(_mm.group(1)))
-        cur_version = max(_av) if _av else 0
-
-    next_version     = cur_version + 1
-    lump_filename    = f'{safe_name}_v{next_version}.lump'
-    sidecar_filename = f'{safe_name}_v{next_version}.json'
-    lump_path        = os.path.join(lumps_dir, lump_filename)
-    sidecar_path     = os.path.join(lumps_dir, sidecar_filename)
-
-    # Resolve the previous current pair.  The shared transition helper archives
-    # it only after the replacement pair and manifest have all been staged.
-    _prev_lp = None
-    _prev_sp = None
-    if existing_entry:
-        _prev_fn  = existing_entry.get('filename',     f'{token8}.lump')
-        _prev_sfn = existing_entry.get('sidecar_file', f'{token8}.json')
-        _prev_lp  = os.path.join(lumps_dir, _prev_fn)
-        _prev_sp  = os.path.join(lumps_dir, _prev_sfn)
-
-    # ── Build stub binary ─────────────────────────────────────────────────────
-    RETURN_AL = 0x1F000000   # RETURN with AL condition (matches _build_lazy_lumps)
-    n_methods = max(1, len(methods_in))
-    cw        = n_methods    # one RETURN stub per method
-    cc        = 1            # self capability placeholder (NULL GT)
-    n_m6      = 0            # 64-word lump (minimum)
-    lump_size = 64
-
-    _wip_words = [0] * lump_size
-    _wip_words[0] = _pack_lump_header(n_minus_6=n_m6, cw=cw, cc=cc, typ=0)
-    for _i in range(cw):
-        _wip_words[1 + _i] = RETURN_AL
-    # c-list slot 0 at position lump_size-1 = NULL GT placeholder
-    _wip_words[lump_size - 1] = 0
-
-    lump_bytes = _struct.pack(f'>{lump_size}I', *[int(w) & 0xFFFFFFFF for w in _wip_words])
-
-    # ── Build sidecar methods list ────────────────────────────────────────────
-    sidecar_methods = []
-    for _mi, _m in enumerate(methods_in):
-        _entry = {
-            'name':   (_m.get('name') or '').strip(),
-            'offset': _mi,
-            'length': 1,
-        }
-        _desc = (_m.get('desc') or '').strip()
-        if _desc:
-            _entry['description'] = _desc
-        sidecar_methods.append(_entry)
-
-    # ── Write sidecar JSON ────────────────────────────────────────────────────
-    import datetime as _dtwip
-    now_ts  = _dtwip.datetime.utcnow().timestamp()
-    sidecar = {
-        'token':        token8,
-        'abstraction':  abs_name,
-        'filename':     lump_filename,
-        'sidecar_file': sidecar_filename,
-        'ns_slot':      None,
-        'lump_size':    lump_size,
-        'typ':          0,
-        'content_type': 'code',
-        'cw':           cw,
-        'cc':           cc,
-        'status':       'wip',
-        'source':       source_text,
-        'description':  description,
-        'methods':      sidecar_methods,
-        'capabilities': [{'name': 'self', 'rights': ['E'], 'grants': ['E'], 'nsIndex': -1}],
-        'pet_names':    {'DR': {}, 'CR': {}},
-        'mtbf':         {'consecutive_clean': 0, 'total_runs': 0, 'status': 'unknown'},
-        'lump_version': next_version,
-        'compiled_at':  now_ts,
-    }
-    new_entry = {
-        'token':        token8,
-        'abstraction':  abs_name,
-        'filename':     lump_filename,
-        'sidecar_file': sidecar_filename,
-        'ns_slot':      None,
-        'lump_size':    lump_size,
-        'cw':           cw,
-        'cc':           cc,
-        'lump_version': next_version,
-        'compiled_at':  now_ts,
-        'status':       'wip',
-        'methods':      sidecar_methods,
-    }
-    try:
-        _transition = _commit_lump_history_transition(
-            lumps_dir=lumps_dir,
-            manifest_path=manifest_path,
-            token8=token8,
-            manifest_entry=new_entry,
-            binary_filename=lump_filename,
-            binary_bytes=lump_bytes,
-            sidecar_filename=sidecar_filename,
-            sidecar=sidecar,
-            archive_stem=safe_name if _prev_lp and os.path.isfile(_prev_lp) else None,
-            archive_version=cur_version if _prev_lp and os.path.isfile(_prev_lp) else None,
-            archive_binary_path=_prev_lp,
-            archive_sidecar_path=_prev_sp,
-            versioned_current_stem=safe_name,
-            current_version=cur_version,
-            expected_manifest_entry=existing_entry,
-        )
-    except _LumpTransitionConflict as _transition_conflict:
-        return jsonify({"error": str(_transition_conflict)}), 409
-    except ValueError as _mf_wip_err:
-        return jsonify({"error": (
-            "manifest.json is corrupt and cannot be read safely. "
-            "The save has been aborted to prevent overwriting previously-saved LUMPs. "
-            f"Details: {_mf_wip_err}"
-        )}), 500
-
-    # Cache binary in LAZY_LUMPS so it can be served immediately
-    try:
-        LAZY_LUMPS[token8] = lump_bytes
-    except Exception:
-        pass
-
-    if _transition:
-        if _transition.get("lump"):
-            logging.info('[lumps] WIP archive: %s → %s', _prev_fn, _transition["lump"])
-        next_version = _transition["next_version"]
-        lump_filename = _transition["current_lump"]
-        sidecar_filename = _transition["current_sidecar"]
-    logging.info('[lumps] WIP saved: %s v%d → %s', abs_name, next_version, lump_filename)
+    """Retired: WIP state is not persisted outside a self-defining LUMP."""
     return jsonify({
-        'ok':      True,
-        'token':   token8,
-        'version': next_version,
-        'filename':  lump_filename,
-        'sidecar':   sidecar_filename,
-        'status':  'wip',
-    })
-
+        "error": "WIP persistence is retired; save a self-defining .lump revision instead"
+    }), 410
 
 @app.route("/api/lump/<token>/wip-source", methods=["PATCH"])
 def patch_wip_source(token):
-    """Patch the source field in a WIP sidecar JSON.
-
-    Called by the editor's debounced auto-save (every ~3 s) while the
-    programmer is typing.  Only updates `source` and `last_edited_at` —
-    no version bump, no new binary, no manifest change.
-
-    Body: { source: <string> }
-    Response: { ok: true }
-    """
-    import re as _re_ps
-    import datetime as _dt_ps
-
-    raw = (token or '').strip().lower()
-    key8 = raw[:8].zfill(8) if len(raw) >= 8 else raw.zfill(8)
-    if not _re_ps.fullmatch(r'[0-9a-f]{8}', key8):
-        return jsonify({'error': 'Invalid token'}), 400
-
-    payload = request.get_json(force=True, silent=True) or {}
-    source  = payload.get('source', '')
-
-    lumps_dir     = LUMPS_DIR
-    manifest_path = os.path.join(lumps_dir, 'manifest.json')
-
-    # Resolve the sidecar file path via manifest first, fall back to bare token
-    sidecar_path = None
-    try:
-        with open(manifest_path) as _fh:
-            _manifest = json.load(_fh)
-        _entry = next((e for e in _manifest if e.get('token') == key8), None)
-        if _entry:
-            _sfn = _entry.get('sidecar_file', f'{key8}.json')
-            sidecar_path = os.path.join(lumps_dir, _sfn)
-    except Exception:
-        pass
-
-    if sidecar_path is None:
-        sidecar_path = os.path.join(lumps_dir, f'{key8}.json')
-
-    if not os.path.isfile(sidecar_path):
-        return jsonify({'error': 'WIP sidecar not found'}), 404
-
-    try:
-        with open(sidecar_path) as _fh:
-            sc = json.load(_fh)
-    except Exception as exc:
-        return jsonify({'error': f'Could not read sidecar: {exc}'}), 500
-
-    sc['source']         = source
-    sc['last_edited_at'] = _dt_ps.datetime.utcnow().timestamp()
-
-    try:
-        with open(sidecar_path, 'w') as _fh:
-            json.dump(sc, _fh, indent=2)
-    except Exception as exc:
-        return jsonify({'error': f'Could not write sidecar: {exc}'}), 500
-
-    return jsonify({'ok': True})
+    """Retired: source is intrinsic to an approved LUMP binary."""
+    return jsonify({
+        "error": "LUMP source patching is retired; source must be intrinsic to the .lump"
+    }), 410
 
 
 @app.route("/api/lumps/list")
 def list_lumps():
-    """Return JSON array of all saved lumps with lean sidecar metadata.
-
-    The 'source' field is intentionally omitted from every entry so the IDE
-    can download the full catalogue without transmitting large source strings.
-    Use GET /api/lumps/<token>/detail to retrieve the full sidecar including
-    the source field for a specific lump.
-    """
+    """Return the manifest catalogue reconciled with binary/approval facts."""
     lumps_dir = LUMPS_DIR
-
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
-    manifest = []
-    if os.path.isfile(manifest_path):
-        try:
-            with open(manifest_path, 'r') as fh:
-                manifest = json.load(fh)
-        except Exception:
-            manifest = []
-
+    try:
+        manifest = _read_manifest_safe(manifest_path)
+        approvals = _read_lump_approvals(lumps_dir)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 409
     result = []
     for entry in manifest:
         token8 = entry.get('token', '')
-        # Prefer named sidecar (filename field) over legacy token-named sidecar
-        _sc_filename = entry.get('sidecar_file', f'{token8}.json')
-        sidecar_path = os.path.join(lumps_dir, _sc_filename)
-        if not os.path.isfile(sidecar_path):
-            sidecar_path = os.path.join(lumps_dir, f'{token8}.json')
-        if os.path.isfile(sidecar_path):
-            try:
-                with open(sidecar_path, 'r') as fh:
-                    sidecar = json.load(fh)
-                lean = {k: v for k, v in sidecar.items() if k != 'source'}
-                lean['has_source'] = bool(sidecar.get('source', '').strip())
-                # Overwrite canonical identity fields from the manifest — the
-                # manifest is the authority for dot_name / issue_n / filename
-                # after migration; sidecar copies of these fields may be stale.
-                for _mkey in ('dot_name', 'issue_n', 'filename'):
-                    _mv = entry.get(_mkey)
-                    if _mv is not None:
-                        lean[_mkey] = _mv
-                result.append(lean)
-                continue
-            except Exception:
-                pass
-        result.append(entry)
+        row = dict(entry)
+        path = os.path.join(lumps_dir, entry.get("filename") or f"{token8}.lump")
+        try:
+            inspected = _inspect_lump_binary(path)
+            approval = approvals.get(inspected["binary_hash"])
+            canonical = _check_lump_canonical_integrity(
+                lumps_dir, token8, inspected["raw_bytes"])
+            if isinstance(canonical, str):
+                raise ValueError(canonical)
+            row.update({k: inspected[k] for k in
+                        ("cw", "cc", "typ", "lump_size", "binary_hash",
+                         "content_profile", "sourceStorageTier")})
+            row["binary_valid"] = True
+            row["approved"] = approval is not None
+            row["clist_entries"] = inspected["clist_entries"]
+            row["has_source"] = bool(inspected["source"])
+            if approval:
+                row.update({k: v for k, v in approval.items()
+                            if k not in {"source", "cw", "cc", "typ", "lump_size"}})
+        except (OSError, ValueError) as exc:
+            row["binary_valid"] = False
+            row["approved"] = False
+            row["validation_errors"] = [str(exc)]
+        result.append(row)
 
     # Prepend system LUMPs extracted live from boot-image.bin.
     # Boot.NS (slot 0, typ=1) comes first so it heads the list; Boot.Abstr (slot 6)
@@ -8749,54 +8533,12 @@ def list_lumps():
         result = [e for e in result if e.get('token') != '00000000']
         result = [dict(_BOOT_NS_META)] + result
 
-    # Add binary_valid: True when the .lump binary has a valid header magic
-    # (bits [31:27] of word 0 == 0x1F).  Boot.Abstr and Boot.NS are always
-    # valid — they are live in-memory copies from boot-image.bin.
-    for _e in result:
-        _tk = _e.get('token', '')
-        if _tk in ('00000600', '00000000'):
-            _e['binary_valid'] = True
-        elif _tk:
-            _lp = os.path.join(lumps_dir, _e.get('filename') or f'{_tk}.lump')
-            _e['binary_valid'] = False
-            if os.path.isfile(_lp):
-                try:
-                    with open(_lp, 'rb') as _fh:
-                        _b = _fh.read(4)
-                    if len(_b) == 4:
-                        _w0 = int.from_bytes(_b, 'big')
-                        _e['binary_valid'] = ((_w0 >> 27) & 0x1F) == 0x1F
-                except Exception:
-                    pass
-        else:
-            _e['binary_valid'] = False
-
-    # Inject clist_entries for every LUMP with cc > 0 and a readable binary.
-    # Boot.NS (00000000): C-List is already in namespace_meta — skip.
-    # Boot.Abstr (00000600): clist_entries already set inside _BOOT_ABSTR_META — skip.
-    # All other LUMPs: read from the .lump file.
-    for _e in result:
-        _tk = _e.get('token', '')
-        if _tk in ('00000000', '00000600') or 'clist_entries' in _e:
-            continue
-        _cc = int(_e.get('cc', 0) or 0)
-        if _cc == 0:
-            continue
-        _lp = os.path.join(lumps_dir, _e.get('filename') or f'{_tk}.lump')
-        if os.path.isfile(_lp):
-            _e['clist_entries'] = _extract_clist_from_lump_file(_lp)
-
     return jsonify(result)
 
 
 @app.route("/api/lumps/<token>/detail")
 def get_lump_detail(token):
-    """Return the full sidecar JSON for a single LUMP, including the source field.
-
-    The list endpoint (/api/lumps) omits 'source' to stay lean.  This endpoint
-    is called lazily by the IDE editor when the user clicks 'Edit ✎' so it can
-    restore the exact source text that was compiled.
-    """
+    """Return binary-intrinsic facts plus metadata approved for this hash."""
     lumps_dir = LUMPS_DIR
     token8 = (token.lower()[:8] if len(token) >= 8 else token.lower()).zfill(8)
 
@@ -8813,77 +8555,26 @@ def get_lump_detail(token):
     if entry is None:
         return jsonify({"error": f"No LUMP found for token {token8}"}), 404
 
-    sc_file = entry.get('sidecar_file', f'{token8}.json')
-    sc_path = os.path.join(lumps_dir, sc_file)
-    if not os.path.isfile(sc_path):
-        return jsonify({"error": "Sidecar not found"}), 404
-
     try:
-        with open(sc_path, 'r') as fh:
-            sidecar = json.load(fh)
-    except Exception as exc:
-        return jsonify({"error": f"Could not read sidecar: {exc}"}), 500
-
-    # Do not hand a malformed/tampered portable contract to an installer.  The
-    # saved sidecar is the durable transport for unresolved relocation rows;
-    # validate it again at this trust boundary rather than treating it as UI
-    # annotation.  Legacy sidecars remain intentionally untouched.
-    if sidecar.get("portable_binding") is not None:
-        try:
-            try:
-                from portable_binding import validate_portable_binding as _detail_validate_binding
-            except ImportError:
-                from server.portable_binding import validate_portable_binding as _detail_validate_binding
-            _detail_binding = _detail_validate_binding(
-                sidecar["portable_binding"], int(sidecar.get("cc", entry.get("cc", 0)) or 0))
-            if (entry.get("dot_name") and entry.get("issue_n") is not None and
-                    _detail_binding["owner"] !=
-                    f"{entry['dot_name']}#{int(entry['issue_n'])}"):
-                raise ValueError("owner does not match manifest canonical identity")
-            sidecar = dict(sidecar)
-            sidecar["portable_binding"] = _detail_binding
-        except (ValueError, TypeError) as exc:
-            return jsonify({"error": f"Portable binding validation failed: {exc}"}), 409
-
-    # If the 'source' field is a file-path reference (no newlines, ends in .cloomc)
-    # rather than actual source text, resolve it to the file's content so the
-    # editor can populate itself correctly.  The sidecar on disk is left unchanged.
-    _src_raw = sidecar.get('source', '')
-    if _src_raw and '\n' not in _src_raw and _src_raw.strip().endswith('.cloomc'):
-        _repo_root = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
-        _src_abs = os.path.normpath(os.path.join(_repo_root, _src_raw.strip()))
-        if os.path.isfile(_src_abs):
-            try:
-                with open(_src_abs, 'r', encoding='utf-8', errors='replace') as _sfh:
-                    sidecar = dict(sidecar)
-                    sidecar['source'] = _sfh.read()
-                    sidecar['source_path'] = _src_raw.strip()
-            except OSError:
-                pass  # serve the path string as fallback; client will show disasm instead
-
-    # V1.3 self-defining binaries: extract the source from freespace when the
-    # binary carries Tier 1/2 content, and report sourceStorageTier.  The
-    # sidecar 'source' field remains the fallback for legacy binaries.
-    _bin_fn = entry.get('filename') or f'{token8}.lump'
-    _bin_path = os.path.join(lumps_dir, _bin_fn)
-    if os.path.isfile(_bin_path):
-        try:
-            with open(_bin_path, 'rb') as _bfh:
-                _braw = _bfh.read()
-            _bn = len(_braw) // 4
-            _bwords = list(_struct.unpack(f'>{_bn}I', _braw[:_bn * 4]))
-            _fs_det = _lump_freespace_content(_bwords)
-            if _fs_det is not None:
-                sidecar = dict(sidecar)
-                sidecar['sourceStorageTier'] = _fs_det['tier']
-                sidecar['api_definition'] = _fs_det['api_definition']
-                sidecar['api_definition_source'] = 'lump'
-                if _fs_det['source']:
-                    sidecar['source'] = _fs_det['source']
-        except Exception:
-            pass  # malformed frame — serve sidecar fields unchanged
-
-    return jsonify(sidecar)
+        inspected = _inspect_lump_binary(
+            os.path.join(lumps_dir, entry.get("filename") or f"{token8}.lump"))
+        approval = _matching_lump_approval(lumps_dir, inspected["binary_hash"])
+        canonical = _check_lump_canonical_integrity(
+            lumps_dir, token8, inspected["raw_bytes"])
+    except (OSError, ValueError) as exc:
+        return jsonify({"error": f"LUMP integrity failure: {exc}"}), 409
+    if isinstance(canonical, str):
+        return jsonify({"error": canonical}), 409
+    detail = dict(approval or {})
+    detail.update({k: inspected[k] for k in
+                   ("cw", "cc", "typ", "lump_size", "binary_hash",
+                    "content_profile", "sourceStorageTier", "api_definition",
+                    "source", "clist_entries")})
+    detail.update({"token": token8, "filename": entry.get("filename"),
+                   "approved": approval is not None,
+                   "trusted": approval is not None and canonical is True,
+                   "api_definition_source": "lump"})
+    return jsonify(detail)
 
 
 @app.route("/api/lump/<token_hex>/words")
@@ -8895,42 +8586,22 @@ def get_lump_words(token_hex):
         return jsonify({"error": "Invalid token"}), 400
     key8  = (raw[:8] if len(raw) >= 8 else raw).zfill(8)
     key   = key8.lstrip('0') or '0'
-    data  = LAZY_LUMPS.get(key8) or LAZY_LUMPS.get(key)
-    if data is None:
-        lumps_dir  = LUMPS_DIR
-        lump_path  = os.path.join(lumps_dir, f'{key8}.lump')
-        # Check manifest for a named (human-readable) filename
-        _mf_path = os.path.join(lumps_dir, 'manifest.json')
-        if os.path.isfile(_mf_path):
-            try:
-                with open(_mf_path) as _mf:
-                    _mf_data = json.load(_mf)
-                for _me in _mf_data:
-                    if _me.get('token') == key8:
-                        _fn = _me.get('filename', '')
-                        if _fn:
-                            _np = os.path.join(lumps_dir, _fn)
-                            if os.path.isfile(_np):
-                                lump_path = _np
-                        break
-            except Exception:
-                pass
-        if os.path.isfile(lump_path):
-            with open(lump_path, 'rb') as fh:
-                data = fh.read()
-            LAZY_LUMPS[key8] = data
-        else:
-            return jsonify({"error": f"Unknown lump 0x{key8}"}), 404
-    num_words = len(data) // 4
-    lump_raw  = data[:num_words * 4]
-    words = list(_struct.unpack(f'>{num_words}I', lump_raw))
+    lump_path = _resolve_lump_path(key8, LUMPS_DIR)
+    if not lump_path:
+        return jsonify({"error": f"Unknown lump 0x{key8}"}), 404
+    try:
+        inspected = _inspect_lump_binary(lump_path)
+    except (OSError, ValueError) as exc:
+        return jsonify({"error": f"LUMP integrity failure: {exc}"}), 409
+    lump_raw = inspected["raw_bytes"]
+    words = inspected["words"]
+    num_words = len(words)
 
     # ── Filename integrity check (fail-closed for canonical entries) ─────────
     # Entries with a dot_name in the manifest MUST pass canonical hash
     # validation before their bytes are served.  _check_lump_canonical_integrity
     # returns None (legacy/unknown — serve freely), True (validated OK), or a
     # string (error message — caller returns 409, no skip path).
-    import hashlib as _hl_words
     _lh_lumps_dir = LUMPS_DIR
     _integrity_result = _check_lump_canonical_integrity(_lh_lumps_dir, key8, lump_raw)
     if isinstance(_integrity_result, str):
@@ -8938,86 +8609,38 @@ def get_lump_words(token_hex):
 
     # Compute a fresh SHA-256 of the binary bytes so the caller can verify
     # the served content matches the hash recorded at compile time.
-    _bh_live = _hl_words.sha256(lump_raw).hexdigest()
+    _bh_live = inspected["binary_hash"]
 
-    # Backfill sidecar with binary_hash if it was compiled before this field existed.
-    _lumps_dir_bh = LUMPS_DIR
-    _sc_fn_bh = f'{key8}.json'
-    _mf_bh_path = os.path.join(_lumps_dir_bh, 'manifest.json')
-    if os.path.isfile(_mf_bh_path):
-        try:
-            with open(_mf_bh_path) as _mf_bh:
-                for _me_bh in json.load(_mf_bh):
-                    if _me_bh.get('token') == key8:
-                        _sc_fn_bh = _me_bh.get('sidecar_file', _sc_fn_bh)
-                        break
-        except Exception:
-            pass
-    _sc_path_bh = os.path.join(_lumps_dir_bh, _sc_fn_bh)
-    if os.path.isfile(_sc_path_bh):
-        try:
-            with open(_sc_path_bh) as _scf_bh:
-                _sc_bh = json.load(_scf_bh)
-            if not _sc_bh.get('binary_hash'):
-                _sc_bh['binary_hash'] = _bh_live
-                with open(_sc_path_bh, 'w') as _scwf_bh:
-                    json.dump(_sc_bh, _scwf_bh, indent=2)
-        except Exception:
-            pass
-
-    # Return identity fields from sidecar alongside hash; backfill legacy lumps.
-    _petname_ret    = ''
-    _issue_ret      = 1
-    _id_str_ret     = ''
-    _id_hash_ret    = ''
-    if os.path.isfile(_sc_path_bh):
-        try:
-            with open(_sc_path_bh) as _scf_id:
-                _sc_id = json.load(_scf_id)
-            _petname_ret = _sc_id.get('petname', '')
-            _issue_ret   = _sc_id.get('issue_number', 1)
-            _id_str_ret  = _sc_id.get('identity_string', '')
-            _id_hash_ret = _sc_id.get('identity_hash', '')
-        except Exception:
-            pass
-
-    return jsonify({
+    try:
+        _approval_ret = _matching_lump_approval(LUMPS_DIR, _bh_live)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 409
+    response = {
         "token":           key8,
         "words":           words,
         "count":           num_words,
         "binary_hash":     _bh_live,
-        "petname":         _petname_ret,
-        "issue_number":    _issue_ret,
-        "identity_string": _id_str_ret,
-        "identity_hash":   _id_hash_ret,
-    })
+        "approved":        _approval_ret is not None,
+        "trusted":         _approval_ret is not None and _integrity_result is True,
+    }
+    if _approval_ret is not None:
+        for field in ("pet_name", "dot_name", "issue_n", "identity_hash"):
+            if field in _approval_ret:
+                response[field] = _approval_ret[field]
+    return jsonify(response)
 
 
-def _validate_lump_snapshot(lump_path, sidecar_path):
-    """Validate one binary/sidecar pair and return its decoded structure.
+def _validate_lump_snapshot(lump_path):
+    """Validate one exact binary and report any hash-bound approval.
 
     History, Preview, and Restore must agree on whether an archive is usable.
     This helper is intentionally read-only and is the sole implementation of
     the archive-level header, size, metadata, and SHA-256 checks.
     """
-    sidecar = {}
     errors = []
-    if sidecar_path and os.path.isfile(sidecar_path):
-        try:
-            with open(sidecar_path, "r") as fh:
-                loaded_sidecar = json.load(fh)
-            if isinstance(loaded_sidecar, dict):
-                sidecar = loaded_sidecar
-            else:
-                errors.append("sidecar root is not a JSON object")
-        except Exception as exc:
-            errors.append(f"sidecar unreadable: {exc}")
-    else:
-        errors.append("sidecar is missing")
-
     binary_available = bool(lump_path and os.path.isfile(lump_path))
     result = {
-        "sidecar": sidecar,
+        "approval": None,
         "errors": errors,
         "binary_available": binary_available,
         "raw_bytes": None,
@@ -9026,76 +8649,37 @@ def _validate_lump_snapshot(lump_path, sidecar_path):
         "cc": None,
         "lump_size": None,
         "content_profile": None,
+        "source": None,
         "binary_hash": None,
+        "approved": False,
+        "trusted": False,
         "valid": False,
     }
     if not binary_available:
         errors.append("archived binary is missing")
         return result
     try:
-        with open(lump_path, "rb") as fh:
-            raw_bytes = fh.read()
-    except OSError as exc:
-        errors.append(f"binary unreadable: {exc}")
+        inspected = _inspect_lump_binary(lump_path)
+    except (OSError, ValueError) as exc:
+        errors.append(str(exc))
         return result
-    result["raw_bytes"] = raw_bytes
-    if len(raw_bytes) < 4 or len(raw_bytes) % 4:
-        errors.append("binary length is not a non-empty whole number of words")
-        return result
-
-    lump_size = len(raw_bytes) // 4
-    words = list(_struct.unpack(f">{lump_size}I", raw_bytes))
-    word0 = words[0]
-    magic = (word0 >> 27) & 0x1F
-    header_size = 1 << (((word0 >> 23) & 0xF) + 6)
-    header_cw = (word0 >> 10) & 0x1FFF
-    header_cc = word0 & 0xFF
-    actual_hash = hashlib.sha256(raw_bytes).hexdigest()
     result.update({
-        "words": words,
-        "cw": header_cw,
-        "cc": header_cc,
-        "lump_size": lump_size,
-        "binary_hash": actual_hash,
+        key: inspected[key] for key in
+        ("raw_bytes", "words", "cw", "cc", "lump_size", "binary_hash",
+         "content_profile", "source")
     })
-    frame_start = 1 + header_cw
-    frame_end = lump_size - header_cc
-    if frame_start < frame_end and frame_start < len(words):
-        frame_header = words[frame_start]
-        if ((frame_header >> 24) & 0xFF) == 0xAB:
-            frame_flags = (frame_header >> 16) & 0xFF
-            if frame_flags == 0x00:
-                result["content_profile"] = "api"
-            elif frame_flags in (0x03, 0x07):
-                result["content_profile"] = "full"
-            elif frame_flags in (0x01, 0x05):
-                result["content_profile"] = "compact"
-    if magic != 0x1F:
-        errors.append(f"invalid header magic 0x{magic:02x}")
-    if header_size != lump_size:
-        errors.append(
-            f"header declares {header_size} words but file contains {lump_size}"
-        )
-    for field, actual in (
-        ("cw", header_cw), ("cc", header_cc), ("lump_size", lump_size)
-    ):
-        declared = sidecar.get(field)
-        if declared is None:
-            continue
-        try:
-            declared = int(declared)
-        except (TypeError, ValueError):
-            errors.append(f"sidecar {field} is not an integer")
-            continue
-        if declared != actual:
-            errors.append(
-                f"sidecar {field} declares {declared} but binary has {actual}"
-            )
-    declared_hash = str(sidecar.get("binary_hash") or "").lower()
-    if not re.fullmatch(r"[0-9a-f]{64}", declared_hash):
-        errors.append("sidecar binary_hash is not a full SHA-256 digest")
-    elif declared_hash != actual_hash:
-        errors.append("sidecar binary_hash does not match the binary")
+    try:
+        approval = _matching_lump_approval(
+            os.path.dirname(os.path.abspath(lump_path)), inspected["binary_hash"])
+    except ValueError as exc:
+        errors.append(str(exc))
+        approval = None
+    if approval is None:
+        pass
+    else:
+        result["approval"] = approval
+        result["approved"] = True
+        result["trusted"] = True
     result["valid"] = not errors
     return result
 
@@ -9107,9 +8691,9 @@ def get_lump_history(token):
     Response shape (wrapped object — intentional):
         { "token": "<8-char>", "history": [ <entry>, ... ] }
 
-    Structural fields come from a validated binary header, never unchecked
-    sidecar metadata.  ``preview_enabled`` / ``restore_enabled`` are true only
-    when the referenced immutable archive agrees with its sidecar size/hash.
+    Structural fields come from exact validated bytes, never sidecar metadata.
+    Preview requires a structurally valid archive; restore additionally
+    requires an approval bound to the archive's exact SHA-256.
 
     Note: the response is a wrapped object (not a bare JSON array) so that
     callers can distinguish an empty-history success from a 404 / error response.
@@ -9145,15 +8729,15 @@ def get_lump_history(token):
     pattern_named = [_re.compile(rf'^{_re.escape(_stem)}_v(\d+)\.lump$')
                      for _stem in _safe_stems_h]
 
-    def _snapshot_entry_h(version, lump_path, sidecar_path, *, current=False):
-        snapshot = _validate_lump_snapshot(lump_path, sidecar_path)
-        sc = snapshot["sidecar"]
+    def _snapshot_entry_h(version, lump_path, *, current=False):
+        snapshot = _validate_lump_snapshot(lump_path)
+        approval = snapshot["approval"] or {}
         errors = snapshot["errors"]
         entry = {
             "version": version,
             "current": current,
-            "compiled_at": sc.get("compiled_at"),
-            "abstraction": sc.get("abstraction"),
+            "compiled_at": approval.get("compiled_at"),
+            "abstraction": approval.get("abstraction"),
             "cw": snapshot["cw"],
             "cc": snapshot["cc"],
             "lump_size": snapshot["lump_size"],
@@ -9161,21 +8745,24 @@ def get_lump_history(token):
             "binary_hash": snapshot["binary_hash"],
             "binary_available": snapshot["binary_available"],
             "binary_valid": snapshot["valid"],
+            "approved": snapshot["approved"],
+            "trusted": snapshot["trusted"],
             "metadata_only": not snapshot["binary_available"],
             "preview_enabled": bool(not current and snapshot["valid"]),
-            "restore_enabled": bool(not current and snapshot["valid"]),
+            "restore_enabled": bool(
+                not current and snapshot["valid"] and snapshot["approved"]),
             "validation_errors": errors,
         }
-        if isinstance(sc.get("mtbf"), dict):
-            entry["mtbf"] = sc["mtbf"]
+        if isinstance(approval.get("mtbf"), dict):
+            entry["mtbf"] = approval["mtbf"]
         return entry
 
     entries = []
     archive_files = {}
     for fn in (os.listdir(lumps_dir) if os.path.isdir(lumps_dir) else []):
-        if not (fn.endswith(".lump") or fn.endswith(".json")):
+        if not fn.endswith(".lump"):
             continue
-        binary_name = fn[:-5] + ".lump" if fn.endswith(".json") else fn
+        binary_name = fn
         m = pattern_token.match(binary_name)
         if not m:
             m = next(
@@ -9188,35 +8775,21 @@ def get_lump_history(token):
 
     for ver, stem in archive_files.items():
         lump_path_v = os.path.join(lumps_dir, stem + ".lump")
-        sc_path_v = os.path.join(lumps_dir, stem + ".json")
-        entries.append(_snapshot_entry_h(ver, lump_path_v, sc_path_v))
+        entries.append(_snapshot_entry_h(ver, lump_path_v))
 
-    # The live canonical artifact is part of version history too.  Resolve it
-    # only through the manifest and enrich it from its actual sidecar + binary.
+    # The live artifact is part of version history too. Resolve it only through
+    # the manifest locator and inspect its exact binary bytes.
     if _current_manifest_h:
         _cur_fn = _current_manifest_h.get("filename") or f"{key8}.lump"
-        _cur_sc_fn = _current_manifest_h.get("sidecar_file") or f"{key8}.json"
         _cur_lp = os.path.join(lumps_dir, _cur_fn)
-        _cur_sp = os.path.join(lumps_dir, _cur_sc_fn)
-        _cur_sc = {}
-        if os.path.isfile(_cur_sp):
-            try:
-                with open(_cur_sp) as _fh:
-                    _cur_sc_loaded = json.load(_fh)
-                if isinstance(_cur_sc_loaded, dict):
-                    _cur_sc = _cur_sc_loaded
-            except Exception:
-                pass
-        _cur_ver = _cur_sc.get(
-            "lump_version", _current_manifest_h.get("lump_version")
-        )
+        _cur_ver = _current_manifest_h.get("lump_version")
         if _cur_ver is not None:
             try:
                 _cur_ver = int(_cur_ver)
                 entries = [e for e in entries if e["version"] != _cur_ver]
                 entries.append(
                     _snapshot_entry_h(
-                        _cur_ver, _cur_lp, _cur_sp, current=True
+                        _cur_ver, _cur_lp, current=True
                     )
                 )
             except (TypeError, ValueError):
@@ -9255,7 +8828,6 @@ def lump_fork_version(token):
     lumps_dir = LUMPS_DIR
     # Resolve current lump path from manifest (may be human-readable name)
     lump_path   = os.path.join(lumps_dir, f'{key8}.lump')
-    sc_path     = os.path.join(lumps_dir, f'{key8}.json')
     _safe_stem_fv = key8
     _mf_path_fv = os.path.join(lumps_dir, 'manifest.json')
     _existing_entry_fv = None
@@ -9266,15 +8838,10 @@ def lump_fork_version(token):
                 if _e.get('token') == key8:
                     _existing_entry_fv = dict(_e)
                     _fn = _e.get('filename', '')
-                    _sfn = _e.get('sidecar_file', '')
                     if _fn:
                         _np = os.path.join(lumps_dir, _fn)
                         if os.path.isfile(_np):
                             lump_path = _np
-                    if _sfn:
-                        _nsp = os.path.join(lumps_dir, _sfn)
-                        if os.path.isfile(_nsp):
-                            sc_path = _nsp
                     if _fn and _fn.endswith('.lump'):
                         _safe_stem_fv = _re_fv.sub(r'_v\d+$', '', _fn[:-5])
                     break
@@ -9282,16 +8849,22 @@ def lump_fork_version(token):
             pass
     if not os.path.isfile(lump_path):
         return jsonify({"error": "No compiled binary for this token — cannot fork"}), 404
+    try:
+        _fork_facts = _inspect_lump_binary(lump_path)
+        _fork_existing_approval = _matching_lump_approval(
+            lumps_dir, _fork_facts["binary_hash"])
+        if _fork_existing_approval is None:
+            return jsonify({
+                "error": "exact hash-bound approval is required to fork"
+            }), 403
+        _fork_payload = request.get_json(force=True, silent=True) or {}
+        _fork_intent_approval = _consume_lump_approval_intent(
+            _fork_payload.get("approval_intent"),
+            _fork_facts["binary_hash"], "fork")
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 403
 
-    sc = {}
-    if os.path.isfile(sc_path):
-        try:
-            with open(sc_path, 'r') as fh:
-                sc = json.load(fh)
-        except Exception:
-            pass
-
-    cur_version = sc.get('lump_version')
+    cur_version = (_existing_entry_fv or {}).get('lump_version')
     if cur_version is None:
         _arch_pats = [
             _re_fv.compile(rf'^{_re_fv.escape(_safe_stem_fv)}_v(\d+)\.lump$'),
@@ -9307,62 +8880,74 @@ def lump_fork_version(token):
     else:
         cur_version = int(cur_version)
 
-    # If already forked (sidecar has forked=True and no new compiled_at set),
+    # If already forked,
     # re-forking would overwrite the archive. Idempotently return current state.
     # Note: when forked=True, cur_version is already N+1 (fork wrote it), so
     # new_version = cur_version (not cur_version+1) to avoid a double-increment.
-    if sc.get('forked'):
+    if (_existing_entry_fv or {}).get('forked'):
         return jsonify({"ok": True, "new_version": cur_version, "prev_version": cur_version - 1, "already_forked": True})
 
-    # Persist the forked state to the live sidecar so that:
-    # 1) Reloading the page won't trigger another fork on the same binary.
-    # 2) _lumpIsSealed() (client) sees forked=True and skips re-fork.
-    # 3) lump_version is incremented server-side; save detects forked=True
-    #    and uses this value directly (not +1) so the new binary lands at N+1.
-    # The next compile-and-save rewrites the sidecar completely, clearing forked.
-    sc['forked'] = True
-    _fork_current_is_archive_pair = (
-        os.path.basename(lump_path) == f"{_safe_stem_fv}_v{cur_version}.lump"
-        and os.path.basename(sc_path) == f"{_safe_stem_fv}_v{cur_version}.json"
-    )
-    if _fork_current_is_archive_pair:
-        # A WIP current pair already occupies the immutable archive names for
-        # its version.  Preserve that pair byte-for-byte and install a separate
-        # live alias pair for the forked state.
-        with open(lump_path, "rb") as _fork_source_fh:
-            _fork_live_bytes = _fork_source_fh.read()
-        _fork_live_lump_name = f"{key8}.lump"
-        _fork_live_sidecar_name = f"{key8}.json"
-    else:
-        _fork_live_bytes = None
-        _fork_live_lump_name = os.path.basename(lump_path)
-        _fork_live_sidecar_name = os.path.basename(sc_path)
+    # Forking the same bytes requires an explicit new issued identity. Never
+    # manufacture a token-named alias: the live artifact remains canonically
+    # named from reviewed dot-name, new issue, exact bytes, and Number.
+    _fork_dot_name = _fork_existing_approval.get("dot_name")
+    _old_issue_n = _fork_existing_approval.get("issue_n")
+    _new_issue_n = _fork_payload.get("issue_n")
+    if (not isinstance(_fork_dot_name, str) or not _fork_dot_name
+            or not isinstance(_old_issue_n, int)
+            or not isinstance(_new_issue_n, int)
+            or isinstance(_new_issue_n, bool)
+            or _new_issue_n <= _old_issue_n):
+        return jsonify({
+            "error": "fork requires an explicit issue_n greater than the approved issue"
+        }), 400
+    _fork_live_bytes = _fork_facts["raw_bytes"]
+    _fork_number = hashlib.sha256(
+        _fork_dot_name.encode("utf-8") + _fork_live_bytes).hexdigest()[:8]
+    _fork_live_lump_name = (
+        f"{_fork_dot_name}.{_new_issue_n}.{_fork_number}.lump")
+    _fork_live_path = os.path.join(lumps_dir, _fork_live_lump_name)
+    if (os.path.abspath(_fork_live_path) != os.path.abspath(lump_path)
+            and os.path.lexists(_fork_live_path)):
+        return jsonify({
+            "error": "the requested canonical fork issue already exists"
+        }), 409
     _fork_manifest_entry = dict(_existing_entry_fv or {})
     _fork_manifest_entry.update({
         'token': key8,
-        'abstraction': sc.get('abstraction', _safe_stem_fv),
+        'abstraction': (_existing_entry_fv or {}).get('abstraction', _safe_stem_fv),
         'filename': _fork_live_lump_name,
-        'sidecar_file': _fork_live_sidecar_name,
         'forked': True,
+        'lump_version': cur_version + 1,
     })
+    _fork_approval = dict(_fork_existing_approval)
+    _fork_approval.update({
+        key: value for key, value in _fork_intent_approval.items()
+        if key in _LUMP_APPROVAL_INTENT_FIELDS
+    })
+    _fork_approval["filename"] = _fork_live_lump_name
+    _fork_approval["issue_n"] = _new_issue_n
+    _fork_approval["identity_hash"] = hashlib.sha256(
+        f"{_fork_dot_name}#{_new_issue_n}".encode("utf-8")).hexdigest()
     try:
         _transition = _commit_lump_history_transition(
             lumps_dir=lumps_dir,
             manifest_path=_mf_path_fv,
             token8=key8,
             manifest_entry=_fork_manifest_entry,
-            binary_filename=(
-                _fork_live_lump_name if _fork_current_is_archive_pair else None
-            ),
+            binary_filename=_fork_live_lump_name,
             binary_bytes=_fork_live_bytes,
-            sidecar_filename=_fork_live_sidecar_name,
-            sidecar=sc,
+            approval_hash=_fork_facts["binary_hash"],
+            approval=_fork_approval,
             archive_stem=_safe_stem_fv,
             archive_version=cur_version,
             archive_binary_path=lump_path,
-            archive_sidecar=None if _fork_current_is_archive_pair else sc,
-            archive_sidecar_path=sc_path,
             advance_current_version_from_archive=True,
+            remove_paths=(
+                (lump_path,)
+                if os.path.basename(lump_path) != _fork_live_lump_name
+                else ()
+            ),
             expected_manifest_entry=_existing_entry_fv,
             idempotent_if_forked=True,
         )
@@ -9382,7 +8967,7 @@ def lump_fork_version(token):
             f"Details: {_mf_fv_err}"
         )}), 500
 
-    logging.info('[lumps] Fork: archived %s → %s_v%d.lump (sidecar forked=True written)',
+    logging.info('[lumps] Fork: archived %s → %s_v%d.lump',
                  lump_path, _safe_stem_fv, _transition["version"])
     return jsonify({
         "ok": True,
@@ -9395,10 +8980,8 @@ def lump_fork_version(token):
 def get_lump_version_words(token, version):
     """Return the raw uint32 word array for an archived version of a LUMP.
 
-    Reads <token>-v<version>.lump and its companion sidecar <token>-v<version>.json.
-    Returns: { token, version, words, count, cw, cc, lump_size, abstraction, compiled_at }
-    The metadata fields are populated from the sidecar when present, and fall back
-    to values derived from the binary header.
+    Intrinsic facts are derived from exact archive bytes.  Reviewed annotations
+    are included only when an approval matches the exact archive SHA-256.
     """
     import re as _re
     raw = token.lower()
@@ -9436,9 +9019,8 @@ def get_lump_version_words(token, version):
             pass
     if not os.path.isfile(lump_path_v):
         return jsonify({"error": f"No archived version v{version} for token 0x{key8}"}), 404
-    sc_path_v = os.path.join(lumps_dir, lump_path_v[len(lumps_dir)+1:-5] + '.json')
-    snapshot = _validate_lump_snapshot(lump_path_v, sc_path_v)
-    sc = snapshot["sidecar"]
+    snapshot = _validate_lump_snapshot(lump_path_v)
+    approval = snapshot["approval"] or {}
     validation_errors = snapshot["errors"]
     if validation_errors:
         return jsonify({
@@ -9458,169 +9040,61 @@ def get_lump_version_words(token, version):
         "lump_size":     snapshot["lump_size"],
         "binary_hash":   snapshot["binary_hash"],
         "binary_valid":  True,
-        "ns_slot":       sc.get('ns_slot'),
-        "abstraction":   sc.get('abstraction'),
-        "compiled_at":   sc.get('compiled_at'),
-        "methods":       sc.get('methods', []),
-        "capabilities":  sc.get('capabilities', []),
-        "language":      sc.get('language'),
-        "profile":       sc.get('profile'),
-        "author":        sc.get('author', ''),
-        "version_str":   sc.get('version', ''),
-        "release_notes": sc.get('release_notes', ''),
-        "grants":        sc.get('grants', ['E']),
-        "content_type":  sc.get('content_type', 'code'),
-        "pet_names":     sc.get('pet_names', {"DR": {}, "CR": {}}),
-        "mtbf":          sc.get('mtbf', {}),
-        "deployment":    sc.get('deployment', {}),
-        "source_hash":   sc.get('mtbf', {}).get('source_hash', ''),
-        "source":        sc.get('source', ''),
+        "approved":      snapshot["approved"],
+        "trusted":       snapshot["trusted"],
+        "ns_slot":       approval.get('ns_slot'),
+        "abstraction":   approval.get('abstraction'),
+        "compiled_at":   approval.get('compiled_at'),
+        "author":        approval.get('author', ''),
+        "version_str":   approval.get('version', ''),
+        "release_notes": approval.get('release_notes', ''),
+        "grants":        approval.get('grants', []),
+        "pet_names":     approval.get('pet_names', {}),
+        "source":        snapshot.get('source') or '',
     })
 
 
 @app.route("/api/lump-source/<name>")
 def get_lump_source(name):
-    """Return the CLOOMC++ functional source for a named lump.
-
-    Search order:
-      1. simulator/cloomc/<name>.cloomc  (case-insensitive)
-      2. simulator/examples/<name>.cloomc or any *.cloomc whose
-         'Abstraction:' header comment matches <name>  (case-insensitive)
-      3. source_file path recorded in the matching sidecar JSON under
-         server/lumps/ (the abstraction name is matched against sidecar
-         "abstraction" field)
-
-    Returns {"name": name, "source": "...", "source_path": "..."} on success.
-    Returns {"error": "...", "binary_only": true} with 404 if not found.
-    """
+    """Return source embedded in the exact manifest-located LUMP bytes."""
     import re as _re
     if not _re.match(r'^[A-Za-z0-9_ .\-]+$', name):
         return jsonify({"error": "Invalid name"}), 400
 
-    _root = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
-
-    def _read_source(path):
-        with open(path, 'r', encoding='utf-8', errors='replace') as fh:
-            return fh.read()
-
-    # 0. V1.3 self-defining binary — the embedded Tier 1/2 source is the
-    # authoritative source and MUST precede all external/sidecar fallbacks:
-    # a same-name .cloomc file on disk may be stale or a different program.
-    lumps_dir = LUMPS_DIR
-    if os.path.isdir(lumps_dir):
-        for fname in os.listdir(lumps_dir):
-            if not fname.endswith('.json') or fname == 'manifest.json':
-                continue
-            try:
-                with open(os.path.join(lumps_dir, fname), 'r') as fh:
-                    sc = json.load(fh)
-            except Exception:
-                continue
-            if sc.get('abstraction', '').lower() != name.lower():
-                continue
-            bin_path = os.path.join(lumps_dir, fname[:-len('.json')] + '.lump')
-            if not os.path.isfile(bin_path):
-                continue
-            try:
-                with open(bin_path, 'rb') as fh:
-                    braw = fh.read()
-                bn = len(braw) // 4
-                fs = _lump_freespace_content(
-                    list(_struct.unpack(f'>{bn}I', braw[:bn * 4])))
-            except Exception:
-                continue
-            if fs and fs.get('source'):
-                return jsonify({"name": name, "source": fs['source'],
-                                "source_path": f"embedded (Tier {fs['tier']})",
-                                "binary_only": False})
-
-    # 1. simulator/cloomc/ — exact then case-insensitive scan
-    cloomc_dir = os.path.join(_root, 'simulator', 'cloomc')
-    candidate = os.path.join(cloomc_dir, f'{name}.cloomc')
-    if os.path.isfile(candidate):
-        return jsonify({"name": name, "source": _read_source(candidate),
-                        "source_path": f"simulator/cloomc/{name}.cloomc",
-                        "binary_only": False})
-    if os.path.isdir(cloomc_dir):
-        for fname in os.listdir(cloomc_dir):
-            if fname.lower() == f'{name.lower()}.cloomc':
-                p = os.path.join(cloomc_dir, fname)
-                return jsonify({"name": name, "source": _read_source(p),
-                                "source_path": f"simulator/cloomc/{fname}",
-                                "binary_only": False})
-
-    # 2. simulator/examples/ — exact filename match then header comment scan
-    examples_dir = os.path.join(_root, 'simulator', 'examples')
-    if os.path.isdir(examples_dir):
-        for fname in os.listdir(examples_dir):
-            if not fname.endswith('.cloomc'):
-                continue
-            p = os.path.join(examples_dir, fname)
-            # Quick filename match (e.g. wukong_callhome → WukongCallHome)
-            stem = fname[:-len('.cloomc')]
-            if stem.lower().replace('_', '') == name.lower().replace('_', '').replace(' ', ''):
-                return jsonify({"name": name, "source": _read_source(p),
-                                "source_path": f"simulator/examples/{fname}",
-                                "binary_only": False})
-            # Check 'Abstraction:' header comment inside the file
-            try:
-                with open(p, 'r', encoding='utf-8', errors='replace') as fh:
-                    for line in fh:
-                        m = _re.match(r'[;#]\s*Abstraction\s*:\s*(.+)', line)
-                        if m and m.group(1).strip().lower() == name.lower():
-                            return jsonify({"name": name, "source": _read_source(p),
-                                            "source_path": f"simulator/examples/{fname}",
-                                            "binary_only": False})
-                        if not line.startswith(';') and not line.startswith('#') and line.strip():
-                            break  # past header block
-            except OSError:
-                pass
-
-    # 3. Sidecar source_file field — scan server/lumps/*.json for matching abstraction
-    lumps_dir = LUMPS_DIR
-    if os.path.isdir(lumps_dir):
-        for fname in os.listdir(lumps_dir):
-            if not fname.endswith('.json'):
-                continue
-            try:
-                with open(os.path.join(lumps_dir, fname), 'r') as fh:
-                    sc = json.load(fh)
-            except Exception:
-                continue
-            if sc.get('abstraction', '').lower() != name.lower():
-                continue
-            sf = sc.get('source_file', '')
-            if not sf:
-                continue
-            abs_sf = os.path.normpath(os.path.join(_root, sf))
-            if os.path.isfile(abs_sf):
-                return jsonify({"name": name, "source": _read_source(abs_sf),
-                                "source_path": sf,
-                                "binary_only": False})
-
-    # 4. Sidecar 'source' text — last fallback before binary_only, which is
-    # only returned when the freespace is all-zero (legacy) AND no sidecar
-    # or external source exists.
-    if os.path.isdir(lumps_dir):
-        for fname in os.listdir(lumps_dir):
-            if not fname.endswith('.json') or fname == 'manifest.json':
-                continue
-            try:
-                with open(os.path.join(lumps_dir, fname), 'r') as fh:
-                    sc = json.load(fh)
-            except Exception:
-                continue
-            if sc.get('abstraction', '').lower() != name.lower():
-                continue
-            if sc.get('source') and '\n' in sc.get('source', ''):
-                return jsonify({"name": name, "source": sc['source'],
-                                "source_path": "sidecar",
-                                "binary_only": False})
-
-    return jsonify({
-        "error": f"No functional CLOOMC++ source found for '{name}'",
-        "binary_only": True
-    }), 404
+    # Source is an intrinsic binary fact.  Never recover it from a sidecar or
+    # same-name workspace file, either of which may describe different bytes.
+    try:
+        manifest = _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json"))
+    except ValueError as exc:
+        return jsonify({"error": str(exc), "binary_only": True}), 409
+    for entry in manifest:
+        if str(entry.get("abstraction", "")).lower() != name.lower():
+            continue
+        try:
+            inspected = _inspect_lump_binary(os.path.join(
+                LUMPS_DIR, entry.get("filename") or f"{entry.get('token', '')}.lump"))
+            approval = _matching_lump_approval(LUMPS_DIR, inspected["binary_hash"])
+            canonical = _check_lump_canonical_integrity(
+                LUMPS_DIR, str(entry.get("token") or "").lower(),
+                inspected["raw_bytes"])
+        except (OSError, ValueError) as exc:
+            return jsonify({"error": f"LUMP integrity failure: {exc}",
+                            "binary_only": True}), 409
+        if isinstance(canonical, str):
+            return jsonify({"error": canonical, "binary_only": True}), 409
+        trust = approval is not None and canonical is True
+        if inspected["source"]:
+            return jsonify({"name": name, "source": inspected["source"],
+                            "source_path": f"embedded (Tier {inspected['sourceStorageTier']})",
+                            "binary_only": False,
+                            "binary_hash": inspected["binary_hash"],
+                            "approved": trust, "trusted": trust})
+        return jsonify({"error": f"'{name}' is a binary-only LUMP",
+                        "binary_only": True,
+                        "binary_hash": inspected["binary_hash"],
+                        "approved": trust, "trusted": trust}), 404
+    return jsonify({"error": f"No LUMP found for '{name}'",
+                    "binary_only": True}), 404
 
 
 @app.route("/api/source-files", methods=["GET"])
@@ -9691,416 +9165,34 @@ _EDITABLE_CONTENT_TYPES = {'text', 'markdown', 'image', 'grayscale', 'binary', '
 
 @app.route("/api/lump/<token>/content", methods=["PUT"])
 def put_lump_content(token):
-    """Overwrite the content of a text, markdown, or image lump in-place."""
-    import base64 as _b64, math as _math
-
-    raw  = token.lower()
-    key8 = (raw[:8] if len(raw) >= 8 else raw).zfill(8)
-    lumps_dir    = LUMPS_DIR
-    lump_path    = os.path.join(lumps_dir, f'{key8}.lump')
-    sidecar_path = os.path.join(lumps_dir, f'{key8}.json')
-
-    if not os.path.isfile(lump_path):
-        return jsonify({"error": f"Lump {key8} not found"}), 404
-
-    sidecar = {}
-    if os.path.isfile(sidecar_path):
-        try:
-            with open(sidecar_path, 'r') as fh:
-                sidecar = json.load(fh)
-        except Exception:
-            pass
-
-    ct = (sidecar.get('content_type') or '').lower()
-    if ct and ct not in _EDITABLE_CONTENT_TYPES:
-        return jsonify({"error": f"Lump content_type '{ct}' is not editable via this endpoint"}), 400
-
-    payload = request.get_json(force=True, silent=True) or {}
-
-    if 'text' in payload:
-        raw_bytes = payload['text'].encode('utf-8')
-    elif 'data_b64' in payload:
-        try:
-            raw_bytes = _b64.b64decode(payload['data_b64'], validate=True)
-        except Exception:
-            return jsonify({"error": "Invalid base64 data"}), 400
-    else:
-        return jsonify({"error": "Payload must include 'text' or 'data_b64'"}), 400
-
-    padded_len   = (len(raw_bytes) + 3) & ~3
-    padded_bytes = raw_bytes + b'\x00' * (padded_len - len(raw_bytes))
-    data_word_count = padded_len // 4
-
-    total_needed = 1 + data_word_count
-    MAX_LUMP_WORDS = 1 << 14
-    if total_needed > MAX_LUMP_WORDS:
-        return jsonify({"error": f"Payload too large: {data_word_count} data words"}), 400
-
-    n = max(6, _math.ceil(_math.log2(max(total_needed, 2))))
-    n = min(n, 14)
-    lump_size   = 1 << n
-    n_minus_6   = n - 6
-    cw          = min(data_word_count, lump_size - 1)
-
-    header = (0x1F << 27) | (n_minus_6 << 23) | (cw << 10) | (0x01 << 8) | 0
-    data_words = list(_struct.unpack(f'>{data_word_count}I', padded_bytes))
-    all_words  = ([header] + data_words)[:lump_size]
-    all_words += [0] * max(0, lump_size - len(all_words))
-
-    lump_bytes = _struct.pack(f'>{lump_size}I', *[int(w) & 0xFFFFFFFF for w in all_words])
-    with open(lump_path, 'wb') as fh:
-        fh.write(lump_bytes)
-    LAZY_LUMPS[key8] = lump_bytes
-    LAZY_LUMPS[key8.lstrip('0') or '0'] = lump_bytes
-
-    sidecar['cw']        = cw
-    sidecar['lump_size'] = lump_size
-    with open(sidecar_path, 'w') as fh:
-        json.dump(sidecar, fh, indent=2)
-
-    print(f'[lumps/content PUT] {key8} cw={cw} lump_size={lump_size} {len(lump_bytes)}B', flush=True)
-    return jsonify({"ok": True, "token": key8, "cw": cw, "lump_size": lump_size})
+    """Retired: approved LUMP binaries are immutable."""
+    return jsonify({
+        "error": "In-place LUMP mutation is retired; save a new hash-approved revision"
+    }), 410
 
 
 @app.route("/api/lump/<token>/meta", methods=["PATCH"])
 def patch_lump_meta(token):
-    """Update author and version metadata fields in a saved lump's sidecar JSON.
-
-    Expects JSON body with any of:
-      author  — string author name
-      version — string version string
-    Only the supplied fields are updated; others are left unchanged.
-    Returns {"ok": true, "token": token8} on success.
-    """
-    raw   = token.lower()
-    key8  = (raw[:8] if len(raw) >= 8 else raw).zfill(8)
-
-    lumps_dir    = LUMPS_DIR
-    sidecar_path = os.path.join(lumps_dir, f'{key8}.json')
-
-    payload = request.get_json(force=True, silent=True) or {}
-
-    # ── Phase 1: validate payload (pure, no I/O, no lock needed) ─────────────
-    # Validate ns_slot_policy before entering the lock so we can return 400
-    # without holding any shared resource.
-    if 'ns_slot_policy' in payload:
-        if payload['ns_slot_policy'] not in ('static', 'dynamic'):
-            return jsonify({"error": "ns_slot_policy must be 'static' or 'dynamic'"}), 400
-
-    if 'ns_slot' in payload:
-        slot_val = payload['ns_slot']
-        if slot_val is not None:
-            # Reject booleans: Python treats True/False as int subtypes, but the
-            # API contract requires a plain integer.
-            if isinstance(slot_val, bool) or not isinstance(slot_val, int) or slot_val < 0:
-                return jsonify({"error": "ns_slot must be a non-negative integer or null"}), 400
-
-    _updatable = ("author", "version", "pet_name_cr_slot", "ns_slot_policy", "ns_slot", "boot_resident")
-    if not any(f in payload for f in _updatable):
-        return jsonify({"ok": True, "token": key8, "message": "No fields updated"}), 200
-
-    # ── Phase 2: serialised transaction under _lumps_manifest_lock ───────────
-    # The lock covers the entire sidecar-bootstrap → fresh-read → apply →
-    # sidecar-write → manifest-write → rollback sequence.  Holding it from
-    # the moment we read the sidecar prevents two concurrent PATCHes from
-    # both snapshotting an old version, then committing stale sidecars that
-    # overwrite each other's fields.
-    #
-    # Rollback strategy: if the manifest write fails, the sidecar is restored
-    # to the on-disk content we read at the start of the lock — the caller
-    # receives a 500 and can retry.  Rollback failure is logged and the 500 is
-    # still returned so the caller is never misled into thinking the write
-    # succeeded.
-
-    manifest_path = os.path.join(lumps_dir, 'manifest.json')
-    with _lumps_manifest_lock:
-        # Bootstrap sidecar if missing (inside lock to prevent concurrent creation).
-        if not os.path.isfile(sidecar_path):
-            seed = None
-            if key8 == '00000600' and _BOOT_ABSTR_META:
-                seed = dict(_BOOT_ABSTR_META)
-            else:
-                if os.path.isfile(manifest_path):
-                    try:
-                        with open(manifest_path, 'r') as _mf:
-                            _manifest = json.load(_mf)
-                        for _entry in _manifest:
-                            if (_entry.get('token', '') or '').lower().zfill(8) == key8:
-                                seed = dict(_entry)
-                                break
-                    except Exception:
-                        pass
-                if seed is None and (key8 in LAZY_LUMPS or
-                                     os.path.isfile(os.path.join(lumps_dir, f'{key8}.lump'))):
-                    seed = {'token': key8, 'abstraction': key8}
-            if seed is None:
-                return jsonify({"error": "Lump sidecar not found"}), 404
-            try:
-                _atomic_write_json(sidecar_path, seed)
-            except Exception as _se:
-                return jsonify({"error": f"Could not create sidecar: {_se}"}), 500
-
-        # Fresh sidecar read inside the lock — picks up any commit by a
-        # concurrent PATCH that took the lock before us.
-        try:
-            with open(sidecar_path, 'r') as _sf:
-                _original_sidecar_json = _sf.read()
-            sidecar = json.loads(_original_sidecar_json)
-        except Exception as exc:
-            return jsonify({"error": f"Could not read sidecar: {exc}"}), 500
-
-        # Apply all validated changes to the freshly-read in-memory copy.
-        for field in ("author", "version"):
-            if field in payload:
-                sidecar[field] = str(payload[field])
-
-        if 'pet_name_cr_slot' in payload:
-            cr_slot = str(payload['pet_name_cr_slot'])
-            cr_value = (str(payload.get('pet_name_cr_value', '')) or '').strip()
-            if 'pet_names' not in sidecar or not isinstance(sidecar.get('pet_names'), dict):
-                sidecar['pet_names'] = {}
-            if 'CR' not in sidecar['pet_names'] or not isinstance(sidecar['pet_names'].get('CR'), dict):
-                sidecar['pet_names']['CR'] = {}
-            if cr_value:
-                sidecar['pet_names']['CR'][cr_slot] = cr_value
-            else:
-                sidecar['pet_names']['CR'].pop(cr_slot, None)
-
-        if 'ns_slot_policy' in payload:
-            sidecar['ns_slot_policy'] = payload['ns_slot_policy']  # already validated above
-
-        if 'ns_slot' in payload:
-            sidecar['ns_slot'] = payload['ns_slot']  # already validated above
-
-        if 'boot_resident' in payload:
-            sidecar['boot_resident'] = bool(payload['boot_resident'])
-
-        # Write updated sidecar atomically.
-        try:
-            _atomic_write_json(sidecar_path, sidecar)
-        except Exception as exc:
-            return jsonify({"error": f"Could not write sidecar: {exc}"}), 500
-
-        # Write manifest — roll back sidecar on any failure so both stores
-        # stay consistent.
-        try:
-            manifest = _read_manifest_safe(manifest_path)
-            changed = False
-            for entry in manifest:
-                if entry.get('token') == key8:
-                    for field in ("author", "version", "ns_slot_policy", "ns_slot"):
-                        if field in payload:
-                            entry[field] = sidecar[field]
-                    changed = True
-            if changed:
-                _atomic_write_json(manifest_path, manifest)
-        except (ValueError, OSError) as _mf_err:
-            app.logger.error(
-                "patch_lump_meta: manifest write failed for %s (%s); rolling back sidecar",
-                key8, _mf_err,
-            )
-            try:
-                _orig = json.loads(_original_sidecar_json)
-                _atomic_write_json(sidecar_path, _orig)
-            except Exception as _rb_err:
-                app.logger.error(
-                    "patch_lump_meta: sidecar rollback also failed for %s: %s", key8, _rb_err
-                )
-            if isinstance(_mf_err, ValueError):
-                msg = f"manifest.json is corrupt and cannot be read safely. Details: {_mf_err}"
-            else:
-                msg = f"Could not commit update to manifest.json: {_mf_err}"
-            return jsonify({"error": msg}), 500
-
-    # Keep _BOOT_ABSTR_META in sync so /api/lumps/list returns the new values
-    # immediately.  Done outside the lock — in-memory update is non-critical.
-    if key8 == '00000600':
-        for field in ("author", "version"):
-            if field in payload:
-                _BOOT_ABSTR_META[field] = sidecar[field]
-
-    print(f'[lumps/meta PATCH] {key8} author={sidecar.get("author","")} version={sidecar.get("version","")} ns_slot_policy={sidecar.get("ns_slot_policy","")} ns_slot={sidecar.get("ns_slot", "")}', flush=True)
-    return jsonify({"ok": True, "token": key8})
+    """Retired: approval metadata is immutable and hash-bound."""
+    return jsonify({
+        "error": "LUMP metadata patching is retired; save a new approval"
+    }), 410
 
 
 @app.route("/api/lump/<token>/mtbf", methods=["POST"])
 def post_lump_mtbf(token):
-    """Record a selftest run outcome and update MTBF fields in the sidecar JSON.
-
-    Expects JSON body: { "passed": true | false }
-
-    Updates:
-      mtbf.total_runs         — incremented by 1 on every call
-      mtbf.consecutive_clean  — incremented on pass, reset to 0 on failure
-      mtbf.status             — "green" when consecutive_clean >= 5,
-                                "amber" when 1-4,
-                                "red"   when 0 and total_runs > 0
-
-    Returns {"ok": true, "token": token8, "mtbf": <updated mtbf object>}.
-    """
-    raw  = token.lower()
-    key8 = (raw[:8] if len(raw) >= 8 else raw).zfill(8)
-
-    lumps_dir    = LUMPS_DIR
-    sidecar_path = os.path.join(lumps_dir, f'{key8}.json')
-
-    if not os.path.isfile(sidecar_path):
-        return jsonify({"error": "Lump sidecar not found"}), 404
-
-    payload = request.get_json(force=True, silent=True) or {}
-    if "passed" not in payload:
-        return jsonify({"error": "Missing required field: passed"}), 400
-
-    if not isinstance(payload["passed"], bool):
-        return jsonify({"error": "Field 'passed' must be a JSON boolean (true or false)"}), 400
-
-    passed = payload["passed"]
-
-    try:
-        with open(sidecar_path, 'r') as fh:
-            sidecar = json.load(fh)
-    except Exception as exc:
-        return jsonify({"error": f"Could not read sidecar: {exc}"}), 500
-
-    mtbf = sidecar.get("mtbf", {})
-    if not isinstance(mtbf, dict):
-        mtbf = {}
-
-    incoming_version = payload.get("lump_version")
-    if incoming_version is not None:
-        try:
-            incoming_version = int(incoming_version)
-        except (ValueError, TypeError):
-            incoming_version = None
-    stored_version = mtbf.get("lump_version")
-    if stored_version is not None:
-        try:
-            stored_version = int(stored_version)
-        except (ValueError, TypeError):
-            stored_version = None
-    if incoming_version is not None and stored_version is not None and incoming_version > stored_version:
-        mtbf["consecutive_clean"] = 0
-    if incoming_version is not None:
-        mtbf["lump_version"] = incoming_version
-
-    total_runs        = int(mtbf.get("total_runs", 0)) + 1
-    consecutive_clean = int(mtbf.get("consecutive_clean", 0))
-
-    if passed:
-        consecutive_clean += 1
-    else:
-        consecutive_clean = 0
-
-    if consecutive_clean >= 5:
-        status = "green"
-    elif consecutive_clean >= 1:
-        status = "amber"
-    else:
-        status = "red"
-
-    mtbf["total_runs"]        = total_runs
-    mtbf["consecutive_clean"] = consecutive_clean
-    mtbf["status"]            = status
-    sidecar["mtbf"]           = mtbf
-
-    try:
-        with open(sidecar_path, 'w') as fh:
-            json.dump(sidecar, fh, indent=2)
-    except Exception as exc:
-        return jsonify({"error": f"Could not write sidecar: {exc}"}), 500
-
-    print(f'[lumps/mtbf POST] {key8} passed={passed} consecutive_clean={consecutive_clean} total_runs={total_runs} status={status}', flush=True)
-    return jsonify({"ok": True, "token": key8, "mtbf": mtbf})
+    """Retired: approval metadata is immutable."""
+    return jsonify({
+        "error": "LUMP MTBF metadata patching is retired"
+    }), 410
 
 
 @app.route("/api/lump/<token_hex>/clist/<int:slot_index>", methods=["PATCH"])
 def patch_lump_clist_slot(token_hex, slot_index):
-    """Write a single GT word into a specific c-list slot of a standalone .lump binary.
-
-    Expects JSON body: { "gt_word": <uint32> }
-
-    The .lump binary is big-endian uint32 words.  The c-list occupies the last
-    `cc` words of the lump; slot 0 is the last-cc-th word.
-
-    Returns { "ok": true, "token": ..., "slot": ..., "gt_word": ... }
-    """
-    raw  = token_hex.lower()
-    key8 = (raw[:8] if len(raw) >= 8 else raw).zfill(8)
-
-    lumps_dir = LUMPS_DIR
-    lump_path = _resolve_lump_path(key8, lumps_dir)
-    if not lump_path:
-        return jsonify({"error": f"No .lump file for token {key8}"}), 404
-
-    payload = request.get_json(force=True, silent=True) or {}
-    gt_word = payload.get("gt_word")
-    if gt_word is None:
-        return jsonify({"error": "Missing 'gt_word' in request body"}), 400
-    gt_word = int(gt_word) & 0xFFFFFFFF
-
-    with open(lump_path, 'rb') as fh:
-        raw_bytes = fh.read()
-    n_words = len(raw_bytes) // 4
-    if n_words < 2:
-        return jsonify({"error": "Lump file too short"}), 400
-
-    words = list(_struct.unpack(f'>{n_words}I', raw_bytes[:n_words * 4]))
-
-    hdr = words[0]
-    if (hdr >> 27) & 0x1F != 0x1F:
-        return jsonify({"error": "Bad lump magic in header word"}), 400
-
-    n_minus_6 = (hdr >> 23) & 0xF
-    cc        = hdr & 0xFF
-    lump_size = 1 << (n_minus_6 + 6)
-
-    if cc == 0:
-        return jsonify({"error": "Lump has no c-list (cc=0)"}), 400
-    if slot_index < 0 or slot_index >= cc:
-        return jsonify({"error": f"slot_index {slot_index} out of range (cc={cc})"}), 400
-    # Type-0 includes raw assembly and legacy architectural layouts.  Only a
-    # sidecar that explicitly records the compiler-owned __SELF__ contract makes
-    # row zero immutable.
-    _compiler_self_row = False
-    sidecar_path = _resolve_sidecar_path(key8, lumps_dir)
-    if sidecar_path:
-        try:
-            with open(sidecar_path, 'r') as _sfh:
-                _sidecar = json.load(_sfh)
-            _caps = _sidecar.get("capabilities", [])
-            _compiler_self_row = bool(
-                _sidecar.get("compiler_owned_self") is True or
-                (isinstance(_caps, list) and len(_caps) > 0 and
-                 isinstance(_caps[0], dict) and
-                 _caps[0].get("compiler_owned_self") is True and
-                 str(_caps[0].get("name", "")).upper() == "__SELF__")
-            )
-        except (OSError, ValueError, TypeError):
-            _compiler_self_row = False
-    if slot_index == 0 and _compiler_self_row:
-        return jsonify({
-            "error": (
-                "c-list row 0 is the immutable ordinary-abstraction self capability. "
-                "Install or recompile the LUMP to mint a new Namespace identity."
-            ),
-            "immutable_self_capability": True,
-            "slot": 0,
-        }), 422
-    if lump_size > n_words:
-        return jsonify({"error": "Lump size exceeds file length"}), 400
-
-    word_pos = lump_size - cc + slot_index
-    words[word_pos] = gt_word
-
-    new_bytes = _struct.pack(f'>{n_words}I', *words)
-    with open(lump_path, 'wb') as fh:
-        fh.write(new_bytes)
-
-    LAZY_LUMPS[key8] = new_bytes
-    LAZY_LUMPS[key8.lstrip('0') or '0'] = new_bytes
-
-    print(f'[clist PATCH] {key8} slot={slot_index} gt_word=0x{gt_word:08x}', flush=True)
-    return jsonify({"ok": True, "token": key8, "slot": slot_index, "gt_word": gt_word})
+    """Retired: approved LUMP binaries are immutable."""
+    return jsonify({
+        "error": "In-place LUMP patching is retired; save a new hash-approved revision"
+    }), 410
 
 
 def _lump_freespace_content(words):
@@ -10116,317 +9208,21 @@ def _lump_freespace_content(words):
     content_words counts the freespace words the frame occupies starting at
     word cw+1 (header + API + optional length word + source).
     """
-    if not words:
-        return None
-    hdr0 = words[0] & 0xFFFFFFFF
-    if (hdr0 >> 27) & 0x1F != 0x1F:
-        return None
-    size = 1 << (((hdr0 >> 23) & 0xF) + 6)
-    cw   = (hdr0 >> 10) & 0x1FFF
-    typ  = (hdr0 >> 8) & 0x3
-    cc   = hdr0 & 0xFF
-    if typ != 0:
-        return None
-    fs_start = 1 + cw
-    fs_end   = size - cc
-    if fs_start >= fs_end or fs_start >= len(words):
-        return None
-    h = words[fs_start] & 0xFFFFFFFF
-    if (h >> 24) & 0xFF != 0xAB:
-        return None
-    flags = (h >> 16) & 0xFF
-    # Valid flag bytes: 0x00 (Tier 0), 0x01/0x03 (Tier 1/2 uncompressed),
-    # 0x05/0x07 (Tier 1/2 deflate-raw compressed; bit 2 = compressed flag).
-    _tier_map = {0x00: 0, 0x01: 1, 0x03: 2, 0x05: 1, 0x07: 2}
-    tier  = _tier_map.get(flags)
-    if tier is None:
-        return None
-    api_len = h & 0xFFFF
-    if api_len == 0:
-        return None
-    api_nw  = (api_len + 3) // 4
-    if fs_start + 1 + api_nw > fs_end or fs_start + 1 + api_nw > len(words):
-        return None
-    try:
-        api_raw = _struct.pack(
-            f'>{api_nw}I',
-            *[w & 0xFFFFFFFF for w in words[fs_start + 1:fs_start + 1 + api_nw]]
-        )[:api_len]
-        api_definition = json.loads(api_raw.decode('utf-8'))
-        if not isinstance(api_definition, dict):
-            return None
-    except Exception:
-        return None
-    content = 1 + api_nw
-    source  = None
-    if flags & 0x01:
-        pos = fs_start + 1 + api_nw
-        if pos >= fs_end or pos >= len(words):
-            return None
-        src_len = words[pos] & 0xFFFFFFFF
-        src_nw  = (src_len + 3) // 4
-        if src_len == 0 or pos + 1 + src_nw > fs_end:
-            return None
-        raw = _struct.pack(f'>{src_nw}I',
-                           *[w & 0xFFFFFFFF for w in words[pos + 1:pos + 1 + src_nw]])[:src_len]
-        try:
-            if flags & 0x04:
-                # deflate-raw compressed (flags 0x05 or 0x07) — wbits=-15 matches
-                # the browser CompressionStream('deflate-raw') / JS _deflateRaw().
-                # Guard against decompression bombs: bound output to 256 KiB
-                # (far above the largest valid lump freespace of ~128 KiB).
-                import zlib as _zlib_fs
-                _MAX_DECOMP = 1 << 18   # 256 KiB
-                _d = _zlib_fs.decompressobj(wbits=-15)
-                _chunk = _d.decompress(raw, _MAX_DECOMP)
-                if _d.unconsumed_tail:
-                    return None   # reject oversized payloads silently
-                _rest = _d.flush()
-                if not _d.eof:
-                    return None   # truncated stream — reject silently
-                source = (_chunk + _rest).decode('utf-8')
-            else:
-                source = raw.decode('utf-8')
-        except Exception:
-            return None
-        content += 1 + src_nw
-    return {"tier": tier, "flags": flags, "api_len": api_len,
-            "content_words": content, "source": source,
-            "api_definition": api_definition}
+    return _parse_intrinsic_lump_content(words)
 
 
 @app.route("/api/lump/<token_hex>/resize", methods=["POST"])
 def resize_lump(token_hex):
-    """Repack a LUMP to its minimum power-of-2 size by removing freespace.
-
-    Keeps the code region (first cw words after the header) and c-list (last cc
-    words) intact; removes the unused freespace words between them.  The new
-    lump size is the smallest power of 2 >= (1 + cw + cc), minimum 64 words.
-
-    Two paths are supported:
-
-    * Standalone .lump files — read from the file, repack, write back, update
-      the sidecar JSON and manifest.
-
-    * Boot lump (token 00000600) embedded in boot-image.bin — repack the lump
-      in-place inside the binary memory image, update NS slot 6 words 1 and 2
-      (cr_limit and CRC-16/XMODEM seal), write boot-image.bin back, then
-      refresh LAZY_LUMPS and _BOOT_ABSTR_META via _load_boot_abstr_lump().
-
-    Lumps that do not fall into either category are rejected with a 400 error.
-    """
-    import math as _math
-    raw   = token_hex.lower()
-    key8  = (raw[:8] if len(raw) >= 8 else raw).zfill(8)
-    lumps_dir    = LUMPS_DIR
-    lump_path    = _resolve_lump_path(key8, lumps_dir)
-    sidecar_path = _resolve_sidecar_path(key8, lumps_dir)
-
-    # Special branch: boot lump embedded in boot-image.bin (token 00000600).
-    # There is no standalone .lump file for this token; resize it in-place inside
-    # the binary, update NS slot 6, then write the file back.
-    if not lump_path and key8 == '00000600' and _BOOT_ABSTR_META:
-        boot_path = BOOT_IMAGE_PATH
-        if not os.path.isfile(boot_path):
-            return jsonify({"error": "boot-image.bin not found"}), 400
-        with open(boot_path, 'rb') as fh:
-            raw = fh.read()
-        n_words = len(raw) // 4
-        if n_words < 1024:
-            return jsonify({"error": "boot-image.bin too small to contain NS table"}), 400
-        # boot-image.bin is little-endian, mirroring _load_boot_abstr_lump()
-        mem_bi = list(_struct.unpack(f'<{n_words}I', raw[:n_words * 4]))
-
-        # Locate Boot.Abstr NS entry via symbolic constants (NS_ENTRY_WORDS=4, BOOT_ABSTR_NS_SLOT=6).
-        # Never hardcode the slot number here — Boot.Abstr migrated from slot 3 to slot 6 and
-        # any hardcoded integer would silently read the wrong NS entry on the next migration.
-        _ns_entry_words  = _boot_image_gen.NS_ENTRY_WORDS      # 4 words per NS entry
-        _boot_abstr_slot = _boot_image_gen.BOOT_ABSTR_NS_SLOT  # 6 (was 3 before slot migration)
-        ns_table_base = n_words - 1024
-        boot_ns_base  = ns_table_base + _boot_abstr_slot * _ns_entry_words
-        word0_location = mem_bi[boot_ns_base]
-        if word0_location == 0 or word0_location + 1 >= n_words:
-            return jsonify({"error": f"Boot.Abstr (NS slot {_boot_abstr_slot}) location is invalid"}), 400
-
-        # Parse lump header (little-endian word, same bit layout as big-endian .lump)
-        hdr = mem_bi[word0_location]
-        if (hdr >> 27) & 0x1F != 0x1F:
-            return jsonify({"error": "Bad lump magic in boot lump header"}), 400
-        n_minus_6 = (hdr >> 23) & 0xF
-        cw        = (hdr >> 10) & 0x1FFF
-        cc        = hdr & 0xFF
-        typ       = (hdr >> 8) & 0x3
-        old_size  = 1 << (n_minus_6 + 6)
-
-        if word0_location + old_size > n_words:
-            return jsonify({"error": "Boot lump region extends beyond boot-image.bin"}), 400
-
-        # V1.3: a self-defining lump's 0xAB content frame (word cw+1 …) must
-        # survive the repack — it is declared content, not reclaimable zeros.
-        _lump_words_bi = mem_bi[word0_location:word0_location + old_size]
-        _fs_bi = _lump_freespace_content(_lump_words_bi)
-        _content_nw_bi = _fs_bi["content_words"] if _fs_bi else 0
-
-        # Compute minimum size (same formula as standalone path, plus the
-        # content frame when present)
-        min_content = 1 + cw + _content_nw_bi + cc
-        new_n = max(6, _math.ceil(_math.log2(max(min_content, 2))))
-        new_n = min(new_n, 14)
-        new_size = 1 << new_n
-
-        if new_size >= old_size:
-            return jsonify({"ok": True, "already_minimal": True,
-                            "lump_size": old_size, "cw": cw, "cc": cc})
-
-        # Capture code, content frame and c-list from the current lump region
-        code_words  = mem_bi[word0_location + 1 : word0_location + 1 + cw]
-        frame_words = (mem_bi[word0_location + 1 + cw :
-                              word0_location + 1 + cw + _content_nw_bi]
-                       if _content_nw_bi else [])
-        clist_words = (mem_bi[word0_location + old_size - cc : word0_location + old_size]
-                       if cc > 0 else [])
-
-        # Repack lump in-place: header | code | content frame | zeros | c-list
-        freespace = new_size - 1 - cw - _content_nw_bi - cc
-        mem_bi[word0_location] = _pack_lump_header(new_n - 6, cw, cc, typ)
-        for i, w in enumerate(code_words + frame_words):
-            mem_bi[word0_location + 1 + i] = int(w) & 0xFFFFFFFF
-        for i in range(freespace):
-            mem_bi[word0_location + 1 + cw + _content_nw_bi + i] = 0
-        for i, w in enumerate(clist_words):
-            mem_bi[word0_location + new_size - cc + i] = int(w) & 0xFFFFFFFF
-        # Zero the freed tail of the old lump region
-        for i in range(new_size, old_size):
-            mem_bi[word0_location + i] = 0
-
-        # Update Boot.Abstr NS entry word 1 (new cr_limit) and word 2 (recomputed seal)
-        new_cr_limit = new_size - cc - 1
-        mem_bi[boot_ns_base + 1] = _boot_image_gen.pack_ns_word1(
-            new_cr_limit, 0, 0, 0)
-        mem_bi[boot_ns_base + 2] = _boot_image_gen.integrity32(
-            word0_location, mem_bi[boot_ns_base + 1])
-
-        # Serialize back to little-endian bytes and write boot-image.bin
-        new_bytes = _struct.pack(f'<{n_words}I', *[int(w) & 0xFFFFFFFF for w in mem_bi])
-        with open(boot_path, 'wb') as fh:
-            fh.write(new_bytes)
-
-        # Refresh LAZY_LUMPS and _BOOT_ABSTR_META / _BOOT_NS_META from the updated file
-        _load_boot_abstr_lump()
-        _load_boot_ns_lump()
-
-        # Sanity check: validate the updated image
-        try:
-            _boot_image_gen.validate_boot_image(new_bytes)
-        except ValueError as ve:
-            return jsonify({"error": f"Post-resize validation failed: {ve}"}), 500
-
-        saved = old_size - new_size
-        print(f'[lump/resize] boot-image 00000600: {old_size}w → {new_size}w '
-              f'(cw={cw}, cc={cc}, cr_limit={new_cr_limit}, saved {saved}w)', flush=True)
-        return jsonify({"ok": True, "already_minimal": False,
-                        "old_size": old_size, "lump_size": new_size,
-                        "cw": cw, "cc": cc, "saved_words": saved})
-
-    if not os.path.isfile(lump_path):
-        return jsonify({"error": f"Lump {key8} has no standalone file — only standalone lumps can be resized"}), 400
-
-    data = LAZY_LUMPS.get(key8)
-    if data is None:
-        with open(lump_path, 'rb') as fh:
-            data = fh.read()
-
-    num_words = len(data) // 4
-    if num_words < 1:
-        return jsonify({"error": "Lump data is too short"}), 400
-
-    words = list(_struct.unpack(f'>{num_words}I', data[:num_words * 4]))
-    hdr = words[0]
-    if (hdr >> 27) & 0x1F != 0x1F:
-        return jsonify({"error": "Bad lump magic in header word"}), 400
-
-    n_minus_6 = (hdr >> 23) & 0xF
-    cw        = (hdr >> 10) & 0x1FFF
-    cc        = hdr & 0xFF
-    typ       = (hdr >> 8) & 0x3
-    old_size  = 1 << (n_minus_6 + 6)
-
-    if old_size != num_words:
-        return jsonify({"error": f"Header size mismatch: header says {old_size}w, file has {num_words}w"}), 400
-
-    # V1.3: preserve the 0xAB self-definition frame (word cw+1 …) — declared
-    # content is never zeroed, and the minimum size must accommodate it.
-    _fs_rs = _lump_freespace_content(words)
-    _content_nw = _fs_rs["content_words"] if _fs_rs else 0
-
-    # Minimum lump size: header + code + content frame + c-list, rounded up
-    # to next power of 2, min 64.
-    min_content = 1 + cw + _content_nw + cc
-    new_n = max(6, _math.ceil(_math.log2(max(min_content, 2))))
-    new_n = min(new_n, 14)
-    new_size = 1 << new_n
-
-    if new_size >= old_size:
-        return jsonify({"ok": True, "already_minimal": True,
-                        "lump_size": old_size, "cw": cw, "cc": cc})
-
-    # Re-pack: new header | code | content frame | freespace zeros | c-list.
-    code_words  = words[1:1 + cw]
-    frame_words = words[1 + cw:1 + cw + _content_nw] if _content_nw else []
-    clist_words = words[old_size - cc:old_size] if cc > 0 else []
-    freespace   = new_size - 1 - cw - _content_nw - cc
-    new_words   = [_pack_lump_header(new_n - 6, cw, cc, typ)]
-    new_words  += code_words
-    new_words  += frame_words
-    new_words  += [0] * freespace
-    new_words  += clist_words
-
-    if len(new_words) != new_size:
-        return jsonify({"error": f"Internal repack error: got {len(new_words)} words, expected {new_size}"}), 500
-
-    lump_bytes = _struct.pack(f'>{new_size}I', *[int(w) & 0xFFFFFFFF for w in new_words])
-    with open(lump_path, 'wb') as fh:
-        fh.write(lump_bytes)
-    LAZY_LUMPS[key8] = lump_bytes
-    LAZY_LUMPS[key8.lstrip('0') or '0'] = lump_bytes
-
-    # Update sidecar JSON.
-    sidecar = {}
-    if os.path.isfile(sidecar_path):
-        try:
-            with open(sidecar_path, 'r') as fh:
-                sidecar = json.load(fh)
-        except Exception:
-            pass
-    sidecar['lump_size'] = new_size
-    with open(sidecar_path, 'w') as fh:
-        json.dump(sidecar, fh, indent=2)
-
-    # Update manifest entry if present.
-    manifest_path = os.path.join(lumps_dir, 'manifest.json')
-    try:
-        manifest = _read_manifest_safe(manifest_path)
-    except ValueError as _mf_rsz_err:
-        return jsonify({"error": (
-            "manifest.json is corrupt and cannot be read safely. "
-            f"Details: {_mf_rsz_err}"
-        )}), 500
-    for entry in manifest:
-        if entry.get('token') == key8:
-            entry['lump_size'] = new_size
-            break
-    _atomic_write_json(manifest_path, manifest)
-
-    print(f'[lump/resize] {key8}: {old_size}w → {new_size}w (cw={cw}, cc={cc}, saved {old_size - new_size}w)', flush=True)
-    return jsonify({"ok": True, "already_minimal": False,
-                    "old_size": old_size, "lump_size": new_size,
-                    "cw": cw, "cc": cc, "saved_words": old_size - new_size})
+    """Retired: resizing would mutate hash-bound bytes."""
+    return jsonify({
+        "error": "In-place LUMP mutation is retired; save a new hash-approved revision"
+    }), 410
 
 
 @app.route("/api/lumps/import", methods=["POST"])
 def import_lump():
-    """Pack an uploaded file (base64) into a data LUMP and save with sidecar."""
-    import base64 as _b64, math as _math, datetime as _dt, hashlib as _hl
+    """Pack uploaded content as an unapproved data LUMP."""
+    import base64 as _b64, math as _math, hashlib as _hl
     payload = request.get_json(force=True, silent=True)
     if not payload:
         return jsonify({"error": "Invalid JSON"}), 400
@@ -10461,46 +9257,19 @@ def import_lump():
     all_words  = ([header] + data_words)[:lump_size]
     all_words += [0] * max(0, lump_size - len(all_words))
 
-    payload_hash = _hl.sha256(raw_bytes).hexdigest()[:4]
-    token8 = (_hl.sha256(name.encode('utf-8')).hexdigest()[:4] + payload_hash)
-
     lumps_dir  = LUMPS_DIR
     os.makedirs(lumps_dir, exist_ok=True)
 
     lump_bytes = _struct.pack(f'>{lump_size}I', *[int(w) & 0xFFFFFFFF for w in all_words])
+    token8 = _hl.sha256(lump_bytes).hexdigest()[:8]
     lump_path  = os.path.join(lumps_dir, f'{token8}.lump')
     with open(lump_path, 'wb') as fh:
         fh.write(lump_bytes)
     LAZY_LUMPS[token8] = lump_bytes
     LAZY_LUMPS[token8.lstrip('0') or '0'] = lump_bytes
 
-    sidecar = {
-        "token":        token8,
-        "abstraction":  name,
-        "ns_slot":      None,
-        "lump_size":    lump_size,
-        "typ":          1,
-        "content_type": content_type,
-        "lump_type":    "data",
-        "cw":           cw,
-        "cc":           0,
-        "profile":      "IoT",
-        "language":     "imported",
-        "methods":      [],
-        "capabilities": [],
-        "pet_names":    {"DR": {}, "CR": {}},
-        "mtbf":         {"consecutive_clean": 0, "total_runs": 0, "status": "unknown", "source_hash": ""},
-        "deployment":   {"target_board": "wukong-xc7a100t", "profile": "IoT",
-                         "built_at": _dt.datetime.utcnow().isoformat() + "Z",
-                         "builder": "IDE Import"},
-        "grants":       ["E"],
-    }
-    if img_width  > 0: sidecar["image_width"]  = img_width
-    if img_height > 0: sidecar["image_height"] = img_height
-
-    sidecar_path = os.path.join(lumps_dir, f'{token8}.json')
-    with open(sidecar_path, 'w') as fh:
-        json.dump(sidecar, fh, indent=2)
+    # Upload creates an unapproved artifact. Explicit approval intent is
+    # required before it can be trusted, deployed, or identified.
 
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
     try:
@@ -10512,9 +9281,8 @@ def import_lump():
             f"Details: {_mf_imp_err}"
         )}), 500
     manifest = [e for e in manifest if e.get('token') != token8]
-    manifest.append({"token": token8, "abstraction": name, "ns_slot": None,
-                      "lump_size": lump_size, "cw": cw, "cc": 0,
-                      "methods": [], "grants": ["E"]})
+    manifest.append({"token": token8, "filename": f"{token8}.lump",
+                     "abstraction": name})
     _atomic_write_json(manifest_path, manifest)
 
     print(f'[lumps/import] {token8} content_type={content_type} {len(lump_bytes)}B', flush=True)
@@ -10523,8 +9291,8 @@ def import_lump():
 
 @app.route("/api/lumps/upload-lump", methods=["POST"])
 def upload_lump_file():
-    """Import a raw .lump binary file as-is; parse its header to populate sidecar."""
-    import base64 as _b64, datetime as _dt, hashlib as _hl
+    """Store an exact raw LUMP as an unapproved artifact."""
+    import base64 as _b64, hashlib as _hl
     payload = request.get_json(force=True, silent=True)
     if not payload:
         return jsonify({"error": "Invalid JSON"}), 400
@@ -10551,14 +9319,14 @@ def upload_lump_file():
     n         = n_minus_6 + 6
     expected_size = 1 << n
 
-    if len(raw_bytes) > expected_size * 4:
-        return jsonify({"error": f"File size ({len(raw_bytes)} B) exceeds LUMP header size 2^{n}={expected_size} words"}), 400
-    if len(raw_bytes) < 4:
-        return jsonify({"error": "LUMP must contain at least a header word"}), 400
+    if len(raw_bytes) != expected_size * 4:
+        return jsonify({"error": (
+            f"File size ({len(raw_bytes)} B) must exactly match LUMP header "
+            f"allocation 2^{n}={expected_size} words"
+        )}), 400
 
-    # Pad to full declared lump size
     lump_size  = expected_size
-    lump_bytes = raw_bytes + b'\x00' * max(0, lump_size * 4 - len(raw_bytes))
+    lump_bytes = raw_bytes
 
     # Map typ bits to metadata
     _TYP_MAP = {
@@ -10581,37 +9349,7 @@ def upload_lump_file():
     LAZY_LUMPS[token8] = lump_bytes
     LAZY_LUMPS[token8.lstrip('0') or '0'] = lump_bytes
 
-    sidecar = {
-        "token":        token8,
-        "abstraction":  name,
-        "ns_slot":      None,
-        "lump_size":    lump_size,
-        "typ":          typ,
-        "content_type": content_type,
-        "lump_type":    lump_type,
-        "cw":           cw,
-        "cc":           cc,
-        "profile":      "IoT",
-        "language":     "imported",
-        "methods":      [],
-        "capabilities": [],
-        "pet_names":    {"DR": {}, "CR": {}},
-        "mtbf":         {"consecutive_clean": 0, "total_runs": 0, "status": "unknown", "source_hash": ""},
-        "deployment":   {"target_board": "wukong-xc7a100t", "profile": "IoT",
-                         "built_at": _dt.datetime.utcnow().isoformat() + "Z",
-                         "builder": "IDE LUMP Upload"},
-        "grants":       ["E"],
-    }
-    # V1.3: derive sourceStorageTier from the uploaded binary's freespace
-    # content header; absent = legacy (all-zero freespace).
-    _fs_upl = _lump_freespace_content(
-        list(_struct.unpack(f'>{lump_size}I', lump_bytes)))
-    if _fs_upl is not None:
-        sidecar["sourceStorageTier"] = _fs_upl["tier"]
-
-    sidecar_path = os.path.join(lumps_dir, f'{token8}.json')
-    with open(sidecar_path, 'w') as fh:
-        json.dump(sidecar, fh, indent=2)
+    # Raw import intentionally remains unapproved.
 
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
     try:
@@ -10623,9 +9361,8 @@ def upload_lump_file():
             f"Details: {_mf_upl_err}"
         )}), 500
     manifest = [e for e in manifest if e.get('token') != token8]
-    manifest.append({"token": token8, "abstraction": name, "ns_slot": None,
-                      "lump_size": lump_size, "cw": cw, "cc": cc,
-                      "methods": [], "grants": ["E"]})
+    manifest.append({"token": token8, "filename": f"{token8}.lump",
+                     "abstraction": name})
     _atomic_write_json(manifest_path, manifest)
 
     print(f'[lumps/upload-lump] {token8} typ={typ} ({lump_type}) n={n} cw={cw} cc={cc} {len(lump_bytes)}B', flush=True)
@@ -10822,47 +9559,14 @@ def build_namespace():
             'Content-Disposition': f'attachment; filename="{safe_name}.namespace.zip"',
         })
 
-    sidecar = {
-        "token": _hashlib.sha256(app_id.encode()).hexdigest()[:8],
-        "abstraction": app_id,
-        "ns_slot": None,
-        "lump_size": lump_size,
-        "cw": 0,
-        "cc": cc,
-        "typ": 10,
-        "lump_type": "namespace",
-        "profile": "IoT",
-        "language": "namespace",
-        "methods": [],
-        "capabilities": [],
-        "pet_names": {"DR": {}, "CR": {}},
-        "mtbf": {"consecutive_clean": 0, "total_runs": 0, "status": "unknown", "source_hash": ""},
-        "deployment": {
-            "target_board": "wukong-xc7a100t",
-            "profile": "IoT",
-            "built_at": _dt.datetime.utcnow().isoformat() + "Z",
-            "builder": "CLOOMC++ IDE v1.0"
-        },
-        "grants": [],
-        "namespace_meta": {
-            "app_id": app_id,
-            "base": f"0x{base_addr:08X}",
-            "n": n,
-            "cc": cc,
-            "ns_table_start": ns_table_start,
-            "entries": manifest_entries,
-        }
-    }
-    token8 = sidecar["token"]
+    token8 = _hashlib.sha256(app_bin).hexdigest()[:8]
     os.makedirs(lumps_dir, exist_ok=True)
 
     lump_path = os.path.join(lumps_dir, f'{token8}.lump')
     with open(lump_path, 'wb') as fh:
         fh.write(app_bin)
 
-    sidecar_path = os.path.join(lumps_dir, f'{token8}.json')
-    with open(sidecar_path, 'w') as fh:
-        json.dump(sidecar, fh, indent=2)
+    # Imported Namespace artifacts remain unapproved until explicitly reviewed.
 
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
     try:
@@ -10877,13 +9581,7 @@ def build_namespace():
     manifest.append({
         "token": token8,
         "abstraction": app_id,
-        "ns_slot": None,
-        "lump_size": lump_size,
-        "cw": 0,
-        "cc": cc,
-        "typ": 10,
-        "methods": [],
-        "grants": [],
+        "filename": f"{token8}.lump",
     })
     _atomic_write_json(manifest_path, manifest)
 
@@ -10902,15 +9600,11 @@ def delete_lump(token):
     lumps_dir = LUMPS_DIR
 
     lump_path    = _resolve_lump_path(token8, lumps_dir)
-    sidecar_path = _resolve_sidecar_path(token8, lumps_dir)
     deleted = []
 
     if lump_path and os.path.isfile(lump_path):
         os.remove(lump_path)
         deleted.append(os.path.basename(lump_path))
-    if sidecar_path and os.path.isfile(sidecar_path):
-        os.remove(sidecar_path)
-        deleted.append(os.path.basename(sidecar_path))
 
     LAZY_LUMPS.pop(token8, None)
     LAZY_LUMPS.pop(token8.lstrip('0') or '0', None)
@@ -16154,16 +14848,12 @@ def _ba_check_report_token():
 def _ba_read_lump_header(path):
     """Return (header_word, cw, cc) or None if file is missing/invalid."""
     try:
-        with open(path, 'rb') as f:
-            raw = f.read(4)
-        if len(raw) < 4:
+        inspected = _inspect_lump_binary(path)
+        if _matching_lump_approval(
+                os.path.dirname(os.path.abspath(path)),
+                inspected["binary_hash"]) is None:
             return None
-        w = _ba_struct.unpack('>I', raw)[0]
-        if ((w >> 27) & 0x1F) != 0x1F:
-            return None
-        cw = (w >> 10) & 0x1FFF
-        cc = w & 0xFF
-        return w, cw, cc
+        return inspected["header"], inspected["cw"], inspected["cc"]
     except Exception:
         return None
 
@@ -16511,14 +15201,8 @@ def _ba_build_ns_map():
             if hdr:
                 checks.append({'label': 'header', 'ok': True,
                                 'detail': f'Header valid: 0x{hdr[0]:08X}  cw={hdr[1]} cc={hdr[2]}'})
-                # 1b. cw/cc match manifest
-                if manifest_entry:
-                    m_cw = manifest_entry.get('cw')
-                    m_cc = manifest_entry.get('cc')
-                    cw_ok = (m_cw is None) or (hdr[1] == m_cw)
-                    cc_ok = (m_cc is None) or (hdr[2] == m_cc)
-                    checks.append({'label': 'cw/cc', 'ok': cw_ok and cc_ok,
-                                   'detail': f'binary cw={hdr[1]} cc={hdr[2]} vs manifest cw={m_cw} cc={m_cc}'})
+                checks.append({'label': 'cw/cc', 'ok': True,
+                               'detail': f'binary cw={hdr[1]} cc={hdr[2]}'})
                 # 1c. md5 (token parity — we just verify file is readable with correct magic)
                 md5 = _ba_md5_file(lump_path)
                 checks.append({'label': 'binary', 'ok': md5 is not None,
@@ -16530,22 +15214,7 @@ def _ba_build_ns_map():
             checks.append({'label': 'file', 'ok': False,
                             'detail': f'LUMP binary not found: {lump_path}'})
 
-        # 2. Name parity (manifest abstraction vs JSON .json sidecar if present)
-        if manifest_entry and token:
-            json_path = os.path.join(_LUMPS_DIR, token + '.json')
-            if os.path.exists(json_path):
-                try:
-                    with open(json_path) as jf:
-                        jdata = json.load(jf)
-                    m_name = manifest_entry.get('abstraction', '')
-                    j_name = jdata.get('abstraction', jdata.get('name', ''))
-                    name_ok = (not m_name or not j_name or m_name == j_name)
-                    checks.append({'label': 'name parity', 'ok': name_ok,
-                                   'detail': f'manifest="{m_name}" sidecar="{j_name}"'})
-                except Exception:
-                    pass
-
-        # 3. Token parity — manifest token should match filename
+        # Token parity — manifest token should match the committed state token.
         if manifest_entry and token:
             m_token = manifest_entry.get('token', '')
             token_ok = (not m_token) or (m_token.lower() == token.lower())
@@ -16744,58 +15413,32 @@ def _ba_build_ns_map():
 def _resolve_lump_path(token8, lumps_dir=None):
     """Return the filesystem path to a token's .lump file, or None.
 
-    Checks the token-named file first (fast path for token-native lumps and
-    symlinks), then falls back to the manifest 'filename' field for lumps that
-    were migrated to canonical ``DotName.N.hash.lump`` names.
+    The manifest filename is the locator authority.  A token-named legacy file
+    is considered only when no manifest row exists for the token.
     """
     if not token8:
         return None
     if lumps_dir is None:
         lumps_dir = _LUMPS_DIR
+    manifest_path = os.path.join(lumps_dir, 'manifest.json')
+    try:
+        manifest = _read_manifest_safe(manifest_path)
+        matches = [
+            entry for entry in manifest
+            if isinstance(entry, dict) and entry.get('token') == token8
+        ]
+        if len(matches) != 1:
+            return None
+        fn = matches[0].get('filename', '')
+        if fn:
+            p = os.path.join(lumps_dir, fn)
+            if os.path.isfile(p):
+                return p
+    except Exception:
+        return None
     token_path = os.path.join(lumps_dir, token8 + '.lump')
     if os.path.isfile(token_path):
         return token_path
-    # Fall back to manifest canonical filename
-    manifest_path = os.path.join(lumps_dir, 'manifest.json')
-    try:
-        manifest = _read_manifest_safe(manifest_path)
-        for entry in manifest:
-            if entry.get('token') == token8:
-                fn = entry.get('filename', '')
-                if fn:
-                    p = os.path.join(lumps_dir, fn)
-                    if os.path.isfile(p):
-                        return p
-    except Exception:
-        pass
-    return None
-
-
-def _resolve_sidecar_path(token8, lumps_dir=None):
-    """Return the filesystem path to a token's .json sidecar, or None.
-
-    Checks the token-named file first, then falls back to the manifest
-    'sidecar_file' field for canonically-renamed lumps.
-    """
-    if not token8:
-        return None
-    if lumps_dir is None:
-        lumps_dir = _LUMPS_DIR
-    token_path = os.path.join(lumps_dir, token8 + '.json')
-    if os.path.isfile(token_path):
-        return token_path
-    manifest_path = os.path.join(lumps_dir, 'manifest.json')
-    try:
-        manifest = _read_manifest_safe(manifest_path)
-        for entry in manifest:
-            if entry.get('token') == token8:
-                sf = entry.get('sidecar_file', '')
-                if sf:
-                    p = os.path.join(lumps_dir, sf)
-                    if os.path.isfile(p):
-                        return p
-    except Exception:
-        pass
     return None
 
 
@@ -17545,13 +16188,11 @@ def _commit_lump_history_transition(
     manifest_entry: dict,
     binary_filename: str | None = None,
     binary_bytes: bytes | None = None,
-    sidecar_filename: str | None = None,
-    sidecar: dict | None = None,
+    approval_hash: str | None = None,
+    approval: dict | None = None,
     archive_stem: str | None = None,
     archive_version: int | None = None,
     archive_binary_path: str | None = None,
-    archive_sidecar: dict | None = None,
-    archive_sidecar_path: str | None = None,
     remove_paths: tuple[str, ...] = (),
     compat_old_filename: str | None = None,
     compat_new_filename: str | None = None,
@@ -17565,9 +16206,9 @@ def _commit_lump_history_transition(
 ) -> dict:
     """Atomically commit one LUMP history transition.
 
-    Save, WIP, and fork all have the same persistence shape: optionally archive
-    the old current pair, optionally install a new current pair, and replace
-    the manifest entry.  Every destination is staged before any destination is
+    Save and fork have the same persistence shape: optionally archive the old
+    binary, optionally install a new binary, atomically record its hash-bound
+    approval, and replace the manifest entry. Every destination is staged before any destination is
     changed.  During commit, existing destinations are moved to private
     backups; any exception restores those backups and removes newly-created
     files.  Archive names are never overwritten: a colliding archive version
@@ -17593,7 +16234,6 @@ def _commit_lump_history_transition(
                 if expected_manifest_entry is None
                 else (
                     expected_manifest_entry.get("filename"),
-                    expected_manifest_entry.get("sidecar_file"),
                     expected_manifest_entry.get("lump_version"),
                 )
             )
@@ -17602,30 +16242,14 @@ def _commit_lump_history_transition(
                 if locked_entry is None
                 else (
                     locked_entry.get("filename"),
-                    locked_entry.get("sidecar_file"),
                     locked_entry.get("lump_version"),
                 )
             )
             if locked_state != expected_state:
                 if idempotent_if_forked and locked_entry is not None:
-                    locked_sidecar_name = locked_entry.get("sidecar_file")
-                    locked_sidecar = {}
-                    if locked_sidecar_name:
-                        locked_sidecar_path = _lump_transition_path(
-                            lumps_dir, locked_sidecar_name
-                        )
-                        if os.path.isfile(locked_sidecar_path):
-                            try:
-                                with open(locked_sidecar_path) as locked_sidecar_fh:
-                                    locked_sidecar = json.load(locked_sidecar_fh)
-                            except (OSError, ValueError, TypeError):
-                                locked_sidecar = {}
-                    if locked_entry.get("forked") or locked_sidecar.get("forked"):
+                    if locked_entry.get("forked"):
                         live_version = int(
-                            locked_sidecar.get(
-                                "lump_version",
-                                locked_entry.get("lump_version", 0),
-                            )
+                            locked_entry.get("lump_version", 0)
                         )
                         return {
                             "version": live_version - 1,
@@ -17672,7 +16296,6 @@ def _commit_lump_history_transition(
 
         try:
             archive_lump_dest = None
-            archive_sidecar_dest = None
             archive_source = archive_binary_path
             archive_requested = (
                 archive_stem is not None
@@ -17684,50 +16307,20 @@ def _commit_lump_history_transition(
                 archive_version = int(archive_version)
                 if archive_version < 0:
                     raise ValueError("archive version must be non-negative")
-                # Reserve a pair together.  A pre-existing binary or sidecar
-                # makes the whole version unavailable; neither is overwritten.
+                # Archive names are immutable and never overwritten.
                 while True:
                     archive_lump_name = f"{archive_stem}_v{archive_version}.lump"
-                    archive_sidecar_name = f"{archive_stem}_v{archive_version}.json"
                     archive_lump_dest = _destination(archive_lump_name)
-                    archive_sidecar_dest = _destination(archive_sidecar_name)
                     same_lump = os.path.abspath(archive_source) == os.path.abspath(archive_lump_dest)
-                    same_sidecar = (
-                        archive_sidecar_path is not None
-                        and os.path.abspath(archive_sidecar_path)
-                        == os.path.abspath(archive_sidecar_dest)
-                    )
-                    if (
-                        (not os.path.lexists(archive_lump_dest) or same_lump)
-                        and (not os.path.lexists(archive_sidecar_dest) or same_sidecar)
-                    ):
+                    if not os.path.lexists(archive_lump_dest) or same_lump:
                         break
                     archive_version += 1
 
                 if os.path.abspath(archive_source) != os.path.abspath(archive_lump_dest):
                     staged.append((archive_lump_dest, _stage_copy(archive_source, ".lump")))
-                if archive_sidecar is not None:
-                    with open(archive_source, "rb") as archive_fh:
-                        archive_bytes = archive_fh.read()
-                    archive_sidecar_out = dict(archive_sidecar)
-                    archive_sidecar_out["archived_version"] = archive_version
-                    archive_sidecar_out["filename"] = archive_lump_name
-                    archive_sidecar_out["sidecar_file"] = archive_sidecar_name
-                    archive_sidecar_out["binary_hash"] = hashlib.sha256(
-                        archive_bytes
-                    ).hexdigest()
-                    staged.append(
-                        (archive_sidecar_dest, _stage_json(archive_sidecar_out))
-                    )
-                elif archive_sidecar_path and os.path.isfile(archive_sidecar_path):
-                    if os.path.abspath(archive_sidecar_path) != os.path.abspath(archive_sidecar_dest):
-                        staged.append(
-                            (archive_sidecar_dest, _stage_copy(archive_sidecar_path, ".json"))
-                        )
                 archive_info = {
                     "version": archive_version,
                     "lump": archive_lump_name,
-                    "sidecar": archive_sidecar_name,
                 }
 
             if versioned_current_stem is not None:
@@ -17739,31 +16332,19 @@ def _commit_lump_history_transition(
                 next_version = version_base + 1
                 while True:
                     candidate_binary = f"{versioned_current_stem}_v{next_version}.lump"
-                    candidate_sidecar = f"{versioned_current_stem}_v{next_version}.json"
                     candidate_binary_path = _destination(candidate_binary)
-                    candidate_sidecar_path = _destination(candidate_sidecar)
-                    if (
-                        not os.path.lexists(candidate_binary_path)
-                        and not os.path.lexists(candidate_sidecar_path)
-                    ):
+                    if not os.path.lexists(candidate_binary_path):
                         break
                     next_version += 1
                 binary_filename = candidate_binary
-                sidecar_filename = candidate_sidecar
-                sidecar = dict(sidecar or {})
-                sidecar["filename"] = binary_filename
-                sidecar["sidecar_file"] = sidecar_filename
-                sidecar["lump_version"] = next_version
                 manifest_entry = dict(manifest_entry)
                 manifest_entry["filename"] = binary_filename
-                manifest_entry["sidecar_file"] = sidecar_filename
                 manifest_entry["lump_version"] = next_version
                 if archive_info is None:
                     archive_info = {}
                 archive_info.update({
                     "next_version": next_version,
                     "current_lump": binary_filename,
-                    "current_sidecar": sidecar_filename,
                 })
             elif advance_current_version_from_archive:
                 if archive_info is None:
@@ -17771,9 +16352,6 @@ def _commit_lump_history_transition(
                 next_version = archive_info["version"] + 1
                 manifest_entry = dict(manifest_entry)
                 manifest_entry["lump_version"] = next_version
-                if sidecar is not None:
-                    sidecar = dict(sidecar)
-                    sidecar["lump_version"] = next_version
                 archive_info["next_version"] = next_version
 
             if binary_filename is not None:
@@ -17782,22 +16360,25 @@ def _commit_lump_history_transition(
                 staged.append(
                     (_destination(binary_filename), _stage_bytes(binary_bytes, ".lump"))
                 )
-            if sidecar_filename is not None:
-                if sidecar is None:
-                    raise ValueError("sidecar is required with sidecar_filename")
-                staged.append(
-                    (_destination(sidecar_filename), _stage_json(sidecar))
-                )
+            if (approval_hash is None) != (approval is None):
+                raise ValueError("approval_hash and approval are required together")
+            if approval_hash is not None:
+                if not re.fullmatch(r"[0-9a-f]{64}", approval_hash):
+                    raise ValueError("approval_hash must be a SHA-256 digest")
+                approval_out = dict(approval)
+                if approval_out.get("binary_hash") != approval_hash:
+                    raise ValueError("approval must be bound to approval_hash")
+                # The endpoint derives this verified locator after all dynamic
+                # version/archive naming has settled. It is never accepted
+                # from an approval intent or client metadata.
+                approval_out["filename"] = manifest_entry.get("filename")
+                approvals = _read_lump_approvals(lumps_dir)
+                approvals[approval_hash] = approval_out
+                staged.append((_destination(_LUMP_APPROVALS_FILENAME), _stage_json({
+                    "version": 1, "algorithm": "sha256", "approvals": approvals,
+                })))
 
             updated_manifest = [entry for entry in locked_manifest if entry.get("token") != token8]
-            if variant_group is not None and ns_slot is not None:
-                for previous in updated_manifest:
-                    if (
-                        previous.get("abstraction") == manifest_entry.get("abstraction")
-                        and previous.get("ns_slot") == ns_slot
-                        and not previous.get("variant_group")
-                    ):
-                        previous["variant_group"] = variant_group
             updated_manifest.append(dict(manifest_entry))
             manifest_stage = _stage_json(updated_manifest)
             staged.append((_destination(os.path.basename(manifest_path)), manifest_stage))

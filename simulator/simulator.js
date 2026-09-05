@@ -4350,6 +4350,7 @@ class ChurchSimulator {
                 sequence: w1.gtSeq,
                 authorized: identity.authorized,
                 verified: true,
+                approved: true,
             });
         }
         return candidates;
@@ -9016,6 +9017,7 @@ class ChurchSimulator {
                 ns_slot: abstrSlot,
                 sequence: this._nsSequenceForWrite(abstrSlot),
                 authorized: true,
+                approved: true,
                 verified: !!(options.portableOwnerCandidate &&
                     options.portableOwnerCandidate.verified === true),
                 binary_hash: options.portableOwnerCandidate && options.portableOwnerCandidate.binary_hash,
@@ -9028,9 +9030,6 @@ class ChurchSimulator {
                 selfCandidate: ownerCandidate,
                 ownerCandidate,
                 baseWords: baseRows,
-                trustPolicy: options.portableTrustPolicy || 'strong',
-                requireVerifiedCandidates: true,
-                authorizeLegacy: options.authorizeLegacyPortable,
                 mintGT: (sequence, slot, rights, type) => {
                     const grants = Object.fromEntries(['R', 'W', 'X', 'L', 'S', 'E']
                         .map(right => [right, rights.includes(right) ? 1 : 0]));

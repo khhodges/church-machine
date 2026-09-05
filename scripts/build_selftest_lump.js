@@ -3,10 +3,7 @@
 //
 // Assembles simulator/examples/post_flash_selftest.cloomc using the production
 // ChurchAssembler (simulator/assembler.js), packs the result into a valid LUMP
-// binary, and writes:
-//
-//   server/lumps/<token>.lump   — binary (big-endian 32-bit words)
-//   server/lumps/<token>.json   — sidecar metadata
+// binary and writes server/lumps/<token>.lump.
 //
 // The token is the CRC-32 of all binary bytes, lower-cased 8-hex-char string.
 // The manifest.json entry is printed to stdout for manual insertion or patch.
@@ -28,7 +25,7 @@ const SOURCE      = path.join(ROOT, 'simulator', 'examples', 'post_flash_selftes
 
 const lumpsDirArgIdx = process.argv.indexOf('--lumps-dir');
 
-// --out-dir <path>: redirect .lump/.json/manifest writes to a different
+// --out-dir <path>: redirect .lump/manifest writes to a different
 // directory (used by CI to validate without touching server/lumps/).
 const _outDirIdx  = process.argv.indexOf('--out-dir');
 const LUMPS_DIR = (_outDirIdx !== -1 && process.argv[_outDirIdx + 1])
@@ -72,6 +69,21 @@ if (result.errors.length > 0) {
 
 const words = result.words;
 console.log(`Assembled ${words.length} instruction words.`);
+function contentFrame(name, text) {
+    const api = Buffer.from(JSON.stringify({ name, methods: [] }), 'utf8');
+    const src = Buffer.from(text, 'utf8');
+    const bytes = Buffer.concat([
+        Buffer.from([0xAB, 0x03, api.length >>> 8, api.length & 0xFF]), api,
+        Buffer.alloc((4 - api.length % 4) % 4),
+        Buffer.from([(src.length >>> 24) & 0xFF, (src.length >>> 16) & 0xFF,
+            (src.length >>> 8) & 0xFF, src.length & 0xFF]), src,
+        Buffer.alloc((4 - src.length % 4) % 4),
+    ]);
+    const frame = [];
+    for (let i = 0; i < bytes.length; i += 4) frame.push(bytes.readUInt32BE(i));
+    return frame;
+}
+const FRAME = contentFrame('PostFlashSelftest', source);
 
 // ── C-List definition ─────────────────────────────────────────────────────────
 //
@@ -110,7 +122,7 @@ const CLIST = [
 
 const cw = words.length;
 const cc = CLIST.length;   // 2
-const totalNeeded = 1 + cw + cc;
+const totalNeeded = 1 + cw + FRAME.length + cc;
 
 let lumpSize = 64;
 while (lumpSize < totalNeeded) lumpSize *= 2;
@@ -133,6 +145,7 @@ const headerWord = (
 const padded = new Uint32Array(lumpSize);
 padded[0] = headerWord;
 for (let i = 0; i < cw; i++) padded[1 + i] = words[i] >>> 0;
+for (let i = 0; i < FRAME.length; i++) padded[1 + cw + i] = FRAME[i] >>> 0;
 
 // Write c-list GT values at the lump tail (words lumpSize-cc .. lumpSize-1)
 const clistBase = lumpSize - cc;
@@ -182,60 +195,17 @@ if (existingIdx !== -1) {
     const oldToken = manifest[existingIdx].token;
     if (oldToken && oldToken !== token) {
         const oldLump = path.join(LUMPS_DIR, `${oldToken}.lump`);
-        const oldSidecar = path.join(LUMPS_DIR, `${oldToken}.json`);
         if (fs.existsSync(oldLump)) {
             fs.unlinkSync(oldLump);
             console.log(`Removed old: ${oldLump}`);
-        }
-        if (fs.existsSync(oldSidecar)) {
-            fs.unlinkSync(oldSidecar);
-            console.log(`Removed old: ${oldSidecar}`);
         }
     }
 }
 
 const lumpPath    = path.join(LUMPS_DIR, `${token}.lump`);
-const sidecarPath = path.join(LUMPS_DIR, `${token}.json`);
 
 fs.writeFileSync(lumpPath, bytes);
 console.log(`Written: ${lumpPath} (${bytes.length} bytes)`);
-
-// ── Write sidecar .json ───────────────────────────────────────────────────────
-//
-// IMPORTANT: the "source" field must always be set to the exact text of the
-// canonical .cloomc file for known-example abstractions (those whose abstraction
-// name maps to a file in simulator/examples/).  Any recompile or rename pass that
-// omits this field will be caught immediately by check-sidecar-source.js.
-//
-const capabilities = [
-    { name: 'SelfTest', grants: ['E'], gt: '0x4A000006', ns_slot: 6, note: 'SelfTest E-GT — loaded into CR1 for TPERM and EXACT cross-checks (POLA minimum)' },
-];
-
-const sidecar = {
-    token,
-    abstraction: 'PostFlashSelftest',
-    ns_slot: null,
-    ns_slot_policy: 'dynamic',
-    lump_size: lumpSize,
-    typ: 0,
-    content_type: 'code',
-    cw,
-    cc,
-    profile: 'IoT',
-    language: 'assembly',
-    description: 'Post-Flash Exhaustive Self-Test — 81 hardware correctness tests (DR independence, ALU, shifts, branches, BFEXT/BFINS, TPERM, CHANGE, LOAD). DR0=0 on full pass, DR0=N on first failure.',
-    // "source" must always reflect the exact text of simulator/examples/post_flash_selftest.cloomc.
-    // Never leave this field empty — check-sidecar-source.js enforces it after every recompile.
-    source,
-    capabilities,
-    grants: ['E'],
-    author: 'Church Machine',
-    version: '1.1',
-    lump_version: 0,
-};
-
-fs.writeFileSync(sidecarPath, JSON.stringify(sidecar, null, 2) + '\n');
-console.log(`Written: ${sidecarPath}`);
 
 // ── Print c-list note ─────────────────────────────────────────────────────────
 console.log(`\nC-List GT slot assignments (cc=${CLIST.length}, tail-packed):`);
@@ -260,7 +230,6 @@ const manifestEntry = {
     cc,
     grants: ['E'],
     lump_version: 0,
-    sidecar_file: `${token}.json`,
 };
 console.log('\nManifest entry to add to server/lumps/manifest.json:');
 console.log(JSON.stringify(manifestEntry, null, 4));

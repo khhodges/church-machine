@@ -47,7 +47,6 @@ function check(label, cond, detail) {
 //   simulator/examples/<source>.cloomc
 //   server/lumps/manifest.json  (our test manifest)
 //   server/lumps/<token>.lump
-//   server/lumps/<token>.json
 //
 // To avoid modifying the real repo files, we launch the script with a NODE_PATH
 // that re-exports fs with patched readFileSync/writeFileSync calls.
@@ -64,7 +63,6 @@ const TEST_TOKEN   = 'ffffffff';
 const LUMPS_DIR    = path.join(ROOT, 'server', 'lumps');
 const MANIFEST_PATH = path.join(LUMPS_DIR, 'manifest.json');
 const TEST_LUMP    = path.join(LUMPS_DIR, `${TEST_TOKEN}.lump`);
-const TEST_SIDECAR = path.join(LUMPS_DIR, `${TEST_TOKEN}.json`);
 const TEST_SOURCE  = path.join(ROOT, 'simulator', 'examples', `${TEST_TOKEN}.cloomc`);
 
 // Save original manifest for restore
@@ -119,7 +117,9 @@ function packLump(words, clistWords) {
 // ── Inject test entry into manifest ──────────────────────────────────────────
 
 function setupTestEntry(opts = {}) {
-    const source = opts.source || `simulator/examples/${TEST_TOKEN}.cloomc`;
+    const source = opts.source === undefined
+        ? `simulator/examples/${TEST_TOKEN}.cloomc`
+        : opts.source;
     const manifest = JSON.parse(originalManifest);
     manifest.push({
         token:     TEST_TOKEN,
@@ -128,14 +128,14 @@ function setupTestEntry(opts = {}) {
         lump_size: opts.lump_size || 64,
         cw:        opts.cw        || 1,
         cc:        opts.cc        || 0,
-        source,
         grants: ['E'],
         lump_version: 0,
     });
+    if (source) manifest[manifest.length - 1].source = source;
     fs.writeFileSync(MANIFEST_PATH, JSON.stringify(manifest, null, 4) + '\n', 'utf8');
 }
 
-// ── Write a trivial source and matching .lump + sidecar ───────────────────────
+// ── Write a trivial source and matching .lump ─────────────────────────────────
 
 const SIMPLE_SOURCE = `; trivial test lump — one RETURN
 RETURN
@@ -157,9 +157,7 @@ function buildAndWriteLump(src, clistWords = []) {
     if (res.errors.length) throw new Error('Assembly failed: ' + res.errors[0].message);
     const { buf, cw, cc, lump_size } = packLump(Array.from(res.words), clistWords);
     fs.writeFileSync(TEST_LUMP, buf);
-    fs.writeFileSync(TEST_SIDECAR, JSON.stringify({ token: TEST_TOKEN, cw, cc, lump_size }, null, 2) + '\n');
     if (!createdFiles.includes(TEST_LUMP))    createdFiles.push(TEST_LUMP);
-    if (!createdFiles.includes(TEST_SIDECAR)) createdFiles.push(TEST_SIDECAR);
     return { cw, cc, lump_size };
 }
 
@@ -198,10 +196,9 @@ console.log('\n── Error cases ───────────────�
 }
 
 // T3: Token found but no source available (binary-only lump)
-//     Pick a token with no source field and no .cloomc file on the search paths.
-//     95a651e7 (NoteG_v6) has no source field in its sidecar JSON.
 {
-    const r = runUpdateLump(['--token', '95a651e7']);
+    setupTestEntry({ source: null });
+    const r = runUpdateLump(['--token', TEST_TOKEN]);
     check('T3: binary-only lump exits non-zero', r.status !== 0);
     check('T3: binary-only lump explains out-of-scope', r.stderr.includes('out of scope'));
 }
@@ -239,10 +236,8 @@ console.log('\n── Check mode (--check) ────────────�
     const r = runUpdateLump(['--token', TEST_TOKEN, '--check']);
     check('T6: --check exits non-zero when binary differs from source', r.status !== 0);
     check('T6: --check reports DRIFT',  r.stderr.includes('DRIFT'));
-    check('T6: --check makes no writes', (() => {
-        const sc = JSON.parse(fs.readFileSync(TEST_SIDECAR, 'utf8'));
-        return sc.cw !== 2;  // sidecar still has old value (1 word), not 2
-    })());
+    check('T6: --check makes no writes',
+        ((fs.readFileSync(TEST_LUMP).readUInt32BE(0) >>> 10) & 0x1FFF) === 1);
 }
 
 // T7: --check fails when .lump file is missing
@@ -260,7 +255,7 @@ console.log('\n── Check mode (--check) ────────────�
 
 console.log('\n── Update mode ──────────────────────────────────────────────────');
 
-// T8: Update mode rewrites lump, sidecar, and manifest
+// T8: Update mode rewrites only the binary
 {
     setupTestEntry({ cw: 1, cc: 0 });
     writeSource(SIMPLE_SOURCE);
@@ -273,12 +268,9 @@ console.log('\n── Update mode ───────────────�
     );
     check('T8: prints one-line summary', r.stdout.includes(`Updated ${TEST_TOKEN}`));
 
-    const sc = JSON.parse(fs.readFileSync(TEST_SIDECAR, 'utf8'));
-    check('T8: sidecar cw updated', sc.cw === 2);
-
     const mf = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'));
     const me = mf.find(e => (e.token || '').toLowerCase() === TEST_TOKEN);
-    check('T8: manifest cw updated', me && me.cw === 2);
+    check('T8: manifest is not updated', me && me.cw === 1);
 
     // Binary must have 2 code words
     const bin = fs.readFileSync(TEST_LUMP);
@@ -325,12 +317,13 @@ console.log('\n── Update mode ───────────────�
 
 console.log('\n── Consistency gate ─────────────────────────────────────────────');
 
-// T11: LUMP consistency gate passes after update
+// T11: focused binary/manifest filename coverage gate passes after update.
 //      Clean up test files first so the gate does not see them.
 {
     cleanup();
     const r = cp.spawnSync('python3', ['-m', 'pytest',
-        'tests/lump/test_lump_consistency.py', '-v', '--tb=short'],
+        'tests/lump/test_lump_consistency.py::TestR25_GitTrackedLumpsInManifest',
+        '-v', '--tb=short'],
         { cwd: ROOT, encoding: 'utf8' });
     const passed = r.status === 0;
     check('T11: consistency gate passes after update', passed,

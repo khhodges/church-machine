@@ -38,12 +38,13 @@ words[0] = sim.packLumpHeader(0, 1, 2, 0);
 words[1] = 0; // NOP
 words[62] = ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER;
 const contract = Binding.createContract('alice.Bank#7', [
-    { name: '__SELF__', compiler_owned_self: true, rights: 'E', type: 'Inform' },
+    { name: '__SELF__', compiler_owned_self: true, binary_hash: 'c'.repeat(64),
+        identity_hash: 'd'.repeat(64), rights: 'E', type: 'Inform' },
     { N: 'church.Audit#3', T: 'a1b2c3d4', binary_hash: HASH, identity_hash: ID,
         rights: 'L', type: 'Inform', relocation_row: 1 },
 ]);
 const owner = { N: 'alice.Bank#7', binary_hash: 'c'.repeat(64),
-    identity_hash: 'd'.repeat(64), verified: true };
+    identity_hash: 'd'.repeat(64), verified: true, approved: true };
 assert.equal(sim.loadLumpBinary(words, 41, {
     portableBinding: contract, portableOwnerCandidate: owner,
     // Must be ignored: only the registered/live dependency is eligible.

@@ -1,5 +1,6 @@
 from amaranth import *
 import hashlib
+from server.lump_approvals import read_approvals
 import json
 import struct
 from pathlib import Path
@@ -664,118 +665,79 @@ assert WUKONG_SELFTEST_WORDS[510] == 0x4A000006  # c-list[0]: SelfTest E-GT (Chu
 
 # The standalone image includes the CapabilityTest currently selected by the
 # IDE for Namespace slot 10.  This is a replaceable boot default, not a
-# factory-owned artifact: its filename, issue, token, and allocation come from
-# ns-state.json and the matching manifest/sidecar records.
+# factory-owned artifact: its filename and placement come from ns-state.
 CAPABILITY_TEST_NS_SLOT = 10
 WUKONG_CAPABILITY_TEST_BASE_BYTE = 0x1400
 WUKONG_CAPABILITY_TEST_BASE_WORD = WUKONG_CAPABILITY_TEST_BASE_BYTE // 4
 _lumps_dir = Path(__file__).resolve().parents[1] / "server" / "lumps"
 _capability_test_ns_state_path = _lumps_dir / "ns-state.json"
-_capability_test_manifest_path = _lumps_dir / "manifest.json"
-with _capability_test_ns_state_path.open("r", encoding="utf-8") as _fh:
-    _capability_test_ns_state = json.load(_fh)
-_capability_test_ns_matches = [
-    _entry for _entry in _capability_test_ns_state.get("abstractions", [])
-    if _entry.get("name") == "CapabilityTest"
-    and _entry.get("slot") == CAPABILITY_TEST_NS_SLOT
-]
-if len(_capability_test_ns_matches) != 1:
-    raise RuntimeError(
-        "IDE Namespace must select exactly one CapabilityTest at slot 10; "
-        f"found {len(_capability_test_ns_matches)}"
-    )
-_capability_test_ns_entry = _capability_test_ns_matches[0]
-_capability_test_filename = _capability_test_ns_entry.get("filename")
-if not isinstance(_capability_test_filename, str) or not _capability_test_filename:
-    raise RuntimeError(
-        "IDE-selected CapabilityTest at slot 10 has no LUMP filename"
-    )
-WUKONG_CAPABILITY_TEST_FILENAME = _capability_test_filename
-_capability_test_sidecar_filename = str(
-    Path(_capability_test_filename).with_suffix(".json")
-)
-_capability_test_path = _lumps_dir / _capability_test_filename
-_capability_test_sidecar_path = _lumps_dir / _capability_test_sidecar_filename
+WUKONG_CAPABILITY_TEST_FILENAME = None
+WUKONG_CAPABILITY_TEST_ALLOC = 0
+WUKONG_CAPABILITY_TEST_WORDS = ()
+WUKONG_CAPABILITY_TEST_BOUND = False
+WUKONG_CAPABILITY_TEST_STATUS = {
+    "bound": False,
+    "code": "not-selected",
+    "message": "Optional CapabilityTest is not selected.",
+}
 try:
-    _capability_test_raw = _capability_test_path.read_bytes()
-except OSError as exc:
-    raise RuntimeError(
-        f"Wukong default image requires the IDE-selected CapabilityTest LUMP: "
-        f"{_capability_test_path}"
-    ) from exc
-if not _capability_test_raw or len(_capability_test_raw) % 4:
-    raise RuntimeError(
-        "IDE-selected CapabilityTest must be a non-empty whole-word LUMP; "
-        f"got {len(_capability_test_raw)} bytes"
-    )
-WUKONG_CAPABILITY_TEST_ALLOC = len(_capability_test_raw) // 4
-WUKONG_CAPABILITY_TEST_WORDS = tuple(
-    struct.unpack(f">{WUKONG_CAPABILITY_TEST_ALLOC}I", _capability_test_raw)
-)
-_capability_test_header = WUKONG_CAPABILITY_TEST_WORDS[0]
-_capability_test_declared_alloc = 1 << (((_capability_test_header >> 23) & 0xF) + 6)
-_capability_test_cw = (_capability_test_header >> 10) & 0x1FFF
-_capability_test_cc = _capability_test_header & 0xFF
-if (
-    ((_capability_test_header >> 27) & 0x1F) != 0x1F
-    or _capability_test_declared_alloc != WUKONG_CAPABILITY_TEST_ALLOC
-    or 1 + _capability_test_cw + _capability_test_cc
-       > WUKONG_CAPABILITY_TEST_ALLOC
-):
-    raise RuntimeError(
-        "IDE-selected CapabilityTest has an invalid LUMP header or allocation: "
-        f"{_capability_test_filename}"
-    )
-# Bind the standalone default to the IDE-selected Namespace record and its
-# exact sidecar/manifest data, without imposing an implementation or size.
-_capability_test_hash = hashlib.sha256(_capability_test_raw).hexdigest()
-with _capability_test_sidecar_path.open("r", encoding="utf-8") as _fh:
-    _capability_test_sidecar = json.load(_fh)
-with _capability_test_manifest_path.open("r", encoding="utf-8") as _fh:
-    _capability_test_manifest = json.load(_fh)
-_capability_test_manifest_entries = (
-    _capability_test_manifest
-    if isinstance(_capability_test_manifest, list)
-    else _capability_test_manifest.get("lumps", [])
-)
-_capability_test_manifest_entry = next(
-    (
-        _entry for _entry in _capability_test_manifest_entries
-        if _entry.get("filename") == _capability_test_filename
-    ),
-    None,
-)
-if (
-    _capability_test_sidecar.get("filename") != _capability_test_filename
-    or _capability_test_sidecar.get("sidecar_file") != _capability_test_sidecar_filename
-    or _capability_test_sidecar.get("token") != _capability_test_ns_entry.get("token")
-    or _capability_test_sidecar.get("ns_slot") != CAPABILITY_TEST_NS_SLOT
-    or _capability_test_sidecar.get("binary_hash") != _capability_test_hash
-    or _capability_test_manifest_entry is None
-    or _capability_test_manifest_entry.get("sidecar_file")
-       != _capability_test_sidecar_filename
-    or _capability_test_manifest_entry.get("token")
-       != _capability_test_ns_entry.get("token")
-    or _capability_test_manifest_entry.get("ns_slot")
-       != CAPABILITY_TEST_NS_SLOT
-    or _capability_test_manifest_entry.get("binary_hash")
-       != _capability_test_hash
-):
-    raise RuntimeError(
-        "IDE-selected CapabilityTest binding is stale or inconsistent: "
-        f"{_capability_test_filename}"
-    )
+    with _capability_test_ns_state_path.open("r", encoding="utf-8") as _fh:
+        _capability_test_ns_state = json.load(_fh)
+    _capability_test_ns_matches = [
+        _entry for _entry in _capability_test_ns_state.get("abstractions", [])
+        if _entry.get("name") == "CapabilityTest"
+        and _entry.get("slot") == CAPABILITY_TEST_NS_SLOT
+    ]
+    if len(_capability_test_ns_matches) != 1:
+        raise ValueError("Namespace does not select exactly one slot-10 CapabilityTest")
+    _capability_test_filename = _capability_test_ns_matches[0].get("filename")
+    if not isinstance(_capability_test_filename, str) or not _capability_test_filename:
+        raise ValueError("Namespace selection has no filename")
+    _capability_test_raw = (_lumps_dir / _capability_test_filename).read_bytes()
+    if not _capability_test_raw or len(_capability_test_raw) % 4:
+        raise ValueError("selected binary is not a non-empty whole-word LUMP")
+    _capability_test_alloc = len(_capability_test_raw) // 4
+    _capability_test_words = tuple(
+        struct.unpack(f">{_capability_test_alloc}I", _capability_test_raw))
+    _capability_test_header = _capability_test_words[0]
+    _declared = 1 << (((_capability_test_header >> 23) & 0xF) + 6)
+    _cw = (_capability_test_header >> 10) & 0x1FFF
+    _cc = _capability_test_header & 0xFF
+    if (((_capability_test_header >> 27) & 0x1F) != 0x1F
+            or _declared != _capability_test_alloc
+            or 1 + _cw + _cc > _capability_test_alloc):
+        raise ValueError("selected binary has an invalid header or allocation")
+    _capability_test_hash = hashlib.sha256(_capability_test_raw).hexdigest()
+    _approval = read_approvals(
+        _lumps_dir / "approvals.json", missing_ok=False).get(_capability_test_hash)
+    if not isinstance(_approval, dict) or _approval.get("binary_hash") != _capability_test_hash:
+        raise PermissionError("exact binary hash is not approved")
+    WUKONG_CAPABILITY_TEST_FILENAME = _capability_test_filename
+    WUKONG_CAPABILITY_TEST_ALLOC = _capability_test_alloc
+    WUKONG_CAPABILITY_TEST_WORDS = _capability_test_words
+    WUKONG_CAPABILITY_TEST_BOUND = True
+    WUKONG_CAPABILITY_TEST_STATUS = {
+        "bound": True, "code": "approved", "message": "CapabilityTest is hash-approved.",
+        "binary_hash": _capability_test_hash,
+    }
+except Exception as _capability_test_error:
+    WUKONG_CAPABILITY_TEST_STATUS = {
+        "bound": False,
+        "code": "approval-required",
+        "message": f"Optional CapabilityTest omitted: {_capability_test_error}",
+    }
 
 # The generic standalone namespace has eight minimal slots. Wukong also carries
 # CapabilityTest at slot 10, so extend its forward table through that slot.
-while len(WUKONG_DEMO_NAMESPACE) < (CAPABILITY_TEST_NS_SLOT + 1) * 4:
-    WUKONG_DEMO_NAMESPACE.append(0)
-_capability_test_word1 = WUKONG_CAPABILITY_TEST_ALLOC - 1
-WUKONG_DEMO_NAMESPACE[CAPABILITY_TEST_NS_SLOT * 4 + 0] = WUKONG_CAPABILITY_TEST_BASE_BYTE
-WUKONG_DEMO_NAMESPACE[CAPABILITY_TEST_NS_SLOT * 4 + 1] = _capability_test_word1
-WUKONG_DEMO_NAMESPACE[CAPABILITY_TEST_NS_SLOT * 4 + 2] = integrity32(
-    WUKONG_CAPABILITY_TEST_BASE_BYTE, _capability_test_word1
-)
+if WUKONG_CAPABILITY_TEST_BOUND:
+    while len(WUKONG_DEMO_NAMESPACE) < (CAPABILITY_TEST_NS_SLOT + 1) * 4:
+        WUKONG_DEMO_NAMESPACE.append(0)
+    _capability_test_word1 = WUKONG_CAPABILITY_TEST_ALLOC - 1
+    WUKONG_DEMO_NAMESPACE[CAPABILITY_TEST_NS_SLOT * 4 + 0] = WUKONG_CAPABILITY_TEST_BASE_BYTE
+    WUKONG_DEMO_NAMESPACE[CAPABILITY_TEST_NS_SLOT * 4 + 1] = _capability_test_word1
+    WUKONG_DEMO_NAMESPACE[CAPABILITY_TEST_NS_SLOT * 4 + 2] = integrity32(
+        WUKONG_CAPABILITY_TEST_BASE_BYTE, _capability_test_word1
+    )
 
 # Fix slot 7 (WukongCallHome) alloc from 64 → 128 words and move it after
 # the relocated Thread lump. The old 0x700 location overlapped SelfTest,

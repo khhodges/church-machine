@@ -199,7 +199,6 @@ function buildBankArtifact() {
     const binary = packWords(words);
     const token = sha256(Buffer.concat([Buffer.from(DOT_NAME, 'utf8'), binary])).slice(0, 8);
     const filename = `${DOT_NAME}.${ISSUE_N}.${token}.lump`;
-    const sidecarFile = `${DOT_NAME}.${ISSUE_N}.${token}.json`;
     const binaryHash = sha256(binary);
     const identityHash = sha256(identityString);
     const methods = api.methods;
@@ -243,39 +242,14 @@ function buildBankArtifact() {
         self_gt: selfGT,
         runtime_binding: runtimeBinding,
         filename,
-        sidecar_file: sidecarFile,
         binary_hash: binaryHash,
         identity_hash: identityHash,
         genesis_authority: 'human-IDE-vouched-not-verified',
         genesis_certificate_verification: 'deferred-not-verified',
     };
 
-    const sidecar = {
-        ...shared,
-        identity_string: identityString,
-        genesis_authority: 'human-IDE-vouched-not-verified',
-        genesis_certificate_verification: 'deferred-not-verified',
-        identity_seal_location: 'c-list[0]',
-        sourceStorageTier: 2,
-        source_file: 'simulator/cloomc/bank.cloomc',
-        source,
-        compiler_language: compiled.language,
-        capabilities: [{
-            row: 0,
-            name: 'SELF',
-            rights: ['E'],
-            role: 'compiler-owned E-permission identity',
-            compiler_owned: true,
-        }],
-        compiler_owned_self: true,
-        description: 'Dynamic Namespace-backed lockbox custody service. The LUMP models lifecycle policy; the proof-bound runtime binding owns private storage, zeroization, and recovery.',
-        documentation_case: 'fully_documented',
-        docs: ['CM_LUMP_SPECIFICATION.md', 'golden-tokens.md'],
-    };
-
     return {
         binary,
-        sidecar,
         manifestEntry: shared,
         compiled,
         words,
@@ -325,22 +299,18 @@ function writeBankArtifact() {
         entry.abstraction !== DOT_NAME && entry.dot_name !== DOT_NAME);
 
     const oldFiles = fs.readdirSync(LUMPS_DIR).filter(filename =>
-        new RegExp(`^${DOT_NAME}\\.${ISSUE_N}\\.[0-9a-f]{8}\\.(?:lump|json)$`).test(filename));
+        new RegExp(`^${DOT_NAME}\\.${ISSUE_N}\\.[0-9a-f]{8}\\.lump$`).test(filename));
 
     // Publish replacement files before atomically switching the manifest. If
     // any write fails, the prior manifest and its artifacts remain usable.
-    writeAtomic(path.join(LUMPS_DIR, artifact.sidecar.filename), artifact.binary);
-    writeAtomic(
-        path.join(LUMPS_DIR, artifact.sidecar.sidecar_file),
-        `${stringifyAsciiJson(artifact.sidecar)}\n`,
-    );
+    writeAtomic(path.join(LUMPS_DIR, artifact.manifestEntry.filename), artifact.binary);
     writeAtomic(IDENTITY_PROJECTION_PATH, renderIdentityProjection(artifact));
     manifest.push(artifact.manifestEntry);
     // Switch the manifest last, after every artifact and the browser/runtime
     // identity projection have been staged successfully.
     writeAtomic(MANIFEST_PATH, `${stringifyAsciiJson(manifest)}\n`);
     for (const filename of oldFiles) {
-        if (filename !== artifact.sidecar.filename && filename !== artifact.sidecar.sidecar_file) {
+        if (filename !== artifact.manifestEntry.filename) {
             fs.unlinkSync(path.join(LUMPS_DIR, filename));
         }
     }
@@ -350,8 +320,8 @@ function writeBankArtifact() {
 if (require.main === module) {
     const artifact = writeBankArtifact();
     console.log(
-        `${artifact.sidecar.dot_name}: ${artifact.sidecar.filename} ` +
-        `(${artifact.sidecar.lump_size} words, cw=${artifact.sidecar.cw}, cc=${artifact.sidecar.cc})`,
+        `${artifact.manifestEntry.dot_name}: ${artifact.manifestEntry.filename} ` +
+        `(${artifact.manifestEntry.lump_size} words, cw=${artifact.manifestEntry.cw}, cc=${artifact.manifestEntry.cc})`,
     );
 }
 

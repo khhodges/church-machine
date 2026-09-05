@@ -34,7 +34,11 @@ import re
 
 import pytest
 
-from hardware.boot_rom import BOOT_PROGRAM, encode_turing, TuringOpcode, CondCode
+from hardware.boot_rom import (
+    BOOT_PROGRAM, encode_turing, TuringOpcode, CondCode,
+    WUKONG_CAPABILITY_TEST_BOUND, WUKONG_CAPABILITY_TEST_STATUS,
+    WUKONG_CAPABILITY_TEST_WORDS,
+)
 from hardware.wukong_top import (
     _WUKONG_BOOT_WINDOW_BYTES,
     _WUKONG_ROM,
@@ -48,6 +52,13 @@ _IL_PATH = os.path.join(
 
 # Expected BRANCH AL, #-1 encoding — must match the constant in wukong_top.py.
 _EXPECTED_BRANCH_MINUS_1 = encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=(-1) & 0x7FFF)
+
+
+def test_optional_capability_test_fails_closed_without_blocking_import():
+    if not WUKONG_CAPABILITY_TEST_BOUND:
+        assert WUKONG_CAPABILITY_TEST_WORDS == ()
+        assert WUKONG_CAPABILITY_TEST_STATUS["code"] == "approval-required"
+        assert "omitted" in WUKONG_CAPABILITY_TEST_STATUS["message"]
 
 
 def test_wukong_rom_guard_word_is_branch_minus_1():
@@ -142,6 +153,8 @@ def test_wukong_init_rom_size_matches_python_source():
     If the IL was generated from an older version of boot_rom.py or
     wukong_top.py, regenerate it and commit the updated file.
     """.format(expected=WUKONG_N_INIT)
+    if not WUKONG_CAPABILITY_TEST_BOUND:
+        pytest.skip("RTLIL may represent a build with an approved optional CapabilityTest")
     if not os.path.isfile(_IL_PATH):
         pytest.skip("build/church_wukong_xc7a100t.il not present — skipped")
 

@@ -5,7 +5,7 @@
 //   DE-1  _ddExtractMethodNames — api_definition.methods as string array
 //   DE-2  _ddExtractMethodNames — api_definition.methods as object array
 //   DE-3  _ddExtractMethodNames — api_definition present but no methods key
-//   DE-4  _ddExtractMethodNames — no api_definition, sidecar methods fallback
+//   DE-4  _ddExtractMethodNames — no api_definition, sidecar methods ignored
 //   DE-5  _ddExtractMethodNames — no api_definition, empty sidecar methods
 //   DE-6  _ddRenderMethods — renders label + pill buttons for each method
 //   DE-7  _ddRenderMethods — pills are <button> elements (keyboard accessible)
@@ -74,6 +74,8 @@ function makeEnv(overrides) {
     window.showAbstractionDetail   = overrides.showAbstractionDetail   || (() => {});
     window.abstractionRegistry     = overrides.abstractionRegistry     || undefined;
     window._lumpsCache             = overrides._lumpsCache             || [];
+    window._lumpTokenIdentity      = overrides._lumpTokenIdentity ||
+        (token => String(token).replace(/^0x/i, '').toLowerCase());
 
     // Evaluate the exported block in this window context
     const scriptEl = window.document.createElement('script');
@@ -137,14 +139,12 @@ section('DE-3: api_definition present but no methods key');
     assert(result.length === 0, 'length = 0 (definition present, no methods)');
 }
 
-section('DE-4: no api_definition, sidecar .methods fallback');
+section('DE-4: no api_definition, sidecar .methods ignored');
 {
     const win = makeEnv({});
     const detail = { methods: [{ name: 'Alpha' }, { name: 'Beta' }] };
     const result = win._ddExtractMethodNames(detail);
-    assert(Array.isArray(result), 'returns array from sidecar fallback');
-    assert(result[0] === 'Alpha', 'result[0] = Alpha');
-    assert(result[1] === 'Beta',  'result[1] = Beta');
+    assert(result === null, 'returns null rather than trusting sidecar methods');
 }
 
 section('DE-5: no api_definition, empty sidecar methods → null (legacy)');
@@ -225,7 +225,8 @@ section('DE-10: null (legacy binary) → "no API definition" label');
     const methodsEl = modal.querySelector('#lumpDeepDiveMethods');
     const noMethods = methodsEl.querySelector('.lump-dd-no-methods');
     assert(noMethods !== null, '.lump-dd-no-methods present for legacy');
-    assert(noMethods.textContent.includes('No API definition'), '"No API definition" text shown');
+    assert(noMethods.textContent.includes('Embedded API unavailable'),
+        '"Embedded API unavailable" text shown');
 }
 
 section('DE-11: _ddRenderMethodsFailed shows unavailable message');
@@ -384,7 +385,10 @@ section('DE-22: _buildLumpDeepDiveGraph — cycle renders without infinite recur
         dot_name: 'Cycle.B',
         clist_entries: [{ target_token: 'cycle-a', perms: 'R' }]
     };
-    const win = makeEnv({ _lumpsCache: [first, second] });
+    const win = makeEnv({
+        _lumpsCache: [first, second],
+        _lumpTokenIdentity: token => String(token).replace(/^0x/i, '').toLowerCase()
+    });
     const result = win._buildLumpDeepDiveGraph(first);
     assert(result !== null, 'cyclic graph returns an SVG result');
     assert(result.nodes.length === 2, 'cycle produces exactly two lump nodes');

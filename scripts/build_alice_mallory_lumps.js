@@ -17,8 +17,6 @@ const SPECS = [
   {
     dotName: 'ide.Alice',
     sourceFile: 'simulator/examples/alice.cloomc',
-    suppliedMetadata: 'attached_assets/alice.lump_1787597258419.json',
-    suppliedHex: 'attached_assets/alice.lump_1787597641217.hex',
     expectedCode: [
       0xBF000002, 0xBF000004, 0x070B0001, 0x8F08C009, 0x1F000000,
       0x070B0001, 0x8708C009, 0x1F000000, 0xF0000000,
@@ -38,8 +36,6 @@ const SPECS = [
   {
     dotName: 'ide.Mallory',
     sourceFile: 'simulator/examples/mallory.cloomc',
-    suppliedMetadata: 'attached_assets/mallory.lump_1787597258420.json',
-    suppliedHex: 'attached_assets/mallory.lump_1787597641216.hex',
     expectedCode: [0xBF000001, 0x070B0002, 0x8708C000, 0x1F000000, 0xF0000000],
     methods: [
       { petName: 'Steal', branchOffset: 1,
@@ -113,45 +109,18 @@ function buildOne(spec) {
   const binary = packWords(words);
   const token = sha256(Buffer.concat([Buffer.from(spec.dotName, 'utf8'), binary])).slice(0, 8);
   const filename = `${spec.dotName}.1.${token}.lump`;
-  const sidecarFile = `${spec.dotName}.1.${token}.json`;
   const binaryHash = sha256(binary);
   const identityString = `${spec.dotName}#1`;
   const identityHash = sha256(Buffer.from(identityString, 'utf8'));
-  const provenance = {
-    disposition: 'reissued from behavioral specification; supplied token and code were placeholders',
-    supplied_metadata: spec.suppliedMetadata,
-    supplied_metadata_sha256: sha256(fs.readFileSync(path.join(ROOT, spec.suppliedMetadata))),
-    supplied_word_image: spec.suppliedHex,
-    supplied_word_image_sha256: sha256(fs.readFileSync(path.join(ROOT, spec.suppliedHex))),
-  };
-  const sidecar = {
-    token, abstraction: spec.dotName, dot_name: spec.dotName, issue_n: 1,
-    identity_string: identityString, identity_hash: identityHash,
-    binary_hash: binaryHash, filename, sidecar_file: sidecarFile,
-    ns_slot: null, ns_slot_policy: 'dynamic', boot_resident: false,
-    lump_size: size, cw: assembled.words.length, cc: cList.length, typ: 0,
-    status: 'released', language: 'Church Machine ISA', author: 'Church Machine',
-    sourceStorageTier: 2, source_file: spec.sourceFile, source,
-    methods: spec.methods, capabilities: spec.capabilities,
-    compiler_owned_self: true,
-    allocation_time_placeholders: [
-      { row: 0, role: 'identity', word: '0xFEED5E1F' },
-      { row: 1, role: 'private_data', word: '0xFEEDDA7A' },
-    ],
-    description: spec.description,
-    documentation_case: 'fully_documented',
-    docs: ['alice-mallory-v13-lumps.md'],
-    provenance,
-  };
   const manifestEntry = {
     token, abstraction: spec.dotName, dot_name: spec.dotName, issue_n: 1,
     ns_slot: null, ns_slot_policy: 'dynamic', boot_resident: false,
     lump_size: size, cw: assembled.words.length, cc: cList.length,
     status: 'released', language: 'Church Machine ISA', author: 'Church Machine',
-    filename, sidecar_file: sidecarFile, binary_hash: binaryHash,
+    filename, binary_hash: binaryHash,
     identity_hash: identityHash,
   };
-  return { spec, binary, sidecar, manifestEntry };
+  return { spec, binary, manifestEntry };
 }
 
 function writeAtomic(filename, data) {
@@ -177,20 +146,18 @@ function main() {
   for (const item of built) {
     for (const old of fs.readdirSync(LUMPS)) {
       if (old.startsWith(`${item.spec.dotName}.1.`) &&
-          (old.endsWith('.lump') || old.endsWith('.json'))) {
+          old.endsWith('.lump')) {
         fs.unlinkSync(path.join(LUMPS, old));
       }
     }
-    writeAtomic(path.join(LUMPS, item.sidecar.filename), item.binary);
-    writeAtomic(path.join(LUMPS, item.sidecar.sidecar_file),
-      `${JSON.stringify(item.sidecar, null, 2)}\n`);
+    writeAtomic(path.join(LUMPS, item.manifestEntry.filename), item.binary);
     manifest.push(item.manifestEntry);
   }
   // Keep the repository manifest's established ASCII-escaped encoding so a
   // deterministic rebuild changes only the Alice/Mallory records.
   writeAtomic(MANIFEST, `${stringifyAsciiJson(manifest)}\n`);
   for (const item of built) {
-    console.log(`${item.spec.dotName}: ${item.sidecar.filename}`);
+    console.log(`${item.spec.dotName}: ${item.manifestEntry.filename}`);
   }
 }
 

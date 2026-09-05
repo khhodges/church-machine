@@ -1102,7 +1102,7 @@ function lumpAuditRenderPanel(container, results, opts) {
  * then render results into `container`.  Returns a Promise<{hasErrors, hasWarnings}>.
  *
  * token    — lump token string (hex)
- * manifest — optional { cw, cc, lump_size } object
+ * manifest — deprecated and ignored; audit facts come only from fetched words
  * container — DOM element to render into (existing children are cleared first)
  * opts      — forwarded to lumpAuditRenderPanel
  */
@@ -1110,7 +1110,7 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = { lumpAudit, lumpAuditHasErrors, lumpAuditHasWarnings, lumpAuditRenderPanel };
 }
 
-async function lumpAuditFromServer(token, manifest, container, opts) {
+async function lumpAuditFromServer(token, _manifest, container, opts) {
     container.innerHTML = '';
     const loadingEl = document.createElement('div');
     loadingEl.className = 'lump-audit-loading';
@@ -1124,44 +1124,8 @@ async function lumpAuditFromServer(token, manifest, container, opts) {
         const words = data.words || [];
         if (!words.length) throw new Error('Empty binary returned from server');
 
-        // Best-effort: reassemble the lump's saved source (if any) so violation
-        // messages carry a real sourceLine instead of falling back to a
-        // word-index-based "Open in editor" affordance. This mirrors how
-        // app-compile.js builds lineNums right after a compile — here we do it
-        // lazily for lumps viewed from the Repository panel, whose source may
-        // not be the one currently open in the editor at all.
-        let lineNums = null;
-        try {
-            const cw = (manifest && manifest.cw != null) ? parseInt(manifest.cw) : null;
-            if (typeof ChurchAssembler !== 'undefined' && typeof fetch === 'function') {
-                // Route through the shared de-duped cache (app-lumps.js) when available
-                // so this best-effort lookup never fires a second GET for a token whose
-                // detail is already being fetched by the Source tab render in parallel.
-                const srcData = (typeof window !== 'undefined' && typeof window._fetchLumpDetailCached === 'function')
-                    ? await window._fetchLumpDetailCached(token).catch(() => null)
-                    : await (async () => {
-                        const srcResp = await fetch(`/api/lumps/${token}/detail`, { cache: 'no-store' });
-                        return srcResp.ok ? srcResp.json() : null;
-                    })();
-                if (srcData && typeof srcData.source === 'string' && srcData.source.trim().length > 0) {
-                    const asm = new ChurchAssembler();
-                    const asmResult = asm.assemble(srcData.source);
-                    // Only trust the mapping when the reassembled word count matches
-                    // the audited binary's code-word count — otherwise the source has
-                    // drifted from the binary and per-word indices would be wrong.
-                    if (asmResult && Array.isArray(asmResult.lineNums) &&
-                        (cw == null || asmResult.words.length === cw)) {
-                        lineNums = [null, ...asmResult.lineNums];
-                    }
-                }
-            }
-        } catch (_srcErr) {
-            // Reassembly is best-effort only — fall through with lineNums = null,
-            // the renderer's wordIndex fallback still makes every row clickable.
-        }
-
         container.innerHTML = '';
-        const results = lumpAudit(words, manifest, lineNums);
+        const results = lumpAudit(words, null, null);
         return lumpAuditRenderPanel(container, results, opts);
     } catch (err) {
         container.innerHTML = '';

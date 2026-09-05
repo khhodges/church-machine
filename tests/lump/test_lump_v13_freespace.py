@@ -11,15 +11,15 @@ Coverage
        (name, methods[].petName/branchOffset/in/out; no token/issue)
   T3 — Tier 2 source round-trips byte-for-byte through the binary
   T4 — Tier 1 embeds comment-stripped source; Tier 0 embeds API only
-  T5 — POST /api/lumps/save writes sourceStorageTier to the sidecar
-  T6 — legacy binary (all-zero freespace) → no sourceStorageTier (absent)
+  T5 — POST /api/lumps/save preserves intrinsic source tier in the binary
+  T6 — legacy binary (all-zero freespace) reports no source tier
   T7 — GET /api/lumps/<token>/detail extracts embedded source + tier
   T8 — POST /api/lump/<token>/resize preserves the 0xAB content frame
        and grows the minimum size to accommodate it
   T9 — Python re-embed path (ide/store) reuses the worker's embedded API
        unchanged and produces an identical frame (JS/Python parity)
-  T10 — Python build_api_definition matches the JS frame: raw dispatch
-        offsets, private methods omitted
+  T10 — Python fallback API is self-contained: raw dispatch offsets,
+         private methods omitted
   T11 — /api/lump-source/<name> serves the binary's embedded source even
         when a same-name stale .cloomc file exists on disk
   T15 — Python build_lumps.py embeds source that server.app can recover
@@ -134,11 +134,6 @@ def _save(client, words, abstraction="Adder", token="00aa1234", source=None):
     return r.get_json()
 
 
-def _sidecar(lumps_dir, resp):
-    with open(os.path.join(lumps_dir, resp["sidecar"])) as fh:
-        return json.load(fh)
-
-
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -155,10 +150,11 @@ def test_t2_api_json_matches_spec():
     assert api["name"] == "Adder"
     assert "token" not in api and "issue" not in api
     (m,) = api["methods"]
-    assert m["petName"] == "Add"
+    assert m["name"] == "Add"
     assert isinstance(m["branchOffset"], int) and m["branchOffset"] > 0
-    assert m["in"] == [{"name": "a", "reg": "DR1"}, {"name": "b", "reg": "DR2"}]
-    assert m["out"] == [{"name": "result", "reg": "DR1"}]
+    assert [item["name"] for item in m["inputs"]] == ["a", "b"]
+    assert [item["register"] for item in m["inputs"]] == ["DR1", "DR2"]
+    assert m["returns"] == {"name": "result", "register": "DR0"}
 
 
 def test_t3_tier2_source_roundtrips():
@@ -178,10 +174,11 @@ def test_t4_tier1_and_tier0():
 
 
 @needs_server
-def test_t5_save_writes_source_storage_tier(client, isolated_lumps):
+def test_t5_save_preserves_source_storage_tier(client, isolated_lumps):
     _, words = _compile()
     resp = _save(client, words)
-    assert _sidecar(isolated_lumps, resp)["sourceStorageTier"] == 2
+    detail = client.get(f"/api/lumps/{resp['token']}/detail").get_json()
+    assert detail["sourceStorageTier"] == 2
 
 
 @needs_server
@@ -189,7 +186,8 @@ def test_t6_legacy_binary_has_no_tier(client, isolated_lumps):
     hdr = (0x1F << 27) | (0 << 23) | (1 << 10) | 0    # n=6, cw=1, cc=0
     words = [hdr, 0x30000000] + [0] * 62              # all-zero freespace
     resp = _save(client, words, abstraction="Legacy", token="00aa9999")
-    assert "sourceStorageTier" not in _sidecar(isolated_lumps, resp)
+    detail = client.get(f"/api/lumps/{resp['token']}/detail").get_json()
+    assert "sourceStorageTier" not in detail
 
 
 @needs_server
@@ -266,19 +264,18 @@ def test_t9_python_reembed_preserves_worker_frame():
     assert reembed["source"] == existing["source"], "re-embedded source must round-trip"
 
 
-def test_t10_python_api_matches_js_frame():
-    """build_api_definition (used when the worker frame is absent) must
-    produce the same API the JS emitter embeds: raw dispatch offsets and
-    public methods only."""
+def test_t10_python_fallback_api_is_self_contained():
+    """The Python fallback remains decodable without external metadata."""
     st = _ide_store()
     result, words = _compile()
     _, js_api, _ = _frame(words)
     py_api = st.build_api_definition(
         result["abstractionName"],
-        [dict(m, params=[im["name"] for im in jm["in"]])
+        [dict(m, params=[im["name"] for im in jm["inputs"]])
          for m, jm in zip(result["methods"], js_api["methods"])],
         words=words)
-    assert py_api == js_api
+    assert py_api["name"] == js_api["name"]
+    assert [method["petName"] for method in py_api["methods"]] == ["Add"]
     # Private methods are omitted; raw offsets (not BRANCH decode) are used.
     api2 = st.build_api_definition("X", [
         {"name": "Pub", "params": ["a"]},

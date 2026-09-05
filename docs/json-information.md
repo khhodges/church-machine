@@ -7,7 +7,12 @@ The abstraction definition format is the JSON schema used to define a Church Mac
 
 The CLOOMC++ compiler produces this format automatically. You can also write it by hand when building assembler programs directly.
 
-> **Note:** This is the *informational* definition format — the human-readable source of truth for an abstraction. The physical deployment artefact produced from it is `lump.zip`. See [locator.md](locator.md) for how lump.zip archives are stored in the Lump Library and loaded on demand at runtime by the Locator.
+> **Authority note:** This JSON is an input format for `Navana.Abstraction.Add`,
+> not a companion metadata file and not LUMP runtime truth. Once compiled,
+> `.lump` bytes are authoritative for intrinsic content; Namespace/boot
+> configuration is authoritative for deployment; and explicit non-intrinsic
+> user decisions belong in the exact SHA-256-bound `server/lumps/approvals.json`
+> store. Runtime and API paths never use legacy per-LUMP JSON as fallback.
 
 ---
 
@@ -322,8 +327,10 @@ offset 31   c-list[1]  Inform E-GT → NS[17] (Abacus)
 
 ## Manifest Catalog Schema — Release 1.1 Extensions
 
-The `manifest.json` file in `server/lumps/` is the lump catalog used by the
-IDE server. It carries fields beyond what `Navana.Abstraction.Add` accepts.
+The `manifest.json` file in `server/lumps/` is a disposable catalogue projection
+used by the IDE server. It is not authoritative for binary facts, approval, or
+Namespace/boot deployment. It carries fields beyond what
+`Navana.Abstraction.Add` accepts.
 Two fields were added in Release 1.1:
 
 | Field | Type | Applies to | Meaning |
@@ -331,8 +338,9 @@ Two fields were added in Release 1.1:
 | `ns_slot_policy` | string | Floating lumps | `"dynamic"` — Mint allocates an NS slot on first use. Required when `ns_slot` is `null`. |
 | `variant_group` | string | Alternative implementations | Two entries may share the same `ns_slot` only if they both carry the same non-null `variant_group`. |
 
-These are manifest-only fields. They are not part of the `Navana.Abstraction.Add`
-upload schema documented above.
+These are cache projection fields. They are not part of the
+`Navana.Abstraction.Add` upload schema documented above and cannot establish
+slot assignment or variant membership.
 
 For full change control rules, see [`CHANGELOG.md`](../CHANGELOG.md).
 

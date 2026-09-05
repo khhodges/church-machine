@@ -4,11 +4,11 @@
 // Regression test for the old-token cleanup logic in build_selftest_lump.js.
 //
 // The test seeds a temp lumps directory with a fake "old" PostFlashSelftest
-// token entry in manifest.json plus matching .lump and .json stub files, then
+// token entry in manifest.json plus a matching .lump stub file, then
 // runs build_selftest_lump.js --lumps-dir <tempdir>.  It asserts that:
 //
-//   1. The old .lump and .json files are deleted.
-//   2. A new .lump and .json are written for the freshly-computed token.
+//   1. The old .lump file is deleted.
+//   2. A new .lump is written for the freshly-computed token.
 //   3. manifest.json contains exactly one PostFlashSelftest entry with the
 //      new token.
 //   4. The script exits with code 0.
@@ -65,7 +65,6 @@ function seedTempDir(tmpDir, oldToken, manifest) {
     fs.writeFileSync(path.join(tmpDir, 'manifest.json'), JSON.stringify(manifest, null, 4) + '\n');
     // Write stub old-token files
     fs.writeFileSync(path.join(tmpDir, `${oldToken}.lump`), 'STUB_OLD_LUMP');
-    fs.writeFileSync(path.join(tmpDir, `${oldToken}.json`), '{"token":"' + oldToken + '"}');
 }
 
 // ── Read real manifest to get a valid baseline ────────────────────────────────
@@ -82,10 +81,22 @@ if (!realEntry) {
     console.error('No PostFlashSelftest entry in real manifest — cannot derive expected token.');
     process.exit(1);
 }
-const realToken = realEntry.token;
+function builtToken() {
+    const dir = makeTempDir();
+    try {
+        fs.writeFileSync(path.join(dir, 'manifest.json'), '[]\n');
+        const result = runScript(dir);
+        if (result.code !== 0) throw new Error(result.stderr);
+        const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
+        return manifest.find(entry => entry.abstraction === 'PostFlashSelftest').token;
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+}
+const realToken = builtToken();
 
 // ── Suite 1: different old token → old files must be removed ─────────────────
-console.log('\nSuite 1: prior token differs → old .lump/.json must be deleted');
+console.log('\nSuite 1: prior token differs → old .lump must be deleted');
 
 let tmpDir1;
 try {
@@ -104,16 +115,12 @@ try {
 
     assert(r.code === 0, 'script exits with code 0');
 
-    const oldLump    = path.join(tmpDir1, `${oldToken}.lump`);
-    const oldSidecar = path.join(tmpDir1, `${oldToken}.json`);
-    assert(!fs.existsSync(oldLump),    `old .lump (${oldToken}.lump) is deleted`);
-    assert(!fs.existsSync(oldSidecar), `old .json (${oldToken}.json) is deleted`);
+    const oldLump = path.join(tmpDir1, `${oldToken}.lump`);
+    assert(!fs.existsSync(oldLump), `old .lump (${oldToken}.lump) is deleted`);
 
     // New files must exist
-    const newLump    = path.join(tmpDir1, `${realToken}.lump`);
-    const newSidecar = path.join(tmpDir1, `${realToken}.json`);
-    assert(fs.existsSync(newLump),    `new .lump (${realToken}.lump) is written`);
-    assert(fs.existsSync(newSidecar), `new .json (${realToken}.json) is written`);
+    const newLump = path.join(tmpDir1, `${realToken}.lump`);
+    assert(fs.existsSync(newLump), `new .lump (${realToken}.lump) is written`);
 
     // Manifest must have exactly one PostFlashSelftest with the new token
     const updatedManifest = JSON.parse(fs.readFileSync(path.join(tmpDir1, 'manifest.json'), 'utf8'));
@@ -183,10 +190,8 @@ try {
 
     assert(r.code === 0, 'script exits with code 0');
 
-    const newLump    = path.join(tmpDir3, `${realToken}.lump`);
-    const newSidecar = path.join(tmpDir3, `${realToken}.json`);
-    assert(fs.existsSync(newLump),    `new .lump written when there was no prior entry`);
-    assert(fs.existsSync(newSidecar), `new .json written when there was no prior entry`);
+    const newLump = path.join(tmpDir3, `${realToken}.lump`);
+    assert(fs.existsSync(newLump), `new .lump written when there was no prior entry`);
 
     const updatedManifest = JSON.parse(fs.readFileSync(path.join(tmpDir3, 'manifest.json'), 'utf8'));
     const entries = updatedManifest.filter(e => e.abstraction === 'PostFlashSelftest');

@@ -62,7 +62,7 @@ def validate_portable_binding(binding, cc=None):
     if cc is not None and len(deps) != cc:
         raise ValueError("portable_binding dependency count must equal LUMP header cc")
     compatibility = binding.get("compatibility", "strong")
-    if compatibility not in ("strong", "allow-authorized-t-only"):
+    if compatibility != "strong":
         raise ValueError("portable_binding compatibility is invalid")
     rows, normalized = set(), []
     for index, raw in enumerate(deps):
@@ -86,8 +86,7 @@ def validate_portable_binding(binding, cc=None):
                          str(raw.get("identity_hash")).lower())
         if not self_row and not _HEX8.fullmatch(token):
             raise ValueError(f"{dep_dot}#{dep_issue} requires expected T")
-        if (not self_row and not _HEX64.fullmatch(binary_hash)
-                and not (compatibility == "allow-authorized-t-only" and not binary_hash)):
+        if not self_row and not _HEX64.fullmatch(binary_hash):
             raise ValueError(f"{dep_dot}#{dep_issue} requires authoritative binary_hash")
         if not self_row and compatibility == "strong" and not _HEX64.fullmatch(identity_hash or ""):
             raise ValueError(f"{dep_dot}#{dep_issue} requires authoritative identity_hash")
@@ -138,8 +137,6 @@ def verify_candidate(dep, candidate, lump_bytes):
     """Verify candidate N/T/hash from actual canonical bytes, never metadata alone."""
     if not isinstance(candidate, dict) or not isinstance(lump_bytes, (bytes, bytearray)):
         return False, "candidate bytes are unavailable"
-    if candidate.get("authorized") is not True:
-        return False, "candidate lacks explicit installation authorization"
     dot, issue = _name(candidate.get("N") or candidate.get("universal_name") or
                        candidate.get("identity_string") or
                        f"{candidate.get('dot_name', '')}#{candidate.get('issue_n', '')}")
@@ -157,11 +154,13 @@ def verify_candidate(dep, candidate, lump_bytes):
     if not dep["symbolic_self"] and actual_t != dep["T"]:
         return False, "content token does not match actual LUMP bytes"
     actual_hash = hashlib.sha256(bytes(lump_bytes)).hexdigest()
-    if dep["binary_hash"] and actual_hash != dep["binary_hash"]:
+    candidate_hash = str(candidate.get("binary_hash") or "").lower()
+    if not _HEX64.fullmatch(candidate_hash):
+        return False, "candidate lacks an exact hash-bound approval"
+    if candidate_hash != actual_hash:
+        return False, "candidate approval hash does not match actual LUMP bytes"
+    if not dep["symbolic_self"] and dep["binary_hash"] != actual_hash:
         return False, "authoritative binary hash does not match actual LUMP bytes"
-    if (not dep["symbolic_self"] and not dep["binary_hash"]
-            and candidate.get("legacy_authorized") is not True):
-        return False, "T-only artifact lacks explicit legacy authorization"
     return True, actual_hash
 
 

@@ -415,6 +415,9 @@ register_suite "check-wukong-hw-init" \
 register_suite "update-lump-tests" \
     'node scripts/test_update_lump.js'
 
+register_suite "lump-sidecar-transition-guard" \
+    'python3 scripts/check_no_operational_lump_sidecars.py && python3 -m pytest tests/lump/test_legacy_sidecar_tools.py -q'
+
 register_suite "callhome-parser-tests" \
     'python -m pytest scripts/test_callhome_parser.py -v'
 
@@ -448,8 +451,8 @@ register_suite "check-sitemap-figure-count" \
 register_suite "check-verilog-rtlil-stale" \
     'python3 scripts/check_verilog_rtlil_stale.py'
 
-register_suite "check-build-lump-sidecar-source" \
-    'node scripts/test_build_lump_sidecar_source.js'
+register_suite "check-build-lump-embedded-content" \
+    'node scripts/test_build_lump_embedded_content.js'
 
 register_suite "check-wukong-callhome-divergence" \
     'node scripts/check_wukong_callhome_divergence.js'
@@ -479,7 +482,7 @@ ALL_GROUPS["lump"]="lump-consistency lump-history-tests lump-v13-freespace-tests
 
 ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests warning-panel-tests bare-space-ns-fallback-tests disasm-panel-tests lump-dir-disasm-tooltip-tests hw-trace-live-movable-tests execution-identity-tests boot-entry-sync-tests install-boot-entry-cr0-tests ns-slot-dynamic-tests rogue-namespace-slot-tests ns-slot-policy-restore-tests ns-slot-modal-persist-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests openin-links-tests open-lump-freshness-tests lump-warning-tests call-cr6-l-perm-tests return-cr6-l-perm-tests load-through-l-perm-cr6-tests return-cr14-trace-tests wukong-cr-update-tests wukong-hw-fault-tests wukong-trace-cr-server-tests return-fetch-lump-tests constants-lump-tests"
 
-ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabilities-blocks check-no-ti60-ui check-security-claims check-api-reference-stale check-whats-new-feed wukong-relay-deployment-guard wukong-fault-sentinel callhome-parser-tests check-slot-index-leak check-ila-probe-names test-check-ila-probe-names check-lumps-guard check-ns-word3-contract test-check-ns-word3-contract check-sitemap-figure-count check-verilog-rtlil-stale check-build-lump-sidecar-source check-wukong-callhome-divergence check-build-lump-clist build-selftest-lump-syntax check-book-chapters check-ide-intro-base-path"
+ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabilities-blocks check-no-ti60-ui check-security-claims check-api-reference-stale check-whats-new-feed wukong-relay-deployment-guard wukong-fault-sentinel callhome-parser-tests check-slot-index-leak check-ila-probe-names test-check-ila-probe-names check-lumps-guard check-ns-word3-contract test-check-ns-word3-contract check-sitemap-figure-count check-verilog-rtlil-stale check-build-lump-embedded-content check-wukong-callhome-divergence check-build-lump-clist build-selftest-lump-syntax check-book-chapters check-ide-intro-base-path lump-sidecar-transition-guard"
 
 ALL_GROUPS["hardware"]="hardware-sim boot-rom-no-false-halt wukong-boot-rom-guard wukong-fault-sentinel check-ila-probe-names test-check-ila-probe-names wukong-preflight-launcher-tests"
 

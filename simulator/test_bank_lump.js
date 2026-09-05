@@ -37,9 +37,7 @@ check('BANK-LUMP01: exactly one canonical Bank manifest entry exists', entries.l
 
 const entry = entries[0];
 const binaryPath = path.join(LUMPS_DIR, entry.filename);
-const sidecarPath = path.join(LUMPS_DIR, entry.sidecar_file);
 const binary = fs.readFileSync(binaryPath);
-const sidecar = JSON.parse(fs.readFileSync(sidecarPath, 'utf8'));
 const header = binary.readUInt32BE(0);
 const size = 1 << (((header >>> 23) & 0x0F) + 6);
 const cw = (header >>> 10) & 0x1FFF;
@@ -53,14 +51,12 @@ check('BANK-LUMP02: Bank source remains a compilable CLOOMC abstraction',
 check('BANK-LUMP03: checked-in binary is the canonical compiler serialization',
     binary.equals(artifact.binary));
 check('BANK-LUMP04: header, binary size, code words, and c-list count agree',
-    size === binary.length / 4 && size === entry.lump_size && size === sidecar.lump_size &&
-    cw === entry.cw && cw === sidecar.cw && cc === 1 && cc === entry.cc && cc === sidecar.cc);
+    size === binary.length / 4 && size === entry.lump_size &&
+    cw === entry.cw && cc === 1 && cc === entry.cc);
 check('BANK-LUMP05: Bank carries the compiler-owned E-permission SELF identity in c-list row zero',
-    binary.readUInt32BE((size - cc) * 4) === artifact.selfGT &&
-    sidecar.permissions.c_list_row_0.live_lockbox_authority === false);
+    binary.readUInt32BE((size - cc) * 4) === artifact.selfGT);
 check('BANK-LUMP06: Bank is a self-defining tier-2 CLOOMC LUMP',
-    ((binary.readUInt32BE((cw + 1) * 4) >>> 24) & 0xFF) === 0xAB &&
-    sidecar.sourceStorageTier === 2 && sidecar.source === source);
+    ((binary.readUInt32BE((cw + 1) * 4) >>> 24) & 0xFF) === 0xAB);
 const createSource = source.slice(source.indexOf('method Create'), source.indexOf('// Read and Inspect'));
 check('BANK-LUMP06b: Create tests the issued CR0 capability rather than treating DR0 or an unconditional return as authority',
     createSource.includes('if (CR0 != null)') &&
@@ -85,24 +81,35 @@ check('BANK-LUMP06c: binary self-definition embeds the canonical Bank source and
     embeddedApi.capability_abi.Create.policy.input_register === 'CR1' &&
     embeddedApi.capability_abi.Create.policy.result_register === 'CR0' &&
     embeddedApi.capability_abi.Create.policy.status_register === 'DR0');
-check('BANK-LUMP07: manifest and sidecar bind the canonical identity and binary',
-    entry.token === sidecar.token &&
+check('BANK-LUMP07: approval view binds the canonical identity and binary',
     entry.token === sha256(Buffer.concat([Buffer.from('Bank', 'utf8'), binary])).slice(0, 8) &&
     entry.binary_hash === sha256(binary) &&
-    entry.identity_hash === sha256('Bank#1') &&
-    sidecar.identity_hash === entry.identity_hash &&
-    sidecar.identity_string === 'Bank#1');
+    entry.identity_hash === sha256('Bank#1'));
+const approval = { ...BankLumpIdentity, approved: true };
+const namespaceRecord = {
+    token: entry.token,
+    ns_slot: null,
+    ns_slot_policy: 'dynamic',
+    boot_resident: false,
+};
 const artifactValidation = BankLumpBinding.validateArtifact({
-    manifestEntry: entry, sidecar, binary,
+    manifestEntry: entry, approval, namespaceRecord, binary,
 });
 check('BANK-LUMP07b: the full manifest artifact validates before runtime selection',
     artifactValidation.ok &&
     BankLumpIdentity.token === entry.token &&
     BankLumpIdentity.binary_hash === entry.binary_hash &&
     BankLumpIdentity.self_gt === artifact.selfGT);
-check('BANK-LUMP07c: tampered fixed-slot metadata is rejected before runtime dispatch',
+check('BANK-LUMP07c: manifest security fields cannot override approval and Namespace truth',
+    BankLumpBinding.validateArtifact({
+        manifestEntry: { token: entry.token, ns_slot: 54, approved: false },
+        approval: { ...approval, ns_slot: 54, ns_slot_policy: 'static', boot_resident: true },
+        namespaceRecord, binary,
+    }).ok &&
     !BankLumpBinding.validateArtifact({
-        manifestEntry: { ...entry, ns_slot: 54 }, sidecar, binary,
+        manifestEntry: entry, approval,
+        namespaceRecord: { ...namespaceRecord, ns_slot: 54, ns_slot_policy: 'static' },
+        binary,
     }).ok);
 check('BANK-LUMP08: Bank is dynamic and never claims a fixed boot slot',
     entry.ns_slot === null && entry.ns_slot_policy === 'dynamic' &&
@@ -209,7 +216,7 @@ const sourceCapability = {
     metadata: {
         dot_name: entry.dot_name, issue_n: entry.issue_n, token: entry.token,
         binary_hash: entry.binary_hash, identity_hash: entry.identity_hash,
-        self_gt: entry.self_gt, identity_string: sidecar.identity_string,
+        self_gt: entry.self_gt, identity_string: 'Bank#1',
         genesis_authority: entry.genesis_authority,
         genesis_certificate_verification: entry.genesis_certificate_verification
     }

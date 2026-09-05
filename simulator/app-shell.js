@@ -1400,30 +1400,16 @@ function init() {
             clearTimeout(_editorAutoSaveTimer);
             _editorAutoSaveTimer = setTimeout(saveEditorState, 800);
         });
-        // ── WIP source auto-save (debounced 3 s) ─────────────────────────────
-        // When a WIP abstraction token is stored in localStorage (set by the
-        // /start page 'Code Edit →' flow), every edit is patched back to the
-        // server sidecar so the source is never lost between sessions.
+        // ── WIP source local draft (debounced 3 s) ───────────────────────────
+        // A draft is browser-local until the programmer explicitly builds and
+        // approves a new immutable LUMP; it never patches artifact metadata.
         var _wipSrcSaveTimer = null;
         asmEd.addEventListener('input', function() {
             clearTimeout(_wipSrcSaveTimer);
             _wipSrcSaveTimer = setTimeout(function() {
                 try {
                     var _tok = localStorage.getItem('church_wip_token');
-                    if (!_tok) return;
-                    fetch('/api/lump/' + _tok + '/wip-source', {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ source: asmEd.value })
-                    }).then(function(resp) {
-                        // A WIP may have been archived or deleted in another
-                        // tab. Stop retrying its dead token, but only if it is
-                        // still the active one when this response arrives.
-                        if (resp.status === 404 &&
-                                localStorage.getItem('church_wip_token') === _tok) {
-                            localStorage.removeItem('church_wip_token');
-                        }
-                    }).catch(function() {});
+                    if (_tok) localStorage.setItem('church_wip_draft_' + _tok, asmEd.value);
                 } catch (_e) {}
             }, 3000);
         });
@@ -2231,8 +2217,8 @@ function selectLumpType(type) {
         code:     'Code lumps contain abstraction methods and are compiled from CLOOMC++ or Assembly source in the Editor. Use <strong>Build LUMP ↓</strong> in the Editor toolbar to compile and download a deployable .lump binary.',
         data:     'Data lumps store raw word arrays — constants, lookup tables, or binary blobs. Each 32-bit word maps directly to hardware memory. Data lump authoring via the IDE is coming in a future release.',
         thread:   'Thread lumps encapsulate a concurrent thread instance with its own capability c-list (typ=10). Thread authoring via the IDE is coming in a future release.',
-        text:     'Text lumps store plain text encoded with Pack4 — 4 ASCII characters packed into each 32-bit word. Stored as a Data lump (typ=01) with <code>.type=text</code> in the sidecar. Text authoring via the IDE is coming in a future release.',
-        markdown: 'Markdown lumps store documentation or rich text encoded with Pack4 — 4 chars per word. Stored as a Data lump (typ=01) with <code>.type=markdown</code> in the sidecar. Markdown authoring via the IDE is coming in a future release.',
+        text:     'Text lumps store plain text encoded with Pack4 — 4 ASCII characters packed into each 32-bit word. Stored as a Data lump (typ=01) with content type recorded in its approved artifact metadata. Text authoring via the IDE is coming in a future release.',
+        markdown: 'Markdown lumps store documentation or rich text encoded with Pack4 — 4 chars per word. Stored as a Data lump (typ=01) with content type recorded in its approved artifact metadata. Markdown authoring via the IDE is coming in a future release.',
         image:    'Image lumps store pixel data or encoded image bytes as a word array (typ=01, <code>.type=image</code>). Image import via the IDE is coming in a future release.',
     };
 

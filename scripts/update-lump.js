@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // scripts/update-lump.js
 //
-// One-command LUMP rebuild: assemble the .cloomc source, write the .lump
-// binary, regenerate the sidecar JSON, and patch manifest.json — all
-// atomically, all in one step.
+// One-command LUMP rebuild: assemble the .cloomc source and write only the
+// .lump binary.  Sidecars and manifest records are catalogues, not build
+// outputs, and are deliberately never changed here.
 //
 // Usage:
 //   node scripts/update-lump.js --token <hex>           # update lump
@@ -199,33 +199,31 @@ function lumpPath(ent) {
     return path.join(LUMPS_DIR, fn);
 }
 
-function sidecarPath(ent) {
-    const fn = ent.sidecar_file || `${(ent.token || '').toLowerCase()}.json`;
-    return path.join(LUMPS_DIR, fn);
-}
-
-const existingLumpPath    = lumpPath(entry);
-const existingSidecarPath = sidecarPath(entry);
+const existingLumpPath = lumpPath(entry);
 
 // ── Read existing c-list from current binary ──────────────────────────────────
 
 let existingCList = [];
-const existingCC = typeof entry.cc === 'number' ? entry.cc : 0;
 
-if (existingCC > 0 && fs.existsSync(existingLumpPath)) {
+if (fs.existsSync(existingLumpPath)) {
     const raw   = fs.readFileSync(existingLumpPath);
     const words = raw.length / 4;
     if (raw.length % 4 !== 0 || words < 1) {
         console.error('ERROR: Existing .lump file is malformed (not a multiple of 4 bytes).');
         process.exit(1);
     }
-    const existingLumpSize = words;
+    const header = raw.readUInt32BE(0);
+    const magic = (header >>> 27) & 0x1F;
+    const existingLumpSize = 1 << (((header >>> 23) & 0xF) + 6);
+    const existingCC = header & 0xFF;
+    if (magic !== 0x1F || words !== existingLumpSize || existingCC >= existingLumpSize) {
+        console.error('ERROR: Existing .lump file has an invalid header or size.');
+        process.exit(1);
+    }
     const clistStart = existingLumpSize - existingCC;
     for (let i = 0; i < existingCC; i++) {
         existingCList.push(raw.readUInt32BE((clistStart + i) * 4));
     }
-} else if (existingCC > 0) {
-    existingCList = new Array(existingCC).fill(0);
 }
 
 const newCC = existingCList.length;
@@ -287,30 +285,9 @@ if (CHECK_MODE) {
     process.exit(1);
 }
 
-// ── Write files atomically ────────────────────────────────────────────────────
+// ── Write binary ──────────────────────────────────────────────────────────────
 
-// All preparation succeeded — write files.
-
-// 1. .lump binary
+// All preparation succeeded.  The binary is the sole build output.
 fs.writeFileSync(existingLumpPath, newBytes);
-
-// 2. Sidecar JSON — update only cw / cc / lump_size; preserve all other fields
-let sidecar = {};
-if (fs.existsSync(existingSidecarPath)) {
-    try {
-        sidecar = JSON.parse(fs.readFileSync(existingSidecarPath, 'utf8'));
-    } catch (_) { /* start fresh if malformed */ }
-}
-sidecar.cw        = newCW;
-sidecar.cc        = newCC;
-sidecar.lump_size = lumpSize;
-fs.writeFileSync(existingSidecarPath, JSON.stringify(sidecar, null, 2) + '\n');
-
-// 3. manifest.json — update only cw / cc / lump_size in the matching entry
-const mEntry = manifest.find(e => (e.token || '').toLowerCase() === TOKEN);
-mEntry.cw        = newCW;
-mEntry.cc        = newCC;
-mEntry.lump_size = lumpSize;
-fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 4) + '\n');
 
 console.log(`Updated ${TOKEN}: cw=${newCW} cc=${newCC} lump_size=${lumpSize}`);

@@ -65,15 +65,15 @@ tu_version = _re_extract(r'_TU_VERSION_CALL_3PKT\s*=\s*(0x[0-9a-fA-F]+|\d+)', to
 # 2. Bitstream sidecar
 # ---------------------------------------------------------------------------
 bit_path = os.path.join(ROOT, 'build', 'church_wukong_xc7a100t.bit')
-sidecar_path = bit_path + '.meta.json'
-sidecar = {}
-if os.path.exists(sidecar_path):
-    with open(sidecar_path) as f:
-        sidecar = json.load(f)
+bit_meta_path = bit_path + '.meta.json'
+bit_meta = {}
+if os.path.exists(bit_meta_path):
+    with open(bit_meta_path) as f:
+        bit_meta = json.load(f)
 # Verify md5 matches the file on disk
 bit_ok = False
-if os.path.exists(bit_path) and sidecar.get('md5'):
-    bit_ok = (_md5_file(bit_path) == sidecar['md5'])
+if os.path.exists(bit_path) and bit_meta.get('md5'):
+    bit_ok = (_md5_file(bit_path) == bit_meta['md5'])
 
 mcs_path = os.path.join(ROOT, 'build', 'church_wukong_xc7a100t.mcs')
 mcs_size = os.path.getsize(mcs_path) if os.path.exists(mcs_path) else None
@@ -182,10 +182,10 @@ for entry in sorted(manifest, key=lambda e: (e.get('ns_slot') or 999, e.get('tok
 # ---------------------------------------------------------------------------
 now = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
 
-bit_version   = sidecar.get('version', '?')
-bit_built_at  = sidecar.get('built_at', '?')
-bit_md5       = sidecar.get('md5', '?')
-bit_size      = sidecar.get('size_bytes', '?')
+bit_version   = bit_meta.get('version', '?')
+bit_built_at  = bit_meta.get('built_at', '?')
+bit_md5       = bit_meta.get('md5', '?')
+bit_size      = bit_meta.get('size_bytes', '?')
 bit_integrity = '✅ md5 verified' if bit_ok else '❌ md5 MISMATCH — bitstream may be corrupt'
 
 def _hdr_str(hdr):

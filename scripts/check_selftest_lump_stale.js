@@ -61,6 +61,21 @@ if (result.errors.length > 0) {
 }
 
 const words = result.words;
+function contentFrame(name, text) {
+    const api = Buffer.from(JSON.stringify({ name, methods: [] }), 'utf8');
+    const src = Buffer.from(text, 'utf8');
+    const data = Buffer.concat([
+        Buffer.from([0xAB, 0x03, api.length >>> 8, api.length & 0xFF]), api,
+        Buffer.alloc((4 - api.length % 4) % 4),
+        Buffer.from([(src.length >>> 24) & 0xFF, (src.length >>> 16) & 0xFF,
+            (src.length >>> 8) & 0xFF, src.length & 0xFF]), src,
+        Buffer.alloc((4 - src.length % 4) % 4),
+    ]);
+    const frame = [];
+    for (let i = 0; i < data.length; i += 4) frame.push(data.readUInt32BE(i));
+    return frame;
+}
+const FRAME = contentFrame('PostFlashSelftest', source);
 
 // ── C-List (must match build_selftest_lump.js exactly) ──────────────────────
 // cc = 2.
@@ -77,7 +92,7 @@ const CLIST = [
 // ── Pack LUMP binary ─────────────────────────────────────────────────────────
 const cw = words.length;
 const cc = CLIST.length;
-const totalNeeded = 1 + cw + cc;
+const totalNeeded = 1 + cw + FRAME.length + cc;
 
 let lumpSize = 64;
 while (lumpSize < totalNeeded) lumpSize *= 2;
@@ -95,6 +110,7 @@ const headerWord = (
 const padded = new Uint32Array(lumpSize);
 padded[0] = headerWord;
 for (let i = 0; i < cw; i++) padded[1 + i] = words[i] >>> 0;
+for (let i = 0; i < FRAME.length; i++) padded[1 + cw + i] = FRAME[i] >>> 0;
 
 const clistBase = lumpSize - cc;
 for (let i = 0; i < CLIST.length; i++) {
@@ -128,7 +144,6 @@ function crc32(buf) {
 
 const token       = crc32(bytes).toString(16).toLowerCase().padStart(8, '0');
 const lumpPath    = path.join(LUMPS_DIR, `${token}.lump`);
-const sidecarPath = path.join(LUMPS_DIR, `${token}.json`);
 
 // Allow --manifest <path> override for testing
 const manifestArgIdx = process.argv.indexOf('--manifest');
@@ -180,32 +195,7 @@ if (!fs.existsSync(CANONICAL_LUMP_PATH)) {
     }
 }
 
-// 3. Sidecar JSON check ───────────────────────────────────────────────────────
-if (!fs.existsSync(sidecarPath)) {
-    console.error(`\nFAIL: server/lumps/${token}.json does not exist.`);
-    console.error('      The sidecar metadata file is missing — rebuild with:');
-    console.error('      node scripts/build_selftest_lump.js');
-    stale = true;
-} else {
-    let sidecar;
-    try {
-        sidecar = JSON.parse(fs.readFileSync(sidecarPath, 'utf8'));
-    } catch (e) {
-        console.error(`\nFAIL: server/lumps/${token}.json could not be parsed: ${e.message}`);
-        stale = true;
-        sidecar = null;
-    }
-    if (sidecar !== null) {
-        if (sidecar.token !== token) {
-            console.error(`\nFAIL: server/lumps/${token}.json has token "${sidecar.token}" but expected "${token}".`);
-            stale = true;
-        } else {
-            console.log(`OK:   server/lumps/${token}.json — sidecar token matches`);
-        }
-    }
-}
-
-// 4. Manifest check ───────────────────────────────────────────────────────────
+// 3. Manifest index check ─────────────────────────────────────────────────────
 if (!fs.existsSync(MANIFEST)) {
     console.error('\nFAIL: server/lumps/manifest.json does not exist.');
     stale = true;
@@ -241,7 +231,7 @@ if (!fs.existsSync(MANIFEST)) {
 if (stale) {
     console.error('');
     console.error('Run:  node scripts/build_selftest_lump.js');
-    console.error('Then commit the updated .lump, .json, and manifest.json.');
+    console.error('Then commit the updated .lump and manifest.json.');
     process.exit(1);
 }
 

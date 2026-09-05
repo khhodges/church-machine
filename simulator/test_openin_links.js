@@ -71,7 +71,9 @@ const ABS_TO_LUMP_SRC   = extractFunctionByName('app-lumps.js', '_goToLumpByAbst
 // exhausted-poll branch — must be extracted alongside it or the sandbox
 // throws a ReferenceError the moment the "not found" degrade path runs.
 const LUMP_VERSION_LABEL_SRC = extractFunctionByName('app-lumps.js', '_lumpVersionLabel');
+const LUMP_TOKEN_ID_SRC = extractFunctionByName('app-lumps.js', '_lumpTokenIdentity');
 const SWITCH_LUMP_VERSION_SRC = extractFunctionByName('app-lumps.js', '_switchToLumpVersionAndScroll');
+const INSPECTED_METHOD_SRC = extractFunctionByName('app-lumps.js', '_lumpHasInspectedMethod');
 const SCROLL_METHOD_SRC = extractFunctionByName('app-lumps.js', '_scrollToLumpMethod');
 const REFRESH_LINKS_SRC = extractFunctionByName('app-shell.js', '_refreshEditorJumpLinks');
 const EDITOR_TO_LUMP_SRC = extractFunctionByName('app-shell.js', '_editorJumpToLump');
@@ -87,7 +89,7 @@ const OPEN_SAVED_LUMP_SRC   = extractFunctionByName('app-lumps.js', 'openLumpInE
 const SWITCH_CODE_TAB_SRC   = extractFunctionByName('app-run.js', 'switchCodeTab');
 
 const ALL_SRC = [TOAST_SRC, ABS_TO_EDITOR_SRC, ABS_TO_LUMP_SRC,
-                 LUMP_VERSION_LABEL_SRC, SWITCH_LUMP_VERSION_SRC, SCROLL_METHOD_SRC,
+                  LUMP_VERSION_LABEL_SRC, LUMP_TOKEN_ID_SRC, SWITCH_LUMP_VERSION_SRC, INSPECTED_METHOD_SRC, SCROLL_METHOD_SRC,
                  REFRESH_LINKS_SRC, EDITOR_TO_LUMP_SRC, EDITOR_TO_ABS_SRC,
                  RENDER_LUMPS_SRC].join('\n\n');
 
@@ -590,16 +592,19 @@ trackAsync((async function t14() {
 // name that other version and offer a one-click switch — not the generic
 // "Method not found" message.
 //
-// WIDGETBOOT (boot-resident) has "MethodX" in its `.methods` sidecar record;
+// WIDGETBOOT (boot-resident) has "MethodX" in API data inspected from its
+// embedded content frame;
 // WIDGETV2FLOAT (versioned, resolved by renderLumps' preference rule) does
 // not have it rendered in its Content-tab panel. Since WIDGETBOOT.methods
 // really does list "MethodX", this is a genuine version mismatch, not a
 // missing method.
 trackAsync((async function t15() {
     const WIDGET_BOOT = { abstraction: 'Widget', token: 'WIDGETBOOT', version: null, ns_slot: 5,
-        methods: [{ name: 'MethodX' }] };
+        api_definition_source: 'binary-inspection',
+        api_definition: { methods: [{ name: 'MethodX' }] } };
     const WIDGET_V2   = { abstraction: 'Widget', token: 'WIDGETV2FLOAT', version: 2, ns_slot: null,
-        methods: [{ name: 'MethodY' }] };
+        api_definition_source: 'binary-inspection',
+        api_definition: { methods: [{ name: 'MethodY' }] } };
     const lumps = [WIDGET_BOOT, WIDGET_V2];
 
     const { ctx, document } = makeCtx({
@@ -607,9 +612,13 @@ trackAsync((async function t15() {
         fastTimers: true,
         fetchImpl: async () => ({ ok: true, json: async () => lumps }),
     });
+    assert('T15 fixture exposes MethodX through binary-inspected API metadata',
+        vm.runInContext('_lumpHasInspectedMethod(_lumpsCache[0], "MethodX")', ctx) === true);
 
     await vm.runInContext('_goToLumpByAbstractionName("Widget", "MethodX")', ctx);
     await vm.runInContext('renderLumps()', ctx);
+    assert('T15 rendered cache preserves inspected MethodX metadata',
+        vm.runInContext('_lumpHasInspectedMethod(_lumpsCache.find(l => l.token === "WIDGETBOOT"), "MethodX")', ctx) === true);
 
     // Only WIDGETV2FLOAT's panel exists in the DOM (the resolved token) and
     // it never gets a "MethodX" card — matching its real method set.
@@ -1184,7 +1193,7 @@ trackAsync((async function t21() {
         await lumpDecodeContentFrame(uncompressed.words) === uncompressedSource);
 })());
 
-// ── T22: source preference, sidecar fallback, and explicit missing state ──────
+// ── T22: embedded-only source authority and explicit missing state ───────────
 (function t22() {
     const sandbox = { console };
     vm.createContext(sandbox);
@@ -1192,18 +1201,18 @@ trackAsync((async function t21() {
 
     const embedded = vm.runInContext(
         '_resolveSavedLumpEditorSource("embedded source", "sidecar source")', sandbox);
-    const fallback = vm.runInContext(
+    const noFallback = vm.runInContext(
         '_resolveSavedLumpEditorSource(null, "sidecar source")', sandbox);
     const missing = vm.runInContext(
         '_resolveSavedLumpEditorSource(null, null)', sandbox);
 
     assert('T22 embedded source wins over sidecar source',
         embedded.origin === 'embedded' && embedded.source === 'embedded source', embedded);
-    assert('T22 older LUMP falls back to sidecar source',
-        fallback.origin === 'sidecar' && fallback.source === 'sidecar source', fallback);
+    assert('T22 older LUMP never falls back to sidecar source',
+        noFallback.origin === 'missing' && !noFallback.source.includes('sidecar source'), noFallback);
     assert('T22 missing source is explicitly identified',
         missing.origin === 'missing' && missing.restored === false &&
-        missing.source.includes('No recoverable source'), missing.source);
+        missing.source.includes('Embedded source is unavailable'), missing.source);
     assert('T22 missing-source buffer never copies compiled disassembly',
         !missing.source.includes('0xF8000000'), missing.source);
 })();
@@ -1325,6 +1334,10 @@ trackAsync((async function t25() {
         fetch() { return wordsResponse; },
         switchView(view) { calls.switchView.push(view); },
         setTimeout,
+        document: {
+            getElementById() { return null; },
+            querySelector() { return null; },
+        },
     };
     sandbox.window = sandbox;
     sandbox.LumpRegistry = {

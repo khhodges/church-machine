@@ -1,74 +1,80 @@
 import hashlib
 import json
+import struct
+import sys
+import types
 
-import pytest
-
+_trace_stub = types.ModuleType("hardware.wukong_trace_symbols")
+_trace_stub.trace_metadata = lambda _nia: None
+_trace_stub._disassemble_word = lambda word: f"0x{word:08X}"
+sys.modules.setdefault("hardware.wukong_trace_symbols", _trace_stub)
 import server.app as app_module
 
 
-@pytest.fixture
-def client():
-    app_module.app.config["TESTING"] = True
-    with app_module.app.test_client() as test_client:
-        yield test_client
+def _binary():
+    return struct.pack(">64I", (0x1F << 27), *([0] * 63))
 
 
-def test_boot_config_catalog_preserves_portable_binder_policy(
-        tmp_path, monkeypatch, client):
-    identity = hashlib.sha256(b"Fixed.Target#2").hexdigest()
-    binary = "a" * 64
-    manifest = [
-        {
-            "token": "11223344", "cache_token": "11223344",
-            "abstraction": "Fixed.Target", "ns_slot": 12,
-            "lump_size": 64, "methods": [{"name": "run"}],
-            "dot_name": "Fixed.Target", "issue_n": 2,
-            "identity_hash": identity, "binary_hash": binary,
-            "grants": ["R", "W"], "capability_type": "inform",
-            "authorized": True, "legacy_authorized": False,
+def test_portable_catalog_trust_is_exact_hash_bound(tmp_path):
+    raw = _binary()
+    digest = hashlib.sha256(raw).hexdigest()
+    (tmp_path / "11223344.lump").write_bytes(raw)
+    (tmp_path / "approvals.json").write_text(json.dumps({
+        "version": 1, "algorithm": "sha256",
+        "approvals": {
+            digest: {
+                "binary_hash": digest,
+                "dot_name": "Floating.Tool",
+                "issue_n": 4,
+                "portable_binding": {"owner": "Floating.Tool#4"},
+            },
         },
-        {
-            "token": "55667788", "abstraction": "Floating.Tool",
-            "ns_slot": None, "ns_slot_policy": "dynamic",
-            "lump_size": 64, "methods": [{"name": "run"}],
-            "sidecar_file": "floating.json",
-        },
-    ]
-    manifest_path = tmp_path / "manifest.json"
-    manifest_path.write_text(json.dumps(manifest))
-    (tmp_path / "floating.json").write_text(json.dumps({
-        "cache_token": "55667788", "dot_name": "Floating.Tool", "issue_n": 4,
-        "identity_hash": hashlib.sha256(b"Floating.Tool#4").hexdigest(),
-        "binary_hash": "b" * 64, "grants": ["E"],
-        "capability_type": "outform", "authorized": True,
-        "legacy_authorized": True,
     }))
-    monkeypatch.setattr(app_module, "LUMPS_MANIFEST_PATH", str(manifest_path))
-    monkeypatch.setattr(app_module, "BOOT_CONFIG_PATH", str(tmp_path / "missing-config.json"))
-    monkeypatch.setattr(app_module, "BOOT_CONFIG_LEGACY_PATH",
-                        str(tmp_path / "missing-legacy.json"))
-    # Keep slot 12 in the normal selectable branch; production profiles may
-    # increase the named prefix through generated Thread slots.
+
+    approval = app_module._matching_lump_approval(str(tmp_path), digest)
+    assert approval["binary_hash"] == digest
+    assert approval["portable_binding"]["owner"] == "Floating.Tool#4"
+
+
+def test_portable_catalog_rejects_unapproved_bytes(tmp_path):
+    raw = _binary()
+    (tmp_path / "approvals.json").write_text(json.dumps({
+        "version": 1, "algorithm": "sha256", "approvals": {},
+    }))
+    assert app_module._matching_lump_approval(
+        str(tmp_path), hashlib.sha256(raw).hexdigest()) is None
+
+
+def test_catalog_ignores_manifest_fact_and_placement_lies(tmp_path, monkeypatch):
+    raw = _binary()
+    digest = hashlib.sha256(raw).hexdigest()
+    (tmp_path / "11223344.lump").write_bytes(raw)
+    (tmp_path / "manifest.json").write_text(json.dumps([{
+        "token": "11223344", "filename": "11223344.lump",
+        "abstraction": "Manifest.Lie", "lump_size": 999, "cw": 999, "cc": 99,
+        "methods": [], "binary_hash": "0" * 64, "identity_hash": "1" * 64,
+        "grants": ["L", "S"], "ns_slot": 31, "ns_slot_policy": "static",
+    }]))
+    identity = hashlib.sha256(b"Approved.Name#2").hexdigest()
+    (tmp_path / "approvals.json").write_text(json.dumps({
+        "version": 1, "algorithm": "sha256", "approvals": {
+            digest: {"binary_hash": digest, "dot_name": "Approved.Name",
+                     "issue_n": 2, "identity_hash": identity, "grants": ["E"]},
+        },
+    }))
+    (tmp_path / "ns-state.json").write_text(json.dumps({"abstractions": [{
+        "name": "Approved.Name", "slot": 12, "token": "11223344",
+    }]}))
+    monkeypatch.setattr(app_module, "LUMPS_MANIFEST_PATH",
+                        str(tmp_path / "manifest.json"))
+    monkeypatch.setattr(app_module, "NS_STATE_PATH", str(tmp_path / "ns-state.json"))
     monkeypatch.setattr(app_module, "BASE_NAMED_NS_COUNT", 20)
 
-    response = client.get("/api/boot-config")
-    assert response.status_code == 200
-    catalog = response.get_json()["lumpCatalog"]
-    fixed = next(row for row in catalog if row["abstraction"] == "Fixed.Target")
-    floating = next(row for row in catalog if row["abstraction"] == "Floating.Tool")
-
-    assert fixed["cache_token"] == fixed["cacheToken"] == "11223344"
-    assert fixed["grants"] == ["R", "W"]
-    assert fixed["capability_type"] == "inform"
-    assert fixed["authorized"] is True
-    assert fixed["legacy_authorized"] is False
-    assert fixed["identityHash"] == identity
-
-    assert floating["floating"] is True
-    assert floating["cache_token"] == floating["cacheToken"] == "55667788"
-    assert floating["grants"] == ["E"]
-    assert floating["capability_type"] == "outform"
-    assert floating["authorized"] is True
-    assert floating["legacy_authorized"] is True
-    assert floating["dotName"] == "Floating.Tool"
-    assert floating["issueN"] == 4
+    row = app_module._load_lump_catalog()[0]
+    assert row["nsSlot"] == 12
+    assert row["nsSlotPolicy"] == "static"
+    assert row["lumpSize"] == 64 and row["cw"] == 0 and row["cc"] == 0
+    assert row["binaryHash"] == digest
+    assert row["identityHash"] == identity
+    assert row["grants"] == ["E"]
+    assert row["abstraction"] == "Approved.Name"

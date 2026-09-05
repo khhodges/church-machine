@@ -32,7 +32,8 @@
  *       Parse the 0xAB content frame from a full LUMP word array and return
  *       the embedded source string, or null when absent / malformed.
  *       Decompression (flags & 0x04) is performed via DecompressionStream.
- *       Silent exceptions return null (caller falls through to sidecar/disasm).
+ *       Returns null when source is not embedded. Callers must not substitute
+ *       sidecar or catalog source for missing binary content.
  *
  * CM_LUMP_SPECIFICATION.md §Freespace Content and Self-Definition,
  * §Mint Validation Sequence step 7.
@@ -245,6 +246,85 @@ function lumpContentFrameProfile(serverWords) {
 }
 
 /**
+ * Inspect the intrinsic self-definition fields carried by a LUMP binary.
+ *
+ * Unlike the legacy detail/sidecar path, this function keeps "not embedded"
+ * distinct from malformed content.  It is the canonical frontend adapter for
+ * source/API/profile UI and never accepts metadata fallbacks.
+ *
+ * @returns {Promise<{headerValid:boolean, contentFramePresent:boolean,
+ *   contentFrameValid:boolean, profile:string|null, sourceEmbedded:boolean,
+ *   source:string|null, apiDefinition:object|null, error:string|null}>}
+ */
+async function lumpInspectContentFrame(serverWords) {
+    var result = {
+        headerValid: false,
+        contentFramePresent: false,
+        contentFrameValid: false,
+        profile: null,
+        sourceEmbedded: false,
+        source: null,
+        apiDefinition: null,
+        header: null,
+        error: null
+    };
+    try {
+        if (!serverWords || serverWords.length === 0) {
+            result.error = 'LUMP binary is empty';
+            return result;
+        }
+        var hdr = serverWords[0] >>> 0;
+        var magic = (hdr >>> 27) & 0x1F;
+        var cw = (hdr >>> 10) & 0x1FFF;
+        var cc = hdr & 0xFF;
+        var size = 64 << ((hdr >>> 23) & 0x0F);
+        if (magic !== 0x1F || serverWords.length < size || 1 + cw > size - cc) {
+            result.error = 'LUMP header or allocation is malformed';
+            return result;
+        }
+        result.headerValid = true;
+        result.header = { cw: cw, cc: cc, lumpSize: size };
+        var start = 1 + cw;
+        var frameHdr = serverWords[start] >>> 0;
+        if (((frameHdr >>> 24) & 0xFF) !== 0xAB) {
+            result.error = 'Legacy LUMP has no embedded content frame';
+            return result;
+        }
+        result.contentFramePresent = true;
+        var flags = (frameHdr >>> 16) & 0xFF;
+        var allowedFlags = flags === 0x00 || flags === 0x01 || flags === 0x03 ||
+            flags === 0x05 || flags === 0x07;
+        var apiLength = frameHdr & 0xFFFF;
+        var apiWords = Math.ceil(apiLength / 4);
+        if (!allowedFlags || apiLength === 0 || start + 1 + apiWords > size - cc) {
+            result.error = 'Embedded content frame is malformed';
+            return result;
+        }
+        result.profile = flags === 0x00 ? 'api' :
+            (flags === 0x01 || flags === 0x05 ? 'compact' : 'full');
+        result.apiDefinition = lumpDecodeContentFrameApi(serverWords);
+        if (!result.apiDefinition) {
+            result.error = 'Embedded API definition is malformed';
+            return result;
+        }
+        result.sourceEmbedded = (flags & 0x01) !== 0;
+        if (result.sourceEmbedded) {
+            result.source = await lumpDecodeContentFrame(serverWords);
+            if (typeof result.source !== 'string') {
+                result.error = 'Embedded source is malformed or cannot be decompressed';
+                return result;
+            }
+        }
+        result.contentFrameValid = true;
+        return result;
+    } catch (_e) {
+        result.error = 'Embedded content inspection failed: ' +
+            (_e && _e.message ? _e.message : String(_e));
+        return result;
+    }
+}
+
+/**
  * Parse the 0xAB content frame from a complete LUMP word array and return the
  * embedded source string, or null when absent, malformed, or on any error.
  *
@@ -311,6 +391,7 @@ var _lcfExports = {
     lumpFrameDeflateRaw:   lumpFrameDeflateRaw,
     lumpBuildContentFrame: lumpBuildContentFrame,
     lumpContentFrameProfile: lumpContentFrameProfile,
+    lumpInspectContentFrame: lumpInspectContentFrame,
     lumpDecodeContentFrameApi: lumpDecodeContentFrameApi,
     lumpDecodeContentFrame: lumpDecodeContentFrame,
 };

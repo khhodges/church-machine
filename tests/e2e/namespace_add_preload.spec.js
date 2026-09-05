@@ -1,7 +1,7 @@
 'use strict';
 
 // The Add LUMP modal is an independent Namespace-policy entry point.  It must
-// bind its selected Preload to catalog metadata before the shared policy saver
+// bind its selected Preload to a hash-matched approval view before the shared policy saver
 // posts the Wukong boot configuration.
 
 const { test, expect } = require('@playwright/test');
@@ -9,7 +9,7 @@ const { test, expect } = require('@playwright/test');
 const TOKEN = 'cafebabe';
 const BINARY_HASH = 'a'.repeat(64);
 const IDENTITY_HASH = 'b'.repeat(64);
-const SIDEcar = {
+const APPROVAL = {
     token: TOKEN,
     abstraction: 'Bridge.Preload',
     dot_name: 'Bridge.Preload.1.cafebabe',
@@ -30,19 +30,11 @@ test('Add LUMP binds a forward Wukong Preload before saving policies', async ({ 
 
     await page.route('**/api/lumps/list', route => route.fulfill({
         contentType: 'application/json',
-        body: JSON.stringify([SIDEcar]),
-    }));
-    await page.route(`**/api/lumps/${TOKEN}/detail`, route => route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify(SIDEcar),
+        body: JSON.stringify([APPROVAL]),
     }));
     await page.route(`**/api/lump/${TOKEN}/words`, route => route.fulfill({
         contentType: 'application/json',
-        body: JSON.stringify(WORDS),
-    }));
-    await page.route(`**/api/lump/${TOKEN}/meta`, route => route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({ ok: true }),
+        body: JSON.stringify({ words: WORDS, binary_hash: BINARY_HASH, approved: true }),
     }));
     await page.route('**/api/boot-config', async route => {
         if (route.request().method() !== 'POST') return route.continue();
@@ -91,7 +83,7 @@ test('Add LUMP binds a forward Wukong Preload before saving policies', async ({ 
     const row = posted.step2.lumps.find(entry => entry.nsSlot === slot);
     expect(row).toMatchObject({
         nsSlot: slot,
-        abstraction: SIDEcar.dot_name,
+        abstraction: APPROVAL.dot_name,
         lumpToken: TOKEN,
         loadPolicy: 'Preload',
         lumpSize: 64,

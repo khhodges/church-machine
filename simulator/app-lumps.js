@@ -33,21 +33,16 @@ function showLumpDetail(token) {
     const _lumpDisplayName = lump.dot_name || lump.abstraction || 'Unknown Lump';
     const _detailTitle = _lumpDisplayName +
         (isNamespace ? ' — Namespace LUMP' : ` — ${_lumpTitleLabel}`);
-    // The binary-derived values below replace these quick manifest estimates as
-    // soon as the words endpoint returns. Keeping the summary in the heading
-    // leaves the LUMP layout visible while inspecting any detail tab.
-    const _headingCw = parseInt(lump.cw) || 0;
-    const _headingCc = parseInt(lump.cc) || 0;
     titleEl.innerHTML =
         `<span class="lump-detail-title-text">${_escHtml(_detailTitle)}</span>` +
         `<span class="lump-field-size-summary" id="lumpFieldSizes_${_tk}" ` +
         `title="LUMP field sizes in 32-bit words. API includes its 0xAB frame header; Source includes its byte-length word.">` +
         _renderLumpFieldSizeSummary({
-            code: _headingCw,
+            code: null,
             api: null,
             source: null,
             empty: null,
-            clist: _headingCc,
+            clist: null,
         }) +
         `</span>`;
 
@@ -113,12 +108,9 @@ function showLumpDetail(token) {
         if (_verNum != null)
             _headerStrip += `<span class="lump-hs-chip lump-version-badge" id="lumpVersionBadge_${_tk}"><span class="lump-hs-label">Ver</span>v${_verNum}</span>`;
     }
-    if (lump.lump_size)
-        _headerStrip += `<span class="lump-hs-chip"><span class="lump-hs-label">Size</span>${parseInt(lump.lump_size)}w</span>`;
-    if (lump.cw !== undefined && lump.cw !== null)
-        _headerStrip += `<span class="lump-hs-chip" id="lumpCwChip_${_tk}"><span class="lump-hs-label">CW</span>${parseInt(lump.cw)}</span>`;
-    if (lump.cc !== undefined && lump.cc !== null)
-        _headerStrip += `<span class="lump-hs-chip" id="lumpCcChip_${_tk}"><span class="lump-hs-label">CC</span>${parseInt(lump.cc)}</span>`;
+    _headerStrip += `<span class="lump-hs-chip" id="lumpSizeChip_${_tk}"><span class="lump-hs-label">Size</span>unavailable</span>`;
+    _headerStrip += `<span class="lump-hs-chip" id="lumpCwChip_${_tk}"><span class="lump-hs-label">CW</span>unavailable</span>`;
+    _headerStrip += `<span class="lump-hs-chip" id="lumpCcChip_${_tk}"><span class="lump-hs-label">CC</span>unavailable</span>`;
     if (!isNamespace)
         _headerStrip += `<span class="lump-malformed-chip" id="lumpMalformedChip_${_tk}" style="display:none" title="Click Edit to repair with canonical source">\u26a0 Binary may be malformed<button class="lump-malformed-chip-dismiss" onclick="this.parentElement.style.display='none'" title="Dismiss">\u00d7</button></span>`;
     // ── Inline actions group (pushed right by margin-left:auto) ───────────────
@@ -132,20 +124,10 @@ function showLumpDetail(token) {
     }
     // Shrink button
     {
-        const _curSize  = parseInt(lump.lump_size) || 0;
-        const _cw       = parseInt(lump.cw) || 0;
-        const _cc       = parseInt(lump.cc) || 0;
-        const _minCont  = 1 + _cw + _cc;
-        let   _minSize  = 64;
-        while (_minSize < _minCont) _minSize *= 2;
-        const _canShrink = _curSize > _minSize;
-        const _saved = _curSize - _minSize;
-        _headerStrip += `<button class="lump-hs-resize-btn${_canShrink ? '' : ' lump-hs-resize-disabled'}" ` +
+        _headerStrip += `<button class="lump-hs-resize-btn lump-hs-resize-disabled" ` +
             `id="lumpShrinkBtn_${_tk}" ` +
-            `onclick="${_canShrink ? `_resizeLump('${_e(lump.token)}')` : ''}" ` +
-            `${_canShrink ? '' : 'disabled '}` +
-            `title="${_canShrink ? `Remove unused freespace — shrink from ${_curSize}w to ${_minSize}w (save ${_saved}w)` : `Already at minimum size (${_curSize}w)`}">` +
-            `Shrink to ${_minSize}w ▼</button>`;
+            `disabled title="Binary layout unavailable until exact words are inspected">` +
+            `Shrink unavailable</button>`;
     }
     if (_lumpAbsMatch) {
         _headerStrip += `<button class="lump-hs-btn lump-view-abs-btn" onclick="_goToAbstractionByName('${_e(lump.abstraction)}')" title="View Abstraction \u2014 Jump to the Abstraction Catalog entry">&#8599; Abstraction</button>`;
@@ -187,9 +169,9 @@ function showLumpDetail(token) {
         if (nsMeta.app_id) html += `<tr><td>App ID</td><td>${e(nsMeta.app_id)}</td></tr>`;
         if (nsMeta.base) html += `<tr><td>Base Address</td><td>${e(nsMeta.base)}</td></tr>`;
         if (nsMeta.n) html += `<tr><td>Size (n)</td><td>${parseInt(nsMeta.n)} (${(1 << parseInt(nsMeta.n))} words)</td></tr>`;
-        html += `<tr><td>Locator Count (cc)</td><td>${parseInt(nsMeta.cc || lump.cc) || 0}</td></tr>`;
+        html += `<tr><td>Locator Count (cc)</td><td id="lumpOverviewCc_${_tk}">unavailable</td></tr>`;
         if (nsMeta.ns_table_start) html += `<tr><td>NS Table Start</td><td>word ${parseInt(nsMeta.ns_table_start)}</td></tr>`;
-        html += `<tr><td>Lump Size</td><td>${parseInt(lump.lump_size) || 0} words (${(parseInt(lump.lump_size) || 0) * 4} bytes)</td></tr>`;
+        html += `<tr><td>Lump Size</td><td id="lumpOverviewSize_${_tk}">unavailable</td></tr>`;
         html += '</tbody></table>';
         html += '</div>';
 
@@ -280,9 +262,8 @@ function showLumpDetail(token) {
             const _verPart  = lump.lump_version != null ? 'v' + lump.lump_version : (lump.version ? 'v' + lump.version : '');
             const _isFloatOv = (lump.ns_slot === null || lump.ns_slot === undefined);
             const _nsPart   = !_isFloatOv ? 'NS\u00a0' + lump.ns_slot : '';
-            const _sizePart = lump.cw != null ? lump.cw + 'w' : (lump.lump_size ? lump.lump_size + 'w' : '');
             const _dateStr  = typeof _lumpTsStr === 'function' && lump.compiled_at ? _lumpTsStr(lump.compiled_at) : '';
-            const _metaParts = [lump.abstraction, _verPart, _nsPart, _sizePart].filter(Boolean).join('\u2002');
+            const _metaParts = [lump.abstraction, _verPart, _nsPart].filter(Boolean).join('\u2002');
             const _metaLine  = [_metaParts, _dateStr].filter(Boolean).join('\u2002\u00b7\u2002');
             html += `<tr><td>Filename</td><td>` +
                 `<code class="lump-filename-code">${e(lump.filename)}</code>` +
@@ -298,11 +279,10 @@ function showLumpDetail(token) {
                 : `<span style="font-size:0.72rem;color:var(--text-secondary);margin-left:6px;" title="Manifest default \u2014 the namespace can be modified at runtime">(default)</span>`;
             html += `<tr><td>NS Slot</td><td>${_slotDisplayOv}${_slotNoteOv}</td></tr>`;
         }
-        html += `<tr><td>Lump Size</td><td>${parseInt(lump.lump_size) || 0} words (${(parseInt(lump.lump_size) || 0) * 4} bytes)</td></tr>`;
-        html += `<tr><td>Code Words</td><td>${parseInt(lump.cw) || 0}</td></tr>`;
-        html += `<tr><td>C-List Slots</td><td>${parseInt(lump.cc) || 0}</td></tr>`;
+        html += `<tr><td>Lump Size</td><td id="lumpOverviewSize_${_tk}">unavailable</td></tr>`;
+        html += `<tr><td>Code Words</td><td id="lumpOverviewCw_${_tk}">unavailable</td></tr>`;
+        html += `<tr><td>C-List Slots</td><td id="lumpOverviewCc_${_tk}">unavailable</td></tr>`;
         if (lump.language) html += `<tr><td>Language</td><td>${e(lump.language)}</td></tr>`;
-        if (lump.profile) html += `<tr><td>Profile</td><td>${e(lump.profile)}</td></tr>`;
         const grants = lump.grants || [];
         if (grants.length > 0) html += `<tr><td>Grants</td><td>[${grants.map(g => e(g)).join(', ')}]</td></tr>`;
         html += '</tbody></table>';
@@ -311,7 +291,7 @@ function showLumpDetail(token) {
 
     if (!isNamespace) {
 
-    const petNames = lump.pet_names || {};
+    const petNames = {};
     const drNames = petNames.DR || {};
     const crNames = petNames.CR || {};
     const hasPetNames = Object.keys(drNames).length > 0 || Object.keys(crNames).length > 0;
@@ -369,7 +349,7 @@ function showLumpDetail(token) {
         html += '</div>';
     }
 
-    const caps = lump.capabilities || [];
+    const caps = [];
     if (caps.length > 0) {
         html += '<div class="lump-detail-section">';
         html += '<div class="lump-section-title">Capabilities</div>';
@@ -417,7 +397,7 @@ function showLumpDetail(token) {
 
     contentEl.innerHTML = html;
     // Asynchronously patch CC badge + shrink button + malformed chip from binary.
-    if (!isNamespace) _patchCcFromBinary(token, lump, _tk);
+    _patchCcFromBinary(token, lump, _tk);
     const delBtn = contentEl.querySelector('.lump-delete-btn[data-delete-token]');
     if (delBtn) delBtn.addEventListener('click', () => deleteLump(delBtn.dataset.deleteToken));
     const editBtn = contentEl.querySelector('.lump-edit-btn[data-edit-token]');
@@ -426,13 +406,11 @@ function showLumpDetail(token) {
     if (auditBtn) {
         auditBtn.addEventListener('click', () => {
             const _auditToken = auditBtn.dataset.auditToken;
-            const _auditLump  = _lumpsCache.find(l => l.token === _auditToken);
             const _auditWrap  = document.getElementById(`lumpAuditResults_${_lumpTokenIdentity(_auditToken)}`);
             if (!_auditWrap) return;
-            const _manifest = _auditLump ? { cw: _auditLump.cw, cc: _auditLump.cc, lump_size: _auditLump.lump_size, pet_names: _auditLump.pet_names || null, capabilities: _auditLump.capabilities || [] } : null;
             if (typeof lumpAuditFromServer === 'function') {
                 auditBtn.disabled = true;
-                lumpAuditFromServer(_auditToken, _manifest, _auditWrap, { collapsible: true, startOpen: true, token: _auditToken })
+                lumpAuditFromServer(_auditToken, null, _auditWrap, { collapsible: true, startOpen: true, token: _auditToken })
                     .finally(() => { auditBtn.disabled = false; });
             }
         });
@@ -443,9 +421,8 @@ function showLumpDetail(token) {
     if (!isNamespace && _lumpAutoAuditEnabled && typeof lumpAuditFromServer === 'function') {
         const _autoAuditWrap = document.getElementById(`lumpAuditResults_${_tk}`);
         if (_autoAuditWrap) {
-            const _autoManifest = { cw: lump.cw, cc: lump.cc, lump_size: lump.lump_size, pet_names: lump.pet_names || null, capabilities: lump.capabilities || [] };
             if (auditBtn) auditBtn.disabled = true;
-            lumpAuditFromServer(token, _autoManifest, _autoAuditWrap, { collapsible: true, token: token })
+            lumpAuditFromServer(token, null, _autoAuditWrap, { collapsible: true, token: token })
                 .finally(() => { if (auditBtn) auditBtn.disabled = false; });
         }
     }
@@ -520,10 +497,19 @@ function _renderLumpFieldSizeSummary(layout) {
     ).join('');
 }
 
-function _updateLumpFieldSizeSummary(tk, words) {
+function _updateLumpFieldSizeSummary(tk, words, inspection) {
     const el = document.getElementById(`lumpFieldSizes_${tk}`);
-    const layout = _getLumpFieldSizeLayout(words);
-    if (!el || !layout) return;
+    if (!el || !inspection || !inspection.headerValid) return;
+    const layout = inspection.contentFrameValid
+        ? _getLumpFieldSizeLayout(words)
+        : {
+            code: inspection.header.cw,
+            api: null,
+            source: null,
+            empty: null,
+            clist: inspection.header.cc,
+        };
+    if (!layout) return;
     el.innerHTML = _renderLumpFieldSizeSummary(layout);
 }
 
@@ -533,6 +519,28 @@ function _updateLumpFieldSizeSummary(tk, words) {
 // later reuse by _renderLumpCodeContent and _loadLumpTokens.
 async function _patchCcFromBinary(token, lump, tk) {
     if (!token || !lump) return;
+    const markUnavailable = (message) => {
+        for (const id of [`lumpSizeChip_${tk}`, `lumpCwChip_${tk}`, `lumpCcChip_${tk}`,
+            `lumpOverviewSize_${tk}`, `lumpOverviewCw_${tk}`, `lumpOverviewCc_${tk}`]) {
+            const el = document.getElementById(id);
+            if (el) {
+                if (el.classList && el.classList.contains('lump-hs-chip')) {
+                    const label = id.includes('Size') ? 'Size' : (id.includes('Cw') ? 'CW' : 'CC');
+                    el.innerHTML = `<span class="lump-hs-label">${label}</span>unavailable`;
+                } else {
+                    el.textContent = 'unavailable';
+                }
+                el.title = message;
+            }
+        }
+        const shrinkBtn = document.getElementById(`lumpShrinkBtn_${tk}`);
+        if (shrinkBtn) {
+            shrinkBtn.disabled = true;
+            shrinkBtn.onclick = null;
+            shrinkBtn.textContent = 'Shrink unavailable';
+            shrinkBtn.title = message;
+        }
+    };
     try {
         let words = [];
         // Reuse cached entry when available (avoids a second round-trip when the
@@ -542,28 +550,40 @@ async function _patchCcFromBinary(token, lump, tk) {
             words = _cached.words || [];
         } else {
             const resp = await fetch(`/api/lump/${token}/words`);
-            if (!resp.ok) return;
+            if (!resp.ok) throw new Error(`exact words unavailable: HTTP ${resp.status}`);
             const data = await resp.json();
             words = data.words || [];
         }
-        if (!words.length) return;
-        const hdr = (typeof sim !== 'undefined' && sim && sim.parseLumpHeader)
-            ? sim.parseLumpHeader(words[0] >>> 0) : null;
-        if (!hdr || !hdr.valid) return;
+        if (!words.length) throw new Error('exact words unavailable: empty binary');
+        const inspect = typeof LumpContentFrame !== 'undefined' && LumpContentFrame &&
+            LumpContentFrame.lumpInspectContentFrame;
+        if (!inspect) throw new Error('exact-word content-frame inspector is unavailable');
+        const inspection = await inspect(words);
+        if (!inspection || !inspection.headerValid)
+            throw new Error(inspection && inspection.error
+                ? inspection.error : 'exact words are malformed');
+        const hdr = Object.assign({ valid: true }, inspection.header);
         _lumpBinaryHdrCache[token] = { hdr, words };
-        _updateLumpFieldSizeSummary(tk, words);
+        _updateLumpFieldSizeSummary(tk, words, inspection);
 
-        // ── Patch CC badge ───────────────────────────────────────────────────
+        const sizeBadge = document.getElementById(`lumpSizeChip_${tk}`);
+        const cwBadge = document.getElementById(`lumpCwChip_${tk}`);
         const ccBadge = document.getElementById(`lumpCcChip_${tk}`);
-        if (ccBadge) {
-            ccBadge.innerHTML = `<span class="lump-hs-label">CC</span>${hdr.cc}`;
-        }
+        if (sizeBadge) sizeBadge.innerHTML = `<span class="lump-hs-label">Size</span>${hdr.lumpSize}w`;
+        if (cwBadge) cwBadge.innerHTML = `<span class="lump-hs-label">CW</span>${hdr.cw}`;
+        if (ccBadge) ccBadge.innerHTML = `<span class="lump-hs-label">CC</span>${hdr.cc}`;
+        const overviewSize = document.getElementById(`lumpOverviewSize_${tk}`);
+        const overviewCw = document.getElementById(`lumpOverviewCw_${tk}`);
+        const overviewCc = document.getElementById(`lumpOverviewCc_${tk}`);
+        if (overviewSize) overviewSize.textContent = `${hdr.lumpSize} words (${hdr.lumpSize * 4} bytes)`;
+        if (overviewCw) overviewCw.textContent = String(hdr.cw);
+        if (overviewCc) overviewCc.textContent = String(hdr.cc);
 
         // ── Patch shrink button ──────────────────────────────────────────────
         const shrinkBtn = document.getElementById(`lumpShrinkBtn_${tk}`);
         if (shrinkBtn) {
-            const _curSize = parseInt(lump.lump_size) || 0;
-            const _cw      = parseInt(lump.cw) || 0;
+            const _curSize = hdr.lumpSize;
+            const _cw      = hdr.cw;
             const _cc      = hdr.cc;
             const _minCont = 1 + _cw + _cc;
             let _minSize   = 64;
@@ -579,13 +599,14 @@ async function _patchCcFromBinary(token, lump, tk) {
             shrinkBtn.textContent = `Shrink to ${_minSize}w ▼`;
         }
 
-        // ── Show malformed chip when binary cc ≠ manifest cc ────────────────
-        const manifestCc = (lump.cc !== undefined && lump.cc !== null) ? parseInt(lump.cc) : null;
-        if (manifestCc !== null && manifestCc !== hdr.cc) {
-            const chip = document.getElementById(`lumpMalformedChip_${tk}`);
-            if (chip) chip.style.display = '';
+    } catch (err) {
+        markUnavailable(err && err.message ? err.message : 'exact words unavailable');
+        const chip = document.getElementById(`lumpMalformedChip_${tk}`);
+        if (chip) {
+            chip.style.display = '';
+            chip.title = err && err.message ? err.message : 'Exact LUMP words unavailable';
         }
-    } catch (_e) { /* silent — best-effort patch */ }
+    }
 }
 
 // Computes { name, start, end } word-index ranges (end exclusive, indices
@@ -595,10 +616,12 @@ async function _patchCcFromBinary(token, lump, tk) {
 // separate, minimal pass (rather than sharing that function's internals)
 // so Content-tab rendering behaviour is untouched.
 function _computeLumpMethodWordRanges(lump, words) {
-    const methods = lump.methods || [];
+    const methods = lump.api_definition_source === 'binary-inspection' &&
+        lump.api_definition && Array.isArray(lump.api_definition.methods)
+        ? lump.api_definition.methods : [];
     const _binaryHdr = (words && words.length > 0 && typeof sim !== 'undefined' && sim && sim.parseLumpHeader)
         ? sim.parseLumpHeader(words[0] >>> 0) : null;
-    const cw = (_binaryHdr && _binaryHdr.valid) ? _binaryHdr.cw : (parseInt(lump.cw) || 0);
+    const cw = (_binaryHdr && _binaryHdr.valid) ? _binaryHdr.cw : 0;
     const abstName = lump.abstraction || 'Lump';
 
     const mb = {};  // wordIndex → method name
@@ -673,10 +696,14 @@ async function _fetchAndShowLumpBinary(token, lump) {
         const words = data.words || [];
         const numWords = words.length;
 
-        const cw       = parseInt(lump.cw)        || 0;
-        const cc       = parseInt(lump.cc)        || 0;
-        const lumpSize = parseInt(lump.lump_size) || numWords;
         if (!numWords) throw new Error('Empty lump');
+        const hdr = (typeof sim !== 'undefined' && sim && sim.parseLumpHeader)
+            ? sim.parseLumpHeader(words[0] >>> 0) : null;
+        if (!hdr || !hdr.valid || !_getLumpFieldSizeLayout(words))
+            throw new Error('Malformed LUMP binary');
+        const cw = hdr.cw;
+        const cc = hdr.cc;
+        const lumpSize = hdr.lumpSize;
 
         // Method boundaries (word index → method covering that word), used to
         // annotate the code region and to let _scrollToLumpHexMethod() jump
@@ -856,10 +883,7 @@ function _runSelectedLumpInSim(btn) {
     // classic "LED flash LUMP stays in place" bug.  Passing null forces
     // loadLumpBinary to target BOOT_ABSTR_NS_SLOT so the new code is reachable
     // via CR14 immediately.
-    // The loader re-reads the canonical sidecar before execution. Passing this
-    // cache entry as undefined (rather than coercing it to []) makes a stale
-    // catalogue entry fail closed instead of bypassing declared-capability checks.
-    _loadLumpBinaryIntoSim(_selectedLumpToken, lump.abstraction || _selectedLumpToken, btn, null, lump.capabilities);
+    _loadLumpBinaryIntoSim(_selectedLumpToken, lump.abstraction || _selectedLumpToken, btn, null);
 }
 
 function _showLumpWorkspaceTabs() {
@@ -977,8 +1001,10 @@ function _populateLumpLogicTab(lump, targetId) {
         : null;
 
     if (!abs) {
-        const methods = lump.methods || [];
-        const caps = lump.capabilities || [];
+        const methods = lump.api_definition_source === 'binary-inspection' &&
+            lump.api_definition && Array.isArray(lump.api_definition.methods)
+            ? lump.api_definition.methods : [];
+        const caps = [];
         let html = '<div class="lump-logic-section">';
         html += `<div class="lump-logic-meta-badge">No catalog entry</div>`;
         html += `<div class="lump-logic-desc">No abstraction catalog entry found for <strong>${e(absName || 'this lump')}</strong>. Showing binary-derived interface below.</div>`;
@@ -1029,7 +1055,7 @@ function _populateLumpLogicTab(lump, targetId) {
     }
     html += '</div>';
 
-    const _aliasNames = new Set((lump.methods || []).filter(m => m.aliasOf).map(m => m.name));
+    const _aliasNames = new Set();
     const methods = (abs.methods || []).filter(mName => !_aliasNames.has(mName));
     if (methods.length > 0) {
         html += '<div class="lump-logic-section">';
@@ -1048,8 +1074,7 @@ function _populateLumpLogicTab(lump, targetId) {
     }
 
     const absCaps = abs.capabilities || [];
-    const lumpCaps = lump.capabilities || [];
-    const allCaps = absCaps.length > 0 ? absCaps : lumpCaps.map(c => c.name);
+    const allCaps = absCaps;
     if (allCaps.length > 0) {
         html += '<div class="lump-logic-section">';
         html += `<div class="lump-logic-methods-title">Capabilities</div>`;
@@ -1290,89 +1315,33 @@ async function _populateLumpSourceTab(lump, targetId) {
 
     const _showBinaryOnly = (reason) => {
         const displayName = absName || lump.token || 'This lump';
-        const fileHint = absName ? `<code>${e(absName)}.cloomc</code>` : 'a named <code>.cloomc</code> source file';
         el.innerHTML = `<div class="lump-source-binary-only">
             <div class="lump-source-binary-only-icon">&#128190;</div>
             <div class="lump-source-binary-only-title">Binary-only &mdash; no functional source available</div>
             <div class="lump-source-binary-only-desc">
                 <strong>${e(displayName)}</strong> ${reason}<br><br>
-                To add functional source, author ${fileHint} using
-                pet-name mechanics (capability registers as named variables, Lambda/Macro
-                constructs as building blocks) and place it in <code>simulator/cloomc/</code>.
-            </div>
-        </div>`;
-        // Async: check if a canonical source exists and append a Reset button if so.
-        if (absName) {
-            (async () => {
-                try {
-                    const _cr = await fetch(`/api/lump-source/${encodeURIComponent(absName)}`, { cache: 'no-store' });
-                    const _ct2 = _cr.headers.get('content-type') || '';
-                    if (_cr.ok && _ct2.includes('application/json')) {
-                        const _cj = await _cr.json();
-                        if (_cj && !_cj.binary_only && _cj.source) {
-                            const _notice = el.querySelector('.lump-source-binary-only-desc');
-                            if (_notice) {
-                                const _resetBtn = document.createElement('button');
-                                _resetBtn.className = 'btn lump-canonical-reset-btn';
-                                _resetBtn.textContent = 'Reset to canonical source';
-                                _resetBtn.style.marginTop = '0.75rem';
-                                _resetBtn.style.display = 'block';
-                                _resetBtn.addEventListener('click', () => {
-                                    _populateLumpSourceTab(lump, targetId);
-                                });
-                                _notice.appendChild(_resetBtn);
-                            }
-                        }
-                    }
-                } catch (_cfe) {}
-            })();
-        }
-    };
-
-    // No abstraction name → no source file can exist; show binary-only notice immediately
-    if (!absName) {
-        _showBinaryOnly('has no associated abstraction name, so no CLOOMC++ source can be located.');
-        return;
-    }
-
-    // Helper: "No source stored yet" — shown when the server has no source file for
-    // this abstraction but it is a software lump that could have source in future.
-    const _showNoSourceYet = () => {
-        const displayName = absName || lump.token || 'This lump';
-        el.innerHTML = `<div class="lump-source-no-source-yet">
-            <div class="lump-source-no-source-yet-icon">&#128196;</div>
-            <div class="lump-source-no-source-yet-title">No source stored yet</div>
-            <div class="lump-source-no-source-yet-desc">
-                No CLOOMC++ source has been saved for <strong>${e(displayName)}</strong> yet.<br><br>
-                Compile and save this abstraction to attach source.
+                To add functional source, explicitly import and approve source to create
+                a new immutable artifact. Same-name workspace files are never substituted
+                for bytes missing from this LUMP.
             </div>
         </div>`;
     };
 
     try {
-        const resp = await fetch(`/api/lump-source/${encodeURIComponent(absName)}`);
+        const resp = await fetch(`/api/lump/${lump.token}/words`, { cache: 'no-store' });
 
-        // Check status BEFORE content-type: 5xx responses are typically HTML, not JSON.
-        // 404 → server found no source file at all; show friendly notice.
-        // Other non-2xx → surface as an explicit HTTP error (not binary-only).
-        if (resp.status === 404) {
-            _showNoSourceYet();
-            return;
-        }
         if (!resp.ok) {
             el.innerHTML = `<div class="lump-source-status err">Error loading source (HTTP ${resp.status}).</div>`;
             return;
         }
-
-        const ct = resp.headers.get('content-type') || '';
-        if (!ct.includes('application/json')) {
-            _showBinaryOnly('has no functional CLOOMC++ source on file. The Binary tab shows the compiled form.');
-            return;
-        }
         const data = await resp.json();
+        const inspector = typeof LumpContentFrame !== 'undefined' &&
+            LumpContentFrame && LumpContentFrame.lumpInspectContentFrame;
+        if (!inspector) throw new Error('Binary content inspector is unavailable');
+        const inspection = await inspector(data.words || []);
 
-        if (!data.binary_only && data.source) {
-            const src = data.source;
+        if (inspection.contentFrameValid && inspection.sourceEmbedded && inspection.source) {
+            const src = inspection.source;
             if (_isRawISASource(src)) {
                 // Source exists but is raw ISA / Church Machine Assembly — show it
                 // read-only with an Assembly badge rather than hiding it entirely.
@@ -1430,7 +1399,7 @@ async function _populateLumpSourceTab(lump, targetId) {
             }
             // ───────────────────────────────────────────────────────────────
             if (lump.forked && lump.lump_version != null) {
-                // Already forked (tab reopened in-session, or page reloaded with forked sidecar).
+                // Already forked (tab reopened in-session, or catalog refreshed).
                 // Show the banner immediately — no keystroke required.
                 if (_banner) {
                     const _prevVer = lump.lump_version - 1;
@@ -1446,13 +1415,30 @@ async function _populateLumpSourceTab(lump, targetId) {
                 // Sealed and not yet forked — arm the one-shot first-edit listener.
                 if (_textarea && _banner) {
                     let _forked = false;
+                    const _sealedSource = _textarea.value;
                     const _onFirstEdit = async () => {
                         if (_forked) return;
+                        if (!confirm(`Fork LUMP 0x${lump.token} for editing?\n\n` +
+                            'The current immutable binary remains in History. Saving the edited source will require a new hash-bound approval.')) {
+                            _textarea.value = _sealedSource;
+                            return;
+                        }
                         _forked = true;
                         // Defer listener removal until after a successful fork so that
                         // a transient network failure does not permanently disable forking.
                         try {
-                            const _resp = await fetch(`/api/lump/${lump.token}/fork-version`, { method: 'POST' });
+                            const _wordsResp = await fetch(`/api/lump/${lump.token}/words`, { cache: 'no-store' });
+                            if (!_wordsResp.ok) throw new Error(`could not inspect current binary: HTTP ${_wordsResp.status}`);
+                            const _wordsData = await _wordsResp.json();
+                            const _words = Array.isArray(_wordsData) ? _wordsData : _wordsData.words;
+                            if (!Array.isArray(_words) || !_words.length) throw new Error('current binary is empty');
+                            const _forkIntent = await _requestLumpApprovalIntent(
+                                _words, 'fork', _lumpApprovalView(lump));
+                            const _resp = await fetch(`/api/lump/${lump.token}/fork-version`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ approval_intent: _forkIntent.intent })
+                            });
                             const _fd = await _resp.json();
                             if (!_fd.ok) throw new Error(_fd.error || 'fork failed');
                             // Success — remove listener now that fork is committed.
@@ -1486,8 +1472,12 @@ async function _populateLumpSourceTab(lump, targetId) {
                     _textarea.addEventListener('input', _onFirstEdit);
                 }
             }
+        } else if (inspection.contentFrameValid && inspection.profile === 'api') {
+            _showBinaryOnly('was saved as API only. Its exact binary contains no source to display.');
+        } else if (!inspection.contentFramePresent) {
+            _showBinaryOnly('is a legacy LUMP with no embedded source. Sidecar and catalog source are not used as substitutes; import and explicitly approve source to create a new artifact.');
         } else {
-            _showBinaryOnly('was compiled from RAW ISA or assembly and has no CLOOMC++ pet-name source on file. The Binary tab shows the compiled form.');
+            _showBinaryOnly('has unavailable or malformed embedded source. Sidecar and catalog source are not used as substitutes.');
         }
     } catch (err) {
         el.innerHTML = `<div class="lump-source-status err">Error loading source: ${e(err.message)}</div>`;
@@ -1620,24 +1610,16 @@ function _restoreSavedLumpEditorOwnership(token, editor) {
 }
 window._restoreSavedLumpEditorOwnership = _restoreSavedLumpEditorOwnership;
 
-function _resolveSavedLumpEditorSource(embeddedSource, sidecarSource) {
+function _resolveSavedLumpEditorSource(embeddedSource) {
     if (typeof embeddedSource === 'string') {
         return { source: embeddedSource, restored: true, origin: 'embedded' };
     }
-    if (typeof sidecarSource === 'string' && sidecarSource.trim().length > 0) {
-        var isStub = sidecarSource.indexOf('; TODO: write your code here') !== -1
-                  || sidecarSource.indexOf('; TODO: write your code') !== -1;
-        var isUnresolvedPath = sidecarSource.indexOf('\n') === -1
-                            && /\.cloomc\s*$/.test(sidecarSource.trim());
-        if (!isStub && !isUnresolvedPath) {
-            return { source: sidecarSource, restored: true, origin: 'sidecar' };
-        }
-    }
     return {
         source:
-            '; No recoverable source was saved with this LUMP.\n' +
+            '; Embedded source is unavailable for this LUMP.\n' +
+            '; Legacy sidecar and catalog source are not trusted as artifact content.\n' +
             '; The read-only Compiled Disassembly panel shows what this binary executes.\n' +
-            '; Write or paste source here to create a new version.\n',
+            '; Import, write, or paste source and explicitly approve a new version.\n',
         restored: false,
         origin: 'missing'
     };
@@ -1775,6 +1757,8 @@ function _lumpSourceBuildLump() {
     const status = document.getElementById('lumpSourceStatus');
     if (!editor) return;
     const src = editor.value;
+    if (!confirm('Build a new LUMP artifact from this edited source?\n\n' +
+        'The resulting binary is a new immutable artifact and must be explicitly approved by its exact hash before deployment.')) return;
     if (status) { status.textContent = 'Building\u2026'; status.className = 'lump-source-status'; }
     try {
         const asmEd = document.getElementById('asmEditor');
@@ -2053,8 +2037,7 @@ function _lumpDeepDiveKeydown(ev) {
 }
 
 /* ---- DD_ANNOTATIONS_UNIT_TEST_EXPORT_START ---- */
-// Extract a flat list of method name strings from a lump detail response.
-// api_definition.methods may be string[] or {name}[]; sidecar .methods is {name,...}[].
+// Extract a flat list of method names from a binary-inspected API definition.
 // Returns null when no API definition is present at all (legacy lump).
 // Returns [] when the definition exists but declares no methods.
 function _ddExtractMethodNames(detail) {
@@ -2063,10 +2046,6 @@ function _ddExtractMethodNames(detail) {
             typeof m === 'string' ? m : ((m && m.name) ? m.name : String(m)));
     }
     if (detail.api_definition) return []; // definition present but no methods key
-    if (Array.isArray(detail.methods) && detail.methods.length > 0) {
-        return detail.methods.map(m =>
-            typeof m === 'string' ? m : ((m && m.name) ? m.name : String(m)));
-    }
     return null; // no API definition recorded
 }
 
@@ -2114,7 +2093,7 @@ async function _openLumpDeepDive(token, trigger) {
 <span><b>Name</b> ${e(lump.dot_name || lump.abstraction || 'Unknown')}</span>\
 <span><b>Type</b> ${e(type)}</span>\
 <span><b>Version</b> ${e(lump.lump_version ?? lump.version ?? '\u2014')}</span>\
-<span><b>Size</b> ${e(lump.lump_size ?? '\u2014')}w</span>\
+<span><b>Size</b> <span id="lumpDeepDiveSize">unavailable</span></span>\
 <span><b>NS slot</b> ${e(lump.ns_slot ?? 'saved')}</span></div>\
 <div class="lump-deep-dive-api lump-dd-methods-row" id="lumpDeepDiveMethods">\
 <span class="lump-dd-loading">loading\u2026</span></div>\
@@ -2144,7 +2123,7 @@ loading\u2026</button></div>\
         _initNsDepGraphPanZoom(result.wrapId);
     } else body.innerHTML = '<div class="lumps-placeholder">No C-List data is available for this LUMP.</div>';
     try {
-        const resp = await fetch(`/api/lumps/${encodeURIComponent(token)}/detail`);
+        const resp = await fetch(`/api/lump/${encodeURIComponent(token)}/words`, { cache: 'no-store' });
         if (!resp.ok || document.getElementById('lumpDeepDiveModal') !== modal) {
             if (document.getElementById('lumpDeepDiveModal') === modal) {
                 _ddRenderMethodsFailed(modal);
@@ -2152,8 +2131,23 @@ loading\u2026</button></div>\
             }
             return;
         }
-        const detail = await resp.json();
+        const wordsPayload = await resp.json();
+        const inspect = typeof LumpContentFrame !== 'undefined' &&
+            LumpContentFrame && LumpContentFrame.lumpInspectContentFrame;
+        if (!inspect) throw new Error('Binary content inspector is unavailable');
+        const binaryInspection = await inspect(wordsPayload.words || []);
+        if (!binaryInspection.headerValid)
+            throw new Error('Malformed LUMP binary header');
+        const detail = {
+            api_definition: binaryInspection.contentFrameValid
+                ? binaryInspection.apiDefinition : null,
+            sourceStorageTier: binaryInspection.profile === 'full' ? 2 :
+                (binaryInspection.profile === 'compact' ? 1 :
+                    (binaryInspection.profile === 'api' ? 0 : null))
+        };
         if (document.getElementById('lumpDeepDiveModal') !== modal) return;
+        const sizeEl = modal.querySelector('#lumpDeepDiveSize');
+        if (sizeEl) sizeEl.textContent = `${binaryInspection.header.lumpSize}w`;
         _ddRenderMethods(modal, detail, _navSlot, _navName);
         _ddRenderSource(modal, detail, _navSlot, _navName);
     } catch (_) {
@@ -2184,7 +2178,7 @@ function _ddRenderMethods(modal, detail, navSlot, navName) {
     if (methods === null) {
         // No api_definition at all — legacy binary
         _ddAppend(el, 'span', 'lump-dd-no-methods',
-            'No API definition recorded in binary');
+            'Embedded API unavailable — legacy sidecar methods are not used');
     } else if (methods.length === 0) {
         _ddAppend(el, 'span', 'lump-dd-no-methods',
             'No methods declared \u2014 CALL enters the abstraction directly');
@@ -2238,9 +2232,12 @@ function _ddRenderSource(modal, detail, navSlot, navName) {
     } else if (tier === 1) {
         tierClass = 'lump-dd-source-badge--tier1';
         label = '\u26a0\ufe0f Uncommented source included';
-    } else {
+    } else if (tier === 0) {
         tierClass = 'lump-dd-source-badge--tier0';
         label = '\u25cb No source embedded';
+    } else {
+        tierClass = 'lump-dd-source-badge--tier0';
+        label = '\u25cb Embedded source unavailable (legacy LUMP)';
     }
     el.appendChild(_ddMakeSourceBtn(tierClass, label, navSlot, navName));
 }
@@ -2261,29 +2258,45 @@ function _populateLumpApiTab(lump, panelId) {
     const el = document.getElementById(panelId);
     if (!el || el._apiLoaded) return;
     el._apiLoaded = true;
-    // The binary is the authority for the self-definition.  The list endpoint
-    // intentionally stays lean, so hydrate this tab from the detail endpoint
-    // before showing the JSON section.  Re-render once the embedded definition
-    // arrives; sidecar fields remain visible while legacy LUMPs are loading.
-    if (!lump.api_definition && lump.token && typeof _fetchLumpDetailCached === 'function') {
-        _fetchLumpDetailCached(lump.token).then(detail => {
-            if (!detail || !detail.api_definition) return;
-            lump.api_definition = detail.api_definition;
-            lump.api_definition_source = detail.api_definition_source || 'lump';
+    // Hydrate only from inspection of the immutable binary.
+    if (lump.token && !lump._apiInspectionComplete) {
+        lump.api_definition = null;
+        fetch(`/api/lump/${lump.token}/words`, { cache: 'no-store' })
+        .then(resp => {
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            return resp.json();
+        }).then(async data => {
+            const inspect = typeof LumpContentFrame !== 'undefined' &&
+                LumpContentFrame && LumpContentFrame.lumpInspectContentFrame;
+            if (!inspect) throw new Error('Binary content inspector is unavailable');
+            const result = await inspect(data.words || []);
+            lump.api_definition = result.contentFrameValid ? result.apiDefinition : null;
+            lump.api_definition_source = result.contentFrameValid ? 'binary-inspection' : 'unavailable';
+            lump._apiInspectionHeader = result.headerValid ? result.header : null;
+            lump._apiInspectionProfile = result.contentFrameValid ? result.profile : null;
+            lump._apiInspectionComplete = true;
             el._apiLoaded = false;
             _populateLumpApiTab(lump, panelId);
-        }).catch(() => {});
+        }).catch(() => {
+            lump._apiInspectionComplete = true;
+            lump.api_definition = null;
+            el._apiLoaded = false;
+            _populateLumpApiTab(lump, panelId);
+        });
     }
     const e = _escHtml;
     const nsSlot = (lump.ns_slot !== null && lump.ns_slot !== undefined) ? parseInt(lump.ns_slot) : null;
     const grants  = lump.grants || [];
-    const methods = lump.methods || [];
-    const caps    = lump.capabilities || [];
-    const cc      = parseInt(lump.cc) || 0;
-    const cw      = parseInt(lump.cw) || 0;
-    const sz      = parseInt(lump.lump_size) || 0;
-    const mtbf    = lump.mtbf || {};
     const apiDefinition = lump.api_definition || null;
+    const methods = apiDefinition && Array.isArray(apiDefinition.methods)
+        ? apiDefinition.methods : [];
+    const caps = apiDefinition && Array.isArray(apiDefinition.capabilities)
+        ? apiDefinition.capabilities : [];
+    const inspectedHeader = lump._apiInspectionHeader || null;
+    const cc = inspectedHeader ? inspectedHeader.cc : 0;
+    const cw = inspectedHeader ? inspectedHeader.cw : 0;
+    const sz = inspectedHeader ? inspectedHeader.lumpSize : null;
+    const mtbf    = lump.mtbf || {};
 
     let html = '<div class="lump-detail-sections">';
 
@@ -2291,7 +2304,9 @@ function _populateLumpApiTab(lump, panelId) {
     html += '<div class="lump-detail-section">';
     html += `<div class="lump-section-title">Methods (${methods.length})</div>`;
     if (methods.length === 0) {
-        html += '<div style="color:var(--text-secondary);font-style:italic;font-size:0.83rem;padding:0.25rem 0;">No methods declared in sidecar record.</div>';
+        html += apiDefinition
+            ? '<div style="color:var(--text-secondary);font-style:italic;font-size:0.83rem;padding:0.25rem 0;">No methods declared in the embedded API.</div>'
+            : '<div style="color:var(--text-secondary);font-style:italic;font-size:0.83rem;padding:0.25rem 0;">Embedded API unavailable; legacy sidecar methods are not displayed.</div>';
     } else {
         html += '<table class="lump-detail-table"><thead><tr><th>#</th><th>Name</th><th>Offset</th><th>Words</th></tr></thead><tbody>';
         methods.forEach((m, i) => {
@@ -2321,9 +2336,12 @@ function _populateLumpApiTab(lump, panelId) {
     const permStr = grants.length ? grants.join('\u00a0|\u00a0') : '\u2014';
     html += `<tr><td>Caller Grants</td><td><strong>${e(permStr)}</strong></td></tr>`;
     html += `<tr><td>Token</td><td><code>0x${e(lump.token || '')}</code></td></tr>`;
-    if (lump.profile)  html += `<tr><td>Profile</td><td>${e(lump.profile)}</td></tr>`;
+    if (lump._apiInspectionProfile)
+        html += `<tr><td>Profile</td><td>${e(lump._apiInspectionProfile)}</td></tr>`;
     if (lump.language) html += `<tr><td>Language</td><td>${e(lump.language)}</td></tr>`;
-    html += `<tr><td>Layout</td><td>${cw} code word${cw !== 1 ? 's' : ''} \u00b7 ${cc} c-list slot${cc !== 1 ? 's' : ''} \u00b7 ${sz} word${sz !== 1 ? 's' : ''} total</td></tr>`;
+    html += `<tr><td>Layout</td><td>${inspectedHeader
+        ? `${cw} code word${cw !== 1 ? 's' : ''} \u00b7 ${cc} c-list slot${cc !== 1 ? 's' : ''} \u00b7 ${sz} word${sz !== 1 ? 's' : ''} total`
+        : 'unavailable'}</td></tr>`;
     html += '</tbody></table>';
     html += '</div>';
 
@@ -2334,8 +2352,8 @@ function _populateLumpApiTab(lump, panelId) {
         html += '<div style="color:var(--text-secondary);font-style:italic;font-size:0.83rem;padding:0.25rem 0;">cc\u202f=\u202f0 \u2014 no private c-list; uses ambient boot c-list at runtime.</div>';
     } else {
         html += '<table class="lump-detail-table"><thead><tr><th>Slot</th><th>Name</th><th>GT Word</th><th>Role</th></tr></thead><tbody>';
-        // Some sidecar capability arrays carry an explicit .slot field; others are
-        // plain-index arrays with no .slot.  Use slot-based lookup when any entry
+        // Embedded capability arrays may carry an explicit .slot field. Use it
+        // when present; otherwise use the declaration index.
         // carries an explicit slot number, otherwise fall back to array index.
         const _capsHaveSlots = caps.some(c => c && typeof c.slot === 'number');
         for (let si = 0; si < cc; si++) {
@@ -2368,10 +2386,10 @@ function _populateLumpApiTab(lump, panelId) {
     if (apiDefinition) {
         html += '<div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:0.35rem;">Read from this LUMP binary (not reconstructed from the sidecar).</div>';
         html += `<pre class="lump-api-json">${e(JSON.stringify(apiDefinition, null, 2))}</pre>`;
-    } else if (lump.token) {
+    } else if (lump.token && !lump._apiInspectionComplete) {
         html += '<div style="color:var(--text-secondary);font-style:italic;font-size:0.83rem;padding:0.25rem 0;">Loading the embedded definition…</div>';
     } else {
-        html += '<div style="color:var(--text-secondary);font-style:italic;font-size:0.83rem;padding:0.25rem 0;">No embedded definition is available for this LUMP.</div>';
+        html += '<div style="color:var(--text-secondary);font-style:italic;font-size:0.83rem;padding:0.25rem 0;">Embedded API unavailable. Legacy sidecar and catalog definitions are not used as artifact content.</div>';
     }
     html += '</div>';
 
@@ -2410,31 +2428,6 @@ function _populateLumpApiTab(lump, panelId) {
 
 const _lumpSavedSrcLoaded = {};
 
-// ── Shared, de-duplicated fetch for /api/lumps/<token>/detail ──
-// Multiple call sites (Source tab render, audit best-effort source lookup)
-// may want this JSON for the same token in the same tick. Without dedup that
-// fires two identical GETs; this cache keys on token and returns the same
-// in-flight (or just-settled) promise to every caller instead.
-const _lumpDetailFetchCache = {};
-function _fetchLumpDetailCached(token) {
-    if (!token) return Promise.reject(new Error('no token'));
-    const cached = _lumpDetailFetchCache[token];
-    if (cached) return cached;
-    const p = fetch(`/api/lumps/${token}/detail`, { cache: 'no-store' })
-        .then(resp => {
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            return resp.json();
-        })
-        .catch(err => {
-            // Don't poison the cache with a rejected promise — let the next
-            // caller retry instead of being stuck with a stale failure.
-            delete _lumpDetailFetchCache[token];
-            throw err;
-        });
-    _lumpDetailFetchCache[token] = p;
-    return p;
-}
-if (typeof window !== 'undefined') window._fetchLumpDetailCached = _fetchLumpDetailCached;
 // ── Shared jump handler for lump-audit.js's clickable warning/failure rows ──
 // token      — lump token to open in the editor first (null when the editor
 //              already shows the audited source, e.g. the post-compile audit
@@ -2489,31 +2482,29 @@ async function _fetchAndShowLumpSavedSource(token, lump, tk) {
     if (!el) return;
     const e = _escHtml;
     try {
-        const data = await _fetchLumpDetailCached(token);
-        // V1.3 self-defining binaries carry a sourceStorageTier (0/1/2);
-        // undefined means a legacy binary (all-zero freespace, sidecar only).
-        const _tier = (typeof data.sourceStorageTier === 'number') ? data.sourceStorageTier : null;
+        const resp = await fetch(`/api/lump/${token}/words`, { cache: 'no-store' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        const inspect = typeof LumpContentFrame !== 'undefined' &&
+            LumpContentFrame && LumpContentFrame.lumpInspectContentFrame;
+        if (!inspect) throw new Error('Binary content inspector is unavailable');
+        const binaryInspection = await inspect(data.words || []);
+        const _tier = binaryInspection.profile === 'full' ? 2 :
+            (binaryInspection.profile === 'compact' ? 1 :
+                (binaryInspection.profile === 'api' ? 0 : null));
         const _tierBadge = _tier !== null
             ? `<span class="lump-stored-src-tier-badge" title="V1.3 self-defining freespace">Tier ${_tier} \u2014 ${_tier >= 1 ? 'source embedded in binary' : 'API embedded in binary'}</span>`
             : '';
-        if (data.source && data.source.trim().length > 0) {
-            const _lang = e(data.language || lump.language || 'cloomc');
-            const _compiledAt = data.compiled_at
-                ? (() => {
-                    const d = _lumpTsToDate(data.compiled_at);
-                    if (!d) return null;
-                    const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
-                    return `${d.getDate()} ${mo} ${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-                })()
-                : null;
+        if (binaryInspection.source && binaryInspection.source.trim().length > 0) {
+            const _langValue = (binaryInspection.apiDefinition || {}).language || 'cloomc';
+            const _lang = e(_langValue);
             el.innerHTML =
                 `<div class="lump-stored-src-section">` +
                 `<div class="lump-stored-src-meta-bar lump-stored-src-meta">` +
                 `<span class="lump-stored-src-lang-badge">${_lang}</span>` +
                 _tierBadge +
-                (_compiledAt ? `<span class="lump-stored-src-ts">compiled ${_compiledAt}</span>` : '') +
                 `</div>` +
-                `<pre class="lump-stored-src-pre lump-stored-src-pre-full">${_highlightCLOOMCSource(data.source, data.language || lump.language)}</pre>` +
+                `<pre class="lump-stored-src-pre lump-stored-src-pre-full">${_highlightCLOOMCSource(binaryInspection.source, _langValue)}</pre>` +
                 `</div>`;
         } else if (_tier !== null) {
             // Tier 0: the binary is self-defining (API embedded) but the
@@ -2521,14 +2512,13 @@ async function _fetchAndShowLumpSavedSource(token, lump, tk) {
             el.innerHTML =
                 `<div class="lump-stored-src-section">` +
                 `<div class="lump-stored-src-meta-bar lump-stored-src-meta">${_tierBadge}</div>` +
-                `<div class="lump-stored-src-empty">Source not embedded (Tier 0 \u2014 API only) and no sidecar source.</div>` +
+                `<div class="lump-stored-src-empty">Source not embedded (Tier 0 \u2014 API only). Sidecar source is not used as a fallback.</div>` +
                 `</div>`;
         } else {
-            // Legacy binary (all-zero freespace) AND no sidecar source.
-            el.innerHTML = `<div class="lump-stored-src-empty">No stored source — this LUMP predates source persistence.</div>`;
+            el.innerHTML = `<div class="lump-stored-src-empty">Embedded source unavailable — this legacy LUMP has no valid content frame. Sidecar source is not trusted; explicitly import and approve source to create a new artifact.</div>`;
         }
-    } catch (_) {
-        // Fail silently; Source tab still shows per-method breakdown below
+    } catch (err) {
+        el.innerHTML = `<div class="lump-stored-src-empty">Embedded source inspection failed: ${e(err.message)}</div>`;
     }
 }
 
@@ -2610,6 +2600,7 @@ async function _fetchAndShowLumpTimeline(token, lump) {
             html += '</tr></thead><tbody>';
 
             for (const { ver, hist, tel } of rows) {
+                const histInspection = _lumpBinaryInspection(hist);
                 // "current" = the token this detail panel is showing
                 // History is authoritative when present: archived telemetry rows
                 // deliberately share the current abstraction token.
@@ -2618,26 +2609,29 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                     : (lump.lump_version != null && ver === lump.lump_version);
                 const compiledTs = hist ? hist.compiled_at : (tel ? tel.compiled_at : null);
                 const compiledStr = fmtTs(compiledTs) || (ver === 0 ? 'system' : '\u2014');
-                const cwStr   = hist && hist.cw       != null ? hist.cw              : '\u2014';
-                const ccStr   = hist && hist.cc       != null ? hist.cc              : '\u2014';
-                const profileLabel = hist && hist.content_profile === 'api'
+                const cwStr = histInspection && histInspection.cw != null ? histInspection.cw : '\u2014';
+                const ccStr = histInspection && histInspection.cc != null ? histInspection.cc : '\u2014';
+                const contentProfile = histInspection &&
+                    (histInspection.content_profile || histInspection.profile);
+                const profileLabel = contentProfile === 'api'
                     ? 'API only'
-                    : (hist && hist.content_profile === 'compact'
+                    : (contentProfile === 'compact'
                         ? 'Compact source'
-                        : (hist && hist.content_profile === 'full' ? 'Full source' : 'Legacy'));
-                const szStr   = hist && hist.lump_size != null
-                    ? `${hist.lump_size}w \u00b7 ${profileLabel}` : '\u2014';
+                        : (contentProfile === 'full' ? 'Full source' : 'Legacy / unavailable'));
+                const szStr = histInspection && histInspection.lump_size != null
+                    ? `${histInspection.lump_size}w \u00b7 ${profileLabel}` : '\u2014';
                 const metadataOnly = Boolean(hist && hist.metadata_only);
                 const validationErrors = hist && Array.isArray(hist.validation_errors)
                     ? hist.validation_errors : [];
                 const archiveUsable = Boolean(hist && !isCurrent &&
-                    hist.preview_enabled !== false && hist.restore_enabled !== false);
+                    hist.preview_enabled !== false && hist.restore_enabled !== false &&
+                    histInspection && hist.binary_valid === true);
 
                 let _rowAttrs = '';
                 if (isCurrent) {
                     _rowAttrs = ' style="background:var(--bg-selected,rgba(99,102,241,0.08));"';
                 } else if (archiveUsable) {
-                    _rowAttrs = ` style="cursor:pointer;" onclick="_lumpHistorySelectRow(this,'${e(token)}',${ver},${hist.cw||0},${hist.cc||0},${hist.lump_size||0},'${tk}')"`;
+                    _rowAttrs = ` style="cursor:pointer;" onclick="_lumpHistorySelectRow(this,'${e(token)}',${ver},${histInspection.cw||0},${histInspection.cc||0},${histInspection.lump_size||0},'${tk}')"`;
                 }
                 html += `<tr class="lump-history-row" data-version="${ver}"${_rowAttrs}>`;
 
@@ -2675,7 +2669,7 @@ async function _fetchAndShowLumpTimeline(token, lump) {
 
                 // Preview + Restore (only for archived binaries)
                 if (archiveUsable) {
-                    html += `<td><button class="btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_lumpHistoryPreview('${e(token)}',${ver},${hist.cw||0},${hist.cc||0},${hist.lump_size||0},'${tk}')" title="Preview hex diff of v${ver}">Preview</button></td>`;
+                    html += `<td><button class="btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_lumpHistoryPreview('${e(token)}',${ver},${histInspection.cw||0},${histInspection.cc||0},${histInspection.lump_size||0},'${tk}')" title="Preview hex diff of v${ver}">Preview</button></td>`;
                     html += `<td><button class="btn lump-history-restore-btn" id="lumpHistoryRestoreBtn_${tk}_${ver}" style="font-size:0.7rem;padding:2px 8px;" disabled onclick="event.stopPropagation();_restoreLumpFromHistory('${e(token)}',${ver})" title="Preview this version first, then restore">Restore</button></td>`;
                 } else if (hist && !isCurrent) {
                     const reason = validationErrors.length
@@ -2797,6 +2791,14 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk) {
         const words = data.words || [];
         const numWords = words.length;
         if (!numWords) { _noPreview('archived binary is empty'); return; }
+        if (!_lumpBinaryInspection(data)) {
+            _noPreview('binary inspection fields are unavailable');
+            return;
+        }
+        if (data.binary_valid !== true && !_lumpApprovalMatchesBinary(data)) {
+            _noPreview('matching hash-bound approval record is unavailable');
+            return;
+        }
 
         let curWords = [];
         let curFetchFailed = false;
@@ -2872,7 +2874,8 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk) {
 async function _restoreLumpFromHistory(token, version) {
     const lump = _lumpsCache.find(l => l.token === token);
     const displayName = (lump && lump.abstraction) || token;
-    if (!confirm(`Restore v${version} of "${displayName}" as the current LUMP?\n\nThe current version will be archived first.`)) return;
+    if (!confirm(`Restore v${version} of "${displayName}" as the current LUMP?\n\n` +
+        'The archived binary and its hash-bound approval record will be validated. The current version will be archived first.')) return;
 
     try {
         const wordsResp = await fetch(`/api/lumps/${token}/words/${version}`);
@@ -2880,30 +2883,14 @@ async function _restoreLumpFromHistory(token, version) {
         const wordsData = await wordsResp.json();
         const words = wordsData.words;
         if (!words || !words.length) throw new Error('Archived binary is empty');
-
-        const metadata = {
-            token:           token,
-            abstraction:     wordsData.abstraction   ?? (lump?.abstraction   ?? ''),
-            ns_slot:         wordsData.ns_slot       ?? (lump?.ns_slot       ?? null),
-            cw:              wordsData.cw            ?? (lump?.cw            ?? 0),
-            cc:              wordsData.cc            ?? (lump?.cc            ?? 0),
-            profile:         wordsData.profile       || lump?.profile || lump?.deployment?.profile || 'IoT',
-            language:        wordsData.language      || lump?.language      || 'unknown',
-            author:          wordsData.author        || lump?.author        || '',
-            version:         wordsData.version_str   || lump?.version       || '',
-            release_notes:   wordsData.release_notes || lump?.release_notes || '',
-            methods:         wordsData.methods       || lump?.methods       || [],
-            capabilities:    wordsData.capabilities  || lump?.capabilities  || [],
-            grants:          wordsData.grants        || lump?.grants        || ['E'],
-            content_type:    wordsData.content_type  || lump?.content_type  || 'code',
-            pet_names_dr:    (wordsData.pet_names || lump?.pet_names || {}).DR || {},
-            pet_names_cr:    (wordsData.pet_names || lump?.pet_names || {}).CR || {},
-            mtbf_clean_runs: (wordsData.mtbf || {}).consecutive_clean || 0,
-            mtbf_total_runs: (wordsData.mtbf || {}).total_runs        || 0,
-            mtbf_status:     (wordsData.mtbf || {}).status            || 'unknown',
-            source_hash:     wordsData.source_hash   || (lump?.mtbf || {}).source_hash || '',
-            source:          wordsData.source        || '',
-        };
+        const inspection = _lumpBinaryInspection(wordsData);
+        if (!inspection) throw new Error('Archived binary inspection is unavailable');
+        const metadata = Object.assign({ approval_confirmed: true },
+            _hashBoundLumpApproval(wordsData, inspection.binary_hash));
+        // The save endpoint classifies restoration of an existing token as a
+        // replacement and consumes a matching "replace" intent.
+        const restoreIntent = await _requestLumpApprovalIntent(words, 'replace', metadata);
+        metadata.approval_intent = restoreIntent.intent;
 
         const saveResp = await fetch('/api/lumps/save', {
             method: 'POST',
@@ -2941,16 +2928,39 @@ function _pack4Decode(words) {
     return td.decode(bytes.subarray(0, end));
 }
 
+function _packDataLumpWords(bytes) {
+    const paddedLength = (bytes.length + 3) & ~3;
+    const padded = new Uint8Array(paddedLength);
+    padded.set(bytes);
+    const dataWords = paddedLength >>> 2;
+    const n = Math.min(14, Math.max(6,
+        Math.ceil(Math.log2(Math.max(1 + dataWords, 2)))));
+    const lumpSize = 1 << n;
+    const cw = Math.min(dataWords, lumpSize - 1);
+    const words = new Array(lumpSize).fill(0);
+    words[0] = ((0x1F << 27) | ((n - 6) << 23) |
+        (cw << 10) | (0x01 << 8)) >>> 0;
+    const view = new DataView(padded.buffer);
+    for (let i = 0; i < cw; i++) words[i + 1] = view.getUint32(i * 4, false);
+    return words;
+}
+
 async function _saveLumpText(token, text, bodyEl, lump) {
     const saveBtn = bodyEl.querySelector('.lump-edit-save-btn');
     const statusEl = bodyEl.querySelector('.lump-edit-status');
+    if (!confirm(`Save edited content for LUMP 0x${token}?\n\n` +
+        'This replaces the artifact bytes and records approval for the resulting binary hash.')) return;
     if (saveBtn) saveBtn.disabled = true;
     if (statusEl) statusEl.textContent = 'Saving\u2026';
     try {
-        const resp = await fetch(`/api/lump/${token}/content`, {
-            method: 'PUT',
+        const words = _packDataLumpWords(new TextEncoder().encode(text));
+        const metadata = _lumpApprovalView(lump || {});
+        const intent = await _requestLumpApprovalIntent(words, 'replace', metadata);
+        metadata.approval_intent = intent.intent;
+        const resp = await fetch('/api/lumps/save', {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text }),
+            body: JSON.stringify({ binary: words, metadata }),
         });
         const result = await resp.json();
         if (!resp.ok) throw new Error(result.error || `HTTP ${resp.status}`);
@@ -2984,34 +2994,16 @@ async function _saveLumpMeta(token, metaId) {
     const statusEl  = document.getElementById(metaId + '_status');
     const saveBtn   = document.querySelector(`#${metaId}_form .lump-edit-save-btn`);
     if (!authorEl || !versionEl) return;
-    const author  = authorEl.value.trim();
-    const version = versionEl.value.trim();
-    if (saveBtn) saveBtn.disabled = true;
-    if (statusEl) { statusEl.textContent = 'Saving\u2026'; statusEl.style.color = ''; }
-    try {
-        const resp = await fetch(`/api/lump/${token}/meta`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ author, version }),
-        });
-        const result = await resp.json();
-        if (!resp.ok) throw new Error(result.error || `HTTP ${resp.status}`);
-        const lump = _lumpsCache.find(l => l.token === token);
-        if (lump) { lump.author = author; lump.version = version; }
-        if (typeof _refreshLumpPickerOption === 'function') _refreshLumpPickerOption(token);
-        if (statusEl) { statusEl.textContent = 'Saved.'; statusEl.style.color = 'var(--accent-green, #4caf50)'; }
-        if (saveBtn) saveBtn.disabled = false;
-        const displayEl = document.getElementById(metaId + '_display');
-        if (displayEl) {
-            const tds = displayEl.querySelectorAll('td:last-child');
-            const e = _escHtml;
-            if (tds[0]) tds[0].innerHTML = author ? e(author) : '<span style="color:var(--text-secondary);font-style:italic;">not set</span>';
-            if (tds[1]) tds[1].innerHTML = version ? e(version) : '<span style="color:var(--text-secondary);font-style:italic;">not set</span>';
-        }
-    } catch (err) {
-        if (statusEl) { statusEl.textContent = `Error: ${err.message}`; statusEl.style.color = 'var(--red, #e53935)'; }
-        if (saveBtn) saveBtn.disabled = false;
+    if (!confirm(`Approve metadata changes for LUMP 0x${token}?\n\n` +
+        'Author and version annotations will be bound to this exact artifact hash.')) return;
+    // The retired metadata PATCH endpoint could alter annotations without a
+    // one-time, hash-bound approval intent. Keep this read-only until the
+    // approval-intent API is available.
+    if (statusEl) {
+        statusEl.textContent = 'Metadata edits require a fresh hash-bound approval intent; no artifact metadata was changed.';
+        statusEl.style.color = 'var(--text-secondary)';
     }
+    if (saveBtn) saveBtn.disabled = false;
 }
 
 const _DRAFT_LS_PREFIX = 'cm_lump_draft_v2_';
@@ -3369,12 +3361,17 @@ async function _loadLumpContent(token, lump) {
         const ct  = (lump.content_type || '').toLowerCase();
         const typ = lump.typ;
         const dataWords = words.slice(1);
-        if (ct === 'code' || typ === 0 || lump.cw > 0) {
+        const inspectedHeader = (typeof sim !== 'undefined' && sim && sim.parseLumpHeader)
+            ? sim.parseLumpHeader(words[0] >>> 0) : null;
+        if (!inspectedHeader || !inspectedHeader.valid || !_getLumpFieldSizeLayout(words))
+            throw new Error('Malformed LUMP binary');
+        if (ct === 'code' || typ === 0 || inspectedHeader.cw > 0) {
             const _identData = {
-                petname:         data.petname         || lump.petname         || '',
-                issue_number:    data.issue_number     || lump.issue_number     || 1,
-                identity_string: data.identity_string  || lump.identity_string  || '',
-                identity_hash:   data.identity_hash    || lump.identity_hash    || '',
+                petname: data.petname || '',
+                issue_number: data.issue_number || null,
+                identity_string: data.identity_string || '',
+                identity_hash: data.identity_hash || '',
+                binary_hash: data.binary_hash || '',
             };
             _renderLumpCodeContent(bodyEl, lump, words, token, data.binary_hash || '', _identData);
         } else if (ct === 'text') {
@@ -3518,15 +3515,22 @@ function _colorizeComment(text) {
 function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identityData) {
     identityData = identityData || {};
     const e = _escHtml;
-    const methods   = lump.methods  || [];
+    const methods = lump.api_definition_source === 'binary-inspection' &&
+        lump.api_definition && Array.isArray(lump.api_definition.methods)
+        ? lump.api_definition.methods : [];
     // Prefer binary-header values — they are the authoritative source and will
     // differ from the manifest when the lump was recompiled but the manifest
     // cache was not yet refreshed (the classic "stale manifest" conflict).
     const _binaryHdr = (words && words.length > 0 && typeof sim !== 'undefined' && sim && sim.parseLumpHeader)
         ? sim.parseLumpHeader(words[0] >>> 0) : null;
-    const cw        = (_binaryHdr && _binaryHdr.valid) ? _binaryHdr.cw       : (parseInt(lump.cw)        || 0);
-    const cc        = (_binaryHdr && _binaryHdr.valid) ? _binaryHdr.cc       : (parseInt(lump.cc)        || 0);
-    const lumpSize  = (_binaryHdr && _binaryHdr.valid) ? _binaryHdr.lumpSize : (parseInt(lump.lump_size) || words.length);
+    if (!_binaryHdr || !_binaryHdr.valid || !_getLumpFieldSizeLayout(words)) {
+        bodyEl.innerHTML = '<div class="lump-hex-loading">Exact LUMP bytes are malformed; content unavailable.</div>';
+        bodyEl.className = '';
+        return;
+    }
+    const cw = _binaryHdr.cw;
+    const cc = _binaryHdr.cc;
+    const lumpSize = _binaryHdr.lumpSize;
     // Keep cache current for any tab that loads after Content.
     if (_binaryHdr && _binaryHdr.valid) _lumpBinaryHdrCache[token] = { hdr: _binaryHdr, words };
     const abstName  = lump.abstraction || 'Lump';
@@ -3534,7 +3538,7 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
     // Build per-method DR pet-name lookup (numeric key → label).
     // Keys in pet_names.DR are stored as numeric strings ("0", "1", ...).
     const methodDRPetNames = {};  // method name → { drNum: "label" }
-    const topLevelDR = ((lump.pet_names || {}).DR) || {};
+    const topLevelDR = {};
     for (const m of methods) {
         const own = ((m.pet_names || {}).DR) || {};
         if (Object.keys(own).length > 0) {
@@ -3625,14 +3629,14 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
     //   2. Abstract GT device-class derivation (LED0, UART0, … — canonical no-bracket form)
     //   3. Inform/Outform GT: token lookup → sim.nsLabels[slot_id]
     const clistSlotName = {};   // slot index (0-based) → human name
-    const _crPetNamesForCode = (lump.pet_names || {}).CR || {};
+    const _crPetNamesForCode = {};
     const _abDevClsNames     = ['?','LED','UART','Button','Timer','Display'];
     const clistStart = lumpSize - cc;
     for (let s = 0; s < cc; s++) {
         const wIdx = clistStart + s;
         const wVal = wIdx < words.length ? (words[wIdx] >>> 0) : 0;
         if (!wVal) {
-            const _capMeta = lump.capabilities && lump.capabilities[s];
+            const _capMeta = null;
             const _capName = _capMeta ? (_capMeta.name || (typeof _capMeta === 'string' ? _capMeta : '')) : '';
             clistSlotName[s] = _capName || '(empty)';
             continue;
@@ -3891,10 +3895,10 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
 
     // Content hash check (binary_hash): did the bytes on disk change since compile?
     const _serverHash   = (binaryHash        || '').toLowerCase();
-    const _manifestHash = (lump.binary_hash  || '').toLowerCase();
+    const _approvedHash = (identityData.binary_hash || '').toLowerCase();
     let _hashStatus, _hashIcon, _hashDisplay, _hashTitle;
-    if (_serverHash && _manifestHash) {
-        if (_serverHash === _manifestHash) {
+    if (_serverHash && _approvedHash) {
+        if (_serverHash === _approvedHash) {
             _hashStatus  = 'ok';
             _hashIcon    = '\u2713';  // ✓
             _hashDisplay = _serverHash.slice(0, 12) + '\u2026';
@@ -3905,13 +3909,13 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
             _hashDisplay = _serverHash.slice(0, 12) + '\u2026';
             _hashTitle   = 'Content mismatch \u2014 binary on disk ('
                          + _serverHash.slice(0, 8) + '\u2026) differs from the compiled record ('
-                         + _manifestHash.slice(0, 8) + '\u2026). Binary may have been replaced after compilation.';
+                         + _approvedHash.slice(0, 8) + '\u2026). Approval does not match these exact bytes.';
         }
     } else if (_serverHash) {
         _hashStatus  = 'none';
         _hashIcon    = '\u2014';  // —
         _hashDisplay = _serverHash.slice(0, 12) + '\u2026';
-        _hashTitle   = 'No compile-time hash recorded \u2014 recompile to establish a verification baseline';
+        _hashTitle   = 'Exact binary hash computed; no matching approval annotation is available';
     } else {
         _hashStatus  = 'none';
         _hashIcon    = '\u2014';
@@ -4122,7 +4126,7 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
     // C-list GTs inline section — same word data already in hand, no extra fetch needed
     if (cc > 0) {
         const _clistStart  = lumpSize - cc;
-        const _gtCRPetNames = (lump.pet_names || {}).CR || {};
+        const _gtCRPetNames = {};
         const _abDevClass  = ['?','LED','UART','Button','Timer','Display'];
         html += `<div class="lump-clist-section">`;
         html += `<div class="lump-clist-title">MyGoldenTokens <span class="lump-gt-count">(${cc} ${cc === 1 ? 'capability' : 'capabilities'})</span></div>`;
@@ -4133,7 +4137,7 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
             const _gType = (_wVal >>> 25) & 0x3;
             const _gSeq  = (_wVal >>> 16) & 0x1FF;
             if (!_wVal) {
-                const _capMeta = lump.capabilities && lump.capabilities[_gs];
+                const _capMeta = null;
                 const _capName = _capMeta ? (_capMeta.name || (typeof _capMeta === 'string' ? _capMeta : '')) : '';
                 if (_capName) {
                     html += `<div class="lump-gt-chip lump-gt-chip-null lump-gt-chip-declared" title="#${_gs} \u2014 ${_capName} (declared in capabilities block; GT assigned at runtime)">` +
@@ -4170,7 +4174,7 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
                 const _gPerms  = (_wVal >>> 25) & 0x3F;
                 const _gTStr   = ['NULL','Inf','Out','Abs'][_gType];
                 const _pStr    = 'RWXLSE'.split('').map((c, i) => (_gPerms >> i) & 1 ? c : '-').join('');
-                const _capMeta2 = lump.capabilities && lump.capabilities[_gs];
+                const _capMeta2 = null;
                 const _capName2 = _capMeta2 ? (_capMeta2.name || (typeof _capMeta2 === 'string' ? _capMeta2 : '')) : '';
                 const _mName   = _capName2 || _gtCRPetNames[_gs] || _gtCRPetNames[String(_gs)] ||
                                  (sim && sim.nsLabels && sim.nsLabels[_slotId]) || '';
@@ -4224,9 +4228,9 @@ async function _loadLumpTokens(token, lump) {
     const nsIdx    = (lump.ns_slot !== null && lump.ns_slot !== undefined) ? parseInt(lump.ns_slot) : null;
 
     // ── Fetch words first so we can derive cc+lumpSize from the binary header ─
-    let words    = [];
-    let cc       = parseInt(lump.cc)        || 0;  // manifest fallback until binary confirms
-    let lumpSize = parseInt(lump.lump_size) || 0;
+    let words = [];
+    let cc;
+    let lumpSize;
     try {
         // Reuse cached words when available (Content tab may have loaded first).
         const _cachedEntry = _lumpBinaryHdrCache[token];
@@ -4238,14 +4242,14 @@ async function _loadLumpTokens(token, lump) {
             const data = await resp.json();
             words = data.words || [];
         }
-        if (words.length > 0 && typeof sim !== 'undefined' && sim && sim.parseLumpHeader) {
-            const _bh = sim.parseLumpHeader(words[0] >>> 0);
-            if (_bh && _bh.valid) {
-                cc = _bh.cc;
-                lumpSize = _bh.lumpSize;
-                _lumpBinaryHdrCache[token] = { hdr: _bh, words };
-            }
-        }
+        if (!words.length || typeof sim === 'undefined' || !sim || !sim.parseLumpHeader)
+            throw new Error('Exact LUMP words are unavailable');
+        const _bh = sim.parseLumpHeader(words[0] >>> 0);
+        if (!_bh || !_bh.valid || !_getLumpFieldSizeLayout(words))
+            throw new Error('Exact LUMP words are malformed');
+        cc = _bh.cc;
+        lumpSize = _bh.lumpSize;
+        _lumpBinaryHdrCache[token] = { hdr: _bh, words };
     } catch (err) {
         const errHtml = `<div class="lump-clist-section"><div style="color:#f87171;font-size:0.8rem;padding:0.4rem 0;">` +
             `Failed to load token words: ${e(err.message)}</div></div>`;
@@ -4287,7 +4291,7 @@ async function _loadLumpTokens(token, lump) {
     }
 
     const clistStart    = lumpSize - cc;
-    const _gtCRPetNames = (lump.pet_names || {}).CR || {};
+    const _gtCRPetNames = {};
     const _abDevClass   = ['?','LED','UART','Button','Timer','Display'];
     const _tokenToName  = tok => {
         if (!_lumpsCache || !_lumpsCache.length) return '';
@@ -4310,7 +4314,7 @@ async function _loadLumpTokens(token, lump) {
         const gtSeq  = (wVal >>> 16) & 0x1FF;
 
         if (!wVal) {
-            const _capMeta = lump.capabilities && lump.capabilities[s];
+            const _capMeta = null;
             const _capName = _capMeta ? (_capMeta.name || (typeof _capMeta === 'string' ? _capMeta : '')) : '';
             if (_capName) {
                 html += `<div class="lump-gt-chip lump-gt-chip-null lump-gt-chip-declared" title="#${s} \u2014 ${e(_capName)} (declared in capabilities block; GT assigned at runtime)">` +
@@ -4361,7 +4365,7 @@ async function _loadLumpTokens(token, lump) {
             const permStr   = dom === 0
                 ? (((perm3>>2)&1 ? 'X' : '-') + ((perm3>>1)&1 ? 'W' : '-') + ((perm3>>0)&1 ? 'R' : '-'))
                 : (((perm3>>2)&1 ? 'E' : '-') + ((perm3>>1)&1 ? 'S' : '-') + ((perm3>>0)&1 ? 'L' : '-'));
-            const _capMeta2    = lump.capabilities && lump.capabilities[s];
+            const _capMeta2 = null;
             const _capName2    = _capMeta2 ? (_capMeta2.name || (typeof _capMeta2 === 'string' ? _capMeta2 : '')) : '';
             const manifestName = _gtCRPetNames[s] || _gtCRPetNames[String(s)] || '';
             const simNsName    = (typeof sim !== 'undefined' && sim && sim.nsLabels)
@@ -4408,22 +4412,25 @@ function _renderLumpImageContent(bodyEl, lump, dataWords, token) {
         fileInput.addEventListener('change', async () => {
             const file = fileInput.files[0];
             if (!file) return;
+            if (!confirm(`Replace the content of LUMP 0x${token} with "${file.name}"?\n\n` +
+                'This creates new artifact bytes and requires approval bound to the resulting binary hash.')) {
+                fileInput.value = '';
+                return;
+            }
             replaceBtn.disabled = true;
             statusEl.textContent = 'Uploading\u2026';
             statusEl.style.color = '';
             try {
                 const arrayBuf = await file.arrayBuffer();
                 const bytes = new Uint8Array(arrayBuf);
-                let b64 = '';
-                const chunk = 8192;
-                for (let i = 0; i < bytes.length; i += chunk) {
-                    b64 += String.fromCharCode(...bytes.subarray(i, i + chunk));
-                }
-                b64 = btoa(b64);
-                const resp = await fetch(`/api/lump/${token}/content`, {
-                    method: 'PUT',
+                const words = _packDataLumpWords(bytes);
+                const metadata = _lumpApprovalView(lump || {});
+                const intent = await _requestLumpApprovalIntent(words, 'replace', metadata);
+                metadata.approval_intent = intent.intent;
+                const resp = await fetch('/api/lumps/save', {
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ data_b64: b64 }),
+                    body: JSON.stringify({ binary: words, metadata }),
                 });
                 const result = await resp.json();
                 if (!resp.ok) throw new Error(result.error || `HTTP ${resp.status}`);
@@ -4651,6 +4658,12 @@ async function _submitLumpImport() {
         if (imgW > 0) body.image_width  = imgW;
         if (imgH > 0) body.image_height = imgH;
     }
+    const importNotice = ct === 'lump'
+        ? 'Raw uploaded bytes remain unapproved: they may be inspected, but security metadata and deployment stay unavailable until a separate explicit approval.'
+        : 'The generated artifact remains unavailable for deployment until separately approved against its exact binary hash.';
+    if (!confirm(`Import "${name}" as a new ${ct} LUMP?\n\n${importNotice}`)) {
+        return;
+    }
 
     const submitBtn = modal.querySelector('#lumpImportSubmit');
     submitBtn.disabled = true;
@@ -4671,6 +4684,8 @@ async function _submitLumpImport() {
 }
 
 async function _resizeLump(token) {
+    if (!confirm(`Shrink LUMP 0x${token} to its minimum allocation?\n\n` +
+        'This creates different artifact bytes. The current immutable binary will remain in History and the result requires hash-bound approval.')) return;
     const btn = document.querySelector('.lump-hs-resize-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Shrinking…'; }
     try {
@@ -5129,6 +5144,15 @@ function _switchToLumpVersionAndScroll(token, methodName) {
     if (typeof renderLumps === 'function') renderLumps();
 }
 
+// The version-mismatch hint is an API feature, so it must only use names
+// previously recovered from that version's embedded content frame.
+function _lumpHasInspectedMethod(lump, methodName) {
+    if (!lump || lump.api_definition_source !== 'binary-inspection' ||
+        !lump.api_definition || !Array.isArray(lump.api_definition.methods)) return false;
+    return lump.api_definition.methods.some(method =>
+        (typeof method === 'string' ? method : method && method.name) === methodName);
+}
+
 function _scrollToLumpMethod(tk, methodName, _attempt) {
     if (!tk || !methodName) return;
     const attempt = _attempt || 0;
@@ -5150,8 +5174,7 @@ function _scrollToLumpMethod(tk, methodName, _attempt) {
             const altLump = (curLump && curLump.abstraction && typeof _lumpsCache !== 'undefined')
                 ? _lumpsCache.find(l => l.abstraction === curLump.abstraction
                     && l.token !== curLump.token
-                    && Array.isArray(l.methods)
-                    && l.methods.some(m => m.name === methodName))
+                    && _lumpHasInspectedMethod(l, methodName))
                 : null;
             if (altLump) {
                 const curLabel = _lumpVersionLabel(curLump);
@@ -5354,12 +5377,10 @@ async function openLumpInEditor(token) {
     }
     if (window._savedLumpOpenRequestId !== _openRequestId) return;
 
-    // ── Try to read embedded source from V1.3 0xAB content frame ─────────────
-    // Delegates to lump-content-frame.js lumpDecodeContentFrame() which handles
-    // compact/full, compressed/uncompressed source frames. Falls through silently
-    // to sidecar / disasm when absent or malformed.
+    // ── Inspect embedded content from the immutable binary ──────────────────
     var _binaryFrameSource = null;
     var _binaryFrameIsApiOnly = false;
+    var _binaryFrameApi = null;
     if (serverWords && serverWords.length > 0) {
         var _lcfDec = (typeof LumpContentFrame !== 'undefined') ? LumpContentFrame : null;
         if (_lcfDec) {
@@ -5374,6 +5395,9 @@ async function openLumpInEditor(token) {
             }
             try { _binaryFrameSource = await _lcfDec.lumpDecodeContentFrame(serverWords); }
             catch (_bfe) { /* fall through */ }
+            if (typeof _lcfDec.lumpDecodeContentFrameApi === 'function') {
+                _binaryFrameApi = _lcfDec.lumpDecodeContentFrameApi(serverWords);
+            }
         }
         var _sourceHdr = serverWords[0] >>> 0;
         var _sourceFrameStart = 1 + ((_sourceHdr >>> 10) & 0x1FFF);
@@ -5385,23 +5409,8 @@ async function openLumpInEditor(token) {
     }
     if (window._savedLumpOpenRequestId !== _openRequestId) return;
 
-    // Embedded source is preferred; older LUMPs fetch their established
-    // sidecar source before any editor UI is changed.  Keeping all awaits
-    // before the view commit prevents a late response from reopening split
-    // mode after the user has navigated elsewhere.
-    var _sidecarSource = null;
-    if (typeof _binaryFrameSource !== 'string' && !_inMemoryLump) {
-        try {
-            var _dr = await fetch('/api/lumps/' + token + '/detail', { cache: 'no-store' });
-            if (_dr.ok) {
-                var _dj = await _dr.json();
-                if (_dj && typeof _dj.source === 'string') _sidecarSource = _dj.source;
-            }
-        } catch (_dfe) {}
-    }
     if (window._savedLumpOpenRequestId !== _openRequestId) return;
-    var _sourceResolution = _resolveSavedLumpEditorSource(
-        _binaryFrameSource, _sidecarSource);
+    var _sourceResolution = _resolveSavedLumpEditorSource(_binaryFrameSource);
 
     // ── Disassemble from server words (authoritative) ──────────────────────
     var disasmLines = null;
@@ -5424,34 +5433,15 @@ async function openLumpInEditor(token) {
                 '(' + codeLimit + ' word' + (codeLimit !== 1 ? 's' : '') +
                 ', cc=' + lhdr.cc + ', ' + _lhFree2 + ' free)'
             ];
-            // Inject capabilities { } block from sidecar metadata when available.
-            // Richer manifest schemas (e.g. wired-at-boot / lazy-filled Tunnel
-            // capabilities) describe the slot's actual GT instead of a plain
-            // grants/rights array, so `c.grants`/`c.rights` can be empty even
-            // though the capability is perfectly valid. Fall through before
-            // giving up, so the decompiled source is always syntactically
-            // valid and re-compilable:
-            //   1. c.grants / c.rights, when the sidecar already has them.
-            //   2. Server-precomputed lump.clist_entries[slot].perms — already
-            //      type-aware (an Outform GT's bits mean something different
-            //      than an Inform/capability GT's), so it beats a naive raw
-            //      bit-decode of the GT word here.
-            //   3. Final fallback: 'E' — by project convention, c-list slots
-            //      only ever carry E (call/execute) permission, so a slot with
-            //      no discoverable rights (e.g. a NULL GT awaiting runtime
-            //      injection, like Tunnel.mymother) still decompiles cleanly.
-            var _lCaps = lump.capabilities;
+            // Embedded API declarations may annotate intrinsic c-list rows.
+            // Never manufacture names or rights from a sidecar/catalog record.
+            var _lCaps = _binaryFrameApi && Array.isArray(_binaryFrameApi.capabilities)
+                ? _binaryFrameApi.capabilities : null;
             if (Array.isArray(_lCaps) && _lCaps.length > 0) {
-                var _clistEntries = Array.isArray(lump.clist_entries) ? lump.clist_entries : null;
                 var _capItems = _lCaps.map(function(c, idx) {
                     var _n = c.name || String(c);
-                    var _slot = (typeof c.slot === 'number') ? c.slot : idx;
                     var _r = (c.grants || c.rights || []).join('');
-                    if (!_r && _clistEntries && _clistEntries[_slot] && !_clistEntries[_slot].null) {
-                        _r = _clistEntries[_slot].perms || '';
-                    }
-                    if (!_r) _r = 'E';
-                    return _n + ' ' + _r;
+                    return _n + (_r ? ' ' + _r : '');
                 }).filter(Boolean).join(', ');
                 disasmLines.push('capabilities { ' + _capItems + ' }');
                 disasmLines.push('');
@@ -5463,11 +5453,10 @@ async function openLumpInEditor(token) {
                 //   a) abstraction name is known
                 //   b) registry has method list (>= 1 method)
                 //   c) first registry.methods.length words are all opcode-23 BRANCH
-                var _absName  = lump.abstraction || null;
-                var _absReg   = (_absName && typeof abstractionRegistry !== 'undefined')
-                                    ? abstractionRegistry.getByName(_absName) : null;
-                var _methods  = (_absReg && _absReg.methods && _absReg.methods.length >= 1)
-                                    ? _absReg.methods : null;
+                var _methods = _binaryFrameApi &&
+                    Array.isArray(_binaryFrameApi.methods) &&
+                    _binaryFrameApi.methods.length >= 1
+                        ? _binaryFrameApi.methods : null;
                 var BRANCH_OP = 23;  // v2.0 ISA BRANCH opcode — matches lump_assembler.js
                 var structured  = false;
 
@@ -5476,8 +5465,10 @@ async function openLumpInEditor(token) {
                 // sequentially without a BRANCH dispatch table.  The server
                 // manifest carries explicit offset+length per method; use those
                 // to slice trimmed[] directly — no dispatch table needed.
-                var _lumpMethods = Array.isArray(lump.methods) && lump.methods.length >= 1
-                                       ? lump.methods : null;
+                var _lumpMethods = _binaryFrameApi &&
+                    Array.isArray(_binaryFrameApi.methods) &&
+                    _binaryFrameApi.methods.length >= 1
+                        ? _binaryFrameApi.methods : null;
                 var _hasOffsets  = _lumpMethods && _lumpMethods.every(function(m) {
                     return typeof m.offset === 'number';
                 });
@@ -5633,9 +5624,7 @@ async function openLumpInEditor(token) {
         if (disasmLines) {
             _compiledDisasm = disasmLines.join('\n');
         } else {
-            var cwHint = (lump.cw  > 0) ? ('\n; Code region: ' + lump.cw  + ' word' + (lump.cw  !== 1 ? 's' : '')) : '';
-            var ccHint = (lump.cc  > 0) ? ('\n; C-List: '      + lump.cc  + ' GT slot' + (lump.cc  !== 1 ? 's' : '')) : '';
-            _compiledDisasm = '; ' + lumpName + cwHint + ccHint +
+            _compiledDisasm = '; ' + lumpName +
                           '\n; Compiled disassembly is unavailable because this binary is malformed.\n';
             var _mfBannerMsg = 'Binary is malformed \u2014 compiled disassembly is unavailable. Recoverable source, if any, remains editable.';
             // Show malformed-binary banner above the editor.
@@ -5649,11 +5638,7 @@ async function openLumpInEditor(token) {
             else if (asmEd.parentNode) asmEd.parentNode.insertBefore(_mfBanner, asmEd);
         }
 
-        // ── Restore original source: binary frame first, sidecar as fallback ──
-        // Binary-embedded source (from the 0xAB content frame) is the canonical
-        // form — it is exactly what was in the editor when the LUMP was saved.
-        // Fall back to the sidecar detail endpoint for older lumps that predate
-        // the V1.3 self-defining binary format.
+        // Restore only source embedded in the selected immutable binary.
         var _recoveredSource = _sourceResolution.source;
         var _sourceRestored = _sourceResolution.restored;
 
@@ -5731,7 +5716,7 @@ async function openLumpInEditor(token) {
             _sourceMissingBanner.textContent =
                 _binaryFrameIsApiOnly
                     ? 'This LUMP was saved as API only, so no source was embedded. The left pane is a new editable source buffer; the right pane is compiled disassembly.'
-                    : 'No embedded or sidecar source was found. The left pane is a new editable source buffer; the right pane is compiled disassembly.';
+                    : 'Embedded source is unavailable. Legacy sidecar and catalog source are not trusted as artifact content. The left pane is a new editable source buffer; the right pane is compiled disassembly.';
             var _sourceMissingParent = asmEd.parentNode && asmEd.parentNode.parentNode;
             if (_sourceMissingParent) _sourceMissingParent.insertBefore(_sourceMissingBanner, asmEd.parentNode);
             else if (asmEd.parentNode) asmEd.parentNode.insertBefore(_sourceMissingBanner, asmEd);
@@ -5830,11 +5815,10 @@ async function openLumpInEditor(token) {
 // ── Save an already-persisted LUMP as a new dated version ────────────────────
 // Called by the "Save Lump" toolbar button when the editor was opened from a
 // server-saved LUMP and no fresh compiled words are in LumpRegistry.
-// Fetches the binary from /api/lump/<token>/words and POSTs it to
-// /api/lumps/save so the server generates a new versioned filename and sidecar
-// following the standard Dot.Name.issue_n.Number.lump rules.
 // ─────────────────────────────────────────────────────────────────────────────
 async function _saveLumpDirectVersion(token, lump, btn) {
+    if (!confirm(`Save a new version of "${lump.abstraction || token}"?\n\n` +
+        'The exact binary hash will be bound to the approval created by this action.')) return;
     if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
     var opName = 'Save Lump \u2014 ' + (lump.abstraction || token);
     try {
@@ -5847,27 +5831,19 @@ async function _saveLumpDirectVersion(token, lump, btn) {
         var _words = _wj && Array.isArray(_wj.words) ? _wj.words : null;
         if (!_words || _words.length < 2) throw new Error('Server returned empty or invalid binary');
 
-        // 2. Build metadata from the existing sidecar fields so the server can
-        //    preserve the abstraction name, issue_n, language, etc.
-        var _meta = {
-            abstraction:   lump.abstraction  || 'Unnamed',
-            token:         token,
-            content_type:  lump.content_type || 'code',
-            language:      lump.language     || '',
-            author:        lump.author       || '',
-            version:       lump.version      || '',
-            status:        lump.status       || '',
-            description:   lump.description  || '',
-            dot_name:      lump.dot_name     || '',
-            issue_n:       lump.issue_n      || 1,
-            boot_resident: lump.boot_resident || false,
-        };
-        if (lump.ns_slot !== null && lump.ns_slot !== undefined) {
-            _meta.ns_slot = lump.ns_slot;
-        }
-        if (lump.ns_slot_policy) _meta.ns_slot_policy = lump.ns_slot_policy;
-        if (Array.isArray(lump.capabilities)) _meta.capabilities = lump.capabilities;
-        if (Array.isArray(lump.grants))       _meta.grants       = lump.grants;
+        // The save service derives intrinsic fields from these bytes and copies
+        // only the matching hash-bound approval record.
+        var _inspection = _lumpBinaryInspection(_wj);
+        var _hash = (_inspection && _inspection.binary_hash) || _wj.binary_hash;
+        var _detailResp = await fetch(`/api/lumps/${token}/detail`, { cache: 'no-store' });
+        if (!_detailResp.ok) throw new Error('Matching hash-bound approval is unavailable');
+        var _detail = await _detailResp.json();
+        var _meta = Object.assign({}, _hashBoundLumpApproval(_detail, _hash), {
+            approval_confirmed: true
+        });
+        var _directIntent = await _requestLumpApprovalIntent(
+            _wj.words || [], 'replace', _meta);
+        _meta.approval_intent = _directIntent.intent;
 
         // 3. POST to the standard save endpoint
         var _sr = await fetch('/api/lumps/save', {
@@ -6557,6 +6533,9 @@ async function _gtPickCommit(lumpToken, slotIndex) {
     const gt_word = (((perm3 & 0x7) << 28) | ((dom & 1) << 27) |
                      ((gtType & 0x3) << 25) |
                      ((state.gtSeq & 0x1FF) << 16) | (state.nsSlot & 0xFFFF)) >>> 0;
+    if (!confirm(`Replace C-List slot ${slotIndex} in LUMP 0x${lumpToken}?\n\n` +
+        `New GT word: 0x${gt_word.toString(16).padStart(8, '0')}\n` +
+        'This changes artifact bytes and requires a new hash-bound approval.')) return;
 
     const btn = document.getElementById('gtpick-assign-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
@@ -6585,46 +6564,171 @@ async function _gtPickCommit(lumpToken, slotIndex) {
     }
 }
 
-// ── Saved-LUMP capability metadata guard ─────────────────────────────────────
-// Always obtain the canonical sidecar before running a saved binary. The list
-// endpoint intentionally returns a lean cache and the resident editor can load
-// a LUMP without a list entry, so callers must not be able to bypass validation
-// by omitting the optional `caps` argument.
-async function _loadSavedLumpCapabilities(token, suppliedCaps) {
-    const resp = await fetch(`/api/lumps/${token}/detail`, { cache: 'no-store' });
-    if (!resp.ok) {
-        throw new Error(`could not load declared capability metadata (server returned ${resp.status})`);
+// Return user-controlled metadata only when the canonical approval record is
+// bound to the exact hash computed while inspecting the selected binary.
+function _hashBoundLumpApproval(payload, binaryHash) {
+    const approval = payload && (payload.approval || payload.approval_record ||
+        payload.approved_metadata ||
+        ((payload.approved === true || payload.binary_valid === true) ? payload : null));
+    if (!approval || typeof approval !== 'object') {
+        throw new Error('matching user approval record is unavailable');
     }
-    const detail = await resp.json();
-    if (!Array.isArray(detail.capabilities)) {
-        throw new Error('declared capability metadata is unavailable or malformed');
+    const approvedHash = String(approval.binary_hash || approval.artifact_hash || '').toLowerCase();
+    const actualHash = String(binaryHash || '').toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(actualHash) || approvedHash !== actualHash) {
+        throw new Error('user approval record is not bound to the fetched LUMP binary hash');
     }
-    if (suppliedCaps !== undefined && suppliedCaps !== null) {
-        if (!Array.isArray(suppliedCaps) ||
-            JSON.stringify(suppliedCaps) !== JSON.stringify(detail.capabilities)) {
-            throw new Error('catalog capability metadata does not match the saved LUMP sidecar');
-        }
+    return approval.metadata && typeof approval.metadata === 'object'
+        ? approval.metadata : approval;
+}
+
+function _lumpBinaryInspection(payload) {
+    if (!payload || typeof payload !== 'object') return null;
+    if (payload.inspection && typeof payload.inspection === 'object') return payload.inspection;
+    if (payload.binary_inspection && typeof payload.binary_inspection === 'object') {
+        return payload.binary_inspection;
     }
+    // Current server contract exposes inspected facts at the top level. Copy
+    // only the explicit intrinsic allow-list; do not treat other metadata as
+    // inspected merely because it shares the same response object.
+    if (!/^[0-9a-f]{64}$/i.test(String(payload.binary_hash || ''))) return null;
     return {
-        capabilities: detail.capabilities,
-        identityHash: detail.identity_hash || null,
-        identitySealLocation: detail.identity_seal_location || null,
-        // This is the compile-time sidecar baseline.  Do not substitute the
-        // /words endpoint hash here: that hash is freshly computed from the
-        // response and therefore cannot reveal a replaced on-disk binary.
-        binaryHash: detail.binary_hash || null,
-        source: typeof detail.source === 'string' ? detail.source : null,
-        sourceHash: detail.source_hash || (detail.mtbf && detail.mtbf.source_hash) || null,
-        portableBinding: detail.portable_binding || null,
-        portableStatus: detail.portable_status || 'legacy-unpinned',
-        petname: detail.petname || '',
-        abstraction: detail.abstraction || '',
-        dotName: detail.dot_name || detail.dotName || '',
-        issueNumber: detail.issue_number != null ? detail.issue_number : detail.issue_n,
-        // Required when a compiler-owned LUMP was already installed once:
-        // its on-disk row 0 is a live GT and must still point at this source slot
-        // before the destination loader is allowed to remint it.
-        sourceNsSlot: detail.ns_slot != null ? detail.ns_slot : detail.nsSlot,
+        binary_hash: payload.binary_hash,
+        cw: payload.cw,
+        cc: payload.cc,
+        typ: payload.typ,
+        lump_size: payload.lump_size,
+        content_profile: payload.content_profile,
+        sourceStorageTier: payload.sourceStorageTier,
+        api_definition: payload.api_definition,
+        source: payload.source,
+        clist_entries: payload.clist_entries
+    };
+}
+
+const _LUMP_APPROVAL_FIELDS = new Set([
+    'abstraction', 'author', 'version', 'release_notes', 'history_note',
+    'display_name', 'documentation', 'annotations', 'pet_name', 'pet_names',
+    'grants', 'capability_type', 'portable_binding'
+]);
+
+function _lumpApprovalView(metadata) {
+    const approval = {};
+    for (const [key, value] of Object.entries(metadata || {})) {
+        if (_LUMP_APPROVAL_FIELDS.has(key)) approval[key] = value;
+    }
+    return approval;
+}
+
+async function _lumpSha256Words(words) {
+    if (!Array.isArray(words) || !words.length) throw new Error('Cannot approve an empty LUMP');
+    const bytes = new Uint8Array(words.length * 4);
+    words.forEach((word, i) => {
+        const value = Number(word) >>> 0;
+        bytes[i * 4] = value >>> 24;
+        bytes[i * 4 + 1] = value >>> 16;
+        bytes[i * 4 + 2] = value >>> 8;
+        bytes[i * 4 + 3] = value;
+    });
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest),
+        byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+// Call only after the action's explicit user confirmation.
+async function _requestLumpApprovalIntent(words, action, metadata) {
+    const digest = await _lumpSha256Words(words);
+    const resp = await fetch('/api/lumps/approval-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            digest,
+            action,
+            confirmation: true,
+            approval: _lumpApprovalView(metadata)
+        })
+    });
+    const result = await resp.json();
+    if (!resp.ok || !result.intent || result.digest !== digest || result.action !== action) {
+        throw new Error(result.error || 'Invalid approval-intent response');
+    }
+    return { intent: result.intent, digest };
+}
+window._requestLumpApprovalIntent = _requestLumpApprovalIntent;
+
+function _lumpApprovalMatchesBinary(payload) {
+    try {
+        const inspection = _lumpBinaryInspection(payload);
+        const hash = inspection && inspection.binary_hash;
+        _hashBoundLumpApproval(payload, hash);
+        return true;
+    } catch (_e) {
+        return false;
+    }
+}
+
+async function _loadSavedLumpCapabilities(token, wordsPayload) {
+    const inspection = _lumpBinaryInspection(wordsPayload);
+    if (!inspection || typeof inspection !== 'object') {
+        throw new Error('binary inspection fields are unavailable');
+    }
+    const binaryHash = inspection.binary_hash || wordsPayload.binary_hash;
+    const detailResp = await fetch(`/api/lumps/${token}/detail`, { cache: 'no-store' });
+    if (!detailResp.ok) {
+        throw new Error(`could not load hash-bound approval metadata (server returned ${detailResp.status})`);
+    }
+    const detail = await detailResp.json();
+    const approved = _hashBoundLumpApproval(detail, binaryHash);
+    const inspectContent = typeof LumpContentFrame !== 'undefined' && LumpContentFrame &&
+        LumpContentFrame.lumpInspectContentFrame;
+    if (!inspectContent) throw new Error('binary content-frame inspector is unavailable');
+    const content = await inspectContent(wordsPayload.words || []);
+    if (!content || !content.headerValid || !content.header) {
+        throw new Error((content && content.error) || 'binary header inspection failed');
+    }
+    const api = content.contentFrameValid && content.apiDefinition &&
+        typeof content.apiDefinition === 'object' ? content.apiDefinition : {};
+    const apiCaps = Array.isArray(api.capabilities) ? api.capabilities : [];
+    const clistStart = content.header.lumpSize - content.header.cc;
+    const approvalLabels = approved.pet_names && approved.pet_names.CR || {};
+    const capabilities = Array.from({ length: content.header.cc }, (_, row) => {
+        const embedded = apiCaps[row];
+        const cap = embedded && typeof embedded === 'object'
+            ? Object.assign({}, embedded)
+            : (typeof embedded === 'string' ? { name: embedded } : {});
+        cap.slot = row;
+        cap.binary_word = (wordsPayload.words[clistStart + row] || 0) >>> 0;
+        if (!cap.name && approvalLabels[row] != null) cap.name = String(approvalLabels[row]);
+        if (row === 0 &&
+            cap.binary_word === ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER) {
+            cap.name = '__SELF__';
+            cap.compiler_owned_self = true;
+        }
+        if (row === 1 &&
+            cap.binary_word === ChurchSimulator.PRIVATE_DATA_CAPABILITY_PLACEHOLDER) {
+            cap.role = 'private_data';
+        }
+        return cap;
+    });
+    return {
+        approval: _lumpApprovalView(approved),
+        capabilities,
+        methods: Array.isArray(api.methods) ? api.methods : [],
+        apiDefinition: content.contentFrameValid ? content.apiDefinition : null,
+        profile: content.contentFrameValid ? content.profile : null,
+        language: content.contentFrameValid && typeof api.language === 'string'
+            ? api.language : null,
+        source: content.contentFrameValid ? content.source : null,
+        identityHash: approved.identity_hash || null,
+        binaryHash,
+        portableBinding: approved.portable_binding || null,
+        petname: approved.pet_name || '',
+        abstraction: approved.abstraction || '',
+        dotName: approved.dot_name || '',
+        issueNumber: approved.issue_n,
+        grants: approved.grants || [],
+        capabilityType: approved.capability_type,
+        petNames: approved.pet_names || {},
     };
 }
 
@@ -6641,32 +6745,12 @@ function _validateSavedLumpClist(rawWords, header, savedMetadata, simInstance) {
     if (selfMarkedRows.length > 0 && !hasCompilerSelf) {
         throw new Error('compiler-owned self capability must be the exact __SELF__ c-list row 0 record');
     }
-    const legacySelfSeal = savedCaps.length === 0 && header.cc > 0 &&
-        savedMetadata.identitySealLocation !== 'sidecar' &&
-        typeof savedMetadata.identityHash === 'string' &&
-        /^[0-9a-f]{64}$/i.test(savedMetadata.identityHash);
-    if (savedCaps.length !== header.cc && !legacySelfSeal) {
+    if (savedCaps.length !== header.cc) {
         throw new Error(
             `declared capability count ${savedCaps.length} does not match c-list count ${header.cc}`
         );
     }
-    if (legacySelfSeal) {
-        const legacyExpectedSeal = (
-            0x0A000000 | (parseInt(savedMetadata.identityHash.slice(0, 8), 16) & 0x1FFFFFF)
-        ) >>> 0;
-        const legacyClistStart = header.lumpSize - header.cc;
-        const legacyActualSeal = rawWords[legacyClistStart] >>> 0;
-        const legacyReservedRowsAreZero = rawWords
-            .slice(legacyClistStart + 1, header.lumpSize)
-            .every(word => (word >>> 0) === 0);
-        if (legacyActualSeal !== legacyExpectedSeal || !legacyReservedRowsAreZero) {
-            throw new Error('legacy identity-seal c-list contains malformed undeclared rows');
-        }
-    }
     if (savedCaps.length > 0) {
-        if (typeof CapabilityTokens === 'undefined') {
-            throw new Error('capability token validator is unavailable');
-        }
         const clistStart = header.lumpSize - header.cc;
         let capsToValidate = savedCaps;
         let validationStart = clistStart;
@@ -6679,7 +6763,12 @@ function _validateSavedLumpClist(rawWords, header, savedMetadata, simInstance) {
             const parsedSelf = !isPlaceholder && simInstance &&
                 typeof simInstance.parseGT === 'function'
                 ? simInstance.parseGT(selfWord) : null;
-            const sourceSlot = Number(savedMetadata.sourceNsSlot);
+            const sourceSlot = isPlaceholder
+                ? Number(savedMetadata.sourceNsSlot)
+                : Number(parsedSelf && parsedSelf.index);
+            if (!isPlaceholder && Number.isInteger(sourceSlot)) {
+                savedMetadata.sourceNsSlot = sourceSlot;
+            }
             const hasSourceSlot = Number.isInteger(sourceSlot) && sourceSlot >= 0;
             const sourceEntryValid = hasSourceSlot && simInstance &&
                 typeof simInstance.isNSEntryValid === 'function' &&
@@ -6764,18 +6853,20 @@ function _validateSavedLumpClist(rawWords, header, savedMetadata, simInstance) {
             }
             return savedCaps;
         }
-        const runResolved = CapabilityTokens.resolveCapabilities(capsToValidate, {
-            sim: simInstance,
-            lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) ? _lumpsCache : [],
-        });
-        const runValidation = CapabilityTokens.validateClist(
-            rawWords,
-            validationStart,
-            runResolved,
-            { sim: simInstance }
-        );
-        if (!runValidation.ok) {
-            throw new Error('capability validation failed: ' + runValidation.errors.join(' '));
+        // For an approved immutable binary, the C-list words themselves are the
+        // capability declarations. Embedded API rows provide names/roles only;
+        // no approval/catalog capability array may reinterpret these words.
+        for (let row = validationStart; row < clistStart + header.cc; row++) {
+            const word = rawWords[row] >>> 0;
+            if (word === 0 ||
+                word === ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER ||
+                word === ChurchSimulator.PRIVATE_DATA_CAPABILITY_PLACEHOLDER) {
+                throw new Error(`binary c-list row ${row - clistStart} is not a materialized capability`);
+            }
+            if (!simInstance || typeof simInstance.parseGT !== 'function') {
+                throw new Error('simulator capability decoder is unavailable');
+            }
+            simInstance.parseGT(word);
         }
     }
     return savedCaps;
@@ -6818,22 +6909,20 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
     if (!token) return;
     if (btn) { btn.disabled = true; btn.textContent = 'Loading\u2026'; }
     try {
-        const [resp, _savedMetadata] = await Promise.all([
-            fetch(`/api/lump/${token}/words`),
-            _loadSavedLumpCapabilities(token, caps),
-        ]);
+        const resp = await fetch(`/api/lump/${token}/words`, { cache: 'no-store' });
         if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
         const data = await resp.json();
         const rawWords = data.words || [];
         if (!rawWords.length) throw new Error('Empty LUMP \u2014 no words returned');
+        const _savedMetadata = await _loadSavedLumpCapabilities(token, data);
 
         if (typeof sim === 'undefined' || !sim) throw new Error('Simulator not ready');
         const _runHeader = sim.parseLumpHeader(rawWords[0] >>> 0);
         if (!_runHeader || !_runHeader.valid) throw new Error('Malformed LUMP header');
         let _portableOwnerCandidate = null;
         if (_savedMetadata.portableBinding) {
-            // Hash the exact response bytes before linking.  The detail sidecar
-            // is useful provenance, but cannot authorize a replacement binary.
+            // Hash the exact response bytes before linking; approval metadata
+            // cannot authorize a replacement binary.
             const _actualHash = await _executionIdentityHashWords(rawWords);
             if (!/^[0-9a-f]{64}$/i.test(_actualHash || '')) {
                 throw new Error('portable install requires WebCrypto verification of fetched binary bytes');
@@ -6853,7 +6942,7 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
             }
             _portableOwnerCandidate = {
                 N: _owner, binary_hash: _actualHash,
-                identity_hash: _savedMetadata.identityHash, verified: true,
+                identity_hash: _savedMetadata.identityHash, verified: true, approved: true,
             };
         }
         const _savedCaps = _validateSavedLumpClist(rawWords, _runHeader, _savedMetadata, sim);
@@ -6871,15 +6960,6 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
         // let vars are NOT on window, so we reference it by name directly.
         const _savedModBootEntry = (typeof bootEntrySlot !== 'undefined') ? bootEntrySlot : _BOOT_SLOT;
 
-        // ALWAYS force instantBoot() to use _BOOT_SLOT (canonical SelfTest / SelfTest
-        // lump, always resident in the boot image).  The target nsSlot may not be
-        // populated yet — booting with an empty slot faults at INIT_ABSTR
-        // ("namespace entry N is null").  This applies even when nsSlot is explicitly
-        // provided: the LUMP is written by loadLumpBinary() AFTER instantBoot() runs,
-        // so the target slot is guaranteed empty until then.
-        sim.bootEntrySlot = _BOOT_SLOT;
-        if (typeof bootEntrySlot !== 'undefined') bootEntrySlot = _BOOT_SLOT;
-
         // On error: restore sim.bootEntrySlot and the module-level variable to the
         // saved values so the user's UI selection is not permanently corrupted.
         const _restoreBootEntry = () => {
@@ -6887,6 +6967,26 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
             if (typeof bootEntrySlot !== 'undefined') bootEntrySlot = _savedModBootEntry;
         };
 
+        if (!confirm(`Deploy "${name || token}" to the simulator?\n\n` +
+            'Authorize this exact immutable binary for one deployment.')) {
+            return;
+        }
+        const _deployIntent = await _requestLumpApprovalIntent(rawWords, 'deploy',
+            _savedMetadata.approval);
+        const _deployAuth = await fetch('/api/lumps/deploy-authorize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, approval_intent: _deployIntent.intent })
+        });
+        const _deployResult = await _deployAuth.json();
+        if (!_deployAuth.ok || !_deployResult.ok) {
+            throw new Error(_deployResult.error || `deployment authorization failed: HTTP ${_deployAuth.status}`);
+        }
+
+        // Mutate boot selection only after the server consumed authorization.
+        // The canonical boot LUMP must run before the selected target is loaded.
+        sim.bootEntrySlot = _BOOT_SLOT;
+        if (typeof bootEntrySlot !== 'undefined') bootEntrySlot = _BOOT_SLOT;
         if (!sim.bootComplete && typeof instantBoot === 'function') instantBoot();
 
         // After instantBoot() completes, point sim.bootEntrySlot at the TARGET slot
@@ -6921,8 +7021,6 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
                     ? (linkedWords, linkedHeader, bindings) => _validateLinkedPortableClist(
                         linkedWords, linkedHeader, bindings, sim)
                     : null,
-                portableTrustPolicy: _savedMetadata.portableStatus === 'portable-pinned'
-                    ? 'strong' : 'allow-authorized-t-only'
             }
         );
         if (!loaded) {
@@ -7287,47 +7385,14 @@ async function _lumpGTNameCommit(inputEl) {
     const newName = inputEl.value.trim();
     const orig    = inputEl.dataset.orig || '';
     if (newName === orig) return;
-
-    inputEl.dataset.orig = newName;
-
-    if (newName) {
-        inputEl.classList.remove('lump-gt-name-unresolved');
-    } else {
-        inputEl.classList.add('lump-gt-name-unresolved');
+    if (!confirm(`Approve capability pet-name change for LUMP 0x${token}?\n\n` +
+        'This annotation will be bound to the exact artifact hash.')) {
+        inputEl.value = orig;
+        return;
     }
 
-    const lump = (typeof _lumpsCache !== 'undefined' && _lumpsCache)
-        ? _lumpsCache.find(l => l.token === token) : null;
-    if (lump) {
-        if (!lump.pet_names) lump.pet_names = {};
-        if (!lump.pet_names.CR) lump.pet_names.CR = {};
-        if (newName) {
-            lump.pet_names.CR[String(crSlot)] = newName;
-        } else {
-            delete lump.pet_names.CR[String(crSlot)];
-        }
-    }
-
-    try {
-        const resp = await fetch(`/api/lump/${token}/meta`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pet_name_cr_slot: crSlot, pet_name_cr_value: newName })
-        });
-        if (!resp.ok) {
-            const errData = await resp.json().catch(() => ({}));
-            throw new Error(errData.error || `HTTP ${resp.status}`);
-        }
-        inputEl.style.transition = 'color 0.2s';
-        inputEl.style.color = '#88dd88';
-        setTimeout(() => { inputEl.style.color = ''; }, 700);
-    } catch (err) {
-        console.warn('[_lumpGTNameCommit] persist failed:', err);
-        inputEl.style.transition = 'color 0.2s';
-        inputEl.style.color = '#f87171';
-        setTimeout(() => { inputEl.style.color = ''; }, 1200);
-        inputEl.title = `Save failed: ${err.message}`;
-    }
+    inputEl.value = orig;
+    inputEl.title = 'Pet-name changes require saving a new hash-bound approval with the immutable binary.';
 }
 
 function _applyLumpNamesToSim(token) {
@@ -7370,7 +7435,7 @@ async function _lumpOverviewCREdit(token, crSlot, btnEl) {
 
     const lump    = (typeof _lumpsCache !== 'undefined' && _lumpsCache)
         ? _lumpsCache.find(l => l.token === token) : null;
-    const current = lump ? ((lump.pet_names || {}).CR || {})[String(crSlot)] || '' : '';
+    const current = '';
 
     const inp = document.createElement('input');
     inp.type  = 'text';
@@ -7389,33 +7454,14 @@ async function _lumpOverviewCREdit(token, crSlot, btnEl) {
         if (btnEl) cell.parentElement && cell.parentElement.querySelector('.lump-pn-edit-btn') && (cell.parentElement.querySelector('.lump-pn-edit-btn').disabled = false);
 
         if (newName === current) return;
-
-        if (lump) {
-            if (!lump.pet_names) lump.pet_names = {};
-            if (!lump.pet_names.CR) lump.pet_names.CR = {};
-            if (newName) {
-                lump.pet_names.CR[String(crSlot)] = newName;
-            } else {
-                delete lump.pet_names.CR[String(crSlot)];
-            }
+        if (!confirm(`Approve CR${crSlot} pet-name change for LUMP 0x${token}?\n\n` +
+            'This annotation will be bound to the exact artifact hash.')) {
+            cell.textContent = current || '\u2014';
+            return;
         }
 
-        try {
-            const resp = await fetch(`/api/lump/${token}/meta`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pet_name_cr_slot: crSlot, pet_name_cr_value: newName })
-            });
-            if (!resp.ok) {
-                const errData = await resp.json().catch(() => ({}));
-                throw new Error(errData.error || `HTTP ${resp.status}`);
-            }
-        } catch (err) {
-            console.warn('[_lumpOverviewCREdit] persist failed:', err);
-            cell.title = `Save failed: ${err.message}`;
-            cell.style.color = '#f87171';
-            setTimeout(() => { cell.style.color = ''; cell.title = ''; }, 2000);
-        }
+        cell.textContent = current || '\u2014';
+        cell.title = 'Pet-name changes require saving a new hash-bound approval with the immutable binary.';
     }
 
     inp.addEventListener('blur', commit, { once: true });

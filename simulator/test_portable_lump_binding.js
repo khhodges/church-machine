@@ -6,7 +6,8 @@ const Binding = require('./portable_lump_binding.js');
 const H1 = '1'.repeat(64);
 const H2 = '2'.repeat(64);
 const contract = Binding.createContract('alice.Bank#7', [
-    { name: '__SELF__', compiler_owned_self: true, rights: 'E', type: 'Inform' },
+    { name: '__SELF__', compiler_owned_self: true, binary_hash: H1, identity_hash: H2,
+        rights: 'E', type: 'Inform' },
     {
         N: 'church.Audit#3', T: 'a1b2c3d4', binary_hash: H1, identity_hash: H2,
         rights: 'L', type: 'Inform', relocation_row: 1,
@@ -25,12 +26,13 @@ function destination(selfSlot, selfSeq, depSlot, depSeq, hash = H1) {
     return [
         {
             N: 'alice.Bank#7', rights: 'E', type: 'Inform',
-            ns_slot: selfSlot, sequence: selfSeq, authorized: true,
+            ns_slot: selfSlot, sequence: selfSeq, binary_hash: H1, identity_hash: H2,
+            approved: true, verified: true,
         },
         {
             N: 'church.Audit#3', T: 'a1b2c3d4', binary_hash: hash, identity_hash: H2,
             rights: 'LS', type: 'Inform', ns_slot: depSlot, sequence: depSeq,
-            authorized: true,
+            approved: true, verified: true,
         },
     ];
 }
@@ -51,16 +53,11 @@ assert.equal(Binding.bind(contract, destination(8, 1, 12, 4, H2), { mintGT }).co
 
 const weak = JSON.parse(JSON.stringify(contract));
 weak.dependencies[1].binary_hash = null;
-assert.equal(Binding.bind(weak, destination(8, 1, 12, 4), { mintGT }).code, 'LEGACY_T_ONLY');
-assert.equal(Binding.bind(weak, destination(8, 1, 12, 4), {
-    mintGT,
-    trustPolicy: 'allow-authorized-t-only',
-    authorizeLegacy: () => true,
-}).ok, true);
+assert.equal(Binding.bind(weak, destination(8, 1, 12, 4), { mintGT }).code, 'INVALID_DESCRIPTOR');
 
 const before = { 0: 0xfeed5e1f, 1: 0 };
 const denied = destination(8, 1, 12, 4);
-denied[1].authorized = false;
+denied[1].approved = false;
 const result = Binding.bind(contract, denied, { mintGT, baseWords: before });
 assert.equal(result.ok, false);
 assert.deepEqual(before, { 0: 0xfeed5e1f, 1: 0 }, 'failed binding must not mutate caller state');
@@ -69,7 +66,7 @@ assert.deepEqual(before, { 0: 0xfeed5e1f, 1: 0 }, 'failed binding must not mutat
 // destination that was not derived from verified registry bytes/live Namespace.
 const strictOwner = {
     N: 'alice.Bank#7', rights: 'E', type: 'Inform', ns_slot: 8, sequence: 1,
-    binary_hash: H1, identity_hash: H2, authorized: true, verified: true,
+    binary_hash: H1, identity_hash: H2, approved: true, verified: true,
 };
 const strictDestination = destination(8, 1, 12, 4);
 strictDestination[0] = strictOwner;
@@ -92,7 +89,8 @@ duplicateSelfRow.dependencies[1].relocation_row = 0;
 assert.equal(Binding.bind(duplicateSelfRow, destination(8, 1, 12, 4), { mintGT }).code,
     'DUPLICATE_RELOCATION_ROW', 'externally supplied contracts have exactly one row zero');
 assert.throws(() => Binding.createContract('alice.Bank#7', [
-    { name: '__SELF__', compiler_owned_self: true, rights: 'E', type: 'Inform' },
+    { name: '__SELF__', compiler_owned_self: true, binary_hash: H1, identity_hash: H2,
+        rights: 'E', type: 'Inform' },
     { N: 'church.Unpinned#1', T: '01020304', binary_hash: H1, rights: 'L', type: 'Inform' },
 ]), /identity_hash/, 'strong JS descriptors require an identity hash');
 

@@ -423,16 +423,13 @@ def test_capabilitytest_manifest_boot_resident():
     assert matches[0].get("filename")
 
 
-def test_capabilitytest_boot_metadata_matches_sidecar():
-    """The exact Namespace-bound artifact must agree with its own sidecar."""
-    entry, _ = _capabilitytest_manifest_body()
-    sidecar_file = entry["filename"][:-5] + ".json"
-    with open(os.path.join(LUMPS_DIR, sidecar_file)) as f:
-        sidecar = json.load(f)
-
-    assert sidecar.get("token") == entry["token"]
-    assert sidecar.get("filename") == entry["filename"]
-    assert sidecar.get("ns_slot") == entry["slot"]
+def test_capabilitytest_boot_binding_points_to_valid_binary():
+    """The Namespace-bound artifact location must contain a valid LUMP."""
+    entry, words = _capabilitytest_manifest_body()
+    header = words[0]
+    assert (header >> 27) & 0x1F == 0x1F
+    assert len(words) == 1 << (((header >> 23) & 0xF) + 6)
+    assert entry["slot"] == CAPTEST_SLOT
 
 
 def test_served_boot_image_carries_capabilitytest_body(tmp_path):

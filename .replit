@@ -1075,6 +1075,18 @@ args = "node simulator/test_deep_dive_annotations.js"
 outputType = "console"
 
 [[workflows.workflow]]
+name = "lump-sidecar-transition-guard"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python3 scripts/check_no_operational_lump_sidecars.py && python3 -m pytest tests/lump/test_legacy_sidecar_tools.py -q"
+
+[workflows.workflow.metadata]
+outputType = "console"
+isValidation = true
+
+[[workflows.workflow]]
 name = "wukong-preflight-launcher-tests"
 author = "agent"
 

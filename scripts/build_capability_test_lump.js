@@ -3,10 +3,7 @@
 //
 // Assembles simulator/examples/capability_test.cloomc using the production
 // ChurchAssembler (simulator/assembler.js), packs the result into a valid LUMP
-// binary, and writes:
-//
-//   server/lumps/CapabilityTest.2.<hash8>.lump — binary
-//   server/lumps/CapabilityTest.2.<hash8>.json — sidecar metadata
+// binary and writes server/lumps/CapabilityTest.2.<hash8>.lump.
 //
 // CapabilityTest's protected slot lookup token remains 00000a00. Content is
 // named by sha256(dot_name_utf8 + lump_bytes)[:8], per lump_integrity.py.
@@ -44,7 +41,7 @@ const ROOT        = path.resolve(__dirname, '..');
 const ASSEMBLER   = path.join(ROOT, 'simulator', 'assembler.js');
 const SOURCE      = path.join(ROOT, 'simulator', 'examples', 'capability_test.cloomc');
 
-// --out-dir <path>: redirect .lump/.json/manifest writes to a different
+// --out-dir <path>: redirect .lump/manifest writes to a different
 // directory (used by CI to validate without touching server/lumps/).
 const _outDirIdx  = process.argv.indexOf('--out-dir');
 const LUMPS_DIR   = (_outDirIdx !== -1 && process.argv[_outDirIdx + 1])
@@ -103,6 +100,21 @@ if (result.errors.length > 0) {
 
 const words = result.words;
 console.log(`Assembled ${words.length} instruction words.`);
+function contentFrame(name, text) {
+    const api = Buffer.from(JSON.stringify({ name, methods: [] }), 'utf8');
+    const src = Buffer.from(text, 'utf8');
+    const data = Buffer.concat([
+        Buffer.from([0xAB, 0x03, api.length >>> 8, api.length & 0xFF]), api,
+        Buffer.alloc((4 - api.length % 4) % 4),
+        Buffer.from([(src.length >>> 24) & 0xFF, (src.length >>> 16) & 0xFF,
+            (src.length >>> 8) & 0xFF, src.length & 0xFF]), src,
+        Buffer.alloc((4 - src.length % 4) % 4),
+    ]);
+    const frame = [];
+    for (let i = 0; i < data.length; i += 4) frame.push(data.readUInt32BE(i));
+    return frame;
+}
+const FRAME = contentFrame(DOT_NAME, source);
 
 // ── C-List definition ─────────────────────────────────────────────────────────
 //
@@ -139,7 +151,7 @@ const CLIST = [
 //
 const cw = words.length;
 const cc = CLIST.length;   // 5
-const totalNeeded = 1 + cw + cc;
+const totalNeeded = 1 + cw + FRAME.length + cc;
 
 let lumpSize = 64;
 while (lumpSize < totalNeeded) lumpSize *= 2;
@@ -161,6 +173,7 @@ const headerWord = (
 const padded = new Uint32Array(lumpSize);
 padded[0] = headerWord;
 for (let i = 0; i < cw; i++) padded[1 + i] = words[i] >>> 0;
+for (let i = 0; i < FRAME.length; i++) padded[1 + cw + i] = FRAME[i] >>> 0;
 
 const clistBase = lumpSize - cc;
 for (let i = 0; i < CLIST.length; i++) {
@@ -191,27 +204,10 @@ console.log(`Binary SHA-256: ${binaryHash}`);
 
 if (CHECK_ONLY) {
     const expectedLump = path.join(LUMPS_DIR, `${artifactStem}.lump`);
-    const expectedSidecar = path.join(LUMPS_DIR, `${artifactStem}.json`);
     const failures = [];
     if (!fs.existsSync(expectedLump) ||
         !fs.readFileSync(expectedLump).equals(bytes)) {
         failures.push(`binary missing or stale: ${path.basename(expectedLump)}`);
-    }
-    let sidecar = null;
-    try {
-        sidecar = JSON.parse(fs.readFileSync(expectedSidecar, 'utf8'));
-    } catch (err) {
-        failures.push(`sidecar missing or invalid: ${path.basename(expectedSidecar)}`);
-    }
-    if (sidecar && (sidecar.token !== IDENTITY_TOKEN ||
-                    sidecar.binary_hash !== binaryHash ||
-                    sidecar.dot_name !== DOT_NAME ||
-                    sidecar.issue_n !== ISSUE_N ||
-                    sidecar.identity_string !== IDENTITY_STRING ||
-                    sidecar.identity_hash !== IDENTITY_HASH ||
-                    sidecar.source !== source ||
-                    sidecar.ns_slot !== 10)) {
-        failures.push('sidecar identity, hash, source, or slot binding is stale');
     }
     let checkedManifest = null;
     try {
@@ -236,7 +232,7 @@ if (CHECK_ONLY) {
         console.error('Run: node scripts/build_capability_test_lump.js');
         process.exit(1);
     }
-    console.log('OK: CapabilityTest source, binary, sidecar, and manifest are fresh.');
+    console.log('OK: CapabilityTest source, binary, and manifest are fresh.');
     process.exit(0);
 }
 
@@ -247,74 +243,18 @@ const manifest = fs.existsSync(MANIFEST)
 const existingIdx = manifest.findIndex(e => e.token === IDENTITY_TOKEN);
 if (existingIdx !== -1) {
     const oldLumpName = manifest[existingIdx].filename;
-    const oldSidecarName = manifest[existingIdx].sidecar_file;
     if (oldLumpName && oldLumpName !== `${artifactStem}.lump`) {
         const oldLump = path.join(LUMPS_DIR, oldLumpName);
-        const oldSidecar = path.join(LUMPS_DIR, oldSidecarName || '');
         if (fs.existsSync(oldLump))    { fs.unlinkSync(oldLump);    console.log(`Removed old: ${oldLump}`); }
-        if (fs.existsSync(oldSidecar)) { fs.unlinkSync(oldSidecar); console.log(`Removed old: ${oldSidecar}`); }
     }
     console.log('\nExisting CapabilityTest entry found — replacing it.');
 }
 
 // ── Write .lump binary ───────────────────────────────────────────────────────
 const lumpPath    = path.join(LUMPS_DIR, `${artifactStem}.lump`);
-const sidecarPath = path.join(LUMPS_DIR, `${artifactStem}.json`);
 
 fs.writeFileSync(lumpPath, bytes);
 console.log(`Written: ${lumpPath} (${bytes.length} bytes)`);
-
-// ── Write sidecar .json ───────────────────────────────────────────────────────
-//
-// IMPORTANT: the "source" field must always be set to the exact text of the
-// canonical .cloomc file for known-example abstractions (those whose abstraction
-// name maps to a file in simulator/examples/).  Any recompile or rename pass that
-// omits this field will be caught immediately by check-sidecar-source.js.
-//
-const capabilitiesJson = CLIST.map(c => ({
-    name:    c.name,
-    rights:  c.rights,
-    gt:      '0x' + c.gt.toString(16).padStart(8, '0'),
-    ns_slot: c.ns_slot,
-    note:    c.note,
-}));
-
-const sidecar = {
-    token,
-    abstraction:     'CapabilityTest',
-    filename:        `${artifactStem}.lump`,
-    sidecar_file:    `${artifactStem}.json`,
-    ns_slot:         10,
-    ns_slot_policy:  'static',
-    boot_resident:   true,
-    lump_size:       lumpSize,
-    typ:             0,
-    content_type:    'code',
-    cw,
-    cc,
-    status:          'wip',
-    profile:         'example',
-    language:        'assembly',
-    description:     'Capability self-test: LOAD, TPERM, destination-M-present and M-absent SWITCH, Turing ISA, ELOADCALL — ' +
-                     'exercises real A7 v1.2 boot-namespace caps (UART_DEV, LED_DEV, BTN_DEV, TIMER_DEV, SelfTest).',
-    // "source" must always reflect the exact text of simulator/examples/capability_test.cloomc.
-    // Never leave this field empty — check-sidecar-source.js enforces it after every recompile.
-    source:          source,
-    source_file:     'simulator/examples/capability_test.cloomc',
-    capabilities:    capabilitiesJson,
-    grants:          ['E'],
-    author:          'Church Machine',
-    version:         '2.0',
-    lump_version:    2,
-    dot_name:        DOT_NAME,
-    issue_n:         ISSUE_N,
-    identity_string: IDENTITY_STRING,
-    identity_hash:   IDENTITY_HASH,
-    binary_hash:     binaryHash,
-};
-
-fs.writeFileSync(sidecarPath, JSON.stringify(sidecar, null, 2) + '\n');
-console.log(`Written: ${sidecarPath}`);
 
 // ── Print c-list slot assignments ─────────────────────────────────────────────
 console.log('\nC-List GT slot assignments (cc=5, tail-packed):');
@@ -329,7 +269,6 @@ const manifestEntry = {
     token,
     abstraction:     'CapabilityTest',
     filename:        `${artifactStem}.lump`,
-    sidecar_file:    `${artifactStem}.json`,
     ns_slot:         10,
     ns_slot_policy:  'static',
     boot_resident:   true,

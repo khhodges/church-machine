@@ -218,29 +218,29 @@ def _verify_release_bundle(path: Path) -> int:
             failures.append(f"size:{name}")
 
     bit_path = build_dir / BITSTREAM_NAME
-    sidecar_path = build_dir / f"{BITSTREAM_NAME}.meta.json"
+    bit_meta_path = build_dir / f"{BITSTREAM_NAME}.meta.json"
     try:
-        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        bit_meta = json.loads(bit_meta_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        sidecar = None
-        failures.append(f"missing_or_invalid:{sidecar_path.name}")
-    if not isinstance(sidecar, dict):
-        failures.append(f"invalid_shape:{sidecar_path.name}")
+        bit_meta = None
+        failures.append(f"missing_or_invalid:{bit_meta_path.name}")
+    if not isinstance(bit_meta, dict):
+        failures.append(f"invalid_shape:{bit_meta_path.name}")
 
     bit_record = artifacts.get(BITSTREAM_NAME)
     if not isinstance(bit_record, dict):
         bit_record = {}
-    if isinstance(sidecar, dict) and bit_path.is_file():
-        if sidecar.get("md5") != _md5(bit_path):
-            failures.append("sidecar:md5")
-        if sidecar.get("sha256") != bit_record.get("sha256"):
-            failures.append("sidecar:sha256")
-        if sidecar.get("size_bytes") != bit_record.get("size_bytes"):
-            failures.append("sidecar:size_bytes")
-        if sidecar.get("source_commit") != source_commit:
-            failures.append("sidecar:source_commit")
-        if sidecar.get("version") != build_version:
-            failures.append("sidecar:version")
+    if isinstance(bit_meta, dict) and bit_path.is_file():
+        if bit_meta.get("md5") != _md5(bit_path):
+            failures.append("bit_meta:md5")
+        if bit_meta.get("sha256") != bit_record.get("sha256"):
+            failures.append("bit_meta:sha256")
+        if bit_meta.get("size_bytes") != bit_record.get("size_bytes"):
+            failures.append("bit_meta:size_bytes")
+        if bit_meta.get("source_commit") != source_commit:
+            failures.append("bit_meta:source_commit")
+        if bit_meta.get("version") != build_version:
+            failures.append("bit_meta:version")
 
     if failures:
         print("FAIL: release bundle mismatch: " + ", ".join(failures), file=sys.stderr)
@@ -304,7 +304,7 @@ def main() -> int:
     verification.add_argument("--verify", action="store_true")
     verification.add_argument(
         "--verify-release", action="store_true",
-        help="Verify the tracked .bit, sidecar, provenance, and .mcs release bundle",
+        help="Verify the tracked .bit metadata, provenance, and .mcs release bundle",
     )
     args = parser.parse_args()
     output = args.output if args.output.is_absolute() else ROOT / args.output

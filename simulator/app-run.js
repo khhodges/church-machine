@@ -1698,7 +1698,7 @@ document.addEventListener('mousedown', function(e) {
 
 // ── Breakpoints ────────────────────────────────────────────────────────────
 const simBreakpoints = new Set();
-// Breakpoints remain address-based for execution. This sidecar only keeps the
+// Breakpoints remain address-based for execution. This UI record only keeps the
 // best decoded operation label for the settings UI.
 const _breakpointOperations = new Map();
 // Universal Church breakpoints pause before every instruction with one of these
@@ -12508,14 +12508,14 @@ const VersionsView = {
                     [
                         'Open Build Approval and review the current hardware checks.',
                         'Freeze approval, build the selected source, and upload the resulting .bit through the existing upload flow.',
-                        'Return here and verify the regenerated sidecar, version, and artifact hash.'
-                    ], 'Stop until the stored .bit has a trusted sidecar; a board sentinel does not certify the downloadable artifact.');
+                        'Return here and verify the regenerated provenance record, version, and artifact hash.'
+                    ], 'Stop until the stored .bit has trusted provenance; a board sentinel does not certify the downloadable artifact.');
             } else if (fw && !/^\d+$/.test(fw)) {
                 add('warn', `Bitstream version looks malformed (\u201C${fwRaw}\u201D)`,
                     [
                         'Open Build Approval and review the current hardware checks.',
                         'Freeze a clean approval, build the selected source, and upload the resulting .bit.',
-                        'Return here and verify the new sidecar and version before flashing.'
+                        'Return here and verify the new provenance record and version before flashing.'
                     ], 'Stop until the stored artifact has verified, numeric metadata.');
             } else if (expected != null && fw && Number(fw) !== Number(expected)) {
                 add('warn', `Stored bitstream is v${fw} but the repo expects v${expected}`,
@@ -12796,7 +12796,7 @@ const VersionsView = {
                 '<div class="versions-note">Could not read the bitstream metadata.</div>';
             return;
         }
-        // The download sidecar is the only proof of the local .bit's version.
+        // The hash-bound provenance record is the proof of the local .bit's version.
         // If the artifact is absent or its metadata is untrusted, a connected
         // board's boot sentinel can still truthfully identify what is running.
         // Source is the final fallback, and must remain visibly qualified as
@@ -12827,7 +12827,7 @@ const VersionsView = {
         const metadataNote = usingBoardVersion
             ? (!bs.present
                 ? '<div class="versions-note">No pre-built Wukong bitstream is available; this version comes only from the running-board sentinel.</div>'
-                : '<div class="versions-note">Local bitstream metadata is unverified; regenerate its sidecar after the next verified upload.</div>')
+                : '<div class="versions-note">Local bitstream metadata is unverified; regenerate its provenance record after the next verified upload.</div>')
             : (usingSourceVersion
                 ? (!bs.present
                     ? '<div class="versions-note">Source expectation only; no downloadable bitstream or running-board version is available.</div>'
@@ -13583,8 +13583,8 @@ function showReleaseHistory() {
         ] },
         { date: '2026-05-12 UTC', title: 'Capability Access Rights, Console Improvements & Navigation', changes: [
             'Access rights declarations in capabilities: write <code>capabilities { LED0 RW }</code> to declare R/W access — assembler and CLOOMC++ compiler parse rights tokens (R/W/X/E) and carry them as structured objects throughout the pipeline',
-            'Cross-check in Draft output: declared rights are compared against sidecar grants; the draft shows a warning when declared rights exceed what the sidecar permits; fault-tolerant — a runtime error in the check can no longer prevent the draft from displaying',
-            'Rights flow through all four LUMP save payloads (CLOOMC++ build, assembly save, NS slot save, server save); editor injection shows <code>capabilities { LED0 RW }</code> with rights pulled from sidecar grants',
+            'Cross-check in Draft output: declared rights are compared against approved grants; the draft shows a warning when declared rights exceed what the approval permits; fault-tolerant — a runtime error in the check can no longer prevent the draft from displaying',
+            'Rights flow through all four LUMP save payloads (CLOOMC++ build, assembly save, NS slot save, server save); editor injection shows <code>capabilities { LED0 RW }</code> with rights pulled from approved grants',
             'LUMP disassembly summary line extended: header comment now reads <code>(N words, cc=M, F free)</code> — code words, C-list slot count, and freespace visible at a glance in both the CR-register editor path and the Lumps panel path',
             'C-list section appended to console listing after a successful assemble or CLOOMC++ compile — each capability shown as <code>; row N  name</code>',
             'CTMM → CM rename completed in ctmm_cap_amaranth Amaranth HDL source: 15 classes (CTMMCapCore→CMCapCore, etc.) and 6 enums (CTMMOpcode→CMOpcode, etc.) renamed across all import sites',
@@ -13622,7 +13622,7 @@ function showReleaseHistory() {
             'Boot stability: Navana.Init skips NS entries for failed code allocations; boot succeeds even when both AllocCode calls return OOM',
         ] },
         { date: '2026-04-24 UTC', title: 'Assembler Upgrades, Editor Polish & Test Infrastructure', changes: ['Named method syntax in CALL: write CALL SlideRule.Multiply or CALL CR11, Multiply — the assembler looks up the method index automatically from the loaded abstraction conventions', 'Disassembler now outputs dot-notation (CALL SlideRule.Multiply) instead of raw method indices', 'BRANCH labels round-trip through assemble/disassemble; out-of-range BRANCH targets caught at assemble time with a clear error message', 'Error panel entries are clickable — clicking a compiler or assembler error jumps the editor to the exact failing line', 'Error lines highlighted in the assembly editor gutter (red marker on the broken line)', 'LUMP header strip gains a Shrink button; resize is available for all lump types, not just code lumps', 'Boot Lump (NS slot 3, LED flash) added to the Lump Repository view', 'Keyboard shortcuts added to the hamburger menu; single-character activators for all menu items', 'Fix CALL step display and step-into: stepping into a CALL now shows the correct target CR and method', 'Assembler regression test suite with 30+ named-method CALL test cases registered as a named validation step', 'Simulator test watcher (watch_assembler_tests.js) extended to discover and run all *_test.js files automatically'] },
-        { date: '2026-04-16 UTC', title: 'LUMP Hardware Verification Fixes', changes: ['Fixed Build LUMP binary: removed embedded method dispatch table (raw word offsets were incorrectly written as code words that the FPGA would try to execute as instructions)', 'Method offsets in sidecar metadata now start at 0, matching the Python build_lumps.py spec and the manifest.json format used by FPGA tooling', 'Added Export Lump as Patch flow: pick any pre-built .lump file, validate the header (magic 0x1F, size, cw, cc), and wrap all words into a .patch file for FPGA flashing via patch_fpga.py', 'Byte-order correctness: .lump files remain big-endian per spec; Lump→Patch automatically byte-swaps each word to little-endian for the UART PATCH_LUMP protocol', 'Lump→Patch button added to editor toolbar, editor actions dropdown, and CRD FPGA action bar', 'Lump→Patch prompts for target BRAM word address (default 0x0100) and produces a CHPF v1 .patch with CRC-16/CCITT and RUN sentinel'] },
+        { date: '2026-04-16 UTC', title: 'LUMP Hardware Verification Fixes', changes: ['Fixed Build LUMP binary: removed embedded method dispatch table (raw word offsets were incorrectly written as code words that the FPGA would try to execute as instructions)', 'Method offsets in historical external metadata now start at 0, matching the Python build_lumps.py spec and the manifest.json format used by FPGA tooling', 'Added Export Lump as Patch flow: pick any pre-built .lump file, validate the header (magic 0x1F, size, cw, cc), and wrap all words into a .patch file for FPGA flashing via patch_fpga.py', 'Byte-order correctness: .lump files remain big-endian per spec; Lump→Patch automatically byte-swaps each word to little-endian for the UART PATCH_LUMP protocol', 'Lump→Patch button added to editor toolbar, editor actions dropdown, and CRD FPGA action bar', 'Lump→Patch prompts for target BRAM word address (default 0x0100) and produces a CHPF v1 .patch with CRC-16/CCITT and RUN sentinel'] },
         { date: '2026-04-16 UTC', title: 'One-Click Build LUMP', changes: ['Build LUMP button: one-click compile-to-binary for any CLOOMC++ abstraction in any language mode', 'Produces spec-compliant .lump binary: header (magic 0x1F + n-6 + cw + typ + cc), code region, c-list, big-endian uint32', 'Console shows full lump layout: header hex, methods with offsets, capability list, freespace, file size', 'Available in toolbar (green button) and Editor Actions dropdown; auto-disabled in Assembly mode'] },
         { date: '2026-04-16 UTC', title: 'English String Abstraction', changes: ['EN: String example — 14 of 15 planned methods for packed 4-char-per-word string operations written in plain English (ReplaceChar deferred: requires bitwise AND/OR masking not yet in English translator)', 'Pack4/Unpack, IsLetter/IsDigit/IsUpper/IsLower/IsSpace, ToUpper/ToLower, CharToDigit/DigitToChar, ReverseWord, CompareWords, CountLetters', 'Byte extraction via shift-and-subtract (no bfext needed) — pure English front-end, zero hardware dependencies', 'New EN: String tab in CLOOMC++ IDE with category-organized source and ASCII reference header'] },
         { date: '2026-04-15 UTC', title: 'Patent Portfolio & Figure Audit', changes: ['Browsable /patents/ page: 8 PDFs with color-coded badges (FULL/BASE/CIP/COVER), 45 HTML figures with category filters and live search', 'Figure audit complete: 14 dark-background figures converted to white, 5 missing figures created (HP-35 opcode chart, Ada Lovelace model, 3 Lambda Recursion CIP figures), 4 new I/O Addressing figures', 'Consolidated patent document (2,818 lines): cover letter + Part I base patent + Addendum A (CLOOMC++) + Addendum B (Abstract GT I/O) + Addendum C (Lambda Recursion)', 'Lambda Recursion CIP finalized: 7 patent claims — CR6 self-invocation, idempotent re-entry, O(1) trifecta, two-RETURN exit, three loop styles, English NL compilation, pet-name constants', 'All patent PDFs regenerated with fpdf2: Unicode support, letter-size pages, multi-line table cells, page numbering', 'Server routes added: /patents/, /patents/files/, /figures/ for browsing patent portfolio'] },

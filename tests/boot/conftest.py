@@ -7,6 +7,8 @@ working tree.
 """
 import contextlib
 import fcntl
+import hashlib
+import json
 import math
 import os
 import shutil
@@ -112,6 +114,27 @@ def isolated_boot_lumps(tmp_path_factory):
     """
     isolated_dir = str(tmp_path_factory.mktemp("boot_lumps"))
     shutil.copytree(LIVE_LUMPS_DIR, isolated_dir, symlinks=True, dirs_exist_ok=True)
+    # Boot execution is approval-gated. Install authentic approvals only in
+    # this isolated test library for the exact committed executable residents.
+    from server.lump_approvals import write_approvals
+    from server.lump_integrity import parse_canonical_filename
+    approvals = {}
+    for filename in (
+            "SelfTest.1.485e71f6.lump",
+            "CapabilityTest.1.b98a03c4.lump"):
+        path = os.path.join(isolated_dir, filename)
+        if not os.path.isfile(path):
+            continue
+        dot_name, issue_n, _number = parse_canonical_filename(filename)
+        raw = open(path, "rb").read()
+        digest = hashlib.sha256(raw).hexdigest()
+        approvals[digest] = {
+            "binary_hash": digest, "filename": filename,
+            "dot_name": dot_name, "issue_n": issue_n,
+            "identity_hash": hashlib.sha256(
+                f"{dot_name}#{issue_n}".encode()).hexdigest(),
+        }
+    write_approvals(os.path.join(isolated_dir, "approvals.json"), approvals)
     boot_state_dir = str(tmp_path_factory.mktemp("boot_state"))
     isolated_boot_config_path = os.path.join(boot_state_dir, "boot-config.json")
     if os.path.exists(LIVE_BOOT_CONFIG_PATH):

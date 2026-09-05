@@ -15,7 +15,7 @@
 //   LLB-03  Synthetic NS slot 3 parameters (cw=17, cc=1) round-trip through
 //            loadLumpBinary: NS slot 3 word1 encodes limit=17, clistCount=1.
 //            (These model the historic LED-flash loader shape; the real-fixture
-//            checks below read their expected values from manifest.json.)
+//            checks below decode expected values from the immutable bytes.)
 //   LLB-04  loadLumpBinary with cc=0: NS slot 3 clistCount=0, CR6 zeroed.
 //   LLB-05  Memory layout: code word at 0x0401 survives the load unchanged.
 //   LLB-06  PC is reset to 0 by loadLumpBinary.
@@ -129,8 +129,7 @@ function canonicalFixture(token, abstraction) {
     const entry = LUMP_MANIFEST.find(candidate =>
         candidate.token === token &&
         candidate.abstraction === abstraction &&
-        typeof candidate.filename === 'string' &&
-        typeof candidate.sidecar_file === 'string'
+        typeof candidate.filename === 'string'
     );
     if (!entry) {
         throw new Error(
@@ -497,18 +496,9 @@ console.log('\n--- LLB-RBA: Canonical SelfTest binary (Boot.Abstr slot) ---');
             sim2.cr[14].word1 === EXTENDED_BASE,
             `got 0x${sim2.cr[14].word1.toString(16)}`);
 
-        // LLB-RBA-11: Sidecar metadata is resolved through the same manifest
-        // entry, preventing independent fixture names from drifting.
-        const sidecarPath = path.join(LUMPS_DIR, SELFTEST_FIXTURE.sidecar_file);
-        const sidecarExists = fs.existsSync(sidecarPath);
-        check(`LLB-RBA-11: canonical SelfTest sidecar ${SELFTEST_FIXTURE.sidecar_file} exists on disk`,
-            sidecarExists, sidecarPath);
-        if (sidecarExists) {
-            const sidecar = JSON.parse(fs.readFileSync(sidecarPath, 'utf8'));
-            check('LLB-RBA-12: sidecar token matches the canonical SelfTest token',
-                sidecar.token === SELFTEST_FIXTURE.token,
-                `got token=${sidecar.token}`);
-        }
+        const fixtureBytes = fs.readFileSync(path.join(LUMPS_DIR, SELFTEST_FIXTURE.filename));
+        check('LLB-RBA-11: canonical SelfTest binary is the indexed immutable artifact',
+            fixtureBytes.length >= 4 && fixtureBytes.length % 4 === 0);
     }
 }
 
@@ -529,7 +519,14 @@ console.log('\n--- LLB-APP: Mimic _loadLumpBinaryIntoSim app path with canonical
     check(`LLB-APP-0: canonical LED flash fixture ${LEDFLASH_FIXTURE.filename} exists on disk`,
         lumpExists, lumpPath);
     if (lumpExists) {
-        // Step 1: Read words from disk (replaces fetch → data.words)
+        // Step 1: Read exact big-endian bytes/words from disk (replaces
+        // fetch → data.words). Decode expected layout independently of both
+        // the locator-only manifest and ChurchSimulator.parseLumpHeader().
+        const exactBytes = fs.readFileSync(lumpPath);
+        const exactHeader = exactBytes.length >= 4 ? exactBytes.readUInt32BE(0) : 0;
+        const expectedMagic = (exactHeader >>> 27) & 0x1F;
+        const expectedWordCount = (exactHeader >>> 10) & 0x1FFF;
+        const expectedCc = exactHeader & 0xFF;
         const rawWords = readLumpFile(lumpPath);
         check('LLB-APP-1: rawWords non-empty (simulates non-empty fetch response)',
             rawWords.length > 0,
@@ -549,21 +546,21 @@ console.log('\n--- LLB-APP: Mimic _loadLumpBinaryIntoSim app path with canonical
         check('LLB-APP-3: hdr.valid (header row is well-formed)',
             hdr !== null && hdr.valid,
             hdr ? `magic=0x${hdr.magic.toString(16)}` : 'hdr is null');
-        check(`LLB-APP-4: wordCount matches manifest cw (${LEDFLASH_FIXTURE.cw})`,
-            wordCount === LEDFLASH_FIXTURE.cw,
-            `got wordCount=${wordCount}`);
-        check(`LLB-APP-5: hdr.cc matches manifest cc (${LEDFLASH_FIXTURE.cc})`,
-            hdr !== null && hdr.cc === LEDFLASH_FIXTURE.cc,
+        check(`LLB-APP-4: wordCount matches exact big-endian header cw (${expectedWordCount})`,
+            expectedMagic === 0x1F && wordCount === expectedWordCount,
+            `got wordCount=${wordCount} exactMagic=0x${expectedMagic.toString(16)}`);
+        check(`LLB-APP-5: hdr.cc matches exact big-endian header cc (${expectedCc})`,
+            hdr !== null && expectedMagic === 0x1F && hdr.cc === expectedCc,
             hdr ? `got cc=${hdr.cc}` : 'hdr is null');
 
         // Verify simulator state matches the header-row values
         const p = sim.parseNSWord1(sim.memory[nsBase + 1]);
         check('LLB-APP-6: NS[3] limit agrees with canonical header-row wordCount',
-            p.limit === LEDFLASH_FIXTURE.cw,
-            `ns limit=${p.limit} expected=${LEDFLASH_FIXTURE.cw}`);
+            p.limit === expectedWordCount,
+            `ns limit=${p.limit} expected=${expectedWordCount}`);
         check('LLB-APP-7: NS[3] clistCount agrees with canonical header cc',
-            sim.readNSEntry(sim.bootEntrySlot).clistCount === LEDFLASH_FIXTURE.cc,
-            `ns clistCount=${sim.readNSEntry(sim.bootEntrySlot).clistCount} expected=${LEDFLASH_FIXTURE.cc}`);
+            sim.readNSEntry(sim.bootEntrySlot).clistCount === expectedCc,
+            `ns clistCount=${sim.readNSEntry(sim.bootEntrySlot).clistCount} expected=${expectedCc}`);
     }
 }
 

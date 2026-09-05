@@ -3,10 +3,7 @@
 //
 // Assembles simulator/examples/wukong_callhome.cloomc using the production
 // ChurchAssembler (simulator/assembler.js), packs the result into a valid LUMP
-// binary, and writes:
-//
-//   server/lumps/<token>.lump   — binary (big-endian 32-bit words)
-//   server/lumps/<token>.json   — sidecar metadata
+// binary and writes server/lumps/<token>.lump.
 //
 // The token is the CRC-32 of all binary bytes, lower-cased 8-hex-char string.
 //
@@ -40,7 +37,7 @@ const ROOT        = path.resolve(__dirname, '..');
 const ASSEMBLER   = path.join(ROOT, 'simulator', 'assembler.js');
 const SOURCE      = path.join(ROOT, 'simulator', 'examples', 'wukong_callhome.cloomc');
 
-// --out-dir <path>: redirect .lump/.json/manifest writes to a different
+// --out-dir <path>: redirect .lump/manifest writes to a different
 // directory (used by CI to validate without touching server/lumps/).
 const _outDirIdx  = process.argv.indexOf('--out-dir');
 const LUMPS_DIR   = (_outDirIdx !== -1 && process.argv[_outDirIdx + 1])
@@ -79,6 +76,21 @@ if (result.errors.length > 0) {
 
 const words = result.words;
 console.log(`Assembled ${words.length} instruction words.`);
+function contentFrame(name, text) {
+    const api = Buffer.from(JSON.stringify({ name, methods: [] }), 'utf8');
+    const src = Buffer.from(text, 'utf8');
+    const data = Buffer.concat([
+        Buffer.from([0xAB, 0x03, api.length >>> 8, api.length & 0xFF]), api,
+        Buffer.alloc((4 - api.length % 4) % 4),
+        Buffer.from([(src.length >>> 24) & 0xFF, (src.length >>> 16) & 0xFF,
+            (src.length >>> 8) & 0xFF, src.length & 0xFF]), src,
+        Buffer.alloc((4 - src.length % 4) % 4),
+    ]);
+    const frame = [];
+    for (let i = 0; i < data.length; i += 4) frame.push(data.readUInt32BE(i));
+    return frame;
+}
+const FRAME = contentFrame('WukongCallHome', source);
 
 if (words.length !== 74) {
     console.error(`ERROR: expected 74 words, got ${words.length}.`);
@@ -125,7 +137,7 @@ const CLIST = [
 //
 const cw = words.length;
 const cc = CLIST.length;   // 2
-const totalNeeded = 1 + cw + cc;
+const totalNeeded = 1 + cw + FRAME.length + cc;
 
 let lumpSize = 64;
 while (lumpSize < totalNeeded) lumpSize *= 2;
@@ -147,6 +159,7 @@ const headerWord = (
 const padded = new Uint32Array(lumpSize);
 padded[0] = headerWord;
 for (let i = 0; i < cw; i++) padded[1 + i] = words[i] >>> 0;
+for (let i = 0; i < FRAME.length; i++) padded[1 + cw + i] = FRAME[i] >>> 0;
 
 const clistBase = lumpSize - cc;
 for (let i = 0; i < CLIST.length; i++) {
@@ -194,9 +207,7 @@ if (existingIdx !== -1) {
     const oldToken = manifest[existingIdx].token;
     if (oldToken && oldToken !== token) {
         const oldLump     = path.join(LUMPS_DIR, `${oldToken}.lump`);
-        const oldSidecar  = path.join(LUMPS_DIR, `${oldToken}.json`);
         if (fs.existsSync(oldLump))    { fs.unlinkSync(oldLump);    console.log(`Removed old: ${oldLump}`); }
-        if (fs.existsSync(oldSidecar)) { fs.unlinkSync(oldSidecar); console.log(`Removed old: ${oldSidecar}`); }
     }
     console.log('\nExisting WukongCallHome entry found — replacing it.');
     manifest.splice(existingIdx, 1);
@@ -204,59 +215,9 @@ if (existingIdx !== -1) {
 
 // ── Write .lump binary ───────────────────────────────────────────────────────
 const lumpPath    = path.join(LUMPS_DIR, `${token}.lump`);
-const sidecarPath = path.join(LUMPS_DIR, `${token}.json`);
 
 fs.writeFileSync(lumpPath, bytes);
 console.log(`Written: ${lumpPath} (${bytes.length} bytes)`);
-
-// ── Write sidecar .json ───────────────────────────────────────────────────────
-//
-// IMPORTANT: the "source" field must always be set to the exact text of the
-// canonical .cloomc file for known-example abstractions (those whose abstraction
-// name maps to a file in simulator/examples/).  Any recompile or rename pass that
-// omits this field will be caught immediately by check-sidecar-source.js.
-//
-const capabilitiesJson = CLIST.map(c => ({
-    name:    c.name,
-    rights:  c.rights,
-    gt:      '0x' + c.gt.toString(16).padStart(8, '0'),
-    ns_slot: c.ns_slot,
-    note:    c.note,
-}));
-
-const sidecar = {
-    token,
-    abstraction:     'WukongCallHome',
-    filename:        `${token}.lump`,
-    sidecar_file:    `${token}.json`,
-    ns_slot:         7,
-    ns_slot_policy:  'static',
-    lump_size:       lumpSize,
-    typ:             0,
-    content_type:    'code',
-    cw,
-    cc,
-    status:          'wip',
-    profile:         'IoT',
-    language:        'assembly',
-    description:     'Wukong board ROM boot program: LED0 blink at ~1 Hz and "CM:WUKONG\\r\\n" ' +
-                     'UART callhome banner. 74 instructions: words 2-71 mirror WUKONG_NUC_PROGRAM, ' +
-                     'word 72 hands off via CALL WukongCallHome.hw, word 73 is the loop fallback BRANCH. ' +
-                     'See docs/wukong-boot.md for the NULL_CAP standalone problem this solves.',
-    // "source" must always reflect the exact text of simulator/examples/wukong_callhome.cloomc.
-    // Never leave this field empty — check-sidecar-source.js enforces it after every recompile.
-    source:          source,
-    source_file:     'simulator/examples/wukong_callhome.cloomc',
-    capabilities:    capabilitiesJson,
-    grants:          ['E'],
-    author:          'Church Machine',
-    version:         '1.0',
-    lump_version:    1,
-    compiled_at:     Date.now() / 1000,
-};
-
-fs.writeFileSync(sidecarPath, JSON.stringify(sidecar, null, 2) + '\n');
-console.log(`Written: ${sidecarPath}`);
 
 // ── Print c-list slot assignments ─────────────────────────────────────────────
 console.log(`\nC-List GT slot assignments (cc=${CLIST.length}, tail-packed):`);

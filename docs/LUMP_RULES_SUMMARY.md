@@ -29,6 +29,20 @@ entries do not become bitstream content merely because they exist. A LUMP is
 present only when it is represented by the Namespace Table and its assigned
 slot/LUMP data.
 
+Repository tooling follows the same boundary: `update-lump.js` writes only the
+binary, and manifest entries do not carry `sidecar_file` pointers. Existing
+sidecars are retained solely as legacy audit material until reviewed. They may
+be imported only through the one-time audit tool with an explicit filename
+acceptance and write flag; they are never accepted automatically. Approved
+non-intrinsic user decisions are stored in `server/lumps/approvals.json`, keyed
+by the exact binary SHA-256. Legacy files are never runtime, API, source, or
+validation fallback.
+
+The complete hierarchy is: `.lump` bytes for intrinsic facts; the Namespace
+Table and boot configuration for deployment; exact SHA-256-bound
+`approvals.json` records for explicit non-intrinsic decisions; and disposable
+manifest/catalogue/UI caches for presentation only.
+
 ## 2. Canonical LUMP identity
 
 Every LUMP must have a canonical identity in this form:

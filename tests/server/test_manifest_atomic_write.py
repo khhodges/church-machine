@@ -180,11 +180,10 @@ class TestManifestWriteSitesUseAtomicHelper(unittest.TestCase):
         lump_bytes = struct.pack(f">{LUMP_SZ}I",
                                  *[int(w) & 0xFFFFFFFF for w in words])
         import base64
-        sidecar = {
+        metadata = {
             "token": token,
             "abstraction": name,
             "filename": f"{token}.lump",
-            "sidecar_file": f"{token}.lump.json",
             "ns_slot": None,
             "lump_size": LUMP_SZ,
             "typ": 0,
@@ -207,7 +206,7 @@ class TestManifestWriteSitesUseAtomicHelper(unittest.TestCase):
             "dot_name": "",
             "issue_n": 0,
         }
-        return lump_bytes, sidecar
+        return lump_bytes, metadata
 
     def test_mid_write_crash_leaves_manifest_intact(self):
         """Simulate a crash inside the manifest write: original content survives."""

@@ -93,7 +93,8 @@ console.log('\n--- portable UI save/load ordering ---');
     words[62] = ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER;
     words[63] = 0; // canonical unresolved portable dependency row
     const contract = Binding.createContract('alice.Bank#7', [
-        { name: '__SELF__', compiler_owned_self: true, rights: 'E', type: 'Inform' },
+        { name: '__SELF__', compiler_owned_self: true, binary_hash: 'c'.repeat(64),
+            identity_hash: 'd'.repeat(64), rights: 'E', type: 'Inform' },
         { N: 'church.Buffer#2', T: '1234abcd', binary_hash: H,
             identity_hash: I, rights: 'RW', type: 'Outform', relocation_row: 1 },
     ]);
@@ -131,7 +132,7 @@ console.log('\n--- portable UI save/load ordering ---');
         portableBinding: contract,
         portableOwnerCandidate: {
             N: 'alice.Bank#7', binary_hash: 'c'.repeat(64),
-            identity_hash: 'd'.repeat(64), verified: true,
+            identity_hash: 'd'.repeat(64), verified: true, approved: true,
         },
         validateLinkedWords(linkedWords, linkedHeader, bindings) {
             postLinkCalled = true;

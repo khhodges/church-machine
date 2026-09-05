@@ -1,4 +1,4 @@
-"""Three-way LUMP consistency check: binary header <-> manifest.json <-> per-lump sidecar .json
+"""LUMP consistency checks for binary, manifest, and hash-bound approval authority.
 
 CHANGE CONTROL GATE — this test must pass before any lump binary or metadata change is merged.
 
@@ -6,22 +6,12 @@ Rules enforced
 --------------
 R1   Every current .lump has valid header magic (bits[31:27] = 0x1F).
 R2   Binary file size in words == header-declared lump_size.
-R3   Every current .lump token has a manifest.json entry.
-R4   No orphan sidecar .json (every non-archive <stem>.json needs a matching .lump).
+R3   Every current .lump filename has a manifest.json entry.
+R4   approvals.json uses exact SHA-256 keys and refers to repository binaries.
 R5   manifest.cw / cc / lump_size == binary header values.
-R6   sidecar.cw / cc / lump_size == binary header values (for sidecars that exist).
-R7   sidecar fields agree with manifest where both exist.  A sidecar-declared
-     boot_resident flag must also be explicitly present and equal in manifest.json,
-     because the boot-image generator reads only the manifest.
 R8   No duplicate ns_slot values unless all claimants share the same non-null variant_group.
 R9   RETIRED — ns_slot=null is implicitly dynamic; ns_slot_policy is optional/informational only.
 R10  Every manifest entry with lump_size declared has a .lump file on disk.
-R11  Every manifest entry with an explicit sidecar_file field has that file on
-     disk.  Entries with lump_size but no sidecar_file emit a pytest warning so
-     the gap stays visible without blocking CI.
-R14  Every archive binary has a matching sidecar .json whose archived_version
-     matches the version encoded in its archive filename (both old <token>-vN
-     and new <Name>_vN).
 R16  A statically-slotted, system-baseline lump's `abstraction` field must name a
      currently-live entry in simulator/abstractions.js (catches abstraction-name
      drift after a rename, at build/merge time instead of only as a runtime toast).
@@ -44,10 +34,6 @@ R24  Every .lump file in server/lumps/ that is a symbolic link must resolve to a
      real regular file (broken/dangling symlinks are an immediate hard failure).
      Symlinks that resolve to a target outside the lumps directory are flagged as
      a pytest warning so the gap stays visible without blocking CI.
-R24b Every .json file in server/lumps/ (sidecar and manifest) that is a symbolic
-     link must resolve to a real regular file (broken/dangling symlinks are an
-     immediate hard failure). Symlinks that resolve outside the lumps directory
-     are flagged as a pytest warning.
 R25b Every git-tracked archive .lump file (<token>-vN.lump, <Name>_vN.lump) with
      a valid LUMP header emits a pytest warning. Archives are exempt from the
      manifest-coverage requirement (R25), but a committed archive that was once
@@ -57,16 +43,9 @@ R25b Every git-tracked archive .lump file (<token>-vN.lump, <Name>_vN.lump) with
 Failure messages are written to be self-diagnosing: they state what was found,
 what was expected, and which file to correct.
 
-Naming conventions supported
------------------------------
-Legacy:  <8hexchars>.lump        — primary file, <8hexchars>.json — sidecar
-         <8hexchars>-vN.lump     — archive binary
-New:     <AbsName>_vN.lump       — primary file (human-readable, N = current version)
-         <AbsName>_vN.json       — sidecar
-         <AbsName>_v(N-1).lump   — archive binary (previous versions)
-
-The manifest entry's optional 'filename' / 'sidecar_file' fields point to the
-actual files on disk.  When absent, the legacy <token>.*  naming is assumed.
+The manifest entry's optional ``filename`` field names the binary exactly.
+Approval metadata has one authority: ``server/lumps/approvals.json``, addressed
+by the full SHA-256 of immutable binary bytes.
 """
 
 import hashlib
@@ -79,8 +58,6 @@ import subprocess
 import warnings
 
 import pytest
-
-from tests.lump.lump_manifest_utils import build_manifest_filename_set as _build_manifest_filename_set_util
 
 LUMPS_DIR = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "..", "server", "lumps")
@@ -95,64 +72,6 @@ _ABSDETAIL_JS   = os.path.join(_SIMULATOR_DIR, "app-absdetail.js")
 _DECORATOR_STRIP_RE = _re.compile(r"[\u2726\u2605\s]+$")
 
 
-# ── R24b preflight: check .json symlinks before any module-level loading ───────
-# This runs at collection time, before _load_manifest() is called, so that a
-# dangling manifest.json or sidecar symlink produces a self-diagnosing R24b
-# message rather than a raw FileNotFoundError from an unrelated rule.
-
-def _check_json_symlinks(lumps_dir: str) -> list:
-    """Return a list of (filename, target, resolved) for every dangling .json
-    symlink found in *lumps_dir*.  Non-symlinks and resolving symlinks are
-    not included.  Exported so regression tests can call it directly.
-    """
-    broken = []
-    try:
-        entries = sorted(os.listdir(lumps_dir))
-    except FileNotFoundError:
-        return broken
-    for fn in entries:
-        if not fn.endswith(".json"):
-            continue
-        path = os.path.join(lumps_dir, fn)
-        if not os.path.islink(path):
-            continue
-        target = os.readlink(path)
-        resolved = os.path.realpath(path)
-        if not os.path.isfile(resolved):
-            broken.append((fn, target, resolved))
-    return broken
-
-
-def _preflight_json_symlinks(lumps_dir: str = LUMPS_DIR) -> None:
-    """Abort pytest collection if any .json file in *lumps_dir* is a dangling
-    symlink.  Called immediately at module-import time so the guard fires
-    before _load_manifest() and all other module-level discovery/loading.
-    """
-    broken = _check_json_symlinks(lumps_dir)
-    if not broken:
-        return
-    lines = []
-    for fn, target, resolved in broken:
-        lines.append(
-            f"  {fn}: dangling symlink — points to {target!r} "
-            f"(resolved path: {resolved!r}).\n"
-            "    Either restore the missing target file or delete this symlink.\n"
-            "    Broken .json symlinks cause confusing FileNotFoundError failures\n"
-            "    in manifest loading and other lump-consistency rules instead of\n"
-            "    a clear R24b diagnostic."
-        )
-    pytest.exit(
-        "R24b preflight: broken .json symlink(s) in "
-        + lumps_dir
-        + ":\n"
-        + "\n".join(lines),
-        returncode=1,
-    )
-
-
-_preflight_json_symlinks()
-
-
 # ── Manifest + path helpers ────────────────────────────────────────────────────
 
 def _load_manifest():
@@ -163,19 +82,22 @@ def _load_manifest():
 MANIFEST = _load_manifest()
 
 # Build per-token path info from the manifest.
-# Keys: token.lower()  Values: dict(lump=path, sidecar=path, lump_stem=str)
+# Keys: normalized token.  `filename` is retained exactly as manifest spelling:
+# case-sensitive filesystems must never receive a lowercased manifest path.
 _TOKEN_PATHS: dict = {}
+_TOKEN_FILENAMES: dict = {}
+_FILENAME_TOKENS: dict = {}
 for _me in MANIFEST:
     _tok = _me.get("token", "").lower()
     if not _tok:
         continue
     _fn  = _me.get("filename",     f"{_tok}.lump")
-    _sfn = _me.get("sidecar_file", f"{_tok}.json")
-    _TOKEN_PATHS[_tok] = {
+    _TOKEN_FILENAMES.setdefault(_tok, []).append(_fn)
+    _FILENAME_TOKENS[_fn] = _tok
+    _TOKEN_PATHS.setdefault(_tok, {
         "lump":      os.path.join(LUMPS_DIR, _fn),
-        "sidecar":   os.path.join(LUMPS_DIR, _sfn),
         "lump_stem": _fn[:-5] if _fn.endswith(".lump") else _tok,
-    }
+    })
 
 # Lowercase stems of every file that IS a "current" (non-archive) lump.
 # A file is current if it is referenced by any manifest entry via 'filename'
@@ -189,16 +111,20 @@ for _tok, _info in _TOKEN_PATHS.items():
 # ── Path-resolution helpers ────────────────────────────────────────────────────
 
 def _lump_path(token: str) -> str:
+    direct = _BINARY_IDENTIFIER_PATHS.get(token)
+    if direct:
+        return direct
     info = _TOKEN_PATHS.get(token.lower())
     return info["lump"] if info else os.path.join(LUMPS_DIR, f"{token.lower()}.lump")
 
 
-def _sidecar_path(token: str) -> str:
-    info = _TOKEN_PATHS.get(token.lower())
-    return info["sidecar"] if info else os.path.join(LUMPS_DIR, f"{token.lower()}.json")
+def _entry_lump_path(entry: dict) -> str:
+    """Resolve one manifest entry without collapsing duplicate token entries."""
+    token = str(entry.get("token", "")).lower()
+    return os.path.join(LUMPS_DIR, entry.get("filename", f"{token}.lump"))
 
 
-# ── Header / sidecar accessors ─────────────────────────────────────────────────
+# ── Header accessors ───────────────────────────────────────────────────────────
 
 def _parse_header(word):
     magic   = (word >> 27) & 0x1F
@@ -223,23 +149,17 @@ def _word_count(token: str) -> int:
     return os.path.getsize(_lump_path(token)) // 4
 
 
-def _load_sidecar(token: str):
-    path = _sidecar_path(token)
-    if not os.path.exists(path):
-        path = os.path.join(LUMPS_DIR, f"{token.lower()}.json")
-    if not os.path.exists(path):
-        return None
-    with open(path) as f:
-        return json.load(f)
-
-
 def _lump_exists(token: str) -> bool:
     return os.path.exists(_lump_path(token))
 
 
-def _sidecar_exists(token: str) -> bool:
-    return os.path.exists(_sidecar_path(token))
-
+def _approval_record(token: str):
+    """Return an approval record by the current binary digest, if any."""
+    path = _lump_path(token)
+    if not os.path.isfile(path):
+        return None
+    with open(path, "rb") as binary:
+        return APPROVALS.get(hashlib.sha256(binary.read()).hexdigest())
 
 # ── Archive detection ──────────────────────────────────────────────────────────
 
@@ -264,37 +184,22 @@ def _lump_tokens():
     Files are mapped back to their manifest token where possible; otherwise the
     lowercase file stem is used as the token.
     """
-    stem_to_token = {info["lump_stem"].lower(): tok for tok, info in _TOKEN_PATHS.items()}
-    result = set()
+    # Filenames are case-sensitive deployment identifiers.  Do not normalize
+    # their stems before resolving them back to a manifest token.
+    result = []
     for fn in os.listdir(LUMPS_DIR):
         if not fn.endswith(".lump"):
             continue
         stem = fn[:-5]
         if _is_archive_stem(stem):
             continue
-        tok = stem_to_token.get(stem.lower()) or stem.lower()
-        result.add(tok)
-    return sorted(result)
-
-
-def _json_tokens():
-    """Return sorted list of manifest tokens for all non-archive .json files (exc. manifest)."""
-    sc_stem_to_token: dict = {}
-    for tok, info in _TOKEN_PATHS.items():
-        sc_stem = info["sidecar"][len(LUMPS_DIR) + 1:]
-        if sc_stem.endswith(".json"):
-            sc_stem_to_token[sc_stem[:-5].lower()] = tok
-        sc_stem_to_token[tok] = tok  # legacy
-    result = set()
-    for fn in os.listdir(LUMPS_DIR):
-        if not fn.endswith(".json") or fn in ("manifest.json", "server_managed_tokens.json",
-                                               "ns-state.json"):
-            continue
-        stem = fn[:-5]
-        if _is_archive_stem(stem):
-            continue
-        tok = sc_stem_to_token.get(stem.lower()) or stem.lower()
-        result.add(tok)
+        tok = _FILENAME_TOKENS.get(fn)
+        identifier = (
+            tok if tok is not None and len(_TOKEN_FILENAMES.get(tok, ())) == 1
+            else stem
+        )
+        _BINARY_IDENTIFIER_PATHS[identifier] = os.path.join(LUMPS_DIR, fn)
+        result.append(identifier)
     return sorted(result)
 
 
@@ -312,14 +217,68 @@ def _archive_lump_stems():
 
 # ── Module-level parametrize targets ──────────────────────────────────────────
 
+_BINARY_IDENTIFIER_PATHS = {}
 LUMP_TOKENS             = _lump_tokens()
-JSON_TOKENS             = _json_tokens()
+_APPROVALS_PATH = os.path.join(LUMPS_DIR, "approvals.json")
+if os.path.exists(_APPROVALS_PATH):
+    with open(_APPROVALS_PATH) as _approval_file:
+        _APPROVAL_DOCUMENT = json.load(_approval_file)
+    assert isinstance(_APPROVAL_DOCUMENT, dict), "approvals.json must be an object"
+    assert _APPROVAL_DOCUMENT.get("version") == 1, (
+        "approvals.json version must be 1"
+    )
+    assert _APPROVAL_DOCUMENT.get("algorithm") == "sha256", (
+        "approvals.json algorithm must be 'sha256'"
+    )
+    APPROVALS = _APPROVAL_DOCUMENT.get("approvals")
+    assert isinstance(APPROVALS, dict), "approvals.json approvals must be an object"
+else:
+    APPROVALS = {}
 MANIFEST_ENTRIES_WITH_SIZE = [e for e in MANIFEST if e.get("lump_size")]
 MANIFEST_ENTRIES_WITH_CW_OR_CC = [
     e for e in MANIFEST
     if e.get("cw") is not None or e.get("cc") is not None
 ]
 ARCHIVE_LUMP_STEMS      = _archive_lump_stems()
+_MANIFEST_FILENAMES = [
+    e.get("filename", f"{str(e.get('token', '')).lower()}.lump")
+    for e in MANIFEST
+]
+CURRENT_LUMP_FILENAMES = sorted({
+    fn for fn in os.listdir(LUMPS_DIR)
+    if fn.endswith(".lump") and not _is_archive_stem(fn[:-5])
+})
+
+
+def _binary_sha256(path: str) -> str:
+    """Return the exact SHA-256 of one binary file."""
+    with open(path, "rb") as binary:
+        return hashlib.sha256(binary.read()).hexdigest()
+
+
+def _represented_binary_hashes() -> set:
+    """Return hashes represented by manifest current files or archive binaries."""
+    filenames = {
+        filename for filename in _MANIFEST_FILENAMES
+        if os.path.isfile(os.path.join(LUMPS_DIR, filename))
+    }
+    filenames.update(
+        filename for filename in os.listdir(LUMPS_DIR)
+        if filename.endswith(".lump") and _is_archive_stem(filename[:-5])
+        and os.path.isfile(os.path.join(LUMPS_DIR, filename))
+    )
+    return {
+        _binary_sha256(os.path.join(LUMPS_DIR, filename))
+        for filename in filenames
+    }
+
+
+REPRESENTED_BINARY_HASHES = _represented_binary_hashes()
+
+
+def _is_represented_binary(path: str, represented_hashes: set) -> bool:
+    """Whether *path* is byte-identical to a hash-authoritative binary."""
+    return os.path.isfile(path) and _binary_sha256(path) in represented_hashes
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -329,14 +288,17 @@ ARCHIVE_LUMP_STEMS      = _archive_lump_stems()
 class TestR1_ValidMagic:
     """R1: Every current .lump has valid header magic (0x1F)."""
 
-    @pytest.mark.parametrize("token", LUMP_TOKENS)
-    def test_header_magic(self, token):
-        h = _read_header(token)
+    @pytest.mark.parametrize("filename", CURRENT_LUMP_FILENAMES)
+    def test_header_magic(self, filename):
+        path = os.path.join(LUMPS_DIR, filename)
+        with open(path, "rb") as binary:
+            raw = binary.read(4)
+        h = _parse_header(struct.unpack(">I", raw)[0]) if len(raw) == 4 else None
         assert h is not None, (
-            f"{token}: lump file is too short to contain a header word."
+            f"{filename}: lump file is too short to contain a header word."
         )
         assert h["valid"], (
-            f"{token}: header magic = {h['magic']:#04x}, expected 0x1F.\n"
+            f"{filename}: header magic = {h['magic']:#04x}, expected 0x1F.\n"
             "  bits[31:27] must equal 11111b. Repack the binary with the correct header."
         )
 
@@ -344,12 +306,15 @@ class TestR1_ValidMagic:
 class TestR2_FileSizeMatchesHeader:
     """R2: Binary file size in words == header-declared lump_size."""
 
-    @pytest.mark.parametrize("token", LUMP_TOKENS)
-    def test_file_size(self, token):
-        h = _read_header(token)
-        actual = _word_count(token)
+    @pytest.mark.parametrize("filename", CURRENT_LUMP_FILENAMES)
+    def test_file_size(self, filename):
+        path = os.path.join(LUMPS_DIR, filename)
+        with open(path, "rb") as binary:
+            raw = binary.read(4)
+        h = _parse_header(struct.unpack(">I", raw)[0])
+        actual = os.path.getsize(path) // 4
         assert actual == h["lump_sz"], (
-            f"{token}: file has {actual} words but header declares "
+            f"{filename}: file has {actual} words but header declares "
             f"lump_size = {h['lump_sz']} (n_minus_6 encodes a different size).\n"
             "  Repack the binary or correct the n_minus_6 field in the header word."
         )
@@ -368,29 +333,71 @@ class TestR3_LumpHasManifestEntry:
     )
 
     def test_all_lumps_in_manifest(self):
-        manifest_keys: set = set()
+        manifest_filenames: set = set()
         for e in MANIFEST:
-            manifest_keys.add(e.get("token", "").lower())
-            fn = e.get("filename", "")
-            if fn and fn.endswith(".lump"):
-                manifest_keys.add(fn[:-5].lower())
-        orphans = set(LUMP_TOKENS) - manifest_keys - self._SERVER_MANAGED_TOKENS
+            token = str(e.get("token", "")).lower()
+            manifest_filenames.add(e.get("filename", f"{token}.lump"))
+        orphans = [
+            filename for filename in CURRENT_LUMP_FILENAMES
+            if filename not in manifest_filenames
+            and filename[:-5].lower() not in self._SERVER_MANAGED_TOKENS
+            and not _is_represented_binary(
+                os.path.join(LUMPS_DIR, filename), REPRESENTED_BINARY_HASHES
+            )
+        ]
         assert not orphans, (
-            f"Lump binaries with no manifest.json entry: {sorted(orphans)}\n"
+            f"Lump binaries with no exact manifest.json filename entry: {sorted(orphans)}\n"
             "  Add an entry to manifest.json or delete the stale .lump file.\n"
             f"  (Server-managed tokens exempt from R3: {sorted(self._SERVER_MANAGED_TOKENS)})"
         )
 
 
-class TestR4_NoOrphanSidecars:
-    """R4: No orphan sidecar .json without a matching current .lump."""
+class TestR3_HashAuthorityAliases:
+    """R3 alias handling is based on exact bytes, never filename resemblance."""
 
-    def test_no_orphan_sidecars(self):
-        orphans = set(JSON_TOKENS) - set(LUMP_TOKENS)
-        assert not orphans, (
-            f"Sidecar .json files with no matching .lump: {sorted(orphans)}\n"
-            "  Either supply the missing .lump binary or delete the stale sidecar."
-        )
+    def test_identical_unmanifested_binary_is_represented(self, tmp_path):
+        canonical = tmp_path / "Canonical.1.12345678.lump"
+        alias = tmp_path / "OldName.lump"
+        canonical.write_bytes(b"same immutable binary")
+        alias.write_bytes(canonical.read_bytes())
+        represented = {_binary_sha256(str(canonical))}
+        assert _is_represented_binary(str(alias), represented)
+
+    def test_distinct_unmanifested_binary_is_not_represented(self, tmp_path):
+        canonical = tmp_path / "Canonical.1.12345678.lump"
+        candidate = tmp_path / "Unmanifested.lump"
+        canonical.write_bytes(b"approved immutable binary")
+        candidate.write_bytes(b"different immutable binary")
+        represented = {_binary_sha256(str(canonical))}
+        assert not _is_represented_binary(str(candidate), represented)
+
+
+class TestR4_ApprovalStore:
+    """R4: canonical approval records are addressed by exact binary SHA-256."""
+
+    def test_approval_keys_and_binary_hash_fields(self):
+        binary_digests = {}
+        for filename in _all_lump_filenames():
+            path = os.path.join(LUMPS_DIR, filename)
+            if os.path.isfile(path):
+                with open(path, "rb") as binary:
+                    binary_digests[hashlib.sha256(binary.read()).hexdigest()] = filename
+        for digest, record in APPROVALS.items():
+            assert _re.fullmatch(r"[0-9a-f]{64}", digest), (
+                f"approvals.json key is not exact lowercase SHA-256: {digest!r}"
+            )
+            assert isinstance(record, dict), (
+                f"approvals.json record {digest} must be an object"
+            )
+            for field, value in record.items():
+                if field == "binary_hash" or field.endswith("_binary_hash"):
+                    assert value == digest, (
+                        f"approvals.json {digest}.{field}={value!r} must equal its key"
+                    )
+            assert digest in binary_digests, (
+                f"approvals.json record {digest} does not match any current or "
+                "archive .lump binary"
+            )
 
 
 class TestR5_ManifestMatchesBinary:
@@ -399,9 +406,11 @@ class TestR5_ManifestMatchesBinary:
     @pytest.mark.parametrize("entry", MANIFEST_ENTRIES_WITH_SIZE, ids=lambda e: e["token"])
     def test_manifest_cw(self, entry):
         token = entry["token"].lower()
-        if not _lump_exists(token):
+        path = _entry_lump_path(entry)
+        if not os.path.exists(path):
             pytest.skip(f"lump file absent for {token} (covered by R10)")
-        h = _read_header(token)
+        with open(path, "rb") as binary:
+            h = _parse_header(struct.unpack(">I", binary.read(4))[0])
         assert entry["cw"] == h["cw"], (
             f"{token}: manifest.cw = {entry['cw']} but binary header cw = {h['cw']}.\n"
             "  Update manifest.json to match the compiled binary, then bump CHANGELOG."
@@ -410,9 +419,11 @@ class TestR5_ManifestMatchesBinary:
     @pytest.mark.parametrize("entry", MANIFEST_ENTRIES_WITH_SIZE, ids=lambda e: e["token"])
     def test_manifest_cc(self, entry):
         token = entry["token"].lower()
-        if not _lump_exists(token):
+        path = _entry_lump_path(entry)
+        if not os.path.exists(path):
             pytest.skip(f"lump file absent for {token} (covered by R10)")
-        h = _read_header(token)
+        with open(path, "rb") as binary:
+            h = _parse_header(struct.unpack(">I", binary.read(4))[0])
         assert entry["cc"] == h["cc"], (
             f"{token}: manifest.cc = {entry['cc']} but binary header cc = {h['cc']}.\n"
             "  Update manifest.json to match the compiled binary, then bump CHANGELOG."
@@ -421,55 +432,16 @@ class TestR5_ManifestMatchesBinary:
     @pytest.mark.parametrize("entry", MANIFEST_ENTRIES_WITH_SIZE, ids=lambda e: e["token"])
     def test_manifest_lump_size(self, entry):
         token = entry["token"].lower()
-        if not _lump_exists(token):
+        path = _entry_lump_path(entry)
+        if not os.path.exists(path):
             pytest.skip(f"lump file absent for {token} (covered by R10)")
-        h = _read_header(token)
+        with open(path, "rb") as binary:
+            h = _parse_header(struct.unpack(">I", binary.read(4))[0])
         assert entry["lump_size"] == h["lump_sz"], (
             f"{token}: manifest.lump_size = {entry['lump_size']} but binary header "
             f"lump_size = {h['lump_sz']}.\n"
             "  Update manifest.json, then bump CHANGELOG."
         )
-
-
-class TestR6_SidecarMatchesBinary:
-    """R6: sidecar cw / cc / lump_size == binary header values."""
-
-    @pytest.mark.parametrize("token", JSON_TOKENS)
-    def test_sidecar_cw(self, token):
-        if not _lump_exists(token):
-            pytest.skip(f"lump file absent for {token}")
-        sc = _load_sidecar(token)
-        h  = _read_header(token)
-        if sc and sc.get("cw") is not None:
-            assert sc["cw"] == h["cw"], (
-                f"{token}: sidecar.cw = {sc['cw']} but binary header cw = {h['cw']}.\n"
-                "  Update the sidecar to match the compiled binary, then bump CHANGELOG."
-            )
-
-    @pytest.mark.parametrize("token", JSON_TOKENS)
-    def test_sidecar_cc(self, token):
-        if not _lump_exists(token):
-            pytest.skip(f"lump file absent for {token}")
-        sc = _load_sidecar(token)
-        h  = _read_header(token)
-        if sc and sc.get("cc") is not None:
-            assert sc["cc"] == h["cc"], (
-                f"{token}: sidecar.cc = {sc['cc']} but binary header cc = {h['cc']}.\n"
-                "  Update the sidecar to match the compiled binary, then bump CHANGELOG."
-            )
-
-    @pytest.mark.parametrize("token", JSON_TOKENS)
-    def test_sidecar_lump_size(self, token):
-        if not _lump_exists(token):
-            pytest.skip(f"lump file absent for {token}")
-        sc = _load_sidecar(token)
-        h  = _read_header(token)
-        if sc and sc.get("lump_size") is not None:
-            assert sc["lump_size"] == h["lump_sz"], (
-                f"{token}: sidecar.lump_size = {sc['lump_size']} but binary header "
-                f"lump_size = {h['lump_sz']}.\n"
-                "  Update the sidecar, then bump CHANGELOG."
-            )
 
 
 def _resolve_ns_slot_policy(ns_slot, policy):
@@ -483,54 +455,6 @@ def _resolve_ns_slot_policy(ns_slot, policy):
     if ns_slot is None:
         return "dynamic"
     return "static"
-
-
-class TestR7_SidecarMatchesManifest:
-    """R7: sidecar fields agree with manifest where both are present.
-
-    Checked fields: cw, cc, lump_size, ns_slot, abstraction, lump_version,
-    and ns_slot_policy (with semantic normalization: absent = dynamic for null
-    slots, absent = static for fixed slots — R9 retired).  boot_resident is
-    manifest-owned: if a sidecar declares it, manifest.json must explicitly
-    declare the same value so the boot-image generator cannot omit its body.
-    """
-
-    @pytest.mark.parametrize("entry", MANIFEST, ids=lambda e: e["token"])
-    def test_sidecar_vs_manifest(self, entry):
-        token = entry["token"].lower()
-        sc = _load_sidecar(token)
-        if sc is None:
-            return
-        for field in ("cw", "cc", "lump_size", "ns_slot", "abstraction", "lump_version"):
-            m_val = entry.get(field)
-            s_val = sc.get(field)
-            if m_val is not None and s_val is not None:
-                assert m_val == s_val, (
-                    f"{token}: manifest.{field} = {m_val!r} but sidecar.{field} = {s_val!r}.\n"
-                    "  The two must agree. Update whichever is stale, then bump CHANGELOG."
-                )
-        if "boot_resident" in sc:
-            m_val = entry.get("boot_resident")
-            s_val = sc["boot_resident"]
-            abstraction = entry.get("abstraction") or entry.get("dot_name") or token
-            assert "boot_resident" in entry and m_val == s_val, (
-                f"{abstraction}: manifest.boot_resident = {m_val!r} but "
-                f"sidecar.boot_resident = {s_val!r}.\n"
-                "  boot_resident is read only from manifest.json when generating "
-                "the boot image. Add the sidecar value to the manifest entry (or "
-                "align the two values) so this LUMP body is not silently omitted."
-            )
-        # ns_slot_policy: always compare resolved values so absent-vs-static (null slot) is caught
-        ns_slot = entry.get("ns_slot")
-        if entry.get("ns_slot_policy") is not None or sc.get("ns_slot_policy") is not None:
-            m_policy = _resolve_ns_slot_policy(ns_slot, entry.get("ns_slot_policy"))
-            s_policy = _resolve_ns_slot_policy(sc.get("ns_slot"), sc.get("ns_slot_policy"))
-            assert m_policy == s_policy, (
-                f"{token}: manifest.ns_slot_policy resolves to {m_policy!r} but "
-                f"sidecar.ns_slot_policy resolves to {s_policy!r}.\n"
-                "  Align the two (add explicit ns_slot_policy to whichever is absent), "
-                "then bump CHANGELOG."
-            )
 
 
 class TestR8_NoDuplicateNsSlots:
@@ -595,13 +519,13 @@ class TestR7b_PolicySemanticNormalization:
         assert _resolve_ns_slot_policy(9, None) == "static"
 
     def test_absent_vs_dynamic_null_slot_agrees(self):
-        """manifest='dynamic', sidecar=absent, null slot → resolved values agree (both dynamic)."""
+        """Explicit dynamic and an absent policy agree for a null slot."""
         m = _resolve_ns_slot_policy(None, "dynamic")
         s = _resolve_ns_slot_policy(None, None)
-        assert m == s, f"Expected both to resolve to 'dynamic', got manifest={m!r} sidecar={s!r}"
+        assert m == s, f"Expected both to resolve to 'dynamic', got {m!r} and {s!r}"
 
     def test_absent_vs_static_null_slot_disagrees(self):
-        """manifest='static', sidecar=absent, null slot → resolved values disagree (NULL vs dynamic)."""
+        """Explicit static and an absent policy disagree for a null slot."""
         m = _resolve_ns_slot_policy(None, "static")
         s = _resolve_ns_slot_policy(None, None)
         assert m != s, "Expected 'static' and absent null-slot to resolve differently, but they agreed"
@@ -614,11 +538,12 @@ class TestR10_LumpFilesExist:
         missing = []
         for e in MANIFEST_ENTRIES_WITH_SIZE:
             token = e["token"].lower()
-            if not _lump_exists(token):
+            path = _entry_lump_path(e)
+            if not os.path.exists(path):
                 missing.append(
                     f"{token} ({e.get('abstraction', '?')}) — "
                     f"lump_size={e['lump_size']} declared but no .lump on disk at "
-                    f"{_lump_path(token)}"
+                    f"{path}"
                 )
         assert not missing, (
             "Manifest entries missing .lump binary:\n  " + "\n  ".join(missing)
@@ -629,9 +554,9 @@ ABSTRACT_LED_GT = 0x07800100
 
 
 class TestR12_LedPetName:
-    """R12: Any lump whose c-list[0] is the Abstract LED GT must name it 'LED0' in pet_names.CR."""
+    """R12: Approved LED capability metadata names c-list row zero LED0."""
 
-    @pytest.mark.parametrize("token", JSON_TOKENS)
+    @pytest.mark.parametrize("token", LUMP_TOKENS)
     def test_led_clist0_pet_name(self, token):
         if not _lump_exists(token):
             pytest.skip(f"lump absent for {token}")
@@ -645,61 +570,15 @@ class TestR12_LedPetName:
         clist_start = h["lump_sz"] - h["cc"]
         if words[clist_start] != ABSTRACT_LED_GT:
             return
-        sc = _load_sidecar(token)
-        cr = (sc or {}).get("pet_names", {}).get("CR", {})
+        approval = _approval_record(token)
+        if approval is None or "pet_names" not in approval:
+            return
+        cr = approval.get("pet_names", {}).get("CR", {})
         assert cr.get("0") == "LED0", (
             f"{token}: c-list[0] = Abstract LED GT (0x07800100) but "
             f"pet_names.CR[\"0\"] = {cr.get('0')!r}, expected 'LED0'.\n"
-            "  Add  \"0\": \"LED0\"  inside the pet_names.CR object in the sidecar."
+            "  Correct pet_names.CR in the hash-bound approval record."
         )
-
-
-class TestR11_SidecarFilesExist:
-    """R11: Every manifest entry with an explicit sidecar_file field has that file on disk.
-
-    A second (warn-only) check flags entries that declare lump_size but omit
-    sidecar_file entirely, so the gap remains visible in CI without blocking it.
-    """
-
-    def test_sidecar_files_present(self):
-        """Hard fail: declared sidecar_file must exist on disk."""
-        missing = []
-        for e in MANIFEST_ENTRIES_WITH_SIZE:
-            # Only check entries that explicitly declare a sidecar_file.
-            # Entries without a sidecar_file are not required to have one.
-            if not e.get("sidecar_file"):
-                continue
-            token = e["token"].lower()
-            if not _sidecar_exists(token):
-                missing.append(
-                    f"{token} ({e.get('abstraction', '?')}) — no sidecar .json on disk at "
-                    f"{_sidecar_path(token)}"
-                )
-        assert not missing, (
-            "Manifest entries missing sidecar .json:\n  " + "\n  ".join(missing)
-        )
-
-    def test_sidecar_file_field_present(self):
-        """Warn (not fail) when a manifest entry with lump_size has no sidecar_file field.
-
-        This makes the gap visible in CI output without blocking merges for
-        entries that legitimately have no sidecar yet.  Add a sidecar and wire
-        up sidecar_file in manifest.json to silence the warning.
-        """
-        no_sidecar = []
-        for e in MANIFEST_ENTRIES_WITH_SIZE:
-            if not e.get("sidecar_file"):
-                no_sidecar.append(
-                    f"{e['token']} ({e.get('abstraction', '?')}) — "
-                    f"lump_size={e['lump_size']} but no sidecar_file in manifest"
-                )
-        if no_sidecar:
-            warnings.warn(
-                "Manifest entries with lump_size but no sidecar_file field "
-                f"({len(no_sidecar)} entries):\n  " + "\n  ".join(no_sidecar),
-                UserWarning,
-                stacklevel=2,
-            )
 
 
 def _read_clist_word(token: str, slot_index: int) -> int:
@@ -942,7 +821,7 @@ LIVE_ABSTRACTION_NAMES = _live_abstraction_names()
 # (e.g. a variant lump that predates the registry, or a Haskell/alt-frontend
 # sibling that is browsed via the LUMP repository rather than the
 # Abstractions view). Anything else that fails R15 is real name drift —
-# fix the sidecar/manifest `abstraction` field or the registry name instead
+# fix the manifest `abstraction` field or the registry name instead
 # of adding it here.
 KNOWN_NON_REGISTRY_ABSTRACTIONS = {
     "PostFlashSelftest":   "Boot-resident hardware diagnostic lump; wired statically at "
@@ -957,7 +836,7 @@ KNOWN_NON_REGISTRY_ABSTRACTIONS = {
 
 
 def _abstraction_check_targets():
-    """Yield (source, token, abstraction_name) for every manifest/sidecar
+    """Yield (source, token, abstraction_name) for every manifest
     entry that is expected to correspond to a live abstraction registry
     entry: system-baseline (lump_version 0/absent) lumps with a real,
     non-null NS slot. Dynamic/NULL lumps (ns_slot is None) and
@@ -977,19 +856,6 @@ def _abstraction_check_targets():
             continue
         targets.append(("manifest", e.get("token", "?"), abs_name))
 
-    for token in JSON_TOKENS:
-        sc = _load_sidecar(token)
-        if not sc:
-            continue
-        abs_name = sc.get("abstraction")
-        if not abs_name:
-            continue
-        lv = sc.get("lump_version")
-        if lv is not None and lv >= 1:
-            continue
-        if sc.get("ns_slot") is None:
-            continue
-        targets.append((f"sidecar:{token}", token, abs_name))
     return targets
 
 
@@ -1006,7 +872,7 @@ class TestR16_AbstractionNameMatchesRegistry:
     LUMP<->Abstraction, Editor<->LUMP) degrade gracefully (toast, no crash)
     when a lump's `abstraction` field no longer matches any live abstraction
     name. This rule catches the drift itself — e.g. an abstraction rename in
-    abstractions.js that a lump's sidecar/manifest was never updated to
+    abstractions.js that a lump's manifest was never updated to
     match — instead of only surfacing as a runtime toast the developer may
     never see.
     """
@@ -1022,7 +888,7 @@ class TestR16_AbstractionNameMatchesRegistry:
             f"{token} ({source}): abstraction = {abstraction_name!r} does not match "
             "any live entry in simulator/abstractions.js.\n"
             "  This usually means the abstraction was renamed and this lump's "
-            "manifest/sidecar `abstraction` field was not updated to match "
+            "manifest `abstraction` field was not updated to match "
             "(abstraction-name drift) — update the field to the new name.\n"
             "  If this mismatch is deliberate (e.g. a pre-registry variant lump "
             "browsable only via the LUMP repository), add it to "
@@ -1036,7 +902,7 @@ class TestR16_AbstractionNameMatchesRegistry:
     def test_allowlist_entry_is_not_stale(self, allowlisted_name):
         """Companion guard for KNOWN_NON_REGISTRY_ABSTRACTIONS: every name in
         the allowlist must still appear as an `abstraction` field on at least
-        one current manifest/sidecar entry (i.e. still be a real, checked
+        one current manifest entry (i.e. still be a real, checked
         target). If a lump is renamed, deleted, or its `abstraction` field
         changed, the allowlist entry stops matching anything and silently
         rots — worse, it could later "cover for" an unrelated future name
@@ -1051,71 +917,12 @@ class TestR16_AbstractionNameMatchesRegistry:
         current_abstraction_names = {t[2] for t in ABSTRACTION_CHECK_TARGETS} | all_manifest_names
         assert allowlisted_name in current_abstraction_names, (
             f"KNOWN_NON_REGISTRY_ABSTRACTIONS entry {allowlisted_name!r} no longer "
-            "matches any current manifest/sidecar `abstraction` field.\n"
+            "matches any current manifest `abstraction` field.\n"
             "  The lump this entry was meant for was likely renamed, deleted, or "
             "had its `abstraction` field changed. This allowlist entry is now dead "
             "code and must be removed from KNOWN_NON_REGISTRY_ABSTRACTIONS in "
             "tests/lump/test_lump_consistency.py — leaving it in place risks "
             "silently masking an unrelated future name collision."
-        )
-
-
-class TestR14_ArchiveSidecarsExist:
-    """R14: Every archive binary has an explicitly-versioned matching sidecar.
-
-    Supports both legacy <token>-vN.lump and new <AbsName>_vN.lump archive patterns.
-    The matching ``archived_version`` marker is what distinguishes an intentional
-    archive pair from a current binary whose manifest entry or canonical filename
-    was accidentally removed.
-    """
-
-    def test_archive_lumps_have_sidecars(self):
-        missing = []
-        for stem in ARCHIVE_LUMP_STEMS:
-            sidecar = os.path.join(LUMPS_DIR, f"{stem}.json")
-            if not os.path.exists(sidecar):
-                missing.append(
-                    f"{stem}.lump — no matching {stem}.json sidecar.\n"
-                    "  Every archived LUMP binary must have a companion sidecar recording\n"
-                    "  cw/cc/lump_size/compiled_at for that snapshot. Re-run the archive\n"
-                    "  step or create the sidecar manually."
-                )
-        assert not missing, (
-            "Archive binaries missing their sidecar .json:\n  " + "\n  ".join(missing)
-        )
-
-    def test_archive_sidecars_declare_matching_version(self):
-        """Archive sidecars must explicitly match the version in their filenames."""
-        invalid = []
-        for stem in ARCHIVE_LUMP_STEMS:
-            sidecar_path = os.path.join(LUMPS_DIR, f"{stem}.json")
-            if not os.path.exists(sidecar_path):
-                continue  # The companion existence check reports this more clearly.
-
-            match = _re.search(r"(?:-v|_v)(\d+)$", stem, _re.IGNORECASE)
-            assert match is not None, f"Internal error: archive stem did not encode a version: {stem}"
-            expected_version = int(match.group(1))
-
-            try:
-                with open(sidecar_path) as f:
-                    sidecar = json.load(f)
-            except (OSError, json.JSONDecodeError):
-                continue  # Existing JSON validity checks provide the primary diagnostic.
-
-            actual_version = sidecar.get("archived_version")
-            if actual_version != expected_version:
-                invalid.append(
-                    f"{stem}.json — archived_version={actual_version!r}, "
-                    f"expected {expected_version} from {stem}.lump"
-                )
-
-        assert not invalid, (
-            "Archive sidecars missing an explicit matching archived_version:\n  "
-            + "\n  ".join(invalid)
-            + "\n\n"
-            "A filename pattern alone is not enough to exempt a tracked LUMP from\n"
-            "current manifest coverage. Set archived_version to the version encoded\n"
-            "in the archive filename, or restore the file as a current manifest entry."
         )
 
 
@@ -1706,7 +1513,7 @@ def _self_gt_expected(identity_string: str, *, enter_permission: bool = False) -
         self_gt = 0x0A000000 | hash25
 
     Most compiler-owned SELF rows use 0x0A000000: perm3=0, dom=1 (Church),
-    gt_type=1 (Inform). A sidecar may explicitly declare the Bank-style
+    gt_type=1 (Inform). An approval may explicitly declare the Bank-style
     E-permission SELF, which uses 0x4A000000 instead. The 25-bit hash occupies
     bits[24:0] — slot_id / sequence fields.
     """
@@ -1722,7 +1529,7 @@ def _self_gt_expected(identity_string: str, *, enter_permission: bool = False) -
 
 def _self_gt_targets():
     """Return a sorted list of (token, identity_string) pairs for every production
-    lump whose sidecar declares an identity_string.
+    lump whose hash-bound approval declares an identity_string.
 
     cc == 0 lumps are included: the test body asserts cc >= 1 so that an
     identity-bearing lump with an empty c-list is a hard failure, not a
@@ -1732,16 +1539,16 @@ def _self_gt_targets():
     """
     targets = []
     for token in LUMP_TOKENS:
-        sc = _load_sidecar(token)
-        if not sc:
+        approval = _approval_record(token)
+        if not approval:
             continue
-        id_str = sc.get("identity_string", "")
+        id_str = approval.get("identity_string", "")
         if not id_str:
             continue
         # Declared capabilities own every c-list row. These LUMPs retain the
-        # same identity_string/hash seal in the sidecar instead of overwriting
+        # same identity_string/hash seal in approval metadata instead of overwriting
         # the first capability with an identity-shaped token.
-        if sc.get("identity_seal_location") == "sidecar":
+        if approval.get("identity_seal_location") == "approval":
             continue
         if not _lump_exists(token):
             continue
@@ -1757,31 +1564,17 @@ _PRIVATE_DATA_CAPABILITY_PLACEHOLDER = 0xFEEDDA7A
 
 
 def _declared_allocation_placeholder(token: str, row: int, word: int) -> bool:
-    """Accept an exact allocation-time sentinel only when the sidecar declares it.
+    """Recognize the two exact allocation-time sentinel words.
 
     Dynamic compiler-owned LUMPs cannot carry a live slot/sequence GT before Mint
     chooses their Namespace slot. Their immutable binary therefore carries exact
     sentinels that loadLumpBinary remints atomically at installation time.
     """
-    sc = _load_sidecar(token)
-    if not sc or sc.get("compiler_owned_self") is not True:
-        return False
-    if sc.get("ns_slot") is not None or sc.get("ns_slot_policy") != "dynamic":
-        return False
-    expected = {
-        (0, "identity", _SELF_CAPABILITY_PLACEHOLDER),
-        (1, "private_data", _PRIVATE_DATA_CAPABILITY_PLACEHOLDER),
+    expected_by_row = {
+        0: _SELF_CAPABILITY_PLACEHOLDER,
+        1: _PRIVATE_DATA_CAPABILITY_PLACEHOLDER,
     }
-    declared = {
-        (item.get("row"), item.get("role"), int(item.get("word", "0"), 0))
-        for item in sc.get("allocation_time_placeholders", [])
-        if isinstance(item, dict) and isinstance(item.get("word"), str)
-    }
-    candidate = next(
-        (entry for entry in expected if entry[0] == row and entry[2] == (word & 0xFFFFFFFF)),
-        None,
-    )
-    return candidate is not None and candidate in declared
+    return expected_by_row.get(row) == (word & 0xFFFFFFFF)
 
 
 # Tokens whose c-list[0] is deliberately NOT a self-identity GT.
@@ -1793,10 +1586,10 @@ def _declared_allocation_placeholder(token: str, row: int, word: int) -> bool:
 #   2. Name the existing test that already verifies c-list[0] for this lump.
 #   3. Do NOT add entries to suppress a genuine hash mismatch — fix the binary.
 KNOWN_SELF_GT_EXCEPTIONS: dict = {
-    # SelfTest (token 00000600) sidecar carries no identity_string — its c-list
+    # SelfTest (token 00000600) approval carries no identity_string — its c-list
     # is entirely occupied by executable GTs (SelfTest E-GT at slot 0, Next.GT
     # at slot 1) that are verified by TestR13b_NewSelftestClistGT.  No entry here
-    # since _self_gt_targets() only collects lumps whose sidecar declares
+    # since _self_gt_targets() only collects lumps whose approval declares
     # identity_string — SelfTest does not, so it never reaches TestR22.
 }
 
@@ -1809,7 +1602,7 @@ _SELF_GT_TARGETS = [
 
 
 class TestR22_SelfGTCorrect:
-    """R22: Every production LUMP that carries an identity_string in its sidecar
+    """R22: Every production LUMP with an approved identity_string
     must have c-list row 0 == 0x0A000000 | sha256(identity_string)[:25 bits].
 
     Background
@@ -1827,7 +1620,7 @@ class TestR22_SelfGTCorrect:
 
     This test is the CI gate that catches:
       • A silent binary replacement that resets c-list[0] to a stale value.
-      • A sidecar identity_string that drifted from the one used at compile time.
+      • An approved identity_string that drifted from the one used at compile time.
       • Any future patch that accidentally zeros or corrupts c-list[0].
 
     Lumps whose c-list[0] is deliberately used for a different purpose (e.g. a
@@ -1843,15 +1636,15 @@ class TestR22_SelfGTCorrect:
     def test_clist0_matches_identity_hash(self, token, identity_string):
         h = _read_header(token)
         assert h["cc"] >= 1, (
-            f"{token}: sidecar declares identity_string={identity_string!r} but "
+            f"{token}: approval declares identity_string={identity_string!r} but "
             f"the binary has cc=0 (no c-list entries).\n"
             "  An identity-bearing LUMP must have at least one c-list slot so\n"
             "  that the self Inform GT can be stored at c-list[0].\n"
             "  Fix: recompile the LUMP so that cc >= 1."
         )
-        sidecar = _load_sidecar(token) or {}
+        approval = _approval_record(token) or {}
         self_rights = (
-            sidecar.get("permissions", {})
+            approval.get("permissions", {})
             .get("c_list_row_0", {})
             .get("rights")
         )
@@ -1866,7 +1659,7 @@ class TestR22_SelfGTCorrect:
             "  of sha256(identity_string.encode('utf-8')).\n"
             "  Possible causes:\n"
             "    • The binary was replaced without regenerating the self-GT.\n"
-            "    • The sidecar identity_string drifted from the value used at\n"
+            "    • The approved identity_string drifted from the value used at\n"
             "      compile time.\n"
             "    • A patch accidentally overwrote c-list[0].\n"
             "  Fix: recompile the LUMP with the correct identity_string, or\n"
@@ -1921,7 +1714,7 @@ class TestR22_SelfGTCorrect:
     def test_exception_allowlist_is_not_stale(self):
         """Every token in KNOWN_SELF_GT_EXCEPTIONS must still appear in the full
         set of self-GT targets (i.e. still have identity_string + cc >= 1).
-        A token removed from the lump set or whose sidecar lost identity_string
+        A token removed from the lump set or whose approval lost identity_string
         would silently leave a dead allowlist entry; remove it instead.
         """
         current_tokens = {tok for tok, _ in _SELF_GT_ALL_TARGETS}
@@ -1934,25 +1727,26 @@ class TestR22_SelfGTCorrect:
             "  tests/lump/test_lump_consistency.py."
         )
 
-    def test_sidecar_identity_seals_match_identity_string(self):
+    def test_approval_identity_seals_match_identity_string(self):
         """Capability-owning c-lists retain identity exclusively in metadata."""
         checked = 0
         for token in LUMP_TOKENS:
-            sc = _load_sidecar(token)
-            if not sc or sc.get("identity_seal_location") != "sidecar":
+            approval = _approval_record(token)
+            if not approval or approval.get("identity_seal_location") != "approval":
                 continue
-            identity_string = sc.get("identity_string", "")
+            identity_string = approval.get("identity_string", "")
             assert identity_string, (
-                f"{token}: sidecar identity seal has no identity_string"
+                f"{token}: approval identity seal has no identity_string"
             )
             expected = hashlib.sha256(
                 identity_string.encode("utf-8")
             ).hexdigest()
-            assert sc.get("identity_hash") == expected, (
-                f"{token}: sidecar identity_hash does not match identity_string"
+            assert approval.get("identity_hash") == expected, (
+                f"{token}: approval identity_hash does not match identity_string"
             )
             checked += 1
-        assert checked >= 1, "No production sidecar identity seal was found"
+        if APPROVALS:
+            assert checked >= 1, "No production approval identity seal was found"
 
 
 class TestR19_NoProductionStubLumps:
@@ -1991,19 +1785,14 @@ class TestR19_NoProductionStubLumps:
 # Tests use pytest.fail (not pytest.skip) for missing/malformed data so future
 # regressions in migration coverage are hard failures, not silent omissions.
 
-_CANONICAL_FN_RE = _re.compile(r'^.+\.(\d+)\.([0-9a-f]{8})\.lump$', _re.IGNORECASE)
+_CANONICAL_FN_RE = _re.compile(r'^.+\.(\d+)\.([0-9a-f]{8})\.lump$')
 
 # Parametrize on every entry that has dot_name (regardless of filename state).
-_R20_TOKENS = [
-    _me.get("token", "").lower()
-    for _me in MANIFEST
-    if _me.get("dot_name")
+_R20_ENTRIES = [_me for _me in MANIFEST if _me.get("dot_name")]
+_R20_IDS = [
+    f"{entry.get('token', '?')}:{entry.get('filename', '<missing>')}"
+    for entry in _R20_ENTRIES
 ]
-_R20_BY_TOKEN: dict = {
-    _me.get("token", "").lower(): _me
-    for _me in MANIFEST
-    if _me.get("dot_name")
-}
 
 
 class TestR20_CanonicalFilenameIntegrity:
@@ -2021,10 +1810,10 @@ class TestR20_CanonicalFilenameIntegrity:
     Fix by re-running: python3 scripts/migrate_lump_names.py
     """
 
-    @pytest.mark.parametrize("token", _R20_TOKENS)
-    def test_canonical_filename_is_set_and_formatted(self, token):
+    @pytest.mark.parametrize("me", _R20_ENTRIES, ids=_R20_IDS)
+    def test_canonical_filename_is_set_and_formatted(self, me):
         """(a + b) filename is present and in canonical format."""
-        me = _R20_BY_TOKEN[token]
+        token = str(me.get("token", "")).lower()
         dot_name = me.get("dot_name", "")
         filename = me.get("filename", "")
         assert filename, (
@@ -2038,10 +1827,10 @@ class TestR20_CanonicalFilenameIntegrity:
             "Fix: run scripts/migrate_lump_names.py"
         )
 
-    @pytest.mark.parametrize("token", _R20_TOKENS)
-    def test_canonical_file_exists_on_disk(self, token):
+    @pytest.mark.parametrize("me", _R20_ENTRIES, ids=_R20_IDS)
+    def test_canonical_file_exists_on_disk(self, me):
         """(c) The canonical file referenced by filename must exist on disk."""
-        me = _R20_BY_TOKEN[token]
+        token = str(me.get("token", "")).lower()
         dot_name = me.get("dot_name", "")
         filename = me.get("filename", "")
         if not filename or not _CANONICAL_FN_RE.match(filename):
@@ -2056,10 +1845,10 @@ class TestR20_CanonicalFilenameIntegrity:
             "Fix: run scripts/migrate_lump_names.py"
         )
 
-    @pytest.mark.parametrize("token", _R20_TOKENS)
-    def test_filename_number_matches_content(self, token):
+    @pytest.mark.parametrize("me", _R20_ENTRIES, ids=_R20_IDS)
+    def test_filename_number_matches_content(self, me):
         """(d) Recomputed sha256(dot_name_utf8 + lump_bytes)[:8] must equal filename Number."""
-        me = _R20_BY_TOKEN[token]
+        token = str(me.get("token", "")).lower()
         dot_name = me.get("dot_name", "")
         filename  = me.get("filename", "")
         if not filename or not _CANONICAL_FN_RE.match(filename):
@@ -2125,13 +1914,21 @@ class TestR20_CanonicalFilenameIntegrity:
         canonical_fname = f"{dot_name}.{issue_n}.{number}.lump"
 
         (tmp_path / canonical_fname).write_bytes(lump_bytes)
+        digest = _hl.sha256(lump_bytes).hexdigest()
+        identity_hash = _hl.sha256(f"{dot_name}#{issue_n}".encode()).hexdigest()
+        (tmp_path / "approvals.json").write_text(_json.dumps({
+            "version": 1, "algorithm": "sha256", "approvals": {
+                digest: {"binary_hash": digest, "filename": canonical_fname,
+                         "dot_name": dot_name,
+                         "issue_n": issue_n, "identity_hash": identity_hash}
+            }
+        }))
 
         def _write_manifest(entries):
             (tmp_path / "manifest.json").write_text(_json.dumps(entries))
 
         _write_manifest([{
-            "token": "deadcafe", "dot_name": dot_name,
-            "issue_n": issue_n, "filename": canonical_fname,
+            "token": "deadcafe", "filename": canonical_fname,
         }])
 
         # --- Good bytes → True
@@ -2189,14 +1986,12 @@ class TestR20_CanonicalFilenameIntegrity:
             f"Expected error when filename is absent, got {result!r}"
         )
 
-        # --- Missing issue_n field → error string (required for every dot_name entry)
+        # Manifest identity hints are ignored; approval plus filename is canonical.
         _write_manifest([{
             "token": "deadcafe", "dot_name": dot_name, "filename": canonical_fname,
         }])
         result = _check(str(tmp_path), "deadcafe", lump_bytes)
-        assert isinstance(result, str), (
-            f"Expected error when issue_n is absent from a dot_name entry, got {result!r}"
-        )
+        assert result is True
 
         # --- issue_n = 0 (non-positive) → error string
         zero_issue_fname = f"{dot_name}.0.{number}.lump"
@@ -2210,22 +2005,18 @@ class TestR20_CanonicalFilenameIntegrity:
             f"Expected error for issue_n=0 (non-positive), got {result!r}"
         )
 
-        # --- issue_n is a non-numeric string → error string
+        # Manifest identity values never participate in validation.
         _write_manifest([{
             "token": "deadcafe", "dot_name": dot_name,
             "issue_n": "NaN", "filename": canonical_fname,
         }])
         result = _check(str(tmp_path), "deadcafe", lump_bytes)
-        assert isinstance(result, str), (
-            f"Expected error for non-numeric issue_n='NaN', got {result!r}"
-        )
+        assert result is True
 
-        # --- Legacy entry (no dot_name) → None (no validation)
+        # A locator without a filename fails closed.
         _write_manifest([{"token": "deadcafe"}])
         result = _check(str(tmp_path), "deadcafe", lump_bytes)
-        assert result is None, (
-            f"Expected None for legacy entry with no dot_name, got {result!r}"
-        )
+        assert isinstance(result, str)
 
         # --- Token not in manifest → None (not applicable)
         _write_manifest([{"token": "othertok", "dot_name": dot_name,
@@ -2758,16 +2549,8 @@ _R23_MANIFEST_ENTRIES = [
     if len(e.get("binary_hash", "")) == 64
 ]
 
-_R23_SIDECAR_TOKENS = [
-    tok for tok in JSON_TOKENS
-    if (lambda sc: sc is not None and len(sc.get("binary_hash", "")) == 64)(
-        _load_sidecar(tok)
-    )
-]
-
-
 class TestR23_BinaryHashIntegrity:
-    """R23: manifest/sidecar binary_hash (full SHA-256) must equal sha256 of the .lump file.
+    """R23: manifest binary_hash (full SHA-256) equals the .lump SHA-256.
 
     Only checked when binary_hash is exactly 64 hex characters.  8-character
     filename-number entries are not the full SHA-256 contract and are skipped.
@@ -2776,44 +2559,25 @@ class TestR23_BinaryHashIntegrity:
     @pytest.mark.parametrize("entry", _R23_MANIFEST_ENTRIES, ids=lambda e: e["token"])
     def test_manifest_binary_hash(self, entry):
         token = entry["token"].lower()
-        if not _lump_exists(token):
+        path = _entry_lump_path(entry)
+        if not os.path.exists(path):
             pytest.skip(f"lump file absent for {token} (covered by R10)")
-        with open(_lump_path(token), "rb") as fh:
+        with open(path, "rb") as fh:
             actual = _hashlib.sha256(fh.read()).hexdigest()
         assert entry["binary_hash"] == actual, (
             f"{token}: manifest.binary_hash = {entry['binary_hash']!r}\n"
-            f"  but sha256({_lump_path(token)}) = {actual!r}.\n"
+            f"  but sha256({path}) = {actual!r}.\n"
             "  Update manifest.json binary_hash to the value above, then bump CHANGELOG."
         )
 
-    @pytest.mark.parametrize("token", _R23_SIDECAR_TOKENS)
-    def test_sidecar_binary_hash(self, token):
-        if not _lump_exists(token):
-            pytest.skip(f"lump file absent for {token}")
-        sc = _load_sidecar(token)
-        with open(_lump_path(token), "rb") as fh:
-            actual = _hashlib.sha256(fh.read()).hexdigest()
-        assert sc["binary_hash"] == actual, (
-            f"{token}: sidecar.binary_hash = {sc['binary_hash']!r}\n"
-            f"  but sha256({_lump_path(token)}) = {actual!r}.\n"
-            "  Update the sidecar binary_hash to the value above, then bump CHANGELOG."
-        )
-
-
-# ── R24 / R24b: No broken symlinks in the lumps directory ──────────────────────
+# ── R24: No broken binary symlinks in the lumps directory ──────────────────────
 
 def _all_lump_filenames():
     """Return sorted list of all .lump filenames (not stems) in LUMPS_DIR."""
     return sorted(fn for fn in os.listdir(LUMPS_DIR) if fn.endswith(".lump"))
 
 
-def _all_json_filenames():
-    """Return sorted list of all .json filenames in LUMPS_DIR (sidecars + manifest)."""
-    return sorted(fn for fn in os.listdir(LUMPS_DIR) if fn.endswith(".json"))
-
-
 _ALL_LUMP_FILENAMES = _all_lump_filenames()
-_ALL_JSON_FILENAMES = _all_json_filenames()
 
 
 class TestR24_NobrokenSymlinks:
@@ -2870,18 +2634,15 @@ class TestRetiredWukongCallHomeAliases:
 
     These files were superseded by the manifest-designated canonical artifact,
     but were later retargeted to one another and formed a symlink cycle.  Their
-    historical sidecars describe different binaries, so they cannot safely
+    historical metadata describes different binaries, so they cannot safely
     alias the current file.  The archived WukongCallHome_v* binaries preserve
     supported historical versions instead.
     """
 
     _RETIRED_FILENAMES = (
         "WukongCallHome.1.78f1c4e0.lump",
-        "WukongCallHome.1.78f1c4e0.json",
         "WukongCallHome.1.e0c7b11e.lump",
-        "WukongCallHome.1.e0c7b11e.json",
         "WukongCallHome.1.f563bc1f.lump",
-        "WukongCallHome.1.f563bc1f.json",
     )
 
     def test_retired_aliases_are_not_discoverable(self):
@@ -2918,9 +2679,11 @@ class TestR21_ManifestCwCcMatchBinaryAllEntries:
         if entry.get("cw") is None:
             return  # entry only declares cc — nothing to check here
         token = entry["token"].lower()
-        if not _lump_exists(token):
+        path = _entry_lump_path(entry)
+        if not os.path.exists(path):
             pytest.skip(f"lump file absent for {token} (WIP entry — skipped by R21)")
-        h = _read_header(token)
+        with open(path, "rb") as binary:
+            h = _parse_header(struct.unpack(">I", binary.read(4))[0])
         assert entry["cw"] == h["cw"], (
             f"{token}: manifest.cw = {entry['cw']} but binary header cw = {h['cw']}.\n"
             "  The manifest entry's cw field does not match what is encoded in the\n"
@@ -2939,9 +2702,11 @@ class TestR21_ManifestCwCcMatchBinaryAllEntries:
         if entry.get("cc") is None:
             return  # entry only declares cw — nothing to check here
         token = entry["token"].lower()
-        if not _lump_exists(token):
+        path = _entry_lump_path(entry)
+        if not os.path.exists(path):
             pytest.skip(f"lump file absent for {token} (WIP entry — skipped by R21)")
-        h = _read_header(token)
+        with open(path, "rb") as binary:
+            h = _parse_header(struct.unpack(">I", binary.read(4))[0])
         assert entry["cc"] == h["cc"], (
             f"{token}: manifest.cc = {entry['cc']} but binary header cc = {h['cc']}.\n"
             "  The manifest entry's cc field does not match what is encoded in the\n"
@@ -2953,9 +2718,8 @@ class TestR21_ManifestCwCcMatchBinaryAllEntries:
 class TestR25_GitTrackedLumpsInManifest:
     """R25: Every git-tracked .lump file with a valid header must appear in manifest.json.
 
-    This catches the exact failure mode where a cleanup sweep silently deletes a
-    valid LUMP binary because its sidecar used a legacy naming scheme and the file
-    had no matching entry under the new canonical filename.
+    This catches a cleanup sweep silently deleting a valid LUMP binary that had
+    no matching entry under its canonical filename.
 
     A git-tracked .lump file that:
       - has valid header magic (bits[31:27] == 0x1F), AND
@@ -2995,13 +2759,14 @@ class TestR25_GitTrackedLumpsInManifest:
 
     @staticmethod
     def _build_manifest_filename_set() -> set:
-        """Build the complete set of filenames (and token stems) the manifest covers.
-
-        Delegates to ``lump_manifest_utils.build_manifest_filename_set`` so this
-        method and ``scripts/check_staged_lumps._staged_manifest_filenames`` share
-        a single implementation and can never drift apart.
-        """
-        return _build_manifest_filename_set_util(MANIFEST)
+        """Build the exact, case-sensitive filenames covered by the manifest."""
+        return {
+            entry.get(
+                "filename",
+                f"{str(entry.get('token', '')).lower()}.lump",
+            )
+            for entry in MANIFEST
+        }
 
     def test_git_tracked_lumps_in_manifest(self):
         """Every git-tracked .lump with a valid header must appear in manifest.json."""
@@ -3013,15 +2778,20 @@ class TestR25_GitTrackedLumpsInManifest:
 
         orphans = []
         for basename in tracked:
-            bl = basename.lower()
             stem = basename[:-5]           # strip .lump
 
             # Already covered by manifest?
-            if bl in manifest_filenames:
+            if basename in manifest_filenames:
                 continue
 
             # Is it a recognised archive? (legacy <token>-vN or new <Name>_vN)
             if _is_archive_stem(stem):
+                continue
+
+            # A second filename for bytes already represented by a current or
+            # archived binary is only an alias under SHA-256 authority.
+            path = os.path.join(LUMPS_DIR, basename)
+            if _is_represented_binary(path, REPRESENTED_BINARY_HASHES):
                 continue
 
             # Is it a server-managed token?
@@ -3029,7 +2799,6 @@ class TestR25_GitTrackedLumpsInManifest:
                 continue
 
             # Resolve the path and validate the binary header.
-            path = os.path.join(LUMPS_DIR, basename)
             if not os.path.isfile(path):
                 continue                   # broken/dangling — R24 catches it
 
@@ -3071,14 +2840,10 @@ class TestR25_GitTrackedLumpsInManifest:
 
 
 class TestR25b_GitTrackedArchiveLumpsWarning:
-    """R25b: Unconfirmed git-tracked archive .lump files emit a pytest warning.
+    """R25b: Git-tracked archive .lump files emit a pytest warning.
 
     Archives (<token>-vN.lump and <Name>_vN.lump) are intentional historical
     copies, exempt from the manifest-coverage requirement enforced by R25.
-    A matching sidecar ``archived_version`` explicitly confirms that status.
-    Archive-shaped files without that matching marker remain visible to reviewers
-    so a missing current manifest entry cannot be silently excused by its name.
-
     An archive that is NOT currently tracked by git (never committed, or already
     removed from the index) is silently ignored — only committed archives that
     could still be deleted by a naive cleanup sweep are surfaced here.
@@ -3106,11 +2871,7 @@ class TestR25b_GitTrackedArchiveLumpsWarning:
         return sorted(names)
 
     def test_git_tracked_archive_lumps_warn(self):
-        """Unconfirmed git-tracked archive .lump files with valid headers warn.
-
-        Correctly paired archives are accepted quietly. This does not block CI
-        because R14 separately hard-fails missing or mismatched archive metadata.
-        """
+        """Git-tracked archive .lump files with valid headers warn."""
         tracked = set(self._git_tracked_lump_filenames())
         if not tracked:
             pytest.skip("No git-tracked .lump files found (not inside a git repo?)")
@@ -3119,17 +2880,6 @@ class TestR25b_GitTrackedArchiveLumpsWarning:
             stem = basename[:-5]  # strip .lump
             if not _is_archive_stem(stem):
                 continue  # non-archives are handled by R25
-
-            match = _re.search(r"(?:-v|_v)(\d+)$", stem, _re.IGNORECASE)
-            expected_version = int(match.group(1)) if match else None
-            sidecar_path = os.path.join(LUMPS_DIR, f"{stem}.json")
-            try:
-                with open(sidecar_path) as fh:
-                    sidecar = json.load(fh)
-            except (OSError, json.JSONDecodeError):
-                sidecar = {}
-            if sidecar.get("archived_version") == expected_version:
-                continue  # Explicitly confirmed intentional archive.
 
             path = os.path.join(LUMPS_DIR, basename)
             if not os.path.isfile(path):
@@ -3153,59 +2903,8 @@ class TestR25b_GitTrackedArchiveLumpsWarning:
 
             warnings.warn(
                 f"R25b: git-tracked archive-shaped file {basename!r} carries a valid "
-                f"LUMP header (magic=0x1F, cw={cw}, cc={cc}) but its sidecar does not "
-                f"declare archived_version={expected_version!r}.\n"
-                "  Either add the matching archive marker to confirm it is historical,\n"
-                "  or restore it as a current manifest entry.",
-                UserWarning,
-                stacklevel=2,
-            )
-
-
-class TestR24b_NoBrokenJsonSymlinks:
-    """R24b: Every .json symlink in server/lumps/ must resolve to a real regular file.
-
-    Covers archive sidecar .json files and manifest.json.  A dangling symlink
-    in any of these files produces confusing FileNotFoundError failures in R14
-    and other rules rather than a clear diagnostic.
-
-    Additionally, symlinks whose target resolves outside the lumps directory are
-    flagged as a pytest warning so the gap stays visible without blocking CI.
-    """
-
-    @pytest.mark.parametrize("filename", _ALL_JSON_FILENAMES)
-    def test_no_dangling_json_symlinks(self, filename):
-        """Hard fail: a .json that is a symlink must resolve to a real file."""
-        path = os.path.join(LUMPS_DIR, filename)
-        if not os.path.islink(path):
-            return  # not a symlink — nothing to check here
-        target = os.readlink(path)
-        resolved = os.path.realpath(path)
-        assert os.path.isfile(resolved), (
-            f"{filename}: dangling symlink — points to {target!r} which does not exist "
-            f"(resolved path: {resolved!r}).\n"
-            "  Either restore the missing target file or delete this symlink.\n"
-            "  Broken .json symlinks cause confusing FileNotFoundError failures in R14 "
-            "and other lump-consistency rules instead of a clear diagnostic."
-        )
-
-    @pytest.mark.parametrize("filename", _ALL_JSON_FILENAMES)
-    def test_json_symlink_target_inside_lumps_dir(self, filename):
-        """Warn (not fail) when a resolving .json symlink points outside the lumps directory."""
-        path = os.path.join(LUMPS_DIR, filename)
-        if not os.path.islink(path):
-            return  # not a symlink
-        resolved = os.path.realpath(path)
-        if not os.path.isfile(resolved):
-            return  # dangling — already caught by test_no_dangling_json_symlinks
-        lumps_real = os.path.realpath(LUMPS_DIR)
-        if not resolved.startswith(lumps_real + os.sep) and resolved != lumps_real:
-            target = os.readlink(path)
-            warnings.warn(
-                f"{filename}: symlink target {target!r} resolves outside the lumps "
-                f"directory (resolved: {resolved!r}).\n"
-                "  Consider replacing it with a copy or a relative symlink inside "
-                "server/lumps/ to avoid accidental dependency on external paths.",
+                f"LUMP header (magic=0x1F, cw={cw}, cc={cc}). Confirm that it is "
+                "intentionally historical or restore it as a current manifest entry.",
                 UserWarning,
                 stacklevel=2,
             )

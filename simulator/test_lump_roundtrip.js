@@ -496,6 +496,7 @@ const {
     lumpBuildContentFrame,
     lumpDecodeContentFrameApi,
     lumpDecodeContentFrame,
+    lumpInspectContentFrame,
 } = require('./lump-content-frame.js');
 
 // ── buildTestLumpBinary: wrap production frame into a minimal LUMP binary ─────
@@ -681,6 +682,7 @@ async function buildTestLumpBinary(codeWords, apiObj, srcText, profile) {
             await buildTestLumpBinary(CODE_WORDS, API_OBJ, SOURCE_TEXT, 'api');
         const recovered = await lumpDecodeContentFrame(binary);
         const api = lumpDecodeContentFrameApi(binary);
+        const inspection = await lumpInspectContentFrame(binary);
         check('T-RT-FS04a: API-only profile writes flags=0x00',
               flags === 0x00 && (((binary[fsStart] >>> 0) >>> 16) & 0xFF) === 0x00);
         check('T-RT-FS04b: API-only profile has no recoverable source', recovered === null);
@@ -689,9 +691,27 @@ async function buildTestLumpBinary(codeWords, apiObj, srcText, profile) {
         check('T-RT-FS04d: embedded API omits circular token and issue fields',
               api && !Object.prototype.hasOwnProperty.call(api, 'token') &&
               !Object.prototype.hasOwnProperty.call(api, 'issue'));
+        check('T-RT-FS04e: inspection distinguishes valid API-only content',
+              inspection.contentFrameValid && inspection.profile === 'api' &&
+              inspection.sourceEmbedded === false && inspection.source === null);
     } catch (err) {
         console.log(`FAIL T-RT-FS04 (exception): ${err}`);
         fail++;
+    }
+
+    console.log('\n--- T-RT-FS06: legacy content is explicitly unavailable ---');
+    {
+        const legacy = new Array(64).fill(0);
+        legacy[0] = ((0x1F << 27) | (1 << 10)) >>> 0;
+        legacy[1] = 0xF8000000;
+        const inspection = await lumpInspectContentFrame(legacy);
+        check('T-RT-FS06a: legacy header remains structurally valid',
+              inspection.headerValid === true);
+        check('T-RT-FS06b: legacy binary has no content frame',
+              inspection.contentFramePresent === false &&
+              inspection.contentFrameValid === false);
+        check('T-RT-FS06c: legacy unavailability is reported clearly',
+              /Legacy LUMP/.test(inspection.error || ''));
     }
 
     // ── T-RT-FS05: Compact profile removes comments but remains recoverable ───

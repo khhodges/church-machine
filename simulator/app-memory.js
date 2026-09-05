@@ -1034,15 +1034,15 @@ function updateCRDetail() {
         const _owAbs = (sim.abstractionRegistry && _absName)
             ? (sim.abstractionRegistry.getByName ? sim.abstractionRegistry.getByName(_absName) : null)
             : null;
-        const _owSidecar = _findSrcLump(nsIdx, _absName);
+        const _owApproval = _findSrcLump(nsIdx, _absName);
         html += '<div class="crd-lump-section">';
         html += '<div class="crd-lump-section-label">Ownership</div>';
         if (_mfst) {
             html += '<table class="cr-table cr-detail-words"><tbody>';
             const _owRows = [
                 ['Name',           _absName],
-                ['Author',         _owSidecar && _owSidecar.author],
-                ['Version',        _owSidecar && _owSidecar.version],
+                ['Author',         _owApproval && _owApproval.author],
+                ['Version',        _owApproval && _owApproval.version],
                 ['Profile',        _mfst.profile],
                 ['Grants',         Array.isArray(_mfst.grants) && _mfst.grants.length ? _mfst.grants.join(', ') : (_mfst.grants || null)],
                 ['Built at',       _mfst.deployment && _mfst.deployment.built_at],
@@ -1078,11 +1078,11 @@ function updateCRDetail() {
                 html += `<tr><td style="color:var(--church-blue)">Methods</td><td style="font-size:0.82rem;">${_owAbs.methods.map(_escHtml).join(', ')}</td></tr>`;
             }
             html += '</tbody></table>';
-        } else if (_owSidecar && (_owSidecar.author || _owSidecar.version)) {
+        } else if (_owApproval && (_owApproval.author || _owApproval.version)) {
             html += '<table class="cr-table cr-detail-words"><tbody>';
             html += `<tr><td style="color:var(--church-blue);width:130px;">Name</td><td>${_escHtml(_absName)}</td></tr>`;
-            if (_owSidecar.author) html += `<tr><td style="color:var(--church-blue)">Author</td><td>${_escHtml(_owSidecar.author)}</td></tr>`;
-            if (_owSidecar.version) html += `<tr><td style="color:var(--church-blue)">Version</td><td>${_escHtml(_owSidecar.version)}</td></tr>`;
+            if (_owApproval.author) html += `<tr><td style="color:var(--church-blue)">Author</td><td>${_escHtml(_owApproval.author)}</td></tr>`;
+            if (_owApproval.version) html += `<tr><td style="color:var(--church-blue)">Version</td><td>${_escHtml(_owApproval.version)}</td></tr>`;
             html += '</tbody></table>';
         } else {
             html += '<div style="color:var(--text-secondary);font-style:italic;">(no ownership metadata \u2014 compile and publish to add)</div>';
@@ -3310,11 +3310,11 @@ function _initNSBolt() {
 // the programmer's chosen load mode, slot, policy and GT type.
 
 // Module-level state shared between _nsTableAdd and _nsTableAddConfirm.
-window._nsAddCurrentSidecar  = null;   // sidecar object for currently-selected LUMP
+window._nsAddCurrentApproval = null;   // hash-bound approval view for selected LUMP
 window._nsAddAvailableList   = null;   // full _available array from last list fetch
 window._nsAddCurrentWords        = null;   // cached words[] from per-selection /words fetch
 window._nsAddCurrentToken        = null;   // token these cached words belong to
-window._nsAddCurrentDetailSidecar = null;  // full sidecar from /api/lumps/<token>/detail
+window._nsAddCurrentInspection = null; // immutable-binary inspection for selected LUMP
 
 // Persistent token-keyed cache for ns_slot_policy / ns_slot choices made by the
 // programmer.  Unlike the per-modal state above, this is intentionally NOT cleared
@@ -3328,20 +3328,20 @@ window._nsPersistedSlotMeta = window._nsPersistedSlotMeta || {};
 // _nsPopulateAddMeta (cache overlay) and _nsTableAddConfirm (persist-on-install)
 // without any DOM or fetch dependency.
 //
-// _nsSlotPolicyResolve: given a sidecar, a token, and the persistent cache,
+// _nsSlotPolicyResolve: given approved display hints, a token, and Namespace state,
 //   return the { nsSlotVal, policy } pair that the ADD modal should display.
 //   Mirrors the overlay block at the top of _nsPopulateAddMeta.
-function _nsSlotPolicyResolve(detailSidecar, token, nsPersistedSlotMeta) {
+function _nsSlotPolicyResolve(approvedMetadata, token, nsPersistedSlotMeta) {
     const _persistedSlotMeta = nsPersistedSlotMeta && nsPersistedSlotMeta[token];
     if (_persistedSlotMeta) {
         if (_persistedSlotMeta.ns_slot_policy !== undefined) {
-            detailSidecar = Object.assign({}, detailSidecar, { ns_slot_policy: _persistedSlotMeta.ns_slot_policy });
+            approvedMetadata = Object.assign({}, approvedMetadata, { ns_slot_policy: _persistedSlotMeta.ns_slot_policy });
         }
         if (_persistedSlotMeta.ns_slot !== undefined) {
-            detailSidecar = Object.assign({}, detailSidecar, { ns_slot: _persistedSlotMeta.ns_slot });
+            approvedMetadata = Object.assign({}, approvedMetadata, { ns_slot: _persistedSlotMeta.ns_slot });
         }
     }
-    const rawSlot   = detailSidecar.ns_slot;
+    const rawSlot   = approvedMetadata.ns_slot;
     // Slots above the built-in catalog were formerly used as private,
     // hard-coded identities.  Treat those values as legacy metadata unless
     // the programmer explicitly saved the choice in this session.
@@ -3356,7 +3356,7 @@ function _nsSlotPolicyResolve(detailSidecar, token, nsPersistedSlotMeta) {
         : ((rawSlot !== null && rawSlot !== undefined) ? String(rawSlot) : '');
     const policy    = legacyHighSlot
         ? 'dynamic'
-        : (detailSidecar.ns_slot_policy || (nsSlotVal !== '' ? 'static' : 'dynamic'));
+        : (approvedMetadata.ns_slot_policy || (nsSlotVal !== '' ? 'static' : 'dynamic'));
     return { nsSlotVal, policy };
 }
 // _nsSlotPersistRecord: given the user's chosen policy and the allocated slot,
@@ -3367,17 +3367,50 @@ function _nsSlotPersistRecord(slotPolicy, slot) {
     const patchedSlot   = slotPolicy === 'dynamic' ? null : slot;
     return { patchedPolicy, patchedSlot };
 }
+
+async function _nsHashImmutableWords(words) {
+    if (!Array.isArray(words) || words.length === 0 ||
+        typeof crypto === 'undefined' || !crypto.subtle) {
+        throw new Error('SHA-256 inspection of immutable words is unavailable');
+    }
+    const bytes = new Uint8Array(words.length * 4);
+    words.forEach(function(word, index) {
+        const value = Number(word) >>> 0;
+        bytes[index * 4] = value >>> 24;
+        bytes[index * 4 + 1] = value >>> 16;
+        bytes[index * 4 + 2] = value >>> 8;
+        bytes[index * 4 + 3] = value;
+    });
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest), function(byte) {
+        return byte.toString(16).padStart(2, '0');
+    }).join('');
+}
+
+function _nsMatchingApproval(wordsPayload, listedApproval, binaryHash) {
+    const embeddedApproval = wordsPayload && wordsPayload.approved_metadata;
+    const fromEmbeddedApproval = embeddedApproval && typeof embeddedApproval === 'object';
+    const candidate = embeddedApproval && typeof embeddedApproval === 'object'
+        ? embeddedApproval : listedApproval;
+    if (!candidate || typeof candidate !== 'object') return null;
+    if (!fromEmbeddedApproval && candidate.approved !== true) return null;
+    const record = candidate.metadata && typeof candidate.metadata === 'object'
+        ? Object.assign({}, candidate, candidate.metadata) : candidate;
+    const approvedHash = String(record.binary_hash || record.artifact_hash || '').toLowerCase();
+    return approvedHash === binaryHash && /^[0-9a-f]{64}$/.test(approvedHash)
+        ? record : null;
+}
 /* ---- NS_SLOT_PERSIST_UNIT_TEST_EXPORT_END ---- */
 
 function _nsTableAdd() {
     if (!sim) return;
     const _existing = document.getElementById('_nsAddModalOverlay');
     if (_existing) _existing.remove();
-    window._nsAddCurrentSidecar       = null;
+    window._nsAddCurrentApproval      = null;
     window._nsAddAvailableList        = null;
     window._nsAddCurrentWords         = null;
     window._nsAddCurrentToken         = null;
-    window._nsAddCurrentDetailSidecar = null;
+    window._nsAddCurrentInspection    = null;
 
     // Show loading overlay immediately
     const _overlay = document.createElement('div');
@@ -3453,39 +3486,30 @@ async function _nsPopulateAddMeta(token) {
     const container = document.getElementById('_nsAddMeta');
     if (!container) return;
 
-    const sidecar = (window._nsAddAvailableList || []).find(function(l) { return l.token === token; }) || null;
-    window._nsAddCurrentSidecar = sidecar;
+    const approval = (window._nsAddAvailableList || []).find(function(l) { return l.token === token; }) || null;
 
-    if (!sidecar) { container.innerHTML = ''; return; }
+    if (!approval) { container.innerHTML = ''; return; }
 
-    // ── Per-selection fetch: sidecar detail + binary words in parallel ─────────
-    // Show spinner immediately; replace with panel once both fetches complete.
-    // The /detail endpoint returns the full authoritative sidecar (including
-    // capability permissions / grants that the lean list may omit).
-    // The /words endpoint provides binary-authoritative cw / cc / lumpSize.
+    // ── Per-selection fetch: immutable binary words only ──────────────────────
     container.innerHTML = '<div style="color:#888;font-size:0.78rem;padding:6px 0;">&#9680; Loading LUMP metadata\u2026</div>';
 
     // Disable Install while metadata is loading so confirm cannot run with stale data.
     const _cfBtn = document.getElementById('_nsAddConfirmBtn');
     if (_cfBtn) { _cfBtn.disabled = true; _cfBtn.title = 'Waiting for LUMP metadata\u2026'; }
 
-    // detailSidecar starts as the lean list entry; overridden by /detail response.
-    let detailSidecar = sidecar;
-    let binaryCw      = sidecar.cw  != null ? sidecar.cw  : null;
-    let binaryCc      = sidecar.cc  != null ? sidecar.cc  : null;
+    let approvedMetadata = null;
+    let artifactDetail = window._nsAddCurrentInspection;
+    let binaryCw = null, binaryCc = null;
 
-    // Cache hit: same token, both words and full sidecar already fetched.
-    if (window._nsAddCurrentToken === token && window._nsAddCurrentWords && window._nsAddCurrentDetailSidecar) {
+    // Cache hit: same token and immutable-binary inspection already fetched.
+    if (window._nsAddCurrentToken === token && window._nsAddCurrentWords && window._nsAddCurrentInspection) {
         const hdr = sim ? sim.parseLumpHeader(window._nsAddCurrentWords[0] >>> 0) : null;
         if (hdr && hdr.valid) { binaryCw = hdr.cw; binaryCc = hdr.cc; }
-        detailSidecar = window._nsAddCurrentDetailSidecar;
+        approvedMetadata = window._nsAddCurrentApproval;
     } else {
+        window._nsAddCurrentApproval = null;
         try {
-            // Fetch full sidecar detail + binary words in parallel.
-            const [detailResp, wordsResp] = await Promise.all([
-                fetch('/api/lumps/' + token + '/detail'),
-                fetch('/api/lump/'  + token + '/words')
-            ]);
+            const wordsResp = await fetch('/api/lump/' + token + '/words', { cache: 'no-store' });
 
             // Stale-guard: abort if user changed selection while fetching.
             const nowSel = document.getElementById('_nsAddSelect');
@@ -3493,17 +3517,7 @@ async function _nsPopulateAddMeta(token) {
 
             if (!wordsResp.ok) throw new Error('HTTP ' + wordsResp.status + ' from /words');
 
-            const [detailData, wordsData] = await Promise.all([
-                detailResp.ok ? detailResp.json() : Promise.resolve(null),
-                wordsResp.json()
-            ]);
-
-            // Override lean sidecar with full detail (has capability permissions, source, etc.)
-            if (detailData && !detailData.error) {
-                detailSidecar = detailData;
-                window._nsAddCurrentDetailSidecar = detailData;
-                window._nsAddCurrentSidecar       = detailData;
-            }
+            const wordsData = await wordsResp.json();
 
             // Cache words + parse authoritative cw/cc/lumpSize from binary header.
             const words = Array.isArray(wordsData) ? wordsData
@@ -3515,6 +3529,14 @@ async function _nsPopulateAddMeta(token) {
 
             const hdr = sim ? sim.parseLumpHeader(words[0] >>> 0) : null;
             if (hdr && hdr.valid) { binaryCw = hdr.cw; binaryCc = hdr.cc; }
+            const inspect = typeof LumpContentFrame !== 'undefined' &&
+                LumpContentFrame && LumpContentFrame.lumpInspectContentFrame;
+            if (!inspect) throw new Error('Binary content inspector is unavailable');
+            window._nsAddCurrentInspection = await inspect(words);
+            artifactDetail = window._nsAddCurrentInspection;
+            const actualBinaryHash = await _nsHashImmutableWords(words);
+            approvedMetadata = _nsMatchingApproval(wordsData, approval, actualBinaryHash);
+            window._nsAddCurrentApproval = approvedMetadata;
 
         } catch (fetchErr) {
             const nowSel2 = document.getElementById('_nsAddSelect');
@@ -3526,40 +3548,42 @@ async function _nsPopulateAddMeta(token) {
 
     // ── Overlay persistent slot-policy choices + compute editable-field defaults ─
     // _nsSlotPolicyResolve() applies the in-memory cache (window._nsPersistedSlotMeta)
-    // on top of the server-fetched sidecar, then derives { nsSlotVal, policy }.
+    // on top of approved hints, then derives { nsSlotVal, policy }.
     // window._nsPersistedSlotMeta is NOT cleared by _nsTableAdd(), so it carries the
     // programmer's last-chosen policy and slot across modal lifecycles and before the
     // async PATCH reaches the server.  The shared helper is unit-tested in
     // test_ns_slot_modal_persist.js so drift between test and production is impossible.
     const { nsSlotVal, policy } = _nsSlotPolicyResolve(
-        detailSidecar, token, window._nsPersistedSlotMeta);
+        approvedMetadata || {}, token, window._nsPersistedSlotMeta);
 
-    // ── Editable-field defaults from detailSidecar ────────────────────────────
-    const bootResident  = !!(detailSidecar.boot_resident);
+    // Approved fields are presentation hints only; Namespace owns placement.
+    const displayMetadata = approvedMetadata || {};
+    const bootResident  = !!(displayMetadata.boot_resident);
     const loadPolicyDefault = ['Resident', 'Preload', 'Lazy'].includes(
-        detailSidecar.loadPolicy || detailSidecar.load_policy)
-        ? (detailSidecar.loadPolicy || detailSidecar.load_policy)
+        displayMetadata.loadPolicy || displayMetadata.load_policy)
+        ? (displayMetadata.loadPolicy || displayMetadata.load_policy)
         : (bootResident ? 'Resident' : 'Lazy');
-    const contentType   = detailSidecar.content_type || 'code';
-    const typField      = typeof detailSidecar.typ === 'number' ? detailSidecar.typ : 0;
+    const typField      = binaryCc !== null && window._nsAddCurrentWords
+        ? ((window._nsAddCurrentWords[0] >>> 8) & 0x03) : 0;
+    const contentType   = typField === 2 ? 'outform' : 'code';
     const gtTypeDefault = (contentType === 'outform' || typField === 2) ? 2 : 1;
 
     // ── Read-only display helpers ─────────────────────────────────────────────
     const esc = function(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
-    const grants    = Array.isArray(detailSidecar.grants) ? detailSidecar.grants.join(', ') : esc(detailSidecar.grants || 'E');
-    const descText  = esc(detailSidecar.description || '');
+    const grants    = Array.isArray(displayMetadata.grants) ? displayMetadata.grants.join(', ') : esc(displayMetadata.grants || 'E');
+    const descText  = esc(displayMetadata.description || '');
 
     // Capabilities table — shows index, name, target NS slot, and permissions.
     let capsHtml = '<span style="color:#6b7280;font-size:0.75rem;">None</span>';
-    if (Array.isArray(detailSidecar.capabilities) && detailSidecar.capabilities.length > 0) {
+    if (Array.isArray(displayMetadata.capabilities) && displayMetadata.capabilities.length > 0) {
         capsHtml = '<table style="width:100%;border-collapse:collapse;font-size:0.72rem;margin-top:3px;">'
             + '<tr style="color:#a78bfa;">'
             + '<th style="text-align:left;padding:1px 5px;">#</th>'
             + '<th style="text-align:left;padding:1px 5px;">Name</th>'
             + '<th style="text-align:left;padding:1px 5px;">NS slot</th>'
             + '<th style="text-align:left;padding:1px 5px;">Perm</th></tr>';
-        for (let ci = 0; ci < detailSidecar.capabilities.length; ci++) {
-            const cap           = detailSidecar.capabilities[ci];
+        for (let ci = 0; ci < displayMetadata.capabilities.length; ci++) {
+            const cap           = displayMetadata.capabilities[ci];
             const capName       = esc(cap.name || '—');
             const nsSlotDisplay = cap.ns_slot != null ? cap.ns_slot : '—';
             const permDisplay   = Array.isArray(cap.grants) ? cap.grants.join(',')
@@ -3623,11 +3647,11 @@ async function _nsPopulateAddMeta(token) {
             <div style="${sGH}">LUMP METADATA</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px 12px;font-size:0.78rem;">
                 <div><span style="${sLabel}">Token</span>
-                     <span style="${sRoVal};font-family:monospace;">${esc(detailSidecar.token || '—')}</span></div>
+                     <span style="${sRoVal};font-family:monospace;">${esc(displayMetadata.token || token || '—')}</span></div>
                 <div><span style="${sLabel}">Canonical dot.name</span>
-                     <span style="${sRoVal}">${esc(detailSidecar.dot_name || detailSidecar.dotName || detailSidecar.abstraction || detailSidecar.name || '—')}</span></div>
+                     <span style="${sRoVal}">${esc(displayMetadata.dot_name || displayMetadata.dotName || (artifactDetail && artifactDetail.apiDefinition && artifactDetail.apiDefinition.name) || approval.abstraction || approval.name || '—')}</span></div>
                 <div><span style="${sLabel}">T-ID</span>
-                     <span style="${sRoVal};font-family:monospace;">${esc(detailSidecar.cache_token || detailSidecar.token || '—')}</span></div>
+                     <span style="${sRoVal};font-family:monospace;">${esc(displayMetadata.cache_token || token || '—')}</span></div>
                 <div><span style="${sLabel}">Code Words (CW)</span>
                      <span style="${sRoVal}">${cwDisplay}</span></div>
                 <div><span style="${sLabel}">C-List (CC)</span>
@@ -3635,17 +3659,17 @@ async function _nsPopulateAddMeta(token) {
                 <div><span style="${sLabel}">Grants</span>
                      <span style="${sRoVal}">${grants}</span></div>
                 <div><span style="${sLabel}">Language</span>
-                     <span style="${sRoVal}">${esc(detailSidecar.language || '—')}</span></div>
+                     <span style="${sRoVal}">${esc(displayMetadata.language || (artifactDetail && artifactDetail.apiDefinition && artifactDetail.apiDefinition.language) || '—')}</span></div>
                 <div><span style="${sLabel}">Version</span>
-                     <span style="${sRoVal}">${esc(detailSidecar.version || '—')}</span></div>
+                     <span style="${sRoVal}">${esc(displayMetadata.version || '—')}</span></div>
                 <div><span style="${sLabel}">Author</span>
-                     <span style="${sRoVal}">${esc(detailSidecar.author || '—')}</span></div>
-                ${detailSidecar.profile ? `<div><span style="${sLabel}">Profile</span>
-                     <span style="${sRoVal}">${esc(detailSidecar.profile)}</span></div>` : ''}
+                     <span style="${sRoVal}">${esc(displayMetadata.author || '—')}</span></div>
+                ${displayMetadata.profile ? `<div><span style="${sLabel}">Profile</span>
+                     <span style="${sRoVal}">${esc(displayMetadata.profile)}</span></div>` : ''}
                 ${descText ? `<div style="grid-column:1/-1"><span style="${sLabel}">Description</span>
                      <div style="color:#b0b0c8;font-size:0.74rem;max-height:52px;overflow-y:auto;line-height:1.4;">${descText}</div></div>` : ''}
             </div>
-            ${(Array.isArray(detailSidecar.capabilities) && detailSidecar.capabilities.length > 0) ? `
+            ${(Array.isArray(displayMetadata.capabilities) && displayMetadata.capabilities.length > 0) ? `
             <div style="margin-top:8px;">
                 <span style="${sLabel}">Capabilities</span>
                 ${capsHtml}
@@ -3666,7 +3690,7 @@ function _nsTableAddConfirm() {
     const name = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : token;
     if (!token) { if (errEl) errEl.textContent = 'Please select a LUMP.'; return; }
 
-    // Guard: refuse to install if sidecar detail + words haven't been fetched for this token.
+    // Guard: refuse to install until immutable binary inspection has completed.
     // _nsPopulateAddMeta keeps Install disabled while loading, but this catch handles
     // any race where confirm fires before the async fetch completes.
     if (!window._nsAddCurrentWords || window._nsAddCurrentToken !== token) {
@@ -3674,7 +3698,8 @@ function _nsTableAddConfirm() {
         return;
     }
 
-    const sidecar = window._nsAddCurrentSidecar;
+    const approvedMetadata = window._nsAddCurrentApproval;
+    const artifactDetail = window._nsAddCurrentInspection;
 
     // ── Read editable field values ────────────────────────────────────────────
     const loadPolicyEl  = document.getElementById('_nsLoadPolicy');
@@ -3709,18 +3734,20 @@ function _nsTableAddConfirm() {
     const _doInstall = async function(words) {
         const hdr = sim.parseLumpHeader(words[0] >>> 0);
         if (!hdr.valid) return Promise.reject('Invalid LUMP header (magic mismatch)');
+        if (!artifactDetail) return Promise.reject('Immutable LUMP inspection is unavailable');
+        const actualBinaryHash = await _nsHashImmutableWords(words);
         const _canonicalHash = function(value) {
             if (value == null) return null;
             const hash = String(value).trim().replace(/^sha256:/i, '').toLowerCase();
             return /^[0-9a-f]{64}$/.test(hash) ? hash : null;
         };
-        // A Wukong Preload is a bridge-bound record.  Its capacity comes from
-        // the verified binary header and its digest from the authoritative
-        // detail sidecar; neither is a programmer-controlled modal field.
+        // A Wukong Preload is bound to the exact fetched immutable words.
+        // Identity annotations are included only from the matching approval.
         const _preloadBinding = loadPolicy === 'Preload' ? {
             lumpSize: hdr.lumpSize,
-            binaryHash: _canonicalHash(sidecar && (sidecar.binary_hash || sidecar.binaryHash)),
-            identityHash: _canonicalHash(sidecar && (sidecar.identity_hash || sidecar.identityHash))
+            binaryHash: actualBinaryHash,
+            identityHash: _canonicalHash(approvedMetadata &&
+                (approvedMetadata.identity_hash || approvedMetadata.identityHash))
         } : null;
         if (_preloadBinding && !_preloadBinding.binaryHash) {
             return Promise.reject(
@@ -3755,12 +3782,30 @@ function _nsTableAddConfirm() {
         // *any* simulator mutation.  This prevents a stale self GT, wrong
         // sequence, or mismatched Namespace location from leaving a half-added
         // body/entry behind when the ADD modal rejects it.
-        const _compilerOwnedSelf = !!(sidecar && Array.isArray(sidecar.capabilities) &&
-            sidecar.capabilities[0] &&
-            sidecar.capabilities[0].compiler_owned_self === true &&
-            String(sidecar.capabilities[0].name || '').toUpperCase() === '__SELF__');
-        const _sourceSelfSlot = sidecar && sidecar.ns_slot != null
-            ? Number(sidecar.ns_slot) : NaN;
+        const _embeddedApi = artifactDetail.apiDefinition;
+        const _hasEmbeddedIdentity = !!(_embeddedApi && typeof _embeddedApi.name === 'string' &&
+            _embeddedApi.name && hdr.typ === 0);
+        const _row0 = hdr.cc > 0 ? (words[hdr.lumpSize - hdr.cc] >>> 0) : 0;
+        const _parsedSelf = hdr.cc > 0 && typeof sim.parseGT === 'function'
+            ? sim.parseGT(_row0) : null;
+        const _selfPerms = _parsedSelf && _parsedSelf.permissions;
+        const _liveSelf = !!(_parsedSelf && _parsedSelf.type === 1 && _selfPerms &&
+            _selfPerms.E === 1 && !_selfPerms.R && !_selfPerms.W && !_selfPerms.X &&
+            !_selfPerms.L && !_selfPerms.S && !_selfPerms.B);
+        const _selfPlaceholder = sim.constructor &&
+            Number.isInteger(sim.constructor.SELF_CAPABILITY_PLACEHOLDER) &&
+            _row0 === (sim.constructor.SELF_CAPABILITY_PLACEHOLDER >>> 0);
+        const _compilerOwnedSelf = _hasEmbeddedIdentity;
+        if (_selfPlaceholder && !_compilerOwnedSelf) {
+            return Promise.reject('Compiler SELF placeholder lacks an intrinsic embedded identity');
+        }
+        if (_compilerOwnedSelf && hdr.cc < 1) {
+            return Promise.reject('Embedded executable identity requires compiler-owned C-List row zero');
+        }
+        if (_compilerOwnedSelf && !_selfPlaceholder && !_liveSelf) {
+            return Promise.reject('Compiler-owned SELF is not proven by the binary C-List');
+        }
+        const _sourceSelfSlot = _liveSelf ? Number(_parsedSelf.index) : NaN;
         const _sourceSelfValid = Number.isInteger(_sourceSelfSlot) &&
             _sourceSelfSlot >= 0 && sim.isNSEntryValid(_sourceSelfSlot);
         const _sourceSelfSeq = _sourceSelfValid
@@ -3771,8 +3816,8 @@ function _nsTableAddConfirm() {
             // the modal.  Raw assembly remains an explicit non-ordinary layout.
             architectural: hdr.typ !== 0 || (gtType !== 1 && !_compilerOwnedSelf),
             compilerOwnedSelf: _compilerOwnedSelf,
-            // A saved live self row can be reminted only after it matches the
-            // sidecar-recorded source slot and that live Namespace sequence.
+            // A saved live self row can be reminted only after its own GT points
+            // at a currently valid Namespace entry with the same sequence.
             remintCompilerOwnedSelf: _compilerOwnedSelf && _sourceSelfValid,
             sourceSelfSlot: _sourceSelfSlot,
             sourceSelfSeq: _sourceSelfSeq
@@ -3791,7 +3836,7 @@ function _nsTableAddConfirm() {
         const limit17    = hdr.cw;
 
         // ── Task #2862: trusted identity registration for network Outform ──────
-        // Derive the trusted per-slot identity from the sidecar/manifest metadata
+        // Derive network identity only from the matching hash-bound approval.
         // BEFORE the lazy Outform NS entry is created.  The cache token T is the
         // canonical W3 for a secure Outform (NOT an Abstract GT).  For a secure
         // Outform (gtType === 2, i.e. a lump that will be fetched over the
@@ -3825,7 +3870,7 @@ function _nsTableAddConfirm() {
             const s = String(v).trim().replace(/^0x/i, '').toLowerCase();
             return /^[0-9a-f]{64}$/.test(s) ? s : null;
         };
-        const _idMeta = sidecar || {};
+        const _idMeta = approvedMetadata || {};
         const cacheToken32 = _hexToU32(
             _idMeta.cache_token != null ? _idMeta.cache_token
           : _idMeta.cacheToken != null ? _idMeta.cacheToken
@@ -3834,7 +3879,7 @@ function _nsTableAddConfirm() {
                            : (_idMeta.issueN  != null) ? _positiveIssue(_idMeta.issueN)
                            : (_idMeta.issue   != null) ? _positiveIssue(_idMeta.issue) : NaN;
         const identityHash = _canon64(_idMeta.identity_hash != null ? _idMeta.identity_hash : _idMeta.identityHash);
-        const binaryHash   = _canon64(_idMeta.binary_hash   != null ? _idMeta.binary_hash   : _idMeta.binaryHash);
+        const binaryHash   = actualBinaryHash;
         const dotName      = _idMeta.dot_name || _idMeta.dotName || name || '';
 
         // A SECURE Outform (gtType === 2, network-fetched on first CALL/LOAD)
@@ -3914,26 +3959,11 @@ function _nsTableAddConfirm() {
             window.bootConfig.slotLabels[String(slot)] = name;
         }
 
-        // Persist the programmer's slot-policy choice (and the concrete slot assigned)
-        // back to the sidecar so re-add and boot_image.py use the correct policy.
-        // _nsSlotPersistRecord() is shared with the unit test (test_ns_slot_modal_persist.js)
-        // so drift between test and production is impossible.
+        // Keep the programmer's Namespace placement choice in Namespace state.
         const { patchedPolicy: _patchedPolicy, patchedSlot: _patchedSlot } =
             _nsSlotPersistRecord(slotPolicy, slot);
-        fetch('/api/lump/' + token + '/meta', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                ns_slot_policy: _patchedPolicy,
-                ns_slot: _patchedSlot
-            })
-        }).catch(function(e) { console.warn('[NSADD] ns_slot_policy persist failed:', e); });
-        // Synchronously record the chosen policy and slot in the persistent token-keyed
-        // cache so that re-opening the ADD modal pre-populates the fields immediately —
-        // even before the async PATCH completes and before _nsTableAdd() clears the
-        // per-modal cache objects.  _nsPopulateAddMeta() overlays this cache after every
-        // detail fetch, giving both the cache-hit path and the fresh-fetch path access
-        // to the previously-selected values.
+        // Record it locally so reopening this modal keeps the current Namespace
+        // decision without mutating artifact metadata.
         if (!window._nsPersistedSlotMeta) window._nsPersistedSlotMeta = {};
         window._nsPersistedSlotMeta[token] = {
             ns_slot_policy: _patchedPolicy,
@@ -3944,8 +3974,9 @@ function _nsTableAddConfirm() {
         window.bootConfig = window.bootConfig || {};
         window.bootConfig.step2 = window.bootConfig.step2 || { lumps: [] };
         const _rows = window.bootConfig.step2.lumps || (window.bootConfig.step2.lumps = []);
-        const _canonicalName = (sidecar && (sidecar.dot_name || sidecar.dotName ||
-            sidecar.abstraction || sidecar.name)) || name;
+        const _canonicalName = (approvedMetadata &&
+            (approvedMetadata.dot_name || approvedMetadata.dotName)) ||
+            (_embeddedApi && _embeddedApi.name) || name;
         let _row = _rows.find(r => r && r.nsSlot === slot);
         if (!_row) {
             _row = { nsSlot: slot, abstraction: _canonicalName, lumpToken: token };
@@ -3969,93 +4000,8 @@ function _nsTableAddConfirm() {
             delete _row.identityHash;
         }
 
-        // ── Populate c-list GTs in DMEM from sidecar capabilities ─────────────
-        // c-list lives at lumpBase + (lumpSize - cc) per parseLumpHeader:
-        // "c-list starts at lumpBase + (lumpSize - cc)" — call.py line 282.
-        //
-        // Real sidecars use a variety of field names across schema versions:
-        //   slot     — c-list write position (REQUIRED, else fall back to iteration index)
-        //   gt / abstract_gt — pre-computed GT: use directly (highest priority)
-        //   ns_slot / target_ns / nsIndex — NS table slot ref: build live Inform GT
-        //   grants / rights — permissions array/string; defaults to {E:1}
-        //   filled_by — capability filled programmatically at boot: skip (leave binary GT)
-        //   intentionally_null — explicitly null slot: skip (leave binary GT)
-        //
-        // We do NOT overwrite with 0 when no GT can be resolved: the binary copy above
-        // (copyLen words) already placed the compiled-in GT; leaving it is safer than
-        // zeroing it and triggering a CALL fault.
-        if (sidecar && Array.isArray(sidecar.capabilities) && sidecar.capabilities.length > 0) {
-            // Helper: parse grants/rights into a createGT permissions object.
-            const _parseCapPerms = function(cap) {
-                const _p = {R:0,W:0,X:0,L:0,S:0,E:0};
-                const _src = cap.grants || cap.rights || [];
-                const _g   = Array.isArray(_src) ? _src : [String(_src)];
-                _g.forEach(function(g) {
-                    for (const ch of String(g).toUpperCase()) if (ch in _p) _p[ch] = 1;
-                });
-                return Object.values(_p).some(Boolean) ? _p : {E:1};
-            };
-
-            const caps    = sidecar.capabilities;
-            const cBase   = lumpBase + (hdr.lumpSize - hdr.cc);
-            for (let capIdx = 0; capIdx < caps.length; capIdx++) {
-                const cap = caps[capIdx];
-
-                // Row zero is owned by the compiler/install mint, not by
-                // sidecar capability editing or import metadata.
-                if (capIdx === 0 && cap && cap.compiler_owned_self === true &&
-                    String(cap.name || '').toUpperCase() === '__SELF__') {
-                    continue;
-                }
-
-                // Skip slots filled at boot or explicitly null (leave binary GT intact).
-                if (cap.filled_by || cap.intentionally_null || cap.wired_at_boot) continue;
-
-                // c-list write position: declared slot field or iteration index.
-                const clistSlotIdx = (cap.slot != null) ? parseInt(cap.slot, 10) : capIdx;
-                if (isNaN(clistSlotIdx) || clistSlotIdx < 0 || clistSlotIdx >= hdr.cc) continue;
-
-                const writeAddr = cBase + clistSlotIdx;
-
-                // 1. NS table slot reference (PRIMARY) → build live Inform GT.
-                //    Must run BEFORE precomputed GT: sidecar `gt` is documentation only when
-                //    `ns_slot`/`target_ns`/`nsIndex` is also present — live NS state is authoritative.
-                //    Normalize across all sidecar schema variants found in server/lumps/*.json:
-                //      ns_slot (00000600, 4c7380cb), target_ns (00002000, 00130000, 50789581),
-                //      nsIndex (Human_Hand_* lumps). Treat negative/sentinel values as absent.
-                const nsSlotRef = (cap.ns_slot  != null) ? cap.ns_slot
-                                : (cap.target_ns != null) ? cap.target_ns
-                                : (cap.nsIndex   != null) ? cap.nsIndex : null;
-                if (nsSlotRef != null) {
-                    const refSlot = parseInt(nsSlotRef, 10);
-                    if (!isNaN(refSlot) && refSlot >= 0 && sim.isNSEntryValid(refSlot)) {
-                        // Canonical NS ABI: read live gt_seq from W1[29:21] (authority
-                        // word) so the GT passes version checks even if this slot has
-                        // been cleared+reinstalled. (W2 is integrity32, not a version.)
-                        const nsW1      = sim.memory[sim._nsSlotBase(refSlot) + 1] >>> 0;
-                        const liveGtSeq = sim.parseNSWord1(nsW1).gtSeq;
-                        sim.writePersistentWord(writeAddr,
-                            sim.createGT(liveGtSeq, refSlot, _parseCapPerms(cap), 1));
-                    } else {
-                        // NS slot not yet loaded — write null GT (0); runtime lazy-resolve fills it.
-                        sim.writePersistentWord(writeAddr, 0x00000000);
-                    }
-                    continue;
-                }
-
-                // 2. Precomputed GT (FALLBACK) — only when no NS slot is declared.
-                //    Applies to self-contained caps: 00001f00.json abstract_gt, cb8739cf.json slot 7.
-                const preGtStr = cap.gt || cap.abstract_gt;
-                if (preGtStr) {
-                    const parsed = parseInt(String(preGtStr), 16);
-                    if (!isNaN(parsed)) { sim.writePersistentWord(writeAddr, parsed); }
-                    continue;
-                }
-
-                // 3. No GT source at all: write null GT (0); lazy-resolve at runtime.
-                sim.writePersistentWord(writeAddr, 0x00000000);
-            }
-        }
+        // The copied binary's C-List is authoritative. Approval metadata never
+        // rewrites or authorizes capability rows at runtime.
         sim._compilerOwnedSelfSlots = sim._compilerOwnedSelfSlots || {};
         if (_identity.ordinary) sim._compilerOwnedSelfSlots[slot] = true;
         else delete sim._compilerOwnedSelfSlots[slot];
@@ -4378,7 +4324,7 @@ function _showNSThreadModal(slotIdx) {
 
 // ── NS slot load-mode cycling badge ─────────────────────────────────────────
 // Cycles: resident → lazy → dynamic → resident
-// Patches the sidecar via /api/lump/<token>/meta and updates both badges in
+// Updates both badges from Namespace runtime state; it never patches LUMP metadata endpoints.
 // the modal (#_nsModeBadgeToken and #_nsModeBadgeSubtitle) optimistically.
 window._nsSlotCycleMode = function(token, currentMode) {
     if (!token) return;
@@ -4406,27 +4352,11 @@ window._nsSlotCycleMode = function(token, currentMode) {
     const descEl = document.getElementById('_nsModeBadgeDesc');
     if (descEl) descEl.textContent = cfg.desc;
 
-    // Persist to sidecar
-    fetch('/api/lump/' + token + '/meta', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ boot_resident: cfg.boot_resident, ns_slot_policy: cfg.ns_slot_policy })
-    }).then(function(r) {
-        if (!r.ok) {
-            // Revert on failure
-            const prev = _CFG[currentMode] || _CFG.lazy;
-            ['_nsModeBadgeToken', '_nsModeBadgeSubtitle'].forEach(function(id) {
-                const el = document.getElementById(id);
-                if (!el) return;
-                el.dataset.mode = currentMode;
-                el.textContent  = prev.label;
-                el.style.color  = prev.color;
-                if (id === '_nsModeBadgeToken') { el.style.borderColor = prev.border; el.style.background = prev.bg; }
-            });
-            if (descEl) descEl.textContent = prev.desc;
-            console.warn('[nsSlotCycleMode] PATCH failed, reverted to', currentMode);
-        }
-    }).catch(function(e) { console.warn('[nsSlotCycleMode] PATCH error:', e); });
+    // This is Namespace runtime state, not mutable LUMP metadata. Persist it
+    // with the boot configuration on the next Namespace save.
+    window.bootConfig = window.bootConfig || {};
+    window.bootConfig.nsLoadModes = window.bootConfig.nsLoadModes || {};
+    window.bootConfig.nsLoadModes[String(slotIdx)] = nextMode;
 };
 
 // ── Lump detail modal — Inform entries only ───────────────────────────────────
