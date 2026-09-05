@@ -28,7 +28,7 @@ body {
 
 .fixed-toolbar {
     position: fixed;
-    top: 0; left: 0; right: 0;
+    top: var(--visual-viewport-top, 0px); left: 0; right: 0;
     z-index: 1000;
     background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%);
     border-bottom: 2px solid var(--accent);

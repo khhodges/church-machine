@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Church Machine IDE — Capability-Based Secure Computing</title>
     <meta name="description" content="Church Machine IDE: browser-based FPGA simulator, assembler, and CLOOMC compiler with capability-based secure computing. Supports English, JavaScript, Haskell, and Lambda Calculus front-ends.">
     <meta name="robots" content="index, follow">
@@ -80,9 +80,9 @@
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="icon" type="image/svg+xml" sizes="32x32" href="favicon.svg">
     <link rel="icon" type="image/svg+xml" sizes="16x16" href="favicon.svg">
-    <link rel="stylesheet" href="styles-base.css?v=20260829-reference-viewer1">
+    <link rel="stylesheet" href="styles-base.css?v=20260905-visual-viewport1">
     <link rel="stylesheet" href="styles-landing.css?v=20260820-card-dnd2">
-    <link rel="stylesheet" href="styles-toolbar.css?v=20260830-thread-status1">
+    <link rel="stylesheet" href="styles-toolbar.css?v=20260905-thread-stack1">
     <link rel="stylesheet" href="styles-editor.css?v=20260820-petname-help1">
     <link rel="stylesheet" href="styles-dashboard.css?v=20260830-thread-heap-formula1">
     <link rel="stylesheet" href="styles-lumps.css?v=20260820-draft2">
@@ -681,6 +681,9 @@
                 <span class="hw-led-hint">← DWRITE LED[0]</span>
             </div>
             <div id="flagsDisplay" class="flags-bar"></div>
+            <div id="threadIdentityStrip" class="thread-identity-strip"
+                 aria-label="Configured Thread NIA and GT dot pet names"
+                 aria-live="polite"></div>
         </div>
         <div class="dash-tabs" role="tablist" aria-label="Dashboard panels" onkeydown="handleDashTabKeydown(event)">
             <button class="dash-tab active" role="tab" aria-selected="true" aria-controls="dashPanel-cr" tabindex="0" id="dashTab-cr" onclick="switchDashTab('cr')" data-tooltip="CRs — Context Registers CR0–CR15">CRs</button>
@@ -688,7 +691,6 @@
             <button class="dash-tab" role="tab" aria-selected="false" aria-controls="dashPanel-gatelog" tabindex="-1" id="dashTab-gatelog" onclick="switchDashTab('gatelog')" data-tooltip="Gate Log — mLoad / mSave from last Step">Gate Log</button>
             <button class="dash-tab" role="tab" aria-selected="false" aria-controls="dashPanel-state" tabindex="-1" id="dashTab-state" onclick="switchDashTab('state')" data-tooltip="State — Machine Architecture info">State</button>
             <button class="dash-tab" role="tab" aria-selected="false" aria-controls="dashPanel-memstats" tabindex="-1" id="dashTab-memstats" onclick="switchDashTab('memstats')" data-tooltip="Memory — Foundation Layer Status">Mem</button>
-            <button class="dash-tab" role="tab" aria-selected="false" aria-controls="dashPanel-thread" tabindex="-1" id="dashTab-thread" onclick="switchDashTab('thread')" data-tooltip="Thread — Configured Thread contexts">Thread</button>
         </div>
         <div id="dashPanel-cr" class="dash-panel active" role="tabpanel" aria-labelledby="dashTab-cr">
             <div class="panel">
@@ -728,12 +730,6 @@
             <div class="panel">
                 <div class="panel-title">Memory &mdash; Foundation Layer Status</div>
                 <div id="memStatsContent"></div>
-            </div>
-        </div>
-        <div id="dashPanel-thread" class="dash-panel" role="tabpanel" aria-labelledby="dashTab-thread">
-            <div class="panel thread-panel">
-                <div class="panel-title">Configured Threads</div>
-                <div id="threadIdentityStrip" class="thread-identity-strip" aria-label="Configured Thread NIA and GT dot pet names" aria-live="polite"></div>
             </div>
         </div>
     </div>
@@ -3389,7 +3385,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="app-build-approval.js?v=20260821a"></script>
     <script src="app-source-library.js?v=20260720h"></script>
     <script src="app-invoke.js?v=20260821-modal-trap"></script>
-    <script src="app-misc.js?v=20260803a"></script>
+    <script src="app-misc.js?v=20260905-viewport-top1"></script>
     <script src="app-popup-lifecycle.js?v=20260830-popup-audit1"></script>
     <script src="asm-instruction-picker.js?v=20260903-isa-sync1"></script>
     <script src="asm-method-popup.js?v=20260518b"></script>

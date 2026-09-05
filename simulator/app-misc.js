@@ -1117,11 +1117,23 @@ function initAllTabOverflows() {
 function adjustViewTop() {
     const toolbar = document.querySelector('.fixed-toolbar');
     if (!toolbar) return;
-    const h = toolbar.offsetHeight;
-    document.querySelectorAll('.view').forEach(v => { v.style.top = h + 'px'; });
+    const bottom = Math.max(0, Math.ceil(toolbar.getBoundingClientRect().bottom));
+    document.querySelectorAll('.view').forEach(v => { v.style.top = bottom + 'px'; });
 }
 
-window.addEventListener('resize', adjustViewTop);
+function syncVisualViewportTop() {
+    const viewportTop = window.visualViewport
+        ? Math.max(0, Math.round(window.visualViewport.offsetTop || 0))
+        : 0;
+    document.documentElement.style.setProperty('--visual-viewport-top', viewportTop + 'px');
+    adjustViewTop();
+}
+
+window.addEventListener('resize', syncVisualViewportTop);
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', syncVisualViewportTop);
+    window.visualViewport.addEventListener('scroll', syncVisualViewportTop);
+}
 window.addEventListener('beforeunload', () => { if (typeof activeUserTabId !== 'undefined' && activeUserTabId && typeof userTabDirty !== 'undefined' && userTabDirty && typeof saveActiveUserTab === 'function') saveActiveUserTab(); });
 window.addEventListener('pagehide', () => { if (typeof activeUserTabId !== 'undefined' && activeUserTabId && typeof userTabDirty !== 'undefined' && userTabDirty && typeof saveActiveUserTab === 'function') saveActiveUserTab(); });
 
@@ -1246,7 +1258,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         initAllTabOverflows();
-        adjustViewTop();
+        syncVisualViewportTop();
         initCodeCopyButtons();
         updateFPGAStatusBtn();
         const _asmEd = document.getElementById('asmEditor');
