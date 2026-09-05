@@ -698,7 +698,94 @@ def test_full_core_thread_switch_preserves_flags_for_next_branch(
         flag_snapshots["before_switch"]
     )
 
+@pytest.mark.parametrize("arithmetic_opcode", [
+    TuringOpcode.IADD,
+    TuringOpcode.ISUB,
+])
+def test_full_core_signed_overflow_branches_follow_live_arithmetic(
+        arithmetic_opcode):
+    """VS and VC consume V set and cleared by the preceding live arithmetic."""
+    dmem = _build_dmem_init()
+    program_word = 384
+    setup = [
+        encode_turing(
+            TuringOpcode.IADD, CondCode.AL, dr_dst=1, dr_src=0, imm=1),
+        encode_turing(
+            TuringOpcode.SHL, CondCode.AL, dr_dst=1, dr_src=1, imm=31),
+    ]
+    if arithmetic_opcode == TuringOpcode.IADD:
+        # 0x80000000 - 1 = 0x7fffffff, then +1 overflows signed addition.
+        setup.append(encode_turing(
+            TuringOpcode.ISUB, CondCode.AL, dr_dst=1, dr_src=1, imm=1))
+        overflow = encode_turing(
+            arithmetic_opcode, CondCode.AL, dr_dst=2, dr_src=1, imm=1)
+    else:
+        # 0x80000000 - 1 overflows signed subtraction.
+        overflow = encode_turing(
+            arithmetic_opcode, CondCode.AL, dr_dst=2, dr_src=1, imm=1)
 
+    clear_overflow = encode_turing(
+        arithmetic_opcode, CondCode.AL, dr_dst=2, dr_src=0, imm=0)
+    branch_vs = encode_turing(TuringOpcode.BRANCH, CondCode.VS, imm=3)
+    branch_vc = encode_turing(TuringOpcode.BRANCH, CondCode.VC, imm=3)
+    mark_wrong_vs = encode_turing(
+        TuringOpcode.IADD, CondCode.AL, dr_dst=3, dr_src=3, imm=1)
+    mark_taken_vs = encode_turing(
+        TuringOpcode.IADD, CondCode.AL, dr_dst=4, dr_src=4, imm=1)
+    mark_wrong_vc = encode_turing(
+        TuringOpcode.IADD, CondCode.AL, dr_dst=5, dr_src=5, imm=1)
+    mark_taken_vc = encode_turing(
+        TuringOpcode.IADD, CondCode.AL, dr_dst=6, dr_src=6, imm=1)
+    loop = encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=0)
+    program = setup + [
+        overflow,
+        branch_vs,
+        mark_wrong_vs,
+        loop,
+        mark_taken_vs,
+        clear_overflow,
+        branch_vc,
+        mark_wrong_vc,
+        loop,
+        mark_taken_vc,
+        loop,
+    ]
+    dmem[program_word] = pack_lump_header(
+        3, program_word + len(program), 2, 0)
+    dmem[program_word + 1:program_word + 1 + len(program)] = program
+    dut = BootRomHarness(dmem)
+    branch_flags = {}
+
+    async def bench(ctx):
+        for _ in range(3000):
+            if ctx.get(dut.core.retire_valid):
+                assert not ctx.get(dut.core.retire_fault_valid)
+                instruction = ctx.get(dut.core.retire_instr)
+                if instruction == branch_vs:
+                    branch_flags["VS"] = ctx.get(
+                        dut.core.retire_flags.as_value())
+                elif instruction == branch_vc:
+                    branch_flags["VC"] = ctx.get(
+                        dut.core.retire_flags.as_value())
+                if ctx.get(dut.core.debug_dr_words[6]) == 1:
+                    break
+            await ctx.tick()
+        else:
+            raise AssertionError(
+                "live arithmetic did not reach both taken branch markers")
+
+        assert ctx.get(dut.core.debug_dr_words[3]) == 0
+        assert ctx.get(dut.core.debug_dr_words[4]) == 1
+        assert ctx.get(dut.core.debug_dr_words[5]) == 0
+        assert ctx.get(dut.core.debug_dr_words[6]) == 1
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(bench)
+    sim.run()
+
+    assert branch_flags["VS"] & 0b1000
+    assert not (branch_flags["VC"] & 0b1000)
 def test_full_core_failed_thread_switch_preserves_source_context():
     """A rejected target frame cannot partially serialize the running Thread."""
     (dmem, source_first, _source_next, _target_first, _target_instr,

@@ -1511,7 +1511,8 @@ class ChurchCore(Elaboratable):
         # Arithmetic on data registers.
         # imm[14]=1: DR[dst] = DR[src] +/- zero_extend(imm[13:0])
         # imm[14]=0: DR[dst] = DR[src] +/- DR[imm[3:0]]
-        # Flags: N = result[31], Z = (result==0), C = carry-out, V = 0.
+        # Flags: N = result[31], Z = (result==0), C = carry-out/no-borrow,
+        # V = signed overflow.
         # 1-cycle busy after execution prevents double-fire due to ROM pipeline latency.
         # (Signals forward-declared above for use in DR write / nia chains.)
 
@@ -1564,11 +1565,17 @@ class ChurchCore(Elaboratable):
             iadd_flags_view.N.eq(iadd_result[31]),
             iadd_flags_view.Z.eq(iadd_result[:32] == 0),
             iadd_flags_view.C.eq(iadd_result[32]),
-            iadd_flags_view.V.eq(0),
+            iadd_flags_view.V.eq(
+                ~(u_regs.dr_rd_data1[31] ^ arith_rhs[31]) &
+                (iadd_result[31] ^ u_regs.dr_rd_data1[31])
+            ),
             isub_flags_view.N.eq(isub_result[31]),
             isub_flags_view.Z.eq(isub_result[:32] == 0),
             isub_flags_view.C.eq(~isub_result[32]),
-            isub_flags_view.V.eq(0),
+            isub_flags_view.V.eq(
+                (u_regs.dr_rd_data1[31] ^ arith_rhs[31]) &
+                (isub_result[31] ^ u_regs.dr_rd_data1[31])
+            ),
         ]
 
         # ── SHL / SHR ────────────────────────────────────────────────────────
