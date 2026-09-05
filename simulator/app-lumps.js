@@ -2874,8 +2874,6 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk) {
 async function _restoreLumpFromHistory(token, version) {
     const lump = _lumpsCache.find(l => l.token === token);
     const displayName = (lump && lump.abstraction) || token;
-    if (!confirm(`Restore v${version} of "${displayName}" as the current LUMP?\n\n` +
-        'The archived binary and its hash-bound approval record will be validated. The current version will be archived first.')) return;
 
     try {
         const wordsResp = await fetch(`/api/lumps/${token}/words/${version}`);
@@ -2887,10 +2885,12 @@ async function _restoreLumpFromHistory(token, version) {
         if (!inspection) throw new Error('Archived binary inspection is unavailable');
         const metadata = Object.assign({ approval_confirmed: true },
             _hashBoundLumpApproval(wordsData, inspection.binary_hash));
-        // The save endpoint classifies restoration of an existing token as a
-        // replacement and consumes a matching "replace" intent.
-        const restoreIntent = await _requestLumpApprovalIntent(words, 'replace', metadata);
-        metadata.approval_intent = restoreIntent.intent;
+        const approval = await _confirmLumpSavePlan(words, metadata, plan =>
+            `Restore v${version} of "${displayName}" as the current LUMP?\n\n` +
+            'The archived binary and its hash-bound approval record will be validated. The current version will be archived first.');
+        if (!approval) return;
+        metadata.approval_intent = approval.intent.intent;
+        metadata.save_plan_id = approval.plan.plan_id;
 
         const saveResp = await fetch('/api/lumps/save', {
             method: 'POST',
@@ -2948,15 +2948,16 @@ function _packDataLumpWords(bytes) {
 async function _saveLumpText(token, text, bodyEl, lump) {
     const saveBtn = bodyEl.querySelector('.lump-edit-save-btn');
     const statusEl = bodyEl.querySelector('.lump-edit-status');
-    if (!confirm(`Save edited content for LUMP 0x${token}?\n\n` +
-        'This replaces the artifact bytes and records approval for the resulting binary hash.')) return;
-    if (saveBtn) saveBtn.disabled = true;
-    if (statusEl) statusEl.textContent = 'Saving\u2026';
     try {
         const words = _packDataLumpWords(new TextEncoder().encode(text));
         const metadata = _lumpApprovalView(lump || {});
-        const intent = await _requestLumpApprovalIntent(words, 'replace', metadata);
-        metadata.approval_intent = intent.intent;
+        const approval = await _confirmLumpSavePlan(words, metadata, plan =>
+            `Save edited content for LUMP 0x${token}?\n\nThis records approval for the resulting binary hash.`);
+        if (!approval) return;
+        if (saveBtn) saveBtn.disabled = true;
+        if (statusEl) statusEl.textContent = 'Saving\u2026';
+        metadata.approval_intent = approval.intent.intent;
+        metadata.save_plan_id = approval.plan.plan_id;
         const resp = await fetch('/api/lumps/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -4412,21 +4413,19 @@ function _renderLumpImageContent(bodyEl, lump, dataWords, token) {
         fileInput.addEventListener('change', async () => {
             const file = fileInput.files[0];
             if (!file) return;
-            if (!confirm(`Replace the content of LUMP 0x${token} with "${file.name}"?\n\n` +
-                'This creates new artifact bytes and requires approval bound to the resulting binary hash.')) {
-                fileInput.value = '';
-                return;
-            }
-            replaceBtn.disabled = true;
-            statusEl.textContent = 'Uploading\u2026';
-            statusEl.style.color = '';
             try {
                 const arrayBuf = await file.arrayBuffer();
                 const bytes = new Uint8Array(arrayBuf);
                 const words = _packDataLumpWords(bytes);
                 const metadata = _lumpApprovalView(lump || {});
-                const intent = await _requestLumpApprovalIntent(words, 'replace', metadata);
-                metadata.approval_intent = intent.intent;
+                const approval = await _confirmLumpSavePlan(words, metadata, plan =>
+                    `Replace the content of LUMP 0x${token} with "${file.name}"?\n\nThis requires approval bound to the resulting binary hash.`);
+                if (!approval) return;
+                replaceBtn.disabled = true;
+                statusEl.textContent = 'Uploading\u2026';
+                statusEl.style.color = '';
+                metadata.approval_intent = approval.intent.intent;
+                metadata.save_plan_id = approval.plan.plan_id;
                 const resp = await fetch('/api/lumps/save', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -5817,9 +5816,6 @@ async function openLumpInEditor(token) {
 // server-saved LUMP and no fresh compiled words are in LumpRegistry.
 // ─────────────────────────────────────────────────────────────────────────────
 async function _saveLumpDirectVersion(token, lump, btn) {
-    if (!confirm(`Save a new version of "${lump.abstraction || token}"?\n\n` +
-        'The exact binary hash will be bound to the approval created by this action.')) return;
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
     var opName = 'Save Lump \u2014 ' + (lump.abstraction || token);
     try {
         // 1. Fetch the authoritative static binary from the server. Never
@@ -5841,9 +5837,13 @@ async function _saveLumpDirectVersion(token, lump, btn) {
         var _meta = Object.assign({}, _hashBoundLumpApproval(_detail, _hash), {
             approval_confirmed: true
         });
-        var _directIntent = await _requestLumpApprovalIntent(
-            _wj.words || [], 'replace', _meta);
-        _meta.approval_intent = _directIntent.intent;
+        var _directApproval = await _confirmLumpSavePlan(_wj.words || [], _meta, function() {
+            return `Save a new version of "${lump.abstraction || token}"?\n\nThe exact binary hash will be bound to the approval created by this action.`;
+        });
+        if (!_directApproval) return;
+        if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
+        _meta.approval_intent = _directApproval.intent.intent;
+        _meta.save_plan_id = _directApproval.plan.plan_id;
 
         // 3. POST to the standard save endpoint
         var _sr = await fetch('/api/lumps/save', {
@@ -6635,9 +6635,56 @@ async function _lumpSha256Words(words) {
         byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-// Call only after the action's explicit user confirmation.
-async function _requestLumpApprovalIntent(words, action, metadata) {
-    const digest = await _lumpSha256Words(words);
+function _lumpSavePlanCurrentName(plan) {
+    const current = plan && (plan.current_lump || plan.current || plan.existing_lump);
+    if (typeof current === 'string') return current;
+    if (current && typeof current === 'object') {
+        return current.dot_name || current.abstraction || current.display_name ||
+            (current.token ? `LUMP 0x${current.token}` : '');
+    }
+    return '';
+}
+
+// This is deliberately server-authored: a same-abstraction save can have a
+// different result when its token or namespace binding differs.
+function _formatLumpSavePlan(plan) {
+    const consequence = plan && (plan.consequence ||
+        (plan.action === 'save' ? 'create' : plan.action));
+    if (consequence === 'create') return 'Create a new LUMP.';
+    if (consequence === 'replace') {
+        const name = _lumpSavePlanCurrentName(plan);
+        return name ? `Replace current LUMP "${name}".` : 'Replace the current LUMP.';
+    }
+    throw new Error('Invalid save-plan consequence');
+}
+
+async function _requestLumpSavePlan(words, metadata) {
+    const resp = await fetch('/api/lumps/save-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ binary: words, metadata: metadata || {} })
+    });
+    const result = await resp.json();
+    const planId = result && (result.plan_id || result.id);
+    if (!resp.ok || !planId || !result ||
+        (result.action !== 'save' && result.action !== 'replace') ||
+        (result.consequence !== 'create' && result.consequence !== 'replace')) {
+        throw new Error((result && result.error) || 'Invalid save-plan response');
+    }
+    return Object.assign({}, result, { plan_id: planId });
+}
+
+// Call only after the action's explicit user confirmation. Save intents must
+// reference the exact server-authored plan rather than a browser guess.
+async function _requestLumpApprovalIntent(words, action, metadata, savePlan) {
+    const digest = savePlan ? String(savePlan.digest || '').toLowerCase()
+        : await _lumpSha256Words(words);
+    if (!/^[0-9a-f]{64}$/.test(digest)) {
+        throw new Error('Save plan is missing its canonical SHA-256 digest');
+    }
+    if (savePlan && action !== savePlan.action) {
+        throw new Error('Approval action does not match save plan');
+    }
     const resp = await fetch('/api/lumps/approval-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -6645,6 +6692,7 @@ async function _requestLumpApprovalIntent(words, action, metadata) {
             digest,
             action,
             confirmation: true,
+            ...(savePlan ? { plan: savePlan.plan_id } : {}),
             approval: _lumpApprovalView(metadata)
         })
     });
@@ -6652,8 +6700,19 @@ async function _requestLumpApprovalIntent(words, action, metadata) {
     if (!resp.ok || !result.intent || result.digest !== digest || result.action !== action) {
         throw new Error(result.error || 'Invalid approval-intent response');
     }
-    return { intent: result.intent, digest };
+    return { intent: result.intent, digest, plan_id: result.plan_id };
 }
+window._requestLumpSavePlan = _requestLumpSavePlan;
+window._formatLumpSavePlan = _formatLumpSavePlan;
+
+async function _confirmLumpSavePlan(words, metadata, prompt) {
+    const plan = await _requestLumpSavePlan(words, metadata);
+    const message = typeof prompt === 'function' ? prompt(plan) : String(prompt || '');
+    if (!confirm(`${_formatLumpSavePlan(plan)}\n\n${message}`.trim())) return null;
+    const intent = await _requestLumpApprovalIntent(words, plan.action, metadata, plan);
+    return { plan, intent };
+}
+window._confirmLumpSavePlan = _confirmLumpSavePlan;
 window._requestLumpApprovalIntent = _requestLumpApprovalIntent;
 
 function _lumpApprovalMatchesBinary(payload) {

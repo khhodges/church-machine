@@ -62,19 +62,25 @@ def repository(tmp_path, monkeypatch):
 
 
 def _payload(client):
-    raw = _raw(2)
-    digest = hashlib.sha256(raw).hexdigest()
-    intent = client.post("/api/lumps/approval-intent", json={
-        "digest": digest, "action": "replace", "confirmation": True,
-        "approval": {"grants": ["E"], "capability_type": "inform"},
-    }).get_json()["intent"]
-    return {"binary": _words(2), "metadata": {
+    metadata = {
         "token": "00000a00", "abstraction": "CapabilityTest",
         "content_type": "code", "language": "assembly", "ns_slot": 10,
         "grants": ["E"], "capability_type": "inform",
         "namespace_sequence": 7, "replacement": True, "capabilities": [],
-        "approval_intent": intent, "approval_action": "replace",
-    }}
+        "approval_action": "replace",
+    }
+    plan_response = client.post("/api/lumps/save-plan", json={
+        "binary": _words(2), "metadata": metadata,
+    })
+    assert plan_response.status_code == 201, plan_response.get_data(as_text=True)
+    plan = plan_response.get_json()
+    intent = client.post("/api/lumps/approval-intent", json={
+        "digest": plan["digest"], "action": "replace", "plan": plan["plan"],
+        "confirmation": True,
+        "approval": {"grants": ["E"], "capability_type": "inform"},
+    }).get_json()["intent"]
+    metadata.update({"approval_intent": intent, "save_plan": plan["plan"]})
+    return {"binary": _words(2), "metadata": metadata}
 
 
 def test_replacement_updates_binary_approval_namespace_and_boot(repository):

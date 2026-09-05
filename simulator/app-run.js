@@ -14481,7 +14481,7 @@ function _persistNamespaceSlotLabel(slot, label) {
 }
 window._persistNamespaceSlotLabel = _persistNamespaceSlotLabel;
 
-function confirmSaveToNamespace() {
+async function confirmSaveToNamespace() {
     const slotSel = document.getElementById('saveNSSlot');
     const label = document.getElementById('saveNSLabel').value.trim();
     if (!label) {
@@ -14720,6 +14720,21 @@ function confirmSaveToNamespace() {
                 token:        _svTok || undefined,
             }
         };
+        let _saveApproval;
+        try {
+            if (typeof window._confirmLumpSavePlan !== 'function') {
+                throw new Error('Save-plan approval helper is unavailable');
+            }
+            _saveApproval = await window._confirmLumpSavePlan(
+                _svPayload.binary, _svPayload.metadata,
+                () => `Save "${_svAbsName}" to Namespace slot ${idx}?`);
+            if (!_saveApproval) return;
+            _svPayload.metadata.approval_intent = _saveApproval.intent.intent;
+            _svPayload.metadata.save_plan_id = _saveApproval.plan.plan_id;
+        } catch (err) {
+            _showFpgaToast('LUMP Save Plan Failed', err.message, 'error', 10000);
+            return;
+        }
         _lumpSaveRequest(fetch, '/api/lumps/save', _svPayload, function(resp) {
             try {
                 // The preflight-selected index is part of the server payload;

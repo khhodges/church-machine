@@ -17,6 +17,7 @@ import gzip as _gzip
 import queue
 import threading
 import contextlib
+import contextvars
 import fcntl
 import requests as http_requests
 import html as _html
@@ -6325,11 +6326,77 @@ from server.lump_approvals import read_approvals as _shared_read_approvals
 from server.lump_approvals import write_approvals as _shared_write_approvals
 _LUMP_APPROVAL_INTENTS = {}
 _LUMP_APPROVAL_INTENTS_LOCK = threading.Lock()
+_LUMP_SAVE_PLANS = {}
+_LUMP_SAVE_PLANS_LOCK = threading.Lock()
+# The preflight endpoint runs the exact save canonicalisation path with this
+# request-local payload override.  It is deliberately not a client-visible
+# save mode.
+_lump_save_payload_override = contextvars.ContextVar(
+    "_lump_save_payload_override", default=None)
 _LUMP_APPROVAL_INTENT_FIELDS = frozenset({
     "abstraction", "author", "version", "release_notes", "history_note",
     "display_name", "documentation", "annotations",
     "pet_name", "pet_names", "grants", "capability_type", "portable_binding",
 })
+
+def _manifest_entry_identity(entry):
+    """A stable identity for the destination being approved."""
+    if entry is None:
+        return None
+    return hashlib.sha256(json.dumps(
+        entry, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")).hexdigest()
+
+
+def _authoritative_lump_library_generation(lumps_dir, manifest_path, manifest):
+    """Digest the authoritative manifest and every live artifact it selects."""
+    try:
+        selected = []
+        for entry in manifest:
+            if not isinstance(entry, dict):
+                raise ValueError("manifest entry is not an object")
+            filename = entry.get("filename")
+            if not isinstance(filename, str) or not filename:
+                raise ValueError("manifest entry has no filename")
+            path = _lump_transition_path(lumps_dir, filename)
+            with open(path, "rb") as source:
+                selected.append((entry, hashlib.sha256(source.read()).hexdigest()))
+        return hashlib.sha256(json.dumps(
+            selected, sort_keys=True, separators=(",", ":"), default=str
+        ).encode("utf-8")).hexdigest()
+    except (OSError, TypeError, ValueError) as exc:
+        raise ValueError(
+            f"authoritative library generation is unavailable: {exc}") from exc
+
+
+def _check_lump_save_plan(plan, *, digest, action, token, filename,
+                          consequence, replacement_identity, generation,
+                          consume=False):
+    """Validate (and only at mutation time consume) a save plan."""
+    plan_id = str(plan or "")
+    with _LUMP_SAVE_PLANS_LOCK:
+        record = _LUMP_SAVE_PLANS.get(plan_id)
+        if record is None:
+            raise ValueError("a valid save plan is required")
+        if record["expires"] < time.time():
+            _LUMP_SAVE_PLANS.pop(plan_id, None)
+            raise ValueError("save plan has expired")
+        if record["session"] != session.get("_lump_approval_session"):
+            raise ValueError("save plan belongs to a different session")
+        checks = {
+            "digest": digest, "action": action, "token": token,
+            "filename": filename, "consequence": consequence,
+            "replacement_identity": replacement_identity,
+            "generation": generation,
+        }
+        for key, actual in checks.items():
+            if record[key] != actual:
+                if key == "generation":
+                    raise ValueError("save plan is stale: authoritative library changed")
+                raise ValueError(f"save plan {key.replace('_', ' ')} does not match")
+        if consume:
+            _LUMP_SAVE_PLANS.pop(plan_id, None)
+    return record
 
 
 def _parse_intrinsic_lump_content(words):
@@ -6475,7 +6542,7 @@ def _write_lump_approval(lumps_dir, binary_hash, metadata):
 def create_lump_approval_intent():
     """Issue a one-time, session-bound approval intent after UI confirmation.
 
-    Request: {digest, action, confirmation:true, approval:{...allowed fields...}}.
+    Request: {digest, action, plan, confirmation:true, approval:{...allowed fields...}}.
     The returned intent must accompany the matching mutation as
     metadata.approval_intent.  Intents are consumed exactly once.
     """
@@ -6492,17 +6559,34 @@ def create_lump_approval_intent():
     if set(supplied) - _LUMP_APPROVAL_INTENT_FIELDS:
         return jsonify({"error": "approval contains fields outside the strict allowlist"}), 400
     session_id = session.setdefault("_lump_approval_session", secrets.token_urlsafe(24))
+    plan_id = payload.get("plan", payload.get("plan_id"))
+    if action in {"save", "replace"}:
+        # Approval is meaningful only for the exact candidate/destination that
+        # was just presented to the user in a server-derived plan.
+        with _LUMP_SAVE_PLANS_LOCK:
+            plan = _LUMP_SAVE_PLANS.get(str(plan_id or ""))
+            if not plan:
+                return jsonify({"error": "a valid save plan is required"}), 403
+            if plan["expires"] < time.time():
+                _LUMP_SAVE_PLANS.pop(str(plan_id or ""), None)
+                return jsonify({"error": "save plan has expired"}), 403
+            if plan["session"] != session_id:
+                return jsonify({"error": "save plan belongs to a different session"}), 403
+            if plan["digest"] != digest or plan["action"] != action:
+                return jsonify({"error": "save plan digest or action does not match"}), 403
     intent = secrets.token_urlsafe(32)
     with _LUMP_APPROVAL_INTENTS_LOCK:
         _LUMP_APPROVAL_INTENTS[intent] = {
             "session": session_id, "digest": digest, "action": action,
-            "approval": dict(supplied), "expires": time.time() + 300,
+            "approval": dict(supplied), "plan": str(plan_id or ""),
+            "expires": time.time() + 300,
         }
     return jsonify({"intent": intent, "digest": digest, "action": action,
+                    "plan_id": str(plan_id or "") or None,
                     "expires_in": 300}), 201
 
 
-def _consume_lump_approval_intent(intent, digest, action):
+def _consume_lump_approval_intent(intent, digest, action, plan=None):
     # This process-local lock makes removal atomic among all server threads.
     # Deployments with multiple workers must provide shared process-safe intent
     # storage rather than routing one intent between workers.
@@ -6511,7 +6595,8 @@ def _consume_lump_approval_intent(intent, digest, action):
     session_id = session.get("_lump_approval_session")
     if (not record or record["expires"] < time.time() or
             record["session"] != session_id or record["digest"] != digest or
-            record["action"] != action):
+            record["action"] != action or
+            (action in {"save", "replace"} and record.get("plan") != str(plan or ""))):
         raise ValueError("a valid, unexpired session-bound approval intent is required")
     return record["approval"]
 
@@ -7385,6 +7470,26 @@ def get_lump_bundle():
     return resp
 
 
+@app.route("/api/lumps/save-plan", methods=["POST"])
+def preflight_lump_save_plan():
+    """Validate a candidate through save canonicalisation without writing it."""
+    candidate = request.get_json(force=True, silent=True)
+    if not isinstance(candidate, dict):
+        return jsonify({"error": "Invalid JSON payload"}), 400
+    metadata = candidate.get("metadata", {})
+    if not isinstance(metadata, dict):
+        return jsonify({"error": "metadata must be an object"}), 400
+    # This endpoint is the sole producer of the private preflight marker.
+    planned = dict(candidate)
+    planned["metadata"] = dict(metadata, _save_plan_preflight=True)
+    session.setdefault("_lump_approval_session", secrets.token_urlsafe(24))
+    reset = _lump_save_payload_override.set(planned)
+    try:
+        return save_lump()
+    finally:
+        _lump_save_payload_override.reset(reset)
+
+
 @app.route("/api/lumps/save", methods=["POST"])
 def save_lump():
     """Save a compiled LUMP binary and hash-bound approval.
@@ -7396,7 +7501,9 @@ def save_lump():
     Returns the token and saved file paths.
     """
     import datetime as _dt
-    payload = request.get_json(force=True, silent=True)
+    payload = _lump_save_payload_override.get()
+    if payload is None:
+        payload = request.get_json(force=True, silent=True)
     if not payload:
         return jsonify({"error": "Invalid JSON payload"}), 400
 
@@ -8230,11 +8337,60 @@ def save_lump():
     if _lumps_manifest_pre_write_hook is not None:
         _lumps_manifest_pre_write_hook()  # noqa: not-callable — callable at runtime
 
+    _plan_consequence = "replace" if _existing_entry else "create"
+    _derived_save_action = "replace" if _existing_entry else "save"
+    # This endpoint only performs save/replace transitions. Alternate approval
+    # classes belong to their dedicated mutation endpoints and must never let
+    # an API caller bypass this endpoint's authoritative save plan.
+    _approval_action = _derived_save_action
+    _replacement_identity = _manifest_entry_identity(_existing_entry)
     try:
-        _approval_action = metadata.get(
-            "approval_action", "replace" if _existing_entry else "save")
+        _library_generation = _authoritative_lump_library_generation(
+            lumps_dir, manifest_path, manifest)
+    except ValueError as _generation_error:
+        return jsonify({"error": str(_generation_error)}), 409
+
+    if (metadata.get("_save_plan_preflight") is True
+            and _lump_save_payload_override.get() is not None):
+        _approval_action = _derived_save_action
+        plan_id = secrets.token_urlsafe(32)
+        with _LUMP_SAVE_PLANS_LOCK:
+            _LUMP_SAVE_PLANS[plan_id] = {
+                "session": session["_lump_approval_session"],
+                "digest": _binary_hash, "action": _approval_action,
+                "token": token8, "filename": lump_filename,
+                "consequence": _plan_consequence,
+                "replacement_identity": _replacement_identity,
+                "generation": _library_generation, "expires": time.time() + 300,
+            }
+        return jsonify({
+            "plan": plan_id, "plan_id": plan_id, "digest": _binary_hash,
+            "action": _approval_action,
+            "destination": lump_filename, "consequence": _plan_consequence,
+            "replacement_identity": _replacement_identity,
+            "current_lump": ({
+                "abstraction": _existing_entry.get("abstraction"),
+                "display_name": _existing_entry.get("display_name"),
+                "dot_name": _existing_entry.get("dot_name"),
+                "token": _existing_entry.get("token"),
+                "filename": _existing_entry.get("filename"),
+            } if _existing_entry else None),
+            "expires_in": 300,
+        }), 201
+
+    try:
+        _save_plan_id = metadata.get(
+            "save_plan", metadata.get("save_plan_id", metadata.get("plan")))
+        if _approval_action in {"save", "replace"}:
+            _check_lump_save_plan(
+                _save_plan_id, digest=_binary_hash,
+                action=_approval_action, token=token8, filename=lump_filename,
+                consequence=_plan_consequence,
+                replacement_identity=_replacement_identity,
+                generation=_library_generation, consume=True)
         _intent_approval = _consume_lump_approval_intent(
-            metadata.get("approval_intent"), _binary_hash, _approval_action)
+            metadata.get("approval_intent"), _binary_hash, _approval_action,
+            _save_plan_id)
     except ValueError as _intent_error:
         return jsonify({"error": str(_intent_error)}), 403
     # Only explicit-intent allowlisted extrinsic fields are retained. Every
@@ -8248,6 +8404,7 @@ def save_lump():
         "issue_n": _issue_n_save, "identity_hash": _identity_hash,
         "abstraction": abs_name, "filename": lump_filename,
     })
+
 
     _remove_after_commit = ()
     if _exist_filename == f"{token8}.lump":

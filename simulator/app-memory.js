@@ -5504,6 +5504,14 @@ window.lumpSaveLump = async function(nsIdx) {
     };
     if (_meta.version) metadata.version = _meta.version;
     try {
+        if (typeof window._confirmLumpSavePlan !== 'function') {
+            throw new Error('Save-plan approval helper is unavailable');
+        }
+        const approval = await window._confirmLumpSavePlan(
+            words, metadata, () => `Save "${absName}" to the LUMP repository?`);
+        if (!approval) return;
+        metadata.approval_intent = approval.intent.intent;
+        metadata.save_plan_id = approval.plan.plan_id;
         const resp = await fetch('/api/lumps/save', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },

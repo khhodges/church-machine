@@ -32,12 +32,33 @@ const sandbox = {
     fetch: async (url, options) => {
         const body = JSON.parse(options.body);
         requests.push({ url, options, body });
+        if (url === '/api/lumps/save-plan') {
+            return {
+                ok: true,
+                json: async () => ({
+                    plan_id: body.metadata.token === 'same-token' ? 'replace-plan' : 'create-plan',
+                    action: body.metadata.token === 'same-token' ? 'replace' : 'save',
+                    consequence: body.metadata.token === 'same-token' ? 'replace' : 'create',
+                    digest: body.metadata.token === 'canonicalized'
+                        ? 'f'.repeat(64)
+                        : createHash('sha256').update(Buffer.from(
+                            body.binary.flatMap(word => [
+                                (word >>> 24) & 0xFF, (word >>> 16) & 0xFF,
+                                (word >>> 8) & 0xFF, word & 0xFF
+                            ])
+                        )).digest('hex'),
+                    current_lump: body.metadata.token === 'same-token'
+                        ? { abstraction: 'Named.Current', token: 'same-token' } : null
+                })
+            };
+        }
         return {
             ok: true,
             json: async () => ({
                 intent: 'one-time-intent',
                 digest: body.digest,
-                action: body.action
+                action: body.action,
+                plan_id: body.plan
             })
         };
     }
@@ -51,10 +72,10 @@ vm.runInContext(source.slice(start, end), sandbox);
     words.forEach((word, i) => bytes.writeUInt32BE(word >>> 0, i * 4));
     const expected = createHash('sha256').update(bytes).digest('hex');
 
-    async function flow(confirmed) {
-        if (!confirmed) return null;
-        return sandbox.window._requestLumpApprovalIntent(words, 'save', {
+    async function flow(confirmed, token) {
+        const metadata = {
             abstraction: 'Approved.Name',
+            token,
             author: 'Alice',
             cw: 999,
             cc: 999,
@@ -68,29 +89,58 @@ vm.runInContext(source.slice(start, end), sandbox);
             api_definition: { methods: [] },
             clist_entries: [0],
             typ: 7
-        });
+        };
+        const plan = await sandbox.window._requestLumpSavePlan(words, metadata);
+        if (!confirmed) return null;
+        return sandbox.window._requestLumpApprovalIntent(words, plan.action, metadata, plan);
     }
 
     await flow(false);
-    check('cancel requests no approval intent', requests.length === 0);
+    check('cancellation obtains only a pre-confirmation save plan',
+        requests.length === 1 && requests[0].url === '/api/lumps/save-plan');
 
     const result = await flow(true);
-    check('intent requested only after confirmation', requests.length === 1);
+    check('intent requested only after a save plan and confirmation', requests.length === 3);
     check('request uses approval-intent endpoint',
-        requests[0].url === '/api/lumps/approval-intent');
+        requests[2].url === '/api/lumps/approval-intent');
     check('digest is lowercase SHA-256 of exact big-endian words',
-        requests[0].body.digest === expected && /^[0-9a-f]{64}$/.test(expected));
+        requests[2].body.digest === expected && /^[0-9a-f]{64}$/.test(expected));
     check('request binds action and explicit confirmation',
-        requests[0].body.action === 'save' && requests[0].body.confirmation === true);
+        requests[2].body.action === 'save' && requests[2].body.confirmation === true &&
+        requests[2].body.plan === 'create-plan');
     check('approval object uses strict non-intrinsic allowlist',
-        requests[0].body.approval.abstraction === 'Approved.Name' &&
-        requests[0].body.approval.author === 'Alice' &&
-        !('cw' in requests[0].body.approval) &&
+        requests[2].body.approval.abstraction === 'Approved.Name' &&
+        requests[2].body.approval.author === 'Alice' &&
+        !('cw' in requests[2].body.approval) &&
         !['cc', 'lump_size', 'source', 'methods', 'capabilities', 'language',
             'profile', 'content_type', 'api_definition', 'clist_entries', 'typ']
-            .some(key => key in requests[0].body.approval));
+            .some(key => key in requests[2].body.approval));
     check('server one-time intent is returned to mutation caller',
         result.intent === 'one-time-intent' && result.digest === expected);
+    check('server plan determines create/replace display, including named current LUMP',
+        sandbox.window._formatLumpSavePlan({
+            action: 'save', consequence: 'create'
+        }) === 'Create a new LUMP.' &&
+        sandbox.window._formatLumpSavePlan({
+            action: 'replace', consequence: 'replace',
+            current_lump: { abstraction: 'Named.Current' }
+        }) === 'Replace current LUMP "Named.Current".');
+    const newToken = await flow(true);
+    const newTokenPlanRequest = requests[3];
+    const newTokenIntentRequest = requests[4];
+    check('same abstraction with a new token remains a server-authored create',
+        newTokenPlanRequest.body.metadata.token === undefined &&
+        newTokenIntentRequest.body.action === 'save' && newToken.plan_id === 'create-plan');
+    const same = await flow(true, 'same-token');
+    const samePlanRequest = requests[5];
+    const sameIntentRequest = requests[6];
+    check('same-token replacement binds the returned plan, not a local inference',
+        samePlanRequest.url === '/api/lumps/save-plan' &&
+        sameIntentRequest.body.action === 'replace' &&
+        sameIntentRequest.body.plan === 'replace-plan' && same.plan_id === 'replace-plan');
+    await flow(true, 'canonicalized');
+    check('save intent uses the server canonical digest when preflight changes bytes',
+        requests[8].body.digest === 'f'.repeat(64));
 
     const memory = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
     const shell = fs.readFileSync(path.join(__dirname, 'app-shell.js'), 'utf8');
@@ -181,14 +231,23 @@ vm.runInContext(source.slice(start, end), sandbox);
         server.includes('_LUMP_APPROVAL_INTENTS.pop(str(intent or \"\"), None)'));
 
     const compile = fs.readFileSync(path.join(__dirname, 'app-compile.js'), 'utf8');
+    const run = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
+    check('all browser save callers obtain server save-plan approval first',
+        lumps.includes('_confirmLumpSavePlan(words, metadata') &&
+        compile.includes('window._confirmLumpSavePlan(') &&
+        run.includes('window._confirmLumpSavePlan(') &&
+        memory.includes('window._confirmLumpSavePlan('));
+    check('save-plan request preserves the original binary and metadata payload',
+        lumps.includes('body: JSON.stringify({ binary: words, metadata: metadata || {} })') &&
+        !lumps.includes('metadata.source =') &&
+        !compile.includes('savePayload.metadata.source ='));
     const saveStart = compile.indexOf('async function compileAndBuild()');
     const saveEnd = compile.indexOf('\nfunction ', saveStart + 1);
     const saveFlow = compile.slice(saveStart, saveEnd > saveStart ? saveEnd : undefined);
     check('genuine immutable save submits a confirmed one-time intent atomically',
-        saveFlow.includes('confirm(`Save "') &&
-        saveFlow.includes("_requestLumpApprovalIntent(") &&
-        saveFlow.includes('savePayload.metadata.approval_intent = _buildIntent.intent') &&
-        saveFlow.indexOf('approval_intent = _buildIntent.intent') <
+        saveFlow.includes('window._confirmLumpSavePlan(') &&
+        saveFlow.includes('savePayload.metadata.approval_intent = _buildApproval.intent.intent') &&
+        saveFlow.indexOf('approval_intent = _buildApproval.intent.intent') <
             saveFlow.indexOf("fetch('/api/lumps/save'"));
 
     const forkStart = lumps.indexOf('const _onFirstEdit = async () =>');

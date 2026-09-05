@@ -90,7 +90,7 @@ def test_invalid_first_consumer_burns_approval_intent():
     digest = hashlib.sha256(_lump()).hexdigest()
     client = app_module.app.test_client()
     response = client.post("/api/lumps/approval-intent", json={
-        "digest": digest, "action": "save", "confirmation": True,
+        "digest": digest, "action": "deploy", "confirmation": True,
         "approval": {},
     })
     intent = response.get_json()["intent"]
@@ -100,9 +100,9 @@ def test_invalid_first_consumer_burns_approval_intent():
     with app_module.app.test_request_context("/"):
         app_module.session["_lump_approval_session"] = session_id
         with pytest.raises(ValueError):
-            app_module._consume_lump_approval_intent(intent, "0" * 64, "save")
+            app_module._consume_lump_approval_intent(intent, "0" * 64, "deploy")
         with pytest.raises(ValueError):
-            app_module._consume_lump_approval_intent(intent, digest, "save")
+            app_module._consume_lump_approval_intent(intent, digest, "deploy")
     assert intent not in app_module._LUMP_APPROVAL_INTENTS
 
 
@@ -266,7 +266,7 @@ def test_approval_intent_is_issued_only_after_confirmation():
     digest = "a" * 64
     client = app_module.app.test_client()
     response = client.post("/api/lumps/approval-intent", json={
-        "digest": digest, "action": "save", "confirmation": True,
+        "digest": digest, "action": "deploy", "confirmation": True,
         "approval": {"author": "reviewer", "grants": ["E"]},
     })
     assert response.status_code == 201
@@ -277,14 +277,14 @@ def test_approval_intent_rejects_unconfirmed_or_unallowlisted_fields():
     client = app_module.app.test_client()
     digest = "b" * 64
     assert client.post("/api/lumps/approval-intent", json={
-        "digest": digest, "action": "save", "confirmation": False, "approval": {},
+        "digest": digest, "action": "deploy", "confirmation": False, "approval": {},
     }).status_code == 400
     assert client.post("/api/lumps/approval-intent", json={
-        "digest": digest, "action": "save", "confirmation": True,
+        "digest": digest, "action": "deploy", "confirmation": True,
         "approval": {"authorized": True},
     }).status_code == 400
     assert client.post("/api/lumps/approval-intent", json={
-        "digest": digest, "action": "save", "confirmation": True,
+        "digest": digest, "action": "deploy", "confirmation": True,
         "approval": {"filename": "client-controlled.lump"},
     }).status_code == 400
 

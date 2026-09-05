@@ -1212,9 +1212,12 @@ async function _doWipVersionSave() {
     // Clear WIP token — this abstraction is now a proper released version
     try { localStorage.removeItem('church_wip_token'); } catch (_e) {}
 
-    const _wipIntent = await window._requestLumpApprovalIntent(
-        savePayload.binary, 'replace', savePayload.metadata);
-    savePayload.metadata.approval_intent = _wipIntent.intent;
+    const _wipApproval = await window._confirmLumpSavePlan(
+        savePayload.binary, savePayload.metadata,
+        () => `Save the tested version of "${absName}"?`);
+    if (!_wipApproval) return;
+    savePayload.metadata.approval_intent = _wipApproval.intent.intent;
+    savePayload.metadata.save_plan_id = _wipApproval.plan.plan_id;
     fetch('/api/lumps/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1340,12 +1343,12 @@ async function _confirmLumpRelease() {
 
     data.savePayload.metadata.version = ver;
     if (notes) data.savePayload.metadata.release_notes = notes;
-    const _releaseExisting = typeof _lumpsCache !== 'undefined' &&
-        _lumpsCache.some(l => l.abstraction === data.absName);
-    const _releaseIntent = await window._requestLumpApprovalIntent(
-        data.savePayload.binary, _releaseExisting ? 'replace' : 'save',
-        data.savePayload.metadata);
-    data.savePayload.metadata.approval_intent = _releaseIntent.intent;
+    const _releaseApproval = await window._confirmLumpSavePlan(
+        data.savePayload.binary, data.savePayload.metadata,
+        () => `Release version "${ver}" of "${data.absName}"?`);
+    if (!_releaseApproval) return;
+    data.savePayload.metadata.approval_intent = _releaseApproval.intent.intent;
+    data.savePayload.metadata.save_plan_id = _releaseApproval.plan.plan_id;
 
     fetch('/api/lumps/save', {
         method: 'POST',
@@ -1810,13 +1813,12 @@ async function compileAndBuild() {
         return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
     })();
     savePayload.metadata.version = _autoVer;
-    if (!confirm(`Save "${absName}" as a new immutable LUMP?\n\n` +
-        'Approval will be bound to the exact SHA-256 of the compiled binary.')) return;
-    const _existingArtifact = typeof _lumpsCache !== 'undefined' &&
-        Array.isArray(_lumpsCache) && _lumpsCache.some(l => l.abstraction === absName);
-    const _buildIntent = await window._requestLumpApprovalIntent(
-        savePayload.binary, _existingArtifact ? 'replace' : 'save', savePayload.metadata);
-    savePayload.metadata.approval_intent = _buildIntent.intent;
+    const _buildApproval = await window._confirmLumpSavePlan(
+        savePayload.binary, savePayload.metadata,
+        () => `Save "${absName}" as an immutable LUMP?\n\nApproval will be bound to the exact SHA-256 of the compiled binary.`);
+    if (!_buildApproval) return;
+    savePayload.metadata.approval_intent = _buildApproval.intent.intent;
+    savePayload.metadata.save_plan_id = _buildApproval.plan.plan_id;
 
     // ── WIP version gate ──────────────────────────────────────────────────────
     // If a WIP token is stored (programmer came from the /start page), defer
