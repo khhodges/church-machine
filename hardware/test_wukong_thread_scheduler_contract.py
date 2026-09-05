@@ -312,7 +312,7 @@ def test_all_frame_paths_follow_the_scheduler_active_thread_base():
     assert "thread_base_latched.eq(self.thread_base)" in return_source
 
 
-def _thread_switch_core_image(decoded_change):
+def _thread_switch_core_image(decoded_change, corruption=None):
     """Return a bootable image with two canonical scheduler Thread frames."""
     dmem = _build_dmem_init()
     source_code_base = 0x600
@@ -375,6 +375,10 @@ def _thread_switch_core_image(decoded_change):
     dmem[thread_word + layout["stack_end"]] = (
         layout["stack_end"] | ((target_word + 1) << 13))
     dmem[thread_word + layout["caps_start"]] = target_gt
+    if corruption == "null_egt":
+        dmem[thread_word + layout["stack_end"] - 1] = 0
+    elif corruption is not None:
+        raise ValueError(f"unknown Thread-switch corruption: {corruption}")
     return (
         dmem,
         source_code_base + 4,
@@ -524,3 +528,84 @@ def test_full_core_thread_switch_resume_nia_contract(decoded_change):
             instruction == decoded_change_instr
             for _, instruction, _ in observed
         ) == 1
+
+
+def test_full_core_failed_thread_switch_preserves_source_context():
+    """A rejected target frame cannot partially serialize the running Thread."""
+    (dmem, source_first, _source_next, _target_first, _target_instr,
+     source_instr, _decoded_change_instr) = _thread_switch_core_image(
+         False, corruption="null_egt")
+    dut = BootRomHarness(dmem)
+
+    async def bench(ctx):
+        ctx.set(dut.core.defer_fault_reset, 1)
+        ctx.set(dut.core.thread_switch_req, 0)
+        ctx.set(dut.core.thread_switch_index, 11)
+
+        for _ in range(800):
+            if ctx.get(dut.core.nia) == source_first:
+                break
+            await ctx.tick()
+        else:
+            raise AssertionError("source program was not entered")
+
+        source_crs = tuple(
+            tuple(ctx.get(word) for word in cr)
+            for cr in dut.core.debug_cr_words
+        )
+        source_drs = tuple(ctx.get(word) for word in dut.core.debug_dr_words)
+        source_slot = ctx.get(dut.core.active_thread_slot)
+        source_base = ctx.get(dut.core.active_thread_base)
+
+        ctx.set(dut.core.thread_switch_req, 1)
+        for _ in range(20):
+            await ctx.delay(1e-9)
+            if ctx.get(dut.core.thread_switch_busy):
+                await ctx.tick()
+                break
+            await ctx.tick()
+        else:
+            raise AssertionError("scheduler request was not accepted")
+        ctx.set(dut.core.thread_switch_req, 0)
+
+        for _ in range(2500):
+            await ctx.delay(1e-9)
+            if ctx.get(dut.core.thread_switch_fault):
+                assert ctx.get(dut.core.fault) == FaultType.NULL_CAP
+                assert ctx.get(dut.core.nia) == source_first
+                assert ctx.get(dut.core.active_thread_slot) == source_slot
+                assert ctx.get(dut.core.active_thread_base) == source_base
+                assert tuple(
+                    tuple(ctx.get(word) for word in cr)
+                    for cr in dut.core.debug_cr_words
+                ) == source_crs
+                assert tuple(
+                    ctx.get(word) for word in dut.core.debug_dr_words
+                ) == source_drs
+                await ctx.tick()
+                break
+            await ctx.tick()
+        else:
+            raise AssertionError("invalid target Thread did not fault")
+
+        for _ in range(400):
+            if ctx.get(dut.core.retire_valid):
+                retire = (
+                    ctx.get(dut.core.retire_nia),
+                    ctx.get(dut.core.retire_instr),
+                    bool(ctx.get(dut.core.retire_fault_valid)),
+                )
+                if retire == (source_first, source_instr, False):
+                    break
+            await ctx.tick()
+        else:
+            raise AssertionError("pending source instruction did not recover")
+
+        assert ctx.get(dut.core.debug_dr_words[1]) == source_drs[1] + 1
+        assert ctx.get(dut.core.active_thread_slot) == source_slot
+        assert ctx.get(dut.core.active_thread_base) == source_base
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(bench)
+    sim.run()
