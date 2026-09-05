@@ -89,6 +89,13 @@ def _encode_instr(opcode: int, cond: int = 14) -> int:
             id="change",
         ),
         pytest.param(
+            ChurchOpcode.CALL,
+            3,
+            [_TRACE_EV_CALL_CR6, _TRACE_EV_CALL_CR14, _TRACE_EV_CALL_PUSH],
+            [0x55555555, 0x66666666, 0],
+            id="call",
+        ),
+        pytest.param(
             ChurchOpcode.ELOADCALL,
             3,
             [_TRACE_EV_CALL_CR6, _TRACE_EV_CALL_CR14, _TRACE_EV_CALL_PUSH],
