@@ -2685,6 +2685,90 @@ const ChurchSimulator = require('./simulator.js');
 // or just increments by 1 (branch not taken).  This exercises the full
 // fetch → decode → _execBranch path and catches condition-evaluation regressions.
 
+// BRV: Program-level overflow branch tests.  Unlike the single-step branch tests
+// below, these cases let IADD/ISUB produce NZCV and immediately consume the live
+// V flag with VS/VC.  DR14 is the wrong-path marker; DR15 is the taken-path marker.
+function runArithmeticOverflowBranchTest({
+    id, arithmetic, condition, dr1, dr3, expectedResult, expectedFlags,
+}) {
+    const source = `${arithmetic}
+BRANCH${condition} taken
+IADD DR14, DR0, #1
+BRANCH done
+taken:
+IADD DR15, DR0, #1
+done:
+NOP`;
+    const asm = new ChurchAssembler();
+    const result = asm.assemble(source);
+    assert(`${id} assembles with no errors`,
+        asm.errors.length === 0,
+        asm.errors.map(e => e.message).join('; '));
+
+    const sim = new ChurchSimulator();
+    for (let i = 0; i < result.words.length; i++) sim.memory[i] = result.words[i] >>> 0;
+    sim.dr[1] = dr1 >>> 0;
+    sim.dr[3] = dr3 >>> 0;
+
+    sim.step(); // arithmetic produces the live flags consumed by the next instruction
+    assert(`${id} arithmetic result`,
+        (sim.dr[2] >>> 0) === (expectedResult >>> 0),
+        `expected 0x${(expectedResult >>> 0).toString(16).toUpperCase()} got 0x${(sim.dr[2] >>> 0).toString(16).toUpperCase()}`);
+    for (const flag of ['N', 'Z', 'C', 'V']) {
+        assert(`${id} ${flag} flag is ${expectedFlags[flag] ? 1 : 0}`,
+            sim.flags[flag] === expectedFlags[flag],
+            `${flag}=${sim.flags[flag]}`);
+    }
+
+    sim.step(); // VS/VC
+    sim.step(); // taken-path marker
+    sim.step(); // NOP at done
+    assert(`${id} skips wrong-path marker`, (sim.dr[14] >>> 0) === 0,
+        `DR14=${sim.dr[14] >>> 0}`);
+    assert(`${id} executes taken-path marker`, (sim.dr[15] >>> 0) === 1,
+        `DR15=${sim.dr[15] >>> 0}`);
+}
+
+runArithmeticOverflowBranchTest({
+    id: 'BRV1 IADD overflow followed by VS',
+    arithmetic: 'IADD DR2, DR1, DR3',
+    condition: 'VS',
+    dr1: 0x7FFFFFFF,
+    dr3: 1,
+    expectedResult: 0x80000000,
+    expectedFlags: { N: true, Z: false, C: false, V: true },
+});
+
+runArithmeticOverflowBranchTest({
+    id: 'BRV2 ISUB overflow followed by VS',
+    arithmetic: 'ISUB DR2, DR1, DR3',
+    condition: 'VS',
+    dr1: 0x7FFFFFFF,
+    dr3: 0xFFFFFFFF,
+    expectedResult: 0x80000000,
+    expectedFlags: { N: true, Z: false, C: false, V: true },
+});
+
+runArithmeticOverflowBranchTest({
+    id: 'BRV3 IADD non-overflow followed by VC',
+    arithmetic: 'IADD DR2, DR1, DR3',
+    condition: 'VC',
+    dr1: 1,
+    dr3: 1,
+    expectedResult: 2,
+    expectedFlags: { N: false, Z: false, C: false, V: false },
+});
+
+runArithmeticOverflowBranchTest({
+    id: 'BRV4 ISUB non-overflow followed by VC',
+    arithmetic: 'ISUB DR2, DR1, DR3',
+    condition: 'VC',
+    dr1: 5,
+    dr3: 3,
+    expectedResult: 2,
+    expectedFlags: { N: false, Z: false, C: true, V: false },
+});
+
 // BR1: Unconditional BRANCH +2 (AL — always taken) at PC=0 → PC must be 2.
 //   Program: BRANCH +2 / MCMP DR0, DR0 / MCMP DR0, DR0
 //   The two trailing MCMP words make targets 1 and 2 valid within the lump.
