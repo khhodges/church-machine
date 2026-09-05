@@ -29,3 +29,16 @@ silently restore obsolete instructions.
 
 **How to apply:** Keep archival artifacts for provenance, but never expose
 their filename as a runnable LUMP alias.
+
+The physical Wukong factory CapabilityTest is a fixed 64-word image even when
+the active Namespace slot 10 record is replaced by a larger simulator LUMP.
+A release must not repoint the factory alias at the active larger binary or
+drop the factory variant's archived manifest binding.
+
+**Why:** A slot-10 replacement redirected the factory alias to a 512-word
+binary. The main server then failed during `boot_rom` import before opening its
+port.
+
+**How to apply:** Treat the physical factory image and the active Namespace
+record as separate same-slot variants; preserve the exact factory
+binary/sidecar/hash binding through every replacement.

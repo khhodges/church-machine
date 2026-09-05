@@ -71,6 +71,15 @@ export default defineConfig({
     strictPort: true,
     host: '0.0.0.0',
     allowedHosts: true,
+    // This artifact owns /ide-intro/ on the shared Replit development
+    // domain. Forward every other route to the primary Church Machine server
+    // so /simulator/, APIs, and hardware endpoints remain available there.
+    proxy: {
+      '^/(?!ide-intro(?:/|$))': {
+        target: 'http://127.0.0.1:5000',
+        changeOrigin: false,
+      },
+    },
     fs: {
       strict: true,
     },
