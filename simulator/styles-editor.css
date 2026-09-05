@@ -645,6 +645,13 @@
     color: #6b7280;
 }
 
+/* Preserve live simulator state on touch devices. Pull-to-refresh is restored
+   as soon as continuous Run, Walk, or animated Boot execution stops. */
+html.sim-executing,
+html.sim-executing body {
+    overscroll-behavior-y: none;
+}
+
 /* Popup audit: anchored toolbar panels stay inside narrow/zoomed viewports. */
 @media (max-width: 600px) {
     .step-settings-popover,

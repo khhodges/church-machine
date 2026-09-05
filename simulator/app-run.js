@@ -1657,11 +1657,23 @@ function stopSim() {
     _runStopped = true;
 }
 
+// Mobile browsers interpret downward overscroll at the top of the page as a
+// full-page refresh.  Losing the simulator while an asynchronous Run, Walk, or
+// animated Boot is active destroys the live machine state, so suppress that
+// browser gesture only for the lifetime of continuous execution.
+function _syncPullToRefreshGuard() {
+    const active = !!(_simRunActive || walkRunning || bootAnimating);
+    if (document && document.documentElement) {
+        document.documentElement.classList.toggle('sim-executing', active);
+    }
+}
+
 function _showStopBtn(show) {
     const runBtn  = document.getElementById('btnRunSim');
     const stopBtn = document.getElementById('btnStopSim');
     if (runBtn)  runBtn.style.display  = show ? 'none' : '';
     if (stopBtn) stopBtn.style.display = show ? '' : 'none';
+    if (typeof _syncPullToRefreshGuard === 'function') _syncPullToRefreshGuard();
 }
 
 document.addEventListener('mousedown', function(e) {
@@ -1996,6 +2008,7 @@ function finishWalk() {
     if (walkBootTimer) { clearInterval(walkBootTimer); walkBootTimer = null; }
     if (pipelineViz) pipelineViz.stopAnimation();
     if (sim) sim.walkActive = false;
+    if (typeof _syncPullToRefreshGuard === 'function') _syncPullToRefreshGuard();
     updateWalkBtn();
     updateThreadControl();
     updateDashboard();
@@ -2007,6 +2020,7 @@ function walkToggle() {
     }
     walkRunning = true;
     sim.walkActive = true;
+    if (typeof _syncPullToRefreshGuard === 'function') _syncPullToRefreshGuard();
     updateWalkBtn();
     updateThreadControl();
     if (!sim.bootComplete) {
@@ -2177,6 +2191,7 @@ function instantBoot() {
     if (bootAnimating) {
         if (_bootAnimTimer !== null) { clearTimeout(_bootAnimTimer); _bootAnimTimer = null; }
         bootAnimating = false;
+        if (typeof _syncPullToRefreshGuard === 'function') _syncPullToRefreshGuard();
     }
     _bootAuditAccum = [];
     sim.auditLog = [];
@@ -2209,6 +2224,7 @@ function slowBoot() {
     if (bootAnimating || sim.bootComplete || sim.halted) return;
     const _savedBootEntrySlow = sim.bootEntrySlot;  // restored in catch on boot error
     bootAnimating = true;
+    if (typeof _syncPullToRefreshGuard === 'function') _syncPullToRefreshGuard();
     if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(0)); pipelineViz.render(); }  // prime NIA to B:00 before first step
     switchView('pipeline');  // show pipeline so boot-step overview is immediately visible
     const delay = 800;
@@ -2216,6 +2232,7 @@ function slowBoot() {
         try {
             if (sim.bootComplete || sim.halted) {
                 bootAnimating = false;
+                if (typeof _syncPullToRefreshGuard === 'function') _syncPullToRefreshGuard();
                 _bootAnimTimer = null;
                 if (sim.halted) _recordUnreportedBootFailure('boot sequence stopped');
                 const con = document.getElementById('editorConsole');
@@ -2301,6 +2318,7 @@ function slowBoot() {
         } catch(e) {
             sim.bootEntrySlot = _savedBootEntrySlow;
             bootAnimating = false;
+            if (typeof _syncPullToRefreshGuard === 'function') _syncPullToRefreshGuard();
             _bootAnimTimer = null;
             console.error('slowBoot nextPhase error:', e);
             _recordUnreportedBootFailure('boot animation failed', e);
