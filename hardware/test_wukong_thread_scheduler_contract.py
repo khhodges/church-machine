@@ -7,8 +7,18 @@ from amaranth.back import rtlil
 from amaranth.sim import Simulator
 
 from hardware.change import ChurchChange
+from hardware.boot_rom import encode_church, encode_turing
+from hardware.test_boot_rom_no_false_halt import BootRomHarness, _build_dmem_init
 from hardware.mload import ChurchMLoad
-from hardware.hw_types import FaultType, GT_TYPE_INFORM
+from hardware.hw_types import (
+    ChurchOpcode,
+    CondCode,
+    FaultType,
+    GT_TYPE_INFORM,
+    PERM_MASK_E,
+    TuringOpcode,
+    make_gt,
+)
 from server.boot_image import create_gt, integrity32, pack_lump_header, pack_ns_word1
 from hardware.thread_design import (
     THREAD_CAP_WORDS,
@@ -65,7 +75,8 @@ def test_change_contract_uses_canonical_church_suspension_frame():
     assert 'with m.State("SAVE_FRAME")' in source
     assert 'stack_slot_addr(' in source
     assert 'self.nia_restore_val.eq(incoming_frame[13:28] << 2)' in source
-    assert '(self.nia_current[2:17] + 1)[:15]' in source
+    assert 'nia_current_latched.eq(self.nia_current)' in source
+    assert '(nia_current_latched[2:17] + 1)[:15]' in source
     assert 'with m.State("PREFLIGHT_CAP_READ")' in source
     assert 'with m.State("PREFLIGHT_EGT_VALIDATE")' in source
     # Scheduler preflight's only successful edge into write-capable SAVE_*
@@ -299,3 +310,217 @@ def test_all_frame_paths_follow_the_scheduler_active_thread_base():
         ), f"{frame_path} must use the scheduler-selected active Thread base"
     return_source = Path("hardware/ret.py").read_text()
     assert "thread_base_latched.eq(self.thread_base)" in return_source
+
+
+def _thread_switch_core_image(decoded_change):
+    """Return a bootable image with two canonical scheduler Thread frames."""
+    dmem = _build_dmem_init()
+    source_code_base = 0x600
+    target_code_base = 0x2000
+    target_thread_base = 0x7000
+    target_thread_slot = 11
+    target_code_slot = 9
+    body_words = thread_body_words(2)
+    layout = thread_layout(body_words, 32)
+    assert layout["valid"]
+
+    def descriptor(slot, location, limit):
+        word = slot * 4
+        authority = pack_ns_word1(limit)
+        dmem[word] = location
+        dmem[word + 1] = authority
+        dmem[word + 2] = integrity32(location, authority)
+        dmem[word + 3] = 0
+
+    descriptor(target_thread_slot, target_thread_base, body_words - 1)
+    descriptor(target_code_slot, target_code_base, 4095)
+    target_gt = make_gt(
+        GT_TYPE_INFORM, PERM_MASK_E, slot_id=target_code_slot)
+
+    source_word = source_code_base // 4
+    # CHANGE frames carry absolute word NIAs, and admission checks those
+    # against cw. Keep each tiny test program at its real image address while
+    # retaining a code zone large enough to include that address.
+    dmem[source_word] = pack_lump_header(3, 400, 2, 0)
+    if decoded_change:
+        dmem[source_word + 1] = encode_church(
+            ChurchOpcode.CHANGE,
+            CondCode.AL,
+            cr_dst=14,
+            cr_src=15,
+            imm=target_thread_slot,
+        )
+        dmem[source_word + 2] = encode_turing(
+            TuringOpcode.IADD, CondCode.AL, dr_dst=1, dr_src=1, imm=1)
+        dmem[source_word + 3] = encode_turing(
+            TuringOpcode.BRANCH, CondCode.AL, imm=0)
+    else:
+        dmem[source_word + 1] = encode_turing(
+            TuringOpcode.IADD, CondCode.AL, dr_dst=1, dr_src=1, imm=1)
+        dmem[source_word + 2] = encode_turing(
+            TuringOpcode.BRANCH, CondCode.AL, imm=0)
+
+    target_word = target_code_base // 4
+    dmem[target_word] = pack_lump_header(6, target_word + 2, 1, 0)
+    dmem[target_word + 1] = encode_turing(
+        TuringOpcode.IADD, CondCode.AL, dr_dst=2, dr_src=2, imm=1)
+    dmem[target_word + 2] = encode_turing(
+        TuringOpcode.BRANCH, CondCode.AL, imm=0)
+
+    thread_word = target_thread_base // 4
+    dmem[thread_word] = pack_lump_header(2, 32, THREAD_CAP_WORDS, 2)
+    dmem[thread_word + THREAD_STO_OFFSET] = (
+        (layout["stack_end"] - 2) | (1 << 12))
+    dmem[thread_word + layout["stack_end"] - 1] = target_gt
+    dmem[thread_word + layout["stack_end"]] = (
+        layout["stack_end"] | ((target_word + 1) << 13))
+    dmem[thread_word + layout["caps_start"]] = target_gt
+    return (
+        dmem,
+        source_code_base + 4,
+        source_code_base + 8,
+        target_code_base + 4,
+        dmem[target_word + 1],
+        dmem[source_word + (2 if decoded_change else 1)],
+        dmem[source_word + 1] if decoded_change else None,
+    )
+
+
+@pytest.mark.parametrize("decoded_change", [False, True])
+def test_full_core_thread_switch_resume_nia_contract(decoded_change):
+    """A scheduler request preserves its boundary; CHANGE advances past itself."""
+    (dmem, source_first, source_next, target_first, target_instr,
+     source_resume_instr, decoded_change_instr) = \
+        _thread_switch_core_image(decoded_change)
+    dut = BootRomHarness(dmem)
+    observed = []
+
+    async def bench(ctx):
+        ctx.set(dut.core.thread_switch_req, 0)
+        ctx.set(dut.core.thread_switch_index, 11)
+
+        async def request_switch():
+            # Match the Wukong contract: the synchronized button request stays
+            # asserted until the core accepts it at a clean unit boundary.
+            ctx.set(dut.core.thread_switch_req, 1)
+            for _ in range(20):
+                await ctx.delay(1e-9)
+                if ctx.get(dut.core.thread_switch_busy):
+                    await ctx.tick()
+                    break
+                await ctx.tick()
+            else:
+                raise AssertionError("scheduler request was not accepted")
+            ctx.set(dut.core.thread_switch_req, 0)
+
+        # Wait until the boot CALL has selected the source program. For the
+        # external case, assert the request before that pending word can retire.
+        for _ in range(800):
+            if ctx.get(dut.core.nia) == source_first:
+                break
+            await ctx.tick()
+        else:
+            raise AssertionError("source program was not entered")
+
+        if not decoded_change:
+            await request_switch()
+
+        # The decoded case starts its own CHANGE. In either case, reaching and
+        # retiring the target instruction proves the canonical frame restored.
+        for _ in range(2500):
+            if ctx.get(dut.core.retire_valid):
+                retire = (
+                    ctx.get(dut.core.retire_nia),
+                    ctx.get(dut.core.retire_instr),
+                    bool(ctx.get(dut.core.retire_fault_valid)),
+                )
+                observed.append(retire)
+                if retire[2]:
+                    raise AssertionError(
+                        "instruction faulted before target retirement: "
+                        f"nia={retire[0]:#x} "
+                        f"fault={ctx.get(dut.core.retire_fault_code)}")
+                if retire[1] == target_instr:
+                    assert retire[0] == target_first
+                    await ctx.tick()
+                    break
+            if ctx.get(dut.core.thread_switch_fault):
+                raise AssertionError(
+                    "switch to Thread 11 faulted: "
+                    f"fault={ctx.get(dut.core.fault)} nia={ctx.get(dut.core.nia):#x}")
+            await ctx.tick()
+        else:
+            raise AssertionError(
+                "target instruction did not retire: "
+                f"nia={ctx.get(dut.core.nia):#x} "
+                f"fault={ctx.get(dut.core.fault)} "
+                f"fault_valid={ctx.get(dut.core.fault_valid)} "
+                f"switch_fault={ctx.get(dut.core.thread_switch_fault)} "
+                f"observed={observed[-8:]}")
+
+        ctx.set(dut.core.thread_switch_index, 1)
+        await request_switch()
+        for _ in range(2500):
+            if ctx.get(dut.core.retire_valid):
+                observed.append((
+                    ctx.get(dut.core.retire_nia),
+                    ctx.get(dut.core.retire_instr),
+                    bool(ctx.get(dut.core.retire_fault_valid)),
+                ))
+            if ctx.get(dut.core.thread_switch_complete):
+                break
+            await ctx.tick()
+        else:
+            raise AssertionError("switch back to Thread 1 timed out")
+
+        expected_resume = source_next if decoded_change else source_first
+        for _ in range(400):
+            if ctx.get(dut.core.retire_valid):
+                retire = (
+                    ctx.get(dut.core.retire_nia),
+                    ctx.get(dut.core.retire_instr),
+                    bool(ctx.get(dut.core.retire_fault_valid)),
+                )
+                observed.append(retire)
+                if retire[:2] == (expected_resume, source_resume_instr):
+                    break
+            await ctx.tick()
+        else:
+            raise AssertionError(
+                "resumed source instruction did not retire: "
+                f"nia={ctx.get(dut.core.nia):#x} "
+                f"dr1={ctx.get(dut.core.debug_dr_words[1])} "
+                f"observed={observed[-12:]}")
+
+        # Keep running long enough to expose an accidental replay.
+        for _ in range(20):
+            await ctx.tick()
+            if ctx.get(dut.core.retire_valid):
+                observed.append((
+                    ctx.get(dut.core.retire_nia),
+                    ctx.get(dut.core.retire_instr),
+                    bool(ctx.get(dut.core.retire_fault_valid)),
+                ))
+
+        assert ctx.get(dut.core.debug_dr_words[1]) == 1
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(bench)
+    sim.run()
+
+    expected_resume = source_next if decoded_change else source_first
+    assert not [retire for retire in observed if retire[2]], observed
+    assert [
+        event for event in observed
+        if event[:2] == (target_first, target_instr)
+    ] == [(target_first, target_instr, False)]
+    assert [
+        event for event in observed
+        if event[:2] == (expected_resume, source_resume_instr)
+    ] == [(expected_resume, source_resume_instr, False)]
+    if decoded_change:
+        assert sum(
+            instruction == decoded_change_instr
+            for _, instruction, _ in observed
+        ) == 1

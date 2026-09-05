@@ -98,6 +98,7 @@ class ChurchChange(Elaboratable):
         mask_latched     = Signal(16)
         cr_src_latched   = Signal(4)   # latched at change_start; self.cr_src is only valid
         cr_dst_latched   = Signal(4)   # at the decode cycle; NIA advances before FSM runs
+        nia_current_latched = Signal(32)
         thread_change_lat = Signal()
         outgoing_thread_base = Signal(32)
         incoming_thread_base = Signal(32)
@@ -386,6 +387,7 @@ class ChurchChange(Elaboratable):
                         mask_latched.eq(self.change_mask),
                         cr_src_latched.eq(self.cr_src),
                         cr_dst_latched.eq(self.cr_dst),
+                        nia_current_latched.eq(self.nia_current),
                         # Thread context CHANGE is selected by its privileged
                         # destination (CR14/CR15), never by a UI/scheduler
                         # side-band semantic flag.
@@ -800,7 +802,7 @@ class ChurchChange(Elaboratable):
                         outgoing_thread_base, outgoing_indicator[:12], 0)),
                     mem_wr_data_reg.eq(Cat(
                         outgoing_indicator[:13],
-                        (self.nia_current[2:17] + 1)[:15],
+                        (nia_current_latched[2:17] + 1)[:15],
                         self.flags_in.as_value())),
                 ]
                 with m.If(self.mem_wr_done):

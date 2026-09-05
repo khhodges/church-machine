@@ -523,6 +523,7 @@ class ChurchCore(Elaboratable):
         eloadcall_start_sig = Signal()
         xloadlambda_start_sig = Signal()
         scheduler_inflight = Signal()
+        decoded_thread_change_inflight = Signal()
 
         if not self.iot_profile:
             cr_rd_addr_default = Mux(u_eloadcall.busy, u_eloadcall.cr_rd_addr,
@@ -606,7 +607,9 @@ class ChurchCore(Elaboratable):
             # LOAD/CHANGE/CALL use null or partially-initialised caps; each unit
             # performs its own M-elevated internal checks.
             u_perm.check_valid.eq(
-                cond_exec_enable & is_church_op & ~any_unit_busy & ~boot_microcode_active
+                cond_exec_enable & is_church_op & ~any_unit_busy &
+                ~boot_microcode_active &
+                (church_op != ChurchOpcode.CHANGE)
             ),
             u_perm.check_domain_purity.eq(
                 cond_exec_enable & is_church_op & (church_op == ChurchOpcode.TPERM)
@@ -992,7 +995,10 @@ class ChurchCore(Elaboratable):
         )
         if not self.iot_profile:
             delayed_complete = delayed_complete | (
-                u_change.change_complete & ~scheduler_inflight)
+                u_change.change_complete &
+                ~scheduler_inflight &
+                ~decoded_thread_change_inflight
+            )
         with m.Elif(self.boot_complete & delayed_complete):
             m.d.sync += nia_reg.eq(nia_reg + 4)
         with m.Elif(branch_taken & ~fetch_bounds_fault):
@@ -1074,6 +1080,23 @@ class ChurchCore(Elaboratable):
         with m.Elif(u_return.complete & ~cross_domain_ret):
             # Lambda-fast RETURN: no cload follows — fence goes inactive.
             m.d.sync += [code_lo_reg.eq(0), code_hi_reg.eq(0)]
+        if not self.iot_profile:
+            with m.Elif(u_change.cr_wr_en &
+                        (u_change.cr_wr_addr == CR_CLOOMC)):
+                # A Thread CHANGE restores CR14 directly rather than through
+                # cLoad. Refresh the fetch fence before CHANGE releases busy
+                # and execution resumes at the restored NIA.
+                change_cr14_view = View(
+                    CAP_REG_LAYOUT, u_change.cr_wr_data)
+                change_cr14_w2 = View(
+                    WORD2_LAYOUT, change_cr14_view.word2_w2)
+                m.d.sync += [
+                    code_lo_reg.eq(change_cr14_view.word1_location),
+                    code_hi_reg.eq(
+                        change_cr14_view.word1_location +
+                        ((change_cr14_w2.limit_offset + 1) << 2)
+                    ),
+                ]
         with m.Elif(u_cload.cr_wr_en & (u_cload.cr_wr_addr == CR_CLOOMC)):
             # cload (triggered by cross-domain RETURN) restores the caller's code cap
             # into CR14.  Re-establish the fence and release the stall.
@@ -1728,6 +1751,7 @@ class ChurchCore(Elaboratable):
         # data memory can present unrelated words while an execution unit is
         # busy, so retain the issuer word for retirement and fault telemetry.
         delayed_issuer_instr = Signal(32)
+        change_issuer_nia = Signal(32)
 
         # ── TraceUnit support: trace read port + LOAD shadow latch ─────────────
         # The trace port always mirrors cr_dst so the old GT is readable.
@@ -1774,6 +1798,16 @@ class ChurchCore(Elaboratable):
                 u_change.nia_current.eq(
                     Mux(thread_switch_start_sig, nia_reg - 4, nia_reg)),
             ]
+            with m.If(change_start_sig & ~thread_switch_start_sig):
+                m.d.sync += [
+                    change_issuer_nia.eq(nia_reg),
+                    decoded_thread_change_inflight.eq(
+                        (cr_dst == 14) | (cr_dst == 15)),
+                ]
+            with m.If(clear_all):
+                m.d.sync += decoded_thread_change_inflight.eq(0)
+            with m.Elif(u_change.change_complete | u_change.change_fault):
+                m.d.sync += decoded_thread_change_inflight.eq(0)
             with m.If(clear_all):
                 m.d.sync += [
                     scheduler_inflight.eq(0),
@@ -2803,9 +2837,13 @@ class ChurchCore(Elaboratable):
             (branch_taken & ~fetch_bounds_fault) |
             retire_norm
         )
+        change_retire = Const(0)
         if not self.iot_profile:
+            change_retire = (
+                u_change.change_complete & ~scheduler_inflight)
             retire_conds = (
                 retire_conds_base |
+                change_retire |
                 u_lambda.nia_set |
                 u_xloadlambda.nia_set |
                 u_eloadcall.nia_set |
@@ -2817,9 +2855,10 @@ class ChurchCore(Elaboratable):
 
         m.d.comb += [
             self.retire_valid.eq(self.boot_complete & retire_conds),
-            self.retire_nia.eq(nia_reg),
+            self.retire_nia.eq(
+                Mux(change_retire, change_issuer_nia, nia_reg)),
             self.retire_instr.eq(
-                Mux(delayed_complete | delayed_fault,
+                Mux(delayed_complete | delayed_fault | change_retire,
                     delayed_issuer_instr, self.imem_data)),
             self.retire_flags.eq(u_regs.flags),
             self.retire_fault_code.eq(self.fault),
