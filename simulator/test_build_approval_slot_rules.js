@@ -67,6 +67,57 @@ assert(activeBoot.includes('value="LightningBolt" selected'));
 assert(!activeBoot.includes('⚡ boot entry'));
 assert(activeBoot.includes('value="LightningBolt"'));
 
+const generatedThread = view._renderRow({
+    slot: 11,
+    name: 'Thread#2',
+    token: null,
+    header_word: '0xF900820C',
+    cw: 32,
+    cc: 12,
+    location: '0x000005C0',
+    perms: [],
+    source: 'generated Thread body (boot image)',
+    load_policy: 'Lazy',
+    size_budget: {
+        available: true,
+        metadata: 'generated Thread body',
+        sections: [
+            { label: 'Header', words: 1 },
+            { label: 'Heap', words: 194 },
+            { label: 'Capability homes', words: 12 },
+        ],
+        total: { words: 256 },
+        allocation: { words: 256 },
+    },
+    checks: [],
+});
+assert(generatedThread.includes('Thread#2'));
+assert(generatedThread.includes('N/A'),
+    'generated Thread must not invent a token or permissions');
+assert(generatedThread.includes('Header 1w'));
+assert(generatedThread.includes('Total 256w / alloc 256w'));
+
+const mBit = view._renderRow({
+    slot: 13,
+    name: 'M_BIT_DEV',
+    token: null,
+    header_word: null,
+    cw: null,
+    cc: null,
+    location: '0xFFFFFF1C',
+    perms: ['R', 'W'],
+    source: 'hardware/namespace register',
+    load_policy: 'Hardware',
+    size_budget: {
+        available: false,
+        reason: 'N/A — M-bit Namespace register (1 word)',
+    },
+    checks: [],
+});
+assert(mBit.includes('M_BIT_DEV'));
+assert(mBit.includes('R+W'));
+assert(mBit.includes('N/A — M-bit Namespace register'));
+
 const fixedBootstrap = view._renderRow(rows[0]);
 assert(fixedBootstrap.includes('value="Bootstrap"'));
 assert(fixedBootstrap.includes('value="LightningBolt"'));

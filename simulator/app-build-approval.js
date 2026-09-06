@@ -36,15 +36,44 @@ const BuildApprovalView = {
     _checkBadge(check) {
         // check: { ok: bool|null, warn: bool, label, detail }
         if (check.ok === true && !check.warn) return this._badge('ok', '✅', check.detail || check.label);
-        if (check.ok === null)               return this._badge('unknown', '—', check.detail || check.label);
+        if (check.ok === null)               return this._badge('unknown', 'N/A', check.detail || check.label);
         if (check.warn)                      return this._badge('warn', '⚠️', check.detail || check.label);
         return this._badge('bad', '❌', check.detail || check.label);
     },
 
     _permStr(perms) {
-        if (!perms) return '—';
-        if (Array.isArray(perms)) return perms.join('+') || '—';
+        if (!perms) return 'N/A';
+        if (Array.isArray(perms)) return perms.join('+') || 'N/A';
         return String(perms);
+    },
+
+    _value(value) {
+        return value == null || value === '' ? 'N/A' : value;
+    },
+
+    _renderSizeBudget(budget) {
+        if (!budget) return '<span class="ba-size-unavailable">N/A</span>';
+        if (!budget.available) {
+            return `<span class="ba-size-unavailable">${this._esc(
+                budget.reason || 'N/A')}</span>`;
+        }
+        const sections = Array.isArray(budget.sections) ? budget.sections : [
+            ['Code', budget.code],
+            ['API', budget.api],
+            ['GT', budget.gt_capabilities],
+            ['Free', budget.freespace],
+        ].map(([label, value]) => value ? {
+            label, words: value.words, measured: value.measured,
+        } : null).filter(Boolean);
+        const sectionHtml = sections.map(section =>
+            `<span>${this._esc(section.label)} ${this._esc(section.words)}w` +
+            `${section.measured === false ? ' *' : ''}</span>`).join('');
+        const total = budget.total && budget.total.words != null
+            ? `<b>Total ${this._esc(budget.total.words)}w / alloc ${
+                this._esc(budget.allocation && budget.allocation.words != null
+                    ? budget.allocation.words : 'N/A')}w</b>` : '';
+        return `<div class="ba-size-budget" title="${this._esc(
+            budget.metadata || 'Measured row metadata')}">${sectionHtml}${total}</div>`;
     },
 
     // ── Build-token auth helpers ───────────────────────────────────────────
@@ -397,35 +426,27 @@ const BuildApprovalView = {
         const hasError = checks.some(c => c.ok === false);
         const hasWarn = !hasError && checks.some(c => c.warn);
         const rowClass = hasError ? 'ba-row-bad' : (hasWarn ? 'ba-row-warn' : (allOk ? 'ba-row-ok' : ''));
-        const checkHtml = checks.map(c => this._checkBadge(c)).join(' ') || '<span class="ba-badge ba-badge-unknown">—</span>';
-
-        const budget = s.size_budget;
-        const budgetHtml = budget && budget.available
-            ? `<div class="ba-size-budget" title="Measured binary content; freespace is reserved, not used content">
-                <span>Code ${budget.code.words}w</span>
-                <span>API ${budget.api.words}w${budget.api.measured ? '' : ' *'}</span>
-                <span>GT ${budget.gt_capabilities.words}w</span>
-                <span>Free ${budget.freespace.words}w</span>
-                <b>Total ${budget.total.words}w / alloc ${budget.allocation.words}w</b>
-               </div>`
-            : `<span class="ba-size-unavailable">${this._esc(budget && budget.reason || 'size unavailable')}</span>`;
+        const checkHtml = checks.map(c => this._checkBadge(c)).join(' ') ||
+            '<span class="ba-badge ba-badge-unknown">N/A</span>';
+        const budgetHtml = this._renderSizeBudget(s.size_budget);
+        const slot = this._value(s.slot);
         return `<tr class="${rowClass}">
-  <td class="ba-slot">${this._esc(s.slot)}</td>
-  <td class="ba-name">${this._esc(s.name || '—')}</td>
-  <td class="ba-token"><code>${this._esc(s.token || '—')}</code></td>
-  <td class="ba-hdr"><code>${this._esc(s.header_word || '—')}</code></td>
-  <td class="ba-num">${this._esc(s.cw != null ? s.cw : '—')}</td>
-  <td class="ba-num">${this._esc(s.cc != null ? s.cc : '—')}</td>
-  <td class="ba-loc"><code>${this._esc(s.location || '—')}</code></td>
-   <td class="ba-load"><select class="ba-slot-rule" data-slot="${this._esc(s.slot)}"
+  <td class="ba-slot">${this._esc(slot)}</td>
+  <td class="ba-name">${this._esc(this._value(s.name))}</td>
+  <td class="ba-token"><code>${this._esc(this._value(s.token))}</code></td>
+  <td class="ba-hdr"><code>${this._esc(this._value(s.header_word))}</code></td>
+  <td class="ba-num">${this._esc(this._value(s.cw))}</td>
+  <td class="ba-num">${this._esc(this._value(s.cc))}</td>
+  <td class="ba-loc"><code>${this._esc(this._value(s.location))}</code></td>
+   <td class="ba-load"><select class="ba-slot-rule" data-slot="${this._esc(slot)}"
        data-previous-value="${this._esc(
-             s.slot_rule || s.slotRule || s.load_policy || s.loadPolicy || '—')}"
-       aria-label="Slot rule for NS slot ${this._esc(s.slot)}"
+             s.slot_rule || s.slotRule || s.load_policy || s.loadPolicy || 'N/A')}"
+       aria-label="Slot rule for NS slot ${this._esc(slot)}"
        onchange="if(typeof BuildApprovalView!=='undefined')BuildApprovalView._changeSlotRule(Number(this.dataset.slot),this.value,this)">
        ${this._slotRuleOptions(s)}
      </select></td>
   <td class="ba-perms">${this._esc(this._permStr(s.perms))}</td>
-  <td class="ba-src">${this._esc(s.source || '—')}</td>
+  <td class="ba-src">${this._esc(this._value(s.source))}</td>
   <td class="ba-checks">${checkHtml}</td>
   <td class="ba-size">${budgetHtml}</td>
 </tr>`;

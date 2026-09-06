@@ -15449,12 +15449,18 @@ def _ba_build_ns_map():
         entry['abstraction'] = state_entry.get('name', '?')
         entry['token'] = state_entry.get('token') or state_entry.get('cache_token')
         if not entry.get('token'):
-            import glob as _glob
-            pat = os.path.join(_LUMPS_DIR, f"{entry['abstraction']}.*.????????.lump")
-            candidates = sorted(_glob.glob(pat))
-            if candidates:
-                entry['filename'] = os.path.basename(candidates[-1])
-                entry['token'] = os.path.basename(candidates[-1]).rsplit('.', 2)[1]
+            state_filename = entry.get('filename')
+            if isinstance(state_filename, str) and os.path.basename(state_filename) == state_filename:
+                parts = state_filename.rsplit('.', 2)
+                if len(parts) == 3 and parts[-1] == 'lump':
+                    entry['token'] = parts[1]
+            if not entry.get('token'):
+                import glob as _glob
+                pat = os.path.join(_LUMPS_DIR, f"{entry['abstraction']}.*.????????.lump")
+                candidates = sorted(_glob.glob(pat))
+                if candidates:
+                    entry['filename'] = os.path.basename(candidates[-1])
+                    entry['token'] = os.path.basename(candidates[-1]).rsplit('.', 2)[1]
         manifest_by_slot[entry['ns_slot']] = entry
     manifest_no_slot = []
 
@@ -15467,9 +15473,12 @@ def _ba_build_ns_map():
     step2_policy_by_slot = {}
     boot_entry_slot = DEFAULT_BOOT_CONFIG["bootEntrySlot"]
     generated_thread_slots = set()
+    saved_step1 = dict(DEFAULT_BOOT_CONFIG.get("step1") or {})
     try:
         saved_cfg, saved_cfg_err = _read_saved_boot_config()
         if saved_cfg_err is None and isinstance(saved_cfg, dict):
+            if isinstance(saved_cfg.get("step1"), dict):
+                saved_step1.update(saved_cfg["step1"])
             generated_thread_slots = _generated_thread_slots_for_step1(
                 saved_cfg.get("step1") or {})
             if isinstance(saved_cfg.get("bootEntrySlot"), int):
@@ -15493,6 +15502,71 @@ def _ba_build_ns_map():
         # Approval rendering must remain available when an older config cannot
         # be fully validated; the sidecar/default fallback below still works.
         pass
+
+    thread_size = int(saved_step1.get("threadLumpWords") or 256)
+    thread_stack_words = int(saved_step1.get("threadStackWords") or 32)
+    thread_layout = _boot_image_gen.thread_layout(thread_size, thread_stack_words)
+
+    def _state_lump_path(state_entry):
+        """Resolve a row's exact Namespace-state filename before its token."""
+        if not isinstance(state_entry, dict):
+            return None
+        filename = state_entry.get("filename")
+        if isinstance(filename, str) and filename:
+            safe_name = os.path.basename(filename)
+            if safe_name == filename:
+                exact_path = os.path.join(_LUMPS_DIR, safe_name)
+                if os.path.isfile(exact_path):
+                    return exact_path
+        token = state_entry.get("token") or state_entry.get("cache_token")
+        return _ba_lump_file_for_token(token) if token else None
+
+    def _row_source(state_entry, lump_path=None, fallback='N/A'):
+        """Return a stable source label without hiding a state filename."""
+        if isinstance(state_entry, dict) and state_entry.get("filename"):
+            return os.path.basename(str(state_entry["filename"]))
+        if lump_path:
+            return os.path.basename(lump_path)
+        return fallback
+
+    def _thread_size_budget(layout):
+        """Describe a generated Thread body using the shared zone layout."""
+        sections = [
+            ("Header", 1),
+            ("Data registers", 16),
+            ("Protected STO", 1),
+            ("Heap", layout["heap_words"]),
+            ("LIFO stack", layout["stack_words"]),
+            ("Capability homes", layout["caps_words"]),
+        ]
+        total_words = layout["lump_size"]
+        return {
+            "available": True,
+            "metadata": "generated Thread body",
+            "sections": [
+                {"label": label, "words": words, "bytes": words * 4}
+                for label, words in sections
+            ],
+            # Keep the legacy aggregate fields for the approval budget and
+            # existing consumers, while the sections above are authoritative
+            # for the row's human-readable layout.
+            "code": {"words": layout["stack_words"], "bytes": layout["stack_words"] * 4},
+            "api": {"words": 0, "bytes": 0, "measured": True},
+            "gt_capabilities": {
+                "words": layout["caps_words"], "bytes": layout["caps_words"] * 4
+            },
+            "freespace": {"words": 0, "bytes": 0, "reserved": False},
+            "total": {"words": total_words, "bytes": total_words * 4},
+            "allocation": {"words": total_words, "bytes": total_words * 4},
+            "reconciles": sum(words for _, words in sections) == total_words,
+        }
+
+    def _not_applicable_budget(description):
+        return {
+            "available": False,
+            "reason": f"N/A — {description}",
+            "metadata": "not applicable",
+        }
 
     def _sidecar_policy(lump_path):
         if not lump_path:
@@ -15616,10 +15690,24 @@ def _ba_build_ns_map():
             'location': location, 'perms': perms, 'source': 'BRAM (boot ROM)',
             'load_policy': 'Bootstrap',
             'programmable': False,
+            'size_budget': _not_applicable_budget('boot namespace table'),
             'checks': [{'label': 'BRAM', 'ok': True, 'detail': detail}],
         }
         for slot_num, (name, location, perms, detail) in bootstrap_slots.items()
     ]
+    # Boot.Thread is a generated body too; expose its real geometry instead
+    # of treating the foundational row as an opaque BRAM entry.
+    _boot_thread = next((row for row in bootstrap if row['slot'] == 1), None)
+    if _boot_thread:
+        _boot_thread.update({
+            'header_word': f'0x{_boot_image_gen.pack_lump_header(
+                _boot_image_gen._ns_n_minus_6(thread_size),
+                thread_stack_words, _boot_image_gen.THREAD_CAP_WORDS, 2):08X}',
+            'cw': thread_stack_words,
+            'cc': _boot_image_gen.THREAD_CAP_WORDS,
+            'source': 'generated Thread#1 body (boot ROM)',
+            'size_budget': _thread_size_budget(thread_layout),
+        })
     for _row in bootstrap:
         _row['load_policy'] = _slot_policy(_row['slot'], default='Bootstrap')
 
@@ -15632,18 +15720,45 @@ def _ba_build_ns_map():
         4: ('BTN_DEV', mmio_btn, ['R']),
         5: ('TIMER_DEV', mmio_timer, ['R', 'W']),
     }
+    catalog_perms = {}
+    for _catalog_slot, _catalog_entry in enumerate(
+            _boot_image_gen.DEFAULT_ABSTRACTION_CATALOG):
+        if isinstance(_catalog_entry, tuple) and len(_catalog_entry) >= 2:
+            catalog_perms[_catalog_slot] = [
+                perm for perm in ('R', 'W', 'X', 'L', 'S', 'E')
+                if _catalog_entry[1].get(perm)
+            ]
     resident = [
         {
             'slot': slot_num, 'name': name, 'token': None,
             'header_word': 'MMIO', 'cw': None, 'cc': None,
-            'location': location, 'perms': perms, 'source': 'boot ROM',
+            'location': location, 'perms': perms, 'source': 'boot ROM hardware register',
             'load_policy': 'Hardware',
             'programmable': False,
+            'size_budget': _not_applicable_budget('hardware register'),
             'checks': [{'label': 'MMIO', 'ok': True,
                         'detail': f'MMIO at {location}'}],
         }
-        for slot_num, (name, location, perms) in mmio_specs.items()
+        for slot_num, (name, location, perms) in {
+            **mmio_specs,
+            13: (
+                'M_BIT_DEV',
+                _boot_image_gen.ARCH_BOOT['devices']['M_BIT_DEV']['address'],
+                ['R', 'W'],
+            ),
+        }.items()
     ]
+    for _row in resident:
+        _state_entry = manifest_by_slot.get(_row['slot'])
+        if _state_entry and _state_entry.get('location'):
+            _row['location'] = _state_entry['location']
+        if _row['slot'] == 13:
+            _row.update({
+                'header_word': None,
+                'source': 'hardware/namespace register',
+                'size_budget': _not_applicable_budget(
+                    'M-bit Namespace register (1 word)'),
+            })
     for _row in resident:
         _row['load_policy'] = _slot_policy(_row['slot'], default='Hardware')
 
@@ -15652,7 +15767,8 @@ def _ba_build_ns_map():
     # The committed state token is the content token.  The legacy token-named
     # file remains a lookup alias and must not redefine that identity.
     st_token = st_entry.get('token') or '00000600'
-    st_lump = os.path.join(_LUMPS_DIR, st_entry.get('filename') or '00000600.lump')
+    st_lump = _state_lump_path(st_entry) or os.path.join(
+        _LUMPS_DIR, st_entry.get('filename') or '00000600.lump')
     st_hdr = _ba_read_lump_header(st_lump) if os.path.exists(st_lump) else None
     st_checks = _lump_checks(selftest_slot, st_token,
                              manifest_by_slot.get(selftest_slot),
@@ -15662,7 +15778,8 @@ def _ba_build_ns_map():
         'token': st_token,
         'header_word': f'0x{st_hdr[0]:08X}' if st_hdr else None,
         'cw': st_hdr[1] if st_hdr else None, 'cc': st_hdr[2] if st_hdr else None,
-        'location': selftest_base, 'perms': ['E'], 'source': 'server/lumps',
+         'location': selftest_base, 'perms': ['E'],
+         'source': _row_source(st_entry, st_lump, 'server/lumps'),
         'checks': st_checks,
     }
     # Keep the path used for header/check inspection so size accounting cannot
@@ -15679,7 +15796,7 @@ def _ba_build_ns_map():
                        if 'WukongCallHome' in fn and fn.endswith('.lump')])
         if cands:
             wch_token = cands[-1].replace('.lump', '')
-    wch_lump = _ba_lump_file_for_token(wch_token) if wch_token else None
+    wch_lump = _state_lump_path(wch_entry)
     wch_hdr = _ba_read_lump_header(wch_lump) if wch_lump else None
     wch_checks = _lump_checks(callhome_slot, wch_token, wch_entry, wch_lump)
     wch_row = {
@@ -15687,7 +15804,8 @@ def _ba_build_ns_map():
         'token': wch_token,
         'header_word': f'0x{wch_hdr[0]:08X}' if wch_hdr else None,
         'cw': wch_hdr[1] if wch_hdr else None, 'cc': wch_hdr[2] if wch_hdr else None,
-        'location': callhome_base, 'perms': ['E'], 'source': 'server/lumps',
+         'location': callhome_base, 'perms': ['E'],
+         'source': _row_source(wch_entry, wch_lump, 'server/lumps'),
         'checks': wch_checks,
     }
     wch_row['_ba_binary_path'] = wch_lump
@@ -15720,14 +15838,48 @@ def _ba_build_ns_map():
     # Every non-intrinsic manifest slot uses its own saved load policy. Never
     # infer Resident/Lazy from a numeric slot boundary.
     intrinsic_slots = set(bootstrap_slots) | set(mmio_specs) | {
-        selftest_slot, callhome_slot,
+        selftest_slot, callhome_slot, 13,
     }
+    intrinsic_slots.update(generated_thread_slots)
+
+    # Generated Thread#2 onward are real boot-image bodies, not token-backed
+    # LUMPs. Their locations and body size are authoritative from Namespace
+    # state and the saved boot layout, respectively.
+    for slot_num in sorted(generated_thread_slots):
+        entry = manifest_by_slot.get(slot_num) or {}
+        label = entry.get('abstraction') or _boot_image_gen.generated_thread_label(slot_num)
+        row = {
+            'slot': slot_num,
+            'name': label or f'Thread slot {slot_num}',
+            'token': None,
+            'header_word': f'0x{_boot_image_gen.pack_lump_header(
+                _boot_image_gen._ns_n_minus_6(thread_size),
+                thread_stack_words, _boot_image_gen.THREAD_CAP_WORDS, 2):08X}',
+            'cw': thread_stack_words,
+            'cc': _boot_image_gen.THREAD_CAP_WORDS,
+            'location': entry.get('location'),
+            'perms': [],
+            'source': 'generated Thread body (boot image)',
+            'programmable': False,
+            'size_budget': _thread_size_budget(thread_layout),
+            'checks': [{
+                'label': 'Thread layout', 'ok': thread_layout['valid'],
+                'detail': (
+                    f'generated {thread_size}-word Thread body: '
+                    f'heap={thread_layout["heap_words"]}w '
+                    f'stack={thread_layout["stack_words"]}w '
+                    f'caps={thread_layout["caps_words"]}w'
+                ),
+            }],
+        }
+        _append_policy_row(row, _slot_policy(slot_num, entry, default='Lazy'))
+
     for slot_num in sorted(manifest_by_slot.keys()):
         if slot_num in intrinsic_slots:
             continue  # rendered by the architecture-specific rows above
         entry = manifest_by_slot[slot_num]
         token = entry.get('token')
-        lump_path = _ba_lump_file_for_token(token)
+        lump_path = _state_lump_path(entry)
         hdr = _ba_read_lump_header(lump_path) if lump_path else None
         checks = _lump_checks(slot_num, token, entry, lump_path)
         row = {
@@ -15738,8 +15890,11 @@ def _ba_build_ns_map():
             'cw': hdr[1] if hdr else (entry.get('cw')),
             'cc': hdr[2] if hdr else (entry.get('cc')),
             'location': entry.get('location'),
-            'perms': entry.get('grants', []),
-            'source': 'manifest (slot policy)',
+            'perms': (
+                entry['grants'] if 'grants' in entry
+                else catalog_perms.get(slot_num, [])
+            ),
+             'source': _row_source(entry, lump_path, 'manifest (slot policy)'),
             'programmable': (
                 slot_num not in RESERVED_NS_SLOTS
                 and slot_num not in generated_thread_slots
@@ -15795,7 +15950,10 @@ def _ba_build_ns_map():
             lump_path = row.get('_ba_binary_path')
             if lump_path is None and row.get('token'):
                 lump_path = _ba_lump_file_for_token(row.get('token'))
-            row['size_budget'] = _ba_lump_size_budget(lump_path)
+            if lump_path:
+                row['size_budget'] = _ba_lump_size_budget(lump_path)
+            elif 'size_budget' not in row:
+                row['size_budget'] = _not_applicable_budget('no LUMP binary')
             row.pop('_ba_binary_path', None)
     hardware_rows = [r for r in resident if r.get('size_budget', {}).get('available')]
     def _sum_budget(key):

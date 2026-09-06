@@ -691,6 +691,42 @@ def test_wukong_callhome_header_and_budget_use_one_binary():
     assert row['size_budget']['total']['words'] == 128
 
 
+def test_ns_map_normalizes_lump_thread_and_hardware_metadata():
+    """All approval row classes expose their authoritative metadata."""
+    ns_map = _app._ba_build_ns_map()
+    rows = {row['slot']: row for row in ns_map['slot_rules']
+            if isinstance(row.get('slot'), int)}
+
+    capability = rows[10]
+    assert (int(capability['header_word'], 16) >> 27) & 0x1F == 0x1F
+    assert capability['cw'] > 0
+    assert capability['cc'] > 0
+    assert capability['perms'] == ['E']
+    assert capability['source'].endswith('.lump')
+    assert capability['size_budget']['available'] is True
+
+    for slot, label in ((11, 'Thread#2'), (12, 'Thread#3')):
+        thread = rows[slot]
+        assert thread['name'] == label
+        assert thread['token'] is None
+        assert thread['cw'] == 32
+        assert thread['cc'] == _app._boot_image_gen.THREAD_CAP_WORDS
+        assert thread['size_budget']['total']['words'] == 256
+        assert thread['size_budget']['allocation']['words'] == 256
+        assert [section['label'] for section in thread['size_budget']['sections']] == [
+            'Header', 'Data registers', 'Protected STO', 'Heap',
+            'LIFO stack', 'Capability homes',
+        ]
+
+    mbit = rows[13]
+    assert mbit['name'] == 'M_BIT_DEV'
+    assert mbit['location'] == '0xFFFFFF1C'
+    assert mbit['perms'] == ['R', 'W']
+    assert mbit['header_word'] is None
+    assert mbit['size_budget']['available'] is False
+    assert mbit['size_budget']['reason'].startswith('N/A')
+
+
 def test_build_approval_routes_registered():
     """
     Smoke test: all Build Approval routes must be registered before the server
