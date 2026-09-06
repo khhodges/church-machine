@@ -17,3 +17,15 @@ derive row 1 from the selected boot-entry slot; reject or ignore legacy
 independent Next-target configuration. After reset, reapply the persisted
 LightningBolt selection to the simulator; never sync a temporary factory
 SelfTest slot back into the user's selection.
+
+Build Approval may show LightningBolt in the same per-slot selector, but it is
+a synthetic boot-role choice: selecting it persists only `bootEntrySlot`, while
+Empty/Resident/Preload/Lazy continue to persist as the slot's independent
+`step2` load policy.
+
+**Why:** The approval table needs one discoverable control without turning the
+boot role into a conflicting fifth load policy.
+
+**How to apply:** Keep the active boot row visibly marked as
+`LightningBolt (boot entry · <load policy>)`; changing its load policy must not
+silently move the boot entry.

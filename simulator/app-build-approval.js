@@ -215,24 +215,20 @@ const BuildApprovalView = {
     _renderIssueComments(data) {
         const el = document.getElementById('baIssueComments');
         if (!el) return;
-        if (!data || !data.tiers) {
+        if (!data || (!data.tiers && !Array.isArray(data.slot_rules))) {
             el.innerHTML = '<div class="ba-context-head"><strong>⚠️ Approval issues &amp; comments</strong></div>' +
                 '<div class="ba-context-note">Paste the build token above to load protected validation comments.</div>';
             return;
         }
-        const tierLabels = {
-            bootstrap: 'Bootstrap',
-            resident: 'Resident',
-            lazy: 'Lazy-load',
-            unused: 'Unused / gap',
-        };
+        const rows = Array.isArray(data.slot_rules)
+            ? data.slot_rules
+            : ['bootstrap', 'resident', 'lazy', 'unused']
+                .flatMap(tier => (data.tiers && data.tiers[tier]) || []);
         const issues = [];
-        for (const [tier, slots] of Object.entries(data.tiers)) {
-            for (const slot of (slots || [])) {
-                for (const check of (slot.checks || [])) {
-                    if (check.ok === false || check.warn) {
-                        issues.push({ tier, slot, check });
-                    }
+        for (const slot of rows) {
+            for (const check of (slot.checks || [])) {
+                if (check.ok === false || check.warn) {
+                    issues.push({ slot, check });
                 }
             }
         }
@@ -241,11 +237,13 @@ const BuildApprovalView = {
                 '<div class="ba-context-note">All current validation checks pass without warnings.</div>';
             return;
         }
-        const issueHtml = issues.map(({ tier, slot, check }) => {
-            const blocking = check.ok === false && (tier === 'bootstrap' || tier === 'resident');
+        const issueHtml = issues.map(({ slot, check }) => {
+            const policy = slot.load_policy || slot.loadPolicy || '—';
+            const blocking = check.ok === false &&
+                ['Bootstrap', 'Hardware', 'Resident'].includes(policy);
             const severity = blocking ? 'bad' : 'warn';
             const label = blocking ? 'Blocks build' : 'Review';
-            const location = `${tierLabels[tier] || tier} · slot ${slot.slot} · ${slot.name || 'unnamed'}`;
+            const location = `${policy} · slot ${slot.slot} · ${slot.name || 'unnamed'}`;
             return `<div class="ba-issue-row ba-issue-${severity}">` +
                 `${this._badge(severity, label)} <b>${this._esc(location)}</b> — ${this._esc(check.label || 'validation check')}` +
                 `<div class="ba-issue-detail">${this._esc(check.detail || 'No additional comment was provided.')}</div></div>`;
@@ -254,6 +252,108 @@ const BuildApprovalView = {
             `<div class="ba-context-head"><strong>⚠️ Approval issues &amp; comments</strong>${this._badge('warn', `${issues.length} to review`)}</div>` +
             '<div class="ba-context-note">Blocking items prevent Freeze and Build. Lazy-load and unused-slot items remain visible for review but do not necessarily block a hardware build.</div>' +
             `<div class="ba-issue-list">${issueHtml}</div>`;
+    },
+
+    _slotRuleOptions(s) {
+        const policy = s.load_policy || s.loadPolicy || 'Lazy';
+        const bootSlot = this._lastMap && Number(this._lastMap.boot_entry_slot);
+        const isBootEntry = Number.isInteger(bootSlot) && Number(s.slot) === bootSlot;
+        const fixed = policy === 'Bootstrap' || policy === 'Hardware';
+        const currentLabel = isBootEntry
+            ? `LightningBolt (boot entry · ${policy})`
+            : 'LightningBolt (boot entry)';
+        const options = fixed
+            ? [[policy, policy]]
+            : [
+                ['Empty', 'Empty'],
+                ['Resident', 'Resident'],
+                ['Preload', 'Preload'],
+                ['Lazy', 'Lazy'],
+                ['LightningBolt', currentLabel],
+            ];
+        const selected = isBootEntry ? 'LightningBolt' : policy;
+        return options.map(([value, label]) =>
+            `<option value="${this._esc(value)}"${selected === value ? ' selected' : ''}>` +
+            `${this._esc(label)}</option>`).join('');
+    },
+
+    async _changeSlotRule(slot, value, select) {
+        const previous = select ? select.dataset.previousValue : '';
+        if (select) select.disabled = true;
+        try {
+            const getRes = await fetch('/api/boot-config');
+            const data = await getRes.json();
+            if (!getRes.ok) throw new Error(data.error || `HTTP ${getRes.status}`);
+            const base = data.config || data.defaults;
+            if (!base || !base.step1) throw new Error('Boot configuration is unavailable.');
+            const config = JSON.parse(JSON.stringify(base));
+            config.step2 = config.step2 && Array.isArray(config.step2.lumps)
+                ? config.step2 : { lumps: [] };
+
+            const row = (this._lastMap && Array.isArray(this._lastMap.slot_rules)
+                ? this._lastMap.slot_rules.find(item => Number(item.slot) === Number(slot))
+                : null);
+            const rows = config.step2.lumps;
+            let saved = rows.find(item => item && Number(item.nsSlot) === Number(slot));
+
+            if (value === 'LightningBolt') {
+                // LightningBolt is a boot role, not a fifth load policy. Keep
+                // the selected slot's saved load policy unchanged.
+                config.bootEntrySlot = Number(slot);
+            } else {
+                if (!saved) {
+                    saved = {
+                        nsSlot: Number(slot),
+                        abstraction: row && row.name ? row.name : `Slot ${slot}`,
+                        lumpToken: row && row.token ? row.token : '',
+                    };
+                    rows.push(saved);
+                }
+                saved.loadPolicy = value;
+                saved.resident = value === 'Resident';
+                delete saved.prefetch;
+                delete saved.prefetchRequired;
+                delete saved.prefetchOrder;
+                delete saved.downloadUrl;
+
+                // A Resident row needs the same physical facts as the
+                // Namespace editor. The approval payload carries the
+                // committed location and measured binary allocation.
+                if (value === 'Resident' && row) {
+                    const location = Number.parseInt(String(row.location || ''), 0);
+                    const measured = row.size_budget && row.size_budget.total &&
+                        Number(row.size_budget.total.words);
+                    if (Number.isInteger(location) && location >= 0) saved.physAddr = location;
+                    if (Number.isInteger(measured) && measured > 0) saved.lumpSize = measured;
+                }
+            }
+
+            const postRes = await fetch('/api/boot-config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config),
+            });
+            const postBody = await postRes.json();
+            if (!postRes.ok || postBody.ok === false) {
+                throw new Error(postBody.error || `HTTP ${postRes.status}`);
+            }
+            if (typeof window !== 'undefined' && typeof window._setActiveBootConfig === 'function') {
+                window._setActiveBootConfig(
+                    postBody.config || config,
+                    postBody.bootImageInvalidated === true,
+                    postBody.invalidatedBootImageWords);
+            }
+            await this.refresh(false);
+        } catch (e) {
+            if (select) {
+                select.value = previous || select.dataset.committedValue || select.value;
+                select.title = `Save failed: ${e.message}`;
+            }
+            const status = document.getElementById('baSnapshotStatus');
+            if (status) status.textContent = `❌ Slot ${slot} rule not saved: ${e.message}`;
+        } finally {
+            if (select) select.disabled = false;
+        }
     },
 
     _renderRow(s) {
@@ -282,7 +382,15 @@ const BuildApprovalView = {
   <td class="ba-num">${this._esc(s.cw != null ? s.cw : '—')}</td>
   <td class="ba-num">${this._esc(s.cc != null ? s.cc : '—')}</td>
   <td class="ba-loc"><code>${this._esc(s.location || '—')}</code></td>
-  <td class="ba-load">${this._esc(s.load_policy || s.loadPolicy || '—')}</td>
+   <td class="ba-load"><select class="ba-slot-rule" data-slot="${this._esc(s.slot)}"
+       data-previous-value="${this._esc(
+           this._lastMap && Number(this._lastMap.boot_entry_slot) === Number(s.slot)
+               ? 'LightningBolt' : (s.load_policy || s.loadPolicy || '—'))}"
+       aria-label="Slot rule for NS slot ${this._esc(s.slot)}"
+       ${['Bootstrap', 'Hardware'].includes(s.load_policy || s.loadPolicy) ? 'disabled' : ''}
+       onchange="if(typeof BuildApprovalView!=='undefined')BuildApprovalView._changeSlotRule(Number(this.dataset.slot),this.value,this)">
+       ${this._slotRuleOptions(s)}
+   </select></td>
   <td class="ba-perms">${this._esc(this._permStr(s.perms))}</td>
   <td class="ba-src">${this._esc(s.source || '—')}</td>
   <td class="ba-checks">${checkHtml}</td>

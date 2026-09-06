@@ -598,6 +598,26 @@ def test_ns_map_routes_slots_by_saved_policy_not_slot_number(monkeypatch):
     assert 10 not in resident_slots
 
 
+def test_ns_map_exposes_boot_entry_separately_from_load_policy(monkeypatch):
+    """LightningBolt is a boot role; it must not replace a slot's load rule."""
+    monkeypatch.setattr(
+        _app,
+        '_read_saved_boot_config',
+        lambda: ({
+            'bootEntrySlot': 10,
+            'step2': {
+                'lumps': [
+                    {'nsSlot': 10, 'loadPolicy': 'Lazy'},
+                ],
+            },
+        }, None),
+    )
+    ns_map = _app._ba_build_ns_map()
+    assert ns_map['boot_entry_slot'] == 10
+    row = next(item for item in ns_map['slot_rules'] if item.get('slot') == 10)
+    assert row['load_policy'] == 'Lazy'
+
+
 def test_real_ns_map_hardware_tiers_all_pass():
     """
     Integration test: the COMMITTED repository's NS map must have no hard failures

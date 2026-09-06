@@ -15425,9 +15425,12 @@ def _ba_build_ns_map():
     # artifact metadata is retained as a compatibility fallback for older
     # projects that predate persisted per-slot policy rows.
     slot_policy_by_slot = {}
+    boot_entry_slot = DEFAULT_BOOT_CONFIG["bootEntrySlot"]
     try:
         saved_cfg, saved_cfg_err = _read_saved_boot_config()
         if saved_cfg_err is None and isinstance(saved_cfg, dict):
+            if isinstance(saved_cfg.get("bootEntrySlot"), int):
+                boot_entry_slot = saved_cfg["bootEntrySlot"]
             for policy_row in ((saved_cfg.get('step2') or {}).get('lumps') or []):
                 if not isinstance(policy_row, dict):
                     continue
@@ -15475,6 +15478,10 @@ def _ba_build_ns_map():
     def _append_policy_row(row, policy):
         row['load_policy'] = policy
         if policy == 'Empty':
+            # Keep explicitly empty slots visible in the one-row-per-slot
+            # approval table so their rule can be changed again. Empty is
+            # still non-blocking and remains outside the resident tier.
+            lazy.append(row)
             return
         # Preload is a startup fetch, not a body baked into boot RAM.  It is
         # therefore visible with the fetched group and remains non-blocking for
@@ -15671,7 +15678,7 @@ def _ba_build_ns_map():
             'header_word': f'0x{hdr[0]:08X}' if hdr else None,
             'cw': hdr[1] if hdr else (entry.get('cw')),
             'cc': hdr[2] if hdr else (entry.get('cc')),
-            'location': None,
+            'location': entry.get('location'),
             'perms': entry.get('grants', []),
             'source': 'manifest (slot policy)',
             'checks': checks,
@@ -15744,6 +15751,7 @@ def _ba_build_ns_map():
             'unused':    [],
         },
         'slot_rules': slot_rules,
+        'boot_entry_slot': boot_entry_slot,
         'ns_table_base': ns_table_base,
         'ns_slot_count': ns_slot_count,
         'hardware_budget': hardware_budget,
