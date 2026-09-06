@@ -713,6 +713,13 @@ def test_ns_map_normalizes_lump_thread_and_hardware_metadata():
     ns_map = _app._ba_build_ns_map()
     rows = {row['slot']: row for row in ns_map['slot_rules']
             if isinstance(row.get('slot'), int)}
+    common_fields = {
+        'slot', 'name', 'token', 'header_word', 'cw', 'cc', 'location',
+        'words', 'limit', 'load_policy', 'slot_rule', 'perms', 'source',
+        'programmable', 'size_budget', 'checks',
+    }
+    assert rows
+    assert all(common_fields <= set(row) for row in rows.values())
 
     capability = rows[10]
     assert (int(capability['header_word'], 16) >> 27) & 0x1F == 0x1F
@@ -740,7 +747,8 @@ def test_ns_map_normalizes_lump_thread_and_hardware_metadata():
     assert mbit['name'] == 'M_BIT_DEV'
     assert mbit['location'] == '0xFFFFFF1C'
     assert mbit['perms'] == ['R', 'W']
-    assert mbit['header_word'] is None
+    assert mbit['header_word'] == 'MMIO'
+    assert mbit['source'] == 'boot ROM hardware register'
     assert mbit['load_policy'] == 'Hardware'
     assert mbit['slot_rule'] == 'Hardware'
     assert mbit['programmable'] is False
@@ -749,7 +757,10 @@ def test_ns_map_normalizes_lump_thread_and_hardware_metadata():
         'detail': 'MMIO at 0xFFFFFF1C',
     }]
     assert mbit['size_budget']['available'] is False
-    assert mbit['size_budget']['reason'].startswith('N/A')
+    assert mbit['size_budget']['reason'].startswith('N/A — hardware register')
+    assert not any(key in mbit for key in (
+        'value', 'state', 'm_bit_value', 'm_bit_state',
+    ))
 
 
 def test_builtin_device_rows_match_architecture_catalog():

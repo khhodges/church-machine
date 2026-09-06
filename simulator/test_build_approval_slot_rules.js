@@ -107,7 +107,7 @@ const mBit = view._renderRow({
     slot: 13,
     name: 'M_BIT_DEV',
     token: null,
-    header_word: null,
+    header_word: 'MMIO',
     cw: null,
     cc: null,
     location: '0xFFFFFF1C',
@@ -118,16 +118,42 @@ const mBit = view._renderRow({
     runtime_m_bits: 0xFFFF,
     size_budget: {
         available: false,
-        reason: 'N/A — M-bit Namespace register (1 word)',
+        reason: 'N/A — hardware register (1 word)',
     },
     checks: [{ label: 'MMIO', ok: true, detail: 'MMIO at 0xFFFFFF1C' }],
 });
 assert(mBit.includes('M_BIT_DEV'));
 assert(mBit.includes('R+W'));
-assert(mBit.includes('N/A — M-bit Namespace register'));
+assert(mBit.includes('>MMIO</code>'));
+assert(mBit.includes('N/A — hardware register'));
 assert(mBit.includes('value="Hardware" selected'));
 assert(!mBit.includes('65535'),
     'Namespace approval must not display the current M-bit register value');
+
+const normalizedMBit = view._normalizeRow({
+    slot: 13,
+    name: 'M_BIT_DEV',
+    header_word: 'MMIO',
+    location: '0xFFFFFF1C',
+    perms: ['R', 'W'],
+    source: 'boot ROM hardware register',
+    load_policy: 'Hardware',
+    checks: [],
+});
+for (const field of [
+    'slot', 'name', 'token', 'header_word', 'cw', 'cc', 'location',
+    'words', 'limit', 'load_policy', 'slot_rule', 'perms', 'source',
+    'programmable', 'checks', 'size_budget',
+]) {
+    assert(Object.prototype.hasOwnProperty.call(normalizedMBit, field),
+        `normalized approval row must include ${field}`);
+}
+assert.strictEqual(normalizedMBit.runtime_m_bits, undefined);
+
+const columnCounts = [rows[0], rows[2], rows[3], { ...normalizedMBit }]
+    .map(row => (view._renderRow(row).match(/<td\b/g) || []).length);
+assert.deepStrictEqual(new Set(columnCounts), new Set([12]),
+    'every Namespace approval row must render the same columns');
 
 const fixedBootstrap = view._renderRow(rows[0]);
 assert(fixedBootstrap.includes('value="Bootstrap"'));

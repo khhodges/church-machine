@@ -15408,8 +15408,7 @@ def _ba_build_ns_map():
     # LUMPs. Keep every device fact tied to the same architecture catalog
     # used by the boot-image generator so approval cannot drift from boot.
     device_catalog = _boot_image_gen.architecture_device_catalog()
-    m_bit_device = device_catalog['M_BIT_DEV']
-    m_bit_slot = m_bit_device['slot']
+    m_bit_slot = device_catalog['M_BIT_DEV']['slot']
 
     # NS_TABLE_BASE from hw_types.py
     hw_types_path = os.path.join(ROOT, 'hardware', 'hw_types.py')
@@ -15683,10 +15682,11 @@ def _ba_build_ns_map():
     # of treating the foundational row as an opaque BRAM entry.
     _boot_thread = next((row for row in bootstrap if row['slot'] == 1), None)
     if _boot_thread:
+        _boot_thread_header = _boot_image_gen.pack_lump_header(
+            _boot_image_gen._ns_n_minus_6(thread_size),
+            thread_stack_words, _boot_image_gen.THREAD_CAP_WORDS, 2)
         _boot_thread.update({
-            'header_word': f'0x{_boot_image_gen.pack_lump_header(
-                _boot_image_gen._ns_n_minus_6(thread_size),
-                thread_stack_words, _boot_image_gen.THREAD_CAP_WORDS, 2):08X}',
+            'header_word': f'0x{_boot_thread_header:08X}',
             'cw': thread_stack_words,
             'cc': _boot_image_gen.THREAD_CAP_WORDS,
             'source': 'generated Thread#1 body (boot ROM)',
@@ -15726,15 +15726,6 @@ def _ba_build_ns_map():
             'checks': [{'label': 'MMIO', 'ok': True,
                         'detail': f'MMIO at {location}'}],
         })
-    for _row in resident:
-        if _row['slot'] == m_bit_slot:
-            _row.update({
-                'header_word': None,
-                'source': 'hardware/namespace register',
-                'size_budget': _not_applicable_budget(
-                    f'M-bit Namespace register ({m_bit_device["words"]} word'
-                    f'{"s" if m_bit_device["words"] != 1 else ""})'),
-            })
     for _row in resident:
         _row['load_policy'] = _slot_policy(_row['slot'], default='Hardware')
 
@@ -15826,13 +15817,14 @@ def _ba_build_ns_map():
     for slot_num in sorted(generated_thread_slots):
         entry = manifest_by_slot.get(slot_num) or {}
         label = entry.get('abstraction') or _boot_image_gen.generated_thread_label(slot_num)
+        _thread_header = _boot_image_gen.pack_lump_header(
+            _boot_image_gen._ns_n_minus_6(thread_size),
+            thread_stack_words, _boot_image_gen.THREAD_CAP_WORDS, 2)
         row = {
             'slot': slot_num,
             'name': label or f'Thread slot {slot_num}',
             'token': None,
-            'header_word': f'0x{_boot_image_gen.pack_lump_header(
-                _boot_image_gen._ns_n_minus_6(thread_size),
-                thread_stack_words, _boot_image_gen.THREAD_CAP_WORDS, 2):08X}',
+            'header_word': f'0x{_thread_header:08X}',
             'cw': thread_stack_words,
             'cc': _boot_image_gen.THREAD_CAP_WORDS,
             'location': entry.get('location'),
@@ -15933,6 +15925,49 @@ def _ba_build_ns_map():
             elif 'size_budget' not in row:
                 row['size_budget'] = _not_applicable_budget('no LUMP binary')
             row.pop('_ba_binary_path', None)
+
+    # Normalize every Namespace row through one allowlisted contract before
+    # exposing it to the approval renderer. In particular, do not copy
+    # runtime-only state such as the live M-register bit word into this
+    # committed Namespace metadata payload.
+    approval_row_fields = (
+        'slot', 'name', 'token', 'header_word', 'cw', 'cc', 'location',
+        'words', 'limit', 'load_policy', 'slot_rule', 'perms', 'source',
+        'programmable', 'size_budget', 'checks',
+    )
+    approval_row_defaults = {
+        'slot': None,
+        'name': '?',
+        'token': None,
+        'header_word': None,
+        'cw': None,
+        'cc': None,
+        'location': None,
+        'words': None,
+        'limit': None,
+        'load_policy': 'Lazy',
+        'slot_rule': None,
+        'perms': [],
+        'source': 'N/A',
+        'programmable': False,
+        'size_budget': _not_applicable_budget('no LUMP binary'),
+        'checks': [],
+    }
+
+    def _normalize_approval_row(row):
+        normalized = {
+            field: row.get(field, approval_row_defaults[field])
+            for field in approval_row_fields
+        }
+        normalized['perms'] = list(normalized['perms'] or [])
+        normalized['checks'] = list(normalized['checks'] or [])
+        return normalized
+
+    for _row in bootstrap + resident + lazy:
+        normalized = _normalize_approval_row(_row)
+        _row.clear()
+        _row.update(normalized)
+
     hardware_rows = [r for r in resident if r.get('size_budget', {}).get('available')]
     def _sum_budget(key):
         return sum(r['size_budget'][key]['words'] for r in hardware_rows)

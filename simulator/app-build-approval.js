@@ -434,34 +434,57 @@ const BuildApprovalView = {
     },
 
     _renderRow(s) {
-        const checks = s.checks || [];
+        const row = this._normalizeRow(s);
+        const checks = row.checks;
         const allOk = checks.length > 0 && checks.every(c => c.ok === true && !c.warn);
         const hasError = checks.some(c => c.ok === false);
         const hasWarn = !hasError && checks.some(c => c.warn);
         const rowClass = hasError ? 'ba-row-bad' : (hasWarn ? 'ba-row-warn' : (allOk ? 'ba-row-ok' : ''));
         const checkHtml = checks.map(c => this._checkBadge(c)).join(' ') ||
             '<span class="ba-badge ba-badge-unknown">N/A</span>';
-        const budgetHtml = this._renderSizeBudget(s.size_budget);
-        const slot = this._value(s.slot);
+        const budgetHtml = this._renderSizeBudget(row.size_budget);
+        const slot = this._value(row.slot);
         return `<tr class="${rowClass}">
   <td class="ba-slot">${this._esc(slot)}</td>
-  <td class="ba-name">${this._esc(this._value(s.name))}</td>
-  <td class="ba-token"><code>${this._esc(this._value(s.token))}</code></td>
-  <td class="ba-hdr"><code>${this._esc(this._value(s.header_word))}</code></td>
-  <td class="ba-num">${this._esc(this._value(s.cw))}</td>
-  <td class="ba-num">${this._esc(this._value(s.cc))}</td>
-  <td class="ba-loc"><code>${this._esc(this._value(s.location))}</code></td>
+  <td class="ba-name">${this._esc(this._value(row.name))}</td>
+  <td class="ba-token"><code>${this._esc(this._value(row.token))}</code></td>
+  <td class="ba-hdr"><code>${this._esc(this._value(row.header_word))}</code></td>
+  <td class="ba-num">${this._esc(this._value(row.cw))}</td>
+  <td class="ba-num">${this._esc(this._value(row.cc))}</td>
+  <td class="ba-loc"><code>${this._esc(this._value(row.location))}</code></td>
    <td class="ba-load"><select class="ba-slot-rule" data-slot="${this._esc(slot)}"
-       data-previous-value="${this._esc(this._slotRuleSelection(s))}"
+        data-previous-value="${this._esc(this._slotRuleSelection(row))}"
        aria-label="Slot rule for NS slot ${this._esc(slot)}"
        onchange="if(typeof BuildApprovalView!=='undefined')BuildApprovalView._changeSlotRule(Number(this.dataset.slot),this.value,this)">
-       ${this._slotRuleOptions(s)}
+        ${this._slotRuleOptions(row)}
      </select></td>
-  <td class="ba-perms">${this._esc(this._permStr(s.perms))}</td>
-  <td class="ba-src">${this._esc(this._value(s.source))}</td>
+  <td class="ba-perms">${this._esc(this._permStr(row.perms))}</td>
+  <td class="ba-src">${this._esc(this._value(row.source))}</td>
   <td class="ba-checks">${checkHtml}</td>
   <td class="ba-size">${budgetHtml}</td>
 </tr>`;
+    },
+
+    _normalizeRow(s) {
+        const row = s && typeof s === 'object' ? s : {};
+        return {
+            slot: row.slot == null ? null : row.slot,
+            name: row.name == null ? '?' : row.name,
+            token: row.token == null ? null : row.token,
+            header_word: row.header_word == null ? null : row.header_word,
+            cw: row.cw == null ? null : row.cw,
+            cc: row.cc == null ? null : row.cc,
+            location: row.location == null ? null : row.location,
+            words: row.words == null ? null : row.words,
+            limit: row.limit == null ? null : row.limit,
+            load_policy: row.load_policy || row.loadPolicy || 'Lazy',
+            slot_rule: row.slot_rule || row.slotRule || null,
+            perms: Array.isArray(row.perms) ? row.perms : [],
+            source: row.source == null ? 'N/A' : row.source,
+            programmable: row.programmable === true,
+            checks: Array.isArray(row.checks) ? row.checks : [],
+            size_budget: row.size_budget || null,
+        };
     },
 
     _renderBudget(label, b) {
