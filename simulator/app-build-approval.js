@@ -16,6 +16,11 @@ const BuildApprovalView = {
     _lastMap: null,
     _release: null,
     AUTO_REFRESH_MS: 30000,
+    _approvalRowFields: [
+        'slot', 'name', 'token', 'header_word', 'cw', 'cc', 'location',
+        'words', 'limit', 'load_policy', 'slot_rule', 'perms', 'source',
+        'programmable', 'size_budget', 'checks',
+    ],
 
     onTabClose() {
         if (this._timer) { clearInterval(this._timer); this._timer = null; }
@@ -103,6 +108,64 @@ const BuildApprovalView = {
         return tok ? { 'Authorization': 'Bearer ' + tok } : {};
     },
 
+    _isRecord(value) {
+        return value !== null && typeof value === 'object' && !Array.isArray(value);
+    },
+
+    _approvalContractError(message) {
+        const error = new Error(message);
+        error.code = 'BUILD_APPROVAL_CONTRACT';
+        return error;
+    },
+
+    _validateApprovalPayload(data) {
+        if (!this._isRecord(data) || !Array.isArray(data.slot_rules)) {
+            throw this._approvalContractError(
+                'expected an object with a slot_rules array');
+        }
+
+        const expected = new Set(this._approvalRowFields);
+        data.slot_rules.forEach((row, index) => {
+            if (!this._isRecord(row)) {
+                throw this._approvalContractError(
+                    `row ${index} must be an object`);
+            }
+            const actual = Object.keys(row);
+            const missing = this._approvalRowFields.filter(field => !actual.includes(field));
+            const unexpected = actual.filter(field => !expected.has(field));
+            if (missing.length || unexpected.length) {
+                const details = [];
+                if (missing.length) details.push(`missing ${missing.join(', ')}`);
+                if (unexpected.length) details.push(`unexpected ${unexpected.join(', ')}`);
+                throw this._approvalContractError(
+                    `row ${index} violates the documented field contract (${details.join('; ')})`);
+            }
+            if (!Array.isArray(row.perms) || !Array.isArray(row.checks)) {
+                throw this._approvalContractError(
+                    `row ${index} must contain perms and checks arrays`);
+            }
+            if (row.size_budget !== null && !this._isRecord(row.size_budget)) {
+                throw this._approvalContractError(
+                    `row ${index} must contain an object or null size_budget`);
+            }
+            if (row.checks.some(check => !this._isRecord(check))) {
+                throw this._approvalContractError(
+                    `row ${index} contains an invalid check entry`);
+            }
+        });
+        return data;
+    },
+
+    _renderApprovalContractError(error) {
+        const body = document.getElementById('baMapBody');
+        if (body) {
+            body.innerHTML =
+                '<div class="ba-error"><strong>Build Approval data is malformed.</strong> ' +
+                `${this._esc(error.message)}. ` +
+                'The Build screen was not updated. Click <strong>Refresh</strong> to try again.</div>';
+        }
+    },
+
     // ── Tab lifecycle ──────────────────────────────────────────────────────
 
     onTabOpen() {
@@ -147,6 +210,7 @@ const BuildApprovalView = {
             }
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
+            this._validateApprovalPayload(data);
             this._lastMap = data;
             // Store the CSRF nonce for the build-start call.
             if (data.build_nonce) this._buildNonce = data.build_nonce;
@@ -154,7 +218,17 @@ const BuildApprovalView = {
             this._renderIssueComments(data);
             this._updateApproveBtn();
         } catch (e) {
-            if (body) body.innerHTML = `<div class="ba-error">Failed to load NS map: ${this._esc(e.message)}</div>`;
+            if (e && e.code === 'BUILD_APPROVAL_CONTRACT') {
+                // Never leave a previously valid approval map actionable after
+                // a malformed response has arrived.
+                this._lastMap = null;
+                this._buildNonce = null;
+                this._snapFrozen = false;
+                this._renderApprovalContractError(e);
+                this._updateApproveBtn();
+            } else if (body) {
+                body.innerHTML = `<div class="ba-error">Failed to load NS map: ${this._esc(e.message)}</div>`;
+            }
             this._renderIssueComments(null);
         } finally {
             this._inFlight = false;

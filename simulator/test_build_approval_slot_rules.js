@@ -160,6 +160,57 @@ assert(fixedBootstrap.includes('value="Bootstrap"'));
 assert(fixedBootstrap.includes('value="Starter"'));
 assert(!fixedBootstrap.includes('<select disabled'));
 
+const validApprovalPayload = {
+    slot_rules: rows.map(row => ({
+        slot: row.slot,
+        name: row.name,
+        token: null,
+        header_word: null,
+        cw: null,
+        cc: null,
+        location: null,
+        words: null,
+        limit: null,
+        load_policy: row.load_policy,
+        slot_rule: null,
+        perms: [],
+        source: 'test',
+        programmable: false,
+        size_budget: null,
+        checks: [],
+    })),
+};
+assert.strictEqual(
+    view._validateApprovalPayload(validApprovalPayload),
+    validApprovalPayload,
+    'a payload matching the documented row contract must be accepted');
+
+for (const [label, mutate, expected] of [
+    [
+        'missing field',
+        payload => { delete payload.slot_rules[0].checks; },
+        'missing checks',
+    ],
+    [
+        'unexpected runtime field',
+        payload => { payload.slot_rules[0].runtime_m_bits = 0xFFFF; },
+        'unexpected runtime_m_bits',
+    ],
+    [
+        'invalid checks collection',
+        payload => { payload.slot_rules[0].checks = null; },
+        'perms and checks arrays',
+    ],
+]) {
+    const malformed = JSON.parse(JSON.stringify(validApprovalPayload));
+    mutate(malformed);
+    assert.throws(
+        () => view._validateApprovalPayload(malformed),
+        error => error.code === 'BUILD_APPROVAL_CONTRACT' &&
+            error.message.includes(expected),
+        `${label} approval payload must be rejected`);
+}
+
 let posted = [];
 let currentConfig = {
     targetBoard: 'wukong-xc7a100t',
@@ -191,9 +242,61 @@ context.fetch = async (url, options) => {
         async json() { return { ok: true, config: body }; },
     };
 };
-view.refresh = async () => {};
+const realRefresh = view.refresh;
 
 (async () => {
+    let mapBody = { innerHTML: '' };
+    let approveButton = { disabled: false };
+    context.document.getElementById = id => {
+        if (id === 'baMapBody') return mapBody;
+        if (id === 'baApproveBtn') return approveButton;
+        return null;
+    };
+    view._lastMap = { slot_rules: rows };
+    context.fetch = async url => {
+        assert.strictEqual(url, '/api/build-approval/ns-map');
+        return {
+            ok: true,
+            status: 200,
+            async json() {
+                const malformed = JSON.parse(JSON.stringify(validApprovalPayload));
+                delete malformed.slot_rules[0].checks;
+                return malformed;
+            },
+        };
+    };
+    await realRefresh.call(view, false);
+    assert(mapBody.innerHTML.includes('Build Approval data is malformed'));
+    assert(mapBody.innerHTML.includes('Refresh'));
+    assert.strictEqual(view._lastMap, null,
+        'malformed approval data must clear the stale actionable map');
+    assert.strictEqual(approveButton.disabled, true,
+        'malformed approval data must keep Build disabled');
+
+    view._lastMap = { boot_entry_slot: 10, slot_rules: rows };
+    view.refresh = async () => {};
+    view._inFlight = false;
+    mapBody = { innerHTML: '' };
+    approveButton = { disabled: true };
+    context.fetch = async (url, options) => {
+        if (url === '/api/boot-config' && !options) {
+            return {
+                ok: true,
+                async json() {
+                    return { config: JSON.parse(JSON.stringify(currentConfig)) };
+                },
+            };
+        }
+        assert.strictEqual(url, '/api/boot-config');
+        const body = JSON.parse(options.body);
+        posted.push(body);
+        currentConfig = body;
+        return {
+            ok: true,
+            async json() { return { ok: true, config: body }; },
+        };
+    };
+
     const select = { dataset: { previousValue: 'Lazy' }, value: 'Starter', disabled: false };
     await view._changeSlotRule(10, 'Starter', select);
     assert.strictEqual(posted[0].bootEntrySlot, 10);
