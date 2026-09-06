@@ -15767,7 +15767,7 @@ def _ba_build_ns_map():
             'load_policy': 'Hardware',
             'programmable': False,
             'size_budget': _not_applicable_budget(
-                f'hardware register ({device["words"]} word'
+                f'ARTIX-7 MMIO hardware register ({device["words"]} word'
                 f'{"s" if device["words"] != 1 else ""})'),
             'checks': [{'label': 'MMIO', 'ok': True,
                         'detail': f'MMIO at {location}'}],

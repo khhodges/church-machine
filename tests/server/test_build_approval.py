@@ -757,7 +757,8 @@ def test_ns_map_normalizes_lump_thread_and_hardware_metadata():
         'detail': 'MMIO at 0xFFFFFF1C',
     }]
     assert mbit['size_budget']['available'] is False
-    assert mbit['size_budget']['reason'].startswith('N/A — hardware register')
+    assert mbit['size_budget']['reason'].startswith(
+        'N/A — ARTIX-7 MMIO hardware register')
     assert not any(key in mbit for key in (
         'value', 'state', 'm_bit_value', 'm_bit_state',
     ))

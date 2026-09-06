@@ -71,8 +71,15 @@ const BuildApprovalView = {
     _renderSizeBudget(budget) {
         if (!budget) return '<span class="ba-size-unavailable">N/A</span>';
         if (!budget.available) {
-            return `<span class="ba-size-unavailable">${this._esc(
-                budget.reason || 'N/A')}</span>`;
+            const reason = budget.reason || 'N/A';
+            const isHardwareRegister = /ARTIX-7|hardware register/i.test(reason);
+            const tooltip = isHardwareRegister
+                ? 'ARTIX-7 MMIO reference — fixed hardware register window from the architecture device catalog; no programmable LUMP body or size budget applies.'
+                : `Size budget unavailable — ${reason}`;
+            const safeTooltip = this._esc(tooltip);
+            return `<span class="ba-size-unavailable" title="${safeTooltip}" ` +
+                `data-tooltip="${safeTooltip}" tabindex="0" role="note" ` +
+                `aria-label="${safeTooltip}">${this._esc(reason)}</span>`;
         }
         const sections = Array.isArray(budget.sections) ? budget.sections : [
             ['Code', budget.code],

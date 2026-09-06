@@ -118,7 +118,7 @@ const mBit = view._renderRow({
     runtime_m_bits: 0xFFFF,
     size_budget: {
         available: false,
-        reason: 'N/A — hardware register (1 word)',
+        reason: 'N/A — ARTIX-7 MMIO hardware register (1 word)',
     },
     checks: [{ label: 'MMIO', ok: true, detail: 'MMIO at 0xFFFFFF1C' }],
 });
@@ -127,7 +127,10 @@ assert(mBit.includes('R+W'));
 assert(mBit.includes('>MMIO</code>'));
 assert(mBit.includes('data-tooltip="MMIO — MMIO at 0xFFFFFF1C"'));
 assert(mBit.includes('tabindex="0"'));
-assert(mBit.includes('N/A — hardware register'));
+assert(mBit.includes('N/A — ARTIX-7 MMIO hardware register'));
+assert(mBit.includes(
+    'data-tooltip="ARTIX-7 MMIO reference — fixed hardware register window from the architecture device catalog; no programmable LUMP body or size budget applies."'),
+    'hardware size rows must explain their ARTIX-7 MMIO reference');
 assert(mBit.includes('value="Hardware" selected'));
 assert(!mBit.includes('65535'),
     'Namespace approval must not display the current M-bit register value');
