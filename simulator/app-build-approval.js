@@ -141,8 +141,8 @@ const BuildApprovalView = {
 
         const tiers = [
             { key: 'bootstrap', label: '🏗️ Bootstrap (slots 0–1 — baked into BRAM)' },
-            { key: 'resident',  label: '📦 Resident (slots 2–7 — boot ROM)' },
-            { key: 'lazy',      label: '🌐 Lazy-load (slots 8+ — server-fetched)' },
+            { key: 'resident',  label: '📦 Resident (per-slot policy — Boot RAM / hardware-backed)' },
+            { key: 'lazy',      label: '🌐 Lazy-load (per-slot policy — server-fetched)' },
             { key: 'unused',    label: '⬛ Unused / gap slots' },
         ];
 
@@ -157,7 +157,7 @@ const BuildApprovalView = {
             html += `<table class="ba-table">
 <thead><tr>
   <th>Slot</th><th>Name</th><th>Token</th><th>Header</th>
-  <th>cw</th><th>cc</th><th>Location</th><th>Perms</th><th>Source</th>
+  <th>cw</th><th>cc</th><th>Location</th><th>Load</th><th>Perms</th><th>Source</th>
   <th>Checks</th><th>Size budget</th>
 </tr></thead><tbody>`;
             for (const s of slots) {
@@ -286,6 +286,7 @@ const BuildApprovalView = {
   <td class="ba-num">${this._esc(s.cw != null ? s.cw : '—')}</td>
   <td class="ba-num">${this._esc(s.cc != null ? s.cc : '—')}</td>
   <td class="ba-loc"><code>${this._esc(s.location || '—')}</code></td>
+  <td class="ba-load">${this._esc(s.load_policy || s.loadPolicy || '—')}</td>
   <td class="ba-perms">${this._esc(this._permStr(s.perms))}</td>
   <td class="ba-src">${this._esc(s.source || '—')}</td>
   <td class="ba-checks">${checkHtml}</td>

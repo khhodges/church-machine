@@ -52,3 +52,17 @@ opcode 8.
 **How to apply:** Use binary structure for header/cw/cc display and reserve
 approval checks for trust/build policy. Keep generic opcode checks strict, then
 normalize only the canonical SelfTest validation path.
+
+## Namespace load-policy boundary
+
+Resident versus lazy-load is a property of each NS slot, not a numeric slot
+range. Only Boot.NS and Boot.Thread form the foundational bootstrap tier; every
+other slot must be routed from its saved policy.
+
+**Why:** The Build Approval view previously made slots 2–7 look inherently
+boot-resident and slots 8+ inherently server-fetched, which misrepresented
+valid configurations where either side of that boundary can be selected.
+
+**How to apply:** Prefer the saved per-slot load policy, use artifact metadata
+only for legacy migration, and keep approval gating tied to the resulting
+resident rows rather than to slot numbers.

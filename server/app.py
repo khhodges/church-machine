@@ -15413,6 +15413,68 @@ def _ba_build_ns_map():
         manifest_by_slot[entry['ns_slot']] = entry
     manifest_no_slot = []
 
+    # Load policy belongs to the individual Namespace slot.  Do not infer it
+    # from the slot number: slot 6 can be lazy while slot 10 can be resident,
+    # or vice versa.  The saved Boot Image Designer setting is authoritative;
+    # artifact metadata is retained as a compatibility fallback for older
+    # projects that predate persisted per-slot policy rows.
+    slot_policy_by_slot = {}
+    try:
+        saved_cfg, saved_cfg_err = _read_saved_boot_config()
+        if saved_cfg_err is None and isinstance(saved_cfg, dict):
+            for policy_row in ((saved_cfg.get('step2') or {}).get('lumps') or []):
+                if not isinstance(policy_row, dict):
+                    continue
+                policy_slot = policy_row.get('nsSlot')
+                policy_value = policy_row.get('loadPolicy', policy_row.get('load_policy'))
+                if isinstance(policy_slot, int) and policy_value in (
+                        'Empty', 'Resident', 'Preload', 'Lazy'):
+                    slot_policy_by_slot[policy_slot] = policy_value
+    except Exception:
+        # Approval rendering must remain available when an older config cannot
+        # be fully validated; the sidecar/default fallback below still works.
+        pass
+
+    def _sidecar_policy(lump_path):
+        if not lump_path:
+            return None
+        sidecar_path = os.path.splitext(lump_path)[0] + '.json'
+        try:
+            with open(sidecar_path, encoding='utf-8') as sidecar_file:
+                metadata = json.load(sidecar_file)
+            if not isinstance(metadata, dict):
+                return None
+            value = metadata.get('loadPolicy', metadata.get('load_policy'))
+            if value in ('Empty', 'Resident', 'Preload', 'Lazy'):
+                return value
+            if isinstance(metadata.get('boot_resident'), bool):
+                return 'Resident' if metadata['boot_resident'] else 'Lazy'
+        except (OSError, ValueError, TypeError):
+            pass
+        return None
+
+    def _slot_policy(slot_num, state_entry=None, lump_path=None):
+        if slot_num in slot_policy_by_slot:
+            return slot_policy_by_slot[slot_num]
+        if isinstance(state_entry, dict):
+            value = state_entry.get('loadPolicy', state_entry.get('load_policy'))
+            if value in ('Empty', 'Resident', 'Preload', 'Lazy'):
+                return value
+        return _sidecar_policy(lump_path) or 'Lazy'
+
+    # These lists are referenced by the policy router before the later
+    # manifest scan, so initialize both before defining/calling the helper.
+    lazy = []
+
+    def _append_policy_row(row, policy):
+        row['load_policy'] = policy
+        if policy == 'Empty':
+            return
+        # Preload is a startup fetch, not a body baked into boot RAM.  It is
+        # therefore visible with the fetched group and remains non-blocking for
+        # hardware approval on this Wukong target.
+        (resident if policy == 'Resident' else lazy).append(row)
+
     # ── Helper: build checks for a LUMP slot ──────────────────────────────
     def _lump_checks(slot_num, token, manifest_entry, lump_path, is_selftest=False):
         checks = []
@@ -15479,12 +15541,14 @@ def _ba_build_ns_map():
             'slot': 0, 'name': 'Boot.NS', 'token': None,
             'header_word': None, 'cw': None, 'cc': None,
             'location': ns_table_base, 'perms': ['R', 'W'], 'source': 'BRAM (boot ROM)',
+            'load_policy': 'Bootstrap',
             'checks': [{'label': 'BRAM', 'ok': True, 'detail': 'Baked into BRAM at NS_TABLE_BASE'}],
         },
         {
             'slot': 1, 'name': 'Boot.Thread', 'token': None,
             'header_word': None, 'cw': None, 'cc': None,
             'location': thread_base, 'perms': ['R', 'W'], 'source': 'BRAM (boot ROM)',
+            'load_policy': 'Bootstrap',
             'checks': [{'label': 'BRAM', 'ok': True, 'detail': 'Thread lump baked into BRAM'}],
         },
     ]
@@ -15493,15 +15557,19 @@ def _ba_build_ns_map():
     resident = [
         {'slot': 2, 'name': 'UART_DEV',  'token': None, 'header_word': 'MMIO', 'cw': None, 'cc': None,
          'location': mmio_uart,  'perms': ['R', 'W'], 'source': 'boot ROM',
+          'load_policy': 'Hardware',
          'checks': [{'label': 'MMIO', 'ok': True, 'detail': f'MMIO at {mmio_uart}'}]},
         {'slot': 3, 'name': 'LED_DEV',   'token': None, 'header_word': 'MMIO', 'cw': None, 'cc': None,
          'location': mmio_led,   'perms': ['R', 'W'], 'source': 'boot ROM',
+          'load_policy': 'Hardware',
          'checks': [{'label': 'MMIO', 'ok': True, 'detail': f'MMIO at {mmio_led}'}]},
         {'slot': 4, 'name': 'BTN_DEV',   'token': None, 'header_word': 'MMIO', 'cw': None, 'cc': None,
          'location': mmio_btn,   'perms': ['R'],      'source': 'boot ROM',
+          'load_policy': 'Hardware',
          'checks': [{'label': 'MMIO', 'ok': True, 'detail': f'MMIO at {mmio_btn}'}]},
         {'slot': 5, 'name': 'TIMER_DEV', 'token': None, 'header_word': 'MMIO', 'cw': None, 'cc': None,
          'location': mmio_timer, 'perms': ['R', 'W'], 'source': 'boot ROM',
+          'load_policy': 'Hardware',
          'checks': [{'label': 'MMIO', 'ok': True, 'detail': f'MMIO at {mmio_timer}'}]},
     ]
 
@@ -15515,14 +15583,14 @@ def _ba_build_ns_map():
     st_checks = _lump_checks(selftest_slot, st_token,
                              manifest_by_slot.get(selftest_slot),
                              st_lump, is_selftest=True)
-    resident.append({
+    _append_policy_row({
         'slot': selftest_slot, 'name': 'SelfTest ⚡',
         'token': st_token,
         'header_word': f'0x{st_hdr[0]:08X}' if st_hdr else None,
         'cw': st_hdr[1] if st_hdr else None, 'cc': st_hdr[2] if st_hdr else None,
         'location': selftest_base, 'perms': ['E'], 'source': 'server/lumps',
         'checks': st_checks,
-    })
+    }, _slot_policy(selftest_slot, st_entry, st_lump))
 
     # Slot 7 — WukongCallHome LUMP
     wch_entry = manifest_by_slot.get(callhome_slot)
@@ -15536,14 +15604,14 @@ def _ba_build_ns_map():
     wch_lump = _ba_lump_file_for_token(wch_token) if wch_token else None
     wch_hdr = _ba_read_lump_header(wch_lump) if wch_lump else None
     wch_checks = _lump_checks(callhome_slot, wch_token, wch_entry, wch_lump)
-    resident.append({
+    _append_policy_row({
         'slot': callhome_slot, 'name': 'WukongCallHome',
         'token': wch_token,
         'header_word': f'0x{wch_hdr[0]:08X}' if wch_hdr else None,
         'cw': wch_hdr[1] if wch_hdr else None, 'cc': wch_hdr[2] if wch_hdr else None,
         'location': callhome_base, 'perms': ['E'], 'source': 'server/lumps',
         'checks': wch_checks,
-    })
+    }, _slot_policy(callhome_slot, wch_entry, wch_lump))
 
     # ── Byte-range overlap check for resident LUMP slots ──────────────────
     def _parse_hex(s):
@@ -15569,17 +15637,16 @@ def _ba_build_ns_map():
             s['checks'].append({'label': 'overlap', 'ok': True,
                                 'detail': 'No byte-range overlap with other resident slots'})
 
-    # ── Lazy-load (manifest ns_slot >= 8) ─────────────────────────────────
-    lazy = []
+    # ── Remaining fixed slots use their own saved load policy ──────────────
     for slot_num in sorted(manifest_by_slot.keys()):
-        if slot_num < ns_slot_count:
-            continue  # already in resident
+        if slot_num < 6 or slot_num in (selftest_slot, callhome_slot):
+            continue  # bootstrap/MMIO or rendered by the dedicated rows above
         entry = manifest_by_slot[slot_num]
         token = entry.get('token')
         lump_path = _ba_lump_file_for_token(token)
         hdr = _ba_read_lump_header(lump_path) if lump_path else None
         checks = _lump_checks(slot_num, token, entry, lump_path)
-        lazy.append({
+        _append_policy_row({
             'slot': slot_num,
             'name': entry.get('abstraction', '?'),
             'token': token,
@@ -15588,9 +15655,9 @@ def _ba_build_ns_map():
             'cc': hdr[2] if hdr else (entry.get('cc')),
             'location': None,
             'perms': entry.get('grants', []),
-            'source': 'manifest (lazy)',
+            'source': 'manifest (slot policy)',
             'checks': checks,
-        })
+        }, _slot_policy(slot_num, entry, lump_path))
 
     # Manifest entries with ns_slot=None or dynamic
     for entry in manifest_no_slot:
@@ -15600,7 +15667,7 @@ def _ba_build_ns_map():
             lump_path = _ba_lump_file_for_token(token)
             hdr = _ba_read_lump_header(lump_path) if lump_path else None
             checks = _lump_checks(None, token, entry, lump_path)
-            lazy.append({
+            _append_policy_row({
                 'slot': '(dynamic)',
                 'name': entry.get('abstraction', '?'),
                 'token': token,
@@ -15609,9 +15676,9 @@ def _ba_build_ns_map():
                 'cc': hdr[2] if hdr else entry.get('cc'),
                 'location': None,
                 'perms': entry.get('grants', []),
-                'source': 'manifest (dynamic)',
+                'source': 'manifest (dynamic slot)',
                 'checks': checks,
-            })
+            }, 'Lazy')
 
     # Size accounting is informational.  In particular, lazy/runtime entries
     # are included when available but never participate in approval gating.
@@ -16054,11 +16121,11 @@ def build_approval_freeze_snapshot():
         ns_map = _ba_build_ns_map()
         # Determine whether the hardware-relevant tiers pass.
         #
-        # Only the bootstrap (slots 0-1, baked into BRAM) and resident (slots
-        # 2-7, in the boot ROM) tiers affect the Vivado bitstream.  Lazy/dynamic
-        # slots are fetched at runtime by the IDE — stale manifest entries and
-        # missing legacy LUMP files in those tiers are informational and must not
-        # block synthesis approval.
+        # Only the bootstrap (slots 0-1, baked into BRAM) and explicitly
+        # resident slot-policy entries affect the Vivado bitstream. Lazy and
+        # dynamic slot-policy entries are fetched at runtime by the IDE —
+        # stale manifest entries and missing legacy LUMP files there are
+        # informational and must not block synthesis approval.
         def _snap_all_pass(m):
             for tier_name in ('bootstrap', 'resident'):
                 for s in m.get('tiers', {}).get(tier_name, []):

@@ -493,8 +493,8 @@ def test_allcheckspass_gate_ignores_lazy_tier_failures():
     This test documents and enforces the gate semantics that must be implemented
     identically in both server-side (_snap_all_pass) and client-side
     (BuildApprovalView._allChecksPass):
-      - Bootstrap (slots 0-1) and Resident (slots 2-7) failures → block approval
-      - Lazy/dynamic failures → informational warning only, do not block
+      - Bootstrap (slots 0-1) and explicitly Resident slot policies → block approval
+      - Lazy/dynamic slot policies → informational warning only, do not block
 
     The commit that fixes this test demonstrates the v8 regression: when the
     old _allChecksPass() iterated every tier, stale legacy manifest entries in
@@ -571,6 +571,31 @@ def test_allcheckspass_gate_ignores_lazy_tier_failures():
     assert not client_all_checks_pass(failing_hw_map), (
         'Hardware-tier RETURN regression must disable Freeze/Approve in the UI'
     )
+
+
+def test_ns_map_routes_slots_by_saved_policy_not_slot_number(monkeypatch):
+    """A higher-numbered slot may be resident and a lower one may be lazy."""
+    monkeypatch.setattr(
+        _app,
+        '_read_saved_boot_config',
+        lambda: ({
+            'step2': {
+                'lumps': [
+                    {'nsSlot': 7, 'loadPolicy': 'Resident'},
+                    {'nsSlot': 10, 'loadPolicy': 'Lazy'},
+                ],
+            },
+        }, None),
+    )
+
+    ns_map = _app._ba_build_ns_map()
+    resident_slots = {row['slot'] for row in ns_map['tiers']['resident']}
+    lazy_slots = {row['slot'] for row in ns_map['tiers']['lazy']}
+
+    assert 7 in resident_slots
+    assert 10 in lazy_slots
+    assert 7 not in lazy_slots
+    assert 10 not in resident_slots
 
 
 def test_real_ns_map_hardware_tiers_all_pass():
