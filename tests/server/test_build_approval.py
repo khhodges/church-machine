@@ -772,6 +772,43 @@ def test_approval_row_contract_is_exact_and_runtime_state_is_rejected():
     with_runtime_state['runtime_m_bits'] = 0xFFFF
     with pytest.raises(ValueError, match=r'unexpected=.*runtime_m_bits'):
         _app._ba_validate_approval_rows([with_runtime_state])
+
+@pytest.mark.parametrize('malformed_row, expected_detail', [
+    (
+        {
+            field: None for field in _app._BA_APPROVAL_ROW_FIELDS
+            if field != 'checks'
+        },
+        'missing',
+    ),
+    (
+        {
+            **{field: None for field in _app._BA_APPROVAL_ROW_FIELDS},
+            'runtime_m_bits': 0xFFFF,
+        },
+        'unexpected',
+    ),
+])
+def test_ns_map_endpoint_rejects_malformed_builder_rows(
+    monkeypatch, malformed_row, expected_detail
+):
+    """The API must not serve malformed rows returned by its map builder."""
+    monkeypatch.setenv('REPORT_TOKEN', 'build-approval-test-token')
+    monkeypatch.setattr(
+        _app,
+        '_ba_build_ns_map',
+        lambda: {'slot_rules': [malformed_row]},
+    )
+
+    response = client.get(
+        '/api/build-approval/ns-map',
+        headers={'Authorization': 'Bearer build-approval-test-token'},
+    )
+
+    assert response.status_code == 500
+    payload = response.get_json()
+    assert payload and expected_detail in payload['error']
+    assert 'build_nonce' not in payload
 def test_builtin_device_rows_match_architecture_catalog():
     """Every built-in device approval row mirrors the boot-image catalog."""
     ns_map = _app._ba_build_ns_map()
