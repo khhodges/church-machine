@@ -616,6 +616,8 @@ def test_ns_map_exposes_boot_entry_separately_from_load_policy(monkeypatch):
     assert ns_map['boot_entry_slot'] == 10
     row = next(item for item in ns_map['slot_rules'] if item.get('slot') == 10)
     assert row['load_policy'] == 'Lazy'
+    assert row['slot_rule'] == 'LightningBolt'
+    assert row['name'] == 'SelfTest' or row['name'] == 'CapabilityTest'
 
 
 def test_ns_map_honors_programmer_slot_rules_on_architecture_rows(monkeypatch):
@@ -636,6 +638,8 @@ def test_ns_map_honors_programmer_slot_rules_on_architecture_rows(monkeypatch):
             if isinstance(row.get('slot'), int)}
     assert rows[0]['load_policy'] == 'Lazy'
     assert rows[2]['load_policy'] == 'Empty'
+    assert rows[0]['slot_rule'] == 'Lazy'
+    assert rows[2]['slot_rule'] == 'Empty'
     assert rows[0]['programmable'] is False
     assert rows[2]['programmable'] is False
 
