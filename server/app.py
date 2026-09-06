@@ -15728,6 +15728,14 @@ def _ba_build_ns_map():
         'allocation': {'words': sum(r['size_budget']['allocation']['words'] for r in hardware_rows),
                        'bytes': sum(r['size_budget']['allocation']['bytes'] for r in hardware_rows)},
     }
+    # The UI consumes one row per Namespace slot. Keep the legacy tier buckets
+    # below for approval-gate compatibility, but make each row's load_policy
+    # the authoritative rule rather than presenting fixed policy sections.
+    slot_rules = bootstrap + resident + lazy
+    slot_rules.sort(key=lambda row: (
+        1 if not isinstance(row.get('slot'), int) else 0,
+        row.get('slot') if isinstance(row.get('slot'), int) else str(row.get('slot')),
+    ))
     return {
         'tiers': {
             'bootstrap': bootstrap,
@@ -15735,6 +15743,7 @@ def _ba_build_ns_map():
             'lazy':      lazy,
             'unused':    [],
         },
+        'slot_rules': slot_rules,
         'ns_table_base': ns_table_base,
         'ns_slot_count': ns_slot_count,
         'hardware_budget': hardware_budget,
@@ -16154,11 +16163,23 @@ def build_approval_freeze_snapshot():
         # stale manifest entries and missing legacy LUMP files there are
         # informational and must not block synthesis approval.
         def _snap_all_pass(m):
-            for tier_name in ('bootstrap', 'resident'):
-                for s in m.get('tiers', {}).get(tier_name, []):
-                    for c in s.get('checks', []):
-                        if c.get('ok') is False:
-                            return False
+            slot_rules = m.get('slot_rules')
+            if isinstance(slot_rules, list):
+                blocking_policies = {'Bootstrap', 'Hardware', 'Resident'}
+                rows = [
+                    row for row in slot_rules
+                    if row.get('load_policy', row.get('loadPolicy')) in blocking_policies
+                ]
+            else:
+                # Backward compatibility for snapshots created before the
+                # individual slot_rules payload was introduced.
+                rows = []
+                for tier_name in ('bootstrap', 'resident'):
+                    rows.extend(m.get('tiers', {}).get(tier_name, []))
+            for s in rows:
+                for c in s.get('checks', []):
+                    if c.get('ok') is False:
+                        return False
             return True
         all_pass = _snap_all_pass(ns_map)
         now_str = _ba_datetime.datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')

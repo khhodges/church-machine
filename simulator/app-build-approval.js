@@ -1,9 +1,9 @@
 /**
  * app-build-approval.js — Build Approval view (Builder ▸ 🔨 Build tab)
  *
- * Renders a four-tier NS map (Bootstrap / Resident / Lazy-load / Unused) with
- * inline ✅/⚠️/❌ check badges per slot, a Freeze Snapshot button, and an
- * Approve & Build button that triggers a remote Vivado synthesis run.
+ * Renders one Namespace table with an individual load rule per slot, inline
+ * ✅/⚠️/❌ check badges, a Freeze Snapshot button, and an Approve & Build
+ * button that triggers a remote Vivado synthesis run.
  */
 
 /* eslint-disable no-use-before-define */
@@ -139,25 +139,21 @@ const BuildApprovalView = {
         const body = document.getElementById('baMapBody');
         if (!body) return;
 
-        const tiers = [
-            { key: 'bootstrap', label: '🏗️ Bootstrap (foundational boot entries — baked into BRAM)' },
-            { key: 'resident',  label: '📦 Resident (per-slot policy — Boot RAM / hardware-backed)' },
-            { key: 'lazy',      label: '🌐 Lazy-load (per-slot policy — server-fetched)' },
-            { key: 'unused',    label: '⬛ Unused / gap slots' },
-        ];
-
         let html = '';
         if (data.hardware_budget) {
-            html += this._renderBudget('Hardware budget (resident binaries)', data.hardware_budget);
+            html += this._renderBudget('Boot RAM budget (individual slot rules)', data.hardware_budget);
         }
-        for (const tier of tiers) {
-            const slots = data.tiers && data.tiers[tier.key];
-            if (!slots || !slots.length) continue;
-            html += `<div class="ba-tier-header">${this._esc(tier.label)}</div>`;
+        const fallbackTiers = data.tiers || {};
+        const slots = Array.isArray(data.slot_rules)
+            ? data.slot_rules
+            : ['bootstrap', 'resident', 'lazy', 'unused']
+                .flatMap(key => Array.isArray(fallbackTiers[key]) ? fallbackTiers[key] : []);
+        if (slots.length) {
+            html += '<div class="ba-tier-header">🧭 Namespace slots (individual load policies)</div>';
             html += `<table class="ba-table">
 <thead><tr>
   <th>Slot</th><th>Name</th><th>Token</th><th>Header</th>
-  <th>cw</th><th>cc</th><th>Location</th><th>Load</th><th>Perms</th><th>Source</th>
+  <th>cw</th><th>cc</th><th>Location</th><th>Slot rule</th><th>Perms</th><th>Source</th>
   <th>Checks</th><th>Size budget</th>
 </tr></thead><tbody>`;
             for (const s of slots) {
@@ -358,13 +354,15 @@ const BuildApprovalView = {
         // stale legacy manifest entries in those tiers show as warnings but must not
         // block synthesis.  This matches _snap_all_pass() in server/app.py exactly.
         if (!this._lastMap) return false;
-        const tiers = this._lastMap.tiers || {};
-        const HW_TIERS = ['bootstrap', 'resident'];
-        for (const tierName of HW_TIERS) {
-            for (const s of (tiers[tierName] || [])) {
-                for (const c of (s.checks || [])) {
-                    if (c.ok === false) return false;
-                }
+        const blockingPolicies = new Set(['Bootstrap', 'Hardware', 'Resident']);
+        const rows = Array.isArray(this._lastMap.slot_rules)
+            ? this._lastMap.slot_rules.filter(s =>
+                blockingPolicies.has(s.load_policy || s.loadPolicy))
+            : ['bootstrap', 'resident'].flatMap(tier =>
+                (this._lastMap.tiers && this._lastMap.tiers[tier]) || []);
+        for (const s of rows) {
+            for (const c of (s.checks || [])) {
+                if (c.ok === false) return false;
             }
         }
         return true;
@@ -378,7 +376,7 @@ const BuildApprovalView = {
         if (freezeBtn) freezeBtn.disabled = !checksOk || this._buildRunning;
         btn.disabled = !checksOk || !this._snapFrozen || this._buildRunning;
         if (!checksOk) {
-            btn.title = 'Fix ❌ checks in Bootstrap/Resident tiers before approving (lazy-tier warnings are non-blocking)';
+            btn.title = 'Fix ❌ checks for blocking per-slot rules before approving (lazy/preload warnings are non-blocking)';
         } else if (!this._snapFrozen) {
             btn.title = 'Freeze a snapshot first';
         } else {
