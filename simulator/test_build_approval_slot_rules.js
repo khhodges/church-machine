@@ -125,10 +125,21 @@ const mBit = view._renderRow({
 assert(mBit.includes('M_BIT_DEV'));
 assert(mBit.includes('R+W'));
 assert(mBit.includes('>MMIO</code>'));
+assert(mBit.includes('data-tooltip="MMIO — MMIO at 0xFFFFFF1C"'));
+assert(mBit.includes('tabindex="0"'));
 assert(mBit.includes('N/A — hardware register'));
 assert(mBit.includes('value="Hardware" selected'));
 assert(!mBit.includes('65535'),
     'Namespace approval must not display the current M-bit register value');
+
+const explainedCheck = view._checkBadge({
+    label: 'header',
+    ok: true,
+    detail: 'Header valid: magic 0x1F',
+});
+assert(explainedCheck.includes(
+    'data-tooltip="header — Header valid: magic 0x1F"'),
+    'validation badges must expose a clear hover explanation');
 
 const normalizedMBit = view._normalizeRow({
     slot: 13,

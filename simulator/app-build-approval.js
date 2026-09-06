@@ -34,16 +34,28 @@ const BuildApprovalView = {
     },
 
     _badge(kind, label, title) {
-        const t = title ? ` title="${this._esc(title)}"` : '';
+        const tooltip = title ? this._esc(title) : '';
+        const t = title
+            ? ` title="${tooltip}" data-tooltip="${tooltip}" tabindex="0" role="img" aria-label="${tooltip}"`
+            : '';
         return `<span class="ba-badge ba-badge-${kind}"${t}>${this._esc(label)}</span>`;
+    },
+
+    _checkTooltip(check) {
+        const label = check && check.label ? String(check.label) : 'Validation check';
+        const detail = check && check.detail
+            ? String(check.detail)
+            : 'No additional detail is available.';
+        return `${label} — ${detail}`;
     },
 
     _checkBadge(check) {
         // check: { ok: bool|null, warn: bool, label, detail }
-        if (check.ok === true && !check.warn) return this._badge('ok', '✅', check.detail || check.label);
-        if (check.ok === null)               return this._badge('unknown', 'N/A', check.detail || check.label);
-        if (check.warn)                      return this._badge('warn', '⚠️', check.detail || check.label);
-        return this._badge('bad', '❌', check.detail || check.label);
+        const tooltip = this._checkTooltip(check);
+        if (check.ok === true && !check.warn) return this._badge('ok', '✅', tooltip);
+        if (check.ok === null)               return this._badge('unknown', 'N/A', tooltip);
+        if (check.warn)                      return this._badge('warn', '⚠️', tooltip);
+        return this._badge('bad', '❌', tooltip);
     },
 
     _permStr(perms) {
