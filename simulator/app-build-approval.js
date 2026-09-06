@@ -292,19 +292,31 @@ const BuildApprovalView = {
             ['Resident', 'Resident'],
             ['Preload', 'Preload'],
             ['Lazy', 'Lazy'],
-            ['LightningBolt', 'LightningBolt (selects boot entry)'],
+            ['Starter', 'Starter'],
         ];
-        const selectedRule = s.slot_rule || s.slotRule;
-        const selected = [
-            'Bootstrap', 'Hardware', 'Empty', 'Resident', 'Preload', 'Lazy',
-            'LightningBolt',
-        ].includes(selectedRule) ? selectedRule : (
-            ['Bootstrap', 'Hardware', 'Empty', 'Resident', 'Preload', 'Lazy']
-                .includes(policy) ? policy : 'Lazy'
-        );
+        const selected = this._slotRuleSelection(s);
         return options.map(([value, label]) =>
             `<option value="${this._esc(value)}"${selected === value ? ' selected' : ''}>` +
             `${this._esc(label)}</option>`).join('');
+    },
+
+    _slotRuleSelection(s) {
+        const policy = s.load_policy || s.loadPolicy || 'Lazy';
+        const selectedRule = s.slot_rule || s.slotRule;
+        const bootEntrySlot = this._lastMap && this._lastMap.boot_entry_slot;
+        const normalizedBootEntrySlot = Number(bootEntrySlot);
+        const hasAuthoritativeBootEntry = bootEntrySlot !== null &&
+            bootEntrySlot !== '' && Number.isInteger(normalizedBootEntrySlot);
+        const isBootEntry = hasAuthoritativeBootEntry
+            ? Number(s.slot) === normalizedBootEntrySlot
+            : selectedRule === 'LightningBolt';
+        if (isBootEntry) return 'Starter';
+        const loadPolicies = [
+            'Bootstrap', 'Hardware', 'Empty', 'Resident', 'Preload', 'Lazy',
+        ];
+        return loadPolicies.includes(selectedRule) ? selectedRule : (
+            loadPolicies.includes(policy) ? policy : 'Lazy'
+        );
     },
 
     async _changeSlotRule(slot, value, select) {
@@ -328,10 +340,11 @@ const BuildApprovalView = {
             const rows = config.step2.lumps;
             let saved = rows.find(item => item && Number(item.nsSlot) === Number(slot));
 
-            if (value === 'LightningBolt') {
-                // LightningBolt is a boot role, not a fifth load policy. Move
-                // the single role and restore the previous slot's underlying
-                // rule so two LightningBolt states cannot persist.
+            if (value === 'Starter' || value === 'LightningBolt') {
+                // Starter is a boot role, not a fifth load policy. Keep the
+                // persisted LightningBolt role for compatibility, move the
+                // single role, and restore the previous slot's rule so two
+                // boot-entry states cannot persist.
                 const previousBootSlot = Number(config.bootEntrySlot);
                 if (Number.isInteger(previousBootSlot) &&
                     previousBootSlot !== Number(slot)) {
@@ -439,8 +452,7 @@ const BuildApprovalView = {
   <td class="ba-num">${this._esc(this._value(s.cc))}</td>
   <td class="ba-loc"><code>${this._esc(this._value(s.location))}</code></td>
    <td class="ba-load"><select class="ba-slot-rule" data-slot="${this._esc(slot)}"
-       data-previous-value="${this._esc(
-             s.slot_rule || s.slotRule || s.load_policy || s.loadPolicy || 'N/A')}"
+       data-previous-value="${this._esc(this._slotRuleSelection(s))}"
        aria-label="Slot rule for NS slot ${this._esc(slot)}"
        onchange="if(typeof BuildApprovalView!=='undefined')BuildApprovalView._changeSlotRule(Number(this.dataset.slot),this.value,this)">
        ${this._slotRuleOptions(s)}

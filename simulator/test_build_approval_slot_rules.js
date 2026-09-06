@@ -5,11 +5,11 @@
  *
  * Covers:
  *   - every Namespace row renders a programmer-selectable rule
- *     plus the single LightningBolt boot-entry role;
+ *     plus the single Starter boot-entry role;
  *   - architecture rows are not disabled or silently forced by the IDE;
- *   - selecting LightningBolt moves the one boot-entry role;
+ *   - selecting Starter moves the one boot-entry role;
  *   - selecting a load policy persists step2 without creating an independent
- *     LightningBolt/load-policy conflict.
+ *     Starter/load-policy conflict.
  */
 
 const assert = require('assert');
@@ -46,7 +46,6 @@ const rows = [
         slot: 10,
         name: 'CapabilityTest',
         load_policy: 'Resident',
-        slot_rule: 'LightningBolt',
         location: '0x000003C0',
         size_budget: { total: { words: 64 } },
         checks: [],
@@ -55,7 +54,7 @@ const rows = [
 view._lastMap = { boot_entry_slot: 10, slot_rules: rows };
 
 const editable = view._renderRow(rows[2]);
-for (const value of ['Bootstrap', 'Hardware', 'Empty', 'Resident', 'Preload', 'Lazy', 'LightningBolt']) {
+for (const value of ['Bootstrap', 'Hardware', 'Empty', 'Resident', 'Preload', 'Lazy', 'Starter']) {
     assert(
         editable.includes(`value="${value}"`),
         `editable slot must offer ${value}`);
@@ -63,9 +62,16 @@ for (const value of ['Bootstrap', 'Hardware', 'Empty', 'Resident', 'Preload', 'L
 assert(editable.includes('aria-label="Slot rule for NS slot 6"'));
 
 const activeBoot = view._renderRow(rows[3]);
-assert(activeBoot.includes('value="LightningBolt" selected'));
+assert(activeBoot.includes('value="Starter" selected'));
+assert(!activeBoot.includes('LightningBolt'));
 assert(!activeBoot.includes('⚡ boot entry'));
-assert(activeBoot.includes('value="LightningBolt"'));
+
+const explicitBootFallback = view._renderRow({
+    ...rows[3],
+    slot_rule: 'LightningBolt',
+});
+assert(explicitBootFallback.includes('value="Starter" selected'));
+assert(!explicitBootFallback.includes('LightningBolt'));
 
 const generatedThread = view._renderRow({
     slot: 11,
@@ -125,7 +131,7 @@ assert(!mBit.includes('65535'),
 
 const fixedBootstrap = view._renderRow(rows[0]);
 assert(fixedBootstrap.includes('value="Bootstrap"'));
-assert(fixedBootstrap.includes('value="LightningBolt"'));
+assert(fixedBootstrap.includes('value="Starter"'));
 assert(!fixedBootstrap.includes('<select disabled'));
 
 let posted = [];
@@ -162,15 +168,15 @@ context.fetch = async (url, options) => {
 view.refresh = async () => {};
 
 (async () => {
-    const select = { dataset: { previousValue: 'Lazy' }, value: 'LightningBolt', disabled: false };
-    await view._changeSlotRule(10, 'LightningBolt', select);
+    const select = { dataset: { previousValue: 'Lazy' }, value: 'Starter', disabled: false };
+    await view._changeSlotRule(10, 'Starter', select);
     assert.strictEqual(posted[0].bootEntrySlot, 10);
     assert.strictEqual(posted[0].slotRules['10'], 'LightningBolt');
     assert.deepStrictEqual(posted[0].step2.lumps, [],
         'LightningBolt must not be persisted as a load-policy row');
 
-    const moveSelect = { dataset: { previousValue: 'LightningBolt' }, value: 'LightningBolt', disabled: false };
-    await view._changeSlotRule(6, 'LightningBolt', moveSelect);
+    const moveSelect = { dataset: { previousValue: 'Lazy' }, value: 'Starter', disabled: false };
+    await view._changeSlotRule(6, 'Starter', moveSelect);
     assert.strictEqual(posted[1].bootEntrySlot, 6);
     assert.strictEqual(posted[1].slotRules['6'], 'LightningBolt');
     assert.strictEqual(posted[1].slotRules['10'], 'Resident',
