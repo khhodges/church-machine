@@ -752,6 +752,26 @@ def test_ns_map_normalizes_lump_thread_and_hardware_metadata():
     assert mbit['size_budget']['reason'].startswith('N/A')
 
 
+def test_builtin_device_rows_match_architecture_catalog():
+    """Every built-in device approval row mirrors the boot-image catalog."""
+    ns_map = _app._ba_build_ns_map()
+    rows = {
+        row['slot']: row for row in ns_map['slot_rules']
+        if isinstance(row.get('slot'), int)
+    }
+    catalog = _app._boot_image_gen.architecture_device_catalog()
+
+    assert catalog
+    for device in catalog.values():
+        row = rows[device['slot']]
+        assert row['name'] == device['name']
+        assert row['slot'] == device['slot']
+        assert row['location'] == f'0x{device["address"]:08X}'
+        assert row['words'] == device['words']
+        assert row['limit'] == device['limit']
+        assert row['perms'] == list(device['permissions'])
+
+
 def test_mbit_approval_row_survives_saved_rules_and_stale_state(monkeypatch):
     """M-bit runtime/config state cannot remove or rewrite its static row."""
     m_bit_slot = _app._boot_image_gen.ARCH_BOOT['minimalSlots']['M_BIT_DEV']

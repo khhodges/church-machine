@@ -340,12 +340,33 @@ def boot_resident_region_end(thread_size, boot_abstr_size, thread_count,
     return thread_size * thread_count + boot_abstr_size + trailing_catalog_words
 
 
+def architecture_device_catalog():
+    """Return the built-in device facts from the shared architecture contract.
+
+    The boot image and server-side approval view both need the same slot,
+    address, register-count, and permission facts.  Keep this as a fresh
+    structure so callers cannot mutate the architecture contract imported
+    from ``shared.architecture_contracts``.
+    """
+    return {
+        name: {
+            "name": name,
+            "slot": int(ARCH_BOOT["minimalSlots"][name]),
+            "address": int(spec["address"]),
+            "words": int(spec["words"]),
+            "limit": int(spec["words"]) - 1,
+            "permissions": tuple(spec.get("permissions", ())),
+        }
+        for name, spec in ARCH_BOOT["devices"].items()
+    }
+
+
 # MMIO NS slot specs: (mmio_byte_addr, lim17).
-# Slots 2-5 use physical MMIO addresses — no RAM body is allocated;
-# running_offset is not advanced for these slots.
+# Device slots use physical MMIO addresses — no RAM body is allocated;
+# running_offset is not advanced for them.
 _MMIO_SLOT_SPECS = {
-    ARCH_BOOT["minimalSlots"][name]: (spec["address"], spec["words"] - 1)
-    for name, spec in ARCH_BOOT["devices"].items()
+    device["slot"]: (device["address"], device["limit"])
+    for device in architecture_device_catalog().values()
 }
 
 # Service abstraction c-list capability table.

@@ -15404,20 +15404,12 @@ def _ba_build_ns_map():
     # callhome base — match the literal constant assignment (not the indirect alias)
     callhome_base   = _rom(r'WUKONG_CALLHOME_BASE_BYTE\s*=\s*(0x[0-9a-fA-F]+|\d+)', '0x1200')
 
-    mmio_uart  = _rom(r'MMIO_UART_ADDR\s*=\s*(0x[0-9a-fA-F]+)',  '0x40000014')
-    mmio_led   = _rom(r'MMIO_LED_ADDR\s*=\s*(0x[0-9a-fA-F]+)',   '0x40000000')
-    mmio_btn   = _rom(r'MMIO_BTN_ADDR\s*=\s*(0x[0-9a-fA-F]+)',   '0x40000028')
-    mmio_timer = _rom(r'MMIO_TIMER_ADDR\s*=\s*(0x[0-9a-fA-F]+)', '0x4000002C')
-    # M_BIT_DEV is an intrinsic Namespace slot, not a runtime LUMP. Keep its
-    # static identity tied to the architecture catalog so a live M-bit value
-    # can never change whether or where the approved row exists.
-    m_bit_slot = int(_boot_image_gen.ARCH_BOOT['minimalSlots']['M_BIT_DEV'])
-    m_bit_device = _boot_image_gen.ARCH_BOOT['devices']['M_BIT_DEV']
-    m_bit_location = f'0x{int(m_bit_device["address"]):08X}'
-    m_bit_perms = [
-        perm for perm in ('R', 'W', 'X', 'L', 'S', 'E')
-        if perm in m_bit_device.get('permissions', [])
-    ]
+    # Built-in device rows are intrinsic Namespace entries, not runtime
+    # LUMPs. Keep every device fact tied to the same architecture catalog
+    # used by the boot-image generator so approval cannot drift from boot.
+    device_catalog = _boot_image_gen.architecture_device_catalog()
+    m_bit_device = device_catalog['M_BIT_DEV']
+    m_bit_slot = m_bit_device['slot']
 
     # NS_TABLE_BASE from hw_types.py
     hw_types_path = os.path.join(ROOT, 'hardware', 'hw_types.py')
@@ -15706,12 +15698,6 @@ def _ba_build_ns_map():
     # Hardware-backed rows are intrinsic device definitions. They are
     # resident regardless of software LUMP policy and are kept outside the
     # policy-controlled resident/lazy split.
-    mmio_specs = {
-        2: ('UART_DEV', mmio_uart, ['R', 'W']),
-        3: ('LED_DEV', mmio_led, ['R', 'W']),
-        4: ('BTN_DEV', mmio_btn, ['R']),
-        5: ('TIMER_DEV', mmio_timer, ['R', 'W']),
-    }
     catalog_perms = {}
     for _catalog_slot, _catalog_entry in enumerate(
             _boot_image_gen.DEFAULT_ABSTRACTION_CATALOG):
@@ -15720,37 +15706,34 @@ def _ba_build_ns_map():
                 perm for perm in ('R', 'W', 'X', 'L', 'S', 'E')
                 if _catalog_entry[1].get(perm)
             ]
-    resident = [
-        {
+    resident = []
+    for device in sorted(device_catalog.values(), key=lambda item: item['slot']):
+        slot_num = device['slot']
+        name = device['name']
+        location = f'0x{device["address"]:08X}'
+        perms = list(device['permissions'])
+        resident.append({
             'slot': slot_num, 'name': name, 'token': None,
             'header_word': 'MMIO', 'cw': None, 'cc': None,
-            'location': location, 'perms': perms, 'source': 'boot ROM hardware register',
+            'location': location, 'words': device['words'],
+            'limit': device['limit'], 'perms': perms,
+            'source': 'boot ROM hardware register',
             'load_policy': 'Hardware',
             'programmable': False,
-            'size_budget': _not_applicable_budget('hardware register'),
+            'size_budget': _not_applicable_budget(
+                f'hardware register ({device["words"]} word'
+                f'{"s" if device["words"] != 1 else ""})'),
             'checks': [{'label': 'MMIO', 'ok': True,
                         'detail': f'MMIO at {location}'}],
-        }
-        for slot_num, (name, location, perms) in {
-            **mmio_specs,
-            m_bit_slot: (
-                'M_BIT_DEV',
-                m_bit_location,
-                m_bit_perms,
-            ),
-        }.items()
-    ]
+        })
     for _row in resident:
-        _state_entry = manifest_by_slot.get(_row['slot'])
-        if (_row['slot'] != m_bit_slot and _state_entry
-                and _state_entry.get('location')):
-            _row['location'] = _state_entry['location']
         if _row['slot'] == m_bit_slot:
             _row.update({
                 'header_word': None,
                 'source': 'hardware/namespace register',
                 'size_budget': _not_applicable_budget(
-                    f'M-bit Namespace register ({m_bit_device.get("words", 1)} word)'),
+                    f'M-bit Namespace register ({m_bit_device["words"]} word'
+                    f'{"s" if m_bit_device["words"] != 1 else ""})'),
             })
     for _row in resident:
         _row['load_policy'] = _slot_policy(_row['slot'], default='Hardware')
@@ -15830,7 +15813,9 @@ def _ba_build_ns_map():
 
     # Every non-intrinsic manifest slot uses its own saved load policy. Never
     # infer Resident/Lazy from a numeric slot boundary.
-    intrinsic_slots = set(bootstrap_slots) | set(mmio_specs) | {
+    intrinsic_slots = set(bootstrap_slots) | {
+        device['slot'] for device in device_catalog.values()
+    } | {
         selftest_slot, callhome_slot, m_bit_slot,
     }
     intrinsic_slots.update(generated_thread_slots)
