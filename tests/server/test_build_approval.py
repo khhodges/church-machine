@@ -884,12 +884,18 @@ def test_worker_command_construction(monkeypatch, tmp_path):
     _ba_build_worker must construct valid SSH command strings without raising
     when a clean approved snapshot exists.  We mock subprocess.run to intercept
     the SSH call and verify the command structure without touching a real host.
+    The simulated successful completion writes its version history to the
+    test directory rather than the committed build metadata.
     """
     if not REPORT_TOKEN:
         pytest.skip('REPORT_TOKEN not set')
 
     # Write a clean approved snapshot so the /start gate passes
     monkeypatch.setattr(_app, '_BUILD_SNAPSHOTS_DIR', str(tmp_path))
+    history_path = tmp_path / 'wukong-bitstream-versions.json'
+    monkeypatch.setattr(
+        _app, '_bitstream_version_log_path', lambda: str(history_path)
+    )
     clean_snap = {
         'frozen_at': '20260101T000000Z',
         'all_checks_pass': True,
@@ -952,6 +958,8 @@ def test_worker_command_construction(monkeypatch, tmp_path):
     assert 'git diff --quiet' in ssh_cmd
     assert 'rm -f church_wukong_xc7a100t.bit' in ssh_cmd
     assert 'ARTIFACT_MD5_' in ssh_cmd
+    assert history_path.exists()
+    assert json.loads(history_path.read_text())[-1]['status'] == 'succeeded'
 
 
 def test_start_rejected_with_failed_snapshot(monkeypatch, tmp_path):
