@@ -39,7 +39,15 @@ vm.runInContext(source, context, { filename: 'app-build-approval.js' });
 const view = vm.runInContext('BuildApprovalView', context);
 
 const rows = [
-    { slot: 0, name: 'Boot.NS', load_policy: 'Bootstrap', checks: [] },
+    {
+        slot: 0,
+        name: 'Boot.NS',
+        header_word: '0x1F200808',
+        cw: 32,
+        cc: 8,
+        load_policy: 'Bootstrap',
+        checks: [],
+    },
     { slot: 2, name: 'UART_DEV', load_policy: 'Hardware', checks: [] },
     { slot: 6, name: 'SelfTest', load_policy: 'Lazy', slot_rule: 'Lazy', checks: [] },
     {
@@ -52,6 +60,10 @@ const rows = [
     },
 ];
 view._lastMap = { boot_entry_slot: 10, slot_rules: rows };
+
+const bootNamespace = view._renderRow(rows[0]);
+assert(bootNamespace.includes('<td class="ba-num">32</td>'));
+assert(bootNamespace.includes('<td class="ba-num">8</td>'));
 
 const editable = view._renderRow(rows[2]);
 for (const value of ['Bootstrap', 'Hardware', 'Empty', 'Resident', 'Preload', 'Lazy', 'Starter']) {

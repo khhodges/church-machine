@@ -742,6 +742,13 @@ def test_ns_map_normalizes_lump_thread_and_hardware_metadata():
     assert rows[1]['name'] == 'Boot.Thread'
     assert rows[1]['perms'] == ['NONE']
 
+    assert rows[0]['name'] == 'Boot.NS'
+    assert rows[0]['header_word'] == _app._BOOT_NS_META['header_word']
+    assert rows[0]['cw'] == _app._BOOT_NS_META['cw']
+    assert rows[0]['cc'] == _app._BOOT_NS_META['cc']
+    assert rows[0]['cw'] > 0
+    assert rows[0]['cc'] > 0
+
     m_bit_slot = _app._boot_image_gen.ARCH_BOOT['minimalSlots']['M_BIT_DEV']
     mbit = rows[m_bit_slot]
     assert mbit['name'] == 'M_BIT_DEV'

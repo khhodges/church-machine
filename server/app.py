@@ -7303,6 +7303,7 @@ def _load_boot_ns_lump():
             "token":       "00000000",
             "abstraction": "Boot.NS",
             "ns_slot":     0,
+            "header_word": f"0x{hdr:08X}",
             "lump_size":   lump_size,
             "cw":          cw,
             "cc":          cc,
@@ -15737,6 +15738,15 @@ def _ba_build_ns_map():
             'cc': _boot_image_gen.THREAD_CAP_WORDS,
             'source': 'generated Thread#1 body (boot ROM)',
             'size_budget': _thread_size_budget(thread_layout),
+        })
+    _boot_ns = _BOOT_NS_META if isinstance(_BOOT_NS_META, dict) else {}
+    _boot_ns_row = next((row for row in bootstrap if row['slot'] == 0), None)
+    if _boot_ns_row and _boot_ns.get('cw') is not None and _boot_ns.get('cc') is not None:
+        _boot_ns_row.update({
+            'header_word': _boot_ns.get('header_word'),
+            'cw': _boot_ns['cw'],
+            'cc': _boot_ns['cc'],
+            'source': 'Boot.NS namespace LUMP (boot ROM)',
         })
     for _row in bootstrap:
         _row['load_policy'] = _slot_policy(_row['slot'], default='Bootstrap')
