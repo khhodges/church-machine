@@ -140,7 +140,7 @@ const BuildApprovalView = {
         if (!body) return;
 
         const tiers = [
-            { key: 'bootstrap', label: '🏗️ Bootstrap (slots 0–1 — baked into BRAM)' },
+            { key: 'bootstrap', label: '🏗️ Bootstrap (foundational boot entries — baked into BRAM)' },
             { key: 'resident',  label: '📦 Resident (per-slot policy — Boot RAM / hardware-backed)' },
             { key: 'lazy',      label: '🌐 Lazy-load (per-slot policy — server-fetched)' },
             { key: 'unused',    label: '⬛ Unused / gap slots' },

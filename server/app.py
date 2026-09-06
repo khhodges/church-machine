@@ -2818,8 +2818,9 @@ def _validate_step1(target_board, step1):
     # lump size — abstractionLumpWords is ignored for the foundation_sum check.
     foundation_sum = _boot_image_gen.boot_resident_region_end(
         step1["threadLumpWords"], BOOT_ABSTR_DEFAULT_SIZE, _thread_count)
-    # The Namespace LUMP occupies the Namespace-table tail, while slots 2–5
-    # are MMIO.  The contiguous RAM prefix also includes catalog slots 7–10.
+    # The Namespace LUMP occupies the Namespace-table tail, while the
+    # architecture-defined device rows are MMIO. The contiguous RAM prefix
+    # also includes the architecture-defined catalog bodies.
     if foundation_sum > total:
         return (f"Sum of foundational lump sizes ({foundation_sum}) exceeds "
                 f"totalNamespaceWords ({total})")
@@ -15540,42 +15541,44 @@ def _ba_build_ns_map():
         return checks
 
     # ── Assemble tiers ─────────────────────────────────────────────────────
-    # Bootstrap: slots 0–1
+    # Bootstrap entries are architecture-defined foundational rows, not a
+    # numeric policy range.
+    bootstrap_slots = {
+        0: ('Boot.NS', ns_table_base, ['R', 'W'],
+            'Baked into BRAM at NS_TABLE_BASE'),
+        1: ('Boot.Thread', thread_base, ['R', 'W'],
+            'Thread lump baked into BRAM'),
+    }
     bootstrap = [
         {
-            'slot': 0, 'name': 'Boot.NS', 'token': None,
+            'slot': slot_num, 'name': name, 'token': None,
             'header_word': None, 'cw': None, 'cc': None,
-            'location': ns_table_base, 'perms': ['R', 'W'], 'source': 'BRAM (boot ROM)',
+            'location': location, 'perms': perms, 'source': 'BRAM (boot ROM)',
             'load_policy': 'Bootstrap',
-            'checks': [{'label': 'BRAM', 'ok': True, 'detail': 'Baked into BRAM at NS_TABLE_BASE'}],
-        },
-        {
-            'slot': 1, 'name': 'Boot.Thread', 'token': None,
-            'header_word': None, 'cw': None, 'cc': None,
-            'location': thread_base, 'perms': ['R', 'W'], 'source': 'BRAM (boot ROM)',
-            'load_policy': 'Bootstrap',
-            'checks': [{'label': 'BRAM', 'ok': True, 'detail': 'Thread lump baked into BRAM'}],
-        },
+            'checks': [{'label': 'BRAM', 'ok': True, 'detail': detail}],
+        }
+        for slot_num, (name, location, perms, detail) in bootstrap_slots.items()
     ]
 
-    # Resident MMIO: slots 2–5
+    # Hardware-backed rows are intrinsic device definitions. They are
+    # resident regardless of software LUMP policy and are kept outside the
+    # policy-controlled resident/lazy split.
+    mmio_specs = {
+        2: ('UART_DEV', mmio_uart, ['R', 'W']),
+        3: ('LED_DEV', mmio_led, ['R', 'W']),
+        4: ('BTN_DEV', mmio_btn, ['R']),
+        5: ('TIMER_DEV', mmio_timer, ['R', 'W']),
+    }
     resident = [
-        {'slot': 2, 'name': 'UART_DEV',  'token': None, 'header_word': 'MMIO', 'cw': None, 'cc': None,
-         'location': mmio_uart,  'perms': ['R', 'W'], 'source': 'boot ROM',
-          'load_policy': 'Hardware',
-         'checks': [{'label': 'MMIO', 'ok': True, 'detail': f'MMIO at {mmio_uart}'}]},
-        {'slot': 3, 'name': 'LED_DEV',   'token': None, 'header_word': 'MMIO', 'cw': None, 'cc': None,
-         'location': mmio_led,   'perms': ['R', 'W'], 'source': 'boot ROM',
-          'load_policy': 'Hardware',
-         'checks': [{'label': 'MMIO', 'ok': True, 'detail': f'MMIO at {mmio_led}'}]},
-        {'slot': 4, 'name': 'BTN_DEV',   'token': None, 'header_word': 'MMIO', 'cw': None, 'cc': None,
-         'location': mmio_btn,   'perms': ['R'],      'source': 'boot ROM',
-          'load_policy': 'Hardware',
-         'checks': [{'label': 'MMIO', 'ok': True, 'detail': f'MMIO at {mmio_btn}'}]},
-        {'slot': 5, 'name': 'TIMER_DEV', 'token': None, 'header_word': 'MMIO', 'cw': None, 'cc': None,
-         'location': mmio_timer, 'perms': ['R', 'W'], 'source': 'boot ROM',
-          'load_policy': 'Hardware',
-         'checks': [{'label': 'MMIO', 'ok': True, 'detail': f'MMIO at {mmio_timer}'}]},
+        {
+            'slot': slot_num, 'name': name, 'token': None,
+            'header_word': 'MMIO', 'cw': None, 'cc': None,
+            'location': location, 'perms': perms, 'source': 'boot ROM',
+            'load_policy': 'Hardware',
+            'checks': [{'label': 'MMIO', 'ok': True,
+                        'detail': f'MMIO at {location}'}],
+        }
+        for slot_num, (name, location, perms) in mmio_specs.items()
     ]
 
     # Slot 6 — SelfTest LUMP
@@ -15648,10 +15651,14 @@ def _ba_build_ns_map():
             s['checks'].append({'label': 'overlap', 'ok': True,
                                 'detail': 'No byte-range overlap with other resident slots'})
 
-    # ── Remaining fixed slots use their own saved load policy ──────────────
+    # Every non-intrinsic manifest slot uses its own saved load policy. Never
+    # infer Resident/Lazy from a numeric slot boundary.
+    intrinsic_slots = set(bootstrap_slots) | set(mmio_specs) | {
+        selftest_slot, callhome_slot,
+    }
     for slot_num in sorted(manifest_by_slot.keys()):
-        if slot_num < 6 or slot_num in (selftest_slot, callhome_slot):
-            continue  # bootstrap/MMIO or rendered by the dedicated rows above
+        if slot_num in intrinsic_slots:
+            continue  # rendered by the architecture-specific rows above
         entry = manifest_by_slot[slot_num]
         token = entry.get('token')
         lump_path = _ba_lump_file_for_token(token)
@@ -16141,8 +16148,8 @@ def build_approval_freeze_snapshot():
         ns_map = _ba_build_ns_map()
         # Determine whether the hardware-relevant tiers pass.
         #
-        # Only the bootstrap (slots 0-1, baked into BRAM) and explicitly
-        # resident slot-policy entries affect the Vivado bitstream. Lazy and
+        # Only the bootstrap tier and explicitly resident slot-policy entries
+        # affect the Vivado bitstream. Lazy and
         # dynamic slot-policy entries are fetched at runtime by the IDE —
         # stale manifest entries and missing legacy LUMP files there are
         # informational and must not block synthesis approval.

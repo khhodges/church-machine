@@ -21,7 +21,7 @@
 //   T04 — cache path: persisted {static, 9} overrides stale server detail
 //   T05 — fresh-fetch path: server detail {static, 9} is used when cache is empty
 //   T06 — cache path: persisted values override server's dynamic/null defaults
-//   T07 — legacy high slot from server is ignored without a saved choice
+//   T07 — a server-selected high slot remains a valid per-slot choice
 //   T08 — fresh-fetch path: server detail {dynamic, null} yields policy=dynamic, nsSlotVal=''
 //   T09 — cache path: after dynamic install the modal shows policy=dynamic, no slot
 //   T10 — resolve: detail with ns_slot=0 yields nsSlotVal='0' (falsy-zero guard)
@@ -134,14 +134,14 @@ try {
     check('T06 cache override nsSlotVal=9',  nsSlotVal === '9',      nsSlotVal);
 }
 
-// T07 — a legacy high slot must not become a modal default.
+// T07 — a high slot is not a special case; per-slot metadata is authoritative.
 {
     const token = 'cafe1234';
     const serverDetail = { token, ns_slot_policy: 'static', ns_slot: 15 };
     const cache = {};
     const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverDetail, token, cache);
-    check('T07 legacy high slot: policy=dynamic', policy === 'dynamic', policy);
-    check('T07 legacy high slot: nsSlotVal empty', nsSlotVal === '', nsSlotVal);
+    check('T07 high slot: policy=static', policy === 'static', policy);
+    check('T07 high slot: nsSlotVal=15', nsSlotVal === '15', nsSlotVal);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -52,12 +52,47 @@ function _setNsDirty(dirty) {
 // is compiled once, not once per row per render.
 const _hwCapRe = /^(LED[0-5]?|LED_DEV|UART(_TX|_RX|_DEV)?|BTN|BTN_DEV|Button|SlideRule|Timer|TIMER_DEV|M_BIT_DEV|Display|Boot\.NS|Boot\.Nucs|Boot\.Abstr)$/i;
 
-function _isResidentIORegister(slot) {
+function _architectureBootSlots() {
     const contracts = (typeof globalThis !== 'undefined')
         ? globalThis.ChurchArchitectureContracts : null;
-    const mBitSlot = contracts && contracts.boot && contracts.boot.minimalSlots
-        ? contracts.boot.minimalSlots.M_BIT_DEV : 13;
-    return (slot >= 2 && slot <= 5) || slot === mBitSlot;
+    return contracts && contracts.boot && contracts.boot.minimalSlots
+        ? contracts.boot.minimalSlots : {};
+}
+
+function _isBootstrapSlot(slot, label) {
+    const slots = _architectureBootSlots();
+    const labelName = String(label || (sim && sim.nsLabels && sim.nsLabels[slot]) || '');
+    return labelName === 'Boot.NS' || labelName === 'Boot.Thread' ||
+        Number(slots['Boot.NS']) === Number(slot) ||
+        Number(slots['Boot.Thread']) === Number(slot);
+}
+
+function _isResidentIORegister(slot, label) {
+    const slots = _architectureBootSlots();
+    const contracts = (typeof globalThis !== 'undefined')
+        ? globalThis.ChurchArchitectureContracts : null;
+    const devices = contracts && contracts.boot && contracts.boot.devices
+        ? contracts.boot.devices : {};
+    const labelName = String(label || (sim && sim.nsLabels && sim.nsLabels[slot]) || '');
+    const deviceNames = Object.keys(devices);
+    return deviceNames.some(name => Number(slots[name]) === Number(slot)) ||
+        labelName === 'M_BIT_DEV';
+}
+
+function _nsSavedLoadPolicy(slot, manifest) {
+    const valid = ['Empty', 'Resident', 'Preload', 'Lazy'];
+    const cfg = window.bootConfig || {};
+    const rows = cfg.step2 && Array.isArray(cfg.step2.lumps) ? cfg.step2.lumps : [];
+    const saved = rows.find(row => row && Number(row.nsSlot) === Number(slot)) || null;
+    const savedValue = saved && (saved.loadPolicy || saved.load_policy);
+    if (valid.includes(savedValue)) return savedValue;
+
+    const manifestValue = manifest && (manifest.loadPolicy || manifest.load_policy);
+    if (valid.includes(manifestValue)) return manifestValue;
+    if (manifest && typeof manifest.boot_resident === 'boolean') {
+        return manifest.boot_resident ? 'Resident' : 'Lazy';
+    }
+    return null;
 }
 
 function _findSrcLump(slotIdx, slotLabel) {
@@ -2958,21 +2993,14 @@ function updateNamespace() {
     // Namespace Table is the primary policy surface.  Each slot has exactly
     // one policy; transport order, hashes, capacity and bridge details remain
     // derived implementation data.
-    function _nsPrefetchRow(slot, manifest) {
-        if (_isResidentIORegister(slot)) {
+    function _nsPrefetchRow(slot, manifest, label) {
+        if (_isBootstrapSlot(slot, label)) {
+            return '<span class="ns-fixed-policy" title="Foundational boot entry; baked into BRAM">Bootstrap</span>';
+        }
+        if (_isResidentIORegister(slot, label)) {
             return '<span class="ns-fixed-policy" title="Fixed MMIO capability; no LUMP source or identity">Resident I/O register</span>';
         }
-        // The fixed boot catalog entries are always resident and are not
-        // programmer-configurable; only user LUMP slots expose the selector.
-        if (slot <= 10) {
-            return '<span class="ns-fixed-policy" title="Boot catalog slots are always resident">Resident</span>';
-        }
-        if (!manifest || !manifest.bootUpload) return '';
-        const cfg = window.bootConfig || {};
-        const rows = cfg.step2 && Array.isArray(cfg.step2.lumps) ? cfg.step2.lumps : [];
-        const saved = rows.find(row => row && row.nsSlot === slot) || null;
-        const value = saved && (saved.loadPolicy || saved.load_policy) ||
-            (saved && saved.resident ? 'Resident' : (saved && saved.prefetch ? 'Preload' : 'Lazy'));
+        const value = _nsSavedLoadPolicy(slot, manifest) || 'Lazy';
         return `<select aria-label="Load policy for slot ${slot}" onchange="event.stopPropagation();_nsPrefetchChange(${slot},this.value)" style="margin-left:5px;background:#0d0d1a;color:#d0d0e8;border:1px solid #6b5320;border-radius:3px;font-size:0.68rem;padding:1px 3px;"><option ${value==='Empty'?'selected':''}>Empty</option><option ${value==='Resident'?'selected':''}>Resident</option><option ${value==='Preload'?'selected':''}>Preload</option><option ${value==='Lazy'?'selected':''}>Lazy</option></select>`;
     }
 
@@ -3023,9 +3051,10 @@ function updateNamespace() {
     };
 
     window._nsPrefetchChange = function(slot, value) {
-        // Boot catalog slots 0–10 are permanently resident.  Keep this guard
-        // at the mutation boundary as well as in the renderer.
-        if (slot <= 10 || _isResidentIORegister(slot)) return;
+        // Only architecture-defined foundational and hardware slots are fixed.
+        // Every other occupied slot owns an editable saved load policy.
+        const label = sim && sim.nsLabels ? sim.nsLabels[slot] : '';
+        if (_isBootstrapSlot(slot, label) || _isResidentIORegister(slot, label)) return;
         const cfg = window.bootConfig || {};
         if (!cfg.step2) cfg.step2 = { lumps: [] };
         if (!Array.isArray(cfg.step2.lumps)) cfg.step2.lumps = [];
@@ -3239,8 +3268,9 @@ function updateNamespace() {
         {
             const _srcLump = _findSrcLump(i, e.label);
             const _srcToken = _srcLump ? _srcLump.token : null;
-            const _residentIO = _isResidentIORegister(i);
-            const _identityBtn = (i > 10 && !_residentIO)
+            const _residentIO = _isResidentIORegister(i, e.label);
+            const _identityBtn = (!_isBootstrapSlot(i, e.label) && !_residentIO &&
+                                  !_isThreadNamespaceSlot(i, e))
                 ? `<button type="button" class="btn btn-xs ns-identity-btn" aria-haspopup="dialog" onclick="event.stopPropagation();_nsShowIdentity(${i})" style="background:#27233b;color:#c4a7ff;border:1px solid rgba(196,167,255,0.35);margin-left:5px;font-size:0.65rem;padding:1px 5px;" title="Show canonical dot.name and T-ID">Identity</button>`
                 : '';
             // Show Source for Inform (gtType 1) and Outform (gtType 2) only.
@@ -3258,7 +3288,7 @@ function updateNamespace() {
                                 _hwCapRe.test(e.label || '') ||
                                 _residentIO;
             if (codeNotResident) {
-                html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span>${_nsPrefetchRow(i, manifest)}${_identityBtn}</td>`;
+                html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span>${_nsPrefetchRow(i, manifest, e.label)}${_identityBtn}</td>`;
             } else {
                 let _srcBtn = '';
                 if (!_hideSource) {
@@ -3270,7 +3300,7 @@ function updateNamespace() {
                         : `null,${i}`;
                     _srcBtn = `<button class="btn btn-xs" onclick="event.stopPropagation();_openLumpSource(${_onclickTarget})" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);" title="Open source in Repository view">Source</button>`;
                 }
-                html += `<td class="ns-entry-actions">${_srcBtn}${_nsPrefetchRow(i, manifest)}${_identityBtn}</td>`;
+                html += `<td class="ns-entry-actions">${_srcBtn}${_nsPrefetchRow(i, manifest, e.label)}${_identityBtn}</td>`;
             }
         }
         html += '</tr>';
@@ -3354,22 +3384,10 @@ function _nsSlotPolicyResolve(approvedMetadata, token, nsPersistedSlotMeta) {
             approvedMetadata = Object.assign({}, approvedMetadata, { ns_slot: _persistedSlotMeta.ns_slot });
         }
     }
-    const rawSlot   = approvedMetadata.ns_slot;
-    // Slots above the built-in catalog were formerly used as private,
-    // hard-coded identities.  Treat those values as legacy metadata unless
-    // the programmer explicitly saved the choice in this session.
-    const hasExplicitSavedSlot = _persistedSlotMeta &&
-        _persistedSlotMeta.ns_slot !== undefined &&
-        _persistedSlotMeta.ns_slot !== null &&
-        _persistedSlotMeta.ns_slot !== '';
-    const legacyHighSlot = !hasExplicitSavedSlot &&
-        Number.isInteger(Number(rawSlot)) && Number(rawSlot) > 10;
-    const nsSlotVal = legacyHighSlot
-        ? ''
-        : ((rawSlot !== null && rawSlot !== undefined) ? String(rawSlot) : '');
-    const policy    = legacyHighSlot
-        ? 'dynamic'
-        : (approvedMetadata.ns_slot_policy || (nsSlotVal !== '' ? 'static' : 'dynamic'));
+    const rawSlot = approvedMetadata.ns_slot;
+    const nsSlotVal = (rawSlot !== null && rawSlot !== undefined) ? String(rawSlot) : '';
+    const policy = approvedMetadata.ns_slot_policy ||
+        (nsSlotVal !== '' ? 'static' : 'dynamic');
     return { nsSlotVal, policy };
 }
 // _nsSlotPersistRecord: given the user's chosen policy and the allocated slot,
@@ -4096,9 +4114,11 @@ function _nsTableAddConfirm() {
 // then zeroes the entry. Any pre-Clear GT will fail GT validation on next use.
 function _nsTableClear(slot) {
     if (!sim) return;
-    // Slots 0–10 are the complete built-in catalog.  Only user allocations
-    // may be cleared and returned to the allocator.
-    if (slot < 11) return;
+    // Namespace allocation owns the reserved catalog boundary. Do not repeat
+    // that boundary here as a numeric range; the simulator is authoritative.
+    const firstUserSlot = typeof sim.firstUserNsSlot === 'function'
+        ? sim.firstUserNsSlot() : null;
+    if (Number.isInteger(firstUserSlot) && slot < firstUserSlot) return;
 
     // A free entry must be all-zero so the shared allocator can reuse it.
     // clearNSEntry keeps the bumped generation out-of-band until reissue.
@@ -4920,7 +4940,7 @@ function _showNSTypeDescModal(slotIdx, nsEntry) {
     };
     const d = descs[gtType] || descs[0];
 
-    // ── MMIO register map (slots 2-5 are hardware devices, not software lumps) ──
+    // ── Architecture-defined MMIO register map ─────────────────────────────
     // Registers are word-wide (4 bytes each); byte address = base + offset*4.
     // Base byte address = word0_location * 4 (matches the loc variable above).
     const _MMIO_REGS = {
