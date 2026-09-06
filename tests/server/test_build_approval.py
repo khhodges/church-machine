@@ -967,7 +967,77 @@ def test_worker_command_construction(monkeypatch, tmp_path):
     assert history_path.exists()
     assert json.loads(history_path.read_text())[-1]['status'] == 'succeeded'
 
+def test_worker_failed_build_records_isolated_history(monkeypatch, tmp_path):
+    """
+    A nonzero remote build records a failure in the redirected history without
+    modifying the committed build-version history.
+    """
+    committed_history = os.path.abspath(os.path.join(
+        os.path.dirname(__file__), '..', '..', 'build',
+        'wukong-bitstream-versions.json',
+    ))
+    committed_before = open(committed_history, 'rb').read()
 
+    history_path = tmp_path / 'wukong-bitstream-versions.json'
+    monkeypatch.setattr(
+        _app, '_bitstream_version_log_path', lambda: str(history_path)
+    )
+    monkeypatch.setattr(_app, '_ba_build_version_context', {
+        'version': 17,
+        'source_commit': '0123456789abcdef0123456789abcdef01234567',
+        'record_id': None,
+    })
+    monkeypatch.setattr(_app, '_ba_build_log', [])
+    monkeypatch.setattr(_app, '_ba_build_done', True)
+    monkeypatch.setattr(_app, '_ba_build_exit', None)
+
+    calls = []
+
+    def _mock_run(cmd, **kwargs):
+        calls.append(cmd)
+
+        class _Result:
+            returncode = 0
+            stdout = 'EXIT_17\n' if len(calls) == 2 else ''
+            stderr = ''
+
+        return _Result()
+
+    import subprocess as _sp
+    monkeypatch.setattr(_sp, 'run', _mock_run)
+
+    fake_key = (
+        '-----BEGIN OPENSSH PRIVATE KEY-----\n'
+        'AAAA\n'
+        '-----END OPENSSH PRIVATE KEY-----\n'
+    )
+    import tempfile, os as _os
+    with tempfile.NamedTemporaryFile(suffix='.key', delete=False) as key_file:
+        key_file.write(fake_key.encode())
+        key_path = key_file.name
+    try:
+        _os.chmod(key_path, 0o600)
+        import time as _time_mod
+        monkeypatch.setattr(_time_mod, 'sleep', lambda _: None)
+        _app._ba_build_worker(key_path)
+    finally:
+        _os.unlink(key_path)
+
+    assert len(calls) == 2, 'Worker must launch and then poll the remote build'
+    assert history_path.exists()
+    records = json.loads(history_path.read_text())
+    assert records[-1] == {
+        'timestamp': records[-1]['timestamp'],
+        'status': 'failed',
+        'version': 17,
+        'source': 'remote-vivado',
+        'source_commit': '0123456789abcdef0123456789abcdef01234567',
+        'bit_hash': None,
+    }
+    assert _app._ba_build_exit == 17
+    assert _app._ba_build_phase == 'failed'
+    assert any('Build FAILED' in line for line in _app._ba_build_log)
+    assert open(committed_history, 'rb').read() == committed_before
 def test_start_rejected_with_failed_snapshot(monkeypatch, tmp_path):
     """
     /api/wukong-build/start must return 422 if the latest snapshot has
