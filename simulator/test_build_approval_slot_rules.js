@@ -5,9 +5,9 @@
  *
  * Covers:
  *   - every Namespace row renders a programmer-selectable rule
- *     plus the special LightningBolt boot-entry role;
+ *     plus the single LightningBolt boot-entry role;
  *   - architecture rows are not disabled or silently forced by the IDE;
- *   - selecting LightningBolt persists only bootEntrySlot;
+ *   - selecting LightningBolt moves the one boot-entry role;
  *   - selecting a load policy persists step2 without creating an independent
  *     LightningBolt/load-policy conflict.
  */
@@ -41,11 +41,12 @@ const view = vm.runInContext('BuildApprovalView', context);
 const rows = [
     { slot: 0, name: 'Boot.NS', load_policy: 'Bootstrap', checks: [] },
     { slot: 2, name: 'UART_DEV', load_policy: 'Hardware', checks: [] },
-    { slot: 6, name: 'SelfTest', load_policy: 'Lazy', checks: [] },
+    { slot: 6, name: 'SelfTest', load_policy: 'Lazy', slot_rule: 'Lazy', checks: [] },
     {
         slot: 10,
         name: 'CapabilityTest',
         load_policy: 'Resident',
+        slot_rule: 'LightningBolt',
         location: '0x000003C0',
         size_budget: { total: { words: 64 } },
         checks: [],
@@ -62,8 +63,8 @@ for (const value of ['Bootstrap', 'Hardware', 'Empty', 'Resident', 'Preload', 'L
 assert(editable.includes('aria-label="Slot rule for NS slot 6"'));
 
 const activeBoot = view._renderRow(rows[3]);
-assert(activeBoot.includes('value="Resident" selected'));
-assert(activeBoot.includes('⚡ boot entry'));
+assert(activeBoot.includes('value="LightningBolt" selected'));
+assert(!activeBoot.includes('⚡ boot entry'));
 assert(activeBoot.includes('value="LightningBolt"'));
 
 const fixedBootstrap = view._renderRow(rows[0]);
@@ -108,15 +109,23 @@ view.refresh = async () => {};
     const select = { dataset: { previousValue: 'Lazy' }, value: 'LightningBolt', disabled: false };
     await view._changeSlotRule(10, 'LightningBolt', select);
     assert.strictEqual(posted[0].bootEntrySlot, 10);
+    assert.strictEqual(posted[0].slotRules['10'], 'LightningBolt');
     assert.deepStrictEqual(posted[0].step2.lumps, [],
         'LightningBolt must not be persisted as a load-policy row');
 
+    const moveSelect = { dataset: { previousValue: 'LightningBolt' }, value: 'LightningBolt', disabled: false };
+    await view._changeSlotRule(6, 'LightningBolt', moveSelect);
+    assert.strictEqual(posted[1].bootEntrySlot, 6);
+    assert.strictEqual(posted[1].slotRules['6'], 'LightningBolt');
+    assert.strictEqual(posted[1].slotRules['10'], 'Resident',
+        'moving LightningBolt must restore the previous slot rule');
+
     const residentSelect = { dataset: { previousValue: 'LightningBolt' }, value: 'Resident', disabled: false };
     await view._changeSlotRule(10, 'Resident', residentSelect);
-    const saved = posted[1].step2.lumps.find(row => row.nsSlot === 10);
+    const saved = posted[2].step2.lumps.find(row => row.nsSlot === 10);
     assert(saved, 'load-policy selection must create/update the slot row');
     assert.strictEqual(saved.loadPolicy, 'Resident');
-    assert.strictEqual(posted[1].bootEntrySlot, 10,
+    assert.strictEqual(posted[2].bootEntrySlot, 6,
         'changing a load policy must not silently change LightningBolt');
     assert.strictEqual(saved.physAddr, 0x3c0);
     assert.strictEqual(saved.lumpSize, 64);

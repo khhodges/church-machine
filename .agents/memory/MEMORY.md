@@ -155,3 +155,4 @@
 - [Wukong one-shot Skip Fault](wukong-skip-fault-protocol.md) — explicit post-snapshot skip needs authenticated FPGA-sequence proof; lost correlation requires reboot
 - [LUMP output profile stability](lump-output-profile-stability.md) — persist API/Compact/Full per abstraction; allocation changes reflect embedded content, not code size alone
 - [LUMP save vs boot rebuild](lump-save-boot-rebuild-boundary.md) — an approved LUMP save must not roll back because an unchanged boot-image dependency cannot rebuild
+- [Static client cache busting](static-client-cache-busting.md) — bump pinned simulator script versions when client code changes or the preview may keep stale UI
