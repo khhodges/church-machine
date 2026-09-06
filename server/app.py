@@ -2323,14 +2323,17 @@ DEFAULT_BOOT_CONFIG = {
     },
 }
 
-SLOT_RULE_VALUES = ("Bootstrap", "Hardware", "Empty", "Resident", "Preload", "Lazy")
+SLOT_RULE_VALUES = (
+    "Bootstrap", "Hardware", "Empty", "Resident", "Preload", "Lazy",
+    "LightningBolt",
+)
 
 
 def _validate_slot_rules(slot_rules):
     """Validate programmer-owned per-slot approval rules.
 
-    LightningBolt is intentionally not stored here: it is a boot-entry role
-    represented by bootEntrySlot, never an independent load policy.
+    LightningBolt is stored as the one visible boot-entry choice, while
+    bootEntrySlot remains the normalized runtime representation.
     """
     if slot_rules is None:
         return None
@@ -15461,6 +15464,7 @@ def _ba_build_ns_map():
     # artifact metadata is retained as a compatibility fallback for older
     # projects that predate persisted per-slot policy rows.
     slot_policy_by_slot = {}
+    step2_policy_by_slot = {}
     boot_entry_slot = DEFAULT_BOOT_CONFIG["bootEntrySlot"]
     generated_thread_slots = set()
     try:
@@ -15484,10 +15488,7 @@ def _ba_build_ns_map():
                 policy_value = policy_row.get('loadPolicy', policy_row.get('load_policy'))
                 if isinstance(policy_slot, int) and policy_value in (
                         'Empty', 'Resident', 'Preload', 'Lazy'):
-                    # slotRules is the programmer-facing authority.  The
-                    # step2 projection remains a compatibility fallback.
-                    if policy_slot not in slot_policy_by_slot:
-                        slot_policy_by_slot[policy_slot] = policy_value
+                    step2_policy_by_slot[policy_slot] = policy_value
     except Exception:
         # Approval rendering must remain available when an older config cannot
         # be fully validated; the sidecar/default fallback below still works.
@@ -15512,8 +15513,11 @@ def _ba_build_ns_map():
         return None
 
     def _slot_policy(slot_num, state_entry=None, lump_path=None, default='Lazy'):
-        if slot_num in slot_policy_by_slot:
-            return slot_policy_by_slot[slot_num]
+        selected_rule = slot_policy_by_slot.get(slot_num)
+        if selected_rule in ('Bootstrap', 'Hardware', 'Empty', 'Resident', 'Preload', 'Lazy'):
+            return selected_rule
+        if slot_num in step2_policy_by_slot:
+            return step2_policy_by_slot[slot_num]
         if isinstance(state_entry, dict):
             value = state_entry.get('loadPolicy', state_entry.get('load_policy'))
             if value in ('Empty', 'Resident', 'Preload', 'Lazy'):
@@ -15654,7 +15658,7 @@ def _ba_build_ns_map():
                              manifest_by_slot.get(selftest_slot),
                              st_lump, is_selftest=True)
     st_row = {
-        'slot': selftest_slot, 'name': 'SelfTest ⚡',
+        'slot': selftest_slot, 'name': 'SelfTest',
         'token': st_token,
         'header_word': f'0x{st_hdr[0]:08X}' if st_hdr else None,
         'cw': st_hdr[1] if st_hdr else None, 'cc': st_hdr[2] if st_hdr else None,
@@ -15767,6 +15771,20 @@ def _ba_build_ns_map():
             }
             row['_ba_binary_path'] = lump_path
             _append_policy_row(row, 'Lazy')
+
+    # The selector has one visible LightningBolt state. Keep the underlying
+    # load policy separate so selecting a new boot entry can restore the old
+    # row to its prior rule instead of leaving two lightning markers behind.
+    def _slot_rule(slot_num, underlying):
+        if slot_num == boot_entry_slot:
+            return 'LightningBolt'
+        selected_rule = slot_policy_by_slot.get(slot_num)
+        return selected_rule if selected_rule in SLOT_RULE_VALUES else underlying
+
+    for _row in bootstrap + resident + lazy:
+        if isinstance(_row.get('slot'), int):
+            _row['slot_rule'] = _slot_rule(
+                _row['slot'], _row.get('load_policy', 'Lazy'))
 
     # Size accounting is informational.  In particular, lazy/runtime entries
     # are included when available but never participate in approval gating.
