@@ -762,7 +762,20 @@ def test_ns_map_normalizes_lump_thread_and_hardware_metadata():
         'value', 'state', 'm_bit_value', 'm_bit_state',
     ))
 
+def test_approval_row_contract_is_exact_and_runtime_state_is_rejected():
+    """The serialized row contract is independent of any specific device row."""
+    row = {field: None for field in _app._BA_APPROVAL_ROW_FIELDS}
+    assert _app._ba_validate_approval_rows([row]) == [row]
 
+    missing = dict(row)
+    missing.pop('checks')
+    with pytest.raises(ValueError, match=r'missing=.*checks'):
+        _app._ba_validate_approval_rows([missing])
+
+    with_runtime_state = dict(row)
+    with_runtime_state['runtime_m_bits'] = 0xFFFF
+    with pytest.raises(ValueError, match=r'unexpected=.*runtime_m_bits'):
+        _app._ba_validate_approval_rows([with_runtime_state])
 def test_builtin_device_rows_match_architecture_catalog():
     """Every built-in device approval row mirrors the boot-image catalog."""
     ns_map = _app._ba_build_ns_map()
@@ -1134,3 +1147,11 @@ class TestRetiredNextAfterSelftestEndpoint:
         assert resp.status_code == 409, (
             f'Should refuse an independent Next target in dev mode; got {resp.status_code}'
         )
+
+def test_ns_map_serializes_only_approval_contract_fields():
+    """Every slot row has exactly the documented approval fields."""
+    ns_map = _app._ba_build_ns_map()
+    rows = ns_map['slot_rules']
+    assert rows
+    expected = set(_app._BA_APPROVAL_ROW_FIELDS)
+    assert all(set(row) == expected for row in rows)

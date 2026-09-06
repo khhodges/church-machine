@@ -15125,6 +15125,45 @@ def _ba_read_lump_header(path):
         return None
 
 
+# This is the complete serialized contract for one Namespace row in the
+# Build Approval payload. Keep this metadata-only: live device state (for
+# example the current M_BIT_DEV value) is intentionally not an approval field.
+_BA_APPROVAL_ROW_FIELDS = (
+    'slot', 'name', 'token', 'header_word', 'cw', 'cc', 'location',
+    'words', 'limit', 'load_policy', 'slot_rule', 'perms', 'source',
+    'programmable', 'size_budget', 'checks',
+)
+_BA_APPROVAL_ROW_FIELD_SET = frozenset(_BA_APPROVAL_ROW_FIELDS)
+
+
+def _ba_validate_approval_rows(rows):
+    """Require every serialized Namespace row to match the approval contract.
+
+    Exact-key validation is deliberate. Missing fields make a row ambiguous
+    to the approval renderer, while unexpected fields can accidentally expose
+    mutable runtime state in a payload meant to describe approval metadata.
+    """
+    if not isinstance(rows, list):
+        raise TypeError('Build Approval slot_rules must be a list')
+
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            raise TypeError(f'Build Approval row {index} must be an object')
+        actual = set(row)
+        missing = sorted(_BA_APPROVAL_ROW_FIELD_SET - actual)
+        unexpected = sorted(actual - _BA_APPROVAL_ROW_FIELD_SET)
+        if missing or unexpected:
+            details = []
+            if missing:
+                details.append(f'missing={missing}')
+            if unexpected:
+                details.append(f'unexpected={unexpected}')
+            raise ValueError(
+                f'Build Approval row {index} violates the serialized '
+                f'field contract: {"; ".join(details)}')
+    return rows
+
+
 @app.route('/api/build-approval/snapshot/latest', methods=['GET'])
 def build_approval_snapshot_latest():
     """Return metadata for the most recent frozen snapshot.
@@ -15373,6 +15412,10 @@ def build_approval_ns_map():
 
     try:
         data = _ba_build_ns_map()
+        # Keep the endpoint boundary independently guarded: this catches a
+        # future builder/refactor that returns rows without running the
+        # canonical normalization below.
+        _ba_validate_approval_rows(data.get('slot_rules'))
         data['build_nonce'] = _ba_fresh_nonce()
         return jsonify(data)
     except Exception as e:
@@ -15930,11 +15973,6 @@ def _ba_build_ns_map():
     # exposing it to the approval renderer. In particular, do not copy
     # runtime-only state such as the live M-register bit word into this
     # committed Namespace metadata payload.
-    approval_row_fields = (
-        'slot', 'name', 'token', 'header_word', 'cw', 'cc', 'location',
-        'words', 'limit', 'load_policy', 'slot_rule', 'perms', 'source',
-        'programmable', 'size_budget', 'checks',
-    )
     approval_row_defaults = {
         'slot': None,
         'name': '?',
@@ -15957,7 +15995,7 @@ def _ba_build_ns_map():
     def _normalize_approval_row(row):
         normalized = {
             field: row.get(field, approval_row_defaults[field])
-            for field in approval_row_fields
+            for field in _BA_APPROVAL_ROW_FIELDS
         }
         normalized['perms'] = list(normalized['perms'] or [])
         normalized['checks'] = list(normalized['checks'] or [])
@@ -15991,6 +16029,7 @@ def _ba_build_ns_map():
         1 if not isinstance(row.get('slot'), int) else 0,
         row.get('slot') if isinstance(row.get('slot'), int) else str(row.get('slot')),
     ))
+    _ba_validate_approval_rows(slot_rules)
     return {
         'tiers': {
             'bootstrap': bootstrap,
