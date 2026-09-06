@@ -6,204 +6,238 @@ id = "5LtzCON58t7pyJ5QK4gpt"
 uri = "file://docs/flexibility-and-decisions.pdf"
 type = "pdf"
 title = "Flexibility and Decisions (updated tables)"
+logical_id = "bb24664f-deb4-429c-88e8-757e2b6e41da"
 
 [[outputs]]
 id = "LGBXHAPfrFZb1bTRbRGON"
 uri = "file://docs/fulcrum-of-computer-science.pdf"
 type = "pdf"
 title = "The Fulcrum of Computer Science (updated tables)"
+logical_id = "b6f576eb-9c70-4f5c-a42f-a0eb4a5fd284"
 
 [[outputs]]
 id = "BcSHNOV01T03YtzZbrzj-"
 uri = "file://docs/introducing-cloomc.pdf"
 type = "pdf"
 title = "Introducing CLOOMC — Capability-Limited, Object-Oriented, Machine Code"
+logical_id = "df8d8137-2467-4880-a6fe-4c34f9c521f2"
 
 [[outputs]]
 id = "ieJch8GCUVKM9Z_yr6gBg"
 uri = "file://docs/pet-name-language.md"
 type = "text"
 title = "Pet-Name Language Reference"
+logical_id = "01ab724a-3127-4956-9952-dfe48082776c"
 
 [[outputs]]
 id = "07IcMXkBDy-i_PaiYPxgj"
 uri = "file://docs/patents/patent-ctmm-consolidated-2026.pdf"
 type = "pdf"
 title = "Consolidated Patent (All Parts + Addendums)"
+logical_id = "fb59e138-25c9-41ca-94ba-93b3457d24d8"
 
 [[outputs]]
 id = "PbyxwGrRpjzJCNuL7e6Ke"
 uri = "file://docs/patents/patent-ctmm-unified.pdf"
 type = "pdf"
 title = "Base Patent - Unified (Feb 2026)"
+logical_id = "fabfbd2b-7a28-4d5a-8885-247e2eadd71e"
 
 [[outputs]]
 id = "KRZPCSzOdMT8U14hemiov"
 uri = "file://docs/patents/patent-ctmm-lambda.pdf"
 type = "pdf"
 title = "Initial Filing - LAMBDA Instruction (Feb 2026)"
+logical_id = "2d57fcb9-fb1f-46da-8eb1-086bb89123e5"
 
 [[outputs]]
 id = "MRZpcvUHPs432qkXF3Igg"
 uri = "file://docs/patents/patent-church-machine-claims.pdf"
 type = "pdf"
 title = "CIP - Pure Church Machine (Feb 2026)"
+logical_id = "b342e74a-9999-4b71-a14a-a58d9621ad6e"
 
 [[outputs]]
 id = "bxCSemZIjaaeibDLY7GYL"
 uri = "file://docs/patents/patent-cloomc-universal-target.pdf"
 type = "pdf"
 title = "CIP - CLOOMC++ Universal Target (Mar 2026)"
+logical_id = "09786a50-9e7e-4a85-98d9-00d58ea98b9b"
 
 [[outputs]]
 id = "VUhBy7hDNLoqCq1Elsso2"
 uri = "file://docs/patents/patent-ctmm-io-addressing-2026.pdf"
 type = "pdf"
 title = "CIP - Abstract GT I/O Addressing (Mar 2026)"
+logical_id = "242e135a-2ee0-4308-b94a-ec1013bf6f59"
 
 [[outputs]]
 id = "bM4o9N9BAGDDWd-hTNRNd"
 uri = "file://docs/patents/patent-ctmm-lambda-recursion-2026.pdf"
 type = "pdf"
 title = "CIP - Lambda Recursion (Apr 2026)"
+logical_id = "77d961a1-e6b2-4400-8a41-95addfc4e71f"
 
 [[outputs]]
 id = "Qe0OOz1k8wDcFgi0vbVz_"
 uri = "file://docs/patents/patent-church-machine-email.pdf"
 type = "pdf"
 title = "Attorney Cover Email"
+logical_id = "e6253fa8-d4ed-49ab-9f6d-f7fb9c4c20a2"
 
 [[outputs]]
 id = "eiYBntSt3zQIyTEnzBhkP"
 uri = "file://six-laws-review.pdf"
 type = "pdf"
 title = "The Six Laws of CLOOMC — Broadsheet PDF"
+logical_id = "95f35702-ca11-47f0-9501-eda5e74dfe38"
 
 [[outputs]]
 id = "7S22tuQ3M-IwaQCmzL7YR"
 uri = "file://attached_assets/CLOOMC_Manifesto.md"
 type = "text"
 title = "The CLOOMC Manifesto"
+logical_id = "7f0aac75-dffc-4051-a6b1-ef0887fb7d45"
 
 [[outputs]]
 id = "hQbwKA-12Ct35s7aVwkMS"
 uri = "file://docs/patent-all-claims-consolidated.md"
 type = "text"
 title = "CTMM — All Claims Consolidated (Patent Office)"
+logical_id = "17c79996-f36b-4d87-80ea-89f89bb54f42"
 
 [[outputs]]
 id = "UmY5WZ8iwb9FPJHCYbTUn"
 uri = "file://docs/patent-all-claims-consolidated.pdf"
 type = "pdf"
 title = "CTMM — All 57 Claims Consolidated (PDF)"
+logical_id = "f853ebba-4213-4237-b92f-77cca51c7bf4"
 
 [[outputs]]
 id = "U386KvPA9OxVfvkUMGWxv"
 uri = "file://docs/export/pdf/golden-tokens.pdf"
 type = "pdf"
 title = "Golden Tokens — sample PDF export"
+logical_id = "e4c99f64-0ca6-4505-aaf8-6c471a4e2d52"
 
 [[outputs]]
 id = "BsrcyQ6pvo9BR3BlEdm47"
 uri = "file://release/r1/ctmm-r1-01-isa-reference.pdf"
 type = "pdf"
 title = "01 — ISA Reference (Hardware Specification)"
+logical_id = "e75e5c21-b579-4572-bf43-437f7f2c666d"
 
 [[outputs]]
 id = "P59qpD0SKwShlsuToCi3j"
 uri = "file://release/r1/ctmm-r1-02-isa-encoding.pdf"
 type = "pdf"
 title = "02 — ISA Encoding (Hardware Specification)"
+logical_id = "d2ec18cb-3ca4-4128-bd43-98a8adf3a11c"
 
 [[outputs]]
 id = "XSkXWeUCquQqR-AF_s33s"
 uri = "file://release/r1/ctmm-r1-03-architecture.pdf"
 type = "pdf"
 title = "03 — Architecture Overview (Hardware Specification)"
+logical_id = "dde68e62-07f1-4c2e-9672-ae42f904cbf4"
 
 [[outputs]]
 id = "rPlZHD4tZCM7c_PPnDoWd"
 uri = "file://release/r1/ctmm-r1-04-church-instructions.pdf"
 type = "pdf"
 title = "04 — Church Instructions (Hardware Specification)"
+logical_id = "92cd506f-34ae-4a39-91bd-4691b77467ba"
 
 [[outputs]]
 id = "dhFmfrRUCktgH-rdxdo2J"
 uri = "file://release/r1/ctmm-r1-05-instruction-set.pdf"
 type = "pdf"
 title = "05 — Full Instruction Set (Hardware Specification)"
+logical_id = "403fd8c1-478d-41d4-9c00-cdd8eacd5d7b"
 
 [[outputs]]
 id = "gbctkLZoUJepp1azKZDCh"
 uri = "file://release/r1/ctmm-r1-06-golden-tokens.pdf"
 type = "pdf"
 title = "06 — Golden Tokens (Security & Capabilities)"
+logical_id = "36434099-2a3c-4513-bfcb-b6b739118e15"
 
 [[outputs]]
 id = "2pkyzce4iai93_-RIxDtN"
 uri = "file://release/r1/ctmm-r1-07-abstract-gt.pdf"
 type = "pdf"
 title = "07 — Abstract Golden Token (Security & Capabilities)"
+logical_id = "d62c1c62-769e-4ada-917f-ac91739ae7d9"
 
 [[outputs]]
 id = "0O58pbTJmIiBRZSlpqckZ"
 uri = "file://release/r1/ctmm-r1-08-namespace-security.pdf"
 type = "pdf"
 title = "08 — Namespace Security (Security & Capabilities)"
+logical_id = "7d491025-6b73-4757-9b95-1144d4e55a5c"
 
 [[outputs]]
 id = "7rXaNE3_IVuR4KuSiXNgp"
 uri = "file://release/r1/ctmm-r1-09-mint.pdf"
 type = "pdf"
 title = "09 — Mint & PassKey Issuance (Security & Capabilities)"
+logical_id = "1d176388-3d8e-4c8e-acbe-8543f6007eae"
 
 [[outputs]]
 id = "6Afvjkd6XoBftjJF__CzE"
 uri = "file://release/r1/ctmm-r1-10-mload.pdf"
 type = "pdf"
 title = "10 — Machine Load / mLoad (Security & Capabilities)"
+logical_id = "006d7990-449e-4546-93b5-80337a4f8011"
 
 [[outputs]]
 id = "cs7hC5VdOZL1bhvYflCMA"
 uri = "file://release/r1/ctmm-r1-11-switch-lifecycle.pdf"
 type = "pdf"
 title = "11 — SWITCH Lifecycle & PassKey Install (Security & Capabilities)"
+logical_id = "fd6bd5e4-9785-4568-beac-97fdfe404eba"
 
 [[outputs]]
 id = "vl9QqEGt0vhNACnbEL2rM"
 uri = "file://release/r1/ctmm-r1-12-boot-rom-layout.pdf"
 type = "pdf"
 title = "12 — Boot ROM Layout (Boot Sequence)"
+logical_id = "2eb2fc4d-171a-402c-b08b-a878a55fb8ae"
 
 [[outputs]]
 id = "aHhbmKhI3dBUWRNd84yqy"
 uri = "file://release/r1/ctmm-r1-13-boot-permission-rules.pdf"
 type = "pdf"
 title = "13 — Boot Permission Rules (Boot Sequence)"
+logical_id = "37f25722-6c01-4b89-83fc-98a1435d6386"
 
 [[outputs]]
 id = "UMs84C-QvAP8an-sqBdc4"
 uri = "file://release/r1/ctmm-r1-14-hardware-deviations.pdf"
 type = "pdf"
 title = "14 — Hardware Deviations — All Closed (Conformance)"
+logical_id = "010b33e0-32d5-4821-ba48-58308b8046bd"
 
 [[outputs]]
 id = "JsG90LKLaoGsbHxudxz39"
 uri = "file://docs/lump-reference.md"
 type = "text"
 title = "LUMP Reference"
+logical_id = "c56abdd7-b933-4de0-ac75-57160bf90bbe"
 
 [[outputs]]
 id = "LV5-7eokTftIsW9fpKKm9"
 uri = "file://docs/dist/cm-msg-protocol-v1.pdf"
 type = "pdf"
 title = "CM_MSG Protocol — V1 for Distribution and Review"
+logical_id = "3ae529f7-8289-43ed-bf4c-26a21bd26fdc"
 
 [[outputs]]
 id = "7E_aBXG6JKaDiP77dlb45"
 uri = "file://docs/GoldenDetails.pdf"
 type = "pdf"
 title = "GoldenDetails v2.0 — footer, single title, narrow cols 1–2"
+logical_id = "064ddf12-1c5a-4a4b-87b5-edbe8a923d6f"
 
 [[outputs]]
 id = "6_CtzKoPLx89Q4YUu3Ug8"
@@ -239,6 +273,7 @@ uri = "file://build/release-candidate-v17/church_wukong_xc7a100t.bit"
 type = "unspecified"
 title = "Wukong v17 bitstream"
 description = "QMTECH Wukong XC7A100T volatile JTAG image. SHA-256: 9ef015d897161d79f75121f920fd2c18191b2b0ad3325c795f4a45e9c91f109b. Size: 3,826,002 bytes."
+logical_id = "42dc2197-e1a9-4c4c-9fb9-b3d756e84a83"
 
 [[outputs]]
 id = "Mrcu2VwvAcyUf8QeifRtS"
@@ -246,6 +281,7 @@ uri = "file://build/release-candidate-v17/church_wukong_xc7a100t.mcs"
 type = "unspecified"
 title = "Wukong v17 persistent MCS image"
 description = "QMTECH Wukong XC7A100T persistent-flash image. SHA-256: d609e72a5f0c84ea32b184c4491e36349c103dd75bf84678949f5857b8c17684. Size: 10,521,876 bytes."
+logical_id = "98bab324-2cef-4c2e-87e2-d72c69ebb1fe"
 
 [[outputs]]
 id = "b8FcxlmEy17bxaLmEiROH"
@@ -253,3 +289,18 @@ uri = "file://docs/portable-lump-compilation-and-fpga-loading.md"
 type = "text"
 title = "Portable LUMP Compilation and FPGA Loading — Final Draft"
 description = "Finalized architecture with explicit T versus binary_hash verification precedence and exact-issue dependency binding."
+logical_id = "4240a777-49f2-4d8d-89c2-e42f5fbd290e"
+
+[[outputs]]
+id = "Y_f6fjSxjYTv_IgD5ku1L"
+uri = "file://attached_assets/Namespace-Lump-Header_1788709029608.md"
+type = "text"
+title = "Namespace LUMP Header — Agreed Specification"
+description = "Updated specification with Namespace typ=01, plain cw slot count, reserved-zero cc, n−13 sizing, fixed four-word entries, explicit versioning requirements, and deferred cryptographic seal design."
+logical_id = "849f4822-3406-499a-95b8-e303ce47b69c"
+content_hash = "sha256:149f2e902873d8d70b65c0103e4d48d334f56b47b988a1ae63797b5cc6ec4fd8"
+size = 12656
+mtime_ms = 1788711212147
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/849f4822-3406-499a-95b8-e303ce47b69c/b2723004-9b49-425e-8727-1c9eb4a96f0f"
+storage_version_token = "1788711313872104"
+content_type = "text/markdown"
