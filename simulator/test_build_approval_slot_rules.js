@@ -81,7 +81,7 @@ const generatedThread = view._renderRow({
     cw: 32,
     cc: 12,
     location: '0x000005C0',
-    perms: [],
+    perms: ['NONE'],
     source: 'generated Thread body (boot image)',
     load_policy: 'Lazy',
     size_budget: {
@@ -98,8 +98,8 @@ const generatedThread = view._renderRow({
     checks: [],
 });
 assert(generatedThread.includes('Thread#2'));
-assert(generatedThread.includes('N/A'),
-    'generated Thread must not invent a token or permissions');
+assert(generatedThread.includes('NONE'),
+    'generated Thread permissions must be NONE');
 assert(generatedThread.includes('Header 1w'));
 assert(generatedThread.includes('Total 256w / alloc 256w'));
 

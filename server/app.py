@@ -15709,7 +15709,7 @@ def _ba_build_ns_map():
     bootstrap_slots = {
         0: ('Boot.NS', ns_table_base, ['R', 'W'],
             'Baked into BRAM at NS_TABLE_BASE'),
-        1: ('Boot.Thread', thread_base, ['R', 'W'],
+        1: ('Boot.Thread', thread_base, ['NONE'],
             'Thread lump baked into BRAM'),
     }
     bootstrap = [
@@ -15874,7 +15874,7 @@ def _ba_build_ns_map():
             'cw': thread_stack_words,
             'cc': _boot_image_gen.THREAD_CAP_WORDS,
             'location': entry.get('location'),
-            'perms': [],
+            'perms': ['NONE'],
             'source': 'generated Thread body (boot image)',
             'programmable': False,
             'size_budget': _thread_size_budget(thread_layout),

@@ -729,6 +729,7 @@ def test_ns_map_normalizes_lump_thread_and_hardware_metadata():
         thread = rows[slot]
         assert thread['name'] == label
         assert thread['token'] is None
+        assert thread['perms'] == ['NONE']
         assert thread['cw'] == 32
         assert thread['cc'] == _app._boot_image_gen.THREAD_CAP_WORDS
         assert thread['size_budget']['total']['words'] == 256
@@ -737,6 +738,9 @@ def test_ns_map_normalizes_lump_thread_and_hardware_metadata():
             'Header', 'Data registers', 'Protected STO', 'Heap',
             'LIFO stack', 'Capability homes',
         ]
+
+    assert rows[1]['name'] == 'Boot.Thread'
+    assert rows[1]['perms'] == ['NONE']
 
     m_bit_slot = _app._boot_image_gen.ARCH_BOOT['minimalSlots']['M_BIT_DEV']
     mbit = rows[m_bit_slot]
