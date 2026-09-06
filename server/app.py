@@ -629,8 +629,11 @@ def _record_bitstream_version_event(status, version, source, source_commit=None,
     with _bitstream_version_log_lock:
         existing = list(reversed(_read_bitstream_version_log()))
         existing.append(record)
-        os.makedirs(_wukong_build_dir(), exist_ok=True)
-        _atomic_write_json(_bitstream_version_log_path(), existing[-100:])
+        log_path = _bitstream_version_log_path()
+        log_dir = os.path.dirname(log_path)
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
+        _atomic_write_json(log_path, existing[-100:])
     return record
 
 _WUKONG_BITSTREAM_SOURCE_PREFIXES = ("hardware/", "verilog/")

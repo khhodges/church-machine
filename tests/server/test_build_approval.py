@@ -40,10 +40,6 @@ CHURCH_BRANCH_OP = 23   # 0b10111
 CHURCH_RETURN_OP =  3   # 0b00011
 
 
-# ===================================================================
-# LUMP binary helpers
-# ===================================================================
-
 def _next_pow2(n: int) -> int:
     if n <= 1:
         return 1
@@ -906,9 +902,6 @@ def test_worker_command_construction(monkeypatch, tmp_path):
     # Write a clean approved snapshot so the /start gate passes
     monkeypatch.setattr(_app, '_BUILD_SNAPSHOTS_DIR', str(tmp_path))
     history_path = tmp_path / 'wukong-bitstream-versions.json'
-    monkeypatch.setattr(
-        _app, '_bitstream_version_log_path', lambda: str(history_path)
-    )
     clean_snap = {
         'frozen_at': '20260101T000000Z',
         'all_checks_pass': True,
@@ -1155,3 +1148,28 @@ def test_ns_map_serializes_only_approval_contract_fields():
     assert rows
     expected = set(_app._BA_APPROVAL_ROW_FIELDS)
     assert all(set(row) == expected for row in rows)
+
+@pytest.fixture(autouse=True)
+def isolate_bitstream_version_history(monkeypatch, tmp_path):
+    """Keep simulated Build Approval runs out of the committed release log."""
+    committed_path = os.path.join(
+        _app._wukong_build_dir(), _app._BITSTREAM_VERSION_LOG_FILE
+    )
+    committed_before = (
+        open(committed_path, 'rb').read()
+        if os.path.isfile(committed_path) else None
+    )
+    isolated_path = tmp_path / _app._BITSTREAM_VERSION_LOG_FILE
+    monkeypatch.setattr(
+        _app, '_bitstream_version_log_path', lambda: str(isolated_path)
+    )
+
+    yield
+
+    committed_after = (
+        open(committed_path, 'rb').read()
+        if os.path.isfile(committed_path) else None
+    )
+    assert committed_after == committed_before, (
+        'Build Approval simulation modified the committed bitstream history'
+    )
