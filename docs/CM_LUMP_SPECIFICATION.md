@@ -2577,6 +2577,39 @@ applying function-lump Freespace rules to any part of the Thread body.
 
 ## Overview
 
+> **Namespace Header V2 supersession.** The historical Namespace-header text in
+> this appendix is superseded by the following physical boot-image contract.
+> A Namespace is `typ=01` (Namespace/data), not `typ=10`; `typ=10` remains
+> exclusively the Thread interpretation.
+
+### Namespace Header V2 — normative physical layout
+
+The header is the first sixteen physical words at the Namespace allocation base.
+Words are in ascending address order and the boot image serializes each 32-bit
+word little-endian. Word 0 is
+`(0x1F<<27) | (size_field<<23) | (slot_count<<10) | (0b01<<8)`: `cc` is
+reserved and **must be zero**. Namespace capacity is
+`2^(size_field+13)` words (fields 0..9 represent 8K..4M words); this is
+Namespace-specific. Thread retains `2^(n_minus_6+6)`.
+
+| Word | Required content |
+|---|---|
+| 0 | Namespace Word-0 contract above: magic `0x1F`, typ `01`, plain 13-bit slot count. |
+| 1 | Format/version marker `0x4E534832` (`NSH2`). |
+| 2 | 32-bit Namespace base byte address. |
+| 3 | Table offset in words, exactly `capacity_words − slot_count×4`. |
+| 4 | Word-aligned boot-entry byte location, after the header and before the table. |
+| 5 | Seal-section boundary, fixed at word offset 6. |
+| 6..15 | Reserved deferred-seal section; all words are zero in V2. |
+
+The NS table is four words per entry at the high end of the allocation. A loader
+must reject malformed Word 0,
+nonzero `cc`, an unknown/missing marker (legacy is unsupported rather than
+silently reinterpreted), bad alignment, non-tail table geometry, a boot entry
+outside the resident-body interval, a nonzero deferred-seal word, or a mismatched
+seal boundary. The boundary reserves space only: SHA-256/signature verification and the mutable
+composite/membership digest are explicitly deferred.
+
 A **Namespace LUMP** is the root lump of a deployed application. Every
 running Church Machine application has exactly one Namespace LUMP, which
 defines three things that no other lump type defines:
@@ -2598,34 +2631,24 @@ list only the abstractions their application references.
 
 ## Namespace LUMP Header Word (Word 0)
 
-A Namespace LUMP is always a clist-only lump (`typ=10`). It contains no
-executable code — the body is Binary Data (NS Table entries). `cw` is
-always `0` and there is no c-list of capability slots; the tail of the
-lump holds the NS Table entries, not GT Word 0 slots.
-
-### Boot.NS Header
+A Namespace LUMP uses the ratified Header V2 `typ=01` (Namespace/data)
+interpretation. Its Word 0 is followed by the remaining fifteen physical
+header words; it is neither a Thread nor a `typ=10` clist-only lump.
 
 ```
 31      27 26    23 22                10 9   8 7              0
 +──────────+────────+──────────────────+──────+────────────────+
-│ 0x1F [5] │ n-6[4] │     cw=0 [13]    │10[2] │    cc [8]      │
+│ 0x1F [5] │ n-13[4]│ slot_count [13]  │01[2] │    cc=0 [8]    │
 +──────────+────────+──────────────────+──────+────────────────+
 ```
 
-| Field | Boot.NS value | Meaning |
+| Field | V2 value | Meaning |
 |-------|--------------|---------|
 | magic | 0x1F | Traps if executed out-of-sequence |
-| n-6   | 8 (2^14 = 16 384 words) | Covers full 64 KB physical address space |
-| cw    | 0 | No code section — NS Table is binary data only |
-| typ   | 10 | clist-only — not callable, no init microcode |
-| cc    | 3 | Locator count embedded in header; no GT Word 0 c-list slots |
-
-### Application NS Header
-
-```
-Boot.NS  (n=14, cw=0, cc=3, typ=10):  0xFF00_0003
-App.NS   (n=10, cw=0, cc=4, typ=10):  0xFA00_0004
-```
+| n-13 | 0..9 | `capacity_words = 2^(field+13)`: 8K through 4M words |
+| cw | 0..8,191 | Plain NS-table entry count |
+| typ | 01 | Namespace/data |
+| cc | 0 | Reserved; a loader rejects nonzero |
 
 ---
 
@@ -2638,23 +2661,15 @@ issue GTs that reference addresses beyond the NS LUMP's limit.
 
 ```
 ┌─────────────────────────────────────────────────────────┐  ← base
-│  Word 0     NS LUMP header (typ=10, cw=0)               │
-│  Words 1..NS_TABLE_START-1  Freespace (all-zero)        │
+│  Words 0..15  Namespace Header V2                       │
+│  Words 16..NS_TABLE_START-1  Resident bodies / work area│
 │  Words NS_TABLE_START..NS_TABLE_END  NS Table           │  ← N × 4 words (Binary Data)
-│  Words NS_TABLE_END+1..lumpSize-1  Trailing zeros       │
-└─────────────────────────────────────────────────────────┘  ← base + lumpSize - 1
+└─────────────────────────────────────────────────────────┘  ← base + capacity_words - 1
 ```
 
-### Boot.NS Physical Map (simulator)
-
-| Region | Start | End | Size | Contents |
-|--------|-------|-----|------|----------|
-| NS LUMP freespace | 0x0001 | 0xFCFF | variable | All zero — Mint verified by CRC scan per slot |
-| NS Table | 0xFC00 | 0xFCFF | 64 × 4 = 256 words | 64 NS slots × 4 words each (Binary Data) |
-
-The NS Table lives at a **hardware-known fixed offset** within Boot.NS.
-On Tang Nano 20 K, `NS_TABLE_BASE = 0xFD00` is wired in the decoder;
-on the Wukong A7, the base is parameterised but fixed at synthesis time.
+The NS Table is tail-anchored: `NS_TABLE_START = capacity_words − N×4`,
+where `N` is Word 0 `cw`. It has exactly four words per entry and cannot
+overlap the 16-word header or resident bodies.
 
 ---
 
@@ -2973,12 +2988,11 @@ Boot.NS (Slot 0) is a special case of the Namespace LUMP:
 | Property | Boot.NS | Application NS LUMP |
 |----------|---------|---------------------|
 | Base | 0x0000 | Declared in manifest |
-| limit_offset | Entire RAM − 1 | 2^n − 1 (sub-range) |
-| typ | 10 (clist-only — no init microcode) | 10 always |
-| cw | 0 | 0 always |
-| N (NS Table entries) | Current entries are listed in `server/lumps/manifest.json`. | App-specific count |
-| NS Table location | `NS_TABLE_BASE = 0xFD00` (hardware fixed) | Declared in manifest or header field |
-| Locators (cc) | 3 (Mint, Scheduler, Locator — header field only, no GT slots) | App-chosen count (header field only) |
+| Capacity | Entire RAM allocation | Declared Namespace allocation |
+| typ | 01 (Namespace/data) | 01 (Namespace/data) |
+| cw / N (NS Table entries) | Plain count, 0..8,191 | Plain count, 0..8,191 |
+| NS Table location | Tail-anchored: `capacity_words − N×4` | Tail-anchored: `capacity_words − N×4` |
+| cc | 0 (reserved; nonzero rejected) | 0 (reserved; nonzero rejected) |
 | Issued by | Hardware at power-on (pre-written) | Mint.Lump() at install time |
 | Distribution | Embedded in FPGA bitstream | namespace.zip |
 
@@ -2996,14 +3010,14 @@ already owns.
 |----------|---------------------|--------|----------------|
 | **Purpose** | CALL & RETURN code unit (one abstraction, several methods) | Live execution context (one thread) · Full machine state save on suspension using CHANGE | SWITCH into CR15 · NS Address-space root + NS Table + lazy-load host |
 | **Word 0** | Header `0x1F` | Header `0x1F` | Header `0x1F` |
-| **`typ` field** | `00` — callable · Enter only | `10` — clist-only | `10` NS table directory only |
-| **`cw` field** | Code word count (≥ 0) | Reinterpreted as `sw` stack words | Always `0` |
-| **`cc` field** | Compiler-chosen GT count | **Exactly 12** persisted tail homes (CR0–CR11) | None — NS Table only |
+| **`typ` field** | `00` — callable · Enter only | `10` — clist-only | `01` — Namespace/data |
+| **`cw` field** | Code word count (≥ 0) | Reinterpreted as `sw` stack words | Plain NS-table count (0..8,191) |
+| **`cc` field** | Compiler-chosen GT count | **Exactly 12** persisted tail homes (CR0–CR11) | Reserved; zero required |
 | **Example header** | `0xF881_AC00` (Decimal, n=7 cw=107 cc=0) | `0xF900_820C` (n-6=2, sw=32, cc=12) | Binary data |
 | **Entry point** | PC = 1 on every CALL | Never — not callable | Never — not callable |
-| **Words 1..cw** | [CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html) code (dispatcher + methods) | DR0–DR15 at +1…+16; no code | Boot / init microcode and SWITCH |
-| **Freespace zone** | Compile-time fixed · `0xAB` content header + embedded API/source, zero remainder (legacy: all-zero) · immutable per release | **None** — Heap fills +18 through `stackStart−1` | Between init code and NS Table · all-zero |
-| **C-list zone** | Last `cc` words · list E-GTs · compiler-set | 12 persisted homes at `capsStart=lumpSize−12`: CR0–CR11 | BINARY DATA |
+| **Words after Word 0** | [CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html) code (dispatcher + methods) | DR0–DR15 at +1…+16; no code | Header V2 words 1..15, then resident bodies/work area |
+| **Freespace zone** | Compile-time fixed · `0xAB` content header + embedded API/source, zero remainder (legacy: all-zero) · immutable per release | **None** — Heap fills +18 through `stackStart−1` | Resident bodies/work area before the tail table |
+| **C-list zone** | Last `cc` words · list E-GTs · compiler-set | 12 persisted homes at `capsStart=lumpSize−12`: CR0–CR11 | None; `cc=0` |
 | **Unique body** | Code and C-List | 6 regions: Header · DR · Protected STO · Heap · Stack · Caps | NS Table (N × 4-word entries: Inform GT + reserved) |
 | **Physical scope · 2^n frame size** | One lump region | One supported Thread frame: 256…8192 words | Entire application address space |
 | **NS Table** | None — uses parent NS | None — uses parent NS | IS the NS Table |
@@ -3014,8 +3028,8 @@ already owns.
 | **Transient CR6** | C-list view (L) last `cc` words | Not derived | C-list view (L) last `cc` words |
 | **Issued GTs** | One E-GT (caller holds) | GT (Thread) | GT NS |
 | **GC interaction** | G bit in NS slot Word 1 authority | G bits in live CR authority snapshots in Zone ① | Live & Dead slots |
-| **lumpSize** | 2^n compiler-chosen (64–16 384 words) | `2^(n−6+6)`: 256…8192 words | 2^n IDE-chosen; Boot.NS = 2^14 = 16 384 words |
-| **Freespace verified by Mint** | Yes — words cw+1..lumpSize-cc-1: `0xAB` content-frame validation (bounds + zero remainder, step 7) or all-zero (legacy) | None — Thread has no Freespace; validate derived geometry | Scan CRC per slot |
+| **lumpSize** | 2^n compiler-chosen (64–16 384 words) | `2^(n−6+6)`: 256…8192 words | `2^(n−13+13)`: 8K…4M words |
+| **Freespace verified by Mint** | Yes — words cw+1..lumpSize-cc-1: `0xAB` content-frame validation (bounds + zero remainder, step 7) or all-zero (legacy) | None — Thread has no Freespace; validate derived geometry | V2 header and tail-table geometry validation |
 | **Distribution format** | `dot.name.issue.token.zip` | `*.thread.zip` | `*.namespace.zip` |
 | **Simulator NS slot** | Most slots (Salvation=4, Mint=6, …) | Slots 1 and 45 | Slot 0 (Boot.NS) |
 | **CALL target** | Yes | No | No |

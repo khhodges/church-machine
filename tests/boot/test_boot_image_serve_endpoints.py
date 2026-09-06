@@ -55,8 +55,7 @@ def _tamper_format_tag(image_bytes):
     a wrong value, so validate_boot_image() raises a ValueError about a stale
     image."""
     total = len(image_bytes) // 4
-    ns_table_base = total - NS_TABLE_RESERVE
-    tag_idx = ns_table_base - 1
+    tag_idx = 1  # physical Namespace Header V2 marker
     words = list(struct.unpack(f"<{total}I", image_bytes))
     words[tag_idx] = 0xDEADBEEF  # any value != BOOT_IMAGE_FORMAT_TAG
     return struct.pack(f"<{total}I", *words)
@@ -101,18 +100,19 @@ def test_binary_rejects_zeroed_mandatory_descriptor(client, temp_image_path, slo
 
 
 @pytest.mark.parametrize("count", [0, MAX_THREAD_COUNT + 1, 0xFFFFFFFF])
-def test_binary_rejects_untrusted_thread_count(client, temp_image_path, count):
+def test_binary_has_no_tail_thread_count_sentinel(client, temp_image_path, count):
     words = list(struct.unpack("<16384I", _make_valid_image()))
     ns_base = 16384 - NS_TABLE_RESERVE
     words[ns_base - 4] = count
     tampered = struct.pack("<16384I", *words)
-    with pytest.raises(ValueError, match="Thread count"):
-        validate_boot_image(tampered, 16384)
+    # V2 does not reserve mutable metadata before the tail table. These words
+    # are inactive table capacity unless their descriptors are populated.
+    validate_boot_image(tampered, 16384)
     with open(temp_image_path, "wb") as image_file:
         image_file.write(tampered)
     with patch("server.app._auto_regen_boot_image") as regenerate:
         response = client.get("/api/boot-image/binary")
-    assert response.status_code == 500
+    assert response.status_code == 200
     regenerate.assert_not_called()
 
 
@@ -127,10 +127,9 @@ def test_validator_allows_enter_shaped_word_at_heap_start():
 
 def test_validator_rejects_retired_thread_abi_by_format_tag():
     words = list(struct.unpack("<16384I", _make_valid_image()))
-    ns_base = 16384 - NS_TABLE_RESERVE
-    words[ns_base - 1] = 0xB0072862
+    words[1] = 0xB0072862
     stale = struct.pack("<16384I", *words)
-    with pytest.raises(ValueError, match="BOOT_IMAGE_FORMAT_TAG"):
+    with pytest.raises(ValueError, match="Namespace Header V2 format marker"):
         validate_boot_image(stale, 16384)
 
 

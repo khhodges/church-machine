@@ -1,6 +1,75 @@
 from amaranth import *
 from amaranth.lib.data import StructLayout
 from shared.architecture_contracts import GT_WORD0, NS_ENTRY
+from shared.namespace_header import (
+    NAMESPACE_ENTRY_WORDS,
+    NAMESPACE_HEADER_V2_TAG,
+    NAMESPACE_HEADER_V2_VERSION,
+    NAMESPACE_HEADER_V2_WORDS,
+    SEAL_START_WORD,
+    encode_namespace_header,
+    namespace_size_words,
+    unpack_namespace_word0,
+)
+
+# Namespace Header V2 is a physical, little-endian-word boot-image record.
+# These integer helpers deliberately sit beside the HDL layouts: image tools and
+# hardware-focused tests can use the same bit/geometry decoder without making
+# Amaranth ``View`` objects part of their file-format contract.
+NAMESPACE_TYPE = 0b01
+THREAD_TYPE = 0b10
+NAMESPACE_HEADER_V2_MARKER = NAMESPACE_HEADER_V2_TAG
+NAMESPACE_HEADER_V2_SEAL_START_WORD = SEAL_START_WORD
+NAMESPACE_MIN_SIZE_FIELD = 0
+NAMESPACE_MAX_SIZE_FIELD = 9                  # 8 Kiwords through 4 Miwords
+
+
+def namespace_words_from_size_field(size_field):
+    """Return V2 Namespace capacity in words, rejecting reserved exponents."""
+    if not isinstance(size_field, int) or not (NAMESPACE_MIN_SIZE_FIELD <= size_field <= NAMESPACE_MAX_SIZE_FIELD):
+        raise ValueError("Namespace V2 size field must be in range 0..9")
+    return namespace_size_words(size_field)
+
+
+def encode_namespace_header_v2(base_byte, size_field, slot_count, boot_entry_byte):
+    """Encode the canonical 16-word Namespace Header V2 block at allocation base."""
+    capacity = namespace_words_from_size_field(size_field)
+    return tuple(encode_namespace_header(base_byte, capacity, slot_count, boot_entry_byte))
+
+
+def decode_namespace_header_v2(words):
+    """Strictly decode a Namespace Header V2 block and its fixed geometry."""
+    if len(words) < NAMESPACE_HEADER_V2_WORDS:
+        raise ValueError("Namespace Header V2 is truncated")
+    block = tuple(words[:NAMESPACE_HEADER_V2_WORDS])
+    if any(not isinstance(word, int) or not 0 <= word <= 0xFFFFFFFF for word in block):
+        raise ValueError("Namespace Header V2 words must be unsigned 32-bit values")
+    parsed = unpack_namespace_word0(block[0])
+    if block[1] != NAMESPACE_HEADER_V2_MARKER:
+        raise ValueError("unsupported or legacy Namespace header format")
+    capacity, slot_count = parsed["total_words"], parsed["slots"]
+    base_byte, table_offset, boot_entry_byte, seal_start = block[2:6]
+    expected_table_offset = capacity - slot_count * NAMESPACE_ENTRY_WORDS
+    if table_offset != expected_table_offset or table_offset < NAMESPACE_HEADER_V2_WORDS:
+        raise ValueError("Namespace Header V2 table geometry is invalid")
+    if base_byte != 0:
+        raise ValueError("Namespace Header V2 boot-image base must be zero")
+    if seal_start != NAMESPACE_HEADER_V2_SEAL_START_WORD:
+        raise ValueError("Namespace Header V2 seal boundary is invalid")
+    if any(block[index] != 0 for index in range(NAMESPACE_HEADER_V2_SEAL_START_WORD, NAMESPACE_HEADER_V2_WORDS)):
+        raise ValueError("Namespace Header V2 deferred seal words must be zero")
+    if boot_entry_byte & 3 or not NAMESPACE_HEADER_V2_WORDS * 4 <= boot_entry_byte < capacity * 4:
+        raise ValueError("Namespace Header V2 boot entry is invalid")
+    return {
+        "version": NAMESPACE_HEADER_V2_VERSION,
+        "base_byte": base_byte,
+        "size_field": parsed["n_minus_13"],
+        "capacity_words": capacity,
+        "slot_count": slot_count,
+        "table_offset_words": table_offset,
+        "boot_entry_byte": boot_entry_byte,
+        "seal_start_word": seal_start,
+    }
 
 
 def _width(field):

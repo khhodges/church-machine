@@ -53,8 +53,8 @@ def _zero_ns_slot(image_bytes, cfg, slot):
 def _set_format_tag(image_bytes, cfg, tag_value):
     """Return a copy of image_bytes with the format-version tag set to tag_value."""
     total = int(cfg["step1"]["totalNamespaceWords"])
-    ns_table_base = total - NS_TABLE_RESERVE
-    tag_idx = ns_table_base - 1
+    # Namespace Header V2 is physical at the allocation base; marker is word 1.
+    tag_idx = 1
     words = list(struct.unpack(f"<{total}I", image_bytes))
     words[tag_idx] = tag_value & 0xFFFFFFFF
     return struct.pack(f"<{total}I", *words)
@@ -150,8 +150,7 @@ def test_validate_boot_image_rejects_zero_format_tag():
     image = generate_boot_image(cfg, LUMPS_DIR)
     stale_image = _set_format_tag(image, cfg, 0)
     total = int(cfg["step1"]["totalNamespaceWords"])
-    # Backwards-scan (Task #1244) cannot find the tag → error says "not found"
-    with pytest.raises(ValueError, match=r"BOOT_IMAGE_FORMAT_TAG not found"):
+    with pytest.raises(ValueError, match=r"Namespace Header V2 format marker not found"):
         validate_boot_image(stale_image, total)
 
 
@@ -161,8 +160,7 @@ def test_validate_boot_image_rejects_wrong_format_tag():
     image = generate_boot_image(cfg, LUMPS_DIR)
     stale_image = _set_format_tag(image, cfg, 0xB0070247)
     total = int(cfg["step1"]["totalNamespaceWords"])
-    # Backwards-scan (Task #1244) cannot find the tag → error says "not found"
-    with pytest.raises(ValueError, match=r"BOOT_IMAGE_FORMAT_TAG not found"):
+    with pytest.raises(ValueError, match=r"Namespace Header V2 format marker not found"):
         validate_boot_image(stale_image, total)
 
 

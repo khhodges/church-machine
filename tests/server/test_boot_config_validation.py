@@ -39,6 +39,7 @@ from server.app import (
     _validate_step1,
     _validate_step2,
 )
+from shared.namespace_header import NAMESPACE_HEADER_V2_MAX_SLOTS
 
 # ---------------------------------------------------------------------------
 # Test constants
@@ -55,10 +56,25 @@ FAKE_CATALOG_ENTRY = {
     "binaryHash": "a" * 64,
 }
 
-# Thread.1, Boot.Abstr, and catalog bodies at slots 7–10 occupy the RAM
-# prefix. Boot.NS instead resides at the Namespace-table tail.
-# With thread_lump=256 and BOOT_ABSTR_DEFAULT_SIZE=64 → 576.
-FOUNDATION_END = 256 + 64 + (4 * 64)  # 576
+# Namespace Header V2, Thread.1, Boot.Abstr, and catalog bodies at slots 7–10
+# occupy the RAM prefix. Boot.NS metadata resides at the Namespace-table tail.
+# With header=16, thread_lump=256 and BOOT_ABSTR_DEFAULT_SIZE=64 → 592.
+FOUNDATION_END = 16 + 256 + 64 + (4 * 64)  # 592
+
+
+def test_step1_ns_slot_codec_bounds_and_mandatory_capacity():
+    """V2 accepts plain cw counts, while a bootable config still needs slots."""
+    step1 = _make_step1(16384)
+    step1["nsSlotsMax"] = NAMESPACE_HEADER_V2_MAX_SLOTS
+    # The board's 16K allocation cannot physically contain an 8191-entry
+    # table, but the count is accepted by the V2 codec before geometry fails.
+    assert "0..8191" not in _validate_step1(TI60_BOARD, step1)
+
+    step1["nsSlotsMax"] = NAMESPACE_HEADER_V2_MAX_SLOTS + 1
+    assert "0..8191" in _validate_step1(TI60_BOARD, step1)
+
+    step1["nsSlotsMax"] = 0
+    assert "cannot hold" in _validate_step1(TI60_BOARD, step1)
 
 
 def _fake_catalog(selected_tokens=None):
@@ -438,6 +454,7 @@ class TestValidateStep1ThreadGeometry:
         (tmp_path / "manifest.json").write_text(json.dumps([{
             "token": "00000600",
             "abstraction": "SelfTest",
+            "filename": "00000600.lump",
             "ns_slot": 6,
             "ns_slot_policy": "static",
         }]))
@@ -446,6 +463,12 @@ class TestValidateStep1ThreadGeometry:
         }))
         with (
             patch.object(_app_module, "LUMPS_DIR", str(tmp_path)),
+            patch.object(_app_module, "_LUMPS_DIR", str(tmp_path)),
+            patch.object(
+                _app_module._boot_image_gen,
+                "find_lump_file_by_abstraction",
+                return_value=str(tmp_path / "00000600.lump"),
+            ),
             patch.object(_app_module, "BOOT_CONFIG_PATH", str(tmp_path / "none.json")),
             patch.object(_app_module, "BOOT_CONFIG_LEGACY_PATH", str(tmp_path / "none-legacy.json")),
         ):

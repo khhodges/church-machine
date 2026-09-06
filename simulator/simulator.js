@@ -255,31 +255,24 @@ class ChurchSimulator {
             return false;
         }
 
-        // Backwards-scan for BOOT_IMAGE_FORMAT_TAG (Task #1244).
-        // The tag's position encodes the actual NS table reserve size dynamically,
-        // so we discover the reserve by finding the tag rather than using a
-        // hardcoded offset. Scan limit: 8192 words covers up to 1024-slot NS tables
-        // (4096 words) plus the 2 sentinel words and future headroom.
-        const BOOT_IMAGE_FORMAT_TAG = 0xB0073224;  // canonical two-word CHURCH Thread suspension frame; must match boot_image.py
-        let tagIdx = -1;
-        const scanLimit = Math.min(8192, src.length);
-        for (let _si = 1; _si <= scanLimit; _si++) {
-            const _pos = src.length - _si;
-            if ((src[_pos] >>> 0) === BOOT_IMAGE_FORMAT_TAG) {
-                tagIdx = _pos;
-                break;
-            }
-        }
-        if (tagIdx < 0) {
-            this.lastBootImageError = 'BOOT_IMAGE_FORMAT_TAG not found in the last 8192 words; regenerate the saved image for the current memory configuration.';
-            this.output += `[BOOTIMG] WARNING: ${this.lastBootImageError} Using built-in namespace defaults.\n`;
+        // Namespace Header V2 is a physical block at word zero.  Legacy images
+        // carried only a tail tag and are rejected rather than reinterpreted.
+        const namespaceHeaderV2 = this.parseNamespaceHeaderV2(src, 0);
+        if (!namespaceHeaderV2.valid) {
+            this.lastBootImageError = `Namespace Header V2 is missing or malformed (legacy boot-image format is unsupported): ${namespaceHeaderV2.errors.join(' ')}`;
+            this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected before changing simulator state.\n`;
             return false;
         }
-        const discoveredNsTableBase    = tagIdx + 1;
+        if (namespaceHeaderV2.namespaceSize !== src.length) {
+            this.lastBootImageError = 'Namespace Header V2 RAM allocation does not match image size.';
+            this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected before changing simulator state.\n`;
+            return false;
+        }
+        const discoveredNsTableBase    = namespaceHeaderV2.tableOffset;
         const discoveredNsTableReserve = src.length - discoveredNsTableBase;
         // Reserve must be a positive multiple of NS_ENTRY_WORDS (4 words per slot).
         if (discoveredNsTableReserve < this.NS_ENTRY_WORDS || discoveredNsTableReserve % this.NS_ENTRY_WORDS !== 0) {
-            this.lastBootImageError = `Invalid Namespace-table reserve ${discoveredNsTableReserve} words (not a positive multiple of ${this.NS_ENTRY_WORDS}) derived from tag at word ${tagIdx}. Regenerate the saved image for the current memory configuration.`;
+            this.lastBootImageError = `Invalid Namespace-table reserve ${discoveredNsTableReserve} words (not a positive multiple of ${this.NS_ENTRY_WORDS}) derived from Namespace Header V2. Regenerate the saved image for the current memory configuration.`;
             this.output += `[BOOTIMG] WARNING: ${this.lastBootImageError} Ignoring binary.\n`;
             return false;
         }
@@ -292,12 +285,23 @@ class ChurchSimulator {
         }
         const discoveredMaxNsEntries = (discoveredNsTableReserve / this.NS_ENTRY_WORDS) | 0;
 
-        // Boot-entry slot: stored at mem[NS_TABLE_BASE - 2] by the generator.
-        // Read into a local so we can validate without mutating this.bootEntrySlot.
+        // V2 W4 is a boot-entry byte address, not a slot number. Resolve it
+        // through the physical descending descriptor table before accepting it.
         let discoveredBootEntrySlot = this.bootEntrySlot;
-        const entrySlotIdx = tagIdx - 1;
-        if (entrySlotIdx >= 0 && entrySlotIdx < src.length) {
-            discoveredBootEntrySlot = src[entrySlotIdx] & 0xFF;
+        const bootEntryWord = namespaceHeaderV2.bootEntryWord / 4;
+        let bootEntryFound = false;
+        for (let slot = 0; slot < discoveredMaxNsEntries; slot++) {
+            const nsBase = src.length - (slot + 1) * this.NS_ENTRY_WORDS;
+            if ((src[nsBase] >>> 0) === bootEntryWord) {
+                discoveredBootEntrySlot = slot;
+                bootEntryFound = true;
+                break;
+            }
+        }
+        if (!bootEntryFound) {
+            this.lastBootImageError = `Namespace Header V2 boot-entry location ${bootEntryWord} does not name an NS table entry.`;
+            this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected before changing simulator state.\n`;
+            return false;
         }
 
         // Stale-trampoline guard — checked against src BEFORE any mutation of
@@ -326,24 +330,29 @@ class ChurchSimulator {
         // two-word CHURCH frame. The format-tag check above rejects the retired
         // +18 layout; this pass rejects malformed current-format frames before
         // changing simulator state.
+        let discoveredThreadSlots;
         {
-            const encodedThreadCount = tagIdx >= 3 ? (src[tagIdx - 3] >>> 0) : 0;
+            // Thread count is not serialized in V2 tail metadata.  Infer it
+            // from resident descriptors: a Thread is the only fixed object
+            // whose lump header has typ=2.  This is deliberately based on the
+            // image, never on browser bootConfig.
+            const threadSlots = [];
+            for (let slot = 0; slot < discoveredMaxNsEntries; slot++) {
+                const nsBase = src.length - (slot + 1) * this.NS_ENTRY_WORDS;
+                const threadBase = src[nsBase] >>> 0;
+                if (threadBase >= discoveredNsTableBase) continue;
+                const candidateHeader = this.parseLumpHeader(src[threadBase] >>> 0);
+                if (candidateHeader.valid && candidateHeader.typ === 2) threadSlots.push(slot);
+            }
+            const encodedThreadCount = threadSlots.length;
             if (encodedThreadCount < 1 || encodedThreadCount > 10) {
                 this.lastBootImageError =
                     `Encoded Thread count ${encodedThreadCount} is outside 1..10.`;
                 this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected.\n`;
                 return false;
             }
-            const threadSlots = [1];
-            for (let candidate = 11;
-                    threadSlots.length < encodedThreadCount;
-                    candidate++) {
-                if (candidate !== ARCH_BOOT.minimalSlots.M_BIT_DEV) {
-                    threadSlots.push(candidate);
-                }
-            }
+            discoveredThreadSlots = threadSlots;
             for (const threadSlot of threadSlots) {
-                if (threadSlot >= discoveredMaxNsEntries) break;
                 const nsBase = src.length - (threadSlot + 1) * this.NS_ENTRY_WORDS;
                 const threadBase = src[nsBase] >>> 0;
                 const header = this.parseLumpHeader(src[threadBase] >>> 0);
@@ -389,6 +398,7 @@ class ChurchSimulator {
         this.NS_TABLE_RESERVE = discoveredNsTableReserve;
         this.NS_TABLE_BASE    = discoveredNsTableBase;
         this.MAX_NS_ENTRIES   = discoveredMaxNsEntries;
+        this._loadedThreadSlots = discoveredThreadSlots;
         if (discoveredBootEntrySlot !== this.bootEntrySlot) {
             // Honour the binary's stored entry UNLESS the binary is merely reverting
             // to the default Boot.Abstr slot (_bootAbstrSlot) while the user has
@@ -410,31 +420,18 @@ class ChurchSimulator {
         const n   = src.length;
         for (let i = 0; i < n; i++) this.memory[i] = src[i] >>> 0;
         this._runtimeWordOriginals = new Map();
-        // Read the stored nsCount from NS_TABLE_BASE-3 (tagIdx-2).
-        // This value is written by both boot_image.py and _initNamespaceTable()
-        // (scan before c-list + empty_count) and avoids counting c-list entries
-        // at the NS table tail as populated NS entries (which inflate to 256).
+        // V2 has no tail metadata.  Derive the Namespace extent directly from
+        // its physical descending descriptor table.
         const maxEntries = (this.NS_TABLE_RESERVE / this.NS_ENTRY_WORDS) | 0;
-        const _storedNsCountIdx = tagIdx - 2;  // = NS_TABLE_BASE - 3
-        const _storedNsCount = (_storedNsCountIdx >= 0 && _storedNsCountIdx < src.length)
-            ? ((src[_storedNsCountIdx] >>> 0) & 0xFFFF) : 0;
-        let count = (_storedNsCount > 0 && _storedNsCount <= maxEntries)
-            ? _storedNsCount
-            : (() => {
-                // Fallback: forward scan (belt-and-suspenders; images with wrong tag
-                // are rejected above, so this path should never be reached in practice).
-                let _c = 0;
-                for (let i = 0; i < maxEntries; i++) {
-                    const base = this._nsSlotBase(i);
-                    if (this.memory[base] !== 0 || this.memory[base + 1] !== 0) _c = i + 1;
-                }
-                return _c;
-            })();
+        let count = 0;
+        for (let i = 0; i < maxEntries; i++) {
+            const base = this._nsSlotBase(i);
+            if (this.memory[base] !== 0 || this.memory[base + 1] !== 0) count = i + 1;
+        }
         // Honour Step 3 empty-slot reservations from the saved boot config:
         // those NS entries are intentionally zeroed in the binary but must
         // still count toward nsCount so the namespace exposes the reserved
-        // capacity to the runtime.  The stored count already includes
-        // step3.emptySlotCount; baseNamedNsCount can push it higher still.
+        // capacity to the runtime.
         const cfg = (typeof window !== 'undefined') ? window.bootConfig : null;
         const baseNamed = (cfg && cfg.step3 && Number.isInteger(cfg.step3.baseNamedNsCount))
             ? cfg.step3.baseNamedNsCount : 0;
@@ -463,10 +460,9 @@ class ChurchSimulator {
             if (_bootCatalog[_bi]) {
                 this.nsLabels[_bi] = _bootCatalog[_bi].label;
             } else if (_bi >= _bootCatalog.length) {
-                const _threadCount = Math.max(1, (src[tagIdx - 3] >>> 0) & 0xFF);
-                const _threadFirst = _bootCatalog.length;
-                if (_bi >= _threadFirst && _bi < _threadFirst + _threadCount - 1) {
-                    this.nsLabels[_bi] = `Thread#${_bi - _threadFirst + 2}`;
+                const _threadOrdinal = discoveredThreadSlots.indexOf(_bi);
+                if (_threadOrdinal > 0) {
+                    this.nsLabels[_bi] = `Thread#${_threadOrdinal + 1}`;
                 } else if (!this.nsLabels[_bi] || this.nsLabels[_bi] === '(free)' || this.nsLabels[_bi] === '(reserved)') {
                     const _savedLabel = cfg && cfg.slotLabels && cfg.slotLabels[_bi];
                     this.nsLabels[_bi] = _savedLabel || `slot_${_bi}`;
@@ -1268,6 +1264,83 @@ class ChurchSimulator {
         ) >>> 0;
     }
 
+    // ── Physical Namespace Header V2 ─────────────────────────────────────────
+    // The Namespace V2 block occupies words 0..15, in little-endian word order:
+    //
+    //   W0 LUMP packing (typ=01); W1 format marker "NSH2"; W2 base byte;
+    //   W3 table offset (words); W4 boot-entry byte; W5 seal boundary (=6);
+    //   W6..W15 reserved, all zero until a future seal is defined.
+    static get NAMESPACE_HEADER_V2_WORDS() { return 16; }
+    static get NAMESPACE_HEADER_V2_FORMAT() { return 0x4E534832; } // ASCII "NSH2"
+
+    packNamespaceHeaderV2(totalWords, slotCount, tableOffset, bootEntryWord = 0) {
+        if (!Number.isInteger(totalWords) || totalWords < 8192 || totalWords > 0x400000 ||
+                (totalWords & (totalWords - 1)) !== 0) {
+            throw new RangeError('Namespace V2 RAM size must be a power of two from 8192 through 4194304 words.');
+        }
+        if (!Number.isInteger(slotCount) || slotCount < 0 || slotCount > 0x1FFF) {
+            throw new RangeError('Namespace V2 slot count must be an unsigned 13-bit value (0..8191).');
+        }
+        if (!Number.isInteger(tableOffset) || tableOffset < ChurchSimulator.NAMESPACE_HEADER_V2_WORDS ||
+                tableOffset + slotCount * this.NS_ENTRY_WORDS !== totalWords) {
+            throw new RangeError('Namespace V2 table must be a tail-aligned sequence of four-word entries.');
+        }
+        if (!Number.isInteger(bootEntryWord) || bootEntryWord < ChurchSimulator.NAMESPACE_HEADER_V2_WORDS ||
+                bootEntryWord >= totalWords || (bootEntryWord & 3) !== 0) {
+            throw new RangeError('Namespace V2 boot-entry byte address must be aligned and resident.');
+        }
+        const nMinus13 = Math.log2(totalWords) - 13;
+        return [
+            this.packLumpHeader(nMinus13, slotCount, 0, 1),
+            ChurchSimulator.NAMESPACE_HEADER_V2_FORMAT,
+            0,
+            tableOffset >>> 0,
+            bootEntryWord >>> 0,
+            6,
+            ...Array(ChurchSimulator.NAMESPACE_HEADER_V2_WORDS - 6).fill(0),
+        ];
+    }
+
+    parseNamespaceHeaderV2(words, start = 0) {
+        const at = offset => (words && Number.isInteger(start + offset) &&
+            start + offset >= 0 && start + offset < words.length)
+            ? (words[start + offset] >>> 0) : null;
+        const rawWord0 = at(0);
+        const header = rawWord0 === null ? null : this.parseLumpHeader(rawWord0);
+        const format = at(1), base = at(2), tableOffset = at(3);
+        const bootEntry = at(4), sealBoundary = at(5);
+        const namespaceSize = header && header.typ === 1 ? 2 ** (header.n_minus_6 + 13) : null;
+        const slotCount = header && header.typ === 1 ? header.cw : null;
+        const errors = [];
+        if (!header || !header.valid) errors.push('Word 0 lacks LUMP magic 0x1F.');
+        if (!header || header.typ !== 1) errors.push('Word 0 typ must be 01 (Namespace).');
+        if (header && header.cc !== 0) errors.push('Word 0 cc is reserved and must be zero.');
+        if (namespaceSize === null || namespaceSize < 8192 || namespaceSize > 0x400000) {
+            errors.push('Namespace RAM size is outside the V2 8K..4M range.');
+        }
+        if (base !== 0) errors.push('Namespace base address must be word 0.');
+        if (format !== ChurchSimulator.NAMESPACE_HEADER_V2_FORMAT) errors.push('Namespace Header V2 format marker is missing.');
+        if (bootEntry === null || bootEntry < ChurchSimulator.NAMESPACE_HEADER_V2_WORDS ||
+                bootEntry >= namespaceSize || (bootEntry & 3) !== 0) errors.push('Boot-entry field must be an aligned resident byte address.');
+        if (!Number.isInteger(tableOffset) || !Number.isInteger(slotCount) ||
+                tableOffset < ChurchSimulator.NAMESPACE_HEADER_V2_WORDS ||
+                tableOffset + slotCount * this.NS_ENTRY_WORDS !== namespaceSize) {
+            errors.push('NS table is not a tail-aligned four-word-per-slot geometry.');
+        }
+        if (sealBoundary !== 6) {
+            errors.push('Future seal-section boundary must be word 6.');
+        }
+        for (let offset = 6; offset < ChurchSimulator.NAMESPACE_HEADER_V2_WORDS; offset++) {
+            if (at(offset) !== 0) errors.push('Future seal section must be zero in V2.');
+        }
+        return {
+            valid: errors.length === 0, errors, start, rawWord0, header, base,
+            tableOffset, bootEntryWord: bootEntry, bootEntrySlot: bootEntry === null ? null : bootEntry / 4, format, sealBoundary,
+            namespaceSize, slotCount, entryWords: this.NS_ENTRY_WORDS,
+            headerWords: ChurchSimulator.NAMESPACE_HEADER_V2_WORDS,
+        };
+    }
+
     // ── CRC-32/ISO-HDLC (poly=0xEDB88320, init=0xFFFFFFFF, xorout=0xFFFFFFFF) ──
     // Matches the hardware outform_iot.py CRC-32 check.
     // Input: array of uint32 values whose big-endian bytes form the message.
@@ -1296,8 +1369,15 @@ class ChurchSimulator {
         // Matches call.py line 402: lumpSize_reg.eq(Const(1,15) << (_hdr.n_minus_6 + 6)).
         // c-list starts at lumpBase + (lumpSize - cc), i.e. at the physical end of the slot
         // (call.py line 282: base = NS_base + (lumpSize − cc) × 4).
-        const lumpSize  = 1 << (n_minus_6 + 6);
-        return { magic, n_minus_6, lumpSize, cw, typ, cc, valid: magic === 0x1F };
+        const lumpSize  = 2 ** (n_minus_6 + 6);
+        // Namespace typ=01 uses the same physical field but a different size
+        // floor: 2^(field+13), and cw is a plain slot count.  Do not let users
+        // of this common decoder accidentally apply ordinary LUMP semantics.
+        const namespaceSize = typ === 1 ? 2 ** (n_minus_6 + 13) : null;
+        const slotCount = typ === 1 ? cw : null;
+        const namespaceValid = typ !== 1 || cc === 0;
+        return { magic, n_minus_6, lumpSize, namespaceSize, slotCount, cw, typ, cc,
+            namespaceValid, valid: magic === 0x1F };
     }
 
     _threadLayoutAtBase(threadBase) {
@@ -2157,6 +2237,9 @@ class ChurchSimulator {
         }
         const generatedThreadOrdinal = new Map(
             generatedThreadSlots.map((slot, index) => [slot, index + 2]));
+        // Keep reset and loaded-image bookkeeping on the same physical Thread
+        // set.  V2 deliberately has no tail thread-count marker.
+        this._loadedThreadSlots = [1].concat(generatedThreadSlots);
         // Boot.Abstr lump size: always 64w in the fallback init path (Task #568).
         // The hardcoded init is only a fallback when no binary boot image is present;
         // loadBootImage() uses the actual size from the generator.  Defaulting to 64w
@@ -2191,7 +2274,9 @@ class ChurchSimulator {
             }
         }
 
-        let runningOffset = 0;
+        // Namespace Header V2 physically owns the first sixteen words.  Thread
+        // and all resident bodies begin after it.
+        let runningOffset = ChurchSimulator.NAMESPACE_HEADER_V2_WORDS;
         for (let i = 0; i < abstractions.length; i++) {
             const a = abstractions[i];
             const mySize = slotSizes[i] || this.SLOT_SIZE;
@@ -2226,15 +2311,15 @@ class ChurchSimulator {
                 MMIO_ADDRS[ARCH_BOOT.minimalSlots[name]] = spec.address;
             }
             const overrideLoc = physAddrOverride[i];
-            // A7 v1.2 layout: NS LUMP (slot 0) lives at NS_TABLE_BASE (top of memory).
-            // Thread LUMP (slot 1) starts at word 0. runningOffset is NOT advanced for
-            // slot 0 so that slot 1 naturally gets loc = 0.
-            const loc = (i === 0) ? this.NS_TABLE_BASE
+            // NS descriptors remain in the tail-descending table.  Namespace
+            // Header V2 occupies words 0..15, so Thread and every RAM body
+            // starts after that physical header.
+            const loc = (i === 0) ? 0
                       : (MMIO_ADDRS[i] !== undefined ? MMIO_ADDRS[i]
                       : (overrideLoc !== undefined ? overrideLoc : runningOffset));
             // Only advance runningOffset for RAM-backed slots (not slot 0, not MMIO, not overrides).
             if (MMIO_ADDRS[i] === undefined && overrideLoc === undefined && i !== 0) runningOffset += mySize;
-            const lim17 = (i === 0) ? (this.NS_TABLE_RESERVE - 1)
+            const lim17 = (i === 0) ? (mySize - 1)
                         : (DEVICE_REG_LIMITS[i] !== undefined ? DEVICE_REG_LIMITS[i]
                         : (mySize - 1));
             // NS[0] (Boot.NS) has no physical c-list in the NS TABLE region —
@@ -2275,7 +2360,7 @@ class ChurchSimulator {
                     'and cannot host a Step-2 lump.');
             }
             const threadLoc = runningOffset;
-            if (threadLoc + THREAD_LUMP_SIZE > this.NS_TABLE_BASE - 3) {
+            if (threadLoc + THREAD_LUMP_SIZE > this.NS_TABLE_BASE) {
                 throw new Error(
                     `Generated Thread#${generatedThreadOrdinal.get(threadSlot)} does not fit below the Namespace table.`);
             }
@@ -2368,16 +2453,15 @@ class ChurchSimulator {
         // for ns_slot_policy=dynamic compliance and boot-image-matches-sim).
         if (this.irqState) this.irqState.irqAllocBase = runningOffset;
 
-        // ── Stored nsCount word (NS_TABLE_BASE - 3) ─────────────────────────────
-        // Write this.nsCount (after step3) at NS_TABLE_BASE-3 so that
-        // loadBootImage() can read the clean count without being confused by
-        // c-list entries at the NS TABLE tail.  Must match boot_image.py's
-        // _ns_count_stored computation (scan before c-list + empty_count).
-        this.memory[this.NS_TABLE_BASE - 3] = (this.nsCount >>> 0);
-        // The count marker at -4 is legacy-zero for the default one-thread
-        // layout.  Multi-thread images use it to identify the deterministic
-        // Thread#2+ Namespace slots during committed-image inspection.
-        this.memory[this.NS_TABLE_BASE - 4] = THREAD_COUNT >>> 0;
+        // Materialize the canonical V2 physical Namespace header at word zero.
+        // It is separate from all resident bodies and the tail-descending table.
+        const _nsHeaderStart = 0;
+        const _bootEntryLocation = (this.readNSEntry(this.bootEntrySlot).word0_location >>> 0) * 4;
+        const _nsHeader = this.packNamespaceHeaderV2(
+            this.memory.length, this.MAX_NS_ENTRIES, this.NS_TABLE_BASE, _bootEntryLocation);
+        for (let _nh = 0; _nh < _nsHeader.length; _nh++) {
+            this.memory[_nsHeaderStart + _nh] = _nsHeader[_nh];
+        }
 
         // n_minus_6 is derived from the actual lump size so a programmer
         // -chosen THREAD_LUMP_SIZE > 256 gets a header that describes the
@@ -2544,17 +2628,6 @@ class ChurchSimulator {
             this.writeNSEntry(cslot, loc, lim17, 0, 0, 1, 0, cc,
                 this.memory[this._nsSlotBase(cslot) + 3] >>> 0);
         }
-
-        // Boot-entry slot: written at NS_TABLE_BASE - 2 (mirrors boot_image.py).
-        // loadBootImage() reads this word and restores bootEntrySlot from the image.
-        this.memory[this.NS_TABLE_BASE - 2] = this.bootEntrySlot >>> 0;
-        // Format-version tag: written immediately before the NS table (at
-        // NS_TABLE_BASE - 1) so that loadBootImage() can detect and reject
-        // stale binaries. Bumped to 0x563 (Task #568) — Boot.Abstr placement is now
-        // dynamic (64w default or saved lump size); abstractionLumpWords deprecated.
-        // Must match boot_image.py BOOT_IMAGE_FORMAT_TAG and loadBootImage().
-        const BOOT_IMAGE_FORMAT_TAG_INIT = 0xB0073224;  // canonical two-word CHURCH Thread suspension frame
-        this.memory[this.NS_TABLE_BASE - 1] = BOOT_IMAGE_FORMAT_TAG_INIT >>> 0;
 
         // Restore NS write guard: boot-load is complete; no further auto-writes permitted.
         this._allowAutoWrite = false;
@@ -4613,17 +4686,23 @@ class ChurchSimulator {
     // numbered generated Thread contexts in numeric order.
     configuredThreadSlots() {
         const slots = [];
-        if (this.isNSEntryValid(1)) slots.push(1);
-        const generated = [];
         for (let slot = 0; slot < this.nsCount; slot++) {
-            const label = String(this.nsLabels[slot] || '');
-            const match = /^Thread#(\d+)$/.exec(label);
-            if (match && Number(match[1]) >= 2 && this.isNSEntryValid(slot)) {
-                generated.push({ slot, number: Number(match[1]) });
+            const entry = this.readNSEntry(slot);
+            const header = entry &&
+                this.parseLumpHeader(this.memory[entry.word0_location] >>> 0);
+            if (header && header.valid && header.typ === 2) {
+                slots.push(slot);
             }
         }
-        generated.sort((a, b) => a.number - b.number);
-        return slots.concat(generated.map(item => item.slot));
+        // Preserve the boot Thread first, then physical slot order for the
+        // other fixed descriptors. Labels are UI metadata and cannot define
+        // the machine's Thread count.
+        const primary = slots.indexOf(1);
+        if (primary > 0) {
+            slots.splice(primary, 1);
+            slots.unshift(1);
+        }
+        return slots;
     }
 
     _threadDisplayGT(slot, activeSlot) {

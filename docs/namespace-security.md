@@ -5,23 +5,26 @@
 
 ## Namespace Table Structure
 
-The namespace is the master directory of all resources in the system. Every Golden Token references an entry in the namespace table. Each entry describes a resource with three 32-bit words:
+The namespace is the master directory of all resources in the system. Every Golden Token references an entry in the namespace table. Each entry describes a resource with four 32-bit words:
 
 | Word   | Content |
 |--------|---------|
 | **Word 0** | Base address — 32-bit lump base byte address |
 | **Word 1** | Limit + gt_seq (`spare[3] \| g_bit[1] \| gt_seq[7] \| limit_offset[21]`) |
 | **Word 2** | integrity32 check (`integrity32(Word 0, Word 1 with g_bit cleared)`) |
+| **Word 3** | Non-authoritative 32-bit content cache/index token; never used for authority |
 
 ### Namespace Entry Format
 
-Each namespace entry occupies exactly **3 consecutive 32-bit words** (12 bytes). The slot byte address is calculated as:
+Each namespace entry occupies exactly **4 consecutive 32-bit words** (16 bytes). The slot byte address is calculated as:
 
 ```
-NS_entry_addr = NS_table_base + slot_id × 12
+NS_entry_addr = NS_table_base + slot_id × 16
 ```
 
-The namespace table supports up to **65,536 entries**, bounded by the 16-bit `slot_id` field in the Golden Token.
+Namespace Header V2 encodes a plain count of **0..8,191 entries** in Word 0
+`cw`; `cc` is reserved, must be zero, and is not part of the count. The
+four-word geometry is mandatory.
 
 #### Word 1 Layout (WORD2_LAYOUT)
 

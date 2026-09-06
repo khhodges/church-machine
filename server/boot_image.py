@@ -61,6 +61,23 @@ from shared.architecture_contracts import (
     field_width,
     ns_integrity_word1_mask,
 )
+from shared.namespace_header import (
+    BASE as NS_HEADER_BASE,
+    BOOT_ENTRY as NS_HEADER_BOOT_ENTRY,
+    FORMAT as NS_HEADER_FORMAT,
+    NAMESPACE_ENTRY_WORDS as NS_HEADER_ENTRY_WORDS,
+    NAMESPACE_HEADER_V2_TAG,
+    NAMESPACE_HEADER_V2_WORDS,
+    NAMESPACE_HEADER_V2_MAX_SLOTS,
+    NAMESPACE_HEADER_V2_VERSION,
+    SEAL_BOUNDARY as NS_HEADER_SEAL_BOUNDARY,
+    TABLE_OFFSET as NS_HEADER_TABLE_OFFSET,
+    WORD0 as NS_HEADER_WORD0,
+    SEAL_START_WORD as NS_HEADER_SEAL_START_WORD,
+    encode_namespace_header,
+    pack_namespace_word0,
+    unpack_namespace_word0,
+)
 try:
     from boot_constants import DEMO_CLIST_SIZE, BOOT_ABSTR_DEFAULT_SIZE
 except ImportError:
@@ -68,7 +85,7 @@ except ImportError:
 
 NS_ENTRY_WORDS   = ARCH_NS_ENTRY["words"]
 NS_BUS_WORDS     = 4            # hardware ns_rd_data/ns_wr_data bus width in 32-bit words
-MAX_NS_ENTRIES   = 1024         # V20 cap: 64–1024 slots, power of two (matches app.py MAX_NS_ENTRIES and the designer selector)
+MAX_NS_ENTRIES   = NAMESPACE_HEADER_V2_MAX_SLOTS
 DEFAULT_NS_SLOTS_MAX = ARCH_PROFILES["generic-boot-image-v20"]["namespace"]["defaultSlots"]
 NS_TABLE_RESERVE = DEFAULT_NS_SLOTS_MAX * NS_ENTRY_WORDS  # 1024 words = 256 entries × 4 (legacy default reserve)
 SLOT_SIZE        = 0x40         # 64 words
@@ -78,16 +95,18 @@ def ns_table_reserve_words(ns_slots_max):
     """Return the NS table reservation in words for ns_slots_max configured slots.
 
     = ns_slots_max * NS_ENTRY_WORDS exactly (no power-of-2 rounding).
-    Minimum 16 words (4 slots).  No artificial upper cap — the caller's
-    slot-count validation bounds the value.
+    This is deliberately not rounded or minimum-clamped: V2 ``cw`` is the
+    physical, plain entry count, including its codec-valid zero value.  The
+    caller validates whether a bootable image has enough entries for its
+    mandatory Namespace rows.
 
     Examples:
         ns_slots_max=16  →   64 words
         ns_slots_max=52  →  208 words
         ns_slots_max=102 →  408 words
-        ns_slots_max=1024 → 4096 words  (= module-level NS_TABLE_RESERVE default)
+        ns_slots_max=1024 → 4096 words
     """
-    return max(16, ns_slots_max * NS_ENTRY_WORDS)
+    return ns_slots_max * NS_ENTRY_WORDS
 
 # Hardware-accurate device register limits (matches simulator.js
 # DEVICE_REG_LIMITS and hardware/boot_rom.py _MMIO_ENTRIES).
@@ -148,7 +167,9 @@ _MANDATORY_NS_SLOTS = (0, 1, 2, 3, 4, 5, BOOT_ABSTR_NS_SLOT, CAPABILITY_TEST_NS_
 # Thread suspension ABI version. Images with the retired +18 executable-
 # identity layout carry an older tag and are rejected before any Thread words
 # are interpreted. Must match simulator.js.
-BOOT_IMAGE_FORMAT_TAG = 0xB0073224
+# Namespace Header V2's physical format marker.  Pre-V2 images only carried a
+# tail sentinel and are intentionally rejected rather than reinterpreted.
+BOOT_IMAGE_FORMAT_TAG = NAMESPACE_HEADER_V2_TAG
 
 # Wukong's physical-memory contract is shared with the hardware ABI so the
 # image projection cannot drift from the synthesized board limits.
@@ -337,7 +358,8 @@ def boot_resident_region_end(thread_size, boot_abstr_size, thread_count,
         if slot not in mmio_slots
         and DEFAULT_ABSTRACTION_CATALOG[slot] is not None
     )
-    return thread_size * thread_count + boot_abstr_size + trailing_catalog_words
+    return (NAMESPACE_HEADER_V2_WORDS + thread_size * thread_count
+            + boot_abstr_size + trailing_catalog_words)
 
 
 def architecture_device_catalog():
@@ -443,6 +465,10 @@ def pack_ns_word1(limit_offset, gt_seq=0, g=0, f=0):
 
 
 def pack_lump_header(n_minus_6, cw, cc, typ=0):
+    if typ == 1:
+        raise ValueError(
+            "pack_lump_header: typ=01 is Namespace Header V2; use "
+            "pack_namespace_word0(total_words, slots)")
     return _u32(
         (0x1F            << 27)
         | ((n_minus_6 & 0xF) << 23)
@@ -578,6 +604,98 @@ def write_ns_entry(mem, total, ns_entry_words, slot, location, lim17,
     mem[base + 3] = (cache_token32 or 0) & 0xFFFFFFFF
 
 
+def _locate_namespace_header(words, caller):
+    """Return V2 physical-header facts or reject legacy/corrupt images.
+
+    The format marker is retained as a bounded tail search only to identify the
+    block; every location thereafter is taken from, and checked against, the
+    physical V2 fields.  This makes a stale V1 tail sentinel an explicit
+    unsupported-format failure, never a different interpretation.
+    """
+    total = len(words)
+    tag_idx = NS_HEADER_FORMAT
+    if total < NAMESPACE_HEADER_V2_WORDS or words[tag_idx] != BOOT_IMAGE_FORMAT_TAG:
+        raise ValueError(
+            f"{caller}: Namespace Header V2 format marker not found; "
+            "image is stale or corrupt (legacy format is unsupported) and must be regenerated")
+    start = 0
+    if total < NAMESPACE_HEADER_V2_WORDS:
+        raise ValueError(f"{caller}: truncated Namespace Header V2 block")
+    decoded = unpack_namespace_word0(words[start + NS_HEADER_WORD0])
+    table_base = words[start + NS_HEADER_TABLE_OFFSET]
+    if decoded["total_words"] != total:
+        raise ValueError(f"{caller}: Namespace header RAM allocation does not match image")
+    if words[start + NS_HEADER_BASE] != 0:
+        raise ValueError(f"{caller}: Namespace header base address must be zero")
+    if words[start + NS_HEADER_SEAL_BOUNDARY] != NS_HEADER_SEAL_START_WORD:
+        raise ValueError(f"{caller}: Namespace header seal boundary is not canonical")
+    if any(words[index] for index in range(NS_HEADER_SEAL_START_WORD, NAMESPACE_HEADER_V2_WORDS)):
+        raise ValueError(f"{caller}: Namespace header future seal section is nonzero")
+    table_words = total - table_base
+    if (table_words < 0 or table_words % NS_HEADER_ENTRY_WORDS
+            or decoded["slots"] != table_words // NS_HEADER_ENTRY_WORDS):
+        raise ValueError(f"{caller}: Namespace header has impossible four-word table geometry")
+    entry = words[start + NS_HEADER_BOOT_ENTRY]
+    if entry & 3 or not NAMESPACE_HEADER_V2_WORDS * 4 <= entry < total * 4:
+        raise ValueError(f"{caller}: Namespace header boot-entry location is invalid")
+    entry_word = entry // 4
+    matching_slots = [
+        slot for slot in range(decoded["slots"])
+        if words[total - (slot + 1) * NS_ENTRY_WORDS] == entry_word
+    ]
+    return {
+        "start": start, "tag_idx": tag_idx, "table_base": table_base,
+        "table_words": table_words, "slots": decoded["slots"],
+        "boot_slot": matching_slots[0] if len(matching_slots) == 1 else None,
+        "boot_entry": entry_word, **decoded,
+    }
+
+
+def read_namespace_header_info(image_bytes):
+    """Return the canonical V2 physical-header facts from an image.
+
+    This is the server/API-facing decoder.  It intentionally exposes values
+    from the serialized header rather than accepting boot-config display
+    metadata, so Build Approval cannot describe a different Namespace than
+    the one a loader will consume.
+    """
+    if not isinstance(image_bytes, (bytes, bytearray, memoryview)):
+        raise ValueError("Namespace image must be bytes")
+    if len(image_bytes) % 4:
+        raise ValueError("Namespace image length is not a whole number of words")
+    n_words = len(image_bytes) // 4
+    words = struct.unpack(f"<{n_words}I", image_bytes)
+    physical = _locate_namespace_header(words, "read_namespace_header_info")
+    return {
+        "format_tag": words[physical["start"] + NS_HEADER_FORMAT],
+        "version": NAMESPACE_HEADER_V2_VERSION,
+        "base_byte": words[physical["start"] + NS_HEADER_BASE],
+        "total_words": physical["total_words"],
+        "slot_count": physical["slots"],
+        "table_offset_words": physical["table_base"],
+        "table_offset_byte": physical["table_base"] * 4,
+        "boot_entry_word": physical["boot_entry"],
+        "boot_entry_byte": words[physical["start"] + NS_HEADER_BOOT_ENTRY],
+        "boot_entry_slot": physical["boot_slot"],
+        "seal_boundary_word": words[physical["start"] + NS_HEADER_SEAL_BOUNDARY],
+    }
+
+
+def _encoded_thread_count(words, slots):
+    """Infer contiguous configured Thread contexts from their fixed NS slots."""
+    count, candidate = 1, GENERATED_THREAD_FIRST_NS_SLOT
+    while count < MAX_THREAD_COUNT:
+        if candidate != ARCH_BOOT["minimalSlots"]["M_BIT_DEV"]:
+            if candidate >= slots:
+                break
+            base = len(words) - (candidate + 1) * NS_ENTRY_WORDS
+            if words[base] == 0 and words[base + 1] == 0:
+                break
+            count += 1
+        candidate += 1
+    return count
+
+
 # ----- pre-flight validator --------------------------------------------------
 
 def validate_boot_image(image_bytes, total_namespace_words=None):
@@ -621,35 +739,9 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
         )
     words = struct.unpack(f"<{n_words}I", image_bytes[: n_words * 4])
 
-    # Backwards-scan for BOOT_IMAGE_FORMAT_TAG.
-    # The tag is written immediately before the NS table; its position encodes
-    # the actual NS table reserve size dynamically (Task #1244).
-    # Scan limit: MAX_NS_ENTRIES × 4 words (NS table) + 2 sentinel words + margin.
-    # With MAX_NS_ENTRIES=1024 this is 4098 words; use 8192 for future headroom.
-    tag_idx = -1
-    scan_limit = min(8192, n_words)
-    for _i in range(1, scan_limit + 1):
-        _pos = n_words - _i
-        if words[_pos] == BOOT_IMAGE_FORMAT_TAG:
-            tag_idx = _pos
-            break
-
-    if tag_idx < 0:
-        raise ValueError(
-            "validate_boot_image: BOOT_IMAGE_FORMAT_TAG not found in last 8192 words; "
-            "the boot image is stale or corrupt and must be regenerated"
-        )
-
-    ns_table_base    = tag_idx + 1
-    ns_table_reserve = n_words - ns_table_base
-
-    # Reserve must be a positive multiple of NS_ENTRY_WORDS (4 words per slot).
-    if ns_table_reserve < NS_ENTRY_WORDS or ns_table_reserve % NS_ENTRY_WORDS != 0:
-        raise ValueError(
-            f"validate_boot_image: NS table reserve {ns_table_reserve} words derived "
-            f"from tag position ({tag_idx}) is not a positive multiple of {NS_ENTRY_WORDS}; "
-            "the boot image is corrupt"
-        )
+    physical = _locate_namespace_header(words, "validate_boot_image")
+    ns_table_base = physical["table_base"]
+    ns_table_reserve = physical["table_words"]
 
     for slot in _MANDATORY_NS_SLOTS:
         base = n_words - (slot + 1) * NS_ENTRY_WORDS
@@ -672,8 +764,8 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
     # Retired +18-layout images are rejected by BOOT_IMAGE_FORMAT_TAG above;
     # Heap contents are unconstrained and must never be used as a version
     # heuristic.
-    thread_count = words[tag_idx - 3] if tag_idx >= 3 else 0
-    ns_capacity = ns_table_reserve // NS_ENTRY_WORDS
+    thread_count = _encoded_thread_count(words, physical["slots"])
+    ns_capacity = physical["slots"]
     if not 1 <= thread_count <= MAX_THREAD_COUNT:
         raise ValueError(
             f"validate_boot_image: encoded Thread count {thread_count} is outside "
@@ -697,7 +789,7 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
         if tbase < 0:
             raise ValueError(f"validate_boot_image: Thread slot {thread_slot} is missing")
         thread_loc = words[tbase]
-        if thread_loc >= n_words:
+        if not NAMESPACE_HEADER_V2_WORDS <= thread_loc < physical["table_base"]:
             raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has invalid location")
         hdr = words[thread_loc]
         size = 1 << (((hdr >> 23) & 0xF) + 6)
@@ -743,6 +835,22 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
 
     # Do not infer Inform/Outform from any NS word.  State belongs exclusively
     # to access GTs, which are outside this raw table validator.
+    for slot in range(physical["slots"]):
+        base = n_words - (slot + 1) * NS_ENTRY_WORDS
+        location, authority = words[base], words[base + 1]
+        if location == 0 and authority == 0:
+            continue
+        # Slot zero names the physically separate Namespace header.  Every
+        # other RAM-resident body must end before its metadata block.
+        if slot == 0:
+            if location != physical["start"]:
+                raise ValueError("validate_boot_image: NS slot 0 does not name Namespace Header V2")
+            continue
+        if (NAMESPACE_HEADER_V2_WORDS <= location < physical["table_base"]
+                and location + _ns_word1_get(authority, "limit_offset") + 1
+                > physical["table_base"]):
+            raise ValueError(
+                f"validate_boot_image: NS slot {slot} resident body overlaps Namespace header/table")
 
 
 def read_boot_entry_info(image_bytes):
@@ -765,20 +873,11 @@ def read_boot_entry_info(image_bytes):
     n_words = len(image_bytes) // 4
     words = struct.unpack(f"<{n_words}I", image_bytes[: n_words * 4])
 
-    tag_idx = -1
-    scan_limit = min(8192, n_words)
-    for _i in range(1, scan_limit + 1):
-        _pos = n_words - _i
-        if words[_pos] == BOOT_IMAGE_FORMAT_TAG:
-            tag_idx = _pos
-            break
-    if tag_idx < 1:
+    physical = _locate_namespace_header(words, "read_boot_entry_info")
+    entry_slot = physical["boot_slot"]
+    if entry_slot is None:
         raise ValueError(
-            "read_boot_entry_info: BOOT_IMAGE_FORMAT_TAG not found; "
-            "the boot image is stale or corrupt and must be regenerated"
-        )
-
-    entry_slot = words[tag_idx - 1] & 0xFF
+            "read_boot_entry_info: Namespace header boot-entry does not name one NS slot")
 
     def _ns_base(slot):
         base = n_words - (slot + 1) * NS_ENTRY_WORDS
@@ -790,7 +889,7 @@ def read_boot_entry_info(image_bytes):
         base = _ns_base(slot)
         return words[base] if base is not None else None
 
-    entry_loc = _ns_word0(entry_slot)
+    entry_loc = physical["boot_entry"]
     entry_ns_base = _ns_base(entry_slot)
     entry_authority = words[entry_ns_base + 1] if entry_ns_base is not None else 0
     entry_gt_seq = _ns_word1_get(entry_authority, "gt_seq")
@@ -905,16 +1004,9 @@ def build_wukong_upload_image(generic_image, boot_config=None):
     # The generic image commits its Thread count immediately before the
     # format tag. Read that image truth instead of an optional saved config:
     # an image may outlive later editor changes and no context may be dropped.
-    source_tag_idx = -1
-    for offset in range(1, min(8192, source_total) + 1):
-        pos = source_total - offset
-        if source_words[pos] == BOOT_IMAGE_FORMAT_TAG:
-            source_tag_idx = pos
-            break
-    if source_tag_idx < 3:
-        raise ValueError("Wukong upload source has no valid Namespace metadata")
-    thread_count = source_words[source_tag_idx - 3] & 0xFF
-    thread_count = thread_count if thread_count >= 1 else 1
+    source_physical = _locate_namespace_header(
+        source_words, "Wukong upload source")
+    thread_count = _encoded_thread_count(source_words, source_physical["slots"])
     if thread_count > WUKONG_PHYSICAL_MAX_THREAD_COUNT:
         raise ValueError(
             f"Wukong supports at most {WUKONG_PHYSICAL_MAX_THREAD_COUNT} "
@@ -1215,6 +1307,25 @@ def find_lump_file_by_abstraction(lumps_dir, abstraction_name, ns_slot):
                     raise
                 except (OSError, TypeError):
                     pass
+            # Older persisted Namespace state predates token/filename fields.
+            # It still identifies a fixed boot abstraction and slot, so resolve
+            # only an exact hash-approved canonical artifact for that name.  A
+            # missing or ambiguous approval remains a hard failure.
+            if not _tok and not _state_filename:
+                approvals = read_approvals(os.path.join(lumps_dir, "approvals.json"))
+                candidates = [
+                    value.get("filename") for value in approvals.values()
+                    if isinstance(value, dict)
+                    and value.get("dot_name") == abstraction_name
+                    and isinstance(value.get("filename"), str)
+                    and os.path.basename(value["filename"]) == value["filename"]
+                ]
+                if len(candidates) == 1:
+                    _located = os.path.join(lumps_dir, candidates[0])
+                    if os.path.isfile(_located):
+                        _require_approved_executable_lump(
+                            _located, lumps_dir, abstraction_name)
+                        return _located
     except ValueError:
         raise
     except Exception:
@@ -1325,26 +1436,15 @@ def parse_ns_table(image_bytes):
         return []
     mem = list(struct.unpack(f"<{n_words}I", image_bytes[: n_words * 4]))
 
-    # Backwards-scan for BOOT_IMAGE_FORMAT_TAG (mirrors validate_boot_image).
-    tag_idx = -1
-    scan_limit = min(8192, n_words)
-    for _i in range(1, scan_limit + 1):
-        _pos = n_words - _i
-        if mem[_pos] == BOOT_IMAGE_FORMAT_TAG:
-            tag_idx = _pos
-            break
-    if tag_idx < 0:
+    try:
+        physical = _locate_namespace_header(mem, "parse_ns_table")
+    except ValueError:
         return []
-
-    ns_table_base    = tag_idx + 1
     total            = n_words
-    ns_table_reserve = total - ns_table_base
-    if ns_table_reserve < NS_ENTRY_WORDS or ns_table_reserve % NS_ENTRY_WORDS != 0:
-        return []
 
     # Read stored nsCount from tag_idx - 2 (= NS_TABLE_BASE - 3).
-    max_entries         = ns_table_reserve // NS_ENTRY_WORDS
-    stored_count_idx    = tag_idx - 2
+    max_entries         = physical["slots"]
+    stored_count_idx    = physical["start"] - 2
     if 0 <= stored_count_idx < total:
         _sc = mem[stored_count_idx] & 0xFFFF
         ns_count = _sc if 0 < _sc <= max_entries else max_entries
@@ -1389,30 +1489,20 @@ def parse_ns_table_raw(image_bytes):
         return None
     mem = list(struct.unpack(f"<{n_words}I", image_bytes[: n_words * 4]))
 
-    tag_idx = -1
-    scan_limit = min(8192, n_words)
-    for _i in range(1, scan_limit + 1):
-        _pos = n_words - _i
-        if mem[_pos] == BOOT_IMAGE_FORMAT_TAG:
-            tag_idx = _pos
-            break
-    if tag_idx < 0:
+    try:
+        physical = _locate_namespace_header(mem, "parse_ns_table_raw")
+    except ValueError:
         return None
-
-    ns_table_base    = tag_idx + 1
     total            = n_words
-    ns_table_reserve = total - ns_table_base
-    if ns_table_reserve < NS_ENTRY_WORDS or ns_table_reserve % NS_ENTRY_WORDS != 0:
-        return None
-    max_entries = ns_table_reserve // NS_ENTRY_WORDS
+    ns_table_base = physical["table_base"]
+    max_entries = physical["slots"]
 
-    # mem[0] is the Thread.1 lump header (Thread lives at word 0), NOT a
-    # namespace header — the NS table region is a raw table with no header
-    # word in RAM.  Decode mem[0] as the thread header, and synthesize the
-    # architectural V20 namespace header (slot count split across cw/cc as
-    # (cw<<8)|cc, typ=01 data) from the committed geometry.
+    # The Namespace header is physical at word zero. Thread.1 is found through
+    # its fixed Namespace descriptor.
     header = None
-    hdr = mem[0]
+    _thread_ns_base = total - 2 * NS_ENTRY_WORDS
+    _thread_loc = mem[_thread_ns_base] if _thread_ns_base >= ns_table_base else -1
+    hdr = mem[_thread_loc] if 0 <= _thread_loc < total else 0
     if (hdr >> 27) & 0x1F == 0x1F:
         header = {
             "kind":      "thread",   # header at word 0 belongs to Thread.1
@@ -1427,7 +1517,7 @@ def parse_ns_table_raw(image_bytes):
     thread_block = None
     if header is not None and header["kind"] == "thread":
         _t_size = 1 << (header["n_minus_6"] + 6)
-        _t_cnt  = mem[tag_idx - 3] & 0xFF if tag_idx >= 3 else 0
+        _t_cnt  = _encoded_thread_count(mem, physical["slots"])
         _t_layout = thread_layout(_t_size, header["cw"])
         _cr0_idx = _t_layout["caps_start"] if _t_layout["valid"] else _t_size
         thread_block = {
@@ -1436,20 +1526,20 @@ def parse_ns_table_raw(image_bytes):
             "cr0Word":    mem[_cr0_idx] if n_words > _cr0_idx else 0,
             "capsOffset": 244,
             "count":      _t_cnt if _t_cnt >= 1 else 1,
-            "bootSlot":   (mem[tag_idx - 1] & 0xFF) if tag_idx >= 1 else None,
+            "bootSlot":   physical["boot_slot"],
         }
 
-    _ns_n = max(0, total.bit_length() - 15)  # total = 2^(n_minus_6+14)
-    _ns_cw = (max_entries >> 8) & 0x1FFF
-    _ns_cc = max_entries & 0xFF
     ns_header = {
-        "slots":     max_entries,
-        "n_minus_6": _ns_n,
-        "cw":        _ns_cw,
-        "typ":       1,          # 01 = data lump (Namespace)
-        "cc":        _ns_cc,
-        "word":      ((0x1F << 27) | (_ns_n << 23) | (_ns_cw << 10)
-                      | (1 << 8) | _ns_cc) & 0xFFFFFFFF,
+        "slots":     physical["slots"],
+        "n_minus_13": physical["n_minus_13"],
+        "cw":        physical["slots"],
+        "typ":       1,
+        "cc":        0,
+        "word":      mem[physical["start"]],
+        "physicalWord": physical["start"],
+        "base": 0, "tableOffset": ns_table_base,
+        "bootSlot": physical["boot_slot"], "bootEntry": physical["boot_entry"],
+        "sealBoundary": ns_table_base,
     }
 
     entries = []
@@ -1466,8 +1556,8 @@ def parse_ns_table_raw(image_bytes):
         "totalWords":  total,
         "maxEntries":  max_entries,
         "nsTableBase": ns_table_base,
-        "header":      header,      # decoded mem[0] — Thread.1 lump header
-        "nsHeader":    ns_header,   # synthesized architectural NS header (V20)
+        "header":      header,
+        "nsHeader":    ns_header,
         "thread":      thread_block,  # Thread.1 memory-truth block (may be None)
         "entries":     entries,
     }
@@ -1644,9 +1734,28 @@ def _load_boot_resident_entries(manifest_path, selected_by_slot=None):
             continue
         slot = e.get("slot")
         tok  = e.get("token") or e.get("cache_token")
-        if not isinstance(slot, int) or not tok:
+        if not isinstance(slot, int):
             continue
         if e.get("resident") is False or e.get("boot_resident") is False:
+            continue
+        # Migration path for the checked-in pre-token Namespace state: an
+        # approved canonical artifact is an exact binding, unlike a manifest
+        # history lookup.  It permits old projects to produce a V2 image while
+        # retaining fail-closed ambiguity handling.
+        if not tok:
+            name = e.get("name")
+            try:
+                approvals = read_approvals(os.path.join(lumps_dir, "approvals.json"))
+                candidates = [
+                    row.get("filename") for row in approvals.values()
+                    if isinstance(row, dict) and row.get("dot_name") == name
+                    and isinstance(row.get("filename"), str)
+                ]
+            except (OSError, ValueError, TypeError):
+                candidates = []
+            if len(candidates) != 1:
+                continue
+            out.append((slot, "", candidates[0], 0))
             continue
         out.append((
             slot,
@@ -1701,11 +1810,13 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
 
     # Dynamic NS table reserve (Task #1244): size follows configured slot capacity.
     # nsSlotsMax defaults to DEFAULT_NS_SLOTS_MAX (256) when absent — legacy images.
-    _ns_slots_max = int(step1.get("nsSlotsMax") or DEFAULT_NS_SLOTS_MAX)
-    if _ns_slots_max > MAX_NS_ENTRIES:
+    _raw_ns_slots_max = step1.get("nsSlotsMax")
+    _ns_slots_max = (DEFAULT_NS_SLOTS_MAX if _raw_ns_slots_max is None
+                     else int(_raw_ns_slots_max))
+    if not 0 <= _ns_slots_max <= MAX_NS_ENTRIES:
         raise ValueError(
-            f"generate_boot_image: nsSlotsMax={_ns_slots_max} exceeds the "
-            f"V20 maximum of {MAX_NS_ENTRIES} slots.")
+            f"generate_boot_image: nsSlotsMax must be in 0..{MAX_NS_ENTRIES}; "
+            f"got {_ns_slots_max}.")
 
     # Thread.1 remains the fixed Boot.Thread at NS[1].  Thread#2 onward are
     # generated resident entries immediately after the fixed catalog.  Reject,
@@ -1721,6 +1832,9 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             "the Thread Count."
         )
     NS_TABLE_RESERVE = ns_table_reserve_words(_ns_slots_max)   # local, shadows module constant
+    # A Namespace header allocates the complete Namespace RAM window, not the
+    # historical synthetic ``namespaceLumpWords`` display value.
+    _ns_word0 = pack_namespace_word0(total, _ns_slots_max)
 
     # Namespace placement is sourced from ns-state and boot configuration.
     if "abstractionLumpWords" in step1:
@@ -1821,6 +1935,10 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     mem = [0] * total
 
     ns_table_base = total - NS_TABLE_RESERVE
+    ns_header_base = 0
+    _metadata_start = ns_table_base
+    if ns_table_base <= NAMESPACE_HEADER_V2_WORDS:
+        raise ValueError("generate_boot_image: Namespace Header V2 does not fit before table")
 
     # ----- Step 2: per-slot physAddr overrides --------------------------
     step2_lumps = []
@@ -1926,7 +2044,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
 
     # ----- NS entries ----------------------------------------------------
     clist_gts = []
-    running_offset = 0
+    running_offset = NAMESPACE_HEADER_V2_WORDS
     locations = {}                              # idx -> location word
     for i, entry in enumerate(catalog):
         my_size  = slot_sizes.get(i, SLOT_SIZE)
@@ -1944,9 +2062,9 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         bitstream_only = bool(_bsonly and _bsonly[0])
         override = phys_override.get(i)
         if i == 0:
-            # A7 v1.2: NS LUMP lives at NS_TABLE_BASE (self-referential).
+            # Namespace Header V2 has a real physical block before the table.
             # runningOffset is NOT advanced so Thread (slot 1) naturally gets loc=0.
-            loc = ns_table_base
+            loc = ns_header_base
         elif i in _MMIO_SLOT_SPECS:
             # MMIO NS slot: physical MMIO byte address, no RAM body allocated.
             loc = _MMIO_SLOT_SPECS[i][0]
@@ -2001,7 +2119,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         _thread_loc = running_offset
         _thread_end = _thread_loc + thread_size
         # Keep all resident bodies below the three metadata sentinel words.
-        if _thread_end > ns_table_base - 3:
+        if _thread_end > _metadata_start:
             raise ValueError(
                 f"generate_boot_image: Thread#{_ordinal} ({thread_size} words at "
                 f"0x{_thread_loc:X}) does not fit below the NS table "
@@ -2086,14 +2204,6 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             f"abstraction catalog count ({ns_count}); the NS table would not fit all "
             f"catalog entries. Increase nsSlotsMax to at least {ns_count}."
         )
-    # ----- Stored nsCount word (NS_TABLE_BASE - 3) -----------------------
-    # Write ns_count + empty_count directly, mirroring _initNamespaceTable()
-    # in simulator.js which writes this.nsCount after the step3 reservation.
-    # The previous forward physical scan gave MAX_NS_ENTRIES (256) because
-    # the inverted NS layout places logical slot 0 at the highest physical
-    # address (always non-null), regardless of how many slots are used.
-    mem[ns_table_base - 3] = (ns_count + empty_count) & 0xFFFFFFFF
-
     # ----- Foundational lump headers -------------------------------------
     # Thread lump (NS slot 1): cw/sw=stack words, cc=12 persisted CR homes, typ=2.
     # Capability homes occupy the final 12 words of the selected Thread size.
@@ -2263,18 +2373,15 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         write_ns_entry(mem, total, NS_ENTRY_WORDS, _cslot, _loc, _lim17,
                        0, 0, 1, 0, _cc, mem[_svc_ns_base + 3])
 
-    # Thread-count sentinel (Task #2563): stored at NS_TABLE_BASE - 4 so the
-    # designer's memory-truth drill-down can verify the committed thread count.
-    # Explicit in every new image; zero is invalid rather than a legacy alias.
-    mem[ns_table_base - 4] = _thread_count & 0xFF
-
-    # Boot-entry slot: stored at NS_TABLE_BASE - 2 so that loadBootImage()
-    # can restore the user's selected boot entry when loading the image.
-    # Default is BOOT_ABSTR_NS_SLOT (= 6); only the low byte is used.
-    mem[ns_table_base - 2] = boot_entry_slot & 0xFF
-    # Format-version tag: written immediately before the NS table so that
-    # loadBootImage() can detect and reject stale pre-Task-#229 binaries.
-    mem[ns_table_base - 1] = BOOT_IMAGE_FORMAT_TAG & 0xFFFFFFFF
+    # Namespace Header V2 occupies physical words 0..15.  Its boot entry is a
+    # byte address; the Namespace descriptors continue to use word offsets.
+    _header_entry = locations.get(boot_entry_slot)
+    if _header_entry is None:
+        raise ValueError(
+            f"generate_boot_image: boot entry slot {boot_entry_slot} has no "
+            "allocated resident Namespace location")
+    mem[:NAMESPACE_HEADER_V2_WORDS] = encode_namespace_header(
+        0, total, _ns_slots_max, _header_entry * 4)
 
     # ----- Boot-resident manifest lumps (auto-placement) ---------------
     # Any manifest entry with boot_resident=true and a corresponding
@@ -2289,7 +2396,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         if _phys is None:
             continue
         _allocation = _boot_resident_allocations[_slot]
-        if _phys + _allocation > ns_table_base - 3:
+        if _phys + _allocation > _metadata_start:
             raise ValueError(
                 f"generate_boot_image: boot-resident catalog slot {_slot} "
                 f"({_allocation} words at 0x{_phys:X}) does not fit below "

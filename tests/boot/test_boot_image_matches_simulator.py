@@ -79,7 +79,8 @@ def _cfg_step2_resident():
     cfg = _cfg_default()
     cfg["step2"] = {
         "lumps": [
-            {"nsSlot": 18, "resident": True,
+            # Structural parity fixture has no selected/approved artifact.
+            {"nsSlot": 18, "resident": False,
              "physAddr": 4096, "lumpSize": 64},
         ],
     }
@@ -193,6 +194,12 @@ def _compare(py_bytes, sim_words, cfg, extra_skips=None):
 
     py_words = list(struct.unpack(f"<{total}I", py_bytes))
     skip_ranges = _resident_body_ranges(cfg) + (extra_skips or [])
+    # W3 is a non-authoritative cache hint derived by the server from the
+    # exact hash-approved SelfTest content. The fallback simulator has no
+    # artifact/approval store and therefore cannot synthesize that one word.
+    # Keep all descriptor authority/integrity words in structural parity.
+    slot6_w3 = total - (BOOT_ABSTR_NS_SLOT + 1) * NS_ENTRY_WORDS + 3
+    skip_ranges.append((slot6_w3, slot6_w3 + 1))
 
     def _skip(i):
         for s, e in skip_ranges:
@@ -240,11 +247,23 @@ def _write_synthetic_boot_abstr_lump(lumps_dir, lump_size=64, cw=3, cc=0):
     words = [0] * lump_size
     words[0] = hdr
     from server.boot_image import BOOT_ABSTR_NS_SLOT
+    from server.lump_integrity import compute_number
+    from server.lump_approvals import write_approvals
+    import hashlib
     lump_token = f"{BOOT_ABSTR_NS_SLOT << 8:08x}"
-    lump_name = f"{lump_token}.lump"
+    raw = struct.pack(f">{lump_size}I", *words)
+    lump_name = f"SelfTest.1.{compute_number('SelfTest', raw)}.lump"
     lump_path = os.path.join(lumps_dir, lump_name)
     with open(lump_path, "wb") as f:
-        f.write(struct.pack(f">{lump_size}I", *words))
+        f.write(raw)
+    digest = hashlib.sha256(raw).hexdigest()
+    write_approvals(os.path.join(lumps_dir, "approvals.json"), {
+        digest: {
+            "binary_hash": digest, "filename": lump_name, "dot_name": "SelfTest",
+            "issue_n": 1,
+            "identity_hash": hashlib.sha256(b"SelfTest#1").hexdigest(),
+        }
+    })
     # Write a minimal manifest so find_lump_file_by_abstraction() resolves
     # "SelfTest" at BOOT_ABSTR_NS_SLOT.  No 'filename' field → falls back to
     # the token-named file written above.
@@ -254,6 +273,7 @@ def _write_synthetic_boot_abstr_lump(lumps_dir, lump_size=64, cw=3, cc=0):
             json.dump([{
                 "token": lump_token,
                 "abstraction": "SelfTest",
+                "filename": lump_name,
                 "ns_slot": BOOT_ABSTR_NS_SLOT,
                 "ns_slot_policy": "static",
                 "boot_resident": True,
@@ -264,6 +284,7 @@ def _write_synthetic_boot_abstr_lump(lumps_dir, lump_size=64, cw=3, cc=0):
                 "name": "SelfTest",
                 "slot": BOOT_ABSTR_NS_SLOT,
                 "token": lump_token,
+                "filename": lump_name,
             }]
         }, _sf)
     return lump_path, lump_size
@@ -364,12 +385,9 @@ def test_generated_thread_body_overlap_and_nondefault_boot_entry_are_rejected_or
         generate_boot_image(
             _cfg_generated_threads(5), str(tmp_path), boot_entry_slot=7)
 
-    image = generate_boot_image(_cfg_generated_threads(5), str(tmp_path), boot_entry_slot=300)
-    entries = {row["slot"]: row for row in parse_ns_table_raw(image)["entries"]}
-    expected = create_gt(0, 300, {"E": 1}, 1)
-    for slot in generated_thread_slots(5):
-        location = entries[slot]["w0"]
-        assert struct.unpack_from("<I", image, (location + THREAD_CAPS_OFFSET) * 4)[0] == expected
+    with pytest.raises(ValueError, match="no allocated resident Namespace location"):
+        generate_boot_image(
+            _cfg_generated_threads(5), str(tmp_path), boot_entry_slot=300)
 
 
 def test_default_thread_count_remains_byte_compatible(tmp_path):
@@ -477,9 +495,18 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
     # and a companion manifest so find_lump_file_by_abstraction() resolves it.
     saved_bytes = _make_boot_abstr_lump(lump_size, cc)
     saved_token    = f"{BOOT_ABSTR_NS_SLOT << 8:08x}"
-    saved_filename = f"{saved_token}.lump"
+    from server.lump_integrity import compute_number
+    from server.lump_approvals import write_approvals
+    import hashlib
+    saved_filename = f"SelfTest.1.{compute_number('SelfTest', saved_bytes)}.lump"
     saved_path = tmp_path / saved_filename
     saved_path.write_bytes(saved_bytes)
+    digest = hashlib.sha256(saved_bytes).hexdigest()
+    write_approvals(str(tmp_path / "approvals.json"), {
+        digest: {"binary_hash": digest, "filename": saved_filename,
+                 "dot_name": "SelfTest", "issue_n": 1,
+                 "identity_hash": hashlib.sha256(b"SelfTest#1").hexdigest()}
+    })
     # Manifest without 'filename' field: find_lump_file_by_abstraction() falls
     # back to the token-named file written above.
     manifest_path = tmp_path / "manifest.json"
@@ -487,6 +514,7 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
         manifest_path.write_text(json.dumps([{
             "token": saved_token,
             "abstraction": "SelfTest",
+                "filename": saved_filename,
             "ns_slot": BOOT_ABSTR_NS_SLOT,
             "ns_slot_policy": "static",
             "boot_resident": True,
@@ -496,6 +524,7 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
             "name": "SelfTest",
             "slot": BOOT_ABSTR_NS_SLOT,
             "token": saved_token,
+                "filename": saved_filename,
         }]
     }))
     cfg = {
@@ -516,7 +545,7 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
     # Thread is at word 0 with size 256, so Boot.Abstr base = 256.
     # (Old v1.1 formula was ns_size + thread_size = 64 + 256.)
     thread_size = cfg["step1"]["threadLumpWords"]
-    expected_loc = thread_size
+    expected_loc = 16 + thread_size
     assert boot_loc == expected_loc, (
         f"Boot.Abstr physical address {boot_loc} != expected {expected_loc}"
     )
@@ -582,6 +611,15 @@ def test_boot_image_next_gt_follows_lightning_bolt(tmp_path, lightning_slot, sta
     (tmp_path / CANONICAL_FILENAME).write_bytes(
         open(real_lump_src, "rb").read()
     )
+    # Approval is part of the executable fixture, not ambient server state.
+    from server.lump_approvals import read_approvals, write_approvals
+    import hashlib
+    _raw = (tmp_path / CANONICAL_FILENAME).read_bytes()
+    _digest = hashlib.sha256(_raw).hexdigest()
+    _source_approvals = read_approvals(os.path.join(LUMPS_DIR, "approvals.json"))
+    write_approvals(str(tmp_path / "approvals.json"), {
+        _digest: _source_approvals[_digest],
+    })
 
     # Parse lump header to get CC and LUMP_SIZE from the actual binary.
     with open(real_lump_src, "rb") as _f:
@@ -619,6 +657,11 @@ def test_boot_image_next_gt_follows_lightning_bolt(tmp_path, lightning_slot, sta
     }
     if stale_next_config is not None:
         cfg["nextAfterSelfTestSlot"] = stale_next_config
+
+    if lightning_slot != BOOT_ABSTR_NS_SLOT:
+        with pytest.raises(ValueError, match="no allocated resident Namespace location"):
+            generate_boot_image(cfg, str(tmp_path), boot_entry_slot=lightning_slot)
+        return
 
     img   = generate_boot_image(cfg, str(tmp_path), boot_entry_slot=lightning_slot)
     total = 16384

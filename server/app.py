@@ -2353,10 +2353,10 @@ def _validate_slot_rules(slot_rules):
             return f"NS slot {slot} has invalid slot rule {rule!r}"
     return None
 
-# Hard ceiling on how many entries the NS table may hold.
-# GT bits[15:0] supports up to 65535 slots; 1024 is the practical cap.
-# At 4 words per entry this reserves up to 4096 words of the namespace LUMP.
-MAX_NS_ENTRIES = 1024
+# Namespace Header V2 encodes its physical table count directly in its
+# 13-bit ``cw`` field.  This is a codec limit, not the former designer-only
+# 1024/power-of-two limit.
+MAX_NS_ENTRIES = _boot_image_gen.NAMESPACE_HEADER_V2_MAX_SLOTS
 # How many fixed named NS entries are present after a cold boot. Configured
 # Thread#2 onward occupy deterministic slots immediately after this catalog.
 # _initNamespaceTable() always populates Boot.NS (0), Boot.Thread (1), UART,
@@ -2698,7 +2698,10 @@ def _validate_step2(step2, step1, target_board):
         if selected_tokens else _load_lump_catalog()
     )
     catalog = {e["nsSlot"]: e for e in catalog_entries}
-    _ns_slots_max_v2 = int(step1.get("nsSlotsMax") or _boot_image_gen.DEFAULT_NS_SLOTS_MAX)
+    _raw_ns_slots_max_v2 = step1.get("nsSlotsMax")
+    _ns_slots_max_v2 = (_boot_image_gen.DEFAULT_NS_SLOTS_MAX
+                         if _raw_ns_slots_max_v2 is None
+                         else int(_raw_ns_slots_max_v2))
     NS_TABLE_RESERVE = _boot_image_gen.ns_table_reserve_words(_ns_slots_max_v2)
     total = step1["totalNamespaceWords"]
     # Determine actual Boot.Abstr size from the saved SelfTest lump (looked up via
@@ -2719,7 +2722,8 @@ def _validate_step2(step2, step1, target_board):
         if not isinstance(entry, dict):
             return "each step2.lumps entry must be an object"
         slot = entry.get("nsSlot")
-        if not isinstance(slot, int) or slot < 0 or slot >= MAX_NS_ENTRIES:
+        if (not isinstance(slot, int) or isinstance(slot, bool)
+                or slot < 0 or slot >= _ns_slots_max_v2):
             return f"step2.lumps entry has invalid nsSlot: {slot!r}"
         if slot in RESERVED_NS_SLOTS:
             return (f"NS slot {slot} is reserved (foundational lump or device "
@@ -2803,7 +2807,9 @@ def _validate_step3(step3, step1, step2):
     # generator rejects overflow of the configured table, not the 1024 cap.
     _cap = MAX_NS_ENTRIES
     try:
-        _cap = int((step1 or {}).get("nsSlotsMax") or _boot_image_gen.DEFAULT_NS_SLOTS_MAX)
+        _raw_cap = (step1 or {}).get("nsSlotsMax")
+        _cap = (_boot_image_gen.DEFAULT_NS_SLOTS_MAX if _raw_cap is None
+                else int(_raw_cap))
     except Exception:
         pass
     _cap = min(_cap, MAX_NS_ENTRIES)
@@ -2861,11 +2867,11 @@ def _validate_step1(target_board, step1):
     # Optional nsSlotsMax — validated here, persisted by boot_config_post (Task #1244).
     _raw_ns_slots_max = step1.get("nsSlotsMax")
     if _raw_ns_slots_max is not None:
-        if not isinstance(_raw_ns_slots_max, int) or _raw_ns_slots_max < 1:
-            return "step1.nsSlotsMax must be a positive integer when provided"
-        if _raw_ns_slots_max > MAX_NS_ENTRIES:
-            return (f"step1.nsSlotsMax ({_raw_ns_slots_max}) exceeds the maximum "
-                    f"supported NS slot count ({MAX_NS_ENTRIES})")
+        if (not isinstance(_raw_ns_slots_max, int)
+                or isinstance(_raw_ns_slots_max, bool)
+                or not 0 <= _raw_ns_slots_max <= MAX_NS_ENTRIES):
+            return (f"step1.nsSlotsMax must be an integer in 0..{MAX_NS_ENTRIES} "
+                    "when provided")
     # The Thread reserves 18 leading words and 12 tail capability homes.
     if step1["threadLumpWords"] < 256:
         return ("step1.threadLumpWords must be at least 256: the Thread "
@@ -2882,10 +2888,10 @@ def _validate_step1(target_board, step1):
     if not _thread_layout["valid"]:
         return ("step1 Thread geometry overlaps: stack must leave at least one "
                 "Heap word after the protected STO and before the tail capability homes")
-    # The simulator reserves the top NS_TABLE_RESERVE words of the namespace
-    # window for the namespace table itself.  Reserve size is now dynamic:
-    # nextPow2(nsSlotsMax × 4).
-    _ns_slots_max_v1 = int(_raw_ns_slots_max or _boot_image_gen.DEFAULT_NS_SLOTS_MAX)
+    # The physical V2 table is tail-anchored and has exactly four words per
+    # encoded slot; no power-of-two rounding or minimum reserve is applied.
+    _ns_slots_max_v1 = (_boot_image_gen.DEFAULT_NS_SLOTS_MAX
+                         if _raw_ns_slots_max is None else _raw_ns_slots_max)
     if _ns_slots_max_v1 < _named_ns_count_for_step1(step1):
         return (f"step1.nsSlotsMax ({_ns_slots_max_v1}) cannot hold the "
                 f"{_named_ns_count_for_step1(step1)} named entries required by "
@@ -3640,23 +3646,19 @@ def namespace_lump_json():
             return jsonify({"error": f"Failed to generate boot image: {_e}"}), 500
 
     words          = list(_st.unpack(f"<{total}I", img_bytes[:total * 4]))
-    _ns_slots_max_mf = int(step1.get("nsSlotsMax") or _boot_image_gen.DEFAULT_NS_SLOTS_MAX)
-    ns_table_base  = total - _boot_image_gen.ns_table_reserve_words(_ns_slots_max_mf)
+    # V2's serialized header is the authority for every Namespace-wide fact.
+    # Do not reinterpret Word 0 as an ordinary n-6 LUMP header or recreate a
+    # table size from the (possibly newer) saved editor configuration.
+    physical = _boot_image_gen.read_namespace_header_info(img_bytes)
+    ns_table_base  = physical["table_offset_words"]
     ns_entry_words = _boot_image_gen.NS_ENTRY_WORDS
     catalog        = _boot_image_gen.DEFAULT_ABSTRACTION_CATALOG
 
-    hdr       = words[0]
-    hdr_magic = (hdr >> 27) & 0x1F
-    hdr_nm6   = (hdr >> 23) & 0xF
-    hdr_cw    = (hdr >> 10) & 0x1FFF
-    hdr_cc    = hdr & 0xFF
-    ns_lump_size = 1 << (hdr_nm6 + 6) if hdr_magic == 0x1F else ns_size
-
-    slot_count = max(hdr_cc, len(catalog))
+    slot_count = physical["slot_count"]
     slots = []
     for i in range(slot_count):
-        ns_base = ns_table_base + i * ns_entry_words
-        if ns_base + ns_entry_words > total:
+        ns_base = total - (i + 1) * ns_entry_words
+        if ns_base < ns_table_base:
             break
         w0, w1, w2, w3 = words[ns_base], words[ns_base+1], words[ns_base+2], words[ns_base+3]
 
@@ -3697,10 +3699,6 @@ def namespace_lump_json():
                 lump_cc_val = lh & 0xFF
 
         gt_word = 0
-        if hdr_magic == 0x1F and hdr_cc > 0 and i < hdr_cc:
-            clist_start = ns_lump_size - hdr_cc
-            if 0 <= clist_start + i < total:
-                gt_word = words[clist_start + i]
 
         slots.append({
             "index":        i,
@@ -3722,11 +3720,16 @@ def namespace_lump_json():
         })
 
     manifest = {
-        "physicalBase":    0,
-        "physicalSize":    ns_lump_size if hdr_magic == 0x1F else ns_size,
-        "cc":              hdr_cc if hdr_magic == 0x1F else 0,
-        "cw":              hdr_cw if hdr_magic == 0x1F else 0,
-        "totalMemoryWords": total,
+        "physicalBase":    physical["base_byte"],
+        "physicalSize":    physical["total_words"],
+        "cc":              0,
+        "cw":              physical["slot_count"],
+        "formatVersion":   physical["version"],
+        "tableOffsetWords": physical["table_offset_words"],
+        "bootEntryByte":   physical["boot_entry_byte"],
+        "bootEntrySlot":   physical["boot_entry_slot"],
+        "sealBoundaryWord": physical["seal_boundary_word"],
+        "totalMemoryWords": physical["total_words"],
         "nsTableBase":     ns_table_base,
         "slots":           slots,
     }
@@ -15432,6 +15435,25 @@ def _ba_build_ns_map():
 
     ROOT = os.path.dirname(_SERVER_DIR)
 
+    # Build Approval reports physical Namespace facts only from a validated
+    # generated image.  Config/ROM values below are policy and board facts,
+    # not substitutes for this binary contract.
+    namespace_header = {
+        "available": False,
+        "error": "boot-image.bin has not been generated",
+    }
+    if os.path.isfile(BOOT_IMAGE_PATH):
+        try:
+            with open(BOOT_IMAGE_PATH, "rb") as _header_image:
+                namespace_header = _boot_image_gen.read_namespace_header_info(
+                    _header_image.read())
+            namespace_header["available"] = True
+        except (OSError, ValueError) as exc:
+            namespace_header = {
+                "available": False,
+                "error": f"boot-image.bin Namespace Header V2 is invalid: {exc}",
+            }
+
     # ── Read boot_rom.py constants ─────────────────────────────────────────
     rom_path = os.path.join(ROOT, 'hardware', 'boot_rom.py')
     try:
@@ -15550,6 +15572,11 @@ def _ba_build_ns_map():
         # Approval rendering must remain available when an older config cannot
         # be fully validated; the default fallback below still works.
         pass
+
+    if namespace_header.get("available"):
+        # A generated image is the boot authority. The saved selection remains
+        # useful while no image exists, but must never relabel an older image.
+        boot_entry_slot = namespace_header["boot_entry_slot"]
 
     thread_size = int(saved_step1.get("threadLumpWords") or 256)
     thread_stack_words = int(saved_step1.get("threadStackWords") or 32)
@@ -16054,6 +16081,7 @@ def _ba_build_ns_map():
         'boot_entry_slot': boot_entry_slot,
         'ns_table_base': ns_table_base,
         'ns_slot_count': ns_slot_count,
+        'namespace_header': namespace_header,
         'hardware_budget': hardware_budget,
     }
 

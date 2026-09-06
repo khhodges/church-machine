@@ -28,6 +28,7 @@
 const vm   = require('vm');
 const fs   = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 
 const ChurchSimulator    = require('./simulator.js');
 const AbstractionRegistry = require('./abstractions.js');
@@ -463,9 +464,18 @@ console.log('\n--- T208: acceptance state gated on loadBootImage() verdict ---')
 console.log('\n--- T211: late boot-image arrival replaces fallback CR state ---');
 {
     const appShellSrc = fs.readFileSync(path.join(__dirname, 'app-shell.js'), 'utf8');
-    const bootImageBytes = fs.readFileSync(
-        path.join(__dirname, '..', 'server', 'lumps', 'boot-image.bin')
-    );
+    // Generate a current physical V2 image rather than depending on the
+    // workspace artifact, which may deliberately be a retired image.
+    const generated = spawnSync('python', ['-c', [
+        'import json, sys',
+        'from server.boot_image import generate_boot_image',
+        'cfg=json.load(open("server/boot-config.json"))',
+        'sys.stdout.buffer.write(generate_boot_image(cfg, "server/lumps"))',
+    ].join(';')], { cwd: process.cwd(), encoding: null });
+    if (generated.status !== 0) {
+        throw new Error(`Could not generate boot image: ${String(generated.stderr || '')}`);
+    }
+    const bootImageBytes = generated.stdout;
     const bootImage = bootImageBytes.buffer.slice(
         bootImageBytes.byteOffset, bootImageBytes.byteOffset + bootImageBytes.byteLength
     );

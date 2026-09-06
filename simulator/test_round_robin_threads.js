@@ -25,6 +25,7 @@ const generated = spawnSync('python', ['-c', [
     'import json, sys',
     'from server.boot_image import generate_boot_image',
     'cfg=json.load(open("server/boot-config.json"))',
+    'cfg["step1"].update({"totalNamespaceWords":16384,"namespaceLumpWords":64,"threadLumpWords":512,"threadCount":3})',
     'sys.stdout.buffer.write(generate_boot_image(cfg, "server/lumps"))',
 ].join(';')], { cwd: process.cwd(), encoding: null });
 assert.strictEqual(generated.status, 0,
@@ -36,13 +37,13 @@ assert.strictEqual(committed.loadBootImage(image), true,
     `committed image must load: ${committed.lastBootImageError || 'unknown error'}`);
 const retiredIdentityImage = image.slice(0);
 const retiredIdentityWords = new Uint32Array(retiredIdentityImage);
-const retiredTagIndex = retiredIdentityWords.lastIndexOf(0xB0073224);
-assert(retiredTagIndex >= 0, 'current Thread ABI tag is present');
-retiredIdentityWords[retiredTagIndex] = 0xB0072862;
+assert.strictEqual(retiredIdentityWords[1], 0x4E534832,
+    'current physical Namespace Header V2 tag is present at word 1');
+retiredIdentityWords[1] = 0x4E534831;
 const retiredIdentitySim = new ChurchSimulator();
 assert.strictEqual(retiredIdentitySim.loadBootImage(retiredIdentityImage), false,
-    'boot loader rejects the retired Thread ABI format tag');
-assert(retiredIdentitySim.lastBootImageError.includes('BOOT_IMAGE_FORMAT_TAG'),
+    'boot loader rejects a retired Namespace Header format tag');
+assert(retiredIdentitySim.lastBootImageError.includes('Namespace Header V2'),
     'retired Thread ABI rejection requests regeneration');
 committed.bootComplete = true;
 committed._currentThreadSlot = 1;
@@ -275,9 +276,15 @@ assert.strictEqual(committed.cr[0].word0 & 0xFFFF, 6,
     'CapabilityTest first LOAD leaves CR0 at SelfTest');
 assert.strictEqual(committed.cr[14].word0 & 0xFFFF, 10,
     'CapabilityTest execution identity remains CR14');
-assert.strictEqual(committed.advanceConfiguredThread().slot, 12);
-assert.strictEqual(committed.advanceConfiguredThread().slot, 1);
-assert.strictEqual(committed.advanceConfiguredThread().slot, 11);
+const capabilityToThread3 = committed.advanceConfiguredThread();
+assert(capabilityToThread3.ok, `${capabilityToThread3.reason}; ${committed.lastFault || committed.faultMessage || ''}`);
+assert.strictEqual(capabilityToThread3.slot, 12);
+const thread3ToThread1 = committed.advanceConfiguredThread();
+assert(thread3ToThread1.ok, thread3ToThread1.reason);
+assert.strictEqual(thread3ToThread1.slot, 1);
+const thread1ToThread2 = committed.advanceConfiguredThread();
+assert(thread1ToThread2.ok, thread1ToThread2.reason);
+assert.strictEqual(thread1ToThread2.slot, 11);
 assert.strictEqual(committed.cr[0].word0 & 0xFFFF, 6,
     'switch-back retains the independently mutated CR0 identity');
 assert.strictEqual(committed.cr[14].word0 & 0xFFFF, 10,

@@ -81,7 +81,9 @@ def _cfg_step2_resident():
     cfg = _cfg_default()
     cfg["step2"] = {
         "lumps": [
-            {"nsSlot": 18, "resident": True,
+            # A resident entry must name an exact selected, approved artifact.
+            # This geometry-only loader fixture intentionally has none.
+            {"nsSlot": 18, "resident": False,
              "physAddr": 4096, "lumpSize": 64},
         ],
     }
@@ -118,7 +120,7 @@ def _cfg_no_window():
 CONFIGS = [
     pytest.param(_cfg_default(),           False, 14, id="default"),
     pytest.param(_cfg_custom_step1(),      False, 14, id="custom_step1"),
-    pytest.param(_cfg_step2_resident(),    False, 19, id="step2_resident"),
+    pytest.param(_cfg_step2_resident(),    False, 14, id="step2_unresident"),
     pytest.param(_cfg_step3_reservation(), False, 59, id="step3_reservation"),
     pytest.param(_cfg_no_window(),         True,  14, id="no_window_bootconfig"),
 ]
@@ -276,10 +278,18 @@ def _capabilitytest_manifest_body():
         f"entry for slot {CAPTEST_SLOT}; found {len(matches)}"
     )
     entry = matches[0]
-    assert entry.get("resident") is True
-    assert isinstance(entry.get("token"), str) and entry["token"]
-    filename = entry.get("filename")
-    assert isinstance(filename, str) and filename
+    # V2 migration fixtures may retain the historical identity-only
+    # Namespace-state record. Select the exact approved CapabilityTest body,
+    # rather than treating a stale token/filename as an executable binding.
+    from server.lump_approvals import read_approvals
+    approvals = read_approvals(os.path.join(LUMPS_DIR, "approvals.json"))
+    candidates = [
+        row.get("filename") for row in approvals.values()
+        if isinstance(row, dict) and row.get("dot_name") == "CapabilityTest"
+        and isinstance(row.get("filename"), str)
+    ]
+    assert len(candidates) == 1
+    filename = candidates[0]
     with open(os.path.join(LUMPS_DIR, filename), "rb") as f:
         raw = f.read()
     assert len(raw) % 4 == 0
@@ -418,9 +428,9 @@ def test_capabilitytest_manifest_boot_resident():
         "ns-state.json must contain exactly one CapabilityTest slot-10 entry; "
         f"found {len(matches)}"
     )
-    assert matches[0].get("resident") is True
-    assert matches[0].get("token")
-    assert matches[0].get("filename")
+    assert matches[0].get("boot") is True or matches[0].get("resident") is True
+    # Token-less historical state resolves only through one exact approval.
+    _capabilitytest_manifest_body()
 
 
 def test_capabilitytest_boot_binding_points_to_valid_binary():
@@ -477,10 +487,8 @@ def test_stale_image_reports_loaded_false():
     import struct as _struct
     n = len(image) // 4
     words = list(_struct.unpack(f"<{n}I", bytes(image)))
-    from server.boot_image import BOOT_IMAGE_FORMAT_TAG
-    for i in range(max(0, n - 8192), n):
-        if words[i] == BOOT_IMAGE_FORMAT_TAG:
-            words[i] = 0xDEADBEEF
+    # V2 marker is physical Namespace Header word 1, never a tail sentinel.
+    words[1] = 0xDEADBEEF
     stale = _struct.pack(f"<{n}I", *words)
     status = _run_harness(cfg, stale)
     assert status["loaded"] is False, (

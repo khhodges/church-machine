@@ -38,6 +38,25 @@ Secure-boot firmware.  Three real instructions, remainder zero-padded to 256.
 
 The programmer takes control at this point; the hardwired Boot ends and software takes control.
 
+## Namespace Header V2 boot-image contract
+
+The Namespace allocation begins with a physical 16-word Header V2 block; it is
+not synthesized display metadata and it is not a Thread header. Namespace
+Header V2 Word 0 has
+`magic=0x1F`, `typ=01` (Namespace/data), the Namespace n−13 size field, plain
+13-bit `cw=slot_count` (0..8,191), and `cc=0`. The count describes fixed
+four-word NS entries; `cc` is not part of the count. Word 1 is `0x4E534832` (`NSH2`); words 2,
+3, and 4 respectively hold the allocation base byte address, table offset in
+words, and boot-entry byte location. Word 3 is exactly
+`capacity_words − 4×slot_count`; word 5 is the fixed future-seal boundary (6);
+words 6..15 are zero until a separately versioned seal design is implemented.
+
+The four-word NS table is physically tail-anchored. A loader rejects a
+missing/unknown marker as legacy/unsupported rather
+than treating raw table or Thread-at-zero layouts as V2. Cryptographic sealing
+and composite-digest verification are deferred, but their reserved boundary is
+already part of the binary contract.
+
 ---
 
 ## See Also

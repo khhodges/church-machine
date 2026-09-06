@@ -39,6 +39,7 @@ from server.boot_image import (  # noqa: E402
     SLOT_SIZE,
 )
 from server.boot_constants import BOOT_ABSTR_DEFAULT_SIZE  # noqa: E402
+from shared.namespace_header import NAMESPACE_HEADER_V2_WORDS  # noqa: E402
 
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
 
@@ -91,7 +92,7 @@ def _compute_catalog_pool_start(ns_size, thread_size, abstr_size=None):
         1:                  thread_size,
         BOOT_ABSTR_NS_SLOT: abstr_size,
     }
-    running_offset = 0
+    running_offset = NAMESPACE_HEADER_V2_WORDS
     for i, entry in enumerate(DEFAULT_ABSTRACTION_CATALOG):
         if entry is None:
             continue
@@ -158,7 +159,7 @@ def _assert_boot_abstr_at(words, thread_size, label):
 # Tests
 # ---------------------------------------------------------------------------
 
-def test_thread_lump_at_word_zero():
+def test_namespace_header_precedes_thread_lump():
     """A7 v1.2: Thread LUMP header must be at word 0 (not NS lump).
 
     In v1.1 word 0 held the NS lump header. In A7 v1.2 the Thread LUMP starts
@@ -171,7 +172,9 @@ def test_thread_lump_at_word_zero():
     image = generate_boot_image(cfg, LUMPS_DIR)
     words = _parse_image(image, total)
 
-    header_word  = words[0]
+    assert ((words[0] >> 8) & 3) == 1
+    assert (words[0] & 0xFF) == 0
+    header_word  = words[NAMESPACE_HEADER_V2_WORDS]
     actual_magic = header_word >> 27
     assert actual_magic == LUMP_HEADER_MAGIC, (
         f"Word 0x0000 = 0x{header_word:08X}: expected Thread LUMP magic 0x1F "
@@ -180,7 +183,7 @@ def test_thread_lump_at_word_zero():
     )
 
     # Verify the Thread region is not all-zero.
-    thread_region = words[0:th]
+    thread_region = words[NAMESPACE_HEADER_V2_WORDS:NAMESPACE_HEADER_V2_WORDS + th]
     assert any(w != 0 for w in thread_region), (
         f"Thread LUMP region [0x0000..0x{th - 1:04X}] is entirely zero — "
         "something failed to write it."
@@ -201,7 +204,7 @@ def test_boot_abstr_immediately_follows_thread_default():
     image = generate_boot_image(cfg, LUMPS_DIR)
     words = _parse_image(image, total)
 
-    _assert_boot_abstr_at(words, th, "default config (thread=256)")
+    _assert_boot_abstr_at(words, NAMESPACE_HEADER_V2_WORDS + th, "default config (thread=256)")
 
 
 def test_boot_abstr_immediately_follows_thread_custom():
@@ -215,7 +218,7 @@ def test_boot_abstr_immediately_follows_thread_custom():
     image = generate_boot_image(cfg, LUMPS_DIR)
     words = _parse_image(image, total)
 
-    _assert_boot_abstr_at(words, th, "custom Namespace config (thread=256)")
+    _assert_boot_abstr_at(words, NAMESPACE_HEADER_V2_WORDS + th, "custom Namespace config (thread=256)")
 
 
 def test_ns_slot0_word0_is_ns_table_base():
@@ -235,7 +238,7 @@ def test_ns_slot0_word0_is_ns_table_base():
     # Inverted NS layout: slot i lives at total − (i+1) × NS_ENTRY_WORDS.
     # Slot 0 is at the highest physical address in the NS table region.
     slot0_word0 = words[total - (0 + 1) * NS_ENTRY_WORDS]
-    assert slot0_word0 == ns_table_base, (
+    assert slot0_word0 == 0, (
         f"NS slot 0 word0 = 0x{slot0_word0:05X}; "
         f"expected NS_TABLE_BASE = 0x{ns_table_base:05X}.  "
         "In A7 v1.2 NS slot 0 is self-referential (points to NS_TABLE_BASE)."
@@ -252,8 +255,8 @@ def test_ns_slot1_word0_is_zero():
     image = generate_boot_image(cfg, LUMPS_DIR)
     words = _parse_image(image, total)
 
-    slot1_word0 = words[ns_table_base + 1 * NS_ENTRY_WORDS]
-    assert slot1_word0 == 0, (
+    slot1_word0 = words[total - 2 * NS_ENTRY_WORDS]
+    assert slot1_word0 == NAMESPACE_HEADER_V2_WORDS, (
         f"NS slot 1 (Thread) word0 = 0x{slot1_word0:08X}; expected 0 "
         "(Thread LUMP is at word 0 in A7 v1.2).  "
         "v1.1 would place Thread at ns_size (e.g. 0x0040 or 0x0400)."
@@ -270,7 +273,7 @@ def test_boot_abstr_ns_entry_points_to_thread_size():
     th    = int(cfg["step1"]["threadLumpWords"])   # 256
     total = int(cfg["step1"]["totalNamespaceWords"])
 
-    expected_phys = th   # 0x0100
+    expected_phys = NAMESPACE_HEADER_V2_WORDS + th
 
     image = generate_boot_image(cfg, LUMPS_DIR)
     words = _parse_image(image, total)
@@ -304,13 +307,13 @@ def test_ns_table_at_top_not_at_zero():
     # Inverted NS layout: slot 0 word0 lives at total − NS_ENTRY_WORDS (highest
     # physical address in the NS table region), not at ns_table_base + 0.
     ns_slot0_word0 = words[total - NS_ENTRY_WORDS]
-    assert ns_slot0_word0 == ns_table_base, (
+    assert ns_slot0_word0 == 0, (
         f"NS slot 0 word0 (at word 0x{total - NS_ENTRY_WORDS:04X}) = 0x{ns_slot0_word0:08X}; "
         f"expected NS_TABLE_BASE = 0x{ns_table_base:08X} (NS slot 0 is self-referential).  "
         "NS TABLE must be at the top of memory in A7 v1.2."
     )
 
-    # Word 0 should be a LUMP header (Thread), not the NS slot 0 entry.
+    # Word 0 is the physical Namespace Header V2, not an NS table entry.
     word0_magic = words[0] >> 27
     assert word0_magic == LUMP_HEADER_MAGIC, (
         f"Word 0x0000 = 0x{words[0]:08X}: expected Thread LUMP header (magic 0x1F) "
@@ -337,7 +340,7 @@ def test_dynamic_pool_is_zeroed_at_boot_time():
         #   ns_table_base-3 = stored nsCount (non-zero)
         #   ns_table_base-2 = boot_entry_slot word (non-zero)
         #   ns_table_base-1 = BOOT_IMAGE_FORMAT_TAG (non-zero)
-        pool_end      = ns_table_base - 3
+        pool_end      = ns_table_base
 
         image = generate_boot_image(cfg, LUMPS_DIR)
         words = _parse_image(image, total)
