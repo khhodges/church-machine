@@ -2299,6 +2299,10 @@ DEFAULT_BOOT_CONFIG = {
     # The selected Lightning Bolt / first executable abstraction.  Older
     # configs omit this field and retain the architectural SelfTest default.
     "bootEntrySlot": 6,
+    # Programmer-selected approval/load rules.  This is separate from
+    # step2.lumps because architecture-defined Namespace rows do not contain
+    # user LUMP bodies, but their approval rule is still user-owned.
+    "slotRules": {},
     "step1": {
         "totalNamespaceWords": 16384,
         "namespaceLumpWords": 64,
@@ -2318,6 +2322,30 @@ DEFAULT_BOOT_CONFIG = {
         "emptySlotCount": 0
     },
 }
+
+SLOT_RULE_VALUES = ("Bootstrap", "Hardware", "Empty", "Resident", "Preload", "Lazy")
+
+
+def _validate_slot_rules(slot_rules):
+    """Validate programmer-owned per-slot approval rules.
+
+    LightningBolt is intentionally not stored here: it is a boot-entry role
+    represented by bootEntrySlot, never an independent load policy.
+    """
+    if slot_rules is None:
+        return None
+    if not isinstance(slot_rules, dict):
+        return "slotRules must be an object"
+    for raw_slot, rule in slot_rules.items():
+        try:
+            slot = int(raw_slot)
+        except (TypeError, ValueError):
+            return f"slotRules has an invalid NS slot: {raw_slot!r}"
+        if slot < 0 or slot >= MAX_NS_ENTRIES:
+            return f"slotRules has an invalid NS slot: {raw_slot!r}"
+        if rule not in SLOT_RULE_VALUES:
+            return f"NS slot {slot} has invalid slot rule {rule!r}"
+    return None
 
 # Hard ceiling on how many entries the NS table may hold.
 # GT bits[15:0] supports up to 65535 slots; 1024 is the practical cap.
@@ -2961,10 +2989,18 @@ def boot_config_post():
                 f"{MAX_NS_ENTRIES - 1}"
             ),
         }), 400
+    slot_rules = data.get("slotRules", existing.get("slotRules", {}))
+    slot_rules_err = _validate_slot_rules(slot_rules)
+    if slot_rules_err:
+        return jsonify({"ok": False, "error": slot_rules_err}), 400
+    normalized_slot_rules = {
+        str(int(slot)): rule for slot, rule in (slot_rules or {}).items()
+    }
     cfg = {
         "schemaVersion": BOOT_CONFIG_SCHEMA_VERSION,
         "targetBoard": target_board,
         "bootEntrySlot": boot_entry_slot,
+        "slotRules": normalized_slot_rules,
         "step1": {
             "totalNamespaceWords": int(step1["totalNamespaceWords"]),
             "namespaceLumpWords": int(step1["namespaceLumpWords"]),
@@ -15426,11 +15462,21 @@ def _ba_build_ns_map():
     # projects that predate persisted per-slot policy rows.
     slot_policy_by_slot = {}
     boot_entry_slot = DEFAULT_BOOT_CONFIG["bootEntrySlot"]
+    generated_thread_slots = set()
     try:
         saved_cfg, saved_cfg_err = _read_saved_boot_config()
         if saved_cfg_err is None and isinstance(saved_cfg, dict):
+            generated_thread_slots = _generated_thread_slots_for_step1(
+                saved_cfg.get("step1") or {})
             if isinstance(saved_cfg.get("bootEntrySlot"), int):
                 boot_entry_slot = saved_cfg["bootEntrySlot"]
+            for raw_slot, policy_value in (saved_cfg.get("slotRules") or {}).items():
+                try:
+                    policy_slot = int(raw_slot)
+                except (TypeError, ValueError):
+                    continue
+                if policy_value in SLOT_RULE_VALUES:
+                    slot_policy_by_slot[policy_slot] = policy_value
             for policy_row in ((saved_cfg.get('step2') or {}).get('lumps') or []):
                 if not isinstance(policy_row, dict):
                     continue
@@ -15438,7 +15484,10 @@ def _ba_build_ns_map():
                 policy_value = policy_row.get('loadPolicy', policy_row.get('load_policy'))
                 if isinstance(policy_slot, int) and policy_value in (
                         'Empty', 'Resident', 'Preload', 'Lazy'):
-                    slot_policy_by_slot[policy_slot] = policy_value
+                    # slotRules is the programmer-facing authority.  The
+                    # step2 projection remains a compatibility fallback.
+                    if policy_slot not in slot_policy_by_slot:
+                        slot_policy_by_slot[policy_slot] = policy_value
     except Exception:
         # Approval rendering must remain available when an older config cannot
         # be fully validated; the sidecar/default fallback below still works.
@@ -15462,14 +15511,14 @@ def _ba_build_ns_map():
             pass
         return None
 
-    def _slot_policy(slot_num, state_entry=None, lump_path=None):
+    def _slot_policy(slot_num, state_entry=None, lump_path=None, default='Lazy'):
         if slot_num in slot_policy_by_slot:
             return slot_policy_by_slot[slot_num]
         if isinstance(state_entry, dict):
             value = state_entry.get('loadPolicy', state_entry.get('load_policy'))
             if value in ('Empty', 'Resident', 'Preload', 'Lazy'):
                 return value
-        return _sidecar_policy(lump_path) or 'Lazy'
+        return _sidecar_policy(lump_path) or default
 
     # These lists are referenced by the policy router before the later
     # manifest scan, so initialize both before defining/calling the helper.
@@ -15562,10 +15611,13 @@ def _ba_build_ns_map():
             'header_word': None, 'cw': None, 'cc': None,
             'location': location, 'perms': perms, 'source': 'BRAM (boot ROM)',
             'load_policy': 'Bootstrap',
+            'programmable': False,
             'checks': [{'label': 'BRAM', 'ok': True, 'detail': detail}],
         }
         for slot_num, (name, location, perms, detail) in bootstrap_slots.items()
     ]
+    for _row in bootstrap:
+        _row['load_policy'] = _slot_policy(_row['slot'], default='Bootstrap')
 
     # Hardware-backed rows are intrinsic device definitions. They are
     # resident regardless of software LUMP policy and are kept outside the
@@ -15582,11 +15634,14 @@ def _ba_build_ns_map():
             'header_word': 'MMIO', 'cw': None, 'cc': None,
             'location': location, 'perms': perms, 'source': 'boot ROM',
             'load_policy': 'Hardware',
+            'programmable': False,
             'checks': [{'label': 'MMIO', 'ok': True,
                         'detail': f'MMIO at {location}'}],
         }
         for slot_num, (name, location, perms) in mmio_specs.items()
     ]
+    for _row in resident:
+        _row['load_policy'] = _slot_policy(_row['slot'], default='Hardware')
 
     # Slot 6 — SelfTest LUMP
     st_entry = manifest_by_slot.get(selftest_slot) or {}
@@ -15681,6 +15736,10 @@ def _ba_build_ns_map():
             'location': entry.get('location'),
             'perms': entry.get('grants', []),
             'source': 'manifest (slot policy)',
+            'programmable': (
+                slot_num not in RESERVED_NS_SLOTS
+                and slot_num not in generated_thread_slots
+            ),
             'checks': checks,
         }
         row['_ba_binary_path'] = lump_path

@@ -19,12 +19,14 @@ LightningBolt selection to the simulator; never sync a temporary factory
 SelfTest slot back into the user's selection.
 
 Build Approval may show LightningBolt in the same per-slot selector, but it is
-a synthetic boot-role choice: selecting it persists only `bootEntrySlot`, while
-Empty/Resident/Preload/Lazy continue to persist as the slot's independent
-`step2` load policy.
+a synthetic boot-role choice: selecting it persists only `bootEntrySlot`. The
+programmer's per-slot rule is stored separately and is authoritative, including
+for architecture rows; step2 remains only the body-loading projection for
+programmable LUMP rows.
 
 **Why:** The approval table needs one discoverable control without turning the
-boot role into a conflicting fifth load policy.
+boot role into a conflicting fifth load policy or letting IDE defaults override
+the programmer's saved rule.
 
 **How to apply:** Keep the active boot row visibly marked as
 `LightningBolt (boot entry · <load policy>)`; changing its load policy must not

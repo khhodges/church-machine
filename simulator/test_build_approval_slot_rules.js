@@ -4,9 +4,9 @@
  * Run: node simulator/test_build_approval_slot_rules.js
  *
  * Covers:
- *   - every editable Namespace row renders a select with all load policies
+ *   - every Namespace row renders a programmer-selectable rule
  *     plus the special LightningBolt boot-entry role;
- *   - architecture-fixed rows remain visibly fixed and disabled;
+ *   - architecture rows are not disabled or silently forced by the IDE;
  *   - selecting LightningBolt persists only bootEntrySlot;
  *   - selecting a load policy persists step2 without creating an independent
  *     LightningBolt/load-policy conflict.
@@ -54,7 +54,7 @@ const rows = [
 view._lastMap = { boot_entry_slot: 10, slot_rules: rows };
 
 const editable = view._renderRow(rows[2]);
-for (const value of ['Empty', 'Resident', 'Preload', 'Lazy', 'LightningBolt']) {
+for (const value of ['Bootstrap', 'Hardware', 'Empty', 'Resident', 'Preload', 'Lazy', 'LightningBolt']) {
     assert(
         editable.includes(`value="${value}"`),
         `editable slot must offer ${value}`);
@@ -62,39 +62,41 @@ for (const value of ['Empty', 'Resident', 'Preload', 'Lazy', 'LightningBolt']) {
 assert(editable.includes('aria-label="Slot rule for NS slot 6"'));
 
 const activeBoot = view._renderRow(rows[3]);
-assert(activeBoot.includes('value="LightningBolt" selected'));
-assert(activeBoot.includes('LightningBolt (boot entry · Resident)'));
+assert(activeBoot.includes('value="Resident" selected'));
+assert(activeBoot.includes('⚡ boot entry'));
+assert(activeBoot.includes('value="LightningBolt"'));
 
 const fixedBootstrap = view._renderRow(rows[0]);
 assert(fixedBootstrap.includes('value="Bootstrap"'));
-assert(fixedBootstrap.includes('disabled'));
-assert(!fixedBootstrap.includes('value="LightningBolt"'));
+assert(fixedBootstrap.includes('value="LightningBolt"'));
+assert(!fixedBootstrap.includes('<select disabled'));
 
 let posted = [];
+let currentConfig = {
+    targetBoard: 'wukong-xc7a100t',
+    bootEntrySlot: 6,
+    step1: {
+        totalNamespaceWords: 16384,
+        namespaceLumpWords: 64,
+        threadLumpWords: 256,
+    },
+    step2: { lumps: [] },
+    slotRules: {},
+    step3: { emptySlotCount: 0 },
+};
 context.fetch = async (url, options) => {
     if (url === '/api/boot-config' && !options) {
         return {
             ok: true,
             async json() {
-                return {
-                    config: {
-                        targetBoard: 'wukong-xc7a100t',
-                        bootEntrySlot: 6,
-                        step1: {
-                            totalNamespaceWords: 16384,
-                            namespaceLumpWords: 64,
-                            threadLumpWords: 256,
-                        },
-                        step2: { lumps: [] },
-                        step3: { emptySlotCount: 0 },
-                    },
-                };
+                return { config: JSON.parse(JSON.stringify(currentConfig)) };
             },
         };
     }
     assert.strictEqual(url, '/api/boot-config');
     const body = JSON.parse(options.body);
     posted.push(body);
+    currentConfig = body;
     return {
         ok: true,
         async json() { return { ok: true, config: body }; },
@@ -114,7 +116,7 @@ view.refresh = async () => {};
     const saved = posted[1].step2.lumps.find(row => row.nsSlot === 10);
     assert(saved, 'load-policy selection must create/update the slot row');
     assert.strictEqual(saved.loadPolicy, 'Resident');
-    assert.strictEqual(posted[1].bootEntrySlot, 6,
+    assert.strictEqual(posted[1].bootEntrySlot, 10,
         'changing a load policy must not silently change LightningBolt');
     assert.strictEqual(saved.physAddr, 0x3c0);
     assert.strictEqual(saved.lumpSize, 64);

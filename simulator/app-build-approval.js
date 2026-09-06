@@ -258,20 +258,17 @@ const BuildApprovalView = {
         const policy = s.load_policy || s.loadPolicy || 'Lazy';
         const bootSlot = this._lastMap && Number(this._lastMap.boot_entry_slot);
         const isBootEntry = Number.isInteger(bootSlot) && Number(s.slot) === bootSlot;
-        const fixed = policy === 'Bootstrap' || policy === 'Hardware';
-        const currentLabel = isBootEntry
-            ? `LightningBolt (boot entry · ${policy})`
-            : 'LightningBolt (boot entry)';
-        const options = fixed
-            ? [[policy, policy]]
-            : [
-                ['Empty', 'Empty'],
-                ['Resident', 'Resident'],
-                ['Preload', 'Preload'],
-                ['Lazy', 'Lazy'],
-                ['LightningBolt', currentLabel],
-            ];
-        const selected = isBootEntry ? 'LightningBolt' : policy;
+        const options = [
+            ['Bootstrap', 'Bootstrap'],
+            ['Hardware', 'Hardware'],
+            ['Empty', 'Empty'],
+            ['Resident', 'Resident'],
+            ['Preload', 'Preload'],
+            ['Lazy', 'Lazy'],
+            ['LightningBolt', 'LightningBolt (selects boot entry)'],
+        ];
+        const selected = ['Bootstrap', 'Hardware', 'Empty', 'Resident', 'Preload', 'Lazy']
+            .includes(policy) ? policy : 'Lazy';
         return options.map(([value, label]) =>
             `<option value="${this._esc(value)}"${selected === value ? ' selected' : ''}>` +
             `${this._esc(label)}</option>`).join('');
@@ -289,6 +286,8 @@ const BuildApprovalView = {
             const config = JSON.parse(JSON.stringify(base));
             config.step2 = config.step2 && Array.isArray(config.step2.lumps)
                 ? config.step2 : { lumps: [] };
+            config.slotRules = config.slotRules && typeof config.slotRules === 'object'
+                ? config.slotRules : {};
 
             const row = (this._lastMap && Array.isArray(this._lastMap.slot_rules)
                 ? this._lastMap.slot_rules.find(item => Number(item.slot) === Number(slot))
@@ -298,33 +297,47 @@ const BuildApprovalView = {
 
             if (value === 'LightningBolt') {
                 // LightningBolt is a boot role, not a fifth load policy. Keep
-                // the selected slot's saved load policy unchanged.
+                // the programmer-selected slot rule unchanged.
                 config.bootEntrySlot = Number(slot);
             } else {
-                if (!saved) {
-                    saved = {
-                        nsSlot: Number(slot),
-                        abstraction: row && row.name ? row.name : `Slot ${slot}`,
-                        lumpToken: row && row.token ? row.token : '',
-                    };
-                    rows.push(saved);
-                }
-                saved.loadPolicy = value;
-                saved.resident = value === 'Resident';
-                delete saved.prefetch;
-                delete saved.prefetchRequired;
-                delete saved.prefetchOrder;
-                delete saved.downloadUrl;
+                // The visible slot rule is programmer-owned for every row.
+                // Only programmable LUMP rows also need a step2 body-loading
+                // projection; architecture rows keep their rule in slotRules.
+                config.slotRules[String(slot)] = value;
+                const shouldPersistStep2 = !row || row.programmable !== false;
+                if (shouldPersistStep2) {
+                    if (!['Empty', 'Resident', 'Preload', 'Lazy'].includes(value)) {
+                        if (saved) {
+                            config.step2.lumps = rows.filter(item =>
+                                !item || Number(item.nsSlot) !== Number(slot));
+                        }
+                    } else {
+                        if (!saved) {
+                            saved = {
+                                nsSlot: Number(slot),
+                                abstraction: row && row.name ? row.name : `Slot ${slot}`,
+                                lumpToken: row && row.token ? row.token : '',
+                            };
+                            rows.push(saved);
+                        }
+                        saved.loadPolicy = value;
+                        saved.resident = value === 'Resident';
+                        delete saved.prefetch;
+                        delete saved.prefetchRequired;
+                        delete saved.prefetchOrder;
+                        delete saved.downloadUrl;
 
-                // A Resident row needs the same physical facts as the
-                // Namespace editor. The approval payload carries the
-                // committed location and measured binary allocation.
-                if (value === 'Resident' && row) {
-                    const location = Number.parseInt(String(row.location || ''), 0);
-                    const measured = row.size_budget && row.size_budget.total &&
-                        Number(row.size_budget.total.words);
-                    if (Number.isInteger(location) && location >= 0) saved.physAddr = location;
-                    if (Number.isInteger(measured) && measured > 0) saved.lumpSize = measured;
+                        // A Resident row needs the same physical facts as the
+                        // Namespace editor. The approval payload carries the
+                        // committed location and measured binary allocation.
+                        if (value === 'Resident' && row) {
+                            const location = Number.parseInt(String(row.location || ''), 0);
+                            const measured = row.size_budget && row.size_budget.total &&
+                                Number(row.size_budget.total.words);
+                            if (Number.isInteger(location) && location >= 0) saved.physAddr = location;
+                            if (Number.isInteger(measured) && measured > 0) saved.lumpSize = measured;
+                        }
+                    }
                 }
             }
 
@@ -384,13 +397,12 @@ const BuildApprovalView = {
   <td class="ba-loc"><code>${this._esc(s.location || '—')}</code></td>
    <td class="ba-load"><select class="ba-slot-rule" data-slot="${this._esc(s.slot)}"
        data-previous-value="${this._esc(
-           this._lastMap && Number(this._lastMap.boot_entry_slot) === Number(s.slot)
-               ? 'LightningBolt' : (s.load_policy || s.loadPolicy || '—'))}"
+            s.load_policy || s.loadPolicy || '—')}"
        aria-label="Slot rule for NS slot ${this._esc(s.slot)}"
-       ${['Bootstrap', 'Hardware'].includes(s.load_policy || s.loadPolicy) ? 'disabled' : ''}
        onchange="if(typeof BuildApprovalView!=='undefined')BuildApprovalView._changeSlotRule(Number(this.dataset.slot),this.value,this)">
        ${this._slotRuleOptions(s)}
-   </select></td>
+    </select>${this._lastMap && Number(this._lastMap.boot_entry_slot) === Number(s.slot)
+        ? '<span class="ba-boot-role" title="LightningBolt boot entry">⚡ boot entry</span>' : ''}</td>
   <td class="ba-perms">${this._esc(this._permStr(s.perms))}</td>
   <td class="ba-src">${this._esc(s.source || '—')}</td>
   <td class="ba-checks">${checkHtml}</td>

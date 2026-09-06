@@ -618,6 +618,28 @@ def test_ns_map_exposes_boot_entry_separately_from_load_policy(monkeypatch):
     assert row['load_policy'] == 'Lazy'
 
 
+def test_ns_map_honors_programmer_slot_rules_on_architecture_rows(monkeypatch):
+    """The IDE must not overwrite a programmer-selected architecture rule."""
+    monkeypatch.setattr(
+        _app,
+        '_read_saved_boot_config',
+        lambda: ({
+            'slotRules': {
+                '0': 'Lazy',
+                '2': 'Empty',
+            },
+            'bootEntrySlot': 6,
+        }, None),
+    )
+    ns_map = _app._ba_build_ns_map()
+    rows = {row['slot']: row for row in ns_map['slot_rules']
+            if isinstance(row.get('slot'), int)}
+    assert rows[0]['load_policy'] == 'Lazy'
+    assert rows[2]['load_policy'] == 'Empty'
+    assert rows[0]['programmable'] is False
+    assert rows[2]['programmable'] is False
+
+
 def test_real_ns_map_hardware_tiers_all_pass():
     """
     Integration test: the COMMITTED repository's NS map must have no hard failures
