@@ -14,10 +14,13 @@ class NamespaceTutorial {
         this.RESIDENT_WORDS  = this.RESIDENT_SLOTS  * this.SLOT_SIZE;   // 640
         // Zone 4 — V20 NS Table: 64 entries at the architectural top of
         // memory. Simulator addresses are words; ISA addresses are bytes.
-        this.NS_TABLE_BASE   = 0x7F00;  // byte address 0x1FC00
-        this.NS_CW           = this.TOTAL_WORDS - this.NS_TABLE_BASE;   // 256 = 64 × 4 words
+        this.NS_TABLE_BASE   = 0x7F00;  // word address; byte address 0x1FC00
         this.NS_TABLE_BASE_BYTE = 0x1FC00;
         this.NS_ENTRY_BYTES  = 16;
+        this.NS_ENTRY_WORDS  = 4;
+        this.NS_SLOT_CAPACITY = (this.TOTAL_WORDS - this.NS_TABLE_BASE) / this.NS_ENTRY_WORDS;
+        this.NS_CW           = (this.NS_SLOT_CAPACITY >> 8) & 0x1FFF;
+        this.NS_CC           = this.NS_SLOT_CAPACITY & 0xFF;
         this.steps = this._buildSteps();
     }
 
@@ -25,11 +28,11 @@ class NamespaceTutorial {
 
     _headerRef() {
         const fields = [
-            { bits: '[31:27]', name: 'magic',  val: '0x1F', note: 'Trap-on-execute guard',                                  w: 5,  bg: '#2a2a2a', border: '#555',    text: '#888'    },
-            { bits: '[26:23]', name: 'n\u22126', val: '1',     note: 'lumpSize = 2^(val+6) = 32K words / 128 KiB V20 address space', w: 4,  bg: '#3a2000', border: '#c86000', text: '#f09040' },
-            { bits: '[22:10]', name: 'cw',     val: '0',     note: 'high bits of slot capacity: cw = slots >> 8 (this example: 64 slots \u2192 cw=0)', w: 13, bg: '#002a40', border: '#2080c0', text: '#60b8f0' },
-            { bits: '[9:8]',   name: 'typ',    val: '01',    note: 'data lump \u2014 Namespace root is data, not a callable',   w: 2,  bg: '#2a2a2a', border: '#555',    text: '#888'    },
-            { bits: '[7:0]',   name: 'cc',     val: '64',    note: 'low byte of slot capacity: cc = slots & 0xFF; capacity = (cw<<8)|cc (power of two, 64\u20131024; this example: 64); slot 0 is highest and slots descend by 16 bytes', w: 8,  bg: '#1a1000', border: '#b07820', text: '#f0c050' },
+            { bits: '[31:27]', name: 'magic',  val: '0x1F', note: 'Header sentinel: parser and loader accept this word as a LUMP header; instruction fetch must not execute it', w: 5,  bg: '#2a2a2a', border: '#555',    text: '#888'    },
+            { bits: '[26:23]', name: 'n\u22126', val: '1',     note: 'Power-of-two allocation exponent: lumpSize = 2^(n\u22126+6) = 128 words (512 bytes) for this example', w: 4,  bg: '#3a2000', border: '#c86000', text: '#f09040' },
+            { bits: '[22:10]', name: 'cw',     val: String(this.NS_CW), note: `Namespace slot-capacity high bits: slotCapacity = (cw<<8)|cc; ${this.NS_SLOT_CAPACITY} slots \u2192 cw=${this.NS_CW}`, w: 13, bg: '#002a40', border: '#2080c0', text: '#60b8f0' },
+            { bits: '[9:8]',   name: 'typ',    val: '01',    note: 'Namespace/data layout: the root describes memory and NS entries; it is not an executable code LUMP',   w: 2,  bg: '#2a2a2a', border: '#555',    text: '#888'    },
+            { bits: '[7:0]',   name: 'cc',     val: String(this.NS_CC), note: `Namespace slot-capacity low bits: cc=${this.NS_CC}; together with cw this reserves ${this.NS_SLOT_CAPACITY} four-word NS entries (not a live-entry count)`, w: 8, bg: '#1a1000', border: '#b07820', text: '#f0c050' },
         ];
         let bar = '<div style="display:flex;width:100%;border-radius:3px;overflow:hidden;margin-bottom:2px;">';
         for (const f of fields) {
@@ -58,6 +61,7 @@ class NamespaceTutorial {
         const NS = this.NS_TABLE_BASE;
         const freespaceEnd = NS - 1;
 
+        const capacity = this.NS_SLOT_CAPACITY;
         const sections = [
             {
                 id: 'bootstrap',
@@ -80,7 +84,7 @@ class NamespaceTutorial {
             {
                 id: 'nstable',
                 label: '\u2463 NS Table \u2191',
-                sub: `2^cc\u2212cw = ${h(NS)} \u00b7 cw words \u00b7 ${this.NS_ENTRY_WORDS} per entry \u00b7 \u2026 0xFFFF`,
+                sub: `${capacity} slots \u00d7 ${this.NS_ENTRY_WORDS} words = ${capacity * this.NS_ENTRY_WORDS} words \u00b7 ${h(NS)} \u2026 0xFFFF`,
                 bg: '#1a1000', border: '#b07820', text: '#f0c050'
             },
         ];
@@ -133,29 +137,29 @@ ${this._memMap(null)}
 <tr><td><strong>\u2460 Bootstrap</strong></td><td><code>0x0000</code> \u2191</td><td>IDE-set</td><td>NS root (Slot\u202f0) \u00b7 Boot Thread (Slot\u202f1) \u2014 First Abstraction loaded from Thread.CR0 (set via \u26a1 in NS table)</td></tr>
 <tr><td><strong>\u2461 Resident Lumps</strong></td><td>${hex(this.BOOTSTRAP_WORDS)} \u2191</td><td>IDE-set</td><td>Always-loaded abstractions \u2014 never evicted</td></tr>
 <tr><td><strong>\u2462 Freespace</strong></td><td>${hex(this.BOOTSTRAP_WORDS + this.RESIDENT_WORDS)} \u2195</td><td>IDE-set</td><td>Cache for lazy-loaded lumps \u2014 dynamic, grows from both ends</td></tr>
-<tr><td><strong>\u2463 NS Table</strong></td><td>0xFFFF \u2191</td><td>cw words</td><td>4-word metadata entry per slot \u2014 slot\u202f0 is the highest-address entry; each following slot descends by 16 bytes toward the table base = 2^cc\u2212cw</td></tr>
+<tr><td><strong>\u2463 NS Table</strong></td><td>${hex(this.NS_TABLE_BASE)} \u2191</td><td>${this.NS_SLOT_CAPACITY * this.NS_ENTRY_WORDS} words</td><td>${this.NS_SLOT_CAPACITY} four-word metadata entries \u2014 slot\u202f0 is the highest-address entry; each following slot descends by 16 bytes</td></tr>
 </table></div>`
             },
             {
                 title: 'Header[0] \u2014 Namespace Lump Bit Fields',
                 type: 'header',
                 content: `${this._headerRef()}
-<p>Word 0 of every lump is a <strong>32-bit header word</strong>. For the Namespace root (Slot\u202f0) the five fields are <em>repurposed</em> just as they are for Thread lumps. The two key fields are <code style="color:#f0c050">cc</code> (low byte of the slot capacity) and <code style="color:#60b8f0">cw</code> (high bits of the slot capacity; capacity = <code>(cw&lt;&lt;8)|cc</code>). Hover any field box above to read its bit range and note.</p>
+<p>Word 0 of every lump is a <strong>32-bit header word</strong>. For the Namespace root (Slot\u202f0), the common header fields describe the root allocation and data layout, while <code style="color:#60b8f0">cw</code>/<code style="color:#f0c050">cc</code> are Namespace-specific: together they encode the configured maximum number of Namespace slots. They do <em>not</em> mean executable code words and c-list entries in this header. Hover any field box above to read its bit range and actual use.</p>
 <table class="sr-table">
 <tr><th>Field</th><th>Bits</th><th>Width</th><th>NS Slot\u202f0 value</th><th>Meaning</th></tr>
-<tr><td><code style="color:#888">magic</code></td><td>[31:27]</td><td>5&nbsp;b</td><td><code>0x1F</code></td><td>Trap-on-execute guard \u2014 executing word&nbsp;0 always faults</td></tr>
-<tr><td><code style="color:#f09040">n\u22126</code></td><td>[26:23]</td><td>4&nbsp;b</td><td><code>1</code></td><td><code>lumpSize = 2^(n\u22126+6)</code> = 32K words / 128 KiB V20 physical space</td></tr>
-<tr><td><code style="color:#60b8f0">cw</code></td><td>[22:10]</td><td>13&nbsp;b</td><td><code>256</code></td><td><strong>High bits of slot capacity</strong>: cw = slots &gt;&gt; 8 (this example: 64 slots \u2192 cw = 0)</td></tr>
-<tr><td><code style="color:#888">typ</code></td><td>[9:8]</td><td>2&nbsp;b</td><td><code>01</code></td><td>data lump \u2014 the Namespace root is data, not a callable</td></tr>
-<tr><td><code style="color:#f0c050">cc</code></td><td>[7:0]</td><td>8&nbsp;b</td><td><code>64</code></td><td><strong>Low byte of slot capacity</strong>: cc = slots &amp; 0xFF; capacity = (cw&lt;&lt;8)|cc, power of two (64\u20131024; this example: 64); slot 0 is highest and slots descend by 16 bytes</td></tr>
+<tr><td><code style="color:#888">magic</code></td><td>[31:27]</td><td>5&nbsp;b</td><td><code>0x1F</code></td><td>Header sentinel used by the parser/loader to recognize a valid LUMP header; it is not executable payload</td></tr>
+<tr><td><code style="color:#f09040">n\u22126</code></td><td>[26:23]</td><td>4&nbsp;b</td><td><code>1</code></td><td><code>lumpSize = 2^(n\u22126+6)</code> = 128 words / 512 bytes in this worked header</td></tr>
+<tr><td><code style="color:#60b8f0">cw</code></td><td>[22:10]</td><td>13&nbsp;b</td><td><code>${this.NS_CW}</code></td><td><strong>High bits of Namespace slot capacity</strong>: the loader combines it with <code>cc</code> as <code>(cw&lt;&lt;8)|cc</code>; this is <code>${this.NS_SLOT_CAPACITY}</code> slots, not code-word count</td></tr>
+<tr><td><code style="color:#888">typ</code></td><td>[9:8]</td><td>2&nbsp;b</td><td><code>01</code></td><td>Identifies the Namespace root as a data/Namespace layout, not an executable code LUMP</td></tr>
+<tr><td><code style="color:#f0c050">cc</code></td><td>[7:0]</td><td>8&nbsp;b</td><td><code>${this.NS_CC}</code></td><td><strong>Low bits of Namespace slot capacity</strong>: completes <code>(cw&lt;&lt;8)|cc</code>; it sizes the reserved four-word-per-slot NS table. Live occupancy is tracked separately.</td></tr>
 </table>
 <div class="sr-key-concept"><div class="sr-concept-title">Address Space Layout \u2014 Four Zones</div>
-<p>The namespace divides physical memory into four IDE-set zones. Lump zones grow <strong>upward \u2191</strong> from <code>0x0000</code>; the V20 NS Table occupies the top-of-memory byte range <code>0x1FC00\u20130x1FFFF</code> and its logical slots descend from the highest address.</p>
+<p>The namespace divides physical memory into four IDE-set zones. Lump zones grow <strong>upward \u2191</strong> from <code>0x0000</code>; the V20 NS Table occupies the top-of-memory byte range <code>0x1FC00\u20130x1FFFF</code>. The combined Namespace capacity is <code>(cw&lt;&lt;8)|cc</code> slots, with ${this.NS_ENTRY_WORDS} words per entry; slot 0 is the highest-address entry and later slots descend by 16 bytes.</p>
 <table class="sr-table" style="margin:6px 0;"><tr><th>Zone</th><th>Base</th><th>Top</th><th>Size</th></tr>
-<tr><td>\u2460 Bootstrap</td><td><code>0x0000</code></td><td>2^cc\u2212cw\u2212resident\u2212free\u22121</td><td>IDE-set (boot slots)</td></tr>
+<tr><td>\u2460 Bootstrap</td><td><code>0x0000</code></td><td>below <code>${hex(this.NS_TABLE_BASE)}</code></td><td>IDE-set (boot slots)</td></tr>
 <tr><td>\u2461 Resident Lumps</td><td>Bootstrap end + 1</td><td>Resident end</td><td>IDE-set (always-loaded)</td></tr>
-<tr><td>\u2462 Freespace</td><td>Resident end + 1</td><td>2^cc\u2212cw\u22121</td><td>IDE-set (lazy-load cache)</td></tr>
-<tr><td>\u2463 NS Table</td><td><code>2^cc \u2212 cw</code></td><td><code>2^cc \u2212 1</code></td><td>cw words (IDE-set)</td></tr>
+<tr><td>\u2462 Freespace</td><td>Resident end + 1</td><td>below <code>${hex(this.NS_TABLE_BASE)}</code></td><td>IDE-set (lazy-load cache)</td></tr>
+<tr><td>\u2463 NS Table</td><td><code>${hex(this.NS_TABLE_BASE)}</code></td><td><code>${hex(this.TOTAL_WORDS - 1)}</code></td><td>${this.NS_SLOT_CAPACITY} entries \u00d7 ${this.NS_ENTRY_WORDS} words</td></tr>
 </table>
 <p>The V20 NS Table begins at byte address <code>0x1FC00</code> (word address <code>0x7F00</code>) and ends at <code>0x1FFFF</code>. Each entry is 16 bytes: slot 0 begins at <code>0x1FFC0</code>, while slot 63 begins at <code>0x1FC00</code>.</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">Encoding Formula</div>
