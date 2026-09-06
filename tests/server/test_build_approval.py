@@ -355,6 +355,23 @@ def test_freeze_snapshot_derives_map_server_side(monkeypatch, tmp_path):
     ns_map = snap.get('ns_map', {})
     assert 'tiers' in ns_map, 'Map must contain server-derived tiers'
     assert 'attacker' not in ns_map, 'Attacker payload must not appear in snapshot'
+    m_bit_rows = [
+        row for row in ns_map.get('slot_rules', [])
+        if row.get('name') == 'M_BIT_DEV'
+    ]
+    assert len(m_bit_rows) == 1, 'Frozen map must retain the M_BIT_DEV row'
+    mbit = m_bit_rows[0]
+    assert mbit['location'] == '0xFFFFFF1C'
+    assert mbit['load_policy'] == 'Hardware'
+    assert mbit['slot_rule'] == 'Hardware'
+    assert mbit['checks'] == [{
+        'label': 'MMIO',
+        'ok': True,
+        'detail': 'MMIO at 0xFFFFFF1C',
+    }]
+    assert not any(key in mbit for key in (
+        'value', 'state', 'm_bit_value', 'm_bit_state',
+    )), 'Frozen M_BIT_DEV row must not serialize runtime M-bit state'
 
 
 def test_freeze_snapshot_stores_all_checks_pass(monkeypatch, tmp_path):
