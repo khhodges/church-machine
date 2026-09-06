@@ -6502,7 +6502,7 @@ def _parse_intrinsic_lump_content(words):
             "api_definition": api}
 
 
-def _inspect_lump_binary(binary_or_path):
+def _inspect_lump_binary(binary_or_path, *, allow_compact_fit=False):
     """Return intrinsic facts from one LUMP, or raise ValueError.
 
     This is the common parser used by catalogue, detail, history, preview and
@@ -6525,9 +6525,16 @@ def _inspect_lump_binary(binary_or_path):
     typ = (header >> 8) & 0x3
     cc = header & 0xFF
     if declared_size != len(words):
-        raise ValueError(
-            f"header declares {declared_size} words but file contains {len(words)}"
-        )
+        min_size = 1 + cw + cc
+        # Approval size rules permit either an exact-fit file or the next
+        # power-of-two padded form, even when an older fixture omitted the
+        # allocation exponent from its header.
+        padded_size = 1 if min_size <= 1 else 1 << (min_size - 1).bit_length()
+        compact_fit = len(words) in (min_size, padded_size)
+        if not (allow_compact_fit and compact_fit):
+            raise ValueError(
+                f"header declares {declared_size} words but file contains {len(words)}"
+            )
     if 1 + cw + cc > declared_size:
         raise ValueError(
             f"header regions exceed allocation: 1+cw({cw})+cc({cc}) > {declared_size}"
@@ -15072,7 +15079,7 @@ def _ba_read_lump_header(path):
     "header magic invalid or file unreadable".
     """
     try:
-        inspected = _inspect_lump_binary(path)
+        inspected = _inspect_lump_binary(path, allow_compact_fit=True)
         return inspected["header"], inspected["cw"], inspected["cc"]
     except Exception:
         return None
@@ -15144,16 +15151,14 @@ def _ba_lump_size_budget(path):
     if not path or not os.path.isfile(path):
         return {'available': False, 'reason': 'binary unavailable'}
     try:
-        with open(path, 'rb') as fh:
-            raw = fh.read()
-        if len(raw) % 4 or not raw:
-            return {'available': False, 'reason': 'binary is not word-aligned'}
-        words = list(_ba_struct.unpack(f'>{len(raw) // 4}I', raw))
-        header = words[0]
-        if ((header >> 27) & 0x1F) != 0x1F:
-            return {'available': False, 'reason': 'invalid LUMP header'}
-        cw, cc = (header >> 10) & 0x1FFF, header & 0xFF
-        allocation = 1 << (((header >> 23) & 0xF) + 6)
+        # Use the same intrinsic parser as the header/cw/cc checks.  Keeping a
+        # second ad-hoc decoder here can make one row show valid cw/cc while
+        # its budget is derived from a different interpretation of the file.
+        inspected = _inspect_lump_binary(path, allow_compact_fit=True)
+        raw = inspected['raw_bytes']
+        words = inspected['words']
+        cw, cc = inspected['cw'], inspected['cc']
+        allocation = inspected['lump_size']
         frame = _lump_freespace_content(words)
         api = 1 + ((frame['api_len'] + 3) // 4) if frame else 0
         source = (frame['content_words'] - api) if frame else 0
@@ -15583,14 +15588,18 @@ def _ba_build_ns_map():
     st_checks = _lump_checks(selftest_slot, st_token,
                              manifest_by_slot.get(selftest_slot),
                              st_lump, is_selftest=True)
-    _append_policy_row({
+    st_row = {
         'slot': selftest_slot, 'name': 'SelfTest ⚡',
         'token': st_token,
         'header_word': f'0x{st_hdr[0]:08X}' if st_hdr else None,
         'cw': st_hdr[1] if st_hdr else None, 'cc': st_hdr[2] if st_hdr else None,
         'location': selftest_base, 'perms': ['E'], 'source': 'server/lumps',
         'checks': st_checks,
-    }, _slot_policy(selftest_slot, st_entry, st_lump))
+    }
+    # Keep the path used for header/check inspection so size accounting cannot
+    # resolve a different manifest alias from the same token.
+    st_row['_ba_binary_path'] = st_lump
+    _append_policy_row(st_row, _slot_policy(selftest_slot, st_entry, st_lump))
 
     # Slot 7 — WukongCallHome LUMP
     wch_entry = manifest_by_slot.get(callhome_slot)
@@ -15604,14 +15613,16 @@ def _ba_build_ns_map():
     wch_lump = _ba_lump_file_for_token(wch_token) if wch_token else None
     wch_hdr = _ba_read_lump_header(wch_lump) if wch_lump else None
     wch_checks = _lump_checks(callhome_slot, wch_token, wch_entry, wch_lump)
-    _append_policy_row({
+    wch_row = {
         'slot': callhome_slot, 'name': 'WukongCallHome',
         'token': wch_token,
         'header_word': f'0x{wch_hdr[0]:08X}' if wch_hdr else None,
         'cw': wch_hdr[1] if wch_hdr else None, 'cc': wch_hdr[2] if wch_hdr else None,
         'location': callhome_base, 'perms': ['E'], 'source': 'server/lumps',
         'checks': wch_checks,
-    }, _slot_policy(callhome_slot, wch_entry, wch_lump))
+    }
+    wch_row['_ba_binary_path'] = wch_lump
+    _append_policy_row(wch_row, _slot_policy(callhome_slot, wch_entry, wch_lump))
 
     # ── Byte-range overlap check for resident LUMP slots ──────────────────
     def _parse_hex(s):
@@ -15646,7 +15657,7 @@ def _ba_build_ns_map():
         lump_path = _ba_lump_file_for_token(token)
         hdr = _ba_read_lump_header(lump_path) if lump_path else None
         checks = _lump_checks(slot_num, token, entry, lump_path)
-        _append_policy_row({
+        row = {
             'slot': slot_num,
             'name': entry.get('abstraction', '?'),
             'token': token,
@@ -15657,7 +15668,9 @@ def _ba_build_ns_map():
             'perms': entry.get('grants', []),
             'source': 'manifest (slot policy)',
             'checks': checks,
-        }, _slot_policy(slot_num, entry, lump_path))
+        }
+        row['_ba_binary_path'] = lump_path
+        _append_policy_row(row, _slot_policy(slot_num, entry, lump_path))
 
     # Manifest entries with ns_slot=None or dynamic
     for entry in manifest_no_slot:
@@ -15667,7 +15680,7 @@ def _ba_build_ns_map():
             lump_path = _ba_lump_file_for_token(token)
             hdr = _ba_read_lump_header(lump_path) if lump_path else None
             checks = _lump_checks(None, token, entry, lump_path)
-            _append_policy_row({
+            row = {
                 'slot': '(dynamic)',
                 'name': entry.get('abstraction', '?'),
                 'token': token,
@@ -15678,14 +15691,21 @@ def _ba_build_ns_map():
                 'perms': entry.get('grants', []),
                 'source': 'manifest (dynamic slot)',
                 'checks': checks,
-            }, 'Lazy')
+            }
+            row['_ba_binary_path'] = lump_path
+            _append_policy_row(row, 'Lazy')
 
     # Size accounting is informational.  In particular, lazy/runtime entries
     # are included when available but never participate in approval gating.
     for tier_name, tier_rows in (('resident', resident), ('lazy', lazy)):
         for row in tier_rows:
-            lump_path = _ba_lump_file_for_token(row.get('token'))
+            # Prefer the exact path already inspected for this row's header and
+            # checks. Token lookup is only a fallback for future synthetic rows.
+            lump_path = row.get('_ba_binary_path')
+            if lump_path is None and row.get('token'):
+                lump_path = _ba_lump_file_for_token(row.get('token'))
             row['size_budget'] = _ba_lump_size_budget(lump_path)
+            row.pop('_ba_binary_path', None)
     hardware_rows = [r for r in resident if r.get('size_budget', {}).get('available')]
     def _sum_budget(key):
         return sum(r['size_budget'][key]['words'] for r in hardware_rows)

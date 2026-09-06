@@ -626,6 +626,25 @@ def test_real_ns_map_hardware_tiers_all_pass():
     )
 
 
+def test_wukong_callhome_header_and_budget_use_one_binary():
+    """WukongCallHome's displayed header and size budget describe one file."""
+    ns_map = _app._ba_build_ns_map()
+    rows = [
+        row
+        for tier in ('resident', 'lazy')
+        for row in ns_map.get('tiers', {}).get(tier, [])
+        if row.get('slot') == 7
+    ]
+    assert len(rows) == 1
+    row = rows[0]
+    assert row['cw'] == 73
+    assert row['cc'] == 2
+    assert row['size_budget']['available'] is True
+    assert row['size_budget']['code']['words'] == row['cw']
+    assert row['size_budget']['gt_capabilities']['words'] == row['cc']
+    assert row['size_budget']['total']['words'] == 128
+
+
 def test_build_approval_routes_registered():
     """
     Smoke test: all Build Approval routes must be registered before the server
