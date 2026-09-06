@@ -15408,6 +15408,16 @@ def _ba_build_ns_map():
     mmio_led   = _rom(r'MMIO_LED_ADDR\s*=\s*(0x[0-9a-fA-F]+)',   '0x40000000')
     mmio_btn   = _rom(r'MMIO_BTN_ADDR\s*=\s*(0x[0-9a-fA-F]+)',   '0x40000028')
     mmio_timer = _rom(r'MMIO_TIMER_ADDR\s*=\s*(0x[0-9a-fA-F]+)', '0x4000002C')
+    # M_BIT_DEV is an intrinsic Namespace slot, not a runtime LUMP. Keep its
+    # static identity tied to the architecture catalog so a live M-bit value
+    # can never change whether or where the approved row exists.
+    m_bit_slot = int(_boot_image_gen.ARCH_BOOT['minimalSlots']['M_BIT_DEV'])
+    m_bit_device = _boot_image_gen.ARCH_BOOT['devices']['M_BIT_DEV']
+    m_bit_location = f'0x{int(m_bit_device["address"]):08X}'
+    m_bit_perms = [
+        perm for perm in ('R', 'W', 'X', 'L', 'S', 'E')
+        if perm in m_bit_device.get('permissions', [])
+    ]
 
     # NS_TABLE_BASE from hw_types.py
     hw_types_path = os.path.join(ROOT, 'hardware', 'hw_types.py')
@@ -15500,7 +15510,7 @@ def _ba_build_ns_map():
                     step2_policy_by_slot[policy_slot] = policy_value
     except Exception:
         # Approval rendering must remain available when an older config cannot
-        # be fully validated; the sidecar/default fallback below still works.
+        # be fully validated; the default fallback below still works.
         pass
 
     thread_size = int(saved_step1.get("threadLumpWords") or 256)
@@ -15568,24 +15578,6 @@ def _ba_build_ns_map():
             "metadata": "not applicable",
         }
 
-    def _sidecar_policy(lump_path):
-        if not lump_path:
-            return None
-        sidecar_path = os.path.splitext(lump_path)[0] + '.json'
-        try:
-            with open(sidecar_path, encoding='utf-8') as sidecar_file:
-                metadata = json.load(sidecar_file)
-            if not isinstance(metadata, dict):
-                return None
-            value = metadata.get('loadPolicy', metadata.get('load_policy'))
-            if value in ('Empty', 'Resident', 'Preload', 'Lazy'):
-                return value
-            if isinstance(metadata.get('boot_resident'), bool):
-                return 'Resident' if metadata['boot_resident'] else 'Lazy'
-        except (OSError, ValueError, TypeError):
-            pass
-        return None
-
     def _slot_policy(slot_num, state_entry=None, lump_path=None, default='Lazy'):
         selected_rule = slot_policy_by_slot.get(slot_num)
         if selected_rule in ('Bootstrap', 'Hardware', 'Empty', 'Resident', 'Preload', 'Lazy'):
@@ -15596,7 +15588,7 @@ def _ba_build_ns_map():
             value = state_entry.get('loadPolicy', state_entry.get('load_policy'))
             if value in ('Empty', 'Resident', 'Preload', 'Lazy'):
                 return value
-        return _sidecar_policy(lump_path) or default
+        return default
 
     # These lists are referenced by the policy router before the later
     # manifest scan, so initialize both before defining/calling the helper.
@@ -15741,23 +15733,24 @@ def _ba_build_ns_map():
         }
         for slot_num, (name, location, perms) in {
             **mmio_specs,
-            13: (
+            m_bit_slot: (
                 'M_BIT_DEV',
-                _boot_image_gen.ARCH_BOOT['devices']['M_BIT_DEV']['address'],
-                ['R', 'W'],
+                m_bit_location,
+                m_bit_perms,
             ),
         }.items()
     ]
     for _row in resident:
         _state_entry = manifest_by_slot.get(_row['slot'])
-        if _state_entry and _state_entry.get('location'):
+        if (_row['slot'] != m_bit_slot and _state_entry
+                and _state_entry.get('location')):
             _row['location'] = _state_entry['location']
-        if _row['slot'] == 13:
+        if _row['slot'] == m_bit_slot:
             _row.update({
                 'header_word': None,
                 'source': 'hardware/namespace register',
                 'size_budget': _not_applicable_budget(
-                    'M-bit Namespace register (1 word)'),
+                    f'M-bit Namespace register ({m_bit_device.get("words", 1)} word)'),
             })
     for _row in resident:
         _row['load_policy'] = _slot_policy(_row['slot'], default='Hardware')
@@ -15838,7 +15831,7 @@ def _ba_build_ns_map():
     # Every non-intrinsic manifest slot uses its own saved load policy. Never
     # infer Resident/Lazy from a numeric slot boundary.
     intrinsic_slots = set(bootstrap_slots) | set(mmio_specs) | {
-        selftest_slot, callhome_slot, 13,
+        selftest_slot, callhome_slot, m_bit_slot,
     }
     intrinsic_slots.update(generated_thread_slots)
 

@@ -718,13 +718,47 @@ def test_ns_map_normalizes_lump_thread_and_hardware_metadata():
             'LIFO stack', 'Capability homes',
         ]
 
-    mbit = rows[13]
+    m_bit_slot = _app._boot_image_gen.ARCH_BOOT['minimalSlots']['M_BIT_DEV']
+    mbit = rows[m_bit_slot]
     assert mbit['name'] == 'M_BIT_DEV'
     assert mbit['location'] == '0xFFFFFF1C'
     assert mbit['perms'] == ['R', 'W']
     assert mbit['header_word'] is None
+    assert mbit['load_policy'] == 'Hardware'
+    assert mbit['slot_rule'] == 'Hardware'
+    assert mbit['programmable'] is False
+    assert mbit['checks'] == [{
+        'label': 'MMIO', 'ok': True,
+        'detail': 'MMIO at 0xFFFFFF1C',
+    }]
     assert mbit['size_budget']['available'] is False
     assert mbit['size_budget']['reason'].startswith('N/A')
+
+
+def test_mbit_approval_row_survives_saved_rules_and_stale_state(monkeypatch):
+    """M-bit runtime/config state cannot remove or rewrite its static row."""
+    m_bit_slot = _app._boot_image_gen.ARCH_BOOT['minimalSlots']['M_BIT_DEV']
+    monkeypatch.setattr(
+        _app,
+        '_read_saved_boot_config',
+        lambda: ({
+            'slotRules': {str(m_bit_slot): 'Empty'},
+            'bootEntrySlot': 6,
+        }, None),
+    )
+    ns_map = _app._ba_build_ns_map()
+    rows = {row['slot']: row for row in ns_map['slot_rules']
+            if isinstance(row.get('slot'), int)}
+    mbit = rows[m_bit_slot]
+
+    assert mbit['name'] == 'M_BIT_DEV'
+    assert mbit['location'] == '0xFFFFFF1C'
+    assert mbit['load_policy'] == 'Empty'
+    assert mbit['slot_rule'] == 'Empty'
+    assert mbit['checks'][0]['ok'] is True
+    assert not any(key in mbit for key in (
+        'value', 'state', 'm_bit_value', 'm_bit_state',
+    ))
 
 
 def test_build_approval_routes_registered():

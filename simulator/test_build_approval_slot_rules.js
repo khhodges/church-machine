@@ -108,15 +108,20 @@ const mBit = view._renderRow({
     perms: ['R', 'W'],
     source: 'hardware/namespace register',
     load_policy: 'Hardware',
+    slot_rule: 'Hardware',
+    runtime_m_bits: 0xFFFF,
     size_budget: {
         available: false,
         reason: 'N/A — M-bit Namespace register (1 word)',
     },
-    checks: [],
+    checks: [{ label: 'MMIO', ok: true, detail: 'MMIO at 0xFFFFFF1C' }],
 });
 assert(mBit.includes('M_BIT_DEV'));
 assert(mBit.includes('R+W'));
 assert(mBit.includes('N/A — M-bit Namespace register'));
+assert(mBit.includes('value="Hardware" selected'));
+assert(!mBit.includes('65535'),
+    'Namespace approval must not display the current M-bit register value');
 
 const fixedBootstrap = view._renderRow(rows[0]);
 assert(fixedBootstrap.includes('value="Bootstrap"'));
@@ -180,6 +185,20 @@ view.refresh = async () => {};
         'changing a load policy must not silently change LightningBolt');
     assert.strictEqual(saved.physAddr, 0x3c0);
     assert.strictEqual(saved.lumpSize, 64);
+
+    view._lastMap = {
+        slot_rules: [{
+            slot: 13,
+            name: 'M_BIT_DEV',
+            load_policy: 'Hardware',
+            checks: [{ label: 'MMIO', ok: true }],
+        }],
+    };
+    assert(view._allChecksPass(),
+        'M_BIT_DEV must participate in the approval result');
+    view._lastMap.slot_rules[0].checks[0].ok = false;
+    assert(!view._allChecksPass(),
+        'M_BIT_DEV approval failures must block the approval result');
 
     console.log('PASS build approval slot rule selector tests');
 })().catch(error => {
