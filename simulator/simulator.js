@@ -7266,7 +7266,12 @@ class ChurchSimulator {
         }
         const bootCr15Noop = d.crSrc === 15 && d.crDst === 15;
         if (bootCr15Noop) {
-            const desc = 'SWITCH CR15, CR15 (guarded Boot placeholder; no-op)';
+            // The guarded placeholder performs no load, but it is still an
+            // accepted SWITCH and therefore consumes any destination M bit.
+            // Leaving M set leaks an isolated-register transaction into the
+            // next abstraction (CapabilityTest→SelfTest).
+            this.cr[15].m = 0;
+            const desc = 'SWITCH CR15, CR15 (guarded Boot placeholder; no-op; destination M consumed)';
             this.output += desc + '\n';
             this.pc++;
             return { pc: this.pc - 1, instr: d, desc };
@@ -7338,6 +7343,21 @@ class ChurchSimulator {
             this._lazySuspended = suspendedBefore;
             this.petNameMemory = petNamesBefore;
             return null;
+        }
+
+        // CR12 names the active Thread object.  SWITCH may exercise the
+        // isolated-register LOAD gate, but loading an ordinary abstraction
+        // must not silently turn that abstraction into the active Thread.
+        // Actual Thread transitions are owned by CHANGE, which validates and
+        // restores the complete Thread context.  Retain the accepted probe's
+        // M consumption while preserving the live Thread authority.
+        if (d.crDst === 12) {
+            const loadedBase = this.cr[12].word1;
+            if (!this._threadLayoutAtBase(loadedBase)) {
+                this.cr[12] = { ...crBefore[12], m: 0 };
+                loadResult.desc =
+                    `SWITCH CR12, [CR${d.crSrc} + ${d.imm}] (non-Thread probe accepted; active Thread preserved; destination M consumed)`;
+            }
         }
 
         // Successful isolated reload consumes the pre-existing destination M.
@@ -9080,7 +9100,7 @@ class ChurchSimulator {
     }
 
     loadLumpBinary(words, nsSlot, options = {}) {
-        const EXTENDED_BASE  = 0x0400;
+        const LEGACY_EXTENDED_BASE = 0x0400;
         const _nsSlotRaw     = (nsSlot !== undefined && nsSlot !== null) ? Number(nsSlot) : NaN;
         const abstrSlot      = Number.isInteger(_nsSlotRaw) ? _nsSlotRaw : this.bootEntrySlot;
 
@@ -9112,6 +9132,26 @@ class ChurchSimulator {
 
         const lumpSize = hdr.lumpSize;
 
+        // Replacements belong in the allocation already owned by their Namespace
+        // slot.  The old fixed 0x0400 staging address can overlap a live Thread
+        // body in boot images whose resident objects are packed above it.
+        //
+        // Keep the legacy address for new/synthetic installs whose current entry
+        // has no valid resident LUMP.  A valid existing allocation is reusable
+        // only when it is at least as large as the replacement.
+        let installBase = LEGACY_EXTENDED_BASE;
+        const currentEntry = this.readNSEntry(abstrSlot);
+        if (currentEntry && Number.isInteger(currentEntry.word0_location)) {
+            const currentBase = currentEntry.word0_location >>> 0;
+            const currentHeader = currentBase < this.NS_TABLE_BASE
+                ? this.parseLumpHeader(this.memory[currentBase] >>> 0) : null;
+            if (currentHeader && currentHeader.valid &&
+                    currentHeader.lumpSize >= lumpSize &&
+                    currentBase + lumpSize <= this.NS_TABLE_BASE) {
+                installBase = currentBase;
+            }
+        }
+
         // Truncation guard: the buffer must supply at least as many words as the
         // header declares.  A shorter buffer means the file was cut short — code
         // words or c-list entries are missing and the LUMP would silently run with
@@ -9122,8 +9162,17 @@ class ChurchSimulator {
             return false;
         }
 
-        if (EXTENDED_BASE + lumpSize > this.NS_TABLE_BASE) {
-            this.output += `[loadLumpBinary] ERROR: LUMP (${lumpSize} words) would overflow memory at 0x${EXTENDED_BASE.toString(16)}.\n`;
+        if (installBase + lumpSize > this.NS_TABLE_BASE) {
+            this.output += `[loadLumpBinary] ERROR: LUMP (${lumpSize} words) would overflow memory at 0x${installBase.toString(16)}.\n`;
+            return false;
+        }
+
+        const activeThreadBase = this._activeThreadBase();
+        const activeThreadLayout = this._threadLayoutAtBase(activeThreadBase);
+        if (activeThreadLayout &&
+                installBase < activeThreadBase + activeThreadLayout.lumpSize &&
+                activeThreadBase < installBase + lumpSize) {
+            this.output += `[loadLumpBinary] ERROR: install range 0x${installBase.toString(16)}..0x${(installBase + lumpSize - 1).toString(16)} overlaps active Thread at 0x${activeThreadBase.toString(16)}. LUMP rejected without installation.\n`;
             return false;
         }
 
@@ -9206,7 +9255,7 @@ class ChurchSimulator {
         // slot and its current sequence are known.  This returns a private copy:
         // all failures above and below this point leave both RAM and the NS table
         // untouched, including when a caller handed us a stale/wrong self GT.
-        const _identity = this._mintOrdinaryLumpIdentity(portableWords, abstrSlot, EXTENDED_BASE, {
+        const _identity = this._mintOrdinaryLumpIdentity(portableWords, abstrSlot, installBase, {
             architectural: options.architectural === true || hdr.typ !== 0,
             compilerOwnedSelf: options.compilerOwnedSelf === true || !!options.portableBinding,
             remintCompilerOwnedSelf: options.remintCompilerOwnedSelf === true,
@@ -9221,7 +9270,7 @@ class ChurchSimulator {
         const installWords = _identity.words;
 
         for (let i = 0; i < lumpSize; i++) {
-            this.memory[EXTENDED_BASE + i] = installWords[i] >>> 0;
+            this.memory[installBase + i] = installWords[i] >>> 0;
         }
 
         const nsBase       = this._nsSlotBase(abstrSlot);
@@ -9239,7 +9288,7 @@ class ChurchSimulator {
         const _declType    = _identity.ordinary ? 1 :
             ((this._nsUiTypeHint && this._nsUiTypeHint[abstrSlot]) || 1);
         this.#withBuiltinNamespaceWrite('validated LUMP installation', () => {
-            this.writeNSEntry(abstrSlot, EXTENDED_BASE >>> 0, hdr.cw,
+            this.writeNSEntry(abstrSlot, installBase >>> 0, hdr.cw,
                 0, _identity.ordinary ? 0 : w1f.g, _declType, existingGtSeq, hdr.cc,
                 _identity.ordinary ? _identity.entry.cacheToken : (this.memory[nsBase + 3] >>> 0));
         });
@@ -9292,7 +9341,7 @@ class ChurchSimulator {
             const cr14 = this.cr[14];
             if (cr14) {
                 cr14.word0 = this.createGT(existingGtSeq, this.bootEntrySlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);
-                cr14.word1 = EXTENDED_BASE >>> 0;
+                cr14.word1 = installBase >>> 0;
                 cr14.word2 = this.memory[nsBase + 1];
                 cr14.word3 = this.memory[nsBase + 2];
             }
@@ -9301,11 +9350,11 @@ class ChurchSimulator {
 
         // Set CR6 to point to the c-list that is already embedded in the lump.
         // The c-list occupies the last cc words of the lump slot:
-        //   clistBase = EXTENDED_BASE + lumpSize - cc
+        //   clistBase = installBase + lumpSize - cc
         // When cc = 0 zero CR6 so any downstream lazy-injection path can take over.
         if (this.cr[6]) {
             if (hdr.cc > 0) {
-                const clistBase = EXTENDED_BASE + lumpSize - hdr.cc;
+                const clistBase = installBase + lumpSize - hdr.cc;
                 const cr6GT = this.createGT(existingGtSeq, abstrSlot, {R:0,W:0,X:0,L:1,S:0,E:0}, 1);
                 this.cr[6] = {
                     word0: cr6GT,
@@ -9331,9 +9380,9 @@ class ChurchSimulator {
         this.faultLog        = [];
         this._instrHistory   = [];
 
-        this.output += `[loadLumpBinary] LUMP loaded at 0x${EXTENDED_BASE.toString(16)}: lumpSize=${lumpSize} cw=${hdr.cw} cc=${hdr.cc}.\n`;
+        this.output += `[loadLumpBinary] LUMP loaded at 0x${installBase.toString(16)}: lumpSize=${lumpSize} cw=${hdr.cw} cc=${hdr.cc}.\n`;
 
-        this.emit('programLoaded', { addr: EXTENDED_BASE, length: hdr.cw });
+        this.emit('programLoaded', { addr: installBase, length: hdr.cw });
         this.emit('stateChange', this.getState());
         return true;
     }
