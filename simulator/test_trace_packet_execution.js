@@ -147,6 +147,7 @@ sim.callStack.push(fakeFrame);
 
 // Write RETURN at PC=0 of the current code lump.
 sim.pc = 0;
+const RETURN_INSTR_ADDR = codeLumpBase + 1 + sim.pc;
 const rReturn = writeAndStep(enc(3, AL, 0, 0, 0));   // RETURN opcode=3
 check('TC1 RETURN step() returns a result',      !!rReturn && !rReturn.faulted,
     `desc: ${rReturn && rReturn.desc}`);
@@ -167,6 +168,9 @@ check('TC6 RETURN_CR14 payload = caller\'s saved CR14',
 check('TC7 RETURN_CR14 payload ≠ callee\'s CR14 (confirming correct selection)',
     retCR14Payload !== CALLEE_CR14_WORD0,
     `payload wrongly matches callee 0x${CALLEE_CR14_WORD0.toString(16)}`);
+check('TC8 RETURN every packet NIA = retiring instruction address',
+    retPkts.every(p => p.nia === RETURN_INSTR_ADDR),
+    `nias=${retPkts.map(p => p.nia).join(',')} want=${RETURN_INSTR_ADDR}`);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // TD: CALL opcode — inject a minimal NS entry + code cap and execute CALL CR0
@@ -220,6 +224,7 @@ sim.cr[0] = { word0: STUB_E_GT >>> 0, word1: CLIST_BASE, word2: 0, word3: 0, m: 
 sim.pc = 0;
 sim.halted = false;
 sim.sto = 63;  // final two words of the active 64-word Thread LUMP are a valid frame
+const CALL_INSTR_ADDR = codeLumpBase + 1 + sim.pc;
 const rCall = writeAndStep(enc(2, AL, 0, 0, 0));
 check('TD1 CALL step() returns a result (not fault)', !!rCall && !rCall.faulted,
     `desc: ${rCall && rCall.desc}; halted=${sim.halted}; output=${sim.output.slice(-240)}`);
@@ -234,6 +239,9 @@ check('TD5 CALL pkt[2].ev_type=CALL_PUSH(8)', (callPkts[2]||{}).ev_type === EV_C
     `got ${(callPkts[2]||{}).ev_type}`);
 check('TD6 CALL pkt[1] payload (CR14) non-zero', ((callPkts[1]||{}).payload_gt >>> 0) !== 0,
     `got 0`);
+check('TD7 CALL every packet NIA = retiring instruction address',
+    callPkts.every(p => p.nia === CALL_INSTR_ADDR),
+    `nias=${callPkts.map(p => p.nia).join(',')} want=${CALL_INSTR_ADDR}`);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // TE: SWITCH → LOAD_SHADOW + LOAD_NEW packets
@@ -250,7 +258,8 @@ sim.pc = 0;
 sim.halted = false;
 // SWITCH: destination CR13, source CR6, c-list row 0.
 const switchInstr = enc(5, AL, 13, 6, 0);
-sim.memory[STUB_BASE + 1 + sim.pc] = switchInstr;
+const SWITCH_INSTR_ADDR = STUB_BASE + 1 + sim.pc;
+sim.memory[SWITCH_INSTR_ADDR] = switchInstr;
 const rSwitch = sim.step();
 check('TE1 SWITCH step() returns a result', !!rSwitch && !rSwitch.faulted,
     `desc: ${rSwitch && rSwitch.desc}; halted=${sim.halted}; output=${sim.output.slice(-240)}`);
@@ -267,6 +276,9 @@ check('TE5 SWITCH pkt[1].ev_type=LOAD_NEW(2)', (swPkts[1]||{}).ev_type === EV_LO
 check('TE6 SWITCH pkt[1] payload = loaded c-list capability',
     ((swPkts[1]||{}).payload_gt >>> 0) === STUB_CODE_GT,
     `got 0x${((swPkts[1]||{}).payload_gt >>> 0).toString(16)}, want 0x${STUB_CODE_GT.toString(16)}`);
+check('TE7 SWITCH every packet NIA = retiring instruction address',
+    swPkts.every(p => p.nia === SWITCH_INSTR_ADDR),
+    `nias=${swPkts.map(p => p.nia).join(',')} want=${SWITCH_INSTR_ADDR}`);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // TF: Packet shape — all required fields present on every packet produced above
