@@ -7,6 +7,8 @@ const assert = require('assert');
 
 const source = fs.readFileSync(
     path.join(__dirname, 'app-abstractions.js'), 'utf8');
+const editorSource = fs.readFileSync(
+    path.join(__dirname, 'app-lumps.js'), 'utf8');
 
 function extractFunction(name) {
     const start = source.indexOf('function ' + name + '(');
@@ -46,5 +48,9 @@ assert(source.includes("lumps.filter(l => l.archived !== true)"),
     'top-level repository excludes archived revisions');
 assert(source.includes('_currentRow.archived === true'),
     'persisted archived selection is repaired on reload');
+assert(editorSource.includes('lump && lump.archived === true') &&
+       editorSource.includes('server.archived !== true') &&
+       editorSource.includes('window.LumpRegistry.setCurrent(token)'),
+    'Open in Editor redirects archived tokens to the current server artifact');
 
 console.log('PASS LUMP browser selects the current documented revision');

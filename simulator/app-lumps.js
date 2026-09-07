@@ -5214,6 +5214,33 @@ async function openLumpInEditor(token) {
     window._savedLumpOpenRequestId = _openRequestId;
     var lump = window.LumpRegistry ? (window.LumpRegistry.resolve(token)?.sources?.server || null) : null;
 
+    // Archived binaries are historical evidence, not the editable current
+    // revision.  History may preview them directly, but Open in Editor must not
+    // carry an archived, source-less token forward merely because it shares the
+    // same pet name as a newer approved artifact.
+    if (lump && lump.archived === true && window.LumpRegistry) {
+        var _archiveAbs = lump.abstraction || null;
+        var _primaryCandidates = window.LumpRegistry.list().filter(function(entry) {
+            var server = entry && entry.sources && entry.sources.server;
+            return server && server.abstraction === _archiveAbs &&
+                server.archived !== true;
+        });
+        _primaryCandidates.sort(function(a, b) {
+            var as = a.sources.server;
+            var bs = b.sources.server;
+            var approvedOrder = Number(Boolean(bs.approved)) -
+                Number(Boolean(as.approved));
+            if (approvedOrder) return approvedOrder;
+            return (parseInt(bs.lump_version) || 0) -
+                (parseInt(as.lump_version) || 0);
+        });
+        if (_primaryCandidates.length > 0) {
+            token = _primaryCandidates[0].token;
+            lump = _primaryCandidates[0].sources.server;
+            window.LumpRegistry.setCurrent(token);
+        }
+    }
+
     // ── Fresh-compilation redirect (dot.name.hash protocol) ───────────────
     // Each compilation produces a unique hash token.  If the Edit button
     // carries a SAVED token (old hash) but the user has since compiled a
