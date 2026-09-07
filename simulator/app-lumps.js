@@ -5703,7 +5703,7 @@ async function openLumpInEditor(token) {
             _draftBanner.className = 'lump-draft-restore-banner';
             _draftBanner.innerHTML =
                 '<strong>Unsaved draft available</strong>' +
-                '<span class="lump-draft-copy">The editor is showing the latest saved LUMP source. You can inspect your browser draft without losing it. </span>' +
+                '<span class="lump-draft-copy" title="The editor is showing the latest saved LUMP source. Your browser draft is preserved until you restore or discard it.">Showing latest saved source.</span>' +
                 '<button class="btn btn-sm lump-draft-restore-btn" id="_lumpDraftBannerRestore">Restore Draft</button>' +
                 '<button class="btn btn-sm lump-draft-discard-btn" id="_lumpDraftBannerDiscard">Discard Draft</button>';
             // Insert above the code-editor-wrap, not inside its flex row;

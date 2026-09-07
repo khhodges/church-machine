@@ -2131,6 +2131,7 @@
 .lump-draft-restore-banner {
     display: flex;
     align-items: center;
+    flex-wrap: nowrap;
     gap: 0.5rem;
     padding: 0.4rem 0.7rem;
     background: #2a2208;
@@ -2140,10 +2141,24 @@
     font-size: 0.82rem;
 }
 .lump-draft-restore-banner strong {
+    flex: 0 0 auto;
     color: #fde68a;
     white-space: nowrap;
 }
-.lump-draft-restore-banner span { flex: 1; }
+.lump-draft-restore-banner .lump-draft-copy {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.lump-draft-restore-banner .btn {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 1.9rem;
+    padding: 0.25rem 0.65rem;
+    white-space: nowrap;
+}
 .lump-draft-copy b { color: #fef3c7; }
 #asmEditor.cm-editor-draft {
     border: 2px solid #fbbf24;
