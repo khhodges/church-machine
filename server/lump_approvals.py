@@ -12,6 +12,7 @@ RECORD_FIELDS = frozenset({
     "abstraction", "author", "version", "compiled_at", "display_name",
     "documentation", "annotations", "portable_binding", "pet_name", "pet_names",
     "history_note", "release_notes", "grants", "capability_type",
+    "identity_string", "identity_seal_location",
 })
 INTRINSIC_FIELDS = frozenset({
     "cw", "cc", "typ", "lump_size", "source", "api_definition",

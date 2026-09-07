@@ -446,35 +446,38 @@ class TestValidateStep1ThreadGeometry:
         assert err is not None
         assert "foundational" in err
 
-    def test_boot_config_exposes_fixed_selftest_size_for_builder_placement(self, tmp_path):
-        """Builder receives slot-6's size, not a selected lightning-bolt target."""
-        words = [0] * 512
-        words[0] = (0x1F << 27) | (3 << 23) | (3 << 10) | 2
-        (tmp_path / "00000600.lump").write_bytes(struct.pack(">512I", *words))
+    def test_boot_config_exposes_header_derived_active_selftest_size(self, tmp_path):
+        """Builder reads the active state-selected SelfTest header allocation."""
+        slot, token, filename, words_count = 23, "active-selftest", "SelfTest.active.lump", 128
+        words = [0] * words_count
+        words[0] = (0x1F << 27) | (1 << 23) | (3 << 10) | 2
+        (tmp_path / filename).write_bytes(struct.pack(f">{words_count}I", *words))
         (tmp_path / "manifest.json").write_text(json.dumps([{
-            "token": "00000600",
+            "token": token,
             "abstraction": "SelfTest",
-            "filename": "00000600.lump",
-            "ns_slot": 6,
-            "ns_slot_policy": "static",
+            "filename": filename,
+            "ns_slot": slot,
+            "ns_slot_policy": "dynamic",
         }]))
         (tmp_path / "ns-state.json").write_text(json.dumps({
-            "abstractions": [{"name": "SelfTest", "slot": 6, "token": "00000600"}],
+            "abstractions": [{"name": "SelfTest", "slot": slot, "token": token,
+                              "filename": filename}],
         }))
         with (
             patch.object(_app_module, "LUMPS_DIR", str(tmp_path)),
             patch.object(_app_module, "_LUMPS_DIR", str(tmp_path)),
+            patch.object(_app_module, "NS_STATE_PATH", str(tmp_path / "ns-state.json")),
             patch.object(
                 _app_module._boot_image_gen,
                 "find_lump_file_by_abstraction",
-                return_value=str(tmp_path / "00000600.lump"),
+                return_value=str(tmp_path / filename),
             ),
             patch.object(_app_module, "BOOT_CONFIG_PATH", str(tmp_path / "none.json")),
             patch.object(_app_module, "BOOT_CONFIG_LEGACY_PATH", str(tmp_path / "none-legacy.json")),
         ):
             response = _app_module.app.test_client().get("/api/boot-config")
         assert response.status_code == 200
-        assert response.get_json()["limits"]["bootAbstrLumpWords"] == 512
+        assert response.get_json()["limits"]["bootAbstrLumpWords"] == words_count
 
 
 # ---------------------------------------------------------------------------

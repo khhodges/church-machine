@@ -31,6 +31,10 @@ Run with:
 
 import os
 import re
+import hashlib
+import json
+import struct
+from pathlib import Path
 
 import pytest
 
@@ -38,6 +42,11 @@ from hardware.boot_rom import (
     BOOT_PROGRAM, encode_turing, TuringOpcode, CondCode,
     WUKONG_CAPABILITY_TEST_BOUND, WUKONG_CAPABILITY_TEST_STATUS,
     WUKONG_CAPABILITY_TEST_WORDS,
+    WUKONG_DEMO_NAMESPACE,
+    WUKONG_SELFTEST_ALLOC, WUKONG_SELFTEST_BASE_BYTE,
+    WUKONG_SELFTEST_FILENAME, WUKONG_SELFTEST_GT_SEQ,
+    WUKONG_SELFTEST_NS_SLOT, WUKONG_SELFTEST_TOKEN, WUKONG_SELFTEST_WORDS,
+    _select_active_manifest_entry, make_gt, GT_TYPE_INFORM, PERM_MASK_E,
 )
 from hardware.wukong_top import (
     _WUKONG_BOOT_WINDOW_BYTES,
@@ -52,6 +61,74 @@ _IL_PATH = os.path.join(
 
 # Expected BRANCH AL, #-1 encoding — must match the constant in wukong_top.py.
 _EXPECTED_BRANCH_MINUS_1 = encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=(-1) & 0x7FFF)
+_LUMPS_DIR = Path(__file__).resolve().parents[2] / "server" / "lumps"
+
+
+def test_wukong_selftest_uses_active_approved_canonical_artifact():
+    """Factory ROM follows the active ns-state + manifest locator, not a token filename."""
+    state = json.loads((_LUMPS_DIR / "ns-state.json").read_text(encoding="utf-8"))
+    selected = [entry for entry in state["abstractions"] if entry.get("name") == "SelfTest"]
+    assert len(selected) == 1
+    selected = selected[0]
+    assert (WUKONG_SELFTEST_FILENAME, WUKONG_SELFTEST_TOKEN,
+            WUKONG_SELFTEST_NS_SLOT, WUKONG_SELFTEST_GT_SEQ) == (
+        selected["filename"], selected["token"], selected["slot"], selected["seq"])
+
+    manifest = json.loads((_LUMPS_DIR / "manifest.json").read_text(encoding="utf-8"))
+    assert len([entry for entry in manifest
+                if entry.get("abstraction") == "SelfTest"
+                and not entry.get("archived", False)
+                and entry.get("token") == WUKONG_SELFTEST_TOKEN
+                and entry.get("filename") == WUKONG_SELFTEST_FILENAME]) == 1
+
+    # Archived history may retain the same abstraction name, but there must be
+    # exactly one non-archived row for the active namespace locator.
+    active_rows = [entry for entry in manifest
+                   if entry.get("abstraction") == "SelfTest"
+                   and not entry.get("archived", False)
+                   and entry.get("token") == selected["token"]
+                   and entry.get("filename") == selected["filename"]]
+    assert len(active_rows) == 1
+
+    raw = (_LUMPS_DIR / WUKONG_SELFTEST_FILENAME).read_bytes()
+    header = struct.unpack_from(">I", raw)[0]
+    assert WUKONG_SELFTEST_ALLOC == 1 << (((header >> 23) & 0xF) + 6)
+    assert WUKONG_SELFTEST_ALLOC == len(raw) // 4
+    assert WUKONG_DEMO_NAMESPACE[WUKONG_SELFTEST_NS_SLOT * 4] == WUKONG_SELFTEST_BASE_BYTE
+    assert WUKONG_DEMO_NAMESPACE[WUKONG_SELFTEST_NS_SLOT * 4 + 1] == (
+        ((WUKONG_SELFTEST_GT_SEQ & 0x1FF) << 21) | (WUKONG_SELFTEST_ALLOC - 1))
+
+    cc = header & 0xFF
+    expected_egt = make_gt(GT_TYPE_INFORM, PERM_MASK_E,
+                           WUKONG_SELFTEST_NS_SLOT, WUKONG_SELFTEST_GT_SEQ)
+    assert cc >= 2
+    assert WUKONG_SELFTEST_WORDS[-cc:][:2] == (expected_egt, expected_egt)
+
+    approvals = json.loads((_LUMPS_DIR / "approvals.json").read_text(encoding="utf-8"))["approvals"]
+    approval = approvals[hashlib.sha256(raw).hexdigest()]
+    assert all(approval[key] == value for key, value in {
+        "binary_hash": hashlib.sha256(raw).hexdigest(),
+        "filename": WUKONG_SELFTEST_FILENAME,
+        "token": WUKONG_SELFTEST_TOKEN,
+        "abstraction": "SelfTest",
+    }.items())
+
+
+def test_selftest_manifest_locator_rejects_archived_or_duplicate_active_rows():
+    locator = {
+        "abstraction": "SelfTest", "ns_slot": 6, "token": "abcdef01",
+        "filename": "SelfTest.9.abcdef01.lump",
+    }
+    archived = dict(locator, archived=True)
+    with pytest.raises(ValueError, match="exactly one active SelfTest"):
+        _select_active_manifest_entry([archived], "SelfTest", 6, "abcdef01",
+                                      "SelfTest.9.abcdef01.lump")
+    with pytest.raises(ValueError, match="exactly one active SelfTest"):
+        _select_active_manifest_entry([locator, dict(locator)], "SelfTest", 6,
+                                      "abcdef01", "SelfTest.9.abcdef01.lump")
+    assert _select_active_manifest_entry(
+        [archived, locator], "SelfTest", 6, "abcdef01",
+        "SelfTest.9.abcdef01.lump") == locator
 
 
 def test_optional_capability_test_fails_closed_without_blocking_import():

@@ -7,23 +7,20 @@ startup).
 
 Three scenarios:
 
-  1. POST /api/lumps/save for ns_slot=6 with a canonical 512-word SelfTest lump
-     (cw=17, cc=2, word[510]=0x4A000006) → GET /api/lumps/list immediately
+   1. POST /api/lumps/save for the active ns-state SelfTest slot with a
+      header-derived SelfTest lump (cw=17, cc=2, live c-list E-GTs) → GET /api/lumps/list immediately
      after save (no manual reload, no page refresh) must return cw=17 / cc=2 as
      the first (Boot.Abstr) entry.  The save endpoint calls
      _load_boot_abstr_lump() internally so _BOOT_ABSTR_META is refreshed without
-     any extra step.  The binary must be 512 words with cc=2 and
-     word[510]=0x4A000006 because save_lump() enforces the canonical SelfTest
-     layout for token 00000600 (rejects any other size, cc, or E-GT value).
+      any extra step.  Its allocation is read from its header, while its two
+      c-list rows are checked against the active Namespace descriptor.
 
   2. With the manifest updated, calling _load_boot_abstr_lump() (simulating a
      server restart) must still return cw=17 / cc=2.  The function is called
      twice to confirm idempotency across multiple boots.
 
-  3. No 00000600.lump / sidecar on disk → _load_boot_abstr_lump() falls back
-     to the on-disk boot-image.bin which carries the canonical NUC_CODE_WORDS=3,
-     cc=0 Boot.Abstr (SelfTest at NS slot 6); GET /api/lumps/list must report
-     cw=3 / cc=0 (no regression in the no-saved-lump code path).
+   3. An absent authoritative Namespace binding is rejected instead of falling
+      back to a historical token-derived filename.
 """
 import os
 import struct
@@ -34,51 +31,39 @@ import pytest
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)
 
-from server.boot_constants import DEMO_CLIST_SIZE  # noqa: E402
-
 LUMPS_DIR      = os.path.join(ROOT, "server", "lumps")
-LUMP_600_PATH  = os.path.join(LUMPS_DIR, "00000600.lump")
-JSON_600_PATH  = os.path.join(LUMPS_DIR, "00000600.json")
-# 00000003.json is the legacy sidecar name; _load_boot_abstr_lump() falls
-# back to it when 00000600.json is absent, so the fixture must manage it too.
-JSON_003_PATH  = os.path.join(LUMPS_DIR, "00000003.json")
-# Keep old 300 names for backward-compat reference in clean_600 fixture.
-LUMP_300_PATH  = os.path.join(LUMPS_DIR, "00000300.lump")
-JSON_300_PATH  = os.path.join(LUMPS_DIR, "00000300.json")
-# manifest.json is updated by /api/lumps/save; back it up to prevent churn.
 MANIFEST_PATH  = os.path.join(LUMPS_DIR, "manifest.json")
+NS_STATE_PATH  = os.path.join(LUMPS_DIR, "ns-state.json")
+APPROVALS_PATH = os.path.join(LUMPS_DIR, "approvals.json")
 
 # ── Lump header encoding ──────────────────────────────────────────────────────
 # Header: [31:27]=0x1F magic, [26:23]=n_minus_6, [22:10]=cw, [9:8]=typ, [7:0]=cc
 # n_minus_6=0  →  lump_size = 1 << (0+6) = 64 words
 
 SAVED_CW        = 17
-# cc must equal the canonical SelfTest cc=2: save_lump() enforces cc=2 for
-# ALL token-00000600 saves regardless of declared lump_size (guards from
-# both the cc check and the size check run before any disk mutation).
+# SelfTest's executable c-list has two state-derived continuation rows.
 SAVED_CC        = 2
-LUMP_N_MINUS_6  = 3           # 512-word lump (2^(3+6)=512)
-LUMP_SIZE_WORDS = 1 << (LUMP_N_MINUS_6 + 6)  # 512
-
-# Canonical E-GT asserted by hardware/boot_rom.py line 658.
-_SELFTEST_EGT = 0x4A000006
-
-
-def _make_header(cw, cc, n_minus_6=LUMP_N_MINUS_6, typ=0):
-    return (0x1F << 27) | (n_minus_6 << 23) | (cw << 10) | (typ << 8) | cc
+def _active_selftest():
+    """Resolve the sole active SelfTest descriptor from ns-state and manifest."""
+    import json
+    with open(os.path.join(LUMPS_DIR, "ns-state.json"), encoding="utf-8") as fh:
+        rows = json.load(fh)["abstractions"]
+    row = next(row for row in rows if row.get("name") == "SelfTest")
+    return row
 
 
-def _make_lump_words(cw, cc):
-    """Return a 512-word canonical SelfTest lump array.
-
-    word[510] is set to 0x4A000006 (the SelfTest E-GT, asserted by
-    hardware/boot_rom.py line 658).  save_lump() rejects any token-00000600
-    binary that omits this value or declares a non-512-word size.
-    """
-    words = [0] * LUMP_SIZE_WORDS
-    words[0] = _make_header(cw, cc)
-    words[510] = _SELFTEST_EGT   # c-list[0]: hardware-invariant E-GT
-    words[511] = _SELFTEST_EGT   # c-list[1]: Next.GT (same E-GT is valid)
+def _make_active_lump_words(cw=SAVED_CW):
+    """Reuse the approved active shape and its live state-derived c-list."""
+    row = _active_selftest()
+    with open(os.path.join(LUMPS_DIR, row["filename"]), "rb") as fh:
+        raw = fh.read()
+    words = list(struct.unpack(f">{len(raw) // 4}I", raw))
+    header = words[0]
+    size = 1 << (((header >> 23) & 0xF) + 6)
+    cc = header & 0xFF
+    assert len(words) >= size and cc == SAVED_CC
+    words = words[:size]
+    words[0] = (header & ~((0x1FFF << 10) | 0xFF)) | (cw << 10) | cc
     return words
 
 
@@ -97,44 +82,30 @@ def client():
 def clean_300():
     """Snapshot and restore the lumps directory state around each test.
 
-    Files removed before the test (and restored/removed after):
-    - 00000600.lump  (written by /api/lumps/save for ns_slot=6; Task #1918)
-    - 00000600.json  (sidecar written by same endpoint)
-    - 00000003.json  (legacy sidecar read as fallback by _load_boot_abstr_lump)
-    - 00000300.lump  (old Boot.Abstr lump, kept for backward-compat)
-    - 00000300.json  (old sidecar)
-
-    Files backed up but kept in place (only restored after the test):
-    - manifest.json  (updated by /api/lumps/save; must remain intact so the
-                      boot-config Step 2 validation can read the lump catalog
-                      and regenerate boot-image.bin successfully)
+    The active manifest, namespace state, and approvals are restored after
+    each save so no state-selected identity leaks into another test.
 
     All existing files are restored unconditionally in teardown.  The shared
     boot fixture already redirects this module to a private library copy.
     """
-    _to_remove    = (LUMP_600_PATH, JSON_600_PATH, JSON_003_PATH, LUMP_300_PATH, JSON_300_PATH)
-    _keep_in_place = (MANIFEST_PATH,)
+    # Saving archives/replaces both the selected artifact and its sidecar, so
+    # snapshot the complete private test library rather than guessing names.
     _backed: dict[str, bytes] = {}
-
-    for path in _to_remove:
-        if os.path.isfile(path):
-            with open(path, "rb") as fh:
-                _backed[path] = fh.read()
-            os.remove(path)
-
-    for path in _keep_in_place:
+    for name in os.listdir(LUMPS_DIR):
+        path = os.path.join(LUMPS_DIR, name)
         if os.path.isfile(path):
             with open(path, "rb") as fh:
                 _backed[path] = fh.read()
 
     yield  # run the test
 
-    for path in _to_remove + _keep_in_place:
-        if os.path.isfile(path):
+    for name in os.listdir(LUMPS_DIR):
+        path = os.path.join(LUMPS_DIR, name)
+        if os.path.isfile(path) and path not in _backed:
             os.remove(path)
-        if path in _backed:
-            with open(path, "wb") as fh:
-                fh.write(_backed[path])
+    for path, content in _backed.items():
+        with open(path, "wb") as fh:
+            fh.write(content)
 
 
 @pytest.fixture()
@@ -191,18 +162,6 @@ def reset_boot_config():
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _write_lump_300(cw=SAVED_CW, cc=SAVED_CC):
-    """Write a canonical 512-word 00000600.lump directly to disk (big-endian).
-
-    Used only for server-restart simulation tests that need the file on disk
-    before calling _simulate_server_restart().  The binary is 512 words with
-    word[510]=0x4A000006 so it passes the hardware invariant in boot_rom.py.
-    """
-    words = _make_lump_words(cw, cc)
-    with open(LUMP_600_PATH, "wb") as fh:
-        fh.write(struct.pack(f">{LUMP_SIZE_WORDS}I", *words))
-
-
 _MINIMAL_BOOT_CFG = {
     "step1": {
         "totalNamespaceWords": 16384,
@@ -241,7 +200,7 @@ def _simulate_server_restart():
 
 
 def _get_boot_abstr_from_list(client):
-    """Return the Boot.Abstr (NS slot 6, token 00000600) entry from GET /api/lumps/list."""
+    """Return the active SelfTest entry from GET /api/lumps/list."""
     resp = client.get("/api/lumps/list")
     assert resp.status_code == 200, (
         f"GET /api/lumps/list returned {resp.status_code}; "
@@ -251,14 +210,43 @@ def _get_boot_abstr_from_list(client):
     assert isinstance(entries, list) and len(entries) > 0, (
         "Expected a non-empty JSON array from /api/lumps/list"
     )
+    active = _active_selftest()
     for e in entries:
-        if e.get("token") in ("00000600",) or e.get("ns_slot") == 6:
+        if (e.get("abstraction") == "SelfTest"
+                and e.get("token") == active["token"]
+                and (e.get("filename") == active["filename"]
+                     or (e.get("ns_slot") == active["slot"]
+                         and e.get("lump_version") == active.get("lump_version")))):
             return e
     tokens = [e.get("token") for e in entries]
     pytest.fail(
-        f"Boot.Abstr (token='00000600', ns_slot=6) not found in /api/lumps/list. "
+        f"Active SelfTest not found in /api/lumps/list. "
         f"Tokens present: {tokens}"
     )
+
+
+def _approved_payload(client, payload):
+    """Obtain the current hash-bound save plan and explicit E approval."""
+    planned = client.post("/api/lumps/save-plan", json=payload)
+    assert planned.status_code == 201, planned.get_data(as_text=True)
+    plan = planned.get_json()
+    issued = client.post("/api/lumps/approval-intent", json={
+        "digest": plan["digest"],
+        "action": plan["action"],
+        "plan": plan["plan"],
+        "confirmation": True,
+        "approval": {"grants": ["E"]},
+    })
+    assert issued.status_code == 201, issued.get_data(as_text=True)
+    approved = {
+        "binary": payload["binary"],
+        "metadata": dict(payload["metadata"]),
+    }
+    approved["metadata"].update({
+        "save_plan": plan["plan"],
+        "approval_intent": issued.get_json()["intent"],
+    })
+    return approved
 
 
 # ── Test 1: save cw=17/cc=18 → list reflects new values without page reload ──
@@ -272,42 +260,46 @@ BOOT_CONFIG_ON_DISK = os.path.join(ROOT, "server", "boot-config.json")
     reason="boot-image.bin or boot-config.json absent; save endpoint cannot "
            "auto-refresh _BOOT_ABSTR_META",
 )
-def test_save_ns_slot3_updates_list_immediately(client, clean_300, reset_boot_abstr_meta, reset_boot_config):
-    """POST /api/lumps/save (ns_slot=6, cw=17, cc=2) → GET /api/lumps/list must
+def test_save_active_selftest_updates_list_immediately(client, clean_300, reset_boot_abstr_meta, reset_boot_config):
+    """POST /api/lumps/save at the active SelfTest slot → GET /api/lumps/list must
     return the new cw/cc immediately — no page reload or server restart needed.
 
-    The binary must be 512 words with cc=2 and word[510]=0x4A000006: save_lump()
-    rejects any token-00000600 binary that declares a different size, cc, or E-GT.
+    The active artifact's header-derived shape and state-derived c-list are
+    retained; save_lump() rejects malformed c-list contracts before mutation.
     When the save succeeds, _load_boot_abstr_lump() is called (unconditionally for
     this token) so _BOOT_ABSTR_META is refreshed in-process and the next GET
     /api/lumps/list reflects the saved cw/cc without any extra step.
     """
     payload = {
-        "binary": _make_lump_words(SAVED_CW, SAVED_CC),
+        "binary": _make_active_lump_words(),
         "metadata": {
             "abstraction": "SelfTest",
-            "ns_slot": 6,
+            "ns_slot": _active_selftest()["slot"],
+            "token": _active_selftest()["token"],
             "cw": SAVED_CW,
             "cc": SAVED_CC,
+            "capabilities": [
+                {"name": "Self", "rights": ["E"],
+                 "nsIndex": _active_selftest()["slot"]},
+                {"name": "Next", "rights": ["E"],
+                 "nsIndex": _active_selftest()["slot"]},
+            ],
         },
     }
-    resp = client.post("/api/lumps/save", json=payload)
+    resp = client.post("/api/lumps/save", json=_approved_payload(client, payload))
     assert resp.status_code == 200, (
         f"POST /api/lumps/save returned {resp.status_code}; "
         f"body={resp.get_data(as_text=True)}"
     )
     data = resp.get_json()
     assert data.get("ok") is True, f"Expected ok=true, got: {data}"
-    assert data.get("token") == "00000600", (
-        f"Expected token='00000600' for ns_slot=6, got: {data.get('token')!r}"
-    )
     # The save endpoint writes a versioned filename (e.g. SelfTest.1.<hash>.lump),
-    # not necessarily 00000600.lump.  Check the response-reported filename instead.
+    # The save endpoint writes a versioned filename. Check its reported path.
     _saved_lump_file = os.path.join(LUMPS_DIR, data.get("lump", ""))
     assert os.path.isfile(_saved_lump_file), (
         f"save_lump() reported lump={data.get('lump')!r} but that file is not on disk"
     )
-    # _BOOT_ABSTR_META is always refreshed after a token-00000600 save (via
+    # _BOOT_ABSTR_META is always refreshed after a SelfTest save (via
     # _load_boot_abstr_lump() called unconditionally in save_lump() when
     # boot_image_refreshed is False).  boot_image_refreshed may be False when
     # generate_boot_image cannot locate the SelfTest lump via manifest ns_slot.
@@ -335,19 +327,26 @@ def test_saved_cw_cc_survive_server_restart(client, clean_300, reset_boot_abstr_
     it would silently fall back to the still-present canonical SelfTest binary
     and report the canonical cw rather than the test value.
 
-    The binary must pass the canonical SelfTest guard: 512 words, cc=2,
-    word[510]=0x4A000006.
+    The binary retains the active descriptor's header-derived allocation and
+    state-derived c-list contract.
     """
     payload = {
-        "binary": _make_lump_words(SAVED_CW, SAVED_CC),
+        "binary": _make_active_lump_words(),
         "metadata": {
             "abstraction": "SelfTest",
-            "ns_slot": 6,
+            "ns_slot": _active_selftest()["slot"],
+            "token": _active_selftest()["token"],
             "cw": SAVED_CW,
             "cc": SAVED_CC,
+            "capabilities": [
+                {"name": "Self", "rights": ["E"],
+                 "nsIndex": _active_selftest()["slot"]},
+                {"name": "Next", "rights": ["E"],
+                 "nsIndex": _active_selftest()["slot"]},
+            ],
         },
     }
-    resp = client.post("/api/lumps/save", json=payload)
+    resp = client.post("/api/lumps/save", json=_approved_payload(client, payload))
     assert resp.status_code == 200, (
         f"POST /api/lumps/save returned {resp.status_code}; "
         f"body={resp.get_data(as_text=True)}"
@@ -366,20 +365,14 @@ def test_saved_cw_cc_survive_server_restart(client, clean_300, reset_boot_abstr_
         )
 
 
-# ── Test 3: no 00000600.lump → generate_boot_image() raises ValueError ────────
+# ── Test 3: no active locator → generate_boot_image() raises ValueError ───────
 
-def test_no_saved_lump_raises_value_error(clean_300, tmp_path):
-    """When 00000600.lump is absent, generate_boot_image() must raise ValueError.
-
-    The direct-dispatch boot model has no fallback trampoline.  The real
-    SelfTest lump must always be present when generating a boot image.
-    This test confirms the error is raised with an informative message rather
-    than silently producing a broken image.
-    """
-    import tempfile
+def test_missing_authoritative_binding_raises_value_error(clean_300, tmp_path):
+    """A missing state/manifest binding cannot fall back to a slot filename."""
     from server.boot_image import generate_boot_image as _gen_bi
 
-    assert not os.path.isfile(LUMP_600_PATH), "Precondition: 00000600.lump must not exist"
+    (tmp_path / "manifest.json").write_text("[]")
+    (tmp_path / "ns-state.json").write_text('{"abstractions": []}')
 
     cfg = {
         "step1": {
@@ -388,5 +381,5 @@ def test_no_saved_lump_raises_value_error(clean_300, tmp_path):
             "threadLumpWords":       256,
         },
     }
-    with pytest.raises(ValueError, match="Boot.Abstr.*lump not found|SelfTest.*lump"):
+    with pytest.raises(ValueError, match="SelfTest.*Namespace-state binding"):
         _gen_bi(cfg, str(tmp_path))

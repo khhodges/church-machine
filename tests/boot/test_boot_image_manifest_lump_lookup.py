@@ -6,8 +6,7 @@ Covers:
      at slot 7's physical location.
   3. generate_boot_image raises a clear, manifest-oriented ValueError (not a cryptic
      file-not-found on a slot-encoded path) when the boot-entry lump is absent.
-  4. The legacy 00000600.lump file is NOT required by generate_boot_image; it uses
-     the manifest-named versioned file instead.
+   4. A historical slot-derived filename is never used as a fallback.
 """
 import json
 import os
@@ -23,7 +22,6 @@ sys.path.insert(0, ROOT)
 from server.boot_image import (
     find_lump_file_by_abstraction,
     generate_boot_image,
-    BOOT_ABSTR_NS_SLOT,
     NS_ENTRY_WORDS,
     pack_lump_header,
 )
@@ -85,9 +83,7 @@ class TestFindLumpFileByAbstraction:
             "filename": "MyAbstr_v3.lump",
             "ns_slot": 42,
         }])
-        result = find_lump_file_by_abstraction(self.tmpdir, "MyAbstr", 42)
-        assert result is not None
-        assert os.path.basename(result) == "MyAbstr_v3.lump"
+        assert find_lump_file_by_abstraction(self.tmpdir, "MyAbstr", 42) is None
 
     def test_falls_back_to_token_file(self):
         """Token-named file is used when manifest entry has no filename field."""
@@ -98,9 +94,7 @@ class TestFindLumpFileByAbstraction:
             "abstraction": "MyAbstr",
             "ns_slot": 42,
         }])
-        result = find_lump_file_by_abstraction(self.tmpdir, "MyAbstr", 42)
-        assert result is not None
-        assert os.path.basename(result) == "aabbccdd.lump"
+        assert find_lump_file_by_abstraction(self.tmpdir, "MyAbstr", 42) is None
 
     def test_returns_none_when_no_match(self):
         """Returns None when no manifest entry matches name+slot."""
@@ -141,9 +135,7 @@ class TestFindLumpFileByAbstraction:
             "filename": "MyAbstr_v3.lump",
             "ns_slot": 42,
         }])
-        result = find_lump_file_by_abstraction(self.tmpdir, "MyAbstr", 42)
-        assert result is not None
-        assert os.path.basename(result) == "aabbccdd.lump"
+        assert find_lump_file_by_abstraction(self.tmpdir, "MyAbstr", 42) is None
 
 
 # ── generate_boot_image with boot_entry_slot=7 ───────────────────────────────
@@ -161,21 +153,14 @@ class TestBootImageSlot7:
         # Check that Thread.caps[0] GT points to slot 7.
         # Thread lump is at physAddr 0 (running_offset starts at 0, Thread gets loc=0).
         # THREAD_CAPS_OFFSET = 244 words into the thread lump.
-        THREAD_CAPS_OFFSET = 244
+        from hardware.thread_design import thread_layout
+        THREAD_CAPS_OFFSET = 16 + thread_layout(
+            cfg["step1"]["threadLumpWords"], 32)["caps_start"]
         cr0_gt = words[THREAD_CAPS_OFFSET]
         cr0_slot = cr0_gt & 0x1FF
         assert cr0_slot == 7, (
             f"Thread.caps[0] GT should point to NS slot 7, got slot {cr0_slot} "
             f"(GT=0x{cr0_gt:08x})"
-        )
-
-        # Check that the boot-entry slot stored in the image is 7.
-        # Stored at ns_table_base - 2.
-        from server.boot_image import ns_table_reserve_words, MAX_NS_ENTRIES
-        ns_table_base = total - ns_table_reserve_words(MAX_NS_ENTRIES)
-        stored_entry_slot = words[ns_table_base - 2] & 0xFF
-        assert stored_entry_slot == 7, (
-            f"boot_entry_slot stored at ns_table_base-2 should be 7, got {stored_entry_slot}"
         )
 
         # Slot 7's NS entry word0 is the physical location of the WukongCallHome lump.
@@ -185,6 +170,11 @@ class TestBootImageSlot7:
         assert slot7_loc > 0, f"NS slot 7 location should be > 0, got {slot7_loc}"
         assert slot7_word1 != 0, "NS slot 7 word1 should be non-zero (lim17 etc.)"
 
+        # Namespace Header V2 records the selected resident entry as a byte
+        # address, not in the retired pre-table sentinel.
+        from shared.namespace_header import BOOT_ENTRY
+        assert words[BOOT_ENTRY] == slot7_loc * 4
+
         # The lump body at slot 7's physAddr should have magic 0x1F in bits[31:27].
         lump_hdr = words[slot7_loc]
         lump_magic = (lump_hdr >> 27) & 0x1F
@@ -193,19 +183,23 @@ class TestBootImageSlot7:
             f"0x{lump_magic:02x} (expected 0x1F); word=0x{lump_hdr:08x}"
         )
 
-    def test_slot6_unaffected_by_slot7_boot_entry(self):
-        """Selecting boot_entry_slot=7 does not corrupt the SelfTest slot 6 entry."""
+    def test_active_selftest_unaffected_by_slot7_boot_entry(self):
+        """Selecting another entry does not corrupt the active SelfTest descriptor."""
         cfg = _minimal_cfg()
-        image6 = generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=6)
+        image6 = generate_boot_image(cfg, LUMPS_DIR)
         image7 = generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=7)
         words6 = _unpack_words(image6)
         words7 = _unpack_words(image7)
         total  = cfg["step1"]["totalNamespaceWords"]
-        ns6    = _ns_slot_base(total, 6)
-        # NS slot 6 entries should be identical in both images.
+        with open(os.path.join(LUMPS_DIR, "ns-state.json"), encoding="utf-8") as fh:
+            state = json.load(fh)
+        selected = [row for row in state["abstractions"] if row.get("name") == "SelfTest"]
+        assert len(selected) == 1
+        ns6 = _ns_slot_base(total, selected[0]["slot"])
+        # The selected SelfTest NS entry should be identical in both images.
         for wi in range(NS_ENTRY_WORDS):
             assert words6[ns6 + wi] == words7[ns6 + wi], (
-                f"NS slot 6 word{wi} changed between boot_entry_slot=6 and =7; "
+                f"active SelfTest NS word{wi} changed between default and =7; "
                 f"was 0x{words6[ns6+wi]:08x}, got 0x{words7[ns6+wi]:08x}"
             )
 
@@ -225,38 +219,39 @@ class TestBootImageMissingLump:
 
     def test_missing_selftest_lump_raises_clear_error(self):
         """ValueError message mentions manifest and SelfTest, not a slot-encoded path."""
-        # Empty manifest — no SelfTest entry, no lump file.
+        # Empty state/manifest — no active SelfTest locator or lump file.
         self._write_manifest([])
+        with open(os.path.join(self.tmpdir, "ns-state.json"), "w") as f:
+            json.dump({"abstractions": []}, f)
 
         cfg = _minimal_cfg()
         with pytest.raises(ValueError) as exc_info:
             generate_boot_image(cfg, self.tmpdir)
 
         msg = str(exc_info.value).lower()
-        # The error should mention "selftest" and "manifest" but NOT a slot-encoded
-        # filename like "00000600.lump".
+        # The error should name the active binding failure, rather than trying
+        # to infer a filename from a historical physical slot.
         assert "selftest" in msg, (
             f"Error message should mention 'SelfTest'; got:\n{exc_info.value}"
         )
-        assert "manifest" in msg, (
-            f"Error message should mention 'manifest'; got:\n{exc_info.value}"
-        )
-        assert "00000600.lump" not in str(exc_info.value), (
-            f"Error message must not reference the legacy physical-slot filename "
-            f"'00000600.lump'; got:\n{exc_info.value}"
-        )
+        assert "namespace-state" in msg
 
     def test_manifest_entry_present_but_file_missing_raises_clear_error(self):
         """Clear error when manifest lists SelfTest but the file does not exist."""
-        # Manifest says SelfTest_v99.lump exists — but we don't create it.
+        # State and manifest select SelfTest_v99.lump — but we don't create it.
+        slot, token, filename = 23, "active-selftest", "SelfTest_v99.lump"
         self._write_manifest([{
-            "token": "00000600",
+            "token": token,
             "abstraction": "SelfTest",
-            "filename": "SelfTest_v99.lump",
-            "ns_slot": BOOT_ABSTR_NS_SLOT,
+            "filename": filename,
+            "ns_slot": slot,
             "ns_slot_policy": "static",
             "boot_resident": True,
         }])
+        with open(os.path.join(self.tmpdir, "ns-state.json"), "w") as f:
+            json.dump({"abstractions": [{
+                "name": "SelfTest", "slot": slot, "token": token, "filename": filename,
+            }]}, f)
 
         cfg = _minimal_cfg()
         with pytest.raises(ValueError) as exc_info:
@@ -264,7 +259,7 @@ class TestBootImageMissingLump:
 
         msg = str(exc_info.value).lower()
         assert "selftest" in msg
-        assert "00000600.lump" not in str(exc_info.value)
+        assert filename in str(exc_info.value)
 
 
 if __name__ == "__main__":

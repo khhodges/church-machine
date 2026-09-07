@@ -2631,12 +2631,12 @@ def _normalize_step2_preload_bindings(step2):
     return normalized, None
 
 def _boot_abstr_size_for_validation():
-    """Return the actual SelfTest allocation used at fixed NS slot 6."""
+    """Return the actual allocation for the state-authorized SelfTest."""
     boot_abstr_size = BOOT_ABSTR_DEFAULT_SIZE
-    saved_abstr_path = _boot_image_gen.find_lump_file_by_abstraction(
-        LUMPS_DIR, "SelfTest", _boot_image_gen.BOOT_ABSTR_NS_SLOT)
-    if saved_abstr_path is None:
+    locator = _active_selftest_locator(LUMPS_DIR)
+    if locator is None:
         return boot_abstr_size
+    saved_abstr_path = os.path.join(LUMPS_DIR, locator["filename"])
     try:
         import struct as _vstruct
         with open(saved_abstr_path, "rb") as fh:
@@ -3240,7 +3240,7 @@ def _load_server_managed_tokens() -> frozenset:
             return frozenset(t.lower() for t in json.load(_f).get('tokens', []))
     except Exception as _e:
         print(f'[lumps] WARNING: could not load server_managed_tokens.json: {_e}', flush=True)
-        return frozenset({'00000600'})
+        return frozenset()
 
 SERVER_MANAGED_TOKENS: frozenset = _load_server_managed_tokens()
 
@@ -3343,7 +3343,7 @@ def boot_image_download():
 def _boot_image_is_stale():
     """Return True if the image size or any tracked source is stale.
 
-    Checked files: 00000600.lump (Boot.Abstr binary), manifest.json
+    Checked files: the state-authorized SelfTest binary, manifest.json
     (controls boot_resident policy), and ns-state.json (authoritative slot,
     artifact, and generation bindings).  If boot-image.bin does not exist
     the function returns False so callers fall through to their own 404 path.
@@ -3392,7 +3392,11 @@ def _boot_image_is_stale():
                 return True
         _img_mtime = os.path.getmtime(BOOT_IMAGE_PATH)
         _lumps_dir = os.path.dirname(BOOT_IMAGE_PATH)
-        for _fname in ("00000600.lump", "manifest.json", "ns-state.json"):
+        _tracked = ["manifest.json", "ns-state.json"]
+        _locator = _active_selftest_locator(_lumps_dir)
+        if _locator is not None:
+            _tracked.append(_locator["filename"])
+        for _fname in _tracked:
             _p = os.path.join(_lumps_dir, _fname)
             if os.path.isfile(_p) and os.path.getmtime(_p) > _img_mtime:
                 return True
@@ -7025,32 +7029,59 @@ def _write_ns_state(entries):
 
 def _bind_saved_lump_to_ns_state(
         abstraction, ns_slot, token, filename, issue_n, lump_version):
-    """Refresh the artifact binding for an already-committed Namespace slot."""
-    if not isinstance(ns_slot, int) or not os.path.isfile(NS_STATE_PATH):
+    """Commit a saved artifact's deployment facts to canonical Namespace state."""
+    if not isinstance(ns_slot, int):
         return False
-    with open(NS_STATE_PATH, encoding="utf-8") as state_file:
-        state = json.load(state_file)
-    entries = state.get("abstractions") if isinstance(state, dict) else None
-    if not isinstance(entries, list):
-        return False
-    updated = False
-    for entry in entries:
-        if not isinstance(entry, dict) or entry.get("slot") != ns_slot:
-            continue
-        if entry.get("name") != abstraction:
+    if os.path.isfile(NS_STATE_PATH):
+        with open(NS_STATE_PATH, encoding="utf-8") as state_file:
+            state = json.load(state_file)
+        entries = state.get("abstractions") if isinstance(state, dict) else None
+        if not isinstance(entries, list):
+            raise ValueError("ns-state.json has no abstractions array")
+    else:
+        entries = []
+
+    entry = next(
+        (row for row in entries
+         if isinstance(row, dict) and row.get("slot") == ns_slot),
+        None)
+    selftest_rows = [
+        row for row in entries
+        if isinstance(row, dict) and row.get("name") == "SelfTest"
+    ] if abstraction == "SelfTest" else []
+    if len(selftest_rows) > 1:
+        raise ValueError("ns-state.json has multiple authoritative SelfTest rows")
+    if abstraction == "SelfTest" and selftest_rows:
+        selftest_entry = selftest_rows[0]
+        if entry is not None and entry is not selftest_entry:
             raise ValueError(
-                f"NS[{ns_slot}] belongs to {entry.get('name')!r}, not {abstraction!r}"
+                f"NS[{ns_slot}] belongs to {entry.get('name')!r}; "
+                "cannot migrate SelfTest onto an occupied Namespace slot"
             )
-        entry["token"] = token
-        entry["filename"] = filename
-        entry["issue_n"] = issue_n
-        entry["lump_version"] = lump_version
-        entry["resident"] = True
-        updated = True
-        break
-    if updated:
-        _write_ns_state(entries)
-    return updated
+        # Move the one logical SelfTest descriptor instead of appending another
+        # row.  Its sequence remains the live descriptor sequence used to mint
+        # the self/Next credentials during save preflight.
+        entry = selftest_entry
+    if entry is None:
+        # A programmer may install into an unused non-bootstrap slot.  Sequence
+        # zero is the initial live sequence for a newly allocated descriptor.
+        entry = {"name": abstraction, "slot": ns_slot, "seq": 0}
+        entries.append(entry)
+    elif entry.get("name") != abstraction:
+        raise ValueError(
+            f"NS[{ns_slot}] belongs to {entry.get('name')!r}, not {abstraction!r}"
+        )
+    entry.update({
+        "slot": ns_slot,
+        "token": token,
+        "filename": filename,
+        "issue_n": issue_n,
+        "lump_version": lump_version,
+        "resident": True,
+        "load_policy": "Resident",
+    })
+    _write_ns_state(entries)
+    return True
 
 def _ensure_ns_state():
     """Create/migrate ns-state.json to the rich per-slot format on startup.
@@ -7090,14 +7121,50 @@ def _ensure_ns_state():
         print(f"[ns-state] cold-start creation failed: {_exc}", flush=True)
 
 
+def _active_selftest_locator(lumps_dir=None):
+    """Return the one state-authorized SelfTest slot/token/file binding."""
+    lumps_dir = lumps_dir or LUMPS_DIR
+    try:
+        with open(NS_STATE_PATH, encoding="utf-8") as state_file:
+            rows = json.load(state_file).get("abstractions", [])
+        matches = [row for row in rows if isinstance(row, dict)
+                   and row.get("name") == "SelfTest"]
+        if len(matches) != 1:
+            return None
+        row = matches[0]
+        slot, token, filename = row.get("slot"), row.get("token"), row.get("filename")
+        if (isinstance(slot, bool) or not isinstance(slot, int)
+                or not isinstance(token, str) or not isinstance(filename, str)
+                or os.path.basename(filename) != filename):
+            return None
+        manifest_path = os.path.join(lumps_dir, "manifest.json")
+        with open(manifest_path, encoding="utf-8") as manifest_file:
+            manifest = json.load(manifest_file)
+        if not isinstance(manifest, list):
+            return None
+        manifest_entry = next(
+            (entry for entry in manifest
+             if entry.get("token") == token and entry.get("filename") == filename),
+            None)
+        if manifest_entry is None:
+            return None
+        return {"slot": slot, "token": token, "filename": filename,
+                "state": row, "manifest": manifest_entry}
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return None
+
+
 def _load_boot_abstr_lump():
-    """Parse boot-image.bin, extract Boot.Abstr (NS slot 6) and cache in LAZY_LUMPS.
+    """Load the state-authorized SelfTest body and cache it under its live token.
 
     boot-image.bin is stored little-endian (matching validate_boot_image / simulator.js).
     The extracted word array is re-packed big-endian for LAZY_LUMPS, matching the
     convention used by all other *.lump files and the get_lump_words endpoint.
     """
     boot_path = BOOT_IMAGE_PATH
+    locator = _active_selftest_locator()
+    if locator is None:
+        return
     if not os.path.isfile(boot_path):
         return
     try:
@@ -7116,8 +7183,7 @@ def _load_boot_abstr_lump():
         _ns_table_reserve_ab = _boot_image_gen.ns_table_reserve_words(_ns_slots_max_ab)
         ns_table_base = n_words - _ns_table_reserve_ab
         NS_ENTRY_WORDS = 4
-        BOOT_ABSTR_NS_SLOT = 6  # Task #1918: Boot.Abstr/SelfTest at slot 6 (was slot 3)
-        boot_ns_base = ns_table_base + BOOT_ABSTR_NS_SLOT * NS_ENTRY_WORDS
+        boot_ns_base = ns_table_base + locator["slot"] * NS_ENTRY_WORDS
         word0_location = mem[boot_ns_base]   # NS entry word0 = physical word address of lump
         if word0_location == 0 or word0_location + 1 >= n_words:
             return
@@ -7131,11 +7197,11 @@ def _load_boot_abstr_lump():
             return
         lump_words = mem[word0_location:word0_location + lump_size]
         # Store as big-endian bytes — matches *.lump file convention and get_lump_words
-        LAZY_LUMPS['00000600'] = _struct.pack(f'>{lump_size}I', *lump_words)
+        LAZY_LUMPS[locator["token"]] = _struct.pack(f'>{lump_size}I', *lump_words)
         _BOOT_ABSTR_META.update({
-            "token":       "00000600",
+            "token":       locator["token"],
             "abstraction": "SelfTest",
-            "ns_slot":     BOOT_ABSTR_NS_SLOT,
+            "ns_slot":     locator["slot"],
             "lump_size":   lump_size,
             "cw":          cw,
             "cc":          cc,
@@ -7165,11 +7231,8 @@ def _load_boot_abstr_lump():
             ]
         print(f'[boot] Boot.Abstr extracted: {lump_size}w at mem[{word0_location}], '
               f'cw={cw}, cc={cc}', flush=True)
-        # Manifest override: if manifest.json names a canonical file for token
-        # 00000600 (the compiled SelfTest binary), prefer it over the boot-image
-        # stub (which is just a lazy placeholder with cw=0, cc=0).  The manifest
-        # file IS the real SelfTest code; the stub in boot-image.bin merely marks
-        # the slot reserved so the boot ROM can lazy-load it on demand.
+        # Prefer the exact state+manifest-authorized SelfTest body over a
+        # possible boot-image stub.
         _lumps_dir_mo = LUMPS_DIR
         _mf_mo_path = os.path.join(_lumps_dir_mo, 'manifest.json')
         _canonical_loaded = False
@@ -7178,8 +7241,9 @@ def _load_boot_abstr_lump():
                 with open(_mf_mo_path) as _mf_mo_f:
                     _mf_mo = json.load(_mf_mo_f)
                 for _me_mo in _mf_mo:
-                    if _me_mo.get('token') == '00000600':
-                        _fn_mo = _me_mo.get('filename', '')
+                    if (_me_mo.get('token') == locator["token"]
+                            and _me_mo.get('filename') == locator["filename"]):
+                        _fn_mo = locator["filename"]
                         _np_mo = os.path.join(_lumps_dir_mo, _fn_mo) if _fn_mo else ''
                         if _fn_mo and os.path.isfile(_np_mo):
                             with open(_np_mo, 'rb') as _fh_mo:
@@ -7194,8 +7258,8 @@ def _load_boot_abstr_lump():
                             if _facts_mo is not None and _approval_mo is not None:
                                     _n_mo = len(_facts_mo["words"])
                                     _h_mo = _facts_mo["header"]
-                                    LAZY_LUMPS['00000600'] = _d_mo
-                                    LAZY_LUMPS['600'] = _d_mo
+                                    LAZY_LUMPS[locator["token"]] = _d_mo
+                                    LAZY_LUMPS[locator["token"].lstrip('0') or '0'] = _d_mo
                                     _cw_mo = _facts_mo["cw"]
                                     _cc_mo = _facts_mo["cc"]
                                     _ls_mo = _facts_mo["lump_size"]
@@ -7220,7 +7284,7 @@ def _load_boot_abstr_lump():
                                           f'cw={_cw_mo} cc={_cc_mo}', flush=True)
                         break
             except Exception as _e_mo:
-                print(f'[boot] manifest override for 00000600 failed: {_e_mo}', flush=True)
+                print(f'[boot] state-authorized SelfTest override failed: {_e_mo}', flush=True)
     except Exception as exc:
         print(f'[boot] Failed to extract Boot.Abstr lump: {exc}', flush=True)
 
@@ -7680,20 +7744,11 @@ def save_lump():
                     "cc":                 _sl_cc,
                 }), 422
 
-    # ── SelfTest canonical E-GT guard (token 00000600) ───────────────────────
-    # Token 00000600 is the canonical SelfTest lump whose c-list[0] must equal
-    # 0x4A000006 — the SelfTest E-GT (Church domain, E permission, NS slot 6).
-    # This value is asserted at module-load time by hardware/boot_rom.py, so a
-    # corrupt save is only discovered on the next server restart (when the whole
-    # IDE fails to launch).  Flag it early here before any file is touched.
-    #
-    # NOTE: The self-GT identity-seal injection below does NOT apply to this
-    # token because c-list[0] is the hardware-specified E-GT, not a petname
-    # identity seal.  The two concepts are distinct; mixing them corrupts the
-    # boot binary.
-    _SELFTEST_CANONICAL_TOKEN  = '00000600'
-    _SELFTEST_EXPECTED_EGT     = 0x4A000006  # Inform E-GT, NS slot 6, Church domain
-    _is_selftest_canonical = (token8 == _SELFTEST_CANONICAL_TOKEN)
+    # SelfTest's first two c-list rows are executable boot contracts, rather
+    # than a caller-owned identity seal.  Its token and physical slot are
+    # deliberately not part of that contract: the programmer selects an
+    # unprotected Namespace slot, and ns-state supplies its live sequence.
+    _is_selftest_canonical = str(abs_name).strip() == "SelfTest"
 
     # ── Pre-flight: identity computation + seal verification ──────────────────
     # Pure computation — no filesystem reads or writes — so a corrupt lump
@@ -7711,8 +7766,8 @@ def save_lump():
     _id_hash_int = int(_identity_hash[:8], 16)
     _self_gt     = (0x0A000000 | (_id_hash_int & 0x1FFFFFF)) & 0xFFFFFFFF
 
-    # Build the word array. The canonical SelfTest guard below runs BEFORE the
-    # cc=0→1 auto-rewrite so the rewrite cannot be used as a bypass.
+    # Build the word array. Structural and canonical checks run before the
+    # cc=0→1 auto-rewrite so it cannot be used as a bypass.
     _sl_words = [int(w) & 0xFFFFFFFF for w in words]
     _sl_hdr   = _sl_words[0]
     _sl_cc2   = _sl_hdr & 0xFF
@@ -7752,93 +7807,37 @@ def save_lump():
             return jsonify({"error": f"Portable binding validation failed: {_portable_error}",
                             "portable_binding_validation_failed": True}), 422
 
-    # ── SelfTest canonical layout guard (ALL token 00000600 saves) ───────────
-    # Runs BEFORE the cc=0→1 auto-rewrite so the rewrite cannot be used to
-    # bypass the cc check.  The canonical SelfTest binary is invariant:
-    #
-    #   lump_size = 512 words   (n_minus_6 = 3, asserted by boot_rom.py:656)
-    #   cc        = 2           (asserted by boot_rom.py:656)
-    #   word[510] = 0x4A000006  (c-list[0] E-GT, asserted by boot_rom.py:658)
-    #
-    # ALL saves of token 00000600 are subject to this guard — including those
-    # that declare a non-512-word lump_size in the header.  A non-512-word save
-    # with this token silently bypasses both the self-GT injection and all
-    # layout checks, then updates the manifest/canonical-compatibility chain,
-    # so the IDE server cannot boot on next restart.
-    # word[510] is checked at the fixed hardware-asserted index (not via
-    # lump_size−cc) so the check is immune to a wrong cc pointing the cursor
-    # elsewhere.
+    # Header and submitted-array shape must agree before any c-list offset is
+    # derived. Compact input is allowed and padded below; appended words are
+    # not, because they would be persisted outside the declared allocation.
+    if _sl_lsz < 1 + (( _sl_hdr >> 10) & 0x1FFF) + _sl_cc2:
+        return jsonify({"error": "LUMP header declares code/c-list sections outside "
+                                 "its allocated size.",
+                        "lump_structure_invalid": True}), 422
+    if len(_sl_words) > _sl_lsz:
+        return jsonify({"error": f"Submitted binary has {len(_sl_words)} words but "
+                                 f"its header allocates {_sl_lsz}.",
+                        "lump_structure_invalid": True,
+                        "declared_lump_size": _sl_lsz,
+                        "actual_lump_size": len(_sl_words)}), 422
+
+    # ── Canonical SelfTest c-list contract ───────────────────────────────────
+    # The allocated size is intentionally variable.  Row offsets and Golden
+    # Tokens are derived from the selected Namespace descriptor, never a
+    # historical token, 512-word shape, or fixed slot number.
     if _is_selftest_canonical:
-        # ── Step 1: exact array-length check (BEFORE header decode or padding) ──
-        # The submitted word array must contain exactly 512 entries.  Checking
-        # the raw array length catches oversized payloads (e.g. 513 words) that
-        # carry a valid 512-word header but extra trailing words: those words
-        # would be serialized to disk and produce a >2048-byte file that
-        # hardware/boot_rom.py's `struct.unpack(">512I", raw)` rejects on the
-        # next server start, breaking IDE boot.
-        if len(_sl_words) != 512:
-            return jsonify({
-                "error": (
-                    f"SelfTest size guard: token 00000600 requires exactly 512 "
-                    f"entries in the submitted word array ({512 * 4} bytes on disk); "
-                    f"got {len(_sl_words)} entries. "
-                    f"Re-compile from the canonical SelfTest source."
-                ),
-                "selftest_size_mismatch": True,
-                "expected_lump_size":     512,
-                "actual_lump_size":       len(_sl_words),
-            }), 422
-        # ── Step 2: header-declared lump_size ────────────────────────────────────
-        # The header must also declare 512 words (n_minus_6=3).  A 512-entry
-        # array with a 64-word header (n_minus_6=0) would write 512 words to disk
-        # but claim to be a 64-word lump — incoherent and rejected.
-        if _sl_lsz != 512:
-            return jsonify({
-                "error": (
-                    f"SelfTest layout guard: token 00000600 must declare "
-                    f"lump_size=512 in the header (n_minus_6=3, asserted by "
-                    f"hardware/boot_rom.py line 656); header declares {_sl_lsz} words. "
-                    f"Re-compile from the canonical SelfTest source."
-                ),
-                "selftest_size_mismatch": True,
-                "expected_lump_size":     512,
-                "actual_lump_size":       _sl_lsz,
-            }), 422
-        # ── Step 3: cc must equal the canonical value ─────────────────────────
         _SELFTEST_CANONICAL_CC = 2
         if _sl_cc2 != _SELFTEST_CANONICAL_CC:
             return jsonify({
                 "error": (
-                    f"SelfTest layout guard: canonical SelfTest lump (token 00000600) "
+                    "SelfTest layout guard: canonical SelfTest lump "
                     f"must have cc={_SELFTEST_CANONICAL_CC} in the header "
-                    f"(asserted by hardware/boot_rom.py line 656); "
                     f"incoming binary has cc={_sl_cc2}. "
-                    f"Submitting cc=0 to trigger the auto-rewrite is not permitted "
-                    f"for this token. "
-                    f"Re-compile from the canonical SelfTest source."
+                    "Submitting cc=0 to trigger the auto-rewrite is not permitted."
                 ),
                 "selftest_cc_mismatch": True,
                 "expected_cc":          _SELFTEST_CANONICAL_CC,
                 "actual_cc":            _sl_cc2,
-            }), 422
-        # ── Step 4: word[510] must be the hardware-asserted E-GT ─────────────
-        # Array length is exactly 512 (verified in Step 1), so word[510] is safe
-        # to access directly without padding or bounds checks.
-        _st_w510 = _sl_words[510]
-        if _st_w510 != _SELFTEST_EXPECTED_EGT:
-            return jsonify({
-                "error": (
-                    f"SelfTest E-GT guard: canonical SelfTest lump (token 00000600) "
-                    f"must have word[510] = 0x{_SELFTEST_EXPECTED_EGT:08X} "
-                    f"(SelfTest E-GT — Inform, Church domain, E permission, NS slot 6; "
-                    f"asserted by hardware/boot_rom.py line 658). "
-                    f"Incoming binary has 0x{_st_w510:08X} at word[510]. "
-                    f"Re-compile from the canonical SelfTest source to restore it."
-                ),
-                "selftest_egt_mismatch": True,
-                "expected_egt":          _SELFTEST_EXPECTED_EGT,
-                "actual_word_510":       _st_w510,
-                "word_index":            510,
             }), 422
 
     if _sl_cc2 == 0 and not _has_declared_caps and _portable_binding is None:
@@ -7854,6 +7853,77 @@ def save_lump():
         _sl_words.extend([0] * (_sl_lsz - len(_sl_words)))
 
     _clist_row0_idx = _sl_lsz - _sl_cc2
+    if _is_selftest_canonical:
+        if not isinstance(ns_slot, int):
+            return jsonify({
+                "error": "SelfTest requires a programmer-selected Namespace slot.",
+                "namespace_identity_failed": True,
+            }), 422
+        # ns-state is the authority for a reissued descriptor's sequence.  A
+        # previously unused slot starts at sequence zero and is materialized by
+        # the commit below; client metadata.namespace_sequence is never trusted.
+        _selftest_sequence = 0
+        if os.path.isfile(NS_STATE_PATH):
+            try:
+                with open(NS_STATE_PATH, encoding="utf-8") as _state_file:
+                    _state_doc = json.load(_state_file)
+                _state_rows = _state_doc.get("abstractions", [])
+                if not isinstance(_state_rows, list):
+                    raise ValueError("abstractions is not an array")
+                _state_row = next(
+                    (row for row in _state_rows
+                     if isinstance(row, dict) and row.get("slot") == ns_slot),
+                    None)
+                _selftest_rows = [
+                    row for row in _state_rows
+                    if isinstance(row, dict) and row.get("name") == "SelfTest"
+                ]
+                if len(_selftest_rows) > 1:
+                    raise ValueError("multiple authoritative SelfTest rows exist")
+                if _state_row is not None:
+                    if _state_row.get("name") != abs_name:
+                        raise ValueError(
+                            f"NS[{ns_slot}] belongs to {_state_row.get('name')!r}, "
+                            f"not {abs_name!r}")
+                    _selftest_sequence = _state_row.get("seq", 0)
+                elif _selftest_rows:
+                    # This is a slot migration.  Carry the single descriptor's
+                    # current sequence into its new unoccupied slot.
+                    _selftest_sequence = _selftest_rows[0].get("seq", 0)
+                if (isinstance(_selftest_sequence, bool)
+                        or not isinstance(_selftest_sequence, int)
+                        or not 0 <= _selftest_sequence <= 0x1FF):
+                    raise ValueError(
+                        f"NS[{ns_slot}] has invalid live sequence "
+                        f"{_selftest_sequence!r}")
+            except (OSError, ValueError, TypeError, json.JSONDecodeError) as _state_error:
+                return jsonify({
+                    "error": f"Namespace identity validation failed: {_state_error}",
+                    "namespace_identity_failed": True,
+                }), 422
+        _selftest_egt = _boot_image_gen.create_gt(
+            _selftest_sequence, ns_slot, {"E": 1}, 1)
+        _next_egt = _selftest_egt
+        for _row, _expected, _label in (
+                (0, _selftest_egt, "self E-GT"),
+                (1, _next_egt, "Next continuation E-GT")):
+            _word_index = _clist_row0_idx + _row
+            _actual = _sl_words[_word_index] & 0xFFFFFFFF
+            if _actual != _expected:
+                return jsonify({
+                    "error": (
+                        f"SelfTest {_label} guard: c-list[{_row}] at "
+                        f"word[{_word_index}] must be 0x{_expected:08X} for "
+                        f"NS[{ns_slot}] sequence {_selftest_sequence}; got "
+                        f"0x{_actual:08X}."),
+                    "selftest_egt_mismatch": True,
+                    "expected_egt": _expected,
+                    "actual_word": _actual,
+                    "word_index": _word_index,
+                    "clist_row": _row,
+                    "ns_slot": ns_slot,
+                    "sequence": _selftest_sequence,
+                }), 422
     if _portable_binding is not None:
         try:
             try:
@@ -8120,8 +8190,8 @@ def save_lump():
             _validated_declared_caps.append(_cap_obj)
 
     # Inject the self-GT identity seal at c-list[0].
-    # Skipped for token 00000600: its c-list[0] is the hardware-asserted SelfTest
-    # E-GT (validated above) and must not be overwritten with the petname seal.
+    # Skipped for canonical SelfTest: its c-list[0] is the live SelfTest E-GT
+    # (validated above) and must not be overwritten with the petname seal.
     # Also skipped when c-list rows belong to declared capabilities; in that
     # case identity_string + identity_hash are the canonical metadata seal.
     if not _is_selftest_canonical and not _has_declared_caps and _portable_binding is None:
@@ -8584,7 +8654,7 @@ def save_lump():
                 _write_boot_image_bytes(blob_bi)
                 boot_refreshed = True
                 print(f'[lumps] boot-image.bin regenerated ({len(blob_bi)} bytes)', flush=True)
-                _load_boot_abstr_lump()   # refresh _BOOT_ABSTR_META / LAZY_LUMPS['00000600']
+                _load_boot_abstr_lump()   # refresh the active SelfTest cache
                 _load_boot_ns_lump()      # refresh _BOOT_NS_META from updated boot-image.bin
             else:
                 boot_refresh_note = f'boot config unavailable: {err_bi}'
@@ -8595,7 +8665,7 @@ def save_lump():
                 "[lumps] saved %s but boot image refresh was deferred: %s",
                 lump_filename, _bie)
 
-    # ── SelfTest metadata always refreshed on token 00000600 save ────────────
+    # ── SelfTest metadata is always refreshed after a SelfTest save ──────────
     # generate_boot_image() locates the SelfTest lump via ns_slot in the
     # manifest, but new manifest entries intentionally omit ns_slot (ns-state.json
     # is authoritative for that mapping).  When regeneration fails or is skipped,
@@ -8604,7 +8674,7 @@ def save_lump():
     # Calling it unconditionally here (reads the manifest-designated lump file
     # directly, no boot-image needed) ensures the list reflects the new binary
     # immediately after every SelfTest save, regardless of boot-image outcome.
-    if token8 == '00000600' and not boot_refreshed:
+    if _is_selftest_canonical and not boot_refreshed:
         _load_boot_abstr_lump()
 
     LAZY_LUMPS[token8] = lump_bytes
@@ -10480,8 +10550,8 @@ def boot_rom_words():
 def boot_lump_words():
     """Return c-list and code words for Boot.Abstr from the boot image.
 
-    The NS slot is read from boot_image_gen.BOOT_ABSTR_NS_SLOT (currently 6);
-    never hardcode the slot number here.  Used by the Connect tab stream panel
+    The NS slot is resolved from the authoritative SelfTest state row. Used by
+    the Connect tab stream panel
     to disassemble NIA lines and display the GT the instruction accesses.
     """
     import struct as _struct
@@ -10496,7 +10566,10 @@ def boot_lump_words():
     words = _struct.unpack_from(f'<{n_words}I', _img)
     BOOT_TAG        = _boot_image_gen.BOOT_IMAGE_FORMAT_TAG
     NS_ENTRY_WORDS  = _boot_image_gen.NS_ENTRY_WORDS
-    BOOT_ABSTR_SLOT = _boot_image_gen.BOOT_ABSTR_NS_SLOT
+    locator = _active_selftest_locator()
+    if locator is None:
+        return jsonify({"ok": False, "error": "no authoritative SelfTest binding"})
+    BOOT_ABSTR_SLOT = locator["slot"]
     tag_idx = None
     for _i in range(n_words - 1, max(n_words - 8192, -1), -1):
         if words[_i] == BOOT_TAG:
@@ -15151,13 +15224,14 @@ def _ba_lump_size_budget(path):
     except Exception as exc:
         return {'available': False, 'reason': f'cannot read binary: {exc}'}
 
-def _ba_check_selftest_egt(lump_path, selftest_ns_slot):
+def _ba_check_selftest_egt(lump_path, selftest_ns_slot, selftest_sequence=0):
     """
-    Verify SelfTest LUMP c-list[0] matches boot_rom's expected E-GT.
+    Verify both canonical SelfTest c-list entries against live Namespace state.
 
     The c-list is stored at the LAST cc words of the lump file.  For the
-    canonical SelfTest binary (cc=1) the last file word should equal:
-        boot_rom.make_gt(GT_TYPE_INFORM, PERM_MASK_E, SELFTEST_NS_SLOT, 0)
+    c-list rows are addressed from the header-declared allocation and cc, not
+    a historical 512-word binary shape.  Both row 0 (self) and row 1 (Next)
+    carry the selected slot's live E-GT.
 
     This is the check that would have caught the v12→v13 regression where the
     SelfTest return-channel GT was corrupted: an incorrect c-list[0] means the
@@ -15166,26 +15240,13 @@ def _ba_check_selftest_egt(lump_path, selftest_ns_slot):
     Fails CLOSED: if the expected value cannot be computed the check returns
     ok=False rather than passing silently.
     """
-    # Import hardware.boot_rom from the repo root (parent of server/).
-    # boot_rom uses package-relative imports (from .hw_types import *) so it
-    # must be loaded as part of the 'hardware' package, not as a standalone file.
-    import sys as _sys
-    _repo_root = os.path.dirname(_SERVER_DIR)
     expected_gt  = None
     import_err   = None
-    _inserted = False
     try:
-        if _repo_root not in _sys.path:
-            _sys.path.insert(0, _repo_root)
-            _inserted = True
-        import hardware.boot_rom as _hw_boot_rom
-        expected_gt = _hw_boot_rom.make_gt(
-            _hw_boot_rom.GT_TYPE_INFORM, _hw_boot_rom.PERM_MASK_E, selftest_ns_slot, 0)
+        expected_gt = _boot_image_gen.create_gt(
+            selftest_sequence, selftest_ns_slot, {"E": 1}, 1)
     except Exception as _e:
         import_err = str(_e)
-    finally:
-        if _inserted and _repo_root in _sys.path:
-            _sys.path.remove(_repo_root)
 
     if expected_gt is None:
         # Fail closed: cannot verify without the expected value
@@ -15201,20 +15262,22 @@ def _ba_check_selftest_egt(lump_path, selftest_ns_slot):
         w0 = _ba_struct.unpack_from('>I', data, 0)[0]
         cw = (w0 >> 10) & 0x1FFF
         cc = w0 & 0xFF
-        if cc == 0:
-            return {'ok': None, 'detail': 'SelfTest LUMP has cc=0 (no c-list entries)'}
+        if cc != 2:
+            return {'ok': False, 'detail': f'SelfTest LUMP has cc={cc}; expected cc=2'}
         # Validate file size before using file-length-derived c-list offset to
         # prevent appended-data attacks where a correct GT is placed beyond the
         # declared content boundary.
         size_err = _ba_validate_lump_size(n_words, cw, cc)
         if size_err:
             return {'ok': False, 'detail': f'LUMP integrity: {size_err}'}
-        # c-list occupies the LAST cc words of the (validated) file
-        actual_gt = _ba_struct.unpack_from('>I', data, (n_words - cc) * 4)[0]
-        ok = (actual_gt == expected_gt)
+        # c-list occupies the last cc words of the validated allocation.
+        row0 = _ba_struct.unpack_from('>I', data, (n_words - cc) * 4)[0]
+        row1 = _ba_struct.unpack_from('>I', data, (n_words - cc + 1) * 4)[0]
+        ok = row0 == expected_gt and row1 == expected_gt
         verdict = '✅ matches boot_rom' if ok else '❌ mismatch'
         return {'ok': ok,
-                'detail': f'c-list[0]=0x{actual_gt:08X} expected=0x{expected_gt:08X} {verdict}'}
+                'detail': (f'c-list[0]=0x{row0:08X} c-list[1]=0x{row1:08X} '
+                           f'expected=0x{expected_gt:08X} {verdict}')}
     except Exception as e:
         return {'ok': None, 'detail': f'c-list check error: {e}'}
 
@@ -15354,7 +15417,8 @@ def _ba_build_ns_map():
         m = _re.search(pattern, rom_src)
         return m.group(1) if m else default
 
-    selftest_slot   = int(_rom(r'SELFTEST_NS_SLOT\s*=\s*(\d+)',          '6'))
+    # SelfTest is a movable, state-owned program rather than a ROM slot.
+    selftest_slot   = None
     callhome_slot   = int(_rom(r'WUKONG_CALLHOME_NS_SLOT\s*=\s*(\d+)',  '7'))
     ns_slot_count   = int(_rom(r'NS_SLOT_COUNT\s*=\s*(\d+)',             '8'))
     selftest_base   = _rom(r'WUKONG_SELFTEST_BASE_BYTE\s*=\s*(0x[0-9a-fA-F]+|\d+)', '0x600')
@@ -15421,6 +15485,12 @@ def _ba_build_ns_map():
                     entry['token'] = os.path.basename(candidates[-1]).rsplit('.', 2)[1]
         manifest_by_slot[entry['ns_slot']] = entry
     manifest_no_slot = []
+    _active_selftest = [
+        entry for entry in manifest_by_slot.values()
+        if entry.get('abstraction') == 'SelfTest'
+    ]
+    if len(_active_selftest) == 1:
+        selftest_slot = _active_selftest[0]['ns_slot']
 
     # Load policy belongs to the individual Namespace slot.  Do not infer it
     # from the slot number: slot 6 can be lazy while slot 10 can be resident,
@@ -15613,7 +15683,9 @@ def _ba_build_ns_map():
                            'warn': op_chk.get('warn', False),
                            'detail': op_chk['detail']})
             # 4b. c-list[0] E-GT check — verify return-channel capability matches boot_rom
-            egt = _ba_check_selftest_egt(lump_path, selftest_slot)
+            egt = _ba_check_selftest_egt(
+                lump_path, selftest_slot,
+                (manifest_entry or {}).get('seq', 0))
             checks.append({'label': 'SelfTest E-GT', 'ok': egt['ok'],
                            'detail': egt['detail']})
 
@@ -15704,10 +15776,9 @@ def _ba_build_ns_map():
     st_entry = manifest_by_slot.get(selftest_slot) or {}
     # The committed state token is the content token.  The legacy token-named
     # file remains a lookup alias and must not redefine that identity.
-    st_token = st_entry.get('token') or '00000600'
-    st_lump = _state_lump_path(st_entry) or os.path.join(
-        _LUMPS_DIR, st_entry.get('filename') or '00000600.lump')
-    st_hdr = _ba_read_lump_header(st_lump) if os.path.exists(st_lump) else None
+    st_token = st_entry.get('token')
+    st_lump = _state_lump_path(st_entry)
+    st_hdr = _ba_read_lump_header(st_lump) if st_lump and os.path.exists(st_lump) else None
     st_checks = _lump_checks(selftest_slot, st_token,
                              manifest_by_slot.get(selftest_slot),
                              st_lump, is_selftest=True)

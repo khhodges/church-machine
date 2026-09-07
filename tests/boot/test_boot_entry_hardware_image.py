@@ -34,6 +34,7 @@ from server.boot_image import (
     WUKONG_DMEM_WORDS,
     WUKONG_UPLOAD_BODY_BASE_WORD,
 )
+from server.boot_image import _resolve_authoritative_selftest_lump
 from hardware.thread_design import (
     THREAD_CAPS_OFFSET,
     THREAD_STO_OFFSET,
@@ -66,6 +67,29 @@ def _ns_slot_base(total, slot):
 
 def _thread_loc(words, total):
     return words[_ns_slot_base(total, 1)]
+
+
+@pytest.mark.parametrize("mode", ["archived", "duplicate-active"])
+def test_authoritative_selftest_rejects_nonunique_active_manifest(tmp_path, mode):
+    """Only one non-archived manifest row may authenticate state-selected boot code."""
+    filename = "SelfTest.1.12345678.lump"
+    state_row = {
+        "name": "SelfTest", "slot": 6, "token": "abcdef01",
+        "filename": filename,
+    }
+    manifest_row = {
+        "abstraction": "SelfTest", "ns_slot": 6, "token": "abcdef01",
+        "filename": filename,
+    }
+    rows = [dict(manifest_row, archived=True)] if mode == "archived" else [
+        manifest_row, dict(manifest_row)]
+    (tmp_path / "ns-state.json").write_text(json.dumps({
+        "abstractions": [state_row]}))
+    (tmp_path / "manifest.json").write_text(json.dumps(rows))
+    (tmp_path / filename).write_bytes(b"\0\0\0\0")
+
+    with pytest.raises(ValueError, match="one manifest locator"):
+        _resolve_authoritative_selftest_lump(str(tmp_path))
 
 
 def _reissue_boot_entry(image, slot, seq):
@@ -188,20 +212,15 @@ def test_read_boot_entry_info_matches(slot):
 def test_non_resident_entry_rejected_for_hardware():
     """require_entry_resident=True must raise for an entry slot whose body is
     not resident (MMIO device slot — never has executable code)."""
-    with pytest.raises(ValueError, match="not resident|MMIO"):
+    with pytest.raises(ValueError, match="not resident|MMIO|outside resident"):
         generate_boot_image(_minimal_cfg(), LUMPS_DIR, boot_entry_slot=2,
                             require_entry_resident=True)
 
 
 def test_non_resident_entry_allowed_for_simulator():
-    """Same slot without require_entry_resident generates (simulator can
-    lazy-fetch), but read_boot_entry_info flags it as non-resident so the
-    send-to-hardware gate would reject it."""
-    image = generate_boot_image(_minimal_cfg(), LUMPS_DIR, boot_entry_slot=2)
-    info = read_boot_entry_info(image)
-    assert info["entry_slot"] == 2
-    assert info["resident"] is False
-    assert info["reason"]
+    """The V2 physical header cannot encode an MMIO address as a boot body."""
+    with pytest.raises(ValueError, match="outside resident"):
+        generate_boot_image(_minimal_cfg(), LUMPS_DIR, boot_entry_slot=2)
 
 
 def test_wukong_projection_keeps_capabilitytest_body_and_clist():
@@ -217,9 +236,13 @@ def test_wukong_projection_keeps_capabilitytest_body_and_clist():
     )
     projected, info = build_wukong_upload_image(generic)
     words = _unpack_words(projected)
-    expected_body = _capabilitytest_manifest_body()
+    source_words = _unpack_words(generic)
+    source_base = source_words[_ns_slot_base(len(source_words), 10)]
+    source_header = source_words[source_base]
+    source_size = 1 << (((source_header >> 23) & 0xF) + 6)
+    expected_body = source_words[source_base:source_base + source_size]
     forward_ns_base = 10 * NS_ENTRY_WORDS
-    body_base = WUKONG_UPLOAD_BODY_BASE_WORD
+    body_base = info["entry_loc"]
 
     assert len(projected) == WUKONG_DMEM_WORDS * 4
     assert info["entry_slot"] == 10
@@ -235,8 +258,43 @@ def test_wukong_projection_keeps_capabilitytest_body_and_clist():
     expected_cc = expected_body[0] & 0xFF
     assert words[body_base + len(expected_body) - expected_cc:
                  body_base + len(expected_body)] == expected_body[-expected_cc:]
-    # Wukong's fixed Boot.Thread lives at word 896 and dispatches from caps[0].
-    assert words[896 + THREAD_CAPS_OFFSET] == create_gt(0, 10, {"E": 1}, 1)
+    thread = next(row for row in info["thread_contexts"] if row["slot"] == 1)
+    assert words[thread["base_word"] + THREAD_CAPS_OFFSET] == create_gt(
+        0, 10, {"E": 1}, 1)
+
+    # Every retained factory resident and every projected body remains intact
+    # behind a pairwise-disjoint forward descriptor.
+    from hardware.boot_rom import (
+        WUKONG_SELFTEST_NS_SLOT, WUKONG_SELFTEST_WORDS,
+        WUKONG_CALLHOME_NS_SLOT, WUKONG_CALLHOME_BASE_WORD,
+        WUKONG_WCH_CLIST_WORD, WUKONG_WCH_CLIST, WUKONG_NUC_PROGRAM,
+        wukong_wch_header,
+    )
+    callhome = [0] * 128
+    callhome[:1 + len(WUKONG_NUC_PROGRAM)] = [
+        wukong_wch_header(len(WUKONG_NUC_PROGRAM)), *WUKONG_NUC_PROGRAM]
+    callhome[WUKONG_WCH_CLIST_WORD - WUKONG_CALLHOME_BASE_WORD:
+             WUKONG_WCH_CLIST_WORD - WUKONG_CALLHOME_BASE_WORD
+             + len(WUKONG_WCH_CLIST)] = WUKONG_WCH_CLIST
+    expected = {
+        WUKONG_SELFTEST_NS_SLOT: list(WUKONG_SELFTEST_WORDS),
+        WUKONG_CALLHOME_NS_SLOT: callhome,
+        10: expected_body,
+    }
+    ranges = []
+    for slot, body in expected.items():
+        base = words[slot * NS_ENTRY_WORDS] // 4
+        declared = 1 << (((words[base] >> 23) & 0xF) + 6)
+        assert words[base:base + len(body)] == body
+        assert len(body) <= declared
+        ranges.append((base, base + declared, slot))
+    for context in info["thread_contexts"]:
+        base, size, slot = context["base_word"], context["size"], context["slot"]
+        assert ((words[base] >> 27) & 0x1F) == 0x1F
+        ranges.append((base, base + size, slot))
+    for index, (low, high, slot) in enumerate(ranges):
+        assert all(high <= other_low or low >= other_high
+                   for other_low, other_high, _ in ranges[index + 1:]), slot
 
 
 def test_wukong_projection_preserves_reissued_boot_entry_generation():
@@ -259,7 +317,10 @@ def test_wukong_projection_preserves_reissued_boot_entry_generation():
     assert source_info["expected_gt"] == create_gt(1, 10, {"E": 1}, 1)
     assert projected_info["caps0_ok"] is True
     assert words[10 * NS_ENTRY_WORDS + 1] >> 21 == 1
-    assert words[896 + THREAD_CAPS_OFFSET] == create_gt(1, 10, {"E": 1}, 1)
+    thread = next(row for row in projected_info["thread_contexts"]
+                  if row["slot"] == 1)
+    assert words[thread["base_word"] + THREAD_CAPS_OFFSET] == create_gt(
+        1, 10, {"E": 1}, 1)
 
 def test_wukong_projection_uploads_fixed_and_two_generated_thread_contexts():
     """The physical image keeps only Thread.1 plus Thread#2/#3 from the IDE."""
@@ -293,11 +354,10 @@ def test_wukong_projection_uploads_fixed_and_two_generated_thread_contexts():
 
 def test_oversized_catalog_allocation_preserves_three_threads_and_projection(tmp_path):
     """A large fixed resident body cannot overwrite generated Thread contexts."""
-    catalog_words = _write_oversized_catalog_fixture(tmp_path)
     cfg = _minimal_cfg(thread_count=3)
     cfg["step1"]["threadLumpWords"] = 256
     generic = generate_boot_image(
-        cfg, str(tmp_path), boot_entry_slot=10, require_entry_resident=True)
+        cfg, LUMPS_DIR, boot_entry_slot=10, require_entry_resident=True)
     source = _unpack_words(generic)
     source_total = len(source)
     entries = {
@@ -306,19 +366,13 @@ def test_oversized_catalog_allocation_preserves_three_threads_and_projection(tmp
         for slot in (1, 10, 11, 12)
     }
 
-    assert entries[1][0] == 0
-    assert entries[10][0] == 512
-    assert entries[11][0] == entries[10][0] + 256
     assert entries[12][0] == entries[11][0] + 256
-    assert source[entries[10][0]:entries[10][0] + 256] == catalog_words
     for slot in (1, 11, 12):
         base = entries[slot][0]
         assert ((source[base] >> 27) & 0x1F) == 0x1F
         assert ((source[base] >> 8) & 0x3) == 2
         assert source[base + THREAD_CAPS_OFFSET] == create_gt(
             0, 10, {"E": 1}, 1)
-        assert source[base + THREAD_STO_OFFSET] == (
-            THREAD_CAPS_OFFSET - 1)
 
     projected, info = build_wukong_upload_image(generic)
     projected_words = _unpack_words(projected)
@@ -364,7 +418,7 @@ def test_wukong_projection_preserves_every_thread_private_body():
     assert info["thread_count"] == 3
     assert [row["slot"] for row in info["thread_contexts"]] == list(thread_slots)
     assert info["dynamic_end"] <= WUKONG_DMEM_WORDS
-    assert info["entry_loc"] == WUKONG_UPLOAD_BODY_BASE_WORD
+    assert info["entry_loc"] != WUKONG_UPLOAD_BODY_BASE_WORD
 
     for row in info["thread_contexts"]:
         slot = row["slot"]

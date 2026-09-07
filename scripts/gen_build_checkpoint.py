@@ -6,8 +6,7 @@ Reads:
   build/church_wukong_xc7a100t.bit.meta.json  (bitstream sidecar)
   hardware/wukong_top.py                        (source build version)
   hardware/boot_rom.py                          (NS slot layout, LUMP bases)
-  server/lumps/00000600.lump                    (SelfTest binary, slot 6)
-  server/lumps/manifest.json                    (registered server LUMPs)
+  server/lumps/ns-state.json + manifest.json    (active SelfTest locator)
 
 Writes:
   build/church_wukong_xc7a100t.checkpoint.md
@@ -19,6 +18,17 @@ Run:
 import os, sys, re, json, struct, hashlib, datetime
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+from hardware.boot_rom import (  # noqa: E402
+    MMIO_M_BIT_SLOT,
+    CAPABILITY_TEST_NS_SLOT,
+    WUKONG_CAPABILITY_TEST_BOUND, WUKONG_CAPABILITY_TEST_WORDS,
+    WUKONG_CALLHOME_NS_SLOT,
+    WUKONG_DEMO_NAMESPACE, WUKONG_NUC_PROGRAM,
+    WUKONG_SELFTEST_NS_SLOT, wukong_wch_header,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -81,87 +91,88 @@ mcs_mtime = (datetime.datetime.utcfromtimestamp(os.path.getmtime(mcs_path))
              .strftime('%Y-%m-%dT%H:%M:%SZ')) if mcs_size else 'missing'
 
 # ---------------------------------------------------------------------------
-# 3. Boot NS slot layout (parsed from boot_rom.py comments + constants)
+# 3. Authoritative Wukong runtime bindings
 # ---------------------------------------------------------------------------
-with open(os.path.join(ROOT, 'hardware', 'boot_rom.py')) as f:
-    rom_src = f.read()
+selftest_ns_slot = WUKONG_SELFTEST_NS_SLOT
+callhome_ns_slot = WUKONG_CALLHOME_NS_SLOT
+ns_slot_count = len(WUKONG_DEMO_NAMESPACE) // 4
+def _runtime_location(slot):
+    return WUKONG_DEMO_NAMESPACE[slot * 4]
 
-selftest_ns_slot   = int(_re_extract(r'SELFTEST_NS_SLOT\s*=\s*(\d+)',         rom_src, default='6'))
-callhome_ns_slot   = int(_re_extract(r'WUKONG_CALLHOME_NS_SLOT\s*=\s*(\d+)', rom_src, default='7'))
-ns_slot_count      = int(_re_extract(r'NS_SLOT_COUNT\s*=\s*(\d+)',            rom_src, default='8'))
+def _runtime_alloc(slot):
+    return (WUKONG_DEMO_NAMESPACE[slot * 4 + 1] & ((1 << 21) - 1)) + 1
 
-# MMIO addresses
-mmio_uart_addr  = _re_extract(r'MMIO_UART_ADDR\s*=\s*(0x[0-9a-fA-F]+)',  rom_src, default='0x40000014')
-mmio_led_addr   = _re_extract(r'MMIO_LED_ADDR\s*=\s*(0x[0-9a-fA-F]+)',   rom_src, default='0x40000000')
-mmio_btn_addr   = _re_extract(r'MMIO_BTN_ADDR\s*=\s*(0x[0-9a-fA-F]+)',   rom_src, default='0x40000028')
-mmio_timer_addr = _re_extract(r'MMIO_TIMER_ADDR\s*=\s*(0x[0-9a-fA-F]+)', rom_src, default='0x4000002C')
-
-# SelfTest LUMP base (0x0600)
-selftest_base  = _re_extract(r'WUKONG_SELFTEST_BASE_BYTE\s*=\s*(0x[0-9a-fA-F]+|\d+)', rom_src, default='0x600')
-callhome_base  = _re_extract(r'_wch_loc_byte\s*=\s*(0x[0-9a-fA-F]+|\d+)',             rom_src, default='0x1200')
-# fallback: look for the literal comment loc=0x1200
-if callhome_base == '0x1200':
-    m = re.search(r'Slot\s+7.*?loc.*?(0x[0-9a-fA-F]+)', rom_src)
-    if m:
-        callhome_base = m.group(1)
-
-thread_base = _re_extract(r'WUKONG_THREAD_BASE_WORD\s*=\s*(\d+)', rom_src, default='896')
-try:
-    thread_base_hex = hex(int(thread_base) * 4)
-except Exception:
-    thread_base_hex = '0xE00'
-
-# NS_TABLE_BASE — defined in hardware/hw_types.py, not boot_rom.py
-hw_types_path = os.path.join(ROOT, 'hardware', 'hw_types.py')
-with open(hw_types_path) as f:
-    hw_types_src = f.read()
-ns_table_base = _re_extract(r'NS_TABLE_BASE\s*=\s*(0x[0-9a-fA-F]+|\d+)', hw_types_src, default='?')
+mmio_uart_addr = f'0x{_runtime_location(2):08X}'
+mmio_led_addr = f'0x{_runtime_location(3):08X}'
+mmio_btn_addr = f'0x{_runtime_location(4):08X}'
+mmio_timer_addr = f'0x{_runtime_location(5):08X}'
+selftest_base = f'0x{_runtime_location(selftest_ns_slot):08X}'
+callhome_base = f'0x{_runtime_location(callhome_ns_slot):08X}'
+thread_base_hex = f'0x{_runtime_location(1):08X}'
+ns_table_base = f'0x{WUKONG_DEMO_NAMESPACE[0]:08X}'
 
 # ---------------------------------------------------------------------------
 # 4. LUMP binaries for NS slots that have physical lumps
 # ---------------------------------------------------------------------------
 lumps_dir = os.path.join(ROOT, 'server', 'lumps')
 
-# Boot.Abstr canonical token is 00000600 by filename convention
-boot_abstr_lump = os.path.join(lumps_dir, '00000600.lump')
-selftest_hdr = _read_lump_header(boot_abstr_lump)
-
-# WukongCallHome — find the token from the JSON manifest or lump files
-# The canonical boot file is not token-named for WukongCallHome; find by ns_slot or known header
-wch_token = None
-wch_hdr = None
 manifest_path = os.path.join(lumps_dir, 'manifest.json')
 manifest = []
 if os.path.exists(manifest_path):
     with open(manifest_path) as f:
         manifest = json.load(f)
 
-# Try to find WukongCallHome from manifest
-for entry in manifest:
-    if 'wukong' in entry.get('abstraction', '').lower() or \
-       entry.get('ns_slot') == callhome_ns_slot:
-        wch_token = entry.get('token')
-        break
+# Resolve the exact active SelfTest canonical artifact.  The historical
+# 00000600 filename is an address-era alias and must never provide provenance.
+selftest_hdr = None
+st_token = '?'
+st_filename = None
+ns_state_path = os.path.join(lumps_dir, 'ns-state.json')
+ns_state = {}
+if os.path.exists(ns_state_path):
+    with open(ns_state_path) as f:
+        ns_state = json.load(f)
+    selected = [entry for entry in ns_state.get('abstractions', [])
+                if entry.get('name') == 'SelfTest']
+    if len(selected) == 1:
+        selected = selected[0]
+        if isinstance(selected.get('slot'), int):
+            selftest_ns_slot = selected['slot']
+        matches = [entry for entry in manifest
+                   if entry.get('abstraction') == 'SelfTest'
+                   and not entry.get('archived', False)
+                   and entry.get('ns_slot') == selected.get('slot')
+                   and entry.get('token') == selected.get('token')
+                   and entry.get('filename') == selected.get('filename')]
+        filename = selected.get('filename')
+        if (len(matches) == 1 and isinstance(filename, str)
+                and os.path.basename(filename) == filename):
+            candidate = os.path.join(lumps_dir, filename)
+            selftest_hdr = _read_lump_header(candidate)
+            st_token = selected.get('token', '?')
+            st_filename = filename
 
-# Also check named lump files for WukongCallHome_v*
-wch_candidates = [fn for fn in os.listdir(lumps_dir) if 'WukongCallHome' in fn and fn.endswith('.lump')]
-if not wch_token and wch_candidates:
-    # Pick the latest version
-    wch_candidates.sort()
-    wch_file = os.path.join(lumps_dir, wch_candidates[-1])
-    wch_hdr = _read_lump_header(wch_file)
-    wch_token = wch_candidates[-1].replace('.lump', '')
-
-if wch_token:
-    # Try hex token path first
-    for ext in ['.lump']:
-        p = os.path.join(lumps_dir, wch_token + ext)
-        if os.path.exists(p):
-            wch_hdr = _read_lump_header(p)
-            break
-    if not wch_hdr:
-        if wch_candidates:
-            wch_hdr = _read_lump_header(os.path.join(lumps_dir, wch_candidates[-1]))
+# WukongCallHome identity comes from the active namespace binding.  Its header
+# and address are the actual synthesized runtime values, not an older manifest
+# row or simulator placement.
+wch_token = None
+wch_hdr = None
+wch_selected = [entry for entry in ns_state.get('abstractions', [])
+                if entry.get('name') == 'WukongCallHome'
+                and entry.get('slot') == callhome_ns_slot]
+if len(wch_selected) == 1:
+    wch_selected = wch_selected[0]
+    wch_matches = [entry for entry in manifest
+                   if entry.get('abstraction') == 'WukongCallHome'
+                   and not entry.get('archived', False)
+                   and entry.get('token') == wch_selected.get('token')
+                   and entry.get('filename') == wch_selected.get('filename')]
+    if len(wch_matches) == 1:
+        wch_token = wch_selected.get('token')
+        _wch_header_word = wukong_wch_header(len(WUKONG_NUC_PROGRAM))
+        wch_hdr = (_wch_header_word,
+                   (_wch_header_word >> 10) & 0x1FFF,
+                   _wch_header_word & 0xFF)
 
 # ---------------------------------------------------------------------------
 # 5. Server manifest LUMPs (registered abstractions)
@@ -225,27 +236,26 @@ lines = [
     f'',
     f'NS_TABLE_BASE = {ns_table_base}',
     f'',
-    f'| Slot | Name              | Location   | Perms | LUMP token   | Header word  | cw  | cc |',
-    f'|------|-------------------|------------|-------|--------------|--------------|-----|----|',
-    f'|  0   | Boot.NS (NS root) | {ns_table_base}  | R+W   | —            | —            | —   | —  |',
-    f'|  1   | Boot.Thread       | {thread_base_hex}      | R+W   | —            | (in ROM)     | —   | —  |',
-    f'|  2   | UART_DEV          | {mmio_uart_addr}  | R+W   | —            | MMIO         | —   | —  |',
-    f'|  3   | LED_DEV           | {mmio_led_addr}  | R+W   | —            | MMIO         | —   | —  |',
-    f'|  4   | BTN_DEV           | {mmio_btn_addr}  | R     | —            | MMIO         | —   | —  |',
-    f'|  5   | TIMER_DEV         | {mmio_timer_addr}  | R+W   | —            | MMIO         | —   | —  |',
+    f'| Slot | Name              | Runtime location | Alloc | Perms | LUMP token   | Header word  | cw  | cc |',
+    f'|------|-------------------|------------------|-------|-------|--------------|--------------|-----|----|',
+    f'|  0   | Boot.NS (NS root) | {ns_table_base}       | {_runtime_alloc(0)}    | R+W   | —            | —            | —   | —  |',
+    f'|  1   | Boot.Thread       | {thread_base_hex}       | {_runtime_alloc(1)}   | R+W   | —            | (in ROM)     | —   | 12 |',
+    f'|  2   | UART_DEV          | {mmio_uart_addr}       | {_runtime_alloc(2)}     | R+W   | —            | MMIO         | —   | —  |',
+    f'|  3   | LED_DEV           | {mmio_led_addr}       | {_runtime_alloc(3)}     | R+W   | —            | MMIO         | —   | —  |',
+    f'|  4   | BTN_DEV           | {mmio_btn_addr}       | {_runtime_alloc(4)}     | R     | —            | MMIO         | —   | —  |',
+    f'|  5   | TIMER_DEV         | {mmio_timer_addr}       | {_runtime_alloc(5)}     | R+W   | —            | MMIO         | —   | —  |',
 ]
 
-# Slot 6 — SelfTest
-st_token = '00000600'
+# Active SelfTest
 st_str = _hdr_str(selftest_hdr)
 if selftest_hdr:
     _, st_cw, st_cc = selftest_hdr
     st_hdr_word = f'0x{selftest_hdr[0]:08X}'
     lines.append(
-        f'|  {selftest_ns_slot}   | SelfTest ⚡        | {selftest_base}      | E     | {st_token}   | {st_hdr_word}   | {st_cw}  | {st_cc}  |'
+        f'|  {selftest_ns_slot}   | SelfTest ⚡        | {selftest_base}       | {_runtime_alloc(selftest_ns_slot)}  | E     | {st_token}   | {st_hdr_word}   | {st_cw}  | {st_cc}  |'
     )
 else:
-    lines.append(f'|  {selftest_ns_slot}   | SelfTest ⚡        | {selftest_base}      | E     | {st_token}   | MISSING      | —   | —  |')
+    lines.append(f'|  {selftest_ns_slot}   | SelfTest ⚡        | {selftest_base}       | —     | E     | {st_token}   | MISSING      | —   | —  |')
 
 # Slot 7 — WukongCallHome
 wch_tok_display = wch_token or '?'
@@ -253,10 +263,29 @@ if wch_hdr:
     _, wch_cw, wch_cc = wch_hdr
     wch_hdr_word = f'0x{wch_hdr[0]:08X}'
     lines.append(
-        f'|  {callhome_ns_slot}   | WukongCallHome    | {callhome_base}    | E     | {wch_tok_display:<12}  | {wch_hdr_word}   | {wch_cw}   | {wch_cc}  |'
+        f'|  {callhome_ns_slot}   | WukongCallHome    | {callhome_base}       | {_runtime_alloc(callhome_ns_slot)}   | E     | {wch_tok_display:<12}  | {wch_hdr_word}   | {wch_cw}   | {wch_cc}  |'
     )
 else:
-    lines.append(f'|  {callhome_ns_slot}   | WukongCallHome    | {callhome_base}    | E     | {wch_tok_display:<12}  | ?            | —   | —  |')
+    lines.append(f'|  {callhome_ns_slot}   | WukongCallHome    | {callhome_base}       | {_runtime_alloc(callhome_ns_slot)}   | E     | {wch_tok_display:<12}  | ?            | —   | —  |')
+
+if WUKONG_CAPABILITY_TEST_BOUND:
+    cap_header = WUKONG_CAPABILITY_TEST_WORDS[0]
+    cap_cw = (cap_header >> 10) & 0x1FFF
+    cap_cc = cap_header & 0xFF
+    cap_binding = [entry for entry in ns_state.get('abstractions', [])
+                   if entry.get('name') == 'CapabilityTest'
+                   and entry.get('slot') == CAPABILITY_TEST_NS_SLOT]
+    cap_token = cap_binding[0].get('token', '?') if len(cap_binding) == 1 else '?'
+    lines.append(
+        f'|  {CAPABILITY_TEST_NS_SLOT}  | CapabilityTest    | '
+        f'0x{_runtime_location(CAPABILITY_TEST_NS_SLOT):08X}       | '
+        f'{_runtime_alloc(CAPABILITY_TEST_NS_SLOT)}   | E     | {cap_token:<12}  | '
+        f'0x{cap_header:08X}   | {cap_cw}  | {cap_cc}  |')
+
+lines.append(
+    f'|  {MMIO_M_BIT_SLOT}  | M_BIT_DEV         | '
+    f'0x{_runtime_location(MMIO_M_BIT_SLOT):08X}       | '
+    f'{_runtime_alloc(MMIO_M_BIT_SLOT)}     | R+W   | —            | MMIO         | —   | —  |')
 
 lines += [
     f'',
@@ -290,8 +319,8 @@ lines += [
     f'',
     f'- [ ] Bitstream md5 verified ({bit_integrity})',
     f'- [ ] Flashed version matches expected (currently v{bit_version})',
-    f'- [ ] SelfTest LUMP token matches boot ROM assertion  '
-         f'(00000600.lump header = {_hdr_str(selftest_hdr)})',
+    f'- [ ] Active SelfTest canonical artifact is resolved from ns-state + manifest  '
+         f'({st_filename or "MISSING"}; header = {_hdr_str(selftest_hdr)})',
     f'- [ ] WukongCallHome LUMP present and header valid  '
          f'(header = {_hdr_str(wch_hdr)})',
     f'- [ ] NS slot count = {ns_slot_count} (slots 0–{ns_slot_count - 1})',

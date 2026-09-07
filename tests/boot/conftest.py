@@ -119,9 +119,18 @@ def isolated_boot_lumps(tmp_path_factory):
     from server.lump_approvals import write_approvals
     from server.lump_integrity import parse_canonical_filename
     approvals = {}
+    with open(os.path.join(isolated_dir, "manifest.json"), encoding="utf-8") as fh:
+        manifest = json.load(fh)
+    active_selftest = [
+        row["filename"] for row in manifest
+        if row.get("abstraction") == "SelfTest"
+        and not row.get("archived")
+        and row.get("filename")
+    ]
     for filename in (
-            "SelfTest.1.485e71f6.lump",
-            "CapabilityTest.1.b98a03c4.lump"):
+            *active_selftest,
+            "WukongCallHome.1.d54e2115.lump",
+            "CapabilityTest.1.2d9ec45d.lump"):
         path = os.path.join(isolated_dir, filename)
         if not os.path.isfile(path):
             continue

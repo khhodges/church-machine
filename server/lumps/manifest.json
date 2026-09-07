@@ -177,7 +177,8 @@
     "filename": "SelfTest.1.485e71f6.lump",
     "version": "1.2",
     "lump_version": 76,
-    "variant_group": "compiled_selftest"
+    "variant_group": "compiled_selftest",
+    "archived": true
   },
   {
     "token": "00000700",
@@ -213,6 +214,14 @@
     "archived": true,
     "variant_group": "capabilitytest-history",
     "lump_version": 1
+  },
+  {
+    "token": "d74af54b",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.1.b98a03c4.lump",
+    "archived": true,
+    "variant_group": "capabilitytest-history",
+    "lump_version": 14
   },
   {
     "token": "fe9c6e42",
@@ -263,7 +272,8 @@
     "filename": "SelfTest.1.199d8c30.lump",
     "version": "",
     "lump_version": 78,
-    "compiled_at": 1787782122.8900723
+    "compiled_at": 1787782122.8900723,
+    "archived": true
   },
   {
     "token": "13812cdf",
@@ -336,5 +346,12 @@
     "filename": "WukongCallHome.1.d54e2115.lump",
     "lump_version": 8,
     "compiled_at": 1788783644.1418462
+  },
+  {
+    "token": "ee750c1b",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.79.eceee227.lump",
+    "variant_group": "selftest-history",
+    "lump_version": 79
   }
 ]

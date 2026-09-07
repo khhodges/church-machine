@@ -10,6 +10,7 @@ from .integrity32 import integrity32
 from shared.architecture_contracts import (
     BOOT as ARCH_BOOT,
     NS_ENTRY as ARCH_NS_ENTRY,
+    PROFILES as ARCH_PROFILES,
     field_lsb,
     field_width,
     logical_permission_mask,
@@ -64,6 +65,23 @@ def make_gt(gt_type=GT_TYPE_NULL, perms=0, slot_id=0, gt_seq=0, b_flag=0):
     dom, perm3 = gt_encode_perm(perms)
     return (b_flag << 31) | (perm3 << 28) | (dom << 27) | \
            (gt_type << 25) | (gt_seq << 16) | slot_id
+
+
+def _select_active_manifest_entry(manifest, abstraction, slot, token, filename):
+    """Return the one non-archived locator for an already-selected NS binding.
+
+    Placement and identity are intentionally not manifest fields: ``slot`` is
+    selected by ns-state and authentication is hash-bound in approvals.
+    """
+    matches = [entry for entry in manifest
+               if entry.get("abstraction") == abstraction
+               and not entry.get("archived", False)
+               and entry.get("token") == token
+               and entry.get("filename") == filename]
+    if len(matches) != 1:
+        raise ValueError(
+            f"manifest must contain exactly one active {abstraction} locator")
+    return matches[0]
 
 
 # ---------------------------------------------------------------------------
@@ -634,42 +652,93 @@ WUKONG_DEMO_NAMESPACE[0] = _wukong_ns0_loc
 WUKONG_DEMO_NAMESPACE[1] = _wukong_ns0_auth
 WUKONG_DEMO_NAMESPACE[2] = integrity32(_wukong_ns0_loc, _wukong_ns0_auth)
 
-# The canonical SelfTest LUMP is the 512-word image used by the simulator and
-# boot-image generator. It must be present in factory DMEM because the
-# lightning-bolt default is a real executable entry.
-# Slot 6 occupies byte range 0x600..0xDFF.
+# The active SelfTest is selected by the namespace state, with its canonical
+# filename authenticated by the manifest and approval ledger.  Do not use the
+# legacy address-token filename: it is an archived artifact, not an authority
+# for the factory image.
 WUKONG_SELFTEST_BASE_BYTE = 0x0600
 WUKONG_SELFTEST_BASE_WORD = WUKONG_SELFTEST_BASE_BYTE // 4
-WUKONG_SELFTEST_ALLOC = 512
-_selftest_word1 = WUKONG_SELFTEST_ALLOC - 1
-WUKONG_DEMO_NAMESPACE[SELFTEST_NS_SLOT * 4 + 0] = WUKONG_SELFTEST_BASE_BYTE
-WUKONG_DEMO_NAMESPACE[SELFTEST_NS_SLOT * 4 + 1] = _selftest_word1
-WUKONG_DEMO_NAMESPACE[SELFTEST_NS_SLOT * 4 + 2] = integrity32(
-    WUKONG_SELFTEST_BASE_BYTE, _selftest_word1
-)
-
-# Canonical 512-word SelfTest image (server/lumps/00000600.lump), stored
-# big-endian on disk.  The Wukong synthesis runs from this repository, so use
-# the canonical binary directly instead of maintaining a second copied image.
-_selftest_path = Path(__file__).resolve().parents[1] / "server" / "lumps" / "00000600.lump"
+_lumps_dir = Path(__file__).resolve().parents[1] / "server" / "lumps"
+_selftest_ns_state_path = _lumps_dir / "ns-state.json"
+_selftest_manifest_path = _lumps_dir / "manifest.json"
 try:
-    _selftest_raw = _selftest_path.read_bytes()
-except OSError as exc:
-    raise RuntimeError(
-        f"Wukong factory image requires canonical SelfTest lump: {_selftest_path}"
-    ) from exc
-WUKONG_SELFTEST_WORDS = tuple(struct.unpack(">512I", _selftest_raw))
-assert WUKONG_SELFTEST_WORDS[0] == 0xF987CC02  # cc=2 (Next.GT in slot 1); update when 00000600.lump is recompiled
-# c-list[0] is at word[512-cc] = word[510]; word[511] is c-list[1] (Next.GT, runtime-patched)
-assert WUKONG_SELFTEST_WORDS[510] == 0x4A000006  # c-list[0]: SelfTest E-GT (Church domain, E-perm, NS slot 6) — baked in at compile time
+    _selftest_ns_state = json.loads(_selftest_ns_state_path.read_text(encoding="utf-8"))
+    _selftest_selected = [entry for entry in _selftest_ns_state.get("abstractions", [])
+                          if entry.get("name") == "SelfTest"]
+    if len(_selftest_selected) != 1:
+        raise ValueError("namespace must select exactly one SelfTest")
+    _selftest_selected = _selftest_selected[0]
+    WUKONG_SELFTEST_NS_SLOT = _selftest_selected["slot"]
+    WUKONG_SELFTEST_GT_SEQ = _selftest_selected["seq"]
+    WUKONG_SELFTEST_FILENAME = _selftest_selected["filename"]
+    WUKONG_SELFTEST_TOKEN = _selftest_selected["token"]
+    if (not isinstance(WUKONG_SELFTEST_NS_SLOT, int)
+            or not isinstance(WUKONG_SELFTEST_GT_SEQ, int)
+            or not 0 <= WUKONG_SELFTEST_NS_SLOT <= 0xFFFF
+            or not 0 <= WUKONG_SELFTEST_GT_SEQ <= 0x1FF
+            or not isinstance(WUKONG_SELFTEST_FILENAME, str)
+            or Path(WUKONG_SELFTEST_FILENAME).name != WUKONG_SELFTEST_FILENAME
+            or not isinstance(WUKONG_SELFTEST_TOKEN, str)):
+        raise ValueError("SelfTest namespace selection is malformed")
+    _selftest_manifest = json.loads(_selftest_manifest_path.read_text(encoding="utf-8"))
+    _selftest_manifest_entry = _select_active_manifest_entry(
+        _selftest_manifest, "SelfTest", WUKONG_SELFTEST_NS_SLOT,
+        WUKONG_SELFTEST_TOKEN, WUKONG_SELFTEST_FILENAME)
+    _selftest_raw = (_lumps_dir / WUKONG_SELFTEST_FILENAME).read_bytes()
+    if not _selftest_raw or len(_selftest_raw) % 4:
+        raise ValueError("active SelfTest is not a non-empty whole-word LUMP")
+    WUKONG_SELFTEST_ALLOC = len(_selftest_raw) // 4
+    WUKONG_SELFTEST_WORDS = tuple(
+        struct.unpack(f">{WUKONG_SELFTEST_ALLOC}I", _selftest_raw))
+    _selftest_header = WUKONG_SELFTEST_WORDS[0]
+    _selftest_declared_alloc = 1 << (((_selftest_header >> 23) & 0xF) + 6)
+    _selftest_cw = (_selftest_header >> 10) & 0x1FFF
+    _selftest_cc = _selftest_header & 0xFF
+    if (((_selftest_header >> 27) & 0x1F) != 0x1F
+            or WUKONG_SELFTEST_ALLOC != _selftest_declared_alloc
+            or 1 + _selftest_cw + _selftest_cc > WUKONG_SELFTEST_ALLOC
+            or _selftest_cc < 2):
+        raise ValueError("active SelfTest header/allocation is invalid")
+    _selftest_hash = hashlib.sha256(_selftest_raw).hexdigest()
+    _selftest_approval = read_approvals(
+        _lumps_dir / "approvals.json", missing_ok=False).get(_selftest_hash)
+    if (not isinstance(_selftest_approval, dict)
+            or any(_selftest_approval.get(key) != value for key, value in {
+                "binary_hash": _selftest_hash, "filename": WUKONG_SELFTEST_FILENAME,
+                "token": WUKONG_SELFTEST_TOKEN, "abstraction": "SelfTest",
+                "issue_n": _selftest_selected.get("issue_n"),
+                "identity_hash": _selftest_selected.get("identity_hash"),
+            }.items())):
+        raise PermissionError("active SelfTest is not exactly hash-approved")
+    if _selftest_manifest_entry.get("lump_version") != _selftest_selected.get("lump_version"):
+        raise PermissionError("manifest locator and namespace disagree on active SelfTest version")
+    _selftest_egt = make_gt(GT_TYPE_INFORM, PERM_MASK_E,
+                            WUKONG_SELFTEST_NS_SLOT, WUKONG_SELFTEST_GT_SEQ)
+    if (WUKONG_SELFTEST_WORDS[-_selftest_cc] != _selftest_egt
+            or WUKONG_SELFTEST_WORDS[-_selftest_cc + 1] != _selftest_egt):
+        raise ValueError("active SelfTest c-list does not contain selected self/Next E-GTs")
+except Exception as exc:
+    raise RuntimeError(f"Wukong factory image requires an approved active SelfTest: {exc}") from exc
+
+_selftest_word1 = ((WUKONG_SELFTEST_GT_SEQ & 0x1FF) << 21) | (WUKONG_SELFTEST_ALLOC - 1)
+while len(WUKONG_DEMO_NAMESPACE) < (WUKONG_SELFTEST_NS_SLOT + 1) * 4:
+    WUKONG_DEMO_NAMESPACE.append(0)
+WUKONG_DEMO_NAMESPACE[WUKONG_SELFTEST_NS_SLOT * 4 + 0] = WUKONG_SELFTEST_BASE_BYTE
+WUKONG_DEMO_NAMESPACE[WUKONG_SELFTEST_NS_SLOT * 4 + 1] = _selftest_word1
+WUKONG_DEMO_NAMESPACE[WUKONG_SELFTEST_NS_SLOT * 4 + 2] = integrity32(
+    WUKONG_SELFTEST_BASE_BYTE, _selftest_word1)
 
 # The standalone image includes the CapabilityTest currently selected by the
 # IDE for Namespace slot 10.  This is a replaceable boot default, not a
 # factory-owned artifact: its filename and placement come from ns-state.
 CAPABILITY_TEST_NS_SLOT = 10
-WUKONG_CAPABILITY_TEST_BASE_BYTE = 0x1400
-WUKONG_CAPABILITY_TEST_BASE_WORD = WUKONG_CAPABILITY_TEST_BASE_BYTE // 4
-_lumps_dir = Path(__file__).resolve().parents[1] / "server" / "lumps"
+# Keep resident objects outside the selected SelfTest allocation.  The active
+# artifact may legitimately be any header-declared power-of-two size.
+WUKONG_THREAD_BASE_WORD = WUKONG_SELFTEST_BASE_WORD + WUKONG_SELFTEST_ALLOC
+WUKONG_CALLHOME_BASE_WORD = ((WUKONG_THREAD_BASE_WORD + 257 + 127) // 128) * 128
+WUKONG_CALLHOME_BASE_BYTE = WUKONG_CALLHOME_BASE_WORD * 4
+WUKONG_CAPABILITY_TEST_BASE_WORD = WUKONG_CALLHOME_BASE_WORD + 128
+WUKONG_CAPABILITY_TEST_BASE_BYTE = WUKONG_CAPABILITY_TEST_BASE_WORD * 4
 _capability_test_ns_state_path = _lumps_dir / "ns-state.json"
 WUKONG_CAPABILITY_TEST_FILENAME = None
 WUKONG_CAPABILITY_TEST_ALLOC = 0
@@ -739,6 +808,18 @@ if WUKONG_CAPABILITY_TEST_BOUND:
         WUKONG_CAPABILITY_TEST_BASE_BYTE, _capability_test_word1
     )
 
+_wukong_required_words = max(
+    WUKONG_SELFTEST_BASE_WORD + WUKONG_SELFTEST_ALLOC,
+    WUKONG_THREAD_BASE_WORD + 257,  # caps[12] is one word past the 256-word body
+    WUKONG_CALLHOME_BASE_WORD + 128,
+    (WUKONG_CAPABILITY_TEST_BASE_WORD + WUKONG_CAPABILITY_TEST_ALLOC
+     if WUKONG_CAPABILITY_TEST_BOUND else 0),
+)
+if _wukong_required_words > ARCH_PROFILES["wukong-uart-upload-v2"]["totalWords"]:
+    raise RuntimeError(
+        f"active SelfTest layout needs {_wukong_required_words} DMEM words, "
+        "exceeding the Wukong hardware profile capacity")
+
 # Fix slot 7 (WukongCallHome) alloc from 64 → 128 words and move it after
 # the relocated Thread lump. The old 0x700 location overlapped SelfTest,
 # and the old 0x900 location overlaps the 256-word Thread.
@@ -747,8 +828,6 @@ if WUKONG_CAPABILITY_TEST_BOUND:
 # padded to 128 (next power of 2 ≥ 74).  Patch word1 (lim17=127) and recompute the
 # integrity seal so the CM's NS range-check passes during LUMP execution.
 _wch_word1_new = 0x0000007F               # lim17 = 127  →  alloc = 128 words
-WUKONG_CALLHOME_BASE_BYTE = 0x1200
-WUKONG_CALLHOME_BASE_WORD = WUKONG_CALLHOME_BASE_BYTE // 4
 _wch_loc_byte  = WUKONG_CALLHOME_BASE_BYTE
 WUKONG_DEMO_NAMESPACE[WUKONG_CALLHOME_NS_SLOT * 4 + 0] = _wch_loc_byte
 WUKONG_DEMO_NAMESPACE[WUKONG_CALLHOME_NS_SLOT * 4 + 1] = _wch_word1_new
@@ -769,7 +848,6 @@ WUKONG_DEMO_NAMESPACE[WUKONG_CALLHOME_NS_SLOT * 4 + 2] = integrity32(_wch_loc_by
 #   caps[12]word 896+256  : S-perm Boot.Thread GT (slot 1) for CR12
 # Slot 1 word1 limit widened to 0xFF (256-word alloc); seal recomputed.
 # ---------------------------------------------------------------------------
-WUKONG_THREAD_BASE_WORD = 896                # byte 0xE00
 WUKONG_THREAD_HEADER = (
     (0x1F << 27) | (2 << 23) | (32 << 10) | (2 << 8) | 12
 )  # n_minus_6=2 (256 words), sw=32, typ=2, cc=12 — mirrors boot_image.py

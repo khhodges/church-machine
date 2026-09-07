@@ -27,11 +27,8 @@ Layout (all words 32-bit little-endian):
 
     [0 .. NS_LUMP_SIZE)                      Namespace lump body (header @0)
     [NS_LUMP_SIZE .. +THREAD_LUMP_SIZE)      Thread lump body    (header @0)
-    [.. +ABSTR_LUMP_SIZE)                    Boot.Abstr body     (header @0,
-                                              code + c-list at physical end;
-                                              NS slot 6, no gap before it)
-    [resident lump bodies at programmer
-     -chosen physAddr]
+     [resident lump bodies, including the
+      state-selected SelfTest, in allocation order]
     [NS_TABLE_BASE .. +NS_TABLE_RESERVE)     Namespace table
        (step1.nsSlotsMax entries × 4 words, default 256; named slots followed
         by Step-3 reserved empties; remainder zero)
@@ -39,8 +36,8 @@ Layout (all words 32-bit little-endian):
 NS slots 2–5 are MMIO device-register windows (UART, LED, BTN, TIMER).
 They carry NS entries pointing at physical hardware addresses but have no
 lump body in RAM — running_offset is not advanced for them.
-Boot.Abstr occupies NS slot 6 (SelfTest) and sits immediately after the
-Thread lump body at physAddr = threadLumpWords.
+SelfTest's Namespace slot, exact artifact, and allocation are selected from
+authoritative Namespace state and manifest metadata.
 """
 import json
 import hashlib
@@ -112,10 +109,9 @@ def ns_table_reserve_words(ns_slots_max):
 # DEVICE_REG_LIMITS and hardware/boot_rom.py _MMIO_ENTRIES).
 DEVICE_REG_LIMITS = {}  # slots 11 (UART), 12 (LED), 13 (Button), 14 (Timer) freed — Tasks #406 and #431
 
-try:
-    from hardware.hw_types import BOOT_ABSTR_NS_SLOT
-except ImportError:
-    BOOT_ABSTR_NS_SLOT = 6   # fallback: hardware.hw_types not on path (standalone runner)
+# This is only the historical catalog index.  The live SelfTest Namespace slot
+# is selected from ns-state for every generated image.
+BOOT_ABSTR_NS_SLOT = ARCH_BOOT["minimalSlots"]["SelfTest"]
 with open(os.path.join(os.path.dirname(os.path.dirname(__file__)),
                        "shared", "thread_design.json"), encoding="utf-8") as _thread_design_file:
     _THREAD_DESIGN = json.load(_thread_design_file)
@@ -157,10 +153,10 @@ def thread_layout(lump_size, stack_words):
     }
 
 # Mandatory NS slots — every valid boot image must have a non-zero entry here.
-# Minimal boot trio: NS root (0), Thread (1), SelfTest/boot-entry (6).
+# CapabilityTest has a conventional catalog slot, but is not foundational.
 CAPABILITY_TEST_NS_SLOT = 10  # CapabilityTest capability-validation LUMP
 
-_MANDATORY_NS_SLOTS = (0, 1, 2, 3, 4, 5, BOOT_ABSTR_NS_SLOT, CAPABILITY_TEST_NS_SLOT)  # 0,1 foundational; 2-5 MMIO; 6 Boot.Abstr; 10 CapabilityTest
+_MANDATORY_NS_SLOTS = (0, 1)  # Only Namespace and Thread have immutable slots.
 
 # Format-version tag written to mem[NS_TABLE_BASE - 1] so loadBootImage()
 # can reject stale binaries.
@@ -341,10 +337,9 @@ def boot_resident_region_end(thread_size, boot_abstr_size, thread_count,
                              catalog_slot_sizes=None):
     """Return the first free RAM word after the fixed boot bodies.
 
-    The Namespace LUMP is stored at the Namespace-table tail.  RAM starts with
-    Thread.1, SelfTest, then the four fixed catalog bodies at slots 7–10;
-    generated Thread#2 onward follow them contiguously.  Step-2 resident
-    bodies must begin at or after this address.
+    Legacy estimate retained for callers that do not have authoritative
+    Namespace state.  Image generation itself computes the protected end from
+    the live resident-placement cursor, including the selected SelfTest body.
     """
     catalog_slot_sizes = catalog_slot_sizes or {}
     mmio_slots = {
@@ -703,7 +698,7 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
 
     Checks that the format-version tag at mem[ns_table_base - 1] equals
     BOOT_IMAGE_FORMAT_TAG, and that every mandatory NS slot (0, 1,
-    BOOT_ABSTR_NS_SLOT=6) is non-zero.  A wrong or zero tag means the
+    and the Namespace-header-selected boot entry are non-zero.  A wrong or zero tag means the
     image was produced by a stale generator and would be rejected by
     loadBootImage() in the simulator; a zeroed mandatory slot causes
     isNSEntryValid() to return false, producing a BOOT fault at runtime.
@@ -758,6 +753,11 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
                 f"(word0=0x{word0:08x}, word1=0x{word1:08x}); "
                 "the boot image is invalid and would cause a BOOT fault at runtime"
             )
+    boot_base = n_words - (physical["boot_slot"] + 1) * NS_ENTRY_WORDS if (
+        physical["boot_slot"] is not None) else -1
+    if boot_base < 0 or boot_base + 1 >= n_words or (
+            words[boot_base] == 0 and words[boot_base + 1] == 0):
+        raise ValueError("validate_boot_image: Namespace header boot entry is zeroed")
 
     # A dormant Thread resumes exclusively through the canonical two-word
     # CHURCH frame at STO+1/STO+2: Enter E-GT followed by packed NIA/flags.
@@ -983,11 +983,6 @@ def build_wukong_upload_image(generic_image, boot_config=None):
             f"Wukong upload source truncates selected slot {entry_slot}: "
             f"needs {alloc_words} words from 0x{entry_loc:X}"
         )
-    if WUKONG_UPLOAD_BODY_BASE_WORD + alloc_words > WUKONG_DMEM_WORDS:
-        raise ValueError(
-            f"selected slot {entry_slot} needs {alloc_words} words but cannot fit "
-            "in Wukong's available DMEM body region"
-        )
     # Wukong has no lazy linker.  A compiler-owned portable row must have been
     # localized in the generic image before projection; the unresolved marker
     # is never safe to upload.  (A zero c-list word remains valid for ordinary
@@ -1057,17 +1052,6 @@ def build_wukong_upload_image(generic_image, boot_config=None):
             "descriptor": descriptor, "size": size,
         })
 
-    # Physical CHANGE consumes the ordinary software Thread layout directly.
-    thread_words = sum(item["size"] for item in thread_sources)
-    dynamic_end = WUKONG_UPLOAD_BODY_BASE_WORD + alloc_words + thread_words
-    if dynamic_end > WUKONG_DMEM_WORDS:
-        raise ValueError(
-            f"Wukong image needs {alloc_words} selected-entry words plus "
-            f"{thread_words} Thread-context words ({thread_count} Threads), "
-            f"but only {WUKONG_DMEM_WORDS - WUKONG_UPLOAD_BODY_BASE_WORD} "
-            "dynamic DMEM words are available"
-        )
-
     # Lazy import prevents simulator-only generation from requiring FPGA
     # dependencies, while making this projection follow the actual bitstream
     # bootstrap structures rather than a copied server-side layout.
@@ -1078,6 +1062,8 @@ def build_wukong_upload_image(generic_image, boot_config=None):
             WUKONG_SELFTEST_BASE_WORD,
             WUKONG_SELFTEST_WORDS,
             WUKONG_CALLHOME_BASE_WORD,
+            WUKONG_CAPABILITY_TEST_BASE_WORD,
+            WUKONG_CAPABILITY_TEST_WORDS,
             WUKONG_WCH_CLIST_WORD,
             WUKONG_WCH_CLIST,
             WUKONG_NUC_PROGRAM,
@@ -1106,6 +1092,9 @@ def build_wukong_upload_image(generic_image, boot_config=None):
         WUKONG_CALLHOME_BASE_WORD + len(wch_words)] = wch_words
     mem[WUKONG_WCH_CLIST_WORD:
         WUKONG_WCH_CLIST_WORD + len(WUKONG_WCH_CLIST)] = list(WUKONG_WCH_CLIST)
+    mem[WUKONG_CAPABILITY_TEST_BASE_WORD:
+        WUKONG_CAPABILITY_TEST_BASE_WORD + len(WUKONG_CAPABILITY_TEST_WORDS)] = list(
+            WUKONG_CAPABILITY_TEST_WORDS)
 
     # Preserve the factory Thread for standalone power-on boot. The uploaded
     # Thread.1 descriptor below replaces it when an IDE image is installed.
@@ -1115,8 +1104,45 @@ def build_wukong_upload_image(generic_image, boot_config=None):
         GT_TYPE_INFORM, PERM_MASK_S, 1, 0
     )
 
+    # Allocate projected bodies around every factory body whose descriptor will
+    # remain live.  The historical upload base is not an allocation boundary:
+    # a large active SelfTest can extend across it.  Slots replaced below may
+    # donate their old factory ranges, but all other residents are immutable.
+    replaced_slots = {entry_slot, *thread_slots}
+    occupied = [
+        (0, WUKONG_FORWARD_NS_SLOTS * NS_ENTRY_WORDS, "forward Namespace"),
+        (256, 256 + len(WUKONG_DEMO_CLIST), "Boot.NS c-list"),
+    ]
+    for slot in range(WUKONG_FORWARD_NS_SLOTS):
+        if slot in replaced_slots:
+            continue
+        ns_base = slot * NS_ENTRY_WORDS
+        location_byte = mem[ns_base]
+        if location_byte % 4:
+            raise ValueError(f"Wukong factory NS slot {slot} has an unaligned location")
+        location = location_byte // 4
+        if not (0 < location < WUKONG_DMEM_WORDS):
+            continue
+        header = mem[location]
+        if ((header >> 27) & 0x1F) != 0x1F:
+            continue
+        size = 1 << (((header >> 23) & 0xF) + 6)
+        if location + size > WUKONG_DMEM_WORDS:
+            raise ValueError(f"Wukong factory NS slot {slot} body exceeds DMEM")
+        occupied.append((location, location + size, f"factory NS slot {slot}"))
+
+    def _claim(size, label):
+        for start in range(WUKONG_DMEM_WORDS - size + 1):
+            end = start + size
+            if all(end <= low or start >= high for low, high, _ in occupied):
+                occupied.append((start, end, label))
+                return start
+        raise ValueError(
+            f"Wukong image cannot allocate a disjoint {size}-word {label} body "
+            f"within {WUKONG_DMEM_WORDS}-word DMEM")
+
     # Copy the complete allocation so c-list rows at the LUMP tail survive.
-    body_base = WUKONG_UPLOAD_BODY_BASE_WORD
+    body_base = _claim(alloc_words, f"uploaded NS slot {entry_slot}")
     mem[body_base:body_base + alloc_words] = source_words[
         entry_loc:entry_loc + alloc_words
     ]
@@ -1137,11 +1163,11 @@ def build_wukong_upload_image(generic_image, boot_config=None):
     # exactly as the IDE saved them. Each body arrives through the ordinary
     # image upload and each forward descriptor is re-sealed for its relocated
     # byte address. No board-side per-thread data RAM is synthesized.
-    thread_target = body_base + alloc_words
     projected_threads = []
     for item in thread_sources:
         size = item["size"]
         slot = item["slot"]
+        thread_target = _claim(size, f"Thread NS slot {slot}")
         source_base = item["source_base"]
         descriptor = item["descriptor"]
         mem[thread_target:thread_target + item["size"]] = source_words[
@@ -1164,8 +1190,7 @@ def build_wukong_upload_image(generic_image, boot_config=None):
             "size": size,
             "caps0": source_words[source_base + 244],
         })
-        thread_target += size
-    assert thread_target == dynamic_end, "Wukong Thread projection accounting drift"
+    dynamic_end = max(end for _, end, _ in occupied)
 
     # Non-authoritative metadata for the physical scheduler.  The final
     # forward-table W3 belongs to an unoccupied slot and is never consulted for
@@ -1184,6 +1209,32 @@ def build_wukong_upload_image(generic_image, boot_config=None):
             f"Wukong projection failed for slot {entry_slot}: "
             f"header=0x{projected_header:08X}, cw={projected_cw}"
         )
+
+    # Fail closed if any live in-DMEM descriptor is truncated, points at a
+    # damaged LUMP, or aliases another live resident body.
+    live_ranges = []
+    for slot in range(WUKONG_FORWARD_NS_SLOTS):
+        ns_base = slot * NS_ENTRY_WORDS
+        location_byte = mem[ns_base]
+        if location_byte % 4:
+            raise ValueError(f"Wukong projected NS slot {slot} has an unaligned location")
+        location = location_byte // 4
+        if slot == 0 or not (0 < location < WUKONG_DMEM_WORDS):
+            continue
+        header = mem[location]
+        if ((header >> 27) & 0x1F) != 0x1F:
+            continue
+        declared = 1 << (((header >> 23) & 0xF) + 6)
+        descriptor_size = _ns_word1_get(mem[ns_base + 1], "limit_offset") + 1
+        if (descriptor_size <= 0 or descriptor_size > declared
+                or location + declared > WUKONG_DMEM_WORDS):
+            raise ValueError(
+                f"Wukong projected NS slot {slot} has inconsistent/truncated body")
+        for low, high, other in live_ranges:
+            if location < high and location + declared > low:
+                raise ValueError(
+                    f"Wukong projected NS slots {other} and {slot} overlap")
+        live_ranges.append((location, location + declared, slot))
 
     projected = struct.pack(f"<{WUKONG_DMEM_WORDS}I", *mem)
     return projected, {
@@ -1331,6 +1382,66 @@ def find_lump_file_by_abstraction(lumps_dir, abstraction_name, ns_slot):
     except Exception:
         pass
     return None
+
+
+def _resolve_authoritative_selftest_lump(lumps_dir):
+    """Return SelfTest's one live, explicitly-bound executable artifact.
+
+    SelfTest is boot code, so neither a slot-derived filename nor a manifest
+    history entry is authority to execute it.  Namespace state selects the
+    exact ``(slot, token, filename)`` tuple; the locator-only manifest repeats
+    token + filename/name, while placement remains solely in Namespace state.
+    Approval validation is deliberately performed by the caller on the
+    returned path, after this binding check.
+    """
+    try:
+        with open(os.path.join(lumps_dir, "ns-state.json"), encoding="utf-8") as source:
+            state = json.load(source)
+        with open(os.path.join(lumps_dir, "manifest.json"), encoding="utf-8") as source:
+            manifest = json.load(source)
+    except (OSError, ValueError, TypeError) as exc:
+        raise ValueError(
+            f"generate_boot_image: SelfTest authoritative Namespace binding is unreadable: {exc}"
+        ) from exc
+
+    state_rows = [
+        row for row in state.get("abstractions", []) if isinstance(row, dict)
+        and row.get("name") == "SelfTest"
+    ] if isinstance(state, dict) else []
+    if len(state_rows) != 1:
+        raise ValueError(
+            "generate_boot_image: SelfTest requires exactly one authoritative "
+            f"Namespace-state binding; found {len(state_rows)}")
+    selected = state_rows[0]
+    slot = selected.get("slot")
+    token = selected.get("token") or selected.get("cache_token")
+    filename = selected.get("filename")
+    if (isinstance(slot, bool) or not isinstance(slot, int) or slot < 2
+            or not isinstance(token, str) or not token
+            or not isinstance(filename, str) or not filename
+            or os.path.basename(filename) != filename):
+        raise ValueError(
+            "generate_boot_image: SelfTest Namespace-state binding requires its "
+            "exact non-foundational slot, token, and canonical filename")
+    if not isinstance(manifest, list):
+        raise ValueError("generate_boot_image: SelfTest manifest must be an array")
+    token = token.lower()
+    manifest_rows = [
+        row for row in manifest if isinstance(row, dict)
+        and row.get("abstraction") == "SelfTest"
+        and not row.get("archived")
+        and str(row.get("token") or "").lower() == token
+        and row.get("filename") == filename
+    ]
+    if len(manifest_rows) != 1:
+        raise ValueError(
+            "generate_boot_image: SelfTest requires one manifest locator matching "
+                "the authoritative Namespace-state filename and token")
+    path = os.path.join(lumps_dir, filename)
+    if not os.path.isfile(path):
+        raise ValueError(
+            f"generate_boot_image: SelfTest Namespace-selected locator {filename} is missing")
+    return path, slot
 
 
 def _resolve_selected_lump_locator(lumps_dir, slot, token):
@@ -1785,9 +1896,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     Step 2 / Step 3 are optional. Returns a `bytes` object whose length
     is `step1.totalNamespaceWords * 4`.
 
-    `boot_entry_slot` – NS slot the boot ROM will jump to (default: BOOT_ABSTR_NS_SLOT=6).
-    The layout always places the SelfTest lump at BOOT_ABSTR_NS_SLOT; this parameter
-    records which slot the hardware / simulator should treat as the boot entry point.
+    `boot_entry_slot` – NS slot the boot ROM will jump to (default: the
+    authoritative SelfTest Namespace-state slot).
 
     `require_entry_resident` – when True (hardware-targeted images, e.g. Wukong
     bridge uploads), the selected boot-entry lump's code body MUST be resident
@@ -1796,8 +1906,6 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     (simulator images), a non-resident entry is permitted because the simulator
     can lazy-fetch the body at runtime.
     """
-    if boot_entry_slot is None:
-        boot_entry_slot = BOOT_ABSTR_NS_SLOT
     step1 = cfg["step1"]
     total       = int(step1["totalNamespaceWords"])
     ns_size     = int(step1["namespaceLumpWords"])
@@ -1817,6 +1925,13 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         raise ValueError(
             f"generate_boot_image: nsSlotsMax must be in 0..{MAX_NS_ENTRIES}; "
             f"got {_ns_slots_max}.")
+    _boot_saved_path, _selftest_slot = _resolve_authoritative_selftest_lump(lumps_dir)
+    if _selftest_slot >= _ns_slots_max:
+        raise ValueError(
+            f"generate_boot_image: SelfTest slot {_selftest_slot} is outside "
+            f"configured Namespace capacity {_ns_slots_max}")
+    if boot_entry_slot is None:
+        boot_entry_slot = _selftest_slot
 
     # Thread.1 remains the fixed Boot.Thread at NS[1].  Thread#2 onward are
     # generated resident entries immediately after the fixed catalog.  Reject,
@@ -1824,6 +1939,10 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # produce a different Namespace layout than the designer displayed.
     _thread_count = configured_thread_count(step1)
     _generated_thread_slots = generated_thread_slots(_thread_count)
+    if _selftest_slot in _generated_thread_slots:
+        raise ValueError(
+            f"generate_boot_image: authoritative SelfTest slot {_selftest_slot} "
+            "collides with a configured generated Thread slot")
     if _generated_thread_slots and _generated_thread_slots[-1] >= _ns_slots_max:
         raise ValueError(
             f"generate_boot_image: threadCount={_thread_count} requires generated "
@@ -1840,29 +1959,23 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     if "abstractionLumpWords" in step1:
         print("WARNING: abstractionLumpWords is deprecated and ignored; "
               "Boot.Abstr size is determined by the saved SelfTest lump "
-              "(from manifest.json) or defaults to 64 words.")
+              "(from the authoritative Namespace binding).")
 
-    # ── Load saved Boot.Abstr lump (SelfTest, looked up via manifest.json) ───
+    # ── Load the authoritative SelfTest binding ────────────────────────────
     # The saved lump is written big-endian by /api/lumps/save. Only exact bytes
     # with a matching strict approval and canonical filename may determine the
     # Boot.Abstr allocation; failure aborts image generation.
-    # The lump is located by searching manifest.json for the entry whose
-    # abstraction name is "SelfTest" at BOOT_ABSTR_NS_SLOT. Resolution uses an
-    # exact Namespace-state filename or one unique token-bound manifest locator.
-    _boot_saved_path = find_lump_file_by_abstraction(
-        lumps_dir, "SelfTest", BOOT_ABSTR_NS_SLOT)
-    actual_abstr_size = BOOT_ABSTR_DEFAULT_SIZE
+    # A real Namespace-state binding and its matching manifest locator are
+    # required.  In particular, do not recover using 00000600.lump, a
+    # token-less approval, or a guessed 512-word Boot.Abstr allocation.
+    actual_abstr_size = None
     abstr_words = None
-    if _boot_saved_path is None:
-        raise ValueError(
-            "generate_boot_image: SelfTest approval-required executable LUMP is missing")
     # Validation is deliberately outside the legacy parsing guard below:
     # approval, filename, hash, or structural failures must never fall back to
     # a generated executable body.
     _require_approved_executable_lump(
         _boot_saved_path, lumps_dir, "SelfTest")
-    if _boot_saved_path is not None:
-        try:
+    try:
             with open(_boot_saved_path, "rb") as _bsf:
                 _bsraw = _bsf.read()
             _bsn = len(_bsraw) // 4
@@ -1926,10 +2039,14 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
                         # POLA-finalized c-list: embed with actual cc so the
                         # simulator's LAZY guard (clistCount === 0) does not fire.
                         abstr_words = list(_bswords[:_bssz])
-        except Exception as exc:
-            raise ValueError(
-                "generate_boot_image: SelfTest executable body could not be "
-                f"embedded after approval validation: {exc}") from exc
+    except Exception as exc:
+        raise ValueError(
+            "generate_boot_image: SelfTest executable body could not be "
+            f"embedded after approval validation: {exc}") from exc
+    if actual_abstr_size is None or abstr_words is None:
+        raise ValueError(
+            "generate_boot_image: SelfTest approval-bound body has no valid "
+            "header-derived allocation")
 
     # Memory image (Python ints, packed at the end).
     mem = [0] * total
@@ -1946,12 +2063,20 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         step2_lumps = cfg["step2"].get("lumps") or []
     # Foundational slots (0=NS, 1=Thread, 6=SelfTest) and MMIO device-register
     # windows (2-5) must not be overridden by caller-supplied physAddr values.
-    _FOUNDATIONAL_SLOTS = {0, 1, BOOT_ABSTR_NS_SLOT}  # slots 0, 1, 6 — minimal boot trio
+    _FOUNDATIONAL_SLOTS = {0, 1}  # Namespace and Thread are the only protected slots.
     _DEVICE_REG_SLOTS   = set(_MMIO_SLOT_SPECS.keys())            # slots 2..5 (MMIO)
     # Every fixed catalog body has a deterministic RAM location, not just the
     # foundational trio.  Keep all catalog identities immutable so direct
     # generator callers cannot create an overlap the Builder would reject.
-    _RESERVED_SLOTS     = set(range(len(DEFAULT_ABSTRACTION_CATALOG))) | set(_generated_thread_slots)
+    # The authoritative SelfTest slot owns its identity, even when it replaces
+    # a historical catalog/MMIO slot.  Slot 6 itself is otherwise free.
+    catalog = list(DEFAULT_ABSTRACTION_CATALOG)
+    catalog[BOOT_ABSTR_NS_SLOT] = None
+    if _selftest_slot < len(catalog):
+        catalog[_selftest_slot] = None
+    _RESERVED_SLOTS = ({0, 1, _selftest_slot}
+                       | {slot for slot, entry in enumerate(catalog) if entry is not None}
+                       | set(_generated_thread_slots))
 
     phys_override = {}
     for e in step2_lumps:
@@ -1978,7 +2103,6 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     }
     trusted_cache_tokens = _load_trusted_cache_token_map(_manifest_path_for_cache)
     retained_sequences = _load_ns_state_sequence_map(lumps_dir)
-    catalog = DEFAULT_ABSTRACTION_CATALOG
     # Resolve boot-resident catalog bodies before assigning any locations.
     # Their declared LUMP allocation, not the historical 64-word catalog
     # default and not merely the file's byte length, reserves physical RAM.
@@ -1988,7 +2112,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     _boot_resident_allocations = {}
     for _slot, _tok, _filename in _load_boot_resident_entries(
             _manifest_path_for_cache, _selected_slot_tokens):
-        if (_slot == BOOT_ABSTR_NS_SLOT
+        if (_slot == _selftest_slot
                 or not (0 <= _slot < len(catalog))
                 or _slot in _MMIO_SLOT_SPECS):
             continue
@@ -2038,7 +2162,6 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         0: ns_size,
         1: thread_size,
         # Slots 2-5: MMIO — no RAM body, handled by _MMIO_SLOT_SPECS.
-        BOOT_ABSTR_NS_SLOT: actual_abstr_size,  # SelfTest: from saved lump or 64w default
     }
     slot_sizes.update(_boot_resident_allocations)
 
@@ -2065,7 +2188,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             # Namespace Header V2 has a real physical block before the table.
             # runningOffset is NOT advanced so Thread (slot 1) naturally gets loc=0.
             loc = ns_header_base
-        elif i in _MMIO_SLOT_SPECS:
+        elif i in _MMIO_SLOT_SPECS and i != _selftest_slot:
             # MMIO NS slot: physical MMIO byte address, no RAM body allocated.
             loc = _MMIO_SLOT_SPECS[i][0]
             # Don't advance running_offset (no RAM reservation for MMIO).
@@ -2087,7 +2210,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             # clistCount=0; the DEMO_CLIST is managed through clist_gts[] and
             # lazily installed into Boot.Abstr at runtime.
             clist_count = 0
-        elif i in _MMIO_SLOT_SPECS:
+        elif i in _MMIO_SLOT_SPECS and i != _selftest_slot:
             lim17 = _MMIO_SLOT_SPECS[i][1]
             clist_count = 0
         else:
@@ -2105,9 +2228,28 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
                        trusted_cache_tokens.get(i, 0))
         clist_gts.append(create_gt(retained_sequence, i, perms, 1))
 
+    # SelfTest is not a catalog-position body.  Its authoritative Namespace
+    # state selects both its slot and the exact approved allocation, so place
+    # it in the same running resident pool as other executable bodies.
+    _selftest_loc = running_offset
+    _selftest_end = _selftest_loc + actual_abstr_size
+    if _selftest_end > _metadata_start:
+        raise ValueError(
+            f"generate_boot_image: SelfTest ({actual_abstr_size} words at "
+            f"0x{_selftest_loc:X}) does not fit below the NS table "
+            f"(base 0x{ns_table_base:X})")
+    _selftest_sequence = retained_sequences.get(_selftest_slot, 0)
+    write_ns_entry(
+        mem, total, NS_ENTRY_WORDS, _selftest_slot, _selftest_loc,
+        (actual_abstr_size - 1) & 0x1FFFF, 0, 0, 1, _selftest_sequence, 0,
+        trusted_cache_tokens.get(_selftest_slot, 0))
+    locations[_selftest_slot] = _selftest_loc
+    running_offset = _selftest_end
+
     # Count only non-null catalog entries: the highest non-null slot index + 1.
     # All 11 catalog entries are non-null (slots 0–10). This must match simulator.js nsCount.
     ns_count = max((i + 1 for i, e in enumerate(catalog) if e is not None), default=0)
+    ns_count = max(ns_count, _selftest_slot + 1)
 
     # ----- Generated Thread Namespace entries ----------------------------
     # Each secondary Thread has the same complete Thread LUMP layout as the
@@ -2138,12 +2280,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # generated-thread loop has reserved every configured Thread body.  A
     # Step-2 body is written later, so reject an overlap before it can corrupt
     # a Thread header or its CR0 boot-entry capability.
-    _protected_end = boot_resident_region_end(
-        thread_size, actual_abstr_size, _thread_count,
-        _boot_resident_allocations)
-    assert running_offset == _protected_end, (
-        "boot layout drift: catalog allocation no longer matches the "
-        "resident-region contract")
+    _protected_end = running_offset
     for _e2 in step2_lumps:
         if not (isinstance(_e2, dict) and bool(_e2.get("resident"))):
             continue
@@ -2265,7 +2402,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # Truncate to DEMO_CLIST_SIZE (11 entries for minimal 8-slot namespace).
     clist_gts = clist_gts[:DEMO_CLIST_SIZE]
 
-    # ----- Boot.Abstr lump (NS slot 6 = SelfTest) -------------------------
+    # ----- Authoritative SelfTest lump ------------------------------------
     # The Boot Abstraction: directly loaded by B:06 (INIT_ABSTR), no director hop.
     #
     # Resident mode is selected only by Namespace state / boot configuration:
@@ -2278,8 +2415,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     #   and triggers a lazy fetch of the canonical SelfTest lump (4c7380cb.lump).
     #   This mirrors the FPGA BRAM model where the 512-word body does not fit in BRAM
     #   and only the 64-word stub is stored on-chip.
-    boot_entry_loc  = locations[BOOT_ABSTR_NS_SLOT]
-    entry_ns_base   = total - (BOOT_ABSTR_NS_SLOT + 1) * NS_ENTRY_WORDS
+    boot_entry_loc  = locations[_selftest_slot]
+    entry_ns_base   = total - (_selftest_slot + 1) * NS_ENTRY_WORDS
 
     # SelfTest residency is not inferred from the artifact manifest.
     _selftest_lazy = False
@@ -2287,7 +2424,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # Preserve the cache_token32 word3 that the catalog loop wrote for Boot.Abstr.
     # The lazy/resident paths below only need to update word1 (limit/authority) and
     # word2 (seal); word0 (location) and word3 (cache token) stay from the loop.
-    _abstr_ns_base = total - (BOOT_ABSTR_NS_SLOT + 1) * NS_ENTRY_WORDS
+    _abstr_ns_base = total - (_selftest_slot + 1) * NS_ENTRY_WORDS
     _abstr_cache_token = mem[_abstr_ns_base + 3]
 
     if _selftest_lazy:
@@ -2295,7 +2432,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         # real lump body on first call; NS entry points here with alloc=64 words.
         mem[boot_entry_loc] = pack_lump_header(_ns_n_minus_6(actual_abstr_size), 0, 0, 0)
         entry_cr_limit = actual_abstr_size - 1  # cc=0 stub has no c-list
-        write_ns_entry(mem, total, NS_ENTRY_WORDS, BOOT_ABSTR_NS_SLOT,
+        write_ns_entry(mem, total, NS_ENTRY_WORDS, _selftest_slot,
                        boot_entry_loc, entry_cr_limit, 0, 0, 1, 0, 0,
                        _abstr_cache_token)
     elif abstr_words is not None:
@@ -2308,20 +2445,18 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         _saved_cc      = abstr_words[0] & 0xFF
         entry_cr_limit = actual_abstr_size - _saved_cc - 1
 
-        # Preserve SelfTest's immutable c-list row 0.  It is the same E-GT as
-        # Thread.CR0 and the SelfTest program LOADs it into CR1 before issuing
-        # TPERM EXACT CR0, CR1.  Replacing row 0 with a managed device or
-        # memory capability makes that intentional identity check fault.
-        #
-        # Only row 1 (Next.GT) follows the selected LightningBolt boot entry;
-        # row 0 remains the authenticated self-reference embedded in the
-        # canonical LUMP binary.
-        if _saved_cc > 1 and len(clist_gts) > 1:
+        # Row 0 is SelfTest's authenticated E-GT.  It and Thread.CR0 must
+        # follow the live authoritative slot/sequence, rather than retaining
+        # a historical slot-6 credential in a portable body.
+        if _saved_cc > 0:
             _clist_base_m = boot_entry_loc + actual_abstr_size - _saved_cc
             if 0 < _clist_base_m < total:
-                mem[_clist_base_m + 1] = clist_gts[1] & 0xFFFFFFFF  # idx 1: Next.GT
-        write_ns_entry(mem, total, NS_ENTRY_WORDS, BOOT_ABSTR_NS_SLOT,
-                       boot_entry_loc, entry_cr_limit, 0, 0, 1, 0, _saved_cc,
+                mem[_clist_base_m] = create_gt(
+                    _selftest_sequence, _selftest_slot, {"E": 1}, 1)
+                if _saved_cc > 1 and len(clist_gts) > 1:
+                    mem[_clist_base_m + 1] = clist_gts[1] & 0xFFFFFFFF
+        write_ns_entry(mem, total, NS_ENTRY_WORDS, _selftest_slot,
+                        boot_entry_loc, entry_cr_limit, 0, 0, 1, _selftest_sequence, _saved_cc,
                        _abstr_cache_token)
     else:
         # No saved lump and resident mode required — the trampoline is eliminated
@@ -2331,7 +2466,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         raise ValueError(
             f"Boot.Abstr (SelfTest) lump not found in lumps directory.\n"
             f"The direct-dispatch boot model requires the real SelfTest lump.\n"
-            f"Save a SelfTest lump (NS slot {BOOT_ABSTR_NS_SLOT}) via the IDE "
+            f"Save the SelfTest lump selected by Namespace state (slot {_selftest_slot}) via the IDE "
             f"and retry.\n"
             f"(Manifest: {os.path.join(lumps_dir, 'manifest.json')})\n"
             f"(Lumps dir: {lumps_dir})"

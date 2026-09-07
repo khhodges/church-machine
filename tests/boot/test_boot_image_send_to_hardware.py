@@ -236,7 +236,7 @@ def test_send_to_hardware_base64_payload_decodes_correctly(client, boot_bin_path
     assert len(decoded) == WUKONG_DMEM_WORDS * 4
     assert decoded != original_payload
     words = struct.unpack(f'<{WUKONG_DMEM_WORDS}I', decoded)
-    assert words[info['entry_slot'] * NS_ENTRY_WORDS] == WUKONG_UPLOAD_BODY_BASE_WORD * 4
+    assert words[info['entry_slot'] * NS_ENTRY_WORDS] == info['entry_loc'] * 4
 
 
 # ── ACK race fix: ack cleared before command is observable ────────────────────
@@ -399,7 +399,7 @@ def test_server_queues_native_wukong_le_image():
         assert decoded != le_bytes
         assert len(decoded) == WUKONG_DMEM_WORDS * 4
         assert cmd_data.get('reboot') is True
-        assert info['entry_loc'] == WUKONG_UPLOAD_BODY_BASE_WORD
+        assert info['entry_loc'] != WUKONG_UPLOAD_BODY_BASE_WORD
 
         # Bridge formula: byte-swap each LE word to BE before UART transmission.
         n = len(decoded) // 4
@@ -696,24 +696,10 @@ def _restore_boot_bin(bin_path, old_data):
 def test_send_to_hardware_rejects_non_resident_entry(client):
     """An image whose entry lump body is not resident (entry slot 2 = MMIO
     UART_DEV, no code) is rejected with 400 before reaching the bridge."""
-    payload = _valid_image(entry_slot=2)   # simulator-legal, hardware-fatal
-    p, old = _install_boot_bin(payload)
-    try:
-        resp = client.post('/api/boot-image/send-to-hardware',
-                           content_type='application/json', data='{}')
-        assert resp.status_code == 400, (
-            f"Expected 400 for non-resident entry image, got {resp.status_code}")
-        body = json.loads(resp.data)
-        assert 'not resident' in body.get('error', '')
-        # Nothing queued, in-flight rolled back, no pending entry slot.
-        with _app_module._wukong_command_lock:
-            assert _app_module._wukong_pending_cmd is None
-        with _app_module._upload_in_flight_lock:
-            assert not _app_module._upload_in_flight
-        with _app_module._wukong_hw_entry_lock:
-            assert _app_module._wukong_pending_entry_slot is None
-    finally:
-        _restore_boot_bin(p, old)
+    # The V2 physical header now rejects such an image even before the upload
+    # endpoint can persist or queue it.
+    with pytest.raises(ValueError, match="outside resident"):
+        _valid_image(entry_slot=2)
 
 
 def test_send_to_hardware_rejects_mismatched_caps0(client):

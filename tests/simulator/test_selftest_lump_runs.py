@@ -1,6 +1,6 @@
-"""Post-Flash Self-Test lump load-and-run test (Task #1285).
+"""Canonical named SelfTest lump load-and-run test (Task #1285).
 
-Verifies that the PostFlashSelftest lump (token from manifest.json) can be
+Verifies that the canonical SelfTest artifact (filename from manifest/ns-state) can be
 loaded into a fresh simulator boot image via ChurchSimulator.loadLumpBinary()
 and that the 81-test selftest suite runs to completion with DR0 === 0 (all
 tests passed).
@@ -114,7 +114,7 @@ def test_selftest_lump_loads_and_boots():
         f'Report: {report}'
     )
     assert report.get('loaded') is True, (
-        'loadLumpBinary() returned false — lump could not be installed in NS slot 6. '
+        'loadLumpBinary() returned false — lump could not be installed in the selected SelfTest NS slot. '
         f'failMessage: {report.get("failMessage")}'
     )
 

@@ -6,7 +6,6 @@ A7 v1.2 inverts the v1.1 layout:
   - NS LUMP IS the NS TABLE, placed at NS_TABLE_BASE = total − NS_TABLE_RESERVE.
   - NS slot 0 word0 = NS_TABLE_BASE (self-referential location).
   - NS slot 1 word0 = 0 (Thread at word 0).
-  - NS slot 6 word0 = thread_size (Boot.Abstr immediately after Thread).
 
 Layout under test (default config: thread=256, total=16384):
 
@@ -18,11 +17,11 @@ Layout under test (default config: thread=256, total=16384):
     [0x3C00 .. 0x3FFF]  NS TABLE (256 entries × 4 words)
                           slot 0 word0 = 0x3C00  (self-referential NS location)
                           slot 1 word0 = 0x0000  (Thread at word 0)
-                          slot 6 word0 = 0x0100  (Boot.Abstr at thread_size)
 
 These tests fail if generate_boot_image() regresses to the old v1.1 layout
 (NS lump at word 0, Thread above it, Boot.Abstr at ns_size+thread_size).
 """
+import json
 import os
 import struct
 import sys
@@ -35,7 +34,6 @@ from server.boot_image import (  # noqa: E402
     DEFAULT_ABSTRACTION_CATALOG,
     NS_TABLE_RESERVE,
     NS_ENTRY_WORDS,
-    BOOT_ABSTR_NS_SLOT,
     SLOT_SIZE,
 )
 from server.boot_constants import BOOT_ABSTR_DEFAULT_SIZE  # noqa: E402
@@ -126,32 +124,44 @@ def _custom_cfg():
     }
 
 
-def _assert_boot_abstr_at(words, thread_size, label):
-    """Core A7 v1.2 assertion: Boot.Abstr header is at physAddr = thread_size.
+def _active_selftest_binding():
+    """Return the one namespace-state/manifest-authorized SelfTest binding."""
+    with open(os.path.join(LUMPS_DIR, "ns-state.json"), encoding="utf-8") as fh:
+        state = json.load(fh)
+    with open(os.path.join(LUMPS_DIR, "manifest.json"), encoding="utf-8") as fh:
+        manifest = json.load(fh)
+    rows = [row for row in state["abstractions"] if row.get("name") == "SelfTest"]
+    assert len(rows) == 1, "SelfTest must have exactly one active ns-state row"
+    row = rows[0]
+    matches = [entry for entry in manifest if entry.get("abstraction") == "SelfTest"
+               and entry.get("ns_slot") == row["slot"]
+               and entry.get("token") == row["token"]
+               and entry.get("filename") == row["filename"]]
+    assert len(matches) == 1, "active SelfTest state must have one matching manifest locator"
+    return row
 
-    In A7 v1.2 the Thread LUMP occupies [0 .. thread_size-1] and Boot.Abstr
-    immediately follows at [thread_size .. thread_size+63].
 
-    Checks:
-    1. The word at thread_size carries the 0x1F LUMP magic in bits [31:27].
-    2. The Boot.Abstr region is NOT all-zero.
-    """
-    phys_abstr = thread_size
+def _assert_active_selftest_at(words, total, label):
+    """Assert the active SelfTest NS descriptor points at a header-sized body."""
+    binding = _active_selftest_binding()
+    slot = binding["slot"]
+    ns_base = total - (slot + 1) * NS_ENTRY_WORDS
+    phys_abstr = words[ns_base]
 
     header_word = words[phys_abstr]
     actual_magic = header_word >> 27
     assert actual_magic == LUMP_HEADER_MAGIC, (
-        f"{label}: Expected LUMP magic 0x1F at word 0x{phys_abstr:04X} "
-        f"(thread_size={thread_size}), "
+        f"{label}: active SelfTest NS[{slot}] points to 0x{phys_abstr:04X}, "
         f"but got 0x{actual_magic:02X} (full word=0x{header_word:08X}).  "
-        "Boot.Abstr should start immediately after Thread in A7 v1.2 layout."
+        "which must contain a valid SelfTest LUMP header."
     )
-
-    abstr_region = words[phys_abstr : phys_abstr + BOOT_ABSTR_DEFAULT_SIZE]
+    abstr_size = 1 << (((header_word >> 23) & 0xF) + 6)
+    cc = header_word & 0xFF
+    # The NS limit bounds executable/data words; the c-list tail is outside it.
+    assert words[ns_base + 1] & 0x1FFFFF == abstr_size - cc - 1
+    abstr_region = words[phys_abstr : phys_abstr + abstr_size]
     assert any(w != 0 for w in abstr_region), (
-        f"{label}: Words 0x{phys_abstr:04X}–"
-        f"0x{phys_abstr + BOOT_ABSTR_DEFAULT_SIZE - 1:04X} are all-zero.  "
-        "Expected Boot.Abstr lump body, not an empty gap."
+        f"{label}: active SelfTest body at 0x{phys_abstr:04X} is all-zero."
     )
 
 
@@ -190,35 +200,26 @@ def test_namespace_header_precedes_thread_lump():
     )
 
 
-def test_boot_abstr_immediately_follows_thread_default():
-    """Default config (thread=256): Boot.Abstr header at 0x0100 (= thread_size).
-
-    In A7 v1.2 physAddr(Boot.Abstr) = threadLumpWords = 256 = 0x0100.
-    """
+def test_active_selftest_descriptor_has_header_derived_extent_default():
     cfg   = _default_cfg()
     th    = int(cfg["step1"]["threadLumpWords"])   # 256
     total = int(cfg["step1"]["totalNamespaceWords"])
 
-    assert th == 0x100, f"Test assumption: thread_size should be 0x100 got 0x{th:04X}"
-
     image = generate_boot_image(cfg, LUMPS_DIR)
     words = _parse_image(image, total)
 
-    _assert_boot_abstr_at(words, NAMESPACE_HEADER_V2_WORDS + th, "default config (thread=256)")
+    _assert_active_selftest_at(words, total, "default config")
 
 
-def test_boot_abstr_immediately_follows_thread_custom():
-    """Custom Namespace config keeps Boot.Abstr directly after Thread."""
+def test_active_selftest_descriptor_has_header_derived_extent_custom():
     cfg   = _custom_cfg()
     th    = int(cfg["step1"]["threadLumpWords"])   # 256
     total = int(cfg["step1"]["totalNamespaceWords"])
 
-    assert th == 0x100, f"Test assumption: thread_size should be 0x100 got 0x{th:04X}"
-
     image = generate_boot_image(cfg, LUMPS_DIR)
     words = _parse_image(image, total)
 
-    _assert_boot_abstr_at(words, NAMESPACE_HEADER_V2_WORDS + th, "custom Namespace config (thread=256)")
+    _assert_active_selftest_at(words, total, "custom config")
 
 
 def test_ns_slot0_word0_is_ns_table_base():
@@ -263,31 +264,22 @@ def test_ns_slot1_word0_is_zero():
     )
 
 
-def test_boot_abstr_ns_entry_points_to_thread_size():
-    """NS entry for Boot.Abstr (slot 6) word0 must equal thread_size = 0x0100.
-
-    In A7 v1.2 Boot.Abstr starts immediately after Thread (at thread_size),
-    so the NS entry records physAddr = thread_size, not ns_size + thread_size.
-    """
+def test_active_selftest_ns_entry_matches_its_selected_slot():
+    """The active ns-state slot, rather than a historical catalog position, owns SelfTest."""
     cfg   = _default_cfg()
-    th    = int(cfg["step1"]["threadLumpWords"])   # 256
     total = int(cfg["step1"]["totalNamespaceWords"])
-
-    expected_phys = NAMESPACE_HEADER_V2_WORDS + th
 
     image = generate_boot_image(cfg, LUMPS_DIR)
     words = _parse_image(image, total)
 
-    ns_table_base = total - NS_TABLE_RESERVE
-    # Inverted NS layout: slot i lives at total − (i+1) × NS_ENTRY_WORDS.
-    slot_base = total - (BOOT_ABSTR_NS_SLOT + 1) * NS_ENTRY_WORDS
+    binding = _active_selftest_binding()
+    slot_base = total - (binding["slot"] + 1) * NS_ENTRY_WORDS
     ns_word0  = words[slot_base]
-
-    assert ns_word0 == expected_phys, (
-        f"NS slot {BOOT_ABSTR_NS_SLOT} (Boot.Abstr) word0 = 0x{ns_word0:04X}; "
-        f"expected 0x{expected_phys:04X} (= thread_size in A7 v1.2).  "
-        "v1.1 would record ns_size + thread_size = 0x0140."
-    )
+    hdr = words[ns_word0]
+    size = 1 << (((hdr >> 23) & 0xF) + 6)
+    cc = hdr & 0xFF
+    assert hdr >> 27 == LUMP_HEADER_MAGIC
+    assert (words[slot_base + 1] & 0x1FFFFF) == size - cc - 1
 
 
 def test_ns_table_at_top_not_at_zero():

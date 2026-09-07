@@ -2219,6 +2219,25 @@ class ChurchSimulator {
         // work unchanged. See docs/foundation-lump-design.md §4.
         const _bcStep1 = (typeof window !== 'undefined' && window.bootConfig
                           && window.bootConfig.step1) ? window.bootConfig.step1 : null;
+        // The server serializes the active, approved SelfTest binding into the
+        // boot config used by fallback initialization.  It is deliberately not
+        // inferred from the historical catalog slot: only the binding's live
+        // slot and header-derived allocation participate in placement.
+        const _selfTestBinding = (typeof window !== 'undefined' && window.bootConfig
+            && window.bootConfig.selfTest) || null;
+        const selfTestSlot = (_selfTestBinding && Number.isInteger(_selfTestBinding.slot)
+            && _selfTestBinding.slot >= 2) ? _selfTestBinding.slot
+            : ARCH_BOOT.minimalSlots.SelfTest;
+        const selfTestWords = (_selfTestBinding && Number.isInteger(_selfTestBinding.lumpWords)
+            && _selfTestBinding.lumpWords >= 64
+            && (_selfTestBinding.lumpWords & (_selfTestBinding.lumpWords - 1)) === 0)
+            ? _selfTestBinding.lumpWords : 64;
+        // The fallback's default boot target is the live SelfTest binding.
+        if (this.bootEntrySlot === ARCH_BOOT.defaultBootEntrySlot) this.bootEntrySlot = selfTestSlot;
+        // Remove the legacy catalog identity and any catalog entry displaced by
+        // the authoritative live SelfTest slot.
+        abstractions[ARCH_BOOT.minimalSlots.SelfTest] = null;
+        if (selfTestSlot < abstractions.length) abstractions[selfTestSlot] = null;
         const THREAD_LUMP_SIZE     = (_bcStep1 && _bcStep1.threadLumpWords)    || 256;
         const THREAD_SW = (_bcStep1 && _bcStep1.threadStackWords) || 32;
         const THREAD_CC = THREAD_DESIGN.capabilityHomes.words;
@@ -2240,18 +2259,11 @@ class ChurchSimulator {
         // Keep reset and loaded-image bookkeeping on the same physical Thread
         // set.  V2 deliberately has no tail thread-count marker.
         this._loadedThreadSlots = [1].concat(generatedThreadSlots);
-        // Boot.Abstr lump size: always 64w in the fallback init path (Task #568).
-        // The hardcoded init is only a fallback when no binary boot image is present;
-        // loadBootImage() uses the actual size from the generator.  Defaulting to 64w
-        // keeps this path consistent with server/boot_image.py BOOT_ABSTR_DEFAULT_SIZE.
-        const BOOT_ABSTR_LUMP_SIZE = 64;
         const NS_LUMP_SIZE         = (_bcStep1 && _bcStep1.namespaceLumpWords) || this.NS_TABLE_RESERVE;
-        // Boot.Abstr at bootEntrySlot (default 6 = SelfTest).
         // Slots 2-5 are MMIO — no RAM body, no slotSizes entry needed.
         const slotSizes = {};
         slotSizes[0] = NS_LUMP_SIZE;
         slotSizes[1] = THREAD_LUMP_SIZE;
-        slotSizes[this.bootEntrySlot] = BOOT_ABSTR_LUMP_SIZE;  // Boot.Abstr: 64w default
 
         // Boot Image Designer Step 2 (Task #215): per-slot physAddr overrides
         // for programmer-declared resident lumps. NS entries for those slots
@@ -2315,12 +2327,12 @@ class ChurchSimulator {
             // Header V2 occupies words 0..15, so Thread and every RAM body
             // starts after that physical header.
             const loc = (i === 0) ? 0
-                      : (MMIO_ADDRS[i] !== undefined ? MMIO_ADDRS[i]
+                      : (MMIO_ADDRS[i] !== undefined && i !== selfTestSlot ? MMIO_ADDRS[i]
                       : (overrideLoc !== undefined ? overrideLoc : runningOffset));
             // Only advance runningOffset for RAM-backed slots (not slot 0, not MMIO, not overrides).
-            if (MMIO_ADDRS[i] === undefined && overrideLoc === undefined && i !== 0) runningOffset += mySize;
+            if ((MMIO_ADDRS[i] === undefined || i === selfTestSlot) && overrideLoc === undefined && i !== 0) runningOffset += mySize;
             const lim17 = (i === 0) ? (mySize - 1)
-                        : (DEVICE_REG_LIMITS[i] !== undefined ? DEVICE_REG_LIMITS[i]
+                        : (DEVICE_REG_LIMITS[i] !== undefined && i !== selfTestSlot ? DEVICE_REG_LIMITS[i]
                         : (mySize - 1));
             // NS[0] (Boot.NS) has no physical c-list in the NS TABLE region —
             // clistCount is 0. The DEMO_CLIST is managed through this.demoClistGTs
@@ -2342,6 +2354,17 @@ class ChurchSimulator {
             const gtWord = this.createGT(0, i, a.perms, 1);
             clistGTs.push(gtWord);
         }
+
+        // SelfTest joins the resident allocation cursor after fixed catalog
+        // bodies.  Its descriptor/body location therefore moves with the
+        // header-declared allocation and relocates following Thread contexts.
+        const selfTestLoc = runningOffset;
+        this.writeNSEntry(selfTestSlot, selfTestLoc, selfTestWords - 1,
+            0, 0, 1, 0, 0, 0);
+        this.nsLabels[selfTestSlot] = 'SelfTest';
+        this.nsChainable[selfTestSlot] = false;
+        runningOffset += selfTestWords;
+        if (selfTestSlot >= this.nsCount) this.nsCount = selfTestSlot + 1;
 
         // Generated Thread#2 onward are resident Thread LUMPs with stable NS
         // identities immediately after the fixed boot catalog.  A Step-2
@@ -2533,7 +2556,7 @@ class ChurchSimulator {
         // loaded at Run time (the "LAZY LOAD does work on First CALL" fix).
         this.demoClistGTs       = clistGTs.slice();
 
-        // ── Boot.Abstr lump (NS Slot 6 = SelfTest) ────────────────────────────────
+        // ── State-selected SelfTest placeholder ─────────────────────────────────
         // Direct dispatch: no trampoline is written here.  The real SelfTest lump
         // is provided by loadBootImage() (from 00000600.lump via boot_image.py).
         // In the fallback init path the lump body is left as zeros; NUC_CLIST will
@@ -2542,18 +2565,8 @@ class ChurchSimulator {
         // NS entry word1/word2 are still set so the NS table entry is structurally
         // valid (non-zero), satisfying isNSEntryValid() during boot step B:05.
         //
-        // ARCHITECTURAL HONESTY (Task #2867): the fallback placeholder is ALWAYS
-        // anchored to the canonical Boot.Abstr slot (_bootAbstrSlot = 6), NEVER to
-        // the user-selected this.bootEntrySlot.  When the user has selected a
-        // different entry (e.g. CapabilityTest at slot 10) but no boot image with
-        // its real body has been loaded, we must NOT fabricate an executable-looking
-        // header at the selected slot — that would let a zero-body slot masquerade
-        // as bootable code.  The selected slot keeps whatever the catalog loop wrote
-        // (a valid NS descriptor pointing at an empty region); boot will fault
-        // cleanly at B:06 (LUMP_MAGIC) until a real image supplies the body.
-        const _placeholderSlot = (typeof this._bootAbstrSlot === 'number')
-            ? this._bootAbstrSlot : this.bootEntrySlot;
-        const entryLumpSize    = BOOT_ABSTR_LUMP_SIZE;
+        const _placeholderSlot = selfTestSlot;
+        const entryLumpSize    = selfTestWords;
         const entryNSBase      = this._nsSlotBase(_placeholderSlot);
         const entryCRLimit     = entryLumpSize - 1;
         const bootEntryLoc     = this.memory[this._nsSlotBase(_placeholderSlot)];

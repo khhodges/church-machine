@@ -135,11 +135,38 @@ def _region_of(word_index, total_words, ns_size, thread_size, entry_size):
     return "resident / free region"
 
 
-def _run_simulator(cfg):
+def _run_simulator(cfg, lumps_dir=LUMPS_DIR):
     """Invoke the Node harness; return memory[] as a list of 32-bit ints."""
+    # The fallback simulator cannot read the server's artifact library. Feed it
+    # only the active authoritative SelfTest binding and its header allocation,
+    # exactly as boot_image.py resolves it; archived manifest history is never
+    # a placement source.
+    state_path = os.path.join(lumps_dir, "ns-state.json")
+    manifest_path = os.path.join(lumps_dir, "manifest.json")
+    with open(state_path) as source:
+        state = json.load(source)
+    active = [row for row in state.get("abstractions", [])
+              if isinstance(row, dict) and row.get("name") == "SelfTest"
+              and not row.get("archived")]
+    assert len(active) == 1, "expected one active authoritative SelfTest state row"
+    selected = active[0]
+    with open(manifest_path) as source:
+        manifest = json.load(source)
+    matches = [row for row in manifest if isinstance(row, dict)
+               and not row.get("archived")
+               and row.get("abstraction") == "SelfTest"
+               and row.get("slot", row.get("ns_slot")) == selected.get("slot")
+               and row.get("token") == selected.get("token")
+               and row.get("filename") == selected.get("filename")]
+    assert len(matches) == 1, "expected one active SelfTest manifest locator"
+    raw = open(os.path.join(lumps_dir, selected["filename"]), "rb").read()
+    header = struct.unpack_from(">I", raw)[0]
+    lump_words = 1 << (((header >> 23) & 0xF) + 6)
+    sim_cfg = json.loads(json.dumps(cfg))
+    sim_cfg["selfTest"] = {"slot": selected["slot"], "lumpWords": lump_words}
     proc = subprocess.run(
         ["node", HARNESS],
-        input=json.dumps(cfg).encode("utf-8"),
+        input=json.dumps(sim_cfg).encode("utf-8"),
         capture_output=True,
         timeout=30,
         cwd=ROOT,
@@ -315,7 +342,7 @@ def test_boot_image_matches_simulator(cfg, tmp_path):
     _write_synthetic_boot_abstr_lump(str(tmp_path))
 
     py_bytes  = generate_boot_image(cfg, str(tmp_path))
-    sim_words = _run_simulator(cfg)
+    sim_words = _run_simulator(cfg, str(tmp_path))
     _compare(py_bytes, sim_words, cfg)
 
 
@@ -342,7 +369,9 @@ def test_generated_thread_namespace_entries_have_stable_slots_and_boot_cr0(count
         return
 
     expected_cr0 = create_gt(0, BOOT_ABSTR_NS_SLOT, {"E": 1}, 1)
-    previous_location = entries[10]["w0"] + 64
+    selftest_location = entries[BOOT_ABSTR_NS_SLOT]["w0"]
+    selftest_header = struct.unpack_from("<I", image, selftest_location * 4)[0]
+    previous_location = selftest_location + (1 << (((selftest_header >> 23) & 0xF) + 6))
     thread_size = cfg["step1"]["threadLumpWords"]
     for slot in expected_slots:
         location = entries[slot]["w0"]
@@ -541,11 +570,9 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
     ns_base  = total - (BOOT_ABSTR_NS_SLOT + 1) * NS_ENTRY_WORDS
     boot_loc = words[ns_base]
 
-    # Expected physical address: A7 v1.2 — Boot.Abstr starts immediately after Thread.
-    # Thread is at word 0 with size 256, so Boot.Abstr base = 256.
-    # (Old v1.1 formula was ns_size + thread_size = 64 + 256.)
-    thread_size = cfg["step1"]["threadLumpWords"]
-    expected_loc = 16 + thread_size
+    # SelfTest follows the RAM-backed fixed catalog residents. Its exact
+    # header allocation then determines the first generated Thread location.
+    expected_loc = words[total - (10 + 1) * NS_ENTRY_WORDS] + 64
     assert boot_loc == expected_loc, (
         f"Boot.Abstr physical address {boot_loc} != expected {expected_loc}"
     )
@@ -574,6 +601,58 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
     assert hdr_cc == cc, f"lump header cc={hdr_cc} != {cc}"
 
 
+def test_selftest_header_allocation_relocates_later_residents_and_threads(tmp_path):
+    """SelfTest uses its approved header size; it has no fixed 512-word hole."""
+    _write_synthetic_boot_abstr_lump(str(tmp_path), lump_size=128, cw=3, cc=0)
+    cfg = _cfg_generated_threads(2)
+    image = generate_boot_image(cfg, str(tmp_path))
+    entries = {row["slot"]: row for row in parse_ns_table_raw(image)["entries"]}
+
+    selftest_loc = entries[BOOT_ABSTR_NS_SLOT]["w0"]
+    # SelfTest joins the dynamic resident pool after the fixed catalog bodies,
+    # rather than claiming a fixed bootstrap address or 512-word reservation.
+    assert selftest_loc == entries[10]["w0"] + 64
+    # Generated Thread#2 follows the selected header allocation exactly.
+    assert entries[11]["w0"] == selftest_loc + 128
+
+
+def test_selftest_can_use_authoritative_non6_slot_and_header_allocation(tmp_path):
+    """SelfTest's live slot is state-selected, not the historical slot 6."""
+    _write_synthetic_boot_abstr_lump(str(tmp_path), lump_size=128, cw=3, cc=0)
+    state_path = tmp_path / "ns-state.json"
+    manifest_path = tmp_path / "manifest.json"
+    state = json.loads(state_path.read_text())
+    manifest = json.loads(manifest_path.read_text())
+    state["abstractions"][0]["slot"] = 20
+    manifest[0]["ns_slot"] = 20
+    state_path.write_text(json.dumps(state))
+    manifest_path.write_text(json.dumps(manifest))
+
+    image = generate_boot_image(_cfg_generated_threads(2), str(tmp_path))
+    entries = {row["slot"]: row for row in parse_ns_table_raw(image)["entries"]}
+    assert 6 not in entries
+    assert entries[20]["w0"] > entries[10]["w0"]
+    assert entries[11]["w0"] == entries[20]["w0"] + 128
+    # Thread's boot credential follows the selected SelfTest slot.
+    cr0 = struct.unpack_from("<I", image, (entries[1]["w0"] + THREAD_CAPS_OFFSET) * 4)[0]
+    assert (cr0 & 0xFFFF) == 20
+
+
+def test_selftest_requires_exact_ns_state_manifest_binding(tmp_path):
+    """A filename/token/slot disagreement is rejected before executable load."""
+    lump_path, _ = _write_synthetic_boot_abstr_lump(str(tmp_path))
+    state_path = tmp_path / "ns-state.json"
+    state = json.loads(state_path.read_text())
+    state["abstractions"][0]["filename"] = "different-approved-name.lump"
+    state_path.write_text(json.dumps(state))
+
+    with pytest.raises(ValueError, match="matching.*filename and token"):
+        generate_boot_image(_cfg_default(), str(tmp_path))
+    # The valid file must not become an implicit fallback after the binding
+    # disagreement above.
+    assert os.path.isfile(lump_path)
+
+
 @pytest.mark.parametrize("lightning_slot,stale_next_config", [
     (6,   None),  # default LightningBolt target: SelfTest
     (300, 6),     # valid nondefault target must beat stale self-loop config
@@ -588,48 +667,50 @@ def test_boot_image_next_gt_follows_lightning_bolt(tmp_path, lightning_slot, sta
     nextAfterSelfTestSlot setting is deliberately supplied in several cases
     to prove it cannot override the LightningBolt selection.
 
-    Uses the production SelfTest lump (cc=2, 512 words) so the patch path taken
-    by generate_boot_image() is identical to what runs on hardware.
+    Uses the active approved SelfTest artifact and derives its allocation from
+    the LUMP header, rather than relying on a historical fixed size.
     """
     from server.boot_image import (
         generate_boot_image, NS_TABLE_RESERVE, NS_ENTRY_WORDS,
         BOOT_ABSTR_NS_SLOT, create_gt,
     )
 
-    # ── Use the production SelfTest binary (cc=2, 512 words) ──────────────────
-    #    find_lump_file_by_abstraction() prefers the "filename" field in the
-    #    manifest entry; we copy the canonical file into tmp_path and point the
-    #    manifest at it so the generator loads the real binary.
+    # ── Use the active approved SelfTest binary ───────────────────────────────
     with open(os.path.join(LUMPS_DIR, "manifest.json"), encoding="utf-8") as _mf:
         _selftest_entries = json.load(_mf)
-    CANONICAL_FILENAME = next(
-        entry["filename"] for entry in _selftest_entries
-        if entry.get("abstraction") == "SelfTest"
-        and isinstance(entry.get("filename"), str)
-    )
+    with open(os.path.join(LUMPS_DIR, "ns-state.json"), encoding="utf-8") as _sf:
+        _active_selftest = next(
+            entry for entry in json.load(_sf)["abstractions"]
+            if entry.get("name") == "SelfTest" and not entry.get("archived"))
+    CANONICAL_FILENAME = _active_selftest["filename"]
     real_lump_src = os.path.join(LUMPS_DIR, CANONICAL_FILENAME)
     (tmp_path / CANONICAL_FILENAME).write_bytes(
         open(real_lump_src, "rb").read()
     )
     # Approval is part of the executable fixture, not ambient server state.
-    from server.lump_approvals import read_approvals, write_approvals
+    from server.lump_approvals import write_approvals
+    from server.lump_integrity import parse_canonical_filename
     import hashlib
     _raw = (tmp_path / CANONICAL_FILENAME).read_bytes()
     _digest = hashlib.sha256(_raw).hexdigest()
-    _source_approvals = read_approvals(os.path.join(LUMPS_DIR, "approvals.json"))
+    _dot_name, _issue_n, _number = parse_canonical_filename(CANONICAL_FILENAME)
     write_approvals(str(tmp_path / "approvals.json"), {
-        _digest: _source_approvals[_digest],
+        _digest: {
+            "binary_hash": _digest, "filename": CANONICAL_FILENAME,
+            "dot_name": _dot_name, "issue_n": _issue_n,
+            "identity_hash": hashlib.sha256(
+                f"{_dot_name}#{_issue_n}".encode()).hexdigest(),
+        },
     })
 
     # Parse lump header to get CC and LUMP_SIZE from the actual binary.
     with open(real_lump_src, "rb") as _f:
         _hdr = struct.unpack_from(">I", _f.read(4))[0]
-    CC        = _hdr & 0xFF                            # must be 2
-    LUMP_SIZE = 1 << (((_hdr >> 23) & 0xF) + 6)       # must be 512
-    assert CC == 2,   f"SelfTest lump cc={CC} but expected 2; rebuild with build_selftest_lump.js"
-    assert LUMP_SIZE == 512, f"SelfTest lump_size={LUMP_SIZE} but expected 512"
+    CC        = _hdr & 0xFF
+    LUMP_SIZE = 1 << (((_hdr >> 23) & 0xF) + 6)
+    assert CC >= 2, "active SelfTest needs self and Next.GT c-list rows"
 
-    SAVED_TOKEN = f"{BOOT_ABSTR_NS_SLOT << 8:08x}"
+    SAVED_TOKEN = _active_selftest["token"]
     (tmp_path / "manifest.json").write_text(json.dumps([{
         "token":           SAVED_TOKEN,
         "abstraction":     "SelfTest",
@@ -645,6 +726,7 @@ def test_boot_image_next_gt_follows_lightning_bolt(tmp_path, lightning_slot, sta
             "name": "SelfTest",
             "slot": BOOT_ABSTR_NS_SLOT,
             "token": SAVED_TOKEN,
+            "filename": CANONICAL_FILENAME,
         }]
     }))
 

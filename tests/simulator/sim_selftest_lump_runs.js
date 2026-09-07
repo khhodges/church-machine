@@ -2,7 +2,7 @@
 //
 // Headless harness used by tests/simulator/test_selftest_lump_runs.py.
 //
-// Loads the PostFlashSelftest lump (token read from manifest.json) into a fresh boot image via
+// Loads the canonical named SelfTest artifact (resolved from manifest + ns-state) into a fresh boot image via
 // ChurchSimulator.loadLumpBinary(), runs the simulator to completion, and
 // verifies that DR0 === 0 (all 81 self-tests passed).
 //
@@ -81,21 +81,27 @@ if (!sim.bootComplete) {
     process.exit(1);
 }
 
-// ── Load PostFlashSelftest lump — token read dynamically from manifest.json ───
+// ── Load canonical SelfTest — filename is owned by manifest + ns-state ───────
 const MANIFEST_PATH = path.join(ROOT, 'server', 'lumps', 'manifest.json');
+const NS_STATE_PATH = path.join(ROOT, 'server', 'lumps', 'ns-state.json');
 const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'));
-const selftestEntry = manifest.find(e => e.abstraction === 'PostFlashSelftest');
-if (!selftestEntry) {
+const selftestEntries = manifest.filter(e =>
+    e.abstraction === 'SelfTest' && !e.archived);
+const nsState = JSON.parse(fs.readFileSync(NS_STATE_PATH, 'utf8'));
+const selftestRows = (nsState.abstractions || []).filter(e => e.name === 'SelfTest');
+if (selftestEntries.length !== 1 || selftestRows.length !== 1 ||
+    selftestEntries[0].filename !== selftestRows[0].filename) {
     process.stdout.write(JSON.stringify({
         bootComplete: true, loaded: false, steps: 0, dr0: null,
         faultType: null, faultMessage: null,
         terminatedBy: 'LUMP_NOT_FOUND', pass: false,
-        failMessage: 'No PostFlashSelftest entry found in manifest.json',
+        failMessage: 'Canonical SelfTest manifest/ns-state binding is missing or inconsistent',
     }) + '\n');
     process.exit(1);
 }
+const selftestEntry = selftestEntries[0];
 const LUMP_TOKEN = selftestEntry.token;
-const LUMP_PATH  = path.join(ROOT, 'server', 'lumps', `${LUMP_TOKEN}.lump`);
+const LUMP_PATH  = path.join(ROOT, 'server', 'lumps', selftestEntry.filename);
 let lumpBytes;
 try {
     lumpBytes = fs.readFileSync(LUMP_PATH);
@@ -122,15 +128,16 @@ for (let i = 0; i < wordCount; i++) {
     lumpWords.push(lumpBytes.readUInt32BE(i * 4));
 }
 
-// loadLumpBinary places the lump at 0x0400 (extended-code area), updates
-// the canonical Boot.Abstr NS slot (sim.bootEntrySlot, currently 6 — see
+// loadLumpBinary places the lump at 0x0400 (extended-code area), updates the
+// selected canonical SelfTest namespace slot (resolved from ns-state — see
 // "Boot.Abstr token and filename migration" — slot 3 is stale), CR14 (code
 // register), and CR6 (c-list register). Targeting sim.bootEntrySlot (rather
 // than a hardcoded slot number) ensures loadLumpBinary's
 // `abstrSlot === this.bootEntrySlot` check rebuilds CR14 to point at the
 // newly-loaded code; a stale slot number leaves CR14 pointing at old memory
 // and the very first fetch reads garbage.
-const loaded = sim.loadLumpBinary(lumpWords, sim.bootEntrySlot);
+const selectedSelfTestSlot = selftestRows[0].slot;
+const loaded = sim.loadLumpBinary(lumpWords, selectedSelfTestSlot);
 
 if (!loaded) {
     const out = {

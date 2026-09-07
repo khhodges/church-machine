@@ -1,246 +1,215 @@
 #!/usr/bin/env node
-// scripts/build_selftest_lump.js
-//
-// Assembles simulator/examples/post_flash_selftest.cloomc using the production
-// ChurchAssembler (simulator/assembler.js), packs the result into a valid LUMP
-// binary and writes server/lumps/<token>.lump.
-//
-// The token is the CRC-32 of all binary bytes, lower-cased 8-hex-char string.
-// The manifest.json entry is printed to stdout for manual insertion or patch.
-//
-// C-List (cc=2) — tail of the lump, 2 slots:
-//   Slot 0  0x4A000006  E    SelfTest (NS slot 6) — one E-GT loaded into CR1 for TPERM/EXACT tests
-//
-// Usage:
-//   node scripts/build_selftest_lump.js
-
 'use strict';
 
-const fs   = require('fs');
+// Build the canonical, named SelfTest artifact.  The protected identity token
+// is intentionally independent of the content-addressed filename; ns-state is
+// the authoritative slot binding.
+const fs = require('fs');
 const path = require('path');
-
-const ROOT        = path.resolve(__dirname, '..');
-const ASSEMBLER   = path.join(ROOT, 'simulator', 'assembler.js');
-const SOURCE      = path.join(ROOT, 'simulator', 'examples', 'post_flash_selftest.cloomc');
-
-const lumpsDirArgIdx = process.argv.indexOf('--lumps-dir');
-
-// --out-dir <path>: redirect .lump/manifest writes to a different
-// directory (used by CI to validate without touching server/lumps/).
-const _outDirIdx  = process.argv.indexOf('--out-dir');
-const LUMPS_DIR = (_outDirIdx !== -1 && process.argv[_outDirIdx + 1])
-    ? path.resolve(process.argv[_outDirIdx + 1])
-    : (lumpsDirArgIdx !== -1 && process.argv[lumpsDirArgIdx + 1])
-        ? path.resolve(process.argv[lumpsDirArgIdx + 1])
-        : path.join(ROOT, 'server', 'lumps');
-const MANIFEST    = path.join(LUMPS_DIR, 'manifest.json');
-
-// ── Minimal browser stubs so assembler.js loads in Node.js ──────────────────
-global.localStorage = {
-    _store: {},
-    getItem(k)    { return this._store[k] !== undefined ? this._store[k] : null; },
-    setItem(k, v) { this._store[k] = String(v); },
-    removeItem(k) { delete this._store[k]; },
-};
-
-// Execute assembler.js in this process context
-const asmSrc = fs.readFileSync(ASSEMBLER, 'utf8');
-// Wrap in IIFE to avoid top-level conflicts
+const crypto = require('crypto');
 const vm = require('vm');
-vm.runInThisContext(asmSrc, { filename: 'assembler.js' });
+const { spawnSync } = require('child_process');
 
-if (typeof ChurchAssembler === 'undefined') {
-    console.error('ERROR: ChurchAssembler not found after loading assembler.js');
+const ROOT = path.resolve(__dirname, '..');
+const arg = name => {
+    const i = process.argv.indexOf(name);
+    return i === -1 ? null : process.argv[i + 1] || null;
+};
+const LUMPS_DIR = path.resolve(arg('--out-dir') || arg('--lumps-dir') ||
+    path.join(ROOT, 'server', 'lumps'));
+const MANIFEST = path.join(LUMPS_DIR, 'manifest.json');
+const NS_STATE = path.join(LUMPS_DIR, 'ns-state.json');
+const APPROVALS = path.join(LUMPS_DIR, 'approvals.json');
+const CHECK_ONLY = process.argv.includes('--check');
+const DOT_NAME = 'SelfTest';
+
+function json(value) {
+    return JSON.stringify(value, null, 2).replace(/[^\x00-\x7F]/g,
+        c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+}
+function die(message) {
+    console.error(`FAIL: ${message}`);
     process.exit(1);
 }
-
-// ── Assemble the source ──────────────────────────────────────────────────────
-const source = fs.readFileSync(SOURCE, 'utf8');
-const asm    = new ChurchAssembler();
-const result = asm.assemble(source);
-
-if (result.errors.length > 0) {
-    console.error('Assembly errors:');
-    for (const e of result.errors) {
-        console.error(`  Line ${e.line}: ${e.message}`);
-    }
-    process.exit(1);
-}
-
-const words = result.words;
-console.log(`Assembled ${words.length} instruction words.`);
-function contentFrame(name, text) {
-    const api = Buffer.from(JSON.stringify({ name, methods: [] }), 'utf8');
-    const src = Buffer.from(text, 'utf8');
-    const bytes = Buffer.concat([
-        Buffer.from([0xAB, 0x03, api.length >>> 8, api.length & 0xFF]), api,
-        Buffer.alloc((4 - api.length % 4) % 4),
-        Buffer.from([(src.length >>> 24) & 0xFF, (src.length >>> 16) & 0xFF,
-            (src.length >>> 8) & 0xFF, src.length & 0xFF]), src,
-        Buffer.alloc((4 - src.length % 4) % 4),
-    ]);
-    const frame = [];
-    for (let i = 0; i < bytes.length; i += 4) frame.push(bytes.readUInt32BE(i));
-    return frame;
-}
-const FRAME = contentFrame('PostFlashSelftest', source);
-
-// ── C-List definition ─────────────────────────────────────────────────────────
-//
-// cc = 2.
-// X-permission is NOT stored in a c-list (constructed dynamically by CALL into CR14,
-// a privileged register blocked from TPERM by the assembler).
-//
-//   slot 0  SelfTest  E  NS slot 6  — E-GT for LOAD+TPERM tests and EXACT cross-comparison.
-//           At SelfTest entry:
-//             CR0  = E-GT for SelfTest  (Church domain, E-perm; from thread[+244])
-//             CR1  = E-GT for SelfTest  (loaded via LOAD CR1, SelfTest from c-list[0])
-//           CR0 and CR1 are bit-identical (0x4A000006) — EXACT cross-checks pass.
-//           This immutable self-reference is preserved in the boot image.
-//
-//   slot 1  Next  E  NS slot 6  — Next.GT: continuation called at done: when all tests pass.
-//           boot_image.py replaces this template word with the E-GT selected
-//           by the ⚡ LightningBolt boot-entry control.
-//
-const CLIST = [
-    { gt: 0x4A000006, rights: ['E'] }, // 0  SelfTest  E  NS slot 6  — E-GT for TPERM/EXACT tests
-    { gt: 0x4A000006, rights: ['E'] }, // 1  Next      E  template; boot image follows ⚡ entry
-];
-
-// ── Pack LUMP binary ─────────────────────────────────────────────────────────
-//
-// Layout (all big-endian 32-bit words):
-//   Word 0           : header  — magic(5)|n_minus_6(4)|cw(13)|typ(2)|cc(8)
-//   Words 1..cw      : instruction words
-//   Words cw+1..     : zero-pad
-//   Words lumpSize-cc..lumpSize-1 : c-list (cc GT words, at lump tail)
-//
-// cw  = instruction word count (len(words))
-// cc  = 2  (SelfTest self-reference plus LightningBolt-following Next.GT)
-// typ = 0  (standard lump, not thread/outform)
-// lump_size = next power-of-2 >= (1 + cw + cc)
-
-const cw = words.length;
-const cc = CLIST.length;   // 2
-const totalNeeded = 1 + cw + FRAME.length + cc;
-
-let lumpSize = 64;
-while (lumpSize < totalNeeded) lumpSize *= 2;
-
-const n_minus_6 = Math.round(Math.log2(lumpSize)) - 6;
-
-// Validate fields fit
-if (n_minus_6 < 0 || n_minus_6 > 15)  { console.error('n_minus_6 out of range:', n_minus_6); process.exit(1); }
-if (cw < 0    || cw    > 0x1FFF)       { console.error('cw out of range:', cw); process.exit(1); }
-if (cc < 0    || cc    > 0xFF)         { console.error('cc out of range:', cc); process.exit(1); }
-
-const headerWord = (
-    (0x1F               << 27) |
-    ((n_minus_6 & 0xF)  << 23) |
-    ((cw        & 0x1FFF) << 10) |
-    ((0         & 0x3)  <<  8) |  // typ=0
-    (cc & 0xFF)
-) >>> 0;
-
-const padded = new Uint32Array(lumpSize);
-padded[0] = headerWord;
-for (let i = 0; i < cw; i++) padded[1 + i] = words[i] >>> 0;
-for (let i = 0; i < FRAME.length; i++) padded[1 + cw + i] = FRAME[i] >>> 0;
-
-// Write c-list GT values at the lump tail (words lumpSize-cc .. lumpSize-1)
-const clistBase = lumpSize - cc;
-for (let i = 0; i < CLIST.length; i++) {
-    padded[clistBase + i] = CLIST[i].gt >>> 0;
-}
-
-console.log(`LUMP header: 0x${headerWord.toString(16).toUpperCase().padStart(8,'0')}`);
-console.log(`  n_minus_6=${n_minus_6} → lump_size=${lumpSize}`);
-console.log(`  cw=${cw}  cc=${cc}  typ=0`);
-console.log(`  c-list base word index: ${clistBase}`);
-
-// ── Convert to big-endian bytes ──────────────────────────────────────────────
-const bytes = Buffer.alloc(lumpSize * 4);
-for (let i = 0; i < lumpSize; i++) {
-    bytes.writeUInt32BE(padded[i] >>> 0, i * 4);
-}
-
-// ── Compute CRC-32 for the token ─────────────────────────────────────────────
-// Standard CRC-32 (IEEE 802.3 polynomial 0xEDB88320)
+function powerOfTwo(n) { return n >= 64 && (n & (n - 1)) === 0; }
 function crc32(buf) {
-    const table = (() => {
-        const t = new Uint32Array(256);
-        for (let n = 0; n < 256; n++) {
-            let c = n;
-            for (let k = 0; k < 8; k++) {
-                c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-            }
-            t[n] = c;
-        }
-        return t;
-    })();
     let crc = 0xFFFFFFFF;
-    for (let i = 0; i < buf.length; i++) {
-        crc = table[(crc ^ buf[i]) & 0xFF] ^ (crc >>> 8);
+    for (const byte of buf) {
+        crc ^= byte;
+        for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
     }
     return (crc ^ 0xFFFFFFFF) >>> 0;
 }
+function frame(text) {
+    const api = Buffer.from(JSON.stringify({ name: DOT_NAME, methods: [] }));
+    const src = Buffer.from(text);
+    const data = Buffer.concat([
+        Buffer.from([0xAB, 0x03, api.length >>> 8, api.length & 0xFF]), api,
+        Buffer.alloc((4 - api.length % 4) % 4),
+        Buffer.from([src.length >>> 24, src.length >>> 16 & 0xFF, src.length >>> 8 & 0xFF, src.length & 0xFF]), src,
+        Buffer.alloc((4 - src.length % 4) % 4),
+    ]);
+    const words = [];
+    for (let i = 0; i < data.length; i += 4) words.push(data.readUInt32BE(i));
+    return words;
+}
 
-const token = crc32(bytes).toString(16).toLowerCase().padStart(8, '0');
-console.log(`Token (CRC-32 of binary): ${token}`);
-
-// ── Remove old SelfTest lump files ──────────────────────────────────────────
+if (!fs.existsSync(MANIFEST)) die(`missing manifest: ${MANIFEST}`);
+if (!fs.existsSync(NS_STATE)) die(`missing ns-state: ${NS_STATE}`);
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
-const existingIdx = manifest.findIndex(e => e.abstraction === 'PostFlashSelftest');
-if (existingIdx !== -1) {
-    const oldToken = manifest[existingIdx].token;
-    if (oldToken && oldToken !== token) {
-        const oldLump = path.join(LUMPS_DIR, `${oldToken}.lump`);
-        if (fs.existsSync(oldLump)) {
-            fs.unlinkSync(oldLump);
-            console.log(`Removed old: ${oldLump}`);
-        }
+const nsState = JSON.parse(fs.readFileSync(NS_STATE, 'utf8'));
+const stateRows = (nsState.abstractions || []).filter(row => row.name === DOT_NAME);
+if (stateRows.length !== 1) die('ns-state must contain exactly one SelfTest row');
+const stateRow = stateRows[0];
+const requestedSlot = arg('--ns-slot');
+const nsSlot = requestedSlot === null ? stateRow.slot : Number(requestedSlot);
+if (!Number.isInteger(nsSlot) || nsSlot < 0 || nsSlot > 0xFFFF) die('--ns-slot must be a valid unsigned 16-bit slot');
+const seq = Number(stateRow.seq);
+if (!Number.isInteger(seq) || seq < 0 || seq > 0x1FF) die('SelfTest ns-state seq must be a valid 9-bit sequence');
+
+global.localStorage = { _store: {}, getItem(k) { return this._store[k] ?? null; },
+    setItem(k, v) { this._store[k] = String(v); }, removeItem(k) { delete this._store[k]; } };
+vm.runInThisContext(fs.readFileSync(path.join(ROOT, 'simulator', 'assembler.js'), 'utf8'),
+    { filename: 'assembler.js' });
+const source = fs.readFileSync(path.join(ROOT, 'simulator', 'examples', 'post_flash_selftest.cloomc'), 'utf8');
+const result = new ChurchAssembler().assemble(source);
+if (result.errors.length) die(result.errors.map(e => `line ${e.line}: ${e.message}`).join('\n'));
+
+const cw = result.words.length;
+const cc = 2;
+const content = frame(source);
+const needed = 1 + cw + content.length + cc;
+let lumpSize = 64;
+while (lumpSize < needed) lumpSize *= 2;
+const requestedWords = arg('--lump-words');
+if (requestedWords !== null) {
+    lumpSize = Number(requestedWords);
+    if (!Number.isSafeInteger(lumpSize) || !powerOfTwo(lumpSize) || lumpSize < needed)
+        die(`--lump-words must be a power of two >= ${needed}`);
+}
+if (lumpSize > 64 * 2 ** 15) die('lump allocation exceeds LUMP header capacity');
+const nMinus6 = Math.log2(lumpSize) - 6;
+if (cw > 0x1FFF) die('instruction count exceeds LUMP header capacity');
+const header = ((0x1F << 27) | (nMinus6 << 23) | (cw << 10) | cc) >>> 0;
+const words = new Uint32Array(lumpSize);
+words[0] = header;
+result.words.forEach((word, i) => { words[1 + i] = word >>> 0; });
+content.forEach((word, i) => { words[1 + cw + i] = word >>> 0; });
+const selfGT = ((4 << 28) | (1 << 27) | (1 << 25) | (seq << 16) | nsSlot) >>> 0;
+words[lumpSize - 2] = selfGT;
+words[lumpSize - 1] = selfGT;
+const bytes = Buffer.alloc(lumpSize * 4);
+words.forEach((word, i) => bytes.writeUInt32BE(word, i * 4));
+const binaryHash = crypto.createHash('sha256').update(bytes).digest('hex');
+const token = crc32(bytes).toString(16).toLowerCase().padStart(8, '0');
+const oldSelfTests = manifest.filter(e => e.abstraction === DOT_NAME);
+const manifestLocatorFields = new Set([
+    'token', 'filename', 'abstraction', 'version', 'lump_version', 'compiled_at',
+    'archived', 'forked', 'variant_group',
+]);
+function stripToManifestLocator(row) {
+    for (const key of Object.keys(row)) {
+        if (!manifestLocatorFields.has(key)) delete row[key];
     }
 }
-
-const lumpPath    = path.join(LUMPS_DIR, `${token}.lump`);
-
-fs.writeFileSync(lumpPath, bytes);
-console.log(`Written: ${lumpPath} (${bytes.length} bytes)`);
-
-// ── Print c-list note ─────────────────────────────────────────────────────────
-console.log(`\nC-List GT slot assignments (cc=${CLIST.length}, tail-packed):`);
-const slotNames = [
-    'SelfTest  E  NS-slot 6  — E-GT for TPERM/EXACT tests; boot_image.py overrides to mem-mgr GT',
-    'Next      E  NS-slot 6  — template; boot_image.py follows the ⚡ boot entry',
-];
-for (let i = 0; i < CLIST.length; i++) {
-    const gt = '0x' + CLIST[i].gt.toString(16).padStart(8, '0');
-    console.log(`  slot ${i}  ${gt}  ${slotNames[i] || '(unnamed)'}`);
-}
-
-// ── Suggest manifest entry ───────────────────────────────────────────────────
-const manifestEntry = {
-    token,
-    abstraction: 'PostFlashSelftest',
-    ns_slot: null,
-    ns_slot_policy: 'dynamic',
-    variant_group: null,
-    lump_size: lumpSize,
-    cw,
-    cc,
-    grants: ['E'],
-    lump_version: 0,
+const existingExact = oldSelfTests.find(e => e.filename === stateRow.filename && !e.archived);
+const priorIssue = oldSelfTests.reduce((max, row) => Math.max(max,
+    Number.isInteger(row.issue_n) ? row.issue_n : 0,
+    Number.isInteger(row.lump_version) ? row.lump_version : 0), 0);
+const issueN = existingExact && stateRow.binary_hash === binaryHash
+    ? (existingExact.issue_n || existingExact.lump_version || 1)
+    : priorIssue + 1;
+const identityHash = crypto.createHash('sha256').update(`${DOT_NAME}#${issueN}`).digest('hex');
+const identityString = `${DOT_NAME}#${issueN}`;
+const filename = `${DOT_NAME}.${issueN}.${crypto.createHash('sha256').update(DOT_NAME).update(bytes).digest('hex').slice(0, 8)}.lump`;
+const entry = {
+    // manifest.json is a locator/history index only.  Identity, placement,
+    // and intrinsic binary facts are fail-closed in approval + ns-state.
+    token, abstraction: DOT_NAME, filename, lump_version: issueN,
+    variant_group: 'selftest-history',
 };
-console.log('\nManifest entry to add to server/lumps/manifest.json:');
-console.log(JSON.stringify(manifestEntry, null, 4));
+console.log(`SelfTest artifact: ${filename}`);
+console.log(`Content token (CRC-32): ${token}`);
+console.log(`slot=${nsSlot} seq=${seq} cw=${cw} cc=${cc} lump_size=${lumpSize} binary_sha256=${binaryHash}`);
 
-// ── Update manifest.json ──────────────────────────────────────────────────────
-if (existingIdx !== -1) {
-    console.log('\nExisting PostFlashSelftest entry found — replacing it.');
-    manifest.splice(existingIdx, 1);
+const active = manifest.filter(e => e.token === token && e.abstraction === DOT_NAME && !e.archived);
+const artifactPath = path.join(LUMPS_DIR, filename);
+const approvalRecord = {
+    binary_hash: binaryHash, filename, dot_name: DOT_NAME, issue_n: issueN,
+    identity_string: identityString, identity_hash: identityHash,
+    identity_seal_location: 'approval',
+    token, abstraction: DOT_NAME, grants: ['E'],
+    capability_type: 'inform',
+};
+if (CHECK_ONLY) {
+    const failures = [];
+    if (!fs.existsSync(artifactPath) || !fs.readFileSync(artifactPath).equals(bytes)) failures.push(`binary missing or stale: ${filename}`);
+    if (active.length !== 1 || active[0].filename !== filename ||
+        active[0].token !== token || active[0].lump_version !== issueN) {
+        failures.push('manifest canonical SelfTest locator is stale');
+    }
+    if (stateRow.token !== token || stateRow.filename !== filename ||
+        stateRow.slot !== nsSlot || stateRow.seq !== seq ||
+        stateRow.identity_hash !== identityHash || stateRow.binary_hash !== binaryHash ||
+        stateRow.ns_slot_policy !== 'static' || stateRow.load_policy !== 'Resident' ||
+        stateRow.resident !== true || stateRow.boot_resident !== true ||
+        stateRow.issue_n !== issueN || stateRow.lump_version !== issueN ||
+        stateRow.limit !== `0x${(lumpSize - cc - 1).toString(16).toUpperCase().padStart(5, '0')}`) {
+        failures.push('ns-state canonical SelfTest binding is stale');
+    }
+    let approvals;
+    try { approvals = JSON.parse(fs.readFileSync(APPROVALS, 'utf8')).approvals; } catch (_) { approvals = null; }
+    if (!approvals || !approvals[binaryHash] ||
+        JSON.stringify(Object.keys(approvals[binaryHash]).sort()) !== JSON.stringify(Object.keys(approvalRecord).sort()) ||
+        Object.entries(approvalRecord).some(([key, value]) => JSON.stringify(approvals[binaryHash][key]) !== JSON.stringify(value))) {
+        failures.push('SelfTest hash-bound approval is missing or stale');
+    }
+    if (failures.length) die(failures.join('\nFAIL: '));
+    console.log('OK: canonical SelfTest source, manifest, ns-state, and named artifact are fresh.');
+    process.exit(0);
 }
-manifest.push(manifestEntry);
-fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 4) + '\n');
-console.log(`Updated: ${MANIFEST}`);
-
-console.log('\nDone. Run python -m pytest tests/lump/test_lump_consistency.py -v to verify.');
+fs.mkdirSync(LUMPS_DIR, { recursive: true });
+fs.writeFileSync(artifactPath, bytes);
+// Preserve every old file and manifest history record.  An unchanged rebuild
+// updates the active record in place; changed bytes archive prior records.
+if (existingExact && stateRow.binary_hash === binaryHash) {
+    for (const old of oldSelfTests) {
+        if (old !== existingExact) old.archived = true;
+        stripToManifestLocator(old);
+    }
+    Object.assign(existingExact, entry);
+    delete existingExact.archived;
+} else {
+    for (const old of oldSelfTests) {
+        old.archived = true;
+        stripToManifestLocator(old);
+    }
+    manifest.push(entry);
+}
+stateRow.slot = nsSlot; // migrate this exact, single row; never add another.
+stateRow.token = token;
+stateRow.filename = filename;
+stateRow.lump_version = issueN;
+stateRow.issue_n = issueN;
+stateRow.identity_hash = identityHash;
+stateRow.binary_hash = binaryHash;
+stateRow.ns_slot_policy = 'static';
+stateRow.load_policy = 'Resident';
+stateRow.resident = true;
+stateRow.boot_resident = true;
+stateRow.limit = `0x${(lumpSize - cc - 1).toString(16).toUpperCase().padStart(5, '0')}`;
+fs.writeFileSync(MANIFEST, json(manifest));
+fs.writeFileSync(NS_STATE, json(nsState));
+const approvalWriter = [
+    'import json, sys',
+    'from server.lump_approvals import read_approvals, write_approvals',
+    'records = read_approvals(sys.argv[1])',
+    'records[sys.argv[2]] = json.loads(sys.argv[3])',
+    'write_approvals(sys.argv[1], records)',
+].join('; ');
+const approvalWrite = spawnSync(process.env.PYTHON || 'python3',
+    ['-c', approvalWriter, APPROVALS, binaryHash, JSON.stringify(approvalRecord)],
+    { cwd: ROOT, encoding: 'utf8' });
+if (approvalWrite.status !== 0) die(`approval update failed: ${approvalWrite.stderr || approvalWrite.error}`);
+console.log(`Written: ${artifactPath}`);
+console.log('Updated manifest, ns-state, and hash-bound approval; prior artifacts were retained as archived history.');

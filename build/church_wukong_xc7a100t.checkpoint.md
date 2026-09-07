@@ -1,6 +1,6 @@
 # Wukong Build Checkpoint
 
-Generated : 2026-08-31T19:24:33Z
+Generated : 2026-09-07T13:21:14Z
 
 ---
 
@@ -9,14 +9,14 @@ Generated : 2026-08-31T19:24:33Z
 | Field            | Value |
 |------------------|-------|
 | Flashed version  | v18 |
-| Source version   | v18 (hardware/wukong_top.py) |
+| Source version   | v20 (hardware/wukong_top.py) |
 | TU_VERSION       | 0x02 |
 | Built at         | 2026-08-31T19:15:58Z |
 | .bit size        | 3,826,002 bytes |
 | .bit md5         | 0646949fc5d500b0486d5c3cabd51d2a |
-| .bit integrity   | ✅ md5 verified |
+| .bit integrity   | ❌ md5 MISMATCH — bitstream may be corrupt |
 | .mcs size        | 10,521,876 bytes |
-| .mcs timestamp   | 2026-08-31T19:16:16Z |
+| .mcs timestamp   | 2026-08-31T19:28:01Z |
 
 > **Note:** "Flashed version" is what the board sentinel reports. "Source version" is
 > what the next Vivado build will bake in. They differ when source has been updated
@@ -24,20 +24,22 @@ Generated : 2026-08-31T19:24:33Z
 
 ---
 
-## Boot Namespace  (8 slots)
+## Boot Namespace  (14 slots)
 
-NS_TABLE_BASE = ?
+NS_TABLE_BASE = 0x00000000
 
-| Slot | Name              | Location   | Perms | LUMP token   | Header word  | cw  | cc |
-|------|-------------------|------------|-------|--------------|--------------|-----|----|
-|  0   | Boot.NS (NS root) | ?  | R+W   | —            | —            | —   | —  |
-|  1   | Boot.Thread       | 0xe00      | R+W   | —            | (in ROM)     | —   | —  |
-|  2   | UART_DEV          | 0x40000014  | R+W   | —            | MMIO         | —   | —  |
-|  3   | LED_DEV           | 0x40000000  | R+W   | —            | MMIO         | —   | —  |
-|  4   | BTN_DEV           | 0x40000028  | R     | —            | MMIO         | —   | —  |
-|  5   | TIMER_DEV         | 0x4000002C  | R+W   | —            | MMIO         | —   | —  |
-|  6   | SelfTest ⚡        | 0x0600      | E     | 00000600   | 0xF987CC02   | 499  | 2  |
-|  7   | WukongCallHome    | 0x1200    | E     | e186c4ec      | 0xF9812803   | 74   | 3  |
+| Slot | Name              | Runtime location | Alloc | Perms | LUMP token   | Header word  | cw  | cc |
+|------|-------------------|------------------|-------|-------|--------------|--------------|-----|----|
+|  0   | Boot.NS (NS root) | 0x00000000       | 64    | R+W   | —            | —            | —   | —  |
+|  1   | Boot.Thread       | 0x00008600       | 256   | R+W   | —            | (in ROM)     | —   | 12 |
+|  2   | UART_DEV          | 0x40000014       | 3     | R+W   | —            | MMIO         | —   | —  |
+|  3   | LED_DEV           | 0x40000000       | 5     | R+W   | —            | MMIO         | —   | —  |
+|  4   | BTN_DEV           | 0x40000028       | 1     | R     | —            | MMIO         | —   | —  |
+|  5   | TIMER_DEV         | 0x4000002C       | 5     | R+W   | —            | MMIO         | —   | —  |
+|  6   | SelfTest ⚡        | 0x00000600       | 8192  | E     | ee750c1b   | 0xFB87CC02   | 499  | 2  |
+|  7   | WukongCallHome    | 0x00008C00       | 128   | E     | 85fcac64      | 0xF8812408   | 73   | 8  |
+|  10  | CapabilityTest    | 0x00008E00       | 512   | E     | 00000a00      | 0xF9806006   | 24  | 6  |
+|  13  | M_BIT_DEV         | 0xFFFFFF1C       | 1     | R+W   | —            | MMIO         | —   | —  |
 
 ⚡ = default boot entry point (IDE-configurable via setBootEntrySlot)
 
@@ -49,49 +51,53 @@ Registered abstractions in server/lumps/manifest.json:
 
 | NS slot | Token    | Abstraction           | cw  | cc | Ver |
 |---------|----------|-----------------------|-----|----|-----|
-|  6      | 00000600 | SelfTest              | 499 | 2  | 76 |
-|  7      | 00000700 | WukongCallHome        | 73  | 2  | 6 |
-|  7      | 1dcb7b09 | WukongCallHome.hw     | 73  | 2  | 1 |
-|  7      | 46738c7a | WukongCallHome        | 74  | 3  | 7 |
-|  7      | 8f7520e5 | WukongCallHome        | 74  | 3  | 7 |
-|  7      | e186c4ec | WukongCallHome        | 3   | 2  | 1 |
-| 10      | 00000a00 | CapabilityTest        | 23  | 5  | 2 |
-| 10      | c7425d6c | CapabilityTest        | 23  | 5  | 1 |
-| None      | 00000800 | Scheduler.IRQ         | 1   | 0  | 1 |
-| None      | 00001000 | SlideRule             | 2602 | 1  | 2 |
-| None      | 00001001 | SlideRule.Haskell     | 137 | 1  | 0 |
-| None      | 00001200 | Constants             | 23  | 2  | 0 |
-| None      | 00001f00 | Tunnel                | 37  | 1  | 0 |
-| None      | 00002000 | Keystone              | 22  | 2  | 0 |
-|  —      | 00003600 | Bank                  | 32  | 1  | 1 |
-| None      | 00130000 | Loader                | 1   | 1  | 1 |
-|  —      | 00aa1234 | Adder                 | 4   | 1  | 222 |
-|  —      | 00aa9999 | Legacy                | 1   | 1  | 66 |
-| None      | 04a720f8 | NoteG                 | 38  | 1  | 6 |
-| None      | 0ca567b5 | ide.Mallory           | 5   | 2  | — |
-|  —      | 0f8ad81b | MyAbstraction         | 2   | 1  | 5 |
-|  —      | 13812cdf | Church Machine Post-F | 500 | 5  | 3 |
-| None      | 19d3e599 | IntegerOps            | 20  | 0  | 5 |
-| None      | 1eec355e | ide.Alice             | 9   | 2  | — |
-|  —      | 4ea370af | Abstraction:  NoteGAs | 141 | 1  | 2 |
-| None      | 501a76a0 | PostFlashSelftest     | 499 | 2  | 0 |
-| None      | 50ce4c64 | StringOps             | 315 | 0  | 1 |
-| None      | 55f1a32f | LEDFlash              | 1   | 1  | 3 |
-|  —      | 56096905 | SelfTest              | 500 | 5  | 78 |
-| None      | 5a93ce79 | BernoulliNumbers      | 15  | 1  | 2 |
-| None      | 7c58f0f4 | Bank                  | 31  | 1  | — |
-| None      | 97cc8047 | Human.Hand            | 7   | 1  | 13 |
-|  —      | 9ce28c0b | CapabilityTest        | 21  | 5  | 11 |
-| None      | ab1e86af | WordString            | 294 | 0  | 0 |
-| None      | ab3de4fd | Salvation             | 141 | 0  | 1 |
-| None      | b169bba4 | Ethernet              | 13  | 1  | 0 |
-| None      | b3076308 | EventRouter           | 19  | 0  | 0 |
-| None      | c3963aed | Memory                | 19  | 0  | 1 |
-|  —      | c7657c2d | CapabilityTest        | 21  | 5  | 12 |
-| None      | cb8739cf | GT.Encoding.v1.1.Hard | 26  | 8  | 1 |
-| None      | d78f751b | MorseCmOk             | 363 | 1  | 4 |
-| None      | d9454529 | EnglishLoops          | 35  | 0  | 1 |
-|  —      | fe9c6e42 | NoteGAssembly         | 141 | 1  | 1 |
+|  6      | ee750c1b | SelfTest              | 499 | 2  | 79 |
+|  —      | 00000600 | SelfTest              | ?   | ?  | 76 |
+|  —      | 00000700 | WukongCallHome        | ?   | ?  | 6 |
+|  —      | 00000800 | Scheduler.IRQ         | ?   | ?  | 1 |
+|  —      | 00000a00 | CapabilityTest        | ?   | ?  | 17 |
+|  —      | 00001000 | SlideRule             | ?   | ?  | 2 |
+|  —      | 00001001 | SlideRule.Haskell     | ?   | ?  | 0 |
+|  —      | 00001200 | Constants             | ?   | ?  | 0 |
+|  —      | 00001f00 | Tunnel                | ?   | ?  | 0 |
+|  —      | 00002000 | Keystone              | ?   | ?  | 0 |
+|  —      | 00003600 | Bank                  | ?   | ?  | 1 |
+|  —      | 00130000 | Loader                | ?   | ?  | 1 |
+|  —      | 00aa1234 | Adder                 | ?   | ?  | 321 |
+|  —      | 00aa9999 | Legacy                | ?   | ?  | 90 |
+|  —      | 04a720f8 | NoteG                 | ?   | ?  | 6 |
+|  —      | 072454a8 | ide.testMbit          | ?   | ?  | 1 |
+|  —      | 0ca567b5 | ide.Mallory           | ?   | ?  | — |
+|  —      | 0f8ad81b | MyAbstraction         | ?   | ?  | 5 |
+|  —      | 13812cdf | Church Machine Post-F | ?   | ?  | 3 |
+|  —      | 19d3e599 | IntegerOps            | ?   | ?  | 5 |
+|  —      | 1dcb7b09 | WukongCallHome.hw     | ?   | ?  | 1 |
+|  —      | 1eec355e | ide.Alice             | ?   | ?  | — |
+|  —      | 46738c7a | WukongCallHome        | ?   | ?  | 7 |
+|  —      | 4ea370af | Abstraction:  NoteGAs | ?   | ?  | 2 |
+|  —      | 501a76a0 | PostFlashSelftest     | ?   | ?  | 0 |
+|  —      | 50ce4c64 | StringOps             | ?   | ?  | 1 |
+|  —      | 55f1a32f | LEDFlash              | ?   | ?  | 3 |
+|  —      | 56096905 | SelfTest              | ?   | ?  | 78 |
+|  —      | 5a93ce79 | BernoulliNumbers      | ?   | ?  | 2 |
+|  —      | 7c58f0f4 | Bank                  | ?   | ?  | — |
+|  —      | 85fcac64 | WukongCallHome        | ?   | ?  | 8 |
+|  —      | 8f7520e5 | WukongCallHome        | ?   | ?  | 7 |
+|  —      | 97cc8047 | Human.Hand            | ?   | ?  | 13 |
+|  —      | 9ce28c0b | CapabilityTest        | ?   | ?  | 11 |
+|  —      | ab1e86af | WordString            | ?   | ?  | 0 |
+|  —      | ab3de4fd | Salvation             | ?   | ?  | 1 |
+|  —      | b169bba4 | Ethernet              | ?   | ?  | 0 |
+|  —      | b3076308 | EventRouter           | ?   | ?  | 0 |
+|  —      | c3963aed | Memory                | ?   | ?  | 1 |
+|  —      | c7425d6c | CapabilityTest        | ?   | ?  | 1 |
+|  —      | c7657c2d | CapabilityTest        | ?   | ?  | 12 |
+|  —      | cb8739cf | GT.Encoding.v1.1.Hard | ?   | ?  | 1 |
+|  —      | d74af54b | CapabilityTest        | 21  | 5  | 14 |
+|  —      | d78f751b | MorseCmOk             | ?   | ?  | 4 |
+|  —      | d9454529 | EnglishLoops          | ?   | ?  | 1 |
+|  —      | e186c4ec | WukongCallHome        | ?   | ?  | 1 |
+|  —      | fe9c6e42 | NoteGAssembly         | ?   | ?  | 1 |
 
 ---
 
@@ -99,13 +105,13 @@ Registered abstractions in server/lumps/manifest.json:
 
 Before flashing, verify:
 
-- [ ] Bitstream md5 verified (✅ md5 verified)
+- [ ] Bitstream md5 verified (❌ md5 MISMATCH — bitstream may be corrupt)
 - [ ] Flashed version matches expected (currently v18)
-- [ ] SelfTest LUMP token matches boot ROM assertion  (00000600.lump header = 0xF987CC02  cw=499  cc=2)
-- [ ] WukongCallHome LUMP present and header valid  (header = 0xF9812803  cw=74  cc=3)
-- [ ] NS slot count = 8 (slots 0–7)
+- [ ] Active SelfTest canonical artifact is resolved from ns-state + manifest  (SelfTest.79.eceee227.lump; header = 0xFB87CC02  cw=499  cc=2)
+- [ ] WukongCallHome LUMP present and header valid  (header = 0xF8812408  cw=73  cc=8)
+- [ ] NS slot count = 14 (slots 0–13)
 - [ ] TU_VERSION = 0x02 (bridge must match or warn)
-- [ ] Source version v18 Verilog regenerated and transferred to droplet
+- [ ] Source version v20 Verilog regenerated and transferred to droplet
 - [ ] MCS regenerated from same .bit (not stale)
 
 ---

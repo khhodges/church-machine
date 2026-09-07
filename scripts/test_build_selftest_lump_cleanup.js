@@ -1,212 +1,85 @@
 #!/usr/bin/env node
-// scripts/test_build_selftest_lump_cleanup.js
-//
-// Regression test for the old-token cleanup logic in build_selftest_lump.js.
-//
-// The test seeds a temp lumps directory with a fake "old" PostFlashSelftest
-// token entry in manifest.json plus a matching .lump stub file, then
-// runs build_selftest_lump.js --lumps-dir <tempdir>.  It asserts that:
-//
-//   1. The old .lump file is deleted.
-//   2. A new .lump is written for the freshly-computed token.
-//   3. manifest.json contains exactly one PostFlashSelftest entry with the
-//      new token.
-//   4. The script exits with code 0.
-//
-// The happy-path (token unchanged) is also verified: when the pre-seeded token
-// already matches the compiled output, old files must NOT be deleted.
-//
-// Run:
-//   node scripts/test_build_selftest_lump_cleanup.js
-
 'use strict';
-
-const fs            = require('fs');
-const path          = require('path');
-const os            = require('os');
+// Regression coverage for named canonical SelfTest artifacts and archival.
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { spawnSync } = require('child_process');
-
-const ROOT   = path.resolve(__dirname, '..');
-const SCRIPT = path.join(__dirname, 'build_selftest_lump.js');
-const REAL_MANIFEST = path.join(ROOT, 'server', 'lumps', 'manifest.json');
-
-let passed = 0;
-let failed = 0;
-
-function assert(condition, message) {
-    if (condition) {
-        console.log(`  PASS: ${message}`);
-        passed++;
-    } else {
-        console.error(`  FAIL: ${message}`);
-        failed++;
-    }
+const ROOT = path.resolve(__dirname, '..');
+const BUILD = path.join(__dirname, 'build_selftest_lump.js');
+let passed = 0, failed = 0;
+function check(ok, text) { console[ok ? 'log' : 'error'](`  ${ok ? 'PASS' : 'FAIL'}: ${text}`); ok ? passed++ : failed++; }
+function temp() {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'selftest-artifact-'));
+    fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify([{
+        token: 'deadbeef', abstraction: 'SelfTest', filename: 'SelfTest.1.old.lump',
+        ns_slot: 37, binary_hash: 'old',
+    }], null, 2));
+    fs.writeFileSync(path.join(dir, 'ns-state.json'), JSON.stringify({
+        abstractions: [{ name: 'SelfTest', slot: 37, seq: 17, location: '0x00ABCDEF',
+            token: 'deadbeef', filename: 'SelfTest.1.old.lump' }],
+    }, null, 2));
+    fs.writeFileSync(path.join(dir, 'SelfTest.1.old.lump'), 'historic bytes');
+    return dir;
 }
-
-function makeTempDir() {
-    return fs.mkdtempSync(path.join(os.tmpdir(), 'selftest_lump_cleanup_'));
+function build(dir, extra = []) {
+    return spawnSync(process.execPath, [BUILD, '--lumps-dir', dir, ...extra],
+        { cwd: ROOT, encoding: 'utf8' });
 }
-
-function runScript(lumpsDir) {
-    const result = spawnSync(
-        process.execPath,
-        [SCRIPT, '--lumps-dir', lumpsDir],
-        { encoding: 'utf8', cwd: ROOT }
-    );
-    return {
-        code:   result.status,
-        stdout: result.stdout || '',
-        stderr: result.stderr || '',
-    };
-}
-
-function seedTempDir(tmpDir, oldToken, manifest) {
-    // Write manifest
-    fs.writeFileSync(path.join(tmpDir, 'manifest.json'), JSON.stringify(manifest, null, 4) + '\n');
-    // Write stub old-token files
-    fs.writeFileSync(path.join(tmpDir, `${oldToken}.lump`), 'STUB_OLD_LUMP');
-}
-
-// ── Read real manifest to get a valid baseline ────────────────────────────────
-let realManifest;
+let dir;
 try {
-    realManifest = JSON.parse(fs.readFileSync(REAL_MANIFEST, 'utf8'));
-} catch (e) {
-    console.error(`Cannot read real manifest: ${e.message}`);
-    process.exit(1);
-}
-
-const realEntry = realManifest.find(e => e.abstraction === 'PostFlashSelftest');
-if (!realEntry) {
-    console.error('No PostFlashSelftest entry in real manifest — cannot derive expected token.');
-    process.exit(1);
-}
-function builtToken() {
-    const dir = makeTempDir();
-    try {
-        fs.writeFileSync(path.join(dir, 'manifest.json'), '[]\n');
-        const result = runScript(dir);
-        if (result.code !== 0) throw new Error(result.stderr);
-        const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
-        return manifest.find(entry => entry.abstraction === 'PostFlashSelftest').token;
-    } finally {
-        fs.rmSync(dir, { recursive: true, force: true });
-    }
-}
-const realToken = builtToken();
-
-// ── Suite 1: different old token → old files must be removed ─────────────────
-console.log('\nSuite 1: prior token differs → old .lump must be deleted');
-
-let tmpDir1;
-try {
-    tmpDir1 = makeTempDir();
-    const oldToken = 'deadbeef';
-
-    // Seed manifest with the fake old token (all other entries from real manifest)
-    const seededManifest = realManifest.map(e =>
-        e.abstraction === 'PostFlashSelftest'
-            ? Object.assign({}, e, { token: oldToken })
-            : e
-    );
-    seedTempDir(tmpDir1, oldToken, seededManifest);
-
-    const r = runScript(tmpDir1);
-
-    assert(r.code === 0, 'script exits with code 0');
-
-    const oldLump = path.join(tmpDir1, `${oldToken}.lump`);
-    assert(!fs.existsSync(oldLump), `old .lump (${oldToken}.lump) is deleted`);
-
-    // New files must exist
-    const newLump = path.join(tmpDir1, `${realToken}.lump`);
-    assert(fs.existsSync(newLump), `new .lump (${realToken}.lump) is written`);
-
-    // Manifest must have exactly one PostFlashSelftest with the new token
-    const updatedManifest = JSON.parse(fs.readFileSync(path.join(tmpDir1, 'manifest.json'), 'utf8'));
-    const entries = updatedManifest.filter(e => e.abstraction === 'PostFlashSelftest');
-    assert(entries.length === 1, 'manifest has exactly one PostFlashSelftest entry');
-    assert(entries[0].token === realToken, `manifest PostFlashSelftest token is ${realToken}`);
-
-    const logged = r.stdout + r.stderr;
-    assert(
-        logged.includes(`Removed old`) && logged.includes(oldToken),
-        'script logs removal of old files'
-    );
+    console.log('\nSuite: canonical named artifact preserves history');
+    dir = temp();
+    const r = build(dir, ['--lump-words', '8192']);
+    check(r.status === 0, 'build succeeds with explicit 8192-word allocation');
+    const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json')));
+    const active = manifest.filter(e => e.abstraction === 'SelfTest' && !e.archived);
+    const archived = manifest.find(e => e.filename === 'SelfTest.1.old.lump');
+    const state = JSON.parse(fs.readFileSync(path.join(dir, 'ns-state.json'))).abstractions[0];
+    check(active.length === 1 && /^SelfTest\.1\.[0-9a-f]{8}\.lump$/.test(active[0].filename),
+        'manifest has one named canonical SelfTest record');
+    check(/^[0-9a-f]{8}$/.test(active[0].token) &&
+        Number.isInteger(active[0].lump_version) &&
+        !Object.hasOwn(active[0], 'ns_slot') && !Object.hasOwn(active[0], 'lump_size'),
+    'manifest remains a locator/history-only canonical record');
+    check(archived && archived.archived === true && fs.existsSync(path.join(dir, archived.filename)),
+        'old manifest record and old binary remain archived history');
+    check(state.token === active[0].token && state.filename === active[0].filename,
+        'ns-state names the exact active artifact');
+    check(/^[0-9a-f]{64}$/.test(state.identity_hash) &&
+        /^[0-9a-f]{64}$/.test(state.binary_hash) &&
+        state.ns_slot_policy === 'static' && state.load_policy === 'Resident' &&
+        state.resident === true && state.boot_resident === true &&
+        state.issue_n === active[0].lump_version && state.lump_version === active[0].lump_version &&
+        state.limit === '0x01FFD' && state.location === '0x00ABCDEF',
+    'ns-state carries complete fail-closed identity, residency, version, and limit binding');
+    check(JSON.parse(fs.readFileSync(path.join(dir, 'ns-state.json'))).abstractions
+        .filter(row => row.name === 'SelfTest').length === 1,
+    'slot migration keeps exactly one SelfTest ns-state row');
+    check(fs.existsSync(path.join(dir, active[0].filename)), 'named artifact was written');
+    const bytes = fs.readFileSync(path.join(dir, active[0].filename));
+    const selfGT = bytes.readUInt32BE(bytes.length - 8);
+    const nextGT = bytes.readUInt32BE(bytes.length - 4);
+    check(selfGT === nextGT && (selfGT & 0xFFFF) === 37 &&
+        ((selfGT >>> 16) & 0x1FF) === 17,
+    'Self and Next E-GTs use the selected slot and live ns-state sequence');
+    const approvals = JSON.parse(fs.readFileSync(path.join(dir, 'approvals.json'))).approvals;
+    const approval = approvals[state.binary_hash];
+    check(approval && approval.token === active[0].token &&
+        approval.identity_string === `SelfTest#${state.issue_n}` &&
+        approval.identity_seal_location === 'approval' &&
+        approval.identity_hash === state.identity_hash,
+    'exact content-hash approval carries its derived identity seal metadata');
+    const guarded = build(dir, ['--check', '--lump-words', '8192']);
+    check(guarded.status === 0, 'check validates exact manifest/ns-state filename');
+    const badState = JSON.parse(fs.readFileSync(path.join(dir, 'ns-state.json')));
+    badState.abstractions[0].filename = 'wrong.lump';
+    fs.writeFileSync(path.join(dir, 'ns-state.json'), JSON.stringify(badState));
+    const stale = build(dir, ['--check', '--lump-words', '8192']);
+    check(stale.status === 1 && (stale.stderr + stale.stdout).includes('ns-state canonical SelfTest binding is stale'),
+        'check rejects an ns-state filename mismatch');
 } finally {
-    if (tmpDir1) try { fs.rmSync(tmpDir1, { recursive: true, force: true }); } catch (_) {}
+    if (dir) fs.rmSync(dir, { recursive: true, force: true });
 }
-
-// ── Suite 2: token unchanged → old files must NOT be deleted ─────────────────
-console.log('\nSuite 2: prior token matches compiled output → no deletion');
-
-let tmpDir2;
-try {
-    tmpDir2 = makeTempDir();
-
-    // Seed manifest with the real (current) token
-    const seededManifest = [...realManifest];
-    seedTempDir(tmpDir2, realToken, seededManifest);
-
-    // The "old" stub file for realToken doubles as the file that should survive
-    // (the script will overwrite it with the real binary — just check it stays)
-
-    const r = runScript(tmpDir2);
-
-    assert(r.code === 0, 'script exits with code 0');
-
-    // Log must NOT contain "Removed old"
-    const logged = r.stdout + r.stderr;
-    assert(
-        !logged.includes('Removed old'),
-        'script does not log any removal when token is unchanged'
-    );
-
-    // File for real token must still exist (script writes it fresh either way)
-    const lumpPath = path.join(tmpDir2, `${realToken}.lump`);
-    assert(fs.existsSync(lumpPath), `${realToken}.lump exists after unchanged-token run`);
-
-    // Exactly one PostFlashSelftest entry
-    const updatedManifest = JSON.parse(fs.readFileSync(path.join(tmpDir2, 'manifest.json'), 'utf8'));
-    const entries = updatedManifest.filter(e => e.abstraction === 'PostFlashSelftest');
-    assert(entries.length === 1, 'manifest still has exactly one PostFlashSelftest entry');
-    assert(entries[0].token === realToken, 'manifest token unchanged');
-} finally {
-    if (tmpDir2) try { fs.rmSync(tmpDir2, { recursive: true, force: true }); } catch (_) {}
-}
-
-// ── Suite 3: no prior PostFlashSelftest entry → new files written cleanly ─────
-console.log('\nSuite 3: no prior PostFlashSelftest entry → new files written, no error');
-
-let tmpDir3;
-try {
-    tmpDir3 = makeTempDir();
-
-    // Manifest without any PostFlashSelftest entry
-    const stripped = realManifest.filter(e => e.abstraction !== 'PostFlashSelftest');
-    fs.writeFileSync(path.join(tmpDir3, 'manifest.json'), JSON.stringify(stripped, null, 4) + '\n');
-
-    const r = runScript(tmpDir3);
-
-    assert(r.code === 0, 'script exits with code 0');
-
-    const newLump = path.join(tmpDir3, `${realToken}.lump`);
-    assert(fs.existsSync(newLump), `new .lump written when there was no prior entry`);
-
-    const updatedManifest = JSON.parse(fs.readFileSync(path.join(tmpDir3, 'manifest.json'), 'utf8'));
-    const entries = updatedManifest.filter(e => e.abstraction === 'PostFlashSelftest');
-    assert(entries.length === 1, 'manifest gains exactly one PostFlashSelftest entry');
-    assert(entries[0].token === realToken, 'new manifest entry has the correct token');
-} finally {
-    if (tmpDir3) try { fs.rmSync(tmpDir3, { recursive: true, force: true }); } catch (_) {}
-}
-
-// ── Summary ───────────────────────────────────────────────────────────────────
-console.log(`\n${'─'.repeat(60)}`);
-console.log(`Results: ${passed} passed, ${failed} failed`);
-
-if (failed > 0) {
-    process.exit(1);
-}
-console.log('All tests passed.');
-process.exit(0);
+console.log(`\nResults: ${passed} passed, ${failed} failed`);
+process.exit(failed ? 1 : 0);

@@ -9,7 +9,6 @@
 - [Wukong boot three-bug root cause](wukong-boot-perm-l-trap.md) — three cooperating bugs (u_perm timing, CR6 S+E→L+E, BRAM address-stability valid); all fixed; NUC runs clean 2M+ cycles
 - [Amaranth sync-domain self-deadlocking reset](amaranth-sync-reset-deadlock.md) — rst_sr in sync domain driving ResetSignal("sync") locks reset HIGH forever; use reset_less=True + GSR instead
 - [Sapphire ROM BRAM iBus/dBus conflict](sapphire-rom-bram-dbus-hang.md) — ROM BRAM single-port: iBus wins always; any dBus lw from ROM hangs; all firmware strings must be static char[] (.data/RAM)
-- [Boot c-list slot index trap](boot-clist-slot-index.md) — clistGTs[0] is overwritten in-place (not prepended); UART=2, LED=3, BTN=4, TIMER=5 direct from _getHardwareBootCatalog() order
 - [LUMP binary is big-endian](lump-binary-big-endian.md) — raw .lump file words are big-endian; ad-hoc LE reads/writes silently corrupt header/c-list, verify with lump-audit.js (also in CM_LUMP_SPECIFICATION.md §Developer Traps)
 - [Shared fetch dedup for concurrent UI lookups](shared-fetch-dedup-for-concurrent-ui-lookups.md) — two independent render paths fetching the same detail endpoint for the same entity will double-fire it; dedupe via shared in-flight-promise cache
 - [Public code search allowlist](public-code-search-allowlist.md) — landing search may expose only allowlisted text source roots/extensions through the escaped code viewer, never arbitrary workspace paths
@@ -20,8 +19,6 @@
 - [Sapphire BRAM init — Variant B stub block](sapphire-bram-init-variant.md) — Efinity 2026.1 IP has stub initial begin (4 zeros) not $readmemb; depth=8192 words; patch_sapphire_init.py handles both variants
 - [Chromebook call-home bridge workflow](chromebook-callhome-workflow.md) — confirmed working flow; bridge baud=57600 (CLOCKDIV=53, 25 MHz, no PLL); --insecure required; make MUST run after git pull
 - [Sapphire SoC as Trusted Security Base](sapphire-soc-tsb.md) — RISC-V private RAM is the keystore; APB3 register map; 5 free capabilities; FAULT_RST gap; FP verdict; SHA32 commissioning impact
-- [NS entry stride is 4 words](ns-entry-stride.md) — each NS slot is 4 words (16 bytes): [location, word1_authority, word2_integrity, abstract_gt]; slot N starts at byte N×16; never 3
-- [NS slot base inverted layout](ns-slot-base-inverted-layout.md) — _nsSlotBase() = NS_TABLE_BASE+NS_TABLE_RESERVE-(idx+1)*4 (inverted); never use NS_TABLE_BASE+idx*4 in loaders or tests
 - [Wukong NS base is not ISA-safe at zero](wukong-ns-base-isa-conflict.md) — standalone Wukong currently overrides the ISA top-of-memory NS base to 0; do not promote that shortcut into a new image without resolving DMEM size/base
 - [BRAM NUC_PROGRAM staleness trap](bram-nuc-program-staleness.md) — church_ti60_f225.v BRAM goes stale when boot_rom.py NUC_PROGRAM changes; regen or patch via gen_cm_dmem_direct.py
 - [Verilog/RTLIL regeneration procedure](verilog-regen-procedure.md) — 9 gen commands for all actively-synthesised targets; legacy-frozen files; builder tab visibility trap
@@ -29,20 +26,15 @@
 - [CLOOMC source expression subset](cloomc-source-expression-subset.md) — split compound guards and nested expressions into single-op temporaries; use bfext/bfins for bitfield work
 - [app.py raw SQL pattern](app-py-raw-sql.md) — server/app.py has no sqlite3 import; all DB access must use db.session.execute(_sa_text(...)); never _sqlite3.connect()
 - [v2.0 hardware format audit](v2-format-audit.md) — ARM cond order; Turing opcodes 16–25; ROL-XOR integrity; g_bit toggles; hardware WORD2 differs from simulator NS
-- [CM DMEM Thread.caps[0] boot fix](cm-dmem-thread-caps.md) — word 125=0x4A000006 (E-GT→slot 6 SelfTest); word 384=0xF8000000 lazy stub; regen: gen_verilog --ti60 then gen_cm_dmem_direct.py build/
 - [OBBS single-patch-location bug class](obbs-single-patch-location.md) — a newer patch step + an un-removed older patch step for the same artifact eventually double-run; make the later step a read-only self-test, not a fallback patch
 - [Ti60 one-button build](ti60-one-button-build.md) — CM DMEM/firmware patches must happen BEFORE synthesis (build_ti60_bitstream.sh, not run_efx_map.sh); patching map.v in PNR is ignored (PNR reads BRAM from top.vdb written by MAP)
 - [Boot namespace architecture rules](boot-namespace-rules.md) — 2 hardwired slots only; namespace liveness rule; authority = Abstract GT not NS entry; 3-layer boot model; SelfTest loop/CALL pattern
-- [Boot.Abstr token and filename migration](boot-abstr-token-migration.md) — slot 3→6, token 00000003→00000600; NS_TABLE_RESERVE 1024→4096 fix; canonical 00000600.lump must be kept alive by save_lump(); Python create_gt vs JS createGT use different bit layouts
 - [Simulator E2E boot-state testing](sim-e2e-boot-testing.md) — instantBoot() fails at B:04 (async fetch); slowBoot() blocked by bootAnimating; force sim.bootComplete=true; suppress #whatsNewModal via addInitScript
 - [LUMP name casing staleness gap](lump-name-casing-staleness-gap.md) — case drift hides orphaned LUMPs from guards; independently audit UI hardcoded tokens
 - [Self-diagnosing remote build guards](self-diagnosing-remote-guards.md) — version-stamp script output and dump actual-vs-expected state on failure when the script runs on a machine you can't directly access
-- [Boot catalog slot 4 no longer a gap](boot-catalog-slot4-no-longer-gap.md) — hardware boot catalog is 8 slots (0-6 named, gap moved to 7); never hardcode slot 3=Boot.Abstr, use sim.bootEntrySlot
-- [Boot catalog slot 7 — WukongCallHome](boot-catalog-slot7-wukong.md) — slot 7 is WukongCallHome (E-perm, loc=0x140); nsCount=8; must update simulator.js + boot_rom.py + boot_image.py + test together
 - [Freshness guards on idempotent patches must be content-based](freshness-guard-content-vs-mtime.md) — if a patch's output text never changes once applied, an mtime comparison against it will eventually false-positive forever
 - [EFXPT_HOME needs /pt suffix](efxpt-home-must-include-pt-suffix.md) — must equal $EFINITY_HOME/pt or Interface Designer's device-name check silently always fails ("unusupported device")
 - [LUMP abstraction-name consistency scoping](lump-abstraction-name-consistency.md) — drift check must exempt user-compiled + dynamic/NULL lumps or it false-fails on legitimate non-registry names (also in CM_LUMP_SPECIFICATION.md §Developer Traps)
-- [Boot DEMO_CLIST layout](demo-clist-layout.md) — [0]=mem-mgr, [1]=Boot.Thread, [2]=UART, [3]=LED, [4]=BTN, [5]=TIMER, [6]=SelfTest; no separate Boot.NS slot at [1]
 - [NS slot migration GT-bypass trap](ns-slot-gt-bypass-trap.md) — when NS slot N migrates, audit ALL c-list fallback paths; old slot number silently maps to wrong GT (was LED_DEV, not SelfTest)
 - [Stale-version redirect strips query strings](stale-version-redirect-strips-query.md) — server AND client cache-bust redirects must each forward the full query string or URL flags (?debug=1 etc.) silently die on every page load
 - [Async in-flight flag needs catch reset](async-inflight-flag-needs-catch-reset.md) — an in-flight/saving boolean gating a disabled UI control must reset on ALL 3 async outcomes (success, explicit failure, AND rejected promise) or the control sticks disabled forever
@@ -104,12 +96,10 @@
 - [Boot test private runtime state](boot-test-private-runtime-state.md) — LUMP isolation must include every boot-regeneration persistence input, including saved config
 - [Latched multi-cycle hardware inputs](latched-multicycle-hardware-inputs.md) — capture operands, control-flow state, and security decisions at acceptance; never consume live inputs later
 - [SelfTest Next follows LightningBolt](selftest-next-lightningbolt.md) — Next.GT is coupled to the selected boot-entry GT; independent continuation targets are prohibited
-- [C-List source-row indexing](clist-source-row-indexing.md) — compiler-owned CR0 is synthetic; source capability rows start at CR1 and delete by source index
 - [Draft banner placement](draft-banner-placement.md) — recovery banners must be siblings above the editor, never children of the code-editor flex row
 - [Capability picker version selection](capability-picker-version-selection.md) — show one latest eligible LUMP per abstraction by default; place older versions behind an explicit disclosure
 - [SELF row click safety](self-row-click-safety.md) — compiler-owned SELF is display-only in the C-List and must never write an operand into the editor
 - [Hardware readiness fingerprints](hardware-readiness-fingerprint.md) — generated Verilog/RTLIL must carry a content fingerprint of active Python inputs before synthesis
-- [Build Approval size accounting](build-approval-size-accounting.md) — derive displayed LUMP budgets from the big-endian binary and mark API metadata unavailable rather than guessing
 - [Namespace Table authority](namespace-table-bitstream-source.md) — Namespace Table first, then its assigned slots/LUMPs; manifest is never authoritative for membership or metadata
 - [Canonical dot-name LUMP integrity](canonical-dot-name-clist-integrity.md) — every LUMP is dot.name.1.token, with compiled data and dot-name C-list content covered by its integrity value
 - [LUMP documentation cases](lump-documentation-cases.md) — classify each LUMP as fully documented, source without comments, or API only
@@ -157,3 +147,4 @@
 - [LUMP save vs boot rebuild](lump-save-boot-rebuild-boundary.md) — an approved LUMP save must not roll back because an unchanged boot-image dependency cannot rebuild
 - [Static client cache busting](static-client-cache-busting.md) — bump pinned simulator script versions when client code changes or the preview may keep stale UI
 - [Pet-name rebuild independence](pet-name-rebuild-independence.md) — dependency-first LUMP rebuild order is temporary; Pet Names should allow consumers to rebind without recompiling last
+- [SelfTest dynamic allocation](selftest-dynamic-allocation.md) — SelfTest authority comes from one active manifest+NS binding; size, slot, sequence, and resident layout are never legacy constants
