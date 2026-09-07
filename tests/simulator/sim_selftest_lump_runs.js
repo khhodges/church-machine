@@ -155,27 +155,6 @@ if (!loaded) {
     process.exit(1);
 }
 
-// ── Patch c-list[1] with a null sentinel ─────────────────────────────────────
-// The selftest completion path is ELOADCALL CR1, Next, which reads c-list[1]
-// and calls through that GT.  The default c-list[1] is the SelfTest self-loop
-// (0x4A000006); left unpatched the ELOADCALL would restart the selftest and
-// the sim would loop until MAX_STEPS with no fault to intercept.
-//
-// Patching c-list[1] with 0x00000000 (null GT) ensures the ELOADCALL faults
-// immediately after all 81 tests pass, giving us a clean DR0 capture point.
-// This fault is NOT a STACK_UNDERFLOW, so the termination classifier below
-// treats it as 'ELOADCALL' rather than 'RETURN'.
-//
-// The c-list[1] word address is: EXTENDED_BASE + (lumpSize - cc) + 1.
-{
-    const EXTENDED_BASE = 0x0400;
-    const hdr = sim.parseLumpHeader(lumpWords[0] >>> 0);
-    if (hdr && hdr.valid && hdr.cc >= 2) {
-        const clist1Addr = EXTENDED_BASE + (hdr.lumpSize - hdr.cc) + 1;
-        sim.memory[clist1Addr] = 0x00000000; // null GT — ELOADCALL will fault
-    }
-}
-
 // ── Intercept fault() to capture DR0 at the moment of the first fault ────────
 // Two completion paths:
 //   RETURN path   — selftest ends with RETURN; empty stack → STACK_UNDERFLOW.
@@ -203,11 +182,21 @@ sim.fault = function(type, msg, meta) {
 // ── Run to completion ─────────────────────────────────────────────────────────
 const MAX_STEPS = 100000;
 let steps = 0;
+let reachedFinalEloadcall = false;
 
 while (steps < MAX_STEPS && !sim.halted && sim.bootComplete) {
     const r = sim.step();
     steps++;
     if (!r) break;  // null result means a fault or skip
+    // The modern SelfTest completion instruction is its only ELOADCALL.  Stop
+    // immediately after observing it instead of mutating Next.GT: a NULL GT can
+    // legitimately enter lazy resolution and be restored, masking completion
+    // as a self-loop in this headless harness.
+    if (r.instr && r.instr.mnemonic === 'ELOADCALL') {
+        reachedFinalEloadcall = true;
+        capturedDR0 = sim.dr[0] >>> 0;
+        break;
+    }
 }
 
 // ── DR0 → section name mapping ────────────────────────────────────────────────
@@ -223,7 +212,7 @@ const SELFTEST_SECTIONS = [
     { first: 58, last: 62, name: 'SECTION H', desc: 'BFEXT / BFINS bit-field operations' },
     { first: 63, last: 73, name: 'SECTION I', desc: 'TPERM presets + domain purity' },
     { first: 74, last: 77, name: 'SECTION J', desc: 'TPERM EXACT credential-pinning' },
-    { first: 78, last: 79, name: 'SECTION K', desc: 'CHANGE (CR swap) + permission verify' },
+    { first: 78, last: 79, name: 'SECTION K', desc: 'TPERM same-domain multi-permission immutability' },
     { first: 80, last: 81, name: 'SECTION L', desc: 'LOAD from multiple c-list slots' },
 ];
 
@@ -238,7 +227,9 @@ function drToSection(n) {
 
 // ── Determine termination reason and pass/fail ────────────────────────────────
 let terminatedBy;
-if (capturedDR0 !== null) {
+if (reachedFinalEloadcall) {
+    terminatedBy = 'ELOADCALL';
+} else if (capturedDR0 !== null) {
     // A fault was intercepted — classify by type and DR0 value:
     //   STACK_UNDERFLOW  → old RETURN-path completion
     //   any other fault, DR0=0 → ELOADCALL-path completion (null-sentinel fired)

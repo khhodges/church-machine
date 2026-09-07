@@ -354,7 +354,8 @@
     "filename": "SelfTest.79.eceee227.lump",
     "lump_version": 79,
     "compiled_at": 1788790072.7247603,
-    "variant_group": "selftest-history"
+    "variant_group": "selftest-history",
+    "archived": true
   },
   {
     "token": "00000a00",
@@ -368,6 +369,30 @@
     "abstraction": "SelfTest",
     "filename": "SelfTest.1.8ab7765f.lump",
     "lump_version": 80,
-    "compiled_at": 1788822614.159658
+    "compiled_at": 1788822614.159658,
+    "archived": true
+  },
+  {
+    "token": "141171da",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.81.532be597.lump",
+    "lump_version": 81,
+    "variant_group": "selftest-history",
+    "archived": true
+  },
+  {
+    "token": "04007dff",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.82.4c1b2651.lump",
+    "lump_version": 82,
+    "variant_group": "selftest-history",
+    "archived": true
+  },
+  {
+    "token": "c5646afa",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.83.c80aeda6.lump",
+    "lump_version": 83,
+    "variant_group": "selftest-history"
   }
 ]

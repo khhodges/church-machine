@@ -7556,7 +7556,11 @@ class ChurchSimulator {
         }
 
         const permissionKeys = ['R', 'W', 'X', 'L', 'S', 'E'];
-        const hasExactPermissions = permissionKeys.every(p =>
+        // CLEAR is the ISA's explicit existence check.  It succeeds for every
+        // structurally valid, in-bounds non-NULL GT and never strips the GT's
+        // current permissions.  Hardware/tperm.py handles it before the exact
+        // ordinary-preset comparison for the same reason.
+        const hasExactPermissions = presetCode === 0 || permissionKeys.every(p =>
             required.includes(p) === (parsed.permissions[p] === 1)
         );
         const hasAll = hasExactPermissions;

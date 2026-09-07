@@ -85,6 +85,7 @@ const results = [
     runTperm('T_STRICT7_cross_domain_faults',     5, GT_E_ONLY, 3, null),
     // Mixed custom requests are also domain-purity faults.
     runTperm('T_STRICT8_mixed_request_faults',   5, GT_R_ONLY, 11, ['X','L']),
+    runTperm('T_CLEAR_valid_E_succeeds_unchanged', 5, GT_E_ONLY, 0, null),
 ];
 
 process.stdout.write(JSON.stringify(results, null, 2) + '\n');

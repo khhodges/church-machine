@@ -584,9 +584,9 @@ tG57:
 tHstart:
     ; Test 58: BFEXT bits [3:0] from 0xABCD = 0xD = 13
     ISUB DR1, DR1, DR1
-    IADD DR1, DR1, #16383
+    IADD DR1, DR1, #10995
     SHL DR1, DR1, #2
-    IADD DR1, DR1, #3
+    IADD DR1, DR1, #1
     BFEXT DR3, DR1, #0, #4
     ISUB DR3, DR3, #13
     BRANCHEQ tH59
@@ -668,13 +668,13 @@ tI66:
 tI67:
     ; Test 67: c-list E-GT satisfies TPERM E  (Z=1: verifies LOAD + TPERM together)
     TPERM CR1, E
-    BRANCHNE tI68
+    BRANCHEQ tI68
     IADD DR0, DR0, #67
     RETURN
 tI68:
     ; Test 68: c-list E-GT does NOT satisfy TPERM L  (Z=0: same-domain missing)
     TPERM CR1, L
-    BRANCHEQ tI69
+    BRANCHNE tI69
     IADD DR0, DR0, #68
     RETURN
 tI69:
@@ -698,7 +698,7 @@ tI71:
 tI72:
     ; Test 72: E-GT still satisfies TPERM E after CLEAR (Z=1: CLEAR is non-mutating)
     TPERM CR0, E
-    BRANCHNE tI73
+    BRANCHEQ tI73
     IADD DR0, DR0, #72
     RETURN
 tI73:
@@ -742,21 +742,23 @@ tJ77:
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
-; SECTION K — TPERM multi-permission (RW, LS) coverage  (Tests 78-79)
+; SECTION K — TPERM same-domain multi-permission immutability  (Tests 78-79)
 ; ═══════════════════════════════════════════════════════════════════════════════
 ; Note: CHANGE always writes to CR12-CR15 (privileged context switch).
 ; Writing to CR0-CR11 via CHANGE faults PRIV_REG by ISA design.
-; Section K tests combined permission specifiers not covered in Section I.
+; Cross-domain RW against an E-GT is intentionally excluded: DOMAIN_PURITY is
+; a terminal fault, not a continuing Z=0 result.  Instead, verify that a failed
+; same-domain LS assertion leaves the E capability unchanged.
 tKstart:
-    ; Test 78: E-GT does NOT satisfy TPERM RW  (Z=0: no read or write permission)
-    TPERM CR0, RW
+    ; Test 78: E-GT does NOT satisfy TPERM LS  (Z=0: same-domain mismatch)
+    TPERM CR0, LS
     BRANCHNE tK79
     IADD DR0, DR0, #78
     RETURN
 tK79:
-    ; Test 79: E-GT does NOT satisfy TPERM LS  (Z=0: no launch or store permission)
-    TPERM CR0, LS
-    BRANCHNE tLstart
+    ; Test 79: the failed LS assertion did not mutate E  (Z=1)
+    TPERM CR0, E
+    BRANCHEQ tLstart
     IADD DR0, DR0, #79
     RETURN
 

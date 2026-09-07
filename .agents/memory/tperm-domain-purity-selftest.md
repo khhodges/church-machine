@@ -14,6 +14,8 @@ The test source expected a normal failed condition and attempted to branch
 afterward, which is incompatible with the hardware security contract.
 
 **How to apply:** Keep cross-domain or authority-increasing TPERM cases out of
-continuing resident self-tests. Test only successful attenuation paths there.
-If fault behavior needs validation, use a deliberately isolated fault test with
-an explicit terminal expectation and snapshot handling.
+continuing resident self-tests. Same-domain exact mismatches may test the Z=0
+path; cross-domain cases require a deliberately isolated fault test with an
+explicit terminal expectation and snapshot handling. `TPERM CLEAR` is the
+non-mutating valid-GT existence check and succeeds with Z=1 for any valid,
+in-bounds non-NULL GT regardless of its current permission set.

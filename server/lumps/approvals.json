@@ -148,6 +148,51 @@
       "issue_n": 1,
       "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25",
       "filename": "SelfTest.1.8ab7765f.lump"
+    },
+    "72b7bf26a60e78573be65dae3746b5b048abe66f3b3007585bfb629ce03bd13f": {
+      "binary_hash": "72b7bf26a60e78573be65dae3746b5b048abe66f3b3007585bfb629ce03bd13f",
+      "filename": "SelfTest.81.532be597.lump",
+      "dot_name": "SelfTest",
+      "issue_n": 81,
+      "identity_string": "SelfTest#81",
+      "identity_hash": "a4e385f76694d4289bd09ea4d5ff1bfb4c250a8ccfd55c2e544ec2bd4af48f72",
+      "identity_seal_location": "approval",
+      "token": "141171da",
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
+    },
+    "592412cc4e1946111c160af05db7ee1c5c754785804251c02698f8c2613e1b75": {
+      "binary_hash": "592412cc4e1946111c160af05db7ee1c5c754785804251c02698f8c2613e1b75",
+      "filename": "SelfTest.82.4c1b2651.lump",
+      "dot_name": "SelfTest",
+      "issue_n": 82,
+      "identity_string": "SelfTest#82",
+      "identity_hash": "92a163a05052509f87cfbf50c34695817a9a4d6b941c233ef9dde1330c1b500d",
+      "identity_seal_location": "approval",
+      "token": "04007dff",
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
+    },
+    "aead2856f5557e002534e40828ea463f8bb13248d256e10feecac1787427295f": {
+      "binary_hash": "aead2856f5557e002534e40828ea463f8bb13248d256e10feecac1787427295f",
+      "filename": "SelfTest.83.c80aeda6.lump",
+      "dot_name": "SelfTest",
+      "issue_n": 83,
+      "identity_string": "SelfTest#83",
+      "identity_hash": "f5b7fa267bd37dc5a1a655465c145a7adec70cfe26464b5054c666f57739b995",
+      "identity_seal_location": "approval",
+      "token": "c5646afa",
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
     }
   }
 }

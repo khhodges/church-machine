@@ -51,6 +51,12 @@ class TestTpermStrict:
             assert not r["faulted"] and r["flags"]["Z"] and not r["flags"]["N"], r
             assert r["unchanged"], r
 
+    def test_clear_is_non_mutating_existence_check(self, results):
+        r = results["T_CLEAR_valid_E_succeeds_unchanged"]
+        assert not r["faulted"], r
+        assert r["flags"] == {"Z": True, "N": False, "C": False, "V": False}
+        assert r["unchanged"], r
+
     @pytest.mark.parametrize("name", ["T_STRICT7_cross_domain_faults", "T_STRICT8_mixed_request_faults"])
     def test_cross_domain_is_hard_fault(self, results, name):
         r = results[name]
