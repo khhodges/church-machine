@@ -97,8 +97,9 @@ check('TA4 IADD packet NIA = physicalPC',     (iaddPkts[0] || {}).nia === (rIadd
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 sim.flags.Z = false;          // EQ fires on Z=1; Z=0 → condition fails → skip
 sim.pc = 0;
-// LOADEQ (opcode=0, cond=EQ=0, crDst=0, crSrc=0, imm=0)
-const rSkip = writeAndStep(enc(0, EQ, 0, 0, 0));
+// LOADEQ with a non-zero c-list index.  LOADEQ CR0, CR0, #0 encodes as the
+// all-zero HALT pseudo-instruction, which is handled before condition decode.
+const rSkip = writeAndStep(enc(0, EQ, 0, 0, 1));
 check('TB1 conditional-skip result.skipped === true', !!(rSkip && rSkip.skipped),
     `desc: ${rSkip && rSkip.desc}`);
 check('TB2 conditional-skip emits 0 packets', ((rSkip && rSkip.tracePackets) || []).length === 0,
@@ -120,10 +121,14 @@ const bootCR14 = { ...sim.cr[14] };
 // Set callee's CR14 to a recognisably different value before injecting the frame.
 const CALLEE_CR14_WORD0 = (sim.cr[14] ? (sim.cr[14].word0 >>> 0) : 0);   // current value
 
-// Build a fake "caller's CR14" with a different slot number so it can't be confused
-// with the callee's value.  Use a NULL GT (type=0) with a distinctive bit pattern.
-// The simulator won't fetch through this GT — it's only read by the RETURN_CR14 emit.
-const CALLER_CR14_WORD0 = 0xDEAD0001;   // distinctive sentinel, definitely ≠ callee's
+// Build a valid caller code capability with a different permission shape so it
+// cannot be confused with the callee's current CR14.  RETURN now restores the
+// complete caller CR14 context, so the fixture must provide current word1/word2
+// prerequisites rather than a malformed payload-only sentinel.
+const bootCodeSlot = sim.parseGT(bootCR14.word0).index;
+const bootCodeSeq = sim.parseGT(bootCR14.word0).gt_seq;
+const CALLER_CR14_WORD0 = sim.createGT(
+    bootCodeSeq, bootCodeSlot, { R:0, W:0, X:1, L:0, S:0, E:0 }, 1);
 
 // Build a minimal fake call frame (same shape as _execCall pushes).
 const fakeFrame = {
@@ -135,8 +140,8 @@ const fakeFrame = {
     sz: 1,
     frameWord: 0,
 };
-// Override saved CR14 to a sentinel we can identify in the RETURN_CR14 packet.
-fakeFrame.savedCRs[14] = { word0: CALLER_CR14_WORD0, word1: 0, word2: 0, word3: 0 };
+// Override saved CR14 with the distinct valid caller capability asserted below.
+fakeFrame.savedCRs[14] = { ...bootCR14, word0: CALLER_CR14_WORD0 };
 
 sim.callStack.push(fakeFrame);
 
@@ -156,7 +161,7 @@ check('TC5 RETURN pkt[2].ev_type=RETURN_CR14(11)', (retPkts[2]||{}).ev_type === 
     `got ${(retPkts[2]||{}).ev_type}`);
 
 const retCR14Payload = (retPkts[2] || {}).payload_gt >>> 0;
-check('TC6 RETURN_CR14 payload = caller\'s saved CR14 (sentinel 0xDEAD0001)',
+check('TC6 RETURN_CR14 payload = caller\'s saved CR14',
     retCR14Payload === CALLER_CR14_WORD0,
     `got 0x${retCR14Payload.toString(16)}, want 0x${CALLER_CR14_WORD0.toString(16)}`);
 check('TC7 RETURN_CR14 payload ≠ callee\'s CR14 (confirming correct selection)',
@@ -231,31 +236,37 @@ check('TD6 CALL pkt[1] payload (CR14) non-zero', ((callPkts[1]||{}).payload_gt >
     `got 0`);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// TE: SWITCH → 1 RESULT packet
-// SWITCH opcode=5, crSrc=CR0, imm=5 (target=CR13).
-// Requires: CR0.word0 = Abstract GT (type=3, bits[26:25]=0b11),
-//           CR0.word1 = SENTINEL_CR13 = 0xFFFFFFFE.
+// TE: SWITCH → LOAD_SHADOW + LOAD_NEW packets
+// SWITCH opcode=5, crDst=CR13, crSrc=CR6, imm=0 (c-list row 0).
+// Requires: CR13.M=1 and CR6 holds the current L-permission c-list capability
+//           installed by CALL.
 // Run inside the stub lump (CR14 now points there after CALL).
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-// Build a minimal Abstract PassKey GT: bits[26:25]=0b11 (type=3), all other bits 0.
-const ABSTRACT_GT_WORD0 = (3 << 25) >>> 0;   // 0x06000000
-const SENTINEL_CR13     = 0xFFFFFFFE;
-sim.cr[0] = { word0: ABSTRACT_GT_WORD0, word1: SENTINEL_CR13, word2: 0, word3: 0, m: 0 };
+sim.cr[13].m = 1;
+const SWITCH_OLD_CR13_GT = sim.cr[13].word0 >>> 0;
 
 sim.pc = 0;
 sim.halted = false;
-// SWITCH: opcode=5, cond=AL, crDst=0 (ignored by SWITCH), crSrc=0, imm=5 (→CR13)
-const switchInstr = enc(5, AL, 0, 0, 5);
+// SWITCH: destination CR13, source CR6, c-list row 0.
+const switchInstr = enc(5, AL, 13, 6, 0);
 sim.memory[STUB_BASE + 1 + sim.pc] = switchInstr;
 const rSwitch = sim.step();
 check('TE1 SWITCH step() returns a result', !!rSwitch && !rSwitch.faulted,
-    `desc: ${rSwitch && rSwitch.desc}`);
+    `desc: ${rSwitch && rSwitch.desc}; halted=${sim.halted}; output=${sim.output.slice(-240)}`);
 const swPkts = (rSwitch && rSwitch.tracePackets) || [];
-check('TE2 SWITCH emits exactly 1 packet',      swPkts.length === 1,
+check('TE2 SWITCH emits exactly 2 packets',      swPkts.length === 2,
     `got ${swPkts.length}`);
-check('TE3 SWITCH packet ev_type=RESULT(0x00)', (swPkts[0]||{}).ev_type === EV_RESULT,
+check('TE3 SWITCH pkt[0].ev_type=LOAD_SHADOW(1)', (swPkts[0]||{}).ev_type === EV_LOAD_SHADOW,
     `got ${(swPkts[0]||{}).ev_type}`);
+check('TE4 SWITCH pkt[0] payload = previous CR13',
+    ((swPkts[0]||{}).payload_gt >>> 0) === SWITCH_OLD_CR13_GT,
+    `got 0x${((swPkts[0]||{}).payload_gt >>> 0).toString(16)}, want 0x${SWITCH_OLD_CR13_GT.toString(16)}`);
+check('TE5 SWITCH pkt[1].ev_type=LOAD_NEW(2)', (swPkts[1]||{}).ev_type === EV_LOAD_NEW,
+    `got ${(swPkts[1]||{}).ev_type}`);
+check('TE6 SWITCH pkt[1] payload = loaded c-list capability',
+    ((swPkts[1]||{}).payload_gt >>> 0) === STUB_CODE_GT,
+    `got 0x${((swPkts[1]||{}).payload_gt >>> 0).toString(16)}, want 0x${STUB_CODE_GT.toString(16)}`);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // TF: Packet shape — all required fields present on every packet produced above
