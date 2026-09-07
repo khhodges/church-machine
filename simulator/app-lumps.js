@@ -3713,8 +3713,8 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
                 return `${condStr}update CR${crDst} via ${crName(crSrc)}[${imm}]`;
             }
             case 5: {  // SWITCH CRd, CRs, row
-                if (crDst >= 12 && crDst <= 15 && crSrc === crDst)
-                    return `${condStr}SWITCH CR${crDst}, CR${crSrc} (direct SR${crDst} reload from CD${crSrc} GT)`;
+                if (crDst === 15 && crSrc === 15)
+                    return `${condStr}SWITCH CR15, CR15 (guarded Boot placeholder; no-op)`;
                 return `${condStr}SWITCH CR${crDst}, CR${crSrc}, #${imm} (isolated M-gated reload)`;
             }
             case 6: {  // TPERM CRd, preset[B]

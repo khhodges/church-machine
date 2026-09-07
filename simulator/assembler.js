@@ -1595,12 +1595,12 @@ class ChurchAssembler {
             case 5: {
                 // SWITCH has two forms:
                 //   SWITCH CR12..CR15, CRs, #row  — isolated C-list LOAD
-                //   SWITCH CRn, CRn              — direct SRn reload from CDn GT
+                //   SWITCH CR15, CR15             — guarded Boot placeholder no-op
                 const directSwitch = parts.length === 3;
                 if (parts.length !== 4 && !directSwitch) {
                     this.errors.push({
                         line: lineNum,
-                        message: 'SWITCH expects SWITCH CR12–CR15, CRsource, #row or direct SWITCH CRn, CRn'
+                        message: 'SWITCH expects SWITCH CR12–CR15, CRsource, #row or the guarded Boot form SWITCH CR15, CR15'
                     });
                 }
                 crDst = this._parseCR(parts[1], lineNum);
@@ -1609,10 +1609,10 @@ class ChurchAssembler {
                 }
                 crSrc = this._parseCR(parts[2], lineNum);
                 if (directSwitch) {
-                    if (crSrc !== crDst || crSrc < 12 || crSrc > 15) {
+                    if (crSrc !== 15 || crDst !== 15) {
                         this.errors.push({
                             line: lineNum,
-                            message: 'Direct SWITCH must reload the matching system register from its capability-domain GT: SWITCH CRn, CRn (n=12–15)'
+                            message: 'The only two-operand SWITCH currently supported is the guarded Boot placeholder: SWITCH CR15, CR15'
                         });
                     }
                 } else {
@@ -2452,9 +2452,9 @@ class ChurchAssembler {
                 if (crSrc === 6) return `${mnemonic}  CR${crDst}, ${cdOff(imm)}`;
                 return `${mnemonic}  CR${crDst}, CR${crSrc}[${hexOff(imm)}]`;
             }
-            // Matching isolated operands encode direct SRn ← CDn.GT reload.
+            // The exact CR15/CR15 encoding is a guarded Boot placeholder.
             case 5:
-                if (crDst >= 12 && crDst <= 15 && crSrc === crDst)
+                if (crDst === 15 && crSrc === 15)
                     return `${mnemonic}  CR${crDst}, CR${crSrc}`;
                 return `${mnemonic}  CR${crDst}, CR${crSrc}, #${hexOff(imm)}`;
             // TPERM CRd, preset[B]  — assert/attenuate permission

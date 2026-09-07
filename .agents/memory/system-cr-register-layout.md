@@ -27,16 +27,15 @@ description: Which capability and data registers are system-reserved vs availabl
 **How to apply:** Any API JSON reg field in in[] or out[] must not name a reserved register.
 CLOOMC++ compiler must reject such assignments at compile time.
 
-## Direct system-register reload
+## Guarded Boot SWITCH placeholder
 
-`SWITCH CRn, CRn` for CR12–CR15 is a privileged two-operand form: the first
-operand names SRn and the second names the GT for CDn. It is not an ordinary
-programmer reference to a reserved CR and does not take a C-list row.
+`SWITCH CR15, CR15` is temporarily detected as an exact guarded no-op that
+advances execution. Do not source a GT from the current SR15/CR15 contents.
 
-**Why:** Treating both encoded fields as ordinary CR operands incorrectly
-rejects the direct SR15 reload and conflates the system-register and
-capability-domain roles.
+**Why:** Boot was gifted the eventual CR15 GT, but that trusted source is not
+yet wired into this instruction path. Fabricating or recycling a GT would
+violate the rule that every real LOAD and SWITCH resolves through a valid GT.
 
-**How to apply:** Permit matching isolated operands only. Mismatched isolated
-sources remain invalid; the existing three-operand C-list form continues to
-require a CR0–CR11 source and an explicit row.
+**How to apply:** Only the exact CR15/CR15 encoding gets this temporary
+exception. Other isolated sources remain invalid, and all operative
+three-operand SWITCH and LOAD paths must resolve and validate a real GT.

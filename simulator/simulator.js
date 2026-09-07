@@ -7249,11 +7249,16 @@ class ChurchSimulator {
                 `SWITCH: destination CR${d.crDst} is not isolated (must be CR12–CR15)`);
             return null;
         }
-        const directReload = d.crSrc === d.crDst &&
-            d.crSrc >= 12 && d.crSrc <= 15;
-        if (!directReload && (d.crSrc < 0 || d.crSrc > 11)) {
+        const bootCr15Noop = d.crSrc === 15 && d.crDst === 15;
+        if (bootCr15Noop) {
+            const desc = 'SWITCH CR15, CR15 (guarded Boot placeholder; no-op)';
+            this.output += desc + '\n';
+            this.pc++;
+            return { pc: this.pc - 1, instr: d, desc };
+        }
+        if (d.crSrc < 0 || d.crSrc > 11) {
             this.fault('INVALID_OP',
-                `SWITCH: source CR${d.crSrc} is invalid (use CR0–CR11 for C-list loads, or matching CR12–CR15 for a direct reload)`);
+                `SWITCH: source CR${d.crSrc} is invalid (must be CR0–CR11)`);
             return null;
         }
 
@@ -7262,21 +7267,6 @@ class ChurchSimulator {
             this.fault('PERM_L',
                 `SWITCH: destination CR${d.crDst} had M=0 when the instruction was accepted`);
             return null;
-        }
-        if (directReload) {
-            const sourceGT = this.cr[d.crSrc].word0 >>> 0;
-            const directCheck = this.mLoad(sourceGT, null, d.crSrc);
-            if (!directCheck.ok) {
-                this.fault(directCheck.fault,
-                    `SWITCH direct CR${d.crDst}: ${directCheck.message}`);
-                return null;
-            }
-            if (!this._writeCR(d.crDst, sourceGT, directCheck.entry)) return null;
-            this.cr[d.crDst].m = 0;
-            const desc = `SWITCH CR${d.crDst}, CR${d.crSrc} (direct SR${d.crDst} reload from CD${d.crSrc} GT; M consumed)`;
-            this.output += desc + '\n';
-            this.pc++;
-            return { pc: this.pc - 1, instr: d, desc };
         }
         // SWITCH is a special LOAD, not an exemption from the C-list authority
         // check.  LOAD's historical CR6 fast path does not require L because it

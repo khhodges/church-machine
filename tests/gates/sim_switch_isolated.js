@@ -79,16 +79,16 @@ for (const source of ['SWITCH CR12, CR6', 'SWITCH CR12, CR13',
     check(new ChurchAssembler().assemble(source).errors.length > 0, `malformed SWITCH rejected: ${source}`);
 }
 
-// Two matching isolated operands are the direct SRn <- CDn.GT form.
+// The exact CR15/CR15 encoding is the guarded Boot placeholder.
 {
     const asm = new ChurchAssembler();
     const encoded = asm.assemble('SWITCH CR15, CR15');
-    check(encoded.errors.length === 0, 'direct SR15 reload syntax is accepted');
+    check(encoded.errors.length === 0, 'guarded Boot SWITCH syntax is accepted');
     const word = encoded.words[0] >>> 0;
     check(((word >>> 19) & 0xF) === 15 && ((word >>> 15) & 0xF) === 15,
-        'direct SR15 reload encodes matching destination/source fields');
+        'guarded Boot SWITCH encodes matching CR15 fields');
     check(asm.disassemble(word).trim() === 'SWITCH  CR15, CR15',
-        'direct SR15 reload disassembles without a synthetic row');
+        'guarded Boot SWITCH disassembles without a synthetic row');
 }
 
 // Destination M is sampled before LOAD, source M is irrelevant, and success
@@ -108,12 +108,13 @@ for (const dst of [12, 13, 14, 15]) {
 
 {
     const sim = machine();
-    const gt15 = sim.createGT(0, 0, { L: 1 }, 1);
-    sim.cr[15] = { word0: gt15, word1: 0, word2: 0, word3: 0, m: 1 };
+    sim.cr[15] = { word0: 0xDEADBEEF, word1: 1, word2: 2, word3: 3, m: 0 };
+    const before = { ...sim.cr[15] };
+    const beforePc = sim.pc;
     const result = sim._execSwitch({ crDst: 15, crSrc: 15, imm: 0 });
-    check(!!result, 'direct SR15 reload from CD15 GT succeeds');
-    check(sim.cr[15].word0 === gt15 && sim.cr[15].m === 0,
-        'direct SR15 reload preserves the GT and consumes destination M');
+    check(!!result && sim.pc === beforePc + 1, 'guarded Boot SWITCH advances execution');
+    check(JSON.stringify(sim.cr[15]) === JSON.stringify(before),
+        'guarded Boot SWITCH is an atomic no-op without a fabricated GT');
 }
 
 // Every failure is non-mutating, including rejection after the delegated LOAD

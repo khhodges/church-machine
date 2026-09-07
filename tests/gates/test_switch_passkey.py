@@ -92,8 +92,10 @@ def test_nonisolated_and_malformed_targets_fault_without_side_effects():
         assert not result["thread_write"]
 
 
-def test_mismatched_isolated_source_registers_are_malformed_and_never_read():
-    for source_cr in range(13, 16):
+def test_isolated_sources_other_than_exact_cr15_noop_are_malformed():
+    for source_cr in range(12, 16):
+        if source_cr == SWITCH_TGT_CR15:
+            continue
         dut = ChurchSwitch()
         observed = {"fault": FaultType.NONE, "mem_read": False,
                     "cr_write": False, "read_addresses": []}
@@ -125,21 +127,23 @@ def test_mismatched_isolated_source_registers_are_malformed_and_never_read():
         assert source_cr not in observed["read_addresses"]
 
 
-def test_matching_isolated_source_selects_direct_reload():
+def test_exact_cr15_form_is_guarded_noop():
     dut = ChurchSwitch()
-    observed = {"fault": FaultType.NONE, "read_addresses": []}
+    observed = {"fault": FaultType.NONE, "done": False, "mem_read": False,
+                "cr_write": False}
 
     async def bench(ctx):
         ctx.set(dut.cr_src, SWITCH_TGT_CR15)
         ctx.set(dut.target, SWITCH_TGT_CR15)
         ctx.set(dut.target_m, 1)
-        ctx.set(dut.cr_rd_data.as_value(), _cap())
         ctx.set(dut.switch_start, 1)
         await ctx.tick()
         ctx.set(dut.switch_start, 0)
         for _ in range(8):
             await ctx.tick()
-            observed["read_addresses"].append(ctx.get(dut.cr_rd_addr))
+            observed["done"] |= bool(ctx.get(dut.switch_complete))
+            observed["mem_read"] |= bool(ctx.get(dut.mem_rd_en))
+            observed["cr_write"] |= bool(ctx.get(dut.cr_wr_en))
             if ctx.get(dut.switch_fault):
                 observed["fault"] = ctx.get(dut.fault_type)
 
@@ -147,8 +151,10 @@ def test_matching_isolated_source_selects_direct_reload():
     sim.add_clock(1e-6)
     sim.add_testbench(bench)
     sim.run()
-    assert observed["fault"] != FaultType.INVALID_OP
-    assert SWITCH_TGT_CR15 in observed["read_addresses"]
+    assert observed["fault"] == FaultType.NONE
+    assert observed["done"]
+    assert not observed["mem_read"]
+    assert not observed["cr_write"]
 
 
 def test_destination_m_clear_faults_before_source_or_memory_access():
