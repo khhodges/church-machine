@@ -6397,6 +6397,13 @@ def _extract_clist_from_lump_file(lump_path):
 _LUMP_APPROVALS_FILENAME = "approvals.json"
 from server.lump_approvals import read_approvals as _shared_read_approvals
 from server.lump_approvals import write_approvals as _shared_write_approvals
+from server.lump_approvals import envelope as _shared_approval_envelope
+
+
+class _LumpApprovalStoreError(ValueError):
+    """The strict approval ledger could not be read or validated."""
+
+
 _LUMP_APPROVAL_INTENTS = {}
 _LUMP_APPROVAL_INTENTS_LOCK = threading.Lock()
 _LUMP_SAVE_PLANS = {}
@@ -6603,7 +6610,8 @@ def _read_lump_approvals(lumps_dir):
     try:
         return _shared_read_approvals(path)
     except Exception as exc:
-        raise ValueError(f"LUMP approval store is unreadable: {exc}") from exc
+        raise _LumpApprovalStoreError(
+            f"approvals.json is corrupt and cannot be read safely: {exc}") from exc
 
 
 def _matching_lump_approval(lumps_dir, binary_hash):
@@ -6708,6 +6716,8 @@ def authorize_lump_simulator_deploy():
             if _matching_lump_approval(LUMPS_DIR, digest) is None:
                 return jsonify({"error": "exact hash-bound approval is required"}), 403
             _consume_lump_approval_intent(payload.get("approval_intent"), digest, "deploy")
+    except _LumpApprovalStoreError as exc:
+        return jsonify({"error": str(exc)}), 500
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 403
     except OSError:
@@ -8567,6 +8577,13 @@ def save_lump():
     except _LumpTransitionConflict as _transition_conflict:
         _rollback_protected_save()
         return jsonify({"error": str(_transition_conflict)}), 409
+    except _LumpApprovalStoreError as _approval_err:
+        _rollback_protected_save()
+        return jsonify({"error": (
+            "approvals.json is corrupt and cannot be read safely. "
+            "The save has been aborted to prevent weakening prior approvals. "
+            f"Details: {_approval_err}"
+        )}), 500
     except ValueError as _mf_lock_err:
         _rollback_protected_save()
         return jsonify({"error": (
@@ -9088,6 +9105,8 @@ def lump_fork_version(token):
         _fork_intent_approval = _consume_lump_approval_intent(
             _fork_payload.get("approval_intent"),
             _fork_facts["binary_hash"], "fork")
+    except _LumpApprovalStoreError as exc:
+        return jsonify({"error": str(exc)}), 500
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 403
 
@@ -9154,8 +9173,12 @@ def lump_fork_version(token):
     })
     _fork_approval["filename"] = _fork_live_lump_name
     _fork_approval["issue_n"] = _new_issue_n
+    _fork_identity_string = f"{_fork_dot_name}#{_new_issue_n}"
     _fork_approval["identity_hash"] = hashlib.sha256(
-        f"{_fork_dot_name}#{_new_issue_n}".encode("utf-8")).hexdigest()
+        _fork_identity_string.encode("utf-8")).hexdigest()
+    if ("identity_string" in _fork_approval
+            or "identity_seal_location" in _fork_approval):
+        _fork_approval["identity_string"] = _fork_identity_string
     try:
         _transition = _commit_lump_history_transition(
             lumps_dir=lumps_dir,
@@ -9187,6 +9210,12 @@ def lump_fork_version(token):
             })
     except _LumpTransitionConflict as _transition_conflict:
         return jsonify({"error": str(_transition_conflict)}), 409
+    except _LumpApprovalStoreError as _approval_err:
+        return jsonify({"error": (
+            "approvals.json is corrupt and cannot be read safely. "
+            "The fork has been aborted to prevent weakening prior approvals. "
+            f"Details: {_approval_err}"
+        )}), 500
     except ValueError as _mf_fv_err:
         return jsonify({"error": (
             "manifest.json is corrupt and cannot be read safely. "
@@ -17020,9 +17049,10 @@ def _commit_lump_history_transition(
                 approval_out["filename"] = manifest_entry.get("filename")
                 approvals = _read_lump_approvals(lumps_dir)
                 approvals[approval_hash] = approval_out
-                staged.append((_destination(_LUMP_APPROVALS_FILENAME), _stage_json({
-                    "version": 1, "algorithm": "sha256", "approvals": approvals,
-                })))
+                staged.append((
+                    _destination(_LUMP_APPROVALS_FILENAME),
+                    _stage_json(_shared_approval_envelope(approvals)),
+                ))
 
             updated_manifest = [entry for entry in locked_manifest if entry.get("token") != token8]
             updated_manifest.append(dict(manifest_entry))

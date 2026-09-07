@@ -1,4 +1,5 @@
 """Dependency-free canonical LUMP approval-ledger contract."""
+import hashlib
 import json
 import os
 import re
@@ -19,6 +20,7 @@ INTRINSIC_FIELDS = frozenset({
     "sourceStorageTier", "binary", "clist_entries", "methods", "capabilities",
     "content_type", "profile", "language",
 })
+IDENTITY_SEAL_LOCATIONS = frozenset({"approval"})
 
 
 def validate_record(digest, record):
@@ -29,6 +31,32 @@ def validate_record(digest, record):
     unknown = set(record) - RECORD_FIELDS
     if unknown:
         raise ValueError(f"approval record contains unsupported fields: {sorted(unknown)}")
+    identity_string = record.get("identity_string")
+    seal_location = record.get("identity_seal_location")
+    if identity_string is not None or seal_location is not None:
+        if not isinstance(identity_string, str) or not identity_string:
+            raise ValueError(
+                "approval identity_string must be a non-empty string when identity metadata is present")
+        dot_name = record.get("dot_name")
+        issue_n = record.get("issue_n")
+        if not isinstance(dot_name, str) or not dot_name:
+            raise ValueError(
+                "approval identity metadata requires a non-empty dot_name")
+        if not isinstance(issue_n, int) or isinstance(issue_n, bool) or issue_n < 1:
+            raise ValueError(
+                "approval identity metadata requires a positive integer issue_n")
+        canonical_identity = f"{dot_name}#{issue_n}"
+        if identity_string != canonical_identity:
+            raise ValueError(
+                f"approval identity_string must equal canonical identity {canonical_identity!r}")
+        identity_hash = record.get("identity_hash")
+        expected_hash = hashlib.sha256(identity_string.encode("utf-8")).hexdigest()
+        if identity_hash != expected_hash:
+            raise ValueError(
+                "approval identity_hash must be the SHA-256 of identity_string")
+        if not isinstance(seal_location, str) or seal_location not in IDENTITY_SEAL_LOCATIONS:
+            raise ValueError(
+                "approval identity_seal_location must be 'approval'")
     return dict(record)
 
 

@@ -70,6 +70,13 @@ try {
         approval.identity_seal_location === 'approval' &&
         approval.identity_hash === state.identity_hash,
     'exact content-hash approval carries its derived identity seal metadata');
+    const loaded = spawnSync(process.env.PYTHON || 'python3', [
+        '-c',
+        'import sys; from server.lump_approvals import read_approvals; read_approvals(sys.argv[1], missing_ok=False)',
+        path.join(dir, 'approvals.json'),
+    ], { cwd: ROOT, encoding: 'utf8' });
+    check(loaded.status === 0,
+        'builder approval shape loads through the production approval contract');
     const guarded = build(dir, ['--check', '--lump-words', '8192']);
     check(guarded.status === 0, 'check validates exact manifest/ns-state filename');
     const badState = JSON.parse(fs.readFileSync(path.join(dir, 'ns-state.json')));

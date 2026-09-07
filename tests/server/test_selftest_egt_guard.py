@@ -140,3 +140,20 @@ def test_only_bootstrap_slots_are_protected(repository):
         })
     assert response.status_code == 403
     assert response.get_json()["protected_namespace_slot"] is True
+
+
+def test_save_reports_invalid_approval_store_without_blaming_manifest(repository):
+    root, _state_path = repository
+    with app_module.app.test_client() as client:
+        payload = _approved_payload(client, _words(), _metadata())
+        (root / "approvals.json").write_text(json.dumps({
+            "version": 1,
+            "algorithm": "sha256",
+            "approvals": {"not-a-digest": {"binary_hash": "not-a-digest"}},
+        }))
+        response = client.post("/api/lumps/save", json=payload)
+
+    assert response.status_code == 500
+    error = response.get_json()["error"]
+    assert "approvals.json is corrupt" in error
+    assert "manifest.json is corrupt" not in error

@@ -375,7 +375,9 @@ def test_fork_requires_new_issue_and_never_creates_token_alias(
             digest: {
                 "binary_hash": digest, "filename": old_filename,
                 "dot_name": dot_name, "issue_n": 1,
+                "identity_string": "Forkable#1",
                 "identity_hash": hashlib.sha256(b"Forkable#1").hexdigest(),
+                "identity_seal_location": "approval",
             },
         },
     }))
@@ -400,5 +402,34 @@ def test_fork_requires_new_issue_and_never_creates_token_alias(
     approval = app_module._matching_lump_approval(str(tmp_path), digest)
     assert approval["filename"] == new_filename
     assert approval["issue_n"] == 2
+    assert approval["identity_string"] == "Forkable#2"
     assert approval["identity_hash"] == hashlib.sha256(b"Forkable#2").hexdigest()
+    assert approval["identity_seal_location"] == "approval"
     assert list(tmp_path.glob(f"{old_filename[:-5]}_v*.lump"))
+
+
+def test_fork_reports_corrupt_approval_store_before_intent_validation(
+        tmp_path, monkeypatch):
+    from server.lump_integrity import compute_number
+    raw = _lump()
+    dot_name = "Forkable"
+    token = compute_number(dot_name, raw)
+    filename = f"{dot_name}.1.{token}.lump"
+    (tmp_path / filename).write_bytes(raw)
+    (tmp_path / "manifest.json").write_text(json.dumps([{
+        "token": token, "abstraction": dot_name,
+        "filename": filename, "lump_version": 1,
+    }]))
+    (tmp_path / "approvals.json").write_text(json.dumps({
+        "version": 1, "algorithm": "sha256",
+        "approvals": {"not-a-digest": {"binary_hash": "not-a-digest"}},
+    }))
+    monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
+
+    response = app_module.app.test_client().post(
+        f"/api/lump/{token}/fork-version", json={})
+
+    assert response.status_code == 500
+    error = response.get_json()["error"]
+    assert "approvals.json is corrupt" in error
+    assert "manifest.json is corrupt" not in error
