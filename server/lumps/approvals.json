@@ -100,6 +100,18 @@
       "issue_n": 1,
       "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
       "filename": "CapabilityTest.1.2cdca9f6.lump"
+    },
+    "a6e7ce5dbfa5f5d767a7538115eafdc5d4af7522f6f3b3beb84c9613b2d450d0": {
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "a6e7ce5dbfa5f5d767a7538115eafdc5d4af7522f6f3b3beb84c9613b2d450d0",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
+      "filename": "CapabilityTest.1.faf715c2.lump"
     }
   }
 }
