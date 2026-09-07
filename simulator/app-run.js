@@ -14819,7 +14819,20 @@ async function confirmSaveToNamespace() {
             }
             _persistNamespaceSlotLabel(idx, label);
             if (window.LumpRegistry) {
-                window.LumpRegistry.registerMemory(resp.token, label, _svWords, _caps);
+                // A successful save makes the server's immutable binary the
+                // authority for this token.  Do not register _svWords here:
+                // those are code words only, so treating them as the saved
+                // artifact drops the embedded API/source frame and makes a
+                // Fully documented LUMP reopen as "source unavailable".
+                window.LumpRegistry.registerFromServer([{
+                    token: resp.token,
+                    abstraction: label,
+                    filename: resp.lump,
+                    ns_slot: idx,
+                    language: _svLang,
+                    capabilities: _caps
+                }]);
+                window.LumpRegistry.evictMemory(resp.token);
                 window.LumpRegistry.setCurrent(resp.token);
                 window.LumpRegistry.setPending(resp.token);
             }
