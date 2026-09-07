@@ -352,13 +352,15 @@
     "abstraction": "SelfTest",
     "filename": "SelfTest.79.eceee227.lump",
     "variant_group": "selftest-history",
-    "lump_version": 79
+    "lump_version": 79,
+    "archived": true
   },
   {
-    "token": "ecf1b358",
+    "token": "ee750c1b",
     "abstraction": "SelfTest",
-    "filename": "SelfTest.1.e9f17d7c.lump",
+    "filename": "SelfTest.79.eceee227.lump",
     "lump_version": 79,
-    "compiled_at": 1788790072.7247603
+    "compiled_at": 1788790072.7247603,
+    "variant_group": "selftest-history"
   }
 ]
