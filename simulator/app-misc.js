@@ -1331,9 +1331,22 @@ function _traceRecordStep(result) {
     if (!result) return;
     const state = sim.getState();
     const instr = result.instr;
+    const physicalPC = Number.isInteger(result.physicalPC) ? result.physicalPC : null;
+    const owner = physicalPC != null && typeof _nsOwnerOf === 'function'
+        ? _nsOwnerOf(physicalPC)
+        : null;
+    const nsIdx = owner && Number.isInteger(owner.nsIdx) ? owner.nsIdx : null;
     const entry = {
         step: state.stepCount,
         pc: result.pc,
+        physicalPC: physicalPC,
+        nsIdx: nsIdx,
+        lumpToken: nsIdx != null && typeof sim.lumpTokenAtSlot === 'function'
+            ? sim.lumpTokenAtSlot(nsIdx)
+            : null,
+        instrIdx: owner && Number.isInteger(owner.offset) && owner.offset > 0
+            ? owner.offset - 1
+            : null,
         opName: instr ? sim.opName(instr.opcode) : '',
         cond: instr ? sim.condName(instr.cond) : '',
         dst: instr ? instr.crDst : '',
@@ -1410,6 +1423,21 @@ function _traceBuildRow(idx) {
     const tr = document.createElement('tr');
     tr.dataset.step = entry.step;
     if (entry.skipped) tr.className = 'trace-row-skipped';
+    if (entry.lumpToken && Number.isInteger(entry.instrIdx)) {
+        tr.classList.add('trace-row-source-link');
+        tr.tabIndex = 0;
+        tr.title = 'Open this executed instruction in the editor';
+        tr.addEventListener('click', function(event) {
+            if (event.target && event.target.closest &&
+                    event.target.closest('button, a, input, select, textarea')) return;
+            void _traceOpenExecutedSource(entry);
+        });
+        tr.addEventListener('keydown', function(event) {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            void _traceOpenExecutedSource(entry);
+        });
+    }
 
     const cells = [
         entry.step,
@@ -1566,6 +1594,29 @@ function _traceBuildRow(idx) {
 
     return frag;
 }
+
+async function _traceOpenExecutedSource(entry) {
+    if (!entry || !entry.lumpToken || !Number.isInteger(entry.instrIdx) ||
+            typeof openLumpInEditor !== 'function') return false;
+    await openLumpInEditor(entry.lumpToken);
+    const editor = document.getElementById('asmEditor');
+    let targetLine = null;
+    if (editor && typeof ChurchAssembler === 'function') {
+        const sourceMapAssembler = new ChurchAssembler();
+        sourceMapAssembler.assemble(editor.value);
+        const lineNums = sourceMapAssembler.getLastLineNums
+            ? sourceMapAssembler.getLastLineNums()
+            : [];
+        targetLine = lineNums[entry.instrIdx] || null;
+    }
+    if (targetLine && typeof _jumpToAsmLine === 'function') {
+        _jumpToAsmLine(targetLine);
+    } else if (typeof _jumpToDecompiledInstruction === 'function') {
+        _jumpToDecompiledInstruction(entry.instrIdx);
+    }
+    return true;
+}
+window._traceOpenExecutedSource = _traceOpenExecutedSource;
 
 function clearTrace() {
     _traceData.length = 0;
