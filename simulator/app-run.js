@@ -15717,13 +15717,13 @@ const INSTRUCTION_DATA = [
     {
         opcode: 5, mnemonic: 'SWITCH', domain: 'church',
         mState: 'down', mStateNote: 'The destination M bit is latched at acceptance. M=1 authorizes this isolated reload and is consumed on success; M=0 faults unchanged. Source M is irrelevant.',
-        syntax: 'SWITCH CRd, CRs, row',
-        brief: 'M-gated isolated-register LOAD into CR12–CR15',
+        syntax: 'SWITCH CRd, CRs, row | SWITCH CRn, CRn',
+        brief: 'M-gated isolated-register LOAD or direct SRn reload from CDn GT',
         encoding: 'opcode[5]=00101 | cond[4] | CRd[4] | CRs[4] | row[15]',
         fields: [
             { name: 'CRd', desc: 'Isolated destination: CR12, CR13, CR14, or CR15' },
-            { name: 'CRs', desc: 'Source c-list capability; CR6 requires L permission' },
-            { name: 'row', desc: 'Capability row to load' },
+            { name: 'CRs', desc: 'Source c-list capability; matching CR12–CR15 selects the direct CDn GT form' },
+            { name: 'row', desc: 'Capability row to load; omitted for direct SWITCH CRn, CRn' },
         ],
         permission: 'Destination M must already be set by Namespace’s single-word M-bit I/O object; normal LOAD authority applies to CRs.',
         flags: 'None',
@@ -15738,7 +15738,7 @@ const INSTRUCTION_DATA = [
           + 'row = c-list row.\n\n'
           + 'SWITCH first checks destination M, then performs ordinary LOAD validation.\n'
           + 'Success clears M; failure changes no register, Namespace entry, or memory word.',
-        example: 'SWITCH CR15, CR6, #0 ; Reload CR15 only when CR15.M is set',
+        example: 'SWITCH CR15, CR15 ; Directly reload SR15 from the GT for CD15',
         mState: { badge: 'M↓', note: 'Destination M is authorization state, not a GT permission; success consumes it.' },
     },
     {

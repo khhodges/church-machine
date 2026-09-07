@@ -26,3 +26,17 @@ description: Which capability and data registers are system-reserved vs availabl
 
 **How to apply:** Any API JSON reg field in in[] or out[] must not name a reserved register.
 CLOOMC++ compiler must reject such assignments at compile time.
+
+## Direct system-register reload
+
+`SWITCH CRn, CRn` for CR12–CR15 is a privileged two-operand form: the first
+operand names SRn and the second names the GT for CDn. It is not an ordinary
+programmer reference to a reserved CR and does not take a C-list row.
+
+**Why:** Treating both encoded fields as ordinary CR operands incorrectly
+rejects the direct SR15 reload and conflates the system-register and
+capability-domain roles.
+
+**How to apply:** Permit matching isolated operands only. Mismatched isolated
+sources remain invalid; the existing three-operand C-list form continues to
+require a CR0–CR11 source and an explicit row.

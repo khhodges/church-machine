@@ -51,6 +51,7 @@ class ChurchSwitch(Elaboratable):
         target_latched = Signal(4)
         index_latched = Signal(16)
         target_m_latched = Signal()
+        direct_gt_latched = Signal(32)
         fault_latched = Signal()
         fault_type_latched = Signal(5)
         sub_start = Signal()
@@ -58,9 +59,13 @@ class ChurchSwitch(Elaboratable):
         # SWITCH is the isolated-register form of LOAD.  Its only additional
         # checks are destination class and the destination's accepted M latch.
         target_valid = Signal()
+        direct_reload = Signal()
         m.d.comb += target_valid.eq(
             (target_latched >= SWITCH_TGT_CR12) &
             (target_latched <= SWITCH_TGT_CR15)
+        )
+        m.d.comb += direct_reload.eq(
+            target_valid & (src_latched == target_latched)
         )
 
         m.d.comb += [
@@ -68,8 +73,8 @@ class ChurchSwitch(Elaboratable):
             u_mload.sub_cr_src.eq(src_latched),
             u_mload.sub_cr_dst.eq(target_latched),
             u_mload.sub_index.eq(index_latched),
-            u_mload.sub_direct.eq(0),
-            u_mload.sub_direct_gt.eq(0),
+            u_mload.sub_direct.eq(direct_reload),
+            u_mload.sub_direct_gt.eq(Mux(direct_reload, direct_gt_latched, 0)),
             # Destination M authorises entering this path; it never elevates
             # source capability checks or Namespace validation.
             u_mload.sub_m_elevated.eq(0),
@@ -112,10 +117,9 @@ class ChurchSwitch(Elaboratable):
                     m.next = "CHECK_SRC"
 
             with m.State("CHECK_SRC"):
-                # SWITCH encoding reserves isolated CR12-CR15 for CRd only.
-                # CRs is the same ordinary source class accepted by assembler:
-                # CR0-CR11. Reject malformed sources before mLoad can read.
-                with m.If(src_latched > 11):
+                # CR0-CR11 select the ordinary C-list form. Matching isolated
+                # operands select direct SRn <- CDn.GT reload.
+                with m.If((src_latched > 11) & ~direct_reload):
                     m.d.sync += [
                         fault_latched.eq(1),
                         fault_type_latched.eq(FaultType.INVALID_OP),
@@ -128,8 +132,16 @@ class ChurchSwitch(Elaboratable):
                 with m.If(~target_m_latched):
                     m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_L)]
                     m.next = "IDLE"
+                with m.Elif(direct_reload):
+                    m.next = "READ_DIRECT"
                 with m.Else():
                     m.next = "START_SUB"
+
+            with m.State("READ_DIRECT"):
+                m.d.comb += self.cr_rd_addr.eq(src_latched)
+                m.d.sync += direct_gt_latched.eq(
+                    View(CAP_REG_LAYOUT, self.cr_rd_data).word0_gt)
+                m.next = "START_SUB"
 
             with m.State("START_SUB"):
                 m.d.comb += sub_start.eq(1)

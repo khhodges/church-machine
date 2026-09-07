@@ -92,8 +92,8 @@ def test_nonisolated_and_malformed_targets_fault_without_side_effects():
         assert not result["thread_write"]
 
 
-def test_isolated_source_registers_are_malformed_and_never_read():
-    for source_cr in range(12, 16):
+def test_mismatched_isolated_source_registers_are_malformed_and_never_read():
+    for source_cr in range(13, 16):
         dut = ChurchSwitch()
         observed = {"fault": FaultType.NONE, "mem_read": False,
                     "cr_write": False, "read_addresses": []}
@@ -123,6 +123,32 @@ def test_isolated_source_registers_are_malformed_and_never_read():
         assert not observed["cr_write"]
         # mLoad remains idle, so it never presents the malformed source.
         assert source_cr not in observed["read_addresses"]
+
+
+def test_matching_isolated_source_selects_direct_reload():
+    dut = ChurchSwitch()
+    observed = {"fault": FaultType.NONE, "read_addresses": []}
+
+    async def bench(ctx):
+        ctx.set(dut.cr_src, SWITCH_TGT_CR15)
+        ctx.set(dut.target, SWITCH_TGT_CR15)
+        ctx.set(dut.target_m, 1)
+        ctx.set(dut.cr_rd_data.as_value(), _cap())
+        ctx.set(dut.switch_start, 1)
+        await ctx.tick()
+        ctx.set(dut.switch_start, 0)
+        for _ in range(8):
+            await ctx.tick()
+            observed["read_addresses"].append(ctx.get(dut.cr_rd_addr))
+            if ctx.get(dut.switch_fault):
+                observed["fault"] = ctx.get(dut.fault_type)
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(bench)
+    sim.run()
+    assert observed["fault"] != FaultType.INVALID_OP
+    assert SWITCH_TGT_CR15 in observed["read_addresses"]
 
 
 def test_destination_m_clear_faults_before_source_or_memory_access():

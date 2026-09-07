@@ -1593,12 +1593,14 @@ class ChurchAssembler {
                 break;
             }
             case 5: {
-                // SWITCH is LOAD's isolated-register form:
-                // SWITCH CR12..CR15, CRs, #row.
-                if (parts.length !== 4) {
+                // SWITCH has two forms:
+                //   SWITCH CR12..CR15, CRs, #row  — isolated C-list LOAD
+                //   SWITCH CRn, CRn              — direct SRn reload from CDn GT
+                const directSwitch = parts.length === 3;
+                if (parts.length !== 4 && !directSwitch) {
                     this.errors.push({
                         line: lineNum,
-                        message: 'SWITCH expects exactly three operands: SWITCH CR12–CR15, CRsource, #row'
+                        message: 'SWITCH expects SWITCH CR12–CR15, CRsource, #row or direct SWITCH CRn, CRn'
                     });
                 }
                 crDst = this._parseCR(parts[1], lineNum);
@@ -1606,8 +1608,17 @@ class ChurchAssembler {
                     this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, 'CR' + crDst), message: `SWITCH: destination CR${crDst} must be an isolated register CR12–CR15` });
                 }
                 crSrc = this._parseCR(parts[2], lineNum);
-                this._checkPrivCR(crSrc, 'SWITCH source', lineNum);
-                const switchRow = this._parseImm(parts[3], lineNum);
+                if (directSwitch) {
+                    if (crSrc !== crDst || crSrc < 12 || crSrc > 15) {
+                        this.errors.push({
+                            line: lineNum,
+                            message: 'Direct SWITCH must reload the matching system register from its capability-domain GT: SWITCH CRn, CRn (n=12–15)'
+                        });
+                    }
+                } else {
+                    this._checkPrivCR(crSrc, 'SWITCH source', lineNum);
+                }
+                const switchRow = directSwitch ? 0 : this._parseImm(parts[3], lineNum);
                 if (!Number.isInteger(switchRow) || switchRow < 0 || switchRow > 0x7FFF) {
                     const rowToken = (parts[3] || '').replace(/,/g, '').trim();
                     this.errors.push({
@@ -2441,8 +2452,11 @@ class ChurchAssembler {
                 if (crSrc === 6) return `${mnemonic}  CR${crDst}, ${cdOff(imm)}`;
                 return `${mnemonic}  CR${crDst}, CR${crSrc}[${hexOff(imm)}]`;
             }
-            // SWITCH CRd, CRs, #row — M-gated special LOAD into CR12–CR15
-            case 5: return `${mnemonic}  CR${crDst}, CR${crSrc}, #${hexOff(imm)}`;
+            // Matching isolated operands encode direct SRn ← CDn.GT reload.
+            case 5:
+                if (crDst >= 12 && crDst <= 15 && crSrc === crDst)
+                    return `${mnemonic}  CR${crDst}, CR${crSrc}`;
+                return `${mnemonic}  CR${crDst}, CR${crSrc}, #${hexOff(imm)}`;
             // TPERM CRd, preset[B]  — assert/attenuate permission
             case 6: {
                 const presetNames = ['CLEAR','R','RW','X','RX','RWX','L','S','E','LS','RSV3','RSV4','RSV5','FRAME','EXACT','RSV1'];

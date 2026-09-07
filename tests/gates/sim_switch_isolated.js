@@ -73,9 +73,22 @@ for (const dst of Array.from({ length: 12 }, (_, i) => i)) {
     check(new ChurchAssembler().assemble(`SWITCH CR${dst}, CR6, #0`).errors.length > 0,
         `CR${dst} destination is rejected`);
 }
-for (const source of ['SWITCH CR12, CR6', 'SWITCH CR12, CR6, #32768',
+for (const source of ['SWITCH CR12, CR6', 'SWITCH CR12, CR13',
+    'SWITCH CR12, CR6, #32768',
     'SWITCH CR12, CR15, #0']) {
     check(new ChurchAssembler().assemble(source).errors.length > 0, `malformed SWITCH rejected: ${source}`);
+}
+
+// Two matching isolated operands are the direct SRn <- CDn.GT form.
+{
+    const asm = new ChurchAssembler();
+    const encoded = asm.assemble('SWITCH CR15, CR15');
+    check(encoded.errors.length === 0, 'direct SR15 reload syntax is accepted');
+    const word = encoded.words[0] >>> 0;
+    check(((word >>> 19) & 0xF) === 15 && ((word >>> 15) & 0xF) === 15,
+        'direct SR15 reload encodes matching destination/source fields');
+    check(asm.disassemble(word).trim() === 'SWITCH  CR15, CR15',
+        'direct SR15 reload disassembles without a synthetic row');
 }
 
 // Destination M is sampled before LOAD, source M is irrelevant, and success
@@ -93,11 +106,21 @@ for (const dst of [12, 13, 14, 15]) {
     check(sim.cr[1].m === 1, `CR${dst} SWITCH ignores source M`);
 }
 
+{
+    const sim = machine();
+    const gt15 = sim.createGT(0, 0, { L: 1 }, 1);
+    sim.cr[15] = { word0: gt15, word1: 0, word2: 0, word3: 0, m: 1 };
+    const result = sim._execSwitch({ crDst: 15, crSrc: 15, imm: 0 });
+    check(!!result, 'direct SR15 reload from CD15 GT succeeds');
+    check(sim.cr[15].word0 === gt15 && sim.cr[15].m === 0,
+        'direct SR15 reload preserves the GT and consumes destination M');
+}
+
 // Every failure is non-mutating, including rejection after the delegated LOAD
 // has begun to modify architectural stores.
 for (const [setup, expectedFault] of [
     [sim => ({ crDst: 11, crSrc: 1, imm: 0 }), 'INVALID_OP'],
-    [sim => ({ crDst: 12, crSrc: 12, imm: 0 }), 'INVALID_OP'],
+    [sim => ({ crDst: 12, crSrc: 13, imm: 0 }), 'INVALID_OP'],
     [sim => ({ crDst: 12, crSrc: 1, imm: 0 }), 'PERM_L'],
     [sim => { sim.cr[12].m = 1; sim.cr[6].word0 = sim.createGT(0, 0, { E: 1 }, 1); return { crDst: 12, crSrc: 6, imm: 0 }; }, 'PERM_L'],
     [sim => {
