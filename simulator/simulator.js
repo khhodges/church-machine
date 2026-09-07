@@ -4876,7 +4876,13 @@ class ChurchSimulator {
             const threadBase = this._activeThreadBase();
             if (threadBase !== null) {
                 const layout = this._threadLayoutAtBase(threadBase);
-                if (!layout) return false;
+                if (!layout) {
+                    this.fault(
+                        'BOUNDS',
+                        `_writeCR(${crIdx}): active Thread at ${threadBase} has invalid geometry`
+                    );
+                    return false;
+                }
                 const homeAddr = (threadBase + layout.capsStart + crIdx) >>> 0;
                 const cr12GT = this.cr[12].word0;
                 if (cr12GT) {
@@ -5751,6 +5757,15 @@ class ChurchSimulator {
             result.tracePackets = this._tracePacketsBuf.slice();
             this.emit('step', result);
             this.emit('stateChange', this.getState());
+        }
+        if (!result && !this.halted && !this.awaitingLump && !this._lazySuspended) {
+            // Null means that execution aborted. If no explicit fault or
+            // suspension explains it, promote the silent abort to a terminal
+            // fault instead of letting sim.run() mislabel it as a boot exit.
+            this.fault(
+                'EXECUTION_ABORT',
+                `${this.opName(d.opcode)} stopped without retiring or reporting a fault at PC ${this.pc}`
+            );
         }
         return result;
     }
