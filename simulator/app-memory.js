@@ -1,5 +1,40 @@
 var _crDetailHighlightPC = null;
 
+function _canonicalEditorTokenForSlot(nsIdx) {
+    const savedRows = window._nsState && Array.isArray(window._nsState.abstractions)
+        ? window._nsState.abstractions : [];
+    const saved = savedRows.find(function(row) {
+        return row && Number(row.slot) === Number(nsIdx);
+    });
+    if (saved && /^[0-9a-f]{1,8}$/i.test(String(saved.token || ''))) {
+        return String(saved.token).toLowerCase().padStart(8, '0');
+    }
+    const label = sim && sim.nsLabels ? sim.nsLabels[nsIdx] : null;
+    const cached = typeof _findSrcLump === 'function' ? _findSrcLump(nsIdx, label) : null;
+    if (cached && cached.token) return String(cached.token);
+    return sim && typeof sim.lumpTokenAtSlot === 'function'
+        ? sim.lumpTokenAtSlot(nsIdx)
+        : null;
+}
+window._canonicalEditorTokenForSlot = _canonicalEditorTokenForSlot;
+
+async function _openSimulatorInstructionSource(nsIdx, instrIdx) {
+    if (!sim || !Number.isInteger(nsIdx) || !Number.isInteger(instrIdx) ||
+            typeof _canonicalEditorTokenForSlot !== 'function') return false;
+    const token = _canonicalEditorTokenForSlot(nsIdx);
+    if (!token) return false;
+    if (typeof _traceOpenExecutedSource === 'function') {
+        return _traceOpenExecutedSource({ lumpToken: token, instrIdx: instrIdx });
+    }
+    if (typeof openLumpInEditor !== 'function') return false;
+    await openLumpInEditor(token);
+    if (typeof _jumpToDecompiledInstruction === 'function') {
+        _jumpToDecompiledInstruction(instrIdx);
+    }
+    return true;
+}
+window._openSimulatorInstructionSource = _openSimulatorInstructionSource;
+
 // Bank custody is intentionally not bridged through browser state or JSON.
 // The sanctum retains its private proof; browser callers hold only the CR0
 // BankVariable Golden Token and invoke the typed Bank methods directly.
@@ -681,14 +716,16 @@ function updateCRDetail() {
             const _clobberOriginIcon = (_clobberOriginInfos && !_clobberInfos)
                 ? `<span class="code-clobber-origin-icon" title="${_clobberOriginInfos.map(o => `CR${o.cr} alias set here \u2014 clobbered at word\u00A0${o.clobberAtWord}`).join('\n')}">&#x25CC;</span> `
                 : '';
+            const _openSource = `event.stopPropagation();_openSimulatorInstructionSource(${nsIdx},${w})`;
+            const _sourceTitle = 'Click to open this instruction in the Code editor';
             const decompTd = decomp
-                ? `<td class="code-decompiled ${isCompiler ? 'code-decompiled-compiler' : 'code-decompiled-user'}">${typeof _colorizeComment === 'function' ? _colorizeComment(decomp.desc) : (decomp.desc || '')}</td>`
+                ? `<td class="code-decompiled code-source-link ${isCompiler ? 'code-decompiled-compiler' : 'code-decompiled-user'}" onclick="${_openSource}" title="${_sourceTitle}">${typeof _colorizeComment === 'function' ? _colorizeComment(decomp.desc) : (decomp.desc || '')}</td>`
                 : '<td class="code-decompiled"></td>';
 
-            codeHtml += `<tr class="${rowClass}" style="cursor:pointer;" title="Double-click to set breakpoint" ondblclick="openBreakPopoverAt(${addr})">`;
-            codeHtml += `<td class="cr-idx">0x${addr.toString(16).toUpperCase().padStart(4,'0')}</td>`;
+            codeHtml += `<tr class="${rowClass}">`;
+            codeHtml += `<td class="cr-idx code-breakpoint-address" style="cursor:pointer;" title="Double-click to set breakpoint" ondblclick="event.stopPropagation();openBreakPopoverAt(${addr})">0x${addr.toString(16).toUpperCase().padStart(4,'0')}</td>`;
             codeHtml += `<td class="cr-gt">0x${word.toString(16).toUpperCase().padStart(8,'0')}</td>`;
-            codeHtml += `<td class="code-disasm">${_controlFlowButton}${bpDot}${_clobberIcon}${_clobberOriginIcon}${decoded}</td>`;
+            codeHtml += `<td class="code-disasm code-source-link" style="cursor:pointer;" onclick="${_openSource}" title="${_sourceTitle}">${_controlFlowButton}${bpDot}${_clobberIcon}${_clobberOriginIcon}${decoded}</td>`;
             if (_brArrows.hasBranches) codeHtml += `<td class="br-arrow-col">${_brArrows.html[w]}</td>`;
             codeHtml += decompTd;
             codeHtml += '</tr>';

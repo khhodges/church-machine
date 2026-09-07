@@ -70,7 +70,12 @@ def check_lump_canonical_integrity(lumps_dir, key8, lump_raw):
         return error
     matches = [x for x in records if isinstance(x, dict) and x.get("token") == key8]
     if len(matches) > 1:
-        return f"Integrity invariant violated: duplicate manifest token {key8}."
+        filenames = {
+            entry.get("filename") for entry in matches
+            if isinstance(entry.get("filename"), str)
+        }
+        if len(filenames) != 1:
+            return f"Integrity invariant violated: duplicate manifest token {key8}."
     if not matches:
         return None
     entry = matches[0]

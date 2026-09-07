@@ -1341,9 +1341,11 @@ function _traceRecordStep(result) {
         pc: result.pc,
         physicalPC: physicalPC,
         nsIdx: nsIdx,
-        lumpToken: nsIdx != null && typeof sim.lumpTokenAtSlot === 'function'
-            ? sim.lumpTokenAtSlot(nsIdx)
-            : null,
+        lumpToken: nsIdx != null && typeof _canonicalEditorTokenForSlot === 'function'
+            ? _canonicalEditorTokenForSlot(nsIdx)
+            : (nsIdx != null && typeof sim.lumpTokenAtSlot === 'function'
+                ? sim.lumpTokenAtSlot(nsIdx)
+                : null),
         instrIdx: owner && Number.isInteger(owner.offset) && owner.offset > 0
             ? owner.offset - 1
             : null,

@@ -16139,9 +16139,18 @@ def _resolve_lump_path(token8, lumps_dir=None):
             entry for entry in manifest
             if isinstance(entry, dict) and entry.get('token') == token8
         ]
-        if len(matches) != 1:
+        if not matches:
             return None
-        fn = matches[0].get('filename', '')
+        # History and current rows may intentionally retain the same immutable
+        # token.  That is unambiguous when every matching row names the same
+        # binary; reject only genuinely conflicting token→file mappings.
+        filenames = {
+            entry.get('filename', '') for entry in matches
+            if entry.get('filename', '')
+        }
+        if len(filenames) != 1:
+            return None
+        fn = next(iter(filenames))
         if fn:
             p = os.path.join(lumps_dir, fn)
             if os.path.isfile(p):
