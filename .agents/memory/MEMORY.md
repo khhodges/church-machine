@@ -148,3 +148,4 @@
 - [Static client cache busting](static-client-cache-busting.md) — bump pinned simulator script versions when client code changes or the preview may keep stale UI
 - [Pet-name rebuild independence](pet-name-rebuild-independence.md) — dependency-first LUMP rebuild order is temporary; Pet Names should allow consumers to rebind without recompiling last
 - [SelfTest dynamic allocation](selftest-dynamic-allocation.md) — SelfTest authority comes from one active manifest+NS binding; size, slot, sequence, and resident layout are never legacy constants
+- [C-List picker programmer authority](clist-picker-programmer-authority.md) — capability declarations may use live, committed, library-only, or not-yet-created pet names

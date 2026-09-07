@@ -16,12 +16,32 @@ function nextTurn() { return new Promise(resolve => setTimeout(resolve, 0)); }
 
 (async function () {
     const dom = new JSDOM(
-        '<!doctype html><html><body><textarea id="asmEditor">capabilities {\n}</textarea></body></html>',
+        '<!doctype html><html><body><textarea id="asmEditor">capabilities {\n    SELF E\n}</textarea></body></html>',
         { url: 'http://localhost/simulator/', runScripts: 'outside-only' }
     );
     const { window } = dom;
     window.AsmInstructionPicker = { hide: function () {} };
-    window.fetch = async function () {
+    window.sim = {
+        nsTable: [],
+        nsLabels: [],
+        parseNSWord1: function () { return { f: 0 }; }
+    };
+    window.sim.nsTable[22] = { word1_limit: 0 };
+    window.sim.nsLabels[22] = 'Dynamic.Pet';
+    window.fetch = async function (url) {
+        if (url === '/api/boot-image/ns-state') {
+            return {
+                ok: true,
+                json: async function () {
+                    return {
+                        abstractions: [
+                            { name: 'WukongCallHome', slot: 7 },
+                            { name: 'SavedName', slot: 21 }
+                        ]
+                    };
+                }
+            };
+        }
         return {
             ok: true,
             json: async function () {
@@ -30,6 +50,8 @@ function nextTurn() { return new Promise(resolve => setTimeout(resolve, 0)); }
                     { abstraction: 'Echo', token: 'new', ns_slot: 12, compiled_at: '2026-08-10T00:00:00Z', binary_valid: true },
                     { abstraction: 'Echo', token: 'broken', ns_slot: 12, compiled_at: '2026-08-20T00:00:00Z', binary_valid: false },
                     { abstraction: 'Nova', token: 'nova', ns_slot: 13, compiled_at: '2026-08-05T00:00:00Z', binary_valid: true },
+                    { abstraction: 'WukongCallHome', token: 'callhome', compiled_at: '2026-08-06T00:00:00Z', binary_valid: true },
+                    { abstraction: 'LibraryOnly', token: 'future', binary_valid: true },
                 ];
             },
         };
@@ -56,6 +78,22 @@ function nextTurn() { return new Promise(resolve => setTimeout(resolve, 0)); }
     check('CPV-4: an abstraction with one LUMP has no duplicate row',
         Array.from(popup.querySelectorAll('.clist-picker-row'))
             .filter(row => row.dataset.capName === 'Nova').length === 1);
+    const wukong = popup.querySelector('.clist-picker-row[data-cap-name="WukongCallHome"]');
+    check('CPV-5: Namespace slot is projected onto a manifest record without ns_slot',
+        !!wukong && wukong.textContent.includes('NS[7]'));
+    const dynamic = popup.querySelector('.clist-picker-row[data-cap-name="Dynamic.Pet"]');
+    check('CPV-6: live dynamic pet names are selectable',
+        !!dynamic && dynamic.textContent.includes('NS[22]'));
+    const libraryOnly = popup.querySelector('.clist-picker-row[data-cap-name="LibraryOnly"]');
+    check('CPV-7: unallocated library abstractions remain symbolically selectable',
+        !!libraryOnly && libraryOnly.textContent.includes('not allocated'));
+
+    popup.querySelector('[data-cap-name="__SYMBOLIC__"]').click();
+    const symbolicInput = popup.querySelector('.clist-symbolic-name-input');
+    symbolicInput.value = 'Future.Member';
+    popup.querySelector('[data-action="insert-symbolic-capability"]').click();
+    check('CPV-8: a not-yet-created abstraction can be declared by pet name',
+        window.document.getElementById('asmEditor').value.includes('Future.Member E'));
 
     console.log('\n' + passed + ' passed, ' + failed + ' failed');
     if (failed) process.exit(1);

@@ -184,6 +184,26 @@
                 return;
             }
 
+            var insertSymbolicBtn = e.target.closest('[data-action="insert-symbolic-capability"]');
+            if (insertSymbolicBtn) {
+                var _symbolicForm = popupEl && popupEl.querySelector('.clist-symbolic-form');
+                var _symbolicInput = _symbolicForm && _symbolicForm.querySelector('.clist-symbolic-name-input');
+                var _symbolicName = _symbolicInput ? _symbolicInput.value.trim() : '';
+                var _symbolicError = _symbolicForm && _symbolicForm.querySelector('.clist-symbolic-error');
+                if (!/^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)*$/.test(_symbolicName)) {
+                    if (_symbolicError) {
+                        _symbolicError.textContent = 'Use letters, numbers, underscores, and dot-separated pet-name parts.';
+                    }
+                    if (_symbolicInput) _symbolicInput.focus();
+                    return;
+                }
+                var _symbolicPerms = Array.from(
+                    _symbolicForm.querySelectorAll('.clist-perm-toggle--on')
+                ).map(function (b) { return b.dataset.perm; }).join('');
+                _insertCapability(_symbolicName, _symbolicPerms);
+                return;
+            }
+
             var resolveBtn = e.target.closest('[data-action="resolve-pending"]');
             if (resolveBtn) {
                 e.stopPropagation();
@@ -221,6 +241,7 @@
             var pickerRow = e.target.closest('.clist-picker-row[data-cap-name]');
             if (pickerRow) {
                 if (pickerRow.dataset.capName === '__NULL__') { showNullSlotForm(); return; }
+                if (pickerRow.dataset.capName === '__SYMBOLIC__') { showSymbolicCapabilityForm(); return; }
                 _insertCapability(
                     pickerRow.dataset.capName,
                     pickerRow.dataset.capRights || '',
@@ -1011,10 +1032,13 @@
         var version = lump.version || lump.version_str;
         var detail = label || (date ? new Date(date).toISOString().slice(0, 10) : 'undated');
         if (version) detail += ' · v' + String(version);
+        var slotDetail = lump.ns_slot !== null && lump.ns_slot !== undefined
+            ? 'NS[' + lump.ns_slot + ']'
+            : 'symbolic · not allocated';
         return '<div class="clist-picker-row" data-cap-name="' + name + '" data-cap-rights="E">' +
             '<span class="clist-picker-type clist-picker-type--inform">Inform</span>' +
             '<span class="clist-picker-name">' + name + '</span>' +
-            '<span class="clist-picker-hint">NS[' + lump.ns_slot + '] · E · ' + escHtml(detail) + '</span>' +
+            '<span class="clist-picker-hint">' + slotDetail + ' · E · ' + escHtml(detail) + '</span>' +
             '</div>';
     }
 
@@ -1031,6 +1055,11 @@
             '<span class="clist-picker-type clist-picker-type--null">Null</span>' +
             '<span class="clist-picker-name">NULL</span>' +
             '<span class="clist-picker-hint">named placeholder \u00b7 choose perms</span>' +
+            '</div>' +
+            '<div class="clist-picker-row clist-picker-row--symbolic" data-cap-name="__SYMBOLIC__">' +
+            '<span class="clist-picker-type clist-picker-type--inform">Pet name</span>' +
+            '<span class="clist-picker-name">Future abstraction\u2026</span>' +
+            '<span class="clist-picker-hint">declare now \u00b7 create or bind later</span>' +
             '</div>';
 
         // Section 1: System — built-in Inform GTs always present in the boot namespace
@@ -1043,31 +1072,85 @@
                 '</div>';
         });
 
-        // Section 2: Abstractions — Inform GTs from lump library (ns_slot != null)
+        // Section 2: Abstractions — merge programmer-controlled Namespace names
+        // with the LUMP library. Namespace state is authoritative for names and
+        // slots; a library-only name remains selectable as a symbolic reference.
         try {
+            var namespaceByName = {};
+            try {
+                var nsresp = await fetch('/api/boot-image/ns-state');
+                if (nsresp.ok) {
+                    var nsstate = await nsresp.json();
+                    var nsrows = Array.isArray(nsstate.abstractions) ? nsstate.abstractions : [];
+                    nsrows.forEach(function (row) {
+                        var nsName = row && (row.name || row.abstraction);
+                        if (nsName && row.slot !== null && row.slot !== undefined) {
+                            namespaceByName[String(nsName)] = {
+                                abstraction: String(nsName),
+                                ns_slot: Number(row.slot),
+                                compiled_at: row.compiled_at || 0,
+                                binary_valid: true,
+                                namespace_entry: true
+                            };
+                        }
+                    });
+                }
+            } catch (nsError) { /* use live/library names below */ }
+
+            // A running simulator can contain programmer-created dynamic pet names
+            // newer than the last committed snapshot. They override saved labels.
+            if (s && s.nsTable && s.nsLabels) {
+                for (var ni = 0; ni < s.nsTable.length; ni++) {
+                    if (!s.nsTable[ni] || !s.nsLabels[ni]) continue;
+                    namespaceByName[String(s.nsLabels[ni])] = {
+                        abstraction: String(s.nsLabels[ni]),
+                        ns_slot: ni,
+                        binary_valid: true,
+                        namespace_entry: true,
+                        live_namespace_entry: true
+                    };
+                }
+            }
+
             var lresp = await fetch('/api/lumps/list');
             if (lresp.ok) {
                 var lumps = await lresp.json();
-                var withSlots = Array.isArray(lumps) ? lumps.filter(function (l) {
-                    return l.ns_slot !== null && l.ns_slot !== undefined &&
-                           (l.abstraction || l.name);
+                var selectable = Array.isArray(lumps) ? lumps.filter(function (l) {
+                    return l.abstraction || l.name;
                 }) : [];
-                if (withSlots.length > 0) {
+                Object.keys(namespaceByName).forEach(function (nsName) {
+                    selectable.push(namespaceByName[nsName]);
+                });
+                if (selectable.length > 0) {
                     bodyRows += '<div class="clist-picker-section-header">Abstractions</div>';
                     var grouped = {};
-                    withSlots.forEach(function (l) {
+                    selectable.forEach(function (l) {
                         var key = String(l.abstraction || l.name);
+                        var authoritative = namespaceByName[key];
+                        if (authoritative) {
+                            l = Object.assign({}, l, {
+                                abstraction: authoritative.abstraction,
+                                ns_slot: authoritative.ns_slot
+                            });
+                        }
                         (grouped[key] || (grouped[key] = [])).push(l);
                     });
                     Object.keys(grouped).sort().forEach(function (key) {
                         var versions = grouped[key].slice().sort(function (a, b) {
+                            if (!!a.namespace_entry !== !!b.namespace_entry) {
+                                return a.namespace_entry ? -1 : 1;
+                            }
                             return _pickerLumpDate(b) - _pickerLumpDate(a);
                         });
                         var tested = versions.filter(_pickerLumpIsTested);
                         var latest = tested[0] || versions[0];
-                        var older = versions.filter(function (l) { return l !== latest; });
+                        var older = versions.filter(function (l) {
+                            return l !== latest && !l.namespace_entry;
+                        });
                         bodyRows += _pickerLumpRow(latest,
-                            _pickerLumpDate(latest) ? 'latest dated tested' : 'default');
+                            latest.live_namespace_entry ? 'live pet name' :
+                            latest.namespace_entry ? 'Namespace' :
+                            _pickerLumpDate(latest) ? 'latest dated tested' : 'library');
                         if (older.length) {
                             bodyRows += '<details class="clist-picker-earlier">' +
                                 '<summary>Earlier versions (' + older.length + ')</summary>' +
@@ -1160,6 +1243,41 @@
             // Enter in the name field activates Insert
             inp.addEventListener('keydown', function (e) {
                 if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); popup.querySelector('[data-action="insert-null-slot"]').click(); }
+            }, true);
+        }
+    }
+
+    function showSymbolicCapabilityForm() {
+        var popup = getOrCreatePopup();
+        focusedRow = -1;
+        var permsHtml = ['R', 'W', 'X', 'E'].map(function (p) {
+            return '<button class="clist-perm-toggle' + (p === 'E' ? ' clist-perm-toggle--on' : '') +
+                '" data-perm="' + p + '">' + p + '</button>';
+        }).join('');
+        popup.innerHTML =
+            '<div class="clist-viewer-header">' +
+            '<button class="clist-back-btn" data-action="show-picker">\u2190 Back</button>' +
+            '<span class="clist-viewer-title">Future Abstraction</span>' +
+            '</div>' +
+            '<div class="clist-null-form clist-symbolic-form">' +
+            '<div class="clist-null-form-label">Dynamic pet name</div>' +
+            '<input class="clist-pet-name-input clist-symbolic-name-input" type="text" ' +
+            'placeholder="Example or Family.Member" maxlength="96" />' +
+            '<div class="clist-null-form-label">Permissions</div>' +
+            '<div class="clist-perm-toggles">' + permsHtml + '</div>' +
+            '<button class="clist-null-insert-btn" data-action="insert-symbolic-capability">Declare capability</button>' +
+            '<div class="clist-viewer-hint clist-symbolic-error" role="status"></div>' +
+            '</div>';
+        positionPopup();
+        var inp = popup.querySelector('.clist-symbolic-name-input');
+        if (inp) {
+            inp.focus();
+            inp.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    popup.querySelector('[data-action="insert-symbolic-capability"]').click();
+                }
             }, true);
         }
     }
