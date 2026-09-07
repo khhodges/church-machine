@@ -334,13 +334,6 @@
     "filename": "ide.Mallory.1.0ca567b5.lump"
   },
   {
-    "token": "00000a00",
-    "abstraction": "CapabilityTest",
-    "filename": "CapabilityTest.1.2d9ec45d.lump",
-    "lump_version": 17,
-    "compiled_at": 1788647325.7849298
-  },
-  {
     "token": "85fcac64",
     "abstraction": "WukongCallHome",
     "filename": "WukongCallHome.1.d54e2115.lump",
@@ -362,5 +355,12 @@
     "lump_version": 79,
     "compiled_at": 1788790072.7247603,
     "variant_group": "selftest-history"
+  },
+  {
+    "token": "00000a00",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.1.2cdca9f6.lump",
+    "lump_version": 18,
+    "compiled_at": 1788793834.9001992
   }
 ]

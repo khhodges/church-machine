@@ -132,8 +132,8 @@
       "location": "0x000003C0",
       "type": "Inform",
       "token": "00000a00",
-      "filename": "CapabilityTest.1.2d9ec45d.lump",
-      "lump_version": 17,
+      "filename": "CapabilityTest.1.2cdca9f6.lump",
+      "lump_version": 18,
       "resident": true,
       "boot_resident": true,
       "f": 0,
@@ -141,7 +141,9 @@
       "limit": "0x001F9",
       "seq": 0,
       "seal": "0xDE937EEF",
-      "boot": true
+      "boot": true,
+      "issue_n": 1,
+      "load_policy": "Resident"
     },
     {
       "name": "Thread#2",
@@ -177,5 +179,5 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1788790073.2277975
+  "generated_at": 1788793834.9226885
 }

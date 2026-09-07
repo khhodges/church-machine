@@ -2416,27 +2416,28 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets) {
         const sTag = _crTag(crSrc, crPets);
         const verb = opcode === 16 ? 'read' : 'write';
         const pet = crPets && crPets[crSrc];
-        const rn = _regName(pet, imm);
-        const offStr = rn ? `.${rn}` : `[${imm}]`;
+        const effectiveImm = (imm & 0x4000) ? (imm & 0x3FFF) : imm;
+        const rn = _regName(pet, effectiveImm);
+        const offStr = rn ? `.${rn}` : `[${effectiveImm}]`;
         const drV = sim && sim.dr ? (sim.dr[crDst] >>> 0) : null;
         let valStr = '';
         if (drV !== null) {
             const nsCheckIdx = sim.cr && sim.cr[crSrc] ? sim.parseGT(sim.cr[crSrc].word0).index : -1;
             if (nsCheckIdx === 12) {
-                const ledNow = (opcode === 17 && sim.ledBits !== undefined && sim.ledMode === 'program') ? (sim.ledBits >> imm) & 1 : null;
+                const ledNow = (opcode === 17 && sim.ledBits !== undefined && sim.ledMode === 'program') ? (sim.ledBits >> effectiveImm) & 1 : null;
                 if (ledNow !== null) {
                     const willBe = drV & 1 ? 'ON' : 'OFF';
                     const was = ledNow ? 'ON' : 'OFF';
                     const transition = (ledNow & 1) === (drV & 1) ? `turns ${willBe}` : `${was} \u2192 ${willBe}`;
-                    valStr = ` (LED${imm}: ${transition})`;
+                    valStr = ` (LED${effectiveImm}: ${transition})`;
                 } else {
-                    valStr = ` (=${drV} \u2192 LED${imm} ${drV & 1 ? 'ON' : 'OFF'})`;
+                    valStr = ` (=${drV} \u2192 LED${effectiveImm} ${drV & 1 ? 'ON' : 'OFF'})`;
                 }
             } else if (nsCheckIdx === 11) {
-                const uartReg = imm === 0 ? 'TX' : imm === 1 ? 'STATUS' : 'RX';
+                const uartReg = effectiveImm === 0 ? 'TX' : effectiveImm === 1 ? 'STATUS' : 'RX';
                 valStr = ` (=${drV} → UART.${uartReg})`;
             } else if (nsCheckIdx === 14) {
-                const tReg = ['TICKS_LO','TICKS_HI','TOD_EPOCH','ALARM_CMP','ALARM_CTL'][imm] || 'reg';
+                const tReg = ['TICKS_LO','TICKS_HI','TOD_EPOCH','ALARM_CMP','ALARM_CTL'][effectiveImm] || 'reg';
                 valStr = ` (=${drV} → TIMER.${tReg})`;
             } else {
                 valStr = ` (=${_fmtVal(drV)})`;

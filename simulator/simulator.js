@@ -8475,10 +8475,28 @@ class ChurchSimulator {
                 return null;
             }
         }
-        this._writeRuntimeWord(loc + offset, value);
         if (dwHomeAddr >= 0) {
             this._writeRuntimeWord(dwHomeAddr, value);
         }
+
+        // Namespace-owned M-bit I/O word. Bits 0..15 map directly to
+        // CR0.M..CR15.M; this is an architectural device register, not RAM.
+        // mLoad above still enforces the programmer-selected GT's W permission
+        // and one-word bounds before this device side effect is applied.
+        if (absAddr === M_BIT_PORT) {
+            for (let crIdx = 0; crIdx < 16; crIdx++) {
+                this.cr[crIdx].m = (value >>> crIdx) & 1;
+            }
+            const desc = `DWRITE DR${drIdx} → M_BIT_DEV: M[15:0] ← 0x${(value & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`;
+            this.output += desc + '\n';
+            this.pc++;
+            this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
+            return { pc: this.pc - 1, instr: d, desc, pipeline: [
+                { stage: 'DWRITE', desc: 'Write M-bit mask for CR0.M through CR15.M', perm: 'W', status: 'pass' },
+            ]};
+        }
+
+        this._writeRuntimeWord(loc + offset, value);
 
         // Route device writes to simulated hardware peripherals
         const devNsIdx = check.index;
