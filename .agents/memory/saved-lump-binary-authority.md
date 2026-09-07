@@ -31,3 +31,14 @@ they were the current saved artifact.
 **How to apply:** History may preview exact archived bytes, but an editable
 open must select the newest approved non-archived server artifact for the same
 abstraction before fetching or decoding its content frame.
+
+A divergent browser draft must be offered, not automatically restored over a
+saved LUMP.
+
+**Why:** Draft age is not ordered against immutable artifact revisions. An old
+draft can mask newer saved source and make the compiled pane appear newer than
+the editable text.
+
+**How to apply:** Open with recovered server source by default. Show an
+“Unsaved draft available” choice with explicit Restore and Discard actions;
+only Restore may replace the editor buffer with draft text.

@@ -5688,24 +5688,43 @@ async function openLumpInEditor(token) {
         };
 
         if (_hasDraft) {
-            // Restore draft content into editor
-            _setSavedLumpEditorSource(_savedDraft);
-            asmEd.classList.add('cm-editor-draft');
-            // Show draft-restore banner above the editor
+            // The immutable saved LUMP is the default editor authority. A
+            // divergent browser draft may be older than that binary (for
+            // example, when a later revision was saved in another session),
+            // so never overwrite recovered source automatically.
+            _setSavedLumpEditorSource(_recoveredSource);
+            asmEd.classList.remove('cm-editor-draft');
+            // Offer the local draft without making it look like the latest
+            // persisted source.
             var _existingDraftBanner = document.getElementById('_lumpDraftBanner');
             if (_existingDraftBanner) _existingDraftBanner.remove();
             var _draftBanner = document.createElement('div');
             _draftBanner.id = '_lumpDraftBanner';
             _draftBanner.className = 'lump-draft-restore-banner';
             _draftBanner.innerHTML =
-                '<strong>Draft restored</strong>' +
-                '<span class="lump-draft-copy">Your previous edits are back in the editor, but are not saved to this LUMP yet. Use <b>Save Lump</b> to keep them, or </span>' +
+                '<strong>Unsaved draft available</strong>' +
+                '<span class="lump-draft-copy">The editor is showing the latest saved LUMP source. You can inspect your browser draft without losing it. </span>' +
+                '<button class="btn btn-sm lump-draft-restore-btn" id="_lumpDraftBannerRestore">Restore Draft</button>' +
                 '<button class="btn btn-sm lump-draft-discard-btn" id="_lumpDraftBannerDiscard">Discard Draft</button>';
             // Insert above the code-editor-wrap, not inside its flex row;
             // inserting into asmEd.parentNode can cover the recovered text.
             var _draftBannerParent = asmEd.parentNode && asmEd.parentNode.parentNode;
             if (_draftBannerParent) _draftBannerParent.insertBefore(_draftBanner, asmEd.parentNode);
             var _bannerDiscardBtn = _draftBanner.querySelector('#_lumpDraftBannerDiscard');
+            var _bannerRestoreBtn = _draftBanner.querySelector('#_lumpDraftBannerRestore');
+            if (_bannerRestoreBtn) {
+                _bannerRestoreBtn.addEventListener('click', function() {
+                    _setSavedLumpEditorSource(_savedDraft);
+                    asmEd.classList.add('cm-editor-draft');
+                    var _strong = _draftBanner.querySelector('strong');
+                    var _copy = _draftBanner.querySelector('.lump-draft-copy');
+                    if (_strong) _strong.textContent = 'Draft restored';
+                    if (_copy) _copy.innerHTML =
+                        'Your browser draft is now in the editor. Use <b>Save Lump</b> to persist it, or ';
+                    _bannerRestoreBtn.remove();
+                    if (typeof updateLineNumbers === 'function') updateLineNumbers();
+                });
+            }
             if (_bannerDiscardBtn) {
                 _bannerDiscardBtn.addEventListener('click', function() {
                     _draftLsDel(token);
