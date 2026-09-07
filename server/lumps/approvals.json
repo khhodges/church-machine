@@ -76,6 +76,18 @@
         "E"
       ],
       "capability_type": "inform"
+    },
+    "5e9e990a14d9c421ad10d902bade71afacd51ec46404b5a94c34902c18c2f65c": {
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "5e9e990a14d9c421ad10d902bade71afacd51ec46404b5a94c34902c18c2f65c",
+      "dot_name": "SelfTest",
+      "issue_n": 1,
+      "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25",
+      "filename": "SelfTest.1.e9f17d7c.lump"
     }
   }
 }

@@ -69,8 +69,8 @@
     {
       "name": "SelfTest",
       "slot": 6,
-      "token": "ee750c1b",
-      "filename": "SelfTest.79.eceee227.lump",
+      "token": "ecf1b358",
+      "filename": "SelfTest.1.e9f17d7c.lump",
       "location": "0x00000100",
       "type": "Inform",
       "f": 0,
@@ -78,8 +78,8 @@
       "limit": "0x01FFD",
       "seq": 0,
       "seal": "0xDE929EEF",
-      "lump_version": 79,
-      "issue_n": 79,
+      "lump_version": 78,
+      "issue_n": 1,
       "identity_hash": "10b043c80d91a8068e7756a7395ab96010a73825008feadf9c868a2ced70c78f",
       "binary_hash": "f0b34adb0d54b936778407efafeda8dcf535c351cb0098c38d6873fa2aacac18",
       "ns_slot_policy": "static",
@@ -177,5 +177,5 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1788783645.535528
+  "generated_at": 1788789523.0049856
 }
