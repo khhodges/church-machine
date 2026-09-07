@@ -7084,7 +7084,31 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
 
         const _BOOT_SLOT = sim._bootAbstrSlot;
         // _targetSlot: the NS slot the LUMP will occupy after loading.
-        const _targetSlot = (nsSlot !== null && nsSlot !== undefined) ? Number(nsSlot) : _BOOT_SLOT;
+        // Manifest records intentionally no longer own deployment slots.
+        // Resolve the immutable token through the live Namespace before using
+        // the canonical boot slot as a legacy fallback.
+        let _targetSlot = (nsSlot !== null && nsSlot !== undefined) ? Number(nsSlot) : null;
+        if (!Number.isInteger(_targetSlot) && typeof sim.lumpTokenAtSlot === 'function') {
+            const wantedToken = String(token).replace(/^0x/i, '').toLowerCase();
+            for (let slot = 2; slot < sim.nsCount; slot++) {
+                const slotToken = sim.lumpTokenAtSlot(slot);
+                if (slotToken &&
+                        String(slotToken).replace(/^0x/i, '').toLowerCase() === wantedToken) {
+                    _targetSlot = slot;
+                    break;
+                }
+            }
+        }
+        if (!Number.isInteger(_targetSlot) && sim.nsLabels && name) {
+            for (const [slotText, label] of Object.entries(sim.nsLabels)) {
+                const slot = Number(slotText);
+                if (slot >= 2 && String(label || '').toLowerCase() === String(name).toLowerCase()) {
+                    _targetSlot = slot;
+                    break;
+                }
+            }
+        }
+        if (!Number.isInteger(_targetSlot)) _targetSlot = _BOOT_SLOT;
         const _savedSimBootEntry = sim.bootEntrySlot;
         // bootEntrySlot is a let-declared cross-file global in app-memory.js.
         // let vars are NOT on window, so we reference it by name directly.

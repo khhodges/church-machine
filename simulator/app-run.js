@@ -2618,6 +2618,23 @@ function runSim() {
         }
         // Persist the fault log so it survives a page reload.
         _saveFaultLog();
+        // The synchronous fault listener normally opens the report immediately.
+        // If its first render was missed or raced this navigation, never leave a
+        // terminal simulator fault looking like a frozen run.
+        if (sim.faultLog.length > 0 &&
+                !document.getElementById('faultModalOverlay') &&
+                typeof showFaultModal === 'function') {
+            const terminalFault = sim.faultLog[sim.faultLog.length - 1];
+            _lastFault = terminalFault;
+            setTimeout(() => {
+                if (!document.getElementById('faultModalOverlay')) {
+                    try { showFaultModal(terminalFault); }
+                    catch (error) {
+                        console.error('[finishRun] fault modal fallback failed:', error);
+                    }
+                }
+            }, 0);
+        }
     }
 
     // Kick off the first batch

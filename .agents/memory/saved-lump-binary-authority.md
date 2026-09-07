@@ -54,3 +54,15 @@ embedded source appear lost when it is still present in the binary.
 run the normal saved-LUMP editor-open path before attempting source navigation.
 Also compare filenames/hashes, not only stable tokens, across development and
 production: the same protected token can bind different deployed revisions.
+
+Saved-LUMP simulator deployment must resolve its target slot from live Namespace
+state when the caller does not provide one; never default immediately to the
+canonical boot abstraction slot.
+
+**Why:** Manifest records intentionally do not own deployment slots. Falling
+back to the boot slot can overwrite SelfTest and leave CR6 bound to SelfTest's
+C-List while a different saved abstraction executes.
+
+**How to apply:** Match the immutable token against live Namespace bindings
+first, then use the abstraction label as a secondary lookup. Use the canonical
+boot slot only for genuinely unbound legacy artifacts.
