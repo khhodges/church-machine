@@ -132,8 +132,8 @@
       "location": "0x000003C0",
       "type": "Inform",
       "token": "00000a00",
-      "filename": "CapabilityTest.1.36b34aa3.lump",
-      "lump_version": 20,
+      "filename": "CapabilityTest.1.e4591c14.lump",
+      "lump_version": 21,
       "resident": true,
       "boot_resident": true,
       "f": 0,
@@ -179,5 +179,5 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1788813263.0586872
+  "generated_at": 1788815363.5165777
 }
