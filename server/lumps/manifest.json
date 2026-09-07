@@ -362,5 +362,12 @@
     "filename": "CapabilityTest.1.e4591c14.lump",
     "lump_version": 21,
     "compiled_at": 1788815363.1958604
+  },
+  {
+    "token": "d2572a73",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.1.8ab7765f.lump",
+    "lump_version": 80,
+    "compiled_at": 1788822614.159658
   }
 ]
