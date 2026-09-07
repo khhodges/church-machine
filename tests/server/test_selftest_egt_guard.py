@@ -29,6 +29,9 @@ def repository(tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, "_LUMPS_DIR", str(tmp_path))
     monkeypatch.setattr(app_module, "NS_STATE_PATH", str(state))
     monkeypatch.setattr(app_module, "BOOT_IMAGE_PATH", str(tmp_path / "absent.bin"))
+    monkeypatch.setattr(
+        app_module, "_read_saved_boot_config",
+        lambda: ({"bootEntrySlot": 12}, None))
     return tmp_path, state
 
 
@@ -42,12 +45,14 @@ def _words(slot=12, seq=7, cc=2, continuation=None):
     return words
 
 
-def _metadata(slot=12, token="abcdef01"):
+def _metadata(slot=12, token="abcdef01", next_slot=None):
+    if next_slot is None:
+        next_slot = slot
     return {
         "token": token, "abstraction": "SelfTest", "ns_slot": slot,
         "capabilities": [
             {"name": "SelfTest", "rights": ["E"], "nsIndex": slot},
-            {"name": "Next.GT", "rights": ["E"], "nsIndex": slot},
+            {"name": "Next.GT", "rights": ["E"], "nsIndex": next_slot},
         ],
     }
 
@@ -105,8 +110,46 @@ def test_next_continuation_must_match_selected_live_descriptor(repository):
     assert not list(repository[0].glob("*.lump"))
 
 
-def test_save_migrates_the_single_selftest_state_row_without_duplicates(repository):
+def test_next_continuation_follows_lightningbolt_not_selftest(
+        repository, monkeypatch):
+    root, state_path = repository
+    state = json.loads(state_path.read_text())
+    state["abstractions"].append({
+        "name": "CapabilityTest", "slot": 10, "seq": 0,
+        "resident": True, "load_policy": "Resident",
+    })
+    state_path.write_text(json.dumps(state))
+    monkeypatch.setattr(
+        app_module, "_read_saved_boot_config",
+        lambda: ({"bootEntrySlot": 10}, None))
+    starter_egt = app_module._boot_image_gen.create_gt(
+        0, 10, {"E": 1}, 1)
+    with app_module.app.test_client() as client:
+        response = client.post("/api/lumps/save-plan", json={
+            "binary": _words(continuation=starter_egt),
+            "metadata": _metadata(next_slot=10),
+        })
+    assert response.status_code == 201, response.get_data(as_text=True)
+
+    self_egt = app_module._boot_image_gen.create_gt(7, 12, {"E": 1}, 1)
+    with app_module.app.test_client() as client:
+        response = client.post("/api/lumps/save-plan", json={
+            "binary": _words(continuation=self_egt),
+            "metadata": _metadata(next_slot=12),
+        })
+    assert response.status_code == 422
+    body = response.get_json()
+    assert body["clist_row"] == 1
+    assert body["expected_egt"] == starter_egt
+    assert body["ns_slot"] == 10
+
+
+def test_save_migrates_the_single_selftest_state_row_without_duplicates(
+        repository, monkeypatch):
     _root, state_path = repository
+    monkeypatch.setattr(
+        app_module, "_read_saved_boot_config",
+        lambda: ({"bootEntrySlot": 14}, None))
     with app_module.app.test_client() as client:
         response = client.post("/api/lumps/save", json=_approved_payload(
             client, _words(slot=14, seq=7), _metadata(slot=14, token="abcdef02")))

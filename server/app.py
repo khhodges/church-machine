@@ -7873,6 +7873,7 @@ def save_lump():
         # previously unused slot starts at sequence zero and is materialized by
         # the commit below; client metadata.namespace_sequence is never trusted.
         _selftest_sequence = 0
+        _state_rows = []
         if os.path.isfile(NS_STATE_PATH):
             try:
                 with open(NS_STATE_PATH, encoding="utf-8") as _state_file:
@@ -7913,10 +7914,58 @@ def save_lump():
                 }), 422
         _selftest_egt = _boot_image_gen.create_gt(
             _selftest_sequence, ns_slot, {"E": 1}, 1)
-        _next_egt = _selftest_egt
-        for _row, _expected, _label in (
-                (0, _selftest_egt, "self E-GT"),
-                (1, _next_egt, "Next continuation E-GT")):
+        _saved_boot_cfg, _saved_boot_error = _read_saved_boot_config()
+        if _saved_boot_error:
+            return jsonify({
+                "error": (
+                    "SelfTest Next continuation E-GT guard could not read the "
+                    f"LightningBolt selection: {_saved_boot_error}"),
+                "selftest_egt_mismatch": True,
+            }), 422
+        _starter_slot = _saved_boot_cfg.get(
+            "bootEntrySlot", DEFAULT_BOOT_CONFIG["bootEntrySlot"])
+        if (isinstance(_starter_slot, bool)
+                or not isinstance(_starter_slot, int)
+                or not 0 <= _starter_slot < MAX_NS_ENTRIES):
+            return jsonify({
+                "error": (
+                    "SelfTest Next continuation E-GT guard: saved "
+                    f"bootEntrySlot is invalid: {_starter_slot!r}."),
+                "selftest_egt_mismatch": True,
+            }), 422
+        if _starter_slot == ns_slot:
+            _starter_sequence = _selftest_sequence
+        else:
+            _starter_row = next(
+                (row for row in _state_rows
+                 if isinstance(row, dict) and row.get("slot") == _starter_slot),
+                None)
+            if _starter_row is None:
+                return jsonify({
+                    "error": (
+                        "SelfTest Next continuation E-GT guard: "
+                        f"LightningBolt NS[{_starter_slot}] has no authoritative "
+                        "Namespace entry."),
+                    "selftest_egt_mismatch": True,
+                }), 422
+            _starter_sequence = _starter_row.get("seq", 0)
+            if (isinstance(_starter_sequence, bool)
+                    or not isinstance(_starter_sequence, int)
+                    or not 0 <= _starter_sequence <= 0x1FF):
+                return jsonify({
+                    "error": (
+                        "SelfTest Next continuation E-GT guard: "
+                        f"LightningBolt NS[{_starter_slot}] has invalid live "
+                        f"sequence {_starter_sequence!r}."),
+                    "selftest_egt_mismatch": True,
+                }), 422
+        _next_egt = _boot_image_gen.create_gt(
+            _starter_sequence, _starter_slot, {"E": 1}, 1)
+        for _row, _expected, _label, _expected_slot, _expected_sequence in (
+                (0, _selftest_egt, "self E-GT",
+                 ns_slot, _selftest_sequence),
+                (1, _next_egt, "Next continuation E-GT",
+                 _starter_slot, _starter_sequence)):
             _word_index = _clist_row0_idx + _row
             _actual = _sl_words[_word_index] & 0xFFFFFFFF
             if _actual != _expected:
@@ -7924,15 +7973,15 @@ def save_lump():
                     "error": (
                         f"SelfTest {_label} guard: c-list[{_row}] at "
                         f"word[{_word_index}] must be 0x{_expected:08X} for "
-                        f"NS[{ns_slot}] sequence {_selftest_sequence}; got "
+                        f"NS[{_expected_slot}] sequence {_expected_sequence}; got "
                         f"0x{_actual:08X}."),
                     "selftest_egt_mismatch": True,
                     "expected_egt": _expected,
                     "actual_word": _actual,
                     "word_index": _word_index,
                     "clist_row": _row,
-                    "ns_slot": ns_slot,
-                    "sequence": _selftest_sequence,
+                    "ns_slot": _expected_slot,
+                    "sequence": _expected_sequence,
                 }), 422
     if _portable_binding is not None:
         try:
