@@ -14688,7 +14688,7 @@ async function confirmSaveToNamespace() {
     }
 
     // Resolve and validate the target before either durable or browser state is
-    // changed. Slot 10 is a protected resident identity, not a generic overwrite.
+    // changed. Only Boot.NS (0) and Boot.Thread (1) are protected.
     const _svClistWords = (_svBinary && _caps.length > 0)
         ? _svBinary.slice(_svBinary.length - _caps.length)
         : [];

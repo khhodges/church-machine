@@ -221,3 +221,44 @@ def test_bad_binary_is_rejected_before_any_artifact_write(isolated_lumps):
         })
     assert response.status_code == 400
     assert not list(isolated_lumps.glob("*.lump"))
+
+
+@pytest.mark.parametrize("slot", [0, 1])
+def test_only_bootstrap_namespace_slots_are_protected(isolated_lumps, slot):
+    with app_module.app.test_client() as client:
+        response = client.post("/api/lumps/save-plan", json={
+            "binary": _words(marker=60 + slot),
+            "metadata": {
+                "token": f"aa00{slot:04x}",
+                "abstraction": "LumpSaveTest",
+                "content_type": "code",
+                "language": "assembly",
+                "ns_slot": slot,
+                "capabilities": [],
+                "methods": [],
+                "grants": ["E"],
+            },
+        })
+    assert response.status_code == 403
+    assert response.get_json()["protected_namespace_slot"] is True
+    assert not list(isolated_lumps.glob("*.lump"))
+
+
+@pytest.mark.parametrize("slot", [2, 6, 7, 10, 31])
+def test_every_non_bootstrap_slot_accepts_programmer_selected_identity(
+        isolated_lumps, slot):
+    with app_module.app.test_client() as client:
+        response = client.post("/api/lumps/save-plan", json={
+            "binary": _words(marker=70 + slot),
+            "metadata": {
+                "token": f"aa00{slot:04x}",
+                "abstraction": "LumpSaveTest",
+                "content_type": "code",
+                "language": "assembly",
+                "ns_slot": slot,
+                "capabilities": [],
+                "methods": [],
+                "grants": ["E"],
+            },
+        })
+    assert response.status_code == 201, response.get_data(as_text=True)

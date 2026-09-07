@@ -33,23 +33,6 @@ _sse_clients_lock = threading.Lock()
 _lumps_manifest_lock = threading.RLock()
 _lump_history_lock_state = threading.local()
 
-# Canonical identities whose replacement must commit binary, approval, manifest,
-# Namespace binding, and boot image as one protected-resident transaction.
-_PROTECTED_RESIDENT_REPLACEMENT_POLICIES = {
-    "SelfTest": {
-        "slot": 6, "gt_type": "inform", "grants": ["E"],
-        "token": "00000600", "sequence": "retained",
-    },
-    "WukongCallHome": {
-        "slot": 7, "gt_type": "inform", "grants": ["E"],
-        "token": "00000700", "sequence": "retained",
-    },
-    "CapabilityTest": {
-        "slot": 10, "gt_type": "inform", "grants": ["E"],
-        "token": "00000a00", "sequence": "retained",
-    },
-}
-
 # Test hook — set to a callable to be invoked inside save_lump() after all
 # per-token file writes (Phase 5/6) complete but BEFORE the manifest lock is
 # acquired (Phase 7).  This lets tests synchronise threads so both have
@@ -7630,6 +7613,19 @@ def save_lump():
     _issue_number = int(metadata.get("issue_number", 1) or 1)
 
     import re as _re
+    if ns_slot is not None:
+        try:
+            ns_slot = int(ns_slot)
+        except (TypeError, ValueError):
+            return jsonify({"error": "Namespace slot must be an integer"}), 400
+        if ns_slot in (0, 1):
+            return jsonify({
+                "error": (
+                    f"Namespace slot {ns_slot} is protected. Only Boot.NS "
+                    "(slot 0) and Boot.Thread (slot 1) cannot be replaced."
+                ),
+                "protected_namespace_slot": True,
+            }), 403
     if token_hint:
         token8 = str(token_hint).lower().zfill(8)[:8]
     elif ns_slot is not None:
@@ -8187,24 +8183,6 @@ def save_lump():
         }), 422
     # ── End pre-flight ────────────────────────────────────────────────────────
 
-    # Every protected boot-resident artifact follows the same replacement
-    # transaction contract. Architecture-specific binary validation remains
-    # above (notably SelfTest's fixed layout and E-GT checks).
-    _protected_policy = None
-    for _policy_name, _candidate_policy in (
-            _PROTECTED_RESIDENT_REPLACEMENT_POLICIES.items()):
-        _candidate_slot = _candidate_policy["slot"]
-        if (
-            abs_name == _policy_name
-            or ns_slot == _candidate_slot
-            or (isinstance(ns_slot, str)
-                and ns_slot.strip() == str(_candidate_slot))
-            or token8 == _candidate_policy["token"]
-        ):
-            _protected_policy = dict(_candidate_policy, name=_policy_name)
-            break
-    _is_protected_resident_save = _protected_policy is not None
-
     # Acquire before reading Namespace, manifest, and boot-image state: those
     # reads are transaction-wide preflight and must describe one revision.
     lumps_dir = LUMPS_DIR
@@ -8216,93 +8194,6 @@ def save_lump():
     def _release_lump_save_transaction(response):
         _save_transaction_guard.__exit__(None, None, None)
         return response
-
-    _protected_current_entry = None
-    if _is_protected_resident_save:
-        try:
-            _protected_manifest = _read_manifest_safe(
-                os.path.join(LUMPS_DIR, "manifest.json"))
-        except Exception as _protected_manifest_error:
-            return jsonify({
-                "error": (
-                    f"{_protected_policy['name']} replacement rejected: "
-                    f"manifest is unavailable: {_protected_manifest_error}"
-                ),
-                "protected_slot_validation_failed": True,
-            }), 422
-        _protected_current_entry = next(
-            (entry for entry in _protected_manifest
-             if entry.get("token") == _protected_policy["token"]),
-            None,
-        )
-
-    if _is_protected_resident_save:
-        _protected_name = _protected_policy["name"]
-        _protected_slot = _protected_policy["slot"]
-        _protected_token = _protected_policy["token"]
-
-        def _protected_reject(detail):
-            return jsonify({
-                "error": f"{_protected_name} replacement rejected: {detail}",
-                "protected_slot_validation_failed": True,
-            }), 422
-
-        if abs_name != _protected_name:
-            return _protected_reject(
-                f"canonical name must be {_protected_name}.")
-        if ns_slot != _protected_slot:
-            return _protected_reject(
-                f"the exact target must be Namespace slot {_protected_slot}.")
-        if (str(metadata.get("capability_type", "")).lower()
-                != _protected_policy["gt_type"]):
-            return _protected_reject("Golden Token type must be Inform.")
-        if metadata.get("grants") != _protected_policy["grants"]:
-            return _protected_reject("permission must be Church E-only.")
-        if metadata.get("replacement") is not True:
-            return _protected_reject(
-                f"slot {_protected_slot} only permits an explicit replacement.")
-        if token8 != _protected_token:
-            return _protected_reject(
-                f"canonical token {_protected_token} must be retained.")
-        try:
-            with open(NS_STATE_PATH, encoding="utf-8") as _protected_state_file:
-                _protected_state = json.load(_protected_state_file)
-            _protected_rows = [
-                row for row in _protected_state.get("abstractions", [])
-                if isinstance(row, dict)
-                and row.get("slot") == _protected_slot
-            ]
-        except Exception as _protected_state_error:
-            return _protected_reject(
-                "committed Namespace state is unavailable: "
-                f"{_protected_state_error}")
-        if (len(_protected_rows) != 1
-                or _protected_rows[0].get("name") != _protected_name):
-            return _protected_reject(
-                f"slot {_protected_slot} is not the retained "
-                f"{_protected_name} identity.")
-        _protected_row = _protected_rows[0]
-        if (str(_protected_row.get("type", "")).lower()
-                != _protected_policy["gt_type"]):
-            return _protected_reject("the retained slot is not Inform.")
-        _protected_seq = _protected_row.get("seq")
-        if (not isinstance(_protected_seq, int)
-                or isinstance(metadata.get("namespace_sequence"), bool)
-                or metadata.get("namespace_sequence") != _protected_seq):
-            return _protected_reject(
-                f"retained sequence must be {_protected_seq}; got "
-                f"{metadata.get('namespace_sequence')!r}.")
-        _protected_eligible = (
-            isinstance(_protected_current_entry, dict)
-            and _protected_current_entry.get("abstraction") == _protected_name
-        )
-        if not _protected_eligible:
-            return _protected_reject(
-                f"the canonical slot-{_protected_slot} artifact is not "
-                "eligible for resident replacement.")
-        if not os.path.isfile(BOOT_IMAGE_PATH):
-            return _protected_reject(
-                "the committed boot image is unavailable; replacement cannot be atomic.")
 
     import re as _re_arch
     import shutil as _shutil
@@ -8518,10 +8409,8 @@ def save_lump():
         _arch_ver is not None
         and _exist_filename == f"{safe_name}_v{_arch_ver}.lump"
     )
-    # Protected residents additionally span Namespace state and the generated boot
-    # image. Snapshot the complete flat repository revision so any later bind
-    # or image-generation failure can restore every artifact (including archive
-    # names and compatibility aliases) rather than leaving a partial commit.
+    # Snapshot the complete flat repository revision so any later bind failure
+    # can restore every artifact, including archive names and compatibility aliases.
     _protected_snapshot = {}
     _protected_lock_existed = False
     if True:
@@ -8650,10 +8539,6 @@ def save_lump():
     try:
         _bound_saved_lump = _bind_saved_lump_to_ns_state(
             abs_name, ns_slot, token8, lump_filename, _issue_n_save)
-        if _is_protected_resident_save and not _bound_saved_lump:
-            raise ValueError(
-                f"the retained slot-{_protected_policy['slot']} Namespace row "
-                "was not found")
     except Exception as _ns_bind_exc:
         _rollback_protected_save()
         return jsonify({"error": (

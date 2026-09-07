@@ -40,7 +40,7 @@ const sim = {
 const result = collect(
     sim,
     [
-        { ns_slot: 6, abstraction: 'SelfTest' },       // protected factory slot
+        { ns_slot: 6, abstraction: 'SelfTest' },
         { ns_slot: 13, abstraction: 'Catalog Release' },
         { ns_slot: 14, abstraction: 'Catalog Loses' }, // live entry wins
         { ns_slot: '16', abstraction: 'String Slot' },
@@ -49,7 +49,7 @@ const result = collect(
     {
         15: 'Persisted Release',
         14: 'Persisted Loses',
-        6: 'Protected SelfTest',
+        6: 'SelfTest',
     }
 );
 
@@ -57,7 +57,7 @@ check('shows Boot.NS in the picker data',
     result.some(entry => entry.slot === 0 && entry.label === 'Boot.NS' && entry.disabled));
 check('shows Boot.Thread in the picker data',
     result.some(entry => entry.slot === 1 && entry.label === 'Boot.Thread' && entry.disabled));
-check('leaves slot 2 enabled',
+check('leaves slot 6 enabled',
     result.some(entry => entry.slot === 6 && !entry.disabled));
 check('leaves non-bootstrap slots enabled in the picker',
     result.some(entry => entry.slot === 10 && !entry.disabled));
