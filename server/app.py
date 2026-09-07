@@ -7023,7 +7023,8 @@ def _write_ns_state(entries):
             raise
 
 
-def _bind_saved_lump_to_ns_state(abstraction, ns_slot, token, filename, issue_n):
+def _bind_saved_lump_to_ns_state(
+        abstraction, ns_slot, token, filename, issue_n, lump_version):
     """Refresh the artifact binding for an already-committed Namespace slot."""
     if not isinstance(ns_slot, int) or not os.path.isfile(NS_STATE_PATH):
         return False
@@ -7043,6 +7044,7 @@ def _bind_saved_lump_to_ns_state(abstraction, ns_slot, token, filename, issue_n)
         entry["token"] = token
         entry["filename"] = filename
         entry["issue_n"] = issue_n
+        entry["lump_version"] = lump_version
         entry["resident"] = True
         updated = True
         break
@@ -8538,7 +8540,8 @@ def save_lump():
     # generator cannot rediscover an older build by filename ordering.
     try:
         _bound_saved_lump = _bind_saved_lump_to_ns_state(
-            abs_name, ns_slot, token8, lump_filename, _issue_n_save)
+            abs_name, ns_slot, token8, lump_filename, _issue_n_save,
+            next_lump_version)
     except Exception as _ns_bind_exc:
         _rollback_protected_save()
         return jsonify({"error": (

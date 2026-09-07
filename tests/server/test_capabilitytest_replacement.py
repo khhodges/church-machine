@@ -98,6 +98,7 @@ def test_replacement_updates_binary_approval_namespace_and_boot(repository):
     digest = hashlib.sha256(saved).hexdigest()
     assert json.loads((root / "approvals.json").read_text())["approvals"][digest]["binary_hash"] == digest
     assert json.loads(state_path.read_text())["abstractions"][0]["filename"] == result["lump"]
+    assert json.loads(state_path.read_text())["abstractions"][0]["lump_version"] == result["lump_version"]
     assert boot.read_bytes() == b"new boot"
     assert not list(root.glob("*.json")) or all(
         p.name in {"manifest.json", "approvals.json", "ns-state.json"}

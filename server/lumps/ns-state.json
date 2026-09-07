@@ -82,16 +82,17 @@
       "slot": 7,
       "location": "0x00000300",
       "type": "Inform",
-      "token": "46738c7a",
-      "filename": "WukongCallHome.1.2fa83c3d.lump",
-      "lump_version": 7,
+      "token": "85fcac64",
+      "filename": "WukongCallHome.1.d54e2115.lump",
+      "lump_version": 8,
       "resident": true,
       "boot_resident": true,
       "f": 0,
       "g": 0,
       "limit": "0x0003F",
       "seq": 0,
-      "seal": "0xDEABDEEF"
+      "seal": "0xDEABDEEF",
+      "issue_n": 1
     },
     {
       "name": "Tunnel",
@@ -166,6 +167,5 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1788652042.6925082,
-  "committed_raw_fingerprint": "0fd57d1638c3eec866a9e1d7ef92766fc5f449ddbaa96402c61c7da26e436b64"
+  "generated_at": 1788783645.535528
 }

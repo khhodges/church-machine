@@ -329,5 +329,12 @@
     "filename": "CapabilityTest.1.2d9ec45d.lump",
     "lump_version": 17,
     "compiled_at": 1788647325.7849298
+  },
+  {
+    "token": "85fcac64",
+    "abstraction": "WukongCallHome",
+    "filename": "WukongCallHome.1.d54e2115.lump",
+    "lump_version": 8,
+    "compiled_at": 1788783644.1418462
   }
 ]
