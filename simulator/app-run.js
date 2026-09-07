@@ -3018,6 +3018,7 @@ function fpgaReadBRAM() {
 let _lastFault = null;
 let _faultModalEditLineNum   = null;   // source line for the faulting instruction
 let _faultModalNsIdxForLump  = null;   // NS slot fallback when no line num
+let _faultModalInstrIdx      = null;   // instruction index within the faulting LUMP
 let _lastRetryLump = null;
 
 function faultAlertOn() {
@@ -3539,6 +3540,10 @@ function showFaultModal(f) {
     // Expose to faultModalInvestigate() which runs after the modal is dismissed.
     _faultModalEditLineNum  = _editLineNum;
     _faultModalNsIdxForLump = nsIdxForViewLump;
+    _faultModalInstrIdx = (locationNs && Number.isInteger(locationNs.offset) &&
+            locationNs.offset >= 1)
+        ? locationNs.offset - 1
+        : null;
 
     // ── Find the faulting trace entry (used by scope section below) ───────────
     const _faultTraceEntry = (f.instrHistory || []).find(h => h.step === f.faultStep)
@@ -3938,10 +3943,39 @@ function faultModalToggleTrace(btn) {
     if (isOpen) section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function faultModalOpenEditor(lineNum) {
+async function _faultModalOpenExecutedSource(lineNum) {
+    const nsIdx = _faultModalNsIdxForLump;
+    const instrIdx = _faultModalInstrIdx;
     faultModalDismiss();
+    if (nsIdx != null && typeof sim !== 'undefined' && sim &&
+            typeof sim.lumpTokenAtSlot === 'function' &&
+            typeof openLumpInEditor === 'function') {
+        const token = sim.lumpTokenAtSlot(nsIdx);
+        if (token) {
+            await openLumpInEditor(token);
+            let targetLine = lineNum;
+            if (!targetLine && Number.isInteger(instrIdx) &&
+                    typeof ChurchAssembler === 'function') {
+                const editor = document.getElementById('asmEditor');
+                if (editor) {
+                    const sourceMapAssembler = new ChurchAssembler();
+                    sourceMapAssembler.assemble(editor.value);
+                    const lineNums = sourceMapAssembler.getLastLineNums
+                        ? sourceMapAssembler.getLastLineNums()
+                        : [];
+                    targetLine = lineNums[instrIdx] || null;
+                }
+            }
+            if (targetLine) _jumpToAsmLine(targetLine);
+            return;
+        }
+    }
     switchView('editor');
     if (lineNum) _jumpToAsmLine(lineNum);
+}
+
+function faultModalOpenEditor(lineNum) {
+    void _faultModalOpenExecutedSource(lineNum);
 }
 
 function faultModalOpenBinaryLump(nsIdx) {
@@ -3966,8 +4000,7 @@ function faultModalOpenBinaryLump(nsIdx) {
 }
 
 function faultModalEditCode(crIdx) {
-    faultModalDismiss();
-    switchView('editor');
+    void _faultModalOpenExecutedSource(_faultModalEditLineNum);
 }
 
 function faultModalReboot() {

@@ -42,3 +42,15 @@ the editable text.
 **How to apply:** Open with recovered server source by default. Show an
 “Unsaved draft available” choice with explicit Restore and Discard actions;
 only Restore may replace the editor buffer with draft text.
+
+Fault-dialog editing must reopen the immutable LUMP identified by the captured
+CR14 Namespace slot, rather than merely switching to the editor view.
+
+**Why:** The editor buffer may belong to another program even though the fault
+modal can correctly identify the executing LUMP. A view switch then makes
+embedded source appear lost when it is still present in the binary.
+
+**How to apply:** Resolve the fault-time slot to its current server token and
+run the normal saved-LUMP editor-open path before attempting source navigation.
+Also compare filenames/hashes, not only stable tokens, across development and
+production: the same protected token can bind different deployed revisions.

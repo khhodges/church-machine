@@ -1888,12 +1888,26 @@ class ChurchAssembler {
                         if (_immStr.startsWith('0x') || _immStr.startsWith('0X')) _immVal = parseInt(_immStr, 16);
                         else if (_immStr.startsWith('0b') || _immStr.startsWith('0B')) _immVal = parseInt(_immStr.substring(2), 2);
                         else _immVal = parseInt(_immStr, 10);
+                        if (!Number.isInteger(_immVal) || _immVal < -0x2000 || _immVal > 0x3FFF) {
+                            this.errors.push({
+                                line: lineNum,
+                                ...this._tokenCols(this._currentLineText, _p2),
+                                message: `IADD: immediate ${_p2} is out of range (-8192..16383); build larger values with shifts or register arithmetic`
+                            });
+                        }
                         imm = 0x4000 | ((isNaN(_immVal) ? 0 : _immVal) & 0x3FFF);
                     } else {
                         crSrc = this._parseDR(parts[2], lineNum);
                         const p3 = (parts[3] || '').replace(/,/g, '').trim();
                         if (p3.startsWith('#')) {
                             const immVal = this._parseImm(p3, lineNum);
+                            if (!Number.isInteger(immVal) || immVal < -0x2000 || immVal > 0x3FFF) {
+                                this.errors.push({
+                                    line: lineNum,
+                                    ...this._tokenCols(this._currentLineText, p3),
+                                    message: `IADD: immediate ${p3} is out of range (-8192..16383); build larger values with shifts or register arithmetic`
+                                });
+                            }
                             imm = 0x4000 | (immVal & 0x3FFF);
                         } else {
                             imm = this._parseDR(parts[3], lineNum);
@@ -1919,12 +1933,26 @@ class ChurchAssembler {
                         if (_immStr.startsWith('0x') || _immStr.startsWith('0X')) _immVal = parseInt(_immStr, 16);
                         else if (_immStr.startsWith('0b') || _immStr.startsWith('0B')) _immVal = parseInt(_immStr.substring(2), 2);
                         else _immVal = parseInt(_immStr, 10);
+                        if (!Number.isInteger(_immVal) || _immVal < -0x2000 || _immVal > 0x3FFF) {
+                            this.errors.push({
+                                line: lineNum,
+                                ...this._tokenCols(this._currentLineText, _p2),
+                                message: `ISUB: immediate ${_p2} is out of range (-8192..16383); build larger values with shifts or register arithmetic`
+                            });
+                        }
                         imm = 0x4000 | ((isNaN(_immVal) ? 0 : _immVal) & 0x3FFF);
                     } else {
                         crSrc = this._parseDR(parts[2], lineNum);
                         const p3 = (parts[3] || '').replace(/,/g, '').trim();
                         if (p3.startsWith('#')) {
                             const immVal = this._parseImm(p3, lineNum);
+                            if (!Number.isInteger(immVal) || immVal < -0x2000 || immVal > 0x3FFF) {
+                                this.errors.push({
+                                    line: lineNum,
+                                    ...this._tokenCols(this._currentLineText, p3),
+                                    message: `ISUB: immediate ${p3} is out of range (-8192..16383); build larger values with shifts or register arithmetic`
+                                });
+                            }
                             imm = 0x4000 | (immVal & 0x3FFF);
                         } else {
                             imm = this._parseDR(parts[3], lineNum);
