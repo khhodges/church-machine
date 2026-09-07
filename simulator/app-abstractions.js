@@ -840,13 +840,30 @@ async function renderLumps() {
             }
         }
 
+        // A persisted browser selection may point at an archived legacy binary
+        // that shares the same abstraction name as the current approved LUMP.
+        // Archived revisions remain available from the History tab, but must
+        // not silently become the primary editor target after reload.
+        if (!_pendingTokenResolved && window.LumpRegistry) {
+            const _currentToken = window.LumpRegistry.getCurrent();
+            const _currentRow = lumps.find(l => l.token === _currentToken);
+            if (_currentRow && _currentRow.archived === true) {
+                const _primary = _latestPrimaryLump(lumps, _currentRow.abstraction);
+                if (_primary) window.LumpRegistry.setCurrent(_primary.token);
+            }
+        }
+
         const _selTok = window.LumpRegistry ? window.LumpRegistry.getCurrent() : null;
 
         let html = '';
         if (!lumps || lumps.length === 0) {
             html = '<div class="lumps-placeholder">No lumps saved yet. Use Build LUMP in the editor to compile and save an abstraction.</div>';
         } else {
-            const _sortedLumps = _lumpsSorted(lumps);
+            // Archived binaries belong in each LUMP's History tab. Showing them
+            // as indistinguishable top-level cards caused legacy source-less
+            // revisions to be opened instead of the current documented binary.
+            const _primaryLumps = lumps.filter(l => l.archived !== true);
+            const _sortedLumps = _lumpsSorted(_primaryLumps.length ? _primaryLumps : lumps);
             html += `<select id="lumpPickerSelect" class="lump-picker-select" onchange="lumpPickerChanged(this.value)">`;
             html += `<option value="">— pick a lump —</option>`;
             for (const lump of _sortedLumps) {
@@ -1137,6 +1154,20 @@ function _lumpsSorted(lumps) {
             (a.abstraction || a.token || '').localeCompare(b.abstraction || b.token || ''));
     }
     return arr;
+}
+
+function _latestPrimaryLump(lumps, abstraction) {
+    const matches = (lumps || []).filter(l =>
+        l && l.abstraction === abstraction && l.archived !== true);
+    matches.sort((a, b) => {
+        const approved = Number(Boolean(b.approved)) - Number(Boolean(a.approved));
+        if (approved) return approved;
+        const version = (parseInt(b.lump_version) || 0) -
+            (parseInt(a.lump_version) || 0);
+        if (version) return version;
+        return String(b.compiled_at || '').localeCompare(String(a.compiled_at || ''));
+    });
+    return matches[0] || null;
 }
 
 // Called by the sort <select> when the user changes sort order.
