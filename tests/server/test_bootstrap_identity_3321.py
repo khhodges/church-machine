@@ -71,23 +71,11 @@ def test_every_frozen_resident_manifest_approval_row0_and_boot_w3_share_t():
 
 def test_programmer_can_plan_slot7_replacement_with_content_token_hint():
     """A content token must not turn a programmer-owned slot into a protected slot."""
-    root = Path(__file__).resolve().parents[2]
-    lumps = root / "server" / "lumps"
-    state = json.loads((lumps / "ns-state.json").read_text())
-    binding = next(row for row in state["abstractions"]
-                   if row.get("name") == "WukongCallHome")
-    raw = (lumps / binding["filename"]).read_bytes()
-    words = list(__import__("struct").unpack(f">{len(raw) // 4}I", raw))
-    capabilities = [
-        {"name": "__SELF__", "rights": ["E"], "compiler_owned_self": True},
-        {"name": "Salvation", "rights": ["E"], "nsIndex": 4},
-        {"name": "Navana", "rights": ["E"], "nsIndex": 5},
-        {"name": "Mint", "rights": ["E"], "nsIndex": 6},
-        {"name": "Memory", "rights": ["E"], "nsIndex": 7},
-        {"name": "LED0", "rights": ["R", "W"], "nsIndex": 3},
-        {"name": "UART_TX", "rights": ["R", "W"], "nsIndex": 2},
-        {"name": "WukongCallHome.hw", "rights": ["E"], "nsIndex": 7},
-    ]
+    words = [(0x1F << 27) | (1 << 10) | 1, 0] + [0] * 62
+    words[-1] = 0x4A000007
+    capabilities = [{
+        "name": "__SELF__", "rights": ["E"], "compiler_owned_self": True,
+    }]
 
     with app_module.app.test_client() as client:
         response = client.post("/api/lumps/save-plan", json={
@@ -106,6 +94,37 @@ def test_programmer_can_plan_slot7_replacement_with_content_token_hint():
 
     assert response.status_code == 201, response.get_data(as_text=True)
     assert response.get_json()["consequence"] == "replace"
+
+
+def test_programmer_can_replace_frozen_slot10_with_compiler_owned_lump():
+    """The selected slot binds SELF; the old resident name does not own it."""
+    words = [(0x1F << 27) | (1 << 10) | 1, 0] + [0] * 62
+    words[-1] = 0xFEED5E1F
+    with app_module.app.test_client() as client:
+        response = client.post("/api/lumps/save-plan", json={
+            "binary": words,
+            "metadata": {
+                "abstraction": "ProgrammerChoice",
+                "ns_slot": 10,
+                "token": "deadbeef",
+                "content_type": "code",
+                "capabilities": [{
+                    "name": "__SELF__",
+                    "rights": ["E"],
+                    "compiler_owned_self": True,
+                }],
+                "grants": ["E"],
+            },
+        })
+
+    assert response.status_code == 201, response.get_data(as_text=True)
+    result = response.get_json()
+    assert result["consequence"] == "replace"
+    canonical_words = list(words)
+    canonical_words[-1] = 0x4A00000A
+    canonical_bytes = __import__("struct").pack(">64I", *canonical_words)
+    assert result["digest"] == __import__("hashlib").sha256(
+        canonical_bytes).hexdigest()
 
 
 @pytest.mark.parametrize("mutation", ["slot", "seq", "token"])

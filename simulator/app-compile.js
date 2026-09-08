@@ -1557,7 +1557,10 @@ async function compileAndBuild() {
         lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache))
             ? _lumpsCache
             : [],
-        bootstrapResidentSlot: _bootstrapResidentCompileSlot(absName, result.portableMode),
+        // Compilation is independent of whichever resident currently occupies
+        // the eventual destination. The save/install transaction binds __SELF__
+        // after the programmer chooses a Namespace slot.
+        bootstrapResidentSlot: null,
     };
     // Portable artifacts intentionally keep destination-local GTs unresolved.
     // Legacy builds, however, are validated and saved against the active
@@ -1581,20 +1584,6 @@ async function compileAndBuild() {
         }
         showNextSteps('error');
         return;
-    }
-    if (_capContext.bootstrapResidentSlot !== null) {
-        const _bootstrapCheck = sim._validateBootstrapResidentSelf(
-            lumpWords, _capContext.bootstrapResidentSlot, { identityContract: 'bootstrap-resident' });
-        if (!_bootstrapCheck.ok) {
-            if (con) con.textContent =
-                `Bootstrap identity validation failed (${_bootstrapCheck.code}): ${_bootstrapCheck.message}`;
-            if (typeof _showAsmErrors === 'function') {
-                _showAsmErrors([{ line: null, message: _bootstrapCheck.message }],
-                    'Bootstrap identity validation failed — code not saved');
-            }
-            showNextSteps('error');
-            return;
-        }
     }
     const resolvedCaps = _capMaterialized.resolvedCaps;
     window._lastCLOOMCLump = {

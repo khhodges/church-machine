@@ -14987,7 +14987,6 @@ async function confirmSaveToNamespace() {
         }
     }
 
-    const _protectedCapabilityTest = idx === 10 || label === 'CapabilityTest';
     const _existingTarget = sim.readNSEntry(idx);
     const _targetSequence = _existingTarget
         ? sim.parseNSWord1(_existingTarget.word1_limit).gtSeq : 0;
@@ -14996,28 +14995,11 @@ async function confirmSaveToNamespace() {
         alert(`Save blocked: Namespace slot ${idx} is not backed by enough writable LUMP storage.`);
         return;
     }
-    if (_protectedCapabilityTest) {
-        const _onlyE = perms.E === 1 &&
-            ['R', 'W', 'X', 'L', 'S'].every(function(p) { return perms[p] === 0; });
-        const _protectedError =
-            (label !== 'CapabilityTest' && 'canonical name must be CapabilityTest') ||
-            (idx !== 10 && 'CapabilityTest must replace Namespace slot 10') ||
-            (gtType !== 1 && 'CapabilityTest must remain an Inform entry') ||
-            (!_onlyE && 'CapabilityTest requires Church E-only permission') ||
-            (!_existingTarget && 'CapabilityTest slot 10 is not an eligible replacement') ||
-            (_existingTarget && _existingTarget.gtType !== 1 &&
-                'CapabilityTest slot 10 is not an Inform entry');
-        if (_protectedError) {
-            alert('Save blocked: ' + _protectedError + '.');
-            return;
-        }
-    }
-
     // Compute the token without registering browser memory. Protected slot 10
-    // retains its canonical token and generation across replacement.
+    // is not special: the programmer chooses what replaces every slot except
+    // Boot.NS and Boot.Thread. The server binds any destination-local SELF row.
     let _svTok = null;
-    if (_protectedCapabilityTest) _svTok = '00000a00';
-    else if (typeof window._computeLumpToken === 'function')
+    if (typeof window._computeLumpToken === 'function')
         _svTok = window._computeLumpToken(_svWords, _caps);
 
     // ── Persist to the server LUMP repository so the LUMP browser reflects the

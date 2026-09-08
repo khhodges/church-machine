@@ -73,6 +73,9 @@ check('live namespace label takes precedence over saved metadata',
     result.some(entry => entry.slot === 14 && entry.label === 'Live Wins'));
 check('shows the other catalogued slots enabled',
     result.some(entry => entry.slot === 6 && !entry.disabled));
+check('does not impose CapabilityTest ownership on slot 10',
+    !source.includes('const _protectedCapabilityTest =') &&
+    !source.includes("if (_protectedCapabilityTest) _svTok = '00000a00'"));
 check('sorts slots numerically',
     result.map(entry => entry.slot).join(',') === '0,1,6,10,12,13,14,15,16');
 

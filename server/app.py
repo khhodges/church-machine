@@ -7295,11 +7295,8 @@ def _bind_saved_lump_to_ns_state(
         # zero is the initial live sequence for a newly allocated descriptor.
         entry = {"name": abstraction, "slot": ns_slot, "seq": 0}
         entries.append(entry)
-    elif entry.get("name") != abstraction:
-        raise ValueError(
-            f"NS[{ns_slot}] belongs to {entry.get('name')!r}, not {abstraction!r}"
-        )
     entry.update({
+        "name": abstraction,
         "slot": ns_slot,
         "token": token,
         "filename": filename,
@@ -7988,22 +7985,34 @@ def save_lump():
                 _bootstrap_rows_all = json.load(_bootstrap_state_file).get("abstractions", [])
         else:
             _bootstrap_rows_all = []
-        _owned_frozen_rows = [
+        _frozen_rows = [
             row for row in _bootstrap_rows_all if isinstance(row, dict)
-            and row.get("name") == str(abs_name).strip()
             and row.get("resident") is True and row.get("boot_resident") is True
             and row.get("ns_slot_policy") == "static"
             and row.get("load_policy") == "Resident"
             and row.get("type") in ("Inform", "Resident")
         ]
-        if len(_owned_frozen_rows) > 1:
-            raise ValueError("multiple authoritative frozen resident bindings")
-        if _owned_frozen_rows:
-            if _owned_frozen_rows[0].get("slot") != ns_slot:
-                raise ValueError(
-                    f"frozen resident {abs_name} is owned by NS slot "
-                    f"{_owned_frozen_rows[0].get('slot')}, not {ns_slot}")
-            _bootstrap_binding = _owned_frozen_rows[0]
+        _target_frozen_rows = [
+            row for row in _frozen_rows if row.get("slot") == ns_slot
+        ]
+        if len(_target_frozen_rows) > 1:
+            raise ValueError(
+                f"multiple authoritative frozen resident bindings occupy NS[{ns_slot}]")
+        if _target_frozen_rows:
+            # The programmer chooses the destination. The current descriptor at
+            # that destination supplies only the local slot/sequence needed to
+            # mint SELF; its previous abstraction name does not own the slot.
+            _bootstrap_binding = _target_frozen_rows[0]
+        elif _is_selftest_canonical:
+            _selftest_frozen_rows = [
+                row for row in _frozen_rows if row.get("name") == "SelfTest"
+            ]
+            if len(_selftest_frozen_rows) > 1:
+                raise ValueError("multiple authoritative frozen SelfTest bindings")
+            if _selftest_frozen_rows:
+                # SelfTest may be migrated to another programmer-selected slot.
+                # Its target slot/sequence are filled after target validation.
+                _bootstrap_binding = dict(_selftest_frozen_rows[0])
     except (OSError, ValueError, TypeError, json.JSONDecodeError) as _bootstrap_state_error:
         return jsonify({
             "error": f"Bootstrap inventory validation failed: {_bootstrap_state_error}",
@@ -8117,6 +8126,11 @@ def save_lump():
         try:
             _live_bootstrap_gt = _resident_inform_egt(_bootstrap_binding)
             _actual_bootstrap_gt = _sl_words[_clist_row0_idx] & 0xFFFFFFFF
+            if _compiler_self_row and _actual_bootstrap_gt == _SELF_CAPABILITY_PLACEHOLDER:
+                # Source compilation leaves SELF unresolved. Bind it from the
+                # programmer-selected destination, never from the prior name.
+                _actual_bootstrap_gt = _live_bootstrap_gt
+                _sl_words[_clist_row0_idx] = _actual_bootstrap_gt
             _runtime_t = _verify_bootstrap_self_gt(
                 _bootstrap_binding, _actual_bootstrap_gt,
                 f"{_live_bootstrap_gt:08x}")
@@ -8183,6 +8197,16 @@ def save_lump():
                 }), 422
         _selftest_egt = _boot_image_gen.create_gt(
             _selftest_sequence, ns_slot, {"E": 1}, 1)
+        _bootstrap_binding = dict(
+            _bootstrap_binding,
+            name="SelfTest",
+            slot=ns_slot,
+            seq=_selftest_sequence,
+            token=f"{_selftest_egt:08x}",
+        )
+        _actual_selftest_gt = _sl_words[_clist_row0_idx] & 0xFFFFFFFF
+        if _compiler_self_row and _actual_selftest_gt == _SELF_CAPABILITY_PLACEHOLDER:
+            _sl_words[_clist_row0_idx] = _selftest_egt
         try:
             _bootstrap_identity = _bootstrap_identity_record(
                 _bootstrap_binding, _selftest_egt)
