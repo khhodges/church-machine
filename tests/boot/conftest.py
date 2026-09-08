@@ -127,10 +127,17 @@ def isolated_boot_lumps(tmp_path_factory):
         and not row.get("archived")
         and row.get("filename")
     ]
+    active_capabilitytest = [
+        row["filename"] for row in manifest
+        if row.get("abstraction") == "CapabilityTest"
+        and row.get("token") == "00000a00"
+        and row.get("filename")
+    ]
     for filename in (
             *active_selftest,
+            *active_capabilitytest,
             "WukongCallHome.1.d54e2115.lump",
-            "CapabilityTest.1.2d9ec45d.lump"):
+    ):
         path = os.path.join(isolated_dir, filename)
         if not os.path.isfile(path):
             continue

@@ -21,10 +21,29 @@ assert.strictEqual(result.status, 0, result.stderr);
 const manifest = JSON.parse(fs.readFileSync(path.join(tmp, 'manifest.json'), 'utf8'));
 const entry = manifest.find(e => e.token === '00000a00');
 assert(entry, 'build must preserve the protected CapabilityTest identity token');
-assert.strictEqual(entry.ns_slot, 10);
+assert.strictEqual(entry.abstraction, 'CapabilityTest');
 
 const binary = path.join(tmp, entry.filename);
 const bytes = fs.readFileSync(binary);
+const words = [];
+for (let i = 0; i < bytes.length; i += 4) words.push(bytes.readUInt32BE(i));
+const header = words[0] >>> 0;
+const cw = (header >>> 10) & 0x1FFF;
+const frameStart = 1 + cw;
+const frameHeader = words[frameStart] >>> 0;
+assert.strictEqual(frameHeader >>> 24, 0xAB);
+const apiBytes = frameHeader & 0xFFFF;
+const sourceLengthWord = frameStart + 1 + Math.ceil(apiBytes / 4);
+const sourceLength = words[sourceLengthWord] >>> 0;
+const sourceBytes = Buffer.alloc(sourceLength);
+for (let i = 0; i < sourceLength; i++) {
+    const word = words[sourceLengthWord + 1 + (i >> 2)] >>> 0;
+    sourceBytes[i] = (word >>> (24 - (i & 3) * 8)) & 0xFF;
+}
+assert.strictEqual(
+    sourceBytes.toString('utf8'),
+    fs.readFileSync(path.join(root, 'simulator', 'examples', 'capability_test.cloomc'), 'utf8'),
+    'active CapabilityTest binary must embed the canonical source exactly');
 bytes[8] ^= 1;
 fs.writeFileSync(binary, bytes);
 result = spawnSync(process.execPath, [check, '--out-dir', tmp], { encoding: 'utf8' });

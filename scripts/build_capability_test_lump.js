@@ -8,13 +8,14 @@
 // CapabilityTest's protected slot lookup token remains 00000a00. Content is
 // named by sha256(dot_name_utf8 + lump_bytes)[:8], per lump_integrity.py.
 //
-// C-List (cc=6) — tail of the lump, 6 slots:
+// C-List (cc=7) — tail of the lump, 7 slots:
 //   Slot 0  SelfTest   (NS slot 6, E)    — E-perm callable abstraction
 //   Slot 1  LED_DEV    (NS slot 3, RW)   — hardware LED register file
 //   Slot 2  UART_DEV   (NS slot 2, RW)   — hardware UART TX/STATUS/RX
 //   Slot 3  BTN_DEV    (NS slot 4, R)    — hardware button state
 //   Slot 4  TIMER_DEV  (NS slot 5, RW)   — hardware timer registers
-//   Slot 5  WukongCallHome (NS slot 7, E) — post-validation continuation
+//   Slot 5  M_BIT_DEV (NS slot 13, RW) — isolated-register M-bit control
+//   Slot 6  WukongCallHome.hw (NS slot 7, E) — hardware continuation
 //
 // GT encoding (v2.0):
 //   b_flag[31] | perm[30:28] | dom[27] | gt_type[26:25] | gt_seq[24:16] | slot[15:0]
@@ -121,7 +122,7 @@ const FRAME = contentFrame(DOT_NAME, source);
 
 // ── C-List definition ─────────────────────────────────────────────────────────
 //
-// cc = 6  (one GT per declared capability).
+// cc = 7  (one GT per declared capability).
 //
 // GT layout (v2.0):
 //   [31]    b_flag  = 0
@@ -142,8 +143,10 @@ const CLIST = [
       note: 'BTN_DEV     Turing R-only Inform GT (NS slot 4, MMIO 0x40000028)' },
     { gt: 0x32000005, name: 'TIMER_DEV',  ns_slot: 5, rights: ['R', 'W'],
       note: 'TIMER_DEV   Turing RW     Inform GT (NS slot 5, MMIO 0x4000002C)' },
-    { gt: 0x4A000007, name: 'WukongCallHome', ns_slot: 7, rights: ['E'],
-      note: 'WukongCallHome Church E-perm Inform GT (NS slot 7)' },
+    { gt: 0x3200000D, name: 'M_BIT_DEV', ns_slot: 13, rights: ['R', 'W'],
+      note: 'M_BIT_DEV    Turing RW     Inform GT (NS slot 13, MMIO 0xFFFFFF1C)' },
+    { gt: 0x4A000007, name: 'WukongCallHome.hw', ns_slot: 7, rights: ['E'],
+      note: 'WukongCallHome.hw Church E-perm Inform GT (NS slot 7)' },
 ];
 
 // ── Pack LUMP binary ─────────────────────────────────────────────────────────
@@ -238,12 +241,24 @@ if (CHECK_ONLY) {
         const bindings = checkedManifest.filter(e => e.token === IDENTITY_TOKEN);
         if (bindings.length !== 1 ||
             bindings[0].abstraction !== 'CapabilityTest' ||
-            bindings[0].ns_slot !== 10 ||
-            bindings[0].filename !== filename ||
-            bindings[0].issue_n !== ISSUE_N ||
-            bindings[0].identity_hash !== IDENTITY_HASH ||
-            bindings[0].binary_hash !== binaryHash) {
-            failures.push('manifest canonical slot-10 binding is stale');
+            bindings[0].filename !== filename) {
+            failures.push('manifest CapabilityTest locator is stale');
+        }
+    }
+    if (fs.existsSync(NS_STATE)) {
+        try {
+            const state = JSON.parse(fs.readFileSync(NS_STATE, 'utf8'));
+            const bindings = (state.abstractions || []).filter(
+                e => e.name === DOT_NAME && e.slot === 10 && e.token === IDENTITY_TOKEN);
+            if (bindings.length !== 1 ||
+                bindings[0].filename !== filename ||
+                bindings[0].issue_n !== ISSUE_N ||
+                bindings[0].identity_hash !== IDENTITY_HASH ||
+                bindings[0].binary_hash !== binaryHash) {
+                failures.push('Namespace canonical slot-10 binding is stale');
+            }
+        } catch (_) {
+            failures.push('Namespace state is invalid');
         }
     }
     let approvals = null;
@@ -293,23 +308,13 @@ for (let i = 0; i < CLIST.length; i++) {
 
 // ── Update manifest.json ──────────────────────────────────────────────────────
 const manifestEntry = {
-    ...(existingIdx !== -1 ? manifest[existingIdx] : {}),
     token,
     abstraction:     'CapabilityTest',
     filename,
-    ns_slot:         10,
-    ns_slot_policy:  'static',
-    boot_resident:   true,
     variant_group:   'capabilitytest-history',
-    lump_size:       lumpSize,
-    cw,
-    cc,
-    grants:          ['E'],
     lump_version:    2,
-    dot_name:        DOT_NAME,
-    issue_n:         ISSUE_N,
-    identity_hash:   IDENTITY_HASH,
-    binary_hash:     binaryHash,
+    ...((existingIdx !== -1 && manifest[existingIdx].compiled_at !== undefined)
+        ? { compiled_at: manifest[existingIdx].compiled_at } : {}),
 };
 
 if (existingIdx !== -1) {
@@ -340,6 +345,7 @@ const approvalWriter = [
     'import json, sys',
     'from server.lump_approvals import read_approvals, write_approvals',
     'records = read_approvals(sys.argv[1])',
+    'records = {k: v for k, v in records.items() if not (v.get("dot_name") == "CapabilityTest" and v.get("issue_n") == 2)}',
     'records[sys.argv[2]] = json.loads(sys.argv[3])',
     'write_approvals(sys.argv[1], records)',
 ].join('; ');

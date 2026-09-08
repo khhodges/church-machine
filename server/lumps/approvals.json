@@ -194,24 +194,9 @@
       ],
       "capability_type": "inform"
     },
-    "cd308536417b2ab027992d7b210a775c115ca80d21f4f4e17eedf9e1116dbf20": {
-      "binary_hash": "cd308536417b2ab027992d7b210a775c115ca80d21f4f4e17eedf9e1116dbf20",
-      "filename": "CapabilityTest.2.3aa73c77.lump",
-      "dot_name": "CapabilityTest",
-      "issue_n": 2,
-      "identity_string": "CapabilityTest#2",
-      "identity_hash": "c4acababbd32765ff6257164a137c459d42d7eb284e850aa105e280d89d43017",
-      "identity_seal_location": "approval",
-      "token": "00000a00",
-      "abstraction": "CapabilityTest",
-      "grants": [
-        "E"
-      ],
-      "capability_type": "inform"
-    },
-    "01b4e3697409bd5d3f8e09f80e6760405a45595fd71c8d6814f9410bb68ec9c4": {
-      "binary_hash": "01b4e3697409bd5d3f8e09f80e6760405a45595fd71c8d6814f9410bb68ec9c4",
-      "filename": "CapabilityTest.2.9fa6b133.lump",
+    "67bf7f2c450557a25c4723660d5ce69fa6d2a29ea4d95cf7d8ee1bca70c960e5": {
+      "binary_hash": "67bf7f2c450557a25c4723660d5ce69fa6d2a29ea4d95cf7d8ee1bca70c960e5",
+      "filename": "CapabilityTest.2.59e2b5ca.lump",
       "dot_name": "CapabilityTest",
       "issue_n": 2,
       "identity_string": "CapabilityTest#2",

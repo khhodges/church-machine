@@ -23,17 +23,23 @@ for (const source of [canonical, appRun]) {
         'CapabilityTest must not recursively call the startup SelfTest');
     assert.match(
         source,
-        /ELOADCALL\s+CR0,\s*WukongCallHome,\s*0/,
-        'CapabilityTest must continue to WukongCallHome');
+        /ELOADCALL\s+CR0,\s*WukongCallHome\.hw,\s*0/,
+        'CapabilityTest must continue to WukongCallHome.hw');
     assert.doesNotMatch(
         source,
-        /SWITCH\s+CR13\b/,
-        'continuing CapabilityTest must not execute the terminal M-absent fault case');
+        /BRANCH\s+Start\b/,
+        'continuing CapabilityTest must not restore the recovered infinite loop');
 }
 
 assert.match(
     builder,
-    /gt:\s*0x4A000007,\s*name:\s*'WukongCallHome'/,
-    'CapabilityTest binary must carry the WukongCallHome E-GT');
+    /gt:\s*0x4A000007,\s*name:\s*'WukongCallHome\.hw'/,
+    'CapabilityTest binary must carry the WukongCallHome.hw E-GT');
+assert.match(canonical, /LOAD\s+CR0,\s*M_BIT_DEV/);
+assert.match(canonical, /IADD\s+DR1,\s*#0b0001000000000000/);
+assert.match(canonical, /IADD\s+DR1,\s*#1[\s\S]*SHL\s+DR1,\s*DR1,\s*15/);
+assert.strictEqual((canonical.match(/DWRITE\s+DR1,\s*CR0,\s*#0/g) || []).length, 2);
+assert.match(canonical, /SWITCH\s+CR12,\s*CR6,\s*#0/);
+assert.match(canonical, /SWITCH\s+CR15,\s*CR15/);
 
 console.log('CapabilityTest recursion guard passed');

@@ -389,7 +389,7 @@ def test_capabilitytest_regeneration_preserves_nonzero_generation(tmp_path):
     import shutil
 
     isolated_lumps = tmp_path / "lumps"
-    shutil.copytree(LUMPS_DIR, isolated_lumps)
+    shutil.copytree(LUMPS_DIR, isolated_lumps, symlinks=True)
     state_path = isolated_lumps / "ns-state.json"
     state = json.loads(state_path.read_text())
     cap_entry = next(

@@ -15,10 +15,10 @@ const DeviceAbstractions = require('../../simulator/device_abstractions.js');
 
 const memoryUiSource = fs.readFileSync(
     path.resolve(__dirname, '../../simulator/app-memory.js'), 'utf8');
+const architectureSlotsHelper = memoryUiSource.match(
+    /function _architectureBootSlots\(\) \{[\s\S]*?\n\}/);
 const residentHelper = memoryUiSource.match(
-    /function _isResidentIORegister\(slot\) \{[\s\S]*?\n\}/);
-const policyHelper = memoryUiSource.match(
-    /function _nsPrefetchRow\(slot, manifest\) \{[\s\S]*?\n    \}/);
+    /function _isResidentIORegister\(slot, label\) \{[\s\S]*?\n\}/);
 
 let failures = 0;
 function check(condition, message) {
@@ -42,21 +42,18 @@ function state(sim) {
 }
 
 // Slot 13 is a fixed resident MMIO register, not a source-backed LUMP.
-check(!!residentHelper && !!policyHelper, 'Namespace resident-I/O helpers are present');
-if (residentHelper && policyHelper) {
+check(!!architectureSlotsHelper && !!residentHelper, 'Namespace resident-I/O helpers are present');
+if (architectureSlotsHelper && residentHelper) {
     const uiContext = vm.createContext({
         globalThis: {
             ChurchArchitectureContracts: { boot: { minimalSlots: { M_BIT_DEV: 13 } } },
         },
     });
-    vm.runInContext(`${residentHelper[0]}\n${policyHelper[0]}`, uiContext);
-    check(vm.runInContext('_isResidentIORegister(13)', uiContext),
+    vm.runInContext(`${architectureSlotsHelper[0]}\n${residentHelper[0]}`, uiContext);
+    check(vm.runInContext("_isResidentIORegister(13, 'M_BIT_DEV')", uiContext),
         'M_BIT_DEV is classified as a resident I/O register');
-    check(!vm.runInContext('_isResidentIORegister(14)', uiContext),
+    check(!vm.runInContext("_isResidentIORegister(14, 'ordinary')", uiContext),
         'ordinary post-catalog slots remain source-backed');
-    check(vm.runInContext('_nsPrefetchRow(13, null)', uiContext)
-        .includes('Resident I/O register'),
-        'M_BIT_DEV Source cell identifies a resident I/O register');
 }
 
 // Full four-bit destination encoding must survive a disassembly round trip.
@@ -169,9 +166,7 @@ for (const [candidate, value, owner] of [
     check(deviceSim.cr.map(cr => cr.m).join(',') === before, 'invalid M device access does not mutate M');
 }
 
-// Real boot reaches the existing Navana.Init dispatch in _bootStep. Init uses
-// its private device capabilities to arm CapabilityTest's first isolated load
-// only: CR12 is set while CR13–CR15 are explicitly cleared.
+// Real boot reaches the existing Navana.Init dispatch in _bootStep.
 const bootRegistry = new AbstractionRegistry();
 const bootSystem = new SystemAbstractions(bootRegistry);
 const bootDevices = new DeviceAbstractions(bootRegistry);
@@ -181,28 +176,37 @@ for (let guard = 0; guard < 32 && !bootSim.bootComplete && !bootSim.halted; guar
     bootSim._bootStep();
 }
 check(bootSim.bootComplete && !bootSim.halted, 'normal boot completes through real Navana.Init');
-check(bootSim.cr.slice(12, 16).map(cr => cr.m).join(',') === '1,0,0,0',
-    'Navana.Init arms only CR12.M');
 
-// CapabilityTest uses the active Thread c-list. Its canonical row 0 SelfTest
-// token is at the boot Thread c-list base (word 244), and CR6 must carry L.
-bootSim.cr[6] = {
-    word0: bootSim.createGT(0, 1, { L: 1 }, 1),
-    word1: 244, word2: 0, word3: 0, m: 1
+// CapabilityTest explicitly writes the recovered CR12 mask through M_BIT_DEV,
+// then SWITCH consumes it. It does not rely on boot-time M state.
+const bootNamespace = { name: 'Navana' };
+const capabilityMBitDevice = new DeviceAbstractions({
+    abstractions: { 5: bootNamespace }, bindMethod() {}
+});
+const bootMBitCap = capabilityMBitDevice.issueNamespaceMBitCapability(bootNamespace);
+const sequenceSim = machine();
+sequenceSim._execLoad = d => {
+    sequenceSim.cr[d.crDst] = {
+        word0: 0x4A000006, word1: 1, word2: 2, word3: 3, m: 1
+    };
+    sequenceSim.pc++;
+    return { pc: sequenceSim.pc - 1, instr: d, desc: 'load' };
 };
+check(capabilityMBitDevice.writeMBitWord(sequenceSim, bootMBitCap, 0x1000, bootNamespace).ok,
+    'CapabilityTest writes the CR12 M-bit mask');
 const capAssembler = new ChurchAssembler();
-const firstSwitch = bootSim.decodeInstruction(
+const firstSwitch = sequenceSim.decodeInstruction(
     capAssembler.assemble('SWITCH CR12, CR6, #0').words[0]);
-const firstResult = bootSim._execSwitch(firstSwitch);
-check(!!firstResult, 'CapabilityTest first SWITCH succeeds after Navana.Init');
-check(bootSim.cr[12].m === 0, 'CapabilityTest first SWITCH consumes CR12.M');
+const firstResult = sequenceSim._execSwitch(firstSwitch);
+check(!!firstResult, 'CapabilityTest first SWITCH succeeds after its M_BIT_DEV write');
+check(sequenceSim.cr[12].m === 0, 'CapabilityTest first SWITCH consumes CR12.M');
 
-const secondSwitch = bootSim.decodeInstruction(
-    capAssembler.assemble('SWITCH CR13, CR6, #0').words[0]);
-const beforeSecond = state(bootSim);
-check(bootSim._execSwitch(secondSwitch) === null, 'CapabilityTest second SWITCH faults with CR13.M absent');
-check(state(bootSim) === beforeSecond,
-    'CR13 M-absent failure leaves complete CR/M/Namespace/memory state unchanged');
+check(capabilityMBitDevice.writeMBitWord(sequenceSim, bootMBitCap, 0x8000, bootNamespace).ok,
+    'CapabilityTest writes the CR15 M-bit mask');
+const secondSwitch = sequenceSim.decodeInstruction(
+    capAssembler.assemble('SWITCH CR15, CR15').words[0]);
+check(!!sequenceSim._execSwitch(secondSwitch), 'CapabilityTest guarded CR15 SWITCH succeeds');
+check(sequenceSim.cr[15].m === 0, 'guarded CR15 self-switch consumes its M bit');
 
 if (failures) process.exitCode = 1;
 else console.log('PASS: Task #3193 isolated SWITCH regressions');

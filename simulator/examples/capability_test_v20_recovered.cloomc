@@ -1,0 +1,70 @@
+; ============================================================
+; Abstraction:  CapabilityTest
+; Description:  Church Machine capability test -- LOAD, TPERM, CALL
+;               using the real hardware boot namespace.
+; Author:       Church Machine Educational Platform
+; Version:      2.0
+; Created:      2026-08-03
+; Language:     Assembly
+; ============================================================
+; Single source of truth for the CapabilityTest abstraction (NS slot 10).
+; The lump is built from this file by scripts/build_capability_test_lump.js,
+; which supplies hardware GT words for each declared capability.
+;
+; C-list layout (CapabilityTest's own 5-entry c-list, injected at load):
+;   [0] SelfTest   E    (NS  6)  0x4A000006 -- entry-callable abstraction
+;   [1] LED_DEV    RW   (NS  3)  0x32000003 -- hardware LED register file
+;   [2] UART_DEV   RW   (NS  2)  0x32000002 -- hardware UART TX/STATUS/RX
+;   [3] BTN_DEV    R    (NS  4)  0x12000004 -- hardware button state
+;   [4] TIMER_DEV  RW   (NS  5)  0x32000005 -- hardware timer registers
+; ============================================================
+
+capabilities {
+    SelfTest E
+    LED_DEV RW
+    UART_DEV RW
+    BTN_DEV R
+    TIMER_DEV RW
+    M_BIT_DEV RW
+    WukongCallHome.hw E
+}
+Start:
+; ============================================================
+; TEST 1: LOAD -- materialise all declared capabilities from c-list
+; ============================================================
+LOAD CR0, SelfTest
+LOAD CR1, LED_DEV
+LOAD CR2, UART_DEV
+LOAD CR3, BTN_DEV
+LOAD CR4, TIMER_DEV
+
+TPERM CR0, E
+TPERM CR1, RW
+TPERM CR2, RW
+TPERM CR4, RW
+TPERM CR0, L
+LOADEQ CR0, LED_DEV
+LOADNE CR0, SelfTest
+
+LOAD CR0, M_BIT_DEV
+ISUB   DR1, DR1, DR1
+IADD   DR1, #0b0001000000000000
+DWRITE DR1, CR0, #0
+SWITCH CR12, CR6, #0
+ISUB   DR1, DR1, DR1
+IADD   DR1, #0b1000000000000000
+DWRITE DR1, CR0, #0
+SWITCH CR15, CR15
+; SWITCH CR13, CR6, #0
+
+IADD DR1, DR0, #42
+IADD DR2, DR1, #8
+ISUB DR3, DR2, DR1
+MCMP DR1, DR2
+IADD DR4, DR0, #1
+SHL  DR4, DR4, 3
+SHR  DR4, DR4, 1
+
+ELOADCALL CR0, SelfTest, 0
+ELOADCALL CR0, WukongCallHome.hw, 0
+BRANCH Start
