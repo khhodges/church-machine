@@ -6,7 +6,6 @@ const os = require('os');
 const path = require('path');
 
 const { execFileSync, spawnSync } = require('child_process');
-const { execFileSync, spawnSync } = require('child_process');
 const { historicalClassification, inspect } = require('./check-lump-embedded-content.js');
 const ROOT = path.resolve(__dirname, '..');
 const CANONICAL_LUMPS = path.join(ROOT, 'server', 'lumps');
@@ -119,7 +118,17 @@ function writeMissingContentLump(file) {
     fs.writeFileSync(file, Buffer.alloc(64 * 4));
 }
 
-const { historicalClassification, inspect } = require('./check-lump-embedded-content.js');
+function writeMalformedApiLump(file, source) {
+    writeFixtureLump(file, source);
+    const raw = fs.readFileSync(file);
+    raw.write('{not-json', 8, 'utf8');
+    fs.writeFileSync(file, raw);
+}
+
+function writeInvalidSizeLump(file) {
+    // A zero header declares 64 words, while this artifact contains only 63.
+    fs.writeFileSync(file, Buffer.alloc(63 * 4));
+}
 
 function testHistoricalClassificationBoundary() {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lump-content-check-'));
@@ -134,6 +143,8 @@ function testHistoricalClassificationBoundary() {
         { abstraction: 'Fixture', filename: 'current-stale.lump' },
         { abstraction: 'Fixture', filename: 'archived-missing.lump', archived: true },
         { abstraction: 'Fixture', filename: 'archived-stale.lump', archived: true },
+        { abstraction: 'Fixture', filename: 'archived-malformed-api.lump', archived: true },
+        { abstraction: 'Fixture', filename: 'archived-invalid-size.lump', archived: true },
     ];
     try {
         fs.writeFileSync(path.join(examplesDir, 'fixture.cloomc'), source);
@@ -143,6 +154,8 @@ function testHistoricalClassificationBoundary() {
         writeFixtureLump(path.join(lumpsDir, 'current-stale.lump'), 'stale source\n');
         writeMissingContentLump(path.join(lumpsDir, 'archived-missing.lump'));
         writeFixtureLump(path.join(lumpsDir, 'archived-stale.lump'), 'stale source\n');
+        writeMalformedApiLump(path.join(lumpsDir, 'archived-malformed-api.lump'), source);
+        writeInvalidSizeLump(path.join(lumpsDir, 'archived-invalid-size.lump'));
 
         const result = spawnSync(process.execPath, [
             path.join(__dirname, 'check-lump-embedded-content.js'),
@@ -156,7 +169,9 @@ function testHistoricalClassificationBoundary() {
             'FAIL current-stale.lump: embedded API/source does not match canonical source',
             'historical archived-missing.lump: historical artifact intentionally lacks embedded content',
             'historical archived-stale.lump: historical artifact embeds an earlier canonical source',
-            'check-lump-embedded-content: 1 checked, 2 failed',
+            'FAIL archived-malformed-api.lump:',
+            'FAIL archived-invalid-size.lump: header size mismatch',
+            'check-lump-embedded-content: 1 checked, 4 failed',
         ];
         if (result.status === 0) throw new Error('broken current artifacts exited zero');
         for (const line of expected) {
@@ -164,6 +179,9 @@ function testHistoricalClassificationBoundary() {
         }
         if (/historical current-(missing|stale)\.lump/.test(output)) {
             throw new Error('current artifact was classified as historical');
+        }
+        if (/historical archived-(malformed-api|invalid-size)\.lump/.test(output)) {
+            throw new Error('corrupted archived artifact was classified as historical');
         }
         console.log('PASS historical classification boundary');
     } finally {
