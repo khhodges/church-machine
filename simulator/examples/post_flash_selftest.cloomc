@@ -41,7 +41,7 @@
 ;     CR1  = E-GT for SelfTest  (loaded via: LOAD CR1, SelfTest from c-list[0])
 ;   CR0 and CR1 hold the same GT word (0x4A000006) — TPERM EXACT cross-check passes.
 capabilities {
-    SelfTest     E          ; slot 0 — E-GT for TPERM/EXACT tests
+    SelfTest     E,         ; slot 0 — E-GT for TPERM/EXACT tests
     Next         E          ; slot 1 — Next.GT (default=SelfTest self-loop; boot_image.py overrides)
 }
 ;

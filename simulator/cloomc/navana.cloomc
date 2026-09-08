@@ -13,10 +13,10 @@
 
 abstraction Navana {
     capabilities {
-        PhysicalPool
-        Mint
-        Billing
-        TuringMemory
+        PhysicalPool,
+        Mint,
+        Billing,
+        TuringMemory,
         ChurchMemory
     }
 

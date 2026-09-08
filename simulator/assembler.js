@@ -654,6 +654,22 @@ class ChurchAssembler {
         const slots = {};
         let inCapBlock = false;
         const capNames = [];
+        let capItemText = '';
+        const collectItem = item => {
+            for (const cap of ChurchAssembler._parseCapItems(item).caps)
+                capNames.push(cap.null_row ? null : cap.name);
+        };
+        const appendBlockText = (text, flushLast = false) => {
+            const pieces = text.split(',');
+            for (let i = 0; i < pieces.length; i++) {
+                const piece = pieces[i].trim();
+                if (piece) capItemText += `${capItemText ? ' ' : ''}${piece}`;
+                if (i < pieces.length - 1 || flushLast) {
+                    if (capItemText) collectItem(capItemText);
+                    capItemText = '';
+                }
+            }
+        };
 
         for (const rawLine of lines) {
             let line = rawLine.trim();
@@ -665,25 +681,20 @@ class ChurchAssembler {
             if (!inCapBlock && /^capabilities\s*\{/i.test(line)) {
                 const inline = line.match(/^capabilities\s*\{\s*(.*?)\s*\}\s*$/i);
                 if (inline) {
-                    for (const item of inline[1].split(',')) {
-                        for (const cap of ChurchAssembler._parseCapItems(item).caps)
-                            capNames.push(cap.null_row ? null : cap.name);
-                    }
+                    appendBlockText(inline[1], true);
                 } else {
                     inCapBlock = true;
                     const tail = line.replace(/^capabilities\s*\{/i, '').trim();
-                    if (tail) for (const item of tail.split(',')) {
-                        for (const cap of ChurchAssembler._parseCapItems(item).caps)
-                            capNames.push(cap.null_row ? null : cap.name);
-                    }
+                    if (tail) appendBlockText(tail);
                 }
                 continue;
             }
             if (inCapBlock) {
-                if (line.includes('}')) { inCapBlock = false; }
-                else for (const item of line.split(',')) {
-                    for (const cap of ChurchAssembler._parseCapItems(item).caps)
-                        capNames.push(cap.null_row ? null : cap.name);
+                if (line.includes('}')) {
+                    appendBlockText(line.substring(0, line.indexOf('}')), true);
+                    inCapBlock = false;
+                } else {
+                    appendBlockText(line);
                 }
                 continue;
             }
@@ -724,12 +735,19 @@ class ChurchAssembler {
         this._parsePetDirectives(lines);               // pre-pass: .pet aliases
         this._capBlockSlots = this._parseCapBlockSlots(lines); // pre-pass: capabilities {} → slot map
         const instructions = [];
-        const _collectCapItem = (item, lineNum) => {
+        const _collectCapItem = (item, lineNum, endLineNum = lineNum) => {
             const parsed = ChurchAssembler._parseCapItems(item);
             for (const missingName of parsed.missingSeparators) {
+                let diagnosticLine = lineNum;
+                for (let candidate = lineNum; candidate <= endLineNum; candidate++) {
+                    if (new RegExp(`(^|[^A-Za-z0-9_.])${missingName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^A-Za-z0-9_.]|$)`).test(this._rawLines[candidate])) {
+                        diagnosticLine = candidate;
+                        break;
+                    }
+                }
                 this.errors.push({
-                    line: lineNum + 1,
-                    ...this._tokenCols(this._currentLineText, missingName),
+                    line: diagnosticLine + 1,
+                    ...this._tokenCols(this._rawLines[diagnosticLine], missingName),
                     message: `Missing comma before capability "${missingName}" — add a comma between capability declarations.`
                 });
             }
@@ -750,6 +768,23 @@ class ChurchAssembler {
 
         // ── Pass 1: scan lines, record label offsets, collect instruction stubs ──
         let _inCapBlock   = false;  // inside a multi-line  capabilities { } block
+        let _capItemText = '';
+        let _capItemStartLine = -1;
+        const _appendCapBlockText = (text, lineNum, flushLast = false) => {
+            const pieces = text.split(',');
+            for (let i = 0; i < pieces.length; i++) {
+                const piece = pieces[i].trim();
+                if (piece) {
+                    if (_capItemStartLine < 0) _capItemStartLine = lineNum;
+                    _capItemText += `${_capItemText ? ' ' : ''}${piece}`;
+                }
+                if (i < pieces.length - 1 || flushLast) {
+                    if (_capItemText) _collectCapItem(_capItemText, _capItemStartLine, lineNum);
+                    _capItemText = '';
+                    _capItemStartLine = -1;
+                }
+            }
+        };
         let _inConstBlock = false;  // inside a multi-line  constants     { } block
         for (let lineNum = 0; lineNum < lines.length; lineNum++) {
             let line = lines[lineNum].trim();
@@ -778,20 +813,16 @@ class ChurchAssembler {
                 } else {
                     _inCapBlock = true;
                     const tail = line.replace(/^capabilities\s*\{/i, '').trim();
-                    if (tail) {
-                        for (const item of tail.split(',')) {
-                            _collectCapItem(item, lineNum);
-                        }
-                    }
+                    if (tail) _appendCapBlockText(tail, lineNum);
                 }
                 continue;
             }
             if (_inCapBlock) {
-                if (line.includes('}')) { _inCapBlock = false; }
-                else {
-                    for (const item of line.split(',')) {
-                        _collectCapItem(item, lineNum);
-                    }
+                if (line.includes('}')) {
+                    _appendCapBlockText(line.substring(0, line.indexOf('}')), lineNum, true);
+                    _inCapBlock = false;
+                } else {
+                    _appendCapBlockText(line, lineNum);
                 }
                 continue;
             }
@@ -2290,25 +2321,29 @@ class ChurchAssembler {
         return { name, rights };
     }
 
-    // Parse one comma-delimited chunk, recovering when two complete declarations
-    // were accidentally joined (for example "Alpha E Beta RX").
+    // Parse one comma-delimited chunk, recovering when declarations were
+    // accidentally joined. A declaration is NAME with optional RIGHTS, so this
+    // also preserves supported rights-less hardware and NULL declarations.
     static _parseCapItems(itemStr) {
         const tokens = itemStr.trim().split(/\s+/).filter(Boolean);
         const nameRE = /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)*$/;
         const rightsRE = /^[RWXErwxe]+$/;
-        if (tokens.length >= 4 && tokens.length % 2 === 0) {
-            const caps = [];
-            const missingSeparators = [];
-            for (let i = 0; i < tokens.length; i += 2) {
-                if (!nameRE.test(tokens[i]) || !rightsRE.test(tokens[i + 1]))
-                    return { caps: [ChurchAssembler._parseCapItem(itemStr)].filter(Boolean), missingSeparators: [] };
-                const cap = ChurchAssembler._parseCapItem(`${tokens[i]} ${tokens[i + 1]}`);
-                if (cap) caps.push(cap);
-                if (i > 0) missingSeparators.push(tokens[i]);
+        if (!tokens.length || tokens.some(token => !nameRE.test(token)))
+            return { caps: [ChurchAssembler._parseCapItem(itemStr)].filter(Boolean), missingSeparators: [] };
+
+        const caps = [];
+        const missingSeparators = [];
+        for (let i = 0; i < tokens.length;) {
+            const name = tokens[i++];
+            let declaration = name;
+            if (!/^NULL$/i.test(name) && i < tokens.length && rightsRE.test(tokens[i])) {
+                declaration += ` ${tokens[i++]}`;
             }
-            return { caps, missingSeparators };
+            const cap = ChurchAssembler._parseCapItem(declaration);
+            if (cap) caps.push(cap);
+            if (caps.length > 1) missingSeparators.push(name);
         }
-        return { caps: [ChurchAssembler._parseCapItem(itemStr)].filter(Boolean), missingSeparators: [] };
+        return { caps, missingSeparators };
     }
 
     // Build a slot-number → capability-name map suitable for passing to disassemble().

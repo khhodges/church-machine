@@ -6230,11 +6230,11 @@ BRANCH led_on
 {
     const EX14_SRC = `
 capabilities {
-    LED0 RW
-    LED1 RW
-    LED2 RW
-    LED3 RW
-    LED4 RW
+    LED0 RW,
+    LED1 RW,
+    LED2 RW,
+    LED3 RW,
+    LED4 RW,
     LED5 RW
 }
 LOAD CR3, LED0
@@ -7392,7 +7392,7 @@ abstraction VlcTest {
         // Minimal 2-instruction reference to capture the ELOADCALL CR1, Next encoding.
         const refSrc =
             'capabilities {\n' +
-            '    SelfTest     E\n' +
+            '    SelfTest     E,\n' +
             '    Next         E\n' +
             '}\n' +
             'start:\n' +
@@ -10270,7 +10270,7 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
 {
     // BC112: LOAD CR3, LED1 — capabilities block { LED0 RW, LED1 RW }; LED1 at position 1.
     const a = new ChurchAssembler();
-    const r = a.assemble('capabilities {\n LED0 RW\n LED1 RW\n}\nLOAD CR3, LED1\nHALT');
+    const r = a.assemble('capabilities {\n LED0 RW,\n LED1 RW\n}\nLOAD CR3, LED1\nHALT');
     assert('BC112 LOAD with LED1 at cap-block position 1 — no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     {
@@ -10286,7 +10286,7 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     //        LED0 at position 3.
     const a = new ChurchAssembler();
     const r = a.assemble(
-        'capabilities {\n Salvation E\n Navana E\n Mint E\n LED0 RW\n}\nLOAD CR3, LED0\nHALT'
+        'capabilities {\n Salvation E,\n Navana E,\n Mint E,\n LED0 RW\n}\nLOAD CR3, LED0\nHALT'
     );
     assert('BC113 LOAD with LED0 at cap-block position 3 — no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
@@ -10360,7 +10360,7 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     //        LED0 at position 2.
     const a = new ChurchAssembler();
     const r = a.assemble(
-        'capabilities {\n Salvation E\n Navana E\n LED0 RW\n}\nXLOADLAMBDA CR3, LED0\nHALT'
+        'capabilities {\n Salvation E,\n Navana E,\n LED0 RW\n}\nXLOADLAMBDA CR3, LED0\nHALT'
     );
     assert('BC117 XLOADLAMBDA with LED0 at cap-block position 2 — no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
@@ -10895,7 +10895,7 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     const a = new ChurchAssembler({});
     const result = a.assemble(
         'capabilities {\n' +
-        '  Alpha E Beta RX\n' +
+        '  Alpha E Beta RX,\n' +
         '  Gamma E\n' +
         '}\n' +
         'ELOADCALL CR1, Beta, 0\n' +
@@ -10927,6 +10927,88 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     assert('CAP-MC2 valid neighboring declarations compile unchanged',
         result.errors.length === 0 &&
         result.capabilities.map(c => c.name).join(',') === 'Alpha,Beta,Gamma',
+        result.errors.map(e => e.message).join('; '));
+}
+
+// CAP-MC3: declarations on adjacent lines are still one comma-delimited
+// structure, so omitting their separator reports the boundary and recovers.
+{
+    const a = new ChurchAssembler({});
+    const result = a.assemble(
+        'capabilities {\n' +
+        '  TIMER_DEV RW\n' +
+        '  WukongCallHome E\n' +
+        '}\n' +
+        'ELOADCALL CR1, WukongCallHome, 0\n' +
+        'RETURN'
+    );
+    const separatorErrors = result.errors.filter(e => /missing comma/i.test(e.message));
+    assert('CAP-MC3 cross-line missing comma produces one targeted diagnostic',
+        separatorErrors.length === 1,
+        result.errors.map(e => `line ${e.line}: ${e.message}`).join('; '));
+    assert('CAP-MC3 diagnostic points to the adjacent declaration boundary',
+        separatorErrors[0] && separatorErrors[0].line === 3 &&
+        separatorErrors[0].message.includes('WukongCallHome'),
+        separatorErrors[0] ? JSON.stringify(separatorErrors[0]) : '(no diagnostic)');
+    assert('CAP-MC3 recovery preserves both capability mappings',
+        result.capabilities.map(c => c.name).join(',') === 'TIMER_DEV,WukongCallHome' &&
+        a._capBlockSlots.WukongCallHome === 1,
+        `caps=${result.capabilities.map(c => c.name).join(',')} slots=${JSON.stringify(a._capBlockSlots)}`);
+    assert('CAP-MC3 recovery suppresses misleading downstream errors',
+        !result.errors.some(e => /expected a capability register/i.test(e.message)) &&
+        !result.errors.some(e => /WukongCallHome.*not declared/i.test(e.message)),
+        result.errors.map(e => e.message).join('; '));
+}
+
+// CAP-MC4: commas at multiline boundaries remain valid.
+{
+    const a = new ChurchAssembler({});
+    const result = a.assemble(
+        'capabilities {\n' +
+        '  TIMER_DEV RW,\n' +
+        '  WukongCallHome E\n' +
+        '}\n' +
+        'ELOADCALL CR1, WukongCallHome, 0\n' +
+        'RETURN'
+    );
+    assert('CAP-MC4 comma-separated multiline declarations compile unchanged',
+        result.errors.length === 0 &&
+        result.capabilities.map(c => c.name).join(',') === 'TIMER_DEV,WukongCallHome',
+        result.errors.map(e => e.message).join('; '));
+}
+
+// CAP-MC5: supported rights-less hardware declarations also retain their
+// boundary, rather than collapsing into the first declaration.
+{
+    const a = new ChurchAssembler({});
+    const result = a.assemble('capabilities {\n  LED0\n  LED1\n}\nLOAD CR1, LED1\nRETURN');
+    const separatorErrors = result.errors.filter(e => /missing comma/i.test(e.message));
+    assert('CAP-MC5 rights-less adjacent declarations report the missing comma',
+        separatorErrors.length === 1 && separatorErrors[0].line === 3 &&
+        separatorErrors[0].message.includes('LED1'),
+        result.errors.map(e => `line ${e.line}: ${e.message}`).join('; '));
+    assert('CAP-MC5 rights-less recovery preserves capability and slot order',
+        result.capabilities.map(c => c.name).join(',') === 'LED0,LED1' &&
+        a._capBlockSlots.LED1 === 1,
+        `caps=${result.capabilities.map(c => c.name).join(',')} slots=${JSON.stringify(a._capBlockSlots)}`);
+}
+
+// CAP-MC6: mixed rights-less and permission-bearing declarations recover too.
+{
+    const a = new ChurchAssembler({});
+    const result = a.assemble(
+        'capabilities {\n  LED0\n  WukongCallHome E\n}\n' +
+        'ELOADCALL CR1, WukongCallHome, 0\nRETURN'
+    );
+    const separatorErrors = result.errors.filter(e => /missing comma/i.test(e.message));
+    assert('CAP-MC6 mixed declaration forms report the adjacent boundary',
+        separatorErrors.length === 1 && separatorErrors[0].line === 3 &&
+        separatorErrors[0].message.includes('WukongCallHome'),
+        result.errors.map(e => `line ${e.line}: ${e.message}`).join('; '));
+    assert('CAP-MC6 mixed recovery prevents secondary downstream errors',
+        result.capabilities.map(c => c.name).join(',') === 'LED0,WukongCallHome' &&
+        a._capBlockSlots.WukongCallHome === 1 &&
+        !result.errors.some(e => /expected a capability register|not declared/i.test(e.message)),
         result.errors.map(e => e.message).join('; '));
 }
 

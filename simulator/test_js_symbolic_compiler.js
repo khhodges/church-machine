@@ -97,7 +97,7 @@ console.log('\n--- JS-ASM: native instructions inside CLOOMC++ methods ---');
     const src = `/* JavaScript / CLOOMC++ */
 abstraction ide.testMbit {
     capabilities {
-        SELF E
+        SELF E,
         M_BIT_DEV RW
     }
     method Status() {
@@ -131,7 +131,7 @@ console.log('\n--- JS-SAVE: local SAVE rows extend the compiled C-List ---');
     const c = new CLOOMCCompiler();
     const src = `abstraction ide.testMbit {
     capabilities {
-        SELF E
+        SELF E,
         M_BIT_DEV RW
     }
     method Status() {

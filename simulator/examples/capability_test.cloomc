@@ -25,7 +25,7 @@ capabilities {
     LED_DEV RW,
     UART_DEV RW,
     BTN_DEV R,
-    TIMER_DEV RW
+    TIMER_DEV RW,
     WukongCallHome E
 }
 

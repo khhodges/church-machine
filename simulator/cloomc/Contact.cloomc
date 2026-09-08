@@ -40,11 +40,11 @@ abstraction Contact {
     // enforcement mechanism.
 
     capabilities {
-        Identity    // resolve identity tokens to network addresses
-        Routing     // select communication medium (private use only)
-        Media       // open/close/query sessions (private use only)
-        Memory      // allocate backing memory for new session objects
-        Navana      // register session objects in the Namespace
+        Identity,   // resolve identity tokens to network addresses
+        Routing,    // select communication medium (private use only)
+        Media,      // open/close/query sessions (private use only)
+        Memory,     // allocate backing memory for new session objects
+        Navana,     // register session objects in the Namespace
         Mint        // encode capability tokens for new session objects
     }
 

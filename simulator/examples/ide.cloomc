@@ -1,7 +1,7 @@
 ; Provides: the functions of ...
 abstraction ide.testMbit {
     capabilities {
-    SELF E
+    SELF E,
     M_BIT_DEV RW
 }
     method Status {; ============================================================

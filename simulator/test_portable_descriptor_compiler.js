@@ -27,7 +27,7 @@ assert.ok(unpinned.errors.some(e => /pinned descriptor/.test(e.message)),
 const legacy = compiler.compile(`@legacy
 abstraction Old {
   capabilities {
-    SELF E
+    SELF E,
     Audit L
   }
   method run() { return(0); }

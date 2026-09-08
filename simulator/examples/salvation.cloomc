@@ -13,9 +13,9 @@
 ; ============================================================
 
 capabilities {
-    Salvation E
-    Navana    E
-    Mint      E
+    Salvation E,
+    Navana    E,
+    Mint      E,
     Memory    E
 }
 

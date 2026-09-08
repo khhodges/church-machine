@@ -18,7 +18,7 @@
 
 abstraction Keystone {
     capabilities {
-        Tunnel
+        Tunnel,
         MumGT
     }
 

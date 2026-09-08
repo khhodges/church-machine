@@ -90,8 +90,8 @@ HALT
     // T003 — three capabilities
     const result = assemble(`
 capabilities {
-  Alpha E
-  Beta  E
+  Alpha E,
+  Beta  E,
   Gamma E
 }
 HALT
@@ -282,8 +282,8 @@ console.log('\n--- T020: Full round-trip assemble → markNamedSlots → getStat
     // sim via markNamedSlots(), then verify getState() contains those slots.
     const result = assemble(`
 capabilities {
-  WidgetA E
-  WidgetB E
+  WidgetA E,
+  WidgetB E,
   WidgetC E
 }
 HALT
@@ -348,13 +348,13 @@ console.log('\n--- T021–T025: resetNamedSlots() / cross-program reload isolati
     //         defaults, not because of stale program-A data.
     const resultA = assemble(`
 capabilities {
-  LibA E
-  LibB E
-  LibC E
-  LibD E
-  LibE E
-  LibF E
-  LibG E
+  LibA E,
+  LibB E,
+  LibC E,
+  LibD E,
+  LibE E,
+  LibF E,
+  LibG E,
   LibH E
 }
 HALT

@@ -9,11 +9,11 @@
 ; ============================================================
 ; Capabilities required by this lump:
 capabilities {
-    LED0 RW
-    LED1 RW
-    LED2 RW
-    LED3 RW
-    LED4 RW
+    LED0 RW,
+    LED1 RW,
+    LED2 RW,
+    LED3 RW,
+    LED4 RW,
     LED5 RW
 }
 ; Methods:

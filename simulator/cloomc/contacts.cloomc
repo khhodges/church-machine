@@ -34,10 +34,10 @@
 
 abstraction Contacts {
     capabilities {
-        TextSink    // CR7  — UART peripheral; text-only fallback path
-        Contact0    // CR8  — tunnel channel GT for contact 0
-        Contact1    // CR9  — tunnel channel GT for contact 1
-        Contact2    // CR10 — tunnel channel GT for contact 2
+        TextSink,   // CR7  — UART peripheral; text-only fallback path
+        Contact0,   // CR8  — tunnel channel GT for contact 0
+        Contact1,   // CR9  — tunnel channel GT for contact 1
+        Contact2,   // CR10 — tunnel channel GT for contact 2
         Contact3    // CR11 — tunnel channel GT for contact 3
     }
 

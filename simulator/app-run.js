@@ -5017,11 +5017,11 @@ const _TURING_DR_TEST_SOURCE = `; ==============================================
 ; ============================================================
 ; Capabilities required by this lump:
 capabilities {
-    LED0 RW
-    LED1 RW
-    LED2 RW
-    LED3 RW
-    LED4 RW
+    LED0 RW,
+    LED1 RW,
+    LED2 RW,
+    LED3 RW,
+    LED4 RW,
     LED5 RW
 }
 ; Methods:
@@ -6861,7 +6861,7 @@ capabilities {
     LED_DEV RW,
     UART_DEV RW,
     BTN_DEV R,
-    TIMER_DEV RW
+    TIMER_DEV RW,
     WukongCallHome E
 }
 
@@ -7102,9 +7102,9 @@ HALT`,
 ; ============================================================
 
 capabilities {
-    Salvation E
-    Navana    E
-    Mint      E
+    Salvation E,
+    Navana    E,
+    Mint      E,
     Memory    E
 }
 
@@ -7362,7 +7362,7 @@ HALT`,
 ;     CR1  = E-GT for SelfTest  (loaded via: LOAD CR1, SelfTest from c-list[0])
 ;   CR0 and CR1 hold the same GT word (0x4A000006) — TPERM EXACT cross-check passes.
 capabilities {
-    SelfTest     E          ; slot 0 — E-GT for TPERM/EXACT tests
+    SelfTest     E,         ; slot 0 — E-GT for TPERM/EXACT tests
     Next         E          ; slot 1 — Next.GT (default=SelfTest self-loop; boot_image.py overrides)
 }
 ;
