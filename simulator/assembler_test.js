@@ -10898,7 +10898,7 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
         '  Alpha E Beta RX\n' +
         '  Gamma E\n' +
         '}\n' +
-        'LOAD CR1, Beta\n' +
+        'ELOADCALL CR1, Beta, 0\n' +
         'RETURN'
     );
     const separatorErrors = result.errors.filter(e => /missing comma/i.test(e.message));
@@ -10914,7 +10914,7 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
         result.capabilities.map(c => c.name).join(',') === 'Alpha,Beta,Gamma' &&
         a._capBlockSlots.Beta === 1 && a._capBlockSlots.Gamma === 2,
         `caps=${result.capabilities.map(c => c.name).join(',')} slots=${JSON.stringify(a._capBlockSlots)}`);
-    assert('CAP-MC1 suppresses misleading downstream capability-register errors',
+    assert('CAP-MC1 ELOADCALL suppresses misleading downstream capability-register errors',
         !result.errors.some(e => /expected a capability register/i.test(e.message)) &&
         !result.errors.some(e => /Beta.*not declared/i.test(e.message)),
         result.errors.map(e => e.message).join('; '));
