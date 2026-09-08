@@ -14806,8 +14806,7 @@ def wukong_status_get():
         for context in active_thread_contexts:
             if context.get('base_word') == thread_base // 4:
                 active_thread = {
-                    'name': 'Thread.1' if context.get('number') == 1
-                            else f"Thread#{context.get('number')}",
+                    'name': f"Thread.{context.get('number')}",
                     'position': context.get('number'),
                     'count': len(active_thread_contexts),
                     'slot': context.get('slot'),

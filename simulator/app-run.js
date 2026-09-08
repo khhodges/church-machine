@@ -17609,13 +17609,10 @@ function _wukongClassifyFreeze(status, expectedRunning, pendingExecution, lastRe
         classification = 'explicit_halt';
         title = 'Explicit Halt';
         action = 'Use Step or Run when you are ready to continue.';
-    } else if ((stepExpired || (expectedRunning && !pendingExecution &&
-                Number.isFinite(age) && age >= _WUKONG_FREEZE_SECONDS))) {
+    } else if (stepExpired) {
         classification = 'no_retirement_stall';
         title = 'Wukong Execution Stalled';
-        action = stepExpired
-            ? 'The confirmed Step produced no causally newer retirement. Inspect the shown instruction and capabilities, then choose Halt or Reboot; no architectural fault was inferred and no instruction was skipped automatically.'
-            : 'Inspect the shown instruction and capabilities, then choose Halt or Reboot; no instruction was skipped automatically.';
+        action = 'The confirmed Step produced no causally newer retirement. Inspect the shown instruction and capabilities, then choose Halt or Reboot; no architectural fault was inferred and no instruction was skipped automatically.';
     }
     if (!classification) return null;
     return {

@@ -45,6 +45,7 @@ def _reset_wukong_state():
     """Reset every in-process Wukong global between tests."""
     with _app_module._wukong_trace_lock:
         _app_module._wukong_latest_trace   = {}
+        _app_module._wukong_latest_snapshot = {}
         _app_module._wukong_latest_cr_gts  = {}
         _app_module._wukong_event_queue[:] = []
         _app_module._wukong_event_seq      = 0
@@ -59,6 +60,8 @@ def _reset_wukong_state():
         _app_module._upload_in_flight = False
     with _app_module._wukong_boot_info_lock:
         _app_module._wukong_boot_info = {}
+    with _app_module._wukong_hw_entry_lock:
+        _app_module._wukong_active_thread_contexts = []
     with _app_module._wukong_bridge_lock:
         _app_module._wukong_bridge_info.clear()
     _app_module._wukong_last_bridge_poll = 0.0
@@ -123,6 +126,19 @@ def client():
 # ---------------------------------------------------------------------------
 
 class TestStatusDoesNotConsume:
+    def test_active_thread_names_use_dot_not_hash(self):
+        _reset_wukong_state()
+        with _app_module._wukong_trace_lock:
+            _app_module._wukong_latest_snapshot = {'thread_base': 0x400}
+        with _app_module._wukong_hw_entry_lock:
+            _app_module._wukong_active_thread_contexts = [
+                {'number': 1, 'slot': 1, 'base_word': 0x80},
+                {'number': 2, 'slot': 11, 'base_word': 0x100},
+            ]
+
+        with app.test_client() as local_client:
+            assert _status(local_client)['active_thread']['name'] == 'Thread.2'
+
     def test_pending_command_survives_repeated_status_polls(self, client):
         """GET /status many times must NOT dequeue the pending command."""
         r = _command(client, {'cmd': 's'})

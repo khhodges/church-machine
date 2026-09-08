@@ -33,9 +33,8 @@ const trace = {nia: 0x120c, instr_word: 0x8F098000, disasm: 'DWRITE DR1, CR3, #0
 
 const realisticStall = {bridge_connected:true,last_trace_age:9,latest_trace:trace,
     halt:{state:'intentional halt',reason:'no newer trace; a missing trace alone is not treated as a fault'}};
-check('non-retiring DWRITE is a stall', c(realisticStall).classification === 'no_retirement_stall');
-check('server stale-trace heuristic cannot mask running stall', c(realisticStall).classification !== 'explicit_halt');
-check('DWRITE identity retained', c(realisticStall).evidence.decoded === 'DWRITE DR1, CR3, #0, DR0');
+check('quiet running loop is not inferred to be stalled', c(realisticStall) === null);
+check('server stale-trace heuristic does not invent an explicit halt', c(realisticStall) === null);
 check('fault classified without losing exact code', c({bridge_connected:true,last_trace_age:1,latest_trace:{...trace,fault_valid:true,fault_code:8}}).faultCode === 8);
 check('breakpoint is expected pause', c({bridge_connected:true,last_trace_age:20,latest_trace:{...trace,bp_hit:true}}).classification === 'breakpoint_pause');
 check('explicit halt is classified', c({bridge_connected:true,last_trace_age:20,latest_trace:trace,halt:{state:'halt confirmed'}}, false).classification === 'explicit_halt');
@@ -43,8 +42,7 @@ check('transport loss while running classified', c({bridge_connected:false,last_
 check('deliberate pause produces no incident', c({bridge_connected:true,last_trace_age:20,latest_trace:trace}, false) === null);
 check('single-step delivery delay produces no stall', c({bridge_connected:true,last_trace_age:20,latest_trace:trace}, true, 's') === null);
 check('fresh retirement produces no incident', c({bridge_connected:true,last_trace_age:2,latest_trace:trace}) === null);
-check('stable key deduplicates sustained polls', c({bridge_connected:true,last_trace_age:9,latest_trace:trace}).key === c({bridge_connected:true,last_trace_age:30,latest_trace:trace}).key);
-check('new retirement creates new incident key', c({bridge_connected:true,last_trace_age:9,latest_trace:trace}, true, null, 8).key !== c({bridge_connected:true,last_trace_age:9,latest_trace:trace}, true, null, 9).key);
+check('sustained quiet running remains incident-free', c({bridge_connected:true,last_trace_age:30,latest_trace:trace}) === null);
 
 const lifecycle = new Function('_WUKONG_FREEZE_SECONDS', `
 let _wukongStepProgressExpectation = null;
