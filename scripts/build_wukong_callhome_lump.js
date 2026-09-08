@@ -7,10 +7,8 @@
 //
 // The token is the CRC-32 of all binary bytes, lower-cased 8-hex-char string.
 //
-// C-List (cc=3) — tail of the lump, 3 slots:
-//   Slot 0  LED0              (NS slot 3, RW)  — LED_DEV  MMIO 0x40000000
-//   Slot 1  UART_TX           (NS slot 2, RW)  — UART_DEV MMIO 0x40000014
-//   Slot 2  WukongCallHome.hw (NS slot 7, E)   — hardware-accelerated callhome LUMP
+// C-List (cc=8): compiler-owned SELF, the six source declarations in their
+// declared order, then the runtime-only hardware handoff capability.
 //
 // GT encoding (v2.0):
 //   b_flag[31] | perm[30:28] | dom[27] | gt_type[26:25] | gt_seq[24:16] | slot[15:0]
@@ -67,8 +65,15 @@ if (typeof ChurchAssembler === 'undefined') {
 
 // ── Assemble the source ──────────────────────────────────────────────────────
 const source = fs.readFileSync(SOURCE, 'utf8');
+// WukongCallHome.hw is an installation-owned handoff, not a programmer
+// declaration. Add it only to the assembly input so the named CALL can be
+// encoded; the embedded/restored source remains the exact six-row source.
+const assemblySource = source.replace(
+    /(UART_TX\s+W)(\s*\n\})/,
+    '$1,\n    WukongCallHome.hw E$2'
+);
 const asm    = new ChurchAssembler();
-const result = asm.assemble(source);
+const result = asm.assemble(assemblySource);
 
 if (result.errors.length > 0) {
     console.error('Assembly errors in wukong_callhome.cloomc:');
@@ -108,34 +113,39 @@ if (words.length !== 74) {
     process.exit(1);
 }
 
-// ── C-List definition ─────────────────────────────────────────────────────────
-//
-// cc = 2  (POLA minimum: one GT per device capability accessed).
-//
-//   Slot 0: LED_DEV  — NS slot 3, MMIO 0x40000000, RW Inform GT
-//   Slot 1: UART_DEV — NS slot 2, MMIO 0x40000014, RW Inform GT
-//
-// GT layout (v2.0):
-//   [31]   b_flag  = 0  (hardware-bound flag; set by system configurator, not here)
-//   [30:28] perm3  = 0b011 (X=0, W=1, R=1 → Turing RW)
-//   [27]    dom    = 0   (Turing domain)
-//   [26:25] gt_type= 01  (Inform — concrete MMIO device)
-//   [24:16] gt_seq = 0
-//   [15:0]  slot   = NS slot index
-//
-//   LED_DEV  NS slot 3: (0b011 << 28) | (0 << 27) | (0b01 << 25) | 3 = 0x32000003
-//   UART_DEV NS slot 2: (0b011 << 28) | (0 << 27) | (0b01 << 25) | 2 = 0x32000002
-//
+const BINDINGS = {
+    Salvation:          { gt: 0x4A000004, ns_slot: 4, rights: ['E'] },
+    Navana:              { gt: 0x4A000005, ns_slot: 5, rights: ['E'] },
+    Mint:                { gt: 0x4A000006, ns_slot: 6, rights: ['E'] },
+    Memory:              { gt: 0x4A000007, ns_slot: 7, rights: ['E'] },
+    LED0:                { gt: 0x32000003, ns_slot: 3, rights: ['R', 'W'] },
+    UART_TX:             { gt: 0x32000002, ns_slot: 2, rights: ['R', 'W'] },
+    'WukongCallHome.hw': { gt: 0x4A000007, ns_slot: 7, rights: ['E'] },
+};
+const assembledCaps = Array.isArray(asm.capabilities) ? asm.capabilities : [];
+const runtimeName = 'WukongCallHome.hw';
+const declaredCaps = assembledCaps.filter(cap => cap.name !== runtimeName);
+if (declaredCaps.length !== 6) {
+    throw new Error(`expected six source-declared capabilities, got ${declaredCaps.length}`);
+}
+const bind = (cap, role) => {
+    const binding = BINDINGS[cap.name];
+    if (!binding) throw new Error(`no concrete capability binding for ${cap.name}`);
+    return {
+        ...binding, name: cap.name, declared_rights: cap.rights,
+        role, note: `${cap.name} ${role} capability (NS slot ${binding.ns_slot})`,
+    };
+};
 const CLIST = [
     { gt: 0x4A000007, name: '__SELF__', ns_slot: 7, rights: ['E'],
-      note: 'WukongCallHome frozen resident SELF E Inform GT (NS slot 7)' },
-    { gt: 0x32000003, name: 'LED0',              ns_slot: 3, rights: ['R','W'],
-      note: 'LED_DEV          Turing RW Inform GT (NS slot 3, MMIO 0x40000000)' },
-    { gt: 0x32000002, name: 'UART_TX',           ns_slot: 2, rights: ['R','W'],
-      note: 'UART_DEV         Turing RW Inform GT (NS slot 2, MMIO 0x40000014, R for STATUS poll)' },
-    { gt: 0x4A000007, name: 'WukongCallHome.hw', ns_slot: 7, rights: ['E'],
-      note: 'WukongCallHome.hw Church E Inform GT (NS slot 7)' },
+      role: 'compiler-owned', note: 'WukongCallHome compiler-owned SELF identity' },
+    ...declaredCaps.map(cap => bind(cap, 'source-declared')),
+    bind({ name: runtimeName, rights: ['E'] }, 'runtime-only'),
 ];
+if (process.argv.includes('--inspect-clist')) {
+    console.log('WUKONG_CLIST_JSON=' + JSON.stringify(CLIST));
+    process.exit(0);
+}
 
 // ── Pack LUMP binary ─────────────────────────────────────────────────────────
 //
@@ -146,7 +156,7 @@ const CLIST = [
 //   Words lumpSize-cc..lumpSize-1 : c-list GT words (tail-packed)
 //
 const cw = words.length;
-const cc = CLIST.length;   // 2
+const cc = CLIST.length;
 const totalNeeded = 1 + cw + FRAME.length + cc;
 
 let lumpSize = 64;

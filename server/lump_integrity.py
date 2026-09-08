@@ -85,7 +85,12 @@ def check_lump_canonical_integrity(lumps_dir, key8, lump_raw):
     records, error = _manifest(lumps_dir)
     if error:
         return error
-    matches = [x for x in records if isinstance(x, dict) and x.get("token") == key8]
+    matches = [
+        x for x in records
+        if isinstance(x, dict)
+        and not x.get("archived")
+        and x.get("token") == key8
+    ]
     if len(matches) > 1:
         filenames = {
             entry.get("filename") for entry in matches
@@ -161,7 +166,12 @@ def resolve_canonical_lump(lumps_dir, key8, lump_raw):
     if error:
         result.update(ok=False, error=error, reason="manifest-unreadable")
         return result
-    entries = [e for e in records if isinstance(e, dict) and e.get("token") == key8]
+    entries = [
+        e for e in records
+        if isinstance(e, dict)
+        and not e.get("archived")
+        and e.get("token") == key8
+    ]
     if len(entries) != 1:
         result.update(ok=False, error="Canonical manifest record is missing or ambiguous.",
                       reason="manifest-ambiguous")

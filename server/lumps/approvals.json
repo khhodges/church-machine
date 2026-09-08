@@ -235,6 +235,20 @@
         "E"
       ],
       "capability_type": "inform"
+    },
+    "968706ae6010d58966a78ed35345608a8997c2192e86f8e1bfb8d4068983edbc": {
+      "binary_hash": "968706ae6010d58966a78ed35345608a8997c2192e86f8e1bfb8d4068983edbc",
+      "filename": "WukongCallHome.1.8965def2.lump",
+      "dot_name": "WukongCallHome",
+      "issue_n": 1,
+      "bootstrap_t": "4a000007",
+      "bootstrap_runtime_gt": 1241513991,
+      "token": "4a000007",
+      "abstraction": "WukongCallHome",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
     }
   }
 }

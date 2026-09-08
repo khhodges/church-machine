@@ -10,7 +10,7 @@
 //   • The software LUMP must contain exactly 74 instructions; the immutable ROM
 //     remains exactly 73 words.
 //   • Words [2..71] must be bit-for-bit identical.
-//   • Word 72 must CALL WukongCallHome.hw through c-list row 2, selector 0.
+//   • Word 72 must CALL WukongCallHome.hw through runtime-only c-list row 7, selector 0.
 //   • Word 73 must be the adjusted loop fallback (BRANCH -70).
 //   • Declared capabilities must materialize to the canonical Wukong tokens.
 //
@@ -59,8 +59,12 @@ if (typeof ChurchAssembler === 'undefined') {
 
 // ── Assemble the CLOOMC source ───────────────────────────────────────────────
 const source = fs.readFileSync(SOURCE, 'utf8');
+const assemblySource = source.replace(
+    /(UART_TX\s+W)(\s*\n\})/,
+    '$1,\n    WukongCallHome.hw E$2'
+);
 const asm    = new ChurchAssembler();
-const result = asm.assemble(source);
+const result = asm.assemble(assemblySource);
 
 if (result.errors.length > 0) {
     console.error('Assembly errors in wukong_callhome.cloomc:');
@@ -189,7 +193,9 @@ if (!diverged) {
 
 // The immutable ROM loops at word 72. The software LUMP instead hands off to
 // the recovered hardware LUMP, then keeps an adjusted loop as a safe fallback.
-const EXPECTED_HW_CALL = 0x47030002;
+// The assembly-only runtime handoff follows the six source declarations, so it
+// is row 6 before the builder inserts compiler-owned SELF at physical row 0.
+const EXPECTED_HW_CALL = 0x47030006;
 const EXPECTED_SW_LOOP = 0xBF007FBA;
 const EXPECTED_ROM_LOOP = 0xBF007FBB;
 if ((assembled[72] >>> 0) !== EXPECTED_HW_CALL) {
@@ -236,6 +242,10 @@ if ((nucProgram[72] >>> 0) !== EXPECTED_ROM_LOOP) {
 // Verify the declared capability order, exact rights, targets, and encoded GTs.
 const CapabilityTokens = require(CAP_TOKENS);
 const expectedCaps = [
+    { name: 'Salvation', rights: ['E'], nsIndex: 4, token: 0x4A000004 },
+    { name: 'Navana', rights: ['E'], nsIndex: 5, token: 0x4A000005 },
+    { name: 'Mint', rights: ['E'], nsIndex: 6, token: 0x4A000006 },
+    { name: 'Memory', rights: ['E'], nsIndex: 7, token: 0x4A000007 },
     { name: 'LED0', rights: ['R', 'W'], nsIndex: 3, token: 0x32000003 },
     { name: 'UART_TX', rights: ['W'], nsIndex: 2, token: 0x22000002 },
     { name: 'WukongCallHome.hw', rights: ['E'], nsIndex: 7, token: 0x4A000007 },
@@ -259,7 +269,13 @@ if (JSON.stringify(declaredCaps) !== JSON.stringify(
     const builtCaps = CapabilityTokens.materialize(
         declaredCaps, capWords, 0, {
             sim: capSim,
-            lumps: [{abstraction: 'WukongCallHome.hw', ns_slot: 7, grants: ['E']}],
+            lumps: [
+                {abstraction: 'Salvation', ns_slot: 4, grants: ['E']},
+                {abstraction: 'Navana', ns_slot: 5, grants: ['E']},
+                {abstraction: 'Mint', ns_slot: 6, grants: ['E']},
+                {abstraction: 'Memory', ns_slot: 7, grants: ['E']},
+                {abstraction: 'WukongCallHome.hw', ns_slot: 7, grants: ['E']},
+            ],
         });
     const expectedWords = expectedCaps.map(cap => cap.token >>> 0);
     if (!builtCaps.ok || JSON.stringify(capWords) !== JSON.stringify(expectedWords)) {

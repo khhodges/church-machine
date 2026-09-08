@@ -225,6 +225,9 @@ if (path0Src) {
             sim: null,
             PERM_COLORS: {},
             _namedBadgeHtml: function () { return ''; },
+            _currentLumpName: function () { return 'Demo'; },
+            _selfNameHtml: function (name) { return 'SELF (' + name + ')'; },
+            _nullSlotPetNames: {},
             escHtml: function (s) { return s; },
             _wrapRows: function (titleExtra, rows) { return { titleExtra: titleExtra, rows: rows }; },
             console,
@@ -241,6 +244,10 @@ if (path0Src) {
         'scenario E: non-empty capabilities block renders Path 0 ("source")');
     check(!!resultE && /Navana/.test(resultE.rows),
         'scenario E: Path 0 rows include the declared capability name');
+    check(!!resultE && /compiler-owned/.test(resultE.rows),
+        'scenario E: SELF is visibly labelled compiler-owned');
+    check(!!resultE && /source-declared/.test(resultE.rows),
+        'scenario E: programmer capability is visibly labelled source-declared');
 
     // -- Scenario F: POLA-emptied capabilities block still resolves to Path 0,
     //    NOT falling through to Path 1 (live sim) ------------------------------

@@ -15,7 +15,8 @@
 //   scripts/build_wukong_callhome_lump.js  ↔  simulator/examples/wukong_callhome.cloomc
 //
 // What is compared:
-//   1. Count — CLIST.length must equal the number of capabilities{} entries.
+//   1. Count — source rows must equal the source declarations; explicitly
+//      role-labelled compiler-owned/runtime-only rows are compared separately.
 //   2. Names — each slot's name must match in order (position = c-list slot index).
 //   3. Metadata — every CLIST entry's `rights:` array must exactly match the
 //      rights encoded by its raw GT word.
@@ -50,6 +51,7 @@ const path = require('path');
 
 const ROOT      = path.resolve(__dirname, '..');
 const SELF_TEST = process.argv.includes('--self-test');
+const WUKONG_ONLY = process.argv.includes('--wukong-only');
 
 // ---------------------------------------------------------------------------
 // Pairs to check
@@ -230,7 +232,9 @@ function parseBuildScriptCLIST(text) {
             name = commentMatch ? commentMatch[1] : '(unnamed)';
         }
 
-        entries.push({ name, gt, decodedRights, claimedRights });
+        const roleMatch = objText.match(/\brole\s*:\s*['"]([^'"]+)['"]/);
+        entries.push({ name, gt, decodedRights, claimedRights,
+            role: roleMatch ? roleMatch[1] : null });
         i = j + 1;
     }
 
@@ -401,7 +405,24 @@ function checkPair(pair) {
     }
 
     const sourceCaps   = parseSourceCapabilities(sourceText);
-    const clistEntries = parseBuildScriptCLIST(buildText);
+    let clistEntries = parseBuildScriptCLIST(buildText);
+    if (pair.label === 'wukong_callhome') {
+        const inspected = require('child_process').spawnSync(
+            process.execPath, [pair.buildScript, '--inspect-clist'],
+            { cwd: ROOT, encoding: 'utf8' }
+        );
+        const marker = (inspected.stdout || '').split('\n')
+            .find(line => line.startsWith('WUKONG_CLIST_JSON='));
+        if (inspected.status !== 0 || !marker) {
+            lines.push(`   ERROR: cannot inspect generated WukongCallHome C-list: ${inspected.stderr || inspected.stdout}`);
+            return { ok: false, lines };
+        }
+        clistEntries = JSON.parse(marker.slice('WUKONG_CLIST_JSON='.length)).map(entry => ({
+            ...entry,
+            decodedRights: decodeGTRights(entry.gt),
+            claimedRights: entry.rights,
+        }));
+    }
 
     if (!sourceCaps) {
         lines.push(`   ERROR: no capabilities{} block found in ${sourceRel}`);
@@ -410,6 +431,19 @@ function checkPair(pair) {
     if (!clistEntries) {
         lines.push(`   ERROR: no CLIST array found in ${buildRel}`);
         return { ok: false, lines };
+    }
+    if (pair.label === 'wukong_callhome') {
+        const compilerRows = clistEntries.filter(row => row.role === 'compiler-owned');
+        const runtimeRows = clistEntries.filter(row => row.role === 'runtime-only');
+        clistEntries = clistEntries.filter(row => row.role === 'source-declared');
+        if (compilerRows.length !== 1 || compilerRows[0].name !== '__SELF__') {
+            lines.push('   ERROR: WukongCallHome must have one separately labelled compiler-owned __SELF__ row');
+            return { ok: false, lines };
+        }
+        if (runtimeRows.length !== 1 || runtimeRows[0].name !== 'WukongCallHome.hw') {
+            lines.push('   ERROR: WukongCallHome must have one separately labelled runtime-only hardware handoff row');
+            return { ok: false, lines };
+        }
     }
 
     const { ok, lines: cmpLines } = compareCaps(sourceCaps, clistEntries, pair.label);
@@ -624,7 +658,7 @@ if (SELF_TEST) {
 let violations = 0;
 const allLines = [];
 
-for (const pair of PAIRS) {
+for (const pair of PAIRS.filter(pair => !WUKONG_ONLY || pair.label === 'wukong_callhome')) {
     const { ok, lines } = checkPair(pair);
     allLines.push(...lines);
     if (!ok) violations++;
@@ -651,5 +685,5 @@ if (violations > 0) {
     console.error('then rebuild the affected LUMP binary.');
     process.exit(1);
 } else {
-    console.log(`check-build-lump-clist: all ${PAIRS.length} pair(s) pass.`);
+    console.log(`check-build-lump-clist: all ${WUKONG_ONLY ? 1 : PAIRS.length} pair(s) pass.`);
 }

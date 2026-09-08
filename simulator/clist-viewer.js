@@ -764,7 +764,7 @@
                     '<span class="clist-slot">0</span>' +
                     '<span class="clist-name clist-pet-name">' + _selfNameHtml(_currentLumpName(_srcSim)) + '</span>' +
                     '<span class="clist-dot-name">' + escHtml(_currentLumpName(_srcSim) || '\u2014') + '</span>' +
-                    '<span class="clist-token">SELF</span>' +
+                    '<span class="clist-token" title="compiler-owned; not declared in source">compiler-owned</span>' +
                     '<span class="clist-perms"><span class="clist-perm-chip clist-perm-chip--on" style="background:#f4b94222;color:#f4b942;border-color:#f4b94255;">E</span></span>' +
                     '<span class="clist-action-placeholder">\u2014</span><span class="clist-action-placeholder">\u2014</span>' +
                     '</div>';
@@ -787,7 +787,7 @@
                             '<span class="clist-slot" title="row ' + sourceSlot + ' \u2014 declared in source (not yet compiled)">' + sourceSlot + '</span>' +
                             '<span class="clist-name clist-pet-name">' + escHtml(sourcePetName) + '</span>' +
                             '<span class="clist-dot-name">' + escHtml(sourceDotName || '\u2014') + '</span>' +
-                            '<span class="clist-token">\u2014</span>' +
+                            '<span class="clist-token" title="programmer-controlled capability declaration">source-declared</span>' +
                             rightsHtml +
                             '<button class="clist-pet-name-btn" data-action="edit-pet-name" data-slot="' + sourceSlot +
                                 '" title="Add or rename the pet name for CR' + sourceSlot + '">\u270e</button>' +
@@ -795,6 +795,8 @@
                                 '" data-source-index="' + si + '" title="Delete CR' + sourceSlot + ' from the source C-List">\u00D7</button>' +
                             '</div>';
                     }
+                } else {
+                    srcRows += '<div class="clist-empty">No capabilities declared in source.</div>';
                 }
                 return _wrapRows('source', srcRows);
             }

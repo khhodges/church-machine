@@ -404,6 +404,13 @@
     "token": "4a000007",
     "abstraction": "WukongCallHome",
     "filename": "WukongCallHome.1.55884a36.lump",
+    "lump_version": 1,
+    "archived": true
+  },
+  {
+    "token": "4a000007",
+    "abstraction": "WukongCallHome",
+    "filename": "WukongCallHome.1.8965def2.lump",
     "lump_version": 1
   }
 ]
