@@ -16856,6 +16856,9 @@ let _wukongHwNia        = null;    // retiring NIA of last HW trace packet
 
 let _wukongLastEventSeq = 0;       // cursor into the server-side ordered event queue
 let _wukongLastRetirementSeq = 0;  // trace events only; excludes status/info rows
+let _wukongFreezeIncidentKey = null;
+let _wukongFreezeRecoverySeq = 0;
+const _WUKONG_FREEZE_SECONDS = 8;
 const _hwBreakpoints = new Set();
 
 // ── Relay state (mirror from production) ──────────────────────────────────────
@@ -17531,6 +17534,136 @@ function _wukongHandleBridgeAlert(alert) {
     }
 }
 
+function _wukongClassifyFreeze(status, expectedRunning, pendingExecution, lastRetirementSeq) {
+    status = status || {};
+    const latest = status.latest_trace || {};
+    const halt = status.halt || {};
+    const age = Number(status.last_trace_age);
+    const evidence = {
+        lastRetiredNia: latest.nia == null ? null : (Number(latest.nia) >>> 0),
+        attemptedNia: latest.attempted_nia == null ? null : (Number(latest.attempted_nia) >>> 0),
+        rawWord: latest.instr != null ? (Number(latest.instr) >>> 0) :
+            (latest.instr_word != null ? (Number(latest.instr_word) >>> 0) : null),
+        decoded: latest.disasm || null,
+        abstraction: latest.pet_name || latest.abstraction_label || null,
+        offset: latest.offset == null ? null : latest.offset,
+        sourceMap: latest.source_map || null,
+        lastEventTs: latest.ts || null,
+        bridgeConnected: !!status.bridge_connected,
+        boardConnected: Number.isFinite(age) && age < 10
+    };
+    let classification = null;
+    let title = null;
+    let action = null;
+    if (latest.fault_valid || halt.active_fault) {
+        classification = 'machine_fault';
+        title = 'Machine Fault';
+        action = 'Inspect the correlated fault snapshot before choosing Reboot or Skip Fault.';
+    } else if (latest.bp_hit || halt.breakpoint_hit) {
+        classification = 'breakpoint_pause';
+        title = 'Breakpoint / Pause';
+        action = 'Use Step to inspect the stopped instruction, or Run to continue.';
+    } else if (!status.bridge_connected && (expectedRunning || pendingExecution)) {
+        classification = 'transport_disconnect';
+        title = 'Wukong Transport Disconnected';
+        action = 'Check board power, USB-UART, the bridge process, serial port, and server URL; then reconnect.';
+    } else if (expectedRunning && !pendingExecution && Number.isFinite(age) &&
+               age >= _WUKONG_FREEZE_SECONDS) {
+        classification = 'no_retirement_stall';
+        title = 'Wukong Execution Stalled';
+        action = 'Inspect the shown instruction and capabilities, then choose Halt or Reboot; no instruction was skipped automatically.';
+    } else if (String(halt.state || '') === 'halt confirmed' &&
+               !halt.breakpoint_hit) {
+        classification = 'explicit_halt';
+        title = 'Explicit Halt';
+        action = 'Use Step or Run when you are ready to continue.';
+    }
+    if (!classification) return null;
+    return {
+        classification, title, action, evidence,
+        faultCode: classification === 'machine_fault' ? latest.fault_code : null,
+        key: classification + ':' + String(lastRetirementSeq || 0) + ':' +
+            String(evidence.lastRetiredNia == null ? 'none' : evidence.lastRetiredNia)
+    };
+}
+
+function _wukongShowFreezeDiagnostic(incident) {
+    const old = document.getElementById('wukong-freeze-diagnostic');
+    if (old) old.remove();
+    const e = incident.evidence || {};
+    const unavailable = 'Unavailable from hardware';
+    const value = function(v, hex) {
+        if (v === null || v === undefined || v === '') return unavailable;
+        return hex ? _wukongHex(v) : String(v);
+    };
+    const rows = [
+        ['Classification', incident.classification.replace(/_/g, ' ')],
+        ['Last confirmed retired NIA', value(e.lastRetiredNia, true)],
+        ['Current / attempted NIA', value(e.attemptedNia, true)],
+        ['Raw instruction word', value(e.rawWord, true)],
+        ['Decoded instruction', value(e.decoded)],
+        ['Abstraction', value(e.abstraction)],
+        ['Offset', value(e.offset)],
+        ['Source map', value(e.sourceMap)],
+        ['Last event time', e.lastEventTs ? new Date(e.lastEventTs * 1000).toLocaleString() : unavailable],
+        ['Board connection', e.boardConnected ? 'Recent board trace observed' : 'No recent board trace'],
+        ['Bridge connection', e.bridgeConnected ? 'Connected' : 'Disconnected'],
+        ['Fault code', incident.faultCode == null ? 'Not asserted — no machine fault code supplied' : value(incident.faultCode, true)]
+    ];
+    const overlay = document.createElement('div');
+    overlay.id = 'wukong-freeze-diagnostic';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:10040;background:rgba(3,7,18,.78);display:flex;align-items:center;justify-content:center;padding:20px;';
+    const panel = document.createElement('div');
+    panel.style.cssText = 'width:min(680px,96vw);max-height:90vh;overflow:auto;background:#101827;color:#e5e7eb;border:1px solid #475569;border-radius:10px;padding:18px;box-shadow:0 20px 60px #000;';
+    const heading = document.createElement('h2');
+    heading.textContent = incident.title;
+    heading.style.cssText = 'margin:0 0 12px;color:#f8fafc;font-size:20px;';
+    const table = document.createElement('dl');
+    table.style.cssText = 'display:grid;grid-template-columns:minmax(170px,1fr) 2fr;gap:7px 14px;font:12px/1.45 ui-monospace,monospace;';
+    rows.forEach(function(row) {
+        const dt = document.createElement('dt');
+        dt.textContent = row[0];
+        dt.style.color = '#94a3b8';
+        const dd = document.createElement('dd');
+        dd.textContent = row[1];
+        dd.style.margin = '0';
+        table.appendChild(dt); table.appendChild(dd);
+    });
+    const action = document.createElement('p');
+    action.textContent = 'Recommended next action: ' + incident.action;
+    action.style.cssText = 'margin:14px 0;color:#fbbf24;';
+    const close = document.createElement('button');
+    close.textContent = 'Close';
+    close.style.cssText = 'float:right;padding:7px 16px;background:#334155;color:white;border:1px solid #64748b;border-radius:5px;cursor:pointer;';
+    close.addEventListener('click', function() { overlay.remove(); });
+    panel.appendChild(heading); panel.appendChild(table); panel.appendChild(action); panel.appendChild(close);
+    overlay.appendChild(panel); document.body.appendChild(overlay);
+}
+
+function _wukongHandleFreezeStatus(status) {
+    const incident = _wukongClassifyFreeze(
+        status, _wukongHWRunning, _wukongPendingExecutionCmd,
+        _wukongLastRetirementSeq);
+    if (!incident) {
+        if (_wukongLastRetirementSeq > _wukongFreezeRecoverySeq) {
+            _wukongFreezeIncidentKey = null;
+            _wukongFreezeRecoverySeq = _wukongLastRetirementSeq;
+        }
+        return null;
+    }
+    // Architectural faults retain the established Machine Fault modal and
+    // correlated snapshot flow; this detector must not open a contradictory one.
+    if (incident.classification === 'machine_fault') return incident;
+    if (incident.key !== _wukongFreezeIncidentKey) {
+        _wukongFreezeIncidentKey = incident.key;
+        _wukongFreezeRecoverySeq = _wukongLastRetirementSeq;
+        _wukongShowFreezeDiagnostic(incident);
+    }
+    return incident;
+}
+
 /** Fetch status and render the health strip inside #wukong-health-strip. */
 async function _wukongRefreshHealthStrip() {
     try {
@@ -17547,6 +17680,7 @@ async function _wukongRefreshHealthStrip() {
                 ? s.relay_last_rx : null;
         }
         _wukongHandleBridgeAlert(s.bridge_alert);
+        _wukongHandleFreezeStatus(s);
         const haltDelivery = s && s.command_delivery;
         if (haltDelivery && haltDelivery.cmd === 'h' &&
                 haltDelivery.board_halt_confirmed &&

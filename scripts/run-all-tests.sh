@@ -308,7 +308,7 @@ register_suite "wukong-cr-update-tests" \
     'node simulator/test_wukong_cr_update.js'
 
 register_suite "wukong-hw-fault-tests" \
-    'node simulator/test_wukong_hw_fault.js'
+    'node simulator/test_wukong_hw_fault.js && node simulator/test_wukong_freeze_incidents.js'
 
 register_suite "wukong-reconnect-halt-badge-tests" \
     'node simulator/test_wukong_reconnect_halt_badge.js && node simulator/test_fault_lamp_explanation.js'
