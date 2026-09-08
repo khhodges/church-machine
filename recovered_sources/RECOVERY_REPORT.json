@@ -1,0 +1,62 @@
+{
+  "recoveredAt": "2026-09-08",
+  "authority": "Embedded 0xAB frames decoded directly from big-endian LUMP binaries",
+  "fullSource": [
+    {
+      "version": "v1_this_screenshot",
+      "binary": "server/lumps/WukongCallHome.1.55884a36.lump",
+      "recovered": "recovered_sources/WukongCallHome_v1_this_screenshot.cloomc",
+      "characters": 8635,
+      "sha256": "198d0f1f87d981b1a56b9913ee1e3b8615525edea395f675eeb60d7bc5c5decf",
+      "cw": 74,
+      "cc": 4,
+      "sizeWords": 4096
+    },
+    {
+      "version": "v2",
+      "binary": "server/lumps/WukongCallHome_v2.lump",
+      "recovered": "recovered_sources/WukongCallHome_v2.cloomc",
+      "characters": 8292,
+      "sha256": "ceaee9932301e1a658ea0abbd2a5803e5485ed2dc461925e9555832e537802ef",
+      "cw": 73,
+      "cc": 2,
+      "sizeWords": 4096
+    },
+    {
+      "version": "v3",
+      "binary": "server/lumps/WukongCallHome_v3.lump",
+      "recovered": "recovered_sources/WukongCallHome_v3.cloomc",
+      "characters": 8292,
+      "sha256": "ceaee9932301e1a658ea0abbd2a5803e5485ed2dc461925e9555832e537802ef",
+      "cw": 73,
+      "cc": 2,
+      "sizeWords": 4096
+    },
+    {
+      "version": "v6",
+      "binary": "server/lumps/WukongCallHome_v6.lump",
+      "recovered": "recovered_sources/WukongCallHome_v6.cloomc",
+      "characters": 7067,
+      "sha256": "6951972b7cdb6e33214aa606271e477e30733a205c6f5d24ca9b9c4c48b52b70",
+      "cw": 74,
+      "cc": 3,
+      "sizeWords": 1024
+    }
+  ],
+  "apiOnly": [
+    {
+      "version": "v4",
+      "binary": "server/lumps/WukongCallHome_v4.lump",
+      "recovered": "recovered_sources/WukongCallHome_v4.api.json"
+    }
+  ],
+  "unrecoverable": [
+    "v5: no artifact found",
+    "v7: telemetry metadata only; no local or Git binary",
+    "v8: telemetry metadata only; no local or Git binary"
+  ],
+  "notes": [
+    "v2 and v3 contain byte-identical source",
+    "v1 screenshot candidate is identified by its exact CW=74, CC=4, 4096-word geometry"
+  ]
+}

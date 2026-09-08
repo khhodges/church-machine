@@ -1,0 +1,8 @@
+{
+  "name": "WukongCallHome",
+  "language": "assembly",
+  "caps": [
+    "LED0",
+    "UART_TX"
+  ]
+}

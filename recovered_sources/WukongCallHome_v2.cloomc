@@ -4,8 +4,8 @@
 ;               UART callhome beacon.  Transcribed from WUKONG_NUC_PROGRAM
 ;               in hardware/boot_rom.py (the authoritative human-readable form).
 ;
-;               This 74-word software LUMP runs the recovered ROM sequence and
-;               then hands off to the immutable WukongCallHome.hw LUMP. Every cycle
+;               This is the exact 73-word program burned into the Wukong FPGA
+;               ROM and executed from word 0 on every power-up.  Every cycle
 ;               (~1 Hz) it:
 ;                 1. Turns LED0 on
 ;                 2. Transmits "CM:WUKONG\r\n" over UART at 57600 baud
@@ -14,14 +14,12 @@
 ;                 5. Waits ~0.498 s  (off-phase delay)
 ;                 6. Jumps back to step 1
 ;
-;               INFINITE LOOP — no RETURN (intentional). The final capability
-;               CALL hands execution to the recovered hardware LUMP; the branch
-;               remains as a safe loop fallback if that implementation returns.
-;               This remains a safe answer to the NULL_CAP problem:
+;               INFINITE LOOP — no RETURN and no CALL (intentional).
+;               This is the safe standalone answer to the NULL_CAP problem:
 ;               BOOT_PROGRAM[2] = CALL CR0,CR0 faults NULL_CAP on a bare board
 ;               because Thread.caps[0] is NULL when no IDE has called
-;               setBootEntrySlot(). This LUMP uses an explicitly declared,
-;               validated WukongCallHome.hw capability instead.
+;               setBootEntrySlot().  This program avoids CALL entirely and
+;               runs safely on an unconfigured FPGA.
 ;               See: docs/wukong-boot.md
 ;
 ; Timing (50 MHz clock):
@@ -39,8 +37,8 @@
 ;   DR7  STATUS − 1 scratch (EQ=0 means busy)
 ;
 ; MMIO (word-addressed via DWRITE/DREAD through capability GTs):
-;   CR3 (LED0,    source c-list[4], physical row 5): word 0 = LED0 {B,G,R}
-;   CR4 (UART_TX, source c-list[5], physical row 6): TX and STATUS
+;   CR3 (LED0,    c-list[0]): word 0 = LED0 {B,G,R}; bit 0 = R → physical pin
+;   CR4 (UART_TX, c-list[1]): word 0 = TX (write), word 1 = STATUS (read, bit0=busy)
 ;
 ; UART busy-poll sequence per byte (5 instructions, words N..N+4):
 ;   IADD  DR5, DR0, #byte         — load byte value
@@ -61,28 +59,24 @@
 ; Divergence check: scripts/check_wukong_callhome_divergence.js
 ;   Words 0-1 (LOAD) encode c-list slots 0/1 here vs 5/6 in WUKONG_NUC_PROGRAM
 ;   because the hardware boot c-list has LED at slot 5 and UART at slot 6.
-;   Words 2-71 match WUKONG_NUC_PROGRAM word-for-word. Word 72 is the
-;   WukongCallHome.hw handoff and word 73 is the loop fallback.
+;   Words 2-72 must match WUKONG_NUC_PROGRAM word-for-word.
 ;
 ; Cross-reference: hardware/boot_rom.py (WUKONG_NUC_PROGRAM)
 ;                  hardware/wukong_top.py (_WUKONG_ROM)
 ; ============================================================
 
 capabilities {
-    SELF E
-    LED0 RW
+    LED0    RW,
     UART_TX W
-    WukongCallHome.hw E
 }
 
 ; ── Setup (words 0-2) — one-time capability loads ────────────────────────────
-; NOTE: LOAD instructions here use source c-list slots 4/5 (LED0, UART_TX);
-; the builder shifts these to physical rows 5/6 after compiler-owned SELF.
+; NOTE: LOAD instructions here use LUMP c-list slots 0/1 (LED0, UART_TX).
 ; The hardware ROM uses slots 5/6 from the Wukong boot c-list.  All other
 ; instructions (words 2-72) are bit-for-bit identical to WUKONG_NUC_PROGRAM.
 setup:
-    LOAD  CR3, LED0               ; [0] LED_DEV → CR3  (physical row 5, RW)
-    LOAD  CR4, UART_TX            ; [1] UART_DEV → CR4  (physical row 6, W)
+    LOAD  CR3, LED0               ; [0] LED_DEV → CR3  (c-list[0], RW)
+    LOAD  CR4, UART_TX            ; [1] UART_DEV → CR4  (c-list[1], W)
     IADD  DR1, DR0, #1            ; [2] DR1 = 1  (LED "on"; also DREAD STATUS offset)
 
 ; ── Loop top (word 3) — unconditional branch target from word 72 ─────────────
@@ -202,6 +196,5 @@ inner_off:
     ISUB  DR3, DR3, #1            ; [70] decrement outer
     BRANCHNE outer_off            ; [71] → [67]  (outer loop: -4)
 
-; ── Hardware handoff + loop fallback (words 72-73) ────────────────────────────
-    CALL WukongCallHome.hw        ; [72] runtime-only physical row 7, selector 0
-    BRANCH loop_top               ; [73] → [3]   BRANCH AL, offset=-70
+; ── Loop branch (word 72) — unconditional, back to LED on + banner ────────────
+    BRANCH loop_top               ; [72] → [3]   BRANCH AL, offset=-69
