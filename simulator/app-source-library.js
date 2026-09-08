@@ -508,6 +508,24 @@ function _lrEsc(s) {
         .replace(/"/g, '&quot;');
 }
 
+function _lrFormatTimestamp(timestamp) {
+    if (timestamp == null) return { text: '\u2014', title: 'Compile time unavailable' };
+    const date = new Date(timestamp);
+    if (!Number.isFinite(date.getTime())) {
+        return { text: '\u2014', title: 'Compile time unavailable' };
+    }
+    return {
+        text: date.toLocaleString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+        }),
+        title: date.toISOString(),
+    };
+}
+
 function _renderLumpRegistry(filter) {
     const container = document.getElementById('lrContent');
     if (!container || typeof LumpRegistry === 'undefined') return;
@@ -529,7 +547,7 @@ function _renderLumpRegistry(filter) {
     }
 
     let html = '<table class="lr-table"><thead><tr>'
-        + '<th>Token</th><th>Abstraction</th><th>Sources</th><th>NS&nbsp;Slot</th><th></th>'
+        + '<th>Token</th><th>Abstraction</th><th>Date &amp; Time</th><th>Sources</th><th>NS&nbsp;Slot</th><th></th>'
         + '</tr></thead><tbody>';
 
     for (const entry of visible) {
@@ -538,6 +556,8 @@ function _renderLumpRegistry(filter) {
         const nsSlot  = (srv && srv.ns_slot != null) ? srv.ns_slot : '\u2014';
         const methods = (srv && srv.methods && srv.methods.length) ? srv.methods.length : null;
         const absName = _lrEsc(entry.abstraction || entry.token);
+        const timestamp = LumpRegistry.timestampFor(entry);
+        const dateTime = _lrFormatTimestamp(timestamp);
 
         const badges = [
             srv ? '<span class="lr-badge lr-badge-server">server</span>' : '',
@@ -550,6 +570,7 @@ function _renderLumpRegistry(filter) {
         html += `<tr class="lr-row">
             <td><span class="lr-token">${_lrEsc(entry.token)}</span></td>
             <td class="lr-name">${absName}${methodHint}</td>
+            <td class="lr-date" title="${_lrEsc(dateTime.title)}">${_lrEsc(dateTime.text)}</td>
             <td>${badges}</td>
             <td class="lr-ns">${nsSlot}</td>
             <td><button class="btn lr-open-btn" onclick="_lrOpenEntry('${_lrEsc(entry.token)}')" data-tooltip="Open in Lump Repository">Open</button></td>

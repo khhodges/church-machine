@@ -46,6 +46,22 @@
     // actually the most recent known-good artefact).
     var _SESSION_EPOCH = Date.now();
 
+    function _timestampMs(value) {
+        var n = Number(value);
+        if (!Number.isFinite(n) || n <= 0) return null;
+        // Manifest compiled_at values are Unix seconds; browser registration
+        // timestamps are milliseconds.
+        return n < 1000000000000 ? n * 1000 : n;
+    }
+
+    function _entryTimestamp(entry) {
+        var sources = entry && entry.sources;
+        var server = sources && sources.server;
+        if (server) return _timestampMs(server.compiled_at);
+        var memory = sources && sources.memory;
+        return memory ? _timestampMs(memory.registeredAt) : null;
+    }
+
     // Restore last-viewed token from localStorage on startup
     try {
         var _saved = localStorage.getItem('lumpRegistryCurrent');
@@ -208,22 +224,25 @@
             }
         },
 
-        // List all known entries sorted by: server entries first (by fetchedAt
-        // desc), then memory-only entries (by registeredAt desc).
+        // Return the persisted compile time for server-backed entries and the
+        // session registration time for memory-only entries, normalized to ms.
+        // Legacy server records without compiled_at intentionally return null.
+        timestampFor: function (entry) {
+            return _entryTimestamp(entry);
+        },
+
+        // List all known entries newest-first by their canonical timestamp.
+        // Undated legacy entries sort last; token is the deterministic tie-break.
         list: function () {
             var arr = [];
             _entries.forEach(function (entry) { arr.push(entry); });
             arr.sort(function (a, b) {
-                var aServer = !!(a.sources && a.sources.server);
-                var bServer = !!(b.sources && b.sources.server);
-                if (aServer !== bServer) return aServer ? -1 : 1;
-                var aT = (a.sources && (
-                    (a.sources.server && a.sources.server.fetchedAt) ||
-                    (a.sources.memory && a.sources.memory.registeredAt))) || 0;
-                var bT = (b.sources && (
-                    (b.sources.server && b.sources.server.fetchedAt) ||
-                    (b.sources.memory && b.sources.memory.registeredAt))) || 0;
-                return bT - aT;
+                var aT = _entryTimestamp(a);
+                var bT = _entryTimestamp(b);
+                if (aT === null && bT !== null) return 1;
+                if (aT !== null && bT === null) return -1;
+                if (aT !== bT) return bT - aT;
+                return String(a.token || '').localeCompare(String(b.token || ''));
             });
             return arr;
         },

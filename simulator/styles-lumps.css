@@ -5811,6 +5811,12 @@ pre:hover .code-copy-btn {
     color: #dde8f0;
     font-size: 0.82rem;
 }
+.lr-date {
+    color: #9aa8b6;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
 .lr-method-count {
     font-size: 0.70rem;
     color: #6b7280;
