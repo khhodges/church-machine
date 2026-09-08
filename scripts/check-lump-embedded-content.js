@@ -12,6 +12,10 @@ function arg(name, fallback) {
 }
 const LUMPS = arg('lumps-dir', path.join(ROOT, 'server', 'lumps'));
 const EXAMPLES = arg('examples-dir', path.join(ROOT, 'simulator', 'examples'));
+const HISTORICAL_WITHOUT_EMBEDDED_CONTENT = new Set([
+    'Salvation.1.6be43a9d.lump',
+    'MorseCmOk.1.eb20fe01.lump',
+]);
 
 function snake(name) {
     return name.replace(/([a-z0-9])([A-Z])/g, '$1_$2')
@@ -44,6 +48,21 @@ function inspect(file) {
     return { api, source };
 }
 
+function historicalClassification(entry, error) {
+    if (HISTORICAL_WITHOUT_EMBEDDED_CONTENT.has(entry.filename) &&
+        error.message === 'embedded content missing') {
+        return 'historical pre-embedded-content artifact';
+    }
+    if (!entry.archived) return null;
+    if (error.message === 'embedded content missing') {
+        return 'historical artifact intentionally lacks embedded content';
+    }
+    if (error.message === 'embedded API/source does not match canonical source') {
+        return 'historical artifact embeds an earlier canonical source';
+    }
+    return null;
+}
+
 function main() {
     const manifestValue = JSON.parse(fs.readFileSync(path.join(LUMPS, 'manifest.json'), 'utf8'));
     const manifest = Array.isArray(manifestValue) ? manifestValue : Object.values(manifestValue);
@@ -62,8 +81,13 @@ function main() {
             console.log(`ok ${entry.filename}`);
             checked++;
         } catch (error) {
-            console.error(`FAIL ${entry.filename}: ${error.message}`);
-            failed++;
+            const classification = historicalClassification(entry, error);
+            if (classification) {
+                console.log(`historical ${entry.filename}: ${classification}`);
+            } else {
+                console.error(`FAIL ${entry.filename}: ${error.message}`);
+                failed++;
+            }
         }
     }
     console.log(`check-lump-embedded-content: ${checked} checked, ${failed} failed`);
