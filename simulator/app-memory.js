@@ -200,7 +200,7 @@ function updateCRDetail() {
                         const _threadLabel = (sim.nsLabels && sim.nsLabels[_selectedThreadSlot])
                             || `Thread slot ${_selectedThreadSlot}`;
                         let hBar = '<div class="crd-menu-bar">';
-                        hBar += `<span class="crd-menu-active-label">${_threadLabel} \u2014 Suspended Memory Image</span>`;
+                        hBar += `<span class="crd-menu-active-label">${formatThreadDisplayName(_threadLabel)} \u2014 Suspended Memory Image</span>`;
                         hBar += `<span class="crd-zone-nav" title="Jump to zone \u00b7 hover for live data">`;
                         hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone('hdr')" onmouseenter="showZonePopup(event,'hdr',${_selectedThreadSlot})" onmouseleave="hideZonePopup()">Hdr</button>`;
                         hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(5)" onmouseenter="showZonePopup(event,5,${_selectedThreadSlot})" onmouseleave="hideZonePopup()">&#x2464;\u202FDR</button>`;
@@ -221,7 +221,7 @@ function updateCRDetail() {
                     const _selectedThreadLabel = (sim.nsLabels && sim.nsLabels[_selectedThreadSlot])
                         || `Thread slot ${_selectedThreadSlot}`;
                     preBootHtml += `<div style="padding:0.75rem 1rem 0.25rem;color:#f4b942;font-weight:600;font-size:0.85rem;letter-spacing:0.04em;">SUSPENDED THREAD IMAGE</div>`;
-                    preBootHtml += `<div style="padding:0 1rem 0.75rem;color:var(--text-secondary);font-size:0.8rem;">CR14 is not live yet. This is the selected ${_selectedThreadLabel} CR0 home:</div>`;
+                    preBootHtml += `<div style="padding:0 1rem 0.75rem;color:var(--text-secondary);font-size:0.8rem;">CR14 is not live yet. This is the selected ${formatThreadDisplayName(_selectedThreadLabel)} CR0 home:</div>`;
                     preBootHtml += `<table class="abs-clist-table" style="margin:0 1rem 1rem;"><thead><tr><th>CR</th><th>GT (HEX)</th><th>PERMS</th><th>TYPE</th><th>NAME</th></tr></thead><tbody>`;
                     if (word === 0) {
                         preBootHtml += `<tr><td class="abs-clist-idx">CR0</td><td colspan="4" class="abs-clist-empty-slot">\u2014 (empty)</td></tr>`;
@@ -2190,7 +2190,7 @@ function _threadLayoutForSlot(nsIndex) {
 function _isThreadNamespaceSlot(nsIndex, entry) {
     if (_threadLayoutForSlot(nsIndex).valid) return true;
     const label = String((entry && entry.label) || (sim && sim.nsLabels && sim.nsLabels[nsIndex]) || '');
-    return label === 'Boot.Thread' || /^Thread#\d+$/.test(label);
+    return label === 'Boot.Thread' || /^Thread[.#]\d+$/.test(label);
 }
 
 function renderThreadMemoryLayout(nsIndex, expandAll = false) {
@@ -4427,7 +4427,7 @@ function _showNSThreadModal(slotIdx) {
     if (old) old.remove();
     const entry = sim && sim.readNSEntry(slotIdx);
     const rawLabel = (entry && entry.label) || (sim && sim.nsLabels && sim.nsLabels[slotIdx]) || `NS[${slotIdx}]`;
-    const label = String(rawLabel).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const label = formatThreadDisplayName(rawLabel).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const body = renderThreadMemoryLayout(slotIdx);
     const html = `<div id="_nsLumpModalOverlay" data-testid="thread-detail-modal" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.72);" onclick="if(event.target===this)this.remove();">` +
         `<div style="background:#1e1e1e;border:1px solid rgba(168,85,247,0.45);border-radius:8px;padding:18px 20px;max-width:1100px;width:94%;max-height:88vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.7);">` +

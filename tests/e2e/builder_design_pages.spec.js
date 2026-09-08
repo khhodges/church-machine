@@ -176,12 +176,12 @@ test.describe('Builder design pages — Thread Lump & Namespace Lump', () => {
         // the default single-thread image and verifies labels/slots whenever
         // a multi-thread image is committed.
         const generated = (nsState.abstractions || [])
-            .filter(row => /^Thread#\d+$/.test(row.name || ''))
+            .filter(row => /^Thread\.\d+$/.test(row.name || ''))
             .sort((a, b) => a.slot - b.slot);
         expect(generated).toHaveLength(c.thread.count - 1);
         generated.forEach((row, index) => {
             expect(row.slot).toBe(11 + index);
-            expect(row.name).toBe(`Thread#${index + 2}`);
+            expect(row.name).toBe(`Thread.${index + 2}`);
         });
     });
 
@@ -281,10 +281,10 @@ test.describe('Namespace Thread instance details', () => {
         });
 
         await expect(page.locator('#namespace')).toBeVisible();
-        await page.locator('.ns-label', { hasText: 'Thread#3' }).click();
+        await page.locator('.ns-label', { hasText: 'Thread.3' }).click();
         const threadModal = page.locator('[data-testid="thread-detail-modal"]');
         await expect(threadModal).toBeVisible();
-        await expect(threadModal).toContainText('Thread#3');
+        await expect(threadModal).toContainText('Thread.3');
         await expect(threadModal).toContainText('0x33330001');
         await expect(threadModal).toContainText('0x33330017');
         await expect(threadModal).not.toContainText('0x22220001');

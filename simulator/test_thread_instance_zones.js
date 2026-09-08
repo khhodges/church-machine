@@ -394,8 +394,8 @@ function assertThreadTableColumns(html, layout, base, label) {
     });
 }
 
-assertThreadTableColumns(thread2Html, thread2, thread2.base, 'Thread#2');
-assertThreadTableColumns(thread3Html, thread3, thread3.base, 'Thread#3');
+assertThreadTableColumns(thread2Html, thread2, thread2.base, 'Thread.2');
+assertThreadTableColumns(thread3Html, thread3, thread3.base, 'Thread.3');
 assert(thread2Html.includes('0x22220001'), 'Thread#2 shows its saved DR value');
 assert(thread2Html.includes('0x22220081'), 'Thread#2 shows its saved heap value');
 assert(!thread2Html.includes('0x33330001'), 'Thread#2 never reads Thread#3 memory');
@@ -438,8 +438,10 @@ sandbox._petNameCRMap = {};
 sim.bootComplete = false;
 sim._currentThreadSlot = 12;
 sandbox.updateCRDetail();
-assert(crDetailContent.innerHTML.includes('Thread#3 — Suspended Memory Image'),
-    'pre-boot CR12 identifies the selected suspended Thread');
+assert(crDetailContent.textContent.includes('Thread.3') &&
+       crDetailContent.textContent.includes('Suspended Memory Image'),
+    'pre-boot CR12 identifies the selected suspended Thread: ' +
+    crDetailContent.textContent.slice(0, 180));
 assert(crDetailContent.innerHTML.includes('thread-zone-5') &&
        crDetailContent.innerHTML.includes('thread-zone-4') &&
        crDetailContent.innerHTML.includes('thread-zone-2') &&
@@ -459,7 +461,7 @@ assert(!crDetailContent.textContent.includes('Machine not booted yet'),
 sandbox._nsLabelOpen(12);
 let modal = dom.window.document.querySelector('[data-testid="thread-detail-modal"]');
 assert(modal, 'clicking a generated Thread Namespace label opens the Thread popup');
-assert(modal.textContent.includes('Thread#3'), 'popup identifies the selected generated Thread');
+assert(modal.textContent.includes('Thread.3'), 'popup identifies the selected generated Thread');
 assert(modal.innerHTML.includes('0x33330001'), 'popup renders selected Thread private values');
 assert([...modal.querySelectorAll('.thread-zone-hdr')]
         .every(header => header.classList.contains('thread-zone-collapsed')) &&

@@ -18795,6 +18795,12 @@ function _wukongAppendTrace(data) {
     if (!hwLogBody && !con) return;
     function _labelHardwareRow(line) {
         line.dataset.source = 'hardware';
+        for (const node of line.childNodes) {
+            if (node.nodeType === 3) {
+                node.nodeValue = String(node.nodeValue == null ? '' : node.nodeValue)
+                    .replace(/\bThread#(\d+)\b/g, 'Thread.$1');
+            }
+        }
         const source = document.createElement('span');
         source.className = 'wukong-trace-source-label';
         source.textContent = 'Hardware trace. ';

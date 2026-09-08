@@ -811,7 +811,7 @@ def test_ns_map_normalizes_lump_thread_and_hardware_metadata():
     assert capability['source'].endswith('.lump')
     assert capability['size_budget']['available'] is True
 
-    for slot, label in ((11, 'Thread#2'), (12, 'Thread#3')):
+    for slot, label in ((11, 'Thread.2'), (12, 'Thread.3')):
         thread = rows[slot]
         assert thread['name'] == label
         assert thread['token'] is None

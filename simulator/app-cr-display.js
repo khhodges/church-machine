@@ -18,7 +18,7 @@ function _crDisplayName(crIdx, cr) {
             const layout = sim.getThreadInstanceLayout(cr.gtIndex);
             const threadName = sim.nsLabels && sim.nsLabels[cr.gtIndex];
             if (layout && layout.valid && threadName) {
-                const displayThreadName = String(threadName).replace(/^Thread#(\d+)$/, 'Thread.$1');
+                const displayThreadName = formatThreadDisplayName(threadName);
                 return `${displayThreadName}.Heap`;
             }
         } catch (_e) {}

@@ -627,12 +627,12 @@ assert.strictEqual(uiSim.activeThreadStatus().slot, 11,
     'browser-shaped Next Thread click switches to Thread#2 without window.sim');
 assert.strictEqual(openedCR, 12,
     'Next Thread opens the selected Thread CR12 memory-map view');
-assert.strictEqual(status.textContent, 'Thread#2 · 2/3',
+assert.strictEqual(status.textContent, 'Thread.2 · 2/3',
     'toolbar status follows the newly active Thread LUMP');
 uiContext.nextConfiguredThread();
 assert.strictEqual(uiSim.activeThreadStatus().slot, 12,
     'second browser-shaped click switches to Thread#3');
-assert.strictEqual(status.textContent, 'Thread#3 · 3/3',
+assert.strictEqual(status.textContent, 'Thread.3 · 3/3',
     'toolbar status follows Thread#3');
 uiContext.nextConfiguredThread();
 assert.strictEqual(uiSim.activeThreadStatus().slot, 1,

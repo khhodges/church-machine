@@ -350,7 +350,7 @@
                 sim.reset();
             }
             // Saving the designer changes the persisted boot geometry, which
-            // also determines the generated Thread#2…Thread#N namespace
+            // also determines the generated Thread.2…Thread.N namespace
             // entries.  Do not leave the live simulator on the previous
             // boot-image snapshot: regenerate and load it now so the
             // Namespace Table reflects the saved design immediately.
@@ -1149,7 +1149,7 @@
         ];
         for (var _ti = 1; _ti <= threadCount; _ti++) {
             allZones.push({
-                label: _ti === 1 ? 'Thread.1' : 'Thread#' + _ti,
+                label: 'Thread.' + _ti,
                 words: threadLump,
                 cls: 'le-zone-stack'
             });
@@ -1161,9 +1161,9 @@
 
         var threadZoneDesc = threadCount === 1
             ? 'Thread.1 (' + threadLump.toLocaleString() + ' w)'
-            : threadCount + ' \u00d7 ' + threadLump.toLocaleString() + ' w (Thread.1, Thread#2\u2026Thread#' + threadCount + ')';
+            : threadCount + ' \u00d7 ' + threadLump.toLocaleString() + ' w (Thread.1, Thread.2\u2026Thread.' + threadCount + ')';
         var generatedThreadSlots = threadCount > 1
-            ? 'NS slots 11\u2013' + (9 + threadCount) + ' (Thread#2\u2026Thread#' + threadCount + ')'
+            ? 'NS slots 11\u2013' + (9 + threadCount) + ' (Thread.2\u2026Thread.' + threadCount + ')'
             : 'None (Thread.1 remains the fixed NS slot 1 entry)';
         var nsTableDesc = esc(NS_TABLE_COMPUTED.toLocaleString() + ' words (' + slots + ' slots × 4)');
         var grid = renderGrid([

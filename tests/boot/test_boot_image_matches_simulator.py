@@ -348,7 +348,7 @@ def test_boot_image_matches_simulator(cfg, tmp_path):
 
 @pytest.mark.parametrize("count", [1, 2, 5])
 def test_generated_thread_namespace_entries_have_stable_slots_and_boot_cr0(count, tmp_path):
-    """Thread#2 onward are resident, named NS entries with Thread.1's CR0."""
+    """Thread.2 onward are resident, named NS entries with Thread.1's CR0."""
     _write_synthetic_boot_abstr_lump(str(tmp_path))
     cfg = _cfg_generated_threads(count)
     image = generate_boot_image(cfg, str(tmp_path))
@@ -472,7 +472,7 @@ def test_committed_ns_state_names_generated_threads_from_image_count(tmp_path, m
     entries = server_app._derive_ns_state_entries()
     names = {entry["slot"]: entry["name"] for entry in entries}
     assert {slot: names[slot] for slot in generated_thread_slots(5)} == {
-        11: "Thread#2", 12: "Thread#3", 14: "Thread#4", 15: "Thread#5",
+        11: "Thread.2", 12: "Thread.3", 14: "Thread.4", 15: "Thread.5",
     }
 
 
@@ -612,7 +612,7 @@ def test_selftest_header_allocation_relocates_later_residents_and_threads(tmp_pa
     # SelfTest joins the dynamic resident pool after the fixed catalog bodies,
     # rather than claiming a fixed bootstrap address or 512-word reservation.
     assert selftest_loc == entries[10]["w0"] + 64
-    # Generated Thread#2 follows the selected header allocation exactly.
+    # Generated Thread.2 follows the selected header allocation exactly.
     assert entries[11]["w0"] == selftest_loc + 128
 
 

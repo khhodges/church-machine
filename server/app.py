@@ -2475,7 +2475,7 @@ def _validate_slot_rules(slot_rules):
 # 1024/power-of-two limit.
 MAX_NS_ENTRIES = _boot_image_gen.NAMESPACE_HEADER_V2_MAX_SLOTS
 # How many fixed named NS entries are present after a cold boot. Configured
-# Thread#2 onward occupy deterministic slots immediately after this catalog.
+# Thread.2 onward occupy deterministic slots immediately after this catalog.
 # _initNamespaceTable() always populates Boot.NS (0), Boot.Thread (1), UART,
 # LED, BTN, TIMER, SelfTest, WukongCallHome, Tunnel, Ethernet, CapabilityTest.
 # Slots 2–5 are MMIO device windows backed by hardware registers, not RAM.
@@ -2495,7 +2495,7 @@ RESERVED_NS_SLOTS = set(range(BASE_NAMED_NS_COUNT))
 
 
 def _generated_thread_slots_for_step1(step1):
-    """Return the generated Thread#2+ slots reserved by a valid Step-1 config."""
+    """Return the generated Thread.2+ slots reserved by a valid Step-1 config."""
     try:
         return set(_boot_image_gen.generated_thread_slots(
             _boot_image_gen.configured_thread_count(step1 or {})))
@@ -2915,7 +2915,7 @@ def _validate_step3(step3, step1, step2):
     n = step3.get("emptySlotCount", 0)
     if not isinstance(n, int) or n < 0:
         return "step3.emptySlotCount must be a non-negative integer"
-    # Generated Thread#2 onward are named entries too. Step 3 reserves after
+    # Generated Thread.2 onward are named entries too. Step 3 reserves after
     # the fixed catalog plus those deterministic Thread slots.
     named_count = _named_ns_count_for_step1(step1)
     end = named_count + n
@@ -16409,7 +16409,7 @@ def _ba_build_ns_map():
             'header_word': f'0x{_boot_thread_header:08X}',
             'cw': thread_stack_words,
             'cc': _boot_image_gen.THREAD_CAP_WORDS,
-            'source': 'generated Thread#1 body (boot ROM)',
+            'source': 'generated Thread.1 body (boot ROM)',
             'size_budget': _thread_size_budget(thread_layout),
         })
     _boot_ns = _BOOT_NS_META if isinstance(_BOOT_NS_META, dict) else {}
@@ -16539,7 +16539,7 @@ def _ba_build_ns_map():
     }
     intrinsic_slots.update(generated_thread_slots)
 
-    # Generated Thread#2 onward are real boot-image bodies, not token-backed
+    # Generated Thread.2 onward are real boot-image bodies, not token-backed
     # LUMPs. Their locations and body size are authoritative from Namespace
     # state and the saved boot layout, respectively.
     for slot_num in sorted(generated_thread_slots):

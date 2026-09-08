@@ -431,7 +431,7 @@ class TestValidateStep1ThreadGeometry:
         collision = {"lumps": [{"nsSlot": 11, "loadPolicy": "Empty"}]}
         err = _validate_step2(collision, step1, TI60_BOARD)
         assert err is not None
-        assert "Thread#2" in err
+        assert "Thread.2" in err
 
         step1["nsSlotsMax"] = 11
         err = _validate_step1(TI60_BOARD, step1)
@@ -441,7 +441,7 @@ class TestValidateStep1ThreadGeometry:
     def test_resident_lump_cannot_overlap_generated_thread_memory(self):
         step1 = _make_step1(16384)
         step1["threadCount"] = 2
-        # Thread#2 occupies words 576..831 in the canonical boot layout.
+        # Thread.2 occupies words 576..831 in the canonical boot layout.
         err = _validate_step2(_make_step2(640, lump_size=256), step1, TI60_BOARD)
         assert err is not None
         assert "foundational" in err

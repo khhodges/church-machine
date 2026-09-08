@@ -87,7 +87,7 @@ assert(!explicitBootFallback.includes('LightningBolt'));
 
 const generatedThread = view._renderRow({
     slot: 11,
-    name: 'Thread#2',
+    name: 'Thread.2',
     token: null,
     header_word: '0xF900820C',
     cw: 32,
@@ -109,7 +109,7 @@ const generatedThread = view._renderRow({
     },
     checks: [],
 });
-assert(generatedThread.includes('Thread#2'));
+assert(generatedThread.includes('Thread.2'));
 assert(generatedThread.includes('NONE'),
     'generated Thread permissions must be NONE');
 assert(generatedThread.includes('Header 1w'));

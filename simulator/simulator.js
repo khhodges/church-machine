@@ -25,6 +25,9 @@ const ARCH_ABSTRACT_GT_FIELDS = ARCH_CONTRACTS.isa.abstractGtWord0.fields;
 const ARCH_NS_W1_FIELDS = ARCH_CONTRACTS.isa.nsEntry.word1.fields;
 const archFieldShift = field => field[0];
 const archFieldMask = field => (2 ** (field[1] - field[0] + 1)) - 1;
+function formatThreadDisplayName(value) {
+    return String(value == null ? '' : value).replace(/\bThread#(\d+)\b/g, 'Thread.$1');
+}
 const ARCH_NS_INTEGRITY_MASK = ARCH_CONTRACTS.isa.nsEntry.integrity.excludedWord1Fields
     .reduce((mask, name) => mask & ~(
         archFieldMask(ARCH_NS_W1_FIELDS[name]) << archFieldShift(ARCH_NS_W1_FIELDS[name])
@@ -480,7 +483,7 @@ class ChurchSimulator {
             } else if (_bi >= _bootCatalog.length) {
                 const _threadOrdinal = discoveredThreadSlots.indexOf(_bi);
                 if (_threadOrdinal > 0) {
-                    this.nsLabels[_bi] = `Thread#${_threadOrdinal + 1}`;
+                    this.nsLabels[_bi] = `Thread.${_threadOrdinal + 1}`;
                 } else if (!this.nsLabels[_bi] || this.nsLabels[_bi] === '(free)' || this.nsLabels[_bi] === '(reserved)') {
                     const _savedLabel = cfg && cfg.slotLabels && cfg.slotLabels[_bi];
                     this.nsLabels[_bi] = _savedLabel || `slot_${_bi}`;
@@ -2485,7 +2488,7 @@ class ChurchSimulator {
         runningOffset += selfTestWords;
         if (selfTestSlot >= this.nsCount) this.nsCount = selfTestSlot + 1;
 
-        // Generated Thread#2 onward are resident Thread LUMPs with stable NS
+        // Generated Thread.2 onward are resident Thread LUMPs with stable NS
         // identities immediately after the fixed boot catalog.  A Step-2
         // selection at one of these slots is a configuration collision, never
         // a reason to overwrite the generated thread.
@@ -2498,17 +2501,17 @@ class ChurchSimulator {
             }
             if (_bcStep2Lumps.some(e => e && (e.nsSlot | 0) === threadSlot)) {
                 throw new Error(
-                    `Boot config NS slot ${threadSlot} is reserved for Thread#${generatedThreadOrdinal.get(threadSlot)} ` +
+                    `Boot config NS slot ${threadSlot} is reserved for Thread.${generatedThreadOrdinal.get(threadSlot)} ` +
                     'and cannot host a Step-2 lump.');
             }
             const threadLoc = runningOffset;
             if (threadLoc + THREAD_LUMP_SIZE > this.NS_TABLE_BASE) {
                 throw new Error(
-                    `Generated Thread#${generatedThreadOrdinal.get(threadSlot)} does not fit below the Namespace table.`);
+                    `Generated Thread.${generatedThreadOrdinal.get(threadSlot)} does not fit below the Namespace table.`);
             }
             this.writeNSEntry(threadSlot, threadLoc, THREAD_LUMP_SIZE - 1,
                 0, 0, 1, 0, 0, 0);
-            this.nsLabels[threadSlot] = `Thread#${generatedThreadOrdinal.get(threadSlot)}`;
+            this.nsLabels[threadSlot] = `Thread.${generatedThreadOrdinal.get(threadSlot)}`;
             this.nsChainable[threadSlot] = false;
             runningOffset += THREAD_LUMP_SIZE;
         }
@@ -4899,7 +4902,8 @@ class ChurchSimulator {
             return {
                 slot,
                 name: slot === 1 ? 'Thread.1'
-                    : (this.nsLabels[slot] || `Thread slot ${slot}`),
+                    : formatThreadDisplayName(
+                        this.nsLabels[slot] || `Thread slot ${slot}`),
                 position: index + 1,
                 active,
                 nia: active ? (this.pc >>> 0)
@@ -4924,7 +4928,8 @@ class ChurchSimulator {
         return {
             slot: activeSlot,
             name: activeSlot === 1 ? 'Thread.1'
-                : (this.nsLabels[activeSlot] || `Thread slot ${activeSlot}`),
+                : formatThreadDisplayName(
+                    this.nsLabels[activeSlot] || `Thread slot ${activeSlot}`),
             position: position + 1,
             count: slots.length,
             slots,

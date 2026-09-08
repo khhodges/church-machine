@@ -150,7 +150,7 @@
       "ns_slot_policy": "static"
     },
     {
-      "name": "Thread#2",
+      "name": "Thread.2",
       "slot": 11,
       "location": "0x000005C0",
       "type": "Inform",
@@ -161,7 +161,7 @@
       "seal": "0xDEB0BEEF"
     },
     {
-      "name": "Thread#3",
+      "name": "Thread.3",
       "slot": 12,
       "location": "0x000006C0",
       "type": "Inform",

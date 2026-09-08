@@ -295,7 +295,7 @@ DEFAULT_ABSTRACTION_CATALOG = [
 assert len(DEFAULT_ABSTRACTION_CATALOG) == 14, "catalog drift vs simulator.js"
 
 # Thread.1 is the fixed Boot.Thread entry at NS slot 1. Configured secondary
-# threads retain their established slots: Thread#2 -> 11, Thread#3 -> 12.
+# threads retain their established slots: Thread.2 -> 11, Thread.3 -> 12.
 # Additional generated threads skip the fixed M_BIT_DEV at slot 13.
 GENERATED_THREAD_FIRST_NS_SLOT = 11
 MAX_THREAD_COUNT = 10
@@ -312,7 +312,7 @@ def configured_thread_count(step1):
 
 
 def generated_thread_slots(thread_count):
-    """Return deterministic NS slots for Thread#2 through Thread#N."""
+    """Return deterministic NS slots for Thread.2 through Thread.N."""
     if not isinstance(thread_count, int) or isinstance(thread_count, bool) or not (
             1 <= thread_count <= MAX_THREAD_COUNT):
         raise ValueError(
@@ -333,7 +333,7 @@ def generated_thread_label(slot):
         offset = generated_thread_slots(MAX_THREAD_COUNT).index(slot)
     except ValueError:
         return None
-    return f"Thread#{offset + 2}"
+    return f"Thread.{offset + 2}"
 
 
 def boot_resident_region_end(thread_size, boot_abstr_size, thread_count,
@@ -1024,19 +1024,19 @@ def build_wukong_upload_image(generic_image, boot_config=None):
         source_ns_base = source_total - (slot + 1) * NS_ENTRY_WORDS
         if source_ns_base < 0 or source_ns_base + NS_ENTRY_WORDS > source_total:
             raise ValueError(
-                f"Wukong source Thread#{number} slot {slot} has no Namespace descriptor"
+                f"Wukong source Thread.{number} slot {slot} has no Namespace descriptor"
             )
         descriptor = source_words[source_ns_base:source_ns_base + NS_ENTRY_WORDS]
         source_base = descriptor[0]
         if not (0 <= source_base < source_total):
             raise ValueError(
-                f"Wukong source Thread#{number} slot {slot} has invalid body location"
+                f"Wukong source Thread.{number} slot {slot} has invalid body location"
             )
         header = source_words[source_base]
         size = 1 << (((header >> 23) & 0xF) + 6)
         if ((header >> 27) & 0x1F) != 0x1F or ((header >> 8) & 0x3) != 2:
             raise ValueError(
-                f"Wukong source Thread#{number} slot {slot} is not a Thread LUMP"
+                f"Wukong source Thread.{number} slot {slot} is not a Thread LUMP"
             )
         stack_words = (header >> 10) & 0x1FFF
         cap_words = header & 0xFF
@@ -1044,7 +1044,7 @@ def build_wukong_upload_image(generic_image, boot_config=None):
         if (size not in THREAD_SUPPORTED_BODY_WORDS or cap_words != THREAD_CAP_WORDS
                 or not layout["valid"] or source_base + size > source_total):
             raise ValueError(
-                f"Wukong source Thread#{number} slot {slot} has an invalid {size}-word body"
+                f"Wukong source Thread.{number} slot {slot} has an invalid {size}-word body"
             )
         if any(source_base < end and source_base + size > start
                for start, end, _ in source_ranges):
@@ -1977,7 +1977,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     if boot_entry_slot is None:
         boot_entry_slot = _selftest_slot
 
-    # Thread.1 remains the fixed Boot.Thread at NS[1].  Thread#2 onward are
+    # Thread.1 remains the fixed Boot.Thread at NS[1].  Thread.2 onward are
     # generated resident entries immediately after the fixed catalog.  Reject,
     # rather than clamp, invalid counts so a hand-edited config cannot silently
     # produce a different Namespace layout than the designer displayed.
@@ -2309,7 +2309,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         # Keep all resident bodies below the three metadata sentinel words.
         if _thread_end > _metadata_start:
             raise ValueError(
-                f"generate_boot_image: Thread#{_ordinal} ({thread_size} words at "
+                f"generate_boot_image: Thread.{_ordinal} ({thread_size} words at "
                 f"0x{_thread_loc:X}) does not fit below the NS table "
                 f"(base 0x{ns_table_base:X}); reduce threadCount, "
                 f"threadLumpWords, or nsSlotsMax, or increase "
@@ -2413,7 +2413,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         (1 << 12) | layout["stack_end"]
     )
 
-    # ----- Generated Thread bodies (Thread#2 .. Thread#N) ----------------
+    # ----- Generated Thread bodies (Thread.2 .. Thread.N) ----------------
     # Their Namespace descriptors were emitted above.  Initialise each body
     # after resolving the live boot-entry generation, so every CR0 credential
     # is identical to Thread.1's selected SelfTest/boot-entry E-GT.

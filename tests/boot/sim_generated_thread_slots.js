@@ -25,14 +25,14 @@ function run(count) {
     for (let n = 2; n <= count; n++) {
         const slot = 9 + n;
         const entry = sim.readNSEntry(slot);
-        assert(entry, `Thread#${n} descriptor missing at NS slot ${slot}`);
-        assert.strictEqual(sim.nsLabels[slot], `Thread#${n}`);
+        assert(entry, `Thread.${n} descriptor missing at NS slot ${slot}`);
+        assert.strictEqual(sim.nsLabels[slot], `Thread.${n}`);
         assert.strictEqual(sim.memory[entry.word0_location] >>> 27, 0x1F);
         assert.strictEqual(sim.memory[entry.word0_location + 244],
-            sim.memory[244], `Thread#${n} CR0 must match Thread.1`);
+            sim.memory[244], `Thread.${n} CR0 must match Thread.1`);
     }
     assert.deepStrictEqual(
-        Object.keys(sim.nsLabels).map(Number).filter(slot => slot >= 11 && sim.nsLabels[slot].startsWith('Thread#')),
+        Object.keys(sim.nsLabels).map(Number).filter(slot => slot >= 11 && sim.nsLabels[slot].startsWith('Thread.')),
         expectedSlots);
 }
 
