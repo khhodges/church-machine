@@ -306,6 +306,9 @@ function makeOrdinaryCallFixture() {
     assert.ok(appRun.includes(
         'sim.run(batchMax, breakpoints, simUniversalBreakpoints)'),
         'Run delegates universal breakpoint policy to the simulator');
+    assert.ok(appRun.includes('(((23 << 27) | (branchOffset & 0x7FFF))') &&
+              !appRun.includes('(((17 << 27) | (branchOffset & 0x7FFF))'),
+        'high-level method tables encode canonical opcode 23 BRANCH, never opcode 17 DWRITE');
     assert.ok(appRun.includes('const breakpoints = simBreakpoints;'),
         'Run keeps the live breakpoint Set across asynchronous batches');
     assert.ok(!appRun.includes('sim._breakpointResumeAddr ='),

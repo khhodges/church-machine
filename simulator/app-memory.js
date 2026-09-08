@@ -5685,7 +5685,7 @@ window.__crdToggleFaultDetail = function(detailRowId, summaryRow) {
 //   accurate inside loops: an alias established in one iteration of a loop body is
 //   visible to earlier instructions in the next iteration.
 //
-//   Phase 1 — Identify basic-block entry points by scanning for BRANCH (opcode 17)
+//   Phase 1 — Identify basic-block entry points by scanning for BRANCH (opcode 23)
 //              instructions; branch targets and fall-through successors start new
 //              blocks.
 //   Phase 2 — Build the CFG successor list for each block.

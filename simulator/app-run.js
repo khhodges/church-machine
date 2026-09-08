@@ -283,13 +283,13 @@ function assembleAndLoad() {
         const labels = {};
         // Layout: words[0..N-1] = method table entries; words[N..] = method bodies.
         // loadProgram writes words[k] at lump word k+1 (word 0 is lump header).
-        // Method-table entries are BRANCH instructions (opcode 17, 15-bit signed offset),
+        // Method-table entries are BRANCH instructions (opcode 23, 15-bit signed offset),
         // matching _assembleLumpFromCatalog / _tryAutoAssembleLump (Tasks #1134, #1145).
         // CALL dispatcher: pc = (methodIndex-1) + soff = i + (codeOffset-i) = codeOffset
         // Fetch: physAddr = lumpBase + 1 + codeOffset → body first instruction. ✓
         let codeOffset = methodTableSize; // lump-relative PC of first body (table = PCs 0..N-1)
         const methodTableEntries = [];
-        // Emit BRANCH-encoded method-table entries (opcode 17, 15-bit signed offset).
+        // Emit BRANCH-encoded method-table entries (opcode 23, 15-bit signed offset).
         // Matches _assembleLumpFromCatalog / _tryAutoAssembleLump (Task #1134 / #1145).
         // Table entry i sits at lump word i+1, lump-relative PC = i.
         // branchOffset = bodyOffset(=codeOffset) - i
@@ -297,7 +297,7 @@ function assembleAndLoad() {
         for (let i = 0; i < methods.length; i++) {
             const m = methods[i];
             const branchOffset = codeOffset - i;
-            methodTableEntries.push(m.visibility === 'private' ? 0 : (((17 << 27) | (branchOffset & 0x7FFF)) >>> 0));
+            methodTableEntries.push(m.visibility === 'private' ? 0 : (((23 << 27) | (branchOffset & 0x7FFF)) >>> 0));
             labels[m.name] = codeOffset;      // lump-relative PC: body at lumpBase+1+codeOffset
             codeOffset += (m.code || []).length;
         }
@@ -2540,7 +2540,14 @@ function runSim() {
                 setTimeout(runBatch, VISUAL_STEP_DELAY_MS);
             }
         } catch(e) {
-            console.error('runSim batch error:', e);
+            const detail = e && (e.stack || e.message) ? (e.stack || e.message) : String(e);
+            console.error('runSim batch error:', detail);
+            if (con) {
+                const lines = con.textContent.split('\n');
+                lines[lines.length - 1] = `Runtime error: ${e && e.message ? e.message : String(e)}`;
+                con.textContent = lines.join('\n');
+                con.scrollTop = con.scrollHeight;
+            }
             finishRun('error');
         }
     }
