@@ -127,6 +127,33 @@ def test_programmer_can_replace_frozen_slot10_with_compiler_owned_lump():
         canonical_bytes).hexdigest()
 
 
+def test_stale_browser_self_is_rebound_to_programmer_selected_slot():
+    """A serialized browser GT cannot override a compiler-owned SELF row."""
+    words = [(0x1F << 27) | (1 << 10) | 1, 0] + [0] * 62
+    words[-1] = 0x4A000006
+    with app_module.app.test_client() as client:
+        response = client.post("/api/lumps/save-plan", json={
+            "binary": words,
+            "metadata": {
+                "abstraction": "ProgrammerChoice",
+                "ns_slot": 10,
+                "token": "deadbeef",
+                "content_type": "code",
+                # Older browser snapshots omitted compiler_owned_self while
+                # retaining the reserved __SELF__ row name.
+                "capabilities": [{"name": "__SELF__", "rights": ["E"]}],
+                "grants": ["E"],
+            },
+        })
+
+    assert response.status_code == 201, response.get_data(as_text=True)
+    canonical_words = list(words)
+    canonical_words[-1] = 0x4A00000A
+    canonical_bytes = __import__("struct").pack(">64I", *canonical_words)
+    assert response.get_json()["digest"] == __import__("hashlib").sha256(
+        canonical_bytes).hexdigest()
+
+
 @pytest.mark.parametrize("mutation", ["slot", "seq", "token"])
 def test_resolver_and_boot_reject_descriptor_or_token_mutation(tmp_path, mutation):
     root = Path(__file__).resolve().parents[2]

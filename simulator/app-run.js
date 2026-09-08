@@ -14913,6 +14913,9 @@ async function confirmSaveToNamespace() {
                     rights: cap.rights.slice(),
                     grants: cap.grants.slice(),
                     nsIndex: cap.nsIndex,
+                    ...(cap.compiler_owned_self === true
+                        ? { compiler_owned_self: true }
+                        : {}),
                 };
             });
         }

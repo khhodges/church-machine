@@ -8055,8 +8055,7 @@ def save_lump():
     _compiler_self_row = (
         _sl_typ == 0 and _has_declared_caps and
         isinstance(_declared_caps_raw[0], dict) and
-        _declared_caps_raw[0].get("compiler_owned_self") is True and
-        str(_declared_caps_raw[0].get("name", "")).upper() == "__SELF__"
+        str(_declared_caps_raw[0].get("name", "")).strip().upper() == "__SELF__"
     )
     _SELF_CAPABILITY_PLACEHOLDER = 0xFEED5E1F
     _validated_declared_caps = []
@@ -8126,9 +8125,10 @@ def save_lump():
         try:
             _live_bootstrap_gt = _resident_inform_egt(_bootstrap_binding)
             _actual_bootstrap_gt = _sl_words[_clist_row0_idx] & 0xFFFFFFFF
-            if _compiler_self_row and _actual_bootstrap_gt == _SELF_CAPABILITY_PLACEHOLDER:
-                # Source compilation leaves SELF unresolved. Bind it from the
-                # programmer-selected destination, never from the prior name.
+            if _compiler_self_row:
+                # SELF is compiler-owned, so any browser materialization is
+                # advisory and may be stale. Bind it from the programmer-
+                # selected destination, never from the prior name or client GT.
                 _actual_bootstrap_gt = _live_bootstrap_gt
                 _sl_words[_clist_row0_idx] = _actual_bootstrap_gt
             _runtime_t = _verify_bootstrap_self_gt(
@@ -8205,7 +8205,7 @@ def save_lump():
             token=f"{_selftest_egt:08x}",
         )
         _actual_selftest_gt = _sl_words[_clist_row0_idx] & 0xFFFFFFFF
-        if _compiler_self_row and _actual_selftest_gt == _SELF_CAPABILITY_PLACEHOLDER:
+        if _compiler_self_row:
             _sl_words[_clist_row0_idx] = _selftest_egt
         try:
             _bootstrap_identity = _bootstrap_identity_record(
