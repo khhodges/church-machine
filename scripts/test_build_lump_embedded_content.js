@@ -4,7 +4,9 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { execFileSync } = require('child_process');
+
+const { execFileSync, spawnSync } = require('child_process');
+const { execFileSync, spawnSync } = require('child_process');
 const { historicalClassification, inspect } = require('./check-lump-embedded-content.js');
 const ROOT = path.resolve(__dirname, '..');
 const CANONICAL_LUMPS = path.join(ROOT, 'server', 'lumps');
@@ -43,6 +45,22 @@ function seedCanonicalState(dir, script) {
         JSON.stringify({ version: 1, algorithm: 'sha256', approvals: {} }, null, 2) + '\n');
 }
 
+function writeFixtureLump(file, source) {
+    const size = 64;
+    const raw = Buffer.alloc(size * 4);
+    const api = Buffer.from(JSON.stringify({ methods: [] }), 'utf8');
+    const sourceBytes = Buffer.from(source, 'utf8');
+    raw.writeUInt32BE(0, 0);
+    let offset = 4;
+    raw[offset] = 0xab;
+    raw[offset + 1] = 1;
+    raw.writeUInt16BE(api.length, offset + 2);
+    api.copy(raw, offset + 4);
+    offset = (offset + 4 + api.length + 3) & ~3;
+    raw.writeUInt32BE(sourceBytes.length, offset);
+    sourceBytes.copy(raw, offset + 4);
+    fs.writeFileSync(file, raw);
+}
 let failures = 0;
 
 try {
@@ -89,4 +107,66 @@ for (const [script, sourceName] of builds) {
         fs.rmSync(dir, { recursive: true, force: true });
     }
 }
+try {
+    testHistoricalClassificationBoundary();
+} catch (error) {
+    console.error(`FAIL historical classification boundary: ${error.message}`);
+    failures++;
+}
 if (failures) process.exit(1);
+
+function writeMissingContentLump(file) {
+    fs.writeFileSync(file, Buffer.alloc(64 * 4));
+}
+
+const { historicalClassification, inspect } = require('./check-lump-embedded-content.js');
+
+function testHistoricalClassificationBoundary() {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lump-content-check-'));
+    const lumpsDir = path.join(dir, 'lumps');
+    const examplesDir = path.join(dir, 'examples');
+    fs.mkdirSync(lumpsDir);
+    fs.mkdirSync(examplesDir);
+    const source = 'abstraction Fixture {}\n';
+    const manifest = [
+        { abstraction: 'Fixture', filename: 'current-matching.lump' },
+        { abstraction: 'Fixture', filename: 'current-missing.lump' },
+        { abstraction: 'Fixture', filename: 'current-stale.lump' },
+        { abstraction: 'Fixture', filename: 'archived-missing.lump', archived: true },
+        { abstraction: 'Fixture', filename: 'archived-stale.lump', archived: true },
+    ];
+    try {
+        fs.writeFileSync(path.join(examplesDir, 'fixture.cloomc'), source);
+        fs.writeFileSync(path.join(lumpsDir, 'manifest.json'), JSON.stringify(manifest));
+        writeFixtureLump(path.join(lumpsDir, 'current-matching.lump'), source);
+        writeMissingContentLump(path.join(lumpsDir, 'current-missing.lump'));
+        writeFixtureLump(path.join(lumpsDir, 'current-stale.lump'), 'stale source\n');
+        writeMissingContentLump(path.join(lumpsDir, 'archived-missing.lump'));
+        writeFixtureLump(path.join(lumpsDir, 'archived-stale.lump'), 'stale source\n');
+
+        const result = spawnSync(process.execPath, [
+            path.join(__dirname, 'check-lump-embedded-content.js'),
+            '--lumps-dir', lumpsDir,
+            '--examples-dir', examplesDir,
+        ], { cwd: ROOT, encoding: 'utf8' });
+        const output = `${result.stdout}${result.stderr}`;
+        const expected = [
+            'ok current-matching.lump',
+            'FAIL current-missing.lump: embedded content missing',
+            'FAIL current-stale.lump: embedded API/source does not match canonical source',
+            'historical archived-missing.lump: historical artifact intentionally lacks embedded content',
+            'historical archived-stale.lump: historical artifact embeds an earlier canonical source',
+            'check-lump-embedded-content: 1 checked, 2 failed',
+        ];
+        if (result.status === 0) throw new Error('broken current artifacts exited zero');
+        for (const line of expected) {
+            if (!output.includes(line)) throw new Error(`missing checker output: ${line}`);
+        }
+        if (/historical current-(missing|stale)\.lump/.test(output)) {
+            throw new Error('current artifact was classified as historical');
+        }
+        console.log('PASS historical classification boundary');
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+}
