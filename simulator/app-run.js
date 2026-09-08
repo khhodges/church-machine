@@ -14588,6 +14588,30 @@ function _persistNamespaceSlotLabel(slot, label) {
 }
 window._persistNamespaceSlotLabel = _persistNamespaceSlotLabel;
 
+// A frozen resident's public token is its literal row-zero SELF GT, not the
+// content-derived token used by ordinary LUMPs.  Recognize that contract from
+// the exact binary bytes plus the selected Namespace generation so the save
+// request agrees with the server without hard-coding any resident name/slot.
+function _selectLumpSaveRequestToken(binary, nsSlot, nsSequence, fallbackToken) {
+    if (!Array.isArray(binary) || binary.length < 2 ||
+            !Number.isInteger(nsSlot) || nsSlot < 0 || nsSlot > 0xFFFF) {
+        return fallbackToken || null;
+    }
+    const header = Number(binary[0]) >>> 0;
+    const cc = header & 0xFF;
+    const lumpSize = 64 << ((header >>> 23) & 0x0F);
+    if (cc < 1 || binary.length < lumpSize) return fallbackToken || null;
+
+    const sequence = Number.isInteger(nsSequence) ? nsSequence : 0;
+    const residentSelf = (0x4A000000 |
+        ((sequence & 0x1FF) << 16) | (nsSlot & 0xFFFF)) >>> 0;
+    const rowZero = Number(binary[lumpSize - cc]) >>> 0;
+    return rowZero === residentSelf
+        ? residentSelf.toString(16).padStart(8, '0')
+        : (fallbackToken || null);
+}
+window._selectLumpSaveRequestToken = _selectLumpSaveRequestToken;
+
 async function confirmSaveToNamespace() {
     const slotSel = document.getElementById('saveNSSlot');
     const label = document.getElementById('saveNSLabel').value.trim();
@@ -14837,11 +14861,15 @@ async function confirmSaveToNamespace() {
     }
 
     // Compute the token without registering browser memory. Protected slot 10
-    // retains its canonical token and generation across replacement.
+    // retains its canonical token and generation across replacement. A frozen
+    // resident whose row-zero SELF exactly matches the selected slot/generation
+    // uses that literal GT; ordinary LUMPs retain their content-derived token.
     let _svTok = null;
     if (_protectedCapabilityTest) _svTok = '00000a00';
     else if (typeof window._computeLumpToken === 'function')
         _svTok = window._computeLumpToken(_svWords, _caps);
+    _svTok = _selectLumpSaveRequestToken(
+        _svBinary, idx, _targetSequence, _svTok);
 
     // ── Persist to the server LUMP repository so the LUMP browser reflects the
     // newly compiled lump immediately, without requiring a manual refresh.
@@ -14859,11 +14887,9 @@ async function confirmSaveToNamespace() {
                     (gtType === 2 ? 'outform' : 'abstract'),
                 namespace_sequence: _targetSequence,
                 replacement: slotSel.value !== 'new',
-                // Pass the canonical CRC32 token so the server stores the lump
-                // under the same token the format dialog displayed and the
-                // "Open Lump" toast navigates to.  Without this the server falls
-                // back to ns_slot<<8, which is a different value and makes the
-                // post-save navigation land on a 404.
+                // Ordinary LUMPs send their content-derived identity. Frozen
+                // residents send the literal row-zero SELF GT selected above.
+                // The response token remains authoritative for navigation.
                 token:        _svTok || undefined,
             }
         };
