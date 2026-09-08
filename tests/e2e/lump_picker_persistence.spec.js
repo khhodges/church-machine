@@ -30,10 +30,13 @@ const { test, expect } = require('@playwright/test');
 
 const STUB_TOKEN_A = 'AABBCCDD';
 const STUB_TOKEN_B = 'DEADBEEF';
+const STUB_SEAL_A = 'a'.repeat(64);
+const STUB_SEAL_B = 'b'.repeat(64);
 
 const STUB_LUMPS = [
     {
         token:        STUB_TOKEN_A,
+        identity_hash: STUB_SEAL_A,
         abstraction:  'LED',
         lump_size:    256,
         methods:      ['On', 'Off'],
@@ -45,6 +48,7 @@ const STUB_LUMPS = [
     },
     {
         token:        STUB_TOKEN_B,
+        identity_hash: STUB_SEAL_B,
         abstraction:  'Scheduler',
         lump_size:    128,
         methods:      ['Pause', 'IRQ'],
@@ -148,6 +152,11 @@ test.describe('LUMP picker — Viewing label', () => {
 
         // … and include the abstraction name.
         await expect(label).toContainText('LED');
+        await expect(label.locator('.lump-viewing-identity-label')).toHaveText(['Seal', 'Token']);
+        await expect(label.locator('.lump-viewing-identity-value')).toHaveText([
+            STUB_SEAL_A,
+            `0x${STUB_TOKEN_A}`,
+        ]);
     });
 
 });
@@ -255,6 +264,10 @@ test.describe('LUMP picker — selection restored after page reload', () => {
         await expect(labelAfter).toBeVisible();
         await expect(labelAfter).toContainText('Viewing:');
         await expect(labelAfter).toContainText('LED');
+        await expect(labelAfter.locator('.lump-viewing-identity-value')).toHaveText([
+            STUB_SEAL_A,
+            `0x${STUB_TOKEN_A}`,
+        ]);
     });
 
 });

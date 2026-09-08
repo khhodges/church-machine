@@ -15,6 +15,56 @@
     cursor: help;
 }
 
+/* ── Selected LUMP identity in the Viewing heading ──────────────────────── */
+.lump-viewing-identity {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.85rem;
+    margin-top: 0.3rem;
+    min-width: 0;
+}
+
+.lump-viewing-identity-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.lump-viewing-identity-label {
+    flex: 0 0 auto;
+    color: var(--text-secondary, #8b93a7);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.lump-viewing-identity-value {
+    color: #a8c7ef;
+    font-size: 0.65rem;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.lump-viewing-identity-item.is-unavailable .lump-viewing-identity-value {
+    color: var(--text-secondary, #7a8a9a);
+    font-family: inherit;
+    font-style: italic;
+}
+
+@media (max-width: 600px) {
+    .lump-viewing-identity {
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+
+    .lump-viewing-identity-item {
+        align-items: flex-start;
+    }
+}
+
 /* ── LUMP binary hex-dump / disassembly table ──────────────────────────── */
 .lump-binary-badge {
     font-size: 0.62rem;

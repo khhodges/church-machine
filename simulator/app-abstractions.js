@@ -1056,6 +1056,8 @@ window.toggleLumpRepository = function() {
 };
 
 // Updates the "Viewing: <name> [TYPE]" label below the picker.
+// Identity values here are deliberately server-backed: identity_hash is the
+// canonical compiled Seal, and token is the full persisted LUMP Token.
 function _updateLumpViewingLabel(token) {
     const el = document.getElementById('lumpViewingLabel');
     if (!el) return;
@@ -1063,7 +1065,7 @@ function _updateLumpViewingLabel(token) {
     const lump = window.LumpRegistry.resolve(token)?.sources?.server
               || window.LumpRegistry.getServerList().find(l => l.token === token)
               || null;
-    if (!lump) { el.style.display = 'none'; return; }
+    if (!lump) { el.style.display = 'none'; el.innerHTML = ''; return; }
     const lt      = (lump.lump_type    || '').toLowerCase();
     const ct      = (lump.content_type || '').toLowerCase();
     const typ     = lump.typ;
@@ -1083,24 +1085,27 @@ function _updateLumpViewingLabel(token) {
     const _datePart = _lumpDateStr(lump);
     const _metaParts = [_verPart, _nsPart, _sizePart].filter(Boolean).join('\u2002');
     const _meta = [_metaParts, _datePart].filter(Boolean).join('\u2002\u00b7\u2002');
-    const _esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    // Dot-name identity: petname.Abstraction#issue · hash8
-    const _petname  = (typeof localStorage !== 'undefined' && localStorage.getItem('church_petname')) || '';
-    const _issueN   = lump.issue_n != null ? parseInt(lump.issue_n) : null;
-    const _hashPart = (() => {
-        if (lump.filename) { const m = lump.filename.match(/\.([0-9a-f]{8})\.lump$/i); if (m) return m[1]; }
-        return '';
-    })();
-    const _dotBase  = _petname ? `${_petname}.${name}` : name;
-    const _identStr = _issueN != null
-        ? (_hashPart ? `${_dotBase}#${_issueN} · ${_hashPart}` : `${_dotBase}#${_issueN}`)
-        : (_hashPart ? `${_dotBase} · ${_hashPart}` : '');
+    const _esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const _seal = typeof lump.identity_hash === 'string' && lump.identity_hash.trim()
+        ? lump.identity_hash.trim()
+        : null;
+    const _serverToken = typeof lump.token === 'string' && lump.token.trim()
+        ? lump.token.trim()
+        : null;
+    const _identityValue = (label, value) =>
+        `<span class="lump-viewing-identity-item${value ? '' : ' is-unavailable'}">` +
+        `<span class="lump-viewing-identity-label">${label}</span>` +
+        `<code class="lump-viewing-identity-value" title="${value ? _esc(value) : `${label} unavailable in server metadata`}">` +
+        `${value ? _esc(label === 'Token' ? `0x${value}` : value) : 'unavailable'}</code></span>`;
 
     el.innerHTML =
         `<span class="lump-viewing-prefix">Viewing: </span>` +
         `<span class="lump-viewing-main">${_esc(name)}${badge ? ' <span class="lump-viewing-badge">' + _esc(badge) + '</span>' : ''}</span>` +
         (_meta    ? `<span class="lump-viewing-meta">${_esc(_meta)}</span>` : '') +
-        (_identStr ? `<span class="lump-viewing-ident" title="dot-name identity: ${_esc(_identStr)}">${_esc(_identStr)}</span>` : '');
+        `<span class="lump-viewing-identity" aria-label="Compiled LUMP identity">` +
+        _identityValue('Seal', _seal) +
+        _identityValue('Token', _serverToken) +
+        `</span>`;
     el.style.display = 'block';
 }
 
