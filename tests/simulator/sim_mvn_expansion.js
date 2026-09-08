@@ -1,7 +1,7 @@
 // Headless harness for Task #1033.
 //
 // Verifies that the MVN pseudo-instruction expands to the correct word
-// sequence in both the same-register and different-register cases.
+// sequence in same-register, different-register, and conditional cases.
 //
 // Strategy: assemble the MVN form, then assemble the expected expansion
 // directly, and compare word-for-word.  This exercises the production
@@ -60,7 +60,7 @@ function wordStr(words) {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 //
-// For each assembler class run four tests:
+// For each assembler class run six tests:
 //
 //   T1  MVN DR1, DR1  (same-register, DR1)
 //       Expected expansion (4 instructions, scratch = DR0):
@@ -87,6 +87,12 @@ function wordStr(words) {
 //         ISUB DR1, DR3, DR3
 //         ISUB DR1, DR1, DR3
 //         ISUB DR1, DR1, #1
+//
+//   T5  MVNEQ DR1, DR1  (conditional, same-register)
+//       Every instruction in the 4-instruction expansion uses EQ.
+//
+//   T6  MVNNE DR2, DR1  (conditional, different-register)
+//       Every instruction in the 3-instruction expansion uses NE.
 //
 
 const CASES = [
@@ -132,12 +138,37 @@ const CASES = [
         ].join('\n'),
         desc: 'MVN DR1, DR3 (different registers, src≠dst) → 3-instruction normal expansion',
     },
+    {
+        id:  'T5',
+        src: 'MVNEQ DR1, DR1',
+        exp: [
+            'ISUBEQ DR0, DR1, DR1',
+            'ISUBEQ DR0, DR0, DR1',
+            'ISUBEQ DR0, DR0, #1',
+            'IADDEQ DR1, DR0, #0',
+        ].join('\n'),
+        desc: 'MVNEQ DR1, DR1 (conditional, same-register) → EQ on every expanded instruction',
+    },
+    {
+        id:  'T6',
+        src: 'MVNNE DR2, DR1',
+        exp: [
+            'ISUBNE DR2, DR1, DR1',
+            'ISUBNE DR2, DR2, DR1',
+            'ISUBNE DR2, DR2, #1',
+        ].join('\n'),
+        desc: 'MVNNE DR2, DR1 (conditional, different-register) → NE on every expanded instruction',
+    },
 ];
 
+const assembledByCopy = new Map();
 for (const [asmName, AsmClass] of [
     ['simulator/assembler.js',   SimAssembler],
     ['church_sim/assembler.js',  ChurchSimAssembler],
 ]) {
+    const assembledCases = new Map();
+    assembledByCopy.set(asmName, assembledCases);
+
     for (const tc of CASES) {
         const label = `${asmName} ${tc.id}`;
 
@@ -158,6 +189,22 @@ for (const [asmName, AsmClass] of [
         } else {
             pass(`${label}: ${tc.desc}`);
         }
+        assembledCases.set(tc.id, got);
+    }
+}
+
+for (const tc of CASES) {
+    const label = `assembler copy parity ${tc.id}`;
+    const simWords = assembledByCopy.get('simulator/assembler.js').get(tc.id);
+    const churchSimWords = assembledByCopy.get('church_sim/assembler.js').get(tc.id);
+    if (!wordsEqual(simWords, churchSimWords)) {
+        fail(label, (
+            `${tc.desc}\n` +
+            `  simulator/assembler.js:  ${wordStr(simWords)}\n` +
+            `  church_sim/assembler.js: ${wordStr(churchSimWords)}`
+        ));
+    } else {
+        pass(`${label}: both assembler copies produced identical words`);
     }
 }
 
@@ -166,6 +213,6 @@ for (const [asmName, AsmClass] of [
 if (ERRORS.length > 0) {
     process.exit(1);
 } else {
-    process.stdout.write(`\nAll ${CASES.length * 2} MVN expansion checks passed.\n`);
+    process.stdout.write(`\nAll ${CASES.length * 3} MVN expansion checks passed.\n`);
     process.exit(0);
 }

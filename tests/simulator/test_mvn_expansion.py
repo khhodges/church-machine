@@ -11,6 +11,10 @@ Same-register case (MVN DRx, DRx):
 Different-register case (MVN DRd, DRs, DRd != DRs):
   Expands to the standard 3-instruction sequence.
 
+Conditional forms:
+  Preserve the requested condition on every instruction in either expansion,
+  and produce identical words in both assembler copies.
+
 All assertions live in the JS harness (tests/simulator/sim_mvn_expansion.js).
 """
 
@@ -58,7 +62,7 @@ def test_mvn_expansion_harness():
     assert '[PASS]' in stdout, f'No [PASS] markers in harness output:\n{stdout}'
 
     pass_count = stdout.count('[PASS]')
-    assert pass_count >= 8, (
-        f'Expected at least 8 [PASS] markers (4 cases × 2 assemblers), '
+    assert pass_count == 18, (
+        f'Expected 18 [PASS] markers (6 cases × 2 assemblers + 6 parity checks), '
         f'got {pass_count}:\n{stdout}'
     )
