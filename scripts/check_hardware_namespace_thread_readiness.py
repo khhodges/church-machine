@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from hardware.boot_rom import (  # noqa: E402
+    CAPABILITY_TEST_NS_SLOT,
     NS_SLOT_COUNT,
     WUKONG_DEMO_CLIST,
     WUKONG_DEMO_NAMESPACE,
@@ -91,8 +92,9 @@ def check_contract() -> list[str]:
              "Thread.caps[12] is not at the fixed +256 offset")
     _fail_if(WUKONG_THREAD_STO_INIT > 0, "boot thread STO must be a non-zero stack sentinel")
     _fail_if(WUKONG_THREAD_HEADER != 0, "boot thread header must be present")
-    _fail_if(WUKONG_DEMO_CLIST[0] == make_gt(GT_TYPE_INFORM, PERM_MASK_E, SELFTEST_NS_SLOT),
-             "boot c-list entry 0 is not the SelfTest E-GT")
+    _fail_if(WUKONG_DEMO_CLIST[0] == make_gt(
+        GT_TYPE_INFORM, PERM_MASK_E, CAPABILITY_TEST_NS_SLOT),
+             "boot c-list entry 0 is not the CapabilityTest E-GT")
     checks.append("namespace width, integrity, reserved slots, and thread offsets")
     return checks
 

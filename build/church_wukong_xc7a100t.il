@@ -1,4 +1,4 @@
-# CM-HARDWARE-SOURCES-SHA256: df9c4bbfa9817b6cc358f4e39c123a40ca69baed6026d8c2d844720b627fcf02
+# CM-HARDWARE-SOURCES-SHA256: f827077aa9c73c684dda651a15bdba6f7819f8132bb013aa9b5d77cbeb926829
 attribute \generator "Amaranth"
 attribute \src "/home/runner/workspace/hardware/wukong_top.py:489"
 attribute \top 1
@@ -13,7 +13,7 @@ module \top
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:508"
   wire width 1 \clk$10
 
-  attribute \src "/home/runner/workspace/hardware/boot_rom.py:1093"
+  attribute \src "/home/runner/workspace/hardware/boot_rom.py:1097"
   wire width 10 \addr
 
   attribute \src "/home/runner/workspace/hardware/core.py:53"
@@ -29,7 +29,7 @@ module \top
   attribute \init 1'0
   wire width 1 \imem_from_dmem
 
-  attribute \src "/home/runner/workspace/hardware/boot_rom.py:1094"
+  attribute \src "/home/runner/workspace/hardware/boot_rom.py:1098"
   wire width 32 \data
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/lib/memory.py:241"
@@ -106431,23 +106431,23 @@ connect \cr_wr_data.word2_w2 \cr_wr_data [95:64]
 end
 
 attribute \generator "Amaranth"
-attribute \src "/home/runner/workspace/hardware/boot_rom.py:1097"
+attribute \src "/home/runner/workspace/hardware/boot_rom.py:1101"
 module \top.boot_rom
 
-  attribute \src "/home/runner/workspace/hardware/boot_rom.py:1099"
+  attribute \src "/home/runner/workspace/hardware/boot_rom.py:1103"
   wire width 32 \rom_comb
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:508"
   wire width 1 input 0  \clk
 
-  attribute \src "/home/runner/workspace/hardware/boot_rom.py:1093"
+  attribute \src "/home/runner/workspace/hardware/boot_rom.py:1097"
   wire width 10 input 1  \addr
 
-  attribute \src "/home/runner/workspace/hardware/boot_rom.py:1094"
+  attribute \src "/home/runner/workspace/hardware/boot_rom.py:1098"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 output 2  \data
 
-  attribute \src "/home/runner/workspace/hardware/boot_rom.py:1099"
+  attribute \src "/home/runner/workspace/hardware/boot_rom.py:1103"
   process $1
     assign \rom_comb [31:0] 32'00000000000000000000000000000000
     switch \addr [9:0]
@@ -106464,7 +106464,7 @@ module \top.boot_rom
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/boot_rom.py:1094"
+  attribute \src "/home/runner/workspace/hardware/boot_rom.py:1098"
   cell $dff $2
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1

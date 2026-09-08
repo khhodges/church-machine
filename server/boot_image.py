@@ -2617,6 +2617,11 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     for _pe in _portable_manifest:
         if not isinstance(_pe, dict):
             raise ValueError("portable catalog contains a non-object locator")
+        # Archived locators preserve immutable history but are never candidates
+        # for the live Namespace binding.  Processing them can emit diagnostics
+        # to stdout and corrupt callers which stream the generated binary there.
+        if _pe.get("archived") is True:
+            continue
         _ptok = str(_pe.get("token", "")).lower()
         _p_slots = [slot for slot, selected_token in token_map.items()
                     if str(selected_token).lower() == _ptok]
@@ -2637,6 +2642,11 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         if not isinstance(_approval, dict):
             print(f"[boot-image] portable token {_ptok}: exact approval missing",
                   flush=True)
+            continue
+        # Frozen bootstrap residents are already materialized and validated
+        # above.  They intentionally carry bootstrap_t rather than a portable
+        # relocation binding, so they must not enter the portable-LUMP path.
+        if _approval.get("bootstrap_t") is not None:
             continue
         _dot = _approval.get("dot_name")
         _issue = _approval.get("issue_n")

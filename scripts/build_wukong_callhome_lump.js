@@ -212,23 +212,22 @@ const binaryHash = crypto.createHash('sha256').update(bytes).digest('hex');
 const filename = `WukongCallHome.1.${crypto.createHash('sha256').update('WukongCallHome').update(bytes).digest('hex').slice(0, 8)}.lump`;
 console.log(`Bootstrap T: ${token}`);
 
-// ── Remove old WukongCallHome lump files ─────────────────────────────────────
+// ── Reconcile the canonical WukongCallHome locator without destroying history ─
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
-const existingIdx = manifest.findIndex(e => e.abstraction === 'WukongCallHome' && e.filename === (
-    ((JSON.parse(fs.readFileSync(NS_STATE, 'utf8')).abstractions || []).find(r => r.name === 'WukongCallHome' && r.slot === 7) || {}).filename));
-if (existingIdx !== -1) {
-    const oldToken = manifest[existingIdx].token;
-    if (oldToken && oldToken !== token) {
-        const oldLump     = path.join(LUMPS_DIR, manifest[existingIdx].filename);
-        if (fs.existsSync(oldLump))    { fs.unlinkSync(oldLump);    console.log(`Removed old: ${oldLump}`); }
-    }
-    console.log('\nExisting WukongCallHome entry found — replacing it.');
-    manifest.splice(existingIdx, 1);
+const stateBefore = JSON.parse(fs.readFileSync(NS_STATE, 'utf8'));
+const residentRows = (stateBefore.abstractions || []).filter(row =>
+    row.name === 'WukongCallHome' && row.slot === 7 &&
+    row.resident === true && row.boot_resident === true);
+if (residentRows.length !== 1) {
+    throw new Error('ns-state must contain exactly one frozen resident WukongCallHome slot-7 binding');
 }
 
 // ── Write .lump binary ───────────────────────────────────────────────────────
 const lumpPath    = path.join(LUMPS_DIR, filename);
 
+if (fs.existsSync(lumpPath) && !fs.readFileSync(lumpPath).equals(bytes)) {
+    throw new Error(`refusing to overwrite immutable history after content-id collision: ${filename}`);
+}
 fs.writeFileSync(lumpPath, bytes);
 console.log(`Written: ${lumpPath} (${bytes.length} bytes)`);
 
@@ -247,11 +246,25 @@ const manifestEntry = {
     lump_version:    1,
 };
 
-manifest.push(manifestEntry);
+// Keep every historical locator and its bytes.  Only the one state-selected
+// locator is live: all displaced Wukong records become explicit archive rows.
+// This also heals historical duplicate active rows deterministically.
+const existingCanonical = manifest.find(row =>
+    row.abstraction === 'WukongCallHome' && row.filename === filename);
+for (const old of manifest) {
+    if (old.abstraction === 'WukongCallHome' && old !== existingCanonical) {
+        old.archived = true;
+    }
+}
+if (existingCanonical) {
+    Object.assign(existingCanonical, manifestEntry);
+    delete existingCanonical.archived;
+} else {
+    manifest.push(manifestEntry);
+}
 fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2));
-const state = JSON.parse(fs.readFileSync(NS_STATE, 'utf8'));
-const row = state.abstractions.find(r => r.name === 'WukongCallHome' && r.slot === 7);
-if (!row || row.resident !== true || row.boot_resident !== true) throw new Error('slot 7 is not a frozen resident binding');
+const state = stateBefore;
+const row = residentRows[0];
 Object.assign(row, { token, filename, binary_hash: binaryHash, issue_n: 1,
     ns_slot_policy: 'static', load_policy: 'Resident' });
 delete row.identity_hash;

@@ -167,6 +167,9 @@ if (CHECK_ONLY) {
     process.exit(0);
 }
 fs.mkdirSync(LUMPS_DIR, { recursive: true });
+if (fs.existsSync(artifactPath) && !fs.readFileSync(artifactPath).equals(bytes)) {
+    die(`refusing to overwrite immutable history after content-id collision: ${filename}`);
+}
 fs.writeFileSync(artifactPath, bytes);
 // Preserve every old file and manifest history record.  An unchanged rebuild
 // updates the active record in place; changed bytes archive prior records.

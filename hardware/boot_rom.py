@@ -2,6 +2,7 @@ from amaranth import *
 import hashlib
 from server.lump_approvals import read_approvals
 import json
+import os
 import struct
 from pathlib import Path
 
@@ -658,7 +659,10 @@ WUKONG_DEMO_NAMESPACE[2] = integrity32(_wukong_ns0_loc, _wukong_ns0_auth)
 # for the factory image.
 WUKONG_SELFTEST_BASE_BYTE = 0x0600
 WUKONG_SELFTEST_BASE_WORD = WUKONG_SELFTEST_BASE_BYTE // 4
-_lumps_dir = Path(__file__).resolve().parents[1] / "server" / "lumps"
+_lumps_dir = Path(os.environ.get(
+    "CHURCH_LUMPS_DIR",
+    Path(__file__).resolve().parents[1] / "server" / "lumps",
+)).resolve()
 _selftest_ns_state_path = _lumps_dir / "ns-state.json"
 _selftest_manifest_path = _lumps_dir / "manifest.json"
 try:

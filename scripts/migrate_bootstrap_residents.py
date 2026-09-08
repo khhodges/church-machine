@@ -1,26 +1,27 @@
 #!/usr/bin/env python3
-"""Atomically regenerate the complete frozen bootstrap-resident catalog."""
+"""Atomically regenerate and fail-closed validate frozen bootstrap residents."""
 import argparse
 import ctypes
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-GENERATORS = (
-    "build_selftest_lump.js",
-    "build_wukong_callhome_lump.js",
-    "build_capability_test_lump.js",
-)
+GENERATORS = ("build_selftest_lump.js", "build_wukong_callhome_lump.js",
+              "build_capability_test_lump.js")
+RESIDENTS = {"SelfTest": (6, 0x4A000006), "WukongCallHome": (7, 0x4A000007),
+             "CapabilityTest": (10, 0x4A00000A)}
 
 
-def _run(command):
-    subprocess.run(command, cwd=ROOT, check=True)
+def _run(command, env=None):
+    subprocess.run(command, cwd=ROOT, check=True, env=env)
 
 
 def _exchange(left, right):
@@ -34,111 +35,179 @@ def _exchange(left, right):
         raise OSError(error, os.strerror(error))
 
 
+def _reconcile_approvals(directory):
+    """Remove only approvals which no longer have any immutable body."""
+    digests = {}
+    for body in directory.glob("*.lump"):
+        if body.is_symlink() and not body.exists():
+            raise ValueError(f"broken historical lump symlink: {body.name}")
+        if body.is_file():
+            digests[hashlib.sha256(body.read_bytes()).hexdigest()] = body.name
+    path = directory / "approvals.json"
+    envelope = json.loads(path.read_text())
+    if not isinstance(envelope.get("approvals"), dict):
+        raise ValueError("approvals.json has no approvals map")
+    envelope["approvals"] = {key: value for key, value in envelope["approvals"].items()
+                             if key in digests}
+    path.write_text(json.dumps(envelope, indent=2) + "\n")
+
+
+def _synchronize_resident_locations(directory):
+    """Record the generated image's exact resident word locations in ns-state."""
+    image = (directory / "boot-image.bin").read_bytes()
+    words = struct.unpack(f"<{len(image) // 4}I", image)
+    state_path = directory / "ns-state.json"
+    state = json.loads(state_path.read_text())
+    for name, (slot, _expected_gt) in RESIDENTS.items():
+        rows = [row for row in state.get("abstractions", [])
+                if row.get("name") == name and row.get("slot") == slot
+                and row.get("resident") is True
+                and row.get("boot_resident") is True]
+        if len(rows) != 1:
+            raise ValueError(f"expected exactly one active frozen resident {name} row")
+        descriptor = words[len(words) - (slot + 1) * 4:
+                           len(words) - (slot + 1) * 4 + 4]
+        location, authority, seal, token = descriptor
+        rows[0].update({
+            "location": f"0x{location:08X}",
+            "limit": f"0x{authority & 0x1FFFFF:05X}",
+            "seq": (authority >> 21) & 0x1FF,
+            "g": (authority >> 30) & 1,
+            "f": (authority >> 31) & 1,
+            "seal": f"0x{seal:08X}",
+            "token": f"{token:08x}",
+        })
+    state_path.write_text(json.dumps(state, indent=2) + "\n")
+
+
+def _validate_stage(directory):
+    """Validate the exact catalog and boot graph before publication."""
+    for path in directory.iterdir():
+        if path.is_symlink() and not path.exists():
+            raise ValueError(f"broken symlink in bootstrap catalog: {path.name}")
+    manifest = json.loads((directory / "manifest.json").read_text())
+    state = json.loads((directory / "ns-state.json").read_text())
+    approvals = json.loads((directory / "approvals.json").read_text()).get("approvals", {})
+    selected = {}
+    for name, (slot, expected_gt) in RESIDENTS.items():
+        rows = [row for row in state.get("abstractions", []) if row.get("name") == name
+                and row.get("resident") is True
+                and row.get("boot_resident") is True]
+        if len(rows) != 1 or rows[0].get("slot") != slot:
+            raise ValueError(f"expected exactly one active frozen resident {name} row")
+        row = rows[0]
+        body = directory / row.get("filename", "")
+        if not body.is_file():
+            raise ValueError(f"{name} resident body is missing")
+        raw = body.read_bytes()
+        if len(raw) < 4 or len(raw) % 4:
+            raise ValueError(f"{name} resident body is malformed")
+        header = int.from_bytes(raw[:4], "big")
+        alloc, cc = 1 << (((header >> 23) & 15) + 6), header & 255
+        if ((header >> 27) & 31) != 31 or alloc * 4 != len(raw) or not 1 <= cc <= alloc:
+            raise ValueError(f"{name} resident header/allocation is invalid")
+        row0 = int.from_bytes(raw[(alloc - cc) * 4:(alloc - cc + 1) * 4], "big")
+        approval = approvals.get(hashlib.sha256(raw).hexdigest())
+        if (row0 != expected_gt or row.get("token") != f"{row0:08x}" or
+                not approval or approval.get("bootstrap_t") != f"{row0:08x}" or
+                approval.get("bootstrap_runtime_gt") != row0):
+            raise ValueError(f"{name} row0/token/bootstrap_t approval mismatch")
+        active = [entry for entry in manifest if entry.get("abstraction") == name
+                  and not entry.get("archived", False)]
+        if (len(active) != 1 or active[0].get("token") != row.get("token")
+                or active[0].get("filename") != row["filename"]):
+            raise ValueError(f"{name} does not have exactly one active canonical manifest binding")
+        selected[name] = (row, raw, alloc, cc)
+    body_digests = {hashlib.sha256(path.read_bytes()).hexdigest()
+                    for path in directory.glob("*.lump") if path.is_file()}
+    if set(approvals) - body_digests:
+        raise ValueError("approval without current or archived binary")
+
+    # generate_boot_image has already validated structural descriptors; inspect
+    # its serialized W3 and boot continuation graph independently here.
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    from server.boot_image import read_namespace_header_info
+    image = (directory / "boot-image.bin").read_bytes()
+    read_namespace_header_info(image)
+    words, total = struct.unpack(f"<{len(image) // 4}I", image), len(image) // 4
+    tails = {}
+    for name, (row, raw, alloc, cc) in selected.items():
+        ns_base = total - (row["slot"] + 1) * 4
+        location = words[ns_base]
+        if row.get("location") != f"0x{location:08X}":
+            raise ValueError(f"{name} Namespace-state location drift")
+        authority, seal = words[ns_base + 1], words[ns_base + 2]
+        if (row.get("limit") != f"0x{authority & 0x1FFFFF:05X}"
+                or row.get("seq") != ((authority >> 21) & 0x1FF)
+                or row.get("g") != ((authority >> 30) & 1)
+                or row.get("f") != ((authority >> 31) & 1)
+                or row.get("seal") != f"0x{seal:08X}"):
+            raise ValueError(f"{name} Namespace-state authority/seal drift")
+        if location < 0 or location + alloc > total:
+            raise ValueError(f"{name} resident body address is outside boot image")
+        if words[location] != int.from_bytes(raw[:4], "big"):
+            raise ValueError(f"{name} boot-image resident header drift")
+        if words[ns_base + 3] != RESIDENTS[name][1]:
+            raise ValueError(f"{name} boot-image descriptor W3 drift")
+        raw_words = list(struct.unpack(f">{len(raw) // 4}I", raw))
+        loaded_words = list(words[location:location + alloc])
+        if name == "SelfTest":
+            # Boot generation binds Next.GT to the selected LightningBolt.
+            raw_words[alloc - cc + 1] = RESIDENTS["CapabilityTest"][1]
+        if loaded_words != raw_words:
+            raise ValueError(f"{name} loaded resident body drift")
+        tails[name] = words[location + alloc - cc:location + alloc]
+    # These are continuation rows, not CapabilityTest's diagnostic SelfTest
+    # capability: SelfTest Next is row 1; CapabilityTest ELOADCALL is last.
+    edges = {"SelfTest": [tails["SelfTest"][1] & 0xffff],
+             "CapabilityTest": [tails["CapabilityTest"][-1] & 0xffff],
+             "WukongCallHome": []}
+    if (tails["SelfTest"][1] != 0x4A00000A or
+            tails["CapabilityTest"][-1] != 0x4A000007):
+        raise ValueError("resident E-only startup links drift")
+    visited, visiting = set(), set()
+    def visit(name):
+        if name in visiting:
+            raise ValueError("resident startup graph is cyclic")
+        if name not in visited:
+            visiting.add(name)
+            for slot in edges[name]:
+                visit(next(n for n, spec in RESIDENTS.items() if spec[0] == slot))
+            visiting.remove(name)
+            visited.add(name)
+    for name in RESIDENTS:
+        visit(name)
+
+
 def migrate(lumps_dir, fault_after_stage=False, fault_during_publication=False):
     """Stage all products, validate them, then swap one directory boundary."""
     target = Path(lumps_dir).resolve()
     parent = target.parent
     lock_path = Path(tempfile.gettempdir()) / (
-        "lumps-history-transition-"
-        + __import__("hashlib").sha256(str(target).encode()).hexdigest()[:16]
-        + ".lock")
+        "lumps-history-transition-" + hashlib.sha256(str(target).encode()).hexdigest()[:16] + ".lock")
     with open(lock_path, "a+") as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
-        # A process killed after a successful exchange can leave only the old
-        # revision under its staging name.  The live target is already the new
-        # revision; cleanup is safe and repeatable while holding the shared
-        # server transition lock.
         for stale in parent.glob(".bootstrap-stage-*"):
             if stale.is_dir():
                 shutil.rmtree(stale)
         stage = Path(tempfile.mkdtemp(prefix=".bootstrap-stage-", dir=parent))
         try:
             shutil.copytree(target, stage, dirs_exist_ok=True, symlinks=True)
-            # A prior interrupted/destructive generator may have removed a
-            # tracked historical body while leaving its hash-bound approval.
-            # Restore those immutable bytes from repository history before
-            # deriving the new active revision; never synthesize history.
-            for historical in (
-                    "CapabilityTest.1.e4fe164d.lump",
-                    "CapabilityTest.1.878a5b27.lump",
-                    "WukongCallHome.1.d54e2115.lump"):
-                destination = stage / historical
-                with open(destination, "wb") as output:
-                    subprocess.run(
-                        ["git", "show", f"HEAD:server/lumps/{historical}"],
-                        cwd=ROOT, check=True, stdout=output)
-            # Repair the historical aliases from immutable archived binaries.
-            aliases = {
-                "CapabilityTest.1.ac2b4b1b.lump": "CapabilityTest_v15.lump",
-                "CapabilityTest.1.e158180f.lump": "CapabilityTest_v16.lump",
-                "CapabilityTest.1.2d9ec45d.lump": "CapabilityTest_v17.lump",
-                "CapabilityTest.1.2cdca9f6.lump": "CapabilityTest_v18.lump",
-                "CapabilityTest.1.faf715c2.lump": "CapabilityTest_v19.lump",
-                "CapabilityTest.1.36b34aa3.lump": "CapabilityTest_v20.lump",
-                "CapabilityTest.2.4dc5c64e.lump": "CapabilityTest_v21.lump",
-            }
-            for alias, archive in aliases.items():
-                path = stage / alias
-                if path.exists() or path.is_symlink():
-                    path.unlink()
-                path.symlink_to(archive)
             for generator in GENERATORS:
-                _run(["node", str(ROOT / "scripts" / generator),
-                      "--out-dir", str(stage)])
-            # Preserve the replaced Wukong artifact as explicit history.  An
-            # approval whose exact historical bytes are no longer available
-            # cannot remain authoritative; remove only that dangling
-            # CapabilityTest record, leaving every backed approval untouched.
-            manifest_path = stage / "manifest.json"
-            manifest = json.loads(manifest_path.read_text())
-            if not any(row.get("filename") == "WukongCallHome.1.d54e2115.lump"
-                       for row in manifest):
-                manifest.append({
-                    "token": "85fcac64", "abstraction": "WukongCallHome",
-                    "filename": "WukongCallHome.1.d54e2115.lump",
-                    "lump_version": 8, "archived": True,
-                })
-            if not any(row.get("filename") == "CapabilityTest.1.878a5b27.lump"
-                       for row in manifest):
-                manifest.append({
-                    "token": "7e661a33", "abstraction": "CapabilityTest",
-                    "filename": "CapabilityTest.1.878a5b27.lump",
-                    "variant_group": "capabilitytest-history",
-                    "lump_version": 1, "archived": True,
-                })
-            manifest_path.write_text(json.dumps(manifest, indent=2))
-            approvals_path = stage / "approvals.json"
-            envelope = json.loads(approvals_path.read_text())
-            envelope["approvals"].pop(
-                "90bb895861580e8ac3c1cfe92d78babb0aeb32d48710a088798ec6819b353cf8",
-                None)
-            approvals_path.write_text(json.dumps(envelope, indent=2) + "\n")
-            code = (
-                "import json,os,sys;"
-                "from server.boot_image import generate_boot_image;"
-                "p=sys.argv[1];c=json.load(open('server/boot-config.json'));"
-                "b=generate_boot_image(c,p,boot_entry_slot=c['bootEntrySlot'],"
-                "require_entry_resident=True);"
-                "open(os.path.join(p,'boot-image.bin'),'wb').write(b)"
-            )
+                _run(["node", str(ROOT / "scripts" / generator), "--out-dir", str(stage)])
+            _reconcile_approvals(stage)
+            code = ("import json,os,sys;from server.boot_image import generate_boot_image;"
+                    "p=sys.argv[1];c=json.load(open('server/boot-config.json'));"
+                    "open(os.path.join(p,'boot-image.bin'),'wb').write(generate_boot_image(c,p,boot_entry_slot=c['bootEntrySlot'],require_entry_resident=True))")
             _run([sys.executable, "-c", code, str(stage)])
-            state = json.loads((stage / "ns-state.json").read_text())
-            approved = json.loads((stage / "approvals.json").read_text())["approvals"]
-            expected = {"SelfTest": 0x4A000006, "WukongCallHome": 0x4A000007,
-                        "CapabilityTest": 0x4A00000A}
-            for row in state["abstractions"]:
-                if row.get("name") not in expected:
-                    continue
-                raw = (stage / row["filename"]).read_bytes()
-                header = int.from_bytes(raw[:4], "big")
-                allocation = 1 << (((header >> 23) & 15) + 6)
-                cc = header & 255
-                row0 = int.from_bytes(
-                    raw[(allocation - cc) * 4:(allocation - cc + 1) * 4], "big")
-                digest = __import__("hashlib").sha256(raw).hexdigest()
-                assert row0 == expected[row["name"]]
-                assert row["token"] == f"{row0:08x}"
-                assert approved[digest]["bootstrap_t"] == f"{row0:08x}"
+            _synchronize_resident_locations(stage)
+            _validate_stage(stage)
+            # This reads committed RTLIL only; it does not synthesize.
+            staged_env = dict(os.environ, CHURCH_LUMPS_DIR=str(stage))
+            _run([sys.executable, "-m", "pytest",
+                  "tests/hardware/test_wukong_boot_rom_guard.py", "-q"],
+                 env=staged_env)
             if fault_after_stage:
                 raise RuntimeError("injected bootstrap migration failure")
             _exchange(target, stage)

@@ -815,8 +815,8 @@ def test_successful_xloadlambda_retires_once_and_clears_namespace_g_bit():
     dmem[target_nia // 4] = encode_turing(
         TuringOpcode.IADD, CondCode.AL, dr_dst=1, dr_src=0, imm=1)
 
-    # CR6 names SelfTest's c-list at the tail of its fixed 512-word body.
-    selftest_clist_word = WUKONG_SELFTEST_BASE_WORD + 512 - 2
+    # CR6 names SelfTest's c-list at the tail of its generated allocation.
+    selftest_clist_word = WUKONG_SELFTEST_BASE_WORD + len(WUKONG_SELFTEST_WORDS) - 2
     dmem[selftest_clist_word] = x_gt
     ns_word = slot * 4
     dmem[ns_word + 0] = target_nia

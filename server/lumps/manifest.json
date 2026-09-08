@@ -145,7 +145,8 @@
     "filename": "WukongCallHome.1.2f3d7d46.lump",
     "variant_group": "WukongCallHome",
     "version": "1.0",
-    "lump_version": 1
+    "lump_version": 1,
+    "archived": true
   },
   {
     "token": "1dcb7b09",
@@ -187,7 +188,8 @@
     "variant_group": "WukongCallHome",
     "version": "",
     "lump_version": 6,
-    "compiled_at": 1787099291.9433396
+    "compiled_at": 1787099291.9433396,
+    "archived": true
   },
   {
     "token": "46738c7a",
@@ -196,7 +198,8 @@
     "version": "",
     "lump_version": 7,
     "compiled_at": 1787142997.7081983,
-    "variant_group": "WukongCallHome"
+    "variant_group": "WukongCallHome",
+    "archived": true
   },
   {
     "token": "8f7520e5",
@@ -205,7 +208,8 @@
     "version": "",
     "lump_version": 7,
     "compiled_at": 1787174128.0646396,
-    "variant_group": "WukongCallHome"
+    "variant_group": "WukongCallHome",
+    "archived": true
   },
   {
     "token": "c7425d6c",
@@ -297,7 +301,8 @@
     "filename": "CapabilityTest.1.b49e8eca.lump",
     "version": "",
     "lump_version": 12,
-    "compiled_at": 1788187484.6248598
+    "compiled_at": 1788187484.6248598,
+    "archived": true
   },
   {
     "token": "072454a8",

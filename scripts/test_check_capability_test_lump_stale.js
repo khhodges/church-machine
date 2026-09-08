@@ -19,7 +19,7 @@ result = spawnSync(process.execPath, [check, '--out-dir', tmp], { encoding: 'utf
 assert.strictEqual(result.status, 0, result.stderr);
 
 const manifest = JSON.parse(fs.readFileSync(path.join(tmp, 'manifest.json'), 'utf8'));
-const entry = manifest.find(e => e.token === '00000a00');
+const entry = manifest.find(e => e.token === '4a00000a');
 assert(entry, 'build must preserve the protected CapabilityTest identity token');
 assert.strictEqual(entry.abstraction, 'CapabilityTest');
 

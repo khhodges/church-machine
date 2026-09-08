@@ -286,7 +286,7 @@ if (CHECK_ONLY) {
     process.exit(0);
 }
 
-// ── Remove old CapabilityTest lump files ────────────────────────────────────────────
+// ── Resolve the selected CapabilityTest without destroying immutable history ────────
 const manifest = fs.existsSync(MANIFEST)
     ? JSON.parse(fs.readFileSync(MANIFEST, 'utf8'))
     : [];
@@ -294,27 +294,29 @@ const manifest = fs.existsSync(MANIFEST)
 // than selecting the first historical CapabilityTest manifest row.
 let existingIdx = -1;
 if (fs.existsSync(NS_STATE)) {
-    const active = (JSON.parse(fs.readFileSync(NS_STATE, 'utf8')).abstractions || []).find(
+    const activeRows = (JSON.parse(fs.readFileSync(NS_STATE, 'utf8')).abstractions || []).filter(
         e => e.name === DOT_NAME && e.slot === 10 && e.resident === true &&
              e.boot_resident === true);
+    if (activeRows.length !== 1) {
+        throw new Error('ns-state must select exactly one frozen resident CapabilityTest record');
+    }
+    const active = activeRows[0];
     if (active) existingIdx = manifest.findIndex(
         e => e.token === active.token && e.filename === active.filename);
 }
-if (existingIdx === -1) {
+if (existingIdx === -1 && fs.existsSync(NS_STATE)) {
     throw new Error('ns-state must select exactly one frozen resident CapabilityTest record');
 }
 if (existingIdx !== -1) {
-    const oldLumpName = manifest[existingIdx].filename;
-    if (oldLumpName && oldLumpName !== filename) {
-        const oldLump = path.join(LUMPS_DIR, oldLumpName);
-        if (fs.existsSync(oldLump))    { fs.unlinkSync(oldLump);    console.log(`Removed old: ${oldLump}`); }
-    }
-    console.log('\nExisting CapabilityTest entry found — replacing it.');
+    console.log('\nExisting CapabilityTest entry found — archiving it before replacement.');
 }
 
 // ── Write .lump binary ───────────────────────────────────────────────────────
 const lumpPath    = path.join(LUMPS_DIR, filename);
 
+if (fs.existsSync(lumpPath) && !fs.readFileSync(lumpPath).equals(bytes)) {
+    throw new Error(`refusing to overwrite immutable history after content-id collision: ${filename}`);
+}
 fs.writeFileSync(lumpPath, bytes);
 console.log(`Written: ${lumpPath} (${bytes.length} bytes)`);
 
@@ -336,8 +338,13 @@ const manifestEntry = {
         ? { compiled_at: manifest[existingIdx].compiled_at } : {}),
 };
 
-if (existingIdx !== -1) {
-    manifest[existingIdx] = manifestEntry;
+const existingCanonicalIdx = manifest.findIndex(
+    entry => entry.abstraction === DOT_NAME && entry.filename === filename);
+for (const entry of manifest) {
+    if (entry.abstraction === DOT_NAME) entry.archived = true;
+}
+if (existingCanonicalIdx !== -1) {
+    manifest[existingCanonicalIdx] = manifestEntry;
 } else {
     manifest.push(manifestEntry);
 }
@@ -367,7 +374,6 @@ const approvalWriter = [
     'import json, sys',
     'from server.lump_approvals import read_approvals, write_approvals',
     'records = read_approvals(sys.argv[1])',
-    'records = {k: v for k, v in records.items() if not (v.get("dot_name") == "CapabilityTest" and v.get("issue_n") == 2)}',
     'records[sys.argv[2]] = json.loads(sys.argv[3])',
     'write_approvals(sys.argv[1], records)',
 ].join('; ');

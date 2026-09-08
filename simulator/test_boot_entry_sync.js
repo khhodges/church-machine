@@ -479,6 +479,8 @@ console.log('\n--- T211: late boot-image arrival replaces fallback CR state ---'
     const bootImage = bootImageBytes.buffer.slice(
         bootImageBytes.byteOffset, bootImageBytes.byteOffset + bootImageBytes.byteLength
     );
+    const bootWords = new Uint32Array(bootImage);
+    const selfTestWord1 = bootWords[bootWords.length - (6 + 1) * 4 + 1] >>> 0;
     global.window = {
         bootConfig: {
             step1: {
@@ -517,7 +519,7 @@ console.log('\n--- T211: late boot-image arrival replaces fallback CR state ---'
     completeBoot(sim);
     const liveLimit = sim.parseNSWord1(sim.cr[14].word2 >>> 0).limit;
     check('T211e: post-reset CALL derives CR14 from the real SelfTest descriptor',
-        sim.bootComplete && liveLimit === 509);
+        sim.bootComplete && liveLimit === sim.parseNSWord1(selfTestWord1).limit);
 
     const cacheAt = appShellSrc.indexOf('window.bootImage = buf;');
     const resetAt = appShellSrc.indexOf('if (_wasBootedBeforeImage)', cacheAt);
