@@ -666,15 +666,15 @@ class ChurchAssembler {
                 const inline = line.match(/^capabilities\s*\{\s*(.*?)\s*\}\s*$/i);
                 if (inline) {
                     for (const item of inline[1].split(',')) {
-                        const cap = ChurchAssembler._parseCapItem(item);
-                        if (cap) capNames.push(cap.null_row ? null : cap.name);
+                        for (const cap of ChurchAssembler._parseCapItems(item).caps)
+                            capNames.push(cap.null_row ? null : cap.name);
                     }
                 } else {
                     inCapBlock = true;
                     const tail = line.replace(/^capabilities\s*\{/i, '').trim();
                     if (tail) for (const item of tail.split(',')) {
-                        const cap = ChurchAssembler._parseCapItem(item);
-                        if (cap) capNames.push(cap.null_row ? null : cap.name);
+                        for (const cap of ChurchAssembler._parseCapItems(item).caps)
+                            capNames.push(cap.null_row ? null : cap.name);
                     }
                 }
                 continue;
@@ -682,8 +682,8 @@ class ChurchAssembler {
             if (inCapBlock) {
                 if (line.includes('}')) { inCapBlock = false; }
                 else for (const item of line.split(',')) {
-                    const cap = ChurchAssembler._parseCapItem(item);
-                    if (cap) capNames.push(cap.null_row ? null : cap.name);
+                    for (const cap of ChurchAssembler._parseCapItems(item).caps)
+                        capNames.push(cap.null_row ? null : cap.name);
                 }
                 continue;
             }
@@ -724,6 +724,29 @@ class ChurchAssembler {
         this._parsePetDirectives(lines);               // pre-pass: .pet aliases
         this._capBlockSlots = this._parseCapBlockSlots(lines); // pre-pass: capabilities {} → slot map
         const instructions = [];
+        const _collectCapItem = (item, lineNum) => {
+            const parsed = ChurchAssembler._parseCapItems(item);
+            for (const missingName of parsed.missingSeparators) {
+                this.errors.push({
+                    line: lineNum + 1,
+                    ...this._tokenCols(this._currentLineText, missingName),
+                    message: `Missing comma before capability "${missingName}" — add a comma between capability declarations.`
+                });
+            }
+            for (const cap of parsed.caps) {
+                if (!cap.null_row && cap.rights.length === 0 && !ChurchAssembler._isHardwareCapName(cap.name)) {
+                    this.errors.push({ line: lineNum + 1, ...this._tokenCols(this._currentLineText, cap.name),
+                        message: `Capability "${cap.name}" has no permission letters — add at least one of E, R, W, X after the name.\n  Example: capabilities { ${cap.name} E }` });
+                }
+                if (!cap.null_row && _seenCapNames.has(cap.name)) {
+                    this.warnings.push({ line: lineNum + 1, ...this._tokenCols(this._currentLineText, cap.name),
+                        message: `Duplicate capability name "${cap.name}" in capabilities block — remove the second declaration.` });
+                } else if (!cap.null_row) {
+                    _seenCapNames.add(cap.name);
+                }
+                this.capabilities.push(cap);
+            }
+        };
 
         // ── Pass 1: scan lines, record label offsets, collect instruction stubs ──
         let _inCapBlock   = false;  // inside a multi-line  capabilities { } block
@@ -750,40 +773,14 @@ class ChurchAssembler {
                 const inline = line.match(/^capabilities\s*\{\s*(.*?)\s*\}\s*$/i);
                 if (inline) {
                     for (const item of inline[1].split(',')) {
-                        const cap = ChurchAssembler._parseCapItem(item);
-                        if (cap) {
-                            if (!cap.null_row && cap.rights.length === 0 && !ChurchAssembler._isHardwareCapName(cap.name)) {
-                                this.errors.push({ line: lineNum + 1, ...this._tokenCols(this._currentLineText, cap.name),
-                                    message: `Capability "${cap.name}" has no permission letters — add at least one of E, R, W, X after the name.\n  Example: capabilities { ${cap.name} E }` });
-                            }
-                            if (!cap.null_row && _seenCapNames.has(cap.name)) {
-                                this.warnings.push({ line: lineNum + 1, ...this._tokenCols(this._currentLineText, cap.name),
-                                    message: `Duplicate capability name "${cap.name}" in capabilities block — remove the second declaration.` });
-                            } else if (!cap.null_row) {
-                                _seenCapNames.add(cap.name);
-                            }
-                            this.capabilities.push(cap);
-                        }
+                        _collectCapItem(item, lineNum);
                     }
                 } else {
                     _inCapBlock = true;
                     const tail = line.replace(/^capabilities\s*\{/i, '').trim();
                     if (tail) {
                         for (const item of tail.split(',')) {
-                            const cap = ChurchAssembler._parseCapItem(item);
-                            if (cap) {
-                                if (!cap.null_row && cap.rights.length === 0 && !ChurchAssembler._isHardwareCapName(cap.name)) {
-                                    this.errors.push({ line: lineNum + 1, ...this._tokenCols(this._currentLineText, cap.name),
-                                        message: `Capability "${cap.name}" has no permission letters — add at least one of E, R, W, X after the name.\n  Example: capabilities { ${cap.name} E }` });
-                                }
-                                if (!cap.null_row && _seenCapNames.has(cap.name)) {
-                                    this.warnings.push({ line: lineNum + 1, ...this._tokenCols(this._currentLineText, cap.name),
-                                        message: `Duplicate capability name "${cap.name}" in capabilities block — remove the second declaration.` });
-                                } else if (!cap.null_row) {
-                                    _seenCapNames.add(cap.name);
-                                }
-                                this.capabilities.push(cap);
-                            }
+                            _collectCapItem(item, lineNum);
                         }
                     }
                 }
@@ -793,20 +790,7 @@ class ChurchAssembler {
                 if (line.includes('}')) { _inCapBlock = false; }
                 else {
                     for (const item of line.split(',')) {
-                        const cap = ChurchAssembler._parseCapItem(item);
-                        if (cap) {
-                            if (!cap.null_row && cap.rights.length === 0 && !ChurchAssembler._isHardwareCapName(cap.name)) {
-                                this.errors.push({ line: lineNum + 1, ...this._tokenCols(this._currentLineText, cap.name),
-                                    message: `Capability "${cap.name}" has no permission letters — add at least one of E, R, W, X after the name.\n  Example: capabilities { ${cap.name} E }` });
-                            }
-                            if (!cap.null_row && _seenCapNames.has(cap.name)) {
-                                this.warnings.push({ line: lineNum + 1, ...this._tokenCols(this._currentLineText, cap.name),
-                                    message: `Duplicate capability name "${cap.name}" in capabilities block — remove the second declaration.` });
-                            } else if (!cap.null_row) {
-                                _seenCapNames.add(cap.name);
-                            }
-                            this.capabilities.push(cap);
-                        }
+                        _collectCapItem(item, lineNum);
                     }
                 }
                 continue;
@@ -2304,6 +2288,27 @@ class ChurchAssembler {
             }
         }
         return { name, rights };
+    }
+
+    // Parse one comma-delimited chunk, recovering when two complete declarations
+    // were accidentally joined (for example "Alpha E Beta RX").
+    static _parseCapItems(itemStr) {
+        const tokens = itemStr.trim().split(/\s+/).filter(Boolean);
+        const nameRE = /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)*$/;
+        const rightsRE = /^[RWXErwxe]+$/;
+        if (tokens.length >= 4 && tokens.length % 2 === 0) {
+            const caps = [];
+            const missingSeparators = [];
+            for (let i = 0; i < tokens.length; i += 2) {
+                if (!nameRE.test(tokens[i]) || !rightsRE.test(tokens[i + 1]))
+                    return { caps: [ChurchAssembler._parseCapItem(itemStr)].filter(Boolean), missingSeparators: [] };
+                const cap = ChurchAssembler._parseCapItem(`${tokens[i]} ${tokens[i + 1]}`);
+                if (cap) caps.push(cap);
+                if (i > 0) missingSeparators.push(tokens[i]);
+            }
+            return { caps, missingSeparators };
+        }
+        return { caps: [ChurchAssembler._parseCapItem(itemStr)].filter(Boolean), missingSeparators: [] };
     }
 
     // Build a slot-number → capability-name map suitable for passing to disassemble().

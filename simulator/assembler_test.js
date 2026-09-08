@@ -10888,5 +10888,46 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
 }
 
 // ── Summary ──────────────────────────────────────────────────────────────────
+// CAP-MC1: joined declarations report the missing separator on the declaration
+// line, but both names remain available to downstream instructions.
+{
+    const a = new ChurchAssembler({});
+    const result = a.assemble(
+        'capabilities {\n' +
+        '  Alpha E Beta RX\n' +
+        '  Gamma E\n' +
+        '}\n' +
+        'LOAD CR1, Beta\n' +
+        'RETURN'
+    );
+    const separatorErrors = result.errors.filter(e => /missing comma/i.test(e.message));
+    assert('CAP-MC1 missing comma produces one targeted diagnostic',
+        separatorErrors.length === 1,
+        result.errors.map(e => `line ${e.line}: ${e.message}`).join('; '));
+    assert('CAP-MC1 diagnostic points to malformed declaration and suggests a comma',
+        separatorErrors[0] && separatorErrors[0].line === 2 &&
+        separatorErrors[0].message.includes('Beta') &&
+        separatorErrors[0].message.toLowerCase().includes('add a comma'),
+        separatorErrors[0] ? JSON.stringify(separatorErrors[0]) : '(no diagnostic)');
+    assert('CAP-MC1 recovery preserves joined and neighboring capability mappings',
+        result.capabilities.map(c => c.name).join(',') === 'Alpha,Beta,Gamma' &&
+        a._capBlockSlots.Beta === 1 && a._capBlockSlots.Gamma === 2,
+        `caps=${result.capabilities.map(c => c.name).join(',')} slots=${JSON.stringify(a._capBlockSlots)}`);
+    assert('CAP-MC1 suppresses misleading downstream capability-register errors',
+        !result.errors.some(e => /expected a capability register/i.test(e.message)) &&
+        !result.errors.some(e => /Beta.*not declared/i.test(e.message)),
+        result.errors.map(e => e.message).join('; '));
+}
+
+// CAP-MC2: correctly comma-separated neighbors retain their existing behavior.
+{
+    const a = new ChurchAssembler({});
+    const result = a.assemble('capabilities { Alpha E, Beta RX, Gamma W }\nLOAD CR1, Beta\nRETURN');
+    assert('CAP-MC2 valid neighboring declarations compile unchanged',
+        result.errors.length === 0 &&
+        result.capabilities.map(c => c.name).join(',') === 'Alpha,Beta,Gamma',
+        result.errors.map(e => e.message).join('; '));
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);
