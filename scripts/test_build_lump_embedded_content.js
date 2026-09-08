@@ -5,7 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { inspect } = require('./check-lump-embedded-content.js');
+const { historicalClassification, inspect } = require('./check-lump-embedded-content.js');
 const ROOT = path.resolve(__dirname, '..');
 const CANONICAL_LUMPS = path.join(ROOT, 'server', 'lumps');
 const builds = [
@@ -44,6 +44,25 @@ function seedCanonicalState(dir, script) {
 }
 
 let failures = 0;
+
+try {
+    const missing = new Error('embedded content missing');
+    const legacy = historicalClassification({ pre_embedded_content: true }, missing);
+    const unmarked = historicalClassification({
+        filename: 'Salvation.1.6be43a9d.lump',
+    }, missing);
+    if (legacy !== 'historical pre-embedded-content artifact') {
+        throw new Error('manifest pre-embedded-content classification was not honored');
+    }
+    if (unmarked !== null) {
+        throw new Error('unmarked current artifact did not fail closed');
+    }
+    console.log('PASS manifest legacy classification');
+} catch (error) {
+    console.error(`FAIL manifest legacy classification: ${error.message}`);
+    failures++;
+}
+
 for (const [script, sourceName] of builds) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lump-content-'));
     try {

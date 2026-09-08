@@ -281,6 +281,7 @@ def test_guard_accepts_locator_and_history_only_manifest(tmp_path):
         "archived": False,
         "forked": False,
         "variant_group": "compiled_example",
+        "pre_embedded_content": True,
     }]))
     result = _run(GUARD, "--root", tmp_path)
     assert result.returncode == 0, result.stderr

@@ -54,7 +54,8 @@
     "version": "2026.05.17",
     "lump_version": 1,
     "compiled_at": 1779016560.4863155,
-    "filename": "Salvation.1.6be43a9d.lump"
+    "filename": "Salvation.1.6be43a9d.lump",
+    "pre_embedded_content": true
   },
   {
     "token": "5a93ce79",
@@ -162,7 +163,8 @@
     "filename": "MorseCmOk.1.eb20fe01.lump",
     "version": "2026.08.03",
     "lump_version": 4,
-    "compiled_at": 1785802519.915584
+    "compiled_at": 1785802519.915584,
+    "pre_embedded_content": true
   },
   {
     "token": "00001000",

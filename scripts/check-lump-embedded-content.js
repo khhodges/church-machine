@@ -12,10 +12,6 @@ function arg(name, fallback) {
 }
 const LUMPS = arg('lumps-dir', path.join(ROOT, 'server', 'lumps'));
 const EXAMPLES = arg('examples-dir', path.join(ROOT, 'simulator', 'examples'));
-const HISTORICAL_WITHOUT_EMBEDDED_CONTENT = new Set([
-    'Salvation.1.6be43a9d.lump',
-    'MorseCmOk.1.eb20fe01.lump',
-]);
 
 function snake(name) {
     return name.replace(/([a-z0-9])([A-Z])/g, '$1_$2')
@@ -49,7 +45,7 @@ function inspect(file) {
 }
 
 function historicalClassification(entry, error) {
-    if (HISTORICAL_WITHOUT_EMBEDDED_CONTENT.has(entry.filename) &&
+    if (entry.pre_embedded_content === true &&
         error.message === 'embedded content missing') {
         return 'historical pre-embedded-content artifact';
     }
@@ -95,4 +91,4 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { inspect };
+module.exports = { historicalClassification, inspect };

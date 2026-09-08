@@ -37,9 +37,9 @@ ALLOWED_FILES = {
 MANIFEST_ALLOWED_FIELDS = frozenset({
     # Binary lookup/index.
     "token", "filename",
-    # Revision and archive history used by the current server transition code.
+    # Revision, archive, and artifact compatibility history.
     "abstraction", "version", "lump_version", "compiled_at", "archived", "forked",
-    "variant_group",
+    "variant_group", "pre_embedded_content",
 })
 MANIFEST_FORBIDDEN_FIELDS = frozenset({
     "sidecar_file",
