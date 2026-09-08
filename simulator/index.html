@@ -116,6 +116,7 @@
             background: linear-gradient(90deg, transparent, #daa520, transparent);
             animation: app-slide 1.4s ease-in-out infinite;
         }
+        .nav-target-stack { display:flex; flex-direction:column; align-items:flex-start; gap:3px; }
         .programming-target { display:flex; align-items:center; gap:5px; max-width:min(720px,55vw); padding:2px 6px; border:1px solid #3a3a5a; border-radius:5px; background:#10101c; font-size:.7rem; overflow:hidden; }
         .programming-target label { color:#daa520; font-weight:700; }
         .programming-target select { max-width:185px; color:#e7e7f2; background:#1a1a2a; border:1px solid #4a4a68; border-radius:3px; font-size:.7rem; padding:2px; }
@@ -311,6 +312,27 @@
                 <a class="board-manual-link" href="https://github.com/DavidJRichards/QMTECH_XC7A100T_Wukong_Board/blob/main/Documents/QMTECH_Artix-7_XC7A100T_Wukong_Board_V2_User_Manual(Experiments)-V01.pdf" target="_blank" rel="noopener noreferrer" data-tooltip="Open the QMTECH Wukong board user manual on GitHub">Wukong board manual</a>
             </div>
             <nav class="controls">
+                <div class="nav-target-stack">
+                <div class="programming-target is-collapsed" id="programmingTargetControl" role="group" aria-label="Programming target">
+                    <label for="programmingTargetSelect">Target</label>
+                    <select id="programmingTargetSelect" aria-describedby="programmingTargetStatus programmingTargetIdentity">
+                        <option value="simulator-ram">Simulator RAM</option>
+                        <option value="wukong-runtime-ram">Wukong RAM — Runtime Upload</option>
+                        <option value="wukong-fpga-bitstream">Wukong FPGA — Bitstream</option>
+                    </select>
+                    <button class="programming-target-toggle" id="programmingTargetToggle" type="button"
+                            aria-expanded="false" aria-controls="programmingTargetDetails"
+                            aria-label="Show programming target details" title="Show programming target details"></button>
+                    <div class="programming-target-details" id="programmingTargetDetails">
+                        <input id="programmingTargetUid" type="text" size="10" placeholder="Wukong UID" aria-label="Selected Wukong device UID">
+                        <input id="programmingTargetBuild" type="text" size="9" placeholder="Provenance ID" list="programmingProvenanceOptions" aria-label="Selected bitstream provenance identity">
+                        <datalist id="programmingProvenanceOptions"></datalist>
+                        <span id="programmingTargetStatus" aria-live="polite"></span>
+                        <span id="programmingTargetIdentity" aria-live="polite"></span>
+                        <span id="programmingRuntimeIdentity" aria-live="polite"></span>
+                        <span id="programmingBitstreamIdentity" aria-live="polite"></span>
+                    </div>
+                </div>
                 <div class="nav-cluster view-buttons">
                     <button id="backBtn" class="nav-cluster-btn" onclick="goBack()" style="display:none;" data-tooltip="Back — Return to the previous view">&#8592;</button>
                     <div class="ham-wrap" id="hamWrap">
@@ -444,25 +466,6 @@
                             onclick="cycleCRView()"
                             data-tooltip="CR0–15 — Context Registers · click to cycle: CR0-15 → CR14 CLOOMC → CR12 Thread">CRs</button>
                 </div>
-                <div class="programming-target is-collapsed" id="programmingTargetControl" role="group" aria-label="Programming target">
-                    <label for="programmingTargetSelect">Target</label>
-                    <select id="programmingTargetSelect" aria-describedby="programmingTargetStatus programmingTargetIdentity">
-                        <option value="simulator-ram">Simulator RAM</option>
-                        <option value="wukong-runtime-ram">Wukong RAM — Runtime Upload</option>
-                        <option value="wukong-fpga-bitstream">Wukong FPGA — Bitstream</option>
-                    </select>
-                    <button class="programming-target-toggle" id="programmingTargetToggle" type="button"
-                            aria-expanded="false" aria-controls="programmingTargetDetails"
-                            aria-label="Show programming target details" title="Show programming target details"></button>
-                    <div class="programming-target-details" id="programmingTargetDetails">
-                        <input id="programmingTargetUid" type="text" size="10" placeholder="Wukong UID" aria-label="Selected Wukong device UID">
-                        <input id="programmingTargetBuild" type="text" size="9" placeholder="Provenance ID" list="programmingProvenanceOptions" aria-label="Selected bitstream provenance identity">
-                        <datalist id="programmingProvenanceOptions"></datalist>
-                        <span id="programmingTargetStatus" aria-live="polite"></span>
-                        <span id="programmingTargetIdentity" aria-live="polite"></span>
-                        <span id="programmingRuntimeIdentity" aria-live="polite"></span>
-                        <span id="programmingBitstreamIdentity" aria-live="polite"></span>
-                    </div>
                 </div>
                 <div id="toolbarGroupSim" class="toolbar-group">
                     <div class="toolbar-group-divider"></div>
