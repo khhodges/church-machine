@@ -132,8 +132,8 @@
       "location": "0x000003C0",
       "type": "Inform",
       "token": "00000a00",
-      "filename": "CapabilityTest.2.59e2b5ca.lump",
-      "lump_version": 21,
+      "filename": "CapabilityTest.1.878a5b27.lump",
+      "lump_version": 22,
       "resident": true,
       "boot_resident": true,
       "f": 0,
@@ -142,7 +142,7 @@
       "seq": 0,
       "seal": "0xDE937EEF",
       "boot": true,
-      "issue_n": 2,
+      "issue_n": 1,
       "load_policy": "Resident",
       "identity_hash": "c4acababbd32765ff6257164a137c459d42d7eb284e850aa105e280d89d43017",
       "binary_hash": "67bf7f2c450557a25c4723660d5ce69fa6d2a29ea4d95cf7d8ee1bca70c960e5"
@@ -181,5 +181,5 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1788822614.3965309
+  "generated_at": 1788866784.3553953
 }

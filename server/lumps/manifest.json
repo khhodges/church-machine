@@ -358,14 +358,6 @@
     "archived": true
   },
   {
-    "token": "00000a00",
-    "abstraction": "CapabilityTest",
-    "filename": "CapabilityTest.2.59e2b5ca.lump",
-    "variant_group": "capabilitytest-history",
-    "lump_version": 2,
-    "compiled_at": 1788815363.1958604
-  },
-  {
     "token": "d2572a73",
     "abstraction": "SelfTest",
     "filename": "SelfTest.1.8ab7765f.lump",
@@ -395,5 +387,12 @@
     "filename": "SelfTest.83.c80aeda6.lump",
     "lump_version": 83,
     "variant_group": "selftest-history"
+  },
+  {
+    "token": "00000a00",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.1.878a5b27.lump",
+    "lump_version": 22,
+    "compiled_at": 1788866783.3035173
   }
 ]
