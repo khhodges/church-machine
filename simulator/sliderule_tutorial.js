@@ -51,16 +51,16 @@ class SlideRuleTutorial {
 <div class="sr-col">
 <div class="sr-col-title">Turing Domain (data)</div>
 <table class="sr-table"><tr><th>Op</th><th>Instruction</th><th>Purpose</th></tr>
-<tr><td>10</td><td><span class="sr-instr-tip" data-tooltip="DREAD — Data Read. Read a 32-bit value from data memory into a data register. Uses R (read) permission. Operates only in the Turing (data) domain.">DREAD</span></td><td>Read from data memory</td></tr>
-<tr><td>11</td><td><span class="sr-instr-tip" data-tooltip="DWRITE — Data Write. Write a 32-bit value from a data register into data memory. Uses W (write) permission. Cannot touch capability space.">DWRITE</span></td><td>Write to data memory</td></tr>
-<tr><td>12</td><td><span class="sr-instr-tip" data-tooltip="BFEXT — Bit Field Extract. Extract a contiguous range of bits from a data register. Used for decoding packed values and protocol fields.">BFEXT</span></td><td>Extract a bitfield</td></tr>
-<tr><td>13</td><td><span class="sr-instr-tip" data-tooltip="BFINS — Bit Field Insert. Insert a value into a specific bit range of a data register. The complement of BFEXT for packing data.">BFINS</span></td><td>Insert a bitfield</td></tr>
-<tr><td>14</td><td><span class="sr-instr-tip" data-tooltip="MCMP — Machine Compare. Compare two data registers and set condition flags (EQ, NE, LT, GT, etc.). Used before BRANCH for conditional logic.">MCMP</span></td><td>Compare (set flags)</td></tr>
-<tr><td>15</td><td><span class="sr-instr-tip" data-tooltip="IADD — Integer Add. Add two 32-bit data registers and store the result. Sets overflow and carry flags. All arithmetic is built from IADD, ISUB, SHL, and SHR.">IADD</span></td><td>Integer addition</td></tr>
-<tr><td>16</td><td><span class="sr-instr-tip" data-tooltip="ISUB — Integer Subtract. Subtract one data register from another. Sets borrow and zero flags. With IADD, provides the basis for all arithmetic.">ISUB</span></td><td>Integer subtraction</td></tr>
-<tr><td>17</td><td><span class="sr-instr-tip" data-tooltip="BRANCH — Conditional Branch. Jump to a target address if the condition flags (set by MCMP) match the instruction's condition code. ARM-style conditional execution.">BRANCH</span></td><td>Conditional branch</td></tr>
-<tr><td>18</td><td><span class="sr-instr-tip" data-tooltip="SHL — Shift Left. Shift a data register left by a specified number of bits, filling with zeros. Equivalent to multiplication by powers of 2.">SHL</span></td><td>Shift left</td></tr>
-<tr><td>19</td><td><span class="sr-instr-tip" data-tooltip="SHR — Shift Right. Shift a data register right by a specified number of bits. Equivalent to integer division by powers of 2.">SHR</span></td><td>Shift right</td></tr>
+<tr><td>16</td><td><span class="sr-instr-tip" data-tooltip="DREAD — Data Read. Read a 32-bit value from data memory into a data register. Uses R (read) permission. Operates only in the Turing (data) domain.">DREAD</span></td><td>Read from data memory</td></tr>
+<tr><td>17</td><td><span class="sr-instr-tip" data-tooltip="DWRITE — Data Write. Write a 32-bit value from a data register into data memory. Uses W (write) permission. Cannot touch capability space.">DWRITE</span></td><td>Write to data memory</td></tr>
+<tr><td>18</td><td><span class="sr-instr-tip" data-tooltip="BFEXT — Bit Field Extract. Extract a contiguous range of bits from a data register. Used for decoding packed values and protocol fields.">BFEXT</span></td><td>Extract a bitfield</td></tr>
+<tr><td>19</td><td><span class="sr-instr-tip" data-tooltip="BFINS — Bit Field Insert. Insert a value into a specific bit range of a data register. The complement of BFEXT for packing data.">BFINS</span></td><td>Insert a bitfield</td></tr>
+<tr><td>20</td><td><span class="sr-instr-tip" data-tooltip="MCMP — Machine Compare. Compare two data registers and set condition flags (EQ, NE, LT, GT, etc.). Used before BRANCH for conditional logic.">MCMP</span></td><td>Compare (set flags)</td></tr>
+<tr><td>21</td><td><span class="sr-instr-tip" data-tooltip="IADD — Integer Add. Add two 32-bit data registers and store the result. Sets overflow and carry flags. All arithmetic is built from IADD, ISUB, SHL, and SHR.">IADD</span></td><td>Integer addition</td></tr>
+<tr><td>22</td><td><span class="sr-instr-tip" data-tooltip="ISUB — Integer Subtract. Subtract one data register from another. Sets borrow and zero flags. With IADD, provides the basis for all arithmetic.">ISUB</span></td><td>Integer subtraction</td></tr>
+<tr><td>23</td><td><span class="sr-instr-tip" data-tooltip="BRANCH — Conditional Branch. Jump to a target address if the condition flags (set by MCMP) match the instruction's condition code. ARM-style conditional execution.">BRANCH</span></td><td>Conditional branch</td></tr>
+<tr><td>24</td><td><span class="sr-instr-tip" data-tooltip="SHL — Shift Left. Shift a data register left by a specified number of bits, filling with zeros. Equivalent to multiplication by powers of 2.">SHL</span></td><td>Shift left</td></tr>
+<tr><td>25</td><td><span class="sr-instr-tip" data-tooltip="SHR — Shift Right. Shift a data register right by a specified number of bits. Equivalent to integer division by powers of 2.">SHR</span></td><td>Shift right</td></tr>
 </table>
 </div>
 </div>

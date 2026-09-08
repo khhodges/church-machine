@@ -454,6 +454,93 @@ console.log('\n--- WCH-HW-11: WukongCallHome.hw dispatches through its direct en
         `errors=${assembled.errors.map(error => error.message).join('; ')} word=0x${callWord.toString(16)}`);
 }
 
+// ── WCH-HW-12: Canonical DWRITE reaches physical LED MMIO safely ─────────────
+console.log('\n--- WCH-HW-12: opcode-17 DWRITE routes physical LED MMIO ---');
+{
+    const sim = new ChurchSimulator();
+    const assembler = new ChurchAssembler();
+    sim.bootComplete = true;
+    const ledSlot = 3;
+    const led = sim.readNSEntry(ledSlot);
+    const ledSeq = sim.parseNSWord1(led.word1_limit).gtSeq;
+    sim.cr[3] = {
+        word0: sim.createGT(ledSeq, ledSlot, {R:1, W:1}, 1),
+        word1: led.word0_location,
+        word2: led.word1_limit,
+        word3: led.word3_seal,
+        m: 0,
+    };
+    const thread = sim.readNSEntry(1);
+    const threadSeq = sim.parseNSWord1(thread.word1_limit).gtSeq;
+    sim.cr[12] = {
+        word0: sim.createGT(threadSeq, 1, {R:1, W:1}, 1),
+        word1: thread.word0_location,
+        word2: thread.word1_limit,
+        word3: thread.word3_seal,
+        m: 0,
+    };
+    const word = 0x8F098000;
+    const decoded = sim.decodeInstruction(word);
+    sim.dr[1] = 1;
+    let thrown = null;
+    try {
+        sim._execDwrite(decoded);
+    } catch (error) {
+        thrown = error;
+    }
+    check('WCH-HW-12a: 0x8F098000 decodes as opcode 17 DWRITE',
+        decoded.opcode === 17 &&
+        assembler.disassemble(word).replace(/\s+/g, ' ').trim() ===
+            'DWRITE DR1, CR3, #0, DR0',
+        assembler.disassemble(word));
+    check('WCH-HW-12b: physical MMIO DWRITE does not throw',
+        thrown === null, thrown && thrown.stack);
+    check('WCH-HW-12c: DWRITE turns LED0 on',
+        (sim.ledBits & 1) === 1, `ledBits=0x${sim.ledBits.toString(16)}`);
+    check('WCH-HW-12d: DWRITE preserves Thread DR1-home synchronization',
+        (sim.memory[thread.word0_location + 2] >>> 0) === 1);
+    sim.dr[2] = 0;
+    let readThrown = null;
+    try {
+        sim._execDread({crDst:2, crSrc:3, imm:0x4000});
+    } catch (error) {
+        readThrown = error;
+    }
+    check('WCH-HW-12e: DREAD reads canonical LED MMIO state',
+        readThrown === null && sim.dr[2] === 1,
+        readThrown ? readThrown.stack : `DR2=${sim.dr[2]}`);
+}
+
+// ── WCH-HW-13: UI and pending-load ownership use canonical opcode rules ───────
+console.log('\n--- WCH-HW-13: code view, compile ownership, and popup guards ---');
+{
+    const appMemory = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
+    const appRun = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
+    const appShell = fs.readFileSync(path.join(__dirname, 'app-shell.js'), 'utf8');
+    const appCompile = fs.readFileSync(path.join(__dirname, 'app-compile.js'), 'utf8');
+
+    check('WCH-HW-13a: code view reserves BRANCH rendering for opcode 23',
+        appMemory.includes('if (((_w >>> 27) & 0x1F) !== 23) continue;') &&
+        appMemory.includes('} else if (((word >>> 27) & 0x1F) === 23) {'));
+    check('WCH-HW-13b: method-start banners decode opcode-23 table entries',
+        appMemory.includes('const offset = pointerOpcode === 23') &&
+        appMemory.includes('? i + signedOffset'));
+    check('WCH-HW-13c: both high-level Load into Sim paths emit opcode 23',
+        appRun.includes('(((23 << 27) | (branchOffset & 0x7FFF))') &&
+        appCompile.includes('(((23 << 27) | (branchOffset & 0x7FFF))') &&
+        !appCompile.includes("methodTableEntries.push(m.visibility === 'private' ? 0 : codeOffset + 1)"));
+    check('WCH-HW-13d: pending loads own an immutable compile snapshot',
+        appShell.includes('let _pendingSimLoadSnapshot = null;') &&
+        appShell.includes('_pendingSimLoadSnapshot = snapshot ? Object.freeze({') &&
+        appRun.includes('const _aplWords = _aplPending && _aplPending.words.length') &&
+        appRun.includes('function _injectClistNow(capabilitiesOverride)') &&
+        appRun.includes('if (_injectClistNow(_aplCaps) === false)'));
+    check('WCH-HW-13e: boot and run exceptions open a dedicated runtime-error popup',
+        appRun.includes('function showRuntimeErrorModal(error, context)') &&
+        appRun.includes("title.textContent = 'Simulator Runtime Error';") &&
+        (appRun.match(/showRuntimeErrorModal\(e,/g) || []).length >= 2);
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(60)}`);
 console.log(`${pass} passed, ${fail} failed`);

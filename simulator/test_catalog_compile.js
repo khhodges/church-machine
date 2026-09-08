@@ -432,7 +432,7 @@ console.log('\n--- T7: _assembleLumpFromCatalog word count for 2-method abstract
     check('T7b: word count (excl header) = N + bodyLen',
           stored !== null && stored.length === N + bodyLen);  // 7
 
-    // Verify method table entries — each is a BRANCH word (opcode 17).
+    // Verify method table entries — each is a BRANCH word (opcode 23).
     // Body offsets (lump-relative 0-indexed PC, table occupies PCs 0..N-1):
     //   body0 starts at PC N=2, body1 starts at PC N+words1.length=5
     // BRANCH word i encodes branchOffset = bodyOffset_i - i (PC-relative).

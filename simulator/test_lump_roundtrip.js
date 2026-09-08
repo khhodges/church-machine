@@ -279,7 +279,7 @@ console.log('\n--- T-RT05: 4-method variable-length bodies round-trip ---');
 // addresses instead of BRANCH instructions, the CALL dispatcher would treat
 // them as non-BRANCH entries and use the bare value as the PC directly.
 // This test verifies that our assembled LUMP uses BRANCH-encoded entries
-// (opcode 17), which the dispatcher decodes correctly, and that the bare-
+// (opcode 23), which the dispatcher decodes correctly, and that the bare-
 // address value would give the WRONG pc (catching any such regression).
 console.log('\n--- T-RT06: Regression gate — BRANCH encoding vs. bare address ---');
 {
@@ -297,7 +297,7 @@ console.log('\n--- T-RT06: Regression gate — BRANCH encoding vs. bare address 
     // Verify the assembled method-table entry IS a BRANCH word (not bare address)
     const tableEntry1 = buf[1];  // buf[1+0] = table entry for method 1
     const tableEntry1Opcode = (tableEntry1 >>> 27) & 0x1F;
-    check('T-RT06a: table entry 1 has BRANCH opcode (17)', tableEntry1Opcode === BRANCH_OPCODE);
+    check('T-RT06a: table entry 1 has BRANCH opcode (23)', tableEntry1Opcode === BRANCH_OPCODE);
 
     // The bare lump-relative address of bodyA (pre-task-1134 format) would be N=2.
     // With BRANCH encoding, the decoded bodyOffset = 2. Both coincidentally agree
@@ -312,11 +312,11 @@ console.log('\n--- T-RT06: Regression gate — BRANCH encoding vs. bare address 
     //   bare: tableEntry = bodyOffset0 = 2
     //   BRANCH: branchOffset = 2-0=2; decoded = (1-1)+2 = 2.  Still equal!
     //
-    // The key regression is: verify the table entries ARE BRANCH words (opcode 17),
+    // The key regression is: verify the table entries ARE BRANCH words (opcode 23),
     // so if the code ever switched back to bare addresses, this check catches it.
     const tableEntry2 = buf[2];  // table entry for method 2
     const tableEntry2Opcode = (tableEntry2 >>> 27) & 0x1F;
-    check('T-RT06b: table entry 2 has BRANCH opcode (17)', tableEntry2Opcode === BRANCH_OPCODE);
+    check('T-RT06b: table entry 2 has BRANCH opcode (23)', tableEntry2Opcode === BRANCH_OPCODE);
 
     // Round-trip step() for method 1 verifies the BRANCH path in the simulator
     {

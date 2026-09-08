@@ -85,8 +85,8 @@ function assertDR0Zero(sim, label) {
     const label = 'IADD DR1, DR2, #7';
     const sim = makeSim();
     sim.dr[2] = 10 >>> 0;
-    // IADD opcode=15, cond=AL, crDst=1, crSrc=2, imm=0x4007 (bit14=1 => immediate mode, value=7)
-    const instr = enc(15, AL, 1, 2, 0x4007);
+    // IADD opcode=21, cond=AL, crDst=1, crSrc=2, imm=0x4007 (bit14=1 => immediate mode, value=7)
+    const instr = enc(21, AL, 1, 2, 0x4007);
     const r = stepPreBoot(sim, instr);
     if (!r) { fail(label, 'step() returned null (fault)'); return; }
     if (!assertDR0Zero(sim, label)) return;
@@ -102,7 +102,7 @@ function assertDR0Zero(sim, label) {
     const label = 'IADD DR0 dst stays zero';
     const sim = makeSim();
     sim.dr[1] = 42 >>> 0;
-    const instr = enc(15, AL, 0, 1, 0x4005); // IADD DR0, DR1, #5
+    const instr = enc(21, AL, 0, 1, 0x4005); // IADD DR0, DR1, #5
     const r = stepPreBoot(sim, instr);
     if (!r) { fail(label, 'step() returned null (fault)'); return; }
     if (!assertDR0Zero(sim, label)) return;
@@ -113,8 +113,8 @@ function assertDR0Zero(sim, label) {
     const label = 'ISUB DR1, DR2, #3';
     const sim = makeSim();
     sim.dr[2] = 10 >>> 0;
-    // ISUB opcode=16, crDst=1, crSrc=2, imm=0x4003 (immediate mode, value=3)
-    const instr = enc(16, AL, 1, 2, 0x4003);
+    // ISUB opcode=22, crDst=1, crSrc=2, imm=0x4003 (immediate mode, value=3)
+    const instr = enc(22, AL, 1, 2, 0x4003);
     const r = stepPreBoot(sim, instr);
     if (!r) { fail(label, 'step() returned null (fault)'); return; }
     if (!assertDR0Zero(sim, label)) return;
@@ -128,7 +128,7 @@ function assertDR0Zero(sim, label) {
     const label = 'ISUB DR0 dst stays zero';
     const sim = makeSim();
     sim.dr[1] = 20 >>> 0;
-    const instr = enc(16, AL, 0, 1, 0x4002); // ISUB DR0, DR1, #2
+    const instr = enc(22, AL, 0, 1, 0x4002); // ISUB DR0, DR1, #2
     const r = stepPreBoot(sim, instr);
     if (!r) { fail(label, 'step() returned null (fault)'); return; }
     if (!assertDR0Zero(sim, label)) return;
@@ -140,8 +140,8 @@ function assertDR0Zero(sim, label) {
     const sim = makeSim();
     sim.dr[1] = 5 >>> 0;
     sim.dr[2] = 5 >>> 0;
-    // MCMP opcode=14, crDst=1, crSrc=2, imm=0
-    const instr = enc(14, AL, 1, 2, 0);
+    // MCMP opcode=20, crDst=1, crSrc=2, imm=0
+    const instr = enc(20, AL, 1, 2, 0);
     const r = stepPreBoot(sim, instr);
     if (!r) { fail(label, 'step() returned null (fault)'); return; }
     if (!assertDR0Zero(sim, label)) return;
@@ -153,8 +153,8 @@ function assertDR0Zero(sim, label) {
     const label = 'BFEXT DR1, DR2, pos=0, w=4';
     const sim = makeSim();
     sim.dr[2] = 0xFF >>> 0;
-    // BFEXT opcode=12, crDst=1, crSrc=2, imm=(pos=0)<<5 | w=4 = 4
-    const instr = enc(12, AL, 1, 2, 4);
+    // BFEXT opcode=18, crDst=1, crSrc=2, imm=(pos=0)<<5 | w=4 = 4
+    const instr = enc(18, AL, 1, 2, 4);
     const r = stepPreBoot(sim, instr);
     if (!r) { fail(label, 'step() returned null (fault)'); return; }
     if (!assertDR0Zero(sim, label)) return;
@@ -169,8 +169,8 @@ function assertDR0Zero(sim, label) {
     const sim = makeSim();
     sim.dr[1] = 0x00 >>> 0; // destination
     sim.dr[2] = 0xA >>> 0;  // value to insert
-    // BFINS opcode=13, crDst=1, crSrc=2, imm=(pos=4)<<5 | w=4 = 128+4 = 132
-    const instr = enc(13, AL, 1, 2, 132);
+    // BFINS opcode=19, crDst=1, crSrc=2, imm=(pos=4)<<5 | w=4 = 128+4 = 132
+    const instr = enc(19, AL, 1, 2, 132);
     const r = stepPreBoot(sim, instr);
     if (!r) { fail(label, 'step() returned null (fault)'); return; }
     if (!assertDR0Zero(sim, label)) return;
@@ -184,8 +184,8 @@ function assertDR0Zero(sim, label) {
     const label = 'SHL DR1, DR2, 2';
     const sim = makeSim();
     sim.dr[2] = 1 >>> 0;
-    // SHL opcode=18, crDst=1, crSrc=2, imm=2
-    const instr = enc(18, AL, 1, 2, 2);
+    // SHL opcode=24, crDst=1, crSrc=2, imm=2
+    const instr = enc(24, AL, 1, 2, 2);
     const r = stepPreBoot(sim, instr);
     if (!r) { fail(label, 'step() returned null (fault)'); return; }
     if (!assertDR0Zero(sim, label)) return;
@@ -199,8 +199,8 @@ function assertDR0Zero(sim, label) {
     const label = 'SHR DR1, DR2, 1 (LSR)';
     const sim = makeSim();
     sim.dr[2] = 4 >>> 0;
-    // SHR opcode=19, crDst=1, crSrc=2, imm=1 (arith bit=0 => LSR)
-    const instr = enc(19, AL, 1, 2, 1);
+    // SHR opcode=25, crDst=1, crSrc=2, imm=1 (arith bit=0 => LSR)
+    const instr = enc(25, AL, 1, 2, 1);
     const r = stepPreBoot(sim, instr);
     if (!r) { fail(label, 'step() returned null (fault)'); return; }
     if (!assertDR0Zero(sim, label)) return;
@@ -213,9 +213,9 @@ function assertDR0Zero(sim, label) {
 (function testBranch() {
     const label = 'BRANCH +1';
     const sim = makeSim();
-    // BRANCH opcode=17, cond=AL, crDst=0, crSrc=0, imm=1
+    // BRANCH opcode=23, cond=AL, crDst=0, crSrc=0, imm=1
     // Place the instruction at pc=0; branch goes to pc=0+1=1
-    const instr = enc(17, AL, 0, 0, 1);
+    const instr = enc(23, AL, 0, 0, 1);
     const startPC = sim.pc; // 0
     const r = stepPreBoot(sim, instr);
     if (!r) { fail(label, 'step() returned null (fault)'); return; }
@@ -251,10 +251,10 @@ function assertDR0Zero(sim, label) {
     // to memory[pc=0], which would clobber the data at memory[0].
     sim.memory[5] = 0xDEAD >>> 0;
 
-    // DREAD opcode=10, cond=AL, crDst(drIdx)=1, crSrc=1, imm=0x4005
+    // DREAD opcode=16, cond=AL, crDst(drIdx)=1, crSrc=1, imm=0x4005
     // bit14=1 → immediate mode, offset=5.
     // Reads memory[cr[1].word1 + 5] = memory[0 + 5] = memory[5] = 0xDEAD.
-    const instr = enc(10, AL, 1, 1, 0x4005);
+    const instr = enc(16, AL, 1, 1, 0x4005);
     const r = stepPreBoot(sim, instr);
     if (!r) {
         fail(label, `step() returned null (fault): ${(sim.faultLog.slice(-1)[0]||{}).message}`);
@@ -396,7 +396,7 @@ function makeCallLEDSim(dr1Method) {
     sim.dr[0] = 0; // should already be 0 after reset
     // IADD with NV (Never) condition: will be skipped
     const nv = 0xF; // Never condition
-    const instr = enc(15, nv, 1, 2, 0x4007);
+    const instr = enc(21, nv, 1, 2, 0x4007);
     const r = stepPreBoot(sim, instr);
     if (!r) { fail(label, 'step() returned null'); return; }
     // The "skipped" result still has pc/instr fields but no execution
@@ -500,7 +500,7 @@ function makeCallLEDSim(dr1Method) {
     // Indexed mode: imm[14]=0, base[13:4]=0, DRx[3:0]=2  (imm = 0x0002)
     sim.dr[2] = 0xFFFFFFFF | 0;               // rawOff = 0 + 0xFFFFFFFF = 0xFFFFFFFF
     const imm = (0 << 4) | 2;
-    const instr = enc(10, AL, 1, 1, imm);
+    const instr = enc(16, AL, 1, 1, imm);
     const r = stepPreBoot(sim, instr);
     if (r !== null) { fail(label, 'step() did not fault — overflow wraps to in-bounds'); return; }
     const fl = sim.faultLog.slice(-1)[0] || {};
@@ -523,7 +523,7 @@ function makeCallLEDSim(dr1Method) {
     // base=1, DR3=0xFFFFFFFF → rawOff = 1 + 4294967295 = 4294967296 > 0xFFFFFFFF → saturated
     sim.dr[3] = 0xFFFFFFFF | 0;
     const imm = (1 << 4) | 3;
-    const instr = enc(10, AL, 1, 1, imm);
+    const instr = enc(16, AL, 1, 1, imm);
     const r = stepPreBoot(sim, instr);
     if (r !== null) { fail(label, 'step() did not fault — overflow must saturate and fault BOUNDS'); return; }
     const fl = sim.faultLog.slice(-1)[0] || {};
@@ -545,7 +545,7 @@ function makeCallLEDSim(dr1Method) {
     // base=2, DR4=0xFFFFFFFE → rawOff = 2 + 4294967294 = 4294967296 > 0xFFFFFFFF → saturated
     sim.dr[4] = 0xFFFFFFFE | 0;
     const imm = (2 << 4) | 4;
-    const instr = enc(10, AL, 1, 1, imm);
+    const instr = enc(16, AL, 1, 1, imm);
     const r = stepPreBoot(sim, instr);
     if (r !== null) { fail(label, 'step() did not fault — sum=2^32 must not wrap to 0'); return; }
     const fl = sim.faultLog.slice(-1)[0] || {};
@@ -568,7 +568,7 @@ function makeCallLEDSim(dr1Method) {
     // DR5=5, base=0 → rawOff=5 → in-bounds; should load memory[5]=0xBEEF into DR1
     sim.dr[5] = 5 >>> 0;
     const imm = (0 << 4) | 5;                  // base=0, DRx=DR5 → imm14=0 (indexed)
-    const instr = enc(10, AL, 1, 1, imm);
+    const instr = enc(16, AL, 1, 1, imm);
     const r = stepPreBoot(sim, instr);
     if (!r) {
         const fl = sim.faultLog.slice(-1)[0] || {};

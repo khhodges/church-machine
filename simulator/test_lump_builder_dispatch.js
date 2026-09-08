@@ -253,7 +253,7 @@ console.log('\n--- DT11: cross-method BRANCH patching for private helper ---');
     // A has code [BRANCH_placeholder], crossMethodRefs = [{addr:0, target:'B'}]
     // B has code [RETURN_word]
     const RETURN_WORD = ((3 << 27) | (14 << 23)) >>> 0; // RETURN AL
-    const BRANCH_WORD = ((17 << 27) | (14 << 23)) >>> 0; // BRANCH AL offset=0 placeholder
+    const BRANCH_WORD = ((23 << 27) | (14 << 23)) >>> 0; // BRANCH AL offset=0 placeholder
 
     const result = {
         methods: [
@@ -282,7 +282,7 @@ console.log('\n--- DT11: cross-method BRANCH patching for private helper ---');
     const encodedOffset = branchWord & 0x7FFF;
     check('DT11d: BRANCH offset patched to 1 (B is 1 word ahead)', encodedOffset === 1,
         'encodedOffset=' + encodedOffset);
-    check('DT11e: BRANCH opcode still intact', ((branchWord >>> 27) & 0x1F) === 17,
+    check('DT11e: BRANCH opcode still intact', ((branchWord >>> 27) & 0x1F) === 23,
         'opcode=' + ((branchWord >>> 27) & 0x1F));
 }
 

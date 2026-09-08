@@ -138,6 +138,35 @@ let lastAssembledCapabilities = null;
 let lastAssembledNamedSlots = null;
 let lastMethodTableSize = 0;
 let _pendingSimLoad = false;
+let _pendingSimLoadSnapshot = null;
+
+function _setPendingSimLoad(snapshot) {
+    const _cloneCap = cap => {
+        if (!cap || typeof cap !== 'object') return cap;
+        return Object.freeze({
+            ...cap,
+            rights: Array.isArray(cap.rights) ? Object.freeze(cap.rights.slice()) : cap.rights,
+            grants: Array.isArray(cap.grants) ? Object.freeze(cap.grants.slice()) : cap.grants,
+        });
+    };
+    _pendingSimLoadSnapshot = snapshot ? Object.freeze({
+        token: snapshot.token !== undefined && snapshot.token !== null
+            ? snapshot.token : null,
+        abstraction: snapshot.abstraction || 'prog',
+        words: Object.freeze(Array.isArray(snapshot.words) ? snapshot.words.slice() : []),
+        capabilities: Object.freeze(Array.isArray(snapshot.capabilities)
+            ? snapshot.capabilities.map(_cloneCap) : []),
+        namedSlots: Array.isArray(snapshot.namedSlots)
+            ? Object.freeze(snapshot.namedSlots.slice()) : null,
+        methodTableSize: Number.isInteger(snapshot.methodTableSize) ? snapshot.methodTableSize : 0,
+    }) : null;
+    _pendingSimLoad = true;
+}
+
+function _clearPendingSimLoad() {
+    _pendingSimLoad = false;
+    _pendingSimLoadSnapshot = null;
+}
 
 // ── Execution identity ─────────────────────────────────────────────────────
 // This is deliberately browser-side provenance, not a replacement for LUMP
@@ -405,7 +434,7 @@ function _clearAssembledProgramState() {
     lastAssembledCapabilities = null;
     lastAssembledNamedSlots = null;
     lastMethodTableSize   = 0;
-    _pendingSimLoad       = false;
+    _clearPendingSimLoad();
 }
 let _lumpManifests = {};
 let _petNameDRMap = {};

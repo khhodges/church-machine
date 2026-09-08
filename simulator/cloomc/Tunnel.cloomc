@@ -15,10 +15,9 @@
 //   ...                (add new tags without changing this lump)
 //
 // Instruction encoding note:
-//   Turing opcode numbering follows the simulator's flat scheme (0–19):
-//     DREAD=10  DWRITE=11  IADD=15  ISUB=16  BRANCH=17
-//   The hardware uses a separate range (DREAD=16, DWRITE=17) gated by the
-//   high bit of the 5-bit opcode field.  Only Church-domain ops (LOAD=0,
+//   Canonical v2.0 Turing opcodes occupy 16–25:
+//     DREAD=16  DWRITE=17  IADD=21  ISUB=22  BRANCH=23
+//   Only Church-domain ops (LOAD=0,
 //   CALL=2, RETURN=3, TPERM=6) share the same number in both systems.
 //
 // UART hardware registers (DEVICE_REG_LIMITS = {11: 2}):

@@ -7452,6 +7452,8 @@ async function runSelftestLump() {
         if (typeof sim === 'undefined' || !sim) throw new Error('Simulator not ready');
         if (!sim.bootComplete && typeof instantBoot === 'function') instantBoot();
 
+        sim.programName = SELFTEST_NAME;
+        sim.programCapabilities = [];
         sim.loadProgram(words, 0);
         if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
         if (window.LumpRegistry) {
@@ -7460,14 +7462,22 @@ async function runSelftestLump() {
             // A registry change invalidates any pending Format Lump binary.
             window._pendingLumpData = null;
         }
-        if (typeof _defaultProgramLoaded !== 'undefined') window._defaultProgramLoaded = true;
+        if (typeof _defaultProgramLoaded !== 'undefined') _defaultProgramLoaded = true;
         if (typeof _injectClistNow === 'function') {
             _injectClistNow();
-            if (typeof _pendingSimLoad !== 'undefined') window._pendingSimLoad = false;
+            if (typeof _clearPendingSimLoad === 'function') _clearPendingSimLoad();
         } else {
-            if (typeof _pendingSimLoad !== 'undefined') window._pendingSimLoad = true;
+            if (typeof _setPendingSimLoad === 'function') {
+                _setPendingSimLoad({
+                    token: SELFTEST_TOKEN,
+                    abstraction: SELFTEST_NAME,
+                    words,
+                    capabilities: [],
+                    namedSlots: null,
+                    methodTableSize: 0,
+                });
+            }
         }
-        if (sim.programName !== undefined) sim.programName = SELFTEST_NAME;
         if (window.ExecutionIdentity) {
             window.ExecutionIdentity.begin({
                 abstraction: SELFTEST_NAME,

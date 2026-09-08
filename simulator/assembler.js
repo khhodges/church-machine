@@ -2380,7 +2380,7 @@ class ChurchAssembler {
         const branchTargetSet = new Set();
         for (let i = 0; i < trimmedWords.length; i++) {
             const w = trimmedWords[i] >>> 0;
-            if (((w >>> 27) & 0x1F) !== 17) continue;
+            if (((w >>> 27) & 0x1F) !== 23) continue;
             const rawImm = w & 0x7FFF;
             const soff = (rawImm & 0x4000) ? (rawImm | 0xFFFF8000) : rawImm;
             const target = i + soff;

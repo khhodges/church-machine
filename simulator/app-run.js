@@ -224,7 +224,7 @@ function _materializeRunCapabilities(capabilities, actionLabel) {
 function _blockCapabilityRun(errors, con) {
     const messages = (errors || []).map(message => `[CAP-GT] ${message}`);
     const text = `Capability validation failed — code not loaded:\n${messages.join('\n')}`;
-    _pendingSimLoad = false;
+    _clearPendingSimLoad();
     window._lastCLOOMCLump = null;
     if (con) {
         con.className = '';
@@ -329,7 +329,14 @@ function assembleAndLoad() {
             runStatus: 'assembled',
         });
         window._assemblerSymbols = { labels, lumpName: sim.programName };
-        _pendingSimLoad = true;
+        _setPendingSimLoad({
+            token: _cluTok,
+            abstraction: sim.programName,
+            words: _cluWords,
+            capabilities: _cluCaps,
+            namedSlots: lastAssembledNamedSlots,
+            methodTableSize,
+        });
         if (_cluTok) {
             if (window.LumpRegistry) {
                 window.LumpRegistry.registerMemory(_cluTok, sim.programName, _cluWords, _cluCaps);
@@ -572,7 +579,14 @@ function assembleAndLoad() {
         runStatus: 'assembled',
     });
     window._assemblerSymbols = { labels: result.labels || {}, lumpName: sim.programName };
-    _pendingSimLoad = true;
+    _setPendingSimLoad({
+        token: _asmTok,
+        abstraction: sim.programName,
+        words: _rawWords,
+        capabilities: _rawCaps,
+        namedSlots: lastAssembledNamedSlots,
+        methodTableSize: 0,
+    });
     if (_asmTok) {
         if (window.LumpRegistry) {
             window.LumpRegistry.registerMemory(_asmTok, sim.programName, _rawWords, _rawCaps);
@@ -1272,7 +1286,7 @@ function hideRunPopover() {
 //     • NS-based abstraction → freshly-created E-GT pointing to its NS slot
 //     • Unknown name → null GT (0)
 //   cc = lastAssembledCapabilities.length.
-function _injectClistNow() {
+function _injectClistNow(capabilitiesOverride) {
     if (!sim.bootComplete || !sim.demoClistGTs || !sim.demoClistGTs.length) return;
 
     // Guard against stale named-slot entries from a previous program (Task #1547).
@@ -1284,9 +1298,11 @@ function _injectClistNow() {
     const _curRegMem = window.LumpRegistry
         ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())?.sources?.memory
         : null;
-    const _curCapsAll = _curRegMem
-        ? (_curRegMem.capabilities || [])
-        : (typeof lastAssembledCapabilities !== 'undefined' ? (lastAssembledCapabilities || []) : []);
+    const _curCapsAll = Array.isArray(capabilitiesOverride)
+        ? capabilitiesOverride
+        : (_curRegMem
+            ? (_curRegMem.capabilities || [])
+            : (typeof lastAssembledCapabilities !== 'undefined' ? (lastAssembledCapabilities || []) : []));
     const _hasUserCaps = !!(_curCapsAll.length > 0);
 
     // Maps capability names (from `capabilities { }` blocks) to their
@@ -1492,19 +1508,33 @@ function _injectClistNow() {
 }
 
 function _applyPendingSimLoad() {
+    const _aplPending = _pendingSimLoadSnapshot;
+    const _aplToken = _aplPending
+        ? _aplPending.token
+        : (window.LumpRegistry ? window.LumpRegistry.getCurrent() : null);
     const _aplMem = window.LumpRegistry
-        ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())?.sources?.memory
+        ? window.LumpRegistry.resolve(_aplToken)?.sources?.memory
         : null;
-    const _aplWords = _aplMem ? (_aplMem.words || []) : [];
+    const _aplWords = _aplPending && _aplPending.words.length
+        ? _aplPending.words.slice()
+        : (_aplMem ? (_aplMem.words || []) : []);
     if (!_pendingSimLoad || !_aplWords.length) return;
-    console.log('[applyPendingSimLoad] v20260719h caps=', JSON.stringify(_aplMem ? _aplMem.capabilities : []));
+    console.log('[applyPendingSimLoad] caps=', JSON.stringify(
+        _aplPending ? _aplPending.capabilities : (_aplMem ? _aplMem.capabilities : [])));
 
     // Dynamic NS slot allocation from compiled token (Task #2084).
     // Instead of patching the hardcoded bootEntrySlot (SelfTest, slot [6]),
     // allocate NS[7] (the boot-reserved programmable slot) for the compiled
     // program so SelfTest remains intact at slot [6].
-    const _aplToken = window.LumpRegistry ? window.LumpRegistry.getCurrent() : null;
-    const _aplCaps  = _aplMem ? (_aplMem.capabilities || []) : [];
+    const _aplCaps = _aplPending
+        ? _aplPending.capabilities.slice()
+        : (_aplMem ? (_aplMem.capabilities || []) : []);
+    if (_aplPending) {
+        sim.programName = _aplPending.abstraction;
+        lastAssembledNamedSlots = _aplPending.namedSlots
+            ? _aplPending.namedSlots.slice() : null;
+        lastMethodTableSize = _aplPending.methodTableSize;
+    }
     let   _progSlot = null;
     let   _progGtSeq = 0;
     if (sim.bootComplete && _aplToken && typeof sim.allocOrFindNsSlot === 'function') {
@@ -1551,7 +1581,7 @@ function _applyPendingSimLoad() {
             : null;
         if (!threadLayout || !threadLayout.valid) {
             sim.fault('BOUNDS', 'Compile+Run: active Thread has invalid or unsupported geometry');
-            _pendingSimLoad = false;
+            _clearPendingSimLoad();
             return;
         }
         const sp_max = threadLayout.stackEnd;
@@ -1599,7 +1629,7 @@ function _applyPendingSimLoad() {
                 : null;
             if (!_thLayout || !_thLayout.valid) {
                 sim.fault('BOUNDS', 'Compile+Run: Boot.Thread has invalid or unsupported geometry');
-                _pendingSimLoad = false;
+                _clearPendingSimLoad();
                 return;
             }
             sim.writePersistentWord(
@@ -1619,11 +1649,11 @@ function _applyPendingSimLoad() {
         }
     }
 
-    if (_injectClistNow() === false) {
-        _pendingSimLoad = false;
+    if (_injectClistNow(_aplCaps) === false) {
+        _clearPendingSimLoad();
         return;
     }
-    _pendingSimLoad = false;
+    _clearPendingSimLoad();
     if (window.ExecutionIdentity) window.ExecutionIdentity.markLive({
         abstraction: sim.programName,
         nsSlot: (typeof _progSlot !== 'undefined' ? _progSlot : null),
@@ -2419,6 +2449,11 @@ function runSim() {
             updateDashboard();
             switchView('dashboard');
             openCRDetail(14);
+            showRuntimeErrorModal(e, {
+                phase: 'Boot',
+                pc: sim.physicalPC,
+                step: sim.stepCount,
+            });
             return;
         }
     }
@@ -2549,6 +2584,12 @@ function runSim() {
                 con.scrollTop = con.scrollHeight;
             }
             finishRun('error');
+            showRuntimeErrorModal(e, {
+                phase: 'Run',
+                pc: sim.physicalPC,
+                step: sim.stepCount,
+                batchSteps: totalSteps,
+            });
         }
     }
 
@@ -3320,6 +3361,130 @@ function _restoreFaultLog() {
     } catch(e) { console.warn('[_restoreFaultLog] failed:', e); }
 }
 
+function _runtimeErrorParts(error) {
+    if (error instanceof Error) {
+        return {
+            name: error.name || 'Error',
+            message: error.message || String(error),
+            stack: error.stack || '',
+        };
+    }
+    if (typeof error === 'string') {
+        return { name: 'Error', message: error, stack: '' };
+    }
+    if (error && typeof error === 'object') {
+        let message = '';
+        let stack = '';
+        try {
+            if (typeof error.message === 'string') message = error.message;
+            if (typeof error.stack === 'string') stack = error.stack;
+            if (!message) {
+                const own = {};
+                for (const key of Object.getOwnPropertyNames(error)) own[key] = error[key];
+                message = JSON.stringify(own);
+            }
+        } catch (_e) {}
+        return {
+            name: (typeof error.name === 'string' && error.name) || 'RuntimeError',
+            message: message && message !== '{}' ? message : String(error),
+            stack,
+        };
+    }
+    return { name: 'RuntimeError', message: String(error), stack: '' };
+}
+
+function showRuntimeErrorModal(error, context) {
+    const existing = document.getElementById('runtimeErrorModalOverlay');
+    if (existing) existing.remove();
+    const parts = _runtimeErrorParts(error);
+    const ctx = context || {};
+    const pcValue = Number(ctx.pc);
+    const hasPC = Number.isFinite(pcValue) && pcValue >= 0;
+    const pc = hasPC ? (pcValue >>> 0) : null;
+    const rawWord = pc !== null && sim && sim.memory && pc < sim.memory.length
+        ? (sim.memory[pc] >>> 0) : null;
+    const disasm = rawWord !== null && assembler
+        ? assembler.disassemble(rawWord) : null;
+    const overlay = document.createElement('div');
+    overlay.id = 'runtimeErrorModalOverlay';
+    overlay.className = 'modal-overlay';
+    const dialog = document.createElement('div');
+    dialog.className = 'modal-dialog fault-dialog';
+
+    const header = document.createElement('div');
+    header.className = 'fault-modal-header';
+    const badge = document.createElement('span');
+    badge.className = 'fault-type-badge';
+    badge.style.cssText = 'background:#e9456022;border-color:#e94560;color:#e94560';
+    badge.textContent = parts.name;
+    const title = document.createElement('span');
+    title.className = 'fault-modal-title';
+    title.textContent = 'Simulator Runtime Error';
+    const close = document.createElement('button');
+    close.className = 'fault-modal-close';
+    close.title = 'Close';
+    close.innerHTML = '&times;';
+    close.onclick = () => overlay.remove();
+    header.append(badge, title, close);
+
+    const actions = document.createElement('div');
+    actions.className = 'modal-buttons fault-modal-actions';
+    const edit = document.createElement('button');
+    edit.className = 'btn btn-primary';
+    edit.textContent = 'Edit Code';
+    edit.onclick = () => {
+        overlay.remove();
+        switchView('editor');
+    };
+    const dismiss = document.createElement('button');
+    dismiss.className = 'btn btn-muted';
+    dismiss.textContent = 'Dismiss';
+    dismiss.onclick = () => overlay.remove();
+    actions.append(edit, dismiss);
+
+    const message = document.createElement('div');
+    message.className = 'fault-modal-message';
+    message.textContent = parts.message;
+    const details = document.createElement('div');
+    details.className = 'fault-detail-grid';
+    const rows = [
+        ['Phase', ctx.phase || 'Run'],
+        ['PC', pc === null ? 'unavailable' : `0x${pc.toString(16).toUpperCase().padStart(4, '0')}`],
+        ['Step', Number.isFinite(Number(ctx.step)) ? `#${Number(ctx.step)}` : 'unavailable'],
+    ];
+    if (rawWord !== null) {
+        rows.push(['Instruction', `0x${rawWord.toString(16).toUpperCase().padStart(8, '0')}${disasm ? ` — ${disasm}` : ''}`]);
+    }
+    for (const [label, value] of rows) {
+        const row = document.createElement('div');
+        row.className = 'fault-detail-row';
+        const labelEl = document.createElement('span');
+        labelEl.className = 'fault-detail-label';
+        labelEl.textContent = label;
+        const valueEl = document.createElement('span');
+        valueEl.className = 'fault-detail-value';
+        valueEl.textContent = value;
+        row.append(labelEl, valueEl);
+        details.appendChild(row);
+    }
+    dialog.append(header, actions, message, details);
+    if (parts.stack && parts.stack !== parts.message) {
+        const trace = document.createElement('details');
+        trace.className = 'fault-trace-section';
+        const summary = document.createElement('summary');
+        summary.textContent = 'Technical details';
+        const pre = document.createElement('pre');
+        pre.textContent = parts.stack;
+        trace.append(summary, pre);
+        dialog.appendChild(trace);
+    }
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', event => {
+        if (event.target === overlay) overlay.remove();
+    });
+}
+
 function showFaultModal(f) {
     const existing = document.getElementById('faultModalOverlay');
     if (existing) existing.remove();
@@ -3338,8 +3503,13 @@ function showFaultModal(f) {
 
     // Use physicalPC (actual memory address of the faulting instruction) when available;
     // fall back to f.pc (relative PC) for pre-boot faults or older entries.
-    const pc     = (f.physicalPC !== undefined && f.physicalPC !== null) ? f.physicalPC : f.pc;
-    const pcHex  = '0x' + pc.toString(16).toUpperCase().padStart(4, '0');
+    const pcCandidate = (f.physicalPC !== undefined && f.physicalPC !== null)
+        ? f.physicalPC : f.pc;
+    const pcNumber = Number(pcCandidate);
+    const pc = Number.isFinite(pcNumber) && pcNumber >= 0 ? (pcNumber >>> 0) : null;
+    const pcHex = pc === null
+        ? 'unavailable'
+        : '0x' + pc.toString(16).toUpperCase().padStart(4, '0');
     const word   = _faultRecordRawWord(f);
     const disasm = word !== null
         ? (assembler ? assembler.disassemble(word) : '???')
@@ -3353,9 +3523,9 @@ function showFaultModal(f) {
             // Prefer the label captured at fault() time; fall back to live nsLabels.
             const _lbl = f.faultLabel || (sim.nsLabels && sim.nsLabels[_ni]) || `NS[${_ni}]`;
             const _base = (_cr14lazy.word1 !== undefined && _cr14lazy.word1 !== null) ? (_cr14lazy.word1 >>> 0) : 0;
-            f._nsSnapshot = { label: _lbl, nsIdx: _ni, offset: pc - _base };
+            f._nsSnapshot = { label: _lbl, nsIdx: _ni, offset: pc === null ? 0 : pc - _base };
         } else {
-            f._nsSnapshot = _nsOwnerOf(pc);
+            f._nsSnapshot = pc === null ? null : _nsOwnerOf(pc);
         }
     }
     const ns     = f._nsSnapshot;
@@ -3370,7 +3540,7 @@ function showFaultModal(f) {
         // Prefer the label captured at fault() time; fall back to live nsLabels.
         const _lbl  = f.faultLabel || (sim.nsLabels && sim.nsLabels[_ni]) || `NS[${_ni}]`;
         const _base = (_cr14snap.word1 !== undefined && _cr14snap.word1 !== null) ? (_cr14snap.word1 >>> 0) : 0;
-        locationNs  = { label: _lbl, nsIdx: _ni, offset: pc - _base };
+        locationNs  = { label: _lbl, nsIdx: _ni, offset: pc === null ? 0 : pc - _base };
     } else {
         locationNs  = ns;
     }

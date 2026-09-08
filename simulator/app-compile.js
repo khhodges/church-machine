@@ -2145,13 +2145,17 @@ function loadCLOOMCIntoSim() {
     const labels = {};
     // Layout: words[0..N-1] = method table entries; words[N..] = method bodies.
     // loadProgram writes words[k] at lump word k+1 (word 0 is lump header).
-    // Entry value = lump-word offset of body start (= codeOffset+1 for words[codeOffset]).
-    // imm = methodIndex+1 (1-based); dispatch reads lump word imm = words[imm-1] = entry.
-    // pc = entry - 1; fetchAddr = lump_base + 1 + pc = lump word entry = body start. ✓
+    // Public entries are canonical opcode-23 BRANCH words. The offset is relative
+    // to the table row, so dispatch lands on the corresponding method body.
     let codeOffset = methodTableSize; // words[] index of next body (= pc value for BRANCH)
     const methodTableEntries = [];
-    for (const m of methods) {
-        methodTableEntries.push(m.visibility === 'private' ? 0 : codeOffset + 1);
+    for (let i = 0; i < methods.length; i++) {
+        const m = methods[i];
+        const branchOffset = codeOffset - i;
+        methodTableEntries.push(
+            m.visibility === 'private'
+                ? 0
+                : (((23 << 27) | (branchOffset & 0x7FFF)) >>> 0));
         labels[m.name] = codeOffset;      // pc value: body at lump word codeOffset+1
         codeOffset += (m.code || []).length;
     }
@@ -2167,7 +2171,15 @@ function loadCLOOMCIntoSim() {
     sim.programLabels       = labels;
     sim.programName         = result.abstractionName || (methods.length > 0 ? methods[0].name : 'prog');
     window._assemblerSymbols = { labels, lumpName: sim.programName };
-    _pendingSimLoad          = true;
+    let _cmpTok = null;
+    const _asmCaps = _compiledLump.resolvedCaps.map(cap => ({
+        name: cap.name,
+        rights: cap.rights.slice(),
+        grants: cap.grants.slice(),
+        nsIndex: cap.nsIndex,
+        token: cap.token >>> 0,
+        null_row: cap.null_row === true,
+    }));
 
     // Compute and store the token for this assembled lump so "Open Lump"
     // navigates by token (not by NS slot index) immediately after assembly,
@@ -2177,15 +2189,7 @@ function loadCLOOMCIntoSim() {
         // above, including each exact GT word. _injectClistNow consumes these
         // tokens verbatim so Compile → Run cannot quietly broaden permissions
         // or replace an unresolved name with a pending placeholder.
-        const _asmCaps = _compiledLump.resolvedCaps.map(cap => ({
-            name: cap.name,
-            rights: cap.rights.slice(),
-            grants: cap.grants.slice(),
-            nsIndex: cap.nsIndex,
-            token: cap.token >>> 0,
-            null_row: cap.null_row === true,
-        }));
-        const _cmpTok = window._computeLumpToken(words, _asmCaps);
+        _cmpTok = window._computeLumpToken(words, _asmCaps);
         if (window.LumpRegistry) {
             window.LumpRegistry.registerMemory(_cmpTok, sim.programName, words.slice(), _asmCaps);
             window.LumpRegistry.setCurrent(_cmpTok);
@@ -2193,6 +2197,15 @@ function loadCLOOMCIntoSim() {
             window._pendingLumpData = null;
         }
     }
+    sim.programCapabilities = _asmCaps.slice();
+    _setPendingSimLoad({
+        token: _cmpTok,
+        abstraction: sim.programName,
+        words,
+        capabilities: _asmCaps,
+        namedSlots: lastAssembledNamedSlots,
+        methodTableSize,
+    });
 
     // If the machine is not yet booted, silently complete the full boot sequence
     // now so the user lands on the dashboard ready to Step immediately — no

@@ -551,7 +551,7 @@ function updateCRDetail() {
         const _brTargetSet = new Set();
         for (let i = 0; i < _codeWords.length; i++) {
             const _w = _codeWords[i] >>> 0;
-            if (((_w >>> 27) & 0x1F) !== 17) continue;
+            if (((_w >>> 27) & 0x1F) !== 23) continue;
             const _rawImm = _w & 0x7FFF;
             const _soff = (_rawImm & 0x4000) ? (_rawImm | 0xFFFF8000) : _rawImm;
             const _tgt = i + _soff;
@@ -574,7 +574,16 @@ function updateCRDetail() {
         // offset of that method's first instruction within _codeWords).
         const _methodStartMap = new Map();
         for (let i = 0; i < _methodTableCount; i++) {
-            const offset = _codeWords[i]; // raw method table word = instruction offset
+            const pointerWord = _codeWords[i] >>> 0;
+            const pointerOpcode = (pointerWord >>> 27) & 0x1F;
+            const rawOffset = pointerWord & 0x7FFF;
+            const signedOffset = (rawOffset & 0x4000)
+                ? (rawOffset | 0xFFFF8000) : rawOffset;
+            // Canonical tables store opcode-23 PC-relative BRANCH words. Keep
+            // raw positive offsets as a deliberate legacy-read fallback only.
+            const offset = pointerOpcode === 23
+                ? i + signedOffset
+                : pointerWord;
             const method = _cloomcMethods[i];
             if (method && typeof offset === 'number' && offset >= _methodTableCount) {
                 _methodStartMap.set(offset, method);
@@ -671,7 +680,7 @@ function updateCRDetail() {
             let decoded;
             if (word === 0) {
                 decoded = 'NOP / HALT';
-            } else if (((word >>> 27) & 0x1F) === 17) {
+            } else if (((word >>> 27) & 0x1F) === 23) {
                 const _rawImm = word & 0x7FFF;
                 const _soff = (_rawImm & 0x4000) ? (_rawImm | 0xFFFF8000) : _rawImm;
                 const _tgt = w + _soff;

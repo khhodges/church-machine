@@ -53,18 +53,18 @@ Special case: `NOP` assembles to the all-zero word `0x00000000`. `HALT` is accep
 |  7  | 0x07 | LAMBDA      |
 |  8  | 0x08 | ELOADCALL   |
 |  9  | 0x09 | XLOADLAMBDA |
-| 10  | 0x0A | DREAD       |
-| 11  | 0x0B | DWRITE      |
-| 12  | 0x0C | BFEXT       |
-| 13  | 0x0D | BFINS       |
-| 14  | 0x0E | MCMP        |
-| 15  | 0x0F | IADD        |
-| 16  | 0x10 | ISUB        |
-| 17  | 0x11 | BRANCH      |
-| 18  | 0x12 | SHL         |
-| 19  | 0x13 | SHR         |
+| 16  | 0x10 | DREAD       |
+| 17  | 0x11 | DWRITE      |
+| 18  | 0x12 | BFEXT       |
+| 19  | 0x13 | BFINS       |
+| 20  | 0x14 | MCMP        |
+| 21  | 0x15 | IADD        |
+| 22  | 0x16 | ISUB        |
+| 23  | 0x17 | BRANCH      |
+| 24  | 0x18 | SHL         |
+| 25  | 0x19 | SHR         |
 
-Opcodes 20–29 are unassigned — the simulator faults with `INVALID_OP`. Opcode 30 (`0x1E`) is the **WORD** sentinel (inline data constant); executing it faults with `INVALID_OP` and a message "WORD is an inline data constant — check your RETURN placement". Opcode 31 (`0x1F`) is the **LUMP magic** header word; executing it faults with `INVALID_OP`. The disassembler labels all three as `???`.
+Opcodes 10–15 and 26–29 are unassigned — the simulator faults with `INVALID_OP`. Opcode 30 (`0x1E`) is the **WORD** sentinel (inline data constant); executing it faults with `INVALID_OP` and a message "WORD is an inline data constant — check your RETURN placement". Opcode 31 (`0x1F`) is the **LUMP magic** header word; executing it faults with `INVALID_OP`. The disassembler labels all three as `???`.
 
 ---
 
@@ -94,7 +94,7 @@ execute) is `AL = 14`; when AL is used the suffix is omitted entirely.
 
 Aliases accepted by the assembler: `HS` → 2, `LO` → 3.
 
-Example: `IADDLT DR4, DR1, DR2` encodes opcode=0x0F, cond=11.
+Example: `IADDLT DR4, DR1, DR2` encodes opcode=0x15, cond=11.
 
 ---
 
@@ -152,16 +152,16 @@ PC=0 (lump header) is always a FAULT — the lump header word is never an execut
 
 | Op | Mnemonic | fld_a  | fld_b  | imm15                                                      |
 |----|----------|--------|--------|------------------------------------------------------------|
-| 10 | DREAD    | DR dst | CR base| unsigned offset                                            |
-| 11 | DWRITE   | DR src | CR base| unsigned offset                                            |
-| 12 | BFEXT    | DR dst | CR base| `(pos & 0x1F) << 5 \| (width & 0x1F)` — bits [9:5]=pos, [4:0]=width |
-| 13 | BFINS    | DR src | CR base| `(pos & 0x1F) << 5 \| (width & 0x1F)` — bits [9:5]=pos, [4:0]=width |
-| 14 | MCMP     | DR op1 | DR op2 | 0 — result goes to condition flags only, no writeback      |
-| 15 | IADD     | DR dst | DR src1| reg: `imm15[3:0]`=DR src2; imm: `0x4000\|(val&0x3FFF)` (bit 14 selects mode) |
-| 16 | ISUB     | DR dst | DR src1| reg: `imm15[3:0]`=DR src2; imm: `0x4000\|(val&0x3FFF)` (bit 14 selects mode) |
-| 17 | BRANCH   | 0      | 0      | signed 15-bit PC-relative offset; bit 14 is the sign bit   |
-| 18 | SHL      | DR dst | DR src | `imm15[4:0]` = shift amount (0–31)                         |
-| 19 | SHR      | DR dst | DR src | `imm15[5]`=1 for ASR / 0 for LSR; `imm15[4:0]`=shift amount |
+| 16 | DREAD    | DR dst | CR base| unsigned offset                                            |
+| 17 | DWRITE   | DR src | CR base| unsigned offset                                            |
+| 18 | BFEXT    | DR dst | CR base| `(pos & 0x1F) << 5 \| (width & 0x1F)` — bits [9:5]=pos, [4:0]=width |
+| 19 | BFINS    | DR src | CR base| `(pos & 0x1F) << 5 \| (width & 0x1F)` — bits [9:5]=pos, [4:0]=width |
+| 20 | MCMP     | DR op1 | DR op2 | 0 — result goes to condition flags only, no writeback      |
+| 21 | IADD     | DR dst | DR src1| reg: `imm15[3:0]`=DR src2; imm: `0x4000\|(val&0x3FFF)` (bit 14 selects mode) |
+| 22 | ISUB     | DR dst | DR src1| reg: `imm15[3:0]`=DR src2; imm: `0x4000\|(val&0x3FFF)` (bit 14 selects mode) |
+| 23 | BRANCH   | 0      | 0      | signed 15-bit PC-relative offset; bit 14 is the sign bit   |
+| 24 | SHL      | DR dst | DR src | `imm15[4:0]` = shift amount (0–31)                         |
+| 25 | SHR      | DR dst | DR src | `imm15[5]`=1 for ASR / 0 for LSR; `imm15[4:0]`=shift amount |
 
 #### Instruction-specific notes
 
@@ -283,19 +283,19 @@ def branch_offset(from_pc, to_pc):
     return offset & 0x7FFF   # truncate to 15 bits (sign preserved in bit 14)
 
 # Examples
-IADD_DR1_DR0_DR2 = encode(opcode=15, fld_a=1, fld_b=0, imm15=2)
+IADD_DR1_DR0_DR2 = encode(opcode=21, fld_a=1, fld_b=0, imm15=2)
 # DR1 = DR0 + DR2  (DR0 is always 0, so this copies DR2 into DR1)
 
 # BRANCH: always PC-relative. Encode as offset from the branch instruction's PC.
 # branch at PC=10, target at PC=3:  offset = 3 - 10 = -7
-BRANCH_back_7    = encode(opcode=17, imm15=branch_offset(from_pc=10, to_pc=3))
+BRANCH_back_7    = encode(opcode=23, imm15=branch_offset(from_pc=10, to_pc=3))
 # branch at PC=5, target at PC=12: offset = 12 - 5 = +7
-BRANCH_forward_7 = encode(opcode=17, imm15=branch_offset(from_pc=5, to_pc=12))
+BRANCH_forward_7 = encode(opcode=23, imm15=branch_offset(from_pc=5, to_pc=12))
 # Conditional branch: BRANCHLT (branch if less-than)
-BRANCHLT_back_2  = encode(opcode=17, cond=11, imm15=branch_offset(10, 8))
+BRANCHLT_back_2  = encode(opcode=23, cond=11, imm15=branch_offset(10, 8))
 
 TPERM_CR0_RWX   = encode(opcode=6,  fld_a=0, imm15=0x05)
-MCMP_DR1_DR2    = encode(opcode=14, fld_a=1, fld_b=2)
+MCMP_DR1_DR2    = encode(opcode=20, fld_a=1, fld_b=2)
 HALT_or_NOP     = 0x00000000
 ```
 ---

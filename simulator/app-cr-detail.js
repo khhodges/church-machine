@@ -2392,7 +2392,9 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets) {
         let valStr = '';
         if (drV !== null) {
             const nsCheckIdx = sim.cr && sim.cr[crSrc] ? sim.parseGT(sim.cr[crSrc].word0).index : -1;
-            if (nsCheckIdx === 12) {
+            const nsCheckLabel = sim.nsLabels && sim.nsLabels[nsCheckIdx]
+                ? String(sim.nsLabels[nsCheckIdx]).toUpperCase() : '';
+            if (nsCheckIdx === 12 || nsCheckLabel.includes('LED')) {
                 const ledNow = (opcode === 17 && sim.ledBits !== undefined && sim.ledMode === 'program') ? (sim.ledBits >> effectiveImm) & 1 : null;
                 if (ledNow !== null) {
                     const willBe = drV & 1 ? 'ON' : 'OFF';

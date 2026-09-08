@@ -64,16 +64,16 @@ The Church Machine has exactly 20 instructions, divided into two domains:
 
 | Opcode | Instruction | Purpose |
 |--------|-------------|---------|
-| 10 | DREAD | Read from data memory |
-| 11 | DWRITE | Write to data memory |
-| 12 | BFEXT | Extract a bitfield |
-| 13 | BFINS | Insert a bitfield |
-| 14 | MCMP | Compare two values (set flags) |
-| 15 | IADD | Integer addition |
-| 16 | ISUB | Integer subtraction |
-| 17 | BRANCH | Conditional/unconditional branch |
-| 18 | SHL | Shift left |
-| 19 | SHR | Shift right |
+| 16 | DREAD | Read from data memory |
+| 17 | DWRITE | Write to data memory |
+| 18 | BFEXT | Extract a bitfield |
+| 19 | BFINS | Insert a bitfield |
+| 20 | MCMP | Compare two values (set flags) |
+| 21 | IADD | Integer addition |
+| 22 | ISUB | Integer subtraction |
+| 23 | BRANCH | Conditional/unconditional branch |
+| 24 | SHL | Shift left |
+| 25 | SHR | Shift right |
 
 RETURN (opcode 3) is shared by both domains.
 

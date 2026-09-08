@@ -19,6 +19,17 @@ const ARCH_CONTRACTS = typeof ChurchArchitectureContracts !== 'undefined'
 const ARCH_PROFILE_NAME = 'simulator-v20';
 const ARCH_PROFILE = ARCH_CONTRACTS.profiles[ARCH_PROFILE_NAME];
 const ARCH_BOOT = ARCH_CONTRACTS.boot;
+const ARCH_MMIO_SLOTS = new Set(Object.keys(ARCH_BOOT.devices).map(
+    name => ARCH_BOOT.minimalSlots[name]));
+// Older simulator-only fixtures used a second logical device catalog at
+// slots 11–14. Keep those RAM-backed aliases readable while routing all new
+// boot images through the canonical architecture-contract slots.
+const LEGACY_SIM_DEVICE_SLOTS = Object.freeze({
+    UART_DEV: 11,
+    LED_DEV: 12,
+    BTN_DEV: 13,
+    TIMER_DEV: 14,
+});
 const ARCH_TRACE = ARCH_CONTRACTS.traceUnits[ARCH_PROFILE.traceUnit];
 const ARCH_GT_FIELDS = ARCH_CONTRACTS.isa.gtWord0.fields;
 const ARCH_ABSTRACT_GT_FIELDS = ARCH_CONTRACTS.isa.abstractGtWord0.fields;
@@ -1011,7 +1022,7 @@ class ChurchSimulator {
         this.callHomeTimestamp = null;
         this.ledBits = 0;
         this.ledMode = 'boot';
-        this.uartRegs    = [0, 0, 0];      // TX@0, STATUS@1 (1=ready), RX@2
+        this.uartRegs    = [0, 0, 0];      // TX@0, STATUS@1 (1=busy, 0=ready), RX@2
         this.buttonState = 0;              // button bitmask (reg 0)
         this.timerRegs   = [0, 0, 0, 0, 0]; // TICKS_LO@0, HI@1, TOD@2, ALARM_CMP@3, CTL@4
         this.lastCapability = null;
@@ -8564,14 +8575,32 @@ class ChurchSimulator {
                 return null;
             }
         }
-        const value = this.memory[loc + offset];
+        const devNsIdx = check.index;
+        let value;
+        if (ARCH_MMIO_SLOTS.has(devNsIdx)) {
+            if (devNsIdx === ARCH_BOOT.minimalSlots.LED_DEV ||
+                    devNsIdx === LEGACY_SIM_DEVICE_SLOTS.LED_DEV) {
+                value = (this.ledBits >>> offset) & 1;
+            } else if (devNsIdx === ARCH_BOOT.minimalSlots.UART_DEV ||
+                    devNsIdx === LEGACY_SIM_DEVICE_SLOTS.UART_DEV) {
+                value = this.uartRegs[offset] >>> 0;
+            } else if (devNsIdx === ARCH_BOOT.minimalSlots.BTN_DEV) {
+                value = this.buttonState >>> 0;
+            } else if (devNsIdx === ARCH_BOOT.minimalSlots.TIMER_DEV ||
+                    devNsIdx === LEGACY_SIM_DEVICE_SLOTS.TIMER_DEV) {
+                value = this.timerRegs[offset] >>> 0;
+            } else {
+                value = 0;
+            }
+        } else {
+            value = this.memory[loc + offset];
+        }
         this._writeDR(drIdx, value);
         const label = this.nsLabels[check.index] || 'data';
-        const devNsIdx = check.index;
-        const readTag = devNsIdx === 12 ? ` [LED${offset} = ${value & 1 ? 'ON' : 'OFF'}]`
-                      : devNsIdx === 11 ? ` [UART.${offset===0?'TX':offset===1?'STATUS':'RX'} = ${value >>> 0}]`
-                      : devNsIdx === 13 ? ` [BTN = ${value >>> 0}]`
-                      : devNsIdx === 14 ? ` [TIMER.${['TICKS_LO','TICKS_HI','TOD_EPOCH','ALARM_CMP','ALARM_CTL'][offset]||'reg'} = ${value >>> 0}]`
+        const readTag = (devNsIdx === ARCH_BOOT.minimalSlots.LED_DEV || devNsIdx === LEGACY_SIM_DEVICE_SLOTS.LED_DEV) ? ` [LED${offset} = ${value & 1 ? 'ON' : 'OFF'}]`
+                      : (devNsIdx === ARCH_BOOT.minimalSlots.UART_DEV || devNsIdx === LEGACY_SIM_DEVICE_SLOTS.UART_DEV) ? ` [UART.${offset===0?'TX':offset===1?'STATUS':'RX'} = ${value >>> 0}]`
+                      : devNsIdx === ARCH_BOOT.minimalSlots.BTN_DEV ? ` [BTN = ${value >>> 0}]`
+                      : (devNsIdx === ARCH_BOOT.minimalSlots.TIMER_DEV || devNsIdx === LEGACY_SIM_DEVICE_SLOTS.TIMER_DEV) ? ` [TIMER.${['TICKS_LO','TICKS_HI','TOD_EPOCH','ALARM_CMP','ALARM_CTL'][offset]||'reg'} = ${value >>> 0}]`
                       : '';
         const desc = `DREAD DR${drIdx} ← ${value >>> 0} (0x${(value >>> 0).toString(16).toUpperCase()}) ← [CR${d.crSrc} + ${offset}] (${label})${readTag}`;
         this.output += desc + '\n';
@@ -8666,11 +8695,13 @@ class ChurchSimulator {
             ]};
         }
 
-        this._writeRuntimeWord(loc + offset, value);
-
         // Route device writes to simulated hardware peripherals
         const devNsIdx = check.index;
-        if (devNsIdx === 12) {
+        if (!ARCH_MMIO_SLOTS.has(devNsIdx)) {
+            this._writeRuntimeWord(loc + offset, value);
+        }
+        if (devNsIdx === ARCH_BOOT.minimalSlots.LED_DEV ||
+                devNsIdx === LEGACY_SIM_DEVICE_SLOTS.LED_DEV) {
             // LED_DEV: offsets 0–4 each control one LED; bit[0] = R (red) drives the pin
             // Matches hardware: DWRITE DR1, CR3, 0 sets LED0 R-bit (bit[0] of word at offset 0)
             if (offset <= 4) {
@@ -8681,13 +8712,19 @@ class ChurchSimulator {
                 }
             }
             this.ledMode = 'program';
+        } else if (devNsIdx === ARCH_BOOT.minimalSlots.UART_DEV ||
+                devNsIdx === LEGACY_SIM_DEVICE_SLOTS.UART_DEV) {
+            this.uartRegs[offset] = value;
+        } else if (devNsIdx === ARCH_BOOT.minimalSlots.TIMER_DEV ||
+                devNsIdx === LEGACY_SIM_DEVICE_SLOTS.TIMER_DEV) {
+            this.timerRegs[offset] = value;
         }
 
         const label = this.nsLabels[check.index] || 'data';
-        const devTag = devNsIdx === 12 ? ` [→ LED${offset} ← ${value} (${value & 1 ? 'ON' : 'OFF'})]`
-                     : devNsIdx === 11 ? ` [→ UART.${offset===0?'TX':'STATUS'} ← ${value}]`
-                     : devNsIdx === 13 ? ' [→ BTN read-only]'
-                     : devNsIdx === 14 ? ` [→ TIMER.${['TICKS_LO','TICKS_HI','TOD_EPOCH','ALARM_CMP','ALARM_CTL'][offset]||'reg'} ← ${value}]`
+        const devTag = (devNsIdx === ARCH_BOOT.minimalSlots.LED_DEV || devNsIdx === LEGACY_SIM_DEVICE_SLOTS.LED_DEV) ? ` [→ LED${offset} ← ${value} (${value & 1 ? 'ON' : 'OFF'})]`
+                     : (devNsIdx === ARCH_BOOT.minimalSlots.UART_DEV || devNsIdx === LEGACY_SIM_DEVICE_SLOTS.UART_DEV) ? ` [→ UART.${offset===0?'TX':'STATUS'} ← ${value}]`
+                     : devNsIdx === ARCH_BOOT.minimalSlots.BTN_DEV ? ' [→ BTN read-only]'
+                     : (devNsIdx === ARCH_BOOT.minimalSlots.TIMER_DEV || devNsIdx === LEGACY_SIM_DEVICE_SLOTS.TIMER_DEV) ? ` [→ TIMER.${['TICKS_LO','TICKS_HI','TOD_EPOCH','ALARM_CMP','ALARM_CTL'][offset]||'reg'} ← ${value}]`
                      : '';
         const desc = `DWRITE DR${drIdx}, [CR${d.crSrc} + ${offset}] ← ${value} (0x${value.toString(16).toUpperCase()}) → ${label}${devTag}`;
         this.output += desc + '\n';

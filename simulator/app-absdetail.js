@@ -1175,22 +1175,34 @@ function _loadCatalogLumpIntoSim() {
     if (!sim.bootComplete && typeof instantBoot === 'function') instantBoot();
 
     // Call loadProgram() directly — handles NS-slot 3 redirect + CR14 wiring.
+    sim.programName = name;
+    sim.programCapabilities = [];
     sim.loadProgram(words, 0);
     if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
 
     // Mirror into lastAssembledWords so C-list injection and other
     // post-load machinery (save-to-NS, code-view labels, etc.) still work.
     if (typeof lastAssembledWords !== 'undefined') lastAssembledWords = words.slice();
-    if (typeof _defaultProgramLoaded !== 'undefined') window._defaultProgramLoaded = true;
+    if (typeof _defaultProgramLoaded !== 'undefined') _defaultProgramLoaded = true;
     // C-list injection: call _injectClistNow if available, otherwise fall
     // through to _applyPendingSimLoad on first Step/Run.
     if (typeof _injectClistNow === 'function') {
         _injectClistNow();
-        if (typeof _pendingSimLoad !== 'undefined') window._pendingSimLoad = false;
+        if (typeof _clearPendingSimLoad === 'function') _clearPendingSimLoad();
     } else {
-        if (typeof _pendingSimLoad !== 'undefined') window._pendingSimLoad = true;
+        if (typeof _setPendingSimLoad === 'function') {
+            const token = typeof window._computeLumpToken === 'function'
+                ? window._computeLumpToken(words, []) : null;
+            _setPendingSimLoad({
+                token,
+                abstraction: name,
+                words,
+                capabilities: [],
+                namedSlots: null,
+                methodTableSize: 0,
+            });
+        }
     }
-    if (sim.programName !== undefined) sim.programName = name;
 
     const btn = document.querySelector('[onclick="_loadCatalogLumpIntoSim()"]');
     if (btn) { btn.textContent = 'Loaded \u2713'; btn.disabled = true; }

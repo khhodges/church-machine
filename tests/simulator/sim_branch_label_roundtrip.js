@@ -30,11 +30,11 @@ function pass(label) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// Encode a raw BRANCH word (mirrors assembler._assembleLine for opcode 17).
+// Encode a raw BRANCH word (mirrors assembler._assembleLine for opcode 23).
 //   condCode in [0,15], signedOffset in [-16384, 16383]
 function encodeBranch(condCode, signedOffset) {
     return (
-        ((17 & 0x1F) << 27) |
+        ((23 & 0x1F) << 27) |
         ((condCode & 0xF) << 23) |
         (signedOffset & 0x7FFF)
     ) >>> 0;

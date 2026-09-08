@@ -8,7 +8,7 @@
 //
 // Method-table encoding (Task #1134):
 //   Each method-table entry at lump word (i+1), lump-relative PC i, is a BRANCH
-//   instruction (opcode 17, 15-bit signed offset).
+//   instruction (opcode 23, 15-bit signed offset).
 //   branchOffset = bodyOffset - i
 //   CALL dispatcher resolves: pc = (methodIndex-1) + soff = i + (bodyOffset-i) = bodyOffset
 //   Fetch: physAddr = lump_base + 1 + bodyOffset → body first instruction.
@@ -26,7 +26,7 @@
 const ChurchSimulator = require('./simulator.js');
 const { assembleLump, decodeBranchEntry, BRANCH_OPCODE } = require('./lump_assembler.js');
 
-const BRANCH_BASE   = (BRANCH_OPCODE << 27) >>> 0;  // 0x88000000
+const BRANCH_BASE   = (BRANCH_OPCODE << 27) >>> 0;  // 0xB8000000
 
 // Build an unsigned BRANCH word — always >>> 0 so comparisons against
 // Uint32Array elements and sim.memory (unsigned) don't sign-mismatch.
@@ -81,10 +81,10 @@ console.log('\n--- T002: BRANCH instruction encoding ---');
 
     check('T002a: N = 3', N === 3);
 
-    // Table entries are BRANCH words (opcode 17 in bits 31-27)
+    // Table entries are BRANCH words (opcode 23 in bits 31-27)
     for (let i = 1; i <= 3; i++) {
         const entryOpcode = (buf[i] >>> 27) & 0x1F;
-        check(`T002b.${i}: table entry ${i} has BRANCH opcode (17)`, entryOpcode === BRANCH_OPCODE);
+        check(`T002b.${i}: table entry ${i} has BRANCH opcode (23)`, entryOpcode === BRANCH_OPCODE);
     }
 
     // Verify specific offset values
@@ -220,15 +220,16 @@ console.log('\n--- T006: loadProgram post-boot memory layout ---');
     const sim2 = new ChurchSimulator();
     sim2.bootComplete = true;
 
-    const ABSTR_SLOT = 3;
-    const nsBase2 = sim2.NS_TABLE_BASE + ABSTR_SLOT * sim2.NS_ENTRY_WORDS;
+    const ABSTR_SLOT = sim2.firstUserNsSlot();
+    sim2.bootEntrySlot = ABSTR_SLOT;
+    sim2._bootAbstrSlot = ABSTR_SLOT;
+    const nsBase2 = sim2._nsSlotBase(ABSTR_SLOT);
     const lumpBase = 0x40;  // non-zero
-    sim2.memory[nsBase2 + 0] = lumpBase;
+    sim2.bootComplete = false;
+    sim2.writeNSEntry(ABSTR_SLOT, lumpBase, 62, 0, 0, 1, 0, 0, 0);
+    sim2.bootComplete = true;
     const hdrWord = ((0x1F << 27) | (0 << 23) | (62 << 10) | 0) >>> 0;
     sim2.memory[lumpBase] = hdrWord;
-    if (sim2.packNSWord1) {
-        sim2.memory[nsBase2 + 1] = sim2.packNSWord1(62, 0, 0, 0, 0, 0);
-    }
     sim2.cr[14] = { word0: 0x00000001, word1: lumpBase, word2: 0, word3: 0, m: 0 };
 
     sim2.loadProgram(words, 0);
@@ -259,7 +260,6 @@ console.log('\n--- T006: loadProgram post-boot memory layout ---');
 console.log('\n--- T007: _fetchInstruction() end-to-end dispatch ---');
 {
     const GT_SEQ    = 5;
-    const LUMP_SLOT = 3;
     const LUMP_BASE = 0x80;
 
     const SENTINEL0 = 0xBEEF0001 >>> 0;
@@ -275,22 +275,26 @@ console.log('\n--- T007: _fetchInstruction() end-to-end dispatch ---');
 
     // Set up sim with valid NS entry and RX GT so mLoad(X) passes
     const sim7 = new ChurchSimulator();
+    const LUMP_SLOT = sim7.firstUserNsSlot();
     sim7.bootComplete = true;
+    sim7.bootEntrySlot = LUMP_SLOT;
+    sim7._bootAbstrSlot = LUMP_SLOT;
     sim7.nsCount = Math.max(sim7.nsCount, LUMP_SLOT + 1);
 
     const lumpSize7 = 64;
     const n_minus_6_7 = Math.max(0, Math.round(Math.log2(lumpSize7)) - 6);
     sim7.memory[LUMP_BASE] = ((0x1F << 27) | ((n_minus_6_7 & 0xF) << 23) | ((cw & 0x1FFF) << 10)) >>> 0;
 
-    const nsBase7 = sim7.NS_TABLE_BASE + LUMP_SLOT * sim7.NS_ENTRY_WORDS;
+    const nsBase7 = sim7._nsSlotBase(LUMP_SLOT);
     sim7.memory[nsBase7 + 0] = LUMP_BASE;
-    sim7.memory[nsBase7 + 1] = sim7.packNSWord1(cw, 0, 0, 0, 0, 0);
-    sim7.memory[nsBase7 + 2] = sim7.makeVersionSeals(GT_SEQ, LUMP_BASE, cw);
+    sim7.memory[nsBase7 + 1] = sim7.packNSWord1(cw, GT_SEQ, 0, 0);
+    sim7.memory[nsBase7 + 2] = sim7._integrity32(
+        sim7.memory[nsBase7 + 0], sim7.memory[nsBase7 + 1]);
 
     sim7.loadProgram(words, 0);  // writes words to LUMP_BASE+1..+5, re-syncs NS + CR14
 
     // Build CR14 GT with gt_seq matching the (possibly recomputed) NS word2
-    const gtSeqAfter = (sim7.memory[nsBase7 + 2] >>> 25) & 0x7F;
+    const gtSeqAfter = sim7.parseNSWord1(sim7.memory[nsBase7 + 1]).gtSeq;
     const cr14GT = sim7.createGT(gtSeqAfter, LUMP_SLOT, { R:1, W:0, X:1, L:0, S:0, E:0 }, 1);
     const lumpBaseActual = sim7.memory[nsBase7 + 0];
     sim7.cr[14] = {

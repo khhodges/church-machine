@@ -3111,7 +3111,7 @@ function _crRoleName(n) {
 // Mnemonic set (opcode 0–19 + HALT for word=0):
 //   0 LOAD  1 SAVE  2 CALL  3 RETURN  4 CHANGE  5 SWITCH  6 TPERM  7 LAMBDA
 //   8 ELOADCALL  9 XLOADLAMBDA  10 DREAD  11 DWRITE  12 BFEXT  13 BFINS
-//   14 MCMP  15 IADD  16 ISUB  17 BRANCH  18 SHL  19 SHR  (word=0 → HALT)
+//   20 MCMP  21 IADD  22 ISUB  23 BRANCH  24 SHL  25 SHR  (word=0 → HALT)
 function _instrPlainEnglish(decoded) {
     if (!decoded || !decoded.mnemonic) return '';
     var m   = decoded.mnemonic;

@@ -354,7 +354,7 @@ Fused LOAD + LAMBDA. Loads a GT from CRs's c-list at the given row (word offset)
 
 These instructions process data. They operate on Data Registers (DR0–DR15) and access DATA objects via R/W-permissioned GTs.
 
-### DREAD (opcode 10)
+### DREAD (opcode 16)
 
 ```
 DREAD DRd, CRs, #offset              ; immediate mode — imm15[14]=1, offset 0–16383
@@ -363,7 +363,7 @@ DREAD DRd, CRs, #base, DRx           ; indexed mode  — imm15[14]=0, effective_
 
 Reads a 32-bit word from the DATA object referenced by CRs at `effective_offset` into DRd. In immediate mode the offset is a 14-bit compile-time constant; in indexed mode a 10-bit base is combined with a runtime DR value. Requires R (read) permission. DR0 as DRx is hardwired zero.
 
-### DWRITE (opcode 11)
+### DWRITE (opcode 17)
 
 ```
 DWRITE DRd, CRs, #offset             ; immediate mode — imm15[14]=1, offset 0–16383
@@ -372,7 +372,7 @@ DWRITE DRd, CRs, #base, DRx          ; indexed mode  — imm15[14]=0, effective_
 
 Writes DR[DRd] to the DATA object referenced by CRs at `effective_offset`. Same two addressing modes as DREAD. Requires W (write) permission.
 
-### BFEXT (opcode 12)
+### BFEXT (opcode 18)
 
 ```
 BFEXT DRd, DRs, #width, #lsb
@@ -380,7 +380,7 @@ BFEXT DRd, DRs, #width, #lsb
 
 Extracts a bitfield from DRs. Width and LSB position are encoded in the immediate field.
 
-### BFINS (opcode 13)
+### BFINS (opcode 19)
 
 ```
 BFINS DRd, DRs, #width, #lsb
@@ -388,7 +388,7 @@ BFINS DRd, DRs, #width, #lsb
 
 Inserts a bitfield from DRs into DRd at the specified position.
 
-### MCMP (opcode 14)
+### MCMP (opcode 20)
 
 ```
 MCMP DRd, DRs
@@ -396,7 +396,7 @@ MCMP DRd, DRs
 
 Compares DRd and DRs, setting condition flags (N, Z, C, V) without storing a result. Used before conditional instructions.
 
-### IADD (opcode 15)
+### IADD (opcode 21)
 
 ```
 IADD DRd, DRs, #imm
@@ -404,7 +404,7 @@ IADD DRd, DRs, #imm
 
 Integer addition. DRd = DRs + imm. Sets condition flags.
 
-### ISUB (opcode 16)
+### ISUB (opcode 22)
 
 ```
 ISUB DRd, DRs, #imm
@@ -412,7 +412,7 @@ ISUB DRd, DRs, #imm
 
 Integer subtraction. DRd = DRs - imm. Sets condition flags.
 
-### BRANCH (opcode 17)
+### BRANCH (opcode 23)
 
 ```
 BRANCH #offset
@@ -422,7 +422,7 @@ BRANCHNE #offset
 
 Branches to PC + offset (signed). Always conditional-compatible. Offset is relative to the current instruction.
 
-### SHL (opcode 18)
+### SHL (opcode 24)
 
 ```
 SHL DRd, DRs, #amount
@@ -430,7 +430,7 @@ SHL DRd, DRs, #amount
 
 Logical shift left. DRd = DRs << amount.
 
-### SHR (opcode 19)
+### SHR (opcode 25)
 
 ```
 SHR DRd, DRs, #amount

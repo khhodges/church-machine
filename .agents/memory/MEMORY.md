@@ -153,3 +153,5 @@
 - [Starter handoff must be acyclic](starter-handoff-acyclic.md) — startup SelfTest hands off once; Starter must continue onward, never call SelfTest back
 - [Quiet hardware loops are not freezes](quiet-hardware-loops-not-freezes.md) — stale trace age alone cannot prove a running Wukong stalled; only causal command expectations may time out
 - [Trace row correlation](trace-row-correlation.md) — combine NIA symbols and raw words only after identity validation; conflicts must remain visibly unresolved
+- [Inform MMIO simulation](inform-mmio-simulation.md) — canonical device capabilities use architectural addresses outside RAM and must route through device state, not RAM bounds
+- [Pending compile ownership](pending-compile-ownership.md) — delayed simulator loads consume the exact immutable compile snapshot that initiated them, never mutable registry selection

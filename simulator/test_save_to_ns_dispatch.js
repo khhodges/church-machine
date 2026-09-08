@@ -36,7 +36,7 @@ function branchWord(offset) {
 }
 
 // Decode a BRANCH method-table entry → lump-relative PC of the body.
-// Mirrors the CALL dispatcher in simulator.js (opcode-17 path).
+// Mirrors the CALL dispatcher in simulator.js (opcode-23 path).
 function decodeBranchEntry(tableEntryWord, methodIndex) {
     const opcode = (tableEntryWord >>> 27) & 0x1F;
     if (opcode !== BRANCH_OPCODE) return null;
@@ -404,7 +404,7 @@ console.log('\n--- T006: Regression guard — bare entries miss body start ---')
     // Legacy dispatcher for old bare entry (method index 1)
     const oldTableEntry = sim.memory[oldLumpBase + 1] >>> 0;  // = 3 (bare, not BRANCH)
     const oldEntryOpcode = (oldTableEntry >>> 27) & 0x1F;
-    check('T006a: old entry is NOT BRANCH-encoded (opcode != 17)', oldEntryOpcode !== BRANCH_OPCODE);
+    check('T006a: old entry is NOT BRANCH-encoded (opcode != 23)', oldEntryOpcode !== BRANCH_OPCODE);
 
     // Legacy path: pc = tableEntry = 3; physAddr = lumpBase+1+3 = lumpBase+4 → WRONG
     const legacyPC = oldTableEntry;
@@ -419,7 +419,7 @@ console.log('\n--- T006: Regression guard — bare entries miss body start ---')
     const lumpBase2 = entry2.word0_location;
     const newTableEntry = sim.memory[lumpBase2 + 1] >>> 0;
     const newEntryOpcode = (newTableEntry >>> 27) & 0x1F;
-    check('T006d: new entry IS BRANCH-encoded (opcode = 17)', newEntryOpcode === BRANCH_OPCODE);
+    check('T006d: new entry IS BRANCH-encoded (opcode = 23)', newEntryOpcode === BRANCH_OPCODE);
     const fixedPC = decodeBranchEntry(newTableEntry, 1);
     check('T006e: fixed pc = 2 (correct body start)', fixedPC === 2);
     check('T006f: fixed fetch hits SENTINEL', sim.memory[lumpBase2 + 1 + fixedPC] === SENTINEL);
