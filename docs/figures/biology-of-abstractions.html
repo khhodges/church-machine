@@ -282,11 +282,11 @@ var BIO = [
     r: "The genotype defines capability; it does not exercise it. Every running organism is an expressed copy. The blueprint itself never executes."
   },
   {
-    s: "DNA",
-    t: "token · content fingerprint",
-    c: "token = <b>hash(SELF ‖ code ‖ c-list)</b>",
-    b: "Compiling seals the genotype into a 32-bit token — the digital DNA. Like a strand of DNA, the token is stable and globally unique to that exact gene. The same source always yields the same token. Issue number, placement, and NS-index are not encoded; the token is pure identity.",
-    r: "DNA does not change when a cell divides or moves. The token does not change when a lump re-materialises or migrates. Identity is immutable; only expression varies."
+    s: "Bootstrap identity",
+    t: "local runtime GT · frozen resident base",
+    c: "<b>T === GT</b>  ·  literal 32-bit word  <b>0x%08X</b>",
+    b: "In the bootstrap there is one machine and its entire resident base is frozen. The complete 32-bit runtime Golden Token is the identifier, token, and lookup key at once: it encodes who and where together. It is not a content hash, name seal, projected SELF value, or slot-derived key.",
+    r: "This rule ends only at a dynamic rebind or a cross-machine reach. Then — not before — the portable content token and portability seals activate."
   },
   {
     s: "Gene",

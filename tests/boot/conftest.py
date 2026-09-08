@@ -114,42 +114,38 @@ def isolated_boot_lumps(tmp_path_factory):
     """
     isolated_dir = str(tmp_path_factory.mktemp("boot_lumps"))
     shutil.copytree(LIVE_LUMPS_DIR, isolated_dir, symlinks=True, dirs_exist_ok=True)
-    # Boot execution is approval-gated. Install authentic approvals only in
-    # this isolated test library for the exact committed executable residents.
+    # Boot execution is approval-gated. Select the exact authoritative
+    # approvals for every active frozen resident; do not synthesize legacy
+    # identity-hash records for bootstrap-T bindings.
+    from server.lump_approvals import read_approvals
     from server.lump_approvals import write_approvals
-    from server.lump_integrity import parse_canonical_filename
+    source_approvals = read_approvals(os.path.join(isolated_dir, "approvals.json"))
     approvals = {}
-    with open(os.path.join(isolated_dir, "manifest.json"), encoding="utf-8") as fh:
-        manifest = json.load(fh)
-    active_selftest = [
-        row["filename"] for row in manifest
-        if row.get("abstraction") == "SelfTest"
-        and not row.get("archived")
-        and row.get("filename")
+    with open(os.path.join(isolated_dir, "ns-state.json"), encoding="utf-8") as fh:
+        state = json.load(fh)
+    frozen = [
+        row for row in state.get("abstractions", [])
+        if isinstance(row, dict)
+        and row.get("resident") is True
+        and row.get("boot_resident") is True
+        and row.get("ns_slot_policy") == "static"
+        and row.get("load_policy") == "Resident"
     ]
-    active_capabilitytest = [
-        row["filename"] for row in manifest
-        if row.get("abstraction") == "CapabilityTest"
-        and row.get("token") == "00000a00"
-        and row.get("filename")
-    ]
-    for filename in (
-            *active_selftest,
-            *active_capabilitytest,
-            "WukongCallHome.1.d54e2115.lump",
-    ):
+    assert {(row.get("name"), row.get("slot")) for row in frozen} == {
+        ("SelfTest", 6), ("WukongCallHome", 7), ("CapabilityTest", 10)
+    }
+    for row in frozen:
+        filename = row["filename"]
         path = os.path.join(isolated_dir, filename)
-        if not os.path.isfile(path):
-            continue
-        dot_name, issue_n, _number = parse_canonical_filename(filename)
-        raw = open(path, "rb").read()
+        with open(path, "rb") as binary:
+            raw = binary.read()
         digest = hashlib.sha256(raw).hexdigest()
-        approvals[digest] = {
-            "binary_hash": digest, "filename": filename,
-            "dot_name": dot_name, "issue_n": issue_n,
-            "identity_hash": hashlib.sha256(
-                f"{dot_name}#{issue_n}".encode()).hexdigest(),
-        }
+        record = source_approvals[digest]
+        assert record["filename"] == filename
+        assert record["bootstrap_t"] == row["token"]
+        assert record["bootstrap_runtime_gt"] == int(row["token"], 16)
+        assert "identity_hash" not in record
+        approvals[digest] = record
     write_approvals(os.path.join(isolated_dir, "approvals.json"), approvals)
     boot_state_dir = str(tmp_path_factory.mktemp("boot_state"))
     isolated_boot_config_path = os.path.join(boot_state_dir, "boot-config.json")

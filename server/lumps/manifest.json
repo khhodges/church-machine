@@ -284,11 +284,11 @@
     "compiled_at": 1788014967.3553412
   },
   {
-    "token": "9ce28c0b",
+    "token": "4a00000a",
     "abstraction": "CapabilityTest",
-    "filename": "CapabilityTest.1.e4fe164d.lump",
-    "version": "",
-    "lump_version": 11,
+    "filename": "CapabilityTest.2.225da6fc.lump",
+    "variant_group": "capabilitytest-history",
+    "lump_version": 2,
     "compiled_at": 1788187312.1902559
   },
   {
@@ -334,27 +334,11 @@
     "filename": "ide.Mallory.1.0ca567b5.lump"
   },
   {
-    "token": "85fcac64",
-    "abstraction": "WukongCallHome",
-    "filename": "WukongCallHome.1.d54e2115.lump",
-    "lump_version": 8,
-    "compiled_at": 1788783644.1418462
-  },
-  {
     "token": "ee750c1b",
     "abstraction": "SelfTest",
     "filename": "SelfTest.79.eceee227.lump",
     "variant_group": "selftest-history",
     "lump_version": 79,
-    "archived": true
-  },
-  {
-    "token": "ee750c1b",
-    "abstraction": "SelfTest",
-    "filename": "SelfTest.79.eceee227.lump",
-    "lump_version": 79,
-    "compiled_at": 1788790072.7247603,
-    "variant_group": "selftest-history",
     "archived": true
   },
   {
@@ -386,13 +370,35 @@
     "abstraction": "SelfTest",
     "filename": "SelfTest.83.c80aeda6.lump",
     "lump_version": 83,
+    "variant_group": "selftest-history",
+    "archived": true
+  },
+  {
+    "token": "4a000006",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.84.f37bafd6.lump",
+    "lump_version": 84,
     "variant_group": "selftest-history"
   },
   {
-    "token": "00000a00",
+    "token": "85fcac64",
+    "abstraction": "WukongCallHome",
+    "filename": "WukongCallHome.1.d54e2115.lump",
+    "lump_version": 8,
+    "archived": true
+  },
+  {
+    "token": "7e661a33",
     "abstraction": "CapabilityTest",
     "filename": "CapabilityTest.1.878a5b27.lump",
-    "lump_version": 22,
-    "compiled_at": 1788866783.3035173
+    "variant_group": "capabilitytest-history",
+    "lump_version": 1,
+    "archived": true
+  },
+  {
+    "token": "4a000007",
+    "abstraction": "WukongCallHome",
+    "filename": "WukongCallHome.1.55884a36.lump",
+    "lump_version": 1
   }
 ]

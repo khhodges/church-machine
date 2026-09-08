@@ -856,14 +856,45 @@ function _isCompilerSelfCapability(cap) {
         String(cap.name || '').toUpperCase() === '__SELF__');
 }
 
+// The bootstrap has no symbolic/token projection layer: its sole identifier is
+// the resident slot's current 32-bit SELF GT.  This is intentionally opt-in via
+// frozen boot provenance; ordinary editor builds remain dynamic-local and
+// portable builds keep their descriptor/binding contract.
+function _bootstrapResidentCompileSlot(name, portableMode) {
+    if (portableMode === 'portable' || typeof sim === 'undefined' || !sim ||
+            !sim._bootstrapResidentSlots || !sim.abstractionRegistry) return null;
+    const abstractions = sim.abstractionRegistry.abstractions || {};
+    for (const key of Object.keys(abstractions)) {
+        const abstraction = abstractions[key];
+        const slot = Number(key);
+        if (abstraction && abstraction.name &&
+                abstraction.name.toUpperCase() === String(name || '').toUpperCase() &&
+                sim._bootstrapResidentSlots[slot] === true) {
+            return slot;
+        }
+    }
+    return null;
+}
+
 function _materializeLumpCapabilities(caps, words, clistStart, context) {
     const allCaps = Array.isArray(caps) ? caps : [];
     const hasSelf = _isCompilerSelfCapability(allCaps[0]);
     const userCaps = hasSelf ? allCaps.slice(1) : allCaps;
     const writeStart = clistStart + (hasSelf ? 1 : 0);
     if (hasSelf) {
-        words[clistStart] = (typeof ChurchSimulator !== 'undefined'
-            ? ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER : 0xFEED5E1F) >>> 0;
+        const bootstrapSlot = context && context.bootstrapResidentSlot;
+        if (bootstrapSlot !== null && bootstrapSlot !== undefined) {
+            const live = context.sim && context.sim.readNSEntry(bootstrapSlot);
+            if (!live || !context.sim.isNSEntryValid(bootstrapSlot)) {
+                return { ok: false, errors: [`Bootstrap NS[${bootstrapSlot}] is not a valid frozen resident entry.`], resolvedCaps: [] };
+            }
+            const seq = context.sim.parseNSWord1(live.word1_limit >>> 0).gtSeq;
+            words[clistStart] = context.sim.createGT(seq, bootstrapSlot,
+                { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, 1) >>> 0;
+        } else {
+            words[clistStart] = (typeof ChurchSimulator !== 'undefined'
+                ? ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER : 0xFEED5E1F) >>> 0;
+        }
     }
     const materialized = CapabilityTokens.materialize(userCaps, words, writeStart, context);
     if (!hasSelf) return materialized;
@@ -876,7 +907,10 @@ function _materializeLumpCapabilities(caps, words, clistStart, context) {
             grants: ['E'],
             nsIndex: null,
             compiler_owned_self: true,
-            placeholder: true,
+            placeholder: !(context && context.bootstrapResidentSlot !== null &&
+                context.bootstrapResidentSlot !== undefined),
+            identity_contract: context && context.bootstrapResidentSlot !== null &&
+                context.bootstrapResidentSlot !== undefined ? 'bootstrap-resident' : 'dynamic-local',
         }, ...(materialized.resolvedCaps || [])],
     };
 }
@@ -896,6 +930,7 @@ function _serializePortableLumpCapabilities(caps, words, clistStart) {
             ? item.rights : (Array.isArray(item.grants) && item.grants.length ? item.grants : ['E']));
         item.grants = item.rights.slice();
         item.nsIndex = null;
+        item.identity_contract = 'portable';
         if (_isCompilerSelfCapability(item)) {
             words[clistStart + row] = (typeof ChurchSimulator !== 'undefined'
                 ? ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER : 0xFEED5E1F) >>> 0;
@@ -1522,6 +1557,7 @@ async function compileAndBuild() {
         lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache))
             ? _lumpsCache
             : [],
+        bootstrapResidentSlot: _bootstrapResidentCompileSlot(absName, result.portableMode),
     };
     // Portable artifacts intentionally keep destination-local GTs unresolved.
     // Legacy builds, however, are validated and saved against the active
@@ -1545,6 +1581,20 @@ async function compileAndBuild() {
         }
         showNextSteps('error');
         return;
+    }
+    if (_capContext.bootstrapResidentSlot !== null) {
+        const _bootstrapCheck = sim._validateBootstrapResidentSelf(
+            lumpWords, _capContext.bootstrapResidentSlot, { identityContract: 'bootstrap-resident' });
+        if (!_bootstrapCheck.ok) {
+            if (con) con.textContent =
+                `Bootstrap identity validation failed (${_bootstrapCheck.code}): ${_bootstrapCheck.message}`;
+            if (typeof _showAsmErrors === 'function') {
+                _showAsmErrors([{ line: null, message: _bootstrapCheck.message }],
+                    'Bootstrap identity validation failed — code not saved');
+            }
+            showNextSteps('error');
+            return;
+        }
     }
     const resolvedCaps = _capMaterialized.resolvedCaps;
     window._lastCLOOMCLump = {
@@ -1704,8 +1754,10 @@ async function compileAndBuild() {
                 null_row: rc.null_row === true,
                 compiler_owned_self: rc.compiler_owned_self === true,
                 placeholder: rc.placeholder === true,
+                identity_contract: rc.identity_contract || null,
             })),
             compiler_owned_self: _isCompilerSelfCapability(resolvedCaps[0]),
+            identity_contract: resolvedCaps[0] && resolvedCaps[0].identity_contract || 'dynamic-local',
             pet_names_dr:   drPetNames,
             pet_names_cr:   crPetNames,
             mtbf_clean_runs: mtbfClean,

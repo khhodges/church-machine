@@ -337,6 +337,9 @@ register_suite "trace-packet-execution-tests" \
 register_suite "boot-image-matches-sim" \
     'python3 -m pytest tests/boot/test_boot_image_matches_simulator.py -v'
 
+register_suite "bootstrap-resident-identity-tests" \
+    'python3 -m pytest tests/server/test_bootstrap_identity_3321.py tests/server/test_bootstrap_migration_atomic_3321.py -v'
+
 register_suite "boot-image-loads-and-boots" \
     'python -m pytest tests/boot/test_boot_image_loads_and_boots.py -v'
 

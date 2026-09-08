@@ -617,7 +617,7 @@ def test_selftest_header_allocation_relocates_later_residents_and_threads(tmp_pa
 
 
 def test_selftest_can_use_authoritative_non6_slot_and_header_allocation(tmp_path):
-    """SelfTest's live slot is state-selected, not the historical slot 6."""
+    """Frozen SelfTest cannot be rebound away from its approved SELF GT slot."""
     _write_synthetic_boot_abstr_lump(str(tmp_path), lump_size=128, cw=3, cc=0)
     state_path = tmp_path / "ns-state.json"
     manifest_path = tmp_path / "manifest.json"
@@ -628,14 +628,8 @@ def test_selftest_can_use_authoritative_non6_slot_and_header_allocation(tmp_path
     state_path.write_text(json.dumps(state))
     manifest_path.write_text(json.dumps(manifest))
 
-    image = generate_boot_image(_cfg_generated_threads(2), str(tmp_path))
-    entries = {row["slot"]: row for row in parse_ns_table_raw(image)["entries"]}
-    assert 6 not in entries
-    assert entries[20]["w0"] > entries[10]["w0"]
-    assert entries[11]["w0"] == entries[20]["w0"] + 128
-    # Thread's boot credential follows the selected SelfTest slot.
-    cr0 = struct.unpack_from("<I", image, (entries[1]["w0"] + THREAD_CAPS_OFFSET) * 4)[0]
-    assert (cr0 & 0xFFFF) == 20
+    with pytest.raises(ValueError):
+        generate_boot_image(_cfg_generated_threads(2), str(tmp_path))
 
 
 def test_selftest_requires_exact_ns_state_manifest_binding(tmp_path):

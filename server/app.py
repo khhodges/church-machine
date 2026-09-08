@@ -6386,6 +6386,21 @@ except ImportError:
         LumpTokenError as _LumpTokenError,
     )
 
+try:
+    from bootstrap_identity import (
+        bootstrap_identity_record as _bootstrap_identity_record,
+        bootstrap_t_from_self_gt as _bootstrap_t_from_self_gt,
+        verify_bootstrap_self_gt as _verify_bootstrap_self_gt,
+        resident_inform_egt as _resident_inform_egt,
+    )
+except ImportError:
+    from server.bootstrap_identity import (
+        bootstrap_identity_record as _bootstrap_identity_record,
+        bootstrap_t_from_self_gt as _bootstrap_t_from_self_gt,
+        verify_bootstrap_self_gt as _verify_bootstrap_self_gt,
+        resident_inform_egt as _resident_inform_egt,
+    )
+
 
 def _extract_clist_from_lump_file(lump_path):
     """Read a .lump binary (big-endian 32-bit words, no CRC prefix) and decode its C-List."""
@@ -7709,10 +7724,14 @@ def save_lump():
                 ),
                 "protected_namespace_slot": True,
             }), 403
+    _bootstrap_identity = None
     if token_hint:
         token8 = str(token_hint).lower().zfill(8)[:8]
     elif ns_slot is not None:
-        token8 = f"{int(ns_slot) << 8:08x}"
+        # The resident SelfTest token is assigned below once its live runtime
+        # row-0 SELF GT is known.  Ordinary/dynamic LUMPs retain their
+        # established lookup-token contract.
+        token8 = "00000000" if str(abs_name).strip() == "SelfTest" else f"{int(ns_slot) << 8:08x}"
     else:
         import hashlib as _hl
         digest = _hl.sha256(abs_name.encode('utf-8')).hexdigest()[:8]
@@ -7766,6 +7785,36 @@ def save_lump():
     # deliberately not part of that contract: the programmer selects an
     # unprotected Namespace slot, and ns-state supplies its live sequence.
     _is_selftest_canonical = str(abs_name).strip() == "SelfTest"
+    _bootstrap_binding = None
+    try:
+        if os.path.isfile(NS_STATE_PATH):
+            with open(NS_STATE_PATH, encoding="utf-8") as _bootstrap_state_file:
+                _bootstrap_rows_all = json.load(_bootstrap_state_file).get("abstractions", [])
+        else:
+            _bootstrap_rows_all = []
+        _owned_frozen_rows = [
+            row for row in _bootstrap_rows_all if isinstance(row, dict)
+            and row.get("name") == str(abs_name).strip()
+            and row.get("resident") is True and row.get("boot_resident") is True
+            and row.get("ns_slot_policy") == "static"
+            and row.get("load_policy") == "Resident"
+            and row.get("type") in ("Inform", "Resident")
+        ]
+        if len(_owned_frozen_rows) > 1:
+            raise ValueError("multiple authoritative frozen resident bindings")
+        if _owned_frozen_rows:
+            if _owned_frozen_rows[0].get("slot") != ns_slot:
+                raise ValueError(
+                    f"frozen resident {abs_name} is owned by NS slot "
+                    f"{_owned_frozen_rows[0].get('slot')}, not {ns_slot}")
+            _bootstrap_binding = _owned_frozen_rows[0]
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as _bootstrap_state_error:
+        return jsonify({
+            "error": f"Bootstrap inventory validation failed: {_bootstrap_state_error}",
+            "namespace_identity_failed": True,
+        }), 422
+    _is_bootstrap_canonical = _bootstrap_binding is not None
+    _is_selftest_canonical = _is_bootstrap_canonical and _is_selftest_canonical
 
     # ── Pre-flight: identity computation + seal verification ──────────────────
     # Pure computation — no filesystem reads or writes — so a corrupt lump
@@ -7777,11 +7826,6 @@ def save_lump():
     else:
         _identity_string = f"{abs_name}#{_issue_number}"
     _identity_hash = _hl_id.sha256(_identity_string.encode('utf-8')).hexdigest()
-
-    # Self Inform GT: bits[31:25] = 0b0000_101 (dom=1, gt_type=Inform, perm=0),
-    # bits[24:0] = low 25 bits of sha256(identity_string).
-    _id_hash_int = int(_identity_hash[:8], 16)
-    _self_gt     = (0x0A000000 | (_id_hash_int & 0x1FFFFFF)) & 0xFFFFFFFF
 
     # Build the word array. Structural and canonical checks run before the
     # cc=0→1 auto-rewrite so it cannot be used as a bypass.
@@ -7870,6 +7914,26 @@ def save_lump():
         _sl_words.extend([0] * (_sl_lsz - len(_sl_words)))
 
     _clist_row0_idx = _sl_lsz - _sl_cc2
+    if _is_bootstrap_canonical and not _is_selftest_canonical:
+        if _sl_cc2 < 1:
+            return jsonify({"error": "Bootstrap resident requires c-list row 0.",
+                            "namespace_identity_failed": True}), 422
+        try:
+            _live_bootstrap_gt = _resident_inform_egt(_bootstrap_binding)
+            _actual_bootstrap_gt = _sl_words[_clist_row0_idx] & 0xFFFFFFFF
+            _runtime_t = _verify_bootstrap_self_gt(
+                _bootstrap_binding, _actual_bootstrap_gt,
+                f"{_live_bootstrap_gt:08x}")
+            if token_hint and token8 != _runtime_t:
+                raise ValueError("request token differs from resident SELF GT")
+            token8 = _runtime_t
+            _bootstrap_identity = _bootstrap_identity_record(
+                _bootstrap_binding, _actual_bootstrap_gt)
+        except ValueError as _bootstrap_error:
+            return jsonify({
+                "error": f"Bootstrap identity validation failed: {_bootstrap_error}",
+                "namespace_identity_failed": True,
+            }), 422
     if _is_selftest_canonical:
         if not isinstance(ns_slot, int):
             return jsonify({
@@ -7921,6 +7985,27 @@ def save_lump():
                 }), 422
         _selftest_egt = _boot_image_gen.create_gt(
             _selftest_sequence, ns_slot, {"E": 1}, 1)
+        try:
+            _bootstrap_identity = _bootstrap_identity_record(
+                _bootstrap_binding, _selftest_egt)
+            _runtime_t = _verify_bootstrap_self_gt(
+                _bootstrap_binding, _selftest_egt,
+                _bootstrap_identity["bootstrap_t"])
+        except ValueError as _bootstrap_error:
+            return jsonify({
+                "error": f"Bootstrap identity validation failed: {_bootstrap_error}",
+                "namespace_identity_failed": True,
+            }), 422
+        # T is not a projection and not a cache alias in the frozen resident
+        # bootstrap: its eight hex digits serialize the full row-0 GT.
+        if token_hint and token8 != _runtime_t:
+            return jsonify({
+                "error": (
+                    "SelfTest bootstrap T must equal the full runtime row-0 "
+                    f"SELF GT 0x{_selftest_egt:08X}; got {token8}."),
+                "namespace_identity_failed": True,
+            }), 422
+        token8 = _runtime_t
         _saved_boot_cfg, _saved_boot_error = _read_saved_boot_config()
         if _saved_boot_error:
             return jsonify({
@@ -8054,7 +8139,7 @@ def save_lump():
                 "capability_validation_failed": True,
             }), 422
 
-        if _compiler_self_row:
+        if _compiler_self_row and not _is_bootstrap_canonical:
             _actual_placeholder = _sl_words[_clist_row0_idx] & 0xFFFFFFFF
             if _actual_placeholder != _SELF_CAPABILITY_PLACEHOLDER:
                 return jsonify({
@@ -8260,7 +8345,10 @@ def save_lump():
     # (validated above) and must not be overwritten with the petname seal.
     # Also skipped when c-list rows belong to declared capabilities; in that
     # case identity_string + identity_hash are the canonical metadata seal.
-    if not _is_selftest_canonical and not _has_declared_caps and _portable_binding is None:
+    if not _is_bootstrap_canonical and not _has_declared_caps and _portable_binding is None:
+        # Legacy ordinary no-capability saves retain their deferred identity
+        # seal contract.  Bootstrap residents take the separate live-GT path.
+        _self_gt = (0x0A000000 | (int(_identity_hash[:8], 16) & 0x1FFFFFF)) & 0xFFFFFFFF
         if 0 < _clist_row0_idx < len(_sl_words):
             _sl_words[_clist_row0_idx] = _self_gt
 
@@ -8285,6 +8373,25 @@ def save_lump():
                 "expected_self_gt":       _self_gt,
                 "actual_clist0":          _actual_seal,
                 "identity_string":        _identity_string,
+            }), 422
+
+    # Recheck the final word array immediately at the persistence boundary.
+    # This catches every later mutation regardless of whether the compiler
+    # supplied an explicit capability list.
+    if _is_bootstrap_canonical:
+        try:
+            _final_bootstrap_gt = _sl_words[_clist_row0_idx] & 0xFFFFFFFF
+            _final_bootstrap_t = _verify_bootstrap_self_gt(
+                _bootstrap_binding, _final_bootstrap_gt,
+                _bootstrap_identity["bootstrap_t"])
+            if token8 != _final_bootstrap_t:
+                raise ValueError("final bootstrap token differs from c-list row 0")
+            if _bootstrap_identity["bootstrap_runtime_gt"] != _final_bootstrap_gt:
+                raise ValueError("final bootstrap approval GT differs from c-list row 0")
+        except (IndexError, KeyError, TypeError, ValueError) as _final_bootstrap_error:
+            return jsonify({
+                "error": f"Final bootstrap identity validation failed: {_final_bootstrap_error}",
+                "namespace_identity_failed": True,
             }), 422
 
     # Pre-pack and hash the verified binary now; Phase 5 only writes it.
@@ -8532,9 +8639,18 @@ def save_lump():
     }
     approval.update({
         "binary_hash": _binary_hash, "dot_name": _dot_name_save,
-        "issue_n": _issue_n_save, "identity_hash": _identity_hash,
+        "issue_n": _issue_n_save,
         "abstraction": abs_name, "filename": lump_filename,
     })
+    if _bootstrap_identity is not None:
+        # Frozen resident bootstrap has exactly one identity word; do not
+        # attach the deferred name-hash identity seal to this approval.
+        approval.update(_bootstrap_identity)
+        approval.pop("identity_hash", None)
+        approval.pop("identity_string", None)
+        approval.pop("identity_seal_location", None)
+    else:
+        approval["identity_hash"] = _identity_hash
 
 
     _remove_after_commit = ()
@@ -8761,7 +8877,7 @@ def save_lump():
         "size_bytes":     len(lump_bytes),
         "lump_version":   next_lump_version,
         "boot_image_refreshed": boot_refreshed,
-        "identity_hash":  _identity_hash,
+        **(_bootstrap_identity or {"identity_hash": _identity_hash}),
         "identity_string": _identity_string,
         "petname":        _petname,
         "issue_number":   _issue_number,
@@ -16902,7 +17018,10 @@ class _LumpTransitionConflict(RuntimeError):
 @contextlib.contextmanager
 def _lump_history_transition_lock(lumps_dir: str):
     """Serialize LUMP transitions across threads and server worker processes."""
-    lock_path = os.path.join(os.path.abspath(lumps_dir), ".history-transition.lock")
+    import tempfile
+    _lock_key = hashlib.sha256(os.path.abspath(lumps_dir).encode()).hexdigest()[:16]
+    lock_path = os.path.join(
+        tempfile.gettempdir(), f"lumps-history-transition-{_lock_key}.lock")
     os.makedirs(lumps_dir, exist_ok=True)
     with _lumps_manifest_lock:
         depth = getattr(_lump_history_lock_state, "depth", 0)

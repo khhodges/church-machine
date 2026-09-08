@@ -418,7 +418,7 @@ function buildOverviewHTML(e) {
       <span class="kv-key">Filename</span>     <span class="kv-val"><code>${nv(e.filename)}</code></span>
       <span class="kv-key">Sidecar</span>      <span class="kv-val"><code>${nv(e.sidecar_file)}</code></span>
       <span class="kv-key">Binary hash</span> <span class="kv-val" style="word-break:break-all"><code style="font-size:0.7rem">${nv(e.binary_hash)}</code></span>
-      ${e.identity_hash ? `<span class="kv-key">Identity hash</span><span class="kv-val" style="word-break:break-all"><code style="font-size:0.7rem">${escH(e.identity_hash)}</code></span>` : ''}
+       ${e.identity_hash ? `<span class="kv-key">Portable identity hash <small>(deferred)</small></span><span class="kv-val" style="word-break:break-all"><code style="font-size:0.7rem">${escH(e.identity_hash)}</code></span>` : ''}
     </div>
   </div>
 

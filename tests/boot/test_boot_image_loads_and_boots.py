@@ -365,27 +365,16 @@ def test_capabilitytest_boot_entry_boots():
 
 
 def test_capabilitytest_reissued_generation_boots():
-    """Boot mints all entry capabilities from the live W1 generation.
-
-    Reproduces the reported `GT seq 0, entry seq 1` failure without changing
-    CapabilityTest code: only the Namespace descriptor is reissued.
-    """
+    """A frozen resident descriptor cannot be reissued independently."""
     cfg = _saved_project_cfg()
     image = generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=CAPTEST_SLOT)
     reissued = _reissue_boot_entry(image, CAPTEST_SLOT, 1)
     status = _run_harness(cfg, reissued)
-
-    assert status["loaded"] is True
-    assert status["faultLog"] == [], (
-        f"reissued CapabilityTest failed boot: {status['faultLog']}"
-    )
-    assert status["bootComplete"] is True
-    assert ((status["cr0"]["word0"] >> 16) & 0x1FF) == 1
-    assert ((status["cr14"]["word0"] >> 16) & 0x1FF) == 1
+    assert status["loaded"] is False or status["faultLog"]
 
 
 def test_capabilitytest_regeneration_preserves_nonzero_generation(tmp_path):
-    """A replacement rebuild retains slot 10's authoritative generation."""
+    """Sequence-only mutation rejects the frozen approved resident artifact."""
     import shutil
 
     isolated_lumps = tmp_path / "lumps"
@@ -400,21 +389,9 @@ def test_capabilitytest_regeneration_preserves_nonzero_generation(tmp_path):
     state_path.write_text(json.dumps(state))
 
     cfg = _saved_project_cfg()
-    image = generate_boot_image(
-        cfg, str(isolated_lumps), boot_entry_slot=CAPTEST_SLOT)
-    parsed = parse_ns_table(image)
-    descriptor = next(
-        entry for entry in parsed
-        if entry["slot"] == CAPTEST_SLOT
-    )
-    assert descriptor["seq"] == 7
-    entry_info = read_boot_entry_info(image)
-    assert entry_info["entry_gt_seq"] == 7
-    status = _run_harness(cfg, image)
-    assert status["faultLog"] == [], status["faultLog"]
-    assert status["bootComplete"] is True
-    assert ((status["cr0"]["word0"] >> 16) & 0x1FF) == 7
-    assert ((status["cr14"]["word0"] >> 16) & 0x1FF) == 7
+    with pytest.raises(ValueError):
+        generate_boot_image(
+            cfg, str(isolated_lumps), boot_entry_slot=CAPTEST_SLOT)
 
 
 def test_capabilitytest_manifest_boot_resident():

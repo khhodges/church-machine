@@ -235,14 +235,40 @@ The PC and NIA counters operate in **word offsets** (one unit = one 32-bit word 
 
 ---
 
-## The Token — Lump Identity
+## Bootstrap Identifier — Literal Runtime GT
+
+> **Bootstrap rule:** on the one local machine, for the entirely resident and
+> frozen base, **`T === GT`**. `T` is the literal, complete 32-bit runtime
+> Golden Token word, rendered `0x%08X`.
+
+The full word — including its identity, location/slot, type, rights, and
+binding/sequence fields — is the one bootstrap identifier, token, and lookup
+key. It is **not** a content hash, a name/identity seal, a projected `SELF`,
+or a key derived from an NS slot. The fields answer who and where together;
+there is no second identity value or derivation.
+
+This rule is deliberately narrow and complete: the bootstrap is one machine
+and its resident base never changes, re-sequences, or rebinds. Consequently
+the complete GT is stable and sufficient. It does not apply to a dynamic slot
+or to a cross-machine reach. The first dynamic rebind/sequence change or the
+first machine-boundary crossing ends this bootstrap rule; only then does the
+portable layer below become active.
+
+## Deferred Portable Token and Seals
+
+The following content-token, name, and seal rules are **portable-layer
+specifications**, deferred during the frozen single-machine bootstrap. They
+must not be substituted for the bootstrap identifier above. They activate at
+the dynamic or cross-machine boundary, where a stable projection and a
+machine-independent content-address token are required.
 
 Terminology in this specification is precise:
 
 - **Genotype** — the full 2^n-word binary form of a lump: header + code +
   freespace + c-list, zero-padded to the next power-of-two word boundary.
   "Genotype" always means this binary form, never an identifier or hash.
-- **Token** — the 32-bit identifier derived from the genotype, defined below.
+- **Portable token** — the content-address token derived from the genotype,
+  defined below; it is not the bootstrap `T`.
 
 ### Canonical Definition
 
@@ -256,9 +282,8 @@ Terminology in this specification is precise:
 > - `genotype_binary` is the full lump binary padded to the next power-of-two word boundary
 >   (i.e. all 2^n words of the genotype, including zero-padding)
 >
-> The token is the runtime identity of the lump. It appears in GTs, c-list entries, and NS table
-> entries. It is also the content fingerprint: two lumps with the same token are guaranteed to have
-> the same name and the same binary content.
+> This is the deferred portable content identity. It is not the local bootstrap
+> runtime identifier, which is the literal full GT (`T === GT`).
 
 **Token vs. runtime GT fields — representation note.** The statement that the token "appears
 in GTs, c-list entries, and NS table entries" describes the *identity model*, not a claim that
@@ -411,11 +436,11 @@ registers on success, or null (`DR`=zero, `CR`=null GT) on failure. The caller t
 registers directly — null means fail, non-null means success. Conditional instructions branch
 on this directly; no separate flag is needed.
 
-### Current Form (Bootstrap Compiler, `cloomc.py`)
+### Superseded Pre-ratification Trace (Not a Bootstrap Rule)
 
-The bootstrap compiler does not yet implement the canonical definition above.
-Its interim token computation is documented here verbatim; the migration path
-follows.
+The following traced computation is retained solely to identify legacy
+artifacts. It is not a bootstrap token rule: a content hash cannot replace the
+literal runtime GT, and must not be emitted as bootstrap identity.
 
 ```python
 # body layout: [header] + clist + method_words, zero-padded to power-of-two
@@ -441,11 +466,11 @@ compare — a mismatch means tampering or corruption. This is exactly what
 `lump_json.py :: _reseal_from_parts` does; all catalogue lumps round-trip and
 verify, and a tampered word is rejected.
 
-### Limits of the Current Form
+### Why the Trace Is Not the Bootstrap
 
-The bootstrap token is deterministic, self-consistent, and sufficient for
-integrity and tamper-detection, but it is a **placeholder**, not the production
-seal, for four reasons:
+This deterministic content hash is a **superseded post-bootstrap trace**, not
+the bootstrap identifier and not the production portable seal, for four
+reasons:
 
 1. **Content-only, not identity-covering.** Two lumps with byte-identical
    c-list and code produce the same token even if they carry different
@@ -464,9 +489,10 @@ seal, for four reasons:
    CLOOMC++ + long-form assembler) so it can be edited out of context; the
    seal must bind that source to the code so they cannot drift independently.
 
-### Target Form (Per the Design)
+### Deferred Portable Target Form
 
-The target form is the canonical definition given above:
+At the expansion boundary, the portable target form is the canonical definition
+given above; it does not replace bootstrap `T === GT` before then:
 
 ```
 token = hash( name || genotype_binary )
@@ -499,28 +525,27 @@ dynamic, secret-based passkey acid test. Integrity (this hash) must be
 verifiable without authority; ownership must not be derivable from these
 static bits. The two gates stay independent by necessity.
 
-### What the Bootstrap Token Does NOT Cover
+### What the Superseded Trace Does Not Cover
 
-The exclusions below apply to the **bootstrap (interim) form only**. Under the
-canonical definition the hash covers the full genotype binary — header,
+The exclusions below apply to the superseded trace only. They do not describe
+bootstrap `T`, which is the complete GT word. Under the deferred canonical
+portable definition the hash covers the full genotype binary — header,
 zero-padding, and all.
 
-| Excluded (bootstrap form) | Reason |
+| Excluded (superseded trace) | Reason |
 |----------|--------|
 | Header (Word 0) | Holds derived layout (`cc`, `code_len`) recomputable from the sealed content, and placement-specific bookkeeping. Sealing it would make the seal depend on layout accidents. |
 | Zero-padding | Carries no information. |
 | Resolved GTs / bindings | Assigned by the locator at load and rebound at runtime (`SAVE`). They are placement, not identity. Their integrity is handled separately by per-GT parity/ECC — **not** by the token. The token never faults on binding because binding does not touch what the token covers. |
 
-### Migration Path (Bootstrap → Production)
+### Deferred Portable Activation Path
 
-Each step is additive; each changes the token values — which is correct
-and expected: a lump sealed under the production scheme is a genuinely
-different (better-identified) artifact than the same lump under the bootstrap
-scheme. Under content-addressing, a better seal is simply a new identity.
+These are portable-layer steps, activated only at the first dynamic or
+cross-machine boundary. They do not alter bootstrap `T === GT`.
 
 | Step | Change |
 |------|--------|
-| **Now** | `sha256(str(clist + code))[:8]`, 32-bit, content-only. Keep for the bootstrap; self-consistent and sufficient for the current single-author, no-transfer world. |
+| **Legacy trace** | `sha256(str(clist + code))[:8]`, 32-bit, content-only. Retain only to recognize legacy artifacts; do not use it as bootstrap identity. |
 | **Add identity** | Extend the hashed input to include the abstraction `name` string, per the canonical definition (issue number excluded). First and most important upgrade — turns a content hash into an identity hash. |
 | **Add source** | Include the carried source in the hashed input, binding source to code (editing → new token). |
 | **Canonicalise** | Replace `str()`-of-list with a defined canonical byte encoding (fixed field order, fixed integer width, explicit lengths), so the token is tool- and language-independent. |
@@ -630,23 +655,27 @@ Current read routes inspect each binary and match an exact SHA-256 approval befo
 approved metadata. A stale or missing cache must be repaired from binary and deployment
 authorities, never from a legacy sidecar.
 
-### Why Tokens Do Not Cross Cyberspace Boundaries
+### Bootstrap Boundary and Portable Activation
 
-A token is computed from `hash(name || genotype_binary)` for a binary compiled against a
-specific hardware target (Ti60, Wukong, etc.). That token is valid only within the region
-where that binary was compiled. A Ti60 token means nothing to a Wukong region because the
-binary — and therefore the hash — differs.
+Within the bootstrap, no token crosses a boundary: there is one machine and
+the resident base is frozen. The local identifier is the literal 32-bit
+runtime GT (`T === GT`, formatted `0x%08X`), not a hash or slot-derived value.
+
+At the first dynamic rebind or cross-machine reach, the deferred portable
+token `hash(name || genotype_binary)` and its portability seals activate. That
+portable token is machine-independent; a local GT remains a local authority
+binding and must not be presented as portable identity.
 
 **Cross-region sharing is logical, not physical.** The exchange protocol is:
 
 ```
 Export:  pet name  +  source (extracted from lump freespace, Tier 1 or Tier 2)
-Import:  compile locally  →  locally-valid token  →  index in local manifest
+Import:  verify portable token and seals  →  bind a local GT  →  index in local manifest
 ```
 
 Pet names are hardware-neutral, owner-neutral, and human-meaningful. They name the idea;
-the token names the instantiation. Each region produces its own binary and its own token
-from the shared source.
+the deferred portable token identifies the portable content, while each
+machine mints its own local GT binding.
 
 > **Transition note — source extraction status.** The freespace layout for embedded
 > source is now specified (Freespace Content and Self-Definition, Tier 1/2). For legacy
@@ -859,10 +888,10 @@ The API definition embedded in freespace is a UTF-8 JSON object:
 }
 ```
 
-**Identity fields are external — never embedded.** The embedded payload MUST NOT contain
-`token` or `issue` fields:
+**Portable identity fields are external — never embedded.** The embedded payload MUST NOT contain
+the deferred portable `token` or `issue` fields:
 
-- The **token** is `hash(name || genotype_binary)` — a function of the complete genotype
+- The **portable token** is `hash(name || genotype_binary)` — a function of the complete genotype
   *including this freespace content*. Embedding the token would require knowing the hash
   of bytes that contain the hash (a circular fixed point). The token therefore lives only
   outside the binary: in the canonical filename, the catalogue, and GT/NS bindings.
@@ -1209,13 +1238,11 @@ an Outform Event only if the download remains absent.
 
 ### C-list Slot 0 — The Lump's Own GT
 
-**Slot 0 is immutable for the lifetime of the abstraction.** C-list slot 0 is
-the abstraction's self-GT. The compiler writes it at seal time, and it is part
-of the sealed content: under the canonical token definition,
-`genotype_binary` includes the complete c-list, so altering slot 0 changes the
-token and the lump is rejected. The transitional bootstrap token also covers
-the c-list and code, so slot-0 alteration is covered by that integrity check as
-well.
+**For the frozen resident bootstrap, slot 0 carries the abstraction's literal
+full self GT: `T === GT` (`0x%08X`).** It is immutable because the resident
+base never rebinds or re-sequences; it is not a hash-derived SELF projection,
+name seal, or slot-derived key. The deferred portable representation instead
+keeps `Self` symbolic until a destination binding is materialized.
 
 The self-GT is a well-formed Inform GT with the exact authority required by the
 lump's exchange contract. Its `object_id` resolves through the Namespace Table
@@ -3056,8 +3083,9 @@ already owns.
 
 | Version | Date | Summary |
 |---|---|---|
-| v1.3 | 2026-08-18 | Naming consistency (T1): canonical **Token** definition (`hash(name ‖ genotype_binary)`; issue number excluded); "genotype" reserved for the 2^n-word binary form only; canonical `dot.name.issue.token.*` filename form and logical file set documented (binary is self-defining; API definition embedded in freespace, register conventions, success/fail convention); "Name and Token are Independent" subsection; C-list Slot 0 self-GT rule (`cc ≥ 1` required for `typ=lump`; Decimal cc=0 examples annotated as legacy); hardcoded NS entry count replaced with a `server/lumps/manifest.json` reference. |
-| v1.2.1 | 2026-08-17 | New section: **The Genotype Field — How It Is Computed** — documents the current bootstrap form (`sha256(str(clist+code))[:8]`, 32-bit), its four known limits, the target production form (`H_canonical(identity ‖ c-list ‖ code ‖ source)`), the two-gate model (integrity vs ownership), the excluded fields (header, padding, resolved GTs), and the four-step migration path (identity → source → canonical encoding → chosen width). |
+| v1.4 | 2026-08-30 | Ratified bootstrap correction: for the entire frozen resident base on one machine, the local identifier/token is the literal full 32-bit runtime GT, `T === GT`, rendered `0x%08X`. Content hashes, identity seals, projected SELF values, and slot-derived keys are deferred; portable token/seal specifications activate only at a dynamic or cross-machine boundary. |
+| v1.3 | 2026-08-18 | Naming consistency (T1): deferred portable **Token** definition (`hash(name ‖ genotype_binary)`; issue number excluded); "genotype" reserved for the 2^n-word binary form only; canonical `dot.name.issue.token.*` filename form and logical file set documented (binary is self-defining; API definition embedded in freespace, register conventions, success/fail convention); "Name and Token are Independent" subsection; C-list Slot 0 self-GT rule (`cc ≥ 1` required for `typ=lump`; Decimal cc=0 examples annotated as legacy); hardcoded NS entry count replaced with a `server/lumps/manifest.json` reference. |
+| v1.2.1 | 2026-08-17 | Historical trace: documented `sha256(str(clist+code))[:8]`, its known limits, and a portable target form. Superseded for bootstrap identity by v1.4's literal-runtime-GT rule. |
 | v1.2 | 2026-06-20 | (prior release) |
 | v1.1 | 2026-05-03 | Floating-lump concept formalised (new section); `variant_group` and `ns_slot_policy` added to manifest schema; Boot.Abstr example table corrected (cw=17, cc=1, 64 words, `0xF800_4401`); automated consistency gate (`tests/lump/test_lump_consistency.py`, 11 rules). |
 | v1.0 | 2026-04-29 | Initial documented release. |

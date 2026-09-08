@@ -6852,6 +6852,11 @@ async function _loadSavedLumpCapabilities(token, wordsPayload) {
         identityHash: approved.identity_hash || null,
         binaryHash,
         portableBinding: approved.portable_binding || null,
+        // This remains local artifact metadata, not an approval/hash identity:
+        // bootstrap, portable, and dynamic rows have intentionally different
+        // binding rules.
+        identityContract: api.identity_contract || api.identityContract ||
+            (apiCaps[0] && apiCaps[0].identity_contract) || 'dynamic-local',
         petname: approved.pet_name || '',
         abstraction: approved.abstraction || '',
         dotName: approved.dot_name || '',
@@ -7079,6 +7084,7 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
         const _compilerOwnedSelf = !!(_savedCaps[0] &&
             _savedCaps[0].compiler_owned_self === true &&
             String(_savedCaps[0].name || '').toUpperCase() === '__SELF__');
+        let _identityContract = _savedMetadata.identityContract || 'dynamic-local';
         const _privateDataRows = _savedCaps.flatMap((cap, row) =>
             cap && cap.role === 'private_data' ? [row] : []);
 
@@ -7109,6 +7115,14 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
             }
         }
         if (!Number.isInteger(_targetSlot)) _targetSlot = _BOOT_SLOT;
+        // API/approval metadata is advisory for old saved artifacts.  The
+        // loaded boot image is authoritative about which objects are frozen
+        // bootstrap residents, so a missing/stale identity_contract cannot
+        // route their row zero through dynamic reminting.
+        if (sim._bootstrapResidentSlots &&
+                sim._bootstrapResidentSlots[_targetSlot] === true) {
+            _identityContract = 'bootstrap-resident';
+        }
         const _savedSimBootEntry = sim.bootEntrySlot;
         // bootEntrySlot is a let-declared cross-file global in app-memory.js.
         // let vars are NOT on window, so we reference it by name directly.
@@ -7156,8 +7170,13 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
             rawWords,
             (nsSlot !== null && nsSlot !== undefined) ? nsSlot : undefined,
             {
-                compilerOwnedSelf: _compilerOwnedSelf,
-                remintCompilerOwnedSelf: _compilerOwnedSelf,
+                // Bootstrap identity is the literal frozen resident row-0 GT.
+                // Do not feed it through the dynamic reminting path.
+                identityContract: _identityContract,
+                compilerOwnedSelf: _identityContract === 'bootstrap-resident'
+                    ? false : _compilerOwnedSelf,
+                remintCompilerOwnedSelf: _identityContract === 'bootstrap-resident'
+                    ? false : _compilerOwnedSelf,
                 sourceSelfSlot: _savedMetadata.sourceNsSlot,
                 sourceSelfSeq: (() => {
                     const sourceSlot = Number(_savedMetadata.sourceNsSlot);

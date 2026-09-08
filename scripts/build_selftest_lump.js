@@ -101,7 +101,8 @@ words[lumpSize - 1] = selfGT;
 const bytes = Buffer.alloc(lumpSize * 4);
 words.forEach((word, i) => bytes.writeUInt32BE(word, i * 4));
 const binaryHash = crypto.createHash('sha256').update(bytes).digest('hex');
-const token = crc32(bytes).toString(16).toLowerCase().padStart(8, '0');
+// Bootstrap T is the literal row-zero runtime SELF GT, never CRC/name hash.
+const token = selfGT.toString(16).toLowerCase().padStart(8, '0');
 const oldSelfTests = manifest.filter(e => e.abstraction === DOT_NAME);
 const manifestLocatorFields = new Set([
     'token', 'filename', 'abstraction', 'version', 'lump_version', 'compiled_at',
@@ -119,8 +120,6 @@ const priorIssue = oldSelfTests.reduce((max, row) => Math.max(max,
 const issueN = existingExact && stateRow.binary_hash === binaryHash
     ? (existingExact.issue_n || existingExact.lump_version || 1)
     : priorIssue + 1;
-const identityHash = crypto.createHash('sha256').update(`${DOT_NAME}#${issueN}`).digest('hex');
-const identityString = `${DOT_NAME}#${issueN}`;
 const filename = `${DOT_NAME}.${issueN}.${crypto.createHash('sha256').update(DOT_NAME).update(bytes).digest('hex').slice(0, 8)}.lump`;
 const entry = {
     // manifest.json is a locator/history index only.  Identity, placement,
@@ -136,8 +135,7 @@ const active = manifest.filter(e => e.token === token && e.abstraction === DOT_N
 const artifactPath = path.join(LUMPS_DIR, filename);
 const approvalRecord = {
     binary_hash: binaryHash, filename, dot_name: DOT_NAME, issue_n: issueN,
-    identity_string: identityString, identity_hash: identityHash,
-    identity_seal_location: 'approval',
+    bootstrap_t: token, bootstrap_runtime_gt: selfGT,
     token, abstraction: DOT_NAME, grants: ['E'],
     capability_type: 'inform',
 };
@@ -150,7 +148,7 @@ if (CHECK_ONLY) {
     }
     if (stateRow.token !== token || stateRow.filename !== filename ||
         stateRow.slot !== nsSlot || stateRow.seq !== seq ||
-        stateRow.identity_hash !== identityHash || stateRow.binary_hash !== binaryHash ||
+        stateRow.binary_hash !== binaryHash ||
         stateRow.ns_slot_policy !== 'static' || stateRow.load_policy !== 'Resident' ||
         stateRow.resident !== true || stateRow.boot_resident !== true ||
         stateRow.issue_n !== issueN || stateRow.lump_version !== issueN ||
@@ -191,7 +189,7 @@ stateRow.token = token;
 stateRow.filename = filename;
 stateRow.lump_version = issueN;
 stateRow.issue_n = issueN;
-stateRow.identity_hash = identityHash;
+    delete stateRow.identity_hash;
 stateRow.binary_hash = binaryHash;
 stateRow.ns_slot_policy = 'static';
 stateRow.load_policy = 'Resident';

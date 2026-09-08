@@ -157,6 +157,10 @@ args = "lump-gt-display-tests"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
+args = "bootstrap-resident-identity-tests"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
 args = "editor-roundtrip-tests"
 
 [[workflows.workflow.tasks]]
@@ -817,6 +821,18 @@ args = "node tests/lump/test_lump_gt_display.js"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "bootstrap-resident-identity-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python3 -m pytest tests/server/test_bootstrap_identity_3321.py tests/server/test_bootstrap_migration_atomic_3321.py -q && node simulator/test_bootstrap_resident_identity.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+isValidation = true
 
 [[workflows.workflow]]
 name = "editor-roundtrip-tests"

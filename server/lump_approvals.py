@@ -13,7 +13,8 @@ RECORD_FIELDS = frozenset({
     "abstraction", "author", "version", "compiled_at", "display_name",
     "documentation", "annotations", "portable_binding", "pet_name", "pet_names",
     "history_note", "release_notes", "grants", "capability_type",
-    "identity_string", "identity_seal_location",
+    "identity_string", "identity_seal_location", "bootstrap_t",
+    "bootstrap_runtime_gt",
 })
 INTRINSIC_FIELDS = frozenset({
     "cw", "cc", "typ", "lump_size", "source", "api_definition",
@@ -57,6 +58,17 @@ def validate_record(digest, record):
         if not isinstance(seal_location, str) or seal_location not in IDENTITY_SEAL_LOCATIONS:
             raise ValueError(
                 "approval identity_seal_location must be 'approval'")
+    bootstrap_t = record.get("bootstrap_t")
+    bootstrap_gt = record.get("bootstrap_runtime_gt")
+    if bootstrap_t is not None or bootstrap_gt is not None:
+        if (not isinstance(bootstrap_t, str) or
+                len(bootstrap_t) != 8 or
+                any(ch not in "0123456789abcdef" for ch in bootstrap_t) or
+                isinstance(bootstrap_gt, bool) or not isinstance(bootstrap_gt, int)
+                or not 0 <= bootstrap_gt <= 0xffffffff
+                or bootstrap_t != f"{bootstrap_gt:08x}"):
+            raise ValueError(
+                "bootstrap approval T must be the exact unsigned 32-bit runtime SELF GT")
     return dict(record)
 
 

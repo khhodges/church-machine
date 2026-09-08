@@ -32,6 +32,8 @@
 
 const fs   = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const { spawnSync } = require('child_process');
 
 const ROOT        = path.resolve(__dirname, '..');
 const ASSEMBLER   = path.join(ROOT, 'simulator', 'assembler.js');
@@ -44,6 +46,8 @@ const LUMPS_DIR   = (_outDirIdx !== -1 && process.argv[_outDirIdx + 1])
     ? path.resolve(process.argv[_outDirIdx + 1])
     : path.join(ROOT, 'server', 'lumps');
 const MANIFEST    = path.join(LUMPS_DIR, 'manifest.json');
+const NS_STATE    = path.join(LUMPS_DIR, 'ns-state.json');
+const APPROVALS   = path.join(LUMPS_DIR, 'approvals.json');
 
 // ── Minimal browser stubs so assembler.js loads in Node.js ──────────────────
 global.localStorage = {
@@ -74,7 +78,11 @@ if (result.errors.length > 0) {
     process.exit(1);
 }
 
-const words = result.words;
+const words = result.words.map(word => {
+    const op = (word >>> 27) & 0x1F, src = (word >>> 15) & 0xF;
+    return src === 6 && [0, 1, 8, 9].includes(op)
+        ? ((word & ~0x1F) | ((word + 1) & 0x1F)) >>> 0 : word;
+});
 console.log(`Assembled ${words.length} instruction words.`);
 function contentFrame(name, text) {
     const api = Buffer.from(JSON.stringify({ name, methods: [] }), 'utf8');
@@ -119,6 +127,8 @@ if (words.length !== 74) {
 //   UART_DEV NS slot 2: (0b011 << 28) | (0 << 27) | (0b01 << 25) | 2 = 0x32000002
 //
 const CLIST = [
+    { gt: 0x4A000007, name: '__SELF__', ns_slot: 7, rights: ['E'],
+      note: 'WukongCallHome frozen resident SELF E Inform GT (NS slot 7)' },
     { gt: 0x32000003, name: 'LED0',              ns_slot: 3, rights: ['R','W'],
       note: 'LED_DEV          Turing RW Inform GT (NS slot 3, MMIO 0x40000000)' },
     { gt: 0x32000002, name: 'UART_TX',           ns_slot: 2, rights: ['R','W'],
@@ -197,16 +207,19 @@ function crc32(buf) {
     return (crc ^ 0xFFFFFFFF) >>> 0;
 }
 
-const token = crc32(bytes).toString(16).toLowerCase().padStart(8, '0');
-console.log(`Token (CRC-32 of binary): ${token}`);
+const token = CLIST[0].gt.toString(16).toLowerCase().padStart(8, '0');
+const binaryHash = crypto.createHash('sha256').update(bytes).digest('hex');
+const filename = `WukongCallHome.1.${crypto.createHash('sha256').update('WukongCallHome').update(bytes).digest('hex').slice(0, 8)}.lump`;
+console.log(`Bootstrap T: ${token}`);
 
 // ── Remove old WukongCallHome lump files ─────────────────────────────────────
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
-const existingIdx = manifest.findIndex(e => e.abstraction === 'WukongCallHome');
+const existingIdx = manifest.findIndex(e => e.abstraction === 'WukongCallHome' && e.filename === (
+    ((JSON.parse(fs.readFileSync(NS_STATE, 'utf8')).abstractions || []).find(r => r.name === 'WukongCallHome' && r.slot === 7) || {}).filename));
 if (existingIdx !== -1) {
     const oldToken = manifest[existingIdx].token;
     if (oldToken && oldToken !== token) {
-        const oldLump     = path.join(LUMPS_DIR, `${oldToken}.lump`);
+        const oldLump     = path.join(LUMPS_DIR, manifest[existingIdx].filename);
         if (fs.existsSync(oldLump))    { fs.unlinkSync(oldLump);    console.log(`Removed old: ${oldLump}`); }
     }
     console.log('\nExisting WukongCallHome entry found — replacing it.');
@@ -214,7 +227,7 @@ if (existingIdx !== -1) {
 }
 
 // ── Write .lump binary ───────────────────────────────────────────────────────
-const lumpPath    = path.join(LUMPS_DIR, `${token}.lump`);
+const lumpPath    = path.join(LUMPS_DIR, filename);
 
 fs.writeFileSync(lumpPath, bytes);
 console.log(`Written: ${lumpPath} (${bytes.length} bytes)`);
@@ -230,18 +243,25 @@ for (let i = 0; i < CLIST.length; i++) {
 const manifestEntry = {
     token,
     abstraction:     'WukongCallHome',
-    ns_slot:         7,
-    ns_slot_policy:  'static',
-    variant_group:   null,
-    lump_size:       lumpSize,
-    cw,
-    cc,
-    grants:          ['E'],
+    filename,
     lump_version:    1,
 };
 
 manifest.push(manifestEntry);
-fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 4) + '\n');
+fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2));
+const state = JSON.parse(fs.readFileSync(NS_STATE, 'utf8'));
+const row = state.abstractions.find(r => r.name === 'WukongCallHome' && r.slot === 7);
+if (!row || row.resident !== true || row.boot_resident !== true) throw new Error('slot 7 is not a frozen resident binding');
+Object.assign(row, { token, filename, binary_hash: binaryHash, issue_n: 1,
+    ns_slot_policy: 'static', load_policy: 'Resident' });
+delete row.identity_hash;
+fs.writeFileSync(NS_STATE, JSON.stringify(state, null, 2));
+const approval = { binary_hash: binaryHash, filename, dot_name: 'WukongCallHome', issue_n: 1,
+    bootstrap_t: token, bootstrap_runtime_gt: CLIST[0].gt, token, abstraction: 'WukongCallHome',
+    grants: ['E'], capability_type: 'inform' };
+const writer = 'import json,sys; from server.lump_approvals import read_approvals,write_approvals; r=read_approvals(sys.argv[1]); r[sys.argv[2]]=json.loads(sys.argv[3]); write_approvals(sys.argv[1],r)';
+const wrote = spawnSync(process.env.PYTHON || 'python3', ['-c', writer, APPROVALS, binaryHash, JSON.stringify(approval)], {cwd: ROOT, encoding:'utf8'});
+if (wrote.status !== 0) throw new Error(wrote.stderr);
 console.log(`Updated: ${MANIFEST}`);
 
 console.log('\nManifest entry written:');

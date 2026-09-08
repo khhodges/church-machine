@@ -45,6 +45,9 @@ from server.lump_approvals import read_approvals
 from server.lump_integrity import (
     compute_number, parse_canonical_filename,
 )
+from server.bootstrap_identity import (
+    bootstrap_t_from_self_gt, verify_bootstrap_self_gt,
+)
 import os
 import struct
 import warnings
@@ -156,7 +159,7 @@ def thread_layout(lump_size, stack_words):
 # CapabilityTest has a conventional catalog slot, but is not foundational.
 CAPABILITY_TEST_NS_SLOT = 10  # CapabilityTest capability-validation LUMP
 
-_MANDATORY_NS_SLOTS = (0, 1)  # Only Namespace and Thread have immutable slots.
+_MANDATORY_NS_SLOTS = (0, 1, 2, 3, 4, 5, 6, 10)
 
 # Format-version tag written to mem[NS_TABLE_BASE - 1] so loadBootImage()
 # can reject stale binaries.
@@ -1495,7 +1498,7 @@ def _resolve_selected_lump_locator(lumps_dir, slot, token):
     return path
 
 
-def _require_approved_executable_lump(path, lumps_dir, label):
+def _require_approved_executable_lump(path, lumps_dir, label, bootstrap_binding=None):
     """Return exact words only for a canonically named, hash-approved body."""
     if not path or not os.path.isfile(path):
         raise ValueError(
@@ -1525,11 +1528,31 @@ def _require_approved_executable_lump(path, lumps_dir, label):
         dot_name, issue_n, number = parsed
         identity_hash = hashlib.sha256(
             f"{dot_name}#{issue_n}".encode("utf-8")).hexdigest()
-        if (compute_number(dot_name, raw) != number
+        bootstrap_record = (
+            approval.get("bootstrap_t") is not None
+            or approval.get("bootstrap_runtime_gt") is not None)
+        if bootstrap_binding is not None and not (
+                approval.get("bootstrap_t") is not None
+                and approval.get("bootstrap_runtime_gt") is not None):
+            raise ValueError(
+                "frozen resident approval requires bootstrap_t and bootstrap_runtime_gt")
+        if ((not bootstrap_record and compute_number(dot_name, raw) != number)
                 or approval.get("dot_name") != dot_name
                 or approval.get("issue_n") != issue_n
-                or approval.get("identity_hash") != identity_hash):
+                or (not bootstrap_record and approval.get("identity_hash") != identity_hash)):
             raise ValueError("approval canonical identity/filename does not match bytes")
+        if bootstrap_record:
+            if bootstrap_binding is None:
+                raise ValueError("bootstrap approval has no authoritative Namespace owner")
+            cc = words[0] & 0xff
+            if cc < 1:
+                raise ValueError("bootstrap approval requires c-list row-0 SELF GT")
+            row0 = words[len(words) - cc]
+            verify_bootstrap_self_gt(
+                bootstrap_binding,
+                row0, approval.get("bootstrap_t"))
+            if row0 != approval.get("bootstrap_runtime_gt"):
+                raise ValueError("bootstrap approval runtime GT disagrees with c-list row 0")
         return words
     except (OSError, ValueError) as exc:
         raise ValueError(
@@ -1926,6 +1949,27 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             f"generate_boot_image: nsSlotsMax must be in 0..{MAX_NS_ENTRIES}; "
             f"got {_ns_slots_max}.")
     _boot_saved_path, _selftest_slot = _resolve_authoritative_selftest_lump(lumps_dir)
+    try:
+        with open(os.path.join(lumps_dir, "ns-state.json"), encoding="utf-8") as _bf:
+            _bootstrap_rows = json.load(_bf).get("abstractions", [])
+    except (OSError, ValueError, AttributeError) as exc:
+        raise ValueError(f"generate_boot_image: authoritative ns-state is unreadable: {exc}")
+    _bootstrap_by_slot = {
+        row["slot"]: row for row in _bootstrap_rows
+        if isinstance(row, dict) and isinstance(row.get("slot"), int)
+        and row.get("resident") is True and row.get("boot_resident") is True
+        and row.get("ns_slot_policy") == "static"
+        and row.get("load_policy") == "Resident"
+        and row.get("type") in ("Inform", "Resident")
+    }
+    for _owner_slot, _owner in _bootstrap_by_slot.items():
+        _owner_filename = _owner.get("filename")
+        if not isinstance(_owner_filename, str):
+            raise ValueError(
+                f"generate_boot_image: frozen resident slot {_owner_slot} has no locator")
+        _require_approved_executable_lump(
+            os.path.join(lumps_dir, _owner_filename), lumps_dir,
+            f"frozen resident owner slot {_owner_slot}", _owner)
     if _selftest_slot >= _ns_slots_max:
         raise ValueError(
             f"generate_boot_image: SelfTest slot {_selftest_slot} is outside "
@@ -1974,7 +2018,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # approval, filename, hash, or structural failures must never fall back to
     # a generated executable body.
     _require_approved_executable_lump(
-        _boot_saved_path, lumps_dir, "SelfTest")
+        _boot_saved_path, lumps_dir, "SelfTest",
+        _bootstrap_by_slot.get(_selftest_slot))
     try:
             with open(_boot_saved_path, "rb") as _bsf:
                 _bsraw = _bsf.read()
@@ -2154,7 +2199,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
                 except (OSError, ValueError, TypeError):
                     _body_path = None
             _body = _require_approved_executable_lump(
-                _body_path, lumps_dir, f"boot-resident catalog slot {_slot}")
+                _body_path, lumps_dir, f"boot-resident catalog slot {_slot}",
+                _bootstrap_by_slot.get(_slot))
             _declared_words = len(_body)
         _boot_resident_bodies[_slot] = _body[:_declared_words]
         _boot_resident_allocations[_slot] = _declared_words
@@ -2445,14 +2491,12 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         _saved_cc      = abstr_words[0] & 0xFF
         entry_cr_limit = actual_abstr_size - _saved_cc - 1
 
-        # Row 0 is SelfTest's authenticated E-GT.  It and Thread.CR0 must
-        # follow the live authoritative slot/sequence, rather than retaining
-        # a historical slot-6 credential in a portable body.
+        # Row 0 is immutable authenticated input.  Approval validation above
+        # already proved it equals the owning descriptor-derived GT; never
+        # repair or normalize a mismatching artifact while building an image.
         if _saved_cc > 0:
             _clist_base_m = boot_entry_loc + actual_abstr_size - _saved_cc
             if 0 < _clist_base_m < total:
-                mem[_clist_base_m] = create_gt(
-                    _selftest_sequence, _selftest_slot, {"E": 1}, 1)
                 if _saved_cc > 1 and len(clist_gts) > 1:
                     mem[_clist_base_m + 1] = clist_gts[1] & 0xFFFFFFFF
         write_ns_entry(mem, total, NS_ENTRY_WORDS, _selftest_slot,
@@ -2655,7 +2699,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         body_path = _resolve_selected_lump_locator(
             lumps_dir, slot, token)
         body = _require_approved_executable_lump(
-            body_path, lumps_dir, f"Step-2 resident slot {slot}")
+            body_path, lumps_dir, f"Step-2 resident slot {slot}",
+            _bootstrap_by_slot.get(slot))
         _binding = (_portable_approvals.get(str(token).lower(), {})
                     .get("portable_binding"))
         if _binding is not None:
@@ -2701,6 +2746,27 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
                 f"boot-resident (manifest boot_resident=true) or pick a resident "
                 f"entry slot before uploading."
             )
+
+    # Final invariant: copied SELF, owning descriptor-derived GT, ns-state T,
+    # approval T (proved while loading), and NS W3 remain one exact word.
+    for _owner_slot, _owner in _bootstrap_by_slot.items():
+        _owner_loc = locations.get(_owner_slot)
+        if _owner_loc is None:
+            raise ValueError(
+                f"generate_boot_image: frozen resident slot {_owner_slot} is not resident")
+        _owner_header = mem[_owner_loc]
+        _owner_size = 1 << (((_owner_header >> 23) & 0xF) + 6)
+        _owner_cc = _owner_header & 0xFF
+        if _owner_cc < 1:
+            raise ValueError(
+                f"generate_boot_image: frozen resident slot {_owner_slot} has no SELF row")
+        _owner_row0 = mem[_owner_loc + _owner_size - _owner_cc]
+        verify_bootstrap_self_gt(_owner, _owner_row0, _owner.get("token"))
+        _owner_ns_base = total - (_owner_slot + 1) * NS_ENTRY_WORDS
+        if mem[_owner_ns_base + 3] != _owner_row0:
+            raise ValueError(
+                f"generate_boot_image: frozen resident slot {_owner_slot} "
+                "NS W3 differs from SELF GT")
 
     # ----- Pack ----------------------------------------------------------
     image = struct.pack(f"<{total}I", *mem)

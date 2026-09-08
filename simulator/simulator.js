@@ -388,6 +388,20 @@ class ChurchSimulator {
             }
         }
 
+        // The boot image is the entire frozen bootstrap.  Every executable
+        // resident descriptor (rather than a manifest/API annotation) declares
+        // its own identity in c-list row zero and descriptor W3:
+        // T === GT === the literal runtime SELF E-GT for that descriptor's
+        // slot and sequence. Validate all 32 bits before copying any state.
+        const bootstrapInventory = this._bootstrapResidentInventory(
+            src, discoveredMaxNsEntries, discoveredNsTableBase);
+        if (!bootstrapInventory.ok) {
+            this.lastBootImageError =
+                `Bootstrap resident identity validation failed: ${bootstrapInventory.errors.join(' ')}`;
+            this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected before changing simulator state.\n`;
+            return false;
+        }
+
         // All validation passed — commit discovered layout to instance state.
         // NS_TABLE_BASE comes from the tag's discovered position, NOT from
         // (this.memory.length - NS_TABLE_RESERVE).  When the image is smaller
@@ -419,6 +433,10 @@ class ChurchSimulator {
 
         const n   = src.length;
         for (let i = 0; i < n; i++) this.memory[i] = src[i] >>> 0;
+        // A boot image is the complete frozen resident bootstrap.  Mark its
+        // populated descriptors as such; later dynamic allocation never gains
+        // this authority merely by being resident in RAM.
+        this._bootstrapResidentSlots = bootstrapInventory.slots;
         this._runtimeWordOriginals = new Map();
         // V2 has no tail metadata.  Derive the Namespace extent directly from
         // its physical descending descriptor table.
@@ -977,6 +995,9 @@ class ChurchSimulator {
         // Installation provenance is runtime-only. Reset must not preserve a
         // revoked slot's immutable-self guard; trusted loaders re-establish it.
         this._compilerOwnedSelfSlots = {};
+        // Only loadBootImage establishes this frozen bootstrap provenance.
+        // Dynamic/resident-at-runtime installs never populate this map.
+        this._bootstrapResidentSlots = {};
 
         this.bootComplete = false;
         this.mElevation = false;
@@ -1320,8 +1341,10 @@ class ChurchSimulator {
         }
         if (base !== 0) errors.push('Namespace base address must be word 0.');
         if (format !== ChurchSimulator.NAMESPACE_HEADER_V2_FORMAT) errors.push('Namespace Header V2 format marker is missing.');
-        if (bootEntry === null || bootEntry < ChurchSimulator.NAMESPACE_HEADER_V2_WORDS ||
-                bootEntry >= namespaceSize || (bootEntry & 3) !== 0) errors.push('Boot-entry field must be an aligned resident byte address.');
+        const bootEntryAddress = bootEntry === null ? null : bootEntry / 4;
+        if (bootEntry === null || (bootEntry & 3) !== 0 ||
+                bootEntryAddress < ChurchSimulator.NAMESPACE_HEADER_V2_WORDS ||
+                bootEntryAddress >= namespaceSize) errors.push('Boot-entry field must be an aligned resident byte address.');
         if (!Number.isInteger(tableOffset) || !Number.isInteger(slotCount) ||
                 tableOffset < ChurchSimulator.NAMESPACE_HEADER_V2_WORDS ||
                 tableOffset + slotCount * this.NS_ENTRY_WORDS !== namespaceSize) {
@@ -1463,7 +1486,12 @@ class ChurchSimulator {
         };
     }
 
-    // ── Ordinary-LUMP Namespace identity contract ───────────────────────────
+    // ── LUMP Namespace identity contracts ───────────────────────────────────
+    // Bootstrap is deliberately a distinct, closed contract:
+    //   T === GT === row-0 SELF, as the complete unsigned runtime word.
+    // It applies only to frozen resident objects.  Dynamic local objects keep
+    // their install-time reminting contract, and portable objects keep their
+    // relocation/binding contract; neither may borrow the bootstrap identity.
     // Row zero of an ordinary executable LUMP is not a user capability.  It is
     // the resident object's own Inform E-GT.  A compiler writes the placeholder
     // below because its final slot and gt_seq do not exist until allocation; the
@@ -1475,6 +1503,93 @@ class ChurchSimulator {
     // Those layouts are owned by their respective boot/hardware contracts.
     static get SELF_CAPABILITY_PLACEHOLDER() { return 0xFEED5E1F; }
     static get PRIVATE_DATA_CAPABILITY_PLACEHOLDER() { return 0xFEEDDA7A; }
+    static formatRuntimeGT(word) {
+        return `0x${(word >>> 0).toString(16).toUpperCase().padStart(8, '0')}`;
+    }
+
+    _bootstrapResidentInventory(words, maxSlots, tableBase) {
+        const slots = {};
+        const errors = [];
+        if (!words || !Number.isInteger(maxSlots) || !Number.isInteger(tableBase)) {
+            return { ok: false, slots,
+                errors: ['bootstrap inventory has invalid image geometry'] };
+        }
+        for (let slot = 0; slot < maxSlots; slot++) {
+            const nsBase = words.length - (slot + 1) * this.NS_ENTRY_WORDS;
+            const location = words[nsBase] >>> 0;
+            const word1 = words[nsBase + 1] >>> 0;
+            const descriptorToken = words[nsBase + 3] >>> 0;
+            if (location >= tableBase || location + 1 >= tableBase) continue;
+            const hdr = this.parseLumpHeader(words[location] >>> 0);
+            // Thread, Namespace and device descriptors have their own explicit
+            // architectural contracts. Type-0 executable LUMPs are the frozen
+            // resident inventory governed by T===GT.
+            if (!hdr.valid || hdr.typ !== 0) continue;
+            if (hdr.cc < 1 || location + hdr.lumpSize > tableBase) {
+                errors.push(`NS[${slot}] executable resident has no complete c-list row 0`);
+                continue;
+            }
+            const row0 = location + hdr.lumpSize - hdr.cc;
+            const supplied = words[row0] >>> 0;
+            const seq = this.parseNSWord1(word1).gtSeq;
+            const expected = this.createGT(seq, slot,
+                { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, 1) >>> 0;
+            let validIdentity = true;
+            if (supplied !== expected) {
+                errors.push(
+                    `NS[${slot}] c-list row 0 is ${ChurchSimulator.formatRuntimeGT(supplied)}; ` +
+                    `expected its full runtime SELF GT ${ChurchSimulator.formatRuntimeGT(expected)}`);
+                validIdentity = false;
+            }
+            if (descriptorToken !== expected) {
+                errors.push(
+                    `NS[${slot}] descriptor W3 is ${ChurchSimulator.formatRuntimeGT(descriptorToken)}; ` +
+                    `expected its full runtime SELF GT ${ChurchSimulator.formatRuntimeGT(expected)}`);
+                validIdentity = false;
+            }
+            if (validIdentity) slots[slot] = true;
+        }
+        return { ok: errors.length === 0, slots, errors };
+    }
+
+    _validateBootstrapResidentSelf(words, slot, opts = {}) {
+        const fail = (code, message) => ({ ok: false, code, message });
+        if (opts.portableBinding || opts.identityContract === 'portable' ||
+                opts.identityContract === 'dynamic') {
+            return fail('BOOTSTRAP_CONTRACT',
+                'bootstrap T===GT identity cannot be used by portable or dynamic LUMPs');
+        }
+        if (!Array.isArray(words) && !(words instanceof Uint32Array)) {
+            return fail('BOOTSTRAP_WORDS', 'bootstrap identity check requires a word array');
+        }
+        if (!Number.isInteger(slot) || !this._bootstrapResidentSlots ||
+                this._bootstrapResidentSlots[slot] !== true) {
+            return fail('BOOTSTRAP_NONRESIDENT',
+                `NS[${slot}] is not a frozen resident bootstrap slot`);
+        }
+        const entry = this.readNSEntry(slot);
+        if (!entry || !this.isNSEntryValid(slot)) {
+            return fail('BOOTSTRAP_NAMESPACE',
+                `NS[${slot}] has no valid frozen resident Namespace entry`);
+        }
+        const copy = Array.from(words, word => word >>> 0);
+        const hdr = this.parseLumpHeader(copy[0] || 0);
+        if (!hdr.valid || hdr.typ !== 0 || hdr.cc < 1 || copy.length < hdr.lumpSize) {
+            return fail('BOOTSTRAP_HEADER',
+                'bootstrap executable requires a complete type-0 LUMP with c-list row 0');
+        }
+        const seq = this.parseNSWord1(entry.word1_limit >>> 0).gtSeq;
+        const expected = this.createGT(seq, slot,
+            { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, 1) >>> 0;
+        const row0 = hdr.lumpSize - hdr.cc;
+        const supplied = copy[row0] >>> 0;
+        if (supplied !== expected) {
+            return fail('BOOTSTRAP_SELF',
+                `bootstrap c-list row 0 is ${ChurchSimulator.formatRuntimeGT(supplied)}; ` +
+                `T must equal the full runtime SELF GT ${ChurchSimulator.formatRuntimeGT(expected)}`);
+        }
+        return { ok: true, words: copy, hdr, selfGT: expected, identityContract: 'bootstrap-resident' };
+    }
 
     _ordinaryLumpNeedsSelfIdentity(hdr, opts = {}) {
         if (!(hdr && hdr.valid && hdr.typ === 0) || opts.architectural) return false;
@@ -1520,7 +1635,10 @@ class ChurchSimulator {
             return fail('IDENTITY_PRIVATE',
                 'private-data placeholder requires trusted compiler-owned installation metadata');
         }
-        if (!compilerOwnedSelf) return { ok: true, words: copy, hdr, ordinary: false };
+        if (!compilerOwnedSelf) {
+            return { ok: true, words: copy, hdr, ordinary: false,
+                identityContract: opts.portableBinding ? 'portable' : 'dynamic-local' };
+        }
         if (hdr.cc < 1) {
             return fail('IDENTITY_CLIST', 'ordinary executable LUMPs require compiler-owned c-list row 0');
         }
@@ -1601,6 +1719,7 @@ class ChurchSimulator {
             words: copy,
             hdr,
             ordinary: true,
+            identityContract: opts.portableBinding ? 'portable' : 'dynamic-local',
             selfGT: expectedSelf,
             entry: { location: w0, word1: w1, integrity: w2, cacheToken: w3, seq, cc: hdr.cc }
         };
@@ -9171,6 +9290,29 @@ class ChurchSimulator {
             return false;
         }
 
+        // A bootstrap identity is never an installation-time projection,
+        // placeholder, content hash, or shifted slot.  It is the exact row-0
+        // runtime SELF GT already assigned to a frozen resident slot.  Keep
+        // this branch ahead of portable binding and ordinary reminting so no
+        // later path can silently reinterpret it as a dynamic artifact.
+        let bootstrapIdentity = null;
+        if (options.identityContract === 'bootstrap-resident') {
+            if (options.portableBinding || options.compilerOwnedSelf) {
+                this.output += '[loadLumpBinary] ERROR: bootstrap identity cannot be combined with portable or dynamic compiler-owned installation.\n';
+                return false;
+            }
+            bootstrapIdentity = this._validateBootstrapResidentSelf(words, abstrSlot, options);
+            if (!bootstrapIdentity.ok) {
+                this.output += `[loadLumpBinary] ERROR: Bootstrap identity validation failed (${bootstrapIdentity.code}) — ${bootstrapIdentity.message}. LUMP rejected without installation.\n`;
+                return false;
+            }
+            const residentEntry = this.readNSEntry(abstrSlot);
+            if ((residentEntry.word0_location >>> 0) !== (installBase >>> 0)) {
+                this.output += '[loadLumpBinary] ERROR: bootstrap LUMP location differs from its frozen resident Namespace binding.\n';
+                return false;
+            }
+        }
+
         const activeThreadBase = this._activeThreadBase();
         const activeThreadLayout = this._threadLayoutAtBase(activeThreadBase);
         if (activeThreadLayout &&
@@ -9259,7 +9401,7 @@ class ChurchSimulator {
         // slot and its current sequence are known.  This returns a private copy:
         // all failures above and below this point leave both RAM and the NS table
         // untouched, including when a caller handed us a stale/wrong self GT.
-        const _identity = this._mintOrdinaryLumpIdentity(portableWords, abstrSlot, installBase, {
+        const _identity = bootstrapIdentity || this._mintOrdinaryLumpIdentity(portableWords, abstrSlot, installBase, {
             architectural: options.architectural === true || hdr.typ !== 0,
             compilerOwnedSelf: options.compilerOwnedSelf === true || !!options.portableBinding,
             remintCompilerOwnedSelf: options.remintCompilerOwnedSelf === true,
@@ -9316,6 +9458,12 @@ class ChurchSimulator {
         this._compilerOwnedSelfSlots = this._compilerOwnedSelfSlots || {};
         if (_identity.ordinary) this._compilerOwnedSelfSlots[abstrSlot] = true;
         else delete this._compilerOwnedSelfSlots[abstrSlot];
+        if (!bootstrapIdentity && this._bootstrapResidentSlots) {
+            // Replacing a boot object through an ordinary runtime path revokes
+            // its frozen-bootstrap provenance rather than letting a later load
+            // treat the reused slot as T===GT authority.
+            delete this._bootstrapResidentSlots[abstrSlot];
+        }
 
         // Stub detection: tag the NS slot when every code word is a bare RETURN.
         // Uses the raw words[] array (not memory[]) so the scan is immune to any

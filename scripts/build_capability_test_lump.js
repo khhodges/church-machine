@@ -5,8 +5,9 @@
 // ChurchAssembler (simulator/assembler.js), packs the result into a valid LUMP
 // binary and writes server/lumps/CapabilityTest.2.<hash8>.lump.
 //
-// CapabilityTest's protected slot lookup token remains 00000a00. Content is
-// named by sha256(dot_name_utf8 + lump_bytes)[:8], per lump_integrity.py.
+// Frozen bootstrap T is the literal full runtime row-0 GT, not slot<<8 or a
+// name/content hash. Content is still named by sha256(dot_name_utf8 +
+// lump_bytes)[:8], per lump_integrity.py.
 //
 // C-List (cc=7) — tail of the lump, 7 slots:
 //   Slot 0  SelfTest   (NS slot 6, E)    — E-perm callable abstraction
@@ -53,13 +54,8 @@ const LUMPS_DIR   = (_outDirIdx !== -1 && process.argv[_outDirIdx + 1])
 const MANIFEST    = path.join(LUMPS_DIR, 'manifest.json');
 const NS_STATE    = path.join(LUMPS_DIR, 'ns-state.json');
 const APPROVALS   = path.join(LUMPS_DIR, 'approvals.json');
-const IDENTITY_TOKEN = '00000a00';
 const DOT_NAME = 'CapabilityTest';
 const ISSUE_N = 2;
-const IDENTITY_STRING = `${DOT_NAME}#${ISSUE_N}`;
-const IDENTITY_HASH = crypto.createHash('sha256')
-    .update(IDENTITY_STRING, 'utf8')
-    .digest('hex');
 const CHECK_ONLY = process.argv.includes('--check');
 fs.mkdirSync(LUMPS_DIR, { recursive: true });
 
@@ -102,7 +98,15 @@ if (result.errors.length > 0) {
     process.exit(1);
 }
 
-const words = result.words;
+// Reserve row zero for this frozen resident's own runtime SELF GT.  The
+// source's declared dependencies begin at row zero, so shift every CR6 c-list
+// selector with it; this preserves the SelfTest dependency at its new row 1.
+const words = result.words.map(word => {
+    const op = (word >>> 27) & 0x1F;
+    const crSrc = (word >>> 15) & 0xF;
+    return (crSrc === 6 && [0, 1, 8, 9].includes(op))
+        ? ((word & ~0x1F) | ((word + 1) & 0x1F)) >>> 0 : word;
+});
 console.log(`Assembled ${words.length} instruction words.`);
 function contentFrame(name, text) {
     const api = Buffer.from(JSON.stringify({ name, methods: [] }), 'utf8');
@@ -133,6 +137,8 @@ const FRAME = contentFrame(DOT_NAME, source);
 //   [15:0]  slot    = NS slot index
 //
 const CLIST = [
+    { gt: 0x4A00000A, name: '__SELF__', ns_slot: 10, rights: ['E'],
+      note: 'CapabilityTest frozen resident SELF E Inform GT (NS slot 10)' },
     { gt: 0x4A000006, name: 'SelfTest',   ns_slot: 6, rights: ['E'],
       note: 'SelfTest    Church E-perm Inform GT (NS slot 6)' },
     { gt: 0x32000003, name: 'LED_DEV',    ns_slot: 3, rights: ['R', 'W'],
@@ -148,6 +154,10 @@ const CLIST = [
     { gt: 0x4A000007, name: 'WukongCallHome.hw', ns_slot: 7, rights: ['E'],
       note: 'WukongCallHome.hw Church E-perm Inform GT (NS slot 7)' },
 ];
+// Bootstrap identity serialization is intentionally a direct unsigned-32-bit
+// rendering of c-list row zero.  Do not replace this with a slot projection,
+// identity hash, or portable token.
+const token = CLIST[0].gt.toString(16).padStart(8, '0');
 
 // ── Pack LUMP binary ─────────────────────────────────────────────────────────
 //
@@ -205,7 +215,6 @@ const contentId = crypto.createHash('sha256')
     .update(bytes)
     .digest('hex')
     .slice(0, 8);
-const token = IDENTITY_TOKEN;
 const artifactStem = `${DOT_NAME}.${ISSUE_N}.${contentId}`;
 const filename = `${artifactStem}.lump`;
 const approvalRecord = {
@@ -213,9 +222,8 @@ const approvalRecord = {
     filename,
     dot_name: DOT_NAME,
     issue_n: ISSUE_N,
-    identity_string: IDENTITY_STRING,
-    identity_hash: IDENTITY_HASH,
-    identity_seal_location: 'approval',
+    bootstrap_t: token,
+    bootstrap_runtime_gt: CLIST[0].gt,
     token,
     abstraction: DOT_NAME,
     grants: ['E'],
@@ -238,7 +246,7 @@ if (CHECK_ONLY) {
         failures.push('manifest is missing or invalid');
     }
     if (checkedManifest) {
-        const bindings = checkedManifest.filter(e => e.token === IDENTITY_TOKEN);
+        const bindings = checkedManifest.filter(e => e.token === token);
         if (bindings.length !== 1 ||
             bindings[0].abstraction !== 'CapabilityTest' ||
             bindings[0].filename !== filename) {
@@ -249,11 +257,10 @@ if (CHECK_ONLY) {
         try {
             const state = JSON.parse(fs.readFileSync(NS_STATE, 'utf8'));
             const bindings = (state.abstractions || []).filter(
-                e => e.name === DOT_NAME && e.slot === 10 && e.token === IDENTITY_TOKEN);
+                e => e.name === DOT_NAME && e.slot === 10 && e.token === token);
             if (bindings.length !== 1 ||
                 bindings[0].filename !== filename ||
                 bindings[0].issue_n !== ISSUE_N ||
-                bindings[0].identity_hash !== IDENTITY_HASH ||
                 bindings[0].binary_hash !== binaryHash) {
                 failures.push('Namespace canonical slot-10 binding is stale');
             }
@@ -283,7 +290,19 @@ if (CHECK_ONLY) {
 const manifest = fs.existsSync(MANIFEST)
     ? JSON.parse(fs.readFileSync(MANIFEST, 'utf8'))
     : [];
-const existingIdx = manifest.findIndex(e => e.token === IDENTITY_TOKEN);
+// Resolve the one live record through the resident Namespace binding, rather
+// than selecting the first historical CapabilityTest manifest row.
+let existingIdx = -1;
+if (fs.existsSync(NS_STATE)) {
+    const active = (JSON.parse(fs.readFileSync(NS_STATE, 'utf8')).abstractions || []).find(
+        e => e.name === DOT_NAME && e.slot === 10 && e.resident === true &&
+             e.boot_resident === true);
+    if (active) existingIdx = manifest.findIndex(
+        e => e.token === active.token && e.filename === active.filename);
+}
+if (existingIdx === -1) {
+    throw new Error('ns-state must select exactly one frozen resident CapabilityTest record');
+}
 if (existingIdx !== -1) {
     const oldLumpName = manifest[existingIdx].filename;
     if (oldLumpName && oldLumpName !== filename) {
@@ -329,13 +348,16 @@ console.log(`Updated: ${MANIFEST}`);
 if (fs.existsSync(NS_STATE)) {
     const nsState = JSON.parse(fs.readFileSync(NS_STATE, 'utf8'));
     const bindings = (nsState.abstractions || []).filter(
-        e => e.name === 'CapabilityTest' && e.slot === 10 && e.token === IDENTITY_TOKEN);
+        e => e.name === 'CapabilityTest' && e.slot === 10);
     if (bindings.length !== 1) {
         throw new Error('ns-state must contain exactly one canonical CapabilityTest slot-10 binding');
     }
     bindings[0].filename = filename;
+    bindings[0].token = token;
     bindings[0].issue_n = ISSUE_N;
-    bindings[0].identity_hash = IDENTITY_HASH;
+    bindings[0].ns_slot_policy = 'static';
+    bindings[0].load_policy = 'Resident';
+    delete bindings[0].identity_hash;
     bindings[0].binary_hash = binaryHash;
     fs.writeFileSync(NS_STATE, stableRepositoryJson(nsState));
     console.log(`Updated: ${NS_STATE}`);
