@@ -1999,7 +1999,7 @@ class CLOOMCCompiler {
         // Keep the assembler as the single owner of instruction syntax/encoding,
         // but resolve the convenient two-operand named LOAD form against this
         // abstraction's C-List before handing the statement over.
-        const rawInstruction = /^(LOAD|SAVE|CALL|CHANGE|SWITCH|TPERM|LAMBDA|ELOADCALL|XLOADLAMBDA|DREAD|DWRITE|BFEXT|BFINS|MCMP|IADD|ISUB|BRANCH(?:EQ|NE|CS|CC|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|NV)?|SHL|SHR|ASR|HALT|NOP)\b/i;
+        const rawInstruction = /^(?!CALL\s+\w+\.\w+\s*\()(LOAD|SAVE|CALL|CHANGE|SWITCH|TPERM|LAMBDA|ELOADCALL|XLOADLAMBDA|DREAD|DWRITE|BFEXT|BFINS|MCMP|IADD|ISUB|BRANCH(?:EQ|NE|CS|CC|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|NV)?|SHL|SHR|ASR|HALT|NOP)(?=\s|$)/i;
         if (rawInstruction.test(text)) {
             let asmText = text;
             const namedLoad = text.match(/^LOAD\s+(CR(?:1[0-5]|[0-9]))\s*,\s*([A-Za-z_][A-Za-z0-9_]*)$/i);
@@ -2243,7 +2243,7 @@ class CLOOMCCompiler {
             return;
         }
 
-        const _callRegex = /^(?:(?:var|let|const)\s+)?(?:(\w+)\s*=\s*)?call\s*\(\s*(\w+)\.(\w+)\s*\(\s*(.*?)\s*\)\s*\)$/d;
+        const _callRegex = /^(?:(?:var|let|const)\s+)?(?:(\w+)\s*=\s*)?call\s*\(\s*(\w+)\.(\w+)\s*\(\s*(.*?)\s*\)\s*\)$/di;
         const callMatch = _callRegex.exec(text);
         if (callMatch) {
             const resultVar = callMatch[1] || null;

@@ -3308,8 +3308,9 @@ const TP_INSTR_RSV = ((6 << 27) | (0xE << 23) | (0 << 19) | 11) >>> 0;
     sim.cr[0] = { word0: TP_GT_R_IDX0, word1: 0, word2: 0 };
     // NS entry 0: location = 0xFFFF0000 (near top of 32-bit space), limit = 0x1FFFF (max 17-bit)
     // True sum = 0xFFFF0000 + 0x1FFFF = 0x1000EFFFF > 0xFFFFFFFF → overflow → fail
-    sim.memory[sim.NS_TABLE_BASE + 0] = 0xFFFF0000;
-    sim.memory[sim.NS_TABLE_BASE + 1] = 0x1FFFF;  // max 17-bit limit in bits[16:0]
+    const ns0 = sim._nsSlotBase(0);
+    sim.memory[ns0 + 0] = 0xFFFF0000;
+    sim.memory[ns0 + 1] = 0x1FFFF;  // max 17-bit limit in bits[16:0]
     sim.step();
     assert('TP5 overflow (base+limit > 0xFFFFFFFF): Z=0', sim.flags.Z === false, `Z=${sim.flags.Z}`);
     assert('TP5 overflow (base+limit > 0xFFFFFFFF): N=1', sim.flags.N === true,  `N=${sim.flags.N}`);
