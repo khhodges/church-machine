@@ -20,6 +20,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from unittest.mock import patch
 
 import pytest
@@ -40,8 +41,18 @@ def client(tmp_path, monkeypatch):
     # Keep uploads exercised without depending on a workspace secret.
     monkeypatch.setenv("REPORT_TOKEN", "bitstream-version-test-token")
     app_module.app.config["TESTING"] = True
+    with app_module._wukong_bridge_lock:
+        previous_bridge = dict(app_module._wukong_bridge_info)
+        app_module._wukong_bridge_info = {
+            "device_uid": "download-board",
+            "session_id": "download-session",
+            "updated_ts": time.time(),
+            "state": "connected",
+        }
     with app_module.app.test_client() as c:
         yield c
+    with app_module._wukong_bridge_lock:
+        app_module._wukong_bridge_info = previous_bridge
 
 
 def _write_bit(tmp_path, content=b"\xff\x00BITSTREAM"):
@@ -57,6 +68,20 @@ def _upload(client, version=None, content=b"\xff\x00BITSTREAM"):
         data["version"] = str(version)
     return client.post("/upload/wukong-bit?token=bitstream-version-test-token", data=data,
                        content_type="multipart/form-data")
+
+
+def _exact_download(client, kind="bit"):
+    metadata = client.get("/api/bitstream-status").get_json()["download"][kind]
+    return client.get(
+        f"/dl/wukong-{kind}",
+        query_string={
+            "provenance_identity": metadata["provenance_identity"],
+            "artifact_identity": metadata["provenance_identity"],
+            "sha256": metadata["sha256"],
+            "target_device_uid": "download-board",
+            "target_session_id": "download-session",
+        },
+    )
 
 
 def _select_ui_firmware_display(cases):
@@ -138,7 +163,7 @@ def test_upload_writes_sidecar_and_versioned_download(client, tmp_path):
     assert meta["md5"] == body["md5"]
     assert meta["built_at"]
 
-    dl = client.get("/dl/wukong-bit")
+    dl = _exact_download(client)
     assert dl.status_code == 200
     assert "church_wukong_xc7a100t_v7.bit" in dl.headers["Content-Disposition"]
 
@@ -158,7 +183,7 @@ def test_stale_bit_newer_source_mismatch_and_unversioned_name(client, tmp_path):
     _upload(client, version=7)
     with patch.object(app_module, "_wukong_build_version", return_value=8):
         st = client.get("/api/bitstream-status").get_json()
-        dl = client.get("/dl/wukong-bit")
+        dl = _exact_download(client)
     assert st["source_version"] == 8
     assert st["firmware_version"] == 7
     assert st["version_mismatch"] is True
@@ -183,9 +208,7 @@ def test_missing_sidecar_unversioned_name(client, tmp_path):
     assert st["version_known"] is False
     assert st["version_mismatch"] is True
     assert "unknown" in st["mismatch_message"]
-    cd = dl.headers["Content-Disposition"]
-    assert "church_wukong_xc7a100t.bit" in cd
-    assert "_v" not in cd
+    assert dl.status_code == 409
 
 
 # ---------------------------------------------------------------------------
@@ -202,8 +225,7 @@ def test_tampered_bit_ignores_sidecar(client, tmp_path):
     assert st["firmware_version"] is None
     assert st["version_known"] is False
     assert st["version_mismatch"] is True
-    cd = dl.headers["Content-Disposition"]
-    assert "_v" not in cd
+    assert dl.status_code == 409
 
 
 def test_tampered_bit_ignores_modern_sha256_sidecar(client, tmp_path):
@@ -229,7 +251,7 @@ def test_tampered_bit_ignores_modern_sha256_sidecar(client, tmp_path):
 def test_upload_without_version_is_unversioned_but_trusted(client, tmp_path):
     r = _upload(client)
     assert r.status_code == 200 and r.get_json()["version"] is None
-    dl = client.get("/dl/wukong-bit")
+    dl = _exact_download(client)
     assert "_v" not in dl.headers["Content-Disposition"]
     st = client.get("/api/bitstream-status").get_json()
     assert st["version_known"] is False
@@ -250,10 +272,56 @@ def test_rejected_upload_preserves_previous_bitstream(client, tmp_path):
     assert (tmp_path / BIT_NAME).read_bytes() == good
     st = client.get("/api/bitstream-status").get_json()
     assert st["firmware_version"] == 7 and st["version_known"] is True
-    dl = client.get("/dl/wukong-bit")
+    dl = _exact_download(client)
     assert "church_wukong_xc7a100t_v7.bit" in dl.headers["Content-Disposition"]
     # No temp leftovers
     assert not list(tmp_path.glob("*.uploading*"))
+
+
+def test_exact_download_rejects_selected_a_when_current_artifact_is_b(client):
+    """A URL learned for artifact A cannot download replacement artifact B."""
+    assert _upload(client, version=7, content=b"ARTIFACT A").status_code == 200
+    selected_a = client.get("/api/bitstream-status").get_json()["download"]["bit"]
+    assert _upload(client, version=8, content=b"ARTIFACT B").status_code == 200
+    response = client.get("/dl/wukong-bit", query_string={
+        "provenance_identity": selected_a["provenance_identity"],
+        "sha256": selected_a["sha256"],
+        "target_device_uid": "download-board",
+        "target_session_id": "download-session",
+    })
+    assert response.status_code == 409
+    assert response.get_json()["decision"] == "artifact_mismatch"
+
+
+def test_exact_download_returns_identity_for_bytes_actually_served(client):
+    payload = b"EXACT CURRENT ARTIFACT"
+    assert _upload(client, version=9, content=payload).status_code == 200
+    selected = client.get("/api/bitstream-status").get_json()["download"]["bit"]
+    response = client.get("/dl/wukong-bit", query_string={
+        "provenance_identity": selected["provenance_identity"],
+        "sha256": selected["sha256"],
+        "target_device_uid": "download-board",
+        "target_session_id": "download-session",
+    })
+    assert response.status_code == 200
+    assert response.data == payload
+    assert response.headers["X-Wukong-Provenance-Identity"] == selected[
+        "provenance_identity"]
+    assert response.headers["X-Wukong-Artifact-SHA256"] == selected["sha256"]
+    assert response.headers["X-Wukong-Lifecycle-State"] == "downloaded"
+
+
+def test_exact_download_rejects_wrong_live_target_before_serving(client):
+    assert _upload(client, version=10, content=b"TARGET BOUND").status_code == 200
+    selected = client.get("/api/bitstream-status").get_json()["download"]["bit"]
+    response = client.get("/dl/wukong-bit", query_string={
+        "artifact_identity": selected["provenance_identity"],
+        "sha256": selected["sha256"],
+        "target_device_uid": "other-board",
+        "target_session_id": "download-session",
+    })
+    assert response.status_code == 409
+    assert response.get_json()["decision"] == "target_mismatch"
 
 
 def test_newer_bitstream_than_source_also_warns(client, tmp_path):
@@ -271,9 +339,7 @@ def test_persistent_mcs_download_and_status(client, tmp_path):
     (tmp_path / MCS_NAME).write_bytes(payload)
 
     response = client.get("/dl/wukong-mcs")
-    assert response.status_code == 200
-    assert response.data == payload
-    assert MCS_NAME in response.headers["Content-Disposition"]
+    assert response.status_code == 409
 
     status = client.get("/api/bitstream-status").get_json()
     assert status["mcs_present"] is True
@@ -297,11 +363,11 @@ def test_connect_card_exposes_persistent_mcs_download():
         page = handle.read()
 
     assert 'id="ti60DlMcsBtn"' in page
-    assert 'href="/dl/wukong-mcs"' in page
+    assert 'data-exact-bitstream-download' in page
     assert "Download .mcs (persistent)" in page
     assert "d.mcs_present" in page
     assert "automatic boot after reset" in page
-    assert 'href="/dl/wukong-bit"' in page
+    assert "'/dl/wukong-bit?provenance_identity='" in page
     assert "/dl/wukong-v17-" not in page
     assert "versionSuffix = d.version_known" in page
     assert 'id="ti60DlBridgeBtn"' in page

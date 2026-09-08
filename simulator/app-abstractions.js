@@ -569,6 +569,9 @@ function _syncSelfTestNextGtToBootEntry(targetSlot) {
 
 
 function setBootEntrySlot(idx, ev) {
+    // Modifiers do not change destination.  Keep the event argument only for
+    // inline-call compatibility; minimal synthetic events need no DOM methods.
+    if (!window.TargetState.authorize('simulator', { id: 'boot-entry-selection' }).ok) return;
     idx = Math.max(0, Math.min(255, Math.trunc(Number(idx)) || 0));
     bootEntrySlot = idx;
     localStorage.setItem('bootEntrySlot', String(idx));

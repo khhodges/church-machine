@@ -498,7 +498,7 @@ def test_fault_recovery_authorizes_after_snapshot_then_rearms_at_sentinel(monkey
     """Promotion authorizes one recovery and a full sentinel re-arms the next."""
     posts = []
 
-    def fake_post(url, json=None, timeout=None, verify=None):
+    def fake_post(url, json=None, headers=None, timeout=None, verify=None):
         posts.append((url, json))
         if url.endswith('/recovery-authorization'):
             return _FakeResponse(reply={

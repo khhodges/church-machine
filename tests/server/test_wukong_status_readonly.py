@@ -22,6 +22,7 @@ import json
 import os
 import sys
 import time
+import hashlib
 
 import pytest
 
@@ -31,6 +32,9 @@ if ROOT not in sys.path:
 
 import server.app as _app_module
 from server.app import app
+
+TARGET_DEVICE_UID = 'status-readonly-board'
+TARGET_SESSION_ID = 'status-readonly-session'
 
 
 # ---------------------------------------------------------------------------
@@ -55,8 +59,30 @@ def _reset_wukong_state():
         _app_module._upload_in_flight = False
     with _app_module._wukong_boot_info_lock:
         _app_module._wukong_boot_info = {}
+    with _app_module._wukong_bridge_lock:
+        _app_module._wukong_bridge_info.clear()
     _app_module._wukong_last_bridge_poll = 0.0
     _app_module._wukong_last_trace_post  = 0.0
+
+
+def _target():
+    return {
+        'target_device_uid': TARGET_DEVICE_UID,
+        'target_session_id': TARGET_SESSION_ID,
+    }
+
+
+def _command(client, data):
+    payload = dict(data)
+    payload.update(_target())
+    return client.post('/hardware/wukong/command', json=payload)
+
+
+def _bridge_poll(client):
+    return client.get('/hardware/wukong/command', headers={
+        'X-Wukong-Session': TARGET_SESSION_ID,
+        'X-Wukong-Device-UID': TARGET_DEVICE_UID,
+    })
 
 
 def _post_trace(client, ev_type=0x00, payload_gt=0, nia=0x10):
@@ -82,6 +108,12 @@ def client():
     app.config['TESTING'] = True
     _reset_wukong_state()
     with app.test_client() as c:
+        established = c.post('/hardware/wukong/bridge-status', json={
+            'device_uid': TARGET_DEVICE_UID,
+            'session_id': TARGET_SESSION_ID,
+            'state': 'connected',
+        })
+        assert established.status_code == 200
         yield c
     _reset_wukong_state()
 
@@ -93,30 +125,39 @@ def client():
 class TestStatusDoesNotConsume:
     def test_pending_command_survives_repeated_status_polls(self, client):
         """GET /status many times must NOT dequeue the pending command."""
-        r = client.post('/hardware/wukong/command',
-                        data=json.dumps({'cmd': 's'}),
-                        content_type='application/json')
+        r = _command(client, {'cmd': 's'})
         assert r.status_code == 200
 
         for _ in range(10):
             data = _status(client)
-            assert data['pending_command'] == {'cmd': 's', 'id': 1}, (
+            assert data['pending_command'] == {
+                'cmd': 's', 'id': 1,
+                'device_uid': TARGET_DEVICE_UID,
+                'bridge_session': TARGET_SESSION_ID,
+                'target_device_uid': TARGET_DEVICE_UID,
+            }, (
                 'status poll consumed or altered the pending command'
             )
 
         # The bridge (GET /command) must still receive the command afterwards.
-        cmd = client.get('/hardware/wukong/command').get_json()
+        cmd = _bridge_poll(client).get_json()
         assert cmd.get('cmd') == 's', (
             'pending command lost before the bridge could dequeue it'
         )
+        assert cmd['target_device_uid'] == TARGET_DEVICE_UID
+        assert cmd['bridge_session'] == TARGET_SESSION_ID
 
     def test_pending_upload_command_survives_and_data_not_leaked(self, client):
         """A queued 'u' upload command must survive status polls, and the
         status response must summarize (not embed) the base64 payload."""
         payload = 'QUJDREVGRw=='  # base64('ABCDEFG')
-        r = client.post('/hardware/wukong/command',
-                        data=json.dumps({'cmd': 'u', 'data': payload}),
-                        content_type='application/json')
+        artifact = b'ABCDEFG'
+        r = _command(client, {
+            'cmd': 'u', 'data': payload,
+            'artifact_sha256': hashlib.sha256(artifact).hexdigest(),
+            'artifact_size': len(artifact),
+            'artifact_identity': 'status-readonly-upload',
+        })
         assert r.status_code == 200
 
         for _ in range(5):
@@ -125,17 +166,17 @@ class TestStatusDoesNotConsume:
                                                'data_bytes': len(payload)}
             assert data['upload_in_flight'] is True
 
-        cmd = client.get('/hardware/wukong/command').get_json()
+        cmd = _bridge_poll(client).get_json()
         assert cmd.get('cmd') == 'u'
         assert cmd.get('data') == payload, 'upload payload corrupted'
+        assert cmd['target_device_uid'] == TARGET_DEVICE_UID
+        assert cmd['bridge_session'] == TARGET_SESSION_ID
 
     def test_non_string_upload_data_rejected_and_status_stays_200(self, client):
         """POST 'u' with non-string data must be rejected (400), and even if a
         malformed pending command somehow exists, /status must stay a 200
         read-only snapshot (never a 500 TypeError)."""
-        r = client.post('/hardware/wukong/command',
-                        data=json.dumps({'cmd': 'u', 'data': 1}),
-                        content_type='application/json')
+        r = _command(client, {'cmd': 'u', 'data': 1})
         assert r.status_code == 400, 'non-string upload data must be rejected'
 
         # Belt-and-braces: seed a malformed pending command directly.
@@ -149,16 +190,43 @@ class TestStatusDoesNotConsume:
 
     def test_upload_ack_survives_repeated_status_polls(self, client):
         """GET /status must NOT consume the upload-ack result."""
-        client.post('/hardware/wukong/upload-ack',
-                    data=json.dumps({'ok': True}),
-                    content_type='application/json')
+        artifact = b'ack-payload'
+        digest = hashlib.sha256(artifact).hexdigest()
+        queued = _command(client, {
+            'cmd': 'u', 'data': 'YWNrLXBheWxvYWQ=',
+            'artifact_sha256': digest,
+            'artifact_size': len(artifact),
+            'artifact_identity': 'status-readonly-ack',
+        })
+        assert queued.status_code == 200
+        command_id = queued.get_json()['id']
+        consumed = _bridge_poll(client).get_json()
+        assert consumed['id'] == command_id
+        assert consumed['target_device_uid'] == TARGET_DEVICE_UID
+        assert consumed['bridge_session'] == TARGET_SESSION_ID
+        acknowledged = client.post('/hardware/wukong/upload-ack', json={
+            'id': command_id, 'ok': True,
+            'target_device_uid': TARGET_DEVICE_UID,
+            'session_id': TARGET_SESSION_ID,
+            'artifact_sha256': digest,
+            'artifact_size': len(artifact),
+            'artifact_identity': 'status-readonly-ack',
+        })
+        assert acknowledged.status_code == 200
 
         for _ in range(10):
             _status(client)
 
         # The IDE's dedicated poll must still see (and consume) the ack.
         ack = client.get('/hardware/wukong/upload-ack').get_json()
-        assert ack == {'ok': True, 'error': ''}, (
+        assert ack == {
+            'ok': True, 'error': '', 'id': command_id,
+            'target_device_uid': TARGET_DEVICE_UID,
+            'session_id': TARGET_SESSION_ID,
+            'artifact_sha256': digest,
+            'artifact_size': len(artifact),
+            'artifact_identity': 'status-readonly-ack',
+        }, (
             'upload-ack was consumed by a status poll before the IDE saw it'
         )
         # And exactly once — the second dedicated GET consumes it.
@@ -202,9 +270,7 @@ class TestStatusDoesNotConsume:
         for _ in range(5):
             assert _status(client)['upload_in_flight'] is True
 
-        r = client.post('/hardware/wukong/command',
-                        data=json.dumps({'cmd': 's'}),
-                        content_type='application/json')
+        r = _command(client, {'cmd': 's'})
         assert r.status_code == 409, (
             'execution command accepted mid-upload after status polls — '
             'status endpoint must not clear _upload_in_flight'
@@ -244,7 +310,7 @@ class TestHeartbeatAges:
         assert data['bridge_connected'] is False
 
     def test_bridge_poll_age_fresh_after_command_get(self, client):
-        client.get('/hardware/wukong/command')
+        _bridge_poll(client)
         data = _status(client)
         assert data['bridge_poll_age'] is not None
         assert 0 <= data['bridge_poll_age'] < 3.0
@@ -270,7 +336,7 @@ class TestHeartbeatAges:
         assert stale['last_trace_age'] > 90
         assert stale['bridge_connected'] is False
 
-        client.get('/hardware/wukong/command')  # fresh bridge poll
+        _bridge_poll(client)  # fresh bridge poll
         _post_trace(client)                     # fresh trace
 
         fresh = _status(client)
@@ -280,7 +346,7 @@ class TestHeartbeatAges:
 
     def test_ages_grow_between_polls(self, client):
         """With no new bridge activity, the reported age increases."""
-        client.get('/hardware/wukong/command')
+        _bridge_poll(client)
         a1 = _status(client)['bridge_poll_age']
         time.sleep(0.05)
         a2 = _status(client)['bridge_poll_age']

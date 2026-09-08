@@ -20,6 +20,8 @@ import json
 import os
 import sys
 import time
+import base64
+import hashlib
 
 import pytest
 
@@ -46,6 +48,9 @@ def _reset_state():
         _app_module._wukong_cmd_delivery = None
         _app_module._wukong_cmd_id = 0
         _app_module._wukong_run_unlocked = True
+        _app_module._wukong_runtime_identity = {
+            'device_uid': 'board-a', 'session_id': 'bridge-a',
+        }
         _app_module._wukong_step_write_trace_seq = None
         _app_module._wukong_step_bridge_session = ''
         _app_module._wukong_bridge_trace_highwater.clear()
@@ -73,15 +78,41 @@ def client():
     app.config['TESTING'] = True
     _reset_state()
     with app.test_client() as c:
+        # All lifecycle requests model one explicitly selected live board.
+        # Individual tests can still override either header to exercise a
+        # mismatch; no test relies on inferred hardware targeting.
+        c.environ_base['HTTP_X_WUKONG_SESSION'] = 'bridge-a'
+        c.environ_base['HTTP_X_WUKONG_DEVICE_UID'] = 'board-a'
+        assert c.post('/hardware/wukong/bridge-status', json={
+            'session_id': 'bridge-a', 'device_uid': 'board-a',
+            'event': 'session_started', 'state': 'connected',
+        }).status_code == 200
+        with _app_module._wukong_command_lock:
+            _app_module._wukong_run_unlocked = True
+            _app_module._wukong_runtime_identity = {
+                'device_uid': 'board-a', 'session_id': 'bridge-a',
+            }
         yield c
     _reset_state()
 
 
 def _post_cmd(client, cmd, **extra):
-    body = {'cmd': cmd}
+    body = {
+        'cmd': cmd, 'target_device_uid': 'board-a',
+        'target_session_id': str(
+            _app_module._wukong_bridge_info.get('session_id', 'bridge-a')),
+    }
     body.update(extra)
+    if cmd == 'u':
+        raw = base64.b64decode(body['data'])
+        body.setdefault('artifact_sha256', hashlib.sha256(raw).hexdigest())
+        body.setdefault('artifact_size', len(raw))
+        body.setdefault('artifact_identity', 'legacy-test-upload')
+    token = os.environ.get('REPORT_TOKEN', '')
+    headers = {'Authorization': f'Bearer {token}'} if token else {}
     return client.post('/hardware/wukong/command',
-                       data=json.dumps(body), content_type='application/json')
+                       data=json.dumps(body), content_type='application/json',
+                       headers=headers)
 
 
 def _status(client):
@@ -92,7 +123,14 @@ def _status(client):
 
 def _ack(client, cmd, cmd_id, ok, error='', session_id='', trace_counter=None,
          state_counter=None):
-    body = {'cmd': cmd, 'id': cmd_id, 'ok': ok}
+    body = {
+        'cmd': cmd, 'id': cmd_id, 'ok': ok,
+        'target_device_uid': 'board-a',
+    }
+    if not session_id:
+        session_id = str(
+            (_app_module._wukong_cmd_delivery or {}).get(
+                'target_session_id', 'bridge-a'))
     if error:
         body['error'] = error
     if session_id:
@@ -101,22 +139,30 @@ def _ack(client, cmd, cmd_id, ok, error='', session_id='', trace_counter=None,
         body['trace_counter'] = trace_counter
     if state_counter is not None:
         body['state_counter'] = state_counter
+    token = os.environ.get('REPORT_TOKEN', '')
+    headers = {'Authorization': f'Bearer {token}'} if token else {}
     return client.post('/hardware/wukong/command-ack',
-                       data=json.dumps(body), content_type='application/json')
+                       data=json.dumps(body), content_type='application/json',
+                       headers=headers)
 
 
 def _trace(client, session_id, counter):
+    token = os.environ.get('REPORT_TOKEN', '')
+    headers = {'Authorization': f'Bearer {token}'} if token else {}
     return client.post('/hardware/wukong/trace', data=json.dumps({
         'nia': 0x140, 'ev_type': 0, 'payload_gt': 0, 'flags': 0,
         'fault_code': 0, 'fault_valid': False, 'bp_hit': False,
         'ts': time.time(), 'bridge_session': session_id,
         'bridge_trace_counter': counter,
-    }), content_type='application/json')
+    }), content_type='application/json', headers=headers)
 
 
 def _bridge_status(client, **body):
+    token = os.environ.get('REPORT_TOKEN', '')
+    headers = {'Authorization': f'Bearer {token}'} if token else {}
     return client.post('/hardware/wukong/bridge-status',
-                       data=json.dumps(body), content_type='application/json')
+                       data=json.dumps(body), content_type='application/json',
+                       headers=headers)
 
 
 def _halt_state(client, command_id, session='bridge-a',
@@ -333,7 +379,11 @@ class TestQueueConsumeAckLifecycle:
         assert response.status_code == 200
         old_ts = _status(client)['boot_info']['received_ts']
         qid = _post_cmd(client, 'f').get_json()['id']
-        client.get('/hardware/wukong/command')
+        client.get('/hardware/wukong/command', headers={
+            'X-Wukong-Session': 'test-session',
+            'X-Wukong-Device-UID': 'board-a',
+            'Authorization': 'Bearer bridge-report-secret',
+        })
         time.sleep(0.01)
         _ack(client, 'f', qid, True)
         d = _status(client)['command_delivery']
@@ -740,13 +790,17 @@ class TestTestingOnlySkipFault:
         self._seed_fault(promoted=True, matching=False)
         assert _post_cmd(client, 'k').status_code == 409
 
-    def test_skip_accepts_exact_promoted_live_incident_and_ack_clears_live_only(self, client):
+    def test_skip_accepts_exact_promoted_live_incident_and_ack_clears_live_only(
+            self, client, monkeypatch):
+        monkeypatch.setenv('REPORT_TOKEN', 'report-secret')
         incident = self._seed_fault()
         queued = _post_cmd(client, 'k')
         assert queued.status_code == 200
         cmd_id = queued.get_json()['id']
         assert _status(client)['skip_fault_available'] is True
-        got = client.get('/hardware/wukong/command').get_json()
+        got = client.get('/hardware/wukong/command', headers={
+            'Authorization': 'Bearer report-secret',
+        }).get_json()
         assert got['cmd'] == 'k' and got['incident_id'] == incident
         assert _ack(client, 'k', cmd_id, True, session_id='bridge-a',
                     state_counter=7).status_code == 200
@@ -801,7 +855,10 @@ class TestTestingOnlySkipFault:
         incident = self._seed_fault()
         cmd_id = _post_cmd(client, 'k').get_json()['id']
         client.get('/hardware/wukong/command',
-                   headers={'X-Wukong-Session': 'bridge-a'})
+                   headers={
+                       'X-Wukong-Session': 'bridge-a',
+                       'Authorization': 'Bearer report-secret',
+                   })
         _ack(client, 'k', cmd_id, True, session_id='bridge-a',
              state_counter=7)
         body = {
@@ -838,12 +895,16 @@ class TestTestingOnlySkipFault:
                    headers={'X-Wukong-Session': 'bridge-a'})
         _ack(client, 'k', cmd_id, True, session_id='bridge-a',
              state_counter=2)
-        _bridge_status(client, session_id='bridge-b', event='reconnect_attempt',
-                       state='reconnecting')
+        _bridge_status(client, session_id='bridge-b', device_uid='board-a',
+                       event='reconnect_attempt', state='reconnecting')
         status = _status(client)
         assert status['skip_fault']['state'] == 'indeterminate'
         assert status['skip_fault']['action'] == 'Reboot required'
         assert _post_cmd(client, 'k').status_code == 409
+        # The selected physical board must become live again before its
+        # explicitly targeted reboot can be admitted.
+        _bridge_status(client, session_id='bridge-b', device_uid='board-a',
+                       event='reconnected', state='connected')
         reboot_id = _post_cmd(client, 'f').get_json()['id']
         client.get('/hardware/wukong/command',
                    headers={'X-Wukong-Session': 'bridge-b'})

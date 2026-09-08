@@ -131,6 +131,52 @@ const BuildApprovalView = {
         return value !== null && typeof value === 'object' && !Array.isArray(value);
     },
 
+    async downloadExactBitstream(event, link) {
+        if (event) event.preventDefault();
+        if (!link) return false;
+        const identity = link.dataset.buildId || '';
+        const digest = (link.dataset.sha256 || '').toLowerCase();
+        const auth = window.TargetState.authorize('bitstream', { id: identity });
+        if (!auth.ok) return false;
+        if (!/^[0-9a-f]{64}$/.test(digest)) {
+            if (typeof appendOutput === 'function') {
+                appendOutput('Bitstream download blocked: exact artifact SHA-256 is unavailable.', 'error');
+            }
+            return false;
+        }
+        const url = new URL(link.getAttribute('href'), window.location.origin);
+        url.searchParams.set('artifact_identity', identity);
+        url.searchParams.set('sha256', digest);
+        url.searchParams.set('target_device_uid', auth.target.deviceUid);
+        url.searchParams.set('target_session_id', auth.target.liveSessionId);
+        let response;
+        try {
+            response = await fetch(url.toString(), { cache: 'no-store' });
+        } catch (error) {
+            if (typeof appendOutput === 'function') appendOutput(
+                'Bitstream download failed: ' + error.message, 'error');
+            return false;
+        }
+        if (!response.ok ||
+                response.headers.get('X-Wukong-Provenance-Identity') !== identity ||
+                response.headers.get('X-Wukong-Artifact-SHA256') !== digest) {
+            if (typeof appendOutput === 'function') appendOutput(
+                'Bitstream download blocked: server target/artifact correlation failed.', 'error');
+            return false;
+        }
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const save = document.createElement('a');
+        save.href = objectUrl;
+        save.download = link.download || 'wukong-artifact.bin';
+        document.body.appendChild(save);
+        save.click();
+        save.remove();
+        URL.revokeObjectURL(objectUrl);
+        window.TargetState.observeBitstreamLifecycle({ downloadedId: identity });
+        return true;
+    },
+
     _approvalContractError(message) {
         const error = new Error(message);
         error.code = 'BUILD_APPROVAL_CONTRACT';
@@ -722,14 +768,35 @@ const BuildApprovalView = {
             const data = await res.json();
             if (data.filename) {
                 const status = document.getElementById('baSnapshotStatus');
+                const provenance = data.provenance_identity || data.build_intent_id || '';
+                // This server-issued immutable snapshot identity is the only
+                // valid bitstream selection. A CSRF nonce is intentionally
+                // kept separate and is never displayed as a build identity.
+                if (provenance) {
+                    this._provenanceIdentity = provenance;
+                    const choices = document.getElementById('programmingProvenanceOptions');
+                    if (choices && !Array.from(choices.options).some(o => o.value === provenance)) {
+                        const option = document.createElement('option');
+                        option.value = provenance;
+                        option.label = 'Frozen approval provenance';
+                        choices.appendChild(option);
+                    }
+                }
                 if (status && !this._snapFrozen) {
-                    status.textContent = 'Latest snapshot: ' + data.filename + ' (' + (data.frozen_at || '') + ')';
+                    status.textContent = 'Latest snapshot: ' + data.filename + ' (' + (data.frozen_at || '') + ')' +
+                        (provenance ? ' · provenance: ' + provenance : '');
                 }
             }
         } catch (_) { /* ignore */ }
     },
 
     async startBuild() {
+        // build_nonce is CSRF protection, never an artifact identity.  The
+        // programmer selects a server-published provenance identity.
+        const targetBuild = window.TargetState.resolve().buildId || '';
+        const targetAuthorization = window.TargetState.authorize(
+            'bitstream', { id: targetBuild });
+        if (!targetAuthorization.ok) return;
         const btn = document.getElementById('baApproveBtn');
         if (btn) btn.disabled = true;
         this._buildRunning = true;
@@ -744,7 +811,7 @@ const BuildApprovalView = {
             const res = await fetch('/api/wukong-build/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
-                body: JSON.stringify({ build_nonce: this._buildNonce || '' }),
+                body: JSON.stringify(Object.assign({ build_nonce: this._buildNonce || '' }, targetAuthorization.request)),
             });
             const data = await res.json();
             if (!res.ok || !data.ok) throw new Error(data.error || 'HTTP ' + res.status);
@@ -804,6 +871,9 @@ const BuildApprovalView = {
                 this._buildRunning = false;
                 this._lastLogLen = 0;
                 const ok = data.exit_code === 0;
+                if (ok && data.provenance_identity) {
+                    window.TargetState.observeBitstreamLifecycle({ generatedId: data.provenance_identity });
+                }
                 if (statusEl) {
                     const d = data.diagnosis;
                     statusEl.textContent = ok ? '✅ Build complete!' :
@@ -820,3 +890,8 @@ const BuildApprovalView = {
     },
 };
 window.BuildApprovalView = BuildApprovalView;
+document.addEventListener('click', function(event) {
+    const link = event.target && event.target.closest
+        ? event.target.closest('[data-exact-bitstream-download]') : null;
+    if (link) return BuildApprovalView.downloadExactBitstream(event, link);
+});

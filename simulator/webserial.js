@@ -61,6 +61,19 @@ const TangSerial = (function() {
         return port !== null && port.readable !== null && port.writable !== null;
     }
 
+    // WebSerial is a physical transport, not an alternate authority path.
+    // Keep this check at the transport boundary as well as at UI call sites so
+    // a console invocation cannot bypass the programmer's selected target.
+    function _authorizePhysicalRuntime(operation) {
+        // The legacy UART framing has no command that proves a device UID or
+        // transport session. A globally observed bridge board therefore cannot
+        // authorize an independently opened browser serial port.
+        throw new Error(
+            'Direct WebSerial ' + operation + ' blocked: this UART protocol cannot verify ' +
+            'the exact device UID/session. Use the selected live Wukong bridge/server Runtime Upload path.'
+        );
+    }
+
     async function ensureOpen() {
         if (_bridgeMode) {
             if (!_bridgeOpen) throw new Error('Bridge not connected. Call connectBridge() first.');
@@ -336,6 +349,7 @@ const TangSerial = (function() {
 
     async function uploadToFPGA(nsWords, clistWords, onStatus) {
         const status = onStatus || function() {};
+        _authorizePhysicalRuntime('upload');
 
         if (!isConnected()) {
             throw new Error(`Not connected. Call connect() first — make sure your ${_boardLabel} is plugged in via USB.`);
@@ -444,6 +458,7 @@ const TangSerial = (function() {
 
     async function patchLump(baseAddr, words, onStatus) {
         var status = onStatus || function() {};
+        _authorizePhysicalRuntime('patch');
 
         if (!isConnected()) {
             throw new Error('Not connected. Call connect() first.');
@@ -575,6 +590,7 @@ const TangSerial = (function() {
 
     async function readBRAM(baseAddr, count, onStatus) {
         const status = onStatus || function() {};
+        _authorizePhysicalRuntime('readback');
         await ensureOpen();
 
         await drainInput();
@@ -650,6 +666,7 @@ const TangSerial = (function() {
 
     async function runFPGA(onStatus) {
         const status = onStatus || function() {};
+        _authorizePhysicalRuntime('run');
         if (!isConnected()) {
             throw new Error('Not connected. Call connect() first.');
         }

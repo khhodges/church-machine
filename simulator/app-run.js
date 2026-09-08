@@ -820,6 +820,7 @@ function _bootNIARows(bootStep) {
 }
 
 function stepSim() {
+    if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
     // A configured boot prefetch is part of startup, not an ordinary lazy-load
     // pause. Never execute user code while its ordered downloads are pending.
     if (sim.bootComplete && sim._bootPrefetchPromise) {
@@ -1641,6 +1642,7 @@ function _applyPendingSimLoad() {
 }
 
 function runSimGo() {
+    if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
     // Guard: if a run batch loop is already active (either mid-batch where
     // sim.running is true, or between setTimeout(runBatch) ticks where
     // sim.running has temporarily returned to false), do nothing.
@@ -2402,6 +2404,7 @@ async function _startBootLumpPrefetch() {
 }
 
 function runSim() {
+    if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
     // Redirect boot to the canonical resident slot (_bootAbstrSlot, always slot 6 =
     // SelfTest) so B:05 INIT_ABSTR never tries mLoad on the user-selected slot (which
     // may be the gap slot with limit17=0 after a Tier-3 fault-recovery reset clears
@@ -4109,6 +4112,16 @@ function faultModalClearAndDismiss() {
 }
 
 function faultModalRetryDownload() {
+    const retryTarget = window.TargetState.resolve();
+    if (retryTarget.mode === window.TargetState.MODES.RUNTIME) {
+        // A runtime retry must be a new, correlated upload to the exact live
+        // Wukong selected by the programmer; never replay local simulator RAM.
+        faultModalDismiss();
+        _wukongLoadToHardware();
+        return;
+    }
+    if (retryTarget.mode !== window.TargetState.MODES.SIMULATOR ||
+        !window.TargetState.authorize('simulator', { id: 'lazy-lump-retry' }).ok) return;
     faultModalDismiss();
     // Prefer the live awaitingLump; fall back to the snapshot taken when the modal opened.
     const al = (sim.awaitingLump && sim.awaitingLump.token != null) ? sim.awaitingLump : _lastRetryLump;
@@ -4500,6 +4513,7 @@ function runLazyLoadTest() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function resetSim() {
+    if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
     // Skip dashboard redirect when a startup default view is pending —
     // slowBoot() will navigate there after boot completes.
     // Search: _startupDefaultView
@@ -15298,6 +15312,16 @@ async function uploadToTang() {
     const boardLabel = getBoardLabel(board);
     const isTi60Board = board === 'ti60-f225';
 
+    if (board === 'wukong-xc7a100t') {
+        con.textContent = 'Routing Wukong runtime upload through the selected live bridge/server target…\n';
+        await _wukongLoadToHardware();
+        return;
+    }
+    con.textContent =
+        'Direct WebSerial deployment blocked: this UART protocol cannot verify the exact ' +
+        'device UID/session. Select a live Wukong and use Runtime Upload through its bridge/server path.\n';
+    return;
+
     if (typeof TangSerial === 'undefined') {
         con.textContent = 'Error: WebSerial module not loaded (webserial.js missing)';
         return;
@@ -18586,6 +18610,7 @@ setInterval(async function _wukongPoll() {
     // Detect disconnection: connection was live but now the last-packet timestamp
     // is older than _WUKONG_STALE_MS.  Log once and update the toolbar button.
     if (_pollWasConnected && !_wukongIsConnected()) {
+        window.TargetState.observeDevice({ connected: false });
         const _dcon = document.getElementById('editorConsole');
         if (_dcon) {
             const _dl = document.createElement('div');
@@ -18606,6 +18631,18 @@ setInterval(async function _wukongPoll() {
         const bi = await fetch('/hardware/wukong/boot-info');
         if (!bi.ok) return;
         const bdata = await bi.json();
+        if (bdata && (bdata.device_uid || bdata.uid)) {
+            window.TargetState.observeDevice({
+                uid: bdata.device_uid || bdata.uid,
+                connected: _wukongIsConnected(),
+                sessionId: bdata.session_id || null,
+                // build_version is the board's own boot report. Do not infer a
+                // provenance identity when firmware cannot report one.
+                runningBuildId: bdata.bitstream_build_id || bdata.build_id ||
+                    bdata.bitstream_id || (bdata.build_version != null
+                        ? 'firmware-v' + bdata.build_version : null)
+            });
+        }
         if (bdata && bdata.received_ts &&
                 bdata.received_ts !== _wukongStartupTs) {
             _wukongStartupTs = bdata.received_ts;
@@ -19069,18 +19106,26 @@ const _wukongCmdWatches = new Set();
 // success, or null after logging the failure.
 async function _wukongPostCmd(cmd, extra, label) {
     label = label || ("'" + cmd + "'");
+    const artifactId = 'wukong-command:' + cmd;
+    const targetAuthorization = window.TargetState.authorize('runtime', { id: artifactId });
+    if (!targetAuthorization.ok) return null;
     const priorityStop = cmd === 'h';
     if (_wukongCmdBusy && !priorityStop) {
         _wukongCmdLog(label + ': another board command is still awaiting ' +
                       'delivery confirmation \u2014 try again in a moment');
         return null;
     }
-    const body = Object.assign({cmd: cmd}, extra || {});
+    const body = Object.assign(
+        {cmd: cmd},
+        targetAuthorization.request,
+        extra || {});
     let resp, d = null;
     try {
         resp = await fetch('/hardware/wukong/command', {
             method : 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: Object.assign({'Content-Type': 'application/json'},
+                (window.BuildApprovalView && window.BuildApprovalView._authHeaders
+                    ? window.BuildApprovalView._authHeaders() : {})),
             body   : JSON.stringify(body)
         });
         try { d = await resp.json(); } catch(e) {}
@@ -19372,7 +19417,11 @@ function _hwStopShortcutHandler(e) {
 }
 window._hwStopShortcutHandler = _hwStopShortcutHandler;
 
-async function _wukongLoadToHardware() {
+async function _wukongLoadToHardware(exactSourceImage) {
+    const _entryForTarget = (typeof sim !== 'undefined' && sim && sim.bootEntrySlot != null)
+        ? sim.bootEntrySlot : 6;
+    const _targetAuthorization = window.TargetState.authorizeDestination('runtime');
+    if (!_targetAuthorization.ok) return false;
     const loadBtn = document.getElementById('toolHWLoadBtn');
     if (loadBtn) {
         loadBtn.disabled = true;
@@ -19408,27 +19457,51 @@ async function _wukongLoadToHardware() {
         let entrySel = (typeof sim !== 'undefined' && sim && sim.bootEntrySlot != null)
             ? sim.bootEntrySlot
             : ((typeof bootEntrySlot !== 'undefined' && bootEntrySlot != null) ? bootEntrySlot : 6);
-        _loadLog('Generating boot image (\u26A1 entry slot ' + entrySel + ')\u2026');
-        const genResp = await fetch('/api/boot-image/generate', {
-            method : 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body   : JSON.stringify({entrySlot: entrySel, forHardware: true})
-        });
-        if (!genResp.ok) {
-            const err = await genResp.json().catch(function() { return {}; });
-            _loadLog('ERROR: generate failed \u2014 ' + (err.error || genResp.status));
-            return _loadDone(false);
+        let exactPayload = {};
+        if (exactSourceImage) {
+            const bytes = exactSourceImage instanceof Uint8Array
+                ? exactSourceImage : new Uint8Array(exactSourceImage);
+            const digestBytes = await crypto.subtle.digest('SHA-256', bytes);
+            const digest = Array.from(new Uint8Array(digestBytes))
+                .map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+            let binary = '';
+            for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+                binary += String.fromCharCode.apply(null, bytes.subarray(offset, offset + 0x8000));
+            }
+            exactPayload = {
+                source_image_base64: btoa(binary),
+                source_sha256: digest,
+                source_size: bytes.length,
+                source_identity: 'church-simulator-memory-v1:' + digest
+            };
+            _loadLog('Materialized exact edited runtime image (' + bytes.length +
+                ' bytes, sha256 ' + digest.slice(0, 12) + '\u2026).');
+        } else {
+            _loadLog('Generating boot image (\u26A1 entry slot ' + entrySel + ')\u2026');
+            const genResp = await fetch('/api/boot-image/generate', {
+                method : 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body   : JSON.stringify(Object.assign({entrySlot: entrySel, forHardware: true},
+                    _targetAuthorization.request))
+            });
+            if (!genResp.ok) {
+                const err = await genResp.json().catch(function() { return {}; });
+                _loadLog('ERROR: generate failed \u2014 ' + (err.error || genResp.status));
+                return _loadDone(false);
+            }
+            const genData = await genResp.json().catch(function() { return {}; });
+            const genWarnings = Array.isArray(genData && genData.warnings) ? genData.warnings : [];
+            genWarnings.forEach(function(w) { _loadLog('\u26A0\uFE0F ns_slot drift: ' + w); });
         }
-        const genData = await genResp.json().catch(function() { return {}; });
-        const genWarnings = Array.isArray(genData && genData.warnings) ? genData.warnings : [];
-        genWarnings.forEach(function(w) { _loadLog('\u26A0\uFE0F ns_slot drift: ' + w); });
 
         // Step 2: enqueue upload command for the bridge.
         _loadLog('Queuing upload to bridge\u2026');
         const sendResp = await fetch('/api/boot-image/send-to-hardware', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({})
+            headers: Object.assign({'Content-Type': 'application/json'},
+                (window.BuildApprovalView && window.BuildApprovalView._authHeaders
+                    ? window.BuildApprovalView._authHeaders() : {})),
+            body: JSON.stringify(Object.assign({}, _targetAuthorization.request, exactPayload))
         });
         if (!sendResp.ok) {
             const err = await sendResp.json().catch(function() { return {}; });
@@ -19442,6 +19515,11 @@ async function _wukongLoadToHardware() {
             }
         }
         const sendData = await sendResp.json().catch(function() { return {}; });
+        if (!sendData.artifact_identity || !sendData.artifact_sha256 ||
+                !Number.isInteger(Number(sendData.size)) || Number(sendData.size) <= 0) {
+            _loadLog('ERROR: queue response omitted exact upload digest, size, or artifact identity');
+            return _loadDone(false);
+        }
         _loadLog('Upload queued (' + (sendData.size || '?') + ' bytes) \u2014 waiting for bridge\u2026');
 
         // Step 3: poll upload-ack until done (up to 30 s).
@@ -19455,7 +19533,24 @@ async function _wukongLoadToHardware() {
                     const ackData = await ackResp.json();
                     if (ackData && typeof ackData.ok === 'boolean') {
                         if (ackData.ok) {
+                            const correlated =
+                                Number(ackData.id) === Number(sendData.id) &&
+                                ackData.target_device_uid === sendData.target_device_uid &&
+                                ackData.session_id === _targetAuthorization.target.liveSessionId &&
+                                ackData.artifact_sha256 === sendData.artifact_sha256 &&
+                                Number(ackData.artifact_size) === Number(sendData.size) &&
+                                ackData.artifact_identity === sendData.artifact_identity;
+                            if (!correlated) {
+                                _loadLog('ERROR: upload ACK did not match the exact target session, digest, size, and artifact identity');
+                                return _loadDone(false);
+                            }
                             ackOk = true;
+                            window.TargetState.observeRuntimeUpload({
+                                acknowledged: true, ok: true,
+                                deviceUid: ackData.target_device_uid || sendData.target_device_uid,
+                                sessionId: ackData.session_id || sendData.target_session_id,
+                                artifactId: ackData.artifact_identity || sendData.artifact_identity
+                            });
                         } else {
                             _loadLog('ERROR: bridge upload failed \u2014 ' +
                                 (ackData.error || 'unknown error'));

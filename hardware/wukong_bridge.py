@@ -1195,10 +1195,11 @@ class FaultDeliveryWorker:
     telemetry.
     """
 
-    def __init__(self, ide_base, verify_tls):
+    def __init__(self, ide_base, verify_tls, session_id=None, device_uid=None):
         self.ide_base = ide_base
         self.verify_tls = verify_tls
-        self.report_token = os.environ.get('REPORT_TOKEN', '').strip()
+        self.session_id = session_id
+        self.device_uid = device_uid
         # Fault evidence has a small reserved lane. Ordinary telemetry is
         # lossy by design during an outage: the most recent later trace/status
         # is useful, but no backlog is worth starving a board-fault record.
@@ -1228,6 +1229,14 @@ class FaultDeliveryWorker:
 
     def submit(self, kind, payload, priority=None):
         payload = dict(payload)
+        if self.session_id:
+            payload['session_id'] = self.session_id
+            if kind in (
+                    'trace', 'trace_fault', 'snapshot', 'snapshot_fault',
+                    'recovery_authorization', 'skip_fault_completion'):
+                payload['bridge_session'] = self.session_id
+        if self.device_uid:
+            payload['device_uid'] = self.device_uid
         critical = kind in (
             'trace_fault', 'snapshot_fault', 'recovery_authorization',
             'skip_fault_completion')
@@ -1323,19 +1332,17 @@ class FaultDeliveryWorker:
                         'halt_state': 'halt-state',
                     }[kind]
                     timeout = 0.5 if kind == 'status' else 1
-                    headers = ({
-                        'Authorization': f'Bearer {self.report_token}',
-                    } if self.report_token else {})
                     response = requests.post(
                         f'{self.ide_base}/hardware/wukong/{endpoint}',
-                        json=payload, headers=headers, timeout=timeout,
+                        json=payload, headers=_bridge_auth_headers(), timeout=timeout,
                         verify=self.verify_tls)
                     reply = {} if 200 <= response.status_code < 300 else None
                 else:
                     try:
                         response = requests.post(
                             f'{self.ide_base}/hardware/wukong/trace',
-                            json=payload, timeout=1, verify=self.verify_tls)
+                            json=payload, headers=_bridge_auth_headers(),
+                            timeout=1, verify=self.verify_tls)
                         reply = response.json() if response.content else {}
                         if not (200 <= response.status_code < 300):
                             reply = None
@@ -1375,8 +1382,10 @@ def _post_json_retry(url, payload, verify_tls, label, accept_reply,
         try:
             request_args = {
                 'json': payload, 'timeout': timeout, 'verify': verify_tls}
-            if headers is not None:
-                request_args['headers'] = headers
+            request_headers = _bridge_auth_headers()
+            if headers:
+                request_headers.update(headers)
+            request_args['headers'] = request_headers
             response = requests.post(url, **request_args)
             try:
                 reply = response.json()
@@ -1446,8 +1455,7 @@ def _post_skip_fault_completion(ide_base, payload, verify_tls,
         verify_tls, 'skip completion POST',
         lambda reply: bool(reply.get('accepted') and
                            reply.get('decision') == 'skip_completed'),
-        max_attempts=max_attempts,
-        headers={'Authorization': f'Bearer {token}'})
+        max_attempts=max_attempts, headers=_bridge_auth_headers())
 
 
 def _authorize_fault_recovery(ser):
@@ -1522,9 +1530,31 @@ def try_parse_utf8_sequence(buf, i):
     return (n, text)
 
 
+def _bridge_auth_headers():
+    """Return the configured bridge credential without embedding a secret."""
+    token = os.environ.get('REPORT_TOKEN', '').strip()
+    return {'Authorization': f'Bearer {token}'} if token else {}
+
+
+def _command_target_matches(data, device_uid, session_id):
+    """Return whether a dequeued command still belongs to this bridge instance.
+
+    The server makes this check before consuming a command.  Repeat it here so
+    a stale/proxied response can never be written to a different UART.
+    """
+    target_uid = data.get('target_device_uid')
+    target_session = data.get('target_session_id')
+    if target_uid is None and target_session is None:
+        # Compatibility with pre-target-routing servers. Production commands
+        # include both fields and take the strict branch below.
+        return True
+    return bool(device_uid and session_id and target_uid == device_uid and
+                target_session == session_id)
+
+
 def post_command_ack(ide_base, verify_tls, cmd, ok, error='', cmd_id=None,
-                      session_id=None, trace_counter=None, state_counter=None,
-                      halt_nonce=None):
+                     session_id=None, device_uid=None, trace_counter=None,
+                     state_counter=None, halt_nonce=None):
     """Report the serial-write result for a dequeued command to the server.
 
     Delivery of the ack is best-effort; a failure to POST never interrupts
@@ -1534,6 +1564,11 @@ def post_command_ack(ide_base, verify_tls, cmd, ok, error='', cmd_id=None,
         payload = {'cmd': cmd, 'ok': ok, 'error': error, 'id': cmd_id}
         if session_id:
             payload['session_id'] = session_id
+        if device_uid:
+            # command-ack predates target routing; retain its established field
+            # while also making the bridge's physical identity explicit.
+            payload['target_device_uid'] = device_uid
+            payload['device_uid'] = device_uid
         if trace_counter is not None:
             payload['trace_counter'] = int(trace_counter)
         if state_counter is not None:
@@ -1541,7 +1576,7 @@ def post_command_ack(ide_base, verify_tls, cmd, ok, error='', cmd_id=None,
         if halt_nonce is not None:
             payload['halt_nonce'] = int(halt_nonce)
         requests.post(f'{ide_base}/hardware/wukong/command-ack',
-                      json=payload,
+                      json=payload, headers=_bridge_auth_headers(),
                       timeout=1, verify=verify_tls)
     except Exception as exc:
         print(f'  [command-ack POST error] {exc}', flush=True)
@@ -1549,7 +1584,7 @@ def post_command_ack(ide_base, verify_tls, cmd, ok, error='', cmd_id=None,
 
 def execute_board_command(cmd, data, ser, reopen_serial, buf,
                           ide_base, verify_tls, session_id=None,
-                          trace_counter=None, state_counter=None,
+                          device_uid=None, trace_counter=None, state_counter=None,
                           write_result=None):
     """Write a dequeued command ('s','r','h','q','b','f','k') to the board's UART.
 
@@ -1577,12 +1612,13 @@ def execute_board_command(cmd, data, ser, reopen_serial, buf,
                 except ValueError:
                     post_command_ack(ide_base, verify_tls, cmd, False,
                                      f'unparseable breakpoint nia {raw_nia!r}',
-                    cmd_id=cmd_id, session_id=session_id)
+                    cmd_id=cmd_id, session_id=session_id, device_uid=device_uid)
                     return ser
             if not (0 <= nia_val <= 0xFFFFFFFF):
                 post_command_ack(ide_base, verify_tls, cmd, False,
                                  f'breakpoint nia out of range: {nia_val}',
-                                 cmd_id=cmd_id, session_id=session_id)
+                                 cmd_id=cmd_id, session_id=session_id,
+                                 device_uid=device_uid)
                 return ser
             ser.write(b'b' + struct.pack('>I', nia_val))
         elif cmd == 'f':
@@ -1600,10 +1636,12 @@ def execute_board_command(cmd, data, ser, reopen_serial, buf,
         else:
             post_command_ack(ide_base, verify_tls, cmd, False,
                              f'bridge does not understand command {cmd!r}',
-                             cmd_id=cmd_id, session_id=session_id)
+                             cmd_id=cmd_id, session_id=session_id,
+                             device_uid=device_uid)
             return ser
         post_command_ack(ide_base, verify_tls, cmd, True, cmd_id=cmd_id,
-                         session_id=session_id, trace_counter=trace_counter,
+                         session_id=session_id, device_uid=device_uid,
+                         trace_counter=trace_counter,
                          state_counter=state_counter,
                          halt_nonce=data.get('_halt_nonce') if cmd == 'h' else None)
         if write_result:
@@ -1613,7 +1651,8 @@ def execute_board_command(cmd, data, ser, reopen_serial, buf,
               flush=True)
         post_command_ack(ide_base, verify_tls, cmd, False,
                          f'serial write failed: {exc}', cmd_id=cmd_id,
-                         session_id=session_id, trace_counter=trace_counter,
+                         session_id=session_id, device_uid=device_uid,
+                         trace_counter=trace_counter,
                          state_counter=state_counter,
                          halt_nonce=data.get('_halt_nonce') if cmd == 'h' else None)
         if write_result:
@@ -1674,6 +1713,10 @@ def main():
                              '/dev/ttyUSB* on Linux)')
     parser.add_argument('--baud', type=int, default=57600, help='Baud rate')
     parser.add_argument('--ide', default='http://localhost:5000', help='IDE base URL')
+    parser.add_argument(
+        '--device-uid', default=os.environ.get('WUKONG_DEVICE_UID', ''),
+        help='Physical board UID for target-routed commands (or WUKONG_DEVICE_UID)',
+    )
     parser.add_argument('--insecure', action='store_true',
                         help='Skip TLS certificate verification')
     parser.add_argument('--church-only', action='store_true',
@@ -1686,6 +1729,9 @@ def main():
 
     ide_base    = args.ide.rstrip('/')
     church_only = args.church_only
+    # This is host configuration because the UART trace protocol deliberately
+    # has no UID field. Never derive identity from a serial path or truncate it.
+    device_uid = str(args.device_uid or '').strip()
 
     # For https:// IDE URLs the common case is a self-signed / lab certificate
     # (e.g. lab.cloomc.org), which floods the terminal with one urllib3
@@ -1752,7 +1798,8 @@ def main():
     bridge_state = 'connected'
     last_read_ts = None
     last_write_ts = None
-    delivery_worker = FaultDeliveryWorker(ide_base, verify_tls)
+    delivery_worker = FaultDeliveryWorker(
+        ide_base, verify_tls, session_id=session_id, device_uid=device_uid)
     trace_counter = 0
     state_counter = 0
     # Monotonic parse counter retained for diagnostics only. Authorization uses
@@ -1802,6 +1849,8 @@ def main():
             'last_read_ts': last_read_ts, 'last_write_ts': last_write_ts,
             'church_only': church_only,
         }
+        if device_uid:
+            payload['device_uid'] = device_uid
         if fault_delivery:
             payload['fault_delivery'] = dict(fault_delivery)
         delivery_worker.submit('status', payload)
@@ -2050,6 +2099,7 @@ def main():
                             'board_state_counter': state_counter,
                             'halt_nonce': decoded.get('nonce'),
                             'session_id': session_id,
+                            'device_uid': device_uid,
                             'ts': time.time(),
                         })
                         delivery_worker.submit('halt_state', payload)
@@ -2390,6 +2440,7 @@ def main():
                             'thread_scheduler': bool(sentinel.get('thread_scheduler', False)),
                             'startup_state': startup_state,
                             'session_id': session_id,
+                            'device_uid': device_uid,
                         })
                     else:
                         # Current bitstream — clear any previous stale warning in the IDE.
@@ -2399,6 +2450,7 @@ def main():
                             'thread_scheduler': bool(sentinel.get('thread_scheduler', False)),
                             'startup_state': startup_state,
                             'session_id': session_id,
+                            'device_uid': device_uid,
                         })
 
                     i += sentinel['length']
@@ -2496,11 +2548,23 @@ def main():
                 try:
                     r = requests.get(
                         f'{ide_base}/hardware/wukong/command',
-                        headers={'X-Wukong-Session': session_id},
+                        headers=dict(_bridge_auth_headers(),
+                                     **{'X-Wukong-Session': session_id,
+                                        'X-Wukong-Device-UID': device_uid}),
                         timeout=0.1, verify=verify_tls)
                     if r.status_code == 200:
                         data = r.json() or {}
                         cmd = data.get('cmd')
+                        if cmd and not _command_target_matches(
+                                data, device_uid, session_id):
+                            # Never turn an unexpected response into UART
+                            # traffic. The server retains the command on a
+                            # target mismatch; this protects against a stale
+                            # response crossing bridge sessions.
+                            _bridge_status('command_target_mismatch',
+                                           'target_mismatch',
+                                           'dequeued command target differs from bridge identity')
+                            continue
                         if cmd in ('s', 'r', 'h', 'q', 'b', 'f', 'k'):
                             if cmd == 'h':
                                 halt_nonce_counter = (
@@ -2508,7 +2572,7 @@ def main():
                                 data['_halt_nonce'] = halt_nonce_counter
                             ser = execute_board_command(
                                 cmd, data, ser, _reopen_serial, buf,
-                                ide_base, verify_tls, session_id,
+                                ide_base, verify_tls, session_id, device_uid,
                                 trace_counter=trace_counter,
                                 state_counter=(snapshot_counter
                                                if cmd == 'k'
@@ -2517,7 +2581,8 @@ def main():
                         elif cmd == 'u':
                             try:
                                 _leftover = _handle_upload(
-                                    data, ser, ide_base, verify_tls)
+                                    data, ser, ide_base, verify_tls, session_id,
+                                    device_uid)
                                 if _leftover:
                                     # Bytes read during the ACK wait that are
                                     # NOT the 0x06 ACK byte (e.g. trace packets
@@ -2532,8 +2597,11 @@ def main():
                                 try:
                                     requests.post(
                                         f'{ide_base}/hardware/wukong/upload-ack',
-                                        json={'ok': False,
-                                              'error': f'handler exception: {_upload_exc}'},
+                                        json=_upload_ack_payload(
+                                            data, False,
+                                            f'handler exception: {_upload_exc}',
+                                            session_id, device_uid),
+                                        headers=_bridge_auth_headers(),
                                         timeout=2, verify=verify_tls)
                                 except Exception:
                                     pass
@@ -2547,7 +2615,47 @@ def main():
         ser.close()
 
 
-def _handle_upload(data, ser, ide_base, verify_tls):
+def _upload_ack_payload(data, ok, error, session_id, device_uid):
+    """Form the immutable upload acknowledgement from the dequeued command."""
+    correlated = bool(
+        session_id or device_uid or data.get('id') is not None or
+        data.get('artifact_sha256') is not None or
+        data.get('artifact_size') is not None or
+        data.get('artifact_identity') is not None)
+    if not correlated:
+        # Retain compatibility with manually-issued uploads from old IDEs.
+        payload = {'ok': bool(ok)}
+        if not ok:
+            payload['error'] = str(error)
+        return payload
+    return {
+        'ok': bool(ok),
+        'error': '' if ok else str(error),
+        'id': data.get('id'),
+        'target_device_uid': device_uid,
+        'device_uid': device_uid,
+        'session_id': session_id,
+        'artifact_sha256': data.get('artifact_sha256'),
+        'artifact_size': data.get('artifact_size'),
+        'artifact_identity': data.get('artifact_identity'),
+    }
+
+
+def _post_upload_ack(data, ok, error, ide_base, verify_tls, session_id,
+                     device_uid):
+    """Best-effort upload result preserving command/target identity."""
+    try:
+        requests.post(
+            f'{ide_base}/hardware/wukong/upload-ack',
+            json=_upload_ack_payload(data, ok, error, session_id, device_uid),
+            headers=_bridge_auth_headers(),
+            timeout=2, verify=verify_tls)
+    except Exception:
+        pass
+
+
+def _handle_upload(data, ser, ide_base, verify_tls, session_id=None,
+                   device_uid=None):
     """Decode a base64 boot-image payload and write it to the board over UART.
 
     Protocol sent to the board (framing that the RTL upload FSM expects):
@@ -2579,24 +2687,31 @@ def _handle_upload(data, ser, ide_base, verify_tls):
     b64_payload = data.get('data', '')
     if not b64_payload:
         print('  [upload] ERROR: empty data payload', flush=True)
-        try:
-            requests.post(f'{ide_base}/hardware/wukong/upload-ack',
-                          json={'ok': False, 'error': 'empty payload'},
-                          timeout=2, verify=verify_tls)
-        except Exception:
-            pass
+        _post_upload_ack(data, False, 'empty payload', ide_base, verify_tls,
+                         session_id, device_uid)
         return leftover
 
     try:
-        raw = base64.b64decode(b64_payload)
+        raw = base64.b64decode(b64_payload, validate=True)
     except Exception as exc:
         print(f'  [upload] ERROR: base64 decode failed: {exc}', flush=True)
-        try:
-            requests.post(f'{ide_base}/hardware/wukong/upload-ack',
-                          json={'ok': False, 'error': f'base64 decode: {exc}'},
-                          timeout=2, verify=verify_tls)
-        except Exception:
-            pass
+        _post_upload_ack(data, False, f'base64 decode: {exc}', ide_base,
+                         verify_tls, session_id, device_uid)
+        return leftover
+    import hashlib
+    source_digest = hashlib.sha256(raw).hexdigest()
+    has_correlation = any(
+        data.get(key) is not None for key in (
+            'id', 'artifact_sha256', 'artifact_size', 'artifact_identity',
+            'target_device_uid', 'target_session_id'))
+    if has_correlation and (
+            source_digest != str(data.get('artifact_sha256', '')).lower() or
+            len(raw) != data.get('artifact_size') or
+            not data.get('artifact_identity')):
+        errmsg = 'upload command artifact identity does not match payload'
+        print(f'  [upload] ERROR: {errmsg}', flush=True)
+        _post_upload_ack(data, False, errmsg, ide_base, verify_tls,
+                         session_id, device_uid)
         return leftover
 
     # boot-image.bin stores each 32-bit word little-endian (struct.pack('<...I')).
@@ -2640,12 +2755,8 @@ def _handle_upload(data, ser, ide_base, verify_tls):
               flush=True)
     except Exception as exc:
         print(f'  [upload] ERROR: UART write failed: {exc}', flush=True)
-        try:
-            requests.post(f'{ide_base}/hardware/wukong/upload-ack',
-                          json={'ok': False, 'error': f'UART write: {exc}'},
-                          timeout=2, verify=verify_tls)
-        except Exception:
-            pass
+        _post_upload_ack(data, False, f'UART write: {exc}', ide_base,
+                         verify_tls, session_id, device_uid)
         return leftover
 
     # Wait for the single unambiguous 0x06 ACK byte.
@@ -2683,26 +2794,23 @@ def _handle_upload(data, ser, ide_base, verify_tls):
             except Exception as exc:
                 errmsg = f'uploaded image but reboot command failed: {exc}'
                 print(f'  [upload] ERROR: {errmsg}', flush=True)
-                try:
-                    requests.post(f'{ide_base}/hardware/wukong/upload-ack',
-                                  json={'ok': False, 'error': errmsg},
-                                  timeout=2, verify=verify_tls)
-                except Exception:
-                    pass
+                _post_upload_ack(data, False, errmsg, ide_base, verify_tls,
+                                 session_id, device_uid)
                 return leftover
         try:
-            requests.post(f'{ide_base}/hardware/wukong/upload-ack',
-                          json={'ok': True},
-                          timeout=2, verify=verify_tls)
+            requests.post(
+                f'{ide_base}/hardware/wukong/upload-ack',
+                json=_upload_ack_payload(data, True, '', session_id, device_uid),
+                headers=_bridge_auth_headers(),
+                timeout=2, verify=verify_tls)
         except Exception as exc:
             print(f'  [upload] WARNING: could not POST upload-ack: {exc}', flush=True)
     else:
         errmsg = f'board ACK timeout after {_ACK_TIMEOUT_S:.0f} s'
         print(f'  [upload] ERROR: {errmsg}', flush=True)
         try:
-            requests.post(f'{ide_base}/hardware/wukong/upload-ack',
-                          json={'ok': False, 'error': errmsg},
-                          timeout=2, verify=verify_tls)
+            _post_upload_ack(data, False, errmsg, ide_base, verify_tls,
+                             session_id, device_uid)
         except Exception as exc:
             print(f'  [upload] WARNING: could not POST upload-ack (timeout): {exc}',
                   flush=True)

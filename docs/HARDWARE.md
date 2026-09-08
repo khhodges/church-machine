@@ -25,6 +25,64 @@ For the end-to-end startup sequence and bridge connection procedure, see **[docs
 
 ---
 
+## Programming target model
+
+The IDE has one programmer-selected **Programming Target**. It is the authority
+for a mutating action; an active editor tab, a connected serial port, a board
+display name, or a keyboard modifier is not. The three target states below are
+**independently versioned**. A change, successful transfer, or status report in
+one state says nothing about either of the others.
+
+| Programming Target | Independently versioned state | Actions that may affect it | Volatility / persistence |
+|:--|:--|:--|:--|
+| **Simulator RAM** | The browser simulator's memory and execution state | Simulator Boot, Step, Run, Reset, Patch, and Inspect | Browser-local and volatile: it is not a hardware command and does not install anything on a Wukong. |
+| **Wukong RAM — Runtime Upload** | The selected board's runtime DMEM boot-image/LUMP state | Boot-image upload, LUMP upload, Retry Download, boot-entry push, and runtime **Patch FPGA** | Volatile: a board reboot, reset, power loss, or subsequent runtime-image installation can clear or replace it. It does not change the FPGA bitstream. |
+| **Wukong FPGA — Bitstream** | The FPGA configuration installed for one exact Wukong build | Build, download package/`.bit`/`.mcs`, and program | A generated or downloaded artifact is only a local file. JTAG `.bit` programming is volatile CRAM configuration; verified `.mcs` programming of the N25Q064 configuration flash persists across reset and power loss. Neither changes the board runtime RAM merely by being built or downloaded. |
+
+### Exact physical target required
+
+Every physical mutation requires that the target is explicitly **Wukong RAM**
+or **Wukong FPGA**, as applicable, and that it carries the exact live Wukong
+**device UID** selected by the programmer. The request and its acknowledgement
+must identify that UID and the runtime artifact or bitstream build being acted
+on. A generic “connected” indication, an old connection, or a matching
+display name is insufficient.
+
+The IDE persists a requested target selection, including a physical UID, so it
+can explain the programmer's intent after reload. It must resolve that request
+against current live connection state at each physical action. If the selected
+UID is stale, disconnected, or differs from the currently live board, the
+selection is **Unresolved** and physical mutation is disabled. The IDE must
+fail closed: it must not silently choose another connected board, fall back to
+Simulator RAM, or infer a target from UI context.
+
+Read-only inspection may remain available when a selection is unresolved, but
+its source must be labeled (simulator, saved status, or live board) and it must
+not imply that a physical action is possible.
+
+### Artifact and running-state vocabulary
+
+The target display keeps three identities separate: the selected target UID,
+the runtime-upload artifact identity, and the bitstream build identity
+(selected, installed, and reported where known). For bitstreams, use these
+terms precisely:
+
+| State | Meaning | Does not establish |
+|:--|:--|:--|
+| **Generated** | A build produced an artifact with recorded provenance/identity. | That the file was downloaded, that any board received it, or that it is running. |
+| **Downloaded** | The identified artifact was delivered to the browser or external programmer workflow. | That a board was programmed. |
+| **Programmed** | The selected exact board acknowledged a programming operation for the exact identified build. | That the configured design has subsequently booted or is currently running. |
+| **Reported Running** | The selected exact board later reported the correlated build identity as running (for example, through its boot sentinel/status protocol). | That a merely generated or downloaded artifact was installed. |
+
+Transport acknowledgement for a runtime upload proves delivery only to the
+selected UID; it is not bitstream-programming evidence. Likewise, a
+bitstream-programming acknowledgement and a later reported-running identity
+are different evidence states. When browser programming is unavailable, the
+IDE must say so, provide the exact external programming artifact, and leave the
+bitstream state unprogrammed rather than implying installation.
+
+---
+
 ## 1. Board Identity
 
 | Feature | Value |

@@ -459,6 +459,7 @@ window.Ti60Connect = (function () {
                             if (pkt) {
                                 registered = true;
                                 _lastUid   = pkt.uid;
+                                window.TargetState.observeDevice({ uid: pkt.uid, connected: true, sessionId: pkt.session_id || null, runningBuildId: pkt.bitstream_build_id || pkt.build_id || null });
                                 await _finishSteps(pkt, greetingSeen);
                                 _showStreamPanel();
                                 _fetchBootLump();
@@ -478,6 +479,7 @@ window.Ti60Connect = (function () {
                                     }
                                     registered = true;
                                     _lastUid   = h.uid;
+                                    window.TargetState.observeDevice({ uid: h.uid, connected: true, sessionId: h.session_id || null, runningBuildId: h.bitstream_build_id || h.build_id || null });
                                     _log('Board already booted — registering via HUNG packet', 'log-warn');
                                     const syntheticPkt = {
                                         uid: h.uid, board: h.board || 'Ti60F225',
@@ -502,6 +504,7 @@ window.Ti60Connect = (function () {
                                     _streamLog('── REBOOT ──', 'sl-boot');
                                     lastNia = null;
                                     _lastUid = newPkt.uid;
+                                    window.TargetState.observeDevice({ uid: newPkt.uid, connected: true, sessionId: newPkt.session_id || null, runningBuildId: newPkt.bitstream_build_id || newPkt.build_id || null });
                                     await _forwardCallhome(newPkt);
                                     await _finishSteps(newPkt, true, true);
                                 }
@@ -638,6 +641,7 @@ window.Ti60Connect = (function () {
         _reader = null;
         try { if (_port)   await _port.close();   } catch (e) {}
         _port   = null;
+        window.TargetState.observeDevice({ connected: false });
         _setActivePort(null);
         _log('Disconnected.');
         const btn  = document.getElementById('ti60ConnectBtn');

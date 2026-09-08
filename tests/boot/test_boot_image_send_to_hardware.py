@@ -22,6 +22,7 @@ Covers:
       still causes a fresh poll cycle rather than a stale-ACK false-positive
 """
 import base64
+import hashlib
 import json
 import os
 import struct
@@ -120,11 +121,104 @@ def _valid_image(entry_slot=None):
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
+BOARD_UID = 'board-a'
+BRIDGE_SESSION = 'bridge-a'
+BRIDGE_HEADERS = {
+    'X-Wukong-Device-UID': BOARD_UID,
+    'X-Wukong-Session': BRIDGE_SESSION,
+}
+
+
+class _LiveBoardClient:
+    """Test client whose hardware calls carry the live board correlation."""
+
+    def __init__(self, flask_client):
+        self._client = flask_client
+
+    @staticmethod
+    def _body(kwargs):
+        if 'json' in kwargs:
+            return dict(kwargs['json'] or {})
+        raw = kwargs.pop('data', '{}')
+        if isinstance(raw, bytes):
+            raw = raw.decode('utf-8')
+        return json.loads(raw or '{}')
+
+    @staticmethod
+    def _json_kwargs(kwargs, body):
+        kwargs.pop('content_type', None)
+        kwargs['json'] = body
+        return kwargs
+
+    def post(self, path, **kwargs):
+        if path not in (
+                '/api/boot-image/send-to-hardware',
+                '/hardware/wukong/command',
+                '/hardware/wukong/upload-ack'):
+            return self._client.post(path, **kwargs)
+        body = self._body(kwargs)
+        token = os.environ.get('REPORT_TOKEN', '')
+        if token:
+            headers = dict(kwargs.pop('headers', {}) or {})
+            headers.setdefault('Authorization', f'Bearer {token}')
+            kwargs['headers'] = headers
+        if path != '/hardware/wukong/upload-ack':
+            body.setdefault('target_device_uid', BOARD_UID)
+            body.setdefault('target_session_id', BRIDGE_SESSION)
+        if path == '/api/boot-image/send-to-hardware':
+            body.setdefault('artifact_identity', 'boot-image:test-send')
+        if path == '/hardware/wukong/command' and body.get('cmd') == 'u' and body.get('data'):
+            artifact = base64.b64decode(body['data'])
+            body.setdefault('artifact_sha256', hashlib.sha256(artifact).hexdigest())
+            body.setdefault('artifact_size', len(artifact))
+            body.setdefault('artifact_identity', 'boot-image:test-upload')
+        elif path == '/hardware/wukong/upload-ack':
+            # ACK evidence must echo the exact command the bridge consumed.
+            with _app_module._wukong_command_lock:
+                delivery = dict(_app_module._wukong_cmd_delivery or {})
+            for source, destination in (
+                    ('id', 'id'),
+                    ('target_device_uid', 'target_device_uid'),
+                    ('target_session_id', 'session_id'),
+                    ('artifact_sha256', 'artifact_sha256'),
+                    ('artifact_size', 'artifact_size'),
+                    ('artifact_identity', 'artifact_identity')):
+                if source in delivery:
+                    body.setdefault(destination, delivery[source])
+        return self._client.post(path, **self._json_kwargs(kwargs, body))
+
+    def get(self, path, **kwargs):
+        if path == '/hardware/wukong/command':
+            headers = dict(kwargs.pop('headers', {}) or {})
+            headers.update(BRIDGE_HEADERS)
+            token = os.environ.get('REPORT_TOKEN', '')
+            if token:
+                headers.setdefault('Authorization', f'Bearer {token}')
+            kwargs['headers'] = headers
+        return self._client.get(path, **kwargs)
+
+
 @pytest.fixture
 def client():
     app.config['TESTING'] = True
     with app.test_client() as c:
-        yield c
+        # Every test starts with one fresh, identified physical board.
+        # Seed the authenticated bridge observation directly; exercising
+        # bridge-status authentication is covered by its own endpoint tests.
+        with _app_module._wukong_bridge_lock:
+            _app_module._wukong_bridge_info = {
+                'device_uid': BOARD_UID,
+                'session_id': BRIDGE_SESSION,
+                'event': 'session_started',
+                'state': 'connected',
+                'updated_ts': _app_module._wk_time.time(),
+            }
+        with _app_module._wukong_command_lock:
+            _app_module._wukong_run_unlocked = True
+            _app_module._wukong_runtime_identity = {
+                'device_uid': BOARD_UID, 'session_id': BRIDGE_SESSION,
+            }
+        yield _LiveBoardClient(c)
 
 
 @pytest.fixture(autouse=True)
@@ -133,6 +227,13 @@ def _reset_wukong_globals():
     with _app_module._wukong_command_lock:
         _app_module._wukong_pending_cmd = None
         _app_module._wukong_cmd_delivery = None
+        _app_module._wukong_cmd_id = 0
+        _app_module._wukong_run_unlocked = True
+        _app_module._wukong_runtime_identity = {
+            'device_uid': BOARD_UID, 'session_id': BRIDGE_SESSION,
+        }
+    with _app_module._wukong_bridge_lock:
+        _app_module._wukong_bridge_info.clear()
     with _app_module._wukong_upload_ack_lock:
         _app_module._wukong_upload_ack = {}
     with _app_module._upload_in_flight_lock:
@@ -144,6 +245,9 @@ def _reset_wukong_globals():
     with _app_module._wukong_command_lock:
         _app_module._wukong_pending_cmd = None
         _app_module._wukong_cmd_delivery = None
+        _app_module._wukong_cmd_id = 0
+    with _app_module._wukong_bridge_lock:
+        _app_module._wukong_bridge_info.clear()
     with _app_module._wukong_upload_ack_lock:
         _app_module._wukong_upload_ack = {}
     with _app_module._upload_in_flight_lock:
@@ -218,6 +322,29 @@ def test_send_to_hardware_enqueues_upload_command(client, boot_bin_path):
     assert 'data' in cmd_data
     assert len(cmd_data['data']) > 0
     assert cmd_data.get('reboot') is True
+
+
+def test_exact_browser_runtime_image_is_digest_bound_and_queued(client):
+    """Edited memory is accepted only with exact source facts and the queued
+    UART artifact receives a server-derived digest identity."""
+    payload = _valid_image(entry_slot=6)
+    source_digest = hashlib.sha256(payload).hexdigest()
+    response = client.post('/api/boot-image/send-to-hardware', json={
+        'source_image_base64': base64.b64encode(payload).decode('ascii'),
+        'source_sha256': source_digest,
+        'source_size': len(payload),
+        'source_identity': 'church-simulator-memory-v1:' + source_digest,
+    })
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['source_size'] == len(payload)
+    assert data['artifact_identity'] == (
+        'wukong-native-dmem-v1:' + data['artifact_sha256'])
+    with _app_module._wukong_command_lock:
+        queued = dict(_app_module._wukong_cmd_delivery)
+    assert queued['artifact_size'] == data['size']
+    assert queued['artifact_sha256'] == data['artifact_sha256']
+    assert queued['artifact_identity'] == data['artifact_identity']
 
 
 def test_send_to_hardware_base64_payload_decodes_correctly(client, boot_bin_path):
@@ -307,6 +434,10 @@ def test_upload_ack_get_returns_empty_before_any_post(client):
 
 def test_upload_ack_post_success_then_get_consumes(client):
     """Bridge POSTs {ok:True}; IDE GETs it once, then gets {} on next GET."""
+    client.post('/hardware/wukong/command',
+                content_type='application/json',
+                data=json.dumps({'cmd': 'u', 'data': 'AAAA'}))
+    client.get('/hardware/wukong/command')
     # Bridge reports success.
     post_resp = client.post('/hardware/wukong/upload-ack',
                             content_type='application/json',
@@ -326,6 +457,10 @@ def test_upload_ack_post_success_then_get_consumes(client):
 
 def test_upload_ack_post_failure_carries_error(client):
     """Bridge POSTs {ok:False, error:'timeout'}; IDE reads the error string."""
+    client.post('/hardware/wukong/command',
+                content_type='application/json',
+                data=json.dumps({'cmd': 'u', 'data': 'AAAA'}))
+    client.get('/hardware/wukong/command')
     client.post('/hardware/wukong/upload-ack',
                 content_type='application/json',
                 data=json.dumps({'ok': False, 'error': 'board ACK timeout after 10 s'}))
@@ -357,7 +492,7 @@ def test_breakpoint_cmd_still_accepted(client):
 
 # ── Endianness contract: LE file → bridge BE-swap → RTL → correct DMEM ────────
 
-def test_server_queues_native_wukong_le_image():
+def test_server_queues_native_wukong_le_image(client):
     """The server projects the generic image onto Wukong's forward 16K DMEM
     layout, then queues that new image as little-endian words for the bridge."""
     import base64, struct
@@ -378,18 +513,14 @@ def test_server_queues_native_wukong_le_image():
         with open(bin_path, 'wb') as fh:
             fh.write(le_bytes)
 
-        app.config['TESTING'] = True
-        with app.test_client() as c:
-            import server.app as _app_module
-            with _app_module._wukong_command_lock:
-                _app_module._wukong_pending_cmd = None
+        with _app_module._wukong_command_lock:
+            _app_module._wukong_pending_cmd = None
 
-            resp = c.post('/api/boot-image/send-to-hardware',
-                          content_type='application/json', data='{}')
+        resp = client.post('/api/boot-image/send-to-hardware',
+                           content_type='application/json', data='{}')
         assert resp.status_code == 200
 
-        with app.test_client() as c:
-            poll = c.get('/hardware/wukong/command')
+        poll = client.get('/hardware/wukong/command')
         cmd_data = json.loads(poll.data)
         decoded  = base64.b64decode(cmd_data['data'])
 
@@ -495,8 +626,10 @@ def test_u_cmd_rejected_while_upload_in_flight(client):
 def test_upload_in_flight_cleared_after_upload_ack(client):
     """POSTing upload-ack (success or failure) clears the in-flight flag so
     subsequent execution commands are accepted."""
-    with _app_module._upload_in_flight_lock:
-        _app_module._upload_in_flight = True
+    client.post('/hardware/wukong/command',
+                content_type='application/json',
+                data=json.dumps({'cmd': 'u', 'data': 'AAAA'}))
+    client.get('/hardware/wukong/command')
 
     # Bridge posts success ACK
     client.post('/hardware/wukong/upload-ack',
@@ -516,8 +649,10 @@ def test_upload_in_flight_cleared_after_upload_ack(client):
 
 def test_upload_in_flight_cleared_after_upload_ack_failure(client):
     """An upload-ack POST with ok=false also clears the in-flight flag."""
-    with _app_module._upload_in_flight_lock:
-        _app_module._upload_in_flight = True
+    client.post('/hardware/wukong/command',
+                content_type='application/json',
+                data=json.dumps({'cmd': 'u', 'data': 'AAAA'}))
+    client.get('/hardware/wukong/command')
 
     client.post('/hardware/wukong/upload-ack',
                 content_type='application/json',
@@ -613,12 +748,18 @@ def test_concurrent_send_to_hardware_only_one_wins(boot_bin_path):
     import threading
 
     results = []
+    request_data = {
+        'target_device_uid': BOARD_UID,
+        'target_session_id': BRIDGE_SESSION,
+    }
 
     def _do_request():
         app.config['TESTING'] = True
         with app.test_client() as c:
+            token = os.environ.get('REPORT_TOKEN', '')
             resp = c.post('/api/boot-image/send-to-hardware',
-                          content_type='application/json', data='{}')
+                          json=request_data,
+                          headers={'Authorization': f'Bearer {token}'} if token else {})
             results.append(resp.status_code)
 
     # Reset globals before concurrent run
@@ -628,6 +769,14 @@ def test_concurrent_send_to_hardware_only_one_wins(boot_bin_path):
         _app_module._wukong_upload_ack = {}
     with _app_module._upload_in_flight_lock:
         _app_module._upload_in_flight = False
+    with _app_module._wukong_bridge_lock:
+        _app_module._wukong_bridge_info = {
+            'device_uid': BOARD_UID,
+            'session_id': BRIDGE_SESSION,
+            'event': 'session_started',
+            'state': 'connected',
+            'updated_ts': _app_module._wk_time.time(),
+        }
 
     threads = [threading.Thread(target=_do_request) for _ in range(4)]
     for t in threads:
@@ -770,9 +919,9 @@ def test_send_to_hardware_accepts_multithread_with_scheduler_capability(client):
             "build_version": _app_module._wukong_min_thread_scheduler_build(),
             "thread_scheduler": False,
             "trusted": True,
-            "session_id": "scheduler-test-session",
+            "session_id": BRIDGE_SESSION,
         }
-        _app_module._wukong_bridge_info["session_id"] = "scheduler-test-session"
+        _app_module._wukong_bridge_info["session_id"] = BRIDGE_SESSION
         rejected = client.post('/api/boot-image/send-to-hardware',
                                content_type='application/json', data='{}')
         assert rejected.status_code == 400
@@ -813,13 +962,13 @@ def test_forged_boot_info_cannot_unlock_multithread_upload(client, monkeypatch):
     monkeypatch.setenv("REPORT_TOKEN", "bridge-report-secret")
     try:
         _app_module._wukong_boot_info = {}
-        _app_module._wukong_bridge_info["session_id"] = "forged-session"
+        _app_module._wukong_bridge_info["session_id"] = BRIDGE_SESSION
         forged = client.post(
             "/hardware/wukong/boot-info",
             json={
                 "build_version": _app_module._wukong_min_thread_scheduler_build(),
                 "thread_scheduler": True,
-                "session_id": "forged-session",
+                "session_id": BRIDGE_SESSION,
             },
         )
         assert forged.status_code == 401
@@ -860,6 +1009,7 @@ def test_hw_entry_slot_committed_only_after_ok_ack(client):
         assert st['hw_entry_slot'] == 7
 
         # Bridge ACKs ok → committed.
+        client.get('/hardware/wukong/command')
         client.post('/hardware/wukong/upload-ack',
                     content_type='application/json',
                     data=json.dumps({'ok': True}))
@@ -881,6 +1031,7 @@ def test_hw_entry_slot_not_committed_on_failed_ack(client):
                            content_type='application/json', data='{}')
         assert resp.status_code == 200
 
+        client.get('/hardware/wukong/command')
         client.post('/hardware/wukong/upload-ack',
                     content_type='application/json',
                     data=json.dumps({'ok': False, 'error': 'board ACK timeout'}))

@@ -24,6 +24,9 @@ if ROOT not in sys.path:
 import server.app as _app_module
 from server.app import app
 
+TARGET_DEVICE_UID = 'pipeline-health-board'
+TARGET_SESSION_ID = 'pipeline-health-session'
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -45,6 +48,8 @@ def _reset():
         _app_module._upload_in_flight = False
     with _app_module._wukong_boot_info_lock:
         _app_module._wukong_boot_info = {}
+    with _app_module._wukong_bridge_lock:
+        _app_module._wukong_bridge_info.clear()
     _app_module._wukong_last_bridge_poll   = 0.0
     _app_module._wukong_last_trace_post    = 0.0
     _app_module._wukong_total_trace_posts  = 0
@@ -70,7 +75,10 @@ def _post_trace(client, ev_type=0x00, nia=0x10):
 
 
 def _bridge_poll(client):
-    return client.get('/hardware/wukong/command')
+    return client.get('/hardware/wukong/command', headers={
+        'X-Wukong-Session': TARGET_SESSION_ID,
+        'X-Wukong-Device-UID': TARGET_DEVICE_UID,
+    })
 
 
 @pytest.fixture()
@@ -78,6 +86,12 @@ def client():
     app.config['TESTING'] = True
     _reset()
     with app.test_client() as c:
+        established = c.post('/hardware/wukong/bridge-status', json={
+            'device_uid': TARGET_DEVICE_UID,
+            'session_id': TARGET_SESSION_ID,
+            'state': 'connected',
+        })
+        assert established.status_code == 200
         yield c
     _reset()
 

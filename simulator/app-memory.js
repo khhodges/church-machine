@@ -396,7 +396,7 @@ function updateCRDetail() {
     if (showEditButton) {
         dynMenuHtml += '<div class="crd-menu-divider"></div>';
         dynMenuHtml += '<div class="crd-menu-section-label">Deploy &amp; Share</div>';
-        dynMenuHtml += `<button class="crd-menu-item crd-menu-item-fpga" onclick="patchFPGA();toggleDashMenu()" title="Patch FPGA \u2014 Runs Patch Simulator first, then uploads the updated lump to the FPGA board over WebSerial (UART). Requires an active hardware connection.">&#x21A9; Patch FPGA</button>`;
+        dynMenuHtml += `<button class="crd-menu-item crd-menu-item-fpga" onclick="patchFPGA();toggleDashMenu()" title="Patch Wukong RAM — volatile runtime LUMP upload to the explicitly selected live UID. Does not program the FPGA bitstream.">&#x21A9; Patch Wukong RAM</button>`;
         dynMenuHtml += `<button class="crd-menu-item crd-menu-item-fpga" onclick="exportPatchFile();toggleDashMenu()" title="Export Patch \u2014 Assembles the code and downloads a .patch file with UART frames, CRC, and RUN sentinel. Flash with: python3 patch_fpga.py /dev/ttyUSB1 file.patch">&#x2B73; Export Patch</button>`;
         dynMenuHtml += `<button class="crd-menu-item crd-menu-item-fpga" onclick="exportLumpAsPatch();toggleDashMenu()" title="Lump\u2192Patch \u2014 Pick a pre-built .lump binary, validate its header, and wrap it into a .patch UART frame file for FPGA flashing.">&#x2B73; Lump\u2192Patch</button>`;
         dynMenuHtml += '<div class="crd-menu-divider"></div>';

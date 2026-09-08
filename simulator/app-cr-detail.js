@@ -1131,65 +1131,33 @@ function injectCRCode(logEl) {
 
 async function injectCRCodeToFPGA(logEl) {
     const log = msg => { if (logEl) { logEl.textContent += msg + '\n'; logEl.scrollTop = logEl.scrollHeight; } };
-
+    const targetAuthorization = window.TargetState.authorizeDestination('runtime');
+    if (!targetAuthorization.ok) {
+        log(targetAuthorization.error);
+        return false;
+    }
     const patch = injectCRCode(logEl);
-    if (!patch) return false;
-
-    const board = getSelectedBoard();
-    if (board === 'tang-nano-20k-iot' && typeof FULL_ONLY_OPCODES !== 'undefined') {
-        const patchWords = patch.newWords || [];
-        for (let i = 0; i < patchWords.length; i++) {
-            const opcode = (patchWords[i] >>> 27) & 0x1F;
-            if (FULL_ONLY_OPCODES.includes(opcode)) {
-                const opName = FULL_ONLY_OPCODE_NAMES[opcode] || `opcode ${opcode}`;
-                log(`ERROR: Assembled code contains Full-only instruction ${opName} at word ${i}. This cannot run on the Tang Nano 20K (IoT profile). Switch to the Wukong Artix-7 or remove Full-only instructions (LAMBDA, CHANGE, SWITCH, ELOADCALL, XLOADLAMBDA).`);
-                return false;
-            }
-        }
-    }
-
-    if (!TangSerial.isConnected()) {
-        log('FPGA not connected — simulator updated only. Connect to FPGA and retry.');
+    if (!patch) {
+        log('Patch upload blocked: edited code could not be materialized safely.');
         return false;
     }
-
-    const { newWords, baseLoc, newCW, nsIdx } = patch;
-
-    if (patch.newCW !== patch.oldCW) {
-        log('Sending updated NS entry to FPGA...');
-        const nsBase = sim._nsSlotBase(nsIdx);
-        const nsSlice = Array.from(sim.memory.slice(0, TangSerial.NS_WORDS));
-        const clSlice = Array.from(sim.memory.slice(TangSerial.NS_WORDS, TangSerial.NS_WORDS + TangSerial.CLIST_WORDS));
-        try {
-            await TangSerial.uploadToFPGA(nsSlice, clSlice, msg => log('  ' + msg));
-        } catch(e) {
-            log('NS upload failed: ' + e.message);
-            return false;
-        }
-    }
-
-    log(`Sending code lump (${newCW} words at 0x${baseLoc.toString(16).toUpperCase().padStart(4,'0')}) to FPGA...`);
-    let patchResult;
-    try {
-        patchResult = await TangSerial.patchLump(baseLoc, newWords, msg => log('  ' + msg));
-    } catch(e) {
-        log('FPGA patch failed: ' + e.message);
+    if (!sim || !sim.memory || !sim.memory.buffer) {
+        log('Patch upload blocked: exact edited simulator memory is unavailable.');
         return false;
     }
-    if (!patchResult || !patchResult.success) {
-        log('FPGA patch failed — no valid echo from hardware.');
-        return false;
+    // Materialize a copy now: later edits cannot change the bytes whose digest
+    // and ACK are correlated by the upload path.
+    const exactBytes = new Uint8Array(sim.memory.length * 4);
+    const view = new DataView(exactBytes.buffer);
+    for (let i = 0; i < sim.memory.length; i++) {
+        view.setUint32(i * 4, sim.memory[i] >>> 0, true);
     }
-    log('FPGA patch confirmed by echo.');
-
-    log('Sending RUN command...');
-    try {
-        await TangSerial.runFPGA(msg => log('  ' + msg));
-        return true;
-    } catch(e) {
-        log('RUN command failed: ' + e.message);
-        return false;
+    if (typeof _wukongLoadToHardware === 'function') {
+        log('Routing exact edited runtime image through the selected live Wukong bridge/server path.');
+        return await _wukongLoadToHardware(exactBytes);
     }
+    log('Runtime upload blocked: the verified Wukong bridge/server path is unavailable.');
+    return false;
 }
 
 function _quickHash(str) {
@@ -1273,6 +1241,7 @@ function _updateFaultFreeCounter() {
 }
 
 function patchSimulator() {
+    if (!window.TargetState.authorize('simulator', { id: 'simulator-patch' }).ok) return false;
     _runStopped = true;
     sim.running = false;
 

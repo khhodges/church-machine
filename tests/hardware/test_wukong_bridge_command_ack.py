@@ -40,7 +40,7 @@ def acks(monkeypatch):
     """Capture all command-ack POSTs made by the bridge."""
     posted = []
 
-    def fake_post(url, json=None, timeout=None, verify=None):
+    def fake_post(url, json=None, headers=None, timeout=None, verify=None):
         posted.append({'url': url, 'json': json})
 
         class R:

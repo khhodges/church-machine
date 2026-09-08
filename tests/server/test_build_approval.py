@@ -35,6 +35,33 @@ client = _app.app.test_client()
 REPORT_TOKEN = os.environ.get('REPORT_TOKEN', '')
 AUTH_HEADERS = {'Authorization': f'Bearer {REPORT_TOKEN}'} if REPORT_TOKEN else {}
 
+
+def _report_live_build_target(
+    device_uid='build-approval-board-3330',
+    session_id='build-approval-session-3330',
+):
+    """Register the explicitly selected, freshly live board for a build POST."""
+    response = client.post('/hardware/wukong/bridge-status', json={
+        'device_uid': device_uid,
+        'session_id': session_id,
+        'event': 'session_started',
+        'state': 'connected',
+    }, headers=AUTH_HEADERS)
+    assert response.status_code == 200, response.get_json()
+    return device_uid, session_id
+
+
+def _build_start_payload(identity, device_uid, session_id):
+    """Task #3330 admission payload: one identity and one live board session."""
+    return {
+        'build_id': identity,
+        'artifact_identity': identity,
+        'build_nonce': identity,
+        'target_device_uid': device_uid,
+        'target_session_id': session_id,
+    }
+
+
 # ISA constants — 5-bit opcodes at bits[31:27]
 CHURCH_BRANCH_OP = 23   # 0b10111
 CHURCH_RETURN_OP =  3   # 0b00011
@@ -478,10 +505,68 @@ def test_raw_only_boot_image_write_invalidates_namespace_binding(monkeypatch, tm
 # /start gate: requires a clean frozen snapshot
 # ===================================================================
 
+def test_start_auth_precedes_identity_and_live_target_validation():
+    """An unauthenticated malformed start remains a 401, never an admission hint."""
+    response = client.post('/api/wukong-build/start', json={
+        'build_id': 'wrong',
+        'artifact_identity': 'also-wrong',
+        'build_nonce': '',
+        'target_device_uid': '',
+        'target_session_id': '',
+    })
+    assert response.status_code == 401
+
+
+def test_start_requires_one_exact_identity_and_explicit_live_session(monkeypatch, tmp_path):
+    """Task #3330 rejects identity splits and omitted board-session correlation."""
+    if not REPORT_TOKEN:
+        pytest.skip('REPORT_TOKEN not set')
+    monkeypatch.setattr(_app, '_BUILD_SNAPSHOTS_DIR', str(tmp_path))
+    nonce_response = client.get('/api/build-approval/ns-map', headers=AUTH_HEADERS)
+    identity = nonce_response.get_json()['build_nonce']
+    device_uid, session_id = _report_live_build_target()
+
+    split_identity = _build_start_payload(identity, device_uid, session_id)
+    split_identity['artifact_identity'] = f'{identity}-other'
+    response = client.post(
+        '/api/wukong-build/start', json=split_identity, headers=AUTH_HEADERS,
+    )
+    assert response.status_code == 400
+    assert 'one exact selected build/provenance identity' in response.get_json()['error']
+
+    no_session = _build_start_payload(identity, device_uid, session_id)
+    no_session.pop('target_session_id')
+    response = client.post(
+        '/api/wukong-build/start', json=no_session, headers=AUTH_HEADERS,
+    )
+    assert response.status_code == 409
+    assert 'session' in response.get_json()['error'].lower()
+
+
+def test_start_rejects_stale_live_target_before_approval_gate(monkeypatch, tmp_path):
+    """A prior bridge report cannot satisfy Task #3330's fresh-board requirement."""
+    if not REPORT_TOKEN:
+        pytest.skip('REPORT_TOKEN not set')
+    monkeypatch.setattr(_app, '_BUILD_SNAPSHOTS_DIR', str(tmp_path))
+    nonce_response = client.get('/api/build-approval/ns-map', headers=AUTH_HEADERS)
+    identity = nonce_response.get_json()['build_nonce']
+    device_uid, session_id = _report_live_build_target()
+    with _app._wukong_bridge_lock:
+        _app._wukong_bridge_info['updated_ts'] = 0
+
+    response = client.post(
+        '/api/wukong-build/start',
+        json=_build_start_payload(identity, device_uid, session_id),
+        headers=AUTH_HEADERS,
+    )
+    assert response.status_code == 409
+    assert response.get_json()['decision'] == 'stale_target'
+
+
 def test_start_rejected_without_snapshot(monkeypatch, tmp_path):
     """
     /api/wukong-build/start must return 422 when no approval snapshot exists,
-    even with a valid token + nonce.
+    even after satisfying Task #3330's exact identity and live-target admission.
     """
     if not REPORT_TOKEN:
         pytest.skip('REPORT_TOKEN not set')
@@ -489,9 +574,10 @@ def test_start_rejected_without_snapshot(monkeypatch, tmp_path):
     # Obtain a fresh nonce
     ns_resp = client.get('/api/build-approval/ns-map', headers=AUTH_HEADERS)
     nonce = ns_resp.get_json().get('build_nonce', '')
+    device_uid, session_id = _report_live_build_target()
     resp = client.post(
         '/api/wukong-build/start',
-        json={'build_nonce': nonce},
+        json=_build_start_payload(nonce, device_uid, session_id),
         headers=AUTH_HEADERS,
     )
     assert resp.status_code == 422, (
@@ -1105,9 +1191,10 @@ def test_start_rejected_with_failed_snapshot(monkeypatch, tmp_path):
     snap_file.write_text(json.dumps(bad_snap))
     ns_resp = client.get('/api/build-approval/ns-map', headers=AUTH_HEADERS)
     nonce = ns_resp.get_json().get('build_nonce', '')
+    device_uid, session_id = _report_live_build_target()
     resp = client.post(
         '/api/wukong-build/start',
-        json={'build_nonce': nonce},
+        json=_build_start_payload(nonce, device_uid, session_id),
         headers=AUTH_HEADERS,
     )
     assert resp.status_code == 422, (
@@ -1150,7 +1237,12 @@ def test_approved_start_freezes_committed_namespace_before_worker_runs(monkeypat
     monkeypatch.setattr(_app, '_ba_build_log', [])
     nonce_response = client.get('/api/build-approval/ns-map', headers=AUTH_HEADERS)
     nonce = nonce_response.get_json()['build_nonce']
-    response = client.post('/api/wukong-build/start', json={'build_nonce': nonce}, headers=AUTH_HEADERS)
+    device_uid, session_id = _report_live_build_target()
+    response = client.post(
+        '/api/wukong-build/start',
+        json=_build_start_payload(nonce, device_uid, session_id),
+        headers=AUTH_HEADERS,
+    )
     assert response.status_code == 200, response.get_json()
     with _app.app.app_context():
         saved = _app.BuildRecord.query.order_by(_app.BuildRecord.id.desc()).first()

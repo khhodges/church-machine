@@ -107,6 +107,11 @@ function makeEnv(opts) {
         },
         fetch: fetchImpl,
         fetchCalls: fetchCalls,
+        TargetState: {
+            authorize: function(kind) {
+                return { ok: kind === 'simulator' };
+            },
+        },
 
         // ── simulator + registry stubs ──
         bootEntrySlot: 6,
@@ -134,6 +139,7 @@ function makeEnv(opts) {
         _wukongUpdateBtn: function() {},
         _syncSelfTestNextGtToBootEntry: function() {},
     };
+    window.TargetState = sandbox.TargetState;
     sandbox.globalThis = sandbox;
     vm.createContext(sandbox);
     vm.runInContext(LOAD_SRC, sandbox);

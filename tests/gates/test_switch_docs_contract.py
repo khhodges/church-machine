@@ -66,3 +66,29 @@ def test_capability_test_documents_explicit_immediate_m_provisioning():
     for text in (source, lifecycle):
         assert "immediately before CapabilityTest execution" in text
         assert "not an assumed initial state" in text or "not a test assumption" in text
+
+
+def test_hardware_reference_keeps_programming_targets_and_evidence_distinct():
+    """Task #3330: keep the IDE target model explicit in its hardware reference."""
+    text = (ROOT / "docs/HARDWARE.md").read_text()
+
+    for phrase in (
+        "Programming Target",
+        "Simulator RAM",
+        "Wukong RAM — Runtime Upload",
+        "Wukong FPGA — Bitstream",
+        "independently versioned",
+        "device UID",
+        "Unresolved",
+        "must not silently choose another connected board",
+        "Generated",
+        "Downloaded",
+        "Programmed",
+        "Reported Running",
+    ):
+        assert phrase in text, phrase
+
+    assert "does not change the FPGA bitstream" in text
+    assert "does not install anything on a Wukong" in text
+    assert "JTAG `.bit` programming is volatile" in text
+    assert "N25Q064 configuration flash persists across reset and power loss" in text

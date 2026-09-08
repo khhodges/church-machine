@@ -526,6 +526,7 @@ def _read_wukong_release_evidence(build_dir):
         "verified": False,
         "bit_sha256": _sha256_file(bit_path),
         "mcs_sha256": _sha256_file(mcs_path),
+        "provenance_identity": None,
     }
     meta = _read_bitstream_meta(bit_path) if os.path.isfile(bit_path) else None
     try:
@@ -568,7 +569,86 @@ def _read_wukong_release_evidence(build_dir):
         evidence["mcs_sha256"] == mcs_record.get("sha256") and
         mcs_record.get("size_bytes") == os.path.getsize(mcs_path)
     )
+    if evidence["verified"]:
+        identity_material = {
+            "schema": "wukong-release-download-v1",
+            "source_commit": source_commit.lower(),
+            "build_version": build_version,
+            "bit_sha256": evidence["bit_sha256"],
+            "mcs_sha256": evidence["mcs_sha256"],
+        }
+        canonical = json.dumps(identity_material, sort_keys=True,
+                               separators=(",", ":"), ensure_ascii=True)
+        evidence["provenance_identity"] = (
+            "wukong-release:v1:" +
+            hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        )
     return evidence
+
+
+def _wukong_bit_download_identity(bit_path):
+    """Return exact verified metadata for the bytes currently at bit_path."""
+    meta = _read_bitstream_meta(bit_path) if os.path.isfile(bit_path) else None
+    if not meta:
+        return None
+    digest = meta.get("sha256") or _sha256_file(bit_path)
+    if not digest:
+        return None
+    material = {
+        "schema": "wukong-bit-download-v1",
+        "sha256": digest,
+        "version": meta.get("version"),
+        "source_commit": meta.get("source_commit"),
+    }
+    canonical = json.dumps(material, sort_keys=True, separators=(",", ":"),
+                           ensure_ascii=True)
+    return {
+        "provenance_identity": "wukong-bit:v1:" + hashlib.sha256(
+            canonical.encode("utf-8")).hexdigest(),
+        "sha256": digest,
+        "meta": meta,
+    }
+
+
+def _serve_exact_wukong_artifact(path, name, kind, identity, digest):
+    """Serve only when the caller selected these exact current bytes."""
+    target, target_error = _wukong_target_error(request.args)
+    if target_error:
+        return _wukong_target_rejection(target_error)
+    requested_identity = str(
+        request.args.get("artifact_identity") or
+        request.args.get("provenance_identity", "") or "").strip()
+    requested_digest = str(request.args.get("sha256", "") or "").strip().lower()
+    if not identity or not digest:
+        return jsonify({
+            "ok": False, "error": "Current artifact has no verified download identity",
+            "decision": "identity_unavailable",
+        }), 409
+    if (not requested_identity or not requested_digest or
+            not hmac.compare_digest(requested_identity, identity) or
+            not hmac.compare_digest(requested_digest, digest.lower())):
+        return jsonify({
+            "ok": False,
+            "error": "Requested artifact identity does not match the current verified bytes",
+            "decision": "artifact_mismatch",
+        }), 409
+    # Re-hash at the serve boundary so replacement after status discovery
+    # cannot make a formerly valid URL download different bytes.
+    current_digest = _sha256_file(path)
+    if not current_digest or not hmac.compare_digest(current_digest, digest.lower()):
+        return jsonify({
+            "ok": False, "error": "Artifact changed before download",
+            "decision": "stale_artifact",
+        }), 409
+    response = send_file(os.path.abspath(path), as_attachment=True,
+                         download_name=name,
+                         mimetype="application/octet-stream")
+    response.headers["X-Wukong-Provenance-Identity"] = identity
+    response.headers["X-Wukong-Artifact-SHA256"] = digest.lower()
+    response.headers["X-Wukong-Artifact-Kind"] = kind
+    response.headers["X-Wukong-Lifecycle-State"] = "downloaded"
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 _BITSTREAM_VERSION_LOG_FILE = "wukong-bitstream-versions.json"
@@ -807,12 +887,13 @@ def download_wukong_bit():
     # Only advertise a version verified against the actual file's sidecar
     # metadata — never the current source version (the .bit on disk may be
     # older than the source right after a code push).
-    meta = _read_bitstream_meta(p)
+    exact = _wukong_bit_download_identity(p)
+    meta = exact.get("meta") if exact else None
     ver = meta.get("version") if meta else None
     name = ("church_wukong_xc7a100t_v%d.bit" % ver) if ver else "church_wukong_xc7a100t.bit"
-    return send_file(os.path.abspath(p), as_attachment=True,
-                     download_name=name,
-                     mimetype="application/octet-stream")
+    return _serve_exact_wukong_artifact(
+        p, name, "bit", exact.get("provenance_identity") if exact else None,
+        exact.get("sha256") if exact else None)
 
 @app.route("/dl/wukong-bscan")
 def download_wukong_bscan():
@@ -824,9 +905,11 @@ def download_wukong_bscan():
 @app.route("/dl/wukong-mcs")
 def download_wukong_mcs():
     p = os.path.join(_wukong_build_dir(), "church_wukong_xc7a100t.mcs")
-    return send_file(os.path.abspath(p), as_attachment=True,
-                     download_name="church_wukong_xc7a100t.mcs",
-                     mimetype="application/octet-stream")
+    evidence = _read_wukong_release_evidence(_wukong_build_dir())
+    identity = evidence.get("provenance_identity") if evidence.get("verified") else None
+    return _serve_exact_wukong_artifact(
+        p, "church_wukong_xc7a100t.mcs", "mcs", identity,
+        evidence.get("mcs_sha256") if evidence.get("verified") else None)
 
 @app.route("/dl/wukong-v17-bit")
 def download_wukong_v17_bit():
@@ -1083,6 +1166,27 @@ def api_bitstream_status():
             "size_bytes": stat.st_size,
             "git_sha": git_sha,
         }
+    # Artifact publication, a browser download, programmer acknowledgement, and
+    # a board-reported build are separate facts.  This server can prove only
+    # publication and a target-bound boot report; it deliberately has no
+    # "installed" shortcut for a downloaded .bit/.mcs.
+    with _wukong_boot_info_lock:
+        reported = dict(_wukong_boot_info)
+    with _wukong_bridge_lock:
+        bridge = dict(_wukong_bridge_info)
+    report_matches_live_target = bool(
+        reported.get('trusted') and reported.get('device_uid') and
+        reported.get('device_uid') == bridge.get('device_uid') and
+        reported.get('session_id') == bridge.get('session_id') and
+        reported.get('received_ts') and bridge.get('updated_ts') and
+        time.time() - float(reported['received_ts']) < _WUKONG_TARGET_FRESH_SECONDS and
+        time.time() - float(bridge['updated_ts']) < _WUKONG_TARGET_FRESH_SECONDS and
+        bridge.get('state') not in ('reconnecting', 'serial_error', 'network_error'))
+    bit_download = _wukong_bit_download_identity(bit_path)
+    mcs_download_identity = (
+        release_evidence.get("provenance_identity")
+        if release_evidence.get("verified") else None
+    )
     return jsonify({
         "ok": True,
         "present": present,
@@ -1102,6 +1206,36 @@ def api_bitstream_status():
         "artifact_sha256": release_evidence["bit_sha256"],
         "mcs_sha256": release_evidence["mcs_sha256"],
         "release_verified": release_evidence["verified"],
+        "download": {
+            "bit": {
+                "available": bool(bit_download),
+                "provenance_identity": (
+                    bit_download.get("provenance_identity")
+                    if bit_download else None),
+                "sha256": bit_download.get("sha256") if bit_download else None,
+            },
+            "mcs": {
+                "available": bool(
+                    mcs_present and mcs_download_identity and
+                    release_evidence.get("mcs_sha256")),
+                "provenance_identity": mcs_download_identity,
+                "sha256": (
+                    release_evidence.get("mcs_sha256")
+                    if mcs_download_identity else None),
+            },
+        },
+        "lifecycle": {
+            "generated": bool(present and _read_bitstream_meta(bit_path)),
+            "downloaded": "unobserved",
+            "programmed": "unacknowledged",
+            "reported_running": report_matches_live_target,
+            "reported_build_version": (
+                reported.get("build_version") if report_matches_live_target else None),
+            "reported_device_uid": (
+                reported.get("device_uid") if report_matches_live_target else None),
+            "reported_session_id": (
+                reported.get("session_id") if report_matches_live_target else None),
+        },
     })
 
 
@@ -3104,6 +3238,19 @@ def _optional_report_token_check():
     return False, (err, 401)
 
 
+def _wukong_control_auth():
+    """Authenticate a physical bridge/control request without leaking secrets.
+
+    The bridge and the IDE use the same configured REPORT_TOKEN convention:
+    callers supply it only in an Authorization bearer header.  Local
+    development remains usable when no hardware secret has been configured,
+    matching the established IDE mutation convention above.  Deliberately do
+    not accept query parameters: they are routinely retained in browser and
+    proxy logs.
+    """
+    return _optional_report_token_check()
+
+
 @app.route("/api/boot-config/next-after-selftest", methods=["POST"])
 def boot_config_next_after_selftest():
     """Reject retired independent Next.GT configuration requests.
@@ -4663,8 +4810,18 @@ def release_r12_index():
       var versionSuffix = d.version_known ? ('_v' + d.firmware_version) : '';
       var bitName = 'church_wukong_xc7a100t' + versionSuffix + '.bit';
       var mcsName = 'church_wukong_xc7a100t' + versionSuffix + '.mcs';
-      var mcs = d.mcs_present
-        ? '<a href="/dl/wukong-mcs" download="'+mcsName+'" style="padding:.4rem 1rem;background:#4c1d95;border-radius:5px;color:#ddd6fe;text-decoration:none;font-size:.82rem;font-weight:700;white-space:nowrap">&#x2B07; Download .mcs (persistent)</a>'
+      function exactUrl(kind) {
+        var item = d.download && d.download[kind];
+        return item && item.available
+          ? '/dl/wukong-' + kind + '?provenance_identity=' +
+            encodeURIComponent(item.provenance_identity) + '&sha256=' +
+            encodeURIComponent(item.sha256)
+          : '';
+      }
+      var bitUrl = exactUrl('bit');
+      var mcsUrl = exactUrl('mcs');
+      var mcs = mcsUrl
+        ? '<a href="'+mcsUrl+'" download="'+mcsName+'" style="padding:.4rem 1rem;background:#4c1d95;border-radius:5px;color:#ddd6fe;text-decoration:none;font-size:.82rem;font-weight:700;white-space:nowrap">&#x2B07; Download .mcs (persistent)</a>'
         : '';
       card.innerHTML = '<div style="background:#071a0e;border:1px solid #166534;border-radius:8px;padding:14px 16px;margin-bottom:0">'
         +'<div style="display:flex;align-items:center;gap:14px">'
@@ -4673,7 +4830,7 @@ def release_r12_index():
         +'<div style="font-size:.75rem;color:#64748b;margin-top:2px">'+sz+' &middot; '+fw+(dt?' &middot; built '+dt:'')+'<br>.bit loads once; .mcs programs the board to boot this image after reset.</div></div>'
         +'</div>'
         +'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">'
-        +'<a href="/dl/wukong-bit" download="'+bitName+'" style="padding:.4rem 1rem;background:#166534;border-radius:5px;color:#4ade80;text-decoration:none;font-size:.82rem;font-weight:700;white-space:nowrap">&#x2B07; Download current .bit (temporary)</a>'
+        +(bitUrl ? '<a href="'+bitUrl+'" download="'+bitName+'" style="padding:.4rem 1rem;background:#166534;border-radius:5px;color:#4ade80;text-decoration:none;font-size:.82rem;font-weight:700;white-space:nowrap">&#x2B07; Download current .bit (temporary)</a>' : '')
         +mcs+'</div>'
         +'</div>' + warn;
     } else {
@@ -12864,15 +13021,67 @@ _wukong_bridge_alert = {
 _wukong_cmd_delivery = None
 _WUKONG_HALT_CONFIRM_TIMEOUT = 5.0
 _wukong_cmd_id       = 0     # monotonic; incremented under _wukong_command_lock
-# Fresh boot sentinels close this gate.  A successful Step UART ACK records the
-# current trace watermark; only a later hardware trace re-opens Run.
-_wukong_run_unlocked = True
+# Fresh boot sentinels close this gate.  Startup has no target-correlated
+# execution proof either: only a successful Step ACK followed by a newer trace
+# from that exact live target opens Run.
+_wukong_run_unlocked = False
 _wukong_step_write_trace_seq = None
 _wukong_step_bridge_session = ''
+_wukong_runtime_identity = None   # {device_uid, session_id}, proven after STEP ACK + trace
 _wukong_bridge_trace_highwater = {}
 _WUKONG_SKIP_COMPLETION_TIMEOUT = 10.0
 # Exact in-process disposition for a k write. Protected by command lock.
 _wukong_skip_pending = None
+_WUKONG_TARGET_FRESH_SECONDS = 3.0
+
+
+def _wukong_target_error(data, *, require_live=True):
+    """Resolve an IDE-selected physical target against the live bridge.
+
+    A display name, a recently connected port, and a bridge session are not a
+    board identity.  Hardware mutations consequently require the caller's
+    selected device UID and compare it with a fresh bridge report on every
+    request.  The bridge session is bound when one is known, preventing a
+    different bridge from consuming an otherwise valid command.
+    """
+    uid = str(data.get('target_device_uid', '') or '').strip()
+    requested_session = str(data.get('target_session_id', '') or '').strip()
+    if not uid or len(uid) > 128:
+        return None, ('missing_target', 'a selected Wukong device UID is required')
+    now = _wk_time.time()
+    with _wukong_bridge_lock:
+        bridge = dict(_wukong_bridge_info)
+    live_session = str(bridge.get('session_id', '') or '')
+    live_uid = str(bridge.get('device_uid', '') or '')
+    updated = bridge.get('updated_ts')
+    fresh = bool(updated and now - float(updated) < _WUKONG_TARGET_FRESH_SECONDS)
+    if require_live and (not fresh or bridge.get('state') in
+                         ('reconnecting', 'serial_error', 'network_error')):
+        return None, ('stale_target', 'selected Wukong target is not live')
+    if not live_uid:
+        return None, ('unidentified_target',
+                      'live bridge has not reported a physical device UID')
+    if not hmac.compare_digest(uid, live_uid):
+        return None, ('target_mismatch',
+                      'selected device UID does not match the live bridge device')
+    if not requested_session:
+        return None, ('missing_session',
+                      'the selected Wukong bridge session is required')
+    if not live_session or not hmac.compare_digest(requested_session, live_session):
+        return None, ('session_mismatch',
+                      'selected bridge session does not match the live bridge')
+    return {
+        'device_uid': uid,
+        # Bind to the session actually observed at admission, including when an
+        # older caller did not send an optional target_session_id.
+        'bridge_session': live_session,
+    }, None
+
+
+def _wukong_target_rejection(error):
+    decision, message = error
+    return jsonify({'ok': False, 'accepted': False, 'decision': decision,
+                    'error': message}), 409
 
 
 def _record_wukong_bridge_event(event, state='', reason='', session_id='',
@@ -13108,10 +13317,15 @@ def wukong_bridge_status_post():
     reconnecting from a dead USB port can still tell the IDE what is happening.
     The timeline is bounded and is diagnostic evidence, not an execution input.
     """
-    global _wukong_fault_candidate
+    global _wukong_fault_candidate, _wukong_runtime_identity, _wukong_run_unlocked, \
+        _wukong_step_write_trace_seq, _wukong_step_bridge_session, _wukong_boot_info
+    auth_ok, auth_error = _wukong_control_auth()
+    if not auth_ok:
+        return auth_error
     data = request.get_json(silent=True) or {}
     now = _wk_time.time()
     session = str(data.get('session_id', '') or '')[:128]
+    device_uid = str(data.get('device_uid', '') or '').strip()[:128]
     event = str(data.get('event', '') or '')[:80]
     raw_bridge_version = data.get('bridge_version')
     bridge_version = None
@@ -13139,9 +13353,14 @@ def wukong_bridge_status_post():
                 raw_fault.get('promotion_status', '') or '')[:160],
         }
     with _wukong_bridge_lock:
+        old_session = str(_wukong_bridge_info.get('session_id', '') or '')
+        old_uid = str(_wukong_bridge_info.get('device_uid', '') or '')
         if session:
+            # A new bridge session must identify the physical board it owns.
+            # Do not carry a prior session's UID forward.
             _wukong_bridge_info.update({
                 'session_id': session,
+                'device_uid': device_uid,
                 'serial_port': str(data.get('serial_port', '') or '')[:128],
                 'bridge_version': bridge_version,
                 'state': str(data.get('state', '') or '')[:40],
@@ -13173,6 +13392,19 @@ def wukong_bridge_status_post():
                     session_id=item['session_id'],
                     serial_port=item['serial_port'],
                     reconnect_attempt=item['reconnect_attempt'])
+    # A reconnect or a different USB board cannot inherit execution proof from
+    # the old target.  Clear the sentinel too; it is evidence for that exact
+    # UID/session only.
+    if session and (session != old_session or device_uid != old_uid):
+        with _wukong_boot_info_lock:
+            if (_wukong_boot_info.get('session_id') != session or
+                    _wukong_boot_info.get('device_uid') != device_uid):
+                _wukong_boot_info = {}
+        with _wukong_command_lock:
+            _wukong_runtime_identity = None
+            _wukong_run_unlocked = False
+            _wukong_step_write_trace_seq = None
+            _wukong_step_bridge_session = ''
     if fault_delivery is not None:
         state = fault_delivery.get('state')
         incident_id = fault_delivery.get('incident_id', '')
@@ -13640,6 +13872,9 @@ def wukong_trace_post():
         bp_hit      — bool
         ts          — float timestamp
     """
+    auth_ok, auth_error = _wukong_control_auth()
+    if not auth_ok:
+        return auth_error
     global _wukong_latest_trace, _wukong_latest_cr_gts, _wukong_event_seq, \
            _wukong_call_depth, _wukong_last_trace_post, _wukong_total_trace_posts, \
            _wukong_fault_candidate
@@ -13738,7 +13973,7 @@ def wukong_trace_post():
         # later be cleared only after board-originated skip completion proof.
         _wukong_latest_trace = dict(entry)
         global _wukong_run_unlocked, _wukong_step_write_trace_seq, \
-            _wukong_step_bridge_session
+            _wukong_step_bridge_session, _wukong_runtime_identity
         if bridge_session and entry.get('bridge_trace_counter', -1) >= 0:
             _wukong_bridge_trace_highwater[bridge_session] = max(
                 entry['bridge_trace_counter'],
@@ -13748,8 +13983,19 @@ def wukong_trace_post():
                 _wukong_step_write_trace_seq and
                 (not _wukong_step_bridge_session or
                  bridge_session == _wukong_step_bridge_session)):
-            _wukong_run_unlocked = True
-            _wukong_step_write_trace_seq = None
+            with _wukong_bridge_lock:
+                live = dict(_wukong_bridge_info)
+            live_fresh = bool(
+                live.get('device_uid') and live.get('session_id') == bridge_session and
+                live.get('updated_ts') and
+                _wk_time.time() - float(live['updated_ts']) < _WUKONG_TARGET_FRESH_SECONDS and
+                live.get('state') not in ('reconnecting', 'serial_error', 'network_error'))
+            if live_fresh:
+                _wukong_runtime_identity = {
+                    'device_uid': live['device_uid'], 'session_id': bridge_session,
+                }
+                _wukong_run_unlocked = True
+                _wukong_step_write_trace_seq = None
         # Persist CR GT updates separately so a subsequent CALL_PUSH packet
         # (ev_type=0x08, payload_gt=0) cannot overwrite the CR6/CR14 GTs
         # before the IDE polls GET /hardware/wukong/trace.
@@ -13798,6 +14044,9 @@ def wukong_snapshot_post():
     events, so the browser can apply snapshots atomically and in arrival
     order.
     """
+    auth_ok, auth_error = _wukong_control_auth()
+    if not auth_ok:
+        return auth_error
     global _wukong_latest_snapshot, _wukong_event_seq, \
         _wukong_last_trace_post, _wukong_total_trace_posts, \
         _wukong_fault_candidate
@@ -13949,6 +14198,9 @@ def wukong_snapshot_post():
 @app.route('/hardware/wukong/recovery-authorization', methods=['POST'])
 def wukong_recovery_authorization_post():
     """Record the exact promoted incident for which the bridge wrote ``g``."""
+    auth_ok, auth_error = _wukong_control_auth()
+    if not auth_ok:
+        return auth_error
     global _wukong_event_seq, _wukong_fault_candidate, _fault_snapshot
     data = request.get_json(silent=True) or {}
     incident_id = str(data.get('incident_id', '') or '')
@@ -14201,6 +14453,9 @@ def wukong_console_post():
     differ in presentation and retention.
     Body JSON: {'text': str, 'ts': float}
     """
+    auth_ok, auth_error = _wukong_control_auth()
+    if not auth_ok:
+        return auth_error
     global _wukong_event_seq
     data = request.get_json(silent=True) or {}
     text = str(data.get('text', ''))[:400]
@@ -14232,13 +14487,23 @@ def wukong_command_post():
     surfaced-overwrite behavior.
     """
     global _wukong_pending_cmd, _upload_in_flight, _wukong_cmd_delivery, \
-        _wukong_cmd_id, _wukong_run_unlocked
+        _wukong_cmd_id, _wukong_run_unlocked, _wukong_runtime_identity
+    auth_ok, auth_error = _wukong_control_auth()
+    if not auth_ok:
+        return auth_error
     data = request.get_json(silent=True) or {}
     cmd = str(data.get('cmd', '')).strip()
     if cmd not in ('s', 'r', 'h', 'q', 'b', 'u', 'f', 'k'):
         return jsonify({'ok': False, 'error': 'unknown cmd'}), 400
 
     entry = {'cmd': cmd}
+    target, target_error = _wukong_target_error(data)
+    if target_error:
+        return _wukong_target_rejection(target_error)
+    entry.update(target)
+    # Keep the protocol field explicit in the dequeued command as well as the
+    # compact internal device_uid field used by admission.
+    entry['target_device_uid'] = target['device_uid']
 
     if cmd == 'k':
         # Testing-only Skip Fault is fail-closed at the server as well as RTL.
@@ -14303,7 +14568,28 @@ def wukong_command_post():
         b64 = data.get('data', '')
         if not isinstance(b64, str) or not b64:
             return jsonify({'ok': False, 'error': 'missing data field'}), 400
+        try:
+            artifact = base64.b64decode(b64, validate=True)
+        except (ValueError, TypeError):
+            return jsonify({'ok': False, 'error': 'invalid upload data encoding'}), 400
+        supplied_digest = str(data.get('artifact_sha256', '') or '').lower()
+        supplied_size = data.get('artifact_size')
+        supplied_identity = str(data.get('artifact_identity', '') or '')[:256]
+        digest = hashlib.sha256(artifact).hexdigest()
+        try:
+            supplied_size = int(supplied_size)
+        except (TypeError, ValueError):
+            supplied_size = -1
+        if (not re.fullmatch(r'[0-9a-f]{64}', supplied_digest) or
+                supplied_digest != digest or supplied_size != len(artifact) or
+                not supplied_identity):
+            return jsonify({'ok': False, 'error':
+                            'runtime upload requires matching artifact digest, size, and identity'}), 400
         entry['data'] = b64
+        entry.update({
+            'artifact_sha256': digest, 'artifact_size': len(artifact),
+            'artifact_identity': supplied_identity,
+        })
         # Atomic check-and-set: claim the in-flight slot under the lock so that
         # a concurrent 'u' request cannot also pass the check and overwrite the
         # pending command slot.  Mirrors the lifecycle enforced by
@@ -14341,7 +14627,11 @@ def wukong_command_post():
                 'error': 'Skip Fault disposition is pending or indeterminate; Reboot is required',
                 'blocked_stage': _wukong_skip_pending.get('state'),
             }), 409
-        if cmd == 'r' and not _wukong_run_unlocked:
+        runtime_matches_target = bool(
+            _wukong_runtime_identity and
+            _wukong_runtime_identity.get('device_uid') == target['device_uid'] and
+            _wukong_runtime_identity.get('session_id') == target['bridge_session'])
+        if cmd == 'r' and (not _wukong_run_unlocked or not runtime_matches_target):
             return jsonify({
                 'ok': False,
                 'error': 'RUN locked until a confirmed Step produces a fresh retirement',
@@ -14405,7 +14695,15 @@ def wukong_command_post():
             'board_halt_ts': None,
             'board_halt_session': '',
             'board_state_counter': None,
+            'target_device_uid': entry['device_uid'],
+            'target_session_id': entry['bridge_session'],
         }
+        if cmd == 'u':
+            _wukong_cmd_delivery.update({
+                'artifact_sha256': entry['artifact_sha256'],
+                'artifact_size': entry['artifact_size'],
+                'artifact_identity': entry['artifact_identity'],
+            })
         if cmd == 'k':
             _wukong_cmd_delivery['incident_id'] = entry['incident_id']
             _wukong_cmd_delivery['expected_skip_snapshot_seq'] = (
@@ -14431,9 +14729,13 @@ def wukong_command_get():
     Returns {'cmd': ..., 'nia': ...} if a command is pending, else {}.
     The command is consumed (set to None) on each successful GET.
     """
+    auth_ok, auth_error = _wukong_control_auth()
+    if not auth_ok:
+        return auth_error
     global _wukong_pending_cmd, _wukong_last_bridge_poll, _wukong_total_bridge_polls
     _wukong_last_bridge_poll    = _wk_time.time()
     bridge_session = request.headers.get('X-Wukong-Session', '')[:128]
+    bridge_uid = request.headers.get('X-Wukong-Device-UID', '')[:128]
     _wukong_total_bridge_polls += 1
     if bridge_session:
         with _wukong_bridge_lock:
@@ -14446,6 +14748,18 @@ def wukong_command_get():
             })
     with _wukong_command_lock:
         entry = _wukong_pending_cmd
+        # Never let an arbitrary or stale bridge consume a command addressed to
+        # a particular board.  Leave it queued for the exact live session.
+        if entry and entry.get('target_device_uid'):
+            expected_uid = entry.get('target_device_uid')
+            expected_session = entry.get('bridge_session', '')
+            if (not bridge_uid or not hmac.compare_digest(bridge_uid, expected_uid) or
+                    (expected_session and
+                     not hmac.compare_digest(bridge_session, expected_session))):
+                return jsonify({
+                    'ok': False, 'accepted': False, 'decision': 'target_mismatch',
+                    'error': 'bridge identity does not match queued command target',
+                }), 409
         _wukong_pending_cmd = None
         if entry and _wukong_cmd_delivery \
                 and _wukong_cmd_delivery.get('id') == entry.get('id'):
@@ -14464,6 +14778,8 @@ def wukong_status_get():
     Unlike GET /hardware/wukong/upload-ack (which consumes the result) this
     endpoint only reads state, so polling it never disturbs the IDE's flows.
     """
+    global _wukong_run_unlocked, _wukong_runtime_identity, \
+        _wukong_step_write_trace_seq, _wukong_step_bridge_session
     now = _wk_time.time()
     with _wukong_trace_lock:
         latest    = dict(_wukong_latest_trace)
@@ -14499,6 +14815,8 @@ def wukong_status_get():
                 break
     with _upload_in_flight_lock:
         upl       = _upload_in_flight
+    with _wukong_upload_ack_lock:
+        upload_ack = dict(_wukong_upload_ack)
     with _wukong_command_lock:
         pending   = dict(_wukong_pending_cmd) if _wukong_pending_cmd else None
         delivery  = dict(_wukong_cmd_delivery) if _wukong_cmd_delivery else None
@@ -14512,6 +14830,24 @@ def wukong_status_get():
     with _wukong_bridge_lock:
         bridge_info = dict(_wukong_bridge_info)
         bridge_timeline = list(_wukong_bridge_timeline[-32:])
+    target_live = bool(
+        bridge_info.get('device_uid') and bridge_info.get('session_id') and
+        bridge_info.get('updated_ts') and
+        now - float(bridge_info['updated_ts']) < _WUKONG_TARGET_FRESH_SECONDS and
+        bridge_info.get('state') not in ('reconnecting', 'serial_error', 'network_error'))
+    # Runtime permission is target-scoped evidence, not a sticky process flag.
+    # Expire it when the reported board/session is no longer a fresh exact live
+    # target so a later reconnect cannot inherit permission from an old board.
+    with _wukong_command_lock:
+        runtime_is_current = bool(
+            target_live and _wukong_runtime_identity and
+            _wukong_runtime_identity.get('device_uid') == bridge_info.get('device_uid') and
+            _wukong_runtime_identity.get('session_id') == bridge_info.get('session_id'))
+        if _wukong_runtime_identity and not runtime_is_current:
+            _wukong_runtime_identity = None
+            _wukong_run_unlocked = False
+            _wukong_step_write_trace_seq = None
+            _wukong_step_bridge_session = ''
     if skip_pending and skip_pending.get('state') == 'awaiting_board_evidence':
         indeterminate = (
             now - float(skip_pending.get('write_ts') or now) >
@@ -14581,6 +14917,15 @@ def wukong_status_get():
         'hw_entry_source':    ('upload' if _wukong_hw_entry_slot is not None
                                else 'power-on'),
         'upload_in_flight':   upl,
+        # These identities describe independent physical evidence.  They are
+        # intentionally not collapsed into "installed": a generated/downloaded
+        # bitstream and a runtime RAM upload do not establish FPGA installation.
+        'physical_target': {
+            'device_uid': bridge_info.get('device_uid', ''),
+            'session_id': bridge_info.get('session_id', ''),
+            'live': target_live,
+        },
+        'runtime_upload_ack': upload_ack,
         'pending_command':    pending,
         'command_delivery':   delivery,
         'bridge':              bridge_info,
@@ -14677,14 +15022,20 @@ def wukong_command_ack_post():
     for a superseded command (even one with the same letter) or an ack that
     arrives before consumption can never corrupt the lifecycle.
     """
-    global _wukong_cmd_delivery, _wukong_run_unlocked, \
+    auth_ok, auth_error = _wukong_control_auth()
+    if not auth_ok:
+        return auth_error
+    global _wukong_cmd_delivery, _wukong_run_unlocked, _wukong_runtime_identity, \
         _wukong_step_write_trace_seq, _wukong_step_bridge_session, \
         _wukong_skip_pending
     data = request.get_json(silent=True) or {}
     cmd  = str(data.get('cmd', '')).strip()
     ok   = bool(data.get('ok', False))
     err  = str(data.get('error', ''))[:400] if not ok else ''
-    ack_session = str(data.get('session_id', '') or '')[:128]
+    ack_session = str(data.get('session_id', '') or
+                      request.headers.get('X-Wukong-Session', '') or '')[:128]
+    ack_uid = str(data.get('target_device_uid', '') or
+                  request.headers.get('X-Wukong-Device-UID', '') or '')[:128]
     try:
         ack_trace_counter = int(data.get('trace_counter'))
     except (TypeError, ValueError):
@@ -14711,9 +15062,12 @@ def wukong_command_ack_post():
                 and _wukong_cmd_delivery.get('id') == ack_id \
                 and _wukong_cmd_delivery.get('cmd') == cmd \
                 and _wukong_cmd_delivery.get('consumed_ts') is not None \
-                and (not _wukong_cmd_delivery.get('bridge_session') or
-                     not ack_session or
-                     _wukong_cmd_delivery.get('bridge_session') == ack_session):
+                and (not _wukong_cmd_delivery.get('target_session_id') or
+                     (ack_session and hmac.compare_digest(
+                         _wukong_cmd_delivery.get('target_session_id'), ack_session))) \
+                and (not _wukong_cmd_delivery.get('target_device_uid') or
+                     (ack_uid and hmac.compare_digest(
+                         _wukong_cmd_delivery.get('target_device_uid'), ack_uid))):
             _wukong_cmd_delivery['write_ok']    = ok
             _wukong_cmd_delivery['write_error'] = err
             _wukong_cmd_delivery['write_ts']    = _wk_time.time()
@@ -14723,12 +15077,24 @@ def wukong_command_ack_post():
             _wukong_cmd_delivery['state_counter_at_write'] = ack_state_counter
             _wukong_cmd_delivery['halt_nonce'] = ack_halt_nonce
             if cmd == 's' and ok:
-                _wukong_run_unlocked = (
+                # UART acknowledgement alone does not prove that the board is
+                # executing.  It may, however, reconcile a trace that arrived
+                # first: the per-session highwater then proves a retirement
+                # newer than the bridge's write watermark.  Identity changes
+                # here, only after the exact UID/session ACK has correlated.
+                trace_already_newer = bool(
                     ack_trace_counter is not None and
                     trace_counter_at_ack > ack_trace_counter)
+                _wukong_run_unlocked = trace_already_newer
                 _wukong_step_write_trace_seq = (
-                    None if _wukong_run_unlocked else ack_trace_counter)
+                    None if trace_already_newer else ack_trace_counter)
                 _wukong_step_bridge_session = ack_session
+                if trace_already_newer:
+                    _wukong_runtime_identity = {
+                        'device_uid': _wukong_cmd_delivery.get(
+                            'target_device_uid'),
+                        'session_id': ack_session,
+                    }
             if ack_session:
                 _wukong_cmd_delivery['bridge_session'] = ack_session
             if cmd == 'k' and ok:
@@ -14921,15 +15287,55 @@ def wukong_halt_state_post():
 def wukong_upload_ack_post():
     """Bridge reports the result of a boot-image upload here.
 
-    Body JSON:
-        ok    — true on success, false on failure
-        error — optional human-readable error string (present when ok=false)
+    The acknowledgement is evidence, not a generic completion notification:
+    it must echo the queued command id, selected device UID, artifact digest,
+    size, identity, and consuming bridge session.
     """
+    auth_ok, auth_error = _wukong_control_auth()
+    if not auth_ok:
+        return auth_error
     global _wukong_upload_ack, _upload_in_flight
-    data  = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True) or {}
+    try:
+        command_id = int(data.get('id'))
+        artifact_size = int(data.get('artifact_size'))
+    except (TypeError, ValueError):
+        return jsonify({'ok': False, 'accepted': False,
+                        'decision': 'upload_correlation_missing'}), 400
+    device_uid = str(data.get('target_device_uid', '') or '')[:128]
+    bridge_session = str(data.get('session_id', '') or '')[:128]
+    artifact_digest = str(data.get('artifact_sha256', '') or '').lower()
+    artifact_identity = str(data.get('artifact_identity', '') or '')[:256]
+    with _wukong_command_lock:
+        delivery = _wukong_cmd_delivery
+        correlated = bool(
+            delivery and delivery.get('cmd') == 'u' and
+            delivery.get('id') == command_id and
+            delivery.get('consumed_ts') is not None and
+            hmac.compare_digest(str(delivery.get('target_device_uid', '')), device_uid) and
+            hmac.compare_digest(str(delivery.get('target_session_id', '')), bridge_session) and
+            hmac.compare_digest(str(delivery.get('artifact_sha256', '')), artifact_digest) and
+            delivery.get('artifact_size') == artifact_size and
+            hmac.compare_digest(str(delivery.get('artifact_identity', '')), artifact_identity))
+        if not correlated:
+            return jsonify({'ok': False, 'accepted': False,
+                            'decision': 'upload_correlation_mismatch',
+                            'error': 'upload acknowledgement does not match consumed target command'}), 409
+        # A correlated upload acknowledgement is stronger evidence than the
+        # generic serial-write ACK: the bridge consumed this exact command and
+        # completed (or explicitly failed) its framed payload transaction.
+        delivery['write_ok'] = bool(data.get('ok', False))
+        delivery['write_error'] = str(data.get('error', '')) if not data.get('ok') else ''
+        delivery['write_ts'] = _wk_time.time()
     entry = {
         'ok':    bool(data.get('ok', False)),
         'error': str(data.get('error', '')) if not data.get('ok') else '',
+        'id': command_id,
+        'target_device_uid': device_uid,
+        'session_id': bridge_session,
+        'artifact_sha256': artifact_digest,
+        'artifact_size': artifact_size,
+        'artifact_identity': artifact_identity,
     }
     with _wukong_upload_ack_lock:
         _wukong_upload_ack = entry
@@ -14946,7 +15352,7 @@ def wukong_upload_ack_post():
     # Clear the in-flight flag so execution commands are accepted again.
     with _upload_in_flight_lock:
         _upload_in_flight = False
-    return jsonify({'ok': True})
+    return jsonify({'ok': True, 'accepted': True, 'id': command_id})
 
 
 @app.route('/hardware/wukong/upload-ack', methods=['GET'])
@@ -14980,7 +15386,14 @@ def boot_image_send_to_hardware():
         {error: '...'}  — boot-image.bin missing or command lock unavailable
     """
     global _wukong_pending_cmd, _wukong_upload_ack, _upload_in_flight
+    auth_ok, auth_error = _wukong_control_auth()
+    if not auth_ok:
+        return auth_error
     import base64 as _b64
+    request_data = request.get_json(silent=True) or {}
+    target, target_error = _wukong_target_error(request_data)
+    if target_error:
+        return _wukong_target_rejection(target_error)
 
     # Atomically claim the in-flight slot under the lock.
     # Checking then releasing and later setting is NOT safe: two concurrent
@@ -14997,14 +15410,37 @@ def boot_image_send_to_hardware():
     _rollback = True   # cleared only on successful enqueue
     try:
         _boot_bin = os.path.join(LUMPS_DIR, 'boot-image.bin')
-        if not os.path.isfile(_boot_bin):
-            return jsonify({'error': 'boot-image.bin not found — generate it first'}), 404
-
-        try:
-            with open(_boot_bin, 'rb') as _fh:
-                _raw = _fh.read()
-        except OSError as _exc:
-            return jsonify({'error': f'could not read boot-image.bin: {_exc}'}), 500
+        _source_b64 = request_data.get('source_image_base64')
+        if _source_b64 is not None:
+            try:
+                _raw = _b64.b64decode(str(_source_b64), validate=True)
+            except (ValueError, TypeError):
+                return jsonify({'error': 'exact source image is not valid base64'}), 400
+            if not _raw or len(_raw) > 1024 * 1024:
+                return jsonify({'error': 'exact source image size is invalid'}), 400
+            _source_digest = hashlib.sha256(_raw).hexdigest()
+            try:
+                _claimed_size = int(request_data.get('source_size'))
+            except (TypeError, ValueError):
+                _claimed_size = -1
+            _claimed_digest = str(request_data.get('source_sha256', '') or '').lower()
+            _claimed_identity = str(request_data.get('source_identity', '') or '')
+            _expected_identity = 'church-simulator-memory-v1:' + _source_digest
+            if (_claimed_size != len(_raw) or
+                    not hmac.compare_digest(_claimed_digest, _source_digest) or
+                    not hmac.compare_digest(_claimed_identity, _expected_identity)):
+                return jsonify({
+                    'error': 'exact source image digest, size, or identity mismatch',
+                    'decision': 'source_artifact_mismatch',
+                }), 409
+        else:
+            if not os.path.isfile(_boot_bin):
+                return jsonify({'error': 'boot-image.bin not found — generate it first'}), 404
+            try:
+                with open(_boot_bin, 'rb') as _fh:
+                    _raw = _fh.read()
+            except OSError as _exc:
+                return jsonify({'error': f'could not read boot-image.bin: {_exc}'}), 500
 
         # Residency gate: reject an image whose entry lump body is not
         # resident BEFORE it reaches the board — the FPGA cannot lazy-fetch
@@ -15066,6 +15502,10 @@ def boot_image_send_to_hardware():
                 }), 400
 
         _encoded = _b64.b64encode(_wukong_raw).decode('ascii')
+        _artifact_digest = hashlib.sha256(_wukong_raw).hexdigest()
+        # Upload identity is always derived from the exact projected UART
+        # bytes. Caller labels are not provenance and cannot replace it.
+        _artifact_identity = 'wukong-native-dmem-v1:' + _artifact_digest
 
         # Register NIA label map so trace events for the uploaded lump resolve
         # to "LumpName.N" labels instead of raw hex NIAs.
@@ -15093,7 +15533,11 @@ def boot_image_send_to_hardware():
         with _wukong_command_lock:
             _wukong_cmd_id += 1
             _wukong_pending_cmd = {'cmd': 'u', 'data': _encoded, 'reboot': True,
-                                   'id': _wukong_cmd_id}
+                                   'id': _wukong_cmd_id, **target,
+                                   'target_device_uid': target['device_uid'],
+                                   'artifact_sha256': _artifact_digest,
+                                   'artifact_size': len(_wukong_raw),
+                                   'artifact_identity': _artifact_identity}
             _wukong_cmd_delivery = {
                 'id':          _wukong_cmd_id,
                 'cmd':         'u',
@@ -15102,13 +15546,22 @@ def boot_image_send_to_hardware():
                 'write_ok':    None,
                 'write_error': '',
                 'write_ts':    None,
+                'target_device_uid': target['device_uid'],
+                'target_session_id': target['bridge_session'],
+                'artifact_sha256': _artifact_digest,
+                'artifact_size': len(_wukong_raw),
+                'artifact_identity': _artifact_identity,
             }
 
         _rollback = False   # committed — in-flight flag stays set
         return jsonify({'queued': True, 'size': len(_wukong_raw),
                         'source_size': len(_raw),
                         'format': 'wukong-native-dmem-v1',
-                        'entry_slot': _wukong_entry_info['entry_slot']})
+                        'entry_slot': _wukong_entry_info['entry_slot'],
+                        'id': _wukong_cmd_id,
+                        'target_device_uid': target['device_uid'],
+                        'artifact_sha256': _artifact_digest,
+                        'artifact_identity': _artifact_identity})
     finally:
         if _rollback:
             with _wukong_hw_entry_lock:
@@ -15130,25 +15583,25 @@ def wukong_boot_info_post():
         thread_scheduler — explicit M6 round-robin scheduler advertisement
         startup_state — awaiting_first_step after the bridge writes Halt
     """
-    global _wukong_boot_info, _wukong_run_unlocked, \
+    global _wukong_boot_info, _wukong_run_unlocked, _wukong_runtime_identity, \
         _wukong_step_write_trace_seq, _wukong_step_bridge_session
-    token = os.environ.get('REPORT_TOKEN', '').strip()
-    if not token:
-        return jsonify({
-            'ok': False,
-            'error': 'REPORT_TOKEN is not configured on this server',
-        }), 503
-    supplied = request.headers.get('Authorization', '')
-    if not hmac.compare_digest(supplied, f'Bearer {token}'):
-        return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
+    auth_ok, auth_error = _wukong_control_auth()
+    if not auth_ok:
+        return auth_error
     data = request.get_json(silent=True) or {}
-    reported_session = str(data.get('session_id', '') or '')[:128]
+    reported_session = str(data.get('session_id', '') or
+                           request.headers.get('X-Wukong-Session', '') or '')[:128]
+    reported_uid = str(data.get('device_uid', '') or
+                       request.headers.get('X-Wukong-Device-UID', '') or '')[:128]
     with _wukong_bridge_lock:
         active_session = str(_wukong_bridge_info.get('session_id', '') or '')
-    if not reported_session or reported_session != active_session:
+        active_uid = str(_wukong_bridge_info.get('device_uid', '') or '')
+    if (not reported_session or reported_session != active_session or
+            not reported_uid or not active_uid or
+            not hmac.compare_digest(reported_uid, active_uid)):
         return jsonify({
             'ok': False,
-            'error': 'boot sentinel does not match the active bridge session',
+            'error': 'boot sentinel does not match the active bridge target',
         }), 409
     bv = data.get('build_version')
     entry = {
@@ -15158,6 +15611,7 @@ def wukong_boot_info_post():
         'thread_scheduler': bool(data.get('thread_scheduler', False)),
         'startup_state': str(data.get('startup_state', '') or '')[:40],
         'session_id':   reported_session,
+        'device_uid':   reported_uid,
         'trusted':      True,
         # Server-side receive timestamp: lets the /fpga page confirm a FRESH
         # sentinel arrived after an explicit reboot or authorized fault recovery.
@@ -15165,11 +15619,17 @@ def wukong_boot_info_post():
     }
     with _wukong_boot_info_lock:
         _wukong_boot_info = entry
+    # A sentinel denotes a new board boot epoch.  Previous runtime proof,
+    # even for the same USB session, cannot authorize this epoch.
+    with _wukong_command_lock:
+        _wukong_run_unlocked = False
+        _wukong_runtime_identity = None
+        _wukong_step_write_trace_seq = None
+        _wukong_step_bridge_session = entry.get('session_id', '')
     if entry.get('startup_state') == 'awaiting_first_step':
-        with _wukong_command_lock:
-            _wukong_run_unlocked = False
-            _wukong_step_write_trace_seq = None
-            _wukong_step_bridge_session = entry.get('session_id', '')
+        # The state is already recorded above; retain this branch as the
+        # explicit protocol marker for callers reading the source.
+        pass
     with _wukong_bridge_lock:
         _wukong_bridge_timeline.append({
             'ts': entry['received_ts'], 'session_id': entry['session_id'],
@@ -15248,6 +15708,26 @@ def _ba_fresh_nonce():
         _ba_nonce_store['nonce']   = nonce
         _ba_nonce_store['expires'] = _time.monotonic() + _BA_NONCE_TTL_SECS
     return nonce
+
+
+def _ba_provenance_identity(ns_map, source_commit=None, source_version=None):
+    """Return a stable, exact build-intent identity for an approved map.
+
+    This is deliberately derived from immutable approval/provenance facts, not
+    from the one-use CSRF nonce.  A nonce proves request freshness; it must
+    never become the name of the artifact the request intends to build.
+    """
+    material = {
+        'schema': 'wukong-build-intent-v1',
+        'namespace_map': ns_map,
+        'source_commit': source_commit or _git_full_head() or _git_short_hash(),
+        'source_version': source_version if source_version is not None
+                          else _wukong_build_version(),
+    }
+    canonical = json.dumps(material, sort_keys=True, separators=(',', ':'),
+                           ensure_ascii=True)
+    return 'wukong-build-intent:v1:' + hashlib.sha256(
+        canonical.encode('utf-8')).hexdigest()
 
 def _ba_check_report_token():
     """
@@ -15355,7 +15835,11 @@ def build_approval_snapshot_latest():
         path = os.path.join(_BUILD_SNAPSHOTS_DIR, latest)
         with open(path) as f:
             snap = json.load(f)
-        return jsonify({'filename': latest, 'frozen_at': snap.get('frozen_at')})
+        return jsonify({
+            'filename': latest, 'frozen_at': snap.get('frozen_at'),
+            'provenance_identity': snap.get('provenance_identity'),
+            'build_intent_id': snap.get('provenance_identity'),
+        })
     except Exception as e:
         return jsonify({'filename': None, 'error': str(e)})
 
@@ -16536,7 +17020,21 @@ def wukong_build_start():
     ok, err = _ba_validate_build_auth()
     if not ok:
         return err
-
+    request_data = request.get_json(silent=True) or {}
+    target, target_error = _wukong_target_error(request_data)
+    if target_error:
+        return _wukong_target_rejection(target_error)
+    supplied_identities = [
+        str(request_data.get(key, '') or '').strip()
+        for key in ('build_intent_id', 'provenance_identity',
+                    'build_id', 'artifact_identity')
+        if request_data.get(key) is not None
+    ]
+    if len(set(supplied_identities)) > 1:
+        return jsonify({
+            'ok': False,
+            'error': 'bitstream build requires one exact selected build/provenance identity',
+        }), 400
     # Server-side approval gate: require a freshly frozen snapshot where every
     # check passed.  An authenticated direct POST cannot bypass the UI's
     # "all checks pass" rule — the server re-enforces it here.
@@ -16559,6 +17057,17 @@ def wukong_build_start():
         return jsonify({'ok': False,
                         'error': (f'Latest snapshot ({snap_files[-1]}) has failed or missing '
                                   f'checks — fix all issues and re-freeze before launching build')}), 422
+    approved_identity = str(latest_snap.get('provenance_identity', '') or '')
+    # Build/provenance aliases are retained only for older UI clients; every
+    # supplied one must be the exact approved identity.  build_nonce was
+    # already checked as CSRF proof and is intentionally excluded.
+    if (not approved_identity or not supplied_identities or
+            any(not hmac.compare_digest(value, approved_identity)
+                for value in supplied_identities)):
+        return jsonify({
+            'ok': False,
+            'error': 'bitstream build requires one exact selected build/provenance identity',
+        }), 400
 
     with _ba_build_lock:
         if _ba_build_done is False and _ba_build_log:
@@ -16605,6 +17114,10 @@ def wukong_build_start():
             "source_commit": source_commit,
             "record_id": record_id,
             "namespace_fingerprint": namespace_snapshot["fingerprint"],
+            "target_device_uid": target["device_uid"],
+            "target_session_id": target["bridge_session"],
+            "selected_build_id": approved_identity,
+            "provenance_identity": approved_identity,
         }
 
     t = threading.Thread(target=_ba_build_worker, args=(key_path,), daemon=True)
@@ -16614,7 +17127,8 @@ def wukong_build_start():
                     'build_record_id': record_id,
                     'hardware_version': source_version,
                     'source_commit': source_commit,
-                    'namespace_fingerprint': namespace_snapshot["fingerprint"]})
+                     'namespace_fingerprint': namespace_snapshot["fingerprint"],
+                     'provenance_identity': approved_identity})
 
 @app.route('/api/wukong-build/status', methods=['GET'])
 def wukong_build_status():
@@ -16645,7 +17159,8 @@ def wukong_build_status():
                     'build_record_id': build_context.get('record_id'),
                     'hardware_version': build_context.get('version'),
                     'source_commit': build_context.get('source_commit'),
-                    'namespace_fingerprint': build_context.get('namespace_fingerprint')})
+                     'namespace_fingerprint': build_context.get('namespace_fingerprint'),
+                     'provenance_identity': build_context.get('provenance_identity')})
 
 @app.route('/api/build-approval/freeze-snapshot', methods=['POST'])
 def build_approval_freeze_snapshot():
@@ -16691,16 +17206,20 @@ def build_approval_freeze_snapshot():
         all_pass = _snap_all_pass(ns_map)
         now_str = _ba_datetime.datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
         filename = f'build-approval-{now_str}.json'
+        provenance_identity = _ba_provenance_identity(ns_map)
         snap = {
             'frozen_at': now_str,
             'all_checks_pass': all_pass,
             'ns_map': ns_map,
+            'provenance_identity': provenance_identity,
         }
         path = os.path.join(_BUILD_SNAPSHOTS_DIR, filename)
         with open(path, 'w') as f:
             json.dump(snap, f, indent=2)
         return jsonify({'ok': True, 'filename': filename, 'frozen_at': now_str,
-                        'all_checks_pass': all_pass})
+                        'all_checks_pass': all_pass,
+                        'provenance_identity': provenance_identity,
+                        'build_intent_id': provenance_identity})
     except Exception as e:
         app.logger.exception('freeze-snapshot error')
         return jsonify({'ok': False, 'error': str(e)}), 500
