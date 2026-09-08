@@ -3414,7 +3414,14 @@ def _auto_regen_boot_image():
         _cfg, _err = _read_saved_boot_config()
         if _err:
             return None, f"Cannot read boot config: {_err}"
-        _blob = _boot_image_gen.generate_boot_image(_cfg, LUMPS_DIR)
+        # Preserve the programmer-selected LightningBolt/Starter during
+        # staleness regeneration.  Omitting this argument falls back to the
+        # SelfTest slot, which rewrites SelfTest.Next.GT as a self-reference and
+        # turns its final ELOADCALL into unbounded recursion.
+        _entry_slot = _cfg.get(
+            "bootEntrySlot", DEFAULT_BOOT_CONFIG["bootEntrySlot"])
+        _blob = _boot_image_gen.generate_boot_image(
+            _cfg, LUMPS_DIR, boot_entry_slot=_entry_slot)
         _write_boot_image_bytes(_blob)
         _load_boot_abstr_lump()
         _load_boot_ns_lump()

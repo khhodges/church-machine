@@ -11,12 +11,13 @@
 ; The lump is built from this file by scripts/build_capability_test_lump.js,
 ; which supplies hardware GT words for each declared capability.
 ;
-; C-list layout (CapabilityTest's own 5-entry c-list, injected at load):
+; C-list layout (CapabilityTest's own 6-entry c-list, injected at load):
 ;   [0] SelfTest   E    (NS  6)  0x4A000006 -- entry-callable abstraction
 ;   [1] LED_DEV    RW   (NS  3)  0x32000003 -- hardware LED register file
 ;   [2] UART_DEV   RW   (NS  2)  0x32000002 -- hardware UART TX/STATUS/RX
 ;   [3] BTN_DEV    R    (NS  4)  0x12000004 -- hardware button state
 ;   [4] TIMER_DEV  RW   (NS  5)  0x32000005 -- hardware timer registers
+;   [5] WukongCallHome E (NS 7)  0x4A000007 -- post-validation continuation
 ; ============================================================
 
 capabilities {
@@ -25,6 +26,7 @@ capabilities {
     UART_DEV RW,
     BTN_DEV R,
     TIMER_DEV RW
+    WukongCallHome E
 }
 
 ; ============================================================
@@ -64,11 +66,12 @@ LOADNE CR0, SelfTest  ; EXEC  -- condition NE met (Z=0) -- restore CR0
 ; ============================================================
 ; Namespace initialization actually provisions CR12.M through its private,
 ; single-word M-bit I/O object immediately before CapabilityTest execution; it
-; also leaves CR13.M clear for the negative case. This is an explicit
-; initialization step, not an assumed initial state. The source is ordinary
-; L-capable CR6; it neither needs nor receives M authority.
+; This is an explicit initialization step, not an assumed initial state. The
+; source is ordinary L-capable CR6; it neither needs nor receives M authority.
 SWITCH CR12, CR6, #0  ; M-present destination: load c-list[0] into CR12
-SWITCH CR13, CR6, #0  ; M-absent destination: fault, with no state mutation
+; The M-absent CR13 negative case is intentionally excluded from this continuing
+; Starter path because PERM_L is a terminal fault; it belongs in an isolated
+; fault test.
 
 ; ============================================================
 ; TEST 7: Turing ISA -- integer arithmetic on data registers
@@ -82,9 +85,11 @@ SHL  DR4, DR4, 3      ; DR4 = 8
 SHR  DR4, DR4, 1      ; DR4 = 4
 
 ; ============================================================
-; TEST 8: ELOADCALL -- fused Load + E-check + Call on SelfTest
+; TEST 8: ELOADCALL -- continue to WukongCallHome
 ; ============================================================
-ELOADCALL CR0, SelfTest, 0     ; Load SelfTest into CR0, verify E, call entry 0
+; SelfTest already ran before Starter/CapabilityTest. Calling it again here
+; creates the unbounded SelfTest → CapabilityTest → SelfTest frame cycle.
+ELOADCALL CR0, WukongCallHome, 0
 
 ; --- All tests complete ---
 HALT

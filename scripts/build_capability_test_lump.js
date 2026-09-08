@@ -8,12 +8,13 @@
 // CapabilityTest's protected slot lookup token remains 00000a00. Content is
 // named by sha256(dot_name_utf8 + lump_bytes)[:8], per lump_integrity.py.
 //
-// C-List (cc=5) — tail of the lump, 5 slots:
+// C-List (cc=6) — tail of the lump, 6 slots:
 //   Slot 0  SelfTest   (NS slot 6, E)    — E-perm callable abstraction
 //   Slot 1  LED_DEV    (NS slot 3, RW)   — hardware LED register file
 //   Slot 2  UART_DEV   (NS slot 2, RW)   — hardware UART TX/STATUS/RX
 //   Slot 3  BTN_DEV    (NS slot 4, R)    — hardware button state
 //   Slot 4  TIMER_DEV  (NS slot 5, RW)   — hardware timer registers
+//   Slot 5  WukongCallHome (NS slot 7, E) — post-validation continuation
 //
 // GT encoding (v2.0):
 //   b_flag[31] | perm[30:28] | dom[27] | gt_type[26:25] | gt_seq[24:16] | slot[15:0]
@@ -36,6 +37,7 @@
 const fs   = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { spawnSync } = require('child_process');
 
 const ROOT        = path.resolve(__dirname, '..');
 const ASSEMBLER   = path.join(ROOT, 'simulator', 'assembler.js');
@@ -49,6 +51,7 @@ const LUMPS_DIR   = (_outDirIdx !== -1 && process.argv[_outDirIdx + 1])
     : path.join(ROOT, 'server', 'lumps');
 const MANIFEST    = path.join(LUMPS_DIR, 'manifest.json');
 const NS_STATE    = path.join(LUMPS_DIR, 'ns-state.json');
+const APPROVALS   = path.join(LUMPS_DIR, 'approvals.json');
 const IDENTITY_TOKEN = '00000a00';
 const DOT_NAME = 'CapabilityTest';
 const ISSUE_N = 2;
@@ -118,7 +121,7 @@ const FRAME = contentFrame(DOT_NAME, source);
 
 // ── C-List definition ─────────────────────────────────────────────────────────
 //
-// cc = 5  (one GT per declared capability).
+// cc = 6  (one GT per declared capability).
 //
 // GT layout (v2.0):
 //   [31]    b_flag  = 0
@@ -139,6 +142,8 @@ const CLIST = [
       note: 'BTN_DEV     Turing R-only Inform GT (NS slot 4, MMIO 0x40000028)' },
     { gt: 0x32000005, name: 'TIMER_DEV',  ns_slot: 5, rights: ['R', 'W'],
       note: 'TIMER_DEV   Turing RW     Inform GT (NS slot 5, MMIO 0x4000002C)' },
+    { gt: 0x4A000007, name: 'WukongCallHome', ns_slot: 7, rights: ['E'],
+      note: 'WukongCallHome Church E-perm Inform GT (NS slot 7)' },
 ];
 
 // ── Pack LUMP binary ─────────────────────────────────────────────────────────
@@ -150,7 +155,7 @@ const CLIST = [
 //   Words lumpSize-cc..lumpSize-1 : c-list GT words (tail-packed)
 //
 const cw = words.length;
-const cc = CLIST.length;   // 5
+const cc = CLIST.length;   // 6
 const totalNeeded = 1 + cw + FRAME.length + cc;
 
 let lumpSize = 64;
@@ -199,11 +204,25 @@ const contentId = crypto.createHash('sha256')
     .slice(0, 8);
 const token = IDENTITY_TOKEN;
 const artifactStem = `${DOT_NAME}.${ISSUE_N}.${contentId}`;
+const filename = `${artifactStem}.lump`;
+const approvalRecord = {
+    binary_hash: binaryHash,
+    filename,
+    dot_name: DOT_NAME,
+    issue_n: ISSUE_N,
+    identity_string: IDENTITY_STRING,
+    identity_hash: IDENTITY_HASH,
+    identity_seal_location: 'approval',
+    token,
+    abstraction: DOT_NAME,
+    grants: ['E'],
+    capability_type: 'inform',
+};
 console.log(`Identity token: ${token}`);
 console.log(`Binary SHA-256: ${binaryHash}`);
 
 if (CHECK_ONLY) {
-    const expectedLump = path.join(LUMPS_DIR, `${artifactStem}.lump`);
+    const expectedLump = path.join(LUMPS_DIR, filename);
     const failures = [];
     if (!fs.existsSync(expectedLump) ||
         !fs.readFileSync(expectedLump).equals(bytes)) {
@@ -220,12 +239,21 @@ if (CHECK_ONLY) {
         if (bindings.length !== 1 ||
             bindings[0].abstraction !== 'CapabilityTest' ||
             bindings[0].ns_slot !== 10 ||
-            bindings[0].filename !== `${artifactStem}.lump` ||
+            bindings[0].filename !== filename ||
             bindings[0].issue_n !== ISSUE_N ||
             bindings[0].identity_hash !== IDENTITY_HASH ||
             bindings[0].binary_hash !== binaryHash) {
             failures.push('manifest canonical slot-10 binding is stale');
         }
+    }
+    let approvals = null;
+    try {
+        approvals = JSON.parse(fs.readFileSync(APPROVALS, 'utf8')).approvals;
+    } catch (_) {}
+    if (!approvals || !approvals[binaryHash] ||
+        Object.entries(approvalRecord).some(
+            ([key, value]) => JSON.stringify(approvals[binaryHash][key]) !== JSON.stringify(value))) {
+        failures.push('CapabilityTest hash-bound approval is missing or stale');
     }
     if (failures.length) {
         for (const failure of failures) console.error(`FAIL: ${failure}`);
@@ -243,7 +271,7 @@ const manifest = fs.existsSync(MANIFEST)
 const existingIdx = manifest.findIndex(e => e.token === IDENTITY_TOKEN);
 if (existingIdx !== -1) {
     const oldLumpName = manifest[existingIdx].filename;
-    if (oldLumpName && oldLumpName !== `${artifactStem}.lump`) {
+    if (oldLumpName && oldLumpName !== filename) {
         const oldLump = path.join(LUMPS_DIR, oldLumpName);
         if (fs.existsSync(oldLump))    { fs.unlinkSync(oldLump);    console.log(`Removed old: ${oldLump}`); }
     }
@@ -251,13 +279,13 @@ if (existingIdx !== -1) {
 }
 
 // ── Write .lump binary ───────────────────────────────────────────────────────
-const lumpPath    = path.join(LUMPS_DIR, `${artifactStem}.lump`);
+const lumpPath    = path.join(LUMPS_DIR, filename);
 
 fs.writeFileSync(lumpPath, bytes);
 console.log(`Written: ${lumpPath} (${bytes.length} bytes)`);
 
 // ── Print c-list slot assignments ─────────────────────────────────────────────
-console.log('\nC-List GT slot assignments (cc=5, tail-packed):');
+console.log(`\nC-List GT slot assignments (cc=${cc}, tail-packed):`);
 for (let i = 0; i < CLIST.length; i++) {
     const gt = '0x' + CLIST[i].gt.toString(16).padStart(8, '0');
     console.log(`  slot ${i}  ${gt}  ${CLIST[i].note}`);
@@ -268,7 +296,7 @@ const manifestEntry = {
     ...(existingIdx !== -1 ? manifest[existingIdx] : {}),
     token,
     abstraction:     'CapabilityTest',
-    filename:        `${artifactStem}.lump`,
+    filename,
     ns_slot:         10,
     ns_slot_policy:  'static',
     boot_resident:   true,
@@ -300,11 +328,28 @@ if (fs.existsSync(NS_STATE)) {
     if (bindings.length !== 1) {
         throw new Error('ns-state must contain exactly one canonical CapabilityTest slot-10 binding');
     }
-    bindings[0].filename = `${artifactStem}.lump`;
+    bindings[0].filename = filename;
     bindings[0].issue_n = ISSUE_N;
+    bindings[0].identity_hash = IDENTITY_HASH;
+    bindings[0].binary_hash = binaryHash;
     fs.writeFileSync(NS_STATE, stableRepositoryJson(nsState));
     console.log(`Updated: ${NS_STATE}`);
 }
+
+const approvalWriter = [
+    'import json, sys',
+    'from server.lump_approvals import read_approvals, write_approvals',
+    'records = read_approvals(sys.argv[1])',
+    'records[sys.argv[2]] = json.loads(sys.argv[3])',
+    'write_approvals(sys.argv[1], records)',
+].join('; ');
+const approvalWrite = spawnSync(process.env.PYTHON || 'python3',
+    ['-c', approvalWriter, APPROVALS, binaryHash, JSON.stringify(approvalRecord)],
+    { cwd: ROOT, encoding: 'utf8' });
+if (approvalWrite.status !== 0) {
+    throw new Error(`approval update failed: ${approvalWrite.stderr || approvalWrite.error}`);
+}
+console.log(`Updated: ${APPROVALS}`);
 
 console.log('\nManifest entry written:');
 console.log(JSON.stringify(manifestEntry, null, 4));

@@ -83,6 +83,30 @@ def _write_valid(path):
     return valid
 
 
+def test_auto_regen_preserves_saved_lightning_bolt_slot():
+    import server.app as app_module
+
+    cfg = _default_cfg()
+    cfg["bootEntrySlot"] = 10
+    blob = b"generated-boot-image"
+
+    with (
+        patch.object(app_module, "_read_saved_boot_config",
+                     return_value=(cfg, None)),
+        patch.object(app_module._boot_image_gen, "generate_boot_image",
+                     return_value=blob) as generate,
+        patch.object(app_module, "_write_boot_image_bytes"),
+        patch.object(app_module, "_load_boot_abstr_lump"),
+        patch.object(app_module, "_load_boot_ns_lump"),
+    ):
+        result, error = app_module._auto_regen_boot_image()
+
+    assert error is None
+    assert result == blob
+    generate.assert_called_once_with(
+        cfg, app_module.LUMPS_DIR, boot_entry_slot=10)
+
+
 @pytest.mark.parametrize("slot", [0, 1, 2, 3, 4, 5, 6, 10])
 def test_binary_rejects_zeroed_mandatory_descriptor(client, temp_image_path, slot):
     words = list(struct.unpack("<16384I", _make_valid_image()))
