@@ -152,3 +152,4 @@
 - [Saved LUMP binary authority](saved-lump-binary-authority.md) — after save, evict code-only memory words so the immutable server binary supplies embedded source
 - [Starter handoff must be acyclic](starter-handoff-acyclic.md) — startup SelfTest hands off once; Starter must continue onward, never call SelfTest back
 - [Quiet hardware loops are not freezes](quiet-hardware-loops-not-freezes.md) — stale trace age alone cannot prove a running Wukong stalled; only causal command expectations may time out
+- [Trace row correlation](trace-row-correlation.md) — combine NIA symbols and raw words only after identity validation; conflicts must remain visibly unresolved

@@ -18382,6 +18382,11 @@ function _wukongTraceLocationText(data) {
     const nia = '0x' + niaInt.toString(16).padStart(8, '0').toUpperCase();
     const label = data && data.nia_label;
     const disasm = data && data.disasm;
+    const metadataStatus = data && data.metadata_status;
+    if (metadataStatus && metadataStatus !== 'matched') {
+        return 'NIA=' + nia + ' ' + (disasm || '<instruction unavailable>') +
+            ' <' + metadataStatus + '>';
+    }
     if (label) {
         return label + ' (NIA=' + nia + ') ' +
             (disasm || '<instruction unavailable>');
@@ -18734,7 +18739,8 @@ function _wukongNormalizeEvent(e) {
         (_WUKONG_EV_TRACE_NAMES[e.ev_type] || e.event ||
          ('EV_0x' + (e.ev_type || 0).toString(16).toUpperCase()));
     const hasGt = _WUKONG_EV_HAS_GT_PAYLOAD.has(Number(e.ev_type));
-    const raw = e.instr != null ? e.instr : e.instr_word;
+    const raw = e.observed_instr_word != null ? e.observed_instr_word :
+        (e.instr != null ? e.instr : null);
     return {
         seq: e.seq == null ? 'unavailable' : e.seq,
         type: snapshot ? 'snapshot' : (e.kind === 'info' ? 'info' : 'trace'),
@@ -18743,6 +18749,7 @@ function _wukongNormalizeEvent(e) {
         offset: e.offset == null ? 'unavailable' : e.offset,
         raw: raw == null ? 'unavailable' : _wukongHex(raw),
         decoded: e.disasm || 'unavailable',
+        metadata: e.metadata_status || (e.disasm ? 'NIA map' : 'unavailable'),
         source: e.source_map || 'unavailable',
         flags: e.flags == null ? 'unavailable' : _wukongFlagsStr(e.flags),
         gt: hasGt ? _wukongHex(e.payload_gt || 0) : 'unavailable',
@@ -18781,7 +18788,8 @@ function _wukongFormatEvent(e) {
         (e.group || (e.nia == null ? 'unavailable' : _wukongHex(e.nia) + ':' + n.event.split(' ')[0])) +
         ' event=' + n.event +
         ' nia=' + n.nia + ' lump=' + n.lump + ' offset=' + n.offset +
-        ' raw=' + n.raw + ' decoded=' + n.decoded + ' source=' + n.source +
+        ' raw=' + n.raw + ' decoded=' + n.decoded + ' metadata=' + n.metadata +
+        ' source=' + n.source +
         ' flags=' + n.flags + ' payload_gt=' + n.gt + ' gt_label=' + n.gtLabel +
         ' depth=' + n.depth + ' breakpoint=' + n.breakpoint + ' fault=' + n.fault;
 }

@@ -189,12 +189,51 @@ def _wukong_resolve_nia(nia):
             'pet_name':   name,
             'offset':     offset,
             'nia_label':  f'{name}.{offset}',
+            'map_instr_word': int(word) & 0xFFFFFFFF if word is not None else None,
             'disasm':     disasm,
             'source_map': 'uploaded',
         }
     return _wukong_trace_metadata_static(nia)
 
 _wukong_trace_metadata = _wukong_resolve_nia
+
+
+def _wukong_correlate_trace_metadata(nia, supplied_word=None):
+    """Return only instruction metadata that belongs to this retirement.
+
+    NIA-backed symbols are authoritative when the packet has no instruction
+    word.  When a newer bridge supplies a word, it must match the word mapped
+    at that NIA.  An unknown NIA can still be decoded from its supplied word,
+    but is explicitly marked as word-only rather than assigned a false label.
+    """
+    location = _wukong_trace_metadata(nia) or {}
+    word = None if supplied_word is None else int(supplied_word) & 0xFFFFFFFF
+    expected = location.get('map_instr_word')
+    if word is None:
+        if location:
+            location['metadata_status'] = 'NIA map (unverified)'
+        return location
+    if expected is not None and (int(expected) & 0xFFFFFFFF) != word:
+        return {
+            'observed_instr_word': word,
+            'disasm': _wukong_disassemble_word(word),
+            'source_map': 'instruction-word',
+            'metadata_status': (
+                f"mismatch: NIA map has 0x{int(expected) & 0xFFFFFFFF:08X}, "
+                f"packet has 0x{word:08X}"
+            ),
+        }
+    if not location:
+        return {
+            'observed_instr_word': word,
+            'disasm': _wukong_disassemble_word(word),
+            'source_map': 'instruction-word',
+            'metadata_status': 'address metadata unavailable',
+        }
+    location['observed_instr_word'] = word
+    location['metadata_status'] = 'matched'
+    return location
+
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -13888,7 +13927,10 @@ def wukong_trace_post():
         'ev_type':     ev_type,
         'payload_gt':  payload_gt,
         'gt_label':    str(data.get('gt_label', '') or ''),
-        'instr':       int(data.get('instr', 0)),
+        # Reserved for a future packet field that is observed at retirement.
+        # Never promote bridge map metadata into raw hardware evidence.
+        'instr':       (int(data['observed_instr_word'])
+                        if data.get('observed_instr_word') is not None else None),
         'flags':       int(data.get('flags', 0)),
         'fault_code':  int(data.get('fault_code', 0)),
         'fault_valid': bool(data.get('fault_valid', False)),
@@ -13914,16 +13956,9 @@ def wukong_trace_post():
             }), 400
         entry['incident_id'] = incident_id
         entry['bridge_session'] = bridge_session
-    # The packet format intentionally remains backward-compatible.  Prefer
-    # metadata supplied by a newer bridge, but derive it server-side as well
-    # for old bridges that only POST the original packet fields.
-    location = {
-        key: data[key]
-        for key in ('pet_name', 'offset', 'nia_label', 'disasm', 'source_map')
-        if key in data
-    }
-    if not location:
-        location = _wukong_trace_metadata(entry['nia']) or {}
+    # Correlate all display metadata server-side.  Never combine a bridge's
+    # stale NIA label/disassembly with a different packet instruction word.
+    location = _wukong_correlate_trace_metadata(entry['nia'], entry['instr'])
     entry.update(location)
     trace_digest = _wukong_payload_digest({
         key: entry[key] for key in sorted(entry)

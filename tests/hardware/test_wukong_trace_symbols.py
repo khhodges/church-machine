@@ -43,6 +43,16 @@ def test_wukong_callhome_immediate_arithmetic_strips_marker():
     item = trace_metadata(0x0000120C)
     assert item["nia_label"] == "WukongCallHome.3"
     assert item["disasm"] == "IADD DR1, DR0, #1"
+    assert item["map_instr_word"] == 0xAF084001
+
+
+def test_wukong_callhome_dwrite_and_loop_branch_have_distinct_identity():
+    write = trace_metadata(0x00001210)
+    branch = trace_metadata(0x00001324)
+    assert write["map_instr_word"] == 0x8F098000
+    assert write["disasm"] == "DWRITE DR1, CR3, #0, DR0"
+    assert branch["map_instr_word"] == 0xBF007FBB
+    assert branch["disasm"] == "BRANCH -69"
 
 
 def test_selftest_register_arithmetic_names_selected_dr():

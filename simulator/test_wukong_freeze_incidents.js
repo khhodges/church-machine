@@ -44,6 +44,23 @@ check('single-step delivery delay produces no stall', c({bridge_connected:true,l
 check('fresh retirement produces no incident', c({bridge_connected:true,last_trace_age:2,latest_trace:trace}) === null);
 check('sustained quiet running remains incident-free', c({bridge_connected:true,last_trace_age:30,latest_trace:trace}) === null);
 
+const normalize = new Function('e', '_WUKONG_EV_TRACE_NAMES',
+    '_WUKONG_EV_HAS_GT_PAYLOAD', '_wukongHex', '_wukongFlagsStr',
+    '_decodeGtLabel', '_WUKONG_FAULT_NAMES',
+    body('_wukongNormalizeEvent', 'e'));
+const mismatch = normalize({
+    nia: 0x0114, instr: 0x8F098000,
+    disasm: 'DWRITE DR1, CR3, #0, DR0',
+    source_map: 'instruction-word',
+    metadata_status: 'address metadata unavailable',
+    ev_type: 0, flags: 0
+}, {}, new Set(), v => '0x' + (v >>> 0).toString(16).toUpperCase().padStart(8, '0'),
+() => '-', () => null, {});
+check('0x0114 raw DWRITE stays explicitly uncorrelated from address metadata',
+    mismatch.decoded.startsWith('DWRITE') &&
+    mismatch.metadata === 'address metadata unavailable' &&
+    mismatch.lump === 'unavailable');
+
 const lifecycle = new Function('_WUKONG_FREEZE_SECONDS', `
 let _wukongStepProgressExpectation = null;
 let _wukongFreezeIncidentKey = null;

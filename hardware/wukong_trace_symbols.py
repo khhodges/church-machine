@@ -143,6 +143,7 @@ def _resident_lump_metadata(nia, base, pet_name, words):
         "pet_name": pet_name,
         "offset": offset,
         "nia_label": f"{pet_name}.{offset}",
+        "map_instr_word": int(words[offset]) & 0xFFFFFFFF,
         "disasm": (
             "LUMP_HEADER" if offset == 0
             else _disassemble_word(words[offset])
@@ -169,16 +170,10 @@ def trace_metadata(nia):
             "pet_name": "Boot",
             "offset": offset,
             "nia_label": f"Boot.{offset}",
+            "map_instr_word": _BOOT_WORDS[offset],
             "disasm": boot_disassembly(offset),
             "source_map": "reference-bitstream",
         }
-
-    location = _resident_lump_metadata(
-        nia, WUKONG_SELFTEST_BASE, WUKONG_SELFTEST_PET_NAME,
-        WUKONG_SELFTEST_WORDS,
-    )
-    if location is not None:
-        return location
 
     # WukongCallHome's generated header is not part of NUC_PROGRAM.
     wch_words = (
@@ -186,6 +181,16 @@ def trace_metadata(nia):
     ) + WUKONG_CALLHOME_WORDS
     location = _resident_lump_metadata(
         nia, WUKONG_CALLHOME_BASE, WUKONG_CALLHOME_PET_NAME, wch_words
+    )
+    if location is not None:
+        return location
+
+    # The hardware-resident SelfTest allocation is 512 words.  The canonical
+    # source tuple may include build-time material beyond that allocation;
+    # never let it overlap WukongCallHome or claim unrelated addresses.
+    location = _resident_lump_metadata(
+        nia, WUKONG_SELFTEST_BASE, WUKONG_SELFTEST_PET_NAME,
+        WUKONG_SELFTEST_WORDS[:512],
     )
     if location is not None:
         return location

@@ -547,6 +547,7 @@ def _trace_location(nia):
             'pet_name': 'WukongCallHome',
             'offset': offset,
             'nia_label': f'WukongCallHome.{offset}',
+            'map_instr_word': _STANDALONE_WUKONG_WORDS[offset - 1],
             'disasm': _standalone_disassemble(_STANDALONE_WUKONG_WORDS[offset - 1]),
             'source_map': 'reference-bitstream',
         }
