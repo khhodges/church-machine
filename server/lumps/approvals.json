@@ -262,6 +262,19 @@
       "filename": "WukongCallHome.1.e3f43d74.lump",
       "bootstrap_t": "4a000007",
       "bootstrap_runtime_gt": 1241513991
+    },
+    "9fd1738667d0ad6d41d56377c99baf6e5e88ef9b00fc7294a26b48ef48ae5916": {
+      "abstraction": "WukongCallHome",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "9fd1738667d0ad6d41d56377c99baf6e5e88ef9b00fc7294a26b48ef48ae5916",
+      "dot_name": "WukongCallHome",
+      "issue_n": 1,
+      "filename": "WukongCallHome.1.abde52f5.lump",
+      "bootstrap_t": "4a000007",
+      "bootstrap_runtime_gt": 1241513991
     }
   }
 }

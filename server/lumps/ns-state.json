@@ -92,8 +92,8 @@
       "location": "0x00000110",
       "type": "Inform",
       "token": "4a000007",
-      "filename": "WukongCallHome.1.e3f43d74.lump",
-      "lump_version": 6,
+      "filename": "WukongCallHome.1.abde52f5.lump",
+      "lump_version": 8,
       "resident": true,
       "boot_resident": true,
       "f": 0,
@@ -183,5 +183,5 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1788903839.3342361
+  "generated_at": 1788906225.6668735
 }

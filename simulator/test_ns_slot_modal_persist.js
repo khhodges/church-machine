@@ -201,6 +201,15 @@ try {
     check('T12 slot only: policy inferred static', policy === 'static', policy);
 }
 
+// T13 — load-mode controls must carry the selected slot into the click handler.
+// A previous handler referenced an undeclared slotIdx and crashed the artifact.
+check('T13 cycle-mode handler accepts and validates slotIdx',
+    src.includes('window._nsSlotCycleMode = function(token, currentMode, slotIdx)') &&
+    src.includes('Number.isInteger(normalizedSlot)'));
+check('T13b all cycle-mode buttons pass their data-slot value',
+    (src.match(/_nsSlotCycleMode\(this\.dataset\.token,this\.dataset\.mode,this\.dataset\.slot\)/g) || []).length === 3 &&
+    (src.match(/data-slot="\$\{slotIdx\}"/g) || []).length === 3);
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log('\n' + pass + ' passed, ' + fail + ' failed out of ' + (pass + fail) + ' checks');
 process.exit(fail > 0 ? 1 : 0);

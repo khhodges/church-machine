@@ -2612,7 +2612,15 @@ class ChurchSimulator {
         // Materialize the canonical V2 physical Namespace header at word zero.
         // It is separate from all resident bodies and the tail-descending table.
         const _nsHeaderStart = 0;
-        const _bootEntryLocation = (this.readNSEntry(this.bootEntrySlot).word0_location >>> 0) * 4;
+        // A persisted boot selection may refer to a slot whose dynamic LUMP is
+        // not resident yet.  Keep reset recoverable; setBootEntrySlot will
+        // validate the selection once its descriptor exists.
+        const _bootEntry = this.readNSEntry(this.bootEntrySlot) ||
+            this.readNSEntry(this._bootAbstrSlot) ||
+            this.readNSEntry(0);
+        const _bootEntryLocation = _bootEntry
+            ? ((_bootEntry.word0_location >>> 0) * 4)
+            : ChurchSimulator.NAMESPACE_HEADER_V2_WORDS;
         const _nsHeader = this.packNamespaceHeaderV2(
             this.memory.length, this.MAX_NS_ENTRIES, this.NS_TABLE_BASE, _bootEntryLocation);
         for (let _nh = 0; _nh < _nsHeader.length; _nh++) {

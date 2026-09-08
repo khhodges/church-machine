@@ -4452,8 +4452,9 @@ function _showNSThreadModal(slotIdx) {
 // Cycles: resident → lazy → dynamic → resident
 // Updates both badges from Namespace runtime state; it never patches LUMP metadata endpoints.
 // the modal (#_nsModeBadgeToken and #_nsModeBadgeSubtitle) optimistically.
-window._nsSlotCycleMode = function(token, currentMode) {
-    if (!token) return;
+window._nsSlotCycleMode = function(token, currentMode, slotIdx) {
+    const normalizedSlot = Number(slotIdx);
+    if (!token || !Number.isInteger(normalizedSlot) || normalizedSlot < 0) return;
     const _MODES = ['resident', 'lazy', 'dynamic'];
     const _CFG = {
         resident: { label: 'Resident',  color: '#4ec9b0', border: 'rgba(78,201,176,0.35)',  bg: 'rgba(78,201,176,0.08)',  boot_resident: true,  ns_slot_policy: 'static',  desc: 'physically resident in DMEM' },
@@ -4482,7 +4483,7 @@ window._nsSlotCycleMode = function(token, currentMode) {
     // with the boot configuration on the next Namespace save.
     window.bootConfig = window.bootConfig || {};
     window.bootConfig.nsLoadModes = window.bootConfig.nsLoadModes || {};
-    window.bootConfig.nsLoadModes[String(slotIdx)] = nextMode;
+    window.bootConfig.nsLoadModes[String(normalizedSlot)] = nextMode;
 };
 
 // ── Lump detail modal — Inform entries only ───────────────────────────────────
@@ -4692,8 +4693,8 @@ function _showNSLumpModal(slotIdx, nsEntry) {
                 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
                     <span style="color:#888;font-size:0.78rem;">Token:</span>
                     <code style="color:#c89b3c;">${_slTok}</code>
-                    <button id="_nsModeBadgeToken" class="btn btn-xs" data-mode="resident" data-token="${_slTok}"
-                        onclick="_nsSlotCycleMode(this.dataset.token,this.dataset.mode)"
+                    <button id="_nsModeBadgeToken" class="btn btn-xs" data-mode="resident" data-token="${_slTok}" data-slot="${slotIdx}"
+                        onclick="_nsSlotCycleMode(this.dataset.token,this.dataset.mode,this.dataset.slot)"
                         style="color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);background:rgba(78,201,176,0.08);border-radius:10px;padding:2px 9px;font-size:0.72rem;cursor:pointer;"
                         title="Click to cycle: Resident → Lazy Load → Dynamic">Resident</button>
                     <button class="btn btn-xs" onclick="document.getElementById('_nsLumpModalOverlay').remove();_openLumpSource('${_slTok}')"
@@ -4722,8 +4723,8 @@ function _showNSLumpModal(slotIdx, nsEntry) {
                 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
                     <span style="color:#888;font-size:0.78rem;">Token:</span>
                     <code style="color:#c89b3c;">${_lazyFetchToken}</code>
-                    <button id="_nsModeBadgeToken" class="btn btn-xs" data-mode="lazy" data-token="${_lazyFetchToken}"
-                        onclick="_nsSlotCycleMode(this.dataset.token,this.dataset.mode)"
+                    <button id="_nsModeBadgeToken" class="btn btn-xs" data-mode="lazy" data-token="${_lazyFetchToken}" data-slot="${slotIdx}"
+                        onclick="_nsSlotCycleMode(this.dataset.token,this.dataset.mode,this.dataset.slot)"
                         style="color:#f0a040;border:1px solid rgba(240,160,64,0.35);background:rgba(240,160,64,0.08);border-radius:10px;padding:2px 9px;font-size:0.72rem;cursor:pointer;"
                         title="Click to cycle: Resident → Lazy Load → Dynamic">Lazy Load</button>
                     <button class="btn btn-xs" onclick="document.getElementById('_nsLumpModalOverlay').remove();_openLumpSource('${_lazyFetchToken}')"
@@ -4829,8 +4830,8 @@ function _showNSLumpModal(slotIdx, nsEntry) {
             <div style="color:#c89b3c;font-weight:700;font-size:1.05rem;margin-bottom:2px;">&#x1F4E6; ${label}</div>
             <div style="color:#6b7280;font-size:0.76rem;margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:10px;">
                 NS[${slotIdx}] &nbsp;·&nbsp;
-                ${_modalToken ? `<button id="_nsModeBadgeSubtitle" class="btn btn-xs" data-mode="${_modalMode}" data-token="${_modalToken}"
-                    onclick="_nsSlotCycleMode(this.dataset.token,this.dataset.mode)"
+                ${_modalToken ? `<button id="_nsModeBadgeSubtitle" class="btn btn-xs" data-mode="${_modalMode}" data-token="${_modalToken}" data-slot="${slotIdx}"
+                    onclick="_nsSlotCycleMode(this.dataset.token,this.dataset.mode,this.dataset.slot)"
                     style="color:${_modalMode==='lazy'?'#f0a040':'#4ec9b0'};border:none;background:none;padding:0;font-size:0.76rem;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;"
                     title="Click to cycle: Resident → Lazy Load → Dynamic">${_modalMode==='lazy'?'Lazy Load':'Resident'}</button>` :
                     `<span style="color:${_lazyFetchToken?'#f0a040':'#4ec9b0'}">${_lazyFetchToken?'Lazy Load':'Inform'}</span>`}
