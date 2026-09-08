@@ -14602,6 +14602,8 @@ def wukong_command_ack_post():
             _wukong_cmd_delivery['write_error'] = err
             _wukong_cmd_delivery['write_ts']    = _wk_time.time()
             _wukong_cmd_delivery['trace_seq_at_write'] = trace_seq_at_ack
+            _wukong_cmd_delivery['bridge_trace_counter_at_write'] = (
+                ack_trace_counter)
             _wukong_cmd_delivery['state_counter_at_write'] = ack_state_counter
             _wukong_cmd_delivery['halt_nonce'] = ack_halt_nonce
             if cmd == 's' and ok:

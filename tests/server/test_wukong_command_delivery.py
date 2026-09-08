@@ -678,7 +678,12 @@ class TestStepFirstRunGate:
 
     def test_step_ack_then_newer_same_session_trace_unlocks(self, client):
         self._step_ack(client)
-        assert _status(client)['run_unlocked'] is False
+        waiting = _status(client)
+        assert waiting['run_unlocked'] is False
+        assert waiting['command_delivery']['cmd'] == 's'
+        assert waiting['command_delivery']['bridge_session'] == 'bridge-a'
+        assert waiting['command_delivery'][
+            'bridge_trace_counter_at_write'] == 10
         _trace(client, 'bridge-a', 11)
         assert _status(client)['run_unlocked'] is True
         assert _post_cmd(client, 'r').status_code == 200
@@ -691,7 +696,10 @@ class TestStepFirstRunGate:
     def test_wrong_session_trace_does_not_unlock(self, client):
         self._step_ack(client)
         _trace(client, 'bridge-b', 11)
-        assert _status(client)['run_unlocked'] is False
+        waiting = _status(client)
+        assert waiting['run_unlocked'] is False
+        assert waiting['command_delivery'][
+            'bridge_trace_counter_at_write'] == 10
 
     def test_trace_arriving_before_ack_is_reconciled_from_highwater(self, client):
         step_id = _post_cmd(client, 's').get_json()['id']

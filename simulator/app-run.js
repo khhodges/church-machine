@@ -16858,6 +16858,7 @@ let _wukongLastEventSeq = 0;       // cursor into the server-side ordered event 
 let _wukongLastRetirementSeq = 0;  // trace events only; excludes status/info rows
 let _wukongFreezeIncidentKey = null;
 let _wukongFreezeRecoverySeq = 0;
+let _wukongStepProgressExpectation = null;
 const _WUKONG_FREEZE_SECONDS = 8;
 const _hwBreakpoints = new Set();
 
@@ -17534,7 +17535,8 @@ function _wukongHandleBridgeAlert(alert) {
     }
 }
 
-function _wukongClassifyFreeze(status, expectedRunning, pendingExecution, lastRetirementSeq) {
+function _wukongClassifyFreeze(status, expectedRunning, pendingExecution, lastRetirementSeq,
+                               stepExpectation, nowMs) {
     status = status || {};
     const latest = status.latest_trace || {};
     const halt = status.halt || {};
@@ -17550,8 +17552,18 @@ function _wukongClassifyFreeze(status, expectedRunning, pendingExecution, lastRe
         sourceMap: latest.source_map || null,
         lastEventTs: latest.ts || null,
         bridgeConnected: !!status.bridge_connected,
-        boardConnected: Number.isFinite(age) && age < 10
+        boardConnected: Number.isFinite(age) && age < 10,
+        commandId: stepExpectation ? stepExpectation.commandId : null,
+        command: stepExpectation ? 'STEP' : null,
+        bridgeSession: stepExpectation ? stepExpectation.bridgeSession : null,
+        traceCounterBaseline: stepExpectation ? stepExpectation.traceCounterBaseline : null
     };
+    const stepExpired = !!(stepExpectation &&
+        Number(nowMs == null ? Date.now() : nowMs) >= stepExpectation.deadlineMs);
+    const currentBridgeSession = status.bridge && status.bridge.session_id || '';
+    const stepSessionLost = !!(stepExpectation &&
+        stepExpectation.bridgeSession && currentBridgeSession &&
+        stepExpectation.bridgeSession !== currentBridgeSession);
     let classification = null;
     let title = null;
     let action = null;
@@ -17563,26 +17575,30 @@ function _wukongClassifyFreeze(status, expectedRunning, pendingExecution, lastRe
         classification = 'breakpoint_pause';
         title = 'Breakpoint / Pause';
         action = 'Use Step to inspect the stopped instruction, or Run to continue.';
-    } else if (!status.bridge_connected && (expectedRunning || pendingExecution)) {
+    } else if ((!status.bridge_connected || stepSessionLost) &&
+               (expectedRunning || pendingExecution || stepExpectation)) {
         classification = 'transport_disconnect';
         title = 'Wukong Transport Disconnected';
         action = 'Check board power, USB-UART, the bridge process, serial port, and server URL; then reconnect.';
-    } else if (expectedRunning && !pendingExecution && Number.isFinite(age) &&
-               age >= _WUKONG_FREEZE_SECONDS) {
-        classification = 'no_retirement_stall';
-        title = 'Wukong Execution Stalled';
-        action = 'Inspect the shown instruction and capabilities, then choose Halt or Reboot; no instruction was skipped automatically.';
     } else if (String(halt.state || '') === 'halt confirmed' &&
                !halt.breakpoint_hit) {
         classification = 'explicit_halt';
         title = 'Explicit Halt';
         action = 'Use Step or Run when you are ready to continue.';
+    } else if ((stepExpired || (expectedRunning && !pendingExecution &&
+                Number.isFinite(age) && age >= _WUKONG_FREEZE_SECONDS))) {
+        classification = 'no_retirement_stall';
+        title = 'Wukong Execution Stalled';
+        action = stepExpired
+            ? 'The confirmed Step produced no causally newer retirement. Inspect the shown instruction and capabilities, then choose Halt or Reboot; no architectural fault was inferred and no instruction was skipped automatically.'
+            : 'Inspect the shown instruction and capabilities, then choose Halt or Reboot; no instruction was skipped automatically.';
     }
     if (!classification) return null;
     return {
         classification, title, action, evidence,
         faultCode: classification === 'machine_fault' ? latest.fault_code : null,
-        key: classification + ':' + String(lastRetirementSeq || 0) + ':' +
+        key: classification + ':' +
+            String(stepExpectation ? stepExpectation.commandId : (lastRetirementSeq || 0)) + ':' +
             String(evidence.lastRetiredNia == null ? 'none' : evidence.lastRetiredNia)
     };
 }
@@ -17598,6 +17614,9 @@ function _wukongShowFreezeDiagnostic(incident) {
     };
     const rows = [
         ['Classification', incident.classification.replace(/_/g, ' ')],
+        ['Command', e.command ? e.command + ' #' + value(e.commandId) : unavailable],
+        ['Bridge session', value(e.bridgeSession)],
+        ['Trace counter at write', value(e.traceCounterBaseline)],
         ['Last confirmed retired NIA', value(e.lastRetiredNia, true)],
         ['Current / attempted NIA', value(e.attemptedNia, true)],
         ['Raw instruction word', value(e.rawWord, true)],
@@ -17643,9 +17662,25 @@ function _wukongShowFreezeDiagnostic(incident) {
 }
 
 function _wukongHandleFreezeStatus(status) {
+    if (_wukongStepProgressExpectation) {
+        const delivery = status && status.command_delivery;
+        const sameCommand = delivery &&
+            delivery.id === _wukongStepProgressExpectation.commandId &&
+            delivery.cmd === 's';
+        if (status && status.run_unlocked === true) {
+            _wukongStepProgressExpectation = null;
+            _wukongFreezeIncidentKey = null;
+            const recoveredDialog =
+                document.getElementById('wukong-freeze-diagnostic');
+            if (recoveredDialog) recoveredDialog.remove();
+        } else if (delivery && !sameCommand) {
+            _wukongStepProgressExpectation = null;
+            _wukongFreezeIncidentKey = null;
+        }
+    }
     const incident = _wukongClassifyFreeze(
         status, _wukongHWRunning, _wukongPendingExecutionCmd,
-        _wukongLastRetirementSeq);
+        _wukongLastRetirementSeq, _wukongStepProgressExpectation);
     if (!incident) {
         if (_wukongLastRetirementSeq > _wukongFreezeRecoverySeq) {
             _wukongFreezeIncidentKey = null;
@@ -17662,6 +17697,22 @@ function _wukongHandleFreezeStatus(status) {
         _wukongShowFreezeDiagnostic(incident);
     }
     return incident;
+}
+
+function _wukongArmStepProgressExpectation(delivery, nowMs) {
+    if (!delivery || delivery.cmd !== 's' || delivery.write_ok !== true ||
+            delivery.id == null) return null;
+    _wukongStepProgressExpectation = {
+        commandId: delivery.id,
+        bridgeSession: delivery.bridge_session || '',
+        traceCounterBaseline:
+            delivery.bridge_trace_counter_at_write == null ? null :
+                Number(delivery.bridge_trace_counter_at_write),
+        deadlineMs: Number(nowMs == null ? Date.now() : nowMs) +
+            _WUKONG_FREEZE_SECONDS * 1000
+    };
+    _wukongFreezeIncidentKey = null;
+    return _wukongStepProgressExpectation;
 }
 
 /** Fetch status and render the health strip inside #wukong-health-strip. */
@@ -19052,6 +19103,11 @@ async function _wukongPostCmd(cmd, extra, label) {
                       ' and queued Halt atomically');
     }
     if (cmd === 's' || cmd === 'r') _wukongPendingExecutionCmd = cmd;
+    _wukongStepProgressExpectation = null;
+    _wukongFreezeIncidentKey = null;
+    const staleFreezeDialog =
+        document.getElementById('wukong-freeze-diagnostic');
+    if (staleFreezeDialog) staleFreezeDialog.remove();
     _wukongCmdWatches.add(d.id);
     _wukongCmdBusy = true;   // released when all delivery watches finish
     _wukongUpdateBtn();
@@ -19146,6 +19202,15 @@ async function _wukongStep() {
         // an absent bridge must surface here, not vanish into a 500 ms wait.
         const delivered = await _wukongWatchDelivery(d.id, 'STEP', 10000);
         if (!delivered) return;
+        try {
+            const deliveredStatus =
+                await (await fetch('/hardware/wukong/status')).json();
+            const deliveredRecord = deliveredStatus &&
+                deliveredStatus.command_delivery;
+            if (deliveredRecord && deliveredRecord.id === d.id) {
+                _wukongArmStepProgressExpectation(deliveredRecord);
+            }
+        } catch(e) {}
         // Wait up to 500 ms for at least one new event beyond beforeSeq.
         const deadline = Date.now() + 500;
         while (Date.now() < deadline) {
