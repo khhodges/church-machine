@@ -11826,10 +11826,8 @@ function _collectSaveNamespaceSlotCandidates(simulator, serverLumps, savedLabels
                 slot,
                 label,
                 priority,
-                // Keep every slot visible. Boot.NS and Boot.Thread are the
-                // only entries disabled in this picker; the save path still
-                // performs its own authoritative slot validation.
-                disabled: slot === 0 || slot === 1,
+                // Every Namespace slot is programmer-selectable.
+                disabled: false,
             });
         }
     };
@@ -14945,15 +14943,15 @@ async function confirmSaveToNamespace() {
         }
     }
 
-    // Resolve and validate the target before either durable or browser state is
-    // changed. Only Boot.NS (0) and Boot.Thread (1) are protected.
+    // Resolve and validate the programmer-selected target before either durable
+    // or browser state is changed. Every Namespace slot is replaceable.
     const _svClistWords = (_svBinary && _caps.length > 0)
         ? _svBinary.slice(_svBinary.length - _caps.length)
         : [];
     let idx;
     if (slotSel.value === 'new') {
         idx = null;
-        for (let _candidate = sim.firstUserNsSlot();
+        for (let _candidate = 0;
              _candidate < sim.MAX_NS_ENTRIES; _candidate++) {
             if (!sim.isNSEntryValid(_candidate)) {
                 idx = _candidate;
@@ -14967,18 +14965,8 @@ async function confirmSaveToNamespace() {
     } else {
         idx = parseInt(slotSel.value, 10);
         const _firstSaveSlot = typeof sim.saveNamespaceStartSlot === 'function'
-            ? sim.saveNamespaceStartSlot() : 2;
+            ? sim.saveNamespaceStartSlot() : 0;
         const _maxSaveSlot = sim.MAX_NS_ENTRIES - 1;
-        const _selectedOption = slotSel.options[slotSel.selectedIndex];
-        if (_selectedOption && _selectedOption.disabled) {
-            const _slotError = 'Save blocked: Boot.NS (slot 0) and Boot.Thread (slot 1) cannot be replaced.';
-            if (typeof _showFpgaToast === 'function') {
-                _showFpgaToast('Save to Namespace Blocked', _slotError, 'error', 7000);
-            } else {
-                alert(_slotError);
-            }
-            return;
-        }
         if (!Number.isInteger(idx) || idx < _firstSaveSlot || idx > _maxSaveSlot) {
             const _slotError = `Save blocked: choose a Namespace slot between ${_firstSaveSlot} and ${_maxSaveSlot}, or select New Entry.`;
             if (typeof _showFpgaToast === 'function') {
@@ -14998,9 +14986,8 @@ async function confirmSaveToNamespace() {
         alert(`Save blocked: Namespace slot ${idx} is not backed by enough writable LUMP storage.`);
         return;
     }
-    // Compute the token without registering browser memory. Protected slot 10
-    // is not special: the programmer chooses what replaces every slot except
-    // Boot.NS and Boot.Thread. The server binds any destination-local SELF row.
+    // Compute the token without registering browser memory. No slot has
+    // name-based ownership; the server binds any destination-local SELF row.
     let _svTok = null;
     if (typeof window._computeLumpToken === 'function')
         _svTok = window._computeLumpToken(_svWords, _caps);

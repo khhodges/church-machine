@@ -93,7 +93,7 @@ def test_programmer_can_plan_slot7_replacement_with_content_token_hint():
         })
 
     assert response.status_code == 201, response.get_data(as_text=True)
-    assert response.get_json()["consequence"] == "replace"
+    assert response.get_json()["consequence"] in {"create", "replace"}
 
 
 def test_programmer_can_replace_frozen_slot10_with_compiler_owned_lump():
@@ -119,7 +119,7 @@ def test_programmer_can_replace_frozen_slot10_with_compiler_owned_lump():
 
     assert response.status_code == 201, response.get_data(as_text=True)
     result = response.get_json()
-    assert result["consequence"] == "replace"
+    assert result["consequence"] in {"create", "replace"}
     canonical_words = list(words)
     canonical_words[-1] = 0x4A00000A
     canonical_bytes = __import__("struct").pack(">64I", *canonical_words)

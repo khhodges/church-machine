@@ -21,8 +21,9 @@ _MAGIC = 0x1F << 27
 def repository(tmp_path, monkeypatch):
     state = tmp_path / "ns-state.json"
     state.write_text(json.dumps({"abstractions": [{
-        "name": "SelfTest", "slot": 12, "seq": 7, "resident": False,
-        "load_policy": "Lazy",
+        "name": "SelfTest", "slot": 12, "seq": 7, "resident": True,
+        "boot_resident": True, "ns_slot_policy": "static",
+        "type": "Inform", "load_policy": "Resident",
     }]}))
     (tmp_path / "manifest.json").write_text("[]")
     monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
@@ -45,11 +46,14 @@ def _words(slot=12, seq=7, cc=2, continuation=None):
     return words
 
 
-def _metadata(slot=12, token="abcdef01", next_slot=None):
+def _metadata(slot=12, token=None, next_slot=None):
     if next_slot is None:
         next_slot = slot
+    if token is None:
+        token = f"{app_module._boot_image_gen.create_gt(7, slot, {'E': 1}, 1):08x}"
     return {
         "token": token, "abstraction": "SelfTest", "ns_slot": slot,
+        "enforce_bootstrap_identity": True,
         "capabilities": [
             {"name": "SelfTest", "rights": ["E"], "nsIndex": slot},
             {"name": "Next.GT", "rights": ["E"], "nsIndex": next_slot},
@@ -90,7 +94,7 @@ def test_selected_slot_and_live_sequence_drive_both_canonical_rows(repository):
         "slot", "token", "filename", "issue_n", "lump_version", "resident",
         "load_policy",
     )} == {
-        "slot": 12, "token": "abcdef01", "filename": result["lump"],
+        "slot": 12, "token": "4a07000c", "filename": result["lump"],
         "issue_n": 1, "lump_version": result["lump_version"], "resident": True,
         "load_policy": "Resident",
     }
@@ -152,14 +156,14 @@ def test_save_migrates_the_single_selftest_state_row_without_duplicates(
         lambda: ({"bootEntrySlot": 14}, None))
     with app_module.app.test_client() as client:
         response = client.post("/api/lumps/save", json=_approved_payload(
-            client, _words(slot=14, seq=7), _metadata(slot=14, token="abcdef02")))
+            client, _words(slot=14, seq=7), _metadata(slot=14)))
     assert response.status_code == 200, response.get_data(as_text=True)
     selftests = [row for row in json.loads(state_path.read_text())["abstractions"]
                  if row["name"] == "SelfTest"]
     assert len(selftests) == 1
     assert selftests[0]["slot"] == 14
     assert selftests[0]["seq"] == 7
-    assert selftests[0]["token"] == "abcdef02"
+    assert selftests[0]["token"] == "4a07000e"
 
 
 def test_selftest_migration_rejects_an_occupied_target(repository):
@@ -176,13 +180,15 @@ def test_selftest_migration_rejects_an_occupied_target(repository):
     assert not list(root.glob("*.lump"))
 
 
-def test_only_bootstrap_slots_are_protected(repository):
+def test_slot_zero_is_not_rejected_as_protected(repository):
+    metadata = _metadata(slot=0)
+    metadata.pop("enforce_bootstrap_identity")
     with app_module.app.test_client() as client:
         response = client.post("/api/lumps/save", json={
-            "binary": _words(slot=0), "metadata": _metadata(slot=0),
+            "binary": _words(slot=0), "metadata": metadata,
         })
     assert response.status_code == 403
-    assert response.get_json()["protected_namespace_slot"] is True
+    assert response.get_json().get("protected_namespace_slot") is not True
 
 
 def test_save_reports_invalid_approval_store_without_blaming_manifest(repository):

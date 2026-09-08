@@ -7281,15 +7281,13 @@ def _bind_saved_lump_to_ns_state(
         raise ValueError("ns-state.json has multiple authoritative SelfTest rows")
     if abstraction == "SelfTest" and selftest_rows:
         selftest_entry = selftest_rows[0]
-        if entry is not None and entry is not selftest_entry:
-            raise ValueError(
-                f"NS[{ns_slot}] belongs to {entry.get('name')!r}; "
-                "cannot migrate SelfTest onto an occupied Namespace slot"
-            )
-        # Move the one logical SelfTest descriptor instead of appending another
-        # row.  Its sequence remains the live descriptor sequence used to mint
-        # the self/Next credentials during save preflight.
-        entry = selftest_entry
+        if entry is None:
+            # Move the one logical SelfTest descriptor to the selected free slot.
+            entry = selftest_entry
+        elif entry is not selftest_entry:
+            # An occupied target is still programmer-replaceable. Remove the old
+            # SelfTest binding so the selected target becomes its sole identity.
+            entries.remove(selftest_entry)
     if entry is None:
         # A programmer may install into an unused non-bootstrap slot.  Sequence
         # zero is the initial live sequence for a newly allocated descriptor.
@@ -7909,14 +7907,13 @@ def save_lump():
             ns_slot = int(ns_slot)
         except (TypeError, ValueError):
             return jsonify({"error": "Namespace slot must be an integer"}), 400
-        if ns_slot in (0, 1):
+        if not 0 <= ns_slot < MAX_NS_ENTRIES:
             return jsonify({
                 "error": (
-                    f"Namespace slot {ns_slot} is protected. Only Boot.NS "
-                    "(slot 0) and Boot.Thread (slot 1) cannot be replaced."
+                    f"Namespace slot must be between 0 and "
+                    f"{MAX_NS_ENTRIES - 1}."
                 ),
-                "protected_namespace_slot": True,
-            }), 403
+            }), 400
     _bootstrap_identity = None
     if token_hint:
         token8 = str(token_hint).lower().zfill(8)[:8]
@@ -8018,7 +8015,13 @@ def save_lump():
             "error": f"Bootstrap inventory validation failed: {_bootstrap_state_error}",
             "namespace_identity_failed": True,
         }), 422
-    _is_bootstrap_canonical = _bootstrap_binding is not None
+    # Bootstrap identity enforcement is explicit, never inherited from the
+    # previous occupant of a programmer-selected slot. Generic Namespace saves
+    # may replace every slot with any abstraction.
+    _is_bootstrap_canonical = (
+        _bootstrap_binding is not None
+        and metadata.get("enforce_bootstrap_identity") is True
+    )
     _is_selftest_canonical = _is_bootstrap_canonical and _is_selftest_canonical
 
     # ── Pre-flight: identity computation + seal verification ──────────────────
@@ -8118,6 +8121,42 @@ def save_lump():
         _sl_words.extend([0] * (_sl_lsz - len(_sl_words)))
 
     _clist_row0_idx = _sl_lsz - _sl_cc2
+    if _compiler_self_row and not _is_bootstrap_canonical:
+        if ns_slot is None:
+            return jsonify({
+                "error": (
+                    "Namespace identity validation failed: compiler-owned "
+                    "__SELF__ requires a programmer-selected Namespace slot."
+                ),
+                "namespace_identity_failed": True,
+            }), 422
+        _selected_sequence = metadata.get("namespace_sequence", 0)
+        try:
+            _selected_sequence = int(_selected_sequence)
+            if os.path.isfile(NS_STATE_PATH):
+                with open(NS_STATE_PATH, encoding="utf-8") as _selected_state_file:
+                    _selected_rows = json.load(_selected_state_file).get(
+                        "abstractions", [])
+                _selected_entry = next(
+                    (row for row in _selected_rows
+                     if isinstance(row, dict) and row.get("slot") == ns_slot),
+                    None,
+                )
+                if _selected_entry is not None:
+                    _selected_sequence = int(_selected_entry.get("seq", 0))
+            if not 0 <= _selected_sequence <= 0x1FF:
+                raise ValueError("sequence is outside the 9-bit range")
+        except (OSError, ValueError, TypeError, json.JSONDecodeError) as _selected_error:
+            return jsonify({
+                "error": (
+                    "Namespace identity validation failed for selected "
+                    f"NS[{ns_slot}]: {_selected_error}"
+                ),
+                "namespace_identity_failed": True,
+            }), 422
+        _sl_words[_clist_row0_idx] = _boot_image_gen.create_gt(
+            _selected_sequence, ns_slot, {"E": 1}, 1)
+
     if _is_bootstrap_canonical and not _is_selftest_canonical:
         if _sl_cc2 < 1:
             return jsonify({"error": "Bootstrap resident requires c-list row 0.",
@@ -8134,8 +8173,8 @@ def save_lump():
             _runtime_t = _verify_bootstrap_self_gt(
                 _bootstrap_binding, _actual_bootstrap_gt,
                 f"{_live_bootstrap_gt:08x}")
-            # The programmer may replace any Namespace entry except Boot.NS and
-            # Boot.Thread. A browser-supplied content token is therefore only a
+            # The programmer may replace any Namespace entry. A browser-supplied
+            # content token is therefore only a
             # lookup hint here, never authority over a resident binding. The
             # verified row-zero SELF GT is canonical for the committed artifact.
             token8 = _runtime_t
@@ -8360,21 +8399,6 @@ def save_lump():
                 ),
                 "capability_validation_failed": True,
             }), 422
-
-        if _compiler_self_row and not _is_bootstrap_canonical:
-            _actual_placeholder = _sl_words[_clist_row0_idx] & 0xFFFFFFFF
-            if _actual_placeholder != _SELF_CAPABILITY_PLACEHOLDER:
-                return jsonify({
-                    "error": (
-                        "Namespace identity validation failed: ordinary LUMP c-list row 0 "
-                        "must contain the compiler-owned self placeholder until installation; "
-                        f"got 0x{_actual_placeholder:08X}."
-                    ),
-                    "namespace_identity_failed": True,
-                    "clist_row": 0,
-                    "expected_placeholder": _SELF_CAPABILITY_PLACEHOLDER,
-                    "actual_word": _actual_placeholder,
-                }), 422
 
         _right_order = ("R", "W", "X", "L", "S", "E")
         for _cap_row, _cap_raw in enumerate(_declared_caps_raw):

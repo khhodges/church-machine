@@ -151,9 +151,9 @@ const LumpContentFrame = require('./lump-content-frame.js');
     check('T2c save slot collector found', collectIdx !== -1);
     if (collectIdx !== -1) {
         const collectBody = appRunSrc.slice(collectIdx, appRunSrc.indexOf('function _currentSaveNamespaceLumpName()', collectIdx));
-        check('T2c1 collector enumerates from slot 0 and disables only bootstrap slots',
+        check('T2c1 collector enumerates from slot 0 and enables every slot',
             collectBody.includes('for (let slot = 0; slot < maxSlots; slot++)') &&
-            collectBody.includes('disabled: slot === 0 || slot === 1'));
+            collectBody.includes('disabled: false'));
     }
 }
 
@@ -163,9 +163,8 @@ const LumpContentFrame = require('./lump-content-frame.js');
     check('T2d confirmSaveToNamespace found', confirmIdx !== -1);
     if (confirmIdx !== -1) {
         const confirmBody = appRunSrc.slice(confirmIdx, appRunSrc.indexOf('function ', confirmIdx + 10));
-        check('T2d1 confirm validates the explicit replacement slot range',
+        check('T2d1 confirm validates the full explicit replacement slot range',
             confirmBody.includes('sim.saveNamespaceStartSlot()') &&
-            confirmBody.includes('Boot.NS (slot 0) and Boot.Thread (slot 1) cannot be replaced.') &&
             confirmBody.includes('Save blocked: choose a Namespace slot'));
         check('T2d2 explicit save exceptions are surfaced instead of escaping',
             confirmBody.includes("console.error('[SaveNS] save failed:', err)") &&

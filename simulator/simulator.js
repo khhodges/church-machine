@@ -1885,12 +1885,9 @@ class ChurchSimulator {
         return BOOT_NAMED_SLOTS.length;
     }
 
-    // Explicit Save-to-Namespace replacement may target any existing slot
-    // except the two bootstrap entries. New-entry allocation still starts at
-    // firstUserNsSlot(), so this wider range only applies to an intentional
-    // replacement selected by the programmer.
+    // Explicit Save-to-Namespace replacement may target every Namespace slot.
     saveNamespaceStartSlot() {
-        return 2;
+        return 0;
     }
 
     _nsSequenceForWrite(idx) {
