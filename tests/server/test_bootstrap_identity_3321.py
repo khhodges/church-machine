@@ -5,6 +5,7 @@ import shutil
 
 import pytest
 
+from server import app as app_module
 from server.bootstrap_identity import (
     bootstrap_identity_record,
     bootstrap_t_from_self_gt,
@@ -66,6 +67,45 @@ def test_every_frozen_resident_manifest_approval_row0_and_boot_w3_share_t():
         assert approval["bootstrap_runtime_gt"] == row0
         assert "identity_hash" not in approval
         assert words[len(words) - (binding["slot"] + 1) * 4 + 3] == row0
+
+
+def test_programmer_can_plan_slot7_replacement_with_content_token_hint():
+    """A content token must not turn a programmer-owned slot into a protected slot."""
+    root = Path(__file__).resolve().parents[2]
+    lumps = root / "server" / "lumps"
+    state = json.loads((lumps / "ns-state.json").read_text())
+    binding = next(row for row in state["abstractions"]
+                   if row.get("name") == "WukongCallHome")
+    raw = (lumps / binding["filename"]).read_bytes()
+    words = list(__import__("struct").unpack(f">{len(raw) // 4}I", raw))
+    capabilities = [
+        {"name": "__SELF__", "rights": ["E"], "compiler_owned_self": True},
+        {"name": "Salvation", "rights": ["E"], "nsIndex": 4},
+        {"name": "Navana", "rights": ["E"], "nsIndex": 5},
+        {"name": "Mint", "rights": ["E"], "nsIndex": 6},
+        {"name": "Memory", "rights": ["E"], "nsIndex": 7},
+        {"name": "LED0", "rights": ["R", "W"], "nsIndex": 3},
+        {"name": "UART_TX", "rights": ["R", "W"], "nsIndex": 2},
+        {"name": "WukongCallHome.hw", "rights": ["E"], "nsIndex": 7},
+    ]
+
+    with app_module.app.test_client() as client:
+        response = client.post("/api/lumps/save-plan", json={
+            "binary": words,
+            "metadata": {
+                "abstraction": "WukongCallHome",
+                "ns_slot": 7,
+                # The browser computes this from content. The verified SELF row,
+                # not this lookup hint, owns resident identity.
+                "token": "deadbeef",
+                "content_type": "code",
+                "capabilities": capabilities,
+                "grants": ["E"],
+            },
+        })
+
+    assert response.status_code == 201, response.get_data(as_text=True)
+    assert response.get_json()["consequence"] == "replace"
 
 
 @pytest.mark.parametrize("mutation", ["slot", "seq", "token"])

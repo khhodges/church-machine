@@ -8120,8 +8120,10 @@ def save_lump():
             _runtime_t = _verify_bootstrap_self_gt(
                 _bootstrap_binding, _actual_bootstrap_gt,
                 f"{_live_bootstrap_gt:08x}")
-            if token_hint and token8 != _runtime_t:
-                raise ValueError("request token differs from resident SELF GT")
+            # The programmer may replace any Namespace entry except Boot.NS and
+            # Boot.Thread. A browser-supplied content token is therefore only a
+            # lookup hint here, never authority over a resident binding. The
+            # verified row-zero SELF GT is canonical for the committed artifact.
             token8 = _runtime_t
             _bootstrap_identity = _bootstrap_identity_record(
                 _bootstrap_binding, _actual_bootstrap_gt)
