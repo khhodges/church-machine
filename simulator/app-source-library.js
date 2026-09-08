@@ -286,7 +286,7 @@ async function _renderSourceLibrary() {
     if (urlsNeeded.size > 0) {
         await Promise.allSettled([...urlsNeeded].map(url =>
             fetch(url)
-                .then(r => r.ok ? r.text() : Promise.reject('not found'))
+                .then(r => r.ok ? r.text() : Promise.reject(new Error('not found')))
                 .then(t  => { _SL_FETCH_CACHE[url] = t; })
                 .catch(() => { _SL_FETCH_CACHE[url] = ''; })
         ));

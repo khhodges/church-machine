@@ -3493,7 +3493,7 @@ function _nsTableAdd() {
     document.body.appendChild(_overlay);
 
     fetch('/api/lumps/list')
-        .then(function(r) { return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
         .then(function(list) {
             if (!Array.isArray(list) || list.length === 0) {
                 document.getElementById('_nsAddStatus').textContent = 'No LUMPs available on the server.';
@@ -3805,8 +3805,8 @@ function _nsTableAddConfirm() {
     // Use cached words from the per-selection fetch if available; otherwise fetch now.
     const _doInstall = async function(words) {
         const hdr = sim.parseLumpHeader(words[0] >>> 0);
-        if (!hdr.valid) return Promise.reject('Invalid LUMP header (magic mismatch)');
-        if (!artifactDetail) return Promise.reject('Immutable LUMP inspection is unavailable');
+        if (!hdr.valid) return Promise.reject(new Error('Invalid LUMP header (magic mismatch)'));
+        if (!artifactDetail) return Promise.reject(new Error('Immutable LUMP inspection is unavailable'));
         const actualBinaryHash = await _nsHashImmutableWords(words);
         const _canonicalHash = function(value) {
             if (value == null) return null;
@@ -3822,8 +3822,8 @@ function _nsTableAddConfirm() {
                 (approvedMetadata.identity_hash || approvedMetadata.identityHash))
         } : null;
         if (_preloadBinding && !_preloadBinding.binaryHash) {
-            return Promise.reject(
-                'Preload requires the selected LUMP’s canonical binary hash; refusing to install an unbound bridge request.');
+            return Promise.reject(new Error(
+                'Preload requires the selected LUMP’s canonical binary hash; refusing to install an unbound bridge request.'));
         }
 
         // ── Determine target NS slot based on Slot Policy ─────────────────────
@@ -3841,7 +3841,7 @@ function _nsTableAddConfirm() {
         } else {
             slot = sim.allocOrFindNsSlot(null, name);
         }
-        if (slot === null) return Promise.reject('Namespace table is full');
+        if (slot === null) return Promise.reject(new Error('Namespace table is full'));
 
         // Copy lump words into this slot's extended DMEM region
         const EXTENDED_BASE   = 0x0800;
@@ -3869,13 +3869,13 @@ function _nsTableAddConfirm() {
             _row0 === (sim.constructor.SELF_CAPABILITY_PLACEHOLDER >>> 0);
         const _compilerOwnedSelf = _hasEmbeddedIdentity;
         if (_selfPlaceholder && !_compilerOwnedSelf) {
-            return Promise.reject('Compiler SELF placeholder lacks an intrinsic embedded identity');
+            return Promise.reject(new Error('Compiler SELF placeholder lacks an intrinsic embedded identity'));
         }
         if (_compilerOwnedSelf && hdr.cc < 1) {
-            return Promise.reject('Embedded executable identity requires compiler-owned C-List row zero');
+            return Promise.reject(new Error('Embedded executable identity requires compiler-owned C-List row zero'));
         }
         if (_compilerOwnedSelf && !_selfPlaceholder && !_liveSelf) {
-            return Promise.reject('Compiler-owned SELF is not proven by the binary C-List');
+            return Promise.reject(new Error('Compiler-owned SELF is not proven by the binary C-List'));
         }
         const _sourceSelfSlot = _liveSelf ? Number(_parsedSelf.index) : NaN;
         const _sourceSelfValid = Number.isInteger(_sourceSelfSlot) &&
@@ -3895,9 +3895,9 @@ function _nsTableAddConfirm() {
             sourceSelfSeq: _sourceSelfSeq
         });
         if (!_identity.ok) {
-            return Promise.reject(
+            return Promise.reject(new Error(
                 `Namespace identity validation failed (${_identity.code}): ${_identity.message}`
-            );
+            ));
         }
         words = _identity.words;
 
@@ -3967,8 +3967,8 @@ function _nsTableAddConfirm() {
             (cacheToken32 == null || !(Number.isInteger(issueN) && issueN > 0) ||
              !dotName || identityHash == null || binaryHash == null)) {
             if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Install'; }
-            return Promise.reject(
-                'Secure Outform requires trusted identity metadata (cache_token, positive issue_n, dot_name, 64-hex identity_hash and binary_hash) — refusing to create an unverifiable Outform.');
+            return Promise.reject(new Error(
+                'Secure Outform requires trusted identity metadata (cache_token, positive issue_n, dot_name, 64-hex identity_hash and binary_hash) — refusing to create an unverifiable Outform.'));
         }
 
         // W3 for the NS entry:
@@ -4129,7 +4129,8 @@ function _nsTableAddConfirm() {
     };
 
     const _onError = function(err) {
-        if (errEl) errEl.textContent = 'Error: ' + err;
+        const message = err instanceof Error ? err.message : String(err);
+        if (errEl) errEl.textContent = 'Error: ' + message;
         if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Install'; }
     };
 
@@ -4138,10 +4139,10 @@ function _nsTableAddConfirm() {
         _doInstall(window._nsAddCurrentWords).catch(_onError);
     } else {
         fetch('/api/lump/' + token + '/words')
-            .then(function(r) { return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
             .then(function(data) {
                 const words = Array.isArray(data) ? data : (data && Array.isArray(data.words) ? data.words : null);
-                if (!words || words.length === 0) return Promise.reject('Empty word list from server');
+                if (!words || words.length === 0) return Promise.reject(new Error('Empty word list from server'));
                 window._nsAddCurrentWords = words;
                 window._nsAddCurrentToken = token;
                 return _doInstall(words);

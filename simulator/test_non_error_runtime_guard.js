@@ -2,6 +2,11 @@ const fs = require('fs');
 
 const source = fs.readFileSync('simulator/index.html', 'utf8');
 const abstractionsSource = fs.readFileSync('simulator/abstractions.js', 'utf8');
+const runtimeSources = [
+  'simulator/app-source-library.js',
+  'simulator/app-compile.js',
+  'simulator/app-memory.js',
+].map(path => fs.readFileSync(path, 'utf8')).join('\n');
 const checks = [
   ['truthy non-Error values are guarded', source.includes('if (!(event.error instanceof Error))')],
   ['non-Error values are normalized', source.includes('function describeNonError(value, fallback)')],
@@ -16,6 +21,8 @@ const checks = [
   ['startup does not abort assets with a second client-side version redirect',
     !abstractionsSource.includes('_simulatorCacheBust') &&
     !abstractionsSource.includes("window.location.replace('/simulator/~/")],
+  ['runtime promises never reject with scalar literals',
+    !/Promise\.reject\(\s*['"`]/.test(runtimeSources)],
 ];
 
 for (const [name, ok] of checks) {

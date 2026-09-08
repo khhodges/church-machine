@@ -2441,7 +2441,7 @@ function loadCLOOMCExample(name) {
     const fileLanguages = _CLOOMC_FILE_LANGUAGES;
     if (fileExamples[name]) {
         fetch(fileExamples[name])
-            .then(r => r.ok ? r.text() : Promise.reject('File not found'))
+            .then(r => r.ok ? r.text() : Promise.reject(new Error('File not found')))
             .then(code => {
                 editor.value = code;
                 // Track the server-side path so "Save File" can write back to it.
