@@ -1,11 +1,42 @@
-function updateCRDisplay() {
-    if (!sim) return;
-    const container = document.getElementById('crRegs');
-    if (!container) return;
+function _crDisplayName(crIdx, cr) {
+    const petCR = _petNameCRMap[crIdx];
+    if (petCR) return petCR;
+
     const localNames = {
         0: 'Result', 1: 'Arg 1', 5: 'Heap', 6: 'C-List',
         12: 'Thread', 13: 'IRQ', 14: 'CLOOMC', 15: 'Namespace'
     };
+    if (crIdx !== 5) return localNames[crIdx] || '';
+
+    // CR5 is architecturally the Heap subregion of a Thread.  Qualify that
+    // role only from a complete, live Namespace validation and a body that
+    // actually decodes as a Thread; never infer an identity from raw GT bits.
+    if (cr && !cr.isNull && cr.validationStatus === 'valid' &&
+            Number.isInteger(cr.gtIndex) && sim &&
+            typeof sim.getThreadInstanceLayout === 'function') {
+        try {
+            const layout = sim.getThreadInstanceLayout(cr.gtIndex);
+            const threadName = sim.nsLabels && sim.nsLabels[cr.gtIndex];
+            if (layout && layout.valid && threadName) {
+                const displayThreadName = String(threadName).replace(/^Thread#(\d+)$/, 'Thread.$1');
+                return `${displayThreadName}.Heap`;
+            }
+        } catch (_e) {}
+    }
+    return 'Heap';
+}
+
+function _escapeCRDisplayName(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function updateCRDisplay() {
+    if (!sim) return;
+    const container = document.getElementById('crRegs');
+    if (!container) return;
     const crMeta = {
         0:  { group: 'gt',     role: 'arch',   badge: 'Arch'   },
         1:  { group: 'gt',     role: 'arch',   badge: 'Arch'   },
@@ -41,8 +72,7 @@ function updateCRDisplay() {
             html += `<tr class="cr-separator"><td colspan="${TOTAL_COLS}">&#9472;&#9472; Not in GT zone &#9472;&#9472; CR12 Thread Stack (Priv) \u00b7 CR13 Interrupt Handler (System) \u00b7 CR14\u201315 Privileged &#9472;&#9472;</td></tr>`;
         }
         const cr = sim.getFormattedCR(i);
-        const petCR = _petNameCRMap[i];
-        let name = petCR || localNames[i] || '';
+        let name = _crDisplayName(i, cr);
         if (!name && cr.word0_gt && cr.word0_gt !== '00000000') {
             try {
                 const _raw = parseInt(cr.word0_gt, 16) >>> 0;
@@ -103,7 +133,7 @@ function updateCRDisplay() {
         html += `<td class="cr-target">${targetHtml}</td>`;
         html += `<td class="cr-type">${cr.gtTypeName}</td>`;
         html += `<td class="cr-m ${cr.mBit ? 'cr-m-set' : ''}">${cr.mBit}</td>`;
-        html += `<td class="cr-name" onmouseenter="showCRPopup(event,${i})" onmouseleave="hideCRPopup()">${name}${lumpTag}</td>`;
+        html += `<td class="cr-name" onmouseenter="showCRPopup(event,${i})" onmouseleave="hideCRPopup()">${_escapeCRDisplayName(name)}${lumpTag}</td>`;
         html += `<td><span class="cr-role-badge cr-role-${meta.role}">${meta.badge}</span></td>`;
         html += `<td>0x${cr.word1_location.toString(16).toUpperCase().padStart(8, '0')}</td>`;
         html += `<td class="cr-flag">${cr.limitB}</td>`;
@@ -211,12 +241,7 @@ function openCRDetail(crIdx) {
     }
 
     if (detailTab) {
-        const localNames = {
-            0: 'Result', 1: 'Arg 1', 6: 'C-List',
-            12: 'Thread', 13: 'IRQ', 14: 'CLOOMC', 15: 'Namespace'
-        };
-        const petCR = _petNameCRMap[crIdx];
-        const name = petCR || localNames[crIdx] || '';
+        const name = _crDisplayName(crIdx, cr);
         detailTab.textContent = `CR${crIdx}${name ? ' \u2014 ' + name : ''}`;
         detailTab.style.display = '';
     }
@@ -1169,8 +1194,8 @@ function showCRPopup(evt, crIdx) {
 
     const nsIdx = cr.gtIndex;
     const nsLabel = (sim.nsLabels && sim.nsLabels[nsIdx]) || '';
-    const displayName = petCR || nsLabel || '';
-    const _crMain = displayName || `CR${crIdx}`;
+    const displayName = crIdx === 5 ? _crDisplayName(crIdx, cr) : (petCR || nsLabel || '');
+    const _crMain = displayName ? _escapeCRDisplayName(displayName) : `CR${crIdx}`;
     const _crSub  = displayName ? ` <span class="popup-sub-id">(CR${crIdx})</span>` : '';
     const hasL = cr.perms.indexOf('L') !== -1;
 

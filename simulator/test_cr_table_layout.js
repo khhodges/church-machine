@@ -10,6 +10,7 @@ const fs = require('fs');
 const source = fs.readFileSync(__dirname + '/app-cr-display.js', 'utf8');
 const container = { innerHTML: '' };
 const fakeDocument = { getElementById: () => container };
+let qualifyCr5 = false;
 
 // Keep the test independent of browser globals while executing the real
 // renderer against a tiny simulator double.
@@ -20,20 +21,20 @@ const rendered = new Function(
     {
         getFormattedCR(i) {
             return {
-                isNull: i > 5,
+                isNull: i > 6,
                 mBit: 0,
-                word0_gt: i <= 5 ? '02000001' : '00000000',
+                word0_gt: i <= 6 ? '02000001' : '00000000',
                 perms: i === 0 ? 'R--' : i <= 5 ? '-E-----' : '-------',
                 gtSeq: i === 0 ? 3 : i <= 5 ? 4 : 0,
-                gtIndex: i <= 3 ? i + 1 : 0,
+                gtIndex: i === 5 ? 1 : i <= 3 ? i + 1 : 0,
                 nsSlot: i <= 3 ? i + 1 : null,
                 nsLabel: i === 0 ? 'Target.Abs' : '',
                 nsVersion: i === 0 ? 3 : i === 1 ? 5 : null,
                 versionMatch: i === 0,
-                validationStatus: i === 0 ? 'valid' : i === 1 ? 'stale' : i === 2 ? 'missing'
+                validationStatus: i === 0 || (i === 5 && qualifyCr5) ? 'valid' : i === 1 ? 'stale' : i === 2 ? 'missing'
                     : i === 3 ? 'malformed' : i === 4 ? 'revoked' : undefined,
                 validationMessage: i === 0 ? 'GT version 3 matches live NS version 3' : '',
-                gtTypeName: i === 5 ? 'Abstract' : i <= 4 ? 'Inform' : 'NULL',
+                gtTypeName: i === 6 ? 'Abstract' : i <= 5 ? 'Inform' : 'NULL',
                 word1_location: 0x100,
                 limitB: 0,
                 limitF: 0,
@@ -43,6 +44,8 @@ const rendered = new Function(
             };
         },
         parseGT: () => ({ type: 1 }),
+        getThreadInstanceLayout: slot => ({ valid: slot === 1 }),
+        nsLabels: { 1: 'Boot.Thread' },
         programName: '',
     },
     fakeDocument,
@@ -82,5 +85,13 @@ assert(html.includes('Abstract GT'), 'abstract GTs do not render a Namespace tar
 assert.strictEqual((html.match(/cr-version-valid/g) || []).length, 1,
     'only the matching version receives a success badge');
 assert(html.includes('class="cr-version-neutral"'), 'NULL rows remain readable without validation');
+
+container.innerHTML = '';
+qualifyCr5 = true;
+rendered();
+assert(container.innerHTML.includes('Boot.Thread.Heap'),
+    'valid CR5 Thread capability receives its qualified Heap name');
+assert(!container.innerHTML.includes('<img'),
+    'ordinary contextual Heap names do not introduce markup');
 
 console.log('PASS CR table layout');

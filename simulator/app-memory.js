@@ -170,12 +170,7 @@ function updateCRDetail() {
 
     const crIdx = selectedCR;
     const cr = sim.getFormattedCR(crIdx);
-    const localNames = {
-        0: 'Result', 1: 'Arg 1', 5: 'Heap', 6: 'C-List',
-        12: 'Thread', 13: 'IRQ', 14: 'CLOOMC', 15: 'Namespace'
-    };
-    const petCR = _petNameCRMap[crIdx];
-    const name = petCR || localNames[crIdx] || '';
+    const name = _crDisplayName(crIdx, cr);
 
     if (cr.isNull) {
         titleEl.innerHTML = '';
@@ -215,7 +210,7 @@ function updateCRDetail() {
                         hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(1)" onmouseenter="showZonePopup(event,1,${_selectedThreadSlot})" onmouseleave="hideZonePopup()">&#x2460;\u202FCaps</button>`;
                         hBar += `</span>`;
                         hBar += '</div>';
-                        contentEl.innerHTML = hBar + renderThreadMemoryLayout(_selectedThreadSlot, true);
+                        contentEl.innerHTML = hBar + renderThreadMemoryLayout(_selectedThreadSlot);
                         contentEl.classList.add('crd-content-thread');
                         return;
                     }
@@ -1011,7 +1006,7 @@ function updateCRDetail() {
     // Thread memory layout (if applicable)
     if (showThread) {
         html += '<div class="cr-detail-section cr-detail-section-thread">';
-        html += renderThreadMemoryLayout(nsIdx, true);
+        html += renderThreadMemoryLayout(nsIdx);
         html += '</div>';
     }
 
@@ -4433,7 +4428,7 @@ function _showNSThreadModal(slotIdx) {
     const entry = sim && sim.readNSEntry(slotIdx);
     const rawLabel = (entry && entry.label) || (sim && sim.nsLabels && sim.nsLabels[slotIdx]) || `NS[${slotIdx}]`;
     const label = String(rawLabel).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const body = renderThreadMemoryLayout(slotIdx, true);
+    const body = renderThreadMemoryLayout(slotIdx);
     const html = `<div id="_nsLumpModalOverlay" data-testid="thread-detail-modal" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.72);" onclick="if(event.target===this)this.remove();">` +
         `<div style="background:#1e1e1e;border:1px solid rgba(168,85,247,0.45);border-radius:8px;padding:18px 20px;max-width:1100px;width:94%;max-height:88vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.7);">` +
         `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">` +

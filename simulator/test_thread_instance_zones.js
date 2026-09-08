@@ -39,6 +39,7 @@ const sandbox = {
     abstractionRegistry: { abstractions: [] },
     currentView: 'namespace',
     correctCRDetailTab: tab => tab,
+    switchDashTab: () => {},
     _lumpManifests: {},
     _petNameDRMap: {},
 };
@@ -128,6 +129,90 @@ assert(dom.window.document.querySelector('.cr-version-unavailable').textContent.
     'the Abstract row renders its own permissions and unavailable version check');
 assert(dom.window.document.querySelector('.cr-version-neutral'),
     'the NULL row renders a safe neutral version cell');
+
+// CR5's architectural Heap role is qualified only by a valid, live Thread
+// Namespace identity. Explicit compiler/programmer aliases still take priority.
+const bootThreadEntry = sim.readNSEntry(1);
+const bootThreadSeq = sim.parseNSWord1(bootThreadEntry.word1_limit).gtSeq;
+sim.cr[5] = {
+    word0: sim.createGT(bootThreadSeq, 1, { R: 1, W: 1 }, 1),
+    word1: bootThreadEntry.word0_location >>> 0,
+    word2: bootThreadEntry.word1_limit >>> 0,
+    word3: bootThreadEntry.word3_cache_token >>> 0,
+    m: 0,
+};
+sandbox.updateCRDisplay();
+assert(dom.window.document.querySelectorAll('.cr-name')[5].textContent.includes('Boot.Thread.Heap'),
+    'CR table qualifies Boot.Thread Heap');
+assert.strictEqual(sandbox._crDisplayName(5, sim.getFormattedCR(5)), 'Boot.Thread.Heap',
+    'the shared CR name resolver supplies the same qualified name to detail and hover views');
+sandbox._petNameCRMap = { 5: 'Scratch Arena' };
+sandbox.updateCRDisplay();
+assert(dom.window.document.querySelectorAll('.cr-name')[5].textContent.includes('Scratch Arena'),
+    'an explicit CR5 alias takes precedence over the contextual Heap name');
+sandbox._petNameCRMap = {};
+sim.cr[5] = crWordsFor(sim.createAbstractGT(0, { R: 1 }, 7, 0x1234));
+sandbox.updateCRDisplay();
+assert.strictEqual(dom.window.document.querySelectorAll('.cr-name')[5].textContent.trim(), 'Heap',
+    'an Abstract CR5 retains the safe bare Heap role');
+
+const generatedThreadEntry = sim.readNSEntry(11);
+const generatedThreadSeq = sim.parseNSWord1(generatedThreadEntry.word1_limit).gtSeq;
+sim.cr[5] = {
+    word0: sim.createGT(generatedThreadSeq, 11, { R: 1, W: 1 }, 1),
+    word1: generatedThreadEntry.word0_location >>> 0,
+    word2: generatedThreadEntry.word1_limit >>> 0,
+    word3: generatedThreadEntry.word3_cache_token >>> 0,
+    m: 0,
+};
+assert.strictEqual(sandbox._crDisplayName(5, sim.getFormattedCR(5)), 'Thread.2.Heap',
+    'generated Thread identities qualify CR5 Heap with dot separators');
+assert.strictEqual(sandbox._crDisplayName(5, { isNull: true }), 'Heap',
+    'a NULL CR5 retains the safe bare Heap role');
+assert.strictEqual(sandbox._crDisplayName(5, {
+    isNull: false, validationStatus: 'malformed', gtIndex: 11,
+}), 'Heap', 'a malformed CR5 never fabricates a Thread identity');
+
+const detailTab = dom.window.document.createElement('div');
+detailTab.id = 'dashTab-crdetail';
+dom.window.document.body.append(detailTab);
+sandbox.openCRDetail(5);
+assert.strictEqual(detailTab.textContent, 'CR5 — Thread.2.Heap',
+    'CR detail navigation title uses the contextual Heap name');
+
+const hoverPopup = dom.window.document.createElement('div');
+hoverPopup.id = 'cr-hover-popup';
+dom.window.document.body.append(hoverPopup);
+vm.runInContext('_crPopupSuppressed = false;', sandbox);
+sandbox.showCRPopup({
+    currentTarget: {
+        querySelectorAll: () => [],
+        getBoundingClientRect: () => ({ left: 300, right: 400, top: 100, bottom: 120 }),
+    },
+}, 5);
+assert(hoverPopup.textContent.includes('Thread.2.Heap'),
+    'CR hover title uses the contextual Heap name');
+
+const generatedThreadLabel = sim.nsLabels[11];
+sim.nsLabels[11] = 'Thread<img src=x onerror=alert(1)>';
+sandbox.updateCRDisplay();
+const hostileNameCell = dom.window.document.querySelectorAll('.cr-name')[5];
+assert.strictEqual(hostileNameCell.textContent, 'Thread<img src=x onerror=alert(1)>.Heap',
+    'CR table renders a special-character Thread label literally');
+assert.strictEqual(hostileNameCell.querySelector('img'), null,
+    'CR table does not interpret a Thread label as HTML');
+vm.runInContext('_crPopupSuppressed = false;', sandbox);
+sandbox.showCRPopup({
+    currentTarget: {
+        querySelectorAll: () => [],
+        getBoundingClientRect: () => ({ left: 300, right: 400, top: 100, bottom: 120 }),
+    },
+}, 5);
+assert(hoverPopup.textContent.includes('Thread<img src=x onerror=alert(1)>.Heap'),
+    'CR hover renders a special-character Thread label literally');
+assert.strictEqual(hoverPopup.querySelector('.zdp-title img'), null,
+    'CR hover title does not interpret a Thread label as HTML');
+sim.nsLabels[11] = generatedThreadLabel;
 
 // Re-rendering derives status from the current live Namespace, not cached data.
 sim.memory[sim._nsSlotBase(validationSlot) + 1] =
@@ -360,6 +445,11 @@ assert(crDetailContent.innerHTML.includes('thread-zone-5') &&
        crDetailContent.innerHTML.includes('thread-zone-2') &&
        crDetailContent.innerHTML.includes('thread-zone-1'),
     'pre-boot CR12 exposes all four selected Thread zones plus capabilities');
+assert([...crDetailContent.querySelectorAll('.thread-zone-hdr')]
+        .every(header => header.classList.contains('thread-zone-collapsed')) &&
+       [...crDetailContent.querySelectorAll('.thread-zone-body')]
+        .every(body => body.style.display === 'none'),
+    'pre-boot Thread detail opens with every memory zone collapsed');
 assert(crDetailContent.innerHTML.includes('0x33330001') &&
        !crDetailContent.innerHTML.includes('0x22220001'),
     'pre-boot CR12 reads the selected Thread#3 body, not Thread#2');
@@ -371,6 +461,11 @@ let modal = dom.window.document.querySelector('[data-testid="thread-detail-modal
 assert(modal, 'clicking a generated Thread Namespace label opens the Thread popup');
 assert(modal.textContent.includes('Thread#3'), 'popup identifies the selected generated Thread');
 assert(modal.innerHTML.includes('0x33330001'), 'popup renders selected Thread private values');
+assert([...modal.querySelectorAll('.thread-zone-hdr')]
+        .every(header => header.classList.contains('thread-zone-collapsed')) &&
+       [...modal.querySelectorAll('.thread-zone-body')]
+        .every(body => body.style.display === 'none'),
+    'Thread Namespace popup opens with every memory zone collapsed');
 
 // A recognizable Thread label with a damaged body remains a Thread view, but
 // declares the data unavailable instead of falling back to another layout.
