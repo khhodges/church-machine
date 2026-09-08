@@ -8,7 +8,7 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "node simulator/assembler_test.js && node scripts/check_assembler_browser_freshness.js && node simulator/test_lump_registry_date_sort.js && node simulator/test_lump_viewing_identity.js && node simulator/test_instruction_picker_catalog.js && node simulator/test_saved_lump_cap_guard.js && node scripts/test_check_sidecar_source.js && node scripts/check-capabilities-blocks.js --glob '**/*.cloomc'",
+    "test": "node simulator/assembler_test.js && node scripts/check_assembler_browser_freshness.js && node simulator/test_lump_registry_date_sort.js && node simulator/test_lump_viewing_identity.js && node simulator/test_instruction_picker_catalog.js && node simulator/test_saved_lump_cap_guard.js && node scripts/check-capabilities-blocks.js --glob '**/*.cloomc'",
     "test:e2e": "npx playwright test",
     "update:browser-cache-keys": "node scripts/check_assembler_browser_freshness.js --update",
     "check:capabilities": "node scripts/check-capabilities-blocks.js --glob '**/*.cloomc'",

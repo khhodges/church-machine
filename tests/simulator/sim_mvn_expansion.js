@@ -66,27 +66,27 @@ function wordStr(words) {
 //       Expected expansion (4 instructions, scratch = DR0):
 //         ISUB DR0, DR1, DR1
 //         ISUB DR0, DR0, DR1
-//         IADD DR0, DR0, #-1
+//         ISUB DR0, DR0, #1
 //         IADD DR1, DR0, #0
 //
 //   T2  MVN DR0, DR0  (same-register, DR0 — scratch must flip to DR1)
 //       Expected expansion (4 instructions, scratch = DR1):
 //         ISUB DR1, DR0, DR0
 //         ISUB DR1, DR1, DR0
-//         IADD DR1, DR1, #-1
+//         ISUB DR1, DR1, #1
 //         IADD DR0, DR1, #0
 //
 //   T3  MVN DR2, DR1  (different registers)
 //       Expected expansion (3 instructions):
 //         ISUB DR2, DR1, DR1
 //         ISUB DR2, DR2, DR1
-//         IADD DR2, DR2, #-1
+//         ISUB DR2, DR2, #1
 //
 //   T4  MVN DR1, DR3  (different registers, src ≠ dst)
 //       Expected expansion (3 instructions):
 //         ISUB DR1, DR3, DR3
 //         ISUB DR1, DR1, DR3
-//         IADD DR1, DR1, #-1
+//         ISUB DR1, DR1, #1
 //
 
 const CASES = [
@@ -96,7 +96,7 @@ const CASES = [
         exp: [
             'ISUB DR0, DR1, DR1',
             'ISUB DR0, DR0, DR1',
-            'IADD DR0, DR0, #-1',
+            'ISUB DR0, DR0, #1',
             'IADD DR1, DR0, #0',
         ].join('\n'),
         desc: 'MVN DR1, DR1 (same-register) → 4-instruction scratch-register expansion',
@@ -107,7 +107,7 @@ const CASES = [
         exp: [
             'ISUB DR1, DR0, DR0',
             'ISUB DR1, DR1, DR0',
-            'IADD DR1, DR1, #-1',
+            'ISUB DR1, DR1, #1',
             'IADD DR0, DR1, #0',
         ].join('\n'),
         desc: 'MVN DR0, DR0 (same-register, DR0) → scratch flips to DR1',
@@ -118,7 +118,7 @@ const CASES = [
         exp: [
             'ISUB DR2, DR1, DR1',
             'ISUB DR2, DR2, DR1',
-            'IADD DR2, DR2, #-1',
+            'ISUB DR2, DR2, #1',
         ].join('\n'),
         desc: 'MVN DR2, DR1 (different registers) → 3-instruction normal expansion',
     },
@@ -128,7 +128,7 @@ const CASES = [
         exp: [
             'ISUB DR1, DR3, DR3',
             'ISUB DR1, DR1, DR3',
-            'IADD DR1, DR1, #-1',
+            'ISUB DR1, DR1, #1',
         ].join('\n'),
         desc: 'MVN DR1, DR3 (different registers, src≠dst) → 3-instruction normal expansion',
     },

@@ -1171,7 +1171,7 @@ class ChurchAssembler {
             // Normal case (DRd ≠ DRs) — 3 instructions:
             //   ISUB DRd, DRs, DRs  ; DRd = 0
             //   ISUB DRd, DRd, DRs  ; DRd = 0 - DRs  = -DRs
-            //   IADD DRd, DRd, #-1  ; DRd = -DRs - 1 = ~DRs
+            //   ISUB DRd, DRd, #1   ; DRd = -DRs - 1 = ~DRs
             //
             // Same-register case (DRd == DRs == DRx) — 4 instructions via a
             // scratch register DRt (DR0 unless DRx is DR0, then DR1).
@@ -1179,7 +1179,7 @@ class ChurchAssembler {
             // DRx_orig happen before any write to DRx:
             //   ISUB[cc] DRt, DRx, DRx  ; DRt = 0              (DRx unchanged)
             //   ISUB[cc] DRt, DRt, DRx  ; DRt = -DRx_orig      (DRx unchanged)
-            //   IADD[cc] DRt, DRt, #-1  ; DRt = ~DRx_orig      (DRx unchanged)
+            //   ISUB[cc] DRt, DRt, #1   ; DRt = ~DRx_orig      (DRx unchanged)
             //   IADD[cc] DRx, DRt, #0   ; DRx = ~DRx_orig  ✓  (copy DRt → DRx)
             // DRt is a declared scratch register; its value after MVN is
             // architecturally undefined (callers must not rely on it).
@@ -1203,12 +1203,12 @@ class ChurchAssembler {
                         const drt = `DR${scratchNum}`;
                         instructions.push({ line: `ISUB${cc} ${drt}, ${drx}, ${drx}`, lineNum: lineNum + 1 });
                         instructions.push({ line: `ISUB${cc} ${drt}, ${drt}, ${drx}`, lineNum: lineNum + 1 });
-                        instructions.push({ line: `IADD${cc} ${drt}, ${drt}, #-1`,    lineNum: lineNum + 1 });
+                        instructions.push({ line: `ISUB${cc} ${drt}, ${drt}, #1`,     lineNum: lineNum + 1 });
                         instructions.push({ line: `IADD${cc} ${drx}, ${drt}, #0`,     lineNum: lineNum + 1 });
                     } else {
                         instructions.push({ line: `ISUB${cc} ${drDst}, ${drSrc}, ${drSrc}`, lineNum: lineNum + 1 });
                         instructions.push({ line: `ISUB${cc} ${drDst}, ${drDst}, ${drSrc}`, lineNum: lineNum + 1 });
-                        instructions.push({ line: `IADD${cc} ${drDst}, ${drDst}, #-1`,      lineNum: lineNum + 1 });
+                        instructions.push({ line: `ISUB${cc} ${drDst}, ${drDst}, #1`,       lineNum: lineNum + 1 });
                     }
                     continue;
                 }
