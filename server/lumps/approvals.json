@@ -191,8 +191,8 @@
       "binary_hash": "96000fbb7460ffcbc59d46a22bf03e33bd2e84163f1573ac6c64614062fcf5e9",
       "dot_name": "CapabilityTest",
       "issue_n": 1,
-      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
-      "filename": "CapabilityTest.1.878a5b27.lump"
+      "filename": "CapabilityTest.1.878a5b27.lump",
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
     },
     "efa0e4323679355a530f0ce9bcf8cf19f962204bba7a45b543ca308f1ece17d7": {
       "binary_hash": "efa0e4323679355a530f0ce9bcf8cf19f962204bba7a45b543ca308f1ece17d7",
@@ -301,6 +301,30 @@
       "filename": "WukongCallHome.1.823c4d65.lump",
       "bootstrap_t": "4a000007",
       "bootstrap_runtime_gt": 1241513991
+    },
+    "9ddd954abfbc2e5ecd26c58c8471f886d7467c4aaad0a02de8355f64cf7adc0c": {
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "9ddd954abfbc2e5ecd26c58c8471f886d7467c4aaad0a02de8355f64cf7adc0c",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "filename": "CapabilityTest.1.edfd9e62.lump",
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
+    },
+    "d349714f7fd348ff3e17d7128582b56dc65c74e1c0990081d37b55c36d949dba": {
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "d349714f7fd348ff3e17d7128582b56dc65c74e1c0990081d37b55c36d949dba",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "filename": "CapabilityTest.1.6c161823.lump",
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
     }
   }
 }

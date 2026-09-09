@@ -133,9 +133,9 @@
       "slot": 10,
       "location": "0x00001190",
       "type": "Inform",
-      "token": "4a00000a",
-      "filename": "CapabilityTest.2.225da6fc.lump",
-      "lump_version": 22,
+      "token": "c1972022",
+      "filename": "CapabilityTest.1.6c161823.lump",
+      "lump_version": 24,
       "resident": true,
       "boot_resident": true,
       "f": 0,
@@ -144,7 +144,7 @@
       "seq": 0,
       "seal": "0xDE5B96EF",
       "boot": true,
-      "issue_n": 2,
+      "issue_n": 1,
       "load_policy": "Resident",
       "binary_hash": "7f36b8a385f82a7b1548deb37b7b25999492b58934b0905fadf06b83d3f659f0",
       "ns_slot_policy": "static"
@@ -183,5 +183,6 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1788909927.0385458
+  "generated_at": 1788912749.0392554,
+  "committed_raw_fingerprint": "c68451b1f0134d4766cab50d975caccf309e97ce04578331687d3175d135abd4"
 }
