@@ -51,6 +51,16 @@ except (ImportError, ModuleNotFoundError):
     _CANONICAL_WUKONG_WORDS = _WUKONG_CALLHOME_FALLBACK_WORDS
     _CANONICAL_SELFTEST_WORDS = ()
     _canonical_wch_header = lambda _cw: 0xF8812408
+except RuntimeError as exc:
+    # The web IDE consumes trace labels, not a factory image. Keep the hardware
+    # build fail-closed in boot_rom.py, but do not take down the entire preview
+    # merely because its active SelfTest is awaiting approval.
+    if not str(exc).startswith(
+            "Wukong factory image requires an approved active SelfTest:"):
+        raise
+    _CANONICAL_WUKONG_WORDS = _WUKONG_CALLHOME_FALLBACK_WORDS
+    _CANONICAL_SELFTEST_WORDS = ()
+    _canonical_wch_header = lambda _cw: 0xF8812408
 
 WUKONG_CALLHOME_WORDS = tuple(int(word) & 0xFFFFFFFF
                               for word in _CANONICAL_WUKONG_WORDS)
