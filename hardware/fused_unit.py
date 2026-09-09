@@ -85,7 +85,9 @@ class ChurchELoadCall(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
-        MAX_SRC_REG = 5
+        # ELOADCALL's normal architectural source is CR6, the current
+        # abstraction's c-list capability. CR7+ remain invalid sources.
+        MAX_SRC_REG = CR_CLIST
 
         u_mload = ChurchMLoad(enable_seal_check=self._enable_seal_check)
         m.submodules.u_mload = u_mload

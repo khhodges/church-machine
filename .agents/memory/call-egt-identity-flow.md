@@ -8,6 +8,10 @@ E-GT builds the callee CR6 view, and the latched callee E-GT builds CR14.
 Neither phase may index through the resolved LUMP capability, because its base
 points at the LUMP header rather than a c-list row.
 
+ELOADCALL must accept CR6 as its ordinary source: CR6 is the architectural
+c-list capability. A source-range gate ending at CR5 rejects canonical
+`ELOADCALL CRd, CR6[row], method` instructions before resolution.
+
 RETURN frames must store the caller identity normalized as a Church E-GT.
 CR6's live word 0 is only a transient L-only c-list view, so copying it raw
 creates a frame that cLoad cannot use to reconstruct the caller.

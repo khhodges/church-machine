@@ -1,4 +1,4 @@
-# CM-HARDWARE-SOURCES-SHA256: fc7bc887590e428fa24e9d99ce9c3535eb1749293d59af4d694c637bbf52c9e7
+# CM-HARDWARE-SOURCES-SHA256: a46521020f3b271ff002505829f79a2e55601ea52c955273366cc431465a937c
 attribute \generator "Amaranth"
 attribute \src "/home/runner/workspace/hardware/wukong_top.py:489"
 attribute \top 1
@@ -16323,7 +16323,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:22"
   wire width 1 \busy$44
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:562"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:564"
   wire width 1 \busy$45
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:45"
@@ -16366,7 +16366,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/dread.py:48"
   wire width 4 \cr_rd_addr$58
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:567"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:569"
   wire width 4 \cr_rd_addr$59
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:27"
@@ -16636,7 +16636,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/cload.py:67"
   wire width 1 \cr_wr_en$151
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:569"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:571"
   wire width 4 \cr_wr_addr$152
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:29"
@@ -16675,7 +16675,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:24"
   wire width 96 \cr_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
   wire width 96 \cr_wr_data$165
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
@@ -16720,7 +16720,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:31"
   wire width 1 \cr_wr_en$179
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:571"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:573"
   wire width 1 \cr_wr_en$180
 
   attribute \src "/home/runner/workspace/hardware/change.py:34"
@@ -18119,34 +18119,34 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/core.py:526"
   wire width 1 \xloadlambda_start_sig
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:558"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:560"
   wire width 1 \start$672
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:559"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:561"
   wire width 4 \cr_src$673
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:560"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:562"
   wire width 4 \cr_dst$674
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:561"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:563"
   wire width 16 \index$675
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 96 \cr_rd_data$676
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 96 \cr15_namespace$677
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:576"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:578"
   wire width 32 \mem_rd_data$678
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:577"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:579"
   wire width 1 \mem_rd_valid$679
 
   attribute \src "/home/runner/workspace/hardware/pet_name_mem.py:71"
   wire width 16 \rd_addr
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:597"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:599"
   wire width 16 \pet_name_rd_addr
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:82"
@@ -18158,7 +18158,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/pet_name_mem.py:72"
   wire width 1 \rd_data
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:598"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:600"
   wire width 1 \pet_name_rd_data$685
 
   attribute \src "/home/runner/workspace/hardware/core.py:1925"
@@ -18176,7 +18176,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:74"
   wire width 1 \lazy_resolve_irq
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:592"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:594"
   wire width 16 \lazy_resolve_slot
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:75"
@@ -18188,7 +18188,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/core.py:1924"
   wire width 1 \irq_dispatch_start
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:591"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:593"
   wire width 1 \lazy_resolve_irq$695
 
   attribute \src "/home/runner/workspace/hardware/core.py:1943"
@@ -18213,7 +18213,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:53"
   wire width 1 \mem_rd_valid$702
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:587"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:589"
   wire width 32 \saved_nia$703
 
   attribute \src "/home/runner/workspace/hardware/core.py:1992"
@@ -18587,7 +18587,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:24"
   wire width 1 \fault
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:564"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:566"
   wire width 1 \fault$821
 
   attribute \src "/home/runner/workspace/hardware/dread.py:45"
@@ -18638,7 +18638,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:25"
   wire width 5 \fault_type$839
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:565"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:567"
   wire width 4 \fault_type$840
 
   attribute \src "/home/runner/workspace/hardware/dread.py:46"
@@ -18700,7 +18700,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/lambda_unit.py:20"
   wire width 1 \nia_set$860
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:585"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:587"
   wire width 1 \nia_set$861
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:43"
@@ -18901,10 +18901,10 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:69"
   wire width 1 \mem_wr_en$939
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:575"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:577"
   wire width 1 \mem_rd_en$940
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:578"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:580"
   wire width 1 \mem_wr_en$941
 
   attribute \src "/home/runner/workspace/hardware/call.py:52"
@@ -18967,10 +18967,10 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:68"
   wire width 32 \mem_wr_data$961
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:576"
   wire width 32 \mem_addr$962
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:579"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:581"
   wire width 32 \mem_wr_data$963
 
   attribute \src "/home/runner/workspace/hardware/call.py:51"
@@ -19072,7 +19072,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/lambda_unit.py:21"
   wire width 32 \nia_value
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:586"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:588"
   wire width 32 \nia_value$1005
 
   attribute \src "/home/runner/workspace/hardware/ret.py:25"
@@ -20920,31 +20920,31 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:24"
   wire width 32 \cr_wr_data.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
   wire width 32 \cr_wr_data$165.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
   wire width 16 \cr_wr_data$165.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
   wire width 9 \cr_wr_data$165.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
   wire width 2 \cr_wr_data$165.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
   wire width 1 \cr_wr_data$165.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
   wire width 3 \cr_wr_data$165.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
   wire width 1 \cr_wr_data$165.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
   wire width 32 \cr_wr_data$165.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
   wire width 32 \cr_wr_data$165.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
@@ -22993,58 +22993,58 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:61"
   wire width 1 \flags$670.V
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 32 \cr_rd_data$676.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 16 \cr_rd_data$676.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 9 \cr_rd_data$676.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 2 \cr_rd_data$676.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 1 \cr_rd_data$676.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 3 \cr_rd_data$676.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 1 \cr_rd_data$676.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 32 \cr_rd_data$676.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 32 \cr_rd_data$676.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 32 \cr15_namespace$677.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 16 \cr15_namespace$677.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 9 \cr15_namespace$677.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 2 \cr15_namespace$677.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 1 \cr15_namespace$677.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 3 \cr15_namespace$677.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 1 \cr15_namespace$677.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 32 \cr15_namespace$677.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 32 \cr15_namespace$677.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:48"
@@ -74557,68 +74557,68 @@ attribute \generator "Amaranth"
 attribute \src "/home/runner/workspace/hardware/fused_unit.py:86"
 module \top.core.u_eloadcall
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:127"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:129"
   wire width 15 \thr_lump_sz
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:128"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:130"
   wire width 15 \sp_max
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:130"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:132"
   wire width 15 \sp_min_base
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:129"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:131"
   wire width 15 \sp_min
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:135"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:137"
   wire width 1 \cr5_null
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:136"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:138"
   wire width 1 \cr5_has_r
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:140"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:142"
   wire width 1 \cr12_null
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:156"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:158"
   wire width 32 \sto_read_addr
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:157"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:159"
   wire width 32 \frame_word
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:153"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:155"
   attribute \init 12'000000000000
   wire width 12 \sto_latched
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:152"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:154"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \sto_indicator
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:174"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:176"
   wire width 1 \is_null
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:94"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:96"
   attribute \init 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
   wire width 96 \loaded_cap
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:179"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:181"
   wire width 1 \src_in_range
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:17"
   wire width 4 \cr_src
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:93"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:95"
   attribute \init 2'00
   wire width 2 \phase
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:182"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:184"
   wire width 4 \mload_src
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:183"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:185"
   wire width 4 \mload_dst
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:18"
   wire width 4 \cr_dst
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:184"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:186"
   wire width 16 \mload_index
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:19"
@@ -74628,7 +74628,7 @@ module \top.core.u_eloadcall
   attribute \init 1'0
   wire width 1 \sub_start
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:99"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:101"
   attribute \init 1'0
   wire width 1 \sub_start$27
 
@@ -74671,16 +74671,16 @@ module \top.core.u_eloadcall
   attribute \src "/home/runner/workspace/hardware/mload.py:59"
   wire width 1 \cr_wr_en$47
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:108"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:110"
   wire width 1 \method_entry_reading
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:154"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:156"
   wire width 1 \sto_reading
 
   attribute \src "/home/runner/workspace/hardware/mload.py:63"
   wire width 32 \mem_addr$51
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:109"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:111"
   wire width 32 \method_entry_addr_sig
 
   attribute \src "/home/runner/workspace/hardware/mload.py:64"
@@ -74704,50 +74704,50 @@ module \top.core.u_eloadcall
   attribute \src "/home/runner/workspace/hardware/mload.py:76"
   wire width 32 \thread_wr_data$60
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:160"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:162"
   wire width 32 \local_mem_wr_addr
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:161"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:163"
   wire width 32 \local_mem_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:159"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:161"
   wire width 1 \local_mem_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:111"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:113"
   wire width 1 \local_cr_rd_en
 
   attribute \src "/home/runner/workspace/hardware/mload.py:54"
   wire width 4 \cr_rd_addr$69
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:112"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:114"
   wire width 4 \local_cr_rd_addr
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:100"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:102"
   attribute \init 1'0
   wire width 1 \sub_start_reg
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:106"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:108"
   wire width 32 \ns_base
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:104"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:106"
   attribute \init 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
   wire width 96 \cr14_latched
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:251"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:253"
   wire width 16 \dr_clear_computed
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:95"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:97"
   attribute \init 16'0000000000000000
   wire width 16 \mask_latched
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:252"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:254"
   wire width 16 \cr_clear_computed
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:96"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:98"
   attribute \init 15'000000000000000
   wire width 15 \call_imm_latched
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:107"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:109"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \method_entry_reg
 
@@ -74755,15 +74755,15 @@ module \top.core.u_eloadcall
   attribute \init 5'00000
   wire width 5 \eloadcall_state
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:121"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:123"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \callee_egt_latched
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:97"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:99"
   attribute \init 1'0
   wire width 1 \fault_latched
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:98"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:100"
   attribute \init 5'00000
   wire width 5 \fault_type_latched
 
@@ -74779,7 +74779,7 @@ module \top.core.u_eloadcall
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:46"
   wire width 16 \cr_clear_mask
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:177"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:179"
   attribute \init 16'0000000000000000
   wire width 16 \index_latched
 
@@ -74787,11 +74787,11 @@ module \top.core.u_eloadcall
   attribute \init 16'0000000000000000
   wire width 16 \pet_name_rd_addr
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:101"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:103"
   attribute \init 1'0
   wire width 1 \sub_done_latched
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:102"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:104"
   attribute \init 1'0
   wire width 1 \sub_fault_latched
 
@@ -74810,7 +74810,7 @@ module \top.core.u_eloadcall
   attribute \src "/home/runner/workspace/hardware/mload.py:52"
   wire width 5 \sub_fault_type
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:155"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:157"
   attribute \init 1'0
   wire width 1 \sto_rd_armed
 
@@ -74876,20 +74876,20 @@ module \top.core.u_eloadcall
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:59"
   wire width 32 input 20  \thread_hdr
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:159"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:161"
   wire width 1 output 21  \mem_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:160"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:162"
   wire width 32 output 22  \mem_wr_addr
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:161"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:163"
   wire width 32 output 23  \mem_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:97"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:99"
   attribute \init 1'0
   wire width 1 output 24  \fault
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:98"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:100"
   attribute \init 5'00000
   wire width 5 output 25  \fault_type
 
@@ -75116,31 +75116,31 @@ module \top.core.u_eloadcall
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:61"
   wire width 1 \flags.V
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:94"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:96"
   wire width 32 \loaded_cap.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:94"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:96"
   wire width 16 \loaded_cap.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:94"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:96"
   wire width 9 \loaded_cap.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:94"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:96"
   wire width 2 \loaded_cap.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:94"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:96"
   wire width 1 \loaded_cap.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:94"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:96"
   wire width 3 \loaded_cap.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:94"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:96"
   wire width 1 \loaded_cap.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:94"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:96"
   wire width 32 \loaded_cap.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:94"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:96"
   wire width 32 \loaded_cap.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/mload.py:55"
@@ -75305,34 +75305,34 @@ module \top.core.u_eloadcall
   attribute \src "/home/runner/workspace/hardware/mload.py:58"
   wire width 32 \cr_wr_data$45.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:104"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:106"
   wire width 32 \cr14_latched.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:104"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:106"
   wire width 16 \cr14_latched.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:104"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:106"
   wire width 9 \cr14_latched.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:104"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:106"
   wire width 2 \cr14_latched.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:104"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:106"
   wire width 1 \cr14_latched.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:104"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:106"
   wire width 3 \cr14_latched.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:104"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:106"
   wire width 1 \cr14_latched.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:104"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:106"
   wire width 32 \cr14_latched.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:104"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:106"
   wire width 32 \cr14_latched.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:91"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:93"
   cell \top.core.u_eloadcall.u_mload \u_mload
     connect \clk \clk [0]
     connect \mem_rd_data \mem_rd_data [31:0]
@@ -75359,7 +75359,7 @@ module \top.core.u_eloadcall
     connect \sub_fault_type \sub_fault_type [4:0]
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:143"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:145"
   cell $add $73
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75371,7 +75371,7 @@ module \top.core.u_eloadcall
     connect \Y $1
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:143"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:145"
   cell $shl $74
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75383,7 +75383,7 @@ module \top.core.u_eloadcall
     connect \Y $2
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:144"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:146"
   cell $sub $75
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75395,7 +75395,7 @@ module \top.core.u_eloadcall
     connect \Y $3
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:144"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:146"
   cell $sub $76
     parameter \A_SIGNED 1
     parameter \B_SIGNED 1
@@ -75407,7 +75407,7 @@ module \top.core.u_eloadcall
     connect \Y $4
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:145"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:147"
   cell $sub $77
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75419,7 +75419,7 @@ module \top.core.u_eloadcall
     connect \Y $5
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:146"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:148"
   cell $sub $78
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75431,7 +75431,7 @@ module \top.core.u_eloadcall
     connect \Y $6
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:147"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:149"
   cell $eq $79
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75443,7 +75443,7 @@ module \top.core.u_eloadcall
     connect \Y \cr5_null
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:148"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:150"
   cell $not $80
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -75452,7 +75452,7 @@ module \top.core.u_eloadcall
     connect \Y $7
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:148"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:150"
   cell $and $81
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75464,7 +75464,7 @@ module \top.core.u_eloadcall
     connect \Y \cr5_has_r
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:149"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:151"
   cell $eq $82
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75476,7 +75476,7 @@ module \top.core.u_eloadcall
     connect \Y \cr12_null
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:165"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:167"
   cell $add $83
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75488,7 +75488,7 @@ module \top.core.u_eloadcall
     connect \Y $8
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:175"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:177"
   cell $eq $84
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75500,7 +75500,7 @@ module \top.core.u_eloadcall
     connect \Y \is_null
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:180"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:182"
   cell $le $85
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75508,11 +75508,11 @@ module \top.core.u_eloadcall
     parameter \B_WIDTH 3
     parameter \Y_WIDTH 1
     connect \A \port$1$0 [18:15]
-    connect \B 3'101
+    connect \B 3'110
     connect \Y \src_in_range
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:211"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:213"
   cell $eq $86
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75524,7 +75524,7 @@ module \top.core.u_eloadcall
     connect \Y \sub_m_elevated
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:226"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:228"
   cell $mux $87
     parameter \WIDTH 32
     connect \S \sto_reading [0]
@@ -75533,7 +75533,7 @@ module \top.core.u_eloadcall
     connect \Y $9
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:225"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:227"
   cell $mux $88
     parameter \WIDTH 32
     connect \S \method_entry_reading [0]
@@ -75542,7 +75542,7 @@ module \top.core.u_eloadcall
     connect \Y \mem_addr
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:229"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:231"
   cell $or $89
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75554,7 +75554,7 @@ module \top.core.u_eloadcall
     connect \Y $10
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:229"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:231"
   cell $or $90
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75566,7 +75566,7 @@ module \top.core.u_eloadcall
     connect \Y \mem_rd_en
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:240"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:242"
   cell $mux $91
     parameter \WIDTH 4
     connect \S \local_cr_rd_en [0]
@@ -75575,7 +75575,7 @@ module \top.core.u_eloadcall
     connect \Y \cr_rd_addr
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:255"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:257"
   cell $not $92
     parameter \A_SIGNED 0
     parameter \A_WIDTH 5
@@ -75584,7 +75584,7 @@ module \top.core.u_eloadcall
     connect \Y $11
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:256"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:258"
   cell $not $93
     parameter \A_SIGNED 0
     parameter \A_WIDTH 6
@@ -75593,7 +75593,7 @@ module \top.core.u_eloadcall
     connect \Y $12
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:260"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:262"
   cell $eq $94
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75605,7 +75605,7 @@ module \top.core.u_eloadcall
     connect \Y $13
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:260"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:262"
   cell $add $95
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75617,7 +75617,7 @@ module \top.core.u_eloadcall
     connect \Y $14
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:260"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:262"
   cell $shl $96
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75629,7 +75629,7 @@ module \top.core.u_eloadcall
     connect \Y $15
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:260"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:262"
   cell $add $97
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75641,7 +75641,7 @@ module \top.core.u_eloadcall
     connect \Y $16
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:260"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:262"
   cell $mux $98
     parameter \WIDTH 36
     connect \S $13 [0]
@@ -75650,7 +75650,7 @@ module \top.core.u_eloadcall
     connect \Y $17
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:387"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:389"
   cell $eq $99
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75662,7 +75662,7 @@ module \top.core.u_eloadcall
     connect \Y $18
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:395"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:397"
   cell $shl $100
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75674,7 +75674,7 @@ module \top.core.u_eloadcall
     connect \Y $19
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:395"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:397"
   cell $add $101
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75686,7 +75686,7 @@ module \top.core.u_eloadcall
     connect \Y $20
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:403"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:405"
   cell $shl $102
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75698,7 +75698,7 @@ module \top.core.u_eloadcall
     connect \Y $21
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:403"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:405"
   cell $add $103
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75770,7 +75770,7 @@ module \top.core.u_eloadcall
     connect \Y $27
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:521"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:523"
   cell $sub $109
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -75782,7 +75782,7 @@ module \top.core.u_eloadcall
     connect \Y $28
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:539"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:541"
   cell $not $110
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -75791,7 +75791,7 @@ module \top.core.u_eloadcall
     connect \Y \busy
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:545"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:547"
   cell $mux $111
     parameter \WIDTH 16
     connect \S \complete [0]
@@ -75800,7 +75800,7 @@ module \top.core.u_eloadcall
     connect \Y \dr_clear_mask
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:546"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:548"
   cell $mux $112
     parameter \WIDTH 16
     connect \S \complete [0]
@@ -76061,7 +76061,7 @@ module \top.core.u_eloadcall
     connect \Y \complete
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:280"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:282"
   cell $not $134
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -76082,7 +76082,7 @@ module \top.core.u_eloadcall
     connect \Y $49
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:324"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:326"
   cell $not $136
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -76091,7 +76091,7 @@ module \top.core.u_eloadcall
     connect \Y $50
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:406"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:408"
   cell $eq $137
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -76103,7 +76103,7 @@ module \top.core.u_eloadcall
     connect \Y $51
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:444"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:446"
   cell $not $138
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -76112,7 +76112,7 @@ module \top.core.u_eloadcall
     connect \Y $52
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:466"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:468"
   cell $and $139
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -76124,7 +76124,7 @@ module \top.core.u_eloadcall
     connect \Y $53
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:479"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:481"
   cell $gt $140
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -76136,7 +76136,7 @@ module \top.core.u_eloadcall
     connect \Y $54
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:485"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:487"
   cell $lt $141
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -76148,7 +76148,7 @@ module \top.core.u_eloadcall
     connect \Y $55
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:182"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:184"
   process $142
     assign \mload_src [3:0] 4'0000
     switch \phase [1:0]
@@ -76161,7 +76161,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:183"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:185"
   process $143
     assign \mload_dst [3:0] 4'0000
     switch \phase [1:0]
@@ -76174,7 +76174,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:184"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:186"
   process $144
     assign \mload_index [15:0] 16'0000000000000000
     switch \phase [1:0]
@@ -76187,7 +76187,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:111"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:113"
   process $145
     assign \local_cr_rd_en [0] 1'0
     switch \eloadcall_state [4:0]
@@ -76218,7 +76218,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:112"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:114"
   process $146
     assign \local_cr_rd_addr [3:0] 4'0000
     switch \eloadcall_state [4:0]
@@ -76249,7 +76249,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:108"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:110"
   process $147
     assign \method_entry_reading [0] 1'0
     switch \eloadcall_state [4:0]
@@ -76283,7 +76283,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:109"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:111"
   process $148
     assign \method_entry_addr_sig [31:0] 32'00000000000000000000000000000000
     switch \eloadcall_state [4:0]
@@ -76317,7 +76317,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:154"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:156"
   process $149
     assign \sto_reading [0] 1'0
     switch \eloadcall_state [4:0]
@@ -76347,7 +76347,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:159"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:161"
   process $150
     assign \mem_wr_en [0] 1'0
     switch \eloadcall_state [4:0]
@@ -76378,7 +76378,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:160"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:162"
   process $151
     assign \mem_wr_addr [31:0] 32'00000000000000000000000000000000
     switch \eloadcall_state [4:0]
@@ -76409,7 +76409,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:161"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:163"
   process $152
     assign \mem_wr_data [31:0] 32'00000000000000000000000000000000
     switch \eloadcall_state [4:0]
@@ -76440,7 +76440,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:93"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:95"
   process $153
     assign $56 [1:0] \phase [1:0]
     switch \eloadcall_state [4:0]
@@ -76480,7 +76480,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:93"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:95"
   cell $dff $154
     parameter \WIDTH 2
     parameter \CLK_POLARITY 1
@@ -76489,7 +76489,7 @@ module \top.core.u_eloadcall
     connect \Q \phase
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:97"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:99"
   process $155
     assign $57 [0] \fault [0]
     switch \eloadcall_state [4:0]
@@ -76574,7 +76574,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:97"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:99"
   cell $dff $156
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -76583,7 +76583,7 @@ module \top.core.u_eloadcall
     connect \Q \fault
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:98"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:100"
   process $157
     assign $58 [4:0] \fault_type [4:0]
     switch \eloadcall_state [4:0]
@@ -76668,7 +76668,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:98"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:100"
   cell $dff $158
     parameter \WIDTH 5
     parameter \CLK_POLARITY 1
@@ -76677,7 +76677,7 @@ module \top.core.u_eloadcall
     connect \Q \fault_type
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:101"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:103"
   process $159
     assign $59 [0] \sub_done_latched [0]
     switch \eloadcall_state [4:0]
@@ -76729,7 +76729,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:101"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:103"
   cell $dff $160
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -76738,7 +76738,7 @@ module \top.core.u_eloadcall
     connect \Q \sub_done_latched
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:102"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:104"
   process $161
     assign $60 [0] \sub_fault_latched [0]
     switch \eloadcall_state [4:0]
@@ -76790,7 +76790,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:102"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:104"
   cell $dff $162
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -76799,7 +76799,7 @@ module \top.core.u_eloadcall
     connect \Q \sub_fault_latched
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:95"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:97"
   process $163
     assign $61 [15:0] \mask_latched [15:0]
     switch \eloadcall_state [4:0]
@@ -76835,7 +76835,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:95"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:97"
   cell $dff $164
     parameter \WIDTH 16
     parameter \CLK_POLARITY 1
@@ -76844,7 +76844,7 @@ module \top.core.u_eloadcall
     connect \Q \mask_latched
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:96"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:98"
   process $165
     assign $62 [14:0] \call_imm_latched [14:0]
     switch \eloadcall_state [4:0]
@@ -76880,7 +76880,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:96"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:98"
   cell $dff $166
     parameter \WIDTH 15
     parameter \CLK_POLARITY 1
@@ -76889,7 +76889,7 @@ module \top.core.u_eloadcall
     connect \Q \call_imm_latched
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:177"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:179"
   process $167
     assign $63 [15:0] \lazy_resolve_slot [15:0]
     switch \eloadcall_state [4:0]
@@ -76925,7 +76925,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:177"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:179"
   cell $dff $168
     parameter \WIDTH 16
     parameter \CLK_POLARITY 1
@@ -77063,7 +77063,7 @@ module \top.core.u_eloadcall
     connect \Q \eloadcall_state
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:100"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:102"
   process $171
     assign $65 [0] \sub_start [0]
     switch \eloadcall_state [4:0]
@@ -77110,7 +77110,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:100"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:102"
   cell $dff $172
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -77119,7 +77119,7 @@ module \top.core.u_eloadcall
     connect \Q \sub_start
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:94"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:96"
   process $173
     assign $66 [95:0] \loaded_cap [95:0]
     switch \eloadcall_state [4:0]
@@ -77152,7 +77152,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:94"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:96"
   cell $dff $174
     parameter \WIDTH 96
     parameter \CLK_POLARITY 1
@@ -77161,7 +77161,7 @@ module \top.core.u_eloadcall
     connect \Q \loaded_cap
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:121"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:123"
   process $175
     assign $67 [31:0] \callee_egt_latched [31:0]
     switch \eloadcall_state [4:0]
@@ -77194,7 +77194,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:121"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:123"
   cell $dff $176
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
@@ -77203,7 +77203,7 @@ module \top.core.u_eloadcall
     connect \Q \callee_egt_latched
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:104"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:106"
   process $177
     assign $68 [95:0] \cr14_latched [95:0]
     switch \eloadcall_state [4:0]
@@ -77236,7 +77236,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:104"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:106"
   cell $dff $178
     parameter \WIDTH 96
     parameter \CLK_POLARITY 1
@@ -77245,7 +77245,7 @@ module \top.core.u_eloadcall
     connect \Q \cr14_latched
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:107"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:109"
   process $179
     assign $69 [31:0] \method_entry_reg [31:0]
     switch \eloadcall_state [4:0]
@@ -77285,7 +77285,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:107"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:109"
   cell $dff $180
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
@@ -77294,7 +77294,7 @@ module \top.core.u_eloadcall
     connect \Q \method_entry_reg
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:155"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:157"
   process $181
     assign $70 [0] \sto_rd_armed [0]
     switch \eloadcall_state [4:0]
@@ -77331,7 +77331,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:155"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:157"
   cell $dff $182
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -77340,7 +77340,7 @@ module \top.core.u_eloadcall
     connect \Q \sto_rd_armed
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:152"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:154"
   process $183
     assign $71 [31:0] \sto_indicator [31:0]
     switch \eloadcall_state [4:0]
@@ -77376,7 +77376,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:152"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:154"
   cell $dff $184
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
@@ -77385,7 +77385,7 @@ module \top.core.u_eloadcall
     connect \Q \sto_indicator
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:153"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:155"
   process $185
     assign $72 [11:0] \sto_latched [11:0]
     switch \eloadcall_state [4:0]
@@ -77421,7 +77421,7 @@ module \top.core.u_eloadcall
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:153"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:155"
   cell $dff $186
     parameter \WIDTH 12
     parameter \CLK_POLARITY 1
@@ -80536,13 +80536,13 @@ connect \cr15_namespace.word2_w2 \cr15_namespace [95:64]
 end
 
 attribute \generator "Amaranth"
-attribute \src "/home/runner/workspace/hardware/fused_unit.py:601"
+attribute \src "/home/runner/workspace/hardware/fused_unit.py:603"
 module \top.core.u_xloadlambda
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:620"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:622"
   wire width 1 \is_null
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:606"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:608"
   attribute \init 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
   wire width 96 \loaded_cap
 
@@ -80550,26 +80550,26 @@ module \top.core.u_xloadlambda
   attribute \init 1'0
   wire width 1 \sub_start
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:609"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:611"
   attribute \init 1'0
   wire width 1 \sub_start_reg
 
   attribute \src "/home/runner/workspace/hardware/mload.py:39"
   wire width 4 \sub_cr_src
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:559"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:561"
   wire width 4 \cr_src
 
   attribute \src "/home/runner/workspace/hardware/mload.py:40"
   wire width 4 \sub_cr_dst
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:560"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:562"
   wire width 4 \cr_dst
 
   attribute \src "/home/runner/workspace/hardware/mload.py:41"
   wire width 16 \sub_index
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:561"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:563"
   wire width 16 \index
 
   attribute \src "/home/runner/workspace/hardware/mload.py:42"
@@ -80581,16 +80581,16 @@ module \top.core.u_xloadlambda
   attribute \src "/home/runner/workspace/hardware/mload.py:43"
   wire width 32 \sub_direct_gt
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 96 \cr_rd_data$14
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 96 \cr15_namespace$16
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:576"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:578"
   wire width 32 \mem_rd_data$18
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:577"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:579"
   wire width 1 \mem_rd_valid$20
 
   attribute \src "/home/runner/workspace/hardware/mload.py:57"
@@ -80614,61 +80614,61 @@ module \top.core.u_xloadlambda
   attribute \src "/home/runner/workspace/hardware/mload.py:68"
   wire width 32 \mem_wr_data$34
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:581"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:583"
   wire width 1 \thread_wr_en
 
   attribute \src "/home/runner/workspace/hardware/mload.py:74"
   wire width 1 \thread_wr_en$36
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:582"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:584"
   wire width 4 \thread_wr_idx
 
   attribute \src "/home/runner/workspace/hardware/mload.py:75"
   wire width 4 \thread_wr_idx$38
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:583"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:585"
   wire width 32 \thread_wr_data
 
   attribute \src "/home/runner/workspace/hardware/mload.py:76"
   wire width 32 \thread_wr_data$40
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:614"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:616"
   wire width 1 \local_cr_rd_en
 
   attribute \src "/home/runner/workspace/hardware/mload.py:54"
   wire width 4 \cr_rd_addr$43
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:615"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:617"
   wire width 4 \local_cr_rd_addr
 
   attribute \src "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144"
   attribute \init 3'000
   wire width 3 \xloadlambda_state
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:563"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:565"
   wire width 1 \complete
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:607"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:609"
   attribute \init 1'0
   wire width 1 \fault_latched
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:608"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:610"
   attribute \init 4'0000
   wire width 4 \fault_type_latched
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:612"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:614"
   attribute \init 16'0000000000000000
   wire width 16 \index_latched
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:597"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:599"
   attribute \init 16'0000000000000000
   wire width 16 \pet_name_rd_addr
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:610"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:612"
   attribute \init 1'0
   wire width 1 \sub_done_latched
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:611"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:613"
   attribute \init 1'0
   wire width 1 \sub_fault_latched
 
@@ -80686,28 +80686,28 @@ module \top.core.u_xloadlambda
 
   wire width 23 input 1  \port$1$0
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:576"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:578"
   wire width 32 input 2  \mem_rd_data
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:577"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:579"
   wire width 1 input 3  \mem_rd_valid
 
   attribute \src "/home/runner/workspace/hardware/core.py:278"
   wire width 1 input 4  \clear_all
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:558"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:560"
   wire width 1 input 5  \start
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 96 input 6  \cr_rd_data
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:567"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:569"
   wire width 4 output 7  \cr_rd_addr
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:562"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:564"
   wire width 1 output 8  \busy
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:591"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:593"
   wire width 1 output 9  \lazy_resolve_irq
 
   attribute \src "/home/runner/workspace/hardware/mload.py:63"
@@ -80716,27 +80716,27 @@ module \top.core.u_xloadlambda
   attribute \src "/home/runner/workspace/hardware/mload.py:64"
   wire width 1 output 11  \mem_rd_en
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:598"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:600"
   wire width 1 input 12  \pet_name_rd_data
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 96 input 13  \cr15_namespace
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:585"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:587"
   wire width 1 output 14  \nia_set
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:586"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:588"
   wire width 32 output 15  \nia_value
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:607"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:609"
   attribute \init 1'0
   wire width 1 output 16  \fault
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:608"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:610"
   attribute \init 4'0000
   wire width 4 output 17  \fault_type
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:597"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:599"
   attribute \init 16'0000000000000000
   wire width 16 output 18  \lazy_resolve_slot
 
@@ -80789,31 +80789,31 @@ module \top.core.u_xloadlambda
 
   wire width 96 $17
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:606"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:608"
   wire width 32 \loaded_cap.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:606"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:608"
   wire width 16 \loaded_cap.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:606"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:608"
   wire width 9 \loaded_cap.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:606"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:608"
   wire width 2 \loaded_cap.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:606"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:608"
   wire width 1 \loaded_cap.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:606"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:608"
   wire width 3 \loaded_cap.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:606"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:608"
   wire width 1 \loaded_cap.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:606"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:608"
   wire width 32 \loaded_cap.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:606"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:608"
   wire width 32 \loaded_cap.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/mload.py:55"
@@ -80843,31 +80843,31 @@ module \top.core.u_xloadlambda
   attribute \src "/home/runner/workspace/hardware/mload.py:55"
   wire width 32 \cr_rd_data.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 32 \cr_rd_data$14.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 16 \cr_rd_data$14.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 9 \cr_rd_data$14.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 2 \cr_rd_data$14.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 1 \cr_rd_data$14.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 3 \cr_rd_data$14.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 1 \cr_rd_data$14.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 32 \cr_rd_data$14.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
   wire width 32 \cr_rd_data$14.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/mload.py:61"
@@ -80897,58 +80897,58 @@ module \top.core.u_xloadlambda
   attribute \src "/home/runner/workspace/hardware/mload.py:61"
   wire width 32 \cr15_namespace.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 32 \cr15_namespace$16.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 16 \cr15_namespace$16.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 9 \cr15_namespace$16.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 2 \cr15_namespace$16.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 1 \cr15_namespace$16.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 3 \cr15_namespace$16.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 1 \cr15_namespace$16.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 32 \cr15_namespace$16.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
   wire width 32 \cr15_namespace$16.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
   wire width 32 \cr_wr_data.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
   wire width 16 \cr_wr_data.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
   wire width 9 \cr_wr_data.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
   wire width 2 \cr_wr_data.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
   wire width 1 \cr_wr_data.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
   wire width 3 \cr_wr_data.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
   wire width 1 \cr_wr_data.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
   wire width 32 \cr_wr_data.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
   wire width 32 \cr_wr_data.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/mload.py:58"
@@ -80978,7 +80978,7 @@ module \top.core.u_xloadlambda
   attribute \src "/home/runner/workspace/hardware/mload.py:58"
   wire width 32 \cr_wr_data$24.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:604"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:606"
   cell \top.core.u_xloadlambda.u_mload \u_mload
     connect \clk \clk [0]
     connect \port$1$0 \port$1$0 [22:0]
@@ -81005,7 +81005,7 @@ module \top.core.u_xloadlambda
     connect \sub_fault_type \sub_fault_type [4:0]
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:621"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:623"
   cell $eq $18
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -81017,7 +81017,7 @@ module \top.core.u_xloadlambda
     connect \Y \is_null
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:629"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:631"
   cell $eq $19
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -81029,7 +81029,7 @@ module \top.core.u_xloadlambda
     connect \Y \sub_m_elevated
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:651"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:653"
   cell $mux $20
     parameter \WIDTH 4
     connect \S \local_cr_rd_en [0]
@@ -81038,7 +81038,7 @@ module \top.core.u_xloadlambda
     connect \Y \cr_rd_addr
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:726"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:728"
   cell $not $21
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -81164,7 +81164,7 @@ module \top.core.u_xloadlambda
     connect \Y $8
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:697"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:699"
   cell $not $32
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -81173,7 +81173,7 @@ module \top.core.u_xloadlambda
     connect \Y $9
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:614"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:616"
   process $33
     assign \local_cr_rd_en [0] 1'0
     switch \xloadlambda_state [2:0]
@@ -81189,7 +81189,7 @@ module \top.core.u_xloadlambda
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:615"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:617"
   process $34
     assign \local_cr_rd_addr [3:0] 4'0000
     switch \xloadlambda_state [2:0]
@@ -81205,7 +81205,7 @@ module \top.core.u_xloadlambda
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:585"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:587"
   process $35
     assign \nia_set [0] 1'0
     switch \xloadlambda_state [2:0]
@@ -81221,7 +81221,7 @@ module \top.core.u_xloadlambda
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:586"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:588"
   process $36
     assign \nia_value [31:0] 32'00000000000000000000000000000000
     switch \xloadlambda_state [2:0]
@@ -81237,7 +81237,7 @@ module \top.core.u_xloadlambda
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:607"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:609"
   process $37
     assign $10 [0] \fault [0]
     switch \xloadlambda_state [2:0]
@@ -81272,7 +81272,7 @@ module \top.core.u_xloadlambda
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:607"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:609"
   cell $dff $38
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -81281,7 +81281,7 @@ module \top.core.u_xloadlambda
     connect \Q \fault
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:608"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:610"
   process $39
     assign $11 [3:0] \fault_type [3:0]
     switch \xloadlambda_state [2:0]
@@ -81316,7 +81316,7 @@ module \top.core.u_xloadlambda
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:608"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:610"
   cell $dff $40
     parameter \WIDTH 4
     parameter \CLK_POLARITY 1
@@ -81325,7 +81325,7 @@ module \top.core.u_xloadlambda
     connect \Q \fault_type
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:610"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:612"
   process $41
     assign $12 [0] \sub_done_latched [0]
     switch \xloadlambda_state [2:0]
@@ -81349,7 +81349,7 @@ module \top.core.u_xloadlambda
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:610"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:612"
   cell $dff $42
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -81358,7 +81358,7 @@ module \top.core.u_xloadlambda
     connect \Q \sub_done_latched
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:611"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:613"
   process $43
     assign $13 [0] \sub_fault_latched [0]
     switch \xloadlambda_state [2:0]
@@ -81382,7 +81382,7 @@ module \top.core.u_xloadlambda
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:611"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:613"
   cell $dff $44
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -81391,7 +81391,7 @@ module \top.core.u_xloadlambda
     connect \Q \sub_fault_latched
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:609"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:611"
   process $45
     assign $14 [0] \sub_start [0]
     switch \xloadlambda_state [2:0]
@@ -81415,7 +81415,7 @@ module \top.core.u_xloadlambda
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:609"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:611"
   cell $dff $46
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -81424,7 +81424,7 @@ module \top.core.u_xloadlambda
     connect \Q \sub_start
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:612"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:614"
   process $47
     assign $15 [15:0] \lazy_resolve_slot [15:0]
     switch \xloadlambda_state [2:0]
@@ -81447,7 +81447,7 @@ module \top.core.u_xloadlambda
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:612"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:614"
   cell $dff $48
     parameter \WIDTH 16
     parameter \CLK_POLARITY 1
@@ -81512,7 +81512,7 @@ module \top.core.u_xloadlambda
     connect \Q \xloadlambda_state
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:606"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:608"
   process $51
     assign $17 [95:0] \loaded_cap [95:0]
     switch \xloadlambda_state [2:0]
@@ -81532,7 +81532,7 @@ module \top.core.u_xloadlambda
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:606"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:608"
   cell $dff $52
     parameter \WIDTH 96
     parameter \CLK_POLARITY 1

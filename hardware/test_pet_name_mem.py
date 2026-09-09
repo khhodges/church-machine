@@ -61,9 +61,8 @@ def _cap_dict(gt_type=0, dom=0, perm=0, slot_id=0, gt_seq=0,
 
 
 # INFORM L-perm Church-domain c-list cap (used for CR0 in ELoadCall tests).
-# ELoadCall restricts cr_src to 0–5 (MAX_SRC_REG=5); m_elevated is only True
-# when mload_src==CR_CLIST which never occurs in phase 0 for cr_src<=5.
-# Therefore the source cap must carry L-permission to pass mLoad's CHECK_L.
+# These focused tests exercise an ordinary CR0 source. Architectural CR6
+# sources use mLoad's elevated c-list path and do not require L permission.
 # Church L-perm encoding: dom=1, perm[0]=1 (L is bit 0 in 3-bit Church perm).
 CLIST_CAP = _cap_dict(
     gt_type=1,      # GT_TYPE_INFORM
@@ -112,8 +111,8 @@ async def _drive_eloadcall_null(ctx, dut, *, pet_named: bool):
     ctx.set(u.mem_rd_valid, 0)
     ctx.set(u.mem_rd_data, 0)
 
-    # ELOADCALL CR0[5] → CR1 (cr_src must be 0–5; CR0 has L-perm via CLIST_CAP)
-    ctx.set(u.cr_src, 0)
+    # Architectural c-list form: ELOADCALL CR1, CR6[5], 0.
+    ctx.set(u.cr_src, 6)
     ctx.set(u.cr_dst, 1)
     ctx.set(u.index, 5)
     ctx.set(u.mask, 0)
@@ -124,9 +123,9 @@ async def _drive_eloadcall_null(ctx, dut, *, pet_named: bool):
     ctx.set(u.start, 0)
 
     for _ in range(80):
-        # Serve CR file: CR0 = L-perm c-list cap; all others = null
+        # Serve CR file: CR6 = c-list cap; all others = null.
         cr_addr = ctx.get(u.cr_rd_addr)
-        ctx.set(u.cr_rd_data, CLIST_CAP if cr_addr == 0 else NULL_CAP_DICT)
+        ctx.set(u.cr_rd_data, CLIST_CAP if cr_addr == 6 else NULL_CAP_DICT)
 
         # Serve memory reads with 0 (NULL GT for slot; zero NS entry)
         if ctx.get(u.mem_rd_en):

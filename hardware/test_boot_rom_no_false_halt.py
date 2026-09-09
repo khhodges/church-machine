@@ -683,7 +683,7 @@ _DELAYED_FAULT_CASES = [
         FaultType.PERM_L,
         None,
         False,
-        id="eloadcall-structural-source",
+        id="eloadcall-cr6-permission",
     ),
     pytest.param(
         "XLOADLAMBDA",
