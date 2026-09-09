@@ -4835,7 +4835,11 @@ function _showNSLumpModal(slotIdx, nsEntry) {
                 ? `<div id="_nsLumpLazyBody" role="alert" style="border:1px solid rgba(248,113,113,0.55);border-left:4px solid #f87171;border-radius:6px;background:rgba(127,29,29,0.22);padding:12px 14px;color:#fecaca;">
                     <div style="font-size:0.78rem;font-weight:800;letter-spacing:0.06em;color:#f87171;margin-bottom:7px;">FAULT \u2014 INVALID SAVED LUMP</div>
                     <div style="font-size:0.82rem;line-height:1.5;">${String(_lazyFetchBlockedError).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-                    <div style="font-size:0.75rem;line-height:1.45;color:#fca5a5;margin-top:8px;">The server refused to expose these bytes. The artifact remains selected so the integrity failure is not hidden by an older revision.</div>
+                    <div style="font-size:0.75rem;line-height:1.45;color:#fca5a5;margin-top:8px;">C-List row 0 contains a SELF authority that does not match the owning Namespace descriptor at NS[${slotIdx}]. The server refused to expose or execute these bytes.</div>
+                    <button type="button" class="btn btn-sm" style="margin-top:10px;background:#7f1d1d;color:#fff;border:1px solid #f87171;font-weight:700;"
+                        onclick="document.getElementById('_nsLumpModalOverlay').remove();openLumpInEditor('${_lazyFetchToken}')">
+                        Open code error in Editor
+                    </button>
                 </div>`
                 : `<div id="_nsLumpLazyBody" style="color:#f0a040;font-size:0.8rem;padding:8px 0;">&#9680; Loading lump data\u2026</div>`;
         } else {

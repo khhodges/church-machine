@@ -5439,6 +5439,8 @@ async function openLumpInEditor(token) {
     // For in-memory assembled lumps (not yet saved): build serverWords directly
     // from lastAssembledWords so no server round-trip is needed.
     var serverWords = null;
+    var _diagnosticSource = null;
+    var _diagnosticError = null;
     if (_inMemoryLump && _regMemData && _regMemData.words && _regMemData.words.length > 0) {
         var _memCaps2 = _regMemData.capabilities || [];
         var _memCw = _regMemData.words.length;
@@ -5455,13 +5457,32 @@ async function openLumpInEditor(token) {
             if (_wr.ok) {
                 var _wj = await _wr.json();
                 if (_wj && Array.isArray(_wj.words)) serverWords = _wj.words;
+            } else {
+                try {
+                    var _wrErr = await _wr.json();
+                    _diagnosticError = _wrErr && _wrErr.error
+                        ? String(_wrErr.error) : ('Server rejected the saved binary (HTTP ' + _wr.status + ').');
+                } catch (_wre) {
+                    _diagnosticError = 'Server rejected the saved binary (HTTP ' + _wr.status + ').';
+                }
+                // Keep binary delivery fail-closed, but recover intrinsic
+                // embedded source through a diagnostic-only endpoint so the
+                // programmer can repair the exact rejected artifact.
+                var _ds = await fetch('/api/lump/' + token + '/diagnostic-source', { cache: 'no-store' });
+                if (_ds.ok) {
+                    var _dj = await _ds.json();
+                    if (_dj && typeof _dj.source === 'string') {
+                        _diagnosticSource = _dj.source;
+                        if (_dj.validation_error) _diagnosticError = String(_dj.validation_error);
+                    }
+                }
             }
         } catch (_fe) {}
     }
     if (window._savedLumpOpenRequestId !== _openRequestId) return;
 
     // ── Inspect embedded content from the immutable binary ──────────────────
-    var _binaryFrameSource = null;
+    var _binaryFrameSource = _diagnosticSource;
     var _binaryFrameIsApiOnly = false;
     var _binaryFrameApi = null;
     if (serverWords && serverWords.length > 0) {
@@ -5707,7 +5728,11 @@ async function openLumpInEditor(token) {
         } else {
             _compiledDisasm = '; ' + lumpName +
                           '\n; Compiled disassembly is unavailable because this binary is malformed.\n';
-            var _mfBannerMsg = 'Binary is malformed \u2014 compiled disassembly is unavailable. Recoverable source, if any, remains editable.';
+            var _mfBannerMsg = _diagnosticError
+                ? '<strong>Saved LUMP integrity fault:</strong> ' +
+                    String(_diagnosticError).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+                    '<br><span>Check C-List row 0 / <code>SELF E</code>, then Save Lump to regenerate the artifact with the owning Namespace identity.</span>'
+                : 'Binary is malformed \u2014 compiled disassembly is unavailable. Recoverable source, if any, remains editable.';
             // Show malformed-binary banner above the editor.
             var _mfBanner = document.createElement('div');
             _mfBanner.id = '_lumpMalformedBanner';
@@ -5804,7 +5829,9 @@ async function openLumpInEditor(token) {
                 _srcBanner.id = '_lumpSourceRestoredBanner';
                 _srcBanner.className = 'lump-source-restored-banner';
                 _srcBanner.innerHTML =
-                    '<span>Source restored from saved LUMP</span>' +
+                    '<span>' + (_diagnosticError
+                        ? 'Faulty artifact source opened for repair'
+                        : 'Source restored from saved LUMP') + '</span>' +
                     '<button class="lump-malformed-banner-dismiss" onclick="this.parentNode.remove()" title="Dismiss">\u00D7</button>';
                 var _srcBannerParent = asmEd.parentNode && asmEd.parentNode.parentNode;
                 if (_srcBannerParent) _srcBannerParent.insertBefore(_srcBanner, asmEd.parentNode);

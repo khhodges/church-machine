@@ -9326,6 +9326,60 @@ def get_lump_detail(token):
     return jsonify(detail)
 
 
+@app.route("/api/lump/<token_hex>/diagnostic-source")
+def get_lump_diagnostic_source(token_hex):
+    """Return embedded source for diagnosing a rejected saved artifact.
+
+    This endpoint deliberately does not return binary words and does not mark
+    the artifact trusted. It lets the programmer repair intrinsic embedded
+    source while the normal words/content endpoints remain fail-closed.
+    """
+    import re as _re_diag
+    raw = token_hex.lower()
+    if not _re_diag.fullmatch(r'[0-9a-f]{1,8}', raw):
+        return jsonify({"error": "Invalid token"}), 400
+    key8 = raw.zfill(8)
+    try:
+        manifest = _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json"))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 409
+    matches = [
+        row for row in manifest
+        if isinstance(row, dict) and str(row.get("token") or "").lower() == key8
+    ]
+    if len(matches) != 1:
+        status = 404 if not matches else 409
+        message = (f"Unknown lump 0x{key8}" if not matches
+                   else f"Duplicate manifest token {key8}")
+        return jsonify({"error": message}), status
+    entry = matches[0]
+    filename = entry.get("filename")
+    if not isinstance(filename, str) or not filename:
+        return jsonify({"error": "Manifest locator has no filename"}), 409
+    try:
+        inspected = _inspect_lump_binary(os.path.join(LUMPS_DIR, filename))
+        validation_error = _check_lump_canonical_integrity(
+            LUMPS_DIR, key8, inspected["raw_bytes"])
+    except (OSError, ValueError) as exc:
+        return jsonify({"error": f"LUMP inspection failure: {exc}"}), 409
+    source = inspected.get("source")
+    if not isinstance(source, str) or not source:
+        return jsonify({
+            "error": "The rejected artifact has no embedded source to repair.",
+            "token": key8,
+            "validation_error": validation_error if isinstance(validation_error, str) else None,
+        }), 404
+    return jsonify({
+        "token": key8,
+        "abstraction": entry.get("abstraction"),
+        "filename": filename,
+        "source": source,
+        "validation_error": validation_error if isinstance(validation_error, str) else None,
+        "diagnostic_only": True,
+        "trusted": False,
+    })
+
+
 @app.route("/api/lump/<token_hex>/words")
 def get_lump_words(token_hex):
     """Return the raw uint32 word array of a saved lump as JSON."""

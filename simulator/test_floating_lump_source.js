@@ -73,6 +73,7 @@ function extractTopLevelFn(sourceFile, fnName) {
 
 const findSrcLumpSrc = extractTopLevelFn('app-memory.js', '_findSrcLump');
 const appMemorySource = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
+const appLumpsSource = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8');
 
 // ── Sandbox factory ───────────────────────────────────────────────────────────
 // Each test gets a fresh VM context with its own _lumpsCache so tests cannot
@@ -236,9 +237,11 @@ console.log('\n--- T10: newest invalid artifact is selected and surfaced as a fa
     };
     const result = vm.runInContext('_findSrcLump(10, "CapabilityTest")', ctx);
     check('T10a: invalid newest artifact remains selected', result === invalidNewest);
-    check('T10b: popup labels invalid saved artifact as a FAULT',
+    check('T10b: popup labels invalid saved artifact as an actionable FAULT',
         appMemorySource.includes('FAULT \\u2014 INVALID SAVED LUMP') &&
-        appMemorySource.includes('The server refused to expose these bytes.'));
+        appMemorySource.includes('Open code error in Editor') &&
+        appMemorySource.includes('C-List row 0 contains a SELF authority') &&
+        appLumpsSource.includes('/diagnostic-source'));
 }
 
 // ── T09: missing cache metadata still preserves committed token ──────────────
