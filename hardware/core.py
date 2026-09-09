@@ -174,6 +174,7 @@ class ChurchCore(Elaboratable):
         # Byte address of the active Thread context body. CR12 remains the
         # system Thread root and is intentionally not overloaded with this.
         self.active_thread_base = Signal(32)
+        self.active_thread_owned = Signal()
 
         self.nia = Signal(32)
         self.flags = Signal(COND_FLAGS_LAYOUT)
@@ -1794,6 +1795,7 @@ class ChurchCore(Elaboratable):
                 u_change.index.eq(Mux(thread_switch_start_sig, self.thread_switch_index, cap_index)),
                 u_change.change_mask.eq(Mux(thread_switch_start_sig, 0x0FFF, u_decoder.call_mask)),
                 u_change.active_thread_base.eq(self.active_thread_base),
+                u_change.active_thread_owned.eq(self.active_thread_owned),
                 u_change.cr_rd_data.eq(u_regs.cr_rd_data),
                 u_change.cr12_thread.eq(u_regs.cr12_thread),
                 u_change.cr15_namespace.eq(u_regs.cr15_namespace),
@@ -1825,6 +1827,7 @@ class ChurchCore(Elaboratable):
                     scheduler_inflight.eq(0),
                     self.active_thread_slot.eq(1),
                     self.active_thread_base.eq(0),
+                    self.active_thread_owned.eq(0),
                 ]
             with m.Elif(thread_switch_start_sig):
                 m.d.sync += scheduler_inflight.eq(1)
@@ -1834,11 +1837,14 @@ class ChurchCore(Elaboratable):
                     m.d.sync += [
                         self.active_thread_slot.eq(self.thread_switch_index),
                         self.active_thread_base.eq(u_change.thread_base_restore_val),
+                        self.active_thread_owned.eq(1),
                     ]
             # Capture the initial boot Thread backing address as well.
             with m.If(u_change.thread_base_restore_en):
-                m.d.sync += self.active_thread_base.eq(
-                    u_change.thread_base_restore_val)
+                m.d.sync += [
+                    self.active_thread_base.eq(u_change.thread_base_restore_val),
+                    self.active_thread_owned.eq(1),
+                ]
             m.d.comb += [
                 self.thread_switch_busy.eq(scheduler_inflight | thread_switch_start_sig),
                 self.thread_switch_complete.eq(u_change.change_complete & scheduler_inflight),

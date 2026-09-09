@@ -71,6 +71,7 @@ def test_change_contract_uses_canonical_church_suspension_frame():
     assert THREAD_CAP_WORDS == 12
     assert THREAD_HEAP_OFFSET == 18
     assert 'mload_direct_gt.eq(entry_gt_latched)' in source
+    assert 'outgoing_thread_owned.eq(self.active_thread_owned)' in source
     assert "THREAD_CODE_IDENTITY_OFFSET" not in source
     assert 'with m.State("SAVE_EGT_WRITE")' in source
     assert 'with m.State("SAVE_FRAME")' in source
@@ -112,13 +113,14 @@ def test_m6_contract_has_synchronizer_debounce_and_fetch_quiesce():
     "thread_n_minus_6",
     [2, 3],
 )
+@pytest.mark.parametrize("active_thread_owned", [False, True])
 @pytest.mark.parametrize(
     "corruption",
     [None, "stale_cap", "null_egt", "stale_egt", "malformed_frame",
      "nia_oob", "underflow", "outgoing_overflow"],
 )
 def test_change_enforces_defined_thread_body_before_restoring_context(
-        thread_n_minus_6, corruption):
+        thread_n_minus_6, active_thread_owned, corruption):
     dut = ChurchChange()
     sim = Simulator(dut)
     sim.add_clock(1e-6)
@@ -204,6 +206,7 @@ def test_change_enforces_defined_thread_body_before_restoring_context(
         ctx.set(dut.m_elevated, 0)
         ctx.set(dut.index, thread_slot)
         ctx.set(dut.active_thread_base, old_base)
+        ctx.set(dut.active_thread_owned, active_thread_owned)
         ctx.set(dut.cr15_namespace.as_value(), crs[15])
         ctx.set(dut.mem_wr_done, 1)
 
@@ -256,7 +259,9 @@ def test_change_enforces_defined_thread_body_before_restoring_context(
         else:
             raise AssertionError("scheduler CHANGE timed out")
 
-        if corruption is not None:
+        target_corruption = corruption not in (None, "outgoing_overflow")
+        outgoing_corruption = corruption == "outgoing_overflow"
+        if target_corruption or (outgoing_corruption and active_thread_owned):
             assert terminal == "fault"
             assert writes == []
             assert crs[14] == 0
@@ -276,18 +281,25 @@ def test_change_enforces_defined_thread_body_before_restoring_context(
             layout["stack_end"] | (return_flags << 28)
         )
         assert mem[new_base + 258 * 4] == 0xDEADBEEF
-        assert old_base + THREAD_STO_OFFSET * 4 in writes
-        assert mem[old_base + (layout["stack_end"] - 1) * 4] == entry_gt
-        assert mem[old_base + layout["stack_end"] * 4] == (
-            layout["stack_end"] | (1 << 13)
-        )
-        assert mem[old_base + THREAD_STO_OFFSET * 4] == (
-            (layout["stack_end"] - 2) | (1 << 12)
-        )
-        for i, gt in enumerate(outgoing_cr_gts):
-            assert mem[old_base + (layout["caps_start"] + i) * 4] == gt
-        for i, value in enumerate(outgoing_drs):
-            assert mem[old_base + (1 + i) * 4] == value
+        if active_thread_owned:
+            assert old_base + THREAD_STO_OFFSET * 4 in writes
+            assert mem[old_base + (layout["stack_end"] - 1) * 4] == entry_gt
+            assert mem[old_base + layout["stack_end"] * 4] == (
+                layout["stack_end"] | (1 << 13)
+            )
+            assert mem[old_base + THREAD_STO_OFFSET * 4] == (
+                (layout["stack_end"] - 2) | (1 << 12)
+            )
+            for i, gt in enumerate(outgoing_cr_gts):
+                assert mem[old_base + (layout["caps_start"] + i) * 4] == gt
+            for i, value in enumerate(outgoing_drs):
+                assert mem[old_base + (1 + i) * 4] == value
+        else:
+            assert not [addr for addr in writes
+                        if old_base <= addr < old_base + body_words * 4]
+            assert mem[old_base + THREAD_STO_OFFSET * 4] == (
+                layout["stack_start"] + 1
+                if outgoing_corruption else layout["stack_end"])
         forbidden = {
             old_base + 258 * 4,
             new_base + 258 * 4,

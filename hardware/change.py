@@ -69,6 +69,9 @@ class ChurchChange(Elaboratable):
         # CR12 remains the system Thread root; the physical scheduler carries
         # the active Thread body's backing address independently.
         self.active_thread_base = Signal(32)
+        # A selected/default Thread is not necessarily the owner of the live
+        # register bank.  Reset scratch state must never be serialized into it.
+        self.active_thread_owned = Signal()
         self.thread_base_restore_en = Signal()
         self.thread_base_restore_val = Signal(32)
         self.dr_wr_en = Signal()
@@ -101,6 +104,7 @@ class ChurchChange(Elaboratable):
         nia_current_latched = Signal(32)
         thread_change_lat = Signal()
         outgoing_thread_base = Signal(32)
+        outgoing_thread_owned = Signal()
         incoming_thread_base = Signal(32)
         thread_loaded = Signal()
         fault_latched    = Signal()
@@ -400,6 +404,7 @@ class ChurchChange(Elaboratable):
                         outgoing_thread_base.eq(
                             Mux((self.cr_dst == 14) | (self.cr_dst == 15), self.active_thread_base,
                                 cr12_view.word1_location)),
+                        outgoing_thread_owned.eq(self.active_thread_owned),
                         thread_loaded.eq(0),
                     ]
                     m.d.comb += self.cr_rd_addr.eq(self.cr_src)
@@ -709,7 +714,14 @@ class ChurchChange(Elaboratable):
                               (self.mem_rd_data[10:23] != 0) &
                               (incoming_frame[13:28] <
                                self.mem_rd_data[10:23])):
-                        m.next = "PREFLIGHT_OUT_HEADER"
+                        with m.If(outgoing_thread_owned):
+                            m.next = "PREFLIGHT_OUT_HEADER"
+                        with m.Else():
+                            # The target is valid, but reset/replacement left
+                            # only scratch registers live. Restore it without
+                            # fabricating a suspension frame for the selected
+                            # default Thread.
+                            m.next = "LOAD_THREAD"
                     with m.Else():
                         m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.BOUNDS)]
                         m.next = "FAULT"

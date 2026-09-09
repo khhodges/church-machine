@@ -1,9 +1,9 @@
 ---
 name: Thread selection versus live ownership
-description: Why a selected Thread slot does not always own the simulator register banks.
+description: Why a selected Thread slot does not always own live simulator or FPGA register banks.
 ---
 
-A configured or selected Thread slot is not proof that the live CR/DR bank belongs to that Thread. Reset and successful whole-image replacement leave a default selection but reset scratch registers; only successful boot or Thread restoration establishes ownership.
+A configured or selected Thread slot is not proof that the live CR/DR bank belongs to that Thread. In both simulator and FPGA lifecycles, reset and successful whole-image replacement leave a default selection but reset scratch registers; only successful boot or Thread restoration establishes ownership.
 
 **Why:** Gating outgoing suspension on boot completion loses pre-boot Threads after the first manual restore, while treating the default selection as owned overwrites its dormant image with reset scratch state.
 
