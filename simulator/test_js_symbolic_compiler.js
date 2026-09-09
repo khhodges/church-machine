@@ -90,6 +90,35 @@ console.log('\n--- JS-DOT: dotted abstraction name from New template ---');
         JSON.stringify(result.capabilities));
 }
 
+console.log('\n--- JS-SELF: SELF is a case-insensitive contextual pet name ---');
+for (const spelling of ['self', 'SeLf', '__self__']) {
+    const c = new CLOOMCCompiler();
+    const src = `abstraction ide.contextualSelf {
+    capabilities {
+        ${spelling} E,
+        M_BIT_DEV RW
+    }
+    method Status() {
+        LOAD CR0, ${spelling}
+        RETURN DR0
+    }
+}`;
+    const result = c.compile(src, []);
+    check('JS-SELF-' + spelling + ': compiles without declaration errors',
+        result.errors.length === 0, errMsg(result));
+    check('JS-SELF-' + spelling + ': emits one contextual SELF at row zero',
+        result.capabilities.length === 2 &&
+        result.capabilities[0].name === '__SELF__' &&
+        result.capabilities[0].compiler_owned_self === true &&
+        result.capabilities[1].name === 'M_BIT_DEV',
+        JSON.stringify(result.capabilities));
+    check('JS-SELF-' + spelling + ': method operand resolves SELF to C-List row zero',
+        result.methods.length === 1 &&
+        result.methods[0].code.length >= 1 &&
+        (result.methods[0].code[0] & 0x7FFF) === 0,
+        result.methods.length ? JSON.stringify(result.methods[0].code) : 'no method');
+}
+
 // ── JS2: return parameter ─────────────────────────────────────────────────────
 console.log('\n--- JS-ASM: native instructions inside CLOOMC++ methods ---');
 {

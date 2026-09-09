@@ -174,15 +174,17 @@ class CLOOMCCompiler {
         // architectural rather than ordinary-abstraction identity.
         if (result.language !== 'assembly' && result.methods && result.methods.length > 0) {
             const declared = Array.isArray(result.capabilities) ? result.capabilities : [];
+            const isContextualSelf = cap => {
+                const name = typeof cap === 'string' ? cap : (cap && cap.name);
+                const normalized = String(name || '').trim().toUpperCase();
+                return normalized === 'SELF' || normalized === '__SELF__' ||
+                    !!(cap && typeof cap === 'object' && cap.symbolic_self);
+            };
             // SELF is the compiler's initial suggestion for a newly opened
             // C-list, not an ownership constraint. Keep one symbolic row zero
             // and leave later programmer changes untouched for advisory
             // validation at save time.
-            const userDeclared = declared.filter(cap => {
-                const name = typeof cap === 'string' ? cap : (cap && cap.name);
-                return !['SELF', '__SELF__'].includes(
-                    String(name || '').trim().toUpperCase());
-            });
+            const userDeclared = declared.filter(cap => !isContextualSelf(cap));
             result.capabilities = [{
                 name: '__SELF__',
                 rights: ['E'],
@@ -1150,9 +1152,17 @@ class CLOOMCCompiler {
         const capNames = hasCompilerSelf
             ? sourceCaps.filter(cap => {
                 const name = typeof cap === 'string' ? cap : (cap && cap.name);
-                return String(name || '').trim().toUpperCase() !== 'SELF';
+                const normalized = String(name || '').trim().toUpperCase();
+                return normalized !== 'SELF' && normalized !== '__SELF__';
             })
             : sourceCaps;
+        // SELF is a contextual pet name for this abstraction's owner capability.
+        // Make it usable by method code immediately; localization later replaces
+        // the symbolic row-zero entry with this artifact's concrete Golden Token.
+        if (hasCompilerSelf) {
+            rom.SELF = 0;
+            rom.__SELF__ = 0;
+        }
         // Only compiler-owned ordinary abstractions reserve row zero.  Assembly
         // deliberately retains the full 32-row architectural c-list layout.
         const firstUserRow = hasCompilerSelf ? 1 : 0;

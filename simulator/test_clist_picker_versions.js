@@ -100,13 +100,27 @@ function nextTurn() { return new Promise(resolve => setTimeout(resolve, 0)); }
     check('CPV-10: search announces the shortlist size',
         popup.querySelector('.clist-picker-search-count').textContent === '1 match');
 
-    search.value = '';
-    search.dispatchEvent(new window.Event('input', { bubbles: true }));
+    window.document.getElementById('asmEditor').value =
+        'capabilities {\n    __self__ E,\n    Dynamic.Pet R\n}';
+    window.CListViewer.show();
+    await nextTurn();
+    const displayedRows = Array.from(popup.querySelectorAll('.clist-row[data-slot]'));
+    check('CPV-11: internal and mixed-case SELF spelling remains contextual row zero',
+        displayedRows.length === 2 &&
+        displayedRows[0].querySelector('.clist-token').textContent === 'SELF' &&
+        displayedRows[1].textContent.includes('Dynamic.Pet'));
+
+    popup.querySelector('[data-action="show-picker"]').click();
+    await nextTurn();
+    await nextTurn();
+    const refreshedSearch = popup.querySelector('.clist-picker-search-input');
+    refreshedSearch.value = '';
+    refreshedSearch.dispatchEvent(new window.Event('input', { bubbles: true }));
     popup.querySelector('[data-cap-name="__SYMBOLIC__"]').click();
     const symbolicInput = popup.querySelector('.clist-symbolic-name-input');
     symbolicInput.value = 'Future.Member';
     popup.querySelector('[data-action="insert-symbolic-capability"]').click();
-    check('CPV-11: a not-yet-created abstraction can be declared by pet name',
+    check('CPV-12: a not-yet-created abstraction can be declared by pet name',
         window.document.getElementById('asmEditor').value.includes('Future.Member E'));
 
     console.log('\n' + passed + ' passed, ' + failed + ' failed');

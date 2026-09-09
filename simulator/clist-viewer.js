@@ -656,7 +656,7 @@
         var removedNames = [];
         entries.forEach(function (entry) {
             var name = entry[0];
-            if (String(name).toUpperCase() === 'SELF') {
+            if (_isSelfPetName(name)) {
                 kept.push(entry);
                 return;
             }
@@ -703,10 +703,10 @@
 
         var entries = _parseCapEntries(cm[1]);
         var selfEntries = entries.filter(function (entry) {
-            return String(entry[0]).toUpperCase() === 'SELF';
+            return _isSelfPetName(entry[0]);
         });
         var userEntries = entries.filter(function (entry) {
-            return String(entry[0]).toUpperCase() !== 'SELF';
+            return !_isSelfPetName(entry[0]);
         });
         if (sourceIndex >= userEntries.length) {
             _showPolaToast(popup, 'C-List row CR' + displaySlot + ' is no longer present.');
@@ -751,9 +751,10 @@
                         return name ? { name: name, rights: rights } : null;
                     })
                     .filter(function (cap) {
-                        // `SELF E` is the visible template declaration for the
-                        // suggested row 0, which is rendered separately.
-                        return cap && String(cap.name).toUpperCase() !== 'SELF';
+                        // SELF is a universal contextual pet name. Both its
+                        // source spelling and internal __SELF__ spelling refer
+                        // to the current abstraction and render as row zero.
+                        return cap && !_isSelfPetName(cap.name);
                     });
                 // A capabilities { } block exists in the source — always treat
                 // this as the authoritative view, even when it is now empty
@@ -883,6 +884,11 @@
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
+    }
+
+    function _isSelfPetName(name) {
+        var normalized = String(name == null ? '' : name).trim().toUpperCase();
+        return normalized === 'SELF' || normalized === '__SELF__';
     }
 
     function _showDisabledResolveToast(btn) {
