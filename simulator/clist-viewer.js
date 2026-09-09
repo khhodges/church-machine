@@ -296,6 +296,9 @@
 
         // While an inline pet-name input is active, let the input handle keys itself
         if (popupEl && popupEl.querySelector('.clist-pet-name-input')) return;
+        var searchInput = e.target && e.target.classList &&
+            e.target.classList.contains('clist-picker-search-input');
+        if (searchInput && !['Escape', 'ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) return;
 
         var inPicker = !!(popupEl && popupEl.querySelector('.clist-back-btn'));
 
@@ -306,7 +309,8 @@
         }
 
         var rows = inPicker
-            ? (popupEl ? popupEl.querySelectorAll('.clist-picker-row[data-cap-name]') : [])
+            ? (popupEl ? Array.from(popupEl.querySelectorAll('.clist-picker-row[data-cap-name]'))
+                .filter(function(row) { return row.style.display !== 'none'; }) : [])
             : (popupEl ? popupEl.querySelectorAll('.clist-row[data-slot]') : []);
         if (!rows.length) return;
 
@@ -1216,7 +1220,40 @@
             '<span class="clist-viewer-title">Add Capability</span>' +
             '<span class="clist-viewer-hint">click to add \u00b7 Esc to go back</span>' +
             '</div>' +
+            '<div class="clist-picker-search">' +
+            '<input type="search" class="clist-picker-search-input" ' +
+            'placeholder="Start typing a capability name\u2026" aria-label="Filter capabilities by starting letters" autocomplete="off" />' +
+            '<span class="clist-picker-search-count" aria-live="polite"></span>' +
+            '</div>' +
             '<div class="clist-viewer-body">' + bodyRows + '</div>';
+    }
+
+    function bindPickerSearch(popup) {
+        var input = popup && popup.querySelector('.clist-picker-search-input');
+        if (!input) return;
+        var count = popup.querySelector('.clist-picker-search-count');
+        var rows = Array.from(popup.querySelectorAll('.clist-picker-row[data-cap-name]'));
+        var applyFilter = function() {
+            var query = input.value.trim().toLocaleLowerCase();
+            var visible = 0;
+            rows.forEach(function(row) {
+                var name = String(row.dataset.capName || '').toLocaleLowerCase();
+                var matches = !query || name.startsWith(query);
+                row.style.display = matches ? '' : 'none';
+                row.classList.remove('clist-row--focused');
+                if (matches) visible++;
+            });
+            popup.querySelectorAll('.clist-picker-earlier').forEach(function(details) {
+                details.style.display = Array.from(
+                    details.querySelectorAll('.clist-picker-row[data-cap-name]')
+                ).some(function(row) { return row.style.display !== 'none'; }) ? '' : 'none';
+            });
+            focusedRow = -1;
+            if (count) count.textContent = query
+                ? (visible + (visible === 1 ? ' match' : ' matches')) : '';
+        };
+        input.addEventListener('input', applyFilter);
+        input.focus();
     }
 
     // ── Null Slot Form ────────────────────────────────────────────────────────
@@ -1353,6 +1390,7 @@
         buildPickerContentAsync().then(function (html) {
             if (popup.style.display !== 'none') {
                 popup.innerHTML = html;
+                bindPickerSearch(popup);
                 positionPopup();
             }
         }).catch(function () {

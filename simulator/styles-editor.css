@@ -2659,6 +2659,39 @@ html.sim-executing body {
     border-top: none;
 }
 
+.clist-picker-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(200, 155, 60, 0.18);
+    background: rgba(9, 12, 25, 0.72);
+}
+
+.clist-picker-search-input {
+    flex: 1;
+    min-width: 0;
+    padding: 7px 9px;
+    color: #e5e7eb;
+    background: #101422;
+    border: 1px solid rgba(200, 155, 60, 0.38);
+    border-radius: 5px;
+    font: inherit;
+    outline: none;
+}
+
+.clist-picker-search-input:focus {
+    border-color: #c89b3c;
+    box-shadow: 0 0 0 2px rgba(200, 155, 60, 0.16);
+}
+
+.clist-picker-search-count {
+    min-width: 62px;
+    color: #8b93a7;
+    font-size: 0.72rem;
+    text-align: right;
+}
+
 .clist-picker-row {
     display: flex;
     align-items: center;

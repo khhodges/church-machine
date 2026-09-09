@@ -88,11 +88,25 @@ function nextTurn() { return new Promise(resolve => setTimeout(resolve, 0)); }
     check('CPV-7: unallocated library abstractions remain symbolically selectable',
         !!libraryOnly && libraryOnly.textContent.includes('not allocated'));
 
+    const search = popup.querySelector('.clist-picker-search-input');
+    check('CPV-8: Add Capability includes a prefix search box', !!search);
+    search.value = 'dy';
+    search.dispatchEvent(new window.Event('input', { bubbles: true }));
+    const visibleNames = Array.from(popup.querySelectorAll('.clist-picker-row[data-cap-name]'))
+        .filter(row => row.style.display !== 'none')
+        .map(row => row.dataset.capName);
+    check('CPV-9: entered letters shortlist names by case-insensitive prefix',
+        visibleNames.length === 1 && visibleNames[0] === 'Dynamic.Pet');
+    check('CPV-10: search announces the shortlist size',
+        popup.querySelector('.clist-picker-search-count').textContent === '1 match');
+
+    search.value = '';
+    search.dispatchEvent(new window.Event('input', { bubbles: true }));
     popup.querySelector('[data-cap-name="__SYMBOLIC__"]').click();
     const symbolicInput = popup.querySelector('.clist-symbolic-name-input');
     symbolicInput.value = 'Future.Member';
     popup.querySelector('[data-action="insert-symbolic-capability"]').click();
-    check('CPV-8: a not-yet-created abstraction can be declared by pet name',
+    check('CPV-11: a not-yet-created abstraction can be declared by pet name',
         window.document.getElementById('asmEditor').value.includes('Future.Member E'));
 
     console.log('\n' + passed + ' passed, ' + failed + ' failed');
