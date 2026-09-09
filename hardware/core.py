@@ -541,9 +541,8 @@ class ChurchCore(Elaboratable):
                     Mux(lambda_start_sig | u_lambda.lambda_busy, u_lambda.cr_rd_addr,
                         Mux(u_tperm.tperm_busy, u_tperm.cr_rd_addr,
                             Mux(u_call.call_busy, u_call.cr_rd_addr,
-                                Mux(u_return.busy, u_return.cr_rd_addr,
                                     Mux(u_save.save_busy, u_save.cr_rd_addr,
-                                        cr_rd_addr_inner))))))
+                                        cr_rd_addr_inner)))))
             )
         else:
             cr_rd_addr_default = Mux(u_dread.busy, u_dread.cr_rd_addr,
@@ -553,9 +552,8 @@ class ChurchCore(Elaboratable):
                 Mux(u_shared_mload.sub_busy, u_shared_mload.cr_rd_addr,
                     Mux(u_tperm.tperm_busy, u_tperm.cr_rd_addr,
                         Mux(u_call.call_busy, u_call.cr_rd_addr,
-                            Mux(u_return.busy, u_return.cr_rd_addr,
-                                Mux(u_save.save_busy, u_save.cr_rd_addr,
-                                    cr_rd_addr_default)))))
+                            Mux(u_save.save_busy, u_save.cr_rd_addr,
+                                cr_rd_addr_default))))
             )
 
         # ── Boot microcode M-elevation window (forward-declared for u_perm gating) ──
@@ -1362,8 +1360,6 @@ class ChurchCore(Elaboratable):
         )
         m.d.comb += [
             u_return.return_start.eq(ret_start_sig),
-            u_return.cr_src.eq(cr_src[:3]),
-            u_return.cr_rd_data.eq(u_regs.cr_rd_data),
             u_return.lambda_active.eq(lambda_active_reg),
             u_return.lambda_pc.eq(lambda_pc_reg),
             u_return.cr5_heap.eq(u_regs.cr5_heap),

@@ -12,6 +12,10 @@ RETURN frames must store the caller identity normalized as a Church E-GT.
 CR6's live word 0 is only a transient L-only c-list view, so copying it raw
 creates a frame that cLoad cannot use to reconstruct the caller.
 
+RETURN has no CR source operand. The encoded register fields are zero/reserved;
+requiring E permission from CR0 (or any decoded CR) aborts before the frame and
+violates the ISA. The saved Enter E-GT is the sole return authority.
+
 RETURN must explicitly set CR6.M after rebuilding the caller's CR6. M is
 boundary microcode state, not ordinary register state to restore from a frame.
 

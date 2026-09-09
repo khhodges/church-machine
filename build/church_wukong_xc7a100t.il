@@ -1,4 +1,4 @@
-# CM-HARDWARE-SOURCES-SHA256: 37b9f453ce4db467afc5242c8ca188ebabeffd356bfe865fc8526b1ed45f69c7
+# CM-HARDWARE-SOURCES-SHA256: fc7bc887590e428fa24e9d99ce9c3535eb1749293d59af4d694c637bbf52c9e7
 attribute \generator "Amaranth"
 attribute \src "/home/runner/workspace/hardware/wukong_top.py:489"
 attribute \top 1
@@ -2939,7 +2939,7 @@ module \top
     connect \debug_dr13 \debug_dr13 [31:0]
     connect \debug_dr14 \debug_dr14 [31:0]
     connect \debug_dr15 \debug_dr15 [31:0]
-    connect \port$5745$0 \dmem_rd__data [31:0]
+    connect \port$5733$0 \dmem_rd__data [31:0]
     connect \reboot_req \reboot_req [0]
     connect \skip_fault_req \skip_fault_req [0]
     connect \boot_start \boot_start [0]
@@ -2947,8 +2947,8 @@ module \top
     connect \clist_addr \clist_addr [31:0]
     connect \clist_wr_data \clist_wr_data [31:0]
     connect \clist_wr_en \clist_wr_en [0]
-    connect \fault$830 \retire_fault_code [4:0]
-    connect \fault_valid$831 \dbg_fault_valid [0]
+    connect \fault$827 \retire_fault_code [4:0]
+    connect \fault_valid$828 \dbg_fault_valid [0]
     connect \dmem_addr \dmem_addr [31:0]
     connect \dmem_rd_en \dmem_rd_en [0]
     connect \dmem_wr_data \dmem_wr_data [31:0]
@@ -2961,20 +2961,20 @@ module \top
     connect \retire_trace_load_shadow_gt \load_shadow_gt [31:0]
     connect \active_thread_slot \active_thread_slot [15:0]
     connect \thread_base \active_thread_base [31:0]
-    connect \port$6367$0 $730 [95:0]
-    connect \port$6369$0 $731 [95:0]
-    connect \port$6371$0 $732 [95:0]
-    connect \port$6373$0 $733 [95:0]
-    connect \port$6375$0 $734 [95:0]
+    connect \port$6355$0 $730 [95:0]
+    connect \port$6357$0 $731 [95:0]
+    connect \port$6359$0 $732 [95:0]
+    connect \port$6361$0 $733 [95:0]
+    connect \port$6363$0 $734 [95:0]
     connect \cr5_heap $735 [95:0]
     connect \cr6_clist $736 [95:0]
-    connect \port$6381$0 $737 [95:0]
-    connect \port$6383$0 $738 [95:0]
-    connect \port$6385$0 $739 [95:0]
-    connect \port$6387$0 $740 [95:0]
-    connect \port$6389$0 $741 [95:0]
+    connect \port$6369$0 $737 [95:0]
+    connect \port$6371$0 $738 [95:0]
+    connect \port$6373$0 $739 [95:0]
+    connect \port$6375$0 $740 [95:0]
+    connect \port$6377$0 $741 [95:0]
     connect \cr12_thread $742 [95:0]
-    connect \port$6393$0 $743 [95:0]
+    connect \port$6381$0 $743 [95:0]
     connect \cr14_code $744 [95:0]
     connect \cr15_namespace $745 [95:0]
     connect \flags \retire_flags [3:0]
@@ -16218,7 +16218,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/core.py:441"
   wire width 1 \boot_rom_return
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:33"
+  attribute \src "/home/runner/workspace/hardware/ret.py:29"
   wire width 1 \boot_rom_return$14
 
   attribute \src "/home/runner/workspace/hardware/core.py:439"
@@ -16230,7 +16230,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/call.py:23"
   wire width 1 \call_busy
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:16"
+  attribute \src "/home/runner/workspace/hardware/ret.py:14"
   wire width 1 \busy
 
   attribute \src "/home/runner/workspace/hardware/save.py:15"
@@ -16381,40 +16381,37 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/save.py:26"
   wire width 4 \cr_rd_addr$63
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:22"
+  attribute \src "/home/runner/workspace/hardware/call.py:29"
   wire width 4 \cr_rd_addr$64
 
-  attribute \src "/home/runner/workspace/hardware/call.py:29"
+  attribute \src "/home/runner/workspace/hardware/tperm.py:34"
   wire width 4 \cr_rd_addr$65
 
-  attribute \src "/home/runner/workspace/hardware/tperm.py:34"
+  attribute \src "/home/runner/workspace/hardware/lambda_unit.py:17"
   wire width 4 \cr_rd_addr$66
 
-  attribute \src "/home/runner/workspace/hardware/lambda_unit.py:17"
+  attribute \src "/home/runner/workspace/hardware/mload.py:54"
   wire width 4 \cr_rd_addr$67
 
-  attribute \src "/home/runner/workspace/hardware/mload.py:54"
-  wire width 4 \cr_rd_addr$68
-
-  attribute \src "/home/runner/workspace/hardware/core.py:569"
+  attribute \src "/home/runner/workspace/hardware/core.py:567"
   wire width 32 \perm_gt_sig
 
   attribute \src "/home/runner/workspace/hardware/registers.py:21"
   wire width 96 \cr_rd_data
 
-  attribute \src "/home/runner/workspace/hardware/core.py:572"
+  attribute \src "/home/runner/workspace/hardware/core.py:570"
   wire width 6 \required_perms
 
   attribute \src "/home/runner/workspace/hardware/perm_check.py:34"
   wire width 32 \gt_in
 
   attribute \src "/home/runner/workspace/hardware/perm_check.py:35"
-  wire width 6 \required_perms$73
+  wire width 6 \required_perms$72
 
   attribute \src "/home/runner/workspace/hardware/perm_check.py:36"
   wire width 1 \check_valid
 
-  attribute \src "/home/runner/workspace/hardware/core.py:567"
+  attribute \src "/home/runner/workspace/hardware/core.py:565"
   wire width 1 \boot_microcode_active
 
   attribute \src "/home/runner/workspace/hardware/perm_check.py:58"
@@ -16424,7 +16421,7 @@ module \top.core
   wire width 1 \gc_start
 
   attribute \src "/home/runner/workspace/hardware/core.py:80"
-  wire width 1 \gc_start$78
+  wire width 1 \gc_start$77
 
   attribute \src "/home/runner/workspace/hardware/gc_unit.py:11"
   wire width 1 \gc_mark_en
@@ -16442,10 +16439,10 @@ module \top.core
   wire width 128 \ns_rd_data
 
   attribute \src "/home/runner/workspace/hardware/core.py:66"
-  wire width 128 \ns_rd_data$84
+  wire width 128 \ns_rd_data$83
 
   attribute \src "/home/runner/workspace/hardware/core.py:81"
-  wire width 1 \gc_busy$85
+  wire width 1 \gc_busy$84
 
   attribute \src "/home/runner/workspace/hardware/core.py:82"
   wire width 32 \gc_garbage_count
@@ -16453,7 +16450,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/gc_unit.py:26"
   wire width 32 \garbage_count
 
-  attribute \src "/home/runner/workspace/hardware/core.py:642"
+  attribute \src "/home/runner/workspace/hardware/core.py:640"
   wire width 32 \cr_rd_data_gt
 
   attribute \src "/home/runner/workspace/hardware/core.py:71"
@@ -16475,108 +16472,108 @@ module \top.core
   wire width 1 \flags_wr_en
 
   attribute \src "/home/runner/workspace/hardware/registers.py:74"
-  wire width 1 \clear_all$98
+  wire width 1 \clear_all$97
 
-  attribute \src "/home/runner/workspace/hardware/core.py:689"
+  attribute \src "/home/runner/workspace/hardware/core.py:687"
   wire width 1 \change_dr_wr_en
 
   attribute \src "/home/runner/workspace/hardware/change.py:74"
   wire width 1 \dr_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:690"
+  attribute \src "/home/runner/workspace/hardware/core.py:688"
   wire width 4 \change_dr_wr_addr
 
   attribute \src "/home/runner/workspace/hardware/change.py:75"
   wire width 4 \dr_wr_addr
 
-  attribute \src "/home/runner/workspace/hardware/core.py:691"
+  attribute \src "/home/runner/workspace/hardware/core.py:689"
   wire width 32 \change_dr_wr_data
 
   attribute \src "/home/runner/workspace/hardware/change.py:76"
   wire width 32 \dr_wr_data
 
   attribute \src "/home/runner/workspace/hardware/dread.py:57"
-  wire width 1 \dr_wr_en$105
+  wire width 1 \dr_wr_en$104
 
-  attribute \src "/home/runner/workspace/hardware/core.py:665"
+  attribute \src "/home/runner/workspace/hardware/core.py:663"
   wire width 1 \iadd_start_sig
 
-  attribute \src "/home/runner/workspace/hardware/core.py:666"
+  attribute \src "/home/runner/workspace/hardware/core.py:664"
   wire width 1 \isub_start_sig
 
-  attribute \src "/home/runner/workspace/hardware/core.py:667"
+  attribute \src "/home/runner/workspace/hardware/core.py:665"
   wire width 1 \shl_start_sig
 
-  attribute \src "/home/runner/workspace/hardware/core.py:668"
+  attribute \src "/home/runner/workspace/hardware/core.py:666"
   wire width 1 \shr_start_sig
 
-  attribute \src "/home/runner/workspace/hardware/core.py:669"
+  attribute \src "/home/runner/workspace/hardware/core.py:667"
   wire width 1 \bfext_start_sig
 
-  attribute \src "/home/runner/workspace/hardware/core.py:670"
+  attribute \src "/home/runner/workspace/hardware/core.py:668"
   wire width 1 \bfins_start_sig
 
-  attribute \src "/home/runner/workspace/hardware/core.py:671"
+  attribute \src "/home/runner/workspace/hardware/core.py:669"
   wire width 1 \mcmp_start_sig
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:21"
   wire width 1 \tperm_complete
 
   attribute \src "/home/runner/workspace/hardware/registers.py:66"
-  wire width 4 \dr_wr_addr$114
+  wire width 4 \dr_wr_addr$113
 
   attribute \src "/home/runner/workspace/hardware/registers.py:67"
-  wire width 32 \dr_wr_data$115
+  wire width 32 \dr_wr_data$114
 
   attribute \src "/home/runner/workspace/hardware/registers.py:68"
-  wire width 1 \dr_wr_en$116
+  wire width 1 \dr_wr_en$115
 
   attribute \src "/home/runner/workspace/hardware/dread.py:55"
-  wire width 4 \dr_wr_addr$117
+  wire width 4 \dr_wr_addr$116
 
   attribute \src "/home/runner/workspace/hardware/dread.py:56"
-  wire width 32 \dr_wr_data$118
+  wire width 32 \dr_wr_data$117
 
-  attribute \src "/home/runner/workspace/hardware/core.py:672"
+  attribute \src "/home/runner/workspace/hardware/core.py:670"
   wire width 33 \iadd_result
 
-  attribute \src "/home/runner/workspace/hardware/core.py:679"
+  attribute \src "/home/runner/workspace/hardware/core.py:677"
   wire width 4 \iadd_flags_sig
 
-  attribute \src "/home/runner/workspace/hardware/core.py:673"
+  attribute \src "/home/runner/workspace/hardware/core.py:671"
   wire width 33 \isub_result
 
-  attribute \src "/home/runner/workspace/hardware/core.py:680"
+  attribute \src "/home/runner/workspace/hardware/core.py:678"
   wire width 4 \isub_flags_sig
 
-  attribute \src "/home/runner/workspace/hardware/core.py:674"
+  attribute \src "/home/runner/workspace/hardware/core.py:672"
   wire width 32 \shl_result
 
-  attribute \src "/home/runner/workspace/hardware/core.py:681"
+  attribute \src "/home/runner/workspace/hardware/core.py:679"
   wire width 4 \shl_flags_sig
 
-  attribute \src "/home/runner/workspace/hardware/core.py:675"
+  attribute \src "/home/runner/workspace/hardware/core.py:673"
   wire width 32 \shr_result
 
-  attribute \src "/home/runner/workspace/hardware/core.py:682"
+  attribute \src "/home/runner/workspace/hardware/core.py:680"
   wire width 4 \shr_flags_sig
 
-  attribute \src "/home/runner/workspace/hardware/core.py:676"
+  attribute \src "/home/runner/workspace/hardware/core.py:674"
   wire width 32 \bfext_result
 
-  attribute \src "/home/runner/workspace/hardware/core.py:683"
+  attribute \src "/home/runner/workspace/hardware/core.py:681"
   wire width 4 \bfext_flags_sig
 
-  attribute \src "/home/runner/workspace/hardware/core.py:677"
+  attribute \src "/home/runner/workspace/hardware/core.py:675"
   wire width 32 \bfins_result
 
-  attribute \src "/home/runner/workspace/hardware/core.py:684"
+  attribute \src "/home/runner/workspace/hardware/core.py:682"
   wire width 4 \bfins_flags_sig
 
-  attribute \src "/home/runner/workspace/hardware/core.py:685"
+  attribute \src "/home/runner/workspace/hardware/core.py:683"
   wire width 4 \mcmp_flags_sig
 
-  attribute \src "/home/runner/workspace/hardware/core.py:770"
+  attribute \src "/home/runner/workspace/hardware/core.py:768"
   wire width 4 \tperm_flags_sig
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:32"
@@ -16588,20 +16585,20 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/change.py:85"
   wire width 4 \flags_restore_data
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:65"
-  wire width 1 \flags_restore_en$136
+  attribute \src "/home/runner/workspace/hardware/ret.py:61"
+  wire width 1 \flags_restore_en$135
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:66"
-  wire width 4 \flags_restore_data$137
+  attribute \src "/home/runner/workspace/hardware/ret.py:62"
+  wire width 4 \flags_restore_data$136
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:56"
-  wire width 1 \dr_wr_en$138
+  wire width 1 \dr_wr_en$137
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:57"
-  wire width 4 \dr_wr_addr$139
+  wire width 4 \dr_wr_addr$138
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:58"
-  wire width 32 \dr_wr_data$140
+  wire width 32 \dr_wr_data$139
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:61"
   wire width 1 \dr1_wr_en
@@ -16615,122 +16612,122 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/core.py:453"
   wire width 1 \mwin_cr_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:819"
+  attribute \src "/home/runner/workspace/hardware/core.py:817"
   wire width 1 \boot_cap_wr_en
 
   attribute \src "/home/runner/workspace/hardware/mload.py:59"
   wire width 1 \cr_wr_en
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:39"
-  wire width 1 \cr_wr_en$147
+  wire width 1 \cr_wr_en$146
 
   attribute \src "/home/runner/workspace/hardware/call.py:33"
-  wire width 1 \cr_wr_en$148
+  wire width 1 \cr_wr_en$147
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:26"
-  wire width 1 \cr_wr_en$149
+  attribute \src "/home/runner/workspace/hardware/ret.py:22"
+  wire width 1 \cr_wr_en$148
 
   attribute \src "/home/runner/workspace/hardware/core.py:218"
   wire width 1 \dbg_cr_wr_en
 
   attribute \src "/home/runner/workspace/hardware/church_outform.py:48"
-  wire width 1 \cr_wr_en$151
+  wire width 1 \cr_wr_en$150
 
   attribute \src "/home/runner/workspace/hardware/cload.py:67"
-  wire width 1 \cr_wr_en$152
+  wire width 1 \cr_wr_en$151
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:569"
-  wire width 4 \cr_wr_addr$153
+  wire width 4 \cr_wr_addr$152
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:29"
-  wire width 4 \cr_wr_addr$154
+  wire width 4 \cr_wr_addr$153
 
   attribute \src "/home/runner/workspace/hardware/switch.py:30"
-  wire width 4 \cr_wr_addr$155
+  wire width 4 \cr_wr_addr$154
 
   attribute \src "/home/runner/workspace/hardware/change.py:32"
-  wire width 4 \cr_wr_addr$156
+  wire width 4 \cr_wr_addr$155
 
   attribute \src "/home/runner/workspace/hardware/cload.py:65"
-  wire width 4 \cr_wr_addr$157
+  wire width 4 \cr_wr_addr$156
 
   attribute \src "/home/runner/workspace/hardware/church_outform.py:49"
-  wire width 4 \cr_wr_addr$158
+  wire width 4 \cr_wr_addr$157
 
   attribute \src "/home/runner/workspace/hardware/core.py:219"
   wire width 4 \dbg_cr_wr_addr
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:24"
-  wire width 4 \cr_wr_addr$160
+  attribute \src "/home/runner/workspace/hardware/ret.py:20"
+  wire width 4 \cr_wr_addr$159
 
   attribute \src "/home/runner/workspace/hardware/call.py:31"
-  wire width 4 \cr_wr_addr$161
+  wire width 4 \cr_wr_addr$160
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:37"
-  wire width 4 \cr_wr_addr$162
+  wire width 4 \cr_wr_addr$161
 
   attribute \src "/home/runner/workspace/hardware/mload.py:57"
-  wire width 4 \cr_wr_addr$163
+  wire width 4 \cr_wr_addr$162
 
-  attribute \src "/home/runner/workspace/hardware/core.py:820"
+  attribute \src "/home/runner/workspace/hardware/core.py:818"
   wire width 4 \boot_cap_wr_addr
 
   attribute \src "/home/runner/workspace/hardware/registers.py:24"
   wire width 96 \cr_wr_data
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
-  wire width 96 \cr_wr_data$166
+  wire width 96 \cr_wr_data$165
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
-  wire width 96 \cr_wr_data$167
+  wire width 96 \cr_wr_data$166
 
   attribute \src "/home/runner/workspace/hardware/switch.py:31"
-  wire width 96 \cr_wr_data$168
+  wire width 96 \cr_wr_data$167
 
   attribute \src "/home/runner/workspace/hardware/change.py:33"
-  wire width 96 \cr_wr_data$169
+  wire width 96 \cr_wr_data$168
 
   attribute \src "/home/runner/workspace/hardware/cload.py:66"
-  wire width 96 \cr_wr_data$170
+  wire width 96 \cr_wr_data$169
 
   attribute \src "/home/runner/workspace/hardware/church_outform.py:50"
-  wire width 96 \cr_wr_data$171
+  wire width 96 \cr_wr_data$170
 
   attribute \src "/home/runner/workspace/hardware/core.py:220"
   wire width 96 \dbg_cr_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
-  wire width 96 \cr_wr_data$173
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
+  wire width 96 \cr_wr_data$172
 
   attribute \src "/home/runner/workspace/hardware/call.py:32"
-  wire width 96 \cr_wr_data$174
+  wire width 96 \cr_wr_data$173
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:38"
-  wire width 96 \cr_wr_data$175
+  wire width 96 \cr_wr_data$174
 
   attribute \src "/home/runner/workspace/hardware/mload.py:58"
-  wire width 96 \cr_wr_data$176
+  wire width 96 \cr_wr_data$175
 
-  attribute \src "/home/runner/workspace/hardware/core.py:821"
+  attribute \src "/home/runner/workspace/hardware/core.py:819"
   wire width 96 \boot_cap_wr_data
 
   attribute \src "/home/runner/workspace/hardware/core.py:454"
   wire width 96 \mwin_cr_wr_data
 
   attribute \src "/home/runner/workspace/hardware/registers.py:25"
-  wire width 1 \cr_wr_en$179
+  wire width 1 \cr_wr_en$178
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:31"
-  wire width 1 \cr_wr_en$180
+  wire width 1 \cr_wr_en$179
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:571"
-  wire width 1 \cr_wr_en$181
+  wire width 1 \cr_wr_en$180
 
   attribute \src "/home/runner/workspace/hardware/change.py:34"
-  wire width 1 \cr_wr_en$182
+  wire width 1 \cr_wr_en$181
 
   attribute \src "/home/runner/workspace/hardware/switch.py:32"
-  wire width 1 \cr_wr_en$183
+  wire width 1 \cr_wr_en$182
 
   attribute \src "/home/runner/workspace/hardware/registers.py:87"
   wire width 1 \m_set_en
@@ -16778,13 +16775,13 @@ module \top.core
   wire width 1 \m_save_consume_en
 
   attribute \src "/home/runner/workspace/hardware/save.py:23"
-  wire width 1 \m_consume_en$199
+  wire width 1 \m_consume_en$198
 
   attribute \src "/home/runner/workspace/hardware/registers.py:124"
   wire width 2 \m_save_consume_target
 
   attribute \src "/home/runner/workspace/hardware/save.py:24"
-  wire width 2 \m_consume_target$201
+  wire width 2 \m_consume_target$200
 
   attribute \src "/home/runner/workspace/hardware/registers.py:127"
   wire width 1 \m_return_commit_en
@@ -16793,7 +16790,7 @@ module \top.core
   wire width 1 \dbg_return_m_commit
 
   attribute \src "/home/runner/workspace/hardware/registers.py:115"
-  wire width 1 \cr15_m_flag$205
+  wire width 1 \cr15_m_flag$204
 
   attribute \src "/home/runner/workspace/hardware/core.py:255"
   wire width 32 \dbg_m_dr11
@@ -16861,7 +16858,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/integrity32.py:61"
   wire width 32 \w1_rot
 
-  attribute \src "/home/runner/workspace/hardware/core.py:920"
+  attribute \src "/home/runner/workspace/hardware/core.py:918"
   wire width 32 \cr15_m_set_integrity
 
   attribute \src "/home/runner/workspace/hardware/registers.py:97"
@@ -16906,343 +16903,343 @@ module \top.core
   wire width 32 \nia
 
   attribute \src "/home/runner/workspace/hardware/core.py:179"
-  wire width 4 \flags$245
+  wire width 4 \flags$244
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr0_word0
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr0_word0$247
+  wire width 32 \debug_cr0_word0$246
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr0_word1
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr0_word1$249
+  wire width 32 \debug_cr0_word1$248
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr0_word2
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr0_word2$251
+  wire width 32 \debug_cr0_word2$250
 
   attribute \src "/home/runner/workspace/hardware/registers.py:51"
-  wire width 32 \debug_dr0$253
+  wire width 32 \debug_dr0$252
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr1_word0
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr1_word0$255
+  wire width 32 \debug_cr1_word0$254
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr1_word1
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr1_word1$257
+  wire width 32 \debug_cr1_word1$256
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr1_word2
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr1_word2$259
+  wire width 32 \debug_cr1_word2$258
 
   attribute \src "/home/runner/workspace/hardware/registers.py:51"
-  wire width 32 \debug_dr1$261
+  wire width 32 \debug_dr1$260
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr2_word0
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr2_word0$263
+  wire width 32 \debug_cr2_word0$262
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr2_word1
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr2_word1$265
+  wire width 32 \debug_cr2_word1$264
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr2_word2
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr2_word2$267
+  wire width 32 \debug_cr2_word2$266
 
   attribute \src "/home/runner/workspace/hardware/registers.py:51"
-  wire width 32 \debug_dr2$269
+  wire width 32 \debug_dr2$268
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr3_word0
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr3_word0$271
+  wire width 32 \debug_cr3_word0$270
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr3_word1
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr3_word1$273
+  wire width 32 \debug_cr3_word1$272
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr3_word2
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr3_word2$275
+  wire width 32 \debug_cr3_word2$274
 
   attribute \src "/home/runner/workspace/hardware/registers.py:51"
-  wire width 32 \debug_dr3$277
+  wire width 32 \debug_dr3$276
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr4_word0
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr4_word0$279
+  wire width 32 \debug_cr4_word0$278
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr4_word1
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr4_word1$281
+  wire width 32 \debug_cr4_word1$280
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr4_word2
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr4_word2$283
+  wire width 32 \debug_cr4_word2$282
 
   attribute \src "/home/runner/workspace/hardware/registers.py:51"
-  wire width 32 \debug_dr4$285
+  wire width 32 \debug_dr4$284
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr5_word0
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr5_word0$287
+  wire width 32 \debug_cr5_word0$286
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr5_word1
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr5_word1$289
+  wire width 32 \debug_cr5_word1$288
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr5_word2
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr5_word2$291
+  wire width 32 \debug_cr5_word2$290
 
   attribute \src "/home/runner/workspace/hardware/registers.py:51"
-  wire width 32 \debug_dr5$293
+  wire width 32 \debug_dr5$292
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr6_word0
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr6_word0$295
+  wire width 32 \debug_cr6_word0$294
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr6_word1
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr6_word1$297
+  wire width 32 \debug_cr6_word1$296
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr6_word2
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr6_word2$299
+  wire width 32 \debug_cr6_word2$298
 
   attribute \src "/home/runner/workspace/hardware/registers.py:51"
-  wire width 32 \debug_dr6$301
+  wire width 32 \debug_dr6$300
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr7_word0
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr7_word0$303
+  wire width 32 \debug_cr7_word0$302
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr7_word1
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr7_word1$305
+  wire width 32 \debug_cr7_word1$304
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr7_word2
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr7_word2$307
+  wire width 32 \debug_cr7_word2$306
 
   attribute \src "/home/runner/workspace/hardware/registers.py:51"
-  wire width 32 \debug_dr7$309
+  wire width 32 \debug_dr7$308
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr8_word0
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr8_word0$311
+  wire width 32 \debug_cr8_word0$310
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr8_word1
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr8_word1$313
+  wire width 32 \debug_cr8_word1$312
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr8_word2
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr8_word2$315
+  wire width 32 \debug_cr8_word2$314
 
   attribute \src "/home/runner/workspace/hardware/registers.py:51"
-  wire width 32 \debug_dr8$317
+  wire width 32 \debug_dr8$316
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr9_word0
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr9_word0$319
+  wire width 32 \debug_cr9_word0$318
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr9_word1
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr9_word1$321
+  wire width 32 \debug_cr9_word1$320
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr9_word2
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr9_word2$323
+  wire width 32 \debug_cr9_word2$322
 
   attribute \src "/home/runner/workspace/hardware/registers.py:51"
-  wire width 32 \debug_dr9$325
+  wire width 32 \debug_dr9$324
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr10_word0
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr10_word0$327
+  wire width 32 \debug_cr10_word0$326
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr10_word1
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr10_word1$329
+  wire width 32 \debug_cr10_word1$328
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr10_word2
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr10_word2$331
+  wire width 32 \debug_cr10_word2$330
 
   attribute \src "/home/runner/workspace/hardware/registers.py:51"
-  wire width 32 \debug_dr10$333
+  wire width 32 \debug_dr10$332
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr11_word0
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr11_word0$335
+  wire width 32 \debug_cr11_word0$334
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr11_word1
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr11_word1$337
+  wire width 32 \debug_cr11_word1$336
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr11_word2
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr11_word2$339
+  wire width 32 \debug_cr11_word2$338
 
   attribute \src "/home/runner/workspace/hardware/registers.py:51"
-  wire width 32 \debug_dr11$341
+  wire width 32 \debug_dr11$340
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr12_word0
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr12_word0$343
+  wire width 32 \debug_cr12_word0$342
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr12_word1
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr12_word1$345
+  wire width 32 \debug_cr12_word1$344
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr12_word2
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr12_word2$347
+  wire width 32 \debug_cr12_word2$346
 
   attribute \src "/home/runner/workspace/hardware/registers.py:51"
-  wire width 32 \debug_dr12$349
+  wire width 32 \debug_dr12$348
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr13_word0
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr13_word0$351
+  wire width 32 \debug_cr13_word0$350
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr13_word1
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr13_word1$353
+  wire width 32 \debug_cr13_word1$352
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr13_word2
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr13_word2$355
+  wire width 32 \debug_cr13_word2$354
 
   attribute \src "/home/runner/workspace/hardware/registers.py:51"
-  wire width 32 \debug_dr13$357
+  wire width 32 \debug_dr13$356
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr14_word0
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr14_word0$359
+  wire width 32 \debug_cr14_word0$358
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr14_word1
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr14_word1$361
+  wire width 32 \debug_cr14_word1$360
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr14_word2
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr14_word2$363
+  wire width 32 \debug_cr14_word2$362
 
   attribute \src "/home/runner/workspace/hardware/registers.py:51"
-  wire width 32 \debug_dr14$365
+  wire width 32 \debug_dr14$364
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr15_word0
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr15_word0$367
+  wire width 32 \debug_cr15_word0$366
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr15_word1
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr15_word1$369
+  wire width 32 \debug_cr15_word1$368
 
   attribute \src "/home/runner/workspace/hardware/core.py:185"
   wire width 32 \debug_cr15_word2
 
   attribute \src "/home/runner/workspace/hardware/registers.py:47"
-  wire width 32 \debug_cr15_word2$371
+  wire width 32 \debug_cr15_word2$370
 
   attribute \src "/home/runner/workspace/hardware/registers.py:51"
-  wire width 32 \debug_dr15$373
+  wire width 32 \debug_dr15$372
 
   attribute \src "/home/runner/workspace/hardware/core.py:191"
   wire width 1 \debug_m_flag
@@ -17250,272 +17247,272 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/core.py:192"
   wire width 4 \debug_isolated_m_flags
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1183"
+  attribute \src "/home/runner/workspace/hardware/core.py:1181"
   wire width 32 \thrd_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1146"
+  attribute \src "/home/runner/workspace/hardware/core.py:1144"
   wire width 1 \boot_cap12_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 32 \boot_cap12_wr_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1146"
+  attribute \src "/home/runner/workspace/hardware/core.py:1144"
   wire width 1 \boot_cap14_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 32 \boot_cap14_wr_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1236"
+  attribute \src "/home/runner/workspace/hardware/core.py:1234"
   wire width 32 \cr14_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:566"
+  attribute \src "/home/runner/workspace/hardware/core.py:564"
   attribute \init 2'00
   wire width 2 \boot_retire_count
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1285"
+  attribute \src "/home/runner/workspace/hardware/core.py:1283"
   wire width 1 \change_gt_sync_active
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1291"
+  attribute \src "/home/runner/workspace/hardware/core.py:1289"
   wire width 32 \switch_src_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
   wire width 1 \rt_cap8_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 32 \rt_cap8_wr_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
   wire width 1 \rt_cap9_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 32 \rt_cap9_wr_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
   wire width 1 \rt_cap10_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 32 \rt_cap10_wr_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
   wire width 1 \rt_cap11_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 32 \rt_cap11_wr_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
   wire width 1 \rt_cap12_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 32 \rt_cap12_wr_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
   wire width 1 \rt_cap13_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 32 \rt_cap13_wr_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
   wire width 1 \rt_cap14_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 32 \rt_cap14_wr_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
   wire width 1 \rt_cap15_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 32 \rt_cap15_wr_gt
 
   attribute \src "/home/runner/workspace/hardware/registers.py:60"
   wire width 1 \cr0_gt_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1146"
+  attribute \src "/home/runner/workspace/hardware/core.py:1144"
   wire width 1 \boot_cap0_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
   wire width 1 \rt_cap0_wr_en
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 32 \cr0_gt_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 32 \rt_cap0_wr_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 32 \boot_cap0_wr_gt
 
   attribute \src "/home/runner/workspace/hardware/registers.py:60"
   wire width 1 \cr1_gt_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1146"
+  attribute \src "/home/runner/workspace/hardware/core.py:1144"
   wire width 1 \boot_cap1_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
   wire width 1 \rt_cap1_wr_en
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 32 \cr1_gt_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 32 \rt_cap1_wr_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 32 \boot_cap1_wr_gt
 
   attribute \src "/home/runner/workspace/hardware/registers.py:60"
   wire width 1 \cr2_gt_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1146"
+  attribute \src "/home/runner/workspace/hardware/core.py:1144"
   wire width 1 \boot_cap2_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
   wire width 1 \rt_cap2_wr_en
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 32 \cr2_gt_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 32 \rt_cap2_wr_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 32 \boot_cap2_wr_gt
 
   attribute \src "/home/runner/workspace/hardware/registers.py:60"
   wire width 1 \cr3_gt_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1146"
+  attribute \src "/home/runner/workspace/hardware/core.py:1144"
   wire width 1 \boot_cap3_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
   wire width 1 \rt_cap3_wr_en
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 32 \cr3_gt_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 32 \rt_cap3_wr_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 32 \boot_cap3_wr_gt
 
   attribute \src "/home/runner/workspace/hardware/registers.py:60"
   wire width 1 \cr4_gt_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1146"
+  attribute \src "/home/runner/workspace/hardware/core.py:1144"
   wire width 1 \boot_cap4_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
   wire width 1 \rt_cap4_wr_en
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 32 \cr4_gt_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 32 \rt_cap4_wr_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 32 \boot_cap4_wr_gt
 
   attribute \src "/home/runner/workspace/hardware/registers.py:60"
   wire width 1 \cr5_gt_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1146"
+  attribute \src "/home/runner/workspace/hardware/core.py:1144"
   wire width 1 \boot_cap5_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
   wire width 1 \rt_cap5_wr_en
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 32 \cr5_gt_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 32 \rt_cap5_wr_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 32 \boot_cap5_wr_gt
 
   attribute \src "/home/runner/workspace/hardware/registers.py:60"
   wire width 1 \cr6_gt_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1146"
+  attribute \src "/home/runner/workspace/hardware/core.py:1144"
   wire width 1 \boot_cap6_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
   wire width 1 \rt_cap6_wr_en
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 32 \cr6_gt_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 32 \rt_cap6_wr_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 32 \boot_cap6_wr_gt
 
   attribute \src "/home/runner/workspace/hardware/registers.py:60"
   wire width 1 \cr7_gt_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1146"
+  attribute \src "/home/runner/workspace/hardware/core.py:1144"
   wire width 1 \boot_cap7_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
   wire width 1 \rt_cap7_wr_en
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 32 \cr7_gt_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 32 \rt_cap7_wr_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 32 \boot_cap7_wr_gt
 
   attribute \src "/home/runner/workspace/hardware/registers.py:60"
   wire width 1 \cr8_gt_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1146"
+  attribute \src "/home/runner/workspace/hardware/core.py:1144"
   wire width 1 \boot_cap8_wr_en
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 32 \cr8_gt_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 32 \boot_cap8_wr_gt
 
   attribute \src "/home/runner/workspace/hardware/registers.py:60"
   wire width 1 \cr9_gt_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1146"
+  attribute \src "/home/runner/workspace/hardware/core.py:1144"
   wire width 1 \boot_cap9_wr_en
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 32 \cr9_gt_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 32 \boot_cap9_wr_gt
 
   attribute \src "/home/runner/workspace/hardware/registers.py:60"
   wire width 1 \cr10_gt_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1146"
+  attribute \src "/home/runner/workspace/hardware/core.py:1144"
   wire width 1 \boot_cap10_wr_en
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 32 \cr10_gt_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 32 \boot_cap10_wr_gt
 
   attribute \src "/home/runner/workspace/hardware/registers.py:60"
   wire width 1 \cr11_gt_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1146"
+  attribute \src "/home/runner/workspace/hardware/core.py:1144"
   wire width 1 \boot_cap11_wr_en
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 32 \cr11_gt_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 32 \boot_cap11_wr_gt
 
   attribute \src "/home/runner/workspace/hardware/registers.py:60"
@@ -17527,13 +17524,13 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:60"
   wire width 1 \cr13_gt_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1146"
+  attribute \src "/home/runner/workspace/hardware/core.py:1144"
   wire width 1 \boot_cap13_wr_en
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 32 \cr13_gt_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 32 \boot_cap13_wr_gt
 
   attribute \src "/home/runner/workspace/hardware/registers.py:60"
@@ -17545,16 +17542,16 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:60"
   wire width 1 \cr15_gt_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1146"
+  attribute \src "/home/runner/workspace/hardware/core.py:1144"
   wire width 1 \boot_cap15_wr_en
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 32 \cr15_gt_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 32 \boot_cap15_wr_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1309"
+  attribute \src "/home/runner/workspace/hardware/core.py:1307"
   wire width 1 \call_src_is_outform
 
   attribute \src "/home/runner/workspace/hardware/core.py:517"
@@ -17576,7 +17573,7 @@ module \top.core
   wire width 1 \boot_window
 
   attribute \src "/home/runner/workspace/hardware/call.py:19"
-  wire width 4 \cr_src$484
+  wire width 4 \cr_src$483
 
   attribute \src "/home/runner/workspace/hardware/call.py:20"
   wire width 16 \index
@@ -17585,7 +17582,7 @@ module \top.core
   wire width 15 \call_imm
 
   attribute \src "/home/runner/workspace/hardware/decoder.py:58"
-  wire width 15 \call_imm$487
+  wire width 15 \call_imm$486
 
   attribute \src "/home/runner/workspace/hardware/call.py:22"
   wire width 16 \mask
@@ -17594,13 +17591,13 @@ module \top.core
   wire width 15 \call_mask
 
   attribute \src "/home/runner/workspace/hardware/call.py:30"
-  wire width 96 \cr_rd_data$490
+  wire width 96 \cr_rd_data$489
 
   attribute \src "/home/runner/workspace/hardware/call.py:62"
-  wire width 96 \cr15_namespace$491
+  wire width 96 \cr15_namespace$490
 
   attribute \src "/home/runner/workspace/hardware/registers.py:40"
-  wire width 96 \cr14_code$493
+  wire width 96 \cr14_code$492
 
   attribute \src "/home/runner/workspace/hardware/core.py:59"
   wire width 32 \dmem_rd_data
@@ -17609,13 +17606,13 @@ module \top.core
   wire width 1 \dmem_rd_valid
 
   attribute \src "/home/runner/workspace/hardware/registers.py:36"
-  wire width 96 \cr5_heap$499
+  wire width 96 \cr5_heap$498
 
   attribute \src "/home/runner/workspace/hardware/call.py:75"
   wire width 15 \caller_pc
 
   attribute \src "/home/runner/workspace/hardware/call.py:81"
-  wire width 96 \cr12_thread$501
+  wire width 96 \cr12_thread$500
 
   attribute \src "/home/runner/workspace/hardware/core.py:176"
   attribute \init 32'00000000000000000000000000000000
@@ -17628,37 +17625,31 @@ module \top.core
   wire width 32 \thread_hdr_out
 
   attribute \src "/home/runner/workspace/hardware/call.py:88"
-  wire width 4 \flags$506
+  wire width 4 \flags$505
 
   attribute \src "/home/runner/workspace/hardware/registers.py:80"
   wire width 12 \cr_b_clear_mask
 
   attribute \src "/home/runner/workspace/hardware/call.py:93"
-  wire width 12 \cr_b_clear_mask$508
+  wire width 12 \cr_b_clear_mask$507
 
   attribute \src "/home/runner/workspace/hardware/registers.py:81"
   wire width 12 \cr_null_mask
 
   attribute \src "/home/runner/workspace/hardware/call.py:94"
-  wire width 12 \cr_null_mask$510
+  wire width 12 \cr_null_mask$509
 
   attribute \src "/home/runner/workspace/hardware/core.py:518"
   wire width 1 \ret_start_sig
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:14"
+  attribute \src "/home/runner/workspace/hardware/ret.py:13"
   wire width 1 \return_start
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:15"
-  wire width 3 \cr_src$513
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 96 \cr_rd_data$514
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:47"
+  attribute \src "/home/runner/workspace/hardware/ret.py:43"
   attribute \init 1'0
   wire width 1 \lambda_active
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:48"
+  attribute \src "/home/runner/workspace/hardware/ret.py:44"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \lambda_pc
 
@@ -17666,21 +17657,21 @@ module \top.core
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \lambda_pc_reg
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
-  wire width 96 \cr5_heap$518
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
+  wire width 96 \cr5_heap$515
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
-  wire width 96 \cr12_thread$519
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
+  wire width 96 \cr12_thread$516
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:49"
+  attribute \init 32'00000000000000000000000000000000
+  wire width 32 \thread_base$517
 
   attribute \src "/home/runner/workspace/hardware/ret.py:53"
-  attribute \init 32'00000000000000000000000000000000
-  wire width 32 \thread_base$520
+  wire width 32 \mem_rd_data$518
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:57"
-  wire width 32 \mem_rd_data$521
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:58"
-  wire width 1 \mem_rd_valid$522
+  attribute \src "/home/runner/workspace/hardware/ret.py:54"
+  wire width 1 \mem_rd_valid$519
 
   attribute \src "/home/runner/workspace/hardware/cload.py:55"
   attribute \init 1'0
@@ -17689,17 +17680,17 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/cload.py:61"
   wire width 32 \e_gt
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:64"
+  attribute \src "/home/runner/workspace/hardware/ret.py:60"
   wire width 32 \cload_e_gt
 
   attribute \src "/home/runner/workspace/hardware/cload.py:63"
-  wire width 96 \cr15_namespace$526
+  wire width 96 \cr15_namespace$523
 
   attribute \src "/home/runner/workspace/hardware/cload.py:71"
-  wire width 32 \mem_rd_data$527
+  wire width 32 \mem_rd_data$524
 
   attribute \src "/home/runner/workspace/hardware/cload.py:72"
-  wire width 1 \mem_rd_valid$528
+  wire width 1 \mem_rd_valid$525
 
   attribute \src "/home/runner/workspace/hardware/lambda_unit.py:10"
   wire width 1 \lambda_start
@@ -17708,7 +17699,7 @@ module \top.core
   wire width 4 \cr_target
 
   attribute \src "/home/runner/workspace/hardware/lambda_unit.py:18"
-  wire width 96 \cr_rd_data$531
+  wire width 96 \cr_rd_data$528
 
   attribute \src "/home/runner/workspace/hardware/lambda_unit.py:22"
   wire width 32 \saved_nia
@@ -17720,10 +17711,10 @@ module \top.core
   wire width 1 \tperm_start
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:11"
-  wire width 4 \cr_target$535
+  wire width 4 \cr_target$532
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:12"
-  wire width 4 \cr_src$536
+  wire width 4 \cr_src$533
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:13"
   wire width 4 \preset
@@ -17732,7 +17723,7 @@ module \top.core
   wire width 4 \tperm_preset
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:35"
-  wire width 96 \cr_rd_data$539
+  wire width 96 \cr_rd_data$536
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:18"
   wire width 1 \stack_has_frame
@@ -17744,13 +17735,13 @@ module \top.core
   wire width 1 \save_start
 
   attribute \src "/home/runner/workspace/hardware/save.py:12"
-  wire width 4 \cr_src$543
+  wire width 4 \cr_src$540
 
   attribute \src "/home/runner/workspace/hardware/save.py:13"
-  wire width 4 \cr_dst$544
+  wire width 4 \cr_dst$541
 
   attribute \src "/home/runner/workspace/hardware/save.py:14"
-  wire width 16 \index$545
+  wire width 16 \index$542
 
   attribute \src "/home/runner/workspace/hardware/decoder.py:56"
   wire width 15 \cap_index
@@ -17759,19 +17750,19 @@ module \top.core
   wire width 1 \source_m
 
   attribute \src "/home/runner/workspace/hardware/save.py:27"
-  wire width 96 \cr_rd_data$548
+  wire width 96 \cr_rd_data$545
 
   attribute \src "/home/runner/workspace/hardware/save.py:39"
-  wire width 96 \cr15_namespace$549
+  wire width 96 \cr15_namespace$546
 
   attribute \src "/home/runner/workspace/hardware/save.py:32"
   wire width 1 \mem_wr_done
 
   attribute \src "/home/runner/workspace/hardware/save.py:36"
-  wire width 32 \mem_rd_data$551
+  wire width 32 \mem_rd_data$548
 
   attribute \src "/home/runner/workspace/hardware/save.py:37"
-  wire width 1 \mem_rd_valid$552
+  wire width 1 \mem_rd_valid$549
 
   attribute \src "/home/runner/workspace/hardware/core.py:522"
   wire width 1 \dread_start_sig
@@ -17783,7 +17774,7 @@ module \top.core
   wire width 1 \start
 
   attribute \src "/home/runner/workspace/hardware/dread.py:41"
-  wire width 4 \cr_src$556
+  wire width 4 \cr_src$553
 
   attribute \src "/home/runner/workspace/hardware/dread.py:42"
   wire width 4 \dr_dst
@@ -17795,10 +17786,10 @@ module \top.core
   wire width 15 \immediate
 
   attribute \src "/home/runner/workspace/hardware/dread.py:49"
-  wire width 96 \cr_rd_data$560
+  wire width 96 \cr_rd_data$557
 
   attribute \src "/home/runner/workspace/hardware/dread.py:61"
-  wire width 32 \dmem_rd_data$561
+  wire width 32 \dmem_rd_data$558
 
   attribute \src "/home/runner/workspace/hardware/dread.py:65"
   wire width 16 \m_bit_rd_word
@@ -17809,7 +17800,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:63"
   wire width 32 \dr_rd_data1
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1476"
+  attribute \src "/home/runner/workspace/hardware/core.py:1472"
   wire width 1 \namespace_exec_authorized
 
   attribute \src "/home/runner/workspace/hardware/dread.py:66"
@@ -17822,31 +17813,31 @@ module \top.core
   wire width 1 \is_dwrite_op
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:36"
-  wire width 1 \start$569
+  wire width 1 \start$566
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:40"
-  wire width 4 \cr_src$570
+  wire width 4 \cr_src$567
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:41"
   wire width 4 \dr_src
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:42"
-  wire width 15 \imm$572
+  wire width 15 \imm$569
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:48"
-  wire width 96 \cr_rd_data$573
+  wire width 96 \cr_rd_data$570
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:52"
-  wire width 32 \dr_rd_data$574
+  wire width 32 \dr_rd_data$571
 
   attribute \src "/home/runner/workspace/hardware/registers.py:65"
   wire width 32 \dr_rd_data2
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:56"
-  wire width 32 \dr_rd_data2$576
+  wire width 32 \dr_rd_data2$573
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:65"
-  wire width 1 \namespace_authorized$577
+  wire width 1 \namespace_authorized$574
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:69"
   wire width 1 \private_m_start
@@ -17873,20 +17864,20 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/decoder.py:42"
   wire width 1 \is_isub_op
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1541"
+  attribute \src "/home/runner/workspace/hardware/core.py:1537"
   wire width 32 \arith_imm_sx
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1546"
+  attribute \src "/home/runner/workspace/hardware/core.py:1542"
   wire width 32 \arith_rhs
 
   attribute \src "/home/runner/workspace/hardware/registers.py:62"
   wire width 4 \dr_rd_addr1
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:55"
-  wire width 4 \dr_rd_addr2$589
+  wire width 4 \dr_rd_addr2$586
 
   attribute \src "/home/runner/workspace/hardware/dread.py:52"
-  wire width 4 \dr_rd_addr$590
+  wire width 4 \dr_rd_addr$587
 
   attribute \src "/home/runner/workspace/hardware/decoder.py:44"
   wire width 1 \is_shl_op
@@ -17894,64 +17885,64 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/decoder.py:45"
   wire width 1 \is_shr_op
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1607"
+  attribute \src "/home/runner/workspace/hardware/core.py:1603"
   wire width 5 \shift_amt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1614"
+  attribute \src "/home/runner/workspace/hardware/core.py:1610"
   wire width 1 \asr_mode
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1618"
+  attribute \src "/home/runner/workspace/hardware/core.py:1614"
   wire width 64 \shr_src_sx
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1620"
+  attribute \src "/home/runner/workspace/hardware/core.py:1616"
   wire width 32 \lsr_result
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1621"
+  attribute \src "/home/runner/workspace/hardware/core.py:1617"
   wire width 32 \asr_result
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1633"
+  attribute \src "/home/runner/workspace/hardware/core.py:1629"
   wire width 5 \shr_c_shift
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1634"
+  attribute \src "/home/runner/workspace/hardware/core.py:1630"
   wire width 6 \shl_c_shift
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1631"
+  attribute \src "/home/runner/workspace/hardware/core.py:1627"
   wire width 1 \shr_c_bit
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1632"
+  attribute \src "/home/runner/workspace/hardware/core.py:1628"
   wire width 1 \shl_c_bit
 
   attribute \src "/home/runner/workspace/hardware/decoder.py:46"
   wire width 1 \is_bfext_op
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1667"
+  attribute \src "/home/runner/workspace/hardware/core.py:1663"
   wire width 5 \bf_offset
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1668"
+  attribute \src "/home/runner/workspace/hardware/core.py:1664"
   wire width 5 \bf_width
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1669"
+  attribute \src "/home/runner/workspace/hardware/core.py:1665"
   wire width 32 \bf_mask
 
   attribute \src "/home/runner/workspace/hardware/decoder.py:47"
   wire width 1 \is_bfins_op
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1697"
+  attribute \src "/home/runner/workspace/hardware/core.py:1693"
   wire width 32 \bfins_mask_shifted
 
   attribute \src "/home/runner/workspace/hardware/decoder.py:48"
   wire width 1 \is_mcmp_op
 
-  attribute \src "/home/runner/workspace/hardware/core.py:678"
+  attribute \src "/home/runner/workspace/hardware/core.py:676"
   wire width 33 \mcmp_result
 
-  attribute \src "/home/runner/workspace/hardware/core.py:686"
+  attribute \src "/home/runner/workspace/hardware/core.py:684"
   wire width 1 \branch_taken
 
   attribute \src "/home/runner/workspace/hardware/decoder.py:43"
   wire width 1 \is_branch_op
 
-  attribute \src "/home/runner/workspace/hardware/core.py:687"
+  attribute \src "/home/runner/workspace/hardware/core.py:685"
   wire width 32 \branch_sx32
 
   attribute \src "/home/runner/workspace/hardware/core.py:520"
@@ -17961,18 +17952,18 @@ module \top.core
   wire width 1 \load_start
 
   attribute \src "/home/runner/workspace/hardware/load.py:9"
-  wire width 4 \cr_src$615
+  wire width 4 \cr_src$612
 
   attribute \src "/home/runner/workspace/hardware/load.py:10"
-  wire width 4 \cr_dst$616
+  wire width 4 \cr_dst$613
 
   attribute \src "/home/runner/workspace/hardware/load.py:11"
-  wire width 16 \index$617
+  wire width 16 \index$614
 
   attribute \src "/home/runner/workspace/hardware/registers.py:56"
   wire width 4 \trace_rd_addr
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1784"
+  attribute \src "/home/runner/workspace/hardware/core.py:1780"
   wire width 1 \thread_switch_start_sig
 
   attribute \src "/home/runner/workspace/hardware/core.py:524"
@@ -17982,50 +17973,50 @@ module \top.core
   wire width 1 \change_start
 
   attribute \src "/home/runner/workspace/hardware/change.py:22"
-  wire width 4 \cr_src$623
+  wire width 4 \cr_src$620
 
   attribute \src "/home/runner/workspace/hardware/change.py:36"
-  wire width 4 \cr_dst$624
+  wire width 4 \cr_dst$621
 
   attribute \src "/home/runner/workspace/hardware/change.py:37"
   wire width 1 \m_elevated
 
   attribute \src "/home/runner/workspace/hardware/change.py:23"
-  wire width 16 \index$626
+  wire width 16 \index$623
 
   attribute \src "/home/runner/workspace/hardware/change.py:24"
   wire width 16 \change_mask
 
   attribute \src "/home/runner/workspace/hardware/change.py:71"
   attribute \init 32'00000000000000000000000000000000
-  wire width 32 \active_thread_base$629
+  wire width 32 \active_thread_base$626
 
   attribute \src "/home/runner/workspace/hardware/change.py:31"
-  wire width 96 \cr_rd_data$630
+  wire width 96 \cr_rd_data$627
 
   attribute \src "/home/runner/workspace/hardware/change.py:39"
-  wire width 96 \cr12_thread$631
+  wire width 96 \cr12_thread$628
 
   attribute \src "/home/runner/workspace/hardware/change.py:40"
-  wire width 96 \cr15_namespace$632
+  wire width 96 \cr15_namespace$629
 
   attribute \src "/home/runner/workspace/hardware/change.py:44"
-  wire width 32 \mem_rd_data$633
+  wire width 32 \mem_rd_data$630
 
   attribute \src "/home/runner/workspace/hardware/change.py:45"
-  wire width 1 \mem_rd_valid$634
+  wire width 1 \mem_rd_valid$631
 
   attribute \src "/home/runner/workspace/hardware/change.py:49"
-  wire width 1 \mem_wr_done$635
+  wire width 1 \mem_wr_done$632
 
   attribute \src "/home/runner/workspace/hardware/change.py:56"
-  wire width 32 \dr_rd_data$636
+  wire width 32 \dr_rd_data$633
 
   attribute \src "/home/runner/workspace/hardware/change.py:68"
-  wire width 1 \boot_window$637
+  wire width 1 \boot_window$634
 
   attribute \src "/home/runner/workspace/hardware/change.py:79"
-  wire width 4 \flags_in$638
+  wire width 4 \flags_in$635
 
   attribute \src "/home/runner/workspace/hardware/change.py:80"
   wire width 32 \nia_current
@@ -18047,110 +18038,110 @@ module \top.core
   wire width 1 \switch_start
 
   attribute \src "/home/runner/workspace/hardware/switch.py:12"
-  wire width 4 \cr_src$648
+  wire width 4 \cr_src$645
 
   attribute \src "/home/runner/workspace/hardware/switch.py:13"
   wire width 4 \target
 
   attribute \src "/home/runner/workspace/hardware/switch.py:14"
-  wire width 16 \index$650
+  wire width 16 \index$647
 
   attribute \src "/home/runner/workspace/hardware/switch.py:18"
   wire width 1 \target_m
 
   attribute \src "/home/runner/workspace/hardware/switch.py:29"
-  wire width 96 \cr_rd_data$652
+  wire width 96 \cr_rd_data$649
 
   attribute \src "/home/runner/workspace/hardware/switch.py:33"
-  wire width 96 \cr15_namespace$653
+  wire width 96 \cr15_namespace$650
 
   attribute \src "/home/runner/workspace/hardware/switch.py:37"
-  wire width 32 \mem_rd_data$654
+  wire width 32 \mem_rd_data$651
 
   attribute \src "/home/runner/workspace/hardware/switch.py:38"
-  wire width 1 \mem_rd_valid$655
+  wire width 1 \mem_rd_valid$652
 
   attribute \src "/home/runner/workspace/hardware/core.py:525"
   wire width 1 \eloadcall_start_sig
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:16"
-  wire width 1 \start$657
+  wire width 1 \start$654
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:17"
-  wire width 4 \cr_src$658
+  wire width 4 \cr_src$655
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:18"
-  wire width 4 \cr_dst$659
+  wire width 4 \cr_dst$656
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:19"
-  wire width 16 \index$660
+  wire width 16 \index$657
 
   attribute \src "/home/runner/workspace/hardware/decoder.py:67"
   wire width 8 \eloadcall_clist_row
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:20"
-  wire width 16 \mask$662
+  wire width 16 \mask$659
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:21"
-  wire width 15 \call_imm$663
+  wire width 15 \call_imm$660
 
   attribute \src "/home/runner/workspace/hardware/decoder.py:66"
   wire width 7 \eloadcall_method_index
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:28"
-  wire width 96 \cr_rd_data$665
+  wire width 96 \cr_rd_data$662
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:32"
-  wire width 96 \cr15_namespace$666
+  wire width 96 \cr15_namespace$663
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:36"
-  wire width 32 \mem_rd_data$667
+  wire width 32 \mem_rd_data$664
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:37"
-  wire width 1 \mem_rd_valid$668
+  wire width 1 \mem_rd_valid$665
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:57"
-  wire width 96 \cr5_heap$669
+  wire width 96 \cr5_heap$666
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:58"
   attribute \init 32'00000000000000000000000000000000
-  wire width 32 \thread_base$670
+  wire width 32 \thread_base$667
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:59"
-  wire width 32 \thread_hdr$671
+  wire width 32 \thread_hdr$668
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:60"
-  wire width 96 \cr12_thread$672
+  wire width 96 \cr12_thread$669
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:61"
-  wire width 4 \flags$673
+  wire width 4 \flags$670
 
   attribute \src "/home/runner/workspace/hardware/core.py:526"
   wire width 1 \xloadlambda_start_sig
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:558"
-  wire width 1 \start$675
+  wire width 1 \start$672
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:559"
-  wire width 4 \cr_src$676
+  wire width 4 \cr_src$673
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:560"
-  wire width 4 \cr_dst$677
+  wire width 4 \cr_dst$674
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:561"
-  wire width 16 \index$678
+  wire width 16 \index$675
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
-  wire width 96 \cr_rd_data$679
+  wire width 96 \cr_rd_data$676
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
-  wire width 96 \cr15_namespace$680
+  wire width 96 \cr15_namespace$677
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:576"
-  wire width 32 \mem_rd_data$681
+  wire width 32 \mem_rd_data$678
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:577"
-  wire width 1 \mem_rd_valid$682
+  wire width 1 \mem_rd_valid$679
 
   attribute \src "/home/runner/workspace/hardware/pet_name_mem.py:71"
   wire width 16 \rd_addr
@@ -18159,7 +18150,7 @@ module \top.core
   wire width 16 \pet_name_rd_addr
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:82"
-  wire width 16 \pet_name_rd_addr$685
+  wire width 16 \pet_name_rd_addr$682
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:83"
   wire width 1 \pet_name_rd_data
@@ -18168,9 +18159,9 @@ module \top.core
   wire width 1 \rd_data
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:598"
-  wire width 1 \pet_name_rd_data$688
+  wire width 1 \pet_name_rd_data$685
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1929"
+  attribute \src "/home/runner/workspace/hardware/core.py:1925"
   wire width 2 \irq_dispatch_reason
 
   attribute \src "/home/runner/workspace/hardware/core.py:238"
@@ -18179,7 +18170,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/call.py:119"
   wire width 1 \lazy_load_irq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1930"
+  attribute \src "/home/runner/workspace/hardware/core.py:1926"
   wire width 16 \irq_dispatch_slot
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:74"
@@ -18189,23 +18180,23 @@ module \top.core
   wire width 16 \lazy_resolve_slot
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:75"
-  wire width 16 \lazy_resolve_slot$695
+  wire width 16 \lazy_resolve_slot$692
 
   attribute \src "/home/runner/workspace/hardware/call.py:120"
   wire width 16 \lazy_load_ns_slot
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1928"
+  attribute \src "/home/runner/workspace/hardware/core.py:1924"
   wire width 1 \irq_dispatch_start
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:591"
-  wire width 1 \lazy_resolve_irq$698
+  wire width 1 \lazy_resolve_irq$695
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1947"
+  attribute \src "/home/runner/workspace/hardware/core.py:1943"
   attribute \init 1'0
   wire width 1 \irq_armed_reg
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:42"
-  wire width 1 \start$700
+  wire width 1 \start$697
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:43"
   wire width 2 \irq_reason
@@ -18214,18 +18205,18 @@ module \top.core
   wire width 16 \irq_slot
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:48"
-  wire width 96 \cr15_namespace$703
+  wire width 96 \cr15_namespace$700
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:52"
-  wire width 32 \mem_rd_data$704
+  wire width 32 \mem_rd_data$701
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:53"
-  wire width 1 \mem_rd_valid$705
+  wire width 1 \mem_rd_valid$702
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:587"
-  wire width 32 \saved_nia$706
+  wire width 32 \saved_nia$703
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1996"
+  attribute \src "/home/runner/workspace/hardware/core.py:1992"
   wire width 1 \_outform_start
 
   attribute \src "/home/runner/workspace/hardware/mload.py:82"
@@ -18235,7 +18226,7 @@ module \top.core
   wire width 1 \outform_start_in
 
   attribute \src "/home/runner/workspace/hardware/church_outform.py:53"
-  wire width 1 \outform_start_out$710
+  wire width 1 \outform_start_out$707
 
   attribute \src "/home/runner/workspace/hardware/outform.py:79"
   wire width 1 \outform_start
@@ -18295,7 +18286,7 @@ module \top.core
   wire width 32 \result_gt
 
   attribute \src "/home/runner/workspace/hardware/core.py:200"
-  wire width 1 \outform_busy$730
+  wire width 1 \outform_busy$727
 
   attribute \src "/home/runner/workspace/hardware/core.py:243"
   wire width 1 \outform_fsm_busy
@@ -18312,7 +18303,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/outform.py:81"
   wire width 1 \outform_done
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2005"
+  attribute \src "/home/runner/workspace/hardware/core.py:2001"
   attribute \init 1'0
   wire width 1 \outform_mode2_active
 
@@ -18329,16 +18320,16 @@ module \top.core
   wire width 5 \outform_fault_type
 
   attribute \src "/home/runner/workspace/hardware/church_outform.py:58"
-  wire width 1 \outform_done_in$741
+  wire width 1 \outform_done_in$738
 
   attribute \src "/home/runner/workspace/hardware/core.py:231"
   wire width 1 \dbg_outform_done_inject
 
   attribute \src "/home/runner/workspace/hardware/church_outform.py:59"
-  wire width 1 \outform_fault_in$743
+  wire width 1 \outform_fault_in$740
 
   attribute \src "/home/runner/workspace/hardware/church_outform.py:60"
-  wire width 5 \outform_fault_type_in$744
+  wire width 5 \outform_fault_type_in$741
 
   attribute \src "/home/runner/workspace/hardware/church_outform.py:61"
   wire width 32 \result_gt_in
@@ -18346,29 +18337,29 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/core.py:232"
   wire width 32 \dbg_outform_result_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2328"
+  attribute \src "/home/runner/workspace/hardware/core.py:2324"
   wire width 32 \alloc_sz_w_noniot
 
   attribute \src "/home/runner/workspace/hardware/outform.py:95"
   wire width 5 \alloc_n
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2329"
+  attribute \src "/home/runner/workspace/hardware/core.py:2325"
   wire width 32 \alloc_mask_w_noniot
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2330"
+  attribute \src "/home/runner/workspace/hardware/core.py:2326"
   wire width 32 \alloc_aligned_w_noniot
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2327"
+  attribute \src "/home/runner/workspace/hardware/core.py:2323"
   attribute \init 32'00000000000000000000000100000000
   wire width 32 \watermark_reg_noniot
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2331"
+  attribute \src "/home/runner/workspace/hardware/core.py:2327"
   wire width 33 \alloc_new_wm_w_noniot
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2341"
+  attribute \src "/home/runner/workspace/hardware/core.py:2337"
   wire width 1 \alloc_fits_ni
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2342"
+  attribute \src "/home/runner/workspace/hardware/core.py:2338"
   wire width 1 \alloc_n_ok_ni
 
   attribute \src "/home/runner/workspace/hardware/outform.py:96"
@@ -18383,23 +18374,23 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/outform.py:98"
   wire width 32 \alloc_base
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2373"
+  attribute \src "/home/runner/workspace/hardware/core.py:2369"
   wire width 32 \mint_ns_entry_base_ni
 
   attribute \src "/home/runner/workspace/hardware/core.py:464"
   attribute \init 16'0000000000000000
   wire width 16 \mint_slot_id_reg
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2380"
+  attribute \src "/home/runner/workspace/hardware/core.py:2376"
   wire width 17 \mint_slot_id_p3_ni
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2379"
+  attribute \src "/home/runner/workspace/hardware/core.py:2375"
   wire width 32 \mint_clist_slot_base_ni
 
   attribute \src "/home/runner/workspace/hardware/core.py:463"
   wire width 32 \mint_e_gt_d
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2387"
+  attribute \src "/home/runner/workspace/hardware/core.py:2383"
   wire width 32 \mint_w2_ni
 
   attribute \src "/home/runner/workspace/hardware/core.py:466"
@@ -18407,19 +18398,19 @@ module \top.core
   wire width 15 \mint_lump_size_reg
 
   attribute \src "/home/runner/workspace/hardware/integrity32.py:59"
-  wire width 32 \w1_masked$766
+  wire width 32 \w1_masked$763
 
   attribute \src "/home/runner/workspace/hardware/integrity32.py:60"
-  wire width 32 \w0_rot$767
+  wire width 32 \w0_rot$764
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2361"
+  attribute \src "/home/runner/workspace/hardware/core.py:2357"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \mint_base_reg_ni
 
   attribute \src "/home/runner/workspace/hardware/integrity32.py:61"
-  wire width 32 \w1_rot$769
+  wire width 32 \w1_rot$766
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2390"
+  attribute \src "/home/runner/workspace/hardware/core.py:2386"
   wire width 32 \mint_integrity_ni
 
   attribute \src "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144"
@@ -18432,21 +18423,21 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/core.py:468"
   wire width 32 \mint_dmem_addr
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2416"
+  attribute \src "/home/runner/workspace/hardware/core.py:2412"
   wire width 15 \lsz_c_ni
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2367"
+  attribute \src "/home/runner/workspace/hardware/core.py:2363"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \mint_hdr_reg_ni
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2436"
+  attribute \src "/home/runner/workspace/hardware/core.py:2432"
   wire width 15 \scan_end_c_ni
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2363"
+  attribute \src "/home/runner/workspace/hardware/core.py:2359"
   attribute \init 8'00000000
   wire width 8 \mint_cc_reg_ni
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2364"
+  attribute \src "/home/runner/workspace/hardware/core.py:2360"
   attribute \init 14'00000000000000
   wire width 14 \mint_scan_idx_reg_ni
 
@@ -18459,18 +18450,18 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/core.py:471"
   wire width 32 \mint_ns_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2365"
+  attribute \src "/home/runner/workspace/hardware/core.py:2361"
   attribute \init 8'00000000
   wire width 8 \mint_copy_idx_reg_ni
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2494"
+  attribute \src "/home/runner/workspace/hardware/core.py:2490"
   wire width 15 \cc_off_ni
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2370"
+  attribute \src "/home/runner/workspace/hardware/core.py:2366"
   attribute \init 15'000000000000000
   wire width 15 \mint_cc_base_reg_ni
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2366"
+  attribute \src "/home/runner/workspace/hardware/core.py:2362"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \mint_copy_data_reg_ni
 
@@ -18478,13 +18469,13 @@ module \top.core
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \mint_clist_addr_reg
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2393"
+  attribute \src "/home/runner/workspace/hardware/core.py:2389"
   wire width 1 \mint_done_comb_ni
 
   attribute \src "/home/runner/workspace/hardware/outform.py:109"
   wire width 32 \mint_result_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2394"
+  attribute \src "/home/runner/workspace/hardware/core.py:2390"
   wire width 1 \mint_fault_comb_ni
 
   attribute \src "/home/runner/workspace/hardware/outform.py:107"
@@ -18493,59 +18484,59 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/outform.py:108"
   wire width 1 \mint_fault
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2564"
+  attribute \src "/home/runner/workspace/hardware/core.py:2560"
   wire width 1 \mwin_trigger
 
   attribute \src "/home/runner/workspace/hardware/call.py:25"
   wire width 1 \call_normal_complete
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:17"
+  attribute \src "/home/runner/workspace/hardware/ret.py:15"
   wire width 1 \complete
 
   attribute \src "/home/runner/workspace/hardware/core.py:253"
   wire width 1 \cr15_m_writeback_trigger
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2579"
+  attribute \src "/home/runner/workspace/hardware/core.py:2575"
   wire width 1 \mwin_dr11_valid
 
   attribute \src "/home/runner/workspace/hardware/integrity32.py:59"
-  wire width 32 \w1_masked$797
+  wire width 32 \w1_masked$794
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2573"
+  attribute \src "/home/runner/workspace/hardware/core.py:2569"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \mwin_dr13_lat
 
   attribute \src "/home/runner/workspace/hardware/integrity32.py:60"
-  wire width 32 \w0_rot$799
+  wire width 32 \w0_rot$796
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2572"
+  attribute \src "/home/runner/workspace/hardware/core.py:2568"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \mwin_dr12_lat
 
   attribute \src "/home/runner/workspace/hardware/integrity32.py:61"
-  wire width 32 \w1_rot$801
+  wire width 32 \w1_rot$798
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2583"
+  attribute \src "/home/runner/workspace/hardware/core.py:2579"
   wire width 32 \mwin_integrity_computed
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2585"
+  attribute \src "/home/runner/workspace/hardware/core.py:2581"
   wire width 1 \mwin_integrity_ok
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2574"
+  attribute \src "/home/runner/workspace/hardware/core.py:2570"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \mwin_dr14_lat
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2590"
+  attribute \src "/home/runner/workspace/hardware/core.py:2586"
   wire width 9 \mwin_dr11_gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2571"
+  attribute \src "/home/runner/workspace/hardware/core.py:2567"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \mwin_dr11_lat
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2591"
+  attribute \src "/home/runner/workspace/hardware/core.py:2587"
   wire width 9 \mwin_dr13_gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2592"
+  attribute \src "/home/runner/workspace/hardware/core.py:2588"
   wire width 1 \mwin_gtseq_ok
 
   attribute \src "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144"
@@ -18570,7 +18561,7 @@ module \top.core
   wire width 1 \fault_valid
 
   attribute \src "/home/runner/workspace/hardware/perm_check.py:56"
-  wire width 1 \fault_valid$815
+  wire width 1 \fault_valid$812
 
   attribute \src "/home/runner/workspace/hardware/lambda_unit.py:14"
   wire width 1 \lambda_fault
@@ -18581,8 +18572,8 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/call.py:26"
   wire width 1 \call_fault
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:18"
-  wire width 1 \fault_valid$819
+  attribute \src "/home/runner/workspace/hardware/ret.py:16"
+  wire width 1 \fault_valid$816
 
   attribute \src "/home/runner/workspace/hardware/save.py:17"
   wire width 1 \save_fault
@@ -18597,72 +18588,72 @@ module \top.core
   wire width 1 \fault
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:564"
-  wire width 1 \fault$824
+  wire width 1 \fault$821
 
   attribute \src "/home/runner/workspace/hardware/dread.py:45"
-  wire width 1 \fault$825
+  wire width 1 \fault$822
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:44"
-  wire width 1 \fault$826
+  wire width 1 \fault$823
 
   attribute \src "/home/runner/workspace/hardware/cload.py:58"
   wire width 1 \cload_fault
 
   attribute \src "/home/runner/workspace/hardware/church_outform.py:66"
-  wire width 1 \fault$828
+  wire width 1 \fault$825
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:70"
   wire width 1 \null_base_fault
 
   attribute \src "/home/runner/workspace/hardware/decoder.py:69"
-  wire width 4 \fault$832
+  wire width 4 \fault$829
 
   attribute \src "/home/runner/workspace/hardware/perm_check.py:55"
   wire width 4 \fault_type
 
   attribute \src "/home/runner/workspace/hardware/lambda_unit.py:15"
-  wire width 4 \fault_type$834
+  wire width 4 \fault_type$831
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:23"
-  wire width 4 \fault_type$835
+  wire width 4 \fault_type$832
 
   attribute \src "/home/runner/workspace/hardware/call.py:27"
-  wire width 5 \fault_type$836
+  wire width 5 \fault_type$833
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:19"
-  wire width 5 \fault_type$837
+  attribute \src "/home/runner/workspace/hardware/ret.py:17"
+  wire width 5 \fault_type$834
 
   attribute \src "/home/runner/workspace/hardware/save.py:18"
-  wire width 5 \fault_type$838
+  wire width 5 \fault_type$835
 
   attribute \src "/home/runner/workspace/hardware/load.py:15"
-  wire width 5 \fault_type$839
+  wire width 5 \fault_type$836
 
   attribute \src "/home/runner/workspace/hardware/change.py:28"
-  wire width 5 \fault_type$840
+  wire width 5 \fault_type$837
 
   attribute \src "/home/runner/workspace/hardware/switch.py:26"
-  wire width 5 \fault_type$841
+  wire width 5 \fault_type$838
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:25"
-  wire width 5 \fault_type$842
+  wire width 5 \fault_type$839
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:565"
-  wire width 4 \fault_type$843
+  wire width 4 \fault_type$840
 
   attribute \src "/home/runner/workspace/hardware/dread.py:46"
-  wire width 5 \fault_type$844
+  wire width 5 \fault_type$841
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:45"
-  wire width 5 \fault_type$845
+  wire width 5 \fault_type$842
 
   attribute \src "/home/runner/workspace/hardware/cload.py:59"
   wire width 5 \cload_fault_type
 
   attribute \src "/home/runner/workspace/hardware/church_outform.py:67"
-  wire width 5 \fault_type$847
+  wire width 5 \fault_type$844
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2742"
+  attribute \src "/home/runner/workspace/hardware/core.py:2738"
   wire width 4 \fault_stage_w
 
   attribute \src "/home/runner/workspace/hardware/core.py:150"
@@ -18672,7 +18663,7 @@ module \top.core
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \fault_instr
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2790"
+  attribute \src "/home/runner/workspace/hardware/core.py:2786"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \fault_instr_latch
 
@@ -18683,15 +18674,15 @@ module \top.core
   attribute \init 4'0000
   wire width 4 \fault_stage
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2791"
+  attribute \src "/home/runner/workspace/hardware/core.py:2787"
   attribute \init 4'0000
   wire width 4 \fault_stage_latch
 
   attribute \src "/home/runner/workspace/hardware/call.py:47"
   wire width 1 \nia_set
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:28"
-  wire width 1 \nia_set$857
+  attribute \src "/home/runner/workspace/hardware/ret.py:24"
+  wire width 1 \nia_set$854
 
   attribute \src "/home/runner/workspace/hardware/load.py:13"
   wire width 1 \load_complete
@@ -18700,32 +18691,32 @@ module \top.core
   wire width 1 \save_complete
 
   attribute \src "/home/runner/workspace/hardware/dread.py:39"
-  wire width 1 \done$860
+  wire width 1 \done$857
 
   attribute \src "/home/runner/workspace/hardware/core.py:528"
   attribute \init 1'0
   wire width 1 \decoded_thread_change_inflight
 
   attribute \src "/home/runner/workspace/hardware/lambda_unit.py:20"
-  wire width 1 \nia_set$863
+  wire width 1 \nia_set$860
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:585"
-  wire width 1 \nia_set$864
+  wire width 1 \nia_set$861
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:43"
-  wire width 1 \nia_set$865
+  wire width 1 \nia_set$862
 
   attribute \src "/home/runner/workspace/hardware/switch.py:20"
   wire width 1 \switch_complete
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:64"
-  wire width 1 \nia_set$867
+  wire width 1 \nia_set$864
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1770"
+  attribute \src "/home/runner/workspace/hardware/core.py:1766"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \change_issuer_nia
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1769"
+  attribute \src "/home/runner/workspace/hardware/core.py:1765"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \delayed_issuer_instr
 
@@ -18735,7 +18726,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/core.py:113"
   wire width 5 \retire_fault_code
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1779"
+  attribute \src "/home/runner/workspace/hardware/core.py:1775"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \trace_load_shadow_gt
 
@@ -18749,16 +18740,16 @@ module \top.core
   wire width 32 \retire_trace_cr14_gt
 
   attribute \src "/home/runner/workspace/hardware/mload.py:55"
-  wire width 96 \cr_rd_data$885
+  wire width 96 \cr_rd_data$882
 
   attribute \src "/home/runner/workspace/hardware/mload.py:61"
-  wire width 96 \cr15_namespace$886
+  wire width 96 \cr15_namespace$883
 
   attribute \src "/home/runner/workspace/hardware/mload.py:65"
-  wire width 32 \mem_rd_data$887
+  wire width 32 \mem_rd_data$884
 
   attribute \src "/home/runner/workspace/hardware/mload.py:66"
-  wire width 1 \mem_rd_valid$888
+  wire width 1 \mem_rd_valid$885
 
   attribute \src "/home/runner/workspace/hardware/mload.py:38"
   wire width 1 \sub_start
@@ -18802,52 +18793,52 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/call.py:41"
   wire width 1 \mload_m_elevated
 
+  attribute \src "/home/runner/workspace/hardware/ret.py:31"
+  wire width 1 \mload_start$900
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:32"
+  wire width 4 \mload_cr_src$901
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:33"
+  wire width 4 \mload_cr_dst$902
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:34"
+  wire width 16 \mload_index$903
+
   attribute \src "/home/runner/workspace/hardware/ret.py:35"
-  wire width 1 \mload_start$903
+  wire width 1 \mload_direct$904
 
   attribute \src "/home/runner/workspace/hardware/ret.py:36"
-  wire width 4 \mload_cr_src$904
+  wire width 32 \mload_direct_gt$905
 
   attribute \src "/home/runner/workspace/hardware/ret.py:37"
-  wire width 4 \mload_cr_dst$905
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:38"
-  wire width 16 \mload_index$906
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:39"
-  wire width 1 \mload_direct$907
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:40"
-  wire width 32 \mload_direct_gt$908
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:41"
-  wire width 1 \mload_m_elevated$909
+  wire width 1 \mload_m_elevated$906
 
   attribute \src "/home/runner/workspace/hardware/load.py:17"
-  wire width 1 \mload_start$910
+  wire width 1 \mload_start$907
 
   attribute \src "/home/runner/workspace/hardware/load.py:18"
-  wire width 4 \mload_cr_src$911
+  wire width 4 \mload_cr_src$908
 
   attribute \src "/home/runner/workspace/hardware/load.py:19"
-  wire width 4 \mload_cr_dst$912
+  wire width 4 \mload_cr_dst$909
 
   attribute \src "/home/runner/workspace/hardware/load.py:20"
-  wire width 16 \mload_index$913
+  wire width 16 \mload_index$910
 
   attribute \src "/home/runner/workspace/hardware/load.py:21"
-  wire width 1 \mload_direct$914
+  wire width 1 \mload_direct$911
 
   attribute \src "/home/runner/workspace/hardware/load.py:22"
-  wire width 32 \mload_direct_gt$915
+  wire width 32 \mload_direct_gt$912
 
   attribute \src "/home/runner/workspace/hardware/load.py:23"
-  wire width 1 \mload_m_elevated$916
+  wire width 1 \mload_m_elevated$913
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2962"
+  attribute \src "/home/runner/workspace/hardware/core.py:2958"
   wire width 1 \return_grant
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2963"
+  attribute \src "/home/runner/workspace/hardware/core.py:2959"
   wire width 1 \load_grant
 
   attribute \src "/home/runner/workspace/hardware/call.py:43"
@@ -18868,26 +18859,26 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/mload.py:52"
   wire width 5 \sub_fault_type
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:43"
-  wire width 1 \mload_done$925
+  attribute \src "/home/runner/workspace/hardware/ret.py:39"
+  wire width 1 \mload_done$922
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:44"
-  wire width 1 \mload_fault$926
+  attribute \src "/home/runner/workspace/hardware/ret.py:40"
+  wire width 1 \mload_fault$923
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:45"
-  wire width 5 \mload_fault_type$927
+  attribute \src "/home/runner/workspace/hardware/ret.py:41"
+  wire width 5 \mload_fault_type$924
 
   attribute \src "/home/runner/workspace/hardware/load.py:25"
   wire width 1 \mload_busy
 
   attribute \src "/home/runner/workspace/hardware/load.py:26"
-  wire width 1 \mload_done$929
+  wire width 1 \mload_done$926
 
   attribute \src "/home/runner/workspace/hardware/load.py:27"
-  wire width 1 \mload_fault$930
+  wire width 1 \mload_fault$927
 
   attribute \src "/home/runner/workspace/hardware/load.py:28"
-  wire width 5 \mload_fault_type$931
+  wire width 5 \mload_fault_type$928
 
   attribute \src "/home/runner/workspace/hardware/mload.py:64"
   wire width 1 \mem_rd_en
@@ -18896,58 +18887,58 @@ module \top.core
   wire width 1 \mem_wr_en
 
   attribute \src "/home/runner/workspace/hardware/change.py:43"
-  wire width 1 \mem_rd_en$938
+  wire width 1 \mem_rd_en$935
 
   attribute \src "/home/runner/workspace/hardware/change.py:48"
-  wire width 1 \mem_wr_en$939
+  wire width 1 \mem_wr_en$936
 
   attribute \src "/home/runner/workspace/hardware/switch.py:36"
-  wire width 1 \mem_rd_en$940
+  wire width 1 \mem_rd_en$937
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:35"
-  wire width 1 \mem_rd_en$941
+  wire width 1 \mem_rd_en$938
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:69"
-  wire width 1 \mem_wr_en$942
+  wire width 1 \mem_wr_en$939
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:575"
-  wire width 1 \mem_rd_en$943
+  wire width 1 \mem_rd_en$940
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:578"
-  wire width 1 \mem_wr_en$944
+  wire width 1 \mem_wr_en$941
 
   attribute \src "/home/runner/workspace/hardware/call.py:52"
-  wire width 1 \mem_rd_en$945
+  wire width 1 \mem_rd_en$942
 
   attribute \src "/home/runner/workspace/hardware/call.py:59"
-  wire width 1 \mem_wr_en$946
+  wire width 1 \mem_wr_en$943
 
   attribute \src "/home/runner/workspace/hardware/save.py:31"
-  wire width 1 \mem_wr_en$947
+  wire width 1 \mem_wr_en$944
 
   attribute \src "/home/runner/workspace/hardware/save.py:35"
-  wire width 1 \mem_rd_en$948
+  wire width 1 \mem_rd_en$945
 
   attribute \src "/home/runner/workspace/hardware/dread.py:60"
-  wire width 1 \dmem_rd_en$949
+  wire width 1 \dmem_rd_en$946
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:60"
-  wire width 1 \dmem_wr_en$950
+  wire width 1 \dmem_wr_en$947
 
   attribute \src "/home/runner/workspace/hardware/cload.py:70"
-  wire width 1 \mem_rd_en$951
+  wire width 1 \mem_rd_en$948
 
   attribute \src "/home/runner/workspace/hardware/outform.py:102"
-  wire width 1 \mem_wr_en$952
+  wire width 1 \mem_wr_en$949
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:56"
-  wire width 1 \mem_rd_en$953
+  attribute \src "/home/runner/workspace/hardware/ret.py:52"
+  wire width 1 \mem_rd_en$950
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:62"
-  wire width 1 \mem_wr_en$954
+  attribute \src "/home/runner/workspace/hardware/ret.py:58"
+  wire width 1 \mem_wr_en$951
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:51"
-  wire width 1 \mem_rd_en$955
+  wire width 1 \mem_rd_en$952
 
   attribute \src "/home/runner/workspace/hardware/mload.py:63"
   wire width 32 \mem_addr
@@ -18962,49 +18953,49 @@ module \top.core
   wire width 32 \mem_wr_addr
 
   attribute \src "/home/runner/workspace/hardware/change.py:47"
-  wire width 32 \mem_wr_data$960
+  wire width 32 \mem_wr_data$957
 
   attribute \src "/home/runner/workspace/hardware/switch.py:35"
-  wire width 32 \mem_addr$961
+  wire width 32 \mem_addr$958
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:34"
-  wire width 32 \mem_addr$962
+  wire width 32 \mem_addr$959
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:67"
-  wire width 32 \mem_wr_addr$963
+  wire width 32 \mem_wr_addr$960
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:68"
-  wire width 32 \mem_wr_data$964
+  wire width 32 \mem_wr_data$961
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:574"
-  wire width 32 \mem_addr$965
+  wire width 32 \mem_addr$962
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:579"
-  wire width 32 \mem_wr_data$966
+  wire width 32 \mem_wr_data$963
 
   attribute \src "/home/runner/workspace/hardware/call.py:51"
-  wire width 32 \mem_rd_addr$967
+  wire width 32 \mem_rd_addr$964
 
   attribute \src "/home/runner/workspace/hardware/call.py:57"
-  wire width 32 \mem_wr_addr$968
+  wire width 32 \mem_wr_addr$965
 
   attribute \src "/home/runner/workspace/hardware/call.py:58"
-  wire width 32 \mem_wr_data$969
+  wire width 32 \mem_wr_data$966
 
   attribute \src "/home/runner/workspace/hardware/save.py:29"
-  wire width 32 \mem_wr_addr$970
+  wire width 32 \mem_wr_addr$967
 
   attribute \src "/home/runner/workspace/hardware/save.py:30"
-  wire width 32 \mem_wr_data$971
+  wire width 32 \mem_wr_data$968
 
   attribute \src "/home/runner/workspace/hardware/save.py:34"
-  wire width 32 \mem_rd_addr$972
+  wire width 32 \mem_rd_addr$969
 
   attribute \src "/home/runner/workspace/hardware/dread.py:59"
-  wire width 32 \dmem_addr$973
+  wire width 32 \dmem_addr$970
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:58"
-  wire width 32 \dmem_addr$974
+  wire width 32 \dmem_addr$971
 
   attribute \src "/home/runner/workspace/hardware/pet_name_mem.py:74"
   wire width 1 \wr_en
@@ -19013,31 +19004,31 @@ module \top.core
   wire width 6 \wr_addr
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:59"
-  wire width 32 \dmem_wr_data$977
+  wire width 32 \dmem_wr_data$974
 
   attribute \src "/home/runner/workspace/hardware/pet_name_mem.py:76"
   wire width 1 \wr_data
 
   attribute \src "/home/runner/workspace/hardware/cload.py:69"
-  wire width 32 \mem_addr$979
+  wire width 32 \mem_addr$976
 
   attribute \src "/home/runner/workspace/hardware/outform.py:100"
-  wire width 32 \mem_wr_addr$980
+  wire width 32 \mem_wr_addr$977
 
   attribute \src "/home/runner/workspace/hardware/outform.py:101"
+  wire width 32 \mem_wr_data$978
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:51"
+  wire width 32 \mem_rd_addr$979
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:56"
+  wire width 32 \mem_wr_addr$980
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:57"
   wire width 32 \mem_wr_data$981
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:55"
-  wire width 32 \mem_rd_addr$982
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:60"
-  wire width 32 \mem_wr_addr$983
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:61"
-  wire width 32 \mem_wr_data$984
-
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:50"
-  wire width 32 \mem_rd_addr$985
+  wire width 32 \mem_rd_addr$982
 
   attribute \src "/home/runner/workspace/hardware/gc_unit.py:28"
   wire width 1 \valid_key_access
@@ -19049,18 +19040,18 @@ module \top.core
   wire width 16 \access_index
 
   attribute \src "/home/runner/workspace/hardware/gc_unit.py:16"
-  wire width 32 \ns_addr$993
+  wire width 32 \ns_addr$990
 
   attribute \src "/home/runner/workspace/hardware/gc_unit.py:17"
-  wire width 1 \ns_rd_en$994
+  wire width 1 \ns_rd_en$991
 
   attribute \src "/home/runner/workspace/hardware/gc_unit.py:19"
-  wire width 128 \ns_wr_data$995
+  wire width 128 \ns_wr_data$992
 
   attribute \src "/home/runner/workspace/hardware/gc_unit.py:20"
-  wire width 1 \ns_wr_en$996
+  wire width 1 \ns_wr_en$993
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:20"
+  attribute \src "/home/runner/workspace/hardware/ret.py:18"
   wire width 1 \reboot_request
 
   attribute \src "/home/runner/workspace/hardware/core.py:97"
@@ -19082,19 +19073,19 @@ module \top.core
   wire width 32 \nia_value
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:586"
-  wire width 32 \nia_value$1008
+  wire width 32 \nia_value$1005
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:29"
-  wire width 32 \nia_value$1009
+  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  wire width 32 \nia_value$1006
 
   attribute \src "/home/runner/workspace/hardware/call.py:48"
-  wire width 32 \nia_value$1010
+  wire width 32 \nia_value$1007
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:44"
-  wire width 32 \nia_value$1011
+  wire width 32 \nia_value$1008
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:65"
-  wire width 32 \nia_value$1012
+  wire width 32 \nia_value$1009
 
   attribute \src "/home/runner/workspace/hardware/core.py:440"
   attribute \init 1'0
@@ -19106,7 +19097,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/call.py:101"
   wire width 32 \code_hi_out
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:49"
+  attribute \src "/home/runner/workspace/hardware/ret.py:45"
   wire width 1 \lambda_clear
 
   attribute \src "/home/runner/workspace/hardware/lambda_unit.py:13"
@@ -19121,7 +19112,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/change.py:72"
   wire width 1 \thread_base_restore_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1948"
+  attribute \src "/home/runner/workspace/hardware/core.py:1944"
   attribute \init 1'0
   wire width 1 \first_call_done_reg
 
@@ -19140,11 +19131,11 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/outform.py:105"
   wire width 32 \mint_base
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2362"
+  attribute \src "/home/runner/workspace/hardware/core.py:2358"
   attribute \init 13'0000000000000
   wire width 13 \mint_cw_reg_ni
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2575"
+  attribute \src "/home/runner/workspace/hardware/core.py:2571"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \mwin_dr15_lat
 
@@ -19247,7 +19238,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:51"
   wire width 32 output 32  \debug_dr15
 
-  wire width 32 input 33  \port$5745$0
+  wire width 32 input 33  \port$5733$0
 
   attribute \src "/home/runner/workspace/hardware/core.py:163"
   wire width 1 input 34  \reboot_req
@@ -19271,10 +19262,10 @@ module \top.core
   wire width 1 output 40  \clist_wr_en
 
   attribute \src "/home/runner/workspace/hardware/core.py:113"
-  wire width 5 output 41  \fault$830
+  wire width 5 output 41  \fault$827
 
   attribute \src "/home/runner/workspace/hardware/core.py:85"
-  wire width 1 output 42  \fault_valid$831
+  wire width 1 output 42  \fault_valid$828
 
   attribute \src "/home/runner/workspace/hardware/core.py:57"
   wire width 32 output 43  \dmem_addr
@@ -19304,7 +19295,7 @@ module \top.core
   attribute \init 32'00000000000000000000000000000000
   wire width 32 output 51  \imem_addr
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1779"
+  attribute \src "/home/runner/workspace/hardware/core.py:1775"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 output 52  \retire_trace_load_shadow_gt
 
@@ -19316,15 +19307,15 @@ module \top.core
   attribute \init 32'00000000000000000000000000000000
   wire width 32 output 54  \thread_base
 
-  wire width 96 output 55  \port$6367$0
+  wire width 96 output 55  \port$6355$0
 
-  wire width 96 output 56  \port$6369$0
+  wire width 96 output 56  \port$6357$0
 
-  wire width 96 output 57  \port$6371$0
+  wire width 96 output 57  \port$6359$0
 
-  wire width 96 output 58  \port$6373$0
+  wire width 96 output 58  \port$6361$0
 
-  wire width 96 output 59  \port$6375$0
+  wire width 96 output 59  \port$6363$0
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:57"
   wire width 96 output 60  \cr5_heap
@@ -19332,20 +19323,20 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:37"
   wire width 96 output 61  \cr6_clist
 
-  wire width 96 output 62  \port$6381$0
+  wire width 96 output 62  \port$6369$0
 
-  wire width 96 output 63  \port$6383$0
+  wire width 96 output 63  \port$6371$0
 
-  wire width 96 output 64  \port$6385$0
+  wire width 96 output 64  \port$6373$0
 
-  wire width 96 output 65  \port$6387$0
+  wire width 96 output 65  \port$6375$0
 
-  wire width 96 output 66  \port$6389$0
+  wire width 96 output 66  \port$6377$0
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:60"
   wire width 96 output 67  \cr12_thread
 
-  wire width 96 output 68  \port$6393$0
+  wire width 96 output 68  \port$6381$0
 
   attribute \src "/home/runner/workspace/hardware/registers.py:40"
   wire width 96 output 69  \cr14_code
@@ -19487,11 +19478,11 @@ module \top.core
 
   wire width 4 $61
 
-  wire width 4 $62
+  wire width 1 $62
 
-  wire width 1 $63
+  wire width 4 $63
 
-  wire width 4 $64
+  wire width 1 $64
 
   wire width 1 $65
 
@@ -19515,7 +19506,7 @@ module \top.core
 
   wire width 1 $75
 
-  wire width 1 $76
+  wire width 4 $76
 
   wire width 4 $77
 
@@ -19539,7 +19530,7 @@ module \top.core
 
   wire width 4 $87
 
-  wire width 4 $88
+  wire width 96 $88
 
   wire width 96 $89
 
@@ -19563,7 +19554,7 @@ module \top.core
 
   wire width 96 $99
 
-  wire width 96 $100
+  wire width 1 $100
 
   wire width 1 $101
 
@@ -19589,9 +19580,9 @@ module \top.core
 
   wire width 1 $112
 
-  wire width 1 $113
+  wire width 32 $113
 
-  wire width 32 $114
+  wire width 1 $114
 
   wire width 1 $115
 
@@ -19633,9 +19624,9 @@ module \top.core
 
   wire width 1 $134
 
-  wire width 1 $135
+  wire width 33 $135
 
-  wire width 33 $136
+  wire width 1 $136
 
   wire width 1 $137
 
@@ -19705,11 +19696,11 @@ module \top.core
 
   wire width 1 $170
 
-  wire width 1 $171
+  wire width 4 $171
 
   wire width 4 $172
 
-  wire width 4 $173
+  wire width 1 $173
 
   wire width 1 $174
 
@@ -19729,11 +19720,11 @@ module \top.core
 
   wire width 1 $182
 
-  wire width 1 $183
+  wire width 4 $183
 
   wire width 4 $184
 
-  wire width 4 $185
+  wire width 1 $185
 
   wire width 1 $186
 
@@ -19761,23 +19752,23 @@ module \top.core
 
   wire width 1 $198
 
-  wire width 1 $199
+  wire width 63 $199
 
-  wire width 63 $200
+  wire width 64 $200
 
-  wire width 64 $201
+  wire width 6 $201
 
-  wire width 6 $202
+  wire width 7 $202
 
-  wire width 7 $203
+  wire width 1 $203
 
-  wire width 1 $204
+  wire width 32 $204
 
-  wire width 32 $205
+  wire width 1 $205
 
-  wire width 1 $206
+  wire width 32 $206
 
-  wire width 32 $207
+  wire width 1 $207
 
   wire width 1 $208
 
@@ -19785,31 +19776,31 @@ module \top.core
 
   wire width 1 $210
 
-  wire width 1 $211
+  wire width 32 $211
 
-  wire width 32 $212
+  wire width 33 $212
 
-  wire width 33 $213
+  wire width 32 $213
 
-  wire width 32 $214
+  wire width 1 $214
 
   wire width 1 $215
 
   wire width 1 $216
 
-  wire width 1 $217
+  wire width 63 $217
 
-  wire width 63 $218
+  wire width 32 $218
 
   wire width 32 $219
 
   wire width 32 $220
 
-  wire width 32 $221
+  wire width 63 $221
 
   wire width 63 $222
 
-  wire width 63 $223
+  wire width 1 $223
 
   wire width 1 $224
 
@@ -19847,13 +19838,13 @@ module \top.core
 
   wire width 1 $241
 
-  wire width 1 $242
+  wire width 15 $242
 
-  wire width 15 $243
+  wire width 33 $243
 
   wire width 33 $244
 
-  wire width 33 $245
+  wire width 1 $245
 
   wire width 1 $246
 
@@ -19891,13 +19882,13 @@ module \top.core
 
   wire width 1 $263
 
-  wire width 1 $264
+  wire width 2 $264
 
-  wire width 2 $265
+  wire width 16 $265
 
   wire width 16 $266
 
-  wire width 16 $267
+  wire width 1 $267
 
   wire width 1 $268
 
@@ -19907,33 +19898,33 @@ module \top.core
 
   wire width 1 $271
 
-  wire width 1 $272
+  wire width 33 $272
 
-  wire width 33 $273
+  wire width 1 $273
 
-  wire width 1 $274
+  wire width 32 $274
 
-  wire width 32 $275
+  wire width 16 $275
 
-  wire width 16 $276
+  wire width 1 $276
 
   wire width 1 $277
 
   wire width 1 $278
 
-  wire width 1 $279
+  wire width 63 $279
 
-  wire width 63 $280
+  wire width 33 $280
 
   wire width 33 $281
 
-  wire width 33 $282
+  wire width 32 $282
 
-  wire width 32 $283
+  wire width 33 $283
 
-  wire width 33 $284
+  wire width 34 $284
 
-  wire width 34 $285
+  wire width 1 $285
 
   wire width 1 $286
 
@@ -19945,33 +19936,33 @@ module \top.core
 
   wire width 1 $290
 
-  wire width 1 $291
+  wire width 35 $291
 
-  wire width 35 $292
+  wire width 23 $292
 
-  wire width 23 $293
+  wire width 33 $293
 
-  wire width 33 $294
+  wire width 31 $294
 
-  wire width 31 $295
+  wire width 16 $295
 
-  wire width 16 $296
+  wire width 22 $296
 
-  wire width 22 $297
+  wire width 32 $297
 
-  wire width 32 $298
+  wire width 5 $298
 
-  wire width 5 $299
+  wire width 32 $299
 
-  wire width 32 $300
+  wire width 16 $300
 
-  wire width 16 $301
+  wire width 17 $301
 
-  wire width 17 $302
+  wire width 1 $302
 
-  wire width 1 $303
+  wire width 17 $303
 
-  wire width 17 $304
+  wire width 33 $304
 
   wire width 33 $305
 
@@ -19979,25 +19970,25 @@ module \top.core
 
   wire width 33 $307
 
-  wire width 33 $308
+  wire width 1 $308
 
-  wire width 1 $309
+  wire width 16 $309
 
-  wire width 16 $310
+  wire width 18 $310
 
-  wire width 18 $311
+  wire width 33 $311
 
-  wire width 33 $312
+  wire width 11 $312
 
-  wire width 11 $313
+  wire width 33 $313
 
-  wire width 33 $314
+  wire width 1 $314
 
   wire width 1 $315
 
-  wire width 1 $316
+  wire width 32 $316
 
-  wire width 32 $317
+  wire width 1 $317
 
   wire width 1 $318
 
@@ -20315,17 +20306,17 @@ module \top.core
 
   wire width 1 $475
 
-  wire width 1 $476
+  wire width 33 $476
 
   wire width 33 $477
 
   wire width 33 $478
 
-  wire width 33 $479
+  wire width 35 $479
 
-  wire width 35 $480
+  wire width 33 $480
 
-  wire width 33 $481
+  wire width 1 $481
 
   wire width 1 $482
 
@@ -20355,27 +20346,27 @@ module \top.core
 
   wire width 1 $495
 
-  wire width 1 $496
+  wire width 22 $496
 
-  wire width 22 $497
+  wire width 25 $497
 
-  wire width 25 $498
+  wire width 33 $498
 
-  wire width 33 $499
+  wire width 22 $499
 
-  wire width 22 $500
+  wire width 25 $500
 
-  wire width 25 $501
+  wire width 33 $501
 
-  wire width 33 $502
+  wire width 1 $502
 
   wire width 1 $503
 
   wire width 1 $504
 
-  wire width 1 $505
+  wire width 3 $505
 
-  wire width 3 $506
+  wire width 1 $506
 
   wire width 1 $507
 
@@ -20475,15 +20466,15 @@ module \top.core
 
   wire width 1 $555
 
-  wire width 1 $556
+  wire width 16 $556
 
   wire width 16 $557
 
-  wire width 16 $558
+  wire width 32 $558
 
   wire width 32 $559
 
-  wire width 32 $560
+  wire width 1 $560
 
   wire width 1 $561
 
@@ -20491,27 +20482,27 @@ module \top.core
 
   wire width 1 $563
 
-  wire width 1 $564
+  wire width 16 $564
 
-  wire width 16 $565
+  wire width 1 $565
 
-  wire width 1 $566
+  wire width 16 $566
 
-  wire width 16 $567
+  wire width 17 $567
 
-  wire width 17 $568
+  wire width 1 $568
 
-  wire width 1 $569
+  wire width 14 $569
 
-  wire width 14 $570
+  wire width 1 $570
 
-  wire width 1 $571
+  wire width 15 $571
 
-  wire width 15 $572
+  wire width 16 $572
 
-  wire width 16 $573
+  wire width 9 $573
 
-  wire width 9 $574
+  wire width 1 $574
 
   wire width 1 $575
 
@@ -20533,23 +20524,23 @@ module \top.core
 
   wire width 1 $584
 
-  wire width 1 $585
+  wire width 32 $585
 
-  wire width 32 $586
+  wire width 3 $586
 
-  wire width 3 $587
+  wire width 1 $587
 
-  wire width 1 $588
+  wire width 32 $588
 
   wire width 32 $589
 
   wire width 32 $590
 
-  wire width 32 $591
+  wire width 1 $591
 
-  wire width 1 $592
+  wire width 2 $592
 
-  wire width 2 $593
+  wire width 1 $593
 
   wire width 1 $594
 
@@ -20557,51 +20548,51 @@ module \top.core
 
   wire width 1 $596
 
-  wire width 1 $597
+  wire width 32 $597
 
   wire width 32 $598
 
   wire width 32 $599
 
-  wire width 32 $600
+  wire width 1 $600
 
   wire width 1 $601
 
-  wire width 1 $602
+  wire width 16 $602
 
-  wire width 16 $603
+  wire width 32 $603
 
-  wire width 32 $604
+  wire width 1 $604
 
   wire width 1 $605
 
   wire width 1 $606
 
-  wire width 1 $607
+  wire width 16 $607
 
-  wire width 16 $608
+  wire width 32 $608
 
   wire width 32 $609
 
   wire width 32 $610
 
-  wire width 32 $611
+  wire width 4 $611
 
-  wire width 4 $612
+  wire width 32 $612
 
-  wire width 32 $613
+  wire width 15 $613
 
-  wire width 15 $614
+  wire width 13 $614
 
-  wire width 13 $615
+  wire width 8 $615
 
-  wire width 8 $616
+  wire width 14 $616
 
-  wire width 14 $617
+  wire width 8 $617
 
-  wire width 8 $618
+  wire width 15 $618
 
-  wire width 15 $619
+  wire width 32 $619
 
   wire width 32 $620
 
@@ -20613,15 +20604,15 @@ module \top.core
 
   wire width 32 $624
 
-  wire width 32 $625
+  wire width 2 $625
 
-  wire width 2 $626
+  wire width 32 $626
 
   wire width 32 $627
 
-  wire width 32 $628
+  wire width 4 $628
 
-  wire width 4 $629
+  wire width 96 $629
 
   wire width 96 $630
 
@@ -20643,11 +20634,9 @@ module \top.core
 
   wire width 96 $639
 
-  wire width 96 $640
+  wire width 2 $640
 
-  wire width 2 $641
-
-  wire width 16 $642
+  wire width 16 $641
 
   attribute \src "/home/runner/workspace/hardware/decoder.py:35"
   wire width 1 \flags.N
@@ -20673,22 +20662,22 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:70"
   wire width 1 \flags$9.V
 
-  attribute \src "/home/runner/workspace/hardware/core.py:569"
+  attribute \src "/home/runner/workspace/hardware/core.py:567"
   wire width 16 \perm_gt_sig.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:569"
+  attribute \src "/home/runner/workspace/hardware/core.py:567"
   wire width 9 \perm_gt_sig.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:569"
+  attribute \src "/home/runner/workspace/hardware/core.py:567"
   wire width 2 \perm_gt_sig.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:569"
+  attribute \src "/home/runner/workspace/hardware/core.py:567"
   wire width 1 \perm_gt_sig.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:569"
+  attribute \src "/home/runner/workspace/hardware/core.py:567"
   wire width 3 \perm_gt_sig.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:569"
+  attribute \src "/home/runner/workspace/hardware/core.py:567"
   wire width 1 \perm_gt_sig.b_flag
 
   attribute \src "/home/runner/workspace/hardware/registers.py:21"
@@ -20736,22 +20725,22 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/perm_check.py:34"
   wire width 1 \gt_in.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:642"
+  attribute \src "/home/runner/workspace/hardware/core.py:640"
   wire width 16 \cr_rd_data_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:642"
+  attribute \src "/home/runner/workspace/hardware/core.py:640"
   wire width 9 \cr_rd_data_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:642"
+  attribute \src "/home/runner/workspace/hardware/core.py:640"
   wire width 2 \cr_rd_data_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:642"
+  attribute \src "/home/runner/workspace/hardware/core.py:640"
   wire width 1 \cr_rd_data_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:642"
+  attribute \src "/home/runner/workspace/hardware/core.py:640"
   wire width 3 \cr_rd_data_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:642"
+  attribute \src "/home/runner/workspace/hardware/core.py:640"
   wire width 1 \cr_rd_data_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/core.py:73"
@@ -20784,100 +20773,100 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:71"
   wire width 1 \flags_in.V
 
-  attribute \src "/home/runner/workspace/hardware/core.py:679"
+  attribute \src "/home/runner/workspace/hardware/core.py:677"
   wire width 1 \iadd_flags_sig.N
 
-  attribute \src "/home/runner/workspace/hardware/core.py:679"
+  attribute \src "/home/runner/workspace/hardware/core.py:677"
   wire width 1 \iadd_flags_sig.Z
 
-  attribute \src "/home/runner/workspace/hardware/core.py:679"
+  attribute \src "/home/runner/workspace/hardware/core.py:677"
   wire width 1 \iadd_flags_sig.C
 
-  attribute \src "/home/runner/workspace/hardware/core.py:679"
+  attribute \src "/home/runner/workspace/hardware/core.py:677"
   wire width 1 \iadd_flags_sig.V
 
-  attribute \src "/home/runner/workspace/hardware/core.py:680"
+  attribute \src "/home/runner/workspace/hardware/core.py:678"
   wire width 1 \isub_flags_sig.N
 
-  attribute \src "/home/runner/workspace/hardware/core.py:680"
+  attribute \src "/home/runner/workspace/hardware/core.py:678"
   wire width 1 \isub_flags_sig.Z
 
-  attribute \src "/home/runner/workspace/hardware/core.py:680"
+  attribute \src "/home/runner/workspace/hardware/core.py:678"
   wire width 1 \isub_flags_sig.C
 
-  attribute \src "/home/runner/workspace/hardware/core.py:680"
+  attribute \src "/home/runner/workspace/hardware/core.py:678"
   wire width 1 \isub_flags_sig.V
 
-  attribute \src "/home/runner/workspace/hardware/core.py:681"
+  attribute \src "/home/runner/workspace/hardware/core.py:679"
   wire width 1 \shl_flags_sig.N
 
-  attribute \src "/home/runner/workspace/hardware/core.py:681"
+  attribute \src "/home/runner/workspace/hardware/core.py:679"
   wire width 1 \shl_flags_sig.Z
 
-  attribute \src "/home/runner/workspace/hardware/core.py:681"
+  attribute \src "/home/runner/workspace/hardware/core.py:679"
   wire width 1 \shl_flags_sig.C
 
-  attribute \src "/home/runner/workspace/hardware/core.py:681"
+  attribute \src "/home/runner/workspace/hardware/core.py:679"
   wire width 1 \shl_flags_sig.V
 
-  attribute \src "/home/runner/workspace/hardware/core.py:682"
+  attribute \src "/home/runner/workspace/hardware/core.py:680"
   wire width 1 \shr_flags_sig.N
 
-  attribute \src "/home/runner/workspace/hardware/core.py:682"
+  attribute \src "/home/runner/workspace/hardware/core.py:680"
   wire width 1 \shr_flags_sig.Z
 
-  attribute \src "/home/runner/workspace/hardware/core.py:682"
+  attribute \src "/home/runner/workspace/hardware/core.py:680"
   wire width 1 \shr_flags_sig.C
 
-  attribute \src "/home/runner/workspace/hardware/core.py:682"
+  attribute \src "/home/runner/workspace/hardware/core.py:680"
   wire width 1 \shr_flags_sig.V
 
-  attribute \src "/home/runner/workspace/hardware/core.py:683"
+  attribute \src "/home/runner/workspace/hardware/core.py:681"
   wire width 1 \bfext_flags_sig.N
 
-  attribute \src "/home/runner/workspace/hardware/core.py:683"
+  attribute \src "/home/runner/workspace/hardware/core.py:681"
   wire width 1 \bfext_flags_sig.Z
 
-  attribute \src "/home/runner/workspace/hardware/core.py:683"
+  attribute \src "/home/runner/workspace/hardware/core.py:681"
   wire width 1 \bfext_flags_sig.C
 
-  attribute \src "/home/runner/workspace/hardware/core.py:683"
+  attribute \src "/home/runner/workspace/hardware/core.py:681"
   wire width 1 \bfext_flags_sig.V
 
-  attribute \src "/home/runner/workspace/hardware/core.py:684"
+  attribute \src "/home/runner/workspace/hardware/core.py:682"
   wire width 1 \bfins_flags_sig.N
 
-  attribute \src "/home/runner/workspace/hardware/core.py:684"
+  attribute \src "/home/runner/workspace/hardware/core.py:682"
   wire width 1 \bfins_flags_sig.Z
 
-  attribute \src "/home/runner/workspace/hardware/core.py:684"
+  attribute \src "/home/runner/workspace/hardware/core.py:682"
   wire width 1 \bfins_flags_sig.C
 
-  attribute \src "/home/runner/workspace/hardware/core.py:684"
+  attribute \src "/home/runner/workspace/hardware/core.py:682"
   wire width 1 \bfins_flags_sig.V
 
-  attribute \src "/home/runner/workspace/hardware/core.py:685"
+  attribute \src "/home/runner/workspace/hardware/core.py:683"
   wire width 1 \mcmp_flags_sig.N
 
-  attribute \src "/home/runner/workspace/hardware/core.py:685"
+  attribute \src "/home/runner/workspace/hardware/core.py:683"
   wire width 1 \mcmp_flags_sig.Z
 
-  attribute \src "/home/runner/workspace/hardware/core.py:685"
+  attribute \src "/home/runner/workspace/hardware/core.py:683"
   wire width 1 \mcmp_flags_sig.C
 
-  attribute \src "/home/runner/workspace/hardware/core.py:685"
+  attribute \src "/home/runner/workspace/hardware/core.py:683"
   wire width 1 \mcmp_flags_sig.V
 
-  attribute \src "/home/runner/workspace/hardware/core.py:770"
+  attribute \src "/home/runner/workspace/hardware/core.py:768"
   wire width 1 \tperm_flags_sig.N
 
-  attribute \src "/home/runner/workspace/hardware/core.py:770"
+  attribute \src "/home/runner/workspace/hardware/core.py:768"
   wire width 1 \tperm_flags_sig.Z
 
-  attribute \src "/home/runner/workspace/hardware/core.py:770"
+  attribute \src "/home/runner/workspace/hardware/core.py:768"
   wire width 1 \tperm_flags_sig.C
 
-  attribute \src "/home/runner/workspace/hardware/core.py:770"
+  attribute \src "/home/runner/workspace/hardware/core.py:768"
   wire width 1 \tperm_flags_sig.V
 
   attribute \src "/home/runner/workspace/hardware/change.py:85"
@@ -20892,17 +20881,17 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/change.py:85"
   wire width 1 \flags_restore_data.V
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:66"
-  wire width 1 \flags_restore_data$137.N
+  attribute \src "/home/runner/workspace/hardware/ret.py:62"
+  wire width 1 \flags_restore_data$136.N
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:66"
-  wire width 1 \flags_restore_data$137.Z
+  attribute \src "/home/runner/workspace/hardware/ret.py:62"
+  wire width 1 \flags_restore_data$136.Z
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:66"
-  wire width 1 \flags_restore_data$137.C
+  attribute \src "/home/runner/workspace/hardware/ret.py:62"
+  wire width 1 \flags_restore_data$136.C
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:66"
-  wire width 1 \flags_restore_data$137.V
+  attribute \src "/home/runner/workspace/hardware/ret.py:62"
+  wire width 1 \flags_restore_data$136.V
 
   attribute \src "/home/runner/workspace/hardware/registers.py:24"
   wire width 32 \cr_wr_data.word0_gt
@@ -20932,166 +20921,166 @@ module \top.core
   wire width 32 \cr_wr_data.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  wire width 32 \cr_wr_data$165.word0_gt
+
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  wire width 16 \cr_wr_data$165.word0_gt.slot_id
+
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  wire width 9 \cr_wr_data$165.word0_gt.gt_seq
+
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  wire width 2 \cr_wr_data$165.word0_gt.gt_type
+
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  wire width 1 \cr_wr_data$165.word0_gt.dom
+
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  wire width 3 \cr_wr_data$165.word0_gt.perm
+
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  wire width 1 \cr_wr_data$165.word0_gt.b_flag
+
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  wire width 32 \cr_wr_data$165.word1_location
+
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  wire width 32 \cr_wr_data$165.word2_w2
+
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
   wire width 32 \cr_wr_data$166.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
   wire width 16 \cr_wr_data$166.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
   wire width 9 \cr_wr_data$166.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
   wire width 2 \cr_wr_data$166.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
   wire width 1 \cr_wr_data$166.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
   wire width 3 \cr_wr_data$166.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
   wire width 1 \cr_wr_data$166.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
   wire width 32 \cr_wr_data$166.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:570"
+  attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
   wire width 32 \cr_wr_data$166.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
+  attribute \src "/home/runner/workspace/hardware/switch.py:31"
   wire width 32 \cr_wr_data$167.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
+  attribute \src "/home/runner/workspace/hardware/switch.py:31"
   wire width 16 \cr_wr_data$167.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
+  attribute \src "/home/runner/workspace/hardware/switch.py:31"
   wire width 9 \cr_wr_data$167.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
+  attribute \src "/home/runner/workspace/hardware/switch.py:31"
   wire width 2 \cr_wr_data$167.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
+  attribute \src "/home/runner/workspace/hardware/switch.py:31"
   wire width 1 \cr_wr_data$167.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
+  attribute \src "/home/runner/workspace/hardware/switch.py:31"
   wire width 3 \cr_wr_data$167.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
+  attribute \src "/home/runner/workspace/hardware/switch.py:31"
   wire width 1 \cr_wr_data$167.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
+  attribute \src "/home/runner/workspace/hardware/switch.py:31"
   wire width 32 \cr_wr_data$167.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/fused_unit.py:30"
+  attribute \src "/home/runner/workspace/hardware/switch.py:31"
   wire width 32 \cr_wr_data$167.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/switch.py:31"
+  attribute \src "/home/runner/workspace/hardware/change.py:33"
   wire width 32 \cr_wr_data$168.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/switch.py:31"
+  attribute \src "/home/runner/workspace/hardware/change.py:33"
   wire width 16 \cr_wr_data$168.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/switch.py:31"
+  attribute \src "/home/runner/workspace/hardware/change.py:33"
   wire width 9 \cr_wr_data$168.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/switch.py:31"
+  attribute \src "/home/runner/workspace/hardware/change.py:33"
   wire width 2 \cr_wr_data$168.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/switch.py:31"
+  attribute \src "/home/runner/workspace/hardware/change.py:33"
   wire width 1 \cr_wr_data$168.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/switch.py:31"
+  attribute \src "/home/runner/workspace/hardware/change.py:33"
   wire width 3 \cr_wr_data$168.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/switch.py:31"
+  attribute \src "/home/runner/workspace/hardware/change.py:33"
   wire width 1 \cr_wr_data$168.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/switch.py:31"
+  attribute \src "/home/runner/workspace/hardware/change.py:33"
   wire width 32 \cr_wr_data$168.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/switch.py:31"
+  attribute \src "/home/runner/workspace/hardware/change.py:33"
   wire width 32 \cr_wr_data$168.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/change.py:33"
+  attribute \src "/home/runner/workspace/hardware/cload.py:66"
   wire width 32 \cr_wr_data$169.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/change.py:33"
+  attribute \src "/home/runner/workspace/hardware/cload.py:66"
   wire width 16 \cr_wr_data$169.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/change.py:33"
+  attribute \src "/home/runner/workspace/hardware/cload.py:66"
   wire width 9 \cr_wr_data$169.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/change.py:33"
+  attribute \src "/home/runner/workspace/hardware/cload.py:66"
   wire width 2 \cr_wr_data$169.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/change.py:33"
+  attribute \src "/home/runner/workspace/hardware/cload.py:66"
   wire width 1 \cr_wr_data$169.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/change.py:33"
+  attribute \src "/home/runner/workspace/hardware/cload.py:66"
   wire width 3 \cr_wr_data$169.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/change.py:33"
+  attribute \src "/home/runner/workspace/hardware/cload.py:66"
   wire width 1 \cr_wr_data$169.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/change.py:33"
+  attribute \src "/home/runner/workspace/hardware/cload.py:66"
   wire width 32 \cr_wr_data$169.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/change.py:33"
+  attribute \src "/home/runner/workspace/hardware/cload.py:66"
   wire width 32 \cr_wr_data$169.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/cload.py:66"
+  attribute \src "/home/runner/workspace/hardware/church_outform.py:50"
   wire width 32 \cr_wr_data$170.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/cload.py:66"
+  attribute \src "/home/runner/workspace/hardware/church_outform.py:50"
   wire width 16 \cr_wr_data$170.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/cload.py:66"
+  attribute \src "/home/runner/workspace/hardware/church_outform.py:50"
   wire width 9 \cr_wr_data$170.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/cload.py:66"
+  attribute \src "/home/runner/workspace/hardware/church_outform.py:50"
   wire width 2 \cr_wr_data$170.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/cload.py:66"
+  attribute \src "/home/runner/workspace/hardware/church_outform.py:50"
   wire width 1 \cr_wr_data$170.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/cload.py:66"
+  attribute \src "/home/runner/workspace/hardware/church_outform.py:50"
   wire width 3 \cr_wr_data$170.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/cload.py:66"
+  attribute \src "/home/runner/workspace/hardware/church_outform.py:50"
   wire width 1 \cr_wr_data$170.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/cload.py:66"
+  attribute \src "/home/runner/workspace/hardware/church_outform.py:50"
   wire width 32 \cr_wr_data$170.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/cload.py:66"
+  attribute \src "/home/runner/workspace/hardware/church_outform.py:50"
   wire width 32 \cr_wr_data$170.word2_w2
-
-  attribute \src "/home/runner/workspace/hardware/church_outform.py:50"
-  wire width 32 \cr_wr_data$171.word0_gt
-
-  attribute \src "/home/runner/workspace/hardware/church_outform.py:50"
-  wire width 16 \cr_wr_data$171.word0_gt.slot_id
-
-  attribute \src "/home/runner/workspace/hardware/church_outform.py:50"
-  wire width 9 \cr_wr_data$171.word0_gt.gt_seq
-
-  attribute \src "/home/runner/workspace/hardware/church_outform.py:50"
-  wire width 2 \cr_wr_data$171.word0_gt.gt_type
-
-  attribute \src "/home/runner/workspace/hardware/church_outform.py:50"
-  wire width 1 \cr_wr_data$171.word0_gt.dom
-
-  attribute \src "/home/runner/workspace/hardware/church_outform.py:50"
-  wire width 3 \cr_wr_data$171.word0_gt.perm
-
-  attribute \src "/home/runner/workspace/hardware/church_outform.py:50"
-  wire width 1 \cr_wr_data$171.word0_gt.b_flag
-
-  attribute \src "/home/runner/workspace/hardware/church_outform.py:50"
-  wire width 32 \cr_wr_data$171.word1_location
-
-  attribute \src "/home/runner/workspace/hardware/church_outform.py:50"
-  wire width 32 \cr_wr_data$171.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/core.py:220"
   wire width 32 \dbg_cr_wr_data.word0_gt
@@ -21120,139 +21109,139 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/core.py:220"
   wire width 32 \dbg_cr_wr_data.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
+  wire width 32 \cr_wr_data$172.word0_gt
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
+  wire width 16 \cr_wr_data$172.word0_gt.slot_id
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
+  wire width 9 \cr_wr_data$172.word0_gt.gt_seq
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
+  wire width 2 \cr_wr_data$172.word0_gt.gt_type
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
+  wire width 1 \cr_wr_data$172.word0_gt.dom
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
+  wire width 3 \cr_wr_data$172.word0_gt.perm
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
+  wire width 1 \cr_wr_data$172.word0_gt.b_flag
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
+  wire width 32 \cr_wr_data$172.word1_location
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
+  wire width 32 \cr_wr_data$172.word2_w2
+
+  attribute \src "/home/runner/workspace/hardware/call.py:32"
   wire width 32 \cr_wr_data$173.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  attribute \src "/home/runner/workspace/hardware/call.py:32"
   wire width 16 \cr_wr_data$173.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  attribute \src "/home/runner/workspace/hardware/call.py:32"
   wire width 9 \cr_wr_data$173.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  attribute \src "/home/runner/workspace/hardware/call.py:32"
   wire width 2 \cr_wr_data$173.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  attribute \src "/home/runner/workspace/hardware/call.py:32"
   wire width 1 \cr_wr_data$173.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  attribute \src "/home/runner/workspace/hardware/call.py:32"
   wire width 3 \cr_wr_data$173.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  attribute \src "/home/runner/workspace/hardware/call.py:32"
   wire width 1 \cr_wr_data$173.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  attribute \src "/home/runner/workspace/hardware/call.py:32"
   wire width 32 \cr_wr_data$173.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  attribute \src "/home/runner/workspace/hardware/call.py:32"
   wire width 32 \cr_wr_data$173.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/call.py:32"
+  attribute \src "/home/runner/workspace/hardware/tperm.py:38"
   wire width 32 \cr_wr_data$174.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/call.py:32"
+  attribute \src "/home/runner/workspace/hardware/tperm.py:38"
   wire width 16 \cr_wr_data$174.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/call.py:32"
+  attribute \src "/home/runner/workspace/hardware/tperm.py:38"
   wire width 9 \cr_wr_data$174.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/call.py:32"
+  attribute \src "/home/runner/workspace/hardware/tperm.py:38"
   wire width 2 \cr_wr_data$174.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/call.py:32"
+  attribute \src "/home/runner/workspace/hardware/tperm.py:38"
   wire width 1 \cr_wr_data$174.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/call.py:32"
+  attribute \src "/home/runner/workspace/hardware/tperm.py:38"
   wire width 3 \cr_wr_data$174.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/call.py:32"
+  attribute \src "/home/runner/workspace/hardware/tperm.py:38"
   wire width 1 \cr_wr_data$174.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/call.py:32"
+  attribute \src "/home/runner/workspace/hardware/tperm.py:38"
   wire width 32 \cr_wr_data$174.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/call.py:32"
+  attribute \src "/home/runner/workspace/hardware/tperm.py:38"
   wire width 32 \cr_wr_data$174.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/tperm.py:38"
+  attribute \src "/home/runner/workspace/hardware/mload.py:58"
   wire width 32 \cr_wr_data$175.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/tperm.py:38"
+  attribute \src "/home/runner/workspace/hardware/mload.py:58"
   wire width 16 \cr_wr_data$175.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/tperm.py:38"
+  attribute \src "/home/runner/workspace/hardware/mload.py:58"
   wire width 9 \cr_wr_data$175.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/tperm.py:38"
+  attribute \src "/home/runner/workspace/hardware/mload.py:58"
   wire width 2 \cr_wr_data$175.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/tperm.py:38"
+  attribute \src "/home/runner/workspace/hardware/mload.py:58"
   wire width 1 \cr_wr_data$175.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/tperm.py:38"
+  attribute \src "/home/runner/workspace/hardware/mload.py:58"
   wire width 3 \cr_wr_data$175.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/tperm.py:38"
+  attribute \src "/home/runner/workspace/hardware/mload.py:58"
   wire width 1 \cr_wr_data$175.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/tperm.py:38"
+  attribute \src "/home/runner/workspace/hardware/mload.py:58"
   wire width 32 \cr_wr_data$175.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/tperm.py:38"
+  attribute \src "/home/runner/workspace/hardware/mload.py:58"
   wire width 32 \cr_wr_data$175.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/mload.py:58"
-  wire width 32 \cr_wr_data$176.word0_gt
-
-  attribute \src "/home/runner/workspace/hardware/mload.py:58"
-  wire width 16 \cr_wr_data$176.word0_gt.slot_id
-
-  attribute \src "/home/runner/workspace/hardware/mload.py:58"
-  wire width 9 \cr_wr_data$176.word0_gt.gt_seq
-
-  attribute \src "/home/runner/workspace/hardware/mload.py:58"
-  wire width 2 \cr_wr_data$176.word0_gt.gt_type
-
-  attribute \src "/home/runner/workspace/hardware/mload.py:58"
-  wire width 1 \cr_wr_data$176.word0_gt.dom
-
-  attribute \src "/home/runner/workspace/hardware/mload.py:58"
-  wire width 3 \cr_wr_data$176.word0_gt.perm
-
-  attribute \src "/home/runner/workspace/hardware/mload.py:58"
-  wire width 1 \cr_wr_data$176.word0_gt.b_flag
-
-  attribute \src "/home/runner/workspace/hardware/mload.py:58"
-  wire width 32 \cr_wr_data$176.word1_location
-
-  attribute \src "/home/runner/workspace/hardware/mload.py:58"
-  wire width 32 \cr_wr_data$176.word2_w2
-
-  attribute \src "/home/runner/workspace/hardware/core.py:821"
+  attribute \src "/home/runner/workspace/hardware/core.py:819"
   wire width 32 \boot_cap_wr_data.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/core.py:821"
+  attribute \src "/home/runner/workspace/hardware/core.py:819"
   wire width 16 \boot_cap_wr_data.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:821"
+  attribute \src "/home/runner/workspace/hardware/core.py:819"
   wire width 9 \boot_cap_wr_data.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:821"
+  attribute \src "/home/runner/workspace/hardware/core.py:819"
   wire width 2 \boot_cap_wr_data.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:821"
+  attribute \src "/home/runner/workspace/hardware/core.py:819"
   wire width 1 \boot_cap_wr_data.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:821"
+  attribute \src "/home/runner/workspace/hardware/core.py:819"
   wire width 3 \boot_cap_wr_data.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:821"
+  attribute \src "/home/runner/workspace/hardware/core.py:819"
   wire width 1 \boot_cap_wr_data.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:821"
+  attribute \src "/home/runner/workspace/hardware/core.py:819"
   wire width 32 \boot_cap_wr_data.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/core.py:821"
+  attribute \src "/home/runner/workspace/hardware/core.py:819"
   wire width 32 \boot_cap_wr_data.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/core.py:454"
@@ -21337,249 +21326,249 @@ module \top.core
   wire width 32 \cr15_namespace.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/core.py:179"
-  wire width 1 \flags$245.N
+  wire width 1 \flags$244.N
 
   attribute \src "/home/runner/workspace/hardware/core.py:179"
-  wire width 1 \flags$245.Z
+  wire width 1 \flags$244.Z
 
   attribute \src "/home/runner/workspace/hardware/core.py:179"
-  wire width 1 \flags$245.C
+  wire width 1 \flags$244.C
 
   attribute \src "/home/runner/workspace/hardware/core.py:179"
-  wire width 1 \flags$245.V
+  wire width 1 \flags$244.V
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1183"
+  attribute \src "/home/runner/workspace/hardware/core.py:1181"
   wire width 16 \thrd_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1183"
+  attribute \src "/home/runner/workspace/hardware/core.py:1181"
   wire width 9 \thrd_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1183"
+  attribute \src "/home/runner/workspace/hardware/core.py:1181"
   wire width 2 \thrd_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1183"
+  attribute \src "/home/runner/workspace/hardware/core.py:1181"
   wire width 1 \thrd_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1183"
+  attribute \src "/home/runner/workspace/hardware/core.py:1181"
   wire width 3 \thrd_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1183"
+  attribute \src "/home/runner/workspace/hardware/core.py:1181"
   wire width 1 \thrd_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 16 \boot_cap12_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 9 \boot_cap12_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 2 \boot_cap12_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap12_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 3 \boot_cap12_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap12_wr_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 16 \boot_cap14_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 9 \boot_cap14_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 2 \boot_cap14_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap14_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 3 \boot_cap14_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap14_wr_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1236"
+  attribute \src "/home/runner/workspace/hardware/core.py:1234"
   wire width 16 \cr14_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1236"
+  attribute \src "/home/runner/workspace/hardware/core.py:1234"
   wire width 9 \cr14_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1236"
+  attribute \src "/home/runner/workspace/hardware/core.py:1234"
   wire width 2 \cr14_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1236"
+  attribute \src "/home/runner/workspace/hardware/core.py:1234"
   wire width 1 \cr14_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1236"
+  attribute \src "/home/runner/workspace/hardware/core.py:1234"
   wire width 3 \cr14_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1236"
+  attribute \src "/home/runner/workspace/hardware/core.py:1234"
   wire width 1 \cr14_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1291"
+  attribute \src "/home/runner/workspace/hardware/core.py:1289"
   wire width 16 \switch_src_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1291"
+  attribute \src "/home/runner/workspace/hardware/core.py:1289"
   wire width 9 \switch_src_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1291"
+  attribute \src "/home/runner/workspace/hardware/core.py:1289"
   wire width 2 \switch_src_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1291"
+  attribute \src "/home/runner/workspace/hardware/core.py:1289"
   wire width 1 \switch_src_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1291"
+  attribute \src "/home/runner/workspace/hardware/core.py:1289"
   wire width 3 \switch_src_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1291"
+  attribute \src "/home/runner/workspace/hardware/core.py:1289"
   wire width 1 \switch_src_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 16 \rt_cap8_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 9 \rt_cap8_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 2 \rt_cap8_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap8_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 3 \rt_cap8_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap8_wr_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 16 \rt_cap9_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 9 \rt_cap9_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 2 \rt_cap9_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap9_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 3 \rt_cap9_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap9_wr_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 16 \rt_cap10_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 9 \rt_cap10_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 2 \rt_cap10_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap10_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 3 \rt_cap10_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap10_wr_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 16 \rt_cap11_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 9 \rt_cap11_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 2 \rt_cap11_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap11_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 3 \rt_cap11_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap11_wr_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 16 \rt_cap12_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 9 \rt_cap12_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 2 \rt_cap12_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap12_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 3 \rt_cap12_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap12_wr_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 16 \rt_cap13_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 9 \rt_cap13_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 2 \rt_cap13_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap13_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 3 \rt_cap13_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap13_wr_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 16 \rt_cap14_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 9 \rt_cap14_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 2 \rt_cap14_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap14_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 3 \rt_cap14_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap14_wr_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 16 \rt_cap15_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 9 \rt_cap15_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 2 \rt_cap15_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap15_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 3 \rt_cap15_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap15_wr_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
@@ -21600,40 +21589,40 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 1 \cr0_gt_wr_data.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 16 \rt_cap0_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 9 \rt_cap0_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 2 \rt_cap0_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap0_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 3 \rt_cap0_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap0_wr_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 16 \boot_cap0_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 9 \boot_cap0_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 2 \boot_cap0_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap0_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 3 \boot_cap0_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap0_wr_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
@@ -21654,40 +21643,40 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 1 \cr1_gt_wr_data.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 16 \rt_cap1_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 9 \rt_cap1_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 2 \rt_cap1_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap1_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 3 \rt_cap1_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap1_wr_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 16 \boot_cap1_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 9 \boot_cap1_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 2 \boot_cap1_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap1_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 3 \boot_cap1_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap1_wr_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
@@ -21708,40 +21697,40 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 1 \cr2_gt_wr_data.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 16 \rt_cap2_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 9 \rt_cap2_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 2 \rt_cap2_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap2_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 3 \rt_cap2_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap2_wr_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 16 \boot_cap2_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 9 \boot_cap2_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 2 \boot_cap2_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap2_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 3 \boot_cap2_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap2_wr_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
@@ -21762,40 +21751,40 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 1 \cr3_gt_wr_data.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 16 \rt_cap3_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 9 \rt_cap3_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 2 \rt_cap3_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap3_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 3 \rt_cap3_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap3_wr_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 16 \boot_cap3_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 9 \boot_cap3_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 2 \boot_cap3_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap3_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 3 \boot_cap3_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap3_wr_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
@@ -21816,40 +21805,40 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 1 \cr4_gt_wr_data.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 16 \rt_cap4_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 9 \rt_cap4_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 2 \rt_cap4_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap4_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 3 \rt_cap4_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap4_wr_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 16 \boot_cap4_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 9 \boot_cap4_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 2 \boot_cap4_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap4_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 3 \boot_cap4_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap4_wr_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
@@ -21870,40 +21859,40 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 1 \cr5_gt_wr_data.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 16 \rt_cap5_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 9 \rt_cap5_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 2 \rt_cap5_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap5_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 3 \rt_cap5_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap5_wr_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 16 \boot_cap5_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 9 \boot_cap5_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 2 \boot_cap5_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap5_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 3 \boot_cap5_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap5_wr_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
@@ -21924,40 +21913,40 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 1 \cr6_gt_wr_data.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 16 \rt_cap6_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 9 \rt_cap6_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 2 \rt_cap6_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap6_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 3 \rt_cap6_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap6_wr_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 16 \boot_cap6_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 9 \boot_cap6_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 2 \boot_cap6_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap6_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 3 \boot_cap6_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap6_wr_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
@@ -21978,40 +21967,40 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 1 \cr7_gt_wr_data.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 16 \rt_cap7_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 9 \rt_cap7_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 2 \rt_cap7_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap7_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 3 \rt_cap7_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
   wire width 1 \rt_cap7_wr_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 16 \boot_cap7_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 9 \boot_cap7_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 2 \boot_cap7_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap7_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 3 \boot_cap7_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap7_wr_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
@@ -22032,22 +22021,22 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 1 \cr8_gt_wr_data.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 16 \boot_cap8_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 9 \boot_cap8_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 2 \boot_cap8_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap8_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 3 \boot_cap8_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap8_wr_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
@@ -22068,22 +22057,22 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 1 \cr9_gt_wr_data.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 16 \boot_cap9_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 9 \boot_cap9_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 2 \boot_cap9_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap9_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 3 \boot_cap9_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap9_wr_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
@@ -22104,22 +22093,22 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 1 \cr10_gt_wr_data.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 16 \boot_cap10_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 9 \boot_cap10_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 2 \boot_cap10_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap10_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 3 \boot_cap10_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap10_wr_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
@@ -22140,22 +22129,22 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 1 \cr11_gt_wr_data.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 16 \boot_cap11_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 9 \boot_cap11_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 2 \boot_cap11_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap11_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 3 \boot_cap11_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap11_wr_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
@@ -22194,22 +22183,22 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 1 \cr13_gt_wr_data.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 16 \boot_cap13_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 9 \boot_cap13_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 2 \boot_cap13_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap13_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 3 \boot_cap13_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap13_wr_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
@@ -22248,22 +22237,22 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:59"
   wire width 1 \cr15_gt_wr_data.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 16 \boot_cap15_wr_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 9 \boot_cap15_wr_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 2 \boot_cap15_wr_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap15_wr_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 3 \boot_cap15_wr_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
   wire width 1 \boot_cap15_wr_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/church_outform.py:45"
@@ -22294,58 +22283,58 @@ module \top.core
   wire width 32 \src_cr_data.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/call.py:30"
-  wire width 32 \cr_rd_data$490.word0_gt
+  wire width 32 \cr_rd_data$489.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/call.py:30"
-  wire width 16 \cr_rd_data$490.word0_gt.slot_id
+  wire width 16 \cr_rd_data$489.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/call.py:30"
-  wire width 9 \cr_rd_data$490.word0_gt.gt_seq
+  wire width 9 \cr_rd_data$489.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/call.py:30"
-  wire width 2 \cr_rd_data$490.word0_gt.gt_type
+  wire width 2 \cr_rd_data$489.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/call.py:30"
-  wire width 1 \cr_rd_data$490.word0_gt.dom
+  wire width 1 \cr_rd_data$489.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/call.py:30"
-  wire width 3 \cr_rd_data$490.word0_gt.perm
+  wire width 3 \cr_rd_data$489.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/call.py:30"
-  wire width 1 \cr_rd_data$490.word0_gt.b_flag
+  wire width 1 \cr_rd_data$489.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/call.py:30"
-  wire width 32 \cr_rd_data$490.word1_location
+  wire width 32 \cr_rd_data$489.word1_location
 
   attribute \src "/home/runner/workspace/hardware/call.py:30"
-  wire width 32 \cr_rd_data$490.word2_w2
+  wire width 32 \cr_rd_data$489.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/call.py:62"
-  wire width 32 \cr15_namespace$491.word0_gt
+  wire width 32 \cr15_namespace$490.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/call.py:62"
-  wire width 16 \cr15_namespace$491.word0_gt.slot_id
+  wire width 16 \cr15_namespace$490.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/call.py:62"
-  wire width 9 \cr15_namespace$491.word0_gt.gt_seq
+  wire width 9 \cr15_namespace$490.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/call.py:62"
-  wire width 2 \cr15_namespace$491.word0_gt.gt_type
+  wire width 2 \cr15_namespace$490.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/call.py:62"
-  wire width 1 \cr15_namespace$491.word0_gt.dom
+  wire width 1 \cr15_namespace$490.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/call.py:62"
-  wire width 3 \cr15_namespace$491.word0_gt.perm
+  wire width 3 \cr15_namespace$490.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/call.py:62"
-  wire width 1 \cr15_namespace$491.word0_gt.b_flag
+  wire width 1 \cr15_namespace$490.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/call.py:62"
-  wire width 32 \cr15_namespace$491.word1_location
+  wire width 32 \cr15_namespace$490.word1_location
 
   attribute \src "/home/runner/workspace/hardware/call.py:62"
-  wire width 32 \cr15_namespace$491.word2_w2
+  wire width 32 \cr15_namespace$490.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/call.py:65"
   wire width 32 \cr14_code.word0_gt
@@ -22375,31 +22364,31 @@ module \top.core
   wire width 32 \cr14_code.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/registers.py:40"
-  wire width 32 \cr14_code$493.word0_gt
+  wire width 32 \cr14_code$492.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/registers.py:40"
-  wire width 16 \cr14_code$493.word0_gt.slot_id
+  wire width 16 \cr14_code$492.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/registers.py:40"
-  wire width 9 \cr14_code$493.word0_gt.gt_seq
+  wire width 9 \cr14_code$492.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/registers.py:40"
-  wire width 2 \cr14_code$493.word0_gt.gt_type
+  wire width 2 \cr14_code$492.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/registers.py:40"
-  wire width 1 \cr14_code$493.word0_gt.dom
+  wire width 1 \cr14_code$492.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/registers.py:40"
-  wire width 3 \cr14_code$493.word0_gt.perm
+  wire width 3 \cr14_code$492.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/registers.py:40"
-  wire width 1 \cr14_code$493.word0_gt.b_flag
+  wire width 1 \cr14_code$492.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/registers.py:40"
-  wire width 32 \cr14_code$493.word1_location
+  wire width 32 \cr14_code$492.word1_location
 
   attribute \src "/home/runner/workspace/hardware/registers.py:40"
-  wire width 32 \cr14_code$493.word2_w2
+  wire width 32 \cr14_code$492.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/call.py:69"
   wire width 32 \cr5_heap.word0_gt
@@ -22429,688 +22418,661 @@ module \top.core
   wire width 32 \cr5_heap.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/registers.py:36"
-  wire width 32 \cr5_heap$499.word0_gt
+  wire width 32 \cr5_heap$498.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/registers.py:36"
-  wire width 16 \cr5_heap$499.word0_gt.slot_id
+  wire width 16 \cr5_heap$498.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/registers.py:36"
-  wire width 9 \cr5_heap$499.word0_gt.gt_seq
+  wire width 9 \cr5_heap$498.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/registers.py:36"
-  wire width 2 \cr5_heap$499.word0_gt.gt_type
+  wire width 2 \cr5_heap$498.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/registers.py:36"
-  wire width 1 \cr5_heap$499.word0_gt.dom
+  wire width 1 \cr5_heap$498.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/registers.py:36"
-  wire width 3 \cr5_heap$499.word0_gt.perm
+  wire width 3 \cr5_heap$498.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/registers.py:36"
-  wire width 1 \cr5_heap$499.word0_gt.b_flag
+  wire width 1 \cr5_heap$498.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/registers.py:36"
-  wire width 32 \cr5_heap$499.word1_location
+  wire width 32 \cr5_heap$498.word1_location
 
   attribute \src "/home/runner/workspace/hardware/registers.py:36"
-  wire width 32 \cr5_heap$499.word2_w2
+  wire width 32 \cr5_heap$498.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/call.py:81"
-  wire width 32 \cr12_thread$501.word0_gt
+  wire width 32 \cr12_thread$500.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/call.py:81"
-  wire width 16 \cr12_thread$501.word0_gt.slot_id
+  wire width 16 \cr12_thread$500.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/call.py:81"
-  wire width 9 \cr12_thread$501.word0_gt.gt_seq
+  wire width 9 \cr12_thread$500.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/call.py:81"
-  wire width 2 \cr12_thread$501.word0_gt.gt_type
+  wire width 2 \cr12_thread$500.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/call.py:81"
-  wire width 1 \cr12_thread$501.word0_gt.dom
+  wire width 1 \cr12_thread$500.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/call.py:81"
-  wire width 3 \cr12_thread$501.word0_gt.perm
+  wire width 3 \cr12_thread$500.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/call.py:81"
-  wire width 1 \cr12_thread$501.word0_gt.b_flag
+  wire width 1 \cr12_thread$500.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/call.py:81"
-  wire width 32 \cr12_thread$501.word1_location
+  wire width 32 \cr12_thread$500.word1_location
 
   attribute \src "/home/runner/workspace/hardware/call.py:81"
-  wire width 32 \cr12_thread$501.word2_w2
+  wire width 32 \cr12_thread$500.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/call.py:88"
-  wire width 1 \flags$506.N
+  wire width 1 \flags$505.N
 
   attribute \src "/home/runner/workspace/hardware/call.py:88"
-  wire width 1 \flags$506.Z
+  wire width 1 \flags$505.Z
 
   attribute \src "/home/runner/workspace/hardware/call.py:88"
-  wire width 1 \flags$506.C
+  wire width 1 \flags$505.C
 
   attribute \src "/home/runner/workspace/hardware/call.py:88"
-  wire width 1 \flags$506.V
+  wire width 1 \flags$505.V
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 32 \cr_rd_data$514.word0_gt
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
+  wire width 32 \cr5_heap$515.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 16 \cr_rd_data$514.word0_gt.slot_id
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
+  wire width 16 \cr5_heap$515.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 9 \cr_rd_data$514.word0_gt.gt_seq
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
+  wire width 9 \cr5_heap$515.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 2 \cr_rd_data$514.word0_gt.gt_type
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
+  wire width 2 \cr5_heap$515.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 1 \cr_rd_data$514.word0_gt.dom
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
+  wire width 1 \cr5_heap$515.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 3 \cr_rd_data$514.word0_gt.perm
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
+  wire width 3 \cr5_heap$515.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 1 \cr_rd_data$514.word0_gt.b_flag
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
+  wire width 1 \cr5_heap$515.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 32 \cr_rd_data$514.word1_location
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
+  wire width 32 \cr5_heap$515.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 32 \cr_rd_data$514.word2_w2
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
+  wire width 32 \cr5_heap$515.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
-  wire width 32 \cr5_heap$518.word0_gt
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
+  wire width 32 \cr12_thread$516.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
-  wire width 16 \cr5_heap$518.word0_gt.slot_id
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
+  wire width 16 \cr12_thread$516.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
-  wire width 9 \cr5_heap$518.word0_gt.gt_seq
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
+  wire width 9 \cr12_thread$516.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
-  wire width 2 \cr5_heap$518.word0_gt.gt_type
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
+  wire width 2 \cr12_thread$516.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
-  wire width 1 \cr5_heap$518.word0_gt.dom
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
+  wire width 1 \cr12_thread$516.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
-  wire width 3 \cr5_heap$518.word0_gt.perm
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
+  wire width 3 \cr12_thread$516.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
-  wire width 1 \cr5_heap$518.word0_gt.b_flag
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
+  wire width 1 \cr12_thread$516.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
-  wire width 32 \cr5_heap$518.word1_location
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
+  wire width 32 \cr12_thread$516.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
-  wire width 32 \cr5_heap$518.word2_w2
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
-  wire width 32 \cr12_thread$519.word0_gt
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
-  wire width 16 \cr12_thread$519.word0_gt.slot_id
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
-  wire width 9 \cr12_thread$519.word0_gt.gt_seq
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
-  wire width 2 \cr12_thread$519.word0_gt.gt_type
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
-  wire width 1 \cr12_thread$519.word0_gt.dom
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
-  wire width 3 \cr12_thread$519.word0_gt.perm
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
-  wire width 1 \cr12_thread$519.word0_gt.b_flag
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
-  wire width 32 \cr12_thread$519.word1_location
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
-  wire width 32 \cr12_thread$519.word2_w2
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
+  wire width 32 \cr12_thread$516.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/cload.py:63"
-  wire width 32 \cr15_namespace$526.word0_gt
+  wire width 32 \cr15_namespace$523.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/cload.py:63"
-  wire width 16 \cr15_namespace$526.word0_gt.slot_id
+  wire width 16 \cr15_namespace$523.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/cload.py:63"
-  wire width 9 \cr15_namespace$526.word0_gt.gt_seq
+  wire width 9 \cr15_namespace$523.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/cload.py:63"
-  wire width 2 \cr15_namespace$526.word0_gt.gt_type
+  wire width 2 \cr15_namespace$523.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/cload.py:63"
-  wire width 1 \cr15_namespace$526.word0_gt.dom
+  wire width 1 \cr15_namespace$523.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/cload.py:63"
-  wire width 3 \cr15_namespace$526.word0_gt.perm
+  wire width 3 \cr15_namespace$523.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/cload.py:63"
-  wire width 1 \cr15_namespace$526.word0_gt.b_flag
+  wire width 1 \cr15_namespace$523.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/cload.py:63"
-  wire width 32 \cr15_namespace$526.word1_location
+  wire width 32 \cr15_namespace$523.word1_location
 
   attribute \src "/home/runner/workspace/hardware/cload.py:63"
-  wire width 32 \cr15_namespace$526.word2_w2
+  wire width 32 \cr15_namespace$523.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/lambda_unit.py:18"
-  wire width 32 \cr_rd_data$531.word0_gt
+  wire width 32 \cr_rd_data$528.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/lambda_unit.py:18"
-  wire width 16 \cr_rd_data$531.word0_gt.slot_id
+  wire width 16 \cr_rd_data$528.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/lambda_unit.py:18"
-  wire width 9 \cr_rd_data$531.word0_gt.gt_seq
+  wire width 9 \cr_rd_data$528.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/lambda_unit.py:18"
-  wire width 2 \cr_rd_data$531.word0_gt.gt_type
+  wire width 2 \cr_rd_data$528.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/lambda_unit.py:18"
-  wire width 1 \cr_rd_data$531.word0_gt.dom
+  wire width 1 \cr_rd_data$528.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/lambda_unit.py:18"
-  wire width 3 \cr_rd_data$531.word0_gt.perm
+  wire width 3 \cr_rd_data$528.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/lambda_unit.py:18"
-  wire width 1 \cr_rd_data$531.word0_gt.b_flag
+  wire width 1 \cr_rd_data$528.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/lambda_unit.py:18"
-  wire width 32 \cr_rd_data$531.word1_location
+  wire width 32 \cr_rd_data$528.word1_location
 
   attribute \src "/home/runner/workspace/hardware/lambda_unit.py:18"
-  wire width 32 \cr_rd_data$531.word2_w2
+  wire width 32 \cr_rd_data$528.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:35"
-  wire width 32 \cr_rd_data$539.word0_gt
+  wire width 32 \cr_rd_data$536.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:35"
-  wire width 16 \cr_rd_data$539.word0_gt.slot_id
+  wire width 16 \cr_rd_data$536.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:35"
-  wire width 9 \cr_rd_data$539.word0_gt.gt_seq
+  wire width 9 \cr_rd_data$536.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:35"
-  wire width 2 \cr_rd_data$539.word0_gt.gt_type
+  wire width 2 \cr_rd_data$536.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:35"
-  wire width 1 \cr_rd_data$539.word0_gt.dom
+  wire width 1 \cr_rd_data$536.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:35"
-  wire width 3 \cr_rd_data$539.word0_gt.perm
+  wire width 3 \cr_rd_data$536.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:35"
-  wire width 1 \cr_rd_data$539.word0_gt.b_flag
+  wire width 1 \cr_rd_data$536.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:35"
-  wire width 32 \cr_rd_data$539.word1_location
+  wire width 32 \cr_rd_data$536.word1_location
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:35"
-  wire width 32 \cr_rd_data$539.word2_w2
+  wire width 32 \cr_rd_data$536.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/save.py:27"
-  wire width 32 \cr_rd_data$548.word0_gt
+  wire width 32 \cr_rd_data$545.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/save.py:27"
-  wire width 16 \cr_rd_data$548.word0_gt.slot_id
+  wire width 16 \cr_rd_data$545.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/save.py:27"
-  wire width 9 \cr_rd_data$548.word0_gt.gt_seq
+  wire width 9 \cr_rd_data$545.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/save.py:27"
-  wire width 2 \cr_rd_data$548.word0_gt.gt_type
+  wire width 2 \cr_rd_data$545.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/save.py:27"
-  wire width 1 \cr_rd_data$548.word0_gt.dom
+  wire width 1 \cr_rd_data$545.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/save.py:27"
-  wire width 3 \cr_rd_data$548.word0_gt.perm
+  wire width 3 \cr_rd_data$545.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/save.py:27"
-  wire width 1 \cr_rd_data$548.word0_gt.b_flag
+  wire width 1 \cr_rd_data$545.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/save.py:27"
-  wire width 32 \cr_rd_data$548.word1_location
+  wire width 32 \cr_rd_data$545.word1_location
 
   attribute \src "/home/runner/workspace/hardware/save.py:27"
-  wire width 32 \cr_rd_data$548.word2_w2
+  wire width 32 \cr_rd_data$545.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/save.py:39"
-  wire width 32 \cr15_namespace$549.word0_gt
+  wire width 32 \cr15_namespace$546.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/save.py:39"
-  wire width 16 \cr15_namespace$549.word0_gt.slot_id
+  wire width 16 \cr15_namespace$546.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/save.py:39"
-  wire width 9 \cr15_namespace$549.word0_gt.gt_seq
+  wire width 9 \cr15_namespace$546.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/save.py:39"
-  wire width 2 \cr15_namespace$549.word0_gt.gt_type
+  wire width 2 \cr15_namespace$546.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/save.py:39"
-  wire width 1 \cr15_namespace$549.word0_gt.dom
+  wire width 1 \cr15_namespace$546.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/save.py:39"
-  wire width 3 \cr15_namespace$549.word0_gt.perm
+  wire width 3 \cr15_namespace$546.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/save.py:39"
-  wire width 1 \cr15_namespace$549.word0_gt.b_flag
+  wire width 1 \cr15_namespace$546.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/save.py:39"
-  wire width 32 \cr15_namespace$549.word1_location
+  wire width 32 \cr15_namespace$546.word1_location
 
   attribute \src "/home/runner/workspace/hardware/save.py:39"
-  wire width 32 \cr15_namespace$549.word2_w2
+  wire width 32 \cr15_namespace$546.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/dread.py:49"
-  wire width 32 \cr_rd_data$560.word0_gt
+  wire width 32 \cr_rd_data$557.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/dread.py:49"
-  wire width 16 \cr_rd_data$560.word0_gt.slot_id
+  wire width 16 \cr_rd_data$557.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/dread.py:49"
-  wire width 9 \cr_rd_data$560.word0_gt.gt_seq
+  wire width 9 \cr_rd_data$557.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/dread.py:49"
-  wire width 2 \cr_rd_data$560.word0_gt.gt_type
+  wire width 2 \cr_rd_data$557.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/dread.py:49"
-  wire width 1 \cr_rd_data$560.word0_gt.dom
+  wire width 1 \cr_rd_data$557.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/dread.py:49"
-  wire width 3 \cr_rd_data$560.word0_gt.perm
+  wire width 3 \cr_rd_data$557.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/dread.py:49"
-  wire width 1 \cr_rd_data$560.word0_gt.b_flag
+  wire width 1 \cr_rd_data$557.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/dread.py:49"
-  wire width 32 \cr_rd_data$560.word1_location
+  wire width 32 \cr_rd_data$557.word1_location
 
   attribute \src "/home/runner/workspace/hardware/dread.py:49"
-  wire width 32 \cr_rd_data$560.word2_w2
+  wire width 32 \cr_rd_data$557.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:48"
-  wire width 32 \cr_rd_data$573.word0_gt
+  wire width 32 \cr_rd_data$570.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:48"
-  wire width 16 \cr_rd_data$573.word0_gt.slot_id
+  wire width 16 \cr_rd_data$570.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:48"
-  wire width 9 \cr_rd_data$573.word0_gt.gt_seq
+  wire width 9 \cr_rd_data$570.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:48"
-  wire width 2 \cr_rd_data$573.word0_gt.gt_type
+  wire width 2 \cr_rd_data$570.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:48"
-  wire width 1 \cr_rd_data$573.word0_gt.dom
+  wire width 1 \cr_rd_data$570.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:48"
-  wire width 3 \cr_rd_data$573.word0_gt.perm
+  wire width 3 \cr_rd_data$570.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:48"
-  wire width 1 \cr_rd_data$573.word0_gt.b_flag
+  wire width 1 \cr_rd_data$570.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:48"
-  wire width 32 \cr_rd_data$573.word1_location
+  wire width 32 \cr_rd_data$570.word1_location
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:48"
-  wire width 32 \cr_rd_data$573.word2_w2
+  wire width 32 \cr_rd_data$570.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/change.py:31"
-  wire width 32 \cr_rd_data$630.word0_gt
+  wire width 32 \cr_rd_data$627.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/change.py:31"
-  wire width 16 \cr_rd_data$630.word0_gt.slot_id
+  wire width 16 \cr_rd_data$627.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/change.py:31"
-  wire width 9 \cr_rd_data$630.word0_gt.gt_seq
+  wire width 9 \cr_rd_data$627.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/change.py:31"
-  wire width 2 \cr_rd_data$630.word0_gt.gt_type
+  wire width 2 \cr_rd_data$627.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/change.py:31"
-  wire width 1 \cr_rd_data$630.word0_gt.dom
+  wire width 1 \cr_rd_data$627.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/change.py:31"
-  wire width 3 \cr_rd_data$630.word0_gt.perm
+  wire width 3 \cr_rd_data$627.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/change.py:31"
-  wire width 1 \cr_rd_data$630.word0_gt.b_flag
+  wire width 1 \cr_rd_data$627.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/change.py:31"
-  wire width 32 \cr_rd_data$630.word1_location
+  wire width 32 \cr_rd_data$627.word1_location
 
   attribute \src "/home/runner/workspace/hardware/change.py:31"
-  wire width 32 \cr_rd_data$630.word2_w2
+  wire width 32 \cr_rd_data$627.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/change.py:39"
-  wire width 32 \cr12_thread$631.word0_gt
+  wire width 32 \cr12_thread$628.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/change.py:39"
-  wire width 16 \cr12_thread$631.word0_gt.slot_id
+  wire width 16 \cr12_thread$628.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/change.py:39"
-  wire width 9 \cr12_thread$631.word0_gt.gt_seq
+  wire width 9 \cr12_thread$628.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/change.py:39"
-  wire width 2 \cr12_thread$631.word0_gt.gt_type
+  wire width 2 \cr12_thread$628.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/change.py:39"
-  wire width 1 \cr12_thread$631.word0_gt.dom
+  wire width 1 \cr12_thread$628.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/change.py:39"
-  wire width 3 \cr12_thread$631.word0_gt.perm
+  wire width 3 \cr12_thread$628.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/change.py:39"
-  wire width 1 \cr12_thread$631.word0_gt.b_flag
+  wire width 1 \cr12_thread$628.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/change.py:39"
-  wire width 32 \cr12_thread$631.word1_location
+  wire width 32 \cr12_thread$628.word1_location
 
   attribute \src "/home/runner/workspace/hardware/change.py:39"
-  wire width 32 \cr12_thread$631.word2_w2
+  wire width 32 \cr12_thread$628.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/change.py:40"
-  wire width 32 \cr15_namespace$632.word0_gt
+  wire width 32 \cr15_namespace$629.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/change.py:40"
-  wire width 16 \cr15_namespace$632.word0_gt.slot_id
+  wire width 16 \cr15_namespace$629.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/change.py:40"
-  wire width 9 \cr15_namespace$632.word0_gt.gt_seq
+  wire width 9 \cr15_namespace$629.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/change.py:40"
-  wire width 2 \cr15_namespace$632.word0_gt.gt_type
+  wire width 2 \cr15_namespace$629.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/change.py:40"
-  wire width 1 \cr15_namespace$632.word0_gt.dom
+  wire width 1 \cr15_namespace$629.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/change.py:40"
-  wire width 3 \cr15_namespace$632.word0_gt.perm
+  wire width 3 \cr15_namespace$629.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/change.py:40"
-  wire width 1 \cr15_namespace$632.word0_gt.b_flag
+  wire width 1 \cr15_namespace$629.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/change.py:40"
-  wire width 32 \cr15_namespace$632.word1_location
+  wire width 32 \cr15_namespace$629.word1_location
 
   attribute \src "/home/runner/workspace/hardware/change.py:40"
-  wire width 32 \cr15_namespace$632.word2_w2
+  wire width 32 \cr15_namespace$629.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/change.py:79"
-  wire width 1 \flags_in$638.N
+  wire width 1 \flags_in$635.N
 
   attribute \src "/home/runner/workspace/hardware/change.py:79"
-  wire width 1 \flags_in$638.Z
+  wire width 1 \flags_in$635.Z
 
   attribute \src "/home/runner/workspace/hardware/change.py:79"
-  wire width 1 \flags_in$638.C
+  wire width 1 \flags_in$635.C
 
   attribute \src "/home/runner/workspace/hardware/change.py:79"
-  wire width 1 \flags_in$638.V
+  wire width 1 \flags_in$635.V
 
   attribute \src "/home/runner/workspace/hardware/switch.py:29"
-  wire width 32 \cr_rd_data$652.word0_gt
+  wire width 32 \cr_rd_data$649.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/switch.py:29"
-  wire width 16 \cr_rd_data$652.word0_gt.slot_id
+  wire width 16 \cr_rd_data$649.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/switch.py:29"
-  wire width 9 \cr_rd_data$652.word0_gt.gt_seq
+  wire width 9 \cr_rd_data$649.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/switch.py:29"
-  wire width 2 \cr_rd_data$652.word0_gt.gt_type
+  wire width 2 \cr_rd_data$649.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/switch.py:29"
-  wire width 1 \cr_rd_data$652.word0_gt.dom
+  wire width 1 \cr_rd_data$649.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/switch.py:29"
-  wire width 3 \cr_rd_data$652.word0_gt.perm
+  wire width 3 \cr_rd_data$649.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/switch.py:29"
-  wire width 1 \cr_rd_data$652.word0_gt.b_flag
+  wire width 1 \cr_rd_data$649.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/switch.py:29"
-  wire width 32 \cr_rd_data$652.word1_location
+  wire width 32 \cr_rd_data$649.word1_location
 
   attribute \src "/home/runner/workspace/hardware/switch.py:29"
-  wire width 32 \cr_rd_data$652.word2_w2
+  wire width 32 \cr_rd_data$649.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/switch.py:33"
-  wire width 32 \cr15_namespace$653.word0_gt
+  wire width 32 \cr15_namespace$650.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/switch.py:33"
-  wire width 16 \cr15_namespace$653.word0_gt.slot_id
+  wire width 16 \cr15_namespace$650.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/switch.py:33"
-  wire width 9 \cr15_namespace$653.word0_gt.gt_seq
+  wire width 9 \cr15_namespace$650.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/switch.py:33"
-  wire width 2 \cr15_namespace$653.word0_gt.gt_type
+  wire width 2 \cr15_namespace$650.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/switch.py:33"
-  wire width 1 \cr15_namespace$653.word0_gt.dom
+  wire width 1 \cr15_namespace$650.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/switch.py:33"
-  wire width 3 \cr15_namespace$653.word0_gt.perm
+  wire width 3 \cr15_namespace$650.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/switch.py:33"
-  wire width 1 \cr15_namespace$653.word0_gt.b_flag
+  wire width 1 \cr15_namespace$650.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/switch.py:33"
-  wire width 32 \cr15_namespace$653.word1_location
+  wire width 32 \cr15_namespace$650.word1_location
 
   attribute \src "/home/runner/workspace/hardware/switch.py:33"
-  wire width 32 \cr15_namespace$653.word2_w2
+  wire width 32 \cr15_namespace$650.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:28"
-  wire width 32 \cr_rd_data$665.word0_gt
+  wire width 32 \cr_rd_data$662.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:28"
-  wire width 16 \cr_rd_data$665.word0_gt.slot_id
+  wire width 16 \cr_rd_data$662.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:28"
-  wire width 9 \cr_rd_data$665.word0_gt.gt_seq
+  wire width 9 \cr_rd_data$662.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:28"
-  wire width 2 \cr_rd_data$665.word0_gt.gt_type
+  wire width 2 \cr_rd_data$662.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:28"
-  wire width 1 \cr_rd_data$665.word0_gt.dom
+  wire width 1 \cr_rd_data$662.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:28"
-  wire width 3 \cr_rd_data$665.word0_gt.perm
+  wire width 3 \cr_rd_data$662.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:28"
-  wire width 1 \cr_rd_data$665.word0_gt.b_flag
+  wire width 1 \cr_rd_data$662.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:28"
-  wire width 32 \cr_rd_data$665.word1_location
+  wire width 32 \cr_rd_data$662.word1_location
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:28"
-  wire width 32 \cr_rd_data$665.word2_w2
+  wire width 32 \cr_rd_data$662.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:32"
-  wire width 32 \cr15_namespace$666.word0_gt
+  wire width 32 \cr15_namespace$663.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:32"
-  wire width 16 \cr15_namespace$666.word0_gt.slot_id
+  wire width 16 \cr15_namespace$663.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:32"
-  wire width 9 \cr15_namespace$666.word0_gt.gt_seq
+  wire width 9 \cr15_namespace$663.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:32"
-  wire width 2 \cr15_namespace$666.word0_gt.gt_type
+  wire width 2 \cr15_namespace$663.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:32"
-  wire width 1 \cr15_namespace$666.word0_gt.dom
+  wire width 1 \cr15_namespace$663.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:32"
-  wire width 3 \cr15_namespace$666.word0_gt.perm
+  wire width 3 \cr15_namespace$663.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:32"
-  wire width 1 \cr15_namespace$666.word0_gt.b_flag
+  wire width 1 \cr15_namespace$663.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:32"
-  wire width 32 \cr15_namespace$666.word1_location
+  wire width 32 \cr15_namespace$663.word1_location
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:32"
-  wire width 32 \cr15_namespace$666.word2_w2
+  wire width 32 \cr15_namespace$663.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:57"
-  wire width 32 \cr5_heap$669.word0_gt
+  wire width 32 \cr5_heap$666.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:57"
-  wire width 16 \cr5_heap$669.word0_gt.slot_id
+  wire width 16 \cr5_heap$666.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:57"
-  wire width 9 \cr5_heap$669.word0_gt.gt_seq
+  wire width 9 \cr5_heap$666.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:57"
-  wire width 2 \cr5_heap$669.word0_gt.gt_type
+  wire width 2 \cr5_heap$666.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:57"
-  wire width 1 \cr5_heap$669.word0_gt.dom
+  wire width 1 \cr5_heap$666.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:57"
-  wire width 3 \cr5_heap$669.word0_gt.perm
+  wire width 3 \cr5_heap$666.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:57"
-  wire width 1 \cr5_heap$669.word0_gt.b_flag
+  wire width 1 \cr5_heap$666.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:57"
-  wire width 32 \cr5_heap$669.word1_location
+  wire width 32 \cr5_heap$666.word1_location
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:57"
-  wire width 32 \cr5_heap$669.word2_w2
+  wire width 32 \cr5_heap$666.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:60"
-  wire width 32 \cr12_thread$672.word0_gt
+  wire width 32 \cr12_thread$669.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:60"
-  wire width 16 \cr12_thread$672.word0_gt.slot_id
+  wire width 16 \cr12_thread$669.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:60"
-  wire width 9 \cr12_thread$672.word0_gt.gt_seq
+  wire width 9 \cr12_thread$669.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:60"
-  wire width 2 \cr12_thread$672.word0_gt.gt_type
+  wire width 2 \cr12_thread$669.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:60"
-  wire width 1 \cr12_thread$672.word0_gt.dom
+  wire width 1 \cr12_thread$669.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:60"
-  wire width 3 \cr12_thread$672.word0_gt.perm
+  wire width 3 \cr12_thread$669.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:60"
-  wire width 1 \cr12_thread$672.word0_gt.b_flag
+  wire width 1 \cr12_thread$669.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:60"
-  wire width 32 \cr12_thread$672.word1_location
+  wire width 32 \cr12_thread$669.word1_location
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:60"
-  wire width 32 \cr12_thread$672.word2_w2
+  wire width 32 \cr12_thread$669.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:61"
-  wire width 1 \flags$673.N
+  wire width 1 \flags$670.N
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:61"
-  wire width 1 \flags$673.Z
+  wire width 1 \flags$670.Z
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:61"
-  wire width 1 \flags$673.C
+  wire width 1 \flags$670.C
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:61"
-  wire width 1 \flags$673.V
+  wire width 1 \flags$670.V
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
-  wire width 32 \cr_rd_data$679.word0_gt
+  wire width 32 \cr_rd_data$676.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
-  wire width 16 \cr_rd_data$679.word0_gt.slot_id
+  wire width 16 \cr_rd_data$676.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
-  wire width 9 \cr_rd_data$679.word0_gt.gt_seq
+  wire width 9 \cr_rd_data$676.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
-  wire width 2 \cr_rd_data$679.word0_gt.gt_type
+  wire width 2 \cr_rd_data$676.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
-  wire width 1 \cr_rd_data$679.word0_gt.dom
+  wire width 1 \cr_rd_data$676.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
-  wire width 3 \cr_rd_data$679.word0_gt.perm
+  wire width 3 \cr_rd_data$676.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
-  wire width 1 \cr_rd_data$679.word0_gt.b_flag
+  wire width 1 \cr_rd_data$676.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
-  wire width 32 \cr_rd_data$679.word1_location
+  wire width 32 \cr_rd_data$676.word1_location
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:568"
-  wire width 32 \cr_rd_data$679.word2_w2
+  wire width 32 \cr_rd_data$676.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
-  wire width 32 \cr15_namespace$680.word0_gt
+  wire width 32 \cr15_namespace$677.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
-  wire width 16 \cr15_namespace$680.word0_gt.slot_id
+  wire width 16 \cr15_namespace$677.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
-  wire width 9 \cr15_namespace$680.word0_gt.gt_seq
+  wire width 9 \cr15_namespace$677.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
-  wire width 2 \cr15_namespace$680.word0_gt.gt_type
+  wire width 2 \cr15_namespace$677.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
-  wire width 1 \cr15_namespace$680.word0_gt.dom
+  wire width 1 \cr15_namespace$677.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
-  wire width 3 \cr15_namespace$680.word0_gt.perm
+  wire width 3 \cr15_namespace$677.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
-  wire width 1 \cr15_namespace$680.word0_gt.b_flag
+  wire width 1 \cr15_namespace$677.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
-  wire width 32 \cr15_namespace$680.word1_location
+  wire width 32 \cr15_namespace$677.word1_location
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:572"
-  wire width 32 \cr15_namespace$680.word2_w2
+  wire width 32 \cr15_namespace$677.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:48"
-  wire width 32 \cr15_namespace$703.word0_gt
+  wire width 32 \cr15_namespace$700.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:48"
-  wire width 16 \cr15_namespace$703.word0_gt.slot_id
+  wire width 16 \cr15_namespace$700.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:48"
-  wire width 9 \cr15_namespace$703.word0_gt.gt_seq
+  wire width 9 \cr15_namespace$700.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:48"
-  wire width 2 \cr15_namespace$703.word0_gt.gt_type
+  wire width 2 \cr15_namespace$700.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:48"
-  wire width 1 \cr15_namespace$703.word0_gt.dom
+  wire width 1 \cr15_namespace$700.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:48"
-  wire width 3 \cr15_namespace$703.word0_gt.perm
+  wire width 3 \cr15_namespace$700.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:48"
-  wire width 1 \cr15_namespace$703.word0_gt.b_flag
+  wire width 1 \cr15_namespace$700.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:48"
-  wire width 32 \cr15_namespace$703.word1_location
+  wire width 32 \cr15_namespace$700.word1_location
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:48"
-  wire width 32 \cr15_namespace$703.word2_w2
+  wire width 32 \cr15_namespace$700.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/core.py:112"
   wire width 1 \retire_flags.N
@@ -23152,58 +23114,58 @@ module \top.core
   wire width 32 \cr6_clist.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/mload.py:55"
-  wire width 32 \cr_rd_data$885.word0_gt
+  wire width 32 \cr_rd_data$882.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/mload.py:55"
-  wire width 16 \cr_rd_data$885.word0_gt.slot_id
+  wire width 16 \cr_rd_data$882.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/mload.py:55"
-  wire width 9 \cr_rd_data$885.word0_gt.gt_seq
+  wire width 9 \cr_rd_data$882.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/mload.py:55"
-  wire width 2 \cr_rd_data$885.word0_gt.gt_type
+  wire width 2 \cr_rd_data$882.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/mload.py:55"
-  wire width 1 \cr_rd_data$885.word0_gt.dom
+  wire width 1 \cr_rd_data$882.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/mload.py:55"
-  wire width 3 \cr_rd_data$885.word0_gt.perm
+  wire width 3 \cr_rd_data$882.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/mload.py:55"
-  wire width 1 \cr_rd_data$885.word0_gt.b_flag
+  wire width 1 \cr_rd_data$882.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/mload.py:55"
-  wire width 32 \cr_rd_data$885.word1_location
+  wire width 32 \cr_rd_data$882.word1_location
 
   attribute \src "/home/runner/workspace/hardware/mload.py:55"
-  wire width 32 \cr_rd_data$885.word2_w2
+  wire width 32 \cr_rd_data$882.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/mload.py:61"
-  wire width 32 \cr15_namespace$886.word0_gt
+  wire width 32 \cr15_namespace$883.word0_gt
 
   attribute \src "/home/runner/workspace/hardware/mload.py:61"
-  wire width 16 \cr15_namespace$886.word0_gt.slot_id
+  wire width 16 \cr15_namespace$883.word0_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/mload.py:61"
-  wire width 9 \cr15_namespace$886.word0_gt.gt_seq
+  wire width 9 \cr15_namespace$883.word0_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/mload.py:61"
-  wire width 2 \cr15_namespace$886.word0_gt.gt_type
+  wire width 2 \cr15_namespace$883.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/mload.py:61"
-  wire width 1 \cr15_namespace$886.word0_gt.dom
+  wire width 1 \cr15_namespace$883.word0_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/mload.py:61"
-  wire width 3 \cr15_namespace$886.word0_gt.perm
+  wire width 3 \cr15_namespace$883.word0_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/mload.py:61"
-  wire width 1 \cr15_namespace$886.word0_gt.b_flag
+  wire width 1 \cr15_namespace$883.word0_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/mload.py:61"
-  wire width 32 \cr15_namespace$886.word1_location
+  wire width 32 \cr15_namespace$883.word1_location
 
   attribute \src "/home/runner/workspace/hardware/mload.py:61"
-  wire width 32 \cr15_namespace$886.word2_w2
+  wire width 32 \cr15_namespace$883.word2_w2
 
   attribute \src "/home/runner/workspace/hardware/core.py:290"
   cell \top.core.u_registers \u_registers
@@ -23213,7 +23175,7 @@ module \top.core
     connect \cr_rd_addr \cr_rd_addr [3:0]
     connect \cr_wr_addr \cr_wr_addr [3:0]
     connect \cr_wr_data \cr_wr_data [95:0]
-    connect \cr_wr_en \cr_wr_en$179 [0]
+    connect \cr_wr_en \cr_wr_en$178 [0]
     connect \m_bit_device_wr_en \m_bit_device_wr_en [0]
     connect \m_bit_device_word \m_bit_device_word [15:0]
     connect \m_return_commit_en \m_return_commit_en [0]
@@ -23259,7 +23221,7 @@ module \top.core
     connect \cr_rd_data \cr_rd_data [95:0]
     connect \trace_rd_gt \trace_rd_gt [31:0]
     connect \dr_rd_data1 \dr_rd_data [31:0]
-    connect \dr_rd_data2 \dr_rd_data$574 [31:0]
+    connect \dr_rd_data2 \dr_rd_data$571 [31:0]
     connect \debug_dr0 \debug_dr0 [31:0]
     connect \debug_dr1 \debug_dr1 [31:0]
     connect \debug_dr2 \debug_dr2 [31:0]
@@ -23282,26 +23244,26 @@ module \top.core
     connect \m_switch_consume_target \m_switch_consume_target [1:0]
     connect \flags_in \flags_in [3:0]
     connect \flags_wr_en \flags_wr_en [0]
-    connect \dr_wr_addr \dr_wr_addr$114 [3:0]
-    connect \dr_wr_data \dr_wr_data$115 [31:0]
-    connect \dr_wr_en \dr_wr_en$116 [0]
+    connect \dr_wr_addr \dr_wr_addr$113 [3:0]
+    connect \dr_wr_data \dr_wr_data$114 [31:0]
+    connect \dr_wr_en \dr_wr_en$115 [0]
     connect \m_set_en \m_set_en [0]
     connect \m_clear_en \m_clear_en [0]
     connect \cr_word_rd_data \dbg_cr8_gt [31:0]
-    connect \cr0 $630 [95:0]
-    connect \cr1 $631 [95:0]
-    connect \cr2 $632 [95:0]
-    connect \cr3 $633 [95:0]
-    connect \cr4 $634 [95:0]
+    connect \cr0 $629 [95:0]
+    connect \cr1 $630 [95:0]
+    connect \cr2 $631 [95:0]
+    connect \cr3 $632 [95:0]
+    connect \cr4 $633 [95:0]
     connect \cr5 \cr5_heap [95:0]
     connect \cr6 \cr6_clist [95:0]
-    connect \cr7 $635 [95:0]
-    connect \cr8 $636 [95:0]
-    connect \cr9 $637 [95:0]
-    connect \cr10 $638 [95:0]
-    connect \cr11 $639 [95:0]
+    connect \cr7 $634 [95:0]
+    connect \cr8 $635 [95:0]
+    connect \cr9 $636 [95:0]
+    connect \cr10 $637 [95:0]
+    connect \cr11 $638 [95:0]
     connect \cr12 \cr12_thread [95:0]
-    connect \cr13 $640 [95:0]
+    connect \cr13 $639 [95:0]
     connect \cr14 \cr14_code [95:0]
     connect \cr15 \cr15_namespace [95:0]
     connect \m_dr11 \dbg_m_dr11 [31:0]
@@ -23333,7 +23295,7 @@ module \top.core
     connect \is_mcmp_op \is_mcmp_op [0]
     connect \flags \flags [3:0]
     connect \fault_valid \fault_valid [0]
-    connect \fault \fault$832 [3:0]
+    connect \fault \fault$829 [3:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:292"
@@ -23341,7 +23303,7 @@ module \top.core
     connect \check_valid \check_valid [0]
     connect \gt_in \cr_rd_data [31:0]
     connect \required_perms \required_perms [5:0]
-    connect \fault_valid \fault_valid$815 [0]
+    connect \fault_valid \fault_valid$812 [0]
     connect \fault_type \fault_type [3:0]
   end
 
@@ -23361,7 +23323,7 @@ module \top.core
     connect \mload_dst \mload_cr_dst [3:0]
     connect \mload_index \mload_index [15:0]
     connect \direct_mload_gt \mload_direct_gt [31:0]
-    connect \nia_computed \nia_value$1010 [31:0]
+    connect \nia_computed \nia_value$1007 [31:0]
     connect \code_lo_out \code_lo_out [31:0]
     connect \code_hi_out \code_hi_out [31:0]
     connect \call_busy \call_busy [0]
@@ -23377,17 +23339,17 @@ module \top.core
     connect \flags \flags [3:0]
     connect \cr_null_mask \cr_null_mask [11:0]
     connect \cr_b_clear_mask \cr_b_clear_mask [11:0]
-    connect \cr_rd_addr \cr_rd_addr$65 [3:0]
-    connect \cr_wr_addr \cr_wr_addr$161 [3:0]
-    connect \cr_wr_data \cr_wr_data$174 [95:0]
-    connect \cr_wr_en \cr_wr_en$148 [0]
-    connect \mem_rd_addr \mem_rd_addr$967 [31:0]
-    connect \mem_rd_en \mem_rd_en$945 [0]
-    connect \mem_wr_addr \mem_wr_addr$968 [31:0]
-    connect \mem_wr_data \mem_wr_data$969 [31:0]
-    connect \mem_wr_en \mem_wr_en$946 [0]
+    connect \cr_rd_addr \cr_rd_addr$64 [3:0]
+    connect \cr_wr_addr \cr_wr_addr$160 [3:0]
+    connect \cr_wr_data \cr_wr_data$173 [95:0]
+    connect \cr_wr_en \cr_wr_en$147 [0]
+    connect \mem_rd_addr \mem_rd_addr$964 [31:0]
+    connect \mem_rd_en \mem_rd_en$942 [0]
+    connect \mem_wr_addr \mem_wr_addr$965 [31:0]
+    connect \mem_wr_data \mem_wr_data$966 [31:0]
+    connect \mem_wr_en \mem_wr_en$943 [0]
     connect \call_fault \call_fault [0]
-    connect \fault_type \fault_type$836 [4:0]
+    connect \fault_type \fault_type$833 [4:0]
     connect \mgt_gt_lat \mgt_gt_word [31:0]
     connect \mload_start \mload_start [0]
     connect \lazy_load_ns_slot \lazy_load_ns_slot [15:0]
@@ -23402,13 +23364,10 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/core.py:294"
   cell \top.core.u_return \u_return
     connect \clk \clk [0]
-    connect \cr_src \instruction [17:15]
     connect \mem_rd_data \mem_rd_data [31:0]
     connect \mem_rd_valid \mem_rd_valid [0]
     connect \clear_all \clear_all [0]
     connect \return_start \ret_start_sig [0]
-    connect \cr_rd_data \cr_rd_data [95:0]
-    connect \cr_rd_addr \cr_rd_addr$64 [3:0]
     connect \boot_rom_return \boot_rom_return [0]
     connect \busy \busy [0]
     connect \complete \complete [0]
@@ -23418,19 +23377,19 @@ module \top.core
     connect \thread_base \thread_base [31:0]
     connect \cr5_heap \cr5_heap [95:0]
     connect \cr12_thread \cr12_thread [95:0]
-    connect \flags_restore_en \flags_restore_en$136 [0]
-    connect \nia_set \nia_set$857 [0]
-    connect \nia_value \nia_value$1009 [31:0]
+    connect \flags_restore_en \flags_restore_en$135 [0]
+    connect \nia_set \nia_set$854 [0]
+    connect \nia_value \nia_value$1006 [31:0]
     connect \lambda_clear \lambda_clear [0]
-    connect \mem_rd_addr \mem_rd_addr$982 [31:0]
-    connect \mem_rd_en \mem_rd_en$953 [0]
-    connect \mem_wr_addr \mem_wr_addr$983 [31:0]
-    connect \mem_wr_data \mem_wr_data$984 [31:0]
-    connect \mem_wr_en \mem_wr_en$954 [0]
-    connect \fault_valid \fault_valid$819 [0]
-    connect \fault_type \fault_type$837 [4:0]
+    connect \mem_rd_addr \mem_rd_addr$979 [31:0]
+    connect \mem_rd_en \mem_rd_en$950 [0]
+    connect \mem_wr_addr \mem_wr_addr$980 [31:0]
+    connect \mem_wr_data \mem_wr_data$981 [31:0]
+    connect \mem_wr_en \mem_wr_en$951 [0]
+    connect \fault_valid \fault_valid$816 [0]
+    connect \fault_type \fault_type$834 [4:0]
     connect \cload_e_gt \e_gt [31:0]
-    connect \flags_restore_data \flags_restore_data$137 [3:0]
+    connect \flags_restore_data \flags_restore_data$136 [3:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:295"
@@ -23443,12 +23402,12 @@ module \top.core
     connect \cr_rd_data \cr_rd_data [95:0]
     connect \tperm_busy \tperm_busy [0]
     connect \tperm_complete \tperm_complete [0]
-    connect \cr_rd_addr \cr_rd_addr$66 [3:0]
-    connect \cr_wr_addr \cr_wr_addr$162 [3:0]
-    connect \cr_wr_data \cr_wr_data$175 [95:0]
-    connect \cr_wr_en \cr_wr_en$147 [0]
+    connect \cr_rd_addr \cr_rd_addr$65 [3:0]
+    connect \cr_wr_addr \cr_wr_addr$161 [3:0]
+    connect \cr_wr_data \cr_wr_data$174 [95:0]
+    connect \cr_wr_en \cr_wr_en$146 [0]
     connect \tperm_fault \tperm_fault [0]
-    connect \fault_type \fault_type$835 [3:0]
+    connect \fault_type \fault_type$832 [3:0]
     connect \tperm_z_result \tperm_z_result [0]
   end
 
@@ -23469,12 +23428,12 @@ module \top.core
     connect \cr15_namespace \cr15_namespace [95:0]
     connect \cr_rd_addr \cr_rd_addr$63 [3:0]
     connect \save_fault \save_fault [0]
-    connect \fault_type \fault_type$838 [4:0]
-    connect \mem_rd_addr \mem_rd_addr$972 [31:0]
-    connect \mem_rd_en \mem_rd_en$948 [0]
-    connect \mem_wr_en \mem_wr_en$947 [0]
-    connect \mem_wr_addr \mem_wr_addr$970 [31:0]
-    connect \mem_wr_data \mem_wr_data$971 [31:0]
+    connect \fault_type \fault_type$835 [4:0]
+    connect \mem_rd_addr \mem_rd_addr$969 [31:0]
+    connect \mem_rd_en \mem_rd_en$945 [0]
+    connect \mem_wr_en \mem_wr_en$944 [0]
+    connect \mem_wr_addr \mem_wr_addr$967 [31:0]
+    connect \mem_wr_data \mem_wr_data$968 [31:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:297"
@@ -23484,16 +23443,16 @@ module \top.core
     connect \clear_all \clear_all [0]
     connect \load_start \load_start_sig [0]
     connect \mload_busy \mload_busy [0]
-    connect \mload_done \mload_done$929 [0]
-    connect \mload_fault \mload_fault$930 [0]
+    connect \mload_done \mload_done$926 [0]
+    connect \mload_fault \mload_fault$927 [0]
     connect \load_busy \load_busy [0]
     connect \load_complete \load_complete [0]
     connect \load_fault \load_fault [0]
-    connect \fault_type \fault_type$839 [4:0]
-    connect \mload_start \mload_start$910 [0]
-    connect \mload_cr_src \mload_cr_src$911 [3:0]
-    connect \mload_cr_dst \mload_cr_dst$912 [3:0]
-    connect \mload_index \mload_index$913 [15:0]
+    connect \fault_type \fault_type$836 [4:0]
+    connect \mload_start \mload_start$907 [0]
+    connect \mload_cr_src \mload_cr_src$908 [3:0]
+    connect \mload_cr_dst \mload_cr_dst$909 [3:0]
+    connect \mload_index \mload_index$910 [15:0]
     connect \mload_fault_type \mload_fault_type [4:0]
   end
 
@@ -23520,12 +23479,12 @@ module \top.core
     connect \sub_direct_gt \sub_direct_gt [31:0]
     connect \m_elevated \sub_m_elevated [0]
     connect \cr15_namespace \cr15_namespace [95:0]
-    connect \cr_rd_addr \cr_rd_addr$68 [3:0]
+    connect \cr_rd_addr \cr_rd_addr$67 [3:0]
     connect \mem_wr_en \mem_wr_en [0]
     connect \mem_wr_data \mem_wr_data [31:0]
     connect \gbit_reset_done \valid_key_access [0]
-    connect \cr_wr_addr \cr_wr_addr$163 [3:0]
-    connect \cr_wr_data \cr_wr_data$176 [95:0]
+    connect \cr_wr_addr \cr_wr_addr$162 [3:0]
+    connect \cr_wr_data \cr_wr_data$175 [95:0]
     connect \cr_wr_en \cr_wr_en [0]
     connect \sub_fault_type \mload_fault_type [4:0]
     connect \outform_fault_type_in \outform_fault_type_in [4:0]
@@ -23536,12 +23495,12 @@ module \top.core
     connect \clk \clk [0]
     connect \clear_all \clear_all [0]
     connect \gc_busy \gc_busy [0]
-    connect \port$5745$0 \port$5745$0 [31:0]
+    connect \port$5733$0 \port$5733$0 [31:0]
     connect \g_bit_reset \valid_key_access [0]
-    connect \ns_addr \ns_addr$993 [31:0]
-    connect \ns_rd_en \ns_rd_en$994 [0]
-    connect \ns_wr_data \ns_wr_data$995 [127:0]
-    connect \ns_wr_en \ns_wr_en$996 [0]
+    connect \ns_addr \ns_addr$990 [31:0]
+    connect \ns_rd_en \ns_rd_en$991 [0]
+    connect \ns_wr_data \ns_wr_data$992 [127:0]
+    connect \ns_wr_en \ns_wr_en$993 [0]
     connect \garbage_count \gc_garbage_count [31:0]
   end
 
@@ -23554,11 +23513,11 @@ module \top.core
     connect \cr_rd_data \cr_rd_data [95:0]
     connect \lambda_busy \lambda_busy [0]
     connect \lambda_complete \lambda_complete [0]
-    connect \cr_rd_addr \cr_rd_addr$67 [3:0]
-    connect \nia_set \nia_set$863 [0]
+    connect \cr_rd_addr \cr_rd_addr$66 [3:0]
+    connect \nia_set \nia_set$860 [0]
     connect \nia_value \nia_value [31:0]
     connect \lambda_fault \lambda_fault [0]
-    connect \fault_type \fault_type$834 [3:0]
+    connect \fault_type \fault_type$831 [3:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:326"
@@ -23569,16 +23528,16 @@ module \top.core
     connect \clear_all \clear_all [0]
     connect \boot_window \boot_microcode_active [0]
     connect \change_start \change_start_sig [0]
-    connect \cr_src \cr_src$623 [3:0]
-    connect \cr_dst \cr_dst$624 [3:0]
+    connect \cr_src \cr_src$620 [3:0]
+    connect \cr_dst \cr_dst$621 [3:0]
     connect \m_elevated \m_elevated [0]
-    connect \index \index$626 [15:0]
-    connect \port$1518$0 $243 [14:0]
-    connect \nia_current $245 [31:0]
+    connect \index \index$623 [15:0]
+    connect \port$1517$0 $242 [14:0]
+    connect \nia_current $244 [31:0]
     connect \cr_rd_data \cr_rd_data [95:0]
     connect \dr_rd_data \dr_rd_data [31:0]
     connect \mem_rd_addr \mem_rd_addr [31:0]
-    connect \mem_rd_en \mem_rd_en$938 [0]
+    connect \mem_rd_en \mem_rd_en$935 [0]
     connect \change_busy \change_busy [0]
     connect \change_complete \change_complete [0]
     connect \active_thread_base \thread_base [31:0]
@@ -23586,9 +23545,9 @@ module \top.core
     connect \cr15_namespace \cr15_namespace [95:0]
     connect \flags_in \flags [3:0]
     connect \cr_rd_addr \cr_rd_addr$62 [3:0]
-    connect \cr_wr_addr \cr_wr_addr$156 [3:0]
-    connect \cr_wr_data \cr_wr_data$169 [95:0]
-    connect \cr_wr_en \cr_wr_en$182 [0]
+    connect \cr_wr_addr \cr_wr_addr$155 [3:0]
+    connect \cr_wr_data \cr_wr_data$168 [95:0]
+    connect \cr_wr_en \cr_wr_en$181 [0]
     connect \thread_base_restore_en \thread_base_restore_en [0]
     connect \dr_wr_en \change_dr_wr_en [0]
     connect \dr_wr_addr \change_dr_wr_addr [3:0]
@@ -23597,11 +23556,11 @@ module \top.core
     connect \nia_restore_val \nia_restore_val [31:0]
     connect \flags_restore_en \flags_restore_en [0]
     connect \flags_restore_data \flags_restore_data [3:0]
-    connect \mem_wr_en \mem_wr_en$939 [0]
+    connect \mem_wr_en \mem_wr_en$936 [0]
     connect \mem_wr_addr \mem_wr_addr [31:0]
-    connect \mem_wr_data \mem_wr_data$960 [31:0]
+    connect \mem_wr_data \mem_wr_data$957 [31:0]
     connect \change_fault \change_fault [0]
-    connect \fault_type \fault_type$840 [4:0]
+    connect \fault_type \fault_type$837 [4:0]
     connect \incoming_thread_base \thread_base_restore_val [31:0]
     connect \thread_hdr_reg \thread_hdr [31:0]
   end
@@ -23620,15 +23579,15 @@ module \top.core
     connect \switch_complete \switch_complete [0]
     connect \m_consume_en \m_switch_consume_en [0]
     connect \m_consume_target \m_switch_consume_target [1:0]
-    connect \mem_addr \mem_addr$961 [31:0]
-    connect \mem_rd_en \mem_rd_en$940 [0]
+    connect \mem_addr \mem_addr$958 [31:0]
+    connect \mem_rd_en \mem_rd_en$937 [0]
     connect \cr15_namespace \cr15_namespace [95:0]
     connect \switch_fault \switch_fault [0]
-    connect \fault_type \fault_type$841 [4:0]
+    connect \fault_type \fault_type$838 [4:0]
     connect \cr_rd_addr \cr_rd_addr$61 [3:0]
-    connect \cr_wr_addr \cr_wr_addr$155 [3:0]
-    connect \cr_wr_data \cr_wr_data$168 [95:0]
-    connect \cr_wr_en \cr_wr_en$183 [0]
+    connect \cr_wr_addr \cr_wr_addr$154 [3:0]
+    connect \cr_wr_data \cr_wr_data$167 [95:0]
+    connect \cr_wr_en \cr_wr_en$182 [0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:328"
@@ -23640,13 +23599,13 @@ module \top.core
     connect \clear_all \clear_all [0]
     connect \start \eloadcall_start_sig [0]
     connect \cr_rd_data \cr_rd_data [95:0]
-    connect \mem_addr \mem_addr$962 [31:0]
-    connect \mem_rd_en \mem_rd_en$941 [0]
+    connect \mem_addr \mem_addr$959 [31:0]
+    connect \mem_rd_en \mem_rd_en$938 [0]
     connect \cr_rd_addr \cr_rd_addr$60 [3:0]
-    connect \nia_computed \nia_value$1011 [31:0]
+    connect \nia_computed \nia_value$1008 [31:0]
     connect \busy \busy$44 [0]
     connect \lazy_resolve_irq \lazy_resolve_irq [0]
-    connect \complete \nia_set$865 [0]
+    connect \complete \nia_set$862 [0]
     connect \pet_name_rd_data \pet_name_rd_data [0]
     connect \thread_base \thread_base [31:0]
     connect \cr5_heap \cr5_heap [95:0]
@@ -23654,15 +23613,15 @@ module \top.core
     connect \cr15_namespace \cr15_namespace [95:0]
     connect \flags \flags [3:0]
     connect \thread_hdr \thread_hdr [31:0]
-    connect \mem_wr_en \mem_wr_en$942 [0]
-    connect \mem_wr_addr \mem_wr_addr$963 [31:0]
-    connect \mem_wr_data \mem_wr_data$964 [31:0]
+    connect \mem_wr_en \mem_wr_en$939 [0]
+    connect \mem_wr_addr \mem_wr_addr$960 [31:0]
+    connect \mem_wr_data \mem_wr_data$961 [31:0]
     connect \fault \fault [0]
-    connect \fault_type \fault_type$842 [4:0]
-    connect \lazy_resolve_slot \pet_name_rd_addr$685 [15:0]
-    connect \cr_wr_addr \cr_wr_addr$154 [3:0]
-    connect \cr_wr_data \cr_wr_data$167 [95:0]
-    connect \cr_wr_en \cr_wr_en$180 [0]
+    connect \fault_type \fault_type$839 [4:0]
+    connect \lazy_resolve_slot \pet_name_rd_addr$682 [15:0]
+    connect \cr_wr_addr \cr_wr_addr$153 [3:0]
+    connect \cr_wr_data \cr_wr_data$166 [95:0]
+    connect \cr_wr_en \cr_wr_en$179 [0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:329"
@@ -23676,21 +23635,21 @@ module \top.core
     connect \cr_rd_data \cr_rd_data [95:0]
     connect \cr_rd_addr \cr_rd_addr$59 [3:0]
     connect \busy \busy$45 [0]
-    connect \lazy_resolve_irq \lazy_resolve_irq$698 [0]
-    connect \mem_addr \mem_addr$965 [31:0]
-    connect \mem_rd_en \mem_rd_en$943 [0]
+    connect \lazy_resolve_irq \lazy_resolve_irq$695 [0]
+    connect \mem_addr \mem_addr$962 [31:0]
+    connect \mem_rd_en \mem_rd_en$940 [0]
     connect \pet_name_rd_data \pet_name_rd_data [0]
     connect \cr15_namespace \cr15_namespace [95:0]
-    connect \nia_set \nia_set$864 [0]
-    connect \nia_value \nia_value$1008 [31:0]
-    connect \fault \fault$824 [0]
-    connect \fault_type \fault_type$843 [3:0]
+    connect \nia_set \nia_set$861 [0]
+    connect \nia_value \nia_value$1005 [31:0]
+    connect \fault \fault$821 [0]
+    connect \fault_type \fault_type$840 [3:0]
     connect \lazy_resolve_slot \pet_name_rd_addr [15:0]
-    connect \mem_wr_en \mem_wr_en$944 [0]
-    connect \mem_wr_data \mem_wr_data$966 [31:0]
-    connect \cr_wr_addr \cr_wr_addr$153 [3:0]
-    connect \cr_wr_data \cr_wr_data$166 [95:0]
-    connect \cr_wr_en \cr_wr_en$181 [0]
+    connect \mem_wr_en \mem_wr_en$941 [0]
+    connect \mem_wr_data \mem_wr_data$963 [31:0]
+    connect \cr_wr_addr \cr_wr_addr$152 [3:0]
+    connect \cr_wr_data \cr_wr_data$165 [95:0]
+    connect \cr_wr_en \cr_wr_en$180 [0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:330"
@@ -23702,17 +23661,17 @@ module \top.core
     connect \irq_reason \irq_dispatch_reason [1:0]
     connect \irq_slot \irq_dispatch_slot [15:0]
     connect \start \irq_dispatch_start [0]
-    connect \nia_value \nia_value$1012 [31:0]
+    connect \nia_value \nia_value$1009 [31:0]
     connect \busy \busy$46 [0]
     connect \null_base_fault \null_base_fault [0]
-    connect \complete \nia_set$867 [0]
+    connect \complete \nia_set$864 [0]
     connect \cr15_namespace \cr15_namespace [95:0]
-    connect \mem_rd_addr \mem_rd_addr$985 [31:0]
-    connect \mem_rd_en \mem_rd_en$955 [0]
-    connect \dr_wr_en \dr_wr_en$138 [0]
+    connect \mem_rd_addr \mem_rd_addr$982 [31:0]
+    connect \mem_rd_en \mem_rd_en$952 [0]
+    connect \dr_wr_en \dr_wr_en$137 [0]
     connect \dr1_wr_en \dr1_wr_en [0]
-    connect \reason_lat $641 [1:0]
-    connect \slot_lat $642 [15:0]
+    connect \reason_lat $640 [1:0]
+    connect \slot_lat $641 [15:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:333"
@@ -23738,15 +23697,15 @@ module \top.core
     connect \cr_rd_addr \cr_rd_addr$58 [3:0]
     connect \m_bit_rd_word \dbg_m_bit_state [15:0]
     connect \busy \busy$22 [0]
-    connect \fault \fault$825 [0]
-    connect \fault_type \fault_type$844 [4:0]
-    connect \dr_wr_addr \dr_wr_addr$117 [3:0]
-    connect \dr_wr_data \dr_wr_data$118 [31:0]
-    connect \dr_wr_en \dr_wr_en$105 [0]
-    connect \done \done$860 [0]
-    connect \dmem_addr \dmem_addr$973 [31:0]
-    connect \dmem_rd_en \dmem_rd_en$949 [0]
-    connect \dr_rd_addr \dr_rd_addr$590 [3:0]
+    connect \fault \fault$822 [0]
+    connect \fault_type \fault_type$841 [4:0]
+    connect \dr_wr_addr \dr_wr_addr$116 [3:0]
+    connect \dr_wr_data \dr_wr_data$117 [31:0]
+    connect \dr_wr_en \dr_wr_en$104 [0]
+    connect \done \done$857 [0]
+    connect \dmem_addr \dmem_addr$970 [31:0]
+    connect \dmem_rd_en \dmem_rd_en$946 [0]
+    connect \dr_rd_addr \dr_rd_addr$587 [3:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:336"
@@ -23759,19 +23718,19 @@ module \top.core
     connect \private_m_start \private_m_start [0]
     connect \cr_rd_data \cr_rd_data [95:0]
     connect \dr_rd_data2 \dr_rd_data [31:0]
-    connect \dr_rd_data \dr_rd_data$574 [31:0]
+    connect \dr_rd_data \dr_rd_data$571 [31:0]
     connect \cr_rd_addr \cr_rd_addr$57 [3:0]
     connect \dr_rd_addr \dr_rd_addr [3:0]
     connect \busy \busy$23 [0]
-    connect \fault \fault$826 [0]
-    connect \fault_type \fault_type$845 [4:0]
-    connect \dmem_addr \dmem_addr$974 [31:0]
-    connect \dmem_wr_data \dmem_wr_data$977 [31:0]
-    connect \dmem_wr_en \dmem_wr_en$950 [0]
+    connect \fault \fault$823 [0]
+    connect \fault_type \fault_type$842 [4:0]
+    connect \dmem_addr \dmem_addr$971 [31:0]
+    connect \dmem_wr_data \dmem_wr_data$974 [31:0]
+    connect \dmem_wr_en \dmem_wr_en$947 [0]
     connect \done \done [0]
     connect \m_bit_wr_en \m_bit_wr_en [0]
     connect \m_bit_wr_word \m_bit_wr_word [15:0]
-    connect \dr_rd_addr2 \dr_rd_addr2$589 [3:0]
+    connect \dr_rd_addr2 \dr_rd_addr2$586 [3:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:337"
@@ -23780,16 +23739,16 @@ module \top.core
     connect \mem_rd_data \mem_rd_data [31:0]
     connect \mem_rd_valid$12 \mem_rd_valid [0]
     connect \clear_all \clear_all [0]
-    connect \mem_addr \mem_addr$979 [31:0]
-    connect \mem_rd_en \mem_rd_en$951 [0]
+    connect \mem_addr \mem_addr$976 [31:0]
+    connect \mem_rd_en \mem_rd_en$948 [0]
     connect \cload_busy \cload_busy [0]
     connect \cload_fault \cload_fault [0]
     connect \cload_start \cload_pending [0]
     connect \cr15_namespace \cr15_namespace [95:0]
     connect \e_gt \e_gt [31:0]
-    connect \cr_wr_addr \cr_wr_addr$157 [3:0]
-    connect \cr_wr_data \cr_wr_data$170 [95:0]
-    connect \cr_wr_en \cr_wr_en$152 [0]
+    connect \cr_wr_addr \cr_wr_addr$156 [3:0]
+    connect \cr_wr_data \cr_wr_data$169 [95:0]
+    connect \cr_wr_en \cr_wr_en$151 [0]
     connect \cload_fault_type \cload_fault_type [4:0]
   end
 
@@ -23802,7 +23761,7 @@ module \top.core
     connect \slot_id \slot_id [15:0]
     connect \alloc_done \alloc_done [0]
     connect \alloc_fault \alloc_fault [0]
-    connect \alloc_base $292 [31:0]
+    connect \alloc_base $291 [31:0]
     connect \mint_done \mint_done_comb_ni [0]
     connect \mint_result_gt \mint_result_gt [31:0]
     connect \mint_fault \mint_fault_comb_ni [0]
@@ -23811,9 +23770,9 @@ module \top.core
     connect \tx_valid \outform_tx_valid [0]
     connect \alloc_req \alloc_req [0]
     connect \alloc_n \alloc_n [4:0]
-    connect \mem_wr_addr \mem_wr_addr$980 [31:0]
-    connect \mem_wr_data \mem_wr_data$981 [31:0]
-    connect \mem_wr_en \mem_wr_en$952 [0]
+    connect \mem_wr_addr \mem_wr_addr$977 [31:0]
+    connect \mem_wr_data \mem_wr_data$978 [31:0]
+    connect \mem_wr_en \mem_wr_en$949 [0]
     connect \mint_call \mint_call [0]
     connect \outform_done \outform_done [0]
     connect \outform_fault \outform_fault [0]
@@ -23827,23 +23786,23 @@ module \top.core
     connect \clk \clk [0]
     connect \clear_all \clear_all [0]
     connect \intercept_start \intercept_start [0]
-    connect \outform_done_in \outform_done_in$741 [0]
-    connect \outform_fault_in \outform_fault_in$743 [0]
+    connect \outform_done_in \outform_done_in$738 [0]
+    connect \outform_fault_in \outform_fault_in$740 [0]
     connect \result_gt_in \result_gt_in [31:0]
     connect \outform_fault_type_in \outform_fault_type_in [4:0]
-    connect \outform_start_out \outform_start_out$710 [0]
+    connect \outform_start_out \outform_start_out$707 [0]
     connect \outform_gt_raw_out \outform_gt_raw_out [31:0]
     connect \outform_slot_id_out \outform_slot_id_out [15:0]
-    connect \cr_wr_en \cr_wr_en$151 [0]
-    connect \cr_wr_addr \cr_wr_addr$158 [3:0]
-    connect \cr_wr_data \cr_wr_data$171 [95:0]
+    connect \cr_wr_en \cr_wr_en$150 [0]
+    connect \cr_wr_addr \cr_wr_addr$157 [3:0]
+    connect \cr_wr_data \cr_wr_data$170 [95:0]
     connect \busy \busy$39 [0]
-    connect \fault \fault$828 [0]
-    connect \fault_type \fault_type$847 [4:0]
+    connect \fault \fault$825 [0]
+    connect \fault_type \fault_type$844 [4:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:367"
-  cell $eq $643
+  cell $eq $642
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 3
@@ -23855,7 +23814,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:368"
-  cell $eq $644
+  cell $eq $643
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 3
@@ -23867,7 +23826,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:399"
-  cell $and $645
+  cell $and $644
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -23879,7 +23838,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:426"
-  cell $and $646
+  cell $and $645
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -23891,7 +23850,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:426"
-  cell $not $647
+  cell $not $646
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
@@ -23900,7 +23859,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:426"
-  cell $and $648
+  cell $and $647
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -23912,7 +23871,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $649
+  cell $or $648
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -23924,7 +23883,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $650
+  cell $or $649
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -23936,7 +23895,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $651
+  cell $or $650
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -23948,7 +23907,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $652
+  cell $or $651
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -23960,7 +23919,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $653
+  cell $or $652
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -23972,7 +23931,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $654
+  cell $or $653
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -23984,7 +23943,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $655
+  cell $or $654
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -23996,7 +23955,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $656
+  cell $or $655
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24008,7 +23967,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $657
+  cell $or $656
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24020,7 +23979,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $658
+  cell $or $657
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24032,7 +23991,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $659
+  cell $or $658
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24044,7 +24003,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $660
+  cell $or $659
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24056,7 +24015,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $661
+  cell $or $660
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24068,7 +24027,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $662
+  cell $or $661
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24080,7 +24039,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $663
+  cell $or $662
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24092,7 +24051,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $664
+  cell $or $663
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24104,7 +24063,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $665
+  cell $or $664
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24116,7 +24075,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $666
+  cell $or $665
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24128,7 +24087,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $667
+  cell $or $666
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24140,7 +24099,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $668
+  cell $or $667
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24152,7 +24111,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $669
+  cell $or $668
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24164,7 +24123,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $670
+  cell $or $669
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24176,7 +24135,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:476"
-  cell $or $671
+  cell $or $670
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24188,7 +24147,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:491"
-  cell $or $672
+  cell $or $671
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24200,7 +24159,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:491"
-  cell $or $673
+  cell $or $672
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24212,7 +24171,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:491"
-  cell $or $674
+  cell $or $673
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24224,7 +24183,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:491"
-  cell $or $675
+  cell $or $674
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24236,7 +24195,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:491"
-  cell $or $676
+  cell $or $675
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24248,7 +24207,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:491"
-  cell $or $677
+  cell $or $676
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24260,7 +24219,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:490"
-  cell $or $678
+  cell $or $677
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24272,7 +24231,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:501"
-  cell $and $679
+  cell $and $678
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24284,7 +24243,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:501"
-  cell $eq $680
+  cell $eq $679
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -24296,7 +24255,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:501"
-  cell $and $681
+  cell $and $680
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24308,7 +24267,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:501"
-  cell $not $682
+  cell $not $681
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
@@ -24317,7 +24276,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:501"
-  cell $and $683
+  cell $and $682
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24329,7 +24288,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:508"
-  cell $and $684
+  cell $and $683
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24341,7 +24300,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:508"
-  cell $eq $685
+  cell $eq $684
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -24353,7 +24312,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:508"
-  cell $and $686
+  cell $and $685
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24365,7 +24324,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:508"
-  cell $not $687
+  cell $not $686
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
@@ -24374,7 +24333,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:508"
-  cell $and $688
+  cell $and $687
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24386,7 +24345,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:508"
-  cell $and $689
+  cell $and $688
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24398,7 +24357,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:509"
-  cell $ne $690
+  cell $ne $689
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -24410,7 +24369,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:508"
-  cell $and $691
+  cell $and $690
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24422,7 +24381,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:512"
-  cell $and $692
+  cell $and $691
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24434,7 +24393,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:512"
-  cell $eq $693
+  cell $eq $692
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -24446,7 +24405,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:512"
-  cell $and $694
+  cell $and $693
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24458,7 +24417,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:512"
-  cell $not $695
+  cell $not $694
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
@@ -24467,7 +24426,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:512"
-  cell $and $696
+  cell $and $695
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24479,7 +24438,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:513"
-  cell $ne $697
+  cell $ne $696
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -24491,7 +24450,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:513"
-  cell $and $698
+  cell $and $697
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24503,7 +24462,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:513"
-  cell $not $699
+  cell $not $698
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
@@ -24512,7 +24471,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:512"
-  cell $and $700
+  cell $and $699
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24524,7 +24483,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:541"
-  cell $or $701
+  cell $or $700
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24536,7 +24495,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:534"
-  cell $mux $702
+  cell $mux $701
     parameter \WIDTH 4
     connect \S \busy$23 [0]
     connect \A \instruction [18:15]
@@ -24545,7 +24504,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:533"
-  cell $mux $703
+  cell $mux $702
     parameter \WIDTH 4
     connect \S \busy$22 [0]
     connect \A $52 [3:0]
@@ -24554,7 +24513,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:532"
-  cell $mux $704
+  cell $mux $703
     parameter \WIDTH 4
     connect \S \busy$45 [0]
     connect \A $53 [3:0]
@@ -24563,7 +24522,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:531"
-  cell $mux $705
+  cell $mux $704
     parameter \WIDTH 4
     connect \S \busy$44 [0]
     connect \A $54 [3:0]
@@ -24572,7 +24531,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:537"
-  cell $mux $706
+  cell $mux $705
     parameter \WIDTH 4
     connect \S \switch_busy [0]
     connect \A $55 [3:0]
@@ -24581,7 +24540,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:536"
-  cell $mux $707
+  cell $mux $706
     parameter \WIDTH 4
     connect \S \change_busy [0]
     connect \A $56 [3:0]
@@ -24589,8 +24548,8 @@ module \top.core
     connect \Y $57
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:545"
-  cell $mux $708
+  attribute \src "/home/runner/workspace/hardware/core.py:544"
+  cell $mux $707
     parameter \WIDTH 4
     connect \S \save_busy [0]
     connect \A $57 [3:0]
@@ -24598,53 +24557,44 @@ module \top.core
     connect \Y $58
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:544"
-  cell $mux $709
+  attribute \src "/home/runner/workspace/hardware/core.py:543"
+  cell $mux $708
     parameter \WIDTH 4
-    connect \S \busy [0]
+    connect \S \call_busy [0]
     connect \A $58 [3:0]
     connect \B \cr_rd_addr$64 [3:0]
     connect \Y $59
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:543"
-  cell $mux $710
+  attribute \src "/home/runner/workspace/hardware/core.py:542"
+  cell $mux $709
     parameter \WIDTH 4
-    connect \S \call_busy [0]
+    connect \S \tperm_busy [0]
     connect \A $59 [3:0]
     connect \B \cr_rd_addr$65 [3:0]
     connect \Y $60
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:542"
-  cell $mux $711
+  attribute \src "/home/runner/workspace/hardware/core.py:541"
+  cell $mux $710
     parameter \WIDTH 4
-    connect \S \tperm_busy [0]
+    connect \S $51 [0]
     connect \A $60 [3:0]
     connect \B \cr_rd_addr$66 [3:0]
     connect \Y $61
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:541"
-  cell $mux $712
-    parameter \WIDTH 4
-    connect \S $51 [0]
-    connect \A $61 [3:0]
-    connect \B \cr_rd_addr$67 [3:0]
-    connect \Y $62
-  end
-
   attribute \src "/home/runner/workspace/hardware/core.py:540"
-  cell $mux $713
+  cell $mux $711
     parameter \WIDTH 4
     connect \S \sub_busy [0]
-    connect \A $62 [3:0]
-    connect \B \cr_rd_addr$68 [3:0]
+    connect \A $61 [3:0]
+    connect \B \cr_rd_addr$67 [3:0]
     connect \Y \cr_rd_addr
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:575"
-  cell $eq $714
+  attribute \src "/home/runner/workspace/hardware/core.py:573"
+  cell $eq $712
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -24652,20 +24602,20 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [18:15]
     connect \B 3'110
+    connect \Y $62
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:573"
+  cell $mux $713
+    parameter \WIDTH 4
+    connect \S $62 [0]
+    connect \A 4'1000
+    connect \B 4'0000
     connect \Y $63
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:575"
-  cell $mux $715
-    parameter \WIDTH 4
-    connect \S $63 [0]
-    connect \A 4'1000
-    connect \B 4'0000
-    connect \Y $64
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:583"
-  cell $eq $716
+  attribute \src "/home/runner/workspace/hardware/core.py:581"
+  cell $eq $714
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 2
@@ -24673,11 +24623,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cr_rd_data [26:25]
     connect \B 2'11
-    connect \Y $65
+    connect \Y $64
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:584"
-  cell $eq $717
+  attribute \src "/home/runner/workspace/hardware/core.py:582"
+  cell $eq $715
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 2
@@ -24685,23 +24635,23 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cr_rd_data [26:25]
     connect \B 2'10
-    connect \Y $66
+    connect \Y $65
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:583"
-  cell $or $718
+  attribute \src "/home/runner/workspace/hardware/core.py:581"
+  cell $or $716
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $65 [0]
-    connect \B $66 [0]
-    connect \Y $67
+    connect \A $64 [0]
+    connect \B $65 [0]
+    connect \Y $66
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:612"
-  cell $and $719
+  attribute \src "/home/runner/workspace/hardware/core.py:610"
+  cell $and $717
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24709,53 +24659,53 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_church_op [0]
-    connect \Y $68
+    connect \Y $67
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:612"
-  cell $not $720
+  attribute \src "/home/runner/workspace/hardware/core.py:610"
+  cell $not $718
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \any_unit_busy [0]
+    connect \Y $68
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:610"
+  cell $and $719
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $67 [0]
+    connect \B $68 [0]
     connect \Y $69
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:612"
+  attribute \src "/home/runner/workspace/hardware/core.py:611"
+  cell $not $720
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \boot_microcode_active [0]
+    connect \Y $70
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:610"
   cell $and $721
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $68 [0]
-    connect \B $69 [0]
-    connect \Y $70
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:613"
-  cell $not $722
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \boot_microcode_active [0]
+    connect \A $69 [0]
+    connect \B $70 [0]
     connect \Y $71
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:612"
-  cell $and $723
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $70 [0]
-    connect \B $71 [0]
-    connect \Y $72
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:614"
-  cell $ne $724
+  cell $ne $722
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -24763,23 +24713,23 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [31:27]
     connect \B 3'100
-    connect \Y $73
+    connect \Y $72
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:612"
-  cell $and $725
+  attribute \src "/home/runner/workspace/hardware/core.py:610"
+  cell $and $723
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $72 [0]
-    connect \B $73 [0]
+    connect \A $71 [0]
+    connect \B $72 [0]
     connect \Y \check_valid
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:617"
-  cell $and $726
+  attribute \src "/home/runner/workspace/hardware/core.py:615"
+  cell $and $724
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -24787,11 +24737,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_church_op [0]
-    connect \Y $74
+    connect \Y $73
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:617"
-  cell $eq $727
+  attribute \src "/home/runner/workspace/hardware/core.py:615"
+  cell $eq $725
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -24799,86 +24749,95 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [31:27]
     connect \B 3'110
-    connect \Y $75
+    connect \Y $74
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:617"
-  cell $and $728
+  attribute \src "/home/runner/workspace/hardware/core.py:615"
+  cell $and $726
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $74 [0]
-    connect \B $75 [0]
+    connect \A $73 [0]
+    connect \B $74 [0]
     connect \Y \check_domain_purity
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:774"
-  cell $not $729
+  attribute \src "/home/runner/workspace/hardware/core.py:772"
+  cell $not $727
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \tperm_z_result [0]
-    connect \Y $76
+    connect \Y $75
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:825"
-  cell $mux $730
+  attribute \src "/home/runner/workspace/hardware/core.py:823"
+  cell $mux $728
     parameter \WIDTH 4
     connect \S \busy$45 [0]
     connect \A 4'0000
+    connect \B \cr_wr_addr$152 [3:0]
+    connect \Y $76
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:822"
+  cell $mux $729
+    parameter \WIDTH 4
+    connect \S \busy$44 [0]
+    connect \A $76 [3:0]
     connect \B \cr_wr_addr$153 [3:0]
     connect \Y $77
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:824"
-  cell $mux $731
+  attribute \src "/home/runner/workspace/hardware/core.py:829"
+  cell $mux $730
     parameter \WIDTH 4
-    connect \S \busy$44 [0]
+    connect \S \switch_busy [0]
     connect \A $77 [3:0]
     connect \B \cr_wr_addr$154 [3:0]
     connect \Y $78
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:831"
-  cell $mux $732
+  attribute \src "/home/runner/workspace/hardware/core.py:828"
+  cell $mux $731
     parameter \WIDTH 4
-    connect \S \switch_busy [0]
+    connect \S \change_busy [0]
     connect \A $78 [3:0]
     connect \B \cr_wr_addr$155 [3:0]
     connect \Y $79
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:830"
-  cell $mux $733
+  attribute \src "/home/runner/workspace/hardware/core.py:827"
+  cell $mux $732
     parameter \WIDTH 4
-    connect \S \change_busy [0]
+    connect \S \cr_wr_en$151 [0]
     connect \A $79 [3:0]
     connect \B \cr_wr_addr$156 [3:0]
     connect \Y $80
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:829"
-  cell $mux $734
+  attribute \src "/home/runner/workspace/hardware/core.py:843"
+  cell $mux $733
     parameter \WIDTH 4
-    connect \S \cr_wr_en$152 [0]
+    connect \S \cr_wr_en$150 [0]
     connect \A $80 [3:0]
     connect \B \cr_wr_addr$157 [3:0]
     connect \Y $81
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:845"
-  cell $mux $735
+  attribute \src "/home/runner/workspace/hardware/core.py:847"
+  cell $mux $734
     parameter \WIDTH 4
-    connect \S \cr_wr_en$151 [0]
+    connect \S 1'0
     connect \A $81 [3:0]
-    connect \B \cr_wr_addr$158 [3:0]
+    connect \B 4'0000
     connect \Y $82
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:849"
-  cell $mux $736
+  attribute \src "/home/runner/workspace/hardware/core.py:857"
+  cell $mux $735
     parameter \WIDTH 4
     connect \S 1'0
     connect \A $82 [3:0]
@@ -24886,116 +24845,116 @@ module \top.core
     connect \Y $83
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:859"
-  cell $mux $737
+  attribute \src "/home/runner/workspace/hardware/core.py:856"
+  cell $mux $736
     parameter \WIDTH 4
-    connect \S 1'0
+    connect \S \cr_wr_en$147 [0]
     connect \A $83 [3:0]
-    connect \B 4'0000
+    connect \B \cr_wr_addr$160 [3:0]
     connect \Y $84
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:858"
-  cell $mux $738
+  attribute \src "/home/runner/workspace/hardware/core.py:855"
+  cell $mux $737
     parameter \WIDTH 4
-    connect \S \cr_wr_en$148 [0]
+    connect \S \cr_wr_en$146 [0]
     connect \A $84 [3:0]
     connect \B \cr_wr_addr$161 [3:0]
     connect \Y $85
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:857"
-  cell $mux $739
+  attribute \src "/home/runner/workspace/hardware/core.py:854"
+  cell $mux $738
     parameter \WIDTH 4
-    connect \S \cr_wr_en$147 [0]
+    connect \S \cr_wr_en [0]
     connect \A $85 [3:0]
     connect \B \cr_wr_addr$162 [3:0]
     connect \Y $86
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:856"
-  cell $mux $740
+  attribute \src "/home/runner/workspace/hardware/core.py:853"
+  cell $mux $739
     parameter \WIDTH 4
-    connect \S \cr_wr_en [0]
+    connect \S \boot_cap_wr_en [0]
     connect \A $86 [3:0]
-    connect \B \cr_wr_addr$163 [3:0]
+    connect \B \boot_cap_wr_addr [3:0]
     connect \Y $87
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:855"
-  cell $mux $741
-    parameter \WIDTH 4
-    connect \S \boot_cap_wr_en [0]
-    connect \A $87 [3:0]
-    connect \B \boot_cap_wr_addr [3:0]
-    connect \Y $88
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:854"
-  cell $mux $742
+  attribute \src "/home/runner/workspace/hardware/core.py:852"
+  cell $mux $740
     parameter \WIDTH 4
     connect \S \mwin_cr_wr_en [0]
-    connect \A $88 [3:0]
+    connect \A $87 [3:0]
     connect \B 4'1111
     connect \Y \cr_wr_addr
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:827"
-  cell $mux $743
+  attribute \src "/home/runner/workspace/hardware/core.py:825"
+  cell $mux $741
     parameter \WIDTH 96
     connect \S \busy$45 [0]
     connect \A 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+    connect \B \cr_wr_data$165 [95:0]
+    connect \Y $88
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:824"
+  cell $mux $742
+    parameter \WIDTH 96
+    connect \S \busy$44 [0]
+    connect \A $88 [95:0]
     connect \B \cr_wr_data$166 [95:0]
     connect \Y $89
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:826"
-  cell $mux $744
+  attribute \src "/home/runner/workspace/hardware/core.py:833"
+  cell $mux $743
     parameter \WIDTH 96
-    connect \S \busy$44 [0]
+    connect \S \switch_busy [0]
     connect \A $89 [95:0]
     connect \B \cr_wr_data$167 [95:0]
     connect \Y $90
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:835"
-  cell $mux $745
+  attribute \src "/home/runner/workspace/hardware/core.py:832"
+  cell $mux $744
     parameter \WIDTH 96
-    connect \S \switch_busy [0]
+    connect \S \change_busy [0]
     connect \A $90 [95:0]
     connect \B \cr_wr_data$168 [95:0]
     connect \Y $91
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:834"
-  cell $mux $746
+  attribute \src "/home/runner/workspace/hardware/core.py:831"
+  cell $mux $745
     parameter \WIDTH 96
-    connect \S \change_busy [0]
+    connect \S \cr_wr_en$151 [0]
     connect \A $91 [95:0]
     connect \B \cr_wr_data$169 [95:0]
     connect \Y $92
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:833"
-  cell $mux $747
+  attribute \src "/home/runner/workspace/hardware/core.py:844"
+  cell $mux $746
     parameter \WIDTH 96
-    connect \S \cr_wr_en$152 [0]
+    connect \S \cr_wr_en$150 [0]
     connect \A $92 [95:0]
     connect \B \cr_wr_data$170 [95:0]
     connect \Y $93
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:846"
-  cell $mux $748
+  attribute \src "/home/runner/workspace/hardware/core.py:848"
+  cell $mux $747
     parameter \WIDTH 96
-    connect \S \cr_wr_en$151 [0]
+    connect \S 1'0
     connect \A $93 [95:0]
-    connect \B \cr_wr_data$171 [95:0]
+    connect \B 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
     connect \Y $94
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:850"
-  cell $mux $749
+  attribute \src "/home/runner/workspace/hardware/core.py:866"
+  cell $mux $748
     parameter \WIDTH 96
     connect \S 1'0
     connect \A $94 [95:0]
@@ -25003,62 +24962,53 @@ module \top.core
     connect \Y $95
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:868"
-  cell $mux $750
+  attribute \src "/home/runner/workspace/hardware/core.py:865"
+  cell $mux $749
     parameter \WIDTH 96
-    connect \S 1'0
+    connect \S \cr_wr_en$147 [0]
     connect \A $95 [95:0]
-    connect \B 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+    connect \B \cr_wr_data$173 [95:0]
     connect \Y $96
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:867"
-  cell $mux $751
+  attribute \src "/home/runner/workspace/hardware/core.py:864"
+  cell $mux $750
     parameter \WIDTH 96
-    connect \S \cr_wr_en$148 [0]
+    connect \S \cr_wr_en$146 [0]
     connect \A $96 [95:0]
     connect \B \cr_wr_data$174 [95:0]
     connect \Y $97
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:866"
-  cell $mux $752
+  attribute \src "/home/runner/workspace/hardware/core.py:863"
+  cell $mux $751
     parameter \WIDTH 96
-    connect \S \cr_wr_en$147 [0]
+    connect \S \cr_wr_en [0]
     connect \A $97 [95:0]
     connect \B \cr_wr_data$175 [95:0]
     connect \Y $98
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:865"
-  cell $mux $753
+  attribute \src "/home/runner/workspace/hardware/core.py:862"
+  cell $mux $752
     parameter \WIDTH 96
-    connect \S \cr_wr_en [0]
+    connect \S \boot_cap_wr_en [0]
     connect \A $98 [95:0]
-    connect \B \cr_wr_data$176 [95:0]
+    connect \B \boot_cap_wr_data [95:0]
     connect \Y $99
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:864"
-  cell $mux $754
-    parameter \WIDTH 96
-    connect \S \boot_cap_wr_en [0]
-    connect \A $99 [95:0]
-    connect \B \boot_cap_wr_data [95:0]
-    connect \Y $100
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:863"
-  cell $mux $755
+  attribute \src "/home/runner/workspace/hardware/core.py:861"
+  cell $mux $753
     parameter \WIDTH 96
     connect \S \mwin_cr_wr_en [0]
-    connect \A $100 [95:0]
+    connect \A $99 [95:0]
     connect \B \mwin_cr_wr_data [95:0]
     connect \Y \cr_wr_data
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:872"
-  cell $or $756
+  attribute \src "/home/runner/workspace/hardware/core.py:870"
+  cell $or $754
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25066,23 +25016,35 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \mwin_cr_wr_en [0]
     connect \B \boot_cap_wr_en [0]
+    connect \Y $100
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:870"
+  cell $or $755
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $100 [0]
+    connect \B \cr_wr_en [0]
     connect \Y $101
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:872"
-  cell $or $757
+  attribute \src "/home/runner/workspace/hardware/core.py:870"
+  cell $or $756
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $101 [0]
-    connect \B \cr_wr_en [0]
+    connect \B \cr_wr_en$146 [0]
     connect \Y $102
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:872"
-  cell $or $758
+  attribute \src "/home/runner/workspace/hardware/core.py:870"
+  cell $or $757
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25093,56 +25055,56 @@ module \top.core
     connect \Y $103
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:872"
-  cell $or $759
+  attribute \src "/home/runner/workspace/hardware/core.py:870"
+  cell $or $758
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $103 [0]
-    connect \B \cr_wr_en$148 [0]
+    connect \B 1'0
     connect \Y $104
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:872"
+  attribute \src "/home/runner/workspace/hardware/core.py:826"
+  cell $or $759
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \cr_wr_en$179 [0]
+    connect \B \cr_wr_en$180 [0]
+    connect \Y $105
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:835"
   cell $or $760
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $104 [0]
-    connect \B 1'0
-    connect \Y $105
+    connect \A $105 [0]
+    connect \B \cr_wr_en$151 [0]
+    connect \Y $106
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:828"
+  attribute \src "/home/runner/workspace/hardware/core.py:835"
   cell $or $761
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \cr_wr_en$180 [0]
-    connect \B \cr_wr_en$181 [0]
-    connect \Y $106
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:837"
-  cell $or $762
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
     connect \A $106 [0]
-    connect \B \cr_wr_en$152 [0]
+    connect \B \cr_wr_en$181 [0]
     connect \Y $107
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:837"
-  cell $or $763
+  attribute \src "/home/runner/workspace/hardware/core.py:835"
+  cell $or $762
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25153,56 +25115,44 @@ module \top.core
     connect \Y $108
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:837"
-  cell $or $764
+  attribute \src "/home/runner/workspace/hardware/core.py:845"
+  cell $or $763
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $108 [0]
-    connect \B \cr_wr_en$183 [0]
+    connect \B \cr_wr_en$150 [0]
     connect \Y $109
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:847"
-  cell $or $765
+  attribute \src "/home/runner/workspace/hardware/core.py:849"
+  cell $or $764
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $109 [0]
-    connect \B \cr_wr_en$151 [0]
+    connect \B 1'0
     connect \Y $110
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:851"
+  attribute \src "/home/runner/workspace/hardware/core.py:870"
+  cell $or $765
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $104 [0]
+    connect \B $110 [0]
+    connect \Y \cr_wr_en$178
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:878"
   cell $or $766
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $110 [0]
-    connect \B 1'0
-    connect \Y $111
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:872"
-  cell $or $767
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $105 [0]
-    connect \B $111 [0]
-    connect \Y \cr_wr_en$179
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:880"
-  cell $or $768
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25213,13 +25163,37 @@ module \top.core
     connect \Y \m_bit_device_wr_en
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:882"
-  cell $mux $769
+  attribute \src "/home/runner/workspace/hardware/core.py:880"
+  cell $mux $767
     parameter \WIDTH 16
     connect \S 1'0
     connect \A \m_bit_wr_word [15:0]
     connect \B 16'0000000000000000
     connect \Y \m_bit_device_word
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:890"
+  cell $eq $768
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 4
+    parameter \B_WIDTH 3
+    parameter \Y_WIDTH 1
+    connect \A \cr_wr_addr$156 [3:0]
+    connect \B 3'110
+    connect \Y $111
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:890"
+  cell $and $769
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \cr_wr_en$151 [0]
+    connect \B $111 [0]
+    connect \Y \m_return_commit_en
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:892"
@@ -25229,7 +25203,7 @@ module \top.core
     parameter \A_WIDTH 4
     parameter \B_WIDTH 3
     parameter \Y_WIDTH 1
-    connect \A \cr_wr_addr$157 [3:0]
+    connect \A \cr_wr_addr$156 [3:0]
     connect \B 3'110
     connect \Y $112
   end
@@ -25241,37 +25215,13 @@ module \top.core
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \cr_wr_en$152 [0]
+    connect \A \cr_wr_en$151 [0]
     connect \B $112 [0]
-    connect \Y \m_return_commit_en
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:894"
-  cell $eq $772
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 4
-    parameter \B_WIDTH 3
-    parameter \Y_WIDTH 1
-    connect \A \cr_wr_addr$157 [3:0]
-    connect \B 3'110
-    connect \Y $113
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:894"
-  cell $and $773
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \cr_wr_en$152 [0]
-    connect \B $113 [0]
     connect \Y \dbg_return_m_commit
   end
 
   attribute \src "/home/runner/workspace/hardware/integrity32.py:63"
-  cell $and $774
+  cell $and $772
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -25283,7 +25233,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/integrity32.py:68"
-  cell $xor $775
+  cell $xor $773
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -25291,23 +25241,23 @@ module \top.core
     parameter \Y_WIDTH 32
     connect \A { \cr15_namespace [56:32] \cr15_namespace [63:57] }
     connect \B { \w1_masked [18:0] \w1_masked [31:19] }
-    connect \Y $114
+    connect \Y $113
   end
 
   attribute \src "/home/runner/workspace/hardware/integrity32.py:68"
-  cell $xor $776
+  cell $xor $774
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 32
     parameter \Y_WIDTH 32
-    connect \A $114 [31:0]
+    connect \A $113 [31:0]
     connect \B 32'11011110101011011011111011101111
     connect \Y \cr15_m_set_integrity
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:929"
-  cell $mux $777
+  attribute \src "/home/runner/workspace/hardware/core.py:927"
+  cell $mux $775
     parameter \WIDTH 32
     connect \S \mgt_set_trigger [0]
     connect \A \cr15_namespace [31:0]
@@ -25315,8 +25265,8 @@ module \top.core
     connect \Y \m_set_dr11
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:933"
-  cell $mux $778
+  attribute \src "/home/runner/workspace/hardware/core.py:931"
+  cell $mux $776
     parameter \WIDTH 32
     connect \S \mgt_set_trigger [0]
     connect \A \cr15_namespace [63:32]
@@ -25324,8 +25274,8 @@ module \top.core
     connect \Y \m_set_dr12
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:937"
-  cell $mux $779
+  attribute \src "/home/runner/workspace/hardware/core.py:935"
+  cell $mux $777
     parameter \WIDTH 32
     connect \S \mgt_set_trigger [0]
     connect \A \cr15_namespace [95:64]
@@ -25333,8 +25283,8 @@ module \top.core
     connect \Y \m_set_dr13
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:941"
-  cell $mux $780
+  attribute \src "/home/runner/workspace/hardware/core.py:939"
+  cell $mux $778
     parameter \WIDTH 32
     connect \S \mgt_set_trigger [0]
     connect \A \cr15_m_set_integrity [31:0]
@@ -25342,8 +25292,8 @@ module \top.core
     connect \Y \m_set_dr14
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:948"
-  cell $mux $781
+  attribute \src "/home/runner/workspace/hardware/core.py:946"
+  cell $mux $779
     parameter \WIDTH 32
     connect \S \mgt_set_trigger [0]
     connect \A 32'00000000000000000000000000000000
@@ -25351,8 +25301,8 @@ module \top.core
     connect \Y \m_set_dr15
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1278"
-  cell $lt $782
+  attribute \src "/home/runner/workspace/hardware/core.py:1276"
+  cell $lt $780
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 2
@@ -25360,23 +25310,23 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \boot_retire_count [1:0]
     connect \B 2'11
-    connect \Y $115
+    connect \Y $114
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1278"
-  cell $and $783
+  attribute \src "/home/runner/workspace/hardware/core.py:1276"
+  cell $and $781
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \boot_complete [0]
-    connect \B $115 [0]
+    connect \B $114 [0]
     connect \Y \boot_microcode_active
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1287"
-  cell $and $784
+  attribute \src "/home/runner/workspace/hardware/core.py:1285"
+  cell $and $782
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25384,10 +25334,31 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \boot_complete [0]
     connect \B \cond_exec_enable [0]
+    connect \Y $115
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1285"
+  cell $and $783
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $115 [0]
+    connect \B \is_church_op [0]
     connect \Y $116
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1287"
+  attribute \src "/home/runner/workspace/hardware/core.py:1285"
+  cell $not $784
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \any_unit_busy [0]
+    connect \Y $117
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1285"
   cell $and $785
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -25395,33 +25366,12 @@ module \top.core
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $116 [0]
-    connect \B \is_church_op [0]
-    connect \Y $117
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1287"
-  cell $not $786
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
+    connect \B $117 [0]
     connect \Y $118
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1287"
-  cell $and $787
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $117 [0]
-    connect \B $118 [0]
-    connect \Y $119
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1288"
-  cell $eq $788
+  attribute \src "/home/runner/workspace/hardware/core.py:1286"
+  cell $eq $786
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -25429,23 +25379,23 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [31:27]
     connect \B 3'100
-    connect \Y $120
+    connect \Y $119
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1287"
-  cell $and $789
+  attribute \src "/home/runner/workspace/hardware/core.py:1285"
+  cell $and $787
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $119 [0]
-    connect \B $120 [0]
+    connect \A $118 [0]
+    connect \B $119 [0]
     connect \Y \change_gt_sync_active
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1301"
-  cell $or $790
+  attribute \src "/home/runner/workspace/hardware/core.py:1299"
+  cell $or $788
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25456,8 +25406,8 @@ module \top.core
     connect \Y \cr0_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1302"
-  cell $mux $791
+  attribute \src "/home/runner/workspace/hardware/core.py:1300"
+  cell $mux $789
     parameter \WIDTH 32
     connect \S 1'0
     connect \A 32'00000000000000000000000000000000
@@ -25465,8 +25415,8 @@ module \top.core
     connect \Y \cr0_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1301"
-  cell $or $792
+  attribute \src "/home/runner/workspace/hardware/core.py:1299"
+  cell $or $790
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25477,8 +25427,8 @@ module \top.core
     connect \Y \cr1_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1302"
-  cell $mux $793
+  attribute \src "/home/runner/workspace/hardware/core.py:1300"
+  cell $mux $791
     parameter \WIDTH 32
     connect \S 1'0
     connect \A 32'00000000000000000000000000000000
@@ -25486,8 +25436,8 @@ module \top.core
     connect \Y \cr1_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1301"
-  cell $or $794
+  attribute \src "/home/runner/workspace/hardware/core.py:1299"
+  cell $or $792
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25498,8 +25448,8 @@ module \top.core
     connect \Y \cr2_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1302"
-  cell $mux $795
+  attribute \src "/home/runner/workspace/hardware/core.py:1300"
+  cell $mux $793
     parameter \WIDTH 32
     connect \S 1'0
     connect \A 32'00000000000000000000000000000000
@@ -25507,8 +25457,8 @@ module \top.core
     connect \Y \cr2_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1301"
-  cell $or $796
+  attribute \src "/home/runner/workspace/hardware/core.py:1299"
+  cell $or $794
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25519,8 +25469,8 @@ module \top.core
     connect \Y \cr3_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1302"
-  cell $mux $797
+  attribute \src "/home/runner/workspace/hardware/core.py:1300"
+  cell $mux $795
     parameter \WIDTH 32
     connect \S 1'0
     connect \A 32'00000000000000000000000000000000
@@ -25528,8 +25478,8 @@ module \top.core
     connect \Y \cr3_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1301"
-  cell $or $798
+  attribute \src "/home/runner/workspace/hardware/core.py:1299"
+  cell $or $796
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25540,8 +25490,8 @@ module \top.core
     connect \Y \cr4_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1302"
-  cell $mux $799
+  attribute \src "/home/runner/workspace/hardware/core.py:1300"
+  cell $mux $797
     parameter \WIDTH 32
     connect \S 1'0
     connect \A 32'00000000000000000000000000000000
@@ -25549,8 +25499,8 @@ module \top.core
     connect \Y \cr4_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1301"
-  cell $or $800
+  attribute \src "/home/runner/workspace/hardware/core.py:1299"
+  cell $or $798
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25561,8 +25511,8 @@ module \top.core
     connect \Y \cr5_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1302"
-  cell $mux $801
+  attribute \src "/home/runner/workspace/hardware/core.py:1300"
+  cell $mux $799
     parameter \WIDTH 32
     connect \S 1'0
     connect \A 32'00000000000000000000000000000000
@@ -25570,8 +25520,8 @@ module \top.core
     connect \Y \cr5_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1301"
-  cell $or $802
+  attribute \src "/home/runner/workspace/hardware/core.py:1299"
+  cell $or $800
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25582,8 +25532,8 @@ module \top.core
     connect \Y \cr6_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1302"
-  cell $mux $803
+  attribute \src "/home/runner/workspace/hardware/core.py:1300"
+  cell $mux $801
     parameter \WIDTH 32
     connect \S 1'0
     connect \A 32'00000000000000000000000000000000
@@ -25591,8 +25541,8 @@ module \top.core
     connect \Y \cr6_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1301"
-  cell $or $804
+  attribute \src "/home/runner/workspace/hardware/core.py:1299"
+  cell $or $802
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25603,8 +25553,8 @@ module \top.core
     connect \Y \cr7_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1302"
-  cell $mux $805
+  attribute \src "/home/runner/workspace/hardware/core.py:1300"
+  cell $mux $803
     parameter \WIDTH 32
     connect \S 1'0
     connect \A 32'00000000000000000000000000000000
@@ -25612,8 +25562,8 @@ module \top.core
     connect \Y \cr7_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1301"
-  cell $or $806
+  attribute \src "/home/runner/workspace/hardware/core.py:1299"
+  cell $or $804
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25624,8 +25574,8 @@ module \top.core
     connect \Y \cr8_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1302"
-  cell $mux $807
+  attribute \src "/home/runner/workspace/hardware/core.py:1300"
+  cell $mux $805
     parameter \WIDTH 32
     connect \S 1'0
     connect \A \rt_cap8_wr_gt [31:0]
@@ -25633,8 +25583,8 @@ module \top.core
     connect \Y \cr8_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1301"
-  cell $or $808
+  attribute \src "/home/runner/workspace/hardware/core.py:1299"
+  cell $or $806
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25645,8 +25595,8 @@ module \top.core
     connect \Y \cr9_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1302"
-  cell $mux $809
+  attribute \src "/home/runner/workspace/hardware/core.py:1300"
+  cell $mux $807
     parameter \WIDTH 32
     connect \S 1'0
     connect \A \rt_cap9_wr_gt [31:0]
@@ -25654,8 +25604,8 @@ module \top.core
     connect \Y \cr9_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1301"
-  cell $or $810
+  attribute \src "/home/runner/workspace/hardware/core.py:1299"
+  cell $or $808
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25666,8 +25616,8 @@ module \top.core
     connect \Y \cr10_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1302"
-  cell $mux $811
+  attribute \src "/home/runner/workspace/hardware/core.py:1300"
+  cell $mux $809
     parameter \WIDTH 32
     connect \S 1'0
     connect \A \rt_cap10_wr_gt [31:0]
@@ -25675,8 +25625,8 @@ module \top.core
     connect \Y \cr10_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1301"
-  cell $or $812
+  attribute \src "/home/runner/workspace/hardware/core.py:1299"
+  cell $or $810
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25687,8 +25637,8 @@ module \top.core
     connect \Y \cr11_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1302"
-  cell $mux $813
+  attribute \src "/home/runner/workspace/hardware/core.py:1300"
+  cell $mux $811
     parameter \WIDTH 32
     connect \S 1'0
     connect \A \rt_cap11_wr_gt [31:0]
@@ -25696,8 +25646,8 @@ module \top.core
     connect \Y \cr11_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1301"
-  cell $or $814
+  attribute \src "/home/runner/workspace/hardware/core.py:1299"
+  cell $or $812
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25708,8 +25658,8 @@ module \top.core
     connect \Y \cr12_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1302"
-  cell $mux $815
+  attribute \src "/home/runner/workspace/hardware/core.py:1300"
+  cell $mux $813
     parameter \WIDTH 32
     connect \S \boot_cap12_wr_en [0]
     connect \A \rt_cap12_wr_gt [31:0]
@@ -25717,8 +25667,8 @@ module \top.core
     connect \Y \cr12_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1301"
-  cell $or $816
+  attribute \src "/home/runner/workspace/hardware/core.py:1299"
+  cell $or $814
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25729,8 +25679,8 @@ module \top.core
     connect \Y \cr13_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1302"
-  cell $mux $817
+  attribute \src "/home/runner/workspace/hardware/core.py:1300"
+  cell $mux $815
     parameter \WIDTH 32
     connect \S 1'0
     connect \A \rt_cap13_wr_gt [31:0]
@@ -25738,8 +25688,8 @@ module \top.core
     connect \Y \cr13_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1301"
-  cell $or $818
+  attribute \src "/home/runner/workspace/hardware/core.py:1299"
+  cell $or $816
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25750,8 +25700,8 @@ module \top.core
     connect \Y \cr14_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1302"
-  cell $mux $819
+  attribute \src "/home/runner/workspace/hardware/core.py:1300"
+  cell $mux $817
     parameter \WIDTH 32
     connect \S \boot_cap14_wr_en [0]
     connect \A \rt_cap14_wr_gt [31:0]
@@ -25759,8 +25709,8 @@ module \top.core
     connect \Y \cr14_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1301"
-  cell $or $820
+  attribute \src "/home/runner/workspace/hardware/core.py:1299"
+  cell $or $818
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25771,8 +25721,8 @@ module \top.core
     connect \Y \cr15_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1302"
-  cell $mux $821
+  attribute \src "/home/runner/workspace/hardware/core.py:1300"
+  cell $mux $819
     parameter \WIDTH 32
     connect \S 1'0
     connect \A \rt_cap15_wr_gt [31:0]
@@ -25780,8 +25730,8 @@ module \top.core
     connect \Y \cr15_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1311"
-  cell $eq $822
+  attribute \src "/home/runner/workspace/hardware/core.py:1309"
+  cell $eq $820
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 2
@@ -25792,86 +25742,86 @@ module \top.core
     connect \Y \call_src_is_outform
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1317"
+  attribute \src "/home/runner/workspace/hardware/core.py:1315"
+  cell $and $821
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \cond_exec_enable [0]
+    connect \B \is_church_op [0]
+    connect \Y $120
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1315"
+  cell $eq $822
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 5
+    parameter \B_WIDTH 2
+    parameter \Y_WIDTH 1
+    connect \A \instruction [31:27]
+    connect \B 2'10
+    connect \Y $121
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1315"
   cell $and $823
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \cond_exec_enable [0]
-    connect \B \is_church_op [0]
-    connect \Y $121
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1317"
-  cell $eq $824
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 5
-    parameter \B_WIDTH 2
-    parameter \Y_WIDTH 1
-    connect \A \instruction [31:27]
-    connect \B 2'10
+    connect \A $120 [0]
+    connect \B $121 [0]
     connect \Y $122
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1317"
+  attribute \src "/home/runner/workspace/hardware/core.py:1316"
+  cell $not $824
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \any_unit_busy [0]
+    connect \Y $123
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1315"
   cell $and $825
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $121 [0]
-    connect \B $122 [0]
-    connect \Y $123
+    connect \A $122 [0]
+    connect \B $123 [0]
+    connect \Y $124
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1318"
+  attribute \src "/home/runner/workspace/hardware/core.py:1316"
   cell $not $826
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
-    connect \Y $124
+    connect \A \call_src_is_outform [0]
+    connect \Y $125
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1317"
+  attribute \src "/home/runner/workspace/hardware/core.py:1315"
   cell $and $827
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $123 [0]
-    connect \B $124 [0]
-    connect \Y $125
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1318"
-  cell $not $828
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \call_src_is_outform [0]
-    connect \Y $126
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1317"
-  cell $and $829
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $125 [0]
-    connect \B $126 [0]
+    connect \A $124 [0]
+    connect \B $125 [0]
     connect \Y \call_start_sig
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1324"
-  cell $and $830
+  attribute \src "/home/runner/workspace/hardware/core.py:1322"
+  cell $and $828
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25879,11 +25829,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_church_op [0]
-    connect \Y $127
+    connect \Y $126
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1324"
-  cell $eq $831
+  attribute \src "/home/runner/workspace/hardware/core.py:1322"
+  cell $eq $829
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -25891,56 +25841,56 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [31:27]
     connect \B 2'10
+    connect \Y $127
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1322"
+  cell $and $830
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $126 [0]
+    connect \B $127 [0]
     connect \Y $128
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1324"
+  attribute \src "/home/runner/workspace/hardware/core.py:1323"
+  cell $not $831
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \any_unit_busy [0]
+    connect \Y $129
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1322"
   cell $and $832
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $127 [0]
-    connect \B $128 [0]
-    connect \Y $129
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1325"
-  cell $not $833
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
+    connect \A $128 [0]
+    connect \B $129 [0]
     connect \Y $130
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1324"
-  cell $and $834
+  attribute \src "/home/runner/workspace/hardware/core.py:1322"
+  cell $and $833
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $129 [0]
-    connect \B $130 [0]
-    connect \Y $131
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1324"
-  cell $and $835
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $131 [0]
+    connect \A $130 [0]
     connect \B \call_src_is_outform [0]
     connect \Y \intercept_start
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1361"
-  cell $and $836
+  attribute \src "/home/runner/workspace/hardware/core.py:1359"
+  cell $and $834
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -25948,11 +25898,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_church_op [0]
-    connect \Y $132
+    connect \Y $131
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1361"
-  cell $eq $837
+  attribute \src "/home/runner/workspace/hardware/core.py:1359"
+  cell $eq $835
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -25960,44 +25910,44 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [31:27]
     connect \B 2'11
+    connect \Y $132
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1359"
+  cell $and $836
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $131 [0]
+    connect \B $132 [0]
     connect \Y $133
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1361"
+  attribute \src "/home/runner/workspace/hardware/core.py:1359"
+  cell $not $837
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \any_unit_busy [0]
+    connect \Y $134
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1359"
   cell $and $838
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $132 [0]
-    connect \B $133 [0]
-    connect \Y $134
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1361"
-  cell $not $839
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
-    connect \Y $135
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1361"
-  cell $and $840
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $134 [0]
-    connect \B $135 [0]
+    connect \A $133 [0]
+    connect \B $134 [0]
     connect \Y \ret_start_sig
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1414"
-  cell $add $841
+  attribute \src "/home/runner/workspace/hardware/core.py:1410"
+  cell $add $839
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -26005,11 +25955,11 @@ module \top.core
     parameter \Y_WIDTH 33
     connect \A \imem_addr [31:0]
     connect \B 3'100
-    connect \Y $136
+    connect \Y $135
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1421"
-  cell $and $842
+  attribute \src "/home/runner/workspace/hardware/core.py:1417"
+  cell $and $840
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -26017,11 +25967,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_church_op [0]
-    connect \Y $137
+    connect \Y $136
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1421"
-  cell $eq $843
+  attribute \src "/home/runner/workspace/hardware/core.py:1417"
+  cell $eq $841
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -26029,44 +25979,44 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [31:27]
     connect \B 3'110
+    connect \Y $137
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1417"
+  cell $and $842
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $136 [0]
+    connect \B $137 [0]
     connect \Y $138
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1421"
+  attribute \src "/home/runner/workspace/hardware/core.py:1417"
+  cell $not $843
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \any_unit_busy [0]
+    connect \Y $139
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1417"
   cell $and $844
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $137 [0]
-    connect \B $138 [0]
-    connect \Y $139
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1421"
-  cell $not $845
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
-    connect \Y $140
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1421"
-  cell $and $846
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $139 [0]
-    connect \B $140 [0]
+    connect \A $138 [0]
+    connect \B $139 [0]
     connect \Y \tperm_start_sig
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1438"
-  cell $and $847
+  attribute \src "/home/runner/workspace/hardware/core.py:1434"
+  cell $and $845
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -26074,11 +26024,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_church_op [0]
-    connect \Y $141
+    connect \Y $140
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1438"
-  cell $eq $848
+  attribute \src "/home/runner/workspace/hardware/core.py:1434"
+  cell $eq $846
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -26086,44 +26036,44 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [31:27]
     connect \B 1'1
+    connect \Y $141
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1434"
+  cell $and $847
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $140 [0]
+    connect \B $141 [0]
     connect \Y $142
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1438"
+  attribute \src "/home/runner/workspace/hardware/core.py:1434"
+  cell $not $848
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \any_unit_busy [0]
+    connect \Y $143
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1434"
   cell $and $849
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $141 [0]
-    connect \B $142 [0]
-    connect \Y $143
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1438"
-  cell $not $850
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
-    connect \Y $144
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1438"
-  cell $and $851
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $143 [0]
-    connect \B $144 [0]
+    connect \A $142 [0]
+    connect \B $143 [0]
     connect \Y \save_start_sig
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1446"
-  cell $eq $852
+  attribute \src "/home/runner/workspace/hardware/core.py:1442"
+  cell $eq $850
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -26131,11 +26081,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [22:19]
     connect \B 4'1100
-    connect \Y $145
+    connect \Y $144
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1447"
-  cell $eq $853
+  attribute \src "/home/runner/workspace/hardware/core.py:1443"
+  cell $eq $851
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -26143,11 +26093,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [22:19]
     connect \B 4'1101
-    connect \Y $146
+    connect \Y $145
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1448"
-  cell $eq $854
+  attribute \src "/home/runner/workspace/hardware/core.py:1444"
+  cell $eq $852
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -26155,11 +26105,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [22:19]
     connect \B 4'1110
-    connect \Y $147
+    connect \Y $146
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1449"
-  cell $eq $855
+  attribute \src "/home/runner/workspace/hardware/core.py:1445"
+  cell $eq $853
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -26167,47 +26117,47 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [22:19]
     connect \B 4'1111
+    connect \Y $147
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1445"
+  cell $mux $854
+    parameter \WIDTH 1
+    connect \S $147 [0]
+    connect \A 1'0
+    connect \B \dbg_m_bit_state [15]
     connect \Y $148
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1449"
-  cell $mux $856
+  attribute \src "/home/runner/workspace/hardware/core.py:1444"
+  cell $mux $855
     parameter \WIDTH 1
-    connect \S $148 [0]
-    connect \A 1'0
-    connect \B \dbg_m_bit_state [15]
+    connect \S $146 [0]
+    connect \A $148 [0]
+    connect \B \dbg_m_bit_state [14]
     connect \Y $149
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1448"
-  cell $mux $857
+  attribute \src "/home/runner/workspace/hardware/core.py:1443"
+  cell $mux $856
     parameter \WIDTH 1
-    connect \S $147 [0]
+    connect \S $145 [0]
     connect \A $149 [0]
-    connect \B \dbg_m_bit_state [14]
+    connect \B \dbg_m_bit_state [13]
     connect \Y $150
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1447"
-  cell $mux $858
+  attribute \src "/home/runner/workspace/hardware/core.py:1442"
+  cell $mux $857
     parameter \WIDTH 1
-    connect \S $146 [0]
+    connect \S $144 [0]
     connect \A $150 [0]
-    connect \B \dbg_m_bit_state [13]
-    connect \Y $151
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1446"
-  cell $mux $859
-    parameter \WIDTH 1
-    connect \S $145 [0]
-    connect \A $151 [0]
     connect \B \dbg_m_bit_state [12]
     connect \Y \source_m
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1460"
-  cell $and $860
+  attribute \src "/home/runner/workspace/hardware/core.py:1456"
+  cell $and $858
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -26215,32 +26165,32 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_dread_op [0]
-    connect \Y $152
+    connect \Y $151
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1460"
-  cell $not $861
+  attribute \src "/home/runner/workspace/hardware/core.py:1456"
+  cell $not $859
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \any_unit_busy [0]
-    connect \Y $153
+    connect \Y $152
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1460"
-  cell $and $862
+  attribute \src "/home/runner/workspace/hardware/core.py:1456"
+  cell $and $860
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $152 [0]
-    connect \B $153 [0]
+    connect \A $151 [0]
+    connect \B $152 [0]
     connect \Y \dread_start_sig
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1478"
-  cell $eq $863
+  attribute \src "/home/runner/workspace/hardware/core.py:1474"
+  cell $eq $861
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 2
@@ -26248,11 +26198,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cr14_code [26:25]
     connect \B 1'1
-    connect \Y $154
+    connect \Y $153
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1479"
-  cell $eq $864
+  attribute \src "/home/runner/workspace/hardware/core.py:1475"
+  cell $eq $862
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 16
@@ -26260,44 +26210,44 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cr14_code [15:0]
     connect \B 3'101
+    connect \Y $154
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1474"
+  cell $and $863
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $153 [0]
+    connect \B $154 [0]
     connect \Y $155
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1478"
+  attribute \src "/home/runner/workspace/hardware/core.py:1476"
+  cell $not $864
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \cr14_code [27]
+    connect \Y $156
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1474"
   cell $and $865
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $154 [0]
-    connect \B $155 [0]
-    connect \Y $156
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1480"
-  cell $not $866
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \cr14_code [27]
+    connect \A $155 [0]
+    connect \B $156 [0]
     connect \Y $157
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1478"
-  cell $and $867
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $156 [0]
-    connect \B $157 [0]
-    connect \Y $158
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1481"
-  cell $eq $868
+  attribute \src "/home/runner/workspace/hardware/core.py:1477"
+  cell $eq $866
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 3
@@ -26305,44 +26255,44 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cr14_code [30:28]
     connect \B 3'101
+    connect \Y $158
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1474"
+  cell $and $867
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $157 [0]
+    connect \B $158 [0]
     connect \Y $159
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:1478"
+  cell $not $868
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \cr14_code [31]
+    connect \Y $160
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1474"
   cell $and $869
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $158 [0]
-    connect \B $159 [0]
-    connect \Y $160
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1482"
-  cell $not $870
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \cr14_code [31]
-    connect \Y $161
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1478"
-  cell $and $871
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $160 [0]
-    connect \B $161 [0]
+    connect \A $159 [0]
+    connect \B $160 [0]
     connect \Y \namespace_exec_authorized
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1486"
-  cell $and $872
+  attribute \src "/home/runner/workspace/hardware/core.py:1482"
+  cell $and $870
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -26350,32 +26300,32 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_dwrite_op [0]
-    connect \Y $162
+    connect \Y $161
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1486"
-  cell $not $873
+  attribute \src "/home/runner/workspace/hardware/core.py:1482"
+  cell $not $871
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \any_unit_busy [0]
-    connect \Y $163
+    connect \Y $162
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1486"
-  cell $and $874
+  attribute \src "/home/runner/workspace/hardware/core.py:1482"
+  cell $and $872
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $162 [0]
-    connect \B $163 [0]
+    connect \A $161 [0]
+    connect \B $162 [0]
     connect \Y \dwrite_start_sig
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1500"
-  cell $eq $875
+  attribute \src "/home/runner/workspace/hardware/core.py:1496"
+  cell $eq $873
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 3
@@ -26383,10 +26333,31 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \boot_state [2:0]
     connect \B 3'100
+    connect \Y $163
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1496"
+  cell $and $874
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $163 [0]
+    connect \B \namespace_init_armed [0]
     connect \Y $164
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1500"
+  attribute \src "/home/runner/workspace/hardware/core.py:1497"
+  cell $not $875
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \busy$23 [0]
+    connect \Y $165
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1496"
   cell $and $876
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -26394,54 +26365,33 @@ module \top.core
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $164 [0]
-    connect \B \namespace_init_armed [0]
-    connect \Y $165
+    connect \B $165 [0]
+    connect \Y $166
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1501"
+  attribute \src "/home/runner/workspace/hardware/core.py:1497"
   cell $not $877
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \busy$23 [0]
-    connect \Y $166
+    connect \A \done [0]
+    connect \Y $167
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1500"
+  attribute \src "/home/runner/workspace/hardware/core.py:1496"
   cell $and $878
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $165 [0]
-    connect \B $166 [0]
-    connect \Y $167
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1501"
-  cell $not $879
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \done [0]
-    connect \Y $168
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1500"
-  cell $and $880
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $167 [0]
-    connect \B $168 [0]
+    connect \A $166 [0]
+    connect \B $167 [0]
     connect \Y \private_m_start
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1512"
-  cell $or $881
+  attribute \src "/home/runner/workspace/hardware/core.py:1508"
+  cell $or $879
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -26449,59 +26399,59 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \iadd_start_sig [0]
     connect \B \isub_start_sig [0]
-    connect \Y $169
+    connect \Y $168
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1513"
-  cell $not $882
+  attribute \src "/home/runner/workspace/hardware/core.py:1509"
+  cell $not $880
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \instruction [14]
-    connect \Y $170
+    connect \Y $169
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1512"
-  cell $and $883
+  attribute \src "/home/runner/workspace/hardware/core.py:1508"
+  cell $and $881
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $169 [0]
-    connect \B $170 [0]
+    connect \A $168 [0]
+    connect \B $169 [0]
+    connect \Y $170
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1508"
+  cell $mux $882
+    parameter \WIDTH 4
+    connect \S $170 [0]
+    connect \A 4'0000
+    connect \B \instruction [3:0]
     connect \Y $171
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1512"
-  cell $mux $884
+  attribute \src "/home/runner/workspace/hardware/core.py:1507"
+  cell $mux $883
     parameter \WIDTH 4
-    connect \S $171 [0]
-    connect \A 4'0000
-    connect \B \instruction [3:0]
+    connect \S \bfins_start_sig [0]
+    connect \A $171 [3:0]
+    connect \B \instruction [22:19]
     connect \Y $172
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1511"
-  cell $mux $885
-    parameter \WIDTH 4
-    connect \S \bfins_start_sig [0]
-    connect \A $172 [3:0]
-    connect \B \instruction [22:19]
-    connect \Y $173
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1510"
-  cell $mux $886
+  attribute \src "/home/runner/workspace/hardware/core.py:1506"
+  cell $mux $884
     parameter \WIDTH 4
     connect \S \busy$23 [0]
-    connect \A $173 [3:0]
+    connect \A $172 [3:0]
     connect \B \dr_rd_addr [3:0]
     connect \Y \dr_rd_addr2
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1529"
-  cell $and $887
+  attribute \src "/home/runner/workspace/hardware/core.py:1525"
+  cell $and $885
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -26509,32 +26459,32 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_iadd_op [0]
-    connect \Y $174
+    connect \Y $173
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1529"
-  cell $not $888
+  attribute \src "/home/runner/workspace/hardware/core.py:1525"
+  cell $not $886
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \any_unit_busy [0]
-    connect \Y $175
+    connect \Y $174
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1529"
-  cell $and $889
+  attribute \src "/home/runner/workspace/hardware/core.py:1525"
+  cell $and $887
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $174 [0]
-    connect \B $175 [0]
+    connect \A $173 [0]
+    connect \B $174 [0]
     connect \Y \iadd_start_sig
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1530"
-  cell $and $890
+  attribute \src "/home/runner/workspace/hardware/core.py:1526"
+  cell $and $888
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -26542,41 +26492,41 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_isub_op [0]
-    connect \Y $176
+    connect \Y $175
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1530"
-  cell $not $891
+  attribute \src "/home/runner/workspace/hardware/core.py:1526"
+  cell $not $889
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \any_unit_busy [0]
-    connect \Y $177
+    connect \Y $176
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1530"
-  cell $and $892
+  attribute \src "/home/runner/workspace/hardware/core.py:1526"
+  cell $and $890
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $176 [0]
-    connect \B $177 [0]
+    connect \A $175 [0]
+    connect \B $176 [0]
     connect \Y \isub_start_sig
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1548"
-  cell $mux $893
+  attribute \src "/home/runner/workspace/hardware/core.py:1544"
+  cell $mux $891
     parameter \WIDTH 32
     connect \S \instruction [14]
-    connect \A \dr_rd_data$574 [31:0]
+    connect \A \dr_rd_data$571 [31:0]
     connect \B { 18'000000000000000000 \instruction [13:0] }
     connect \Y \arith_rhs
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1557"
-  cell $or $894
+  attribute \src "/home/runner/workspace/hardware/core.py:1553"
+  cell $or $892
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -26584,98 +26534,98 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \iadd_start_sig [0]
     connect \B \isub_start_sig [0]
+    connect \Y $177
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1553"
+  cell $or $893
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $177 [0]
+    connect \B \shl_start_sig [0]
     connect \Y $178
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1557"
-  cell $or $895
+  attribute \src "/home/runner/workspace/hardware/core.py:1553"
+  cell $or $894
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $178 [0]
-    connect \B \shl_start_sig [0]
+    connect \B \shr_start_sig [0]
     connect \Y $179
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1557"
-  cell $or $896
+  attribute \src "/home/runner/workspace/hardware/core.py:1553"
+  cell $or $895
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $179 [0]
-    connect \B \shr_start_sig [0]
+    connect \B \bfext_start_sig [0]
     connect \Y $180
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1557"
-  cell $or $897
+  attribute \src "/home/runner/workspace/hardware/core.py:1553"
+  cell $or $896
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $180 [0]
-    connect \B \bfext_start_sig [0]
+    connect \B \bfins_start_sig [0]
     connect \Y $181
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1557"
-  cell $or $898
+  attribute \src "/home/runner/workspace/hardware/core.py:1553"
+  cell $or $897
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $181 [0]
-    connect \B \bfins_start_sig [0]
+    connect \B \mcmp_start_sig [0]
     connect \Y $182
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1557"
-  cell $or $899
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $182 [0]
-    connect \B \mcmp_start_sig [0]
+  attribute \src "/home/runner/workspace/hardware/core.py:1553"
+  cell $mux $898
+    parameter \WIDTH 4
+    connect \S $182 [0]
+    connect \A 4'0000
+    connect \B \instruction [18:15]
     connect \Y $183
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1557"
-  cell $mux $900
+  attribute \src "/home/runner/workspace/hardware/core.py:1552"
+  cell $mux $899
     parameter \WIDTH 4
-    connect \S $183 [0]
-    connect \A 4'0000
-    connect \B \instruction [18:15]
+    connect \S \busy$23 [0]
+    connect \A $183 [3:0]
+    connect \B \dr_rd_addr2$586 [3:0]
     connect \Y $184
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1556"
-  cell $mux $901
-    parameter \WIDTH 4
-    connect \S \busy$23 [0]
-    connect \A $184 [3:0]
-    connect \B \dr_rd_addr2$589 [3:0]
-    connect \Y $185
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1555"
-  cell $mux $902
+  attribute \src "/home/runner/workspace/hardware/core.py:1551"
+  cell $mux $900
     parameter \WIDTH 4
     connect \S \busy$22 [0]
-    connect \A $185 [3:0]
-    connect \B \dr_rd_addr$590 [3:0]
+    connect \A $184 [3:0]
+    connect \B \dr_rd_addr$587 [3:0]
     connect \Y \dr_rd_addr1
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1567"
-  cell $add $903
+  attribute \src "/home/runner/workspace/hardware/core.py:1563"
+  cell $add $901
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -26686,8 +26636,8 @@ module \top.core
     connect \Y \iadd_result
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1568"
-  cell $sub $904
+  attribute \src "/home/runner/workspace/hardware/core.py:1564"
+  cell $sub $902
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -26698,8 +26648,8 @@ module \top.core
     connect \Y \isub_result
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1575"
-  cell $eq $905
+  attribute \src "/home/runner/workspace/hardware/core.py:1571"
+  cell $eq $903
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -26707,11 +26657,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \iadd_result [31:0]
     connect \B {  }
-    connect \Y $186
+    connect \Y $185
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1578"
-  cell $xor $906
+  attribute \src "/home/runner/workspace/hardware/core.py:1574"
+  cell $xor $904
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -26719,20 +26669,20 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \dr_rd_data [31]
     connect \B \arith_rhs [31]
-    connect \Y $187
+    connect \Y $186
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1578"
-  cell $not $907
+  attribute \src "/home/runner/workspace/hardware/core.py:1574"
+  cell $not $905
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $187 [0]
-    connect \Y $188
+    connect \A $186 [0]
+    connect \Y $187
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1579"
-  cell $xor $908
+  attribute \src "/home/runner/workspace/hardware/core.py:1575"
+  cell $xor $906
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -26740,23 +26690,23 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \iadd_result [31]
     connect \B \dr_rd_data [31]
-    connect \Y $189
+    connect \Y $188
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1578"
-  cell $and $909
+  attribute \src "/home/runner/workspace/hardware/core.py:1574"
+  cell $and $907
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $188 [0]
-    connect \B $189 [0]
-    connect \Y $190
+    connect \A $187 [0]
+    connect \B $188 [0]
+    connect \Y $189
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1582"
-  cell $eq $910
+  attribute \src "/home/runner/workspace/hardware/core.py:1578"
+  cell $eq $908
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -26764,20 +26714,20 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \isub_result [31:0]
     connect \B {  }
-    connect \Y $191
+    connect \Y $190
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1583"
-  cell $not $911
+  attribute \src "/home/runner/workspace/hardware/core.py:1579"
+  cell $not $909
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \isub_result [32]
-    connect \Y $192
+    connect \Y $191
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1585"
-  cell $xor $912
+  attribute \src "/home/runner/workspace/hardware/core.py:1581"
+  cell $xor $910
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -26785,11 +26735,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \dr_rd_data [31]
     connect \B \arith_rhs [31]
-    connect \Y $193
+    connect \Y $192
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1586"
-  cell $xor $913
+  attribute \src "/home/runner/workspace/hardware/core.py:1582"
+  cell $xor $911
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -26797,23 +26747,23 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \isub_result [31]
     connect \B \dr_rd_data [31]
-    connect \Y $194
+    connect \Y $193
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1585"
-  cell $and $914
+  attribute \src "/home/runner/workspace/hardware/core.py:1581"
+  cell $and $912
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $193 [0]
-    connect \B $194 [0]
-    connect \Y $195
+    connect \A $192 [0]
+    connect \B $193 [0]
+    connect \Y $194
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1599"
-  cell $and $915
+  attribute \src "/home/runner/workspace/hardware/core.py:1595"
+  cell $and $913
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -26821,32 +26771,32 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_shl_op [0]
-    connect \Y $196
+    connect \Y $195
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1599"
-  cell $not $916
+  attribute \src "/home/runner/workspace/hardware/core.py:1595"
+  cell $not $914
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \any_unit_busy [0]
-    connect \Y $197
+    connect \Y $196
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1599"
-  cell $and $917
+  attribute \src "/home/runner/workspace/hardware/core.py:1595"
+  cell $and $915
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $196 [0]
-    connect \B $197 [0]
+    connect \A $195 [0]
+    connect \B $196 [0]
     connect \Y \shl_start_sig
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1600"
-  cell $and $918
+  attribute \src "/home/runner/workspace/hardware/core.py:1596"
+  cell $and $916
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -26854,32 +26804,32 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_shr_op [0]
-    connect \Y $198
+    connect \Y $197
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1600"
-  cell $not $919
+  attribute \src "/home/runner/workspace/hardware/core.py:1596"
+  cell $not $917
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \any_unit_busy [0]
-    connect \Y $199
+    connect \Y $198
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1600"
-  cell $and $920
+  attribute \src "/home/runner/workspace/hardware/core.py:1596"
+  cell $and $918
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $198 [0]
-    connect \B $199 [0]
+    connect \A $197 [0]
+    connect \B $198 [0]
     connect \Y \shr_start_sig
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1611"
-  cell $shl $921
+  attribute \src "/home/runner/workspace/hardware/core.py:1607"
+  cell $shl $919
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -26887,11 +26837,11 @@ module \top.core
     parameter \Y_WIDTH 63
     connect \A \dr_rd_data [31:0]
     connect \B \instruction [4:0]
-    connect \Y $200
+    connect \Y $199
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1623"
-  cell $shr $922
+  attribute \src "/home/runner/workspace/hardware/core.py:1619"
+  cell $shr $920
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -26902,8 +26852,8 @@ module \top.core
     connect \Y \lsr_result
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1624"
-  cell $shr $923
+  attribute \src "/home/runner/workspace/hardware/core.py:1620"
+  cell $shr $921
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 64
@@ -26911,20 +26861,20 @@ module \top.core
     parameter \Y_WIDTH 64
     connect \A { \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31:0] }
     connect \B \instruction [4:0]
-    connect \Y $201
+    connect \Y $200
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1625"
-  cell $mux $924
+  attribute \src "/home/runner/workspace/hardware/core.py:1621"
+  cell $mux $922
     parameter \WIDTH 32
     connect \S \instruction [5]
     connect \A \lsr_result [31:0]
-    connect \B $201 [31:0]
+    connect \B $200 [31:0]
     connect \Y \shr_result
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1636"
-  cell $sub $925
+  attribute \src "/home/runner/workspace/hardware/core.py:1632"
+  cell $sub $923
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -26932,11 +26882,11 @@ module \top.core
     parameter \Y_WIDTH 6
     connect \A \instruction [4:0]
     connect \B 1'1
-    connect \Y $202
+    connect \Y $201
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1637"
-  cell $sub $926
+  attribute \src "/home/runner/workspace/hardware/core.py:1633"
+  cell $sub $924
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 6
@@ -26944,11 +26894,11 @@ module \top.core
     parameter \Y_WIDTH 7
     connect \A 6'100000
     connect \B \instruction [4:0]
-    connect \Y $203
+    connect \Y $202
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1638"
-  cell $eq $927
+  attribute \src "/home/runner/workspace/hardware/core.py:1634"
+  cell $eq $925
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -26956,32 +26906,32 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [4:0]
     connect \B {  }
-    connect \Y $204
+    connect \Y $203
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1639"
-  cell $shr $928
+  attribute \src "/home/runner/workspace/hardware/core.py:1635"
+  cell $shr $926
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 5
     parameter \Y_WIDTH 32
     connect \A \dr_rd_data [31:0]
-    connect \B $202 [4:0]
-    connect \Y $205
+    connect \B $201 [4:0]
+    connect \Y $204
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1638"
-  cell $mux $929
+  attribute \src "/home/runner/workspace/hardware/core.py:1634"
+  cell $mux $927
     parameter \WIDTH 1
-    connect \S $204 [0]
-    connect \A $205 [0]
+    connect \S $203 [0]
+    connect \A $204 [0]
     connect \B 1'0
     connect \Y \shr_c_bit
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1640"
-  cell $eq $930
+  attribute \src "/home/runner/workspace/hardware/core.py:1636"
+  cell $eq $928
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -26989,44 +26939,44 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [4:0]
     connect \B {  }
-    connect \Y $206
+    connect \Y $205
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1641"
-  cell $shr $931
+  attribute \src "/home/runner/workspace/hardware/core.py:1637"
+  cell $shr $929
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 6
     parameter \Y_WIDTH 32
     connect \A \dr_rd_data [31:0]
-    connect \B $203 [5:0]
-    connect \Y $207
+    connect \B $202 [5:0]
+    connect \Y $206
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1640"
-  cell $mux $932
+  attribute \src "/home/runner/workspace/hardware/core.py:1636"
+  cell $mux $930
     parameter \WIDTH 1
-    connect \S $206 [0]
-    connect \A $207 [0]
+    connect \S $205 [0]
+    connect \A $206 [0]
     connect \B 1'0
     connect \Y \shl_c_bit
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1648"
-  cell $eq $933
+  attribute \src "/home/runner/workspace/hardware/core.py:1644"
+  cell $eq $931
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 0
     parameter \Y_WIDTH 1
-    connect \A $200 [31:0]
+    connect \A $199 [31:0]
     connect \B {  }
-    connect \Y $208
+    connect \Y $207
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1652"
-  cell $eq $934
+  attribute \src "/home/runner/workspace/hardware/core.py:1648"
+  cell $eq $932
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -27034,11 +26984,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \shr_result [31:0]
     connect \B {  }
-    connect \Y $209
+    connect \Y $208
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1664"
-  cell $and $935
+  attribute \src "/home/runner/workspace/hardware/core.py:1660"
+  cell $and $933
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -27046,32 +26996,32 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_bfext_op [0]
-    connect \Y $210
+    connect \Y $209
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1664"
-  cell $not $936
+  attribute \src "/home/runner/workspace/hardware/core.py:1660"
+  cell $not $934
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \any_unit_busy [0]
-    connect \Y $211
+    connect \Y $210
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1664"
-  cell $and $937
+  attribute \src "/home/runner/workspace/hardware/core.py:1660"
+  cell $and $935
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $210 [0]
-    connect \B $211 [0]
+    connect \A $209 [0]
+    connect \B $210 [0]
     connect \Y \bfext_start_sig
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1673"
-  cell $shl $938
+  attribute \src "/home/runner/workspace/hardware/core.py:1669"
+  cell $shl $936
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -27079,23 +27029,23 @@ module \top.core
     parameter \Y_WIDTH 32
     connect \A 1'1
     connect \B \instruction [9:5]
-    connect \Y $212
+    connect \Y $211
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1673"
-  cell $sub $939
+  attribute \src "/home/runner/workspace/hardware/core.py:1669"
+  cell $sub $937
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 33
-    connect \A $212 [31:0]
+    connect \A $211 [31:0]
     connect \B 1'1
-    connect \Y $213
+    connect \Y $212
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1674"
-  cell $shr $940
+  attribute \src "/home/runner/workspace/hardware/core.py:1670"
+  cell $shr $938
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -27103,23 +27053,23 @@ module \top.core
     parameter \Y_WIDTH 32
     connect \A \dr_rd_data [31:0]
     connect \B \instruction [4:0]
-    connect \Y $214
+    connect \Y $213
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1674"
-  cell $and $941
+  attribute \src "/home/runner/workspace/hardware/core.py:1670"
+  cell $and $939
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 32
     parameter \Y_WIDTH 32
-    connect \A $214 [31:0]
-    connect \B $213 [31:0]
+    connect \A $213 [31:0]
+    connect \B $212 [31:0]
     connect \Y \bfext_result
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1680"
-  cell $eq $942
+  attribute \src "/home/runner/workspace/hardware/core.py:1676"
+  cell $eq $940
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -27127,11 +27077,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \bfext_result [31:0]
     connect \B {  }
-    connect \Y $215
+    connect \Y $214
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1694"
-  cell $and $943
+  attribute \src "/home/runner/workspace/hardware/core.py:1690"
+  cell $and $941
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -27139,113 +27089,113 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_bfins_op [0]
-    connect \Y $216
+    connect \Y $215
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1694"
-  cell $not $944
+  attribute \src "/home/runner/workspace/hardware/core.py:1690"
+  cell $not $942
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \any_unit_busy [0]
-    connect \Y $217
+    connect \Y $216
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1694"
-  cell $and $945
+  attribute \src "/home/runner/workspace/hardware/core.py:1690"
+  cell $and $943
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $216 [0]
-    connect \B $217 [0]
+    connect \A $215 [0]
+    connect \B $216 [0]
     connect \Y \bfins_start_sig
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1699"
-  cell $shl $946
+  attribute \src "/home/runner/workspace/hardware/core.py:1695"
+  cell $shl $944
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 5
     parameter \Y_WIDTH 63
-    connect \A $213 [31:0]
+    connect \A $212 [31:0]
     connect \B \instruction [4:0]
-    connect \Y $218
+    connect \Y $217
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1701"
-  cell $not $947
+  attribute \src "/home/runner/workspace/hardware/core.py:1697"
+  cell $not $945
     parameter \A_SIGNED 0
     parameter \A_WIDTH 32
     parameter \Y_WIDTH 32
-    connect \A $218 [31:0]
-    connect \Y $219
+    connect \A $217 [31:0]
+    connect \Y $218
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1701"
-  cell $and $948
+  attribute \src "/home/runner/workspace/hardware/core.py:1697"
+  cell $and $946
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 32
     parameter \Y_WIDTH 32
-    connect \A \dr_rd_data$574 [31:0]
-    connect \B $219 [31:0]
-    connect \Y $220
+    connect \A \dr_rd_data$571 [31:0]
+    connect \B $218 [31:0]
+    connect \Y $219
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1702"
-  cell $and $949
+  attribute \src "/home/runner/workspace/hardware/core.py:1698"
+  cell $and $947
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 32
     parameter \Y_WIDTH 32
     connect \A \dr_rd_data [31:0]
-    connect \B $213 [31:0]
-    connect \Y $221
+    connect \B $212 [31:0]
+    connect \Y $220
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1702"
-  cell $shl $950
+  attribute \src "/home/runner/workspace/hardware/core.py:1698"
+  cell $shl $948
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 5
     parameter \Y_WIDTH 63
-    connect \A $221 [31:0]
+    connect \A $220 [31:0]
     connect \B \instruction [4:0]
-    connect \Y $222
+    connect \Y $221
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1701"
-  cell $or $951
+  attribute \src "/home/runner/workspace/hardware/core.py:1697"
+  cell $or $949
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 63
     parameter \B_WIDTH 63
     parameter \Y_WIDTH 63
-    connect \A { 31'0000000000000000000000000000000 $220 [31:0] }
-    connect \B $222 [62:0]
-    connect \Y $223
+    connect \A { 31'0000000000000000000000000000000 $219 [31:0] }
+    connect \B $221 [62:0]
+    connect \Y $222
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1709"
-  cell $eq $952
+  attribute \src "/home/runner/workspace/hardware/core.py:1705"
+  cell $eq $950
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 0
     parameter \Y_WIDTH 1
-    connect \A $223 [31:0]
+    connect \A $222 [31:0]
     connect \B {  }
-    connect \Y $224
+    connect \Y $223
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1720"
-  cell $and $953
+  attribute \src "/home/runner/workspace/hardware/core.py:1716"
+  cell $and $951
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -27253,32 +27203,32 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_mcmp_op [0]
-    connect \Y $225
+    connect \Y $224
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1720"
-  cell $not $954
+  attribute \src "/home/runner/workspace/hardware/core.py:1716"
+  cell $not $952
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \any_unit_busy [0]
-    connect \Y $226
+    connect \Y $225
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1720"
-  cell $and $955
+  attribute \src "/home/runner/workspace/hardware/core.py:1716"
+  cell $and $953
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $225 [0]
-    connect \B $226 [0]
+    connect \A $224 [0]
+    connect \B $225 [0]
     connect \Y \mcmp_start_sig
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1723"
-  cell $sub $956
+  attribute \src "/home/runner/workspace/hardware/core.py:1719"
+  cell $sub $954
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -27289,8 +27239,8 @@ module \top.core
     connect \Y \mcmp_result
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1728"
-  cell $eq $957
+  attribute \src "/home/runner/workspace/hardware/core.py:1724"
+  cell $eq $955
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -27298,11 +27248,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \mcmp_result [31:0]
     connect \B {  }
-    connect \Y $227
+    connect \Y $226
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1741"
-  cell $and $958
+  attribute \src "/home/runner/workspace/hardware/core.py:1737"
+  cell $and $956
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -27310,10 +27260,31 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \boot_complete [0]
     connect \B \exec_enable [0]
+    connect \Y $227
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1737"
+  cell $and $957
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $227 [0]
+    connect \B \is_branch_op [0]
     connect \Y $228
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1741"
+  attribute \src "/home/runner/workspace/hardware/core.py:1737"
+  cell $not $958
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \any_unit_busy [0]
+    connect \Y $229
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1737"
   cell $and $959
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -27321,33 +27292,12 @@ module \top.core
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $228 [0]
-    connect \B \is_branch_op [0]
-    connect \Y $229
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1741"
-  cell $not $960
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
-    connect \Y $230
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1741"
-  cell $and $961
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $229 [0]
-    connect \B $230 [0]
+    connect \B $229 [0]
     connect \Y \branch_taken
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1750"
-  cell $and $962
+  attribute \src "/home/runner/workspace/hardware/core.py:1746"
+  cell $and $960
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -27355,11 +27305,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_church_op [0]
-    connect \Y $231
+    connect \Y $230
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1750"
-  cell $eq $963
+  attribute \src "/home/runner/workspace/hardware/core.py:1746"
+  cell $eq $961
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -27367,44 +27317,44 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [31:27]
     connect \B {  }
+    connect \Y $231
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1746"
+  cell $and $962
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $230 [0]
+    connect \B $231 [0]
     connect \Y $232
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1750"
+  attribute \src "/home/runner/workspace/hardware/core.py:1746"
+  cell $not $963
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \any_unit_busy [0]
+    connect \Y $233
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1746"
   cell $and $964
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $231 [0]
-    connect \B $232 [0]
-    connect \Y $233
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1750"
-  cell $not $965
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
-    connect \Y $234
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1750"
-  cell $and $966
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $233 [0]
-    connect \B $234 [0]
+    connect \A $232 [0]
+    connect \B $233 [0]
     connect \Y \load_start_sig
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1786"
-  cell $and $967
+  attribute \src "/home/runner/workspace/hardware/core.py:1782"
+  cell $and $965
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -27412,32 +27362,32 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \thread_switch_req [0]
     connect \B \boot_complete [0]
-    connect \Y $235
+    connect \Y $234
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1786"
-  cell $not $968
+  attribute \src "/home/runner/workspace/hardware/core.py:1782"
+  cell $not $966
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \any_unit_busy [0]
-    connect \Y $236
+    connect \Y $235
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1786"
-  cell $and $969
+  attribute \src "/home/runner/workspace/hardware/core.py:1782"
+  cell $and $967
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $235 [0]
-    connect \B $236 [0]
+    connect \A $234 [0]
+    connect \B $235 [0]
     connect \Y \thread_switch_start_sig
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1788"
-  cell $and $970
+  attribute \src "/home/runner/workspace/hardware/core.py:1784"
+  cell $and $968
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -27445,11 +27395,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_church_op [0]
-    connect \Y $237
+    connect \Y $236
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1788"
-  cell $eq $971
+  attribute \src "/home/runner/workspace/hardware/core.py:1784"
+  cell $eq $969
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -27457,74 +27407,74 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [31:27]
     connect \B 3'100
+    connect \Y $237
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1784"
+  cell $and $970
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $236 [0]
+    connect \B $237 [0]
     connect \Y $238
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1788"
+  attribute \src "/home/runner/workspace/hardware/core.py:1784"
+  cell $not $971
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \any_unit_busy [0]
+    connect \Y $239
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1784"
   cell $and $972
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $237 [0]
-    connect \B $238 [0]
-    connect \Y $239
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1788"
-  cell $not $973
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
+    connect \A $238 [0]
+    connect \B $239 [0]
     connect \Y $240
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1788"
-  cell $and $974
+  attribute \src "/home/runner/workspace/hardware/core.py:1784"
+  cell $or $973
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $239 [0]
-    connect \B $240 [0]
-    connect \Y $241
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1788"
-  cell $or $975
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $241 [0]
+    connect \A $240 [0]
     connect \B \thread_switch_start_sig [0]
     connect \Y \change_start_sig
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1793"
-  cell $mux $976
+  attribute \src "/home/runner/workspace/hardware/core.py:1789"
+  cell $mux $974
     parameter \WIDTH 4
     connect \S \thread_switch_start_sig [0]
     connect \A \instruction [18:15]
     connect \B 4'1111
-    connect \Y \cr_src$623
+    connect \Y \cr_src$620
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1794"
-  cell $mux $977
+  attribute \src "/home/runner/workspace/hardware/core.py:1790"
+  cell $mux $975
     parameter \WIDTH 4
     connect \S \thread_switch_start_sig [0]
     connect \A \instruction [22:19]
     connect \B 4'1110
-    connect \Y \cr_dst$624
+    connect \Y \cr_dst$621
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1796"
-  cell $ne $978
+  attribute \src "/home/runner/workspace/hardware/core.py:1792"
+  cell $ne $976
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 3
@@ -27532,41 +27482,41 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \boot_state [2:0]
     connect \B 3'110
-    connect \Y $242
+    connect \Y $241
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1796"
-  cell $or $979
+  attribute \src "/home/runner/workspace/hardware/core.py:1792"
+  cell $or $977
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $242 [0]
+    connect \A $241 [0]
     connect \B \boot_microcode_active [0]
     connect \Y \m_elevated
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1798"
-  cell $mux $980
+  attribute \src "/home/runner/workspace/hardware/core.py:1794"
+  cell $mux $978
     parameter \WIDTH 16
     connect \S \thread_switch_start_sig [0]
     connect \A { 1'0 \instruction [14:0] }
     connect \B \thread_switch_index [15:0]
-    connect \Y \index$626
+    connect \Y \index$623
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1799"
-  cell $mux $981
+  attribute \src "/home/runner/workspace/hardware/core.py:1795"
+  cell $mux $979
     parameter \WIDTH 15
     connect \S \thread_switch_start_sig [0]
     connect \A 15'000000000000000
     connect \B 15'000111111111111
-    connect \Y $243
+    connect \Y $242
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1815"
-  cell $sub $982
+  attribute \src "/home/runner/workspace/hardware/core.py:1811"
+  cell $sub $980
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -27574,20 +27524,20 @@ module \top.core
     parameter \Y_WIDTH 33
     connect \A \imem_addr [31:0]
     connect \B 3'100
-    connect \Y $244
+    connect \Y $243
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1815"
-  cell $mux $983
+  attribute \src "/home/runner/workspace/hardware/core.py:1811"
+  cell $mux $981
     parameter \WIDTH 33
     connect \S \thread_switch_start_sig [0]
     connect \A { 1'0 \imem_addr [31:0] }
-    connect \B $244 [32:0]
-    connect \Y $245
+    connect \B $243 [32:0]
+    connect \Y $244
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1847"
-  cell $or $984
+  attribute \src "/home/runner/workspace/hardware/core.py:1843"
+  cell $or $982
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -27598,8 +27548,8 @@ module \top.core
     connect \Y \thread_switch_busy
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1848"
-  cell $and $985
+  attribute \src "/home/runner/workspace/hardware/core.py:1844"
+  cell $and $983
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -27610,8 +27560,8 @@ module \top.core
     connect \Y \thread_switch_complete
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1849"
-  cell $and $986
+  attribute \src "/home/runner/workspace/hardware/core.py:1845"
+  cell $and $984
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -27622,8 +27572,8 @@ module \top.core
     connect \Y \thread_switch_fault
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1853"
-  cell $and $987
+  attribute \src "/home/runner/workspace/hardware/core.py:1849"
+  cell $and $985
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -27631,11 +27581,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_church_op [0]
-    connect \Y $246
+    connect \Y $245
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1853"
-  cell $eq $988
+  attribute \src "/home/runner/workspace/hardware/core.py:1849"
+  cell $eq $986
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -27643,44 +27593,44 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [31:27]
     connect \B 3'101
+    connect \Y $246
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1849"
+  cell $and $987
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $245 [0]
+    connect \B $246 [0]
     connect \Y $247
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1853"
+  attribute \src "/home/runner/workspace/hardware/core.py:1849"
+  cell $not $988
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \any_unit_busy [0]
+    connect \Y $248
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1849"
   cell $and $989
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $246 [0]
-    connect \B $247 [0]
-    connect \Y $248
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1853"
-  cell $not $990
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
-    connect \Y $249
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1853"
-  cell $and $991
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $248 [0]
-    connect \B $249 [0]
+    connect \A $247 [0]
+    connect \B $248 [0]
     connect \Y \switch_start_sig
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1863"
-  cell $eq $992
+  attribute \src "/home/runner/workspace/hardware/core.py:1859"
+  cell $eq $990
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -27688,11 +27638,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [22:19]
     connect \B 4'1100
-    connect \Y $250
+    connect \Y $249
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1864"
-  cell $eq $993
+  attribute \src "/home/runner/workspace/hardware/core.py:1860"
+  cell $eq $991
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -27700,11 +27650,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [22:19]
     connect \B 4'1101
-    connect \Y $251
+    connect \Y $250
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1865"
-  cell $eq $994
+  attribute \src "/home/runner/workspace/hardware/core.py:1861"
+  cell $eq $992
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -27712,11 +27662,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [22:19]
     connect \B 4'1110
-    connect \Y $252
+    connect \Y $251
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1866"
-  cell $eq $995
+  attribute \src "/home/runner/workspace/hardware/core.py:1862"
+  cell $eq $993
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -27724,47 +27674,47 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [22:19]
     connect \B 4'1111
+    connect \Y $252
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1862"
+  cell $mux $994
+    parameter \WIDTH 1
+    connect \S $252 [0]
+    connect \A 1'0
+    connect \B \dbg_m_bit_state [15]
     connect \Y $253
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1866"
-  cell $mux $996
+  attribute \src "/home/runner/workspace/hardware/core.py:1861"
+  cell $mux $995
     parameter \WIDTH 1
-    connect \S $253 [0]
-    connect \A 1'0
-    connect \B \dbg_m_bit_state [15]
+    connect \S $251 [0]
+    connect \A $253 [0]
+    connect \B \dbg_m_bit_state [14]
     connect \Y $254
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1865"
-  cell $mux $997
+  attribute \src "/home/runner/workspace/hardware/core.py:1860"
+  cell $mux $996
     parameter \WIDTH 1
-    connect \S $252 [0]
+    connect \S $250 [0]
     connect \A $254 [0]
-    connect \B \dbg_m_bit_state [14]
+    connect \B \dbg_m_bit_state [13]
     connect \Y $255
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1864"
-  cell $mux $998
+  attribute \src "/home/runner/workspace/hardware/core.py:1859"
+  cell $mux $997
     parameter \WIDTH 1
-    connect \S $251 [0]
+    connect \S $249 [0]
     connect \A $255 [0]
-    connect \B \dbg_m_bit_state [13]
-    connect \Y $256
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1863"
-  cell $mux $999
-    parameter \WIDTH 1
-    connect \S $250 [0]
-    connect \A $256 [0]
     connect \B \dbg_m_bit_state [12]
     connect \Y \target_m
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1876"
-  cell $and $1000
+  attribute \src "/home/runner/workspace/hardware/core.py:1872"
+  cell $and $998
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -27772,11 +27722,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_church_op [0]
-    connect \Y $257
+    connect \Y $256
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1876"
-  cell $eq $1001
+  attribute \src "/home/runner/workspace/hardware/core.py:1872"
+  cell $eq $999
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -27784,44 +27734,44 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [31:27]
     connect \B 4'1000
+    connect \Y $257
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1872"
+  cell $and $1000
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $256 [0]
+    connect \B $257 [0]
     connect \Y $258
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1876"
+  attribute \src "/home/runner/workspace/hardware/core.py:1872"
+  cell $not $1001
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \any_unit_busy [0]
+    connect \Y $259
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1872"
   cell $and $1002
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $257 [0]
-    connect \B $258 [0]
-    connect \Y $259
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1876"
-  cell $not $1003
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
-    connect \Y $260
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1876"
-  cell $and $1004
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $259 [0]
-    connect \B $260 [0]
+    connect \A $258 [0]
+    connect \B $259 [0]
     connect \Y \eloadcall_start_sig
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1899"
-  cell $and $1005
+  attribute \src "/home/runner/workspace/hardware/core.py:1895"
+  cell $and $1003
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -27829,11 +27779,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_church_op [0]
-    connect \Y $261
+    connect \Y $260
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1899"
-  cell $eq $1006
+  attribute \src "/home/runner/workspace/hardware/core.py:1895"
+  cell $eq $1004
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -27841,98 +27791,98 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [31:27]
     connect \B 4'1001
+    connect \Y $261
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1895"
+  cell $and $1005
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $260 [0]
+    connect \B $261 [0]
     connect \Y $262
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1899"
+  attribute \src "/home/runner/workspace/hardware/core.py:1895"
+  cell $not $1006
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \any_unit_busy [0]
+    connect \Y $263
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1895"
   cell $and $1007
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $261 [0]
-    connect \B $262 [0]
-    connect \Y $263
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1899"
-  cell $not $1008
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
-    connect \Y $264
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1899"
-  cell $and $1009
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $263 [0]
-    connect \B $264 [0]
+    connect \A $262 [0]
+    connect \B $263 [0]
     connect \Y \xloadlambda_start_sig
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1917"
-  cell $mux $1010
+  attribute \src "/home/runner/workspace/hardware/core.py:1913"
+  cell $mux $1008
     parameter \WIDTH 16
     connect \S \busy$44 [0]
     connect \A \pet_name_rd_addr [15:0]
-    connect \B \pet_name_rd_addr$685 [15:0]
+    connect \B \pet_name_rd_addr$682 [15:0]
     connect \Y \rd_addr
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1965"
-  cell $mux $1011
+  attribute \src "/home/runner/workspace/hardware/core.py:1961"
+  cell $mux $1009
     parameter \WIDTH 2
     connect \S \lazy_load_irq [0]
     connect \A 2'10
     connect \B 2'01
-    connect \Y $265
+    connect \Y $264
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1964"
-  cell $mux $1012
+  attribute \src "/home/runner/workspace/hardware/core.py:1960"
+  cell $mux $1010
     parameter \WIDTH 2
     connect \S 1'0
-    connect \A $265 [1:0]
+    connect \A $264 [1:0]
     connect \B 2'00
     connect \Y \irq_dispatch_reason
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1971"
-  cell $mux $1013
+  attribute \src "/home/runner/workspace/hardware/core.py:1967"
+  cell $mux $1011
     parameter \WIDTH 16
     connect \S \lazy_resolve_irq [0]
     connect \A \pet_name_rd_addr [15:0]
-    connect \B \pet_name_rd_addr$685 [15:0]
+    connect \B \pet_name_rd_addr$682 [15:0]
+    connect \Y $265
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1966"
+  cell $mux $1012
+    parameter \WIDTH 16
+    connect \S \lazy_load_irq [0]
+    connect \A $265 [15:0]
+    connect \B \lazy_load_ns_slot [15:0]
     connect \Y $266
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1970"
-  cell $mux $1014
-    parameter \WIDTH 16
-    connect \S \lazy_load_irq [0]
-    connect \A $266 [15:0]
-    connect \B \lazy_load_ns_slot [15:0]
-    connect \Y $267
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1969"
-  cell $mux $1015
+  attribute \src "/home/runner/workspace/hardware/core.py:1965"
+  cell $mux $1013
     parameter \WIDTH 16
     connect \S 1'0
-    connect \A $267 [15:0]
+    connect \A $266 [15:0]
     connect \B 16'0000000000000000
     connect \Y \irq_dispatch_slot
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1975"
-  cell $or $1016
+  attribute \src "/home/runner/workspace/hardware/core.py:1971"
+  cell $or $1014
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -27940,34 +27890,55 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A 1'0
     connect \B \lazy_load_irq [0]
+    connect \Y $267
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1971"
+  cell $or $1015
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $267 [0]
+    connect \B \lazy_resolve_irq [0]
     connect \Y $268
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1975"
-  cell $or $1017
+  attribute \src "/home/runner/workspace/hardware/core.py:1971"
+  cell $or $1016
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $268 [0]
-    connect \B \lazy_resolve_irq [0]
+    connect \B \lazy_resolve_irq$695 [0]
     connect \Y $269
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1975"
-  cell $or $1018
+  attribute \src "/home/runner/workspace/hardware/core.py:1971"
+  cell $and $1017
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $269 [0]
-    connect \B \lazy_resolve_irq$698 [0]
+    connect \B \irq_armed_reg [0]
     connect \Y $270
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1975"
+  attribute \src "/home/runner/workspace/hardware/core.py:1974"
+  cell $not $1018
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \busy$46 [0]
+    connect \Y $271
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1971"
   cell $and $1019
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -27975,33 +27946,12 @@ module \top.core
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $270 [0]
-    connect \B \irq_armed_reg [0]
-    connect \Y $271
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1978"
-  cell $not $1020
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \busy$46 [0]
-    connect \Y $272
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1975"
-  cell $and $1021
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $271 [0]
-    connect \B $272 [0]
+    connect \B $271 [0]
     connect \Y \irq_dispatch_start
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1988"
-  cell $add $1022
+  attribute \src "/home/runner/workspace/hardware/core.py:1984"
+  cell $add $1020
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -28009,11 +27959,11 @@ module \top.core
     parameter \Y_WIDTH 33
     connect \A \imem_addr [31:0]
     connect \B 3'100
-    connect \Y $273
+    connect \Y $272
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1998"
-  cell $or $1023
+  attribute \src "/home/runner/workspace/hardware/core.py:1994"
+  cell $or $1021
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -28021,58 +27971,79 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \outform_start_out [0]
     connect \B 1'0
-    connect \Y $274
+    connect \Y $273
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1998"
-  cell $or $1024
+  attribute \src "/home/runner/workspace/hardware/core.py:1994"
+  cell $or $1022
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $274 [0]
-    connect \B \outform_start_out$710 [0]
+    connect \A $273 [0]
+    connect \B \outform_start_out$707 [0]
     connect \Y \_outform_start
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2015"
-  cell $mux $1025
+  attribute \src "/home/runner/workspace/hardware/core.py:2011"
+  cell $mux $1023
     parameter \WIDTH 32
-    connect \S \outform_start_out$710 [0]
+    connect \S \outform_start_out$707 [0]
     connect \A 32'00000000000000000000000000000000
     connect \B \outform_gt_raw_out [31:0]
-    connect \Y $275
+    connect \Y $274
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2014"
-  cell $mux $1026
+  attribute \src "/home/runner/workspace/hardware/core.py:2010"
+  cell $mux $1024
     parameter \WIDTH 32
     connect \S 1'0
-    connect \A $275 [31:0]
+    connect \A $274 [31:0]
     connect \B 32'00000000000000000000000000000000
     connect \Y \gt_raw
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2020"
-  cell $mux $1027
+  attribute \src "/home/runner/workspace/hardware/core.py:2016"
+  cell $mux $1025
     parameter \WIDTH 16
-    connect \S \outform_start_out$710 [0]
+    connect \S \outform_start_out$707 [0]
     connect \A 16'0000000000000000
     connect \B \outform_slot_id_out [15:0]
-    connect \Y $276
+    connect \Y $275
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2019"
-  cell $mux $1028
+  attribute \src "/home/runner/workspace/hardware/core.py:2015"
+  cell $mux $1026
     parameter \WIDTH 16
     connect \S 1'0
-    connect \A $276 [15:0]
+    connect \A $275 [15:0]
     connect \B 16'0000000000000000
     connect \Y \slot_id
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2032"
+  attribute \src "/home/runner/workspace/hardware/core.py:2028"
+  cell $not $1027
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \outform_mode2_active [0]
+    connect \Y $276
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2028"
+  cell $and $1028
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \outform_done [0]
+    connect \B $276 [0]
+    connect \Y \outform_done_in
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2029"
   cell $not $1029
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -28081,41 +28052,20 @@ module \top.core
     connect \Y $277
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2032"
+  attribute \src "/home/runner/workspace/hardware/core.py:2029"
   cell $and $1030
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \outform_done [0]
-    connect \B $277 [0]
-    connect \Y \outform_done_in
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2033"
-  cell $not $1031
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \outform_mode2_active [0]
-    connect \Y $278
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2033"
-  cell $and $1032
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
     connect \A \outform_fault [0]
-    connect \B $278 [0]
+    connect \B $277 [0]
     connect \Y \outform_fault_in
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2036"
-  cell $or $1033
+  attribute \src "/home/runner/workspace/hardware/core.py:2032"
+  cell $or $1031
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -28123,23 +28073,23 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \outform_done [0]
     connect \B 1'0
-    connect \Y $279
+    connect \Y $278
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2036"
-  cell $and $1034
+  attribute \src "/home/runner/workspace/hardware/core.py:2032"
+  cell $and $1032
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $279 [0]
+    connect \A $278 [0]
     connect \B \outform_mode2_active [0]
-    connect \Y \outform_done_in$741
+    connect \Y \outform_done_in$738
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2038"
-  cell $and $1035
+  attribute \src "/home/runner/workspace/hardware/core.py:2034"
+  cell $and $1033
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -28147,11 +28097,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \outform_fault [0]
     connect \B \outform_mode2_active [0]
-    connect \Y \outform_fault_in$743
+    connect \Y \outform_fault_in$740
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2041"
-  cell $mux $1036
+  attribute \src "/home/runner/workspace/hardware/core.py:2037"
+  cell $mux $1034
     parameter \WIDTH 32
     connect \S 1'0
     connect \A \outform_result_gt [31:0]
@@ -28159,8 +28109,8 @@ module \top.core
     connect \Y \result_gt_in
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2333"
-  cell $shl $1037
+  attribute \src "/home/runner/workspace/hardware/core.py:2329"
+  cell $shl $1035
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -28168,80 +28118,80 @@ module \top.core
     parameter \Y_WIDTH 63
     connect \A 1'1
     connect \B \alloc_n [4:0]
-    connect \Y $280
+    connect \Y $279
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2334"
-  cell $sub $1038
+  attribute \src "/home/runner/workspace/hardware/core.py:2330"
+  cell $sub $1036
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 33
-    connect \A $280 [31:0]
+    connect \A $279 [31:0]
     connect \B 1'1
-    connect \Y $281
+    connect \Y $280
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2336"
-  cell $add $1039
+  attribute \src "/home/runner/workspace/hardware/core.py:2332"
+  cell $add $1037
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 32
     parameter \Y_WIDTH 33
     connect \A \watermark_reg_noniot [31:0]
-    connect \B $281 [31:0]
-    connect \Y $282
+    connect \B $280 [31:0]
+    connect \Y $281
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2336"
-  cell $not $1040
+  attribute \src "/home/runner/workspace/hardware/core.py:2332"
+  cell $not $1038
     parameter \A_SIGNED 0
     parameter \A_WIDTH 32
     parameter \Y_WIDTH 32
-    connect \A $281 [31:0]
-    connect \Y $283
+    connect \A $280 [31:0]
+    connect \Y $282
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2336"
-  cell $and $1041
+  attribute \src "/home/runner/workspace/hardware/core.py:2332"
+  cell $and $1039
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 33
     parameter \B_WIDTH 33
     parameter \Y_WIDTH 33
-    connect \A $282 [32:0]
-    connect \B { 1'0 $283 [31:0] }
-    connect \Y $284
+    connect \A $281 [32:0]
+    connect \B { 1'0 $282 [31:0] }
+    connect \Y $283
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2339"
-  cell $add $1042
+  attribute \src "/home/runner/workspace/hardware/core.py:2335"
+  cell $add $1040
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 32
     parameter \Y_WIDTH 34
-    connect \A $284 [31:0]
-    connect \B $280 [31:0]
-    connect \Y $285
+    connect \A $283 [31:0]
+    connect \B $279 [31:0]
+    connect \Y $284
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2343"
-  cell $le $1043
+  attribute \src "/home/runner/workspace/hardware/core.py:2339"
+  cell $le $1041
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 33
     parameter \B_WIDTH 12
     parameter \Y_WIDTH 1
-    connect \A $285 [32:0]
+    connect \A $284 [32:0]
     connect \B 12'100000000000
     connect \Y \alloc_fits_ni
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2345"
-  cell $ge $1044
+  attribute \src "/home/runner/workspace/hardware/core.py:2341"
+  cell $ge $1042
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -28249,11 +28199,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \alloc_n [4:0]
     connect \B 3'110
-    connect \Y $286
+    connect \Y $285
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2345"
-  cell $le $1045
+  attribute \src "/home/runner/workspace/hardware/core.py:2341"
+  cell $le $1043
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -28261,23 +28211,23 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \alloc_n [4:0]
     connect \B 4'1110
-    connect \Y $287
+    connect \Y $286
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2345"
-  cell $and $1046
+  attribute \src "/home/runner/workspace/hardware/core.py:2341"
+  cell $and $1044
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $286 [0]
-    connect \B $287 [0]
+    connect \A $285 [0]
+    connect \B $286 [0]
     connect \Y \alloc_n_ok_ni
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2350"
-  cell $and $1047
+  attribute \src "/home/runner/workspace/hardware/core.py:2346"
+  cell $and $1045
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -28285,77 +28235,77 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \alloc_req [0]
     connect \B \alloc_fits_ni [0]
+    connect \Y $287
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2346"
+  cell $and $1046
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $287 [0]
+    connect \B \alloc_n_ok_ni [0]
+    connect \Y \alloc_done
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2349"
+  cell $not $1047
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \alloc_fits_ni [0]
     connect \Y $288
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2350"
-  cell $and $1048
+  attribute \src "/home/runner/workspace/hardware/core.py:2349"
+  cell $not $1048
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \alloc_n_ok_ni [0]
+    connect \Y $289
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2349"
+  cell $or $1049
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $288 [0]
-    connect \B \alloc_n_ok_ni [0]
-    connect \Y \alloc_done
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2353"
-  cell $not $1049
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \alloc_fits_ni [0]
-    connect \Y $289
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2353"
-  cell $not $1050
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \alloc_n_ok_ni [0]
+    connect \B $289 [0]
     connect \Y $290
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2353"
-  cell $or $1051
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $289 [0]
-    connect \B $290 [0]
-    connect \Y $291
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2353"
-  cell $and $1052
+  attribute \src "/home/runner/workspace/hardware/core.py:2349"
+  cell $and $1050
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \alloc_req [0]
-    connect \B $291 [0]
+    connect \B $290 [0]
     connect \Y \alloc_fault
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2355"
-  cell $shl $1053
+  attribute \src "/home/runner/workspace/hardware/core.py:2351"
+  cell $shl $1051
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 2
     parameter \Y_WIDTH 35
-    connect \A $284 [31:0]
+    connect \A $283 [31:0]
     connect \B 2'10
-    connect \Y $292
+    connect \Y $291
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2375"
-  cell $shl $1054
+  attribute \src "/home/runner/workspace/hardware/core.py:2371"
+  cell $shl $1052
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 16
@@ -28363,23 +28313,23 @@ module \top.core
     parameter \Y_WIDTH 23
     connect \A \mint_slot_id_reg [15:0]
     connect \B 3'100
-    connect \Y $293
+    connect \Y $292
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2375"
-  cell $add $1055
+  attribute \src "/home/runner/workspace/hardware/core.py:2371"
+  cell $add $1053
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 23
     parameter \Y_WIDTH 33
     connect \A \cr15_namespace [63:32]
-    connect \B $293 [22:0]
-    connect \Y $294
+    connect \B $292 [22:0]
+    connect \Y $293
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2381"
-  cell $add $1056
+  attribute \src "/home/runner/workspace/hardware/core.py:2377"
+  cell $add $1054
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 16
@@ -28390,8 +28340,8 @@ module \top.core
     connect \Y \mint_slot_id_p3_ni
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2385"
-  cell $or $1057
+  attribute \src "/home/runner/workspace/hardware/core.py:2381"
+  cell $or $1055
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 31
@@ -28399,11 +28349,11 @@ module \top.core
     parameter \Y_WIDTH 31
     connect \A 31'1000010000000010000000000000000
     connect \B { 15'000000000000000 \mint_slot_id_reg [15:0] }
-    connect \Y $295
+    connect \Y $294
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2388"
-  cell $sub $1058
+  attribute \src "/home/runner/workspace/hardware/core.py:2384"
+  cell $sub $1056
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 15
@@ -28411,59 +28361,59 @@ module \top.core
     parameter \Y_WIDTH 16
     connect \A \mint_lump_size_reg [14:0]
     connect \B 1'1
-    connect \Y $296
+    connect \Y $295
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2388"
-  cell $or $1059
+  attribute \src "/home/runner/workspace/hardware/core.py:2384"
+  cell $or $1057
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 22
     parameter \B_WIDTH 22
     parameter \Y_WIDTH 22
     connect \A 22'1000000000000000000000
-    connect \B { 6'000000 $296 [15:0] }
-    connect \Y $297
+    connect \B { 6'000000 $295 [15:0] }
+    connect \Y $296
   end
 
   attribute \src "/home/runner/workspace/hardware/integrity32.py:63"
-  cell $and $1060
+  cell $and $1058
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 32
     parameter \Y_WIDTH 32
-    connect \A { 10'0000000000 $297 [21:0] }
+    connect \A { 10'0000000000 $296 [21:0] }
     connect \B 32'00111111111111111111111111111111
-    connect \Y \w1_masked$766
+    connect \Y \w1_masked$763
   end
 
   attribute \src "/home/runner/workspace/hardware/integrity32.py:68"
-  cell $xor $1061
+  cell $xor $1059
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 32
     parameter \Y_WIDTH 32
     connect \A { \mint_base_reg_ni [24:0] \mint_base_reg_ni [31:25] }
-    connect \B { \w1_masked$766 [18:0] \w1_masked$766 [31:19] }
-    connect \Y $298
+    connect \B { \w1_masked$763 [18:0] \w1_masked$763 [31:19] }
+    connect \Y $297
   end
 
   attribute \src "/home/runner/workspace/hardware/integrity32.py:68"
-  cell $xor $1062
+  cell $xor $1060
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 32
     parameter \Y_WIDTH 32
-    connect \A $298 [31:0]
+    connect \A $297 [31:0]
     connect \B 32'11011110101011011011111011101111
     connect \Y \mint_integrity_ni
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2417"
-  cell $add $1063
+  attribute \src "/home/runner/workspace/hardware/core.py:2413"
+  cell $add $1061
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -28471,23 +28421,23 @@ module \top.core
     parameter \Y_WIDTH 5
     connect \A \mint_hdr_reg_ni [26:23]
     connect \B 3'110
-    connect \Y $299
+    connect \Y $298
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2417"
-  cell $shl $1064
+  attribute \src "/home/runner/workspace/hardware/core.py:2413"
+  cell $shl $1062
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 5
     parameter \Y_WIDTH 32
     connect \A 1'1
-    connect \B $299 [4:0]
-    connect \Y $300
+    connect \B $298 [4:0]
+    connect \Y $299
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2437"
-  cell $sub $1065
+  attribute \src "/home/runner/workspace/hardware/core.py:2433"
+  cell $sub $1063
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 15
@@ -28495,23 +28445,23 @@ module \top.core
     parameter \Y_WIDTH 16
     connect \A \mint_lump_size_reg [14:0]
     connect \B \mint_cc_reg_ni [7:0]
-    connect \Y $301
+    connect \Y $300
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2437"
-  cell $sub $1066
+  attribute \src "/home/runner/workspace/hardware/core.py:2433"
+  cell $sub $1064
     parameter \A_SIGNED 1
     parameter \B_SIGNED 1
     parameter \A_WIDTH 16
     parameter \B_WIDTH 2
     parameter \Y_WIDTH 17
-    connect \A $301 [15:0]
+    connect \A $300 [15:0]
     connect \B 2'01
-    connect \Y $302
+    connect \Y $301
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2438"
-  cell $gt $1067
+  attribute \src "/home/runner/workspace/hardware/core.py:2434"
+  cell $gt $1065
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 14
@@ -28519,11 +28469,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \mint_scan_idx_reg_ni [13:0]
     connect \B \scan_end_c_ni [14:0]
-    connect \Y $303
+    connect \Y $302
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2445"
-  cell $shl $1068
+  attribute \src "/home/runner/workspace/hardware/core.py:2441"
+  cell $shl $1066
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 14
@@ -28531,59 +28481,59 @@ module \top.core
     parameter \Y_WIDTH 17
     connect \A \mint_scan_idx_reg_ni [13:0]
     connect \B 2'10
-    connect \Y $304
+    connect \Y $303
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2445"
-  cell $add $1069
+  attribute \src "/home/runner/workspace/hardware/core.py:2441"
+  cell $add $1067
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 17
     parameter \Y_WIDTH 33
     connect \A \mint_base_reg_ni [31:0]
-    connect \B $304 [16:0]
-    connect \Y $305
+    connect \B $303 [16:0]
+    connect \Y $304
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2464"
-  cell $add $1070
+  attribute \src "/home/runner/workspace/hardware/core.py:2460"
+  cell $add $1068
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 3
     parameter \Y_WIDTH 33
-    connect \A $294 [31:0]
+    connect \A $293 [31:0]
     connect \B 3'100
+    connect \Y $305
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2468"
+  cell $add $1069
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 32
+    parameter \B_WIDTH 4
+    parameter \Y_WIDTH 33
+    connect \A $293 [31:0]
+    connect \B 4'1000
     connect \Y $306
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2472"
-  cell $add $1071
+  attribute \src "/home/runner/workspace/hardware/core.py:2478"
+  cell $add $1070
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 4
     parameter \Y_WIDTH 33
-    connect \A $294 [31:0]
-    connect \B 4'1000
+    connect \A $293 [31:0]
+    connect \B 4'1100
     connect \Y $307
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2482"
-  cell $add $1072
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 32
-    parameter \B_WIDTH 4
-    parameter \Y_WIDTH 33
-    connect \A $294 [31:0]
-    connect \B 4'1100
-    connect \Y $308
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2491"
-  cell $ge $1073
+  attribute \src "/home/runner/workspace/hardware/core.py:2487"
+  cell $ge $1071
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 8
@@ -28591,11 +28541,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \mint_copy_idx_reg_ni [7:0]
     connect \B \mint_cc_reg_ni [7:0]
-    connect \Y $309
+    connect \Y $308
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2495"
-  cell $add $1074
+  attribute \src "/home/runner/workspace/hardware/core.py:2491"
+  cell $add $1072
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 15
@@ -28603,11 +28553,11 @@ module \top.core
     parameter \Y_WIDTH 16
     connect \A \mint_cc_base_reg_ni [14:0]
     connect \B \mint_copy_idx_reg_ni [7:0]
-    connect \Y $310
+    connect \Y $309
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2499"
-  cell $shl $1075
+  attribute \src "/home/runner/workspace/hardware/core.py:2495"
+  cell $shl $1073
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 15
@@ -28615,23 +28565,23 @@ module \top.core
     parameter \Y_WIDTH 18
     connect \A \cc_off_ni [14:0]
     connect \B 2'10
-    connect \Y $311
+    connect \Y $310
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2499"
-  cell $add $1076
+  attribute \src "/home/runner/workspace/hardware/core.py:2495"
+  cell $add $1074
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 18
     parameter \Y_WIDTH 33
     connect \A \mint_base_reg_ni [31:0]
-    connect \B $311 [17:0]
-    connect \Y $312
+    connect \B $310 [17:0]
+    connect \Y $311
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2513"
-  cell $shl $1077
+  attribute \src "/home/runner/workspace/hardware/core.py:2509"
+  cell $shl $1075
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 8
@@ -28639,32 +28589,32 @@ module \top.core
     parameter \Y_WIDTH 11
     connect \A \mint_copy_idx_reg_ni [7:0]
     connect \B 2'10
-    connect \Y $313
+    connect \Y $312
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2512"
-  cell $add $1078
+  attribute \src "/home/runner/workspace/hardware/core.py:2508"
+  cell $add $1076
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 25
     parameter \B_WIDTH 11
     parameter \Y_WIDTH 33
     connect \A { \mint_slot_id_p3_ni [16:0] 8'00000000 }
-    connect \B $313 [10:0]
-    connect \Y $314
+    connect \B $312 [10:0]
+    connect \Y $313
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2540"
-  cell $not $1079
+  attribute \src "/home/runner/workspace/hardware/core.py:2536"
+  cell $not $1077
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $417 [0]
+    connect \A $416 [0]
     connect \Y \mint_busy
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2566"
-  cell $or $1080
+  attribute \src "/home/runner/workspace/hardware/core.py:2562"
+  cell $or $1078
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -28672,35 +28622,35 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \call_normal_complete [0]
     connect \B \complete [0]
+    connect \Y $314
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2562"
+  cell $or $1079
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $314 [0]
+    connect \B 1'0
     connect \Y $315
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2566"
-  cell $or $1081
+  attribute \src "/home/runner/workspace/hardware/core.py:2562"
+  cell $and $1080
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $315 [0]
-    connect \B 1'0
-    connect \Y $316
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2566"
-  cell $and $1082
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $316 [0]
     connect \B \dbg_m_bit_state [15]
     connect \Y \mwin_trigger
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2580"
-  cell $ne $1083
+  attribute \src "/home/runner/workspace/hardware/core.py:2576"
+  cell $ne $1081
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 2
@@ -28712,7 +28662,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/integrity32.py:63"
-  cell $and $1084
+  cell $and $1082
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -28720,35 +28670,35 @@ module \top.core
     parameter \Y_WIDTH 32
     connect \A \mwin_dr13_lat [31:0]
     connect \B 32'00111111111111111111111111111111
-    connect \Y \w1_masked$797
+    connect \Y \w1_masked$794
   end
 
   attribute \src "/home/runner/workspace/hardware/integrity32.py:68"
-  cell $xor $1085
+  cell $xor $1083
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 32
     parameter \Y_WIDTH 32
     connect \A { \mwin_dr12_lat [24:0] \mwin_dr12_lat [31:25] }
-    connect \B { \w1_masked$797 [18:0] \w1_masked$797 [31:19] }
-    connect \Y $317
+    connect \B { \w1_masked$794 [18:0] \w1_masked$794 [31:19] }
+    connect \Y $316
   end
 
   attribute \src "/home/runner/workspace/hardware/integrity32.py:68"
-  cell $xor $1086
+  cell $xor $1084
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 32
     parameter \Y_WIDTH 32
-    connect \A $317 [31:0]
+    connect \A $316 [31:0]
     connect \B 32'11011110101011011011111011101111
     connect \Y \mwin_integrity_computed
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2586"
-  cell $eq $1087
+  attribute \src "/home/runner/workspace/hardware/core.py:2582"
+  cell $eq $1085
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -28759,8 +28709,8 @@ module \top.core
     connect \Y \mwin_integrity_ok
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2596"
-  cell $eq $1088
+  attribute \src "/home/runner/workspace/hardware/core.py:2592"
+  cell $eq $1086
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 9
@@ -28771,8 +28721,8 @@ module \top.core
     connect \Y \mwin_gtseq_ok
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2617"
-  cell $or $1089
+  attribute \src "/home/runner/workspace/hardware/core.py:2613"
+  cell $or $1087
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -28780,11 +28730,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A 1'0
     connect \B \mgt_set_trigger [0]
-    connect \Y $318
+    connect \Y $317
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2642"
-  cell $and $1090
+  attribute \src "/home/runner/workspace/hardware/core.py:2638"
+  cell $and $1088
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -28792,32 +28742,32 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \mwin_integrity_ok [0]
     connect \B \mwin_gtseq_ok [0]
-    connect \Y $319
+    connect \Y $318
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2681"
-  cell $not $1091
+  attribute \src "/home/runner/workspace/hardware/core.py:2677"
+  cell $not $1089
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \any_unit_busy [0]
-    connect \Y $320
+    connect \Y $319
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2681"
-  cell $and $1092
+  attribute \src "/home/runner/workspace/hardware/core.py:2677"
+  cell $and $1090
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \boot_complete [0]
-    connect \B $320 [0]
-    connect \Y $321
+    connect \B $319 [0]
+    connect \Y $320
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2682"
-  cell $ne $1093
+  attribute \src "/home/runner/workspace/hardware/core.py:2678"
+  cell $ne $1091
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -28825,23 +28775,23 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \code_lo_reg [31:0]
     connect \B \code_hi_reg [31:0]
-    connect \Y $322
+    connect \Y $321
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2681"
-  cell $and $1094
+  attribute \src "/home/runner/workspace/hardware/core.py:2677"
+  cell $and $1092
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $321 [0]
-    connect \B $322 [0]
-    connect \Y $323
+    connect \A $320 [0]
+    connect \B $321 [0]
+    connect \Y $322
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2683"
-  cell $lt $1095
+  attribute \src "/home/runner/workspace/hardware/core.py:2679"
+  cell $lt $1093
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -28849,11 +28799,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \imem_addr [31:0]
     connect \B \code_lo_reg [31:0]
-    connect \Y $324
+    connect \Y $323
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2683"
-  cell $ge $1096
+  attribute \src "/home/runner/workspace/hardware/core.py:2679"
+  cell $ge $1094
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -28861,164 +28811,164 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \imem_addr [31:0]
     connect \B \code_hi_reg [31:0]
-    connect \Y $325
+    connect \Y $324
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2683"
-  cell $or $1097
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $324 [0]
-    connect \B $325 [0]
-    connect \Y $326
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2681"
-  cell $and $1098
+  attribute \src "/home/runner/workspace/hardware/core.py:2679"
+  cell $or $1095
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $323 [0]
-    connect \B $326 [0]
+    connect \B $324 [0]
+    connect \Y $325
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2677"
+  cell $and $1096
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $322 [0]
+    connect \B $325 [0]
     connect \Y \fetch_bounds_fault
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2692"
+  attribute \src "/home/runner/workspace/hardware/core.py:2688"
+  cell $not $1097
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \any_unit_busy [0]
+    connect \Y $326
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2688"
+  cell $and $1098
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \fault_valid [0]
+    connect \B $326 [0]
+    connect \Y $327
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2690"
   cell $not $1099
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \any_unit_busy [0]
-    connect \Y $327
+    connect \Y $328
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2692"
+  attribute \src "/home/runner/workspace/hardware/core.py:2690"
   cell $and $1100
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \fault_valid [0]
-    connect \B $327 [0]
-    connect \Y $328
+    connect \A \fault_valid$812 [0]
+    connect \B $328 [0]
+    connect \Y $329
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2694"
+  attribute \src "/home/runner/workspace/hardware/core.py:2722"
   cell $not $1101
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
-    connect \Y $329
+    connect \A \outform_mode2_active [0]
+    connect \Y $330
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2694"
+  attribute \src "/home/runner/workspace/hardware/core.py:2722"
   cell $and $1102
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \fault_valid$815 [0]
-    connect \B $329 [0]
-    connect \Y $330
+    connect \A \outform_fault [0]
+    connect \B $330 [0]
+    connect \Y $331
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2726"
+  attribute \src "/home/runner/workspace/hardware/core.py:2741"
   cell $not $1103
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \outform_mode2_active [0]
-    connect \Y $331
+    connect \A \any_unit_busy [0]
+    connect \Y $332
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2726"
+  attribute \src "/home/runner/workspace/hardware/core.py:2741"
   cell $and $1104
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \outform_fault [0]
-    connect \B $331 [0]
-    connect \Y $332
+    connect \A \fault_valid [0]
+    connect \B $332 [0]
+    connect \Y $333
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2745"
+  attribute \src "/home/runner/workspace/hardware/core.py:2743"
   cell $not $1105
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \any_unit_busy [0]
-    connect \Y $333
+    connect \Y $334
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2745"
+  attribute \src "/home/runner/workspace/hardware/core.py:2743"
   cell $and $1106
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \fault_valid [0]
-    connect \B $333 [0]
-    connect \Y $334
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2747"
-  cell $not $1107
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
+    connect \A \fault_valid$812 [0]
+    connect \B $334 [0]
     connect \Y $335
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2747"
-  cell $and $1108
+  attribute \src "/home/runner/workspace/hardware/core.py:2845"
+  cell $or $1107
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \fault_valid$815 [0]
-    connect \B $335 [0]
+    connect \A \fault_valid$828 [0]
+    connect \B \call_normal_complete [0]
     connect \Y $336
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2849"
-  cell $or $1109
+  attribute \src "/home/runner/workspace/hardware/core.py:2845"
+  cell $or $1108
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \fault_valid$831 [0]
-    connect \B \call_normal_complete [0]
+    connect \A $336 [0]
+    connect \B \nia_set$854 [0]
     connect \Y $337
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2849"
-  cell $or $1110
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $337 [0]
-    connect \B \nia_set$857 [0]
-    connect \Y $338
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:999"
-  cell $or $1111
+  attribute \src "/home/runner/workspace/hardware/core.py:997"
+  cell $or $1109
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -29026,608 +28976,608 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \load_complete [0]
     connect \B \save_complete [0]
-    connect \Y $339
+    connect \Y $338
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:999"
-  cell $or $1112
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $339 [0]
-    connect \B \tperm_complete [0]
-    connect \Y $340
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:999"
-  cell $or $1113
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $340 [0]
-    connect \B \done$860 [0]
-    connect \Y $341
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:999"
-  cell $or $1114
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $341 [0]
-    connect \B \done [0]
-    connect \Y $342
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1008"
-  cell $not $1115
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \scheduler_inflight [0]
-    connect \Y $343
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1007"
-  cell $and $1116
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \change_complete [0]
-    connect \B $343 [0]
-    connect \Y $344
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1009"
-  cell $not $1117
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \decoded_thread_change_inflight [0]
-    connect \Y $345
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1007"
-  cell $and $1118
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $344 [0]
-    connect \B $345 [0]
-    connect \Y $346
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1006"
-  cell $or $1119
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $342 [0]
-    connect \B $346 [0]
-    connect \Y $347
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2849"
-  cell $or $1120
+  attribute \src "/home/runner/workspace/hardware/core.py:997"
+  cell $or $1110
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $338 [0]
-    connect \B $347 [0]
-    connect \Y $348
+    connect \B \tperm_complete [0]
+    connect \Y $339
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2853"
-  cell $not $1121
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \fetch_bounds_fault [0]
-    connect \Y $349
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2853"
-  cell $and $1122
+  attribute \src "/home/runner/workspace/hardware/core.py:997"
+  cell $or $1111
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \branch_taken [0]
-    connect \B $349 [0]
-    connect \Y $350
+    connect \A $339 [0]
+    connect \B \done$857 [0]
+    connect \Y $340
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2849"
-  cell $or $1123
+  attribute \src "/home/runner/workspace/hardware/core.py:997"
+  cell $or $1112
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $348 [0]
-    connect \B $350 [0]
-    connect \Y $351
+    connect \A $340 [0]
+    connect \B \done [0]
+    connect \Y $341
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2833"
-  cell $not $1124
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \halt_req [0]
-    connect \Y $352
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2833"
-  cell $and $1125
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \instr_valid [0]
-    connect \B $352 [0]
-    connect \Y $353
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2833"
-  cell $not $1126
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
-    connect \Y $354
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2833"
-  cell $and $1127
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $353 [0]
-    connect \B $354 [0]
-    connect \Y $355
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2834"
-  cell $not $1128
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \call_start_sig [0]
-    connect \Y $356
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2833"
-  cell $and $1129
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $355 [0]
-    connect \B $356 [0]
-    connect \Y $357
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2835"
-  cell $not $1130
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \ret_start_sig [0]
-    connect \Y $358
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2833"
-  cell $and $1131
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $357 [0]
-    connect \B $358 [0]
-    connect \Y $359
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2836"
-  cell $not $1132
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \load_start_sig [0]
-    connect \Y $360
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2833"
-  cell $and $1133
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $359 [0]
-    connect \B $360 [0]
-    connect \Y $361
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2837"
-  cell $not $1134
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \save_start_sig [0]
-    connect \Y $362
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2833"
-  cell $and $1135
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $361 [0]
-    connect \B $362 [0]
-    connect \Y $363
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2838"
-  cell $not $1136
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \tperm_start_sig [0]
-    connect \Y $364
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2833"
-  cell $and $1137
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $363 [0]
-    connect \B $364 [0]
-    connect \Y $365
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2839"
-  cell $not $1138
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \dread_start_sig [0]
-    connect \Y $366
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2833"
-  cell $and $1139
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $365 [0]
-    connect \B $366 [0]
-    connect \Y $367
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2840"
-  cell $not $1140
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \dwrite_start_sig [0]
-    connect \Y $368
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2833"
-  cell $and $1141
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $367 [0]
-    connect \B $368 [0]
-    connect \Y $369
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2841"
-  cell $not $1142
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \switch_start_sig [0]
-    connect \Y $370
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2833"
-  cell $and $1143
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $369 [0]
-    connect \B $370 [0]
-    connect \Y $371
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2842"
-  cell $not $1144
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \change_start_sig [0]
-    connect \Y $372
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2833"
-  cell $and $1145
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $371 [0]
-    connect \B $372 [0]
-    connect \Y $373
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2843"
-  cell $not $1146
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \lambda_start_sig [0]
-    connect \Y $374
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2833"
-  cell $and $1147
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $373 [0]
-    connect \B $374 [0]
-    connect \Y $375
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2844"
-  cell $not $1148
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \eloadcall_start_sig [0]
-    connect \Y $376
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2833"
-  cell $and $1149
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $375 [0]
-    connect \B $376 [0]
-    connect \Y $377
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2845"
-  cell $not $1150
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \xloadlambda_start_sig [0]
-    connect \Y $378
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2833"
-  cell $and $1151
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $377 [0]
-    connect \B $378 [0]
-    connect \Y $379
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2846"
-  cell $not $1152
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \fetch_bounds_fault [0]
-    connect \Y $380
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2833"
-  cell $and $1153
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $379 [0]
-    connect \B $380 [0]
-    connect \Y $381
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2846"
-  cell $not $1154
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \intercept_start [0]
-    connect \Y $382
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2833"
-  cell $and $1155
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $381 [0]
-    connect \B $382 [0]
-    connect \Y $383
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2849"
-  cell $or $1156
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $351 [0]
-    connect \B $383 [0]
-    connect \Y $384
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2859"
-  cell $not $1157
+  attribute \src "/home/runner/workspace/hardware/core.py:1006"
+  cell $not $1113
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \scheduler_inflight [0]
-    connect \Y $385
+    connect \Y $342
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2859"
-  cell $and $1158
+  attribute \src "/home/runner/workspace/hardware/core.py:1005"
+  cell $and $1114
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \change_complete [0]
+    connect \B $342 [0]
+    connect \Y $343
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1007"
+  cell $not $1115
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \decoded_thread_change_inflight [0]
+    connect \Y $344
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1005"
+  cell $and $1116
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $343 [0]
+    connect \B $344 [0]
+    connect \Y $345
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1004"
+  cell $or $1117
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $341 [0]
+    connect \B $345 [0]
+    connect \Y $346
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2845"
+  cell $or $1118
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $337 [0]
+    connect \B $346 [0]
+    connect \Y $347
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2849"
+  cell $not $1119
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \fetch_bounds_fault [0]
+    connect \Y $348
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2849"
+  cell $and $1120
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \branch_taken [0]
+    connect \B $348 [0]
+    connect \Y $349
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2845"
+  cell $or $1121
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $347 [0]
+    connect \B $349 [0]
+    connect \Y $350
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2829"
+  cell $not $1122
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \halt_req [0]
+    connect \Y $351
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2829"
+  cell $and $1123
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \instr_valid [0]
+    connect \B $351 [0]
+    connect \Y $352
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2829"
+  cell $not $1124
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \any_unit_busy [0]
+    connect \Y $353
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2829"
+  cell $and $1125
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $352 [0]
+    connect \B $353 [0]
+    connect \Y $354
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2830"
+  cell $not $1126
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \call_start_sig [0]
+    connect \Y $355
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2829"
+  cell $and $1127
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $354 [0]
+    connect \B $355 [0]
+    connect \Y $356
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2831"
+  cell $not $1128
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \ret_start_sig [0]
+    connect \Y $357
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2829"
+  cell $and $1129
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $356 [0]
+    connect \B $357 [0]
+    connect \Y $358
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2832"
+  cell $not $1130
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \load_start_sig [0]
+    connect \Y $359
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2829"
+  cell $and $1131
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $358 [0]
+    connect \B $359 [0]
+    connect \Y $360
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2833"
+  cell $not $1132
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \save_start_sig [0]
+    connect \Y $361
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2829"
+  cell $and $1133
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $360 [0]
+    connect \B $361 [0]
+    connect \Y $362
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2834"
+  cell $not $1134
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \tperm_start_sig [0]
+    connect \Y $363
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2829"
+  cell $and $1135
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $362 [0]
+    connect \B $363 [0]
+    connect \Y $364
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2835"
+  cell $not $1136
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \dread_start_sig [0]
+    connect \Y $365
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2829"
+  cell $and $1137
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $364 [0]
+    connect \B $365 [0]
+    connect \Y $366
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2836"
+  cell $not $1138
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \dwrite_start_sig [0]
+    connect \Y $367
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2829"
+  cell $and $1139
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $366 [0]
+    connect \B $367 [0]
+    connect \Y $368
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2837"
+  cell $not $1140
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \switch_start_sig [0]
+    connect \Y $369
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2829"
+  cell $and $1141
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $368 [0]
+    connect \B $369 [0]
+    connect \Y $370
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2838"
+  cell $not $1142
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \change_start_sig [0]
+    connect \Y $371
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2829"
+  cell $and $1143
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $370 [0]
+    connect \B $371 [0]
+    connect \Y $372
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2839"
+  cell $not $1144
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \lambda_start_sig [0]
+    connect \Y $373
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2829"
+  cell $and $1145
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $372 [0]
+    connect \B $373 [0]
+    connect \Y $374
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2840"
+  cell $not $1146
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \eloadcall_start_sig [0]
+    connect \Y $375
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2829"
+  cell $and $1147
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $374 [0]
+    connect \B $375 [0]
+    connect \Y $376
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2841"
+  cell $not $1148
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \xloadlambda_start_sig [0]
+    connect \Y $377
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2829"
+  cell $and $1149
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $376 [0]
+    connect \B $377 [0]
+    connect \Y $378
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2842"
+  cell $not $1150
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \fetch_bounds_fault [0]
+    connect \Y $379
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2829"
+  cell $and $1151
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $378 [0]
+    connect \B $379 [0]
+    connect \Y $380
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2842"
+  cell $not $1152
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \intercept_start [0]
+    connect \Y $381
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2829"
+  cell $and $1153
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $380 [0]
+    connect \B $381 [0]
+    connect \Y $382
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2845"
+  cell $or $1154
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $350 [0]
+    connect \B $382 [0]
+    connect \Y $383
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2855"
+  cell $not $1155
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \scheduler_inflight [0]
+    connect \Y $384
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2855"
+  cell $and $1156
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \change_complete [0]
+    connect \B $384 [0]
+    connect \Y $385
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2857"
+  cell $or $1157
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $383 [0]
     connect \B $385 [0]
     connect \Y $386
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2861"
+  attribute \src "/home/runner/workspace/hardware/core.py:2857"
+  cell $or $1158
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $386 [0]
+    connect \B \nia_set$860 [0]
+    connect \Y $387
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2857"
   cell $or $1159
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $384 [0]
-    connect \B $386 [0]
-    connect \Y $387
+    connect \A $387 [0]
+    connect \B \nia_set$861 [0]
+    connect \Y $388
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2861"
+  attribute \src "/home/runner/workspace/hardware/core.py:2857"
   cell $or $1160
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $387 [0]
-    connect \B \nia_set$863 [0]
-    connect \Y $388
+    connect \A $388 [0]
+    connect \B \nia_set$862 [0]
+    connect \Y $389
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2861"
+  attribute \src "/home/runner/workspace/hardware/core.py:2857"
   cell $or $1161
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $388 [0]
-    connect \B \nia_set$864 [0]
-    connect \Y $389
+    connect \A $389 [0]
+    connect \B \switch_complete [0]
+    connect \Y $390
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2861"
+  attribute \src "/home/runner/workspace/hardware/core.py:2857"
   cell $or $1162
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $389 [0]
-    connect \B \nia_set$865 [0]
-    connect \Y $390
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2861"
-  cell $or $1163
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
     connect \A $390 [0]
-    connect \B \switch_complete [0]
+    connect \B \nia_set$864 [0]
     connect \Y $391
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2861"
-  cell $or $1164
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $391 [0]
-    connect \B \nia_set$867 [0]
-    connect \Y $392
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2873"
-  cell $and $1165
+  attribute \src "/home/runner/workspace/hardware/core.py:2869"
+  cell $and $1163
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \boot_complete [0]
-    connect \B $392 [0]
+    connect \B $391 [0]
     connect \Y \retire_valid
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2875"
-  cell $mux $1166
+  attribute \src "/home/runner/workspace/hardware/core.py:2871"
+  cell $mux $1164
     parameter \WIDTH 32
-    connect \S $386 [0]
+    connect \S $385 [0]
     connect \A \imem_addr [31:0]
     connect \B \change_issuer_nia [31:0]
     connect \Y \retire_nia
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2772"
-  cell $or $1167
+  attribute \src "/home/runner/workspace/hardware/core.py:2768"
+  cell $or $1165
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -29635,71 +29585,71 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \load_fault [0]
     connect \B \save_fault [0]
+    connect \Y $392
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2768"
+  cell $or $1166
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $392 [0]
+    connect \B \tperm_fault [0]
     connect \Y $393
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2772"
-  cell $or $1168
+  attribute \src "/home/runner/workspace/hardware/core.py:2768"
+  cell $or $1167
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $393 [0]
-    connect \B \tperm_fault [0]
+    connect \B \fault$822 [0]
     connect \Y $394
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2772"
-  cell $or $1169
+  attribute \src "/home/runner/workspace/hardware/core.py:2768"
+  cell $or $1168
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $394 [0]
-    connect \B \fault$825 [0]
+    connect \B \fault$823 [0]
     connect \Y $395
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2772"
-  cell $or $1170
+  attribute \src "/home/runner/workspace/hardware/core.py:2768"
+  cell $or $1169
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $395 [0]
-    connect \B \fault$826 [0]
+    connect \B \call_fault [0]
     connect \Y $396
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2772"
-  cell $or $1171
+  attribute \src "/home/runner/workspace/hardware/core.py:2768"
+  cell $or $1170
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $396 [0]
-    connect \B \call_fault [0]
+    connect \B \fault_valid$816 [0]
     connect \Y $397
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2772"
-  cell $or $1172
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $397 [0]
-    connect \B \fault_valid$819 [0]
-    connect \Y $398
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2782"
-  cell $or $1173
+  attribute \src "/home/runner/workspace/hardware/core.py:2778"
+  cell $or $1171
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -29707,104 +29657,104 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \change_fault [0]
     connect \B \switch_fault [0]
-    connect \Y $399
+    connect \Y $398
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2782"
-  cell $or $1174
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $399 [0]
-    connect \B \lambda_fault [0]
-    connect \Y $400
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2782"
-  cell $or $1175
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $400 [0]
-    connect \B \fault [0]
-    connect \Y $401
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2782"
-  cell $or $1176
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $401 [0]
-    connect \B \fault$824 [0]
-    connect \Y $402
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2781"
-  cell $or $1177
+  attribute \src "/home/runner/workspace/hardware/core.py:2778"
+  cell $or $1172
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $398 [0]
+    connect \B \lambda_fault [0]
+    connect \Y $399
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2778"
+  cell $or $1173
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $399 [0]
+    connect \B \fault [0]
+    connect \Y $400
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2778"
+  cell $or $1174
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $400 [0]
+    connect \B \fault$821 [0]
+    connect \Y $401
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2777"
+  cell $or $1175
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $397 [0]
+    connect \B $401 [0]
+    connect \Y $402
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2873"
+  cell $or $1176
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $346 [0]
     connect \B $402 [0]
     connect \Y $403
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2877"
-  cell $or $1178
+  attribute \src "/home/runner/workspace/hardware/core.py:2873"
+  cell $or $1177
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $347 [0]
-    connect \B $403 [0]
+    connect \A $403 [0]
+    connect \B $385 [0]
     connect \Y $404
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2877"
-  cell $or $1179
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $404 [0]
-    connect \B $386 [0]
-    connect \Y $405
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2877"
-  cell $mux $1180
+  attribute \src "/home/runner/workspace/hardware/core.py:2873"
+  cell $mux $1178
     parameter \WIDTH 32
-    connect \S $405 [0]
+    connect \S $404 [0]
     connect \A \instruction [31:0]
     connect \B \delayed_issuer_instr [31:0]
     connect \Y \retire_instr
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2881"
-  cell $and $1181
+  attribute \src "/home/runner/workspace/hardware/core.py:2877"
+  cell $and $1179
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \fault_valid$831 [0]
+    connect \A \fault_valid$828 [0]
     connect \B \boot_complete [0]
     connect \Y \retire_fault_valid
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2898"
-  cell $mux $1182
+  attribute \src "/home/runner/workspace/hardware/core.py:2894"
+  cell $mux $1180
     parameter \WIDTH 32
     connect \S \complete [0]
     connect \A \cr6_clist [31:0]
@@ -29812,32 +29762,32 @@ module \top.core
     connect \Y \retire_trace_cr6_gt
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2908"
-  cell $eq $1183
+  attribute \src "/home/runner/workspace/hardware/core.py:2904"
+  cell $eq $1181
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
     parameter \B_WIDTH 4
     parameter \Y_WIDTH 1
-    connect \A \cr_wr_addr$157 [3:0]
+    connect \A \cr_wr_addr$156 [3:0]
     connect \B 4'1110
-    connect \Y $406
+    connect \Y $405
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2908"
-  cell $and $1184
+  attribute \src "/home/runner/workspace/hardware/core.py:2904"
+  cell $and $1182
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \cr_wr_en$152 [0]
-    connect \B $406 [0]
+    connect \A \cr_wr_en$151 [0]
+    connect \B $405 [0]
     connect \Y \retire_trace_return_cr14_valid
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2950"
-  cell $ne $1185
+  attribute \src "/home/runner/workspace/hardware/core.py:2946"
+  cell $ne $1183
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 3
@@ -29845,34 +29795,55 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \boot_state [2:0]
     connect \B 3'110
-    connect \Y $407
+    connect \Y $406
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2949"
-  cell $or $1186
+  attribute \src "/home/runner/workspace/hardware/core.py:2945"
+  cell $or $1184
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A 1'0
-    connect \B $407 [0]
-    connect \Y $408
+    connect \B $406 [0]
+    connect \Y $407
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2949"
-  cell $or $1187
+  attribute \src "/home/runner/workspace/hardware/core.py:2945"
+  cell $or $1185
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $408 [0]
+    connect \A $407 [0]
     connect \B \boot_microcode_active [0]
+    connect \Y $408
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2961"
+  cell $not $1186
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \call_busy [0]
     connect \Y $409
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2965"
+  attribute \src "/home/runner/workspace/hardware/core.py:2961"
+  cell $and $1187
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $409 [0]
+    connect \B \busy [0]
+    connect \Y \return_grant
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2962"
   cell $not $1188
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -29881,62 +29852,41 @@ module \top.core
     connect \Y $410
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2965"
-  cell $and $1189
+  attribute \src "/home/runner/workspace/hardware/core.py:2962"
+  cell $not $1189
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \busy [0]
+    connect \Y $411
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2962"
+  cell $and $1190
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $410 [0]
-    connect \B \busy [0]
-    connect \Y \return_grant
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2966"
-  cell $not $1190
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \call_busy [0]
-    connect \Y $411
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2966"
-  cell $not $1191
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \busy [0]
+    connect \B $411 [0]
     connect \Y $412
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2966"
-  cell $and $1192
+  attribute \src "/home/runner/workspace/hardware/core.py:2962"
+  cell $and $1191
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $411 [0]
-    connect \B $412 [0]
-    connect \Y $413
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2966"
-  cell $and $1193
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $413 [0]
+    connect \A $412 [0]
     connect \B \load_busy [0]
     connect \Y \load_grant
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2969"
-  cell $and $1194
+  attribute \src "/home/runner/workspace/hardware/core.py:2965"
+  cell $and $1192
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -29947,8 +29897,8 @@ module \top.core
     connect \Y \mload_done
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2970"
-  cell $and $1195
+  attribute \src "/home/runner/workspace/hardware/core.py:2966"
+  cell $and $1193
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -29959,8 +29909,8 @@ module \top.core
     connect \Y \mload_fault
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2973"
-  cell $and $1196
+  attribute \src "/home/runner/workspace/hardware/core.py:2969"
+  cell $and $1194
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -29968,11 +29918,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \sub_done [0]
     connect \B \return_grant [0]
-    connect \Y \mload_done$925
+    connect \Y \mload_done$922
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2974"
-  cell $and $1197
+  attribute \src "/home/runner/workspace/hardware/core.py:2970"
+  cell $and $1195
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -29980,11 +29930,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \sub_fault [0]
     connect \B \return_grant [0]
-    connect \Y \mload_fault$926
+    connect \Y \mload_fault$923
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2977"
-  cell $and $1198
+  attribute \src "/home/runner/workspace/hardware/core.py:2973"
+  cell $and $1196
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -29995,8 +29945,8 @@ module \top.core
     connect \Y \mload_busy
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2978"
-  cell $and $1199
+  attribute \src "/home/runner/workspace/hardware/core.py:2974"
+  cell $and $1197
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -30004,11 +29954,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \sub_done [0]
     connect \B \load_grant [0]
-    connect \Y \mload_done$929
+    connect \Y \mload_done$926
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2979"
-  cell $and $1200
+  attribute \src "/home/runner/workspace/hardware/core.py:2975"
+  cell $and $1198
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -30016,11 +29966,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \sub_fault [0]
     connect \B \load_grant [0]
-    connect \Y \mload_fault$930
+    connect \Y \mload_fault$927
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2990"
-  cell $or $1201
+  attribute \src "/home/runner/workspace/hardware/core.py:2986"
+  cell $or $1199
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -30028,35 +29978,35 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \mem_rd_en [0]
     connect \B \mem_wr_en [0]
-    connect \Y $414
+    connect \Y $413
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:3038"
-  cell $or $1202
+  attribute \src "/home/runner/workspace/hardware/core.py:3034"
+  cell $or $1200
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \mem_rd_en$943 [0]
-    connect \B \mem_wr_en$944 [0]
-    connect \Y $415
+    connect \A \mem_rd_en$940 [0]
+    connect \B \mem_wr_en$941 [0]
+    connect \Y $414
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:3084"
-  cell $eq $1203
+  attribute \src "/home/runner/workspace/hardware/core.py:3080"
+  cell $eq $1201
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 32
     parameter \Y_WIDTH 1
-    connect \A \dmem_addr$974 [31:0]
+    connect \A \dmem_addr$971 [31:0]
     connect \B 32'11111111111111111111111100111000
-    connect \Y $416
+    connect \Y $415
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $1204
+  cell $eq $1202
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -30064,11 +30014,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \mint_noniot_state [3:0]
     connect \B {  }
-    connect \Y $417
+    connect \Y $416
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $1205
+  cell $eq $1203
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -30076,11 +30026,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \mint_noniot_state [3:0]
     connect \B 1'1
-    connect \Y $418
+    connect \Y $417
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $1206
+  cell $eq $1204
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -30088,11 +30038,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \mint_noniot_state [3:0]
     connect \B 2'10
-    connect \Y $419
+    connect \Y $418
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $1207
+  cell $eq $1205
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -30100,7 +30050,31 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \mint_noniot_state [3:0]
     connect \B 2'11
+    connect \Y $419
+  end
+
+  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
+  cell $eq $1206
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 4
+    parameter \B_WIDTH 3
+    parameter \Y_WIDTH 1
+    connect \A \mint_noniot_state [3:0]
+    connect \B 3'100
     connect \Y $420
+  end
+
+  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
+  cell $eq $1207
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 4
+    parameter \B_WIDTH 3
+    parameter \Y_WIDTH 1
+    connect \A \mint_noniot_state [3:0]
+    connect \B 3'101
+    connect \Y $421
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
@@ -30111,8 +30085,8 @@ module \top.core
     parameter \B_WIDTH 3
     parameter \Y_WIDTH 1
     connect \A \mint_noniot_state [3:0]
-    connect \B 3'100
-    connect \Y $421
+    connect \B 3'110
+    connect \Y $422
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
@@ -30123,8 +30097,8 @@ module \top.core
     parameter \B_WIDTH 3
     parameter \Y_WIDTH 1
     connect \A \mint_noniot_state [3:0]
-    connect \B 3'101
-    connect \Y $422
+    connect \B 3'111
+    connect \Y $423
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
@@ -30132,11 +30106,11 @@ module \top.core
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
-    parameter \B_WIDTH 3
+    parameter \B_WIDTH 4
     parameter \Y_WIDTH 1
     connect \A \mint_noniot_state [3:0]
-    connect \B 3'110
-    connect \Y $423
+    connect \B 4'1000
+    connect \Y $424
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
@@ -30144,11 +30118,11 @@ module \top.core
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
-    parameter \B_WIDTH 3
+    parameter \B_WIDTH 4
     parameter \Y_WIDTH 1
     connect \A \mint_noniot_state [3:0]
-    connect \B 3'111
-    connect \Y $424
+    connect \B 4'1001
+    connect \Y $425
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
@@ -30159,8 +30133,8 @@ module \top.core
     parameter \B_WIDTH 4
     parameter \Y_WIDTH 1
     connect \A \mint_noniot_state [3:0]
-    connect \B 4'1000
-    connect \Y $425
+    connect \B 4'1010
+    connect \Y $426
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
@@ -30171,8 +30145,8 @@ module \top.core
     parameter \B_WIDTH 4
     parameter \Y_WIDTH 1
     connect \A \mint_noniot_state [3:0]
-    connect \B 4'1001
-    connect \Y $426
+    connect \B 4'1011
+    connect \Y $427
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
@@ -30183,8 +30157,8 @@ module \top.core
     parameter \B_WIDTH 4
     parameter \Y_WIDTH 1
     connect \A \mint_noniot_state [3:0]
-    connect \B 4'1010
-    connect \Y $427
+    connect \B 4'1100
+    connect \Y $428
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
@@ -30195,8 +30169,8 @@ module \top.core
     parameter \B_WIDTH 4
     parameter \Y_WIDTH 1
     connect \A \mint_noniot_state [3:0]
-    connect \B 4'1011
-    connect \Y $428
+    connect \B 4'1101
+    connect \Y $429
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
@@ -30207,36 +30181,12 @@ module \top.core
     parameter \B_WIDTH 4
     parameter \Y_WIDTH 1
     connect \A \mint_noniot_state [3:0]
-    connect \B 4'1100
-    connect \Y $429
-  end
-
-  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $1217
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 4
-    parameter \B_WIDTH 4
-    parameter \Y_WIDTH 1
-    connect \A \mint_noniot_state [3:0]
-    connect \B 4'1101
+    connect \B 4'1110
     connect \Y $430
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $1218
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 4
-    parameter \B_WIDTH 4
-    parameter \Y_WIDTH 1
-    connect \A \mint_noniot_state [3:0]
-    connect \B 4'1110
-    connect \Y $431
-  end
-
-  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $1219
+  cell $eq $1217
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 2
@@ -30244,11 +30194,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \mwin_state [1:0]
     connect \B {  }
-    connect \Y $432
+    connect \Y $431
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $1220
+  cell $eq $1218
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 2
@@ -30256,11 +30206,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \mwin_state [1:0]
     connect \B 1'1
-    connect \Y $433
+    connect \Y $432
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $1221
+  cell $eq $1219
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 2
@@ -30268,20 +30218,20 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \mwin_state [1:0]
     connect \B 2'10
-    connect \Y $434
+    connect \Y $433
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:388"
-  cell $not $1222
+  cell $not $1220
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \namespace_init_armed [0]
-    connect \Y $435
+    connect \Y $434
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:960"
-  cell $or $1223
+  attribute \src "/home/runner/workspace/hardware/core.py:958"
+  cell $or $1221
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -30289,68 +30239,68 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \reboot_request [0]
     connect \B \reboot_req [0]
+    connect \Y $435
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:959"
+  cell $and $1222
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \fault_valid$828 [0]
+    connect \B \boot_complete [0]
     connect \Y $436
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:961"
+  attribute \src "/home/runner/workspace/hardware/core.py:960"
+  cell $not $1223
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A 1'1
+    connect \Y $437
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:959"
   cell $and $1224
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \fault_valid$831 [0]
-    connect \B \boot_complete [0]
-    connect \Y $437
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:962"
-  cell $not $1225
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A 1'1
+    connect \A $436 [0]
+    connect \B $437 [0]
     connect \Y $438
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:961"
+  attribute \src "/home/runner/workspace/hardware/core.py:958"
+  cell $or $1225
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $435 [0]
+    connect \B $438 [0]
+    connect \Y $439
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:965"
   cell $and $1226
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $437 [0]
-    connect \B $438 [0]
-    connect \Y $439
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:960"
-  cell $or $1227
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $436 [0]
-    connect \B $439 [0]
+    connect \A \fault_valid$828 [0]
+    connect \B \boot_complete [0]
     connect \Y $440
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:967"
-  cell $and $1228
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \fault_valid$831 [0]
-    connect \B \boot_complete [0]
-    connect \Y $441
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:971"
-  cell $and $1229
+  attribute \src "/home/runner/workspace/hardware/core.py:969"
+  cell $and $1227
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -30358,7 +30308,28 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \skip_fault_req [0]
     connect \B \boot_complete [0]
+    connect \Y $441
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1009"
+  cell $and $1228
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \boot_complete [0]
+    connect \B $346 [0]
     connect \Y $442
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1011"
+  cell $not $1229
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \fetch_bounds_fault [0]
+    connect \Y $443
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:1011"
@@ -30368,34 +30339,13 @@ module \top.core
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \boot_complete [0]
-    connect \B $347 [0]
-    connect \Y $443
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1013"
-  cell $not $1231
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \fetch_bounds_fault [0]
+    connect \A \branch_taken [0]
+    connect \B $443 [0]
     connect \Y $444
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1013"
-  cell $and $1232
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \branch_taken [0]
-    connect \B $444 [0]
-    connect \Y $445
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1019"
-  cell $and $1233
+  attribute \src "/home/runner/workspace/hardware/core.py:1017"
+  cell $and $1231
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -30403,326 +30353,338 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \boot_complete [0]
     connect \B \instr_valid [0]
-    connect \Y $446
+    connect \Y $445
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1019"
-  cell $not $1234
+  attribute \src "/home/runner/workspace/hardware/core.py:1017"
+  cell $not $1232
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \any_unit_busy [0]
+    connect \Y $446
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1017"
+  cell $and $1233
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $445 [0]
+    connect \B $446 [0]
     connect \Y $447
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1019"
+  attribute \src "/home/runner/workspace/hardware/core.py:1018"
+  cell $not $1234
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \call_start_sig [0]
+    connect \Y $448
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1017"
   cell $and $1235
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $446 [0]
-    connect \B $447 [0]
-    connect \Y $448
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1020"
-  cell $not $1236
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \call_start_sig [0]
+    connect \A $447 [0]
+    connect \B $448 [0]
     connect \Y $449
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:1019"
+  cell $not $1236
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \ret_start_sig [0]
+    connect \Y $450
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1017"
   cell $and $1237
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $448 [0]
-    connect \B $449 [0]
-    connect \Y $450
+    connect \A $449 [0]
+    connect \B $450 [0]
+    connect \Y $451
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1021"
+  attribute \src "/home/runner/workspace/hardware/core.py:1020"
   cell $not $1238
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \ret_start_sig [0]
-    connect \Y $451
+    connect \A \load_start_sig [0]
+    connect \Y $452
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1019"
+  attribute \src "/home/runner/workspace/hardware/core.py:1017"
   cell $and $1239
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $450 [0]
-    connect \B $451 [0]
-    connect \Y $452
+    connect \A $451 [0]
+    connect \B $452 [0]
+    connect \Y $453
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1022"
+  attribute \src "/home/runner/workspace/hardware/core.py:1021"
   cell $not $1240
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \load_start_sig [0]
-    connect \Y $453
+    connect \A \save_start_sig [0]
+    connect \Y $454
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1019"
+  attribute \src "/home/runner/workspace/hardware/core.py:1017"
   cell $and $1241
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $452 [0]
-    connect \B $453 [0]
-    connect \Y $454
+    connect \A $453 [0]
+    connect \B $454 [0]
+    connect \Y $455
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1023"
+  attribute \src "/home/runner/workspace/hardware/core.py:1022"
   cell $not $1242
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \save_start_sig [0]
-    connect \Y $455
+    connect \A \tperm_start_sig [0]
+    connect \Y $456
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1019"
+  attribute \src "/home/runner/workspace/hardware/core.py:1017"
   cell $and $1243
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $454 [0]
-    connect \B $455 [0]
-    connect \Y $456
+    connect \A $455 [0]
+    connect \B $456 [0]
+    connect \Y $457
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1024"
+  attribute \src "/home/runner/workspace/hardware/core.py:1023"
   cell $not $1244
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \tperm_start_sig [0]
-    connect \Y $457
+    connect \A \dread_start_sig [0]
+    connect \Y $458
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1019"
+  attribute \src "/home/runner/workspace/hardware/core.py:1017"
   cell $and $1245
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $456 [0]
-    connect \B $457 [0]
-    connect \Y $458
+    connect \A $457 [0]
+    connect \B $458 [0]
+    connect \Y $459
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1025"
+  attribute \src "/home/runner/workspace/hardware/core.py:1024"
   cell $not $1246
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \dread_start_sig [0]
-    connect \Y $459
+    connect \A \dwrite_start_sig [0]
+    connect \Y $460
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1019"
+  attribute \src "/home/runner/workspace/hardware/core.py:1017"
   cell $and $1247
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $458 [0]
-    connect \B $459 [0]
-    connect \Y $460
+    connect \A $459 [0]
+    connect \B $460 [0]
+    connect \Y $461
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1026"
+  attribute \src "/home/runner/workspace/hardware/core.py:1025"
   cell $not $1248
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \dwrite_start_sig [0]
-    connect \Y $461
+    connect \A \switch_start_sig [0]
+    connect \Y $462
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1019"
+  attribute \src "/home/runner/workspace/hardware/core.py:1017"
   cell $and $1249
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $460 [0]
-    connect \B $461 [0]
-    connect \Y $462
+    connect \A $461 [0]
+    connect \B $462 [0]
+    connect \Y $463
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1027"
+  attribute \src "/home/runner/workspace/hardware/core.py:1026"
   cell $not $1250
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \switch_start_sig [0]
-    connect \Y $463
+    connect \A \change_start_sig [0]
+    connect \Y $464
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1019"
+  attribute \src "/home/runner/workspace/hardware/core.py:1017"
   cell $and $1251
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $462 [0]
-    connect \B $463 [0]
-    connect \Y $464
+    connect \A $463 [0]
+    connect \B $464 [0]
+    connect \Y $465
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1028"
+  attribute \src "/home/runner/workspace/hardware/core.py:1027"
   cell $not $1252
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \change_start_sig [0]
-    connect \Y $465
+    connect \A \lambda_start_sig [0]
+    connect \Y $466
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1019"
+  attribute \src "/home/runner/workspace/hardware/core.py:1017"
   cell $and $1253
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $464 [0]
-    connect \B $465 [0]
-    connect \Y $466
+    connect \A $465 [0]
+    connect \B $466 [0]
+    connect \Y $467
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1029"
+  attribute \src "/home/runner/workspace/hardware/core.py:1028"
   cell $not $1254
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \lambda_start_sig [0]
-    connect \Y $467
+    connect \A \eloadcall_start_sig [0]
+    connect \Y $468
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1019"
+  attribute \src "/home/runner/workspace/hardware/core.py:1017"
   cell $and $1255
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $466 [0]
-    connect \B $467 [0]
-    connect \Y $468
+    connect \A $467 [0]
+    connect \B $468 [0]
+    connect \Y $469
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1030"
+  attribute \src "/home/runner/workspace/hardware/core.py:1029"
   cell $not $1256
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \eloadcall_start_sig [0]
-    connect \Y $469
+    connect \A \xloadlambda_start_sig [0]
+    connect \Y $470
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1019"
+  attribute \src "/home/runner/workspace/hardware/core.py:1017"
   cell $and $1257
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $468 [0]
-    connect \B $469 [0]
-    connect \Y $470
+    connect \A $469 [0]
+    connect \B $470 [0]
+    connect \Y $471
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1031"
+  attribute \src "/home/runner/workspace/hardware/core.py:1030"
   cell $not $1258
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \xloadlambda_start_sig [0]
-    connect \Y $471
+    connect \A \fetch_bounds_fault [0]
+    connect \Y $472
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1019"
+  attribute \src "/home/runner/workspace/hardware/core.py:1017"
   cell $and $1259
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $470 [0]
-    connect \B $471 [0]
-    connect \Y $472
+    connect \A $471 [0]
+    connect \B $472 [0]
+    connect \Y $473
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1032"
+  attribute \src "/home/runner/workspace/hardware/core.py:1030"
   cell $not $1260
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \fetch_bounds_fault [0]
-    connect \Y $473
+    connect \A \intercept_start [0]
+    connect \Y $474
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1019"
+  attribute \src "/home/runner/workspace/hardware/core.py:1017"
   cell $and $1261
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $472 [0]
-    connect \B $473 [0]
-    connect \Y $474
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1032"
-  cell $not $1262
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \intercept_start [0]
+    connect \A $473 [0]
+    connect \B $474 [0]
     connect \Y $475
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1019"
-  cell $and $1263
+  attribute \src "/home/runner/workspace/hardware/core.py:970"
+  cell $add $1262
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $474 [0]
-    connect \B $475 [0]
+    parameter \A_WIDTH 32
+    parameter \B_WIDTH 3
+    parameter \Y_WIDTH 33
+    connect \A \imem_addr [31:0]
+    connect \B 3'100
     connect \Y $476
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:972"
-  cell $add $1264
+  attribute \src "/home/runner/workspace/hardware/core.py:984"
+  cell $add $1263
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -30733,8 +30695,8 @@ module \top.core
     connect \Y $477
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:986"
-  cell $add $1265
+  attribute \src "/home/runner/workspace/hardware/core.py:1010"
+  cell $add $1264
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -30745,7 +30707,19 @@ module \top.core
     connect \Y $478
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1012"
+  attribute \src "/home/runner/workspace/hardware/core.py:1015"
+  cell $add $1265
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 32
+    parameter \B_WIDTH 34
+    parameter \Y_WIDTH 35
+    connect \A \imem_addr [31:0]
+    connect \B { \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14:0] 2'00 }
+    connect \Y $479
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1040"
   cell $add $1266
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -30754,35 +30728,11 @@ module \top.core
     parameter \Y_WIDTH 33
     connect \A \imem_addr [31:0]
     connect \B 3'100
-    connect \Y $479
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1017"
-  cell $add $1267
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 32
-    parameter \B_WIDTH 34
-    parameter \Y_WIDTH 35
-    connect \A \imem_addr [31:0]
-    connect \B { \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14:0] 2'00 }
     connect \Y $480
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1042"
-  cell $add $1268
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 32
-    parameter \B_WIDTH 3
-    parameter \Y_WIDTH 33
-    connect \A \imem_addr [31:0]
-    connect \B 3'100
-    connect \Y $481
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1061"
-  cell $or $1269
+  attribute \src "/home/runner/workspace/hardware/core.py:1059"
+  cell $or $1267
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -30790,35 +30740,35 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \reboot_request [0]
     connect \B \clear_all [0]
-    connect \Y $482
+    connect \Y $481
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1069"
-  cell $eq $1270
+  attribute \src "/home/runner/workspace/hardware/core.py:1067"
+  cell $eq $1268
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 4
     parameter \Y_WIDTH 1
-    connect \A \nia_value$1009 [31:0]
+    connect \A \nia_value$1006 [31:0]
     connect \B 4'1100
-    connect \Y $483
+    connect \Y $482
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1069"
-  cell $and $1271
+  attribute \src "/home/runner/workspace/hardware/core.py:1067"
+  cell $and $1269
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \nia_set$857 [0]
-    connect \B $483 [0]
-    connect \Y $484
+    connect \A \nia_set$854 [0]
+    connect \B $482 [0]
+    connect \Y $483
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1083"
-  cell $and $1272
+  attribute \src "/home/runner/workspace/hardware/core.py:1081"
+  cell $and $1270
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -30826,52 +30776,76 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \complete [0]
     connect \B \cross_domain_ret [0]
-    connect \Y $485
+    connect \Y $484
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1083"
-  cell $not $1273
+  attribute \src "/home/runner/workspace/hardware/core.py:1081"
+  cell $not $1271
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \boot_rom_return [0]
+    connect \Y $485
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1081"
+  cell $and $1272
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $484 [0]
+    connect \B $485 [0]
     connect \Y $486
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1083"
+  attribute \src "/home/runner/workspace/hardware/core.py:1087"
+  cell $not $1273
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \cross_domain_ret [0]
+    connect \Y $487
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1087"
   cell $and $1274
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $485 [0]
-    connect \B $486 [0]
-    connect \Y $487
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1089"
-  cell $not $1275
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \cross_domain_ret [0]
+    connect \A \complete [0]
+    connect \B $487 [0]
     connect \Y $488
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1089"
+  attribute \src "/home/runner/workspace/hardware/core.py:1092"
+  cell $eq $1275
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 4
+    parameter \B_WIDTH 4
+    parameter \Y_WIDTH 1
+    connect \A \cr_wr_addr$155 [3:0]
+    connect \B 4'1110
+    connect \Y $489
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1091"
   cell $and $1276
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \complete [0]
-    connect \B $488 [0]
-    connect \Y $489
+    connect \A \cr_wr_en$181 [0]
+    connect \B $489 [0]
+    connect \Y $490
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1094"
+  attribute \src "/home/runner/workspace/hardware/core.py:1107"
   cell $eq $1277
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -30880,59 +30854,47 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \cr_wr_addr$156 [3:0]
     connect \B 4'1110
-    connect \Y $490
+    connect \Y $491
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1093"
+  attribute \src "/home/runner/workspace/hardware/core.py:1107"
   cell $and $1278
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \cr_wr_en$182 [0]
-    connect \B $490 [0]
-    connect \Y $491
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1109"
-  cell $eq $1279
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 4
-    parameter \B_WIDTH 4
-    parameter \Y_WIDTH 1
-    connect \A \cr_wr_addr$157 [3:0]
-    connect \B 4'1110
+    connect \A \cr_wr_en$151 [0]
+    connect \B $491 [0]
     connect \Y $492
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1109"
-  cell $and $1280
+  attribute \src "/home/runner/workspace/hardware/core.py:1121"
+  cell $or $1279
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \cr_wr_en$152 [0]
-    connect \B $492 [0]
+    connect \A \nia_set$860 [0]
+    connect \B \nia_set$862 [0]
     connect \Y $493
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1123"
-  cell $or $1281
+  attribute \src "/home/runner/workspace/hardware/core.py:1121"
+  cell $or $1280
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \nia_set$863 [0]
-    connect \B \nia_set$865 [0]
+    connect \A $493 [0]
+    connect \B \nia_set$861 [0]
     connect \Y $494
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1123"
-  cell $or $1282
+  attribute \src "/home/runner/workspace/hardware/core.py:1121"
+  cell $or $1281
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -30943,20 +30905,44 @@ module \top.core
     connect \Y $495
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1123"
-  cell $or $1283
+  attribute \src "/home/runner/workspace/hardware/core.py:1104"
+  cell $add $1282
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
+    parameter \A_WIDTH 21
     parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $495 [0]
-    connect \B \nia_set$867 [0]
+    parameter \Y_WIDTH 22
+    connect \A \cr_wr_data$168 [84:64]
+    connect \B 1'1
     connect \Y $496
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1106"
+  attribute \src "/home/runner/workspace/hardware/core.py:1104"
+  cell $shl $1283
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 22
+    parameter \B_WIDTH 2
+    parameter \Y_WIDTH 25
+    connect \A $496 [21:0]
+    connect \B 2'10
+    connect \Y $497
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1103"
   cell $add $1284
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 32
+    parameter \B_WIDTH 25
+    parameter \Y_WIDTH 33
+    connect \A \cr_wr_data$168 [63:32]
+    connect \B $497 [24:0]
+    connect \Y $498
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1117"
+  cell $add $1285
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 21
@@ -30964,71 +30950,35 @@ module \top.core
     parameter \Y_WIDTH 22
     connect \A \cr_wr_data$169 [84:64]
     connect \B 1'1
-    connect \Y $497
+    connect \Y $499
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1106"
-  cell $shl $1285
+  attribute \src "/home/runner/workspace/hardware/core.py:1117"
+  cell $shl $1286
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 22
     parameter \B_WIDTH 2
     parameter \Y_WIDTH 25
-    connect \A $497 [21:0]
+    connect \A $499 [21:0]
     connect \B 2'10
-    connect \Y $498
+    connect \Y $500
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1105"
-  cell $add $1286
+  attribute \src "/home/runner/workspace/hardware/core.py:1116"
+  cell $add $1287
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
     parameter \B_WIDTH 25
     parameter \Y_WIDTH 33
     connect \A \cr_wr_data$169 [63:32]
-    connect \B $498 [24:0]
-    connect \Y $499
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1119"
-  cell $add $1287
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 21
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 22
-    connect \A \cr_wr_data$170 [84:64]
-    connect \B 1'1
-    connect \Y $500
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1119"
-  cell $shl $1288
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 22
-    parameter \B_WIDTH 2
-    parameter \Y_WIDTH 25
-    connect \A $500 [21:0]
-    connect \B 2'10
+    connect \B $500 [24:0]
     connect \Y $501
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1118"
-  cell $add $1289
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 32
-    parameter \B_WIDTH 25
-    parameter \Y_WIDTH 33
-    connect \A \cr_wr_data$170 [63:32]
-    connect \B $501 [24:0]
-    connect \Y $502
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1275"
-  cell $and $1290
+  attribute \src "/home/runner/workspace/hardware/core.py:1273"
+  cell $and $1288
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -31036,11 +30986,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \boot_complete [0]
     connect \B \retire_valid [0]
-    connect \Y $503
+    connect \Y $502
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1275"
-  cell $lt $1291
+  attribute \src "/home/runner/workspace/hardware/core.py:1273"
+  cell $lt $1289
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 2
@@ -31048,23 +30998,23 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \boot_retire_count [1:0]
     connect \B 2'11
-    connect \Y $504
+    connect \Y $503
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1275"
-  cell $and $1292
+  attribute \src "/home/runner/workspace/hardware/core.py:1273"
+  cell $and $1290
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $503 [0]
-    connect \B $504 [0]
-    connect \Y $505
+    connect \A $502 [0]
+    connect \B $503 [0]
+    connect \Y $504
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1276"
-  cell $add $1293
+  attribute \src "/home/runner/workspace/hardware/core.py:1274"
+  cell $add $1291
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 2
@@ -31072,16 +31022,37 @@ module \top.core
     parameter \Y_WIDTH 3
     connect \A \boot_retire_count [1:0]
     connect \B 1'1
-    connect \Y $506
+    connect \Y $505
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1377"
-  cell $not $1294
+  attribute \src "/home/runner/workspace/hardware/core.py:1373"
+  cell $not $1292
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \lambda_active_reg [0]
+    connect \Y $506
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1377"
+  cell $not $1293
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \busy [0]
     connect \Y $507
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1377"
+  cell $and $1294
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \return_fetch_settle [0]
+    connect \B $507 [0]
+    connect \Y $508
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:1381"
@@ -31089,8 +31060,8 @@ module \top.core
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \busy [0]
-    connect \Y $508
+    connect \A \fault_valid$816 [0]
+    connect \Y $509
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:1381"
@@ -31100,54 +31071,54 @@ module \top.core
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \return_fetch_settle [0]
-    connect \B $508 [0]
-    connect \Y $509
+    connect \A \complete [0]
+    connect \B $509 [0]
+    connect \Y $510
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1385"
+  attribute \src "/home/runner/workspace/hardware/core.py:1382"
   cell $not $1297
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \fault_valid$819 [0]
-    connect \Y $510
+    connect \A \reboot_request [0]
+    connect \Y $511
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1385"
+  attribute \src "/home/runner/workspace/hardware/core.py:1381"
   cell $and $1298
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \complete [0]
-    connect \B $510 [0]
-    connect \Y $511
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1386"
-  cell $not $1299
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \reboot_request [0]
+    connect \A $510 [0]
+    connect \B $511 [0]
     connect \Y $512
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1385"
-  cell $and $1300
+  attribute \src "/home/runner/workspace/hardware/core.py:1381"
+  cell $and $1299
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $511 [0]
-    connect \B $512 [0]
+    connect \A $512 [0]
+    connect \B \cross_domain_ret [0]
     connect \Y $513
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1385"
+  attribute \src "/home/runner/workspace/hardware/core.py:1382"
+  cell $not $1300
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \boot_rom_return [0]
+    connect \Y $514
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1381"
   cell $and $1301
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -31155,264 +31126,243 @@ module \top.core
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $513 [0]
-    connect \B \cross_domain_ret [0]
-    connect \Y $514
+    connect \B $514 [0]
+    connect \Y $515
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1386"
+  attribute \src "/home/runner/workspace/hardware/core.py:1401"
   cell $not $1302
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \boot_rom_return [0]
-    connect \Y $515
+    connect \A \call_fault [0]
+    connect \Y $516
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1385"
+  attribute \src "/home/runner/workspace/hardware/core.py:1401"
   cell $and $1303
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $514 [0]
-    connect \B $515 [0]
-    connect \Y $516
+    connect \A \call_normal_complete [0]
+    connect \B $516 [0]
+    connect \Y $517
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1405"
+  attribute \src "/home/runner/workspace/hardware/core.py:1403"
   cell $not $1304
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \call_fault [0]
-    connect \Y $517
+    connect \A \lambda_fault [0]
+    connect \Y $518
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1405"
+  attribute \src "/home/runner/workspace/hardware/core.py:1403"
   cell $and $1305
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \call_normal_complete [0]
-    connect \B $517 [0]
-    connect \Y $518
+    connect \A \lambda_complete [0]
+    connect \B $518 [0]
+    connect \Y $519
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1407"
+  attribute \src "/home/runner/workspace/hardware/core.py:1531"
   cell $not $1306
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \lambda_fault [0]
-    connect \Y $519
+    connect \A \iadd_busy_reg [0]
+    connect \Y $520
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1407"
+  attribute \src "/home/runner/workspace/hardware/core.py:1531"
   cell $and $1307
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \lambda_complete [0]
-    connect \B $519 [0]
-    connect \Y $520
+    connect \A \iadd_start_sig [0]
+    connect \B $520 [0]
+    connect \Y $521
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1535"
+  attribute \src "/home/runner/workspace/hardware/core.py:1532"
   cell $not $1308
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \iadd_busy_reg [0]
-    connect \Y $521
+    connect \A \isub_busy_reg [0]
+    connect \Y $522
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1535"
+  attribute \src "/home/runner/workspace/hardware/core.py:1532"
   cell $and $1309
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \iadd_start_sig [0]
-    connect \B $521 [0]
-    connect \Y $522
+    connect \A \isub_start_sig [0]
+    connect \B $522 [0]
+    connect \Y $523
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1536"
+  attribute \src "/home/runner/workspace/hardware/core.py:1599"
   cell $not $1310
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \isub_busy_reg [0]
-    connect \Y $523
+    connect \A \shl_busy_reg [0]
+    connect \Y $524
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1536"
+  attribute \src "/home/runner/workspace/hardware/core.py:1599"
   cell $and $1311
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \isub_start_sig [0]
-    connect \B $523 [0]
-    connect \Y $524
+    connect \A \shl_start_sig [0]
+    connect \B $524 [0]
+    connect \Y $525
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1603"
+  attribute \src "/home/runner/workspace/hardware/core.py:1600"
   cell $not $1312
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \shl_busy_reg [0]
-    connect \Y $525
+    connect \A \shr_busy_reg [0]
+    connect \Y $526
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1603"
+  attribute \src "/home/runner/workspace/hardware/core.py:1600"
   cell $and $1313
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \shl_start_sig [0]
-    connect \B $525 [0]
-    connect \Y $526
+    connect \A \shr_start_sig [0]
+    connect \B $526 [0]
+    connect \Y $527
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1604"
+  attribute \src "/home/runner/workspace/hardware/core.py:1661"
   cell $not $1314
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \shr_busy_reg [0]
-    connect \Y $527
+    connect \A \bfext_busy_reg [0]
+    connect \Y $528
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1604"
+  attribute \src "/home/runner/workspace/hardware/core.py:1661"
   cell $and $1315
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \shr_start_sig [0]
-    connect \B $527 [0]
-    connect \Y $528
+    connect \A \bfext_start_sig [0]
+    connect \B $528 [0]
+    connect \Y $529
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1665"
+  attribute \src "/home/runner/workspace/hardware/core.py:1691"
   cell $not $1316
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \bfext_busy_reg [0]
-    connect \Y $529
+    connect \A \bfins_busy_reg [0]
+    connect \Y $530
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1665"
+  attribute \src "/home/runner/workspace/hardware/core.py:1691"
   cell $and $1317
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \bfext_start_sig [0]
-    connect \B $529 [0]
-    connect \Y $530
+    connect \A \bfins_start_sig [0]
+    connect \B $530 [0]
+    connect \Y $531
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1695"
+  attribute \src "/home/runner/workspace/hardware/core.py:1717"
   cell $not $1318
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \bfins_busy_reg [0]
-    connect \Y $531
+    connect \A \mcmp_busy_reg [0]
+    connect \Y $532
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1695"
+  attribute \src "/home/runner/workspace/hardware/core.py:1717"
   cell $and $1319
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \bfins_start_sig [0]
-    connect \B $531 [0]
-    connect \Y $532
+    connect \A \mcmp_start_sig [0]
+    connect \B $532 [0]
+    connect \Y $533
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1721"
+  attribute \src "/home/runner/workspace/hardware/core.py:1739"
   cell $not $1320
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \mcmp_busy_reg [0]
-    connect \Y $533
+    connect \A \branch_busy_reg [0]
+    connect \Y $534
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1721"
+  attribute \src "/home/runner/workspace/hardware/core.py:1739"
   cell $and $1321
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \mcmp_start_sig [0]
-    connect \B $533 [0]
-    connect \Y $534
+    connect \A \branch_taken [0]
+    connect \B $534 [0]
+    connect \Y $535
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1743"
+  attribute \src "/home/runner/workspace/hardware/core.py:1813"
   cell $not $1322
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \branch_busy_reg [0]
-    connect \Y $535
+    connect \A \thread_switch_start_sig [0]
+    connect \Y $536
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1743"
+  attribute \src "/home/runner/workspace/hardware/core.py:1813"
   cell $and $1323
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \branch_taken [0]
-    connect \B $535 [0]
-    connect \Y $536
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1817"
-  cell $not $1324
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \thread_switch_start_sig [0]
+    connect \A \change_start_sig [0]
+    connect \B $536 [0]
     connect \Y $537
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:1817"
-  cell $and $1325
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \change_start_sig [0]
-    connect \B $537 [0]
-    connect \Y $538
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1821"
-  cell $eq $1326
+  cell $eq $1324
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -31420,11 +31370,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [22:19]
     connect \B 4'1110
-    connect \Y $539
+    connect \Y $538
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1821"
-  cell $eq $1327
+  attribute \src "/home/runner/workspace/hardware/core.py:1817"
+  cell $eq $1325
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -31432,23 +31382,35 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \instruction [22:19]
     connect \B 4'1111
-    connect \Y $540
+    connect \Y $539
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1821"
-  cell $or $1328
+  attribute \src "/home/runner/workspace/hardware/core.py:1817"
+  cell $or $1326
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $539 [0]
-    connect \B $540 [0]
+    connect \A $538 [0]
+    connect \B $539 [0]
+    connect \Y $540
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1821"
+  cell $or $1327
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \change_complete [0]
+    connect \B \change_fault [0]
     connect \Y $541
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1825"
-  cell $or $1329
+  attribute \src "/home/runner/workspace/hardware/core.py:1831"
+  cell $or $1328
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -31459,20 +31421,8 @@ module \top.core
     connect \Y $542
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1835"
-  cell $or $1330
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \change_complete [0]
-    connect \B \change_fault [0]
-    connect \Y $543
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1837"
-  cell $and $1331
+  attribute \src "/home/runner/workspace/hardware/core.py:1833"
+  cell $and $1329
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -31480,19 +31430,40 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \change_complete [0]
     connect \B \scheduler_inflight [0]
-    connect \Y $544
+    connect \Y $543
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1951"
-  cell $not $1332
+  attribute \src "/home/runner/workspace/hardware/core.py:1947"
+  cell $not $1330
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \first_call_done_reg [0]
+    connect \Y $544
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1947"
+  cell $and $1331
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $544 [0]
+    connect \B \call_normal_complete [0]
     connect \Y $545
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1951"
+  attribute \src "/home/runner/workspace/hardware/core.py:1948"
+  cell $not $1332
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \call_fault [0]
+    connect \Y $546
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1947"
   cell $and $1333
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -31500,53 +31471,53 @@ module \top.core
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $545 [0]
-    connect \B \call_normal_complete [0]
-    connect \Y $546
+    connect \B $546 [0]
+    connect \Y $547
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1952"
+  attribute \src "/home/runner/workspace/hardware/core.py:1950"
   cell $not $1334
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \call_fault [0]
-    connect \Y $547
+    connect \A \irq_armed_reg [0]
+    connect \Y $548
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1951"
+  attribute \src "/home/runner/workspace/hardware/core.py:1950"
   cell $and $1335
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $546 [0]
-    connect \B $547 [0]
-    connect \Y $548
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1954"
-  cell $not $1336
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \irq_armed_reg [0]
+    connect \A \first_call_done_reg [0]
+    connect \B $548 [0]
     connect \Y $549
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1954"
-  cell $and $1337
+  attribute \src "/home/runner/workspace/hardware/core.py:1950"
+  cell $and $1336
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \first_call_done_reg [0]
-    connect \B $549 [0]
+    connect \A $549 [0]
+    connect \B \complete [0]
     connect \Y $550
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1954"
+  attribute \src "/home/runner/workspace/hardware/core.py:1951"
+  cell $not $1337
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \fault_valid$816 [0]
+    connect \Y $551
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1950"
   cell $and $1338
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -31554,54 +31525,33 @@ module \top.core
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $550 [0]
-    connect \B \complete [0]
-    connect \Y $551
+    connect \B $551 [0]
+    connect \Y $552
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1955"
+  attribute \src "/home/runner/workspace/hardware/core.py:1952"
   cell $not $1339
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \fault_valid$819 [0]
-    connect \Y $552
+    connect \A \reboot_request [0]
+    connect \Y $553
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1954"
+  attribute \src "/home/runner/workspace/hardware/core.py:1950"
   cell $and $1340
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $551 [0]
-    connect \B $552 [0]
-    connect \Y $553
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1956"
-  cell $not $1341
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \reboot_request [0]
+    connect \A $552 [0]
+    connect \B $553 [0]
     connect \Y $554
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1954"
-  cell $and $1342
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $553 [0]
-    connect \B $554 [0]
-    connect \Y $555
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2008"
-  cell $or $1343
+  attribute \src "/home/runner/workspace/hardware/core.py:2004"
+  cell $or $1341
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -31609,47 +31559,47 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \outform_done [0]
     connect \B \outform_fault [0]
+    connect \Y $555
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2048"
+  cell $mux $1342
+    parameter \WIDTH 16
+    connect \S \outform_start_out$707 [0]
+    connect \A 16'0000000000000000
+    connect \B \outform_slot_id_out [15:0]
     connect \Y $556
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2052"
-  cell $mux $1344
+  attribute \src "/home/runner/workspace/hardware/core.py:2047"
+  cell $mux $1343
     parameter \WIDTH 16
-    connect \S \outform_start_out$710 [0]
-    connect \A 16'0000000000000000
-    connect \B \outform_slot_id_out [15:0]
+    connect \S 1'0
+    connect \A $556 [15:0]
+    connect \B 16'0000000000000000
     connect \Y $557
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2051"
-  cell $mux $1345
-    parameter \WIDTH 16
-    connect \S 1'0
-    connect \A $557 [15:0]
-    connect \B 16'0000000000000000
+  attribute \src "/home/runner/workspace/hardware/core.py:2061"
+  cell $mux $1344
+    parameter \WIDTH 32
+    connect \S \outform_start_out$707 [0]
+    connect \A 32'00000000000000000000000000000000
+    connect \B 32'00000000000000000000000000000000
     connect \Y $558
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2065"
-  cell $mux $1346
+  attribute \src "/home/runner/workspace/hardware/core.py:2060"
+  cell $mux $1345
     parameter \WIDTH 32
-    connect \S \outform_start_out$710 [0]
-    connect \A 32'00000000000000000000000000000000
+    connect \S 1'0
+    connect \A $558 [31:0]
     connect \B 32'00000000000000000000000000000000
     connect \Y $559
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2064"
-  cell $mux $1347
-    parameter \WIDTH 32
-    connect \S 1'0
-    connect \A $559 [31:0]
-    connect \B 32'00000000000000000000000000000000
-    connect \Y $560
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2357"
-  cell $and $1348
+  attribute \src "/home/runner/workspace/hardware/core.py:2353"
+  cell $and $1346
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -31657,23 +31607,23 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \alloc_req [0]
     connect \B \alloc_fits_ni [0]
-    connect \Y $561
+    connect \Y $560
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2357"
-  cell $and $1349
+  attribute \src "/home/runner/workspace/hardware/core.py:2353"
+  cell $and $1347
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $561 [0]
+    connect \A $560 [0]
     connect \B \alloc_n_ok_ni [0]
-    connect \Y $562
+    connect \Y $561
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2418"
-  cell $ne $1350
+  attribute \src "/home/runner/workspace/hardware/core.py:2414"
+  cell $ne $1348
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -31681,11 +31631,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \mint_hdr_reg_ni [31:27]
     connect \B 5'11111
-    connect \Y $563
+    connect \Y $562
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2420"
-  cell $gt $1351
+  attribute \src "/home/runner/workspace/hardware/core.py:2416"
+  cell $gt $1349
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -31693,11 +31643,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \mint_hdr_reg_ni [26:23]
     connect \B 4'1000
-    connect \Y $564
+    connect \Y $563
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2422"
-  cell $sub $1352
+  attribute \src "/home/runner/workspace/hardware/core.py:2418"
+  cell $sub $1350
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 15
@@ -31705,23 +31655,23 @@ module \top.core
     parameter \Y_WIDTH 16
     connect \A \lsz_c_ni [14:0]
     connect \B 2'10
-    connect \Y $565
+    connect \Y $564
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2422"
-  cell $gt $1353
+  attribute \src "/home/runner/workspace/hardware/core.py:2418"
+  cell $gt $1351
     parameter \A_SIGNED 1
     parameter \B_SIGNED 1
     parameter \A_WIDTH 9
     parameter \B_WIDTH 16
     parameter \Y_WIDTH 1
     connect \A { 1'0 \mint_hdr_reg_ni [7:0] }
-    connect \B $565 [15:0]
-    connect \Y $566
+    connect \B $564 [15:0]
+    connect \Y $565
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2424"
-  cell $sub $1354
+  attribute \src "/home/runner/workspace/hardware/core.py:2420"
+  cell $sub $1352
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 15
@@ -31729,35 +31679,35 @@ module \top.core
     parameter \Y_WIDTH 16
     connect \A \lsz_c_ni [14:0]
     connect \B \mint_hdr_reg_ni [7:0]
-    connect \Y $567
+    connect \Y $566
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2424"
-  cell $sub $1355
+  attribute \src "/home/runner/workspace/hardware/core.py:2420"
+  cell $sub $1353
     parameter \A_SIGNED 1
     parameter \B_SIGNED 1
     parameter \A_WIDTH 16
     parameter \B_WIDTH 3
     parameter \Y_WIDTH 17
-    connect \A $567 [15:0]
+    connect \A $566 [15:0]
     connect \B 3'010
-    connect \Y $568
+    connect \Y $567
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2424"
-  cell $gt $1356
+  attribute \src "/home/runner/workspace/hardware/core.py:2420"
+  cell $gt $1354
     parameter \A_SIGNED 1
     parameter \B_SIGNED 1
     parameter \A_WIDTH 14
     parameter \B_WIDTH 17
     parameter \Y_WIDTH 1
     connect \A { 1'0 \mint_hdr_reg_ni [22:10] }
-    connect \B $568 [16:0]
-    connect \Y $569
+    connect \B $567 [16:0]
+    connect \Y $568
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2431"
-  cell $add $1357
+  attribute \src "/home/runner/workspace/hardware/core.py:2427"
+  cell $add $1355
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 13
@@ -31765,11 +31715,11 @@ module \top.core
     parameter \Y_WIDTH 14
     connect \A \mint_hdr_reg_ni [22:10]
     connect \B 1'1
-    connect \Y $570
+    connect \Y $569
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2448"
-  cell $ne $1358
+  attribute \src "/home/runner/workspace/hardware/core.py:2444"
+  cell $ne $1356
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -31777,11 +31727,11 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \mem_rd_data [31:0]
     connect \B {  }
-    connect \Y $571
+    connect \Y $570
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2451"
-  cell $add $1359
+  attribute \src "/home/runner/workspace/hardware/core.py:2447"
+  cell $add $1357
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 14
@@ -31789,11 +31739,11 @@ module \top.core
     parameter \Y_WIDTH 15
     connect \A \mint_scan_idx_reg_ni [13:0]
     connect \B 1'1
-    connect \Y $572
+    connect \Y $571
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2487"
-  cell $sub $1360
+  attribute \src "/home/runner/workspace/hardware/core.py:2483"
+  cell $sub $1358
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 15
@@ -31801,11 +31751,11 @@ module \top.core
     parameter \Y_WIDTH 16
     connect \A \mint_lump_size_reg [14:0]
     connect \B \mint_cc_reg_ni [7:0]
-    connect \Y $573
+    connect \Y $572
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2517"
-  cell $add $1361
+  attribute \src "/home/runner/workspace/hardware/core.py:2513"
+  cell $add $1359
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 8
@@ -31813,11 +31763,11 @@ module \top.core
     parameter \Y_WIDTH 9
     connect \A \mint_copy_idx_reg_ni [7:0]
     connect \B 1'1
-    connect \Y $574
+    connect \Y $573
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2767"
-  cell $or $1362
+  attribute \src "/home/runner/workspace/hardware/core.py:2763"
+  cell $or $1360
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -31825,71 +31775,71 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \load_start_sig [0]
     connect \B \save_start_sig [0]
+    connect \Y $574
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2763"
+  cell $or $1361
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $574 [0]
+    connect \B \tperm_start_sig [0]
     connect \Y $575
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2767"
-  cell $or $1363
+  attribute \src "/home/runner/workspace/hardware/core.py:2763"
+  cell $or $1362
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $575 [0]
-    connect \B \tperm_start_sig [0]
+    connect \B \dread_start_sig [0]
     connect \Y $576
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2767"
-  cell $or $1364
+  attribute \src "/home/runner/workspace/hardware/core.py:2763"
+  cell $or $1363
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $576 [0]
-    connect \B \dread_start_sig [0]
+    connect \B \dwrite_start_sig [0]
     connect \Y $577
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2767"
-  cell $or $1365
+  attribute \src "/home/runner/workspace/hardware/core.py:2763"
+  cell $or $1364
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $577 [0]
-    connect \B \dwrite_start_sig [0]
+    connect \B \call_start_sig [0]
     connect \Y $578
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2767"
-  cell $or $1366
+  attribute \src "/home/runner/workspace/hardware/core.py:2763"
+  cell $or $1365
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $578 [0]
-    connect \B \call_start_sig [0]
+    connect \B \ret_start_sig [0]
     connect \Y $579
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2767"
-  cell $or $1367
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $579 [0]
-    connect \B \ret_start_sig [0]
-    connect \Y $580
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2778"
-  cell $or $1368
+  attribute \src "/home/runner/workspace/hardware/core.py:2774"
+  cell $or $1366
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -31897,76 +31847,76 @@ module \top.core
     parameter \Y_WIDTH 1
     connect \A \change_start_sig [0]
     connect \B \switch_start_sig [0]
-    connect \Y $581
+    connect \Y $580
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2778"
-  cell $or $1369
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $581 [0]
-    connect \B \lambda_start_sig [0]
-    connect \Y $582
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2778"
-  cell $or $1370
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $582 [0]
-    connect \B \eloadcall_start_sig [0]
-    connect \Y $583
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2778"
-  cell $or $1371
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $583 [0]
-    connect \B \xloadlambda_start_sig [0]
-    connect \Y $584
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2777"
-  cell $or $1372
+  attribute \src "/home/runner/workspace/hardware/core.py:2774"
+  cell $or $1367
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $580 [0]
-    connect \B $584 [0]
+    connect \B \lambda_start_sig [0]
+    connect \Y $581
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2774"
+  cell $or $1368
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $581 [0]
+    connect \B \eloadcall_start_sig [0]
+    connect \Y $582
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2774"
+  cell $or $1369
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $582 [0]
+    connect \B \xloadlambda_start_sig [0]
+    connect \Y $583
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2773"
+  cell $or $1370
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $579 [0]
+    connect \B $583 [0]
+    connect \Y $584
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2791"
+  cell $mux $1371
+    parameter \WIDTH 32
+    connect \S $402 [0]
+    connect \A \instruction [31:0]
+    connect \B \delayed_issuer_instr [31:0]
     connect \Y $585
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2795"
-  cell $mux $1373
-    parameter \WIDTH 32
-    connect \S $403 [0]
-    connect \A \instruction [31:0]
-    connect \B \delayed_issuer_instr [31:0]
-    connect \Y $586
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:572"
-  process $1374
+  attribute \src "/home/runner/workspace/hardware/core.py:570"
+  process $1372
     assign \required_perms [5:0] 6'000000
     switch \instruction [31:27]
       case 5'00000
-        assign \required_perms [5:0] { 2'00 $64 [3:0] }
+        assign \required_perms [5:0] { 2'00 $63 [3:0] }
       case 5'00001
         assign \required_perms [5:0] 6'000000
       case 5'00010
-        switch $67 [0]
+        switch $66 [0]
           case 1'1
             assign \required_perms [5:0] 6'000000
           case
@@ -31988,7 +31938,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:70"
-  process $1375
+  process $1373
     assign \clist_addr [31:0] 32'00000000000000000000000000000000
     switch \mint_clist_wr_en [0]
       case 1'1
@@ -31997,7 +31947,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:73"
-  process $1376
+  process $1374
     assign \clist_wr_data [31:0] \cr_rd_data [31:0]
     switch \mint_clist_wr_en [0]
       case 1'1
@@ -32006,7 +31956,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:74"
-  process $1377
+  process $1375
     assign \clist_wr_en [0] 1'0
     switch \mint_clist_wr_en [0]
       case 1'1
@@ -32015,9 +31965,9 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/registers.py:71"
-  process $1378
+  process $1376
     assign \flags_in [3:0] 4'0000
-    switch { \tperm_complete [0] \mcmp_start_sig [0] \bfins_start_sig [0] \bfext_start_sig [0] \shr_start_sig [0] \shl_start_sig [0] \isub_start_sig [0] \iadd_start_sig [0] \dr_wr_en$105 [0] \change_dr_wr_en [0] }
+    switch { \tperm_complete [0] \mcmp_start_sig [0] \bfins_start_sig [0] \bfext_start_sig [0] \shr_start_sig [0] \shl_start_sig [0] \isub_start_sig [0] \iadd_start_sig [0] \dr_wr_en$104 [0] \change_dr_wr_en [0] }
       case 10'---------1
       case 10'--------1-
       case 10'-------1--
@@ -32042,16 +31992,16 @@ module \top.core
       case 1'1
         assign \flags_in [3:0] \flags_restore_data [3:0]
     end
-    switch \flags_restore_en$136 [0]
+    switch \flags_restore_en$135 [0]
       case 1'1
-        assign \flags_in [3:0] \flags_restore_data$137 [3:0]
+        assign \flags_in [3:0] \flags_restore_data$136 [3:0]
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/registers.py:72"
-  process $1379
+  process $1377
     assign \flags_wr_en [0] 1'0
-    switch { \tperm_complete [0] \mcmp_start_sig [0] \bfins_start_sig [0] \bfext_start_sig [0] \shr_start_sig [0] \shl_start_sig [0] \isub_start_sig [0] \iadd_start_sig [0] \dr_wr_en$105 [0] \change_dr_wr_en [0] }
+    switch { \tperm_complete [0] \mcmp_start_sig [0] \bfins_start_sig [0] \bfext_start_sig [0] \shr_start_sig [0] \shl_start_sig [0] \isub_start_sig [0] \iadd_start_sig [0] \dr_wr_en$104 [0] \change_dr_wr_en [0] }
       case 10'---------1
       case 10'--------1-
       case 10'-------1--
@@ -32076,124 +32026,124 @@ module \top.core
       case 1'1
         assign \flags_wr_en [0] 1'1
     end
-    switch \flags_restore_en$136 [0]
+    switch \flags_restore_en$135 [0]
       case 1'1
         assign \flags_wr_en [0] 1'1
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/registers.py:66"
-  process $1380
-    assign \dr_wr_addr$114 [3:0] 4'0000
-    switch { \tperm_complete [0] \mcmp_start_sig [0] \bfins_start_sig [0] \bfext_start_sig [0] \shr_start_sig [0] \shl_start_sig [0] \isub_start_sig [0] \iadd_start_sig [0] \dr_wr_en$105 [0] \change_dr_wr_en [0] }
+  process $1378
+    assign \dr_wr_addr$113 [3:0] 4'0000
+    switch { \tperm_complete [0] \mcmp_start_sig [0] \bfins_start_sig [0] \bfext_start_sig [0] \shr_start_sig [0] \shl_start_sig [0] \isub_start_sig [0] \iadd_start_sig [0] \dr_wr_en$104 [0] \change_dr_wr_en [0] }
       case 10'---------1
-        assign \dr_wr_addr$114 [3:0] \change_dr_wr_addr [3:0]
+        assign \dr_wr_addr$113 [3:0] \change_dr_wr_addr [3:0]
       case 10'--------1-
-        assign \dr_wr_addr$114 [3:0] \dr_wr_addr$117 [3:0]
+        assign \dr_wr_addr$113 [3:0] \dr_wr_addr$116 [3:0]
       case 10'-------1--
-        assign \dr_wr_addr$114 [3:0] \instruction [22:19]
+        assign \dr_wr_addr$113 [3:0] \instruction [22:19]
       case 10'------1---
-        assign \dr_wr_addr$114 [3:0] \instruction [22:19]
+        assign \dr_wr_addr$113 [3:0] \instruction [22:19]
       case 10'-----1----
-        assign \dr_wr_addr$114 [3:0] \instruction [22:19]
+        assign \dr_wr_addr$113 [3:0] \instruction [22:19]
       case 10'----1-----
-        assign \dr_wr_addr$114 [3:0] \instruction [22:19]
+        assign \dr_wr_addr$113 [3:0] \instruction [22:19]
       case 10'---1------
-        assign \dr_wr_addr$114 [3:0] \instruction [22:19]
+        assign \dr_wr_addr$113 [3:0] \instruction [22:19]
       case 10'--1-------
-        assign \dr_wr_addr$114 [3:0] \instruction [22:19]
+        assign \dr_wr_addr$113 [3:0] \instruction [22:19]
       case 10'-1--------
-        assign \dr_wr_addr$114 [3:0] 4'0000
+        assign \dr_wr_addr$113 [3:0] 4'0000
       case 10'1---------
       case
-        assign \dr_wr_addr$114 [3:0] 4'0000
+        assign \dr_wr_addr$113 [3:0] 4'0000
     end
-    switch \dr_wr_en$138 [0]
+    switch \dr_wr_en$137 [0]
       case 1'1
-        assign \dr_wr_addr$114 [3:0] 4'0000
+        assign \dr_wr_addr$113 [3:0] 4'0000
     end
     switch \dr1_wr_en [0]
       case 1'1
-        assign \dr_wr_addr$114 [3:0] 4'0001
+        assign \dr_wr_addr$113 [3:0] 4'0001
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/registers.py:67"
-  process $1381
-    assign \dr_wr_data$115 [31:0] 32'00000000000000000000000000000000
-    switch { \tperm_complete [0] \mcmp_start_sig [0] \bfins_start_sig [0] \bfext_start_sig [0] \shr_start_sig [0] \shl_start_sig [0] \isub_start_sig [0] \iadd_start_sig [0] \dr_wr_en$105 [0] \change_dr_wr_en [0] }
+  process $1379
+    assign \dr_wr_data$114 [31:0] 32'00000000000000000000000000000000
+    switch { \tperm_complete [0] \mcmp_start_sig [0] \bfins_start_sig [0] \bfext_start_sig [0] \shr_start_sig [0] \shl_start_sig [0] \isub_start_sig [0] \iadd_start_sig [0] \dr_wr_en$104 [0] \change_dr_wr_en [0] }
       case 10'---------1
-        assign \dr_wr_data$115 [31:0] \change_dr_wr_data [31:0]
+        assign \dr_wr_data$114 [31:0] \change_dr_wr_data [31:0]
       case 10'--------1-
-        assign \dr_wr_data$115 [31:0] \dr_wr_data$118 [31:0]
+        assign \dr_wr_data$114 [31:0] \dr_wr_data$117 [31:0]
       case 10'-------1--
-        assign \dr_wr_data$115 [31:0] \iadd_result [31:0]
+        assign \dr_wr_data$114 [31:0] \iadd_result [31:0]
       case 10'------1---
-        assign \dr_wr_data$115 [31:0] \isub_result [31:0]
+        assign \dr_wr_data$114 [31:0] \isub_result [31:0]
       case 10'-----1----
-        assign \dr_wr_data$115 [31:0] $200 [31:0]
+        assign \dr_wr_data$114 [31:0] $199 [31:0]
       case 10'----1-----
-        assign \dr_wr_data$115 [31:0] \shr_result [31:0]
+        assign \dr_wr_data$114 [31:0] \shr_result [31:0]
       case 10'---1------
-        assign \dr_wr_data$115 [31:0] \bfext_result [31:0]
+        assign \dr_wr_data$114 [31:0] \bfext_result [31:0]
       case 10'--1-------
-        assign \dr_wr_data$115 [31:0] $223 [31:0]
+        assign \dr_wr_data$114 [31:0] $222 [31:0]
       case 10'-1--------
-        assign \dr_wr_data$115 [31:0] 32'00000000000000000000000000000000
+        assign \dr_wr_data$114 [31:0] 32'00000000000000000000000000000000
       case 10'1---------
       case
-        assign \dr_wr_data$115 [31:0] 32'00000000000000000000000000000000
+        assign \dr_wr_data$114 [31:0] 32'00000000000000000000000000000000
     end
-    switch \dr_wr_en$138 [0]
+    switch \dr_wr_en$137 [0]
       case 1'1
-        assign \dr_wr_data$115 [31:0] { 30'000000000000000000000000000000 $641 [1:0] }
+        assign \dr_wr_data$114 [31:0] { 30'000000000000000000000000000000 $640 [1:0] }
     end
     switch \dr1_wr_en [0]
       case 1'1
-        assign \dr_wr_data$115 [31:0] { 16'0000000000000000 $642 [15:0] }
+        assign \dr_wr_data$114 [31:0] { 16'0000000000000000 $641 [15:0] }
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/registers.py:68"
-  process $1382
-    assign \dr_wr_en$116 [0] 1'0
-    switch { \tperm_complete [0] \mcmp_start_sig [0] \bfins_start_sig [0] \bfext_start_sig [0] \shr_start_sig [0] \shl_start_sig [0] \isub_start_sig [0] \iadd_start_sig [0] \dr_wr_en$105 [0] \change_dr_wr_en [0] }
+  process $1380
+    assign \dr_wr_en$115 [0] 1'0
+    switch { \tperm_complete [0] \mcmp_start_sig [0] \bfins_start_sig [0] \bfext_start_sig [0] \shr_start_sig [0] \shl_start_sig [0] \isub_start_sig [0] \iadd_start_sig [0] \dr_wr_en$104 [0] \change_dr_wr_en [0] }
       case 10'---------1
-        assign \dr_wr_en$116 [0] 1'1
+        assign \dr_wr_en$115 [0] 1'1
       case 10'--------1-
-        assign \dr_wr_en$116 [0] 1'1
+        assign \dr_wr_en$115 [0] 1'1
       case 10'-------1--
-        assign \dr_wr_en$116 [0] 1'1
+        assign \dr_wr_en$115 [0] 1'1
       case 10'------1---
-        assign \dr_wr_en$116 [0] 1'1
+        assign \dr_wr_en$115 [0] 1'1
       case 10'-----1----
-        assign \dr_wr_en$116 [0] 1'1
+        assign \dr_wr_en$115 [0] 1'1
       case 10'----1-----
-        assign \dr_wr_en$116 [0] 1'1
+        assign \dr_wr_en$115 [0] 1'1
       case 10'---1------
-        assign \dr_wr_en$116 [0] 1'1
+        assign \dr_wr_en$115 [0] 1'1
       case 10'--1-------
-        assign \dr_wr_en$116 [0] 1'1
+        assign \dr_wr_en$115 [0] 1'1
       case 10'-1--------
-        assign \dr_wr_en$116 [0] 1'0
+        assign \dr_wr_en$115 [0] 1'0
       case 10'1---------
       case
-        assign \dr_wr_en$116 [0] 1'0
+        assign \dr_wr_en$115 [0] 1'0
     end
-    switch \dr_wr_en$138 [0]
+    switch \dr_wr_en$137 [0]
       case 1'1
-        assign \dr_wr_en$116 [0] 1'1
+        assign \dr_wr_en$115 [0] 1'1
     end
     switch \dr1_wr_en [0]
       case 1'1
-        assign \dr_wr_en$116 [0] 1'1
+        assign \dr_wr_en$115 [0] 1'1
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:770"
-  process $1383
+  attribute \src "/home/runner/workspace/hardware/core.py:768"
+  process $1381
     assign \tperm_flags_sig [3:0] 4'0000
-    switch { \tperm_complete [0] \mcmp_start_sig [0] \bfins_start_sig [0] \bfext_start_sig [0] \shr_start_sig [0] \shl_start_sig [0] \isub_start_sig [0] \iadd_start_sig [0] \dr_wr_en$105 [0] \change_dr_wr_en [0] }
+    switch { \tperm_complete [0] \mcmp_start_sig [0] \bfins_start_sig [0] \bfext_start_sig [0] \shr_start_sig [0] \shl_start_sig [0] \isub_start_sig [0] \iadd_start_sig [0] \dr_wr_en$104 [0] \change_dr_wr_en [0] }
       case 10'---------1
       case 10'--------1-
       case 10'-------1--
@@ -32205,15 +32155,15 @@ module \top.core
       case 10'-1--------
       case 10'1---------
         assign \tperm_flags_sig [1] \tperm_z_result [0]
-        assign \tperm_flags_sig [0] $76 [0]
+        assign \tperm_flags_sig [0] $75 [0]
         assign \tperm_flags_sig [2] 1'0
         assign \tperm_flags_sig [3] 1'0
       case
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:819"
-  process $1384
+  attribute \src "/home/runner/workspace/hardware/core.py:817"
+  process $1382
     assign \boot_cap_wr_en [0] 1'0
     switch \boot_state [2:0]
       case 3'010
@@ -32225,8 +32175,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:820"
-  process $1385
+  attribute \src "/home/runner/workspace/hardware/core.py:818"
+  process $1383
     assign \boot_cap_wr_addr [3:0] 4'0000
     switch \boot_state [2:0]
       case 3'010
@@ -32238,8 +32188,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:821"
-  process $1386
+  attribute \src "/home/runner/workspace/hardware/core.py:819"
+  process $1384
     assign \boot_cap_wr_data [95:0] 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
     switch \boot_state [2:0]
       case 3'010
@@ -32251,8 +32201,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1183"
-  process $1387
+  attribute \src "/home/runner/workspace/hardware/core.py:1181"
+  process $1385
     assign \thrd_gt [31:0] 32'00000000000000000000000000000000
     switch \boot_state [2:0]
       case 3'010
@@ -32267,8 +32217,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1146"
-  process $1388
+  attribute \src "/home/runner/workspace/hardware/core.py:1144"
+  process $1386
     assign \boot_cap12_wr_en [0] 1'0
     switch \boot_state [2:0]
       case 3'010
@@ -32279,8 +32229,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
-  process $1389
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
+  process $1387
     assign \boot_cap12_wr_gt [31:0] 32'00000000000000000000000000000000
     switch \boot_state [2:0]
       case 3'010
@@ -32291,8 +32241,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1146"
-  process $1390
+  attribute \src "/home/runner/workspace/hardware/core.py:1144"
+  process $1388
     assign \boot_cap14_wr_en [0] 1'0
     switch \boot_state [2:0]
       case 3'010
@@ -32304,8 +32254,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1147"
-  process $1391
+  attribute \src "/home/runner/workspace/hardware/core.py:1145"
+  process $1389
     assign \boot_cap14_wr_gt [31:0] 32'00000000000000000000000000000000
     switch \boot_state [2:0]
       case 3'010
@@ -32317,8 +32267,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1236"
-  process $1392
+  attribute \src "/home/runner/workspace/hardware/core.py:1234"
+  process $1390
     assign \cr14_gt [31:0] 32'00000000000000000000000000000000
     switch \boot_state [2:0]
       case 3'010
@@ -32333,8 +32283,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
-  process $1393
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
+  process $1391
     assign \rt_cap8_wr_en [0] 1'0
     switch \change_gt_sync_active [0]
       case 1'1
@@ -32345,8 +32295,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
-  process $1394
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
+  process $1392
     assign \rt_cap8_wr_gt [31:0] 32'00000000000000000000000000000000
     switch \change_gt_sync_active [0]
       case 1'1
@@ -32357,8 +32307,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
-  process $1395
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
+  process $1393
     assign \rt_cap9_wr_en [0] 1'0
     switch \change_gt_sync_active [0]
       case 1'1
@@ -32369,8 +32319,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
-  process $1396
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
+  process $1394
     assign \rt_cap9_wr_gt [31:0] 32'00000000000000000000000000000000
     switch \change_gt_sync_active [0]
       case 1'1
@@ -32381,8 +32331,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
-  process $1397
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
+  process $1395
     assign \rt_cap10_wr_en [0] 1'0
     switch \change_gt_sync_active [0]
       case 1'1
@@ -32393,8 +32343,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
-  process $1398
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
+  process $1396
     assign \rt_cap10_wr_gt [31:0] 32'00000000000000000000000000000000
     switch \change_gt_sync_active [0]
       case 1'1
@@ -32405,8 +32355,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
-  process $1399
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
+  process $1397
     assign \rt_cap11_wr_en [0] 1'0
     switch \change_gt_sync_active [0]
       case 1'1
@@ -32417,8 +32367,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
-  process $1400
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
+  process $1398
     assign \rt_cap11_wr_gt [31:0] 32'00000000000000000000000000000000
     switch \change_gt_sync_active [0]
       case 1'1
@@ -32429,8 +32379,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
-  process $1401
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
+  process $1399
     assign \rt_cap12_wr_en [0] 1'0
     switch \change_gt_sync_active [0]
       case 1'1
@@ -32441,8 +32391,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
-  process $1402
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
+  process $1400
     assign \rt_cap12_wr_gt [31:0] 32'00000000000000000000000000000000
     switch \change_gt_sync_active [0]
       case 1'1
@@ -32453,8 +32403,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
-  process $1403
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
+  process $1401
     assign \rt_cap13_wr_en [0] 1'0
     switch \change_gt_sync_active [0]
       case 1'1
@@ -32465,8 +32415,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
-  process $1404
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
+  process $1402
     assign \rt_cap13_wr_gt [31:0] 32'00000000000000000000000000000000
     switch \change_gt_sync_active [0]
       case 1'1
@@ -32477,8 +32427,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
-  process $1405
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
+  process $1403
     assign \rt_cap14_wr_en [0] 1'0
     switch \change_gt_sync_active [0]
       case 1'1
@@ -32489,8 +32439,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
-  process $1406
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
+  process $1404
     assign \rt_cap14_wr_gt [31:0] 32'00000000000000000000000000000000
     switch \change_gt_sync_active [0]
       case 1'1
@@ -32501,8 +32451,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1281"
-  process $1407
+  attribute \src "/home/runner/workspace/hardware/core.py:1279"
+  process $1405
     assign \rt_cap15_wr_en [0] 1'0
     switch \change_gt_sync_active [0]
       case 1'1
@@ -32513,8 +32463,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1282"
-  process $1408
+  attribute \src "/home/runner/workspace/hardware/core.py:1280"
+  process $1406
     assign \rt_cap15_wr_gt [31:0] 32'00000000000000000000000000000000
     switch \change_gt_sync_active [0]
       case 1'1
@@ -32525,71 +32475,71 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:679"
-  process $1409
+  attribute \src "/home/runner/workspace/hardware/core.py:677"
+  process $1407
     assign \iadd_flags_sig [3:0] 4'0000
     assign \iadd_flags_sig [0] \iadd_result [31]
-    assign \iadd_flags_sig [1] $186 [0]
+    assign \iadd_flags_sig [1] $185 [0]
     assign \iadd_flags_sig [2] \iadd_result [32]
-    assign \iadd_flags_sig [3] $190 [0]
+    assign \iadd_flags_sig [3] $189 [0]
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:680"
-  process $1410
+  attribute \src "/home/runner/workspace/hardware/core.py:678"
+  process $1408
     assign \isub_flags_sig [3:0] 4'0000
     assign \isub_flags_sig [0] \isub_result [31]
-    assign \isub_flags_sig [1] $191 [0]
-    assign \isub_flags_sig [2] $192 [0]
-    assign \isub_flags_sig [3] $195 [0]
+    assign \isub_flags_sig [1] $190 [0]
+    assign \isub_flags_sig [2] $191 [0]
+    assign \isub_flags_sig [3] $194 [0]
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:681"
-  process $1411
+  attribute \src "/home/runner/workspace/hardware/core.py:679"
+  process $1409
     assign \shl_flags_sig [3:0] 4'0000
-    assign \shl_flags_sig [0] $200 [31]
-    assign \shl_flags_sig [1] $208 [0]
+    assign \shl_flags_sig [0] $199 [31]
+    assign \shl_flags_sig [1] $207 [0]
     assign \shl_flags_sig [2] \shl_c_bit [0]
     assign \shl_flags_sig [3] 1'0
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:682"
-  process $1412
+  attribute \src "/home/runner/workspace/hardware/core.py:680"
+  process $1410
     assign \shr_flags_sig [3:0] 4'0000
     assign \shr_flags_sig [0] \shr_result [31]
-    assign \shr_flags_sig [1] $209 [0]
+    assign \shr_flags_sig [1] $208 [0]
     assign \shr_flags_sig [2] \shr_c_bit [0]
     assign \shr_flags_sig [3] 1'0
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:683"
-  process $1413
+  attribute \src "/home/runner/workspace/hardware/core.py:681"
+  process $1411
     assign \bfext_flags_sig [3:0] 4'0000
     assign \bfext_flags_sig [0] \bfext_result [31]
-    assign \bfext_flags_sig [1] $215 [0]
+    assign \bfext_flags_sig [1] $214 [0]
     assign \bfext_flags_sig [2] 1'0
     assign \bfext_flags_sig [3] 1'0
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:684"
-  process $1414
+  attribute \src "/home/runner/workspace/hardware/core.py:682"
+  process $1412
     assign \bfins_flags_sig [3:0] 4'0000
-    assign \bfins_flags_sig [0] $223 [31]
-    assign \bfins_flags_sig [1] $224 [0]
+    assign \bfins_flags_sig [0] $222 [31]
+    assign \bfins_flags_sig [1] $223 [0]
     assign \bfins_flags_sig [2] 1'0
     assign \bfins_flags_sig [3] 1'0
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:685"
-  process $1415
+  attribute \src "/home/runner/workspace/hardware/core.py:683"
+  process $1413
     assign \mcmp_flags_sig [3:0] 4'0000
     assign \mcmp_flags_sig [0] \mcmp_result [31]
-    assign \mcmp_flags_sig [1] $227 [0]
+    assign \mcmp_flags_sig [1] $226 [0]
     assign \mcmp_flags_sig [2] \mcmp_result [32]
     assign \mcmp_flags_sig [3] 1'0
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:467"
-  process $1416
+  process $1414
     assign \mint_dmem_rd_en [0] 1'0
     switch \mint_noniot_state [3:0]
       case 4'0000
@@ -32598,7 +32548,7 @@ module \top.core
       case 4'0010
       case 4'0011
       case 4'0101
-        switch $303 [0]
+        switch $302 [0]
           case 1'1
           case
             assign \mint_dmem_rd_en [0] 1'1
@@ -32608,7 +32558,7 @@ module \top.core
       case 4'1000
       case 4'1001
       case 4'1010
-        switch $309 [0]
+        switch $308 [0]
           case 1'1
           case
             assign \mint_dmem_rd_en [0] 1'1
@@ -32622,7 +32572,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:468"
-  process $1417
+  process $1415
     assign \mint_dmem_addr [31:0] 32'00000000000000000000000000000000
     switch \mint_noniot_state [3:0]
       case 4'0000
@@ -32631,20 +32581,20 @@ module \top.core
       case 4'0010
       case 4'0011
       case 4'0101
-        switch $303 [0]
+        switch $302 [0]
           case 1'1
           case
-            assign \mint_dmem_addr [31:0] $305 [31:0]
+            assign \mint_dmem_addr [31:0] $304 [31:0]
         end
       case 4'0110
       case 4'0111
       case 4'1000
       case 4'1001
       case 4'1010
-        switch $309 [0]
+        switch $308 [0]
           case 1'1
           case
-            assign \mint_dmem_addr [31:0] $312 [31:0]
+            assign \mint_dmem_addr [31:0] $311 [31:0]
         end
       case 4'1100
       case 4'1101
@@ -32654,15 +32604,15 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2416"
-  process $1418
+  attribute \src "/home/runner/workspace/hardware/core.py:2412"
+  process $1416
     assign \lsz_c_ni [14:0] 15'000000000000000
     switch \mint_noniot_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
       case 4'0011
-        assign \lsz_c_ni [14:0] $300 [14:0]
+        assign \lsz_c_ni [14:0] $299 [14:0]
       case 4'0101
       case 4'0110
       case 4'0111
@@ -32677,8 +32627,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2436"
-  process $1419
+  attribute \src "/home/runner/workspace/hardware/core.py:2432"
+  process $1417
     assign \scan_end_c_ni [14:0] 15'000000000000000
     switch \mint_noniot_state [3:0]
       case 4'0000
@@ -32686,7 +32636,7 @@ module \top.core
       case 4'0010
       case 4'0011
       case 4'0101
-        assign \scan_end_c_ni [14:0] $302 [14:0]
+        assign \scan_end_c_ni [14:0] $301 [14:0]
       case 4'0110
       case 4'0111
       case 4'1000
@@ -32701,7 +32651,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:469"
-  process $1420
+  process $1418
     assign \mint_ns_wr_en [0] 1'0
     switch \mint_noniot_state [3:0]
       case 4'0000
@@ -32727,7 +32677,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:470"
-  process $1421
+  process $1419
     assign \mint_ns_addr [31:0] 32'00000000000000000000000000000000
     switch \mint_noniot_state [3:0]
       case 4'0000
@@ -32736,13 +32686,13 @@ module \top.core
       case 4'0011
       case 4'0101
       case 4'0110
-        assign \mint_ns_addr [31:0] $294 [31:0]
+        assign \mint_ns_addr [31:0] $293 [31:0]
       case 4'0111
-        assign \mint_ns_addr [31:0] $306 [31:0]
+        assign \mint_ns_addr [31:0] $305 [31:0]
       case 4'1000
-        assign \mint_ns_addr [31:0] $307 [31:0]
+        assign \mint_ns_addr [31:0] $306 [31:0]
       case 4'1001
-        assign \mint_ns_addr [31:0] $308 [31:0]
+        assign \mint_ns_addr [31:0] $307 [31:0]
       case 4'1010
       case 4'1100
       case 4'1101
@@ -32753,7 +32703,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:471"
-  process $1422
+  process $1420
     assign \mint_ns_wr_data [31:0] 32'00000000000000000000000000000000
     switch \mint_noniot_state [3:0]
       case 4'0000
@@ -32764,7 +32714,7 @@ module \top.core
       case 4'0110
         assign \mint_ns_wr_data [31:0] \mint_base_reg_ni [31:0]
       case 4'0111
-        assign \mint_ns_wr_data [31:0] { 10'0000000000 $297 [21:0] }
+        assign \mint_ns_wr_data [31:0] { 10'0000000000 $296 [21:0] }
       case 4'1000
         assign \mint_ns_wr_data [31:0] \mint_integrity_ni [31:0]
       case 4'1001
@@ -32778,8 +32728,8 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2494"
-  process $1423
+  attribute \src "/home/runner/workspace/hardware/core.py:2490"
+  process $1421
     assign \cc_off_ni [14:0] 15'000000000000000
     switch \mint_noniot_state [3:0]
       case 4'0000
@@ -32792,10 +32742,10 @@ module \top.core
       case 4'1000
       case 4'1001
       case 4'1010
-        switch $309 [0]
+        switch $308 [0]
           case 1'1
           case
-            assign \cc_off_ni [14:0] $310 [14:0]
+            assign \cc_off_ni [14:0] $309 [14:0]
         end
       case 4'1100
       case 4'1101
@@ -32806,7 +32756,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:461"
-  process $1424
+  process $1422
     assign \mint_clist_wr_en [0] 1'0
     switch \mint_noniot_state [3:0]
       case 4'0000
@@ -32830,7 +32780,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:462"
-  process $1425
+  process $1423
     assign \mint_clist_addr_d [31:0] 32'00000000000000000000000000000000
     switch \mint_noniot_state [3:0]
       case 4'0000
@@ -32845,7 +32795,7 @@ module \top.core
       case 4'1010
       case 4'1100
       case 4'1101
-        assign \mint_clist_addr_d [31:0] $314 [31:0]
+        assign \mint_clist_addr_d [31:0] $313 [31:0]
       case 4'1011
         assign \mint_clist_addr_d [31:0] \mint_clist_addr_reg [31:0]
       case 4'1110
@@ -32854,7 +32804,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:472"
-  process $1426
+  process $1424
     assign \mint_clist_wr_data_d [31:0] 32'00000000000000000000000000000000
     switch \mint_noniot_state [3:0]
       case 4'0000
@@ -32871,14 +32821,14 @@ module \top.core
       case 4'1101
         assign \mint_clist_wr_data_d [31:0] \mint_copy_data_reg_ni [31:0]
       case 4'1011
-        assign \mint_clist_wr_data_d [31:0] { 1'0 $295 [30:0] }
+        assign \mint_clist_wr_data_d [31:0] { 1'0 $294 [30:0] }
       case 4'1110
       case 4'0100
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2393"
-  process $1427
+  attribute \src "/home/runner/workspace/hardware/core.py:2389"
+  process $1425
     assign \mint_done_comb_ni [0] 1'0
     switch \mint_noniot_state [3:0]
       case 4'0000
@@ -32901,7 +32851,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/outform.py:109"
-  process $1428
+  process $1426
     assign \mint_result_gt [31:0] 32'00000000000000000000000000000000
     switch \mint_noniot_state [3:0]
       case 4'0000
@@ -32918,13 +32868,13 @@ module \top.core
       case 4'1101
       case 4'1011
       case 4'1110
-        assign \mint_result_gt [31:0] { 1'0 $295 [30:0] }
+        assign \mint_result_gt [31:0] { 1'0 $294 [30:0] }
       case 4'0100
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2394"
-  process $1429
+  attribute \src "/home/runner/workspace/hardware/core.py:2390"
+  process $1427
     assign \mint_fault_comb_ni [0] 1'0
     switch \mint_noniot_state [3:0]
       case 4'0000
@@ -32947,7 +32897,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:452"
-  process $1430
+  process $1428
     assign \mwin_busy [0] 1'0
     switch \mwin_state [1:0]
       case 2'00
@@ -32960,13 +32910,13 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:453"
-  process $1431
+  process $1429
     assign \mwin_cr_wr_en [0] 1'0
     switch \mwin_state [1:0]
       case 2'00
         assign \mwin_cr_wr_en [0] 1'0
       case 2'01
-        switch $319 [0]
+        switch $318 [0]
           case 1'1
             assign \mwin_cr_wr_en [0] 1'1
           case
@@ -32978,13 +32928,13 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:454"
-  process $1432
+  process $1430
     assign \mwin_cr_wr_data [95:0] 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
     switch \mwin_state [1:0]
       case 2'00
         assign \mwin_cr_wr_data [95:0] 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
       case 2'01
-        switch $319 [0]
+        switch $318 [0]
           case 1'1
             assign \mwin_cr_wr_data [31:0] \mwin_dr11_lat [31:0]
             assign \mwin_cr_wr_data [63:32] \mwin_dr12_lat [31:0]
@@ -32997,13 +32947,13 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:455"
-  process $1433
+  process $1431
     assign \m_set_en [0] 1'0
     switch \mwin_state [1:0]
       case 2'00
-        assign \m_set_en [0] $318 [0]
+        assign \m_set_en [0] $317 [0]
       case 2'01
-        switch $319 [0]
+        switch $318 [0]
           case 1'1
             assign \m_set_en [0] 1'0
           case
@@ -33015,13 +32965,13 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:456"
-  process $1434
+  process $1432
     assign \m_clear_en [0] 1'0
     switch \mwin_state [1:0]
       case 2'00
         assign \m_clear_en [0] 1'0
       case 2'01
-        switch $319 [0]
+        switch $318 [0]
           case 1'1
             assign \m_clear_en [0] 1'1
           case
@@ -33033,13 +32983,13 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:457"
-  process $1435
+  process $1433
     assign \mwin_fault_valid [0] 1'0
     switch \mwin_state [1:0]
       case 2'00
         assign \mwin_fault_valid [0] 1'0
       case 2'01
-        switch $319 [0]
+        switch $318 [0]
           case 1'1
             assign \mwin_fault_valid [0] 1'0
           case
@@ -33051,111 +33001,111 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:84"
-  process $1436
-    assign \fault$830 [4:0] 5'00000
-    switch { \mwin_fault_valid [0] \null_base_fault [0] \fault$828 [0] $332 [0] \cload_fault [0] \fault$826 [0] \fault$825 [0] \fault$824 [0] \fault [0] \switch_fault [0] \change_fault [0] \load_fault [0] \save_fault [0] \fault_valid$819 [0] \call_fault [0] \tperm_fault [0] \nested_lambda_fault [0] \lambda_fault [0] $330 [0] $328 [0] \fetch_bounds_fault [0] }
+  process $1434
+    assign \fault$827 [4:0] 5'00000
+    switch { \mwin_fault_valid [0] \null_base_fault [0] \fault$825 [0] $331 [0] \cload_fault [0] \fault$823 [0] \fault$822 [0] \fault$821 [0] \fault [0] \switch_fault [0] \change_fault [0] \load_fault [0] \save_fault [0] \fault_valid$816 [0] \call_fault [0] \tperm_fault [0] \nested_lambda_fault [0] \lambda_fault [0] $329 [0] $327 [0] \fetch_bounds_fault [0] }
       case 21'--------------------1
-        assign \fault$830 [4:0] 5'01000
+        assign \fault$827 [4:0] 5'01000
       case 21'-------------------1-
-        assign \fault$830 [4:0] { 1'0 \fault$832 [3:0] }
+        assign \fault$827 [4:0] { 1'0 \fault$829 [3:0] }
       case 21'------------------1--
-        assign \fault$830 [4:0] { 1'0 \fault_type [3:0] }
+        assign \fault$827 [4:0] { 1'0 \fault_type [3:0] }
       case 21'-----------------1---
-        assign \fault$830 [4:0] { 1'0 \fault_type$834 [3:0] }
+        assign \fault$827 [4:0] { 1'0 \fault_type$831 [3:0] }
       case 21'----------------1----
-        assign \fault$830 [4:0] 5'01011
+        assign \fault$827 [4:0] 5'01011
       case 21'---------------1-----
-        assign \fault$830 [4:0] { 1'0 \fault_type$835 [3:0] }
+        assign \fault$827 [4:0] { 1'0 \fault_type$832 [3:0] }
       case 21'--------------1------
-        assign \fault$830 [4:0] \fault_type$836 [4:0]
+        assign \fault$827 [4:0] \fault_type$833 [4:0]
       case 21'-------------1-------
-        assign \fault$830 [4:0] \fault_type$837 [4:0]
+        assign \fault$827 [4:0] \fault_type$834 [4:0]
       case 21'------------1--------
-        assign \fault$830 [4:0] \fault_type$838 [4:0]
+        assign \fault$827 [4:0] \fault_type$835 [4:0]
       case 21'-----------1---------
-        assign \fault$830 [4:0] \fault_type$839 [4:0]
+        assign \fault$827 [4:0] \fault_type$836 [4:0]
       case 21'----------1----------
-        assign \fault$830 [4:0] \fault_type$840 [4:0]
+        assign \fault$827 [4:0] \fault_type$837 [4:0]
       case 21'---------1-----------
-        assign \fault$830 [4:0] \fault_type$841 [4:0]
+        assign \fault$827 [4:0] \fault_type$838 [4:0]
       case 21'--------1------------
-        assign \fault$830 [4:0] \fault_type$842 [4:0]
+        assign \fault$827 [4:0] \fault_type$839 [4:0]
       case 21'-------1-------------
-        assign \fault$830 [4:0] { 1'0 \fault_type$843 [3:0] }
+        assign \fault$827 [4:0] { 1'0 \fault_type$840 [3:0] }
       case 21'------1--------------
-        assign \fault$830 [4:0] \fault_type$844 [4:0]
+        assign \fault$827 [4:0] \fault_type$841 [4:0]
       case 21'-----1---------------
-        assign \fault$830 [4:0] \fault_type$845 [4:0]
+        assign \fault$827 [4:0] \fault_type$842 [4:0]
       case 21'----1----------------
-        assign \fault$830 [4:0] \cload_fault_type [4:0]
+        assign \fault$827 [4:0] \cload_fault_type [4:0]
       case 21'---1-----------------
-        assign \fault$830 [4:0] \outform_fault_type_in [4:0]
+        assign \fault$827 [4:0] \outform_fault_type_in [4:0]
       case 21'--1------------------
-        assign \fault$830 [4:0] \fault_type$847 [4:0]
+        assign \fault$827 [4:0] \fault_type$844 [4:0]
       case 21'-1-------------------
-        assign \fault$830 [4:0] 5'10100
+        assign \fault$827 [4:0] 5'10100
       case 21'1--------------------
-        assign \fault$830 [4:0] 5'01011
+        assign \fault$827 [4:0] 5'01011
       case
-        assign \fault$830 [4:0] 5'00000
+        assign \fault$827 [4:0] 5'00000
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:85"
-  process $1437
-    assign \fault_valid$831 [0] 1'0
-    switch { \mwin_fault_valid [0] \null_base_fault [0] \fault$828 [0] $332 [0] \cload_fault [0] \fault$826 [0] \fault$825 [0] \fault$824 [0] \fault [0] \switch_fault [0] \change_fault [0] \load_fault [0] \save_fault [0] \fault_valid$819 [0] \call_fault [0] \tperm_fault [0] \nested_lambda_fault [0] \lambda_fault [0] $330 [0] $328 [0] \fetch_bounds_fault [0] }
+  process $1435
+    assign \fault_valid$828 [0] 1'0
+    switch { \mwin_fault_valid [0] \null_base_fault [0] \fault$825 [0] $331 [0] \cload_fault [0] \fault$823 [0] \fault$822 [0] \fault$821 [0] \fault [0] \switch_fault [0] \change_fault [0] \load_fault [0] \save_fault [0] \fault_valid$816 [0] \call_fault [0] \tperm_fault [0] \nested_lambda_fault [0] \lambda_fault [0] $329 [0] $327 [0] \fetch_bounds_fault [0] }
       case 21'--------------------1
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'-------------------1-
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'------------------1--
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'-----------------1---
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'----------------1----
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'---------------1-----
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'--------------1------
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'-------------1-------
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'------------1--------
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'-----------1---------
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'----------1----------
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'---------1-----------
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'--------1------------
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'-------1-------------
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'------1--------------
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'-----1---------------
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'----1----------------
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'---1-----------------
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'--1------------------
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'-1-------------------
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case 21'1--------------------
-        assign \fault_valid$831 [0] 1'1
+        assign \fault_valid$828 [0] 1'1
       case
-        assign \fault_valid$831 [0] 1'0
+        assign \fault_valid$828 [0] 1'0
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2742"
-  process $1438
+  attribute \src "/home/runner/workspace/hardware/core.py:2738"
+  process $1436
     assign \fault_stage_w [3:0] 4'0000
-    switch { \fault_valid$819 [0] \call_fault [0] \tperm_fault [0] \nested_lambda_fault [0] \lambda_fault [0] $336 [0] $334 [0] \fetch_bounds_fault [0] }
+    switch { \fault_valid$816 [0] \call_fault [0] \tperm_fault [0] \nested_lambda_fault [0] \lambda_fault [0] $335 [0] $333 [0] \fetch_bounds_fault [0] }
       case 8'-------1
         assign \fault_stage_w [3:0] 4'0000
       case 8'------1-
@@ -33178,7 +33128,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/mload.py:38"
-  process $1439
+  process $1437
     assign \sub_start [0] 1'0
     switch { \load_busy [0] \busy [0] \call_busy [0] }
       case 3'--1
@@ -33186,12 +33136,12 @@ module \top.core
       case 3'-1-
         assign \sub_start [0] 1'0
       case 3'1--
-        assign \sub_start [0] \mload_start$910 [0]
+        assign \sub_start [0] \mload_start$907 [0]
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/mload.py:39"
-  process $1440
+  process $1438
     assign \sub_cr_src [3:0] 4'0000
     switch { \load_busy [0] \busy [0] \call_busy [0] }
       case 3'--1
@@ -33199,12 +33149,12 @@ module \top.core
       case 3'-1-
         assign \sub_cr_src [3:0] 4'0000
       case 3'1--
-        assign \sub_cr_src [3:0] \mload_cr_src$911 [3:0]
+        assign \sub_cr_src [3:0] \mload_cr_src$908 [3:0]
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/mload.py:40"
-  process $1441
+  process $1439
     assign \sub_cr_dst [3:0] 4'0000
     switch { \load_busy [0] \busy [0] \call_busy [0] }
       case 3'--1
@@ -33212,12 +33162,12 @@ module \top.core
       case 3'-1-
         assign \sub_cr_dst [3:0] 4'0000
       case 3'1--
-        assign \sub_cr_dst [3:0] \mload_cr_dst$912 [3:0]
+        assign \sub_cr_dst [3:0] \mload_cr_dst$909 [3:0]
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/mload.py:41"
-  process $1442
+  process $1440
     assign \sub_index [15:0] 16'0000000000000000
     switch { \load_busy [0] \busy [0] \call_busy [0] }
       case 3'--1
@@ -33225,12 +33175,12 @@ module \top.core
       case 3'-1-
         assign \sub_index [15:0] 16'0000000000000000
       case 3'1--
-        assign \sub_index [15:0] \mload_index$913 [15:0]
+        assign \sub_index [15:0] \mload_index$910 [15:0]
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/mload.py:42"
-  process $1443
+  process $1441
     assign \sub_direct [0] 1'0
     switch { \load_busy [0] \busy [0] \call_busy [0] }
       case 3'--1
@@ -33243,7 +33193,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/mload.py:43"
-  process $1444
+  process $1442
     assign \sub_direct_gt [31:0] 32'00000000000000000000000000000000
     switch { \load_busy [0] \busy [0] \call_busy [0] }
       case 3'--1
@@ -33256,7 +33206,7 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/mload.py:44"
-  process $1445
+  process $1443
     assign \sub_m_elevated [0] 1'0
     switch { \load_busy [0] \busy [0] \call_busy [0] }
       case 3'--1
@@ -33264,14 +33214,14 @@ module \top.core
       case 3'-1-
         assign \sub_m_elevated [0] 1'0
       case 3'1--
-        assign \sub_m_elevated [0] $409 [0]
+        assign \sub_m_elevated [0] $408 [0]
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:57"
-  process $1446
+  process $1444
     assign \dmem_addr [31:0] 32'00000000000000000000000000000000
-    switch { \mem_rd_en$955 [0] \mem_wr_en$954 [0] \mem_rd_en$953 [0] \mint_dmem_rd_en [0] \mem_wr_en$952 [0] \mem_rd_en$951 [0] \dmem_wr_en$950 [0] \dmem_rd_en$949 [0] \mem_rd_en$948 [0] \mem_wr_en$947 [0] \mem_wr_en$946 [0] \mem_rd_en$945 [0] $415 [0] \mem_wr_en$942 [0] \mem_rd_en$941 [0] \mem_rd_en$940 [0] \mem_wr_en$939 [0] \mem_rd_en$938 [0] $414 [0] }
+    switch { \mem_rd_en$952 [0] \mem_wr_en$951 [0] \mem_rd_en$950 [0] \mint_dmem_rd_en [0] \mem_wr_en$949 [0] \mem_rd_en$948 [0] \dmem_wr_en$947 [0] \dmem_rd_en$946 [0] \mem_rd_en$945 [0] \mem_wr_en$944 [0] \mem_wr_en$943 [0] \mem_rd_en$942 [0] $414 [0] \mem_wr_en$939 [0] \mem_rd_en$938 [0] \mem_rd_en$937 [0] \mem_wr_en$936 [0] \mem_rd_en$935 [0] $413 [0] }
       case 19'------------------1
         assign \dmem_addr [31:0] \mem_addr [31:0]
       case 19'-----------------1-
@@ -33279,48 +33229,48 @@ module \top.core
       case 19'----------------1--
         assign \dmem_addr [31:0] \mem_wr_addr [31:0]
       case 19'---------------1---
-        assign \dmem_addr [31:0] \mem_addr$961 [31:0]
+        assign \dmem_addr [31:0] \mem_addr$958 [31:0]
       case 19'--------------1----
-        assign \dmem_addr [31:0] \mem_addr$962 [31:0]
+        assign \dmem_addr [31:0] \mem_addr$959 [31:0]
       case 19'-------------1-----
-        assign \dmem_addr [31:0] \mem_wr_addr$963 [31:0]
+        assign \dmem_addr [31:0] \mem_wr_addr$960 [31:0]
       case 19'------------1------
-        assign \dmem_addr [31:0] \mem_addr$965 [31:0]
+        assign \dmem_addr [31:0] \mem_addr$962 [31:0]
       case 19'-----------1-------
-        assign \dmem_addr [31:0] \mem_rd_addr$967 [31:0]
+        assign \dmem_addr [31:0] \mem_rd_addr$964 [31:0]
       case 19'----------1--------
-        assign \dmem_addr [31:0] \mem_wr_addr$968 [31:0]
+        assign \dmem_addr [31:0] \mem_wr_addr$965 [31:0]
       case 19'---------1---------
-        assign \dmem_addr [31:0] \mem_wr_addr$970 [31:0]
+        assign \dmem_addr [31:0] \mem_wr_addr$967 [31:0]
       case 19'--------1----------
-        assign \dmem_addr [31:0] \mem_rd_addr$972 [31:0]
+        assign \dmem_addr [31:0] \mem_rd_addr$969 [31:0]
       case 19'-------1-----------
-        assign \dmem_addr [31:0] \dmem_addr$973 [31:0]
+        assign \dmem_addr [31:0] \dmem_addr$970 [31:0]
       case 19'------1------------
-        switch $416 [0]
+        switch $415 [0]
           case 1'1
           case
-            assign \dmem_addr [31:0] \dmem_addr$974 [31:0]
+            assign \dmem_addr [31:0] \dmem_addr$971 [31:0]
         end
       case 19'-----1-------------
-        assign \dmem_addr [31:0] \mem_addr$979 [31:0]
+        assign \dmem_addr [31:0] \mem_addr$976 [31:0]
       case 19'----1--------------
-        assign \dmem_addr [31:0] \mem_wr_addr$980 [31:0]
+        assign \dmem_addr [31:0] \mem_wr_addr$977 [31:0]
       case 19'---1---------------
         assign \dmem_addr [31:0] \mint_dmem_addr [31:0]
       case 19'--1----------------
-        assign \dmem_addr [31:0] \mem_rd_addr$982 [31:0]
+        assign \dmem_addr [31:0] \mem_rd_addr$979 [31:0]
       case 19'-1-----------------
-        assign \dmem_addr [31:0] \mem_wr_addr$983 [31:0]
+        assign \dmem_addr [31:0] \mem_wr_addr$980 [31:0]
       case 19'1------------------
-        assign \dmem_addr [31:0] \mem_rd_addr$985 [31:0]
+        assign \dmem_addr [31:0] \mem_rd_addr$982 [31:0]
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:58"
-  process $1447
+  process $1445
     assign \dmem_rd_en [0] 1'0
-    switch { \mem_rd_en$955 [0] \mem_wr_en$954 [0] \mem_rd_en$953 [0] \mint_dmem_rd_en [0] \mem_wr_en$952 [0] \mem_rd_en$951 [0] \dmem_wr_en$950 [0] \dmem_rd_en$949 [0] \mem_rd_en$948 [0] \mem_wr_en$947 [0] \mem_wr_en$946 [0] \mem_rd_en$945 [0] $415 [0] \mem_wr_en$942 [0] \mem_rd_en$941 [0] \mem_rd_en$940 [0] \mem_wr_en$939 [0] \mem_rd_en$938 [0] $414 [0] }
+    switch { \mem_rd_en$952 [0] \mem_wr_en$951 [0] \mem_rd_en$950 [0] \mint_dmem_rd_en [0] \mem_wr_en$949 [0] \mem_rd_en$948 [0] \dmem_wr_en$947 [0] \dmem_rd_en$946 [0] \mem_rd_en$945 [0] \mem_wr_en$944 [0] \mem_wr_en$943 [0] \mem_rd_en$942 [0] $414 [0] \mem_wr_en$939 [0] \mem_rd_en$938 [0] \mem_rd_en$937 [0] \mem_wr_en$936 [0] \mem_rd_en$935 [0] $413 [0] }
       case 19'------------------1
         assign \dmem_rd_en [0] \mem_rd_en [0]
       case 19'-----------------1-
@@ -33332,7 +33282,7 @@ module \top.core
         assign \dmem_rd_en [0] 1'1
       case 19'-------------1-----
       case 19'------------1------
-        assign \dmem_rd_en [0] \mem_rd_en$943 [0]
+        assign \dmem_rd_en [0] \mem_rd_en$940 [0]
       case 19'-----------1-------
         assign \dmem_rd_en [0] 1'1
       case 19'----------1--------
@@ -33356,48 +33306,48 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:61"
-  process $1448
+  process $1446
     assign \dmem_wr_data [31:0] 32'00000000000000000000000000000000
-    switch { \mem_rd_en$955 [0] \mem_wr_en$954 [0] \mem_rd_en$953 [0] \mint_dmem_rd_en [0] \mem_wr_en$952 [0] \mem_rd_en$951 [0] \dmem_wr_en$950 [0] \dmem_rd_en$949 [0] \mem_rd_en$948 [0] \mem_wr_en$947 [0] \mem_wr_en$946 [0] \mem_rd_en$945 [0] $415 [0] \mem_wr_en$942 [0] \mem_rd_en$941 [0] \mem_rd_en$940 [0] \mem_wr_en$939 [0] \mem_rd_en$938 [0] $414 [0] }
+    switch { \mem_rd_en$952 [0] \mem_wr_en$951 [0] \mem_rd_en$950 [0] \mint_dmem_rd_en [0] \mem_wr_en$949 [0] \mem_rd_en$948 [0] \dmem_wr_en$947 [0] \dmem_rd_en$946 [0] \mem_rd_en$945 [0] \mem_wr_en$944 [0] \mem_wr_en$943 [0] \mem_rd_en$942 [0] $414 [0] \mem_wr_en$939 [0] \mem_rd_en$938 [0] \mem_rd_en$937 [0] \mem_wr_en$936 [0] \mem_rd_en$935 [0] $413 [0] }
       case 19'------------------1
         assign \dmem_wr_data [31:0] \mem_wr_data [31:0]
       case 19'-----------------1-
       case 19'----------------1--
-        assign \dmem_wr_data [31:0] \mem_wr_data$960 [31:0]
+        assign \dmem_wr_data [31:0] \mem_wr_data$957 [31:0]
       case 19'---------------1---
       case 19'--------------1----
       case 19'-------------1-----
-        assign \dmem_wr_data [31:0] \mem_wr_data$964 [31:0]
+        assign \dmem_wr_data [31:0] \mem_wr_data$961 [31:0]
       case 19'------------1------
-        assign \dmem_wr_data [31:0] \mem_wr_data$966 [31:0]
+        assign \dmem_wr_data [31:0] \mem_wr_data$963 [31:0]
       case 19'-----------1-------
       case 19'----------1--------
-        assign \dmem_wr_data [31:0] \mem_wr_data$969 [31:0]
+        assign \dmem_wr_data [31:0] \mem_wr_data$966 [31:0]
       case 19'---------1---------
-        assign \dmem_wr_data [31:0] \mem_wr_data$971 [31:0]
+        assign \dmem_wr_data [31:0] \mem_wr_data$968 [31:0]
       case 19'--------1----------
       case 19'-------1-----------
       case 19'------1------------
-        switch $416 [0]
+        switch $415 [0]
           case 1'1
           case
-            assign \dmem_wr_data [31:0] \dmem_wr_data$977 [31:0]
+            assign \dmem_wr_data [31:0] \dmem_wr_data$974 [31:0]
         end
       case 19'-----1-------------
       case 19'----1--------------
-        assign \dmem_wr_data [31:0] \mem_wr_data$981 [31:0]
+        assign \dmem_wr_data [31:0] \mem_wr_data$978 [31:0]
       case 19'---1---------------
       case 19'--1----------------
       case 19'-1-----------------
-        assign \dmem_wr_data [31:0] \mem_wr_data$984 [31:0]
+        assign \dmem_wr_data [31:0] \mem_wr_data$981 [31:0]
       case 19'1------------------
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:62"
-  process $1449
+  process $1447
     assign \dmem_wr_en [0] 1'0
-    switch { \mem_rd_en$955 [0] \mem_wr_en$954 [0] \mem_rd_en$953 [0] \mint_dmem_rd_en [0] \mem_wr_en$952 [0] \mem_rd_en$951 [0] \dmem_wr_en$950 [0] \dmem_rd_en$949 [0] \mem_rd_en$948 [0] \mem_wr_en$947 [0] \mem_wr_en$946 [0] \mem_rd_en$945 [0] $415 [0] \mem_wr_en$942 [0] \mem_rd_en$941 [0] \mem_rd_en$940 [0] \mem_wr_en$939 [0] \mem_rd_en$938 [0] $414 [0] }
+    switch { \mem_rd_en$952 [0] \mem_wr_en$951 [0] \mem_rd_en$950 [0] \mint_dmem_rd_en [0] \mem_wr_en$949 [0] \mem_rd_en$948 [0] \dmem_wr_en$947 [0] \dmem_rd_en$946 [0] \mem_rd_en$945 [0] \mem_wr_en$944 [0] \mem_wr_en$943 [0] \mem_rd_en$942 [0] $414 [0] \mem_wr_en$939 [0] \mem_rd_en$938 [0] \mem_rd_en$937 [0] \mem_wr_en$936 [0] \mem_rd_en$935 [0] $413 [0] }
       case 19'------------------1
         assign \dmem_wr_en [0] \mem_wr_en [0]
       case 19'-----------------1-
@@ -33408,7 +33358,7 @@ module \top.core
       case 19'-------------1-----
         assign \dmem_wr_en [0] 1'1
       case 19'------------1------
-        assign \dmem_wr_en [0] \mem_wr_en$944 [0]
+        assign \dmem_wr_en [0] \mem_wr_en$941 [0]
       case 19'-----------1-------
       case 19'----------1--------
         assign \dmem_wr_en [0] 1'1
@@ -33417,7 +33367,7 @@ module \top.core
       case 19'--------1----------
       case 19'-------1-----------
       case 19'------1------------
-        switch $416 [0]
+        switch $415 [0]
           case 1'1
           case
             assign \dmem_wr_en [0] 1'1
@@ -33434,9 +33384,9 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/pet_name_mem.py:74"
-  process $1450
+  process $1448
     assign \wr_en [0] 1'0
-    switch { \mem_rd_en$955 [0] \mem_wr_en$954 [0] \mem_rd_en$953 [0] \mint_dmem_rd_en [0] \mem_wr_en$952 [0] \mem_rd_en$951 [0] \dmem_wr_en$950 [0] \dmem_rd_en$949 [0] \mem_rd_en$948 [0] \mem_wr_en$947 [0] \mem_wr_en$946 [0] \mem_rd_en$945 [0] $415 [0] \mem_wr_en$942 [0] \mem_rd_en$941 [0] \mem_rd_en$940 [0] \mem_wr_en$939 [0] \mem_rd_en$938 [0] $414 [0] }
+    switch { \mem_rd_en$952 [0] \mem_wr_en$951 [0] \mem_rd_en$950 [0] \mint_dmem_rd_en [0] \mem_wr_en$949 [0] \mem_rd_en$948 [0] \dmem_wr_en$947 [0] \dmem_rd_en$946 [0] \mem_rd_en$945 [0] \mem_wr_en$944 [0] \mem_wr_en$943 [0] \mem_rd_en$942 [0] $414 [0] \mem_wr_en$939 [0] \mem_rd_en$938 [0] \mem_rd_en$937 [0] \mem_wr_en$936 [0] \mem_rd_en$935 [0] $413 [0] }
       case 19'------------------1
       case 19'-----------------1-
       case 19'----------------1--
@@ -33450,7 +33400,7 @@ module \top.core
       case 19'--------1----------
       case 19'-------1-----------
       case 19'------1------------
-        switch $416 [0]
+        switch $415 [0]
           case 1'1
             assign \wr_en [0] 1'1
           case
@@ -33465,9 +33415,9 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/pet_name_mem.py:75"
-  process $1451
+  process $1449
     assign \wr_addr [5:0] 6'000000
-    switch { \mem_rd_en$955 [0] \mem_wr_en$954 [0] \mem_rd_en$953 [0] \mint_dmem_rd_en [0] \mem_wr_en$952 [0] \mem_rd_en$951 [0] \dmem_wr_en$950 [0] \dmem_rd_en$949 [0] \mem_rd_en$948 [0] \mem_wr_en$947 [0] \mem_wr_en$946 [0] \mem_rd_en$945 [0] $415 [0] \mem_wr_en$942 [0] \mem_rd_en$941 [0] \mem_rd_en$940 [0] \mem_wr_en$939 [0] \mem_rd_en$938 [0] $414 [0] }
+    switch { \mem_rd_en$952 [0] \mem_wr_en$951 [0] \mem_rd_en$950 [0] \mint_dmem_rd_en [0] \mem_wr_en$949 [0] \mem_rd_en$948 [0] \dmem_wr_en$947 [0] \dmem_rd_en$946 [0] \mem_rd_en$945 [0] \mem_wr_en$944 [0] \mem_wr_en$943 [0] \mem_rd_en$942 [0] $414 [0] \mem_wr_en$939 [0] \mem_rd_en$938 [0] \mem_rd_en$937 [0] \mem_wr_en$936 [0] \mem_rd_en$935 [0] $413 [0] }
       case 19'------------------1
       case 19'-----------------1-
       case 19'----------------1--
@@ -33481,9 +33431,9 @@ module \top.core
       case 19'--------1----------
       case 19'-------1-----------
       case 19'------1------------
-        switch $416 [0]
+        switch $415 [0]
           case 1'1
-            assign \wr_addr [5:0] \dmem_wr_data$977 [5:0]
+            assign \wr_addr [5:0] \dmem_wr_data$974 [5:0]
           case
         end
       case 19'-----1-------------
@@ -33496,9 +33446,9 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/pet_name_mem.py:76"
-  process $1452
+  process $1450
     assign \wr_data [0] 1'0
-    switch { \mem_rd_en$955 [0] \mem_wr_en$954 [0] \mem_rd_en$953 [0] \mint_dmem_rd_en [0] \mem_wr_en$952 [0] \mem_rd_en$951 [0] \dmem_wr_en$950 [0] \dmem_rd_en$949 [0] \mem_rd_en$948 [0] \mem_wr_en$947 [0] \mem_wr_en$946 [0] \mem_rd_en$945 [0] $415 [0] \mem_wr_en$942 [0] \mem_rd_en$941 [0] \mem_rd_en$940 [0] \mem_wr_en$939 [0] \mem_rd_en$938 [0] $414 [0] }
+    switch { \mem_rd_en$952 [0] \mem_wr_en$951 [0] \mem_rd_en$950 [0] \mint_dmem_rd_en [0] \mem_wr_en$949 [0] \mem_rd_en$948 [0] \dmem_wr_en$947 [0] \dmem_rd_en$946 [0] \mem_rd_en$945 [0] \mem_wr_en$944 [0] \mem_wr_en$943 [0] \mem_rd_en$942 [0] $414 [0] \mem_wr_en$939 [0] \mem_rd_en$938 [0] \mem_rd_en$937 [0] \mem_wr_en$936 [0] \mem_rd_en$935 [0] $413 [0] }
       case 19'------------------1
       case 19'-----------------1-
       case 19'----------------1--
@@ -33512,7 +33462,7 @@ module \top.core
       case 19'--------1----------
       case 19'-------1-----------
       case 19'------1------------
-        switch $416 [0]
+        switch $415 [0]
           case 1'1
             assign \wr_data [0] 1'1
           case
@@ -33527,86 +33477,86 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:64"
-  process $1453
+  process $1451
     assign \ns_addr [31:0] 32'00000000000000000000000000000000
     switch { \gc_busy [0] \mint_ns_wr_en [0] }
       case 2'-1
         assign \ns_addr [31:0] \mint_ns_addr [31:0]
       case 2'1-
-        assign \ns_addr [31:0] \ns_addr$993 [31:0]
+        assign \ns_addr [31:0] \ns_addr$990 [31:0]
       case
         assign \ns_addr [31:0] 32'00000000000000000000000000000000
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:65"
-  process $1454
+  process $1452
     assign \ns_rd_en [0] 1'0
     switch { \gc_busy [0] \mint_ns_wr_en [0] }
       case 2'-1
         assign \ns_rd_en [0] 1'0
       case 2'1-
-        assign \ns_rd_en [0] \ns_rd_en$994 [0]
+        assign \ns_rd_en [0] \ns_rd_en$991 [0]
       case
         assign \ns_rd_en [0] 1'0
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:67"
-  process $1455
+  process $1453
     assign \ns_wr_data [127:0] 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
     switch { \gc_busy [0] \mint_ns_wr_en [0] }
       case 2'-1
         assign \ns_wr_data [127:0] { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \mint_ns_wr_data [31:0] }
       case 2'1-
-        assign \ns_wr_data [127:0] \ns_wr_data$995 [127:0]
+        assign \ns_wr_data [127:0] \ns_wr_data$992 [127:0]
       case
         assign \ns_wr_data [127:0] 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:68"
-  process $1456
+  process $1454
     assign \ns_wr_en [0] 1'0
     switch { \gc_busy [0] \mint_ns_wr_en [0] }
       case 2'-1
         assign \ns_wr_en [0] 1'1
       case 2'1-
-        assign \ns_wr_en [0] \ns_wr_en$996 [0]
+        assign \ns_wr_en [0] \ns_wr_en$993 [0]
       case
         assign \ns_wr_en [0] 1'0
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:362"
-  process $1457
-    assign $587 [2:0] \boot_state [2:0]
+  process $1455
+    assign $586 [2:0] \boot_state [2:0]
     switch \boot_state [2:0]
       case 3'000
         switch \boot_start [0]
           case 1'1
-            assign $587 [2:0] 3'001
+            assign $586 [2:0] 3'001
         end
       case 3'001
-        assign $587 [2:0] 3'010
+        assign $586 [2:0] 3'010
       case 3'010
-        assign $587 [2:0] 3'011
+        assign $586 [2:0] 3'011
       case 3'011
-        assign $587 [2:0] 3'100
+        assign $586 [2:0] 3'100
       case 3'100
-        switch { \done [0] $435 [0] }
+        switch { \done [0] $434 [0] }
           case 2'-1
           case 2'1-
-            assign $587 [2:0] 3'101
+            assign $586 [2:0] 3'101
         end
       case 3'101
-        assign $587 [2:0] 3'110
+        assign $586 [2:0] 3'110
       case 3'110
-        assign $587 [2:0] 3'110
+        assign $586 [2:0] 3'110
     end
-    switch { $476 [0] $445 [0] $443 [0] \nia_set$867 [0] \nia_set$865 [0] \call_normal_complete [0] \nia_set$857 [0] \switch_complete [0] \nia_set$864 [0] \nia_set$863 [0] \nia_restore_en [0] 1'0 $442 [0] \clear_all [0] $441 [0] $440 [0] }
+    switch { $475 [0] $444 [0] $442 [0] \nia_set$864 [0] \nia_set$862 [0] \call_normal_complete [0] \nia_set$854 [0] \switch_complete [0] \nia_set$861 [0] \nia_set$860 [0] \nia_restore_en [0] 1'0 $441 [0] \clear_all [0] $440 [0] $439 [0] }
       case 16'---------------1
-        assign $587 [2:0] 3'001
+        assign $586 [2:0] 3'001
       case 16'--------------1-
       case 16'-------------1--
       case 16'------------1---
@@ -33626,27 +33576,27 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:362"
-  cell $dff $1458
+  cell $dff $1456
     parameter \WIDTH 3
     parameter \CLK_POLARITY 1
-    connect \D $587 [2:0]
+    connect \D $586 [2:0]
     connect \CLK \clk [0]
     connect \Q \boot_state
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:363"
-  process $1459
-    assign $588 [0] \namespace_init_armed [0]
+  process $1457
+    assign $587 [0] \namespace_init_armed [0]
     switch \boot_state [2:0]
       case 3'000
       case 3'001
-        assign $588 [0] 1'0
+        assign $587 [0] 1'0
       case 3'010
       case 3'011
       case 3'100
-        switch { \done [0] $435 [0] }
+        switch { \done [0] $434 [0] }
           case 2'-1
-            assign $588 [0] 1'1
+            assign $587 [0] 1'1
           case 2'1-
         end
       case 3'101
@@ -33655,208 +33605,228 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:363"
-  cell $dff $1460
+  cell $dff $1458
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $588 [0]
+    connect \D $587 [0]
     connect \CLK \clk [0]
     connect \Q \namespace_init_armed
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:343"
-  process $1461
-    assign $589 [31:0] \imem_addr [31:0]
-    switch { $476 [0] $445 [0] $443 [0] \nia_set$867 [0] \nia_set$865 [0] \call_normal_complete [0] \nia_set$857 [0] \switch_complete [0] \nia_set$864 [0] \nia_set$863 [0] \nia_restore_en [0] 1'0 $442 [0] \clear_all [0] $441 [0] $440 [0] }
+  process $1459
+    assign $588 [31:0] \imem_addr [31:0]
+    switch { $475 [0] $444 [0] $442 [0] \nia_set$864 [0] \nia_set$862 [0] \call_normal_complete [0] \nia_set$854 [0] \switch_complete [0] \nia_set$861 [0] \nia_set$860 [0] \nia_restore_en [0] 1'0 $441 [0] \clear_all [0] $440 [0] $439 [0] }
       case 16'---------------1
-        assign $589 [31:0] 32'00000000000000000000000000000000
+        assign $588 [31:0] 32'00000000000000000000000000000000
       case 16'--------------1-
-        assign $589 [31:0] \imem_addr [31:0]
+        assign $588 [31:0] \imem_addr [31:0]
       case 16'-------------1--
-        assign $589 [31:0] 32'00000000000000000000000000000000
+        assign $588 [31:0] 32'00000000000000000000000000000000
       case 16'------------1---
-        assign $589 [31:0] $477 [31:0]
+        assign $588 [31:0] $476 [31:0]
       case 16'-----------1----
-        assign $589 [31:0] 32'00000000000000000000000000000000
+        assign $588 [31:0] 32'00000000000000000000000000000000
       case 16'----------1-----
-        assign $589 [31:0] \nia_restore_val [31:0]
+        assign $588 [31:0] \nia_restore_val [31:0]
       case 16'---------1------
-        assign $589 [31:0] \nia_value [31:0]
+        assign $588 [31:0] \nia_value [31:0]
       case 16'--------1-------
-        assign $589 [31:0] \nia_value$1008 [31:0]
+        assign $588 [31:0] \nia_value$1005 [31:0]
       case 16'-------1--------
-        assign $589 [31:0] $478 [31:0]
+        assign $588 [31:0] $477 [31:0]
       case 16'------1---------
-        assign $589 [31:0] \nia_value$1009 [31:0]
+        assign $588 [31:0] \nia_value$1006 [31:0]
       case 16'-----1----------
-        assign $589 [31:0] \nia_value$1010 [31:0]
+        assign $588 [31:0] \nia_value$1007 [31:0]
       case 16'----1-----------
-        assign $589 [31:0] \nia_value$1011 [31:0]
+        assign $588 [31:0] \nia_value$1008 [31:0]
       case 16'---1------------
-        assign $589 [31:0] \nia_value$1012 [31:0]
+        assign $588 [31:0] \nia_value$1009 [31:0]
       case 16'--1-------------
-        assign $589 [31:0] $479 [31:0]
+        assign $588 [31:0] $478 [31:0]
       case 16'-1--------------
-        assign $589 [31:0] $480 [31:0]
+        assign $588 [31:0] $479 [31:0]
       case 16'1---------------
-        assign $589 [31:0] $481 [31:0]
+        assign $588 [31:0] $480 [31:0]
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:343"
-  cell $dff $1462
+  cell $dff $1460
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
-    connect \D $589 [31:0]
+    connect \D $588 [31:0]
     connect \CLK \clk [0]
     connect \Q \imem_addr
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:355"
-  process $1463
-    assign $590 [31:0] \code_lo_reg [31:0]
-    switch { \call_normal_complete [0] $496 [0] $493 [0] $491 [0] $489 [0] $487 [0] $484 [0] $482 [0] }
+  process $1461
+    assign $589 [31:0] \code_lo_reg [31:0]
+    switch { \call_normal_complete [0] $495 [0] $492 [0] $490 [0] $488 [0] $486 [0] $483 [0] $481 [0] }
       case 8'-------1
-        assign $590 [31:0] 32'00000000000000000000000000000000
+        assign $589 [31:0] 32'00000000000000000000000000000000
       case 8'------1-
-        assign $590 [31:0] 32'00000000000000000000000000000000
+        assign $589 [31:0] 32'00000000000000000000000000000000
       case 8'-----1--
       case 8'----1---
-        assign $590 [31:0] 32'00000000000000000000000000000000
+        assign $589 [31:0] 32'00000000000000000000000000000000
       case 8'---1----
-        assign $590 [31:0] \cr_wr_data$169 [63:32]
+        assign $589 [31:0] \cr_wr_data$168 [63:32]
       case 8'--1-----
-        assign $590 [31:0] \cr_wr_data$170 [63:32]
+        assign $589 [31:0] \cr_wr_data$169 [63:32]
       case 8'-1------
-        assign $590 [31:0] 32'00000000000000000000000000000000
+        assign $589 [31:0] 32'00000000000000000000000000000000
       case 8'1-------
-        assign $590 [31:0] \code_lo_out [31:0]
+        assign $589 [31:0] \code_lo_out [31:0]
     end
     switch \boot_state [2:0]
       case 3'010
       case 3'011
       case 3'100
       case 3'101
-        assign $590 [31:0] 32'00000000000000000000000000000000
+        assign $589 [31:0] 32'00000000000000000000000000000000
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:355"
-  cell $dff $1464
+  cell $dff $1462
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
-    connect \D $590 [31:0]
+    connect \D $589 [31:0]
     connect \CLK \clk [0]
     connect \Q \code_lo_reg
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:356"
-  process $1465
-    assign $591 [31:0] \code_hi_reg [31:0]
-    switch { \call_normal_complete [0] $496 [0] $493 [0] $491 [0] $489 [0] $487 [0] $484 [0] $482 [0] }
+  process $1463
+    assign $590 [31:0] \code_hi_reg [31:0]
+    switch { \call_normal_complete [0] $495 [0] $492 [0] $490 [0] $488 [0] $486 [0] $483 [0] $481 [0] }
       case 8'-------1
-        assign $591 [31:0] 32'00000000000000000000000000000000
+        assign $590 [31:0] 32'00000000000000000000000000000000
       case 8'------1-
-        assign $591 [31:0] 32'00000000000000000000000000000000
+        assign $590 [31:0] 32'00000000000000000000000000000000
       case 8'-----1--
       case 8'----1---
-        assign $591 [31:0] 32'00000000000000000000000000000000
+        assign $590 [31:0] 32'00000000000000000000000000000000
       case 8'---1----
-        assign $591 [31:0] $499 [31:0]
+        assign $590 [31:0] $498 [31:0]
       case 8'--1-----
-        assign $591 [31:0] $502 [31:0]
+        assign $590 [31:0] $501 [31:0]
       case 8'-1------
-        assign $591 [31:0] 32'00000000000000000000000000000000
+        assign $590 [31:0] 32'00000000000000000000000000000000
       case 8'1-------
-        assign $591 [31:0] \code_hi_out [31:0]
+        assign $590 [31:0] \code_hi_out [31:0]
     end
     switch \boot_state [2:0]
       case 3'010
       case 3'011
       case 3'100
       case 3'101
-        assign $591 [31:0] 32'00000000000000000000001111111100
+        assign $590 [31:0] 32'00000000000000000000001111111100
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:356"
-  cell $dff $1466
+  cell $dff $1464
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
-    connect \D $591 [31:0]
+    connect \D $590 [31:0]
     connect \CLK \clk [0]
     connect \Q \code_hi_reg
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:357"
-  process $1467
-    assign $592 [0] \fence_pending_reg [0]
-    switch { \call_normal_complete [0] $496 [0] $493 [0] $491 [0] $489 [0] $487 [0] $484 [0] $482 [0] }
+  process $1465
+    assign $591 [0] \fence_pending_reg [0]
+    switch { \call_normal_complete [0] $495 [0] $492 [0] $490 [0] $488 [0] $486 [0] $483 [0] $481 [0] }
       case 8'-------1
-        assign $592 [0] 1'0
+        assign $591 [0] 1'0
       case 8'------1-
-        assign $592 [0] 1'0
+        assign $591 [0] 1'0
       case 8'-----1--
-        assign $592 [0] 1'1
+        assign $591 [0] 1'1
       case 8'----1---
       case 8'---1----
       case 8'--1-----
-        assign $592 [0] 1'0
+        assign $591 [0] 1'0
       case 8'-1------
       case 8'1-------
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:357"
-  cell $dff $1468
+  cell $dff $1466
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $592 [0]
+    connect \D $591 [0]
     connect \CLK \clk [0]
     connect \Q \fence_pending_reg
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:566"
-  process $1469
-    assign $593 [1:0] \boot_retire_count [1:0]
-    switch { $505 [0] \clear_all [0] }
+  attribute \src "/home/runner/workspace/hardware/core.py:564"
+  process $1467
+    assign $592 [1:0] \boot_retire_count [1:0]
+    switch { $504 [0] \clear_all [0] }
       case 2'-1
-        assign $593 [1:0] 2'00
+        assign $592 [1:0] 2'00
       case 2'1-
-        assign $593 [1:0] $506 [1:0]
+        assign $592 [1:0] $505 [1:0]
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:566"
-  cell $dff $1470
+  attribute \src "/home/runner/workspace/hardware/core.py:564"
+  cell $dff $1468
     parameter \WIDTH 2
     parameter \CLK_POLARITY 1
-    connect \D $593 [1:0]
+    connect \D $592 [1:0]
     connect \CLK \clk [0]
     connect \Q \boot_retire_count
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:440"
-  process $1471
-    assign $594 [0] \cross_domain_ret [0]
+  process $1469
+    assign $593 [0] \cross_domain_ret [0]
     switch \ret_start_sig [0]
       case 1'1
-        assign $594 [0] $507 [0]
+        assign $593 [0] $506 [0]
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:440"
-  cell $dff $1472
+  cell $dff $1470
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $594 [0]
+    connect \D $593 [0]
     connect \CLK \clk [0]
     connect \Q \cross_domain_ret
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:448"
+  process $1471
+    assign $594 [0] \return_fetch_settle [0]
+    switch { $508 [0] \nia_set$854 [0] }
+      case 2'-1
+        assign $594 [0] 1'1
+      case 2'1-
+        assign $594 [0] 1'0
+    end
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:448"
+  cell $dff $1472
+    parameter \WIDTH 1
+    parameter \CLK_POLARITY 1
+    connect \D $594 [0]
+    connect \CLK \clk [0]
+    connect \Q \return_fetch_settle
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:442"
   process $1473
-    assign $595 [0] \return_fetch_settle [0]
-    switch { $509 [0] \nia_set$857 [0] }
+    assign $595 [0] \cload_pending [0]
+    switch { \cload_pending [0] $515 [0] }
       case 2'-1
         assign $595 [0] 1'1
       case 2'1-
@@ -33864,155 +33834,135 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:448"
+  attribute \src "/home/runner/workspace/hardware/core.py:442"
   cell $dff $1474
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
     connect \D $595 [0]
     connect \CLK \clk [0]
-    connect \Q \return_fetch_settle
+    connect \Q \cload_pending
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:442"
+  attribute \src "/home/runner/workspace/hardware/core.py:359"
   process $1475
-    assign $596 [0] \cload_pending [0]
-    switch { \cload_pending [0] $516 [0] }
-      case 2'-1
-        assign $596 [0] 1'1
-      case 2'1-
+    assign $596 [0] \lambda_active_reg [0]
+    switch { $519 [0] $517 [0] \lambda_clear [0] \clear_all [0] }
+      case 4'---1
         assign $596 [0] 1'0
+      case 4'--1-
+        assign $596 [0] 1'0
+      case 4'-1--
+        assign $596 [0] 1'0
+      case 4'1---
+        assign $596 [0] 1'1
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:442"
+  attribute \src "/home/runner/workspace/hardware/core.py:359"
   cell $dff $1476
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
     connect \D $596 [0]
     connect \CLK \clk [0]
-    connect \Q \cload_pending
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:359"
-  process $1477
-    assign $597 [0] \lambda_active_reg [0]
-    switch { $520 [0] $518 [0] \lambda_clear [0] \clear_all [0] }
-      case 4'---1
-        assign $597 [0] 1'0
-      case 4'--1-
-        assign $597 [0] 1'0
-      case 4'-1--
-        assign $597 [0] 1'0
-      case 4'1---
-        assign $597 [0] 1'1
-    end
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:359"
-  cell $dff $1478
-    parameter \WIDTH 1
-    parameter \CLK_POLARITY 1
-    connect \D $597 [0]
-    connect \CLK \clk [0]
     connect \Q \lambda_active_reg
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:360"
-  process $1479
-    assign $598 [31:0] \lambda_pc [31:0]
-    switch { $520 [0] $518 [0] \lambda_clear [0] \clear_all [0] }
+  process $1477
+    assign $597 [31:0] \lambda_pc [31:0]
+    switch { $519 [0] $517 [0] \lambda_clear [0] \clear_all [0] }
       case 4'---1
-        assign $598 [31:0] 32'00000000000000000000000000000000
+        assign $597 [31:0] 32'00000000000000000000000000000000
       case 4'--1-
       case 4'-1--
       case 4'1---
-        assign $598 [31:0] $136 [31:0]
+        assign $597 [31:0] $135 [31:0]
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:360"
-  cell $dff $1480
+  cell $dff $1478
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
-    connect \D $598 [31:0]
+    connect \D $597 [31:0]
     connect \CLK \clk [0]
     connect \Q \lambda_pc
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:430"
-  cell $dff $1481
+  cell $dff $1479
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $522 [0]
+    connect \D $521 [0]
     connect \CLK \clk [0]
     connect \Q \iadd_busy_reg
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:431"
-  cell $dff $1482
+  cell $dff $1480
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $524 [0]
+    connect \D $523 [0]
     connect \CLK \clk [0]
     connect \Q \isub_busy_reg
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:433"
-  cell $dff $1483
+  cell $dff $1481
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $526 [0]
+    connect \D $525 [0]
     connect \CLK \clk [0]
     connect \Q \shl_busy_reg
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:434"
-  cell $dff $1484
+  cell $dff $1482
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $528 [0]
+    connect \D $527 [0]
     connect \CLK \clk [0]
     connect \Q \shr_busy_reg
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:435"
-  cell $dff $1485
+  cell $dff $1483
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $530 [0]
+    connect \D $529 [0]
     connect \CLK \clk [0]
     connect \Q \bfext_busy_reg
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:436"
-  cell $dff $1486
+  cell $dff $1484
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $532 [0]
+    connect \D $531 [0]
     connect \CLK \clk [0]
     connect \Q \bfins_busy_reg
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:437"
-  cell $dff $1487
+  cell $dff $1485
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $534 [0]
+    connect \D $533 [0]
     connect \CLK \clk [0]
     connect \Q \mcmp_busy_reg
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:432"
-  cell $dff $1488
+  cell $dff $1486
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $536 [0]
+    connect \D $535 [0]
     connect \CLK \clk [0]
     connect \Q \branch_busy_reg
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:474"
-  cell $dff $1489
+  cell $dff $1487
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
     connect \D \load_start_sig [0]
@@ -34020,373 +33970,373 @@ module \top.core
     connect \Q \load_busy_shadow
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1779"
-  process $1490
-    assign $599 [31:0] \retire_trace_load_shadow_gt [31:0]
+  attribute \src "/home/runner/workspace/hardware/core.py:1775"
+  process $1488
+    assign $598 [31:0] \retire_trace_load_shadow_gt [31:0]
     switch \load_start_sig [0]
       case 1'1
-        assign $599 [31:0] \trace_rd_gt [31:0]
+        assign $598 [31:0] \trace_rd_gt [31:0]
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1779"
+  attribute \src "/home/runner/workspace/hardware/core.py:1775"
+  cell $dff $1489
+    parameter \WIDTH 32
+    parameter \CLK_POLARITY 1
+    connect \D $598 [31:0]
+    connect \CLK \clk [0]
+    connect \Q \retire_trace_load_shadow_gt
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1766"
+  process $1490
+    assign $599 [31:0] \change_issuer_nia [31:0]
+    switch $537 [0]
+      case 1'1
+        assign $599 [31:0] \imem_addr [31:0]
+    end
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1766"
   cell $dff $1491
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
     connect \D $599 [31:0]
     connect \CLK \clk [0]
-    connect \Q \retire_trace_load_shadow_gt
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1770"
-  process $1492
-    assign $600 [31:0] \change_issuer_nia [31:0]
-    switch $538 [0]
-      case 1'1
-        assign $600 [31:0] \imem_addr [31:0]
-    end
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:1770"
-  cell $dff $1493
-    parameter \WIDTH 32
-    parameter \CLK_POLARITY 1
-    connect \D $600 [31:0]
-    connect \CLK \clk [0]
     connect \Q \change_issuer_nia
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:528"
-  process $1494
-    assign $601 [0] \decoded_thread_change_inflight [0]
-    switch $538 [0]
+  process $1492
+    assign $600 [0] \decoded_thread_change_inflight [0]
+    switch $537 [0]
       case 1'1
-        assign $601 [0] $541 [0]
+        assign $600 [0] $540 [0]
     end
-    switch { $542 [0] \clear_all [0] }
+    switch { $541 [0] \clear_all [0] }
       case 2'-1
-        assign $601 [0] 1'0
+        assign $600 [0] 1'0
       case 2'1-
-        assign $601 [0] 1'0
+        assign $600 [0] 1'0
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:528"
-  cell $dff $1495
+  cell $dff $1493
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $601 [0]
+    connect \D $600 [0]
     connect \CLK \clk [0]
     connect \Q \decoded_thread_change_inflight
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:527"
-  process $1496
-    assign $602 [0] \scheduler_inflight [0]
-    switch { $543 [0] \thread_switch_start_sig [0] \clear_all [0] }
+  process $1494
+    assign $601 [0] \scheduler_inflight [0]
+    switch { $542 [0] \thread_switch_start_sig [0] \clear_all [0] }
       case 3'--1
-        assign $602 [0] 1'0
+        assign $601 [0] 1'0
       case 3'-1-
-        assign $602 [0] 1'1
+        assign $601 [0] 1'1
       case 3'1--
-        assign $602 [0] 1'0
+        assign $601 [0] 1'0
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:527"
-  cell $dff $1497
+  cell $dff $1495
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $602 [0]
+    connect \D $601 [0]
     connect \CLK \clk [0]
     connect \Q \scheduler_inflight
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:173"
-  process $1498
-    assign $603 [15:0] \active_thread_slot [15:0]
-    switch { $543 [0] \thread_switch_start_sig [0] \clear_all [0] }
+  process $1496
+    assign $602 [15:0] \active_thread_slot [15:0]
+    switch { $542 [0] \thread_switch_start_sig [0] \clear_all [0] }
       case 3'--1
-        assign $603 [15:0] 16'0000000000000001
+        assign $602 [15:0] 16'0000000000000001
       case 3'-1-
       case 3'1--
-        switch $544 [0]
+        switch $543 [0]
           case 1'1
-            assign $603 [15:0] \thread_switch_index [15:0]
+            assign $602 [15:0] \thread_switch_index [15:0]
         end
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:173"
-  cell $dff $1499
+  cell $dff $1497
     parameter \WIDTH 16
     parameter \CLK_POLARITY 1
-    connect \D $603 [15:0]
+    connect \D $602 [15:0]
     connect \CLK \clk [0]
     connect \Q \active_thread_slot
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:176"
-  process $1500
-    assign $604 [31:0] \thread_base [31:0]
-    switch { $543 [0] \thread_switch_start_sig [0] \clear_all [0] }
+  process $1498
+    assign $603 [31:0] \thread_base [31:0]
+    switch { $542 [0] \thread_switch_start_sig [0] \clear_all [0] }
       case 3'--1
-        assign $604 [31:0] 32'00000000000000000000000000000000
+        assign $603 [31:0] 32'00000000000000000000000000000000
       case 3'-1-
       case 3'1--
-        switch $544 [0]
+        switch $543 [0]
           case 1'1
-            assign $604 [31:0] \thread_base_restore_val [31:0]
+            assign $603 [31:0] \thread_base_restore_val [31:0]
         end
     end
     switch \thread_base_restore_en [0]
       case 1'1
-        assign $604 [31:0] \thread_base_restore_val [31:0]
+        assign $603 [31:0] \thread_base_restore_val [31:0]
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:176"
-  cell $dff $1501
+  cell $dff $1499
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
-    connect \D $604 [31:0]
+    connect \D $603 [31:0]
     connect \CLK \clk [0]
     connect \Q \thread_base
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1947"
-  process $1502
-    assign $605 [0] \irq_armed_reg [0]
-    switch { $555 [0] $548 [0] \clear_all [0] }
+  attribute \src "/home/runner/workspace/hardware/core.py:1943"
+  process $1500
+    assign $604 [0] \irq_armed_reg [0]
+    switch { $554 [0] $547 [0] \clear_all [0] }
       case 3'--1
-        assign $605 [0] 1'0
+        assign $604 [0] 1'0
       case 3'-1-
       case 3'1--
-        assign $605 [0] 1'1
+        assign $604 [0] 1'1
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1947"
+  attribute \src "/home/runner/workspace/hardware/core.py:1943"
+  cell $dff $1501
+    parameter \WIDTH 1
+    parameter \CLK_POLARITY 1
+    connect \D $604 [0]
+    connect \CLK \clk [0]
+    connect \Q \irq_armed_reg
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1944"
+  process $1502
+    assign $605 [0] \first_call_done_reg [0]
+    switch { $554 [0] $547 [0] \clear_all [0] }
+      case 3'--1
+        assign $605 [0] 1'0
+      case 3'-1-
+        assign $605 [0] 1'1
+      case 3'1--
+    end
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:1944"
   cell $dff $1503
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
     connect \D $605 [0]
     connect \CLK \clk [0]
-    connect \Q \irq_armed_reg
+    connect \Q \first_call_done_reg
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1948"
+  attribute \src "/home/runner/workspace/hardware/core.py:2001"
   process $1504
-    assign $606 [0] \first_call_done_reg [0]
-    switch { $555 [0] $548 [0] \clear_all [0] }
-      case 3'--1
-        assign $606 [0] 1'0
-      case 3'-1-
+    assign $606 [0] \outform_mode2_active [0]
+    switch { $555 [0] \outform_start_out$707 [0] }
+      case 2'-1
         assign $606 [0] 1'1
-      case 3'1--
+      case 2'1-
+        assign $606 [0] 1'0
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1948"
+  attribute \src "/home/runner/workspace/hardware/core.py:2001"
   cell $dff $1505
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
     connect \D $606 [0]
     connect \CLK \clk [0]
-    connect \Q \first_call_done_reg
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2005"
-  process $1506
-    assign $607 [0] \outform_mode2_active [0]
-    switch { $556 [0] \outform_start_out$710 [0] }
-      case 2'-1
-        assign $607 [0] 1'1
-      case 2'1-
-        assign $607 [0] 1'0
-    end
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2005"
-  cell $dff $1507
-    parameter \WIDTH 1
-    parameter \CLK_POLARITY 1
-    connect \D $607 [0]
-    connect \CLK \clk [0]
     connect \Q \outform_mode2_active
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:464"
-  process $1508
-    assign $608 [15:0] \mint_slot_id_reg [15:0]
+  process $1506
+    assign $607 [15:0] \mint_slot_id_reg [15:0]
     switch \_outform_start [0]
       case 1'1
-        assign $608 [15:0] $558 [15:0]
+        assign $607 [15:0] $557 [15:0]
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:464"
-  cell $dff $1509
+  cell $dff $1507
     parameter \WIDTH 16
     parameter \CLK_POLARITY 1
-    connect \D $608 [15:0]
+    connect \D $607 [15:0]
     connect \CLK \clk [0]
     connect \Q \mint_slot_id_reg
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:465"
-  process $1510
-    assign $609 [31:0] \mint_clist_addr_reg [31:0]
+  process $1508
+    assign $608 [31:0] \mint_clist_addr_reg [31:0]
     switch \_outform_start [0]
       case 1'1
-        assign $609 [31:0] $560 [31:0]
+        assign $608 [31:0] $559 [31:0]
     end
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:465"
+  cell $dff $1509
+    parameter \WIDTH 32
+    parameter \CLK_POLARITY 1
+    connect \D $608 [31:0]
+    connect \CLK \clk [0]
+    connect \Q \mint_clist_addr_reg
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2323"
+  process $1510
+    assign $609 [31:0] \watermark_reg_noniot [31:0]
+    switch $561 [0]
+      case 1'1
+        assign $609 [31:0] $284 [31:0]
+    end
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2323"
   cell $dff $1511
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
     connect \D $609 [31:0]
     connect \CLK \clk [0]
-    connect \Q \mint_clist_addr_reg
+    connect \Q \watermark_reg_noniot
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2327"
+  attribute \src "/home/runner/workspace/hardware/core.py:2357"
   process $1512
-    assign $610 [31:0] \watermark_reg_noniot [31:0]
-    switch $562 [0]
-      case 1'1
-        assign $610 [31:0] $285 [31:0]
+    assign $610 [31:0] \mint_base_reg_ni [31:0]
+    switch \mint_noniot_state [3:0]
+      case 4'0000
+        switch \mint_call [0]
+          case 1'1
+            assign $610 [31:0] \mint_base [31:0]
+        end
+      case 4'0001
+      case 4'0010
+      case 4'0011
+      case 4'0101
+      case 4'0110
+      case 4'0111
+      case 4'1000
+      case 4'1001
+      case 4'1010
+      case 4'1100
+      case 4'1101
+      case 4'1011
+      case 4'1110
+      case 4'0100
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2327"
+  attribute \src "/home/runner/workspace/hardware/core.py:2357"
   cell $dff $1513
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
     connect \D $610 [31:0]
     connect \CLK \clk [0]
-    connect \Q \watermark_reg_noniot
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2361"
-  process $1514
-    assign $611 [31:0] \mint_base_reg_ni [31:0]
-    switch \mint_noniot_state [3:0]
-      case 4'0000
-        switch \mint_call [0]
-          case 1'1
-            assign $611 [31:0] \mint_base [31:0]
-        end
-      case 4'0001
-      case 4'0010
-      case 4'0011
-      case 4'0101
-      case 4'0110
-      case 4'0111
-      case 4'1000
-      case 4'1001
-      case 4'1010
-      case 4'1100
-      case 4'1101
-      case 4'1011
-      case 4'1110
-      case 4'0100
-    end
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2361"
-  cell $dff $1515
-    parameter \WIDTH 32
-    parameter \CLK_POLARITY 1
-    connect \D $611 [31:0]
-    connect \CLK \clk [0]
     connect \Q \mint_base_reg_ni
   end
 
   attribute \src "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144"
-  process $1516
-    assign $612 [3:0] \mint_noniot_state [3:0]
+  process $1514
+    assign $611 [3:0] \mint_noniot_state [3:0]
     switch \mint_noniot_state [3:0]
       case 4'0000
         switch \mint_call [0]
           case 1'1
-            assign $612 [3:0] 4'0001
+            assign $611 [3:0] 4'0001
         end
       case 4'0001
-        assign $612 [3:0] 4'0010
+        assign $611 [3:0] 4'0010
       case 4'0010
-        assign $612 [3:0] 4'0011
+        assign $611 [3:0] 4'0011
       case 4'0011
-        switch { $569 [0] $566 [0] $564 [0] $563 [0] }
+        switch { $568 [0] $565 [0] $563 [0] $562 [0] }
           case 4'---1
-            assign $612 [3:0] 4'0100
+            assign $611 [3:0] 4'0100
           case 4'--1-
-            assign $612 [3:0] 4'0100
+            assign $611 [3:0] 4'0100
           case 4'-1--
-            assign $612 [3:0] 4'0100
+            assign $611 [3:0] 4'0100
           case 4'1---
-            assign $612 [3:0] 4'0100
+            assign $611 [3:0] 4'0100
           case
-            assign $612 [3:0] 4'0101
+            assign $611 [3:0] 4'0101
         end
       case 4'0101
-        switch $303 [0]
+        switch $302 [0]
           case 1'1
-            assign $612 [3:0] 4'0110
+            assign $611 [3:0] 4'0110
           case
-            switch $571 [0]
+            switch $570 [0]
               case 1'1
-                assign $612 [3:0] 4'0100
+                assign $611 [3:0] 4'0100
               case
             end
         end
       case 4'0110
-        assign $612 [3:0] 4'0111
+        assign $611 [3:0] 4'0111
       case 4'0111
-        assign $612 [3:0] 4'1000
+        assign $611 [3:0] 4'1000
       case 4'1000
-        assign $612 [3:0] 4'1001
+        assign $611 [3:0] 4'1001
       case 4'1001
-        assign $612 [3:0] 4'1010
+        assign $611 [3:0] 4'1010
       case 4'1010
-        switch $309 [0]
+        switch $308 [0]
           case 1'1
-            assign $612 [3:0] 4'1011
+            assign $611 [3:0] 4'1011
           case
-            assign $612 [3:0] 4'1100
+            assign $611 [3:0] 4'1100
         end
       case 4'1100
-        assign $612 [3:0] 4'1101
+        assign $611 [3:0] 4'1101
       case 4'1101
-        assign $612 [3:0] 4'1010
+        assign $611 [3:0] 4'1010
       case 4'1011
-        assign $612 [3:0] 4'1110
+        assign $611 [3:0] 4'1110
       case 4'1110
-        assign $612 [3:0] 4'0000
+        assign $611 [3:0] 4'0000
       case 4'0100
-        assign $612 [3:0] 4'0000
+        assign $611 [3:0] 4'0000
     end
   end
 
   attribute \src "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144"
-  cell $dff $1517
+  cell $dff $1515
     parameter \WIDTH 4
     parameter \CLK_POLARITY 1
-    connect \D $612 [3:0]
+    connect \D $611 [3:0]
     connect \CLK \clk [0]
     connect \Q \mint_noniot_state
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2367"
-  process $1518
-    assign $613 [31:0] \mint_hdr_reg_ni [31:0]
+  attribute \src "/home/runner/workspace/hardware/core.py:2363"
+  process $1516
+    assign $612 [31:0] \mint_hdr_reg_ni [31:0]
     switch \mint_noniot_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
-        assign $613 [31:0] \mem_rd_data [31:0]
+        assign $612 [31:0] \mem_rd_data [31:0]
       case 4'0011
       case 4'0101
       case 4'0110
@@ -34402,30 +34352,30 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2367"
-  cell $dff $1519
+  attribute \src "/home/runner/workspace/hardware/core.py:2363"
+  cell $dff $1517
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
-    connect \D $613 [31:0]
+    connect \D $612 [31:0]
     connect \CLK \clk [0]
     connect \Q \mint_hdr_reg_ni
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:466"
-  process $1520
-    assign $614 [14:0] \mint_lump_size_reg [14:0]
+  process $1518
+    assign $613 [14:0] \mint_lump_size_reg [14:0]
     switch \mint_noniot_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
       case 4'0011
-        switch { $569 [0] $566 [0] $564 [0] $563 [0] }
+        switch { $568 [0] $565 [0] $563 [0] $562 [0] }
           case 4'---1
           case 4'--1-
           case 4'-1--
           case 4'1---
           case
-            assign $614 [14:0] \lsz_c_ni [14:0]
+            assign $613 [14:0] \lsz_c_ni [14:0]
         end
       case 4'0101
       case 4'0110
@@ -34442,29 +34392,29 @@ module \top.core
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:466"
-  cell $dff $1521
+  cell $dff $1519
     parameter \WIDTH 15
     parameter \CLK_POLARITY 1
-    connect \D $614 [14:0]
+    connect \D $613 [14:0]
     connect \CLK \clk [0]
     connect \Q \mint_lump_size_reg
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2362"
-  process $1522
-    assign $615 [12:0] \mint_cw_reg_ni [12:0]
+  attribute \src "/home/runner/workspace/hardware/core.py:2358"
+  process $1520
+    assign $614 [12:0] \mint_cw_reg_ni [12:0]
     switch \mint_noniot_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
       case 4'0011
-        switch { $569 [0] $566 [0] $564 [0] $563 [0] }
+        switch { $568 [0] $565 [0] $563 [0] $562 [0] }
           case 4'---1
           case 4'--1-
           case 4'-1--
           case 4'1---
           case
-            assign $615 [12:0] \mint_hdr_reg_ni [22:10]
+            assign $614 [12:0] \mint_hdr_reg_ni [22:10]
         end
       case 4'0101
       case 4'0110
@@ -34480,30 +34430,30 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2362"
-  cell $dff $1523
+  attribute \src "/home/runner/workspace/hardware/core.py:2358"
+  cell $dff $1521
     parameter \WIDTH 13
     parameter \CLK_POLARITY 1
-    connect \D $615 [12:0]
+    connect \D $614 [12:0]
     connect \CLK \clk [0]
     connect \Q \mint_cw_reg_ni
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2363"
-  process $1524
-    assign $616 [7:0] \mint_cc_reg_ni [7:0]
+  attribute \src "/home/runner/workspace/hardware/core.py:2359"
+  process $1522
+    assign $615 [7:0] \mint_cc_reg_ni [7:0]
     switch \mint_noniot_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
       case 4'0011
-        switch { $569 [0] $566 [0] $564 [0] $563 [0] }
+        switch { $568 [0] $565 [0] $563 [0] $562 [0] }
           case 4'---1
           case 4'--1-
           case 4'-1--
           case 4'1---
           case
-            assign $616 [7:0] \mint_hdr_reg_ni [7:0]
+            assign $615 [7:0] \mint_hdr_reg_ni [7:0]
         end
       case 4'0101
       case 4'0110
@@ -34519,39 +34469,39 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2363"
-  cell $dff $1525
+  attribute \src "/home/runner/workspace/hardware/core.py:2359"
+  cell $dff $1523
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
-    connect \D $616 [7:0]
+    connect \D $615 [7:0]
     connect \CLK \clk [0]
     connect \Q \mint_cc_reg_ni
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2364"
-  process $1526
-    assign $617 [13:0] \mint_scan_idx_reg_ni [13:0]
+  attribute \src "/home/runner/workspace/hardware/core.py:2360"
+  process $1524
+    assign $616 [13:0] \mint_scan_idx_reg_ni [13:0]
     switch \mint_noniot_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
       case 4'0011
-        switch { $569 [0] $566 [0] $564 [0] $563 [0] }
+        switch { $568 [0] $565 [0] $563 [0] $562 [0] }
           case 4'---1
           case 4'--1-
           case 4'-1--
           case 4'1---
           case
-            assign $617 [13:0] $570 [13:0]
+            assign $616 [13:0] $569 [13:0]
         end
       case 4'0101
-        switch $303 [0]
+        switch $302 [0]
           case 1'1
           case
-            switch $571 [0]
+            switch $570 [0]
               case 1'1
               case
-                assign $617 [13:0] $572 [13:0]
+                assign $616 [13:0] $571 [13:0]
             end
         end
       case 4'0110
@@ -34567,27 +34517,27 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2364"
-  cell $dff $1527
+  attribute \src "/home/runner/workspace/hardware/core.py:2360"
+  cell $dff $1525
     parameter \WIDTH 14
     parameter \CLK_POLARITY 1
-    connect \D $617 [13:0]
+    connect \D $616 [13:0]
     connect \CLK \clk [0]
     connect \Q \mint_scan_idx_reg_ni
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2365"
-  process $1528
-    assign $618 [7:0] \mint_copy_idx_reg_ni [7:0]
+  attribute \src "/home/runner/workspace/hardware/core.py:2361"
+  process $1526
+    assign $617 [7:0] \mint_copy_idx_reg_ni [7:0]
     switch \mint_noniot_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
       case 4'0011
       case 4'0101
-        switch $303 [0]
+        switch $302 [0]
           case 1'1
-            assign $618 [7:0] 8'00000000
+            assign $617 [7:0] 8'00000000
           case
         end
       case 4'0110
@@ -34597,25 +34547,25 @@ module \top.core
       case 4'1010
       case 4'1100
       case 4'1101
-        assign $618 [7:0] $574 [7:0]
+        assign $617 [7:0] $573 [7:0]
       case 4'1011
       case 4'1110
       case 4'0100
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2365"
-  cell $dff $1529
+  attribute \src "/home/runner/workspace/hardware/core.py:2361"
+  cell $dff $1527
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
-    connect \D $618 [7:0]
+    connect \D $617 [7:0]
     connect \CLK \clk [0]
     connect \Q \mint_copy_idx_reg_ni
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2370"
-  process $1530
-    assign $619 [14:0] \mint_cc_base_reg_ni [14:0]
+  attribute \src "/home/runner/workspace/hardware/core.py:2366"
+  process $1528
+    assign $618 [14:0] \mint_cc_base_reg_ni [14:0]
     switch \mint_noniot_state [3:0]
       case 4'0000
       case 4'0001
@@ -34626,7 +34576,7 @@ module \top.core
       case 4'0111
       case 4'1000
       case 4'1001
-        assign $619 [14:0] $573 [14:0]
+        assign $618 [14:0] $572 [14:0]
       case 4'1010
       case 4'1100
       case 4'1101
@@ -34636,18 +34586,18 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2370"
-  cell $dff $1531
+  attribute \src "/home/runner/workspace/hardware/core.py:2366"
+  cell $dff $1529
     parameter \WIDTH 15
     parameter \CLK_POLARITY 1
-    connect \D $619 [14:0]
+    connect \D $618 [14:0]
     connect \CLK \clk [0]
     connect \Q \mint_cc_base_reg_ni
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2366"
-  process $1532
-    assign $620 [31:0] \mint_copy_data_reg_ni [31:0]
+  attribute \src "/home/runner/workspace/hardware/core.py:2362"
+  process $1530
+    assign $619 [31:0] \mint_copy_data_reg_ni [31:0]
     switch \mint_noniot_state [3:0]
       case 4'0000
       case 4'0001
@@ -34660,7 +34610,7 @@ module \top.core
       case 4'1001
       case 4'1010
       case 4'1100
-        assign $620 [31:0] \mem_rd_data [31:0]
+        assign $619 [31:0] \mem_rd_data [31:0]
       case 4'1101
       case 4'1011
       case 4'1110
@@ -34668,214 +34618,214 @@ module \top.core
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2366"
+  attribute \src "/home/runner/workspace/hardware/core.py:2362"
+  cell $dff $1531
+    parameter \WIDTH 32
+    parameter \CLK_POLARITY 1
+    connect \D $619 [31:0]
+    connect \CLK \clk [0]
+    connect \Q \mint_copy_data_reg_ni
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2567"
+  process $1532
+    assign $620 [31:0] \mwin_dr11_lat [31:0]
+    switch \mwin_state [1:0]
+      case 2'00
+        switch \mwin_trigger [0]
+          case 1'1
+            assign $620 [31:0] \dbg_m_dr11 [31:0]
+        end
+      case 2'01
+      case 2'10
+    end
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2567"
   cell $dff $1533
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
     connect \D $620 [31:0]
     connect \CLK \clk [0]
-    connect \Q \mint_copy_data_reg_ni
+    connect \Q \mwin_dr11_lat
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2571"
+  attribute \src "/home/runner/workspace/hardware/core.py:2568"
   process $1534
-    assign $621 [31:0] \mwin_dr11_lat [31:0]
+    assign $621 [31:0] \mwin_dr12_lat [31:0]
     switch \mwin_state [1:0]
       case 2'00
         switch \mwin_trigger [0]
           case 1'1
-            assign $621 [31:0] \dbg_m_dr11 [31:0]
+            assign $621 [31:0] \dbg_m_dr12 [31:0]
         end
       case 2'01
       case 2'10
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2571"
+  attribute \src "/home/runner/workspace/hardware/core.py:2568"
   cell $dff $1535
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
     connect \D $621 [31:0]
     connect \CLK \clk [0]
-    connect \Q \mwin_dr11_lat
+    connect \Q \mwin_dr12_lat
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2572"
+  attribute \src "/home/runner/workspace/hardware/core.py:2569"
   process $1536
-    assign $622 [31:0] \mwin_dr12_lat [31:0]
+    assign $622 [31:0] \mwin_dr13_lat [31:0]
     switch \mwin_state [1:0]
       case 2'00
         switch \mwin_trigger [0]
           case 1'1
-            assign $622 [31:0] \dbg_m_dr12 [31:0]
+            assign $622 [31:0] \dbg_m_dr13 [31:0]
         end
       case 2'01
       case 2'10
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2572"
+  attribute \src "/home/runner/workspace/hardware/core.py:2569"
   cell $dff $1537
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
     connect \D $622 [31:0]
     connect \CLK \clk [0]
-    connect \Q \mwin_dr12_lat
+    connect \Q \mwin_dr13_lat
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2573"
+  attribute \src "/home/runner/workspace/hardware/core.py:2570"
   process $1538
-    assign $623 [31:0] \mwin_dr13_lat [31:0]
+    assign $623 [31:0] \mwin_dr14_lat [31:0]
     switch \mwin_state [1:0]
       case 2'00
         switch \mwin_trigger [0]
           case 1'1
-            assign $623 [31:0] \dbg_m_dr13 [31:0]
+            assign $623 [31:0] \dbg_m_dr14 [31:0]
         end
       case 2'01
       case 2'10
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2573"
+  attribute \src "/home/runner/workspace/hardware/core.py:2570"
   cell $dff $1539
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
     connect \D $623 [31:0]
     connect \CLK \clk [0]
-    connect \Q \mwin_dr13_lat
+    connect \Q \mwin_dr14_lat
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2574"
+  attribute \src "/home/runner/workspace/hardware/core.py:2571"
   process $1540
-    assign $624 [31:0] \mwin_dr14_lat [31:0]
+    assign $624 [31:0] \mwin_dr15_lat [31:0]
     switch \mwin_state [1:0]
       case 2'00
         switch \mwin_trigger [0]
           case 1'1
-            assign $624 [31:0] \dbg_m_dr14 [31:0]
+            assign $624 [31:0] \dbg_m_dr15 [31:0]
         end
       case 2'01
       case 2'10
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2574"
+  attribute \src "/home/runner/workspace/hardware/core.py:2571"
   cell $dff $1541
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
     connect \D $624 [31:0]
     connect \CLK \clk [0]
-    connect \Q \mwin_dr14_lat
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2575"
-  process $1542
-    assign $625 [31:0] \mwin_dr15_lat [31:0]
-    switch \mwin_state [1:0]
-      case 2'00
-        switch \mwin_trigger [0]
-          case 1'1
-            assign $625 [31:0] \dbg_m_dr15 [31:0]
-        end
-      case 2'01
-      case 2'10
-    end
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2575"
-  cell $dff $1543
-    parameter \WIDTH 32
-    parameter \CLK_POLARITY 1
-    connect \D $625 [31:0]
-    connect \CLK \clk [0]
     connect \Q \mwin_dr15_lat
   end
 
   attribute \src "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144"
-  process $1544
-    assign $626 [1:0] \mwin_state [1:0]
+  process $1542
+    assign $625 [1:0] \mwin_state [1:0]
     switch \mwin_state [1:0]
       case 2'00
         switch \mwin_trigger [0]
           case 1'1
             switch \mwin_dr11_valid [0]
               case 1'1
-                assign $626 [1:0] 2'01
+                assign $625 [1:0] 2'01
               case
-                assign $626 [1:0] 2'10
+                assign $625 [1:0] 2'10
             end
         end
       case 2'01
-        assign $626 [1:0] 2'00
+        assign $625 [1:0] 2'00
       case 2'10
-        assign $626 [1:0] 2'00
+        assign $625 [1:0] 2'00
     end
   end
 
   attribute \src "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144"
-  cell $dff $1545
+  cell $dff $1543
     parameter \WIDTH 2
     parameter \CLK_POLARITY 1
-    connect \D $626 [1:0]
+    connect \D $625 [1:0]
     connect \CLK \clk [0]
     connect \Q \mwin_state
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1769"
-  process $1546
-    assign $627 [31:0] \delayed_issuer_instr [31:0]
-    switch $585 [0]
+  attribute \src "/home/runner/workspace/hardware/core.py:1765"
+  process $1544
+    assign $626 [31:0] \delayed_issuer_instr [31:0]
+    switch $584 [0]
       case 1'1
-        assign $627 [31:0] \instruction [31:0]
+        assign $626 [31:0] \instruction [31:0]
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:1769"
+  attribute \src "/home/runner/workspace/hardware/core.py:1765"
+  cell $dff $1545
+    parameter \WIDTH 32
+    parameter \CLK_POLARITY 1
+    connect \D $626 [31:0]
+    connect \CLK \clk [0]
+    connect \Q \delayed_issuer_instr
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2786"
+  process $1546
+    assign $627 [31:0] \fault_instr [31:0]
+    switch { \clear_all [0] \fault_valid$828 [0] }
+      case 2'-1
+        assign $627 [31:0] $585 [31:0]
+      case 2'1-
+        assign $627 [31:0] 32'00000000000000000000000000000000
+    end
+  end
+
+  attribute \src "/home/runner/workspace/hardware/core.py:2786"
   cell $dff $1547
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
     connect \D $627 [31:0]
     connect \CLK \clk [0]
-    connect \Q \delayed_issuer_instr
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2790"
-  process $1548
-    assign $628 [31:0] \fault_instr [31:0]
-    switch { \clear_all [0] \fault_valid$831 [0] }
-      case 2'-1
-        assign $628 [31:0] $586 [31:0]
-      case 2'1-
-        assign $628 [31:0] 32'00000000000000000000000000000000
-    end
-  end
-
-  attribute \src "/home/runner/workspace/hardware/core.py:2790"
-  cell $dff $1549
-    parameter \WIDTH 32
-    parameter \CLK_POLARITY 1
-    connect \D $628 [31:0]
-    connect \CLK \clk [0]
     connect \Q \fault_instr
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2791"
-  process $1550
-    assign $629 [3:0] \fault_stage [3:0]
-    switch { \clear_all [0] \fault_valid$831 [0] }
+  attribute \src "/home/runner/workspace/hardware/core.py:2787"
+  process $1548
+    assign $628 [3:0] \fault_stage [3:0]
+    switch { \clear_all [0] \fault_valid$828 [0] }
       case 2'-1
-        assign $629 [3:0] \fault_stage_w [3:0]
+        assign $628 [3:0] \fault_stage_w [3:0]
       case 2'1-
-        assign $629 [3:0] 4'0000
+        assign $628 [3:0] 4'0000
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/core.py:2791"
-  cell $dff $1551
+  attribute \src "/home/runner/workspace/hardware/core.py:2787"
+  cell $dff $1549
     parameter \WIDTH 4
     parameter \CLK_POLARITY 1
-    connect \D $629 [3:0]
+    connect \D $628 [3:0]
     connect \CLK \clk [0]
     connect \Q \fault_stage
   end
@@ -34889,43 +34839,43 @@ connect \cr_dst \instruction [22:19]
 connect \cr_src \instruction [18:15]
 connect \perm_gt_sig \cr_rd_data [31:0]
 connect \gt_in \cr_rd_data [31:0]
-connect \required_perms$73 \required_perms [5:0]
+connect \required_perms$72 \required_perms [5:0]
 connect \gc_start 1'0
-connect \gc_start$78 1'0
+connect \gc_start$77 1'0
 connect \gc_mark_en 1'1
 connect \gc_sweep_en 1'1
 connect \ns_start_index 16'0000000000000001
 connect \ns_end_index 16'0001000000000000
-connect \ns_rd_data { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$5745$0 [31:0] }
-connect \ns_rd_data$84 { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$5745$0 [31:0] }
-connect \gc_busy$85 \gc_busy [0]
+connect \ns_rd_data { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$5733$0 [31:0] }
+connect \ns_rd_data$83 { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$5733$0 [31:0] }
+connect \gc_busy$84 \gc_busy [0]
 connect \garbage_count \gc_garbage_count [31:0]
 connect \cr_rd_data_gt \cr_rd_data [31:0]
 connect \clist_rd_en 1'0
-connect \clear_all$98 \clear_all [0]
+connect \clear_all$97 \clear_all [0]
 connect \dr_wr_en \change_dr_wr_en [0]
 connect \dr_wr_addr \change_dr_wr_addr [3:0]
 connect \dr_wr_data \change_dr_wr_data [31:0]
-connect \shl_result $200 [31:0]
-connect \bfins_result $223 [31:0]
-connect \dr_wr_addr$139 4'0000
-connect \dr_wr_data$140 { 30'000000000000000000000000000000 $641 [1:0] }
-connect \dr1_wr_data { 16'0000000000000000 $642 [15:0] }
-connect \cr_wr_en$149 1'0
+connect \shl_result $199 [31:0]
+connect \bfins_result $222 [31:0]
+connect \dr_wr_addr$138 4'0000
+connect \dr_wr_data$139 { 30'000000000000000000000000000000 $640 [1:0] }
+connect \dr1_wr_data { 16'0000000000000000 $641 [15:0] }
+connect \cr_wr_en$148 1'0
 connect \dbg_cr_wr_en 1'0
 connect \dbg_cr_wr_addr 4'0000
-connect \cr_wr_addr$160 4'0000
+connect \cr_wr_addr$159 4'0000
 connect \dbg_cr_wr_data 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-connect \cr_wr_data$173 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+connect \cr_wr_data$172 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 connect \mwin_m_set_en \m_set_en [0]
 connect \mwin_m_clear_en \m_clear_en [0]
 connect \dbg_m_bit_wr_en 1'0
 connect \dbg_m_bit_word 16'0000000000000000
 connect \m_consume_en \m_switch_consume_en [0]
 connect \m_consume_target \m_switch_consume_target [1:0]
-connect \m_consume_en$199 \m_save_consume_en [0]
-connect \m_consume_target$201 \m_save_consume_target [1:0]
-connect \cr15_m_flag$205 \dbg_m_bit_state [15]
+connect \m_consume_en$198 \m_save_consume_en [0]
+connect \m_consume_target$200 \m_save_consume_target [1:0]
+connect \cr15_m_flag$204 \dbg_m_bit_state [15]
 connect \m_dr11 \dbg_m_dr11 [31:0]
 connect \m_dr12 \dbg_m_dr12 [31:0]
 connect \m_dr13 \dbg_m_dr13 [31:0]
@@ -34942,119 +34892,119 @@ connect \w0_rot { \cr15_namespace [56:32] \cr15_namespace [63:57] }
 connect \w1_rot { \w1_masked [18:0] \w1_masked [31:19] }
 connect \nia_reg \imem_addr [31:0]
 connect \nia \imem_addr [31:0]
-connect \flags$245 \flags [3:0]
-connect \debug_cr0_word0 $630 [31:0]
-connect \debug_cr0_word0$247 $630 [31:0]
-connect \debug_cr0_word1 $630 [63:32]
-connect \debug_cr0_word1$249 $630 [63:32]
-connect \debug_cr0_word2 $630 [95:64]
-connect \debug_cr0_word2$251 $630 [95:64]
-connect \debug_dr0$253 \debug_dr0 [31:0]
-connect \debug_cr1_word0 $631 [31:0]
-connect \debug_cr1_word0$255 $631 [31:0]
-connect \debug_cr1_word1 $631 [63:32]
-connect \debug_cr1_word1$257 $631 [63:32]
-connect \debug_cr1_word2 $631 [95:64]
-connect \debug_cr1_word2$259 $631 [95:64]
-connect \debug_dr1$261 \debug_dr1 [31:0]
-connect \debug_cr2_word0 $632 [31:0]
-connect \debug_cr2_word0$263 $632 [31:0]
-connect \debug_cr2_word1 $632 [63:32]
-connect \debug_cr2_word1$265 $632 [63:32]
-connect \debug_cr2_word2 $632 [95:64]
-connect \debug_cr2_word2$267 $632 [95:64]
-connect \debug_dr2$269 \debug_dr2 [31:0]
-connect \debug_cr3_word0 $633 [31:0]
-connect \debug_cr3_word0$271 $633 [31:0]
-connect \debug_cr3_word1 $633 [63:32]
-connect \debug_cr3_word1$273 $633 [63:32]
-connect \debug_cr3_word2 $633 [95:64]
-connect \debug_cr3_word2$275 $633 [95:64]
-connect \debug_dr3$277 \debug_dr3 [31:0]
-connect \debug_cr4_word0 $634 [31:0]
-connect \debug_cr4_word0$279 $634 [31:0]
-connect \debug_cr4_word1 $634 [63:32]
-connect \debug_cr4_word1$281 $634 [63:32]
-connect \debug_cr4_word2 $634 [95:64]
-connect \debug_cr4_word2$283 $634 [95:64]
-connect \debug_dr4$285 \debug_dr4 [31:0]
+connect \flags$244 \flags [3:0]
+connect \debug_cr0_word0 $629 [31:0]
+connect \debug_cr0_word0$246 $629 [31:0]
+connect \debug_cr0_word1 $629 [63:32]
+connect \debug_cr0_word1$248 $629 [63:32]
+connect \debug_cr0_word2 $629 [95:64]
+connect \debug_cr0_word2$250 $629 [95:64]
+connect \debug_dr0$252 \debug_dr0 [31:0]
+connect \debug_cr1_word0 $630 [31:0]
+connect \debug_cr1_word0$254 $630 [31:0]
+connect \debug_cr1_word1 $630 [63:32]
+connect \debug_cr1_word1$256 $630 [63:32]
+connect \debug_cr1_word2 $630 [95:64]
+connect \debug_cr1_word2$258 $630 [95:64]
+connect \debug_dr1$260 \debug_dr1 [31:0]
+connect \debug_cr2_word0 $631 [31:0]
+connect \debug_cr2_word0$262 $631 [31:0]
+connect \debug_cr2_word1 $631 [63:32]
+connect \debug_cr2_word1$264 $631 [63:32]
+connect \debug_cr2_word2 $631 [95:64]
+connect \debug_cr2_word2$266 $631 [95:64]
+connect \debug_dr2$268 \debug_dr2 [31:0]
+connect \debug_cr3_word0 $632 [31:0]
+connect \debug_cr3_word0$270 $632 [31:0]
+connect \debug_cr3_word1 $632 [63:32]
+connect \debug_cr3_word1$272 $632 [63:32]
+connect \debug_cr3_word2 $632 [95:64]
+connect \debug_cr3_word2$274 $632 [95:64]
+connect \debug_dr3$276 \debug_dr3 [31:0]
+connect \debug_cr4_word0 $633 [31:0]
+connect \debug_cr4_word0$278 $633 [31:0]
+connect \debug_cr4_word1 $633 [63:32]
+connect \debug_cr4_word1$280 $633 [63:32]
+connect \debug_cr4_word2 $633 [95:64]
+connect \debug_cr4_word2$282 $633 [95:64]
+connect \debug_dr4$284 \debug_dr4 [31:0]
 connect \debug_cr5_word0 \cr5_heap [31:0]
-connect \debug_cr5_word0$287 \cr5_heap [31:0]
+connect \debug_cr5_word0$286 \cr5_heap [31:0]
 connect \debug_cr5_word1 \cr5_heap [63:32]
-connect \debug_cr5_word1$289 \cr5_heap [63:32]
+connect \debug_cr5_word1$288 \cr5_heap [63:32]
 connect \debug_cr5_word2 \cr5_heap [95:64]
-connect \debug_cr5_word2$291 \cr5_heap [95:64]
-connect \debug_dr5$293 \debug_dr5 [31:0]
+connect \debug_cr5_word2$290 \cr5_heap [95:64]
+connect \debug_dr5$292 \debug_dr5 [31:0]
 connect \debug_cr6_word0 \cr6_clist [31:0]
-connect \debug_cr6_word0$295 \cr6_clist [31:0]
+connect \debug_cr6_word0$294 \cr6_clist [31:0]
 connect \debug_cr6_word1 \cr6_clist [63:32]
-connect \debug_cr6_word1$297 \cr6_clist [63:32]
+connect \debug_cr6_word1$296 \cr6_clist [63:32]
 connect \debug_cr6_word2 \cr6_clist [95:64]
-connect \debug_cr6_word2$299 \cr6_clist [95:64]
-connect \debug_dr6$301 \debug_dr6 [31:0]
-connect \debug_cr7_word0 $635 [31:0]
-connect \debug_cr7_word0$303 $635 [31:0]
-connect \debug_cr7_word1 $635 [63:32]
-connect \debug_cr7_word1$305 $635 [63:32]
-connect \debug_cr7_word2 $635 [95:64]
-connect \debug_cr7_word2$307 $635 [95:64]
-connect \debug_dr7$309 \debug_dr7 [31:0]
-connect \debug_cr8_word0 $636 [31:0]
-connect \debug_cr8_word0$311 $636 [31:0]
-connect \debug_cr8_word1 $636 [63:32]
-connect \debug_cr8_word1$313 $636 [63:32]
-connect \debug_cr8_word2 $636 [95:64]
-connect \debug_cr8_word2$315 $636 [95:64]
-connect \debug_dr8$317 \debug_dr8 [31:0]
-connect \debug_cr9_word0 $637 [31:0]
-connect \debug_cr9_word0$319 $637 [31:0]
-connect \debug_cr9_word1 $637 [63:32]
-connect \debug_cr9_word1$321 $637 [63:32]
-connect \debug_cr9_word2 $637 [95:64]
-connect \debug_cr9_word2$323 $637 [95:64]
-connect \debug_dr9$325 \debug_dr9 [31:0]
-connect \debug_cr10_word0 $638 [31:0]
-connect \debug_cr10_word0$327 $638 [31:0]
-connect \debug_cr10_word1 $638 [63:32]
-connect \debug_cr10_word1$329 $638 [63:32]
-connect \debug_cr10_word2 $638 [95:64]
-connect \debug_cr10_word2$331 $638 [95:64]
-connect \debug_dr10$333 \debug_dr10 [31:0]
-connect \debug_cr11_word0 $639 [31:0]
-connect \debug_cr11_word0$335 $639 [31:0]
-connect \debug_cr11_word1 $639 [63:32]
-connect \debug_cr11_word1$337 $639 [63:32]
-connect \debug_cr11_word2 $639 [95:64]
-connect \debug_cr11_word2$339 $639 [95:64]
-connect \debug_dr11$341 \debug_dr11 [31:0]
+connect \debug_cr6_word2$298 \cr6_clist [95:64]
+connect \debug_dr6$300 \debug_dr6 [31:0]
+connect \debug_cr7_word0 $634 [31:0]
+connect \debug_cr7_word0$302 $634 [31:0]
+connect \debug_cr7_word1 $634 [63:32]
+connect \debug_cr7_word1$304 $634 [63:32]
+connect \debug_cr7_word2 $634 [95:64]
+connect \debug_cr7_word2$306 $634 [95:64]
+connect \debug_dr7$308 \debug_dr7 [31:0]
+connect \debug_cr8_word0 $635 [31:0]
+connect \debug_cr8_word0$310 $635 [31:0]
+connect \debug_cr8_word1 $635 [63:32]
+connect \debug_cr8_word1$312 $635 [63:32]
+connect \debug_cr8_word2 $635 [95:64]
+connect \debug_cr8_word2$314 $635 [95:64]
+connect \debug_dr8$316 \debug_dr8 [31:0]
+connect \debug_cr9_word0 $636 [31:0]
+connect \debug_cr9_word0$318 $636 [31:0]
+connect \debug_cr9_word1 $636 [63:32]
+connect \debug_cr9_word1$320 $636 [63:32]
+connect \debug_cr9_word2 $636 [95:64]
+connect \debug_cr9_word2$322 $636 [95:64]
+connect \debug_dr9$324 \debug_dr9 [31:0]
+connect \debug_cr10_word0 $637 [31:0]
+connect \debug_cr10_word0$326 $637 [31:0]
+connect \debug_cr10_word1 $637 [63:32]
+connect \debug_cr10_word1$328 $637 [63:32]
+connect \debug_cr10_word2 $637 [95:64]
+connect \debug_cr10_word2$330 $637 [95:64]
+connect \debug_dr10$332 \debug_dr10 [31:0]
+connect \debug_cr11_word0 $638 [31:0]
+connect \debug_cr11_word0$334 $638 [31:0]
+connect \debug_cr11_word1 $638 [63:32]
+connect \debug_cr11_word1$336 $638 [63:32]
+connect \debug_cr11_word2 $638 [95:64]
+connect \debug_cr11_word2$338 $638 [95:64]
+connect \debug_dr11$340 \debug_dr11 [31:0]
 connect \debug_cr12_word0 \cr12_thread [31:0]
-connect \debug_cr12_word0$343 \cr12_thread [31:0]
+connect \debug_cr12_word0$342 \cr12_thread [31:0]
 connect \debug_cr12_word1 \cr12_thread [63:32]
-connect \debug_cr12_word1$345 \cr12_thread [63:32]
+connect \debug_cr12_word1$344 \cr12_thread [63:32]
 connect \debug_cr12_word2 \cr12_thread [95:64]
-connect \debug_cr12_word2$347 \cr12_thread [95:64]
-connect \debug_dr12$349 \debug_dr12 [31:0]
-connect \debug_cr13_word0 $640 [31:0]
-connect \debug_cr13_word0$351 $640 [31:0]
-connect \debug_cr13_word1 $640 [63:32]
-connect \debug_cr13_word1$353 $640 [63:32]
-connect \debug_cr13_word2 $640 [95:64]
-connect \debug_cr13_word2$355 $640 [95:64]
-connect \debug_dr13$357 \debug_dr13 [31:0]
+connect \debug_cr12_word2$346 \cr12_thread [95:64]
+connect \debug_dr12$348 \debug_dr12 [31:0]
+connect \debug_cr13_word0 $639 [31:0]
+connect \debug_cr13_word0$350 $639 [31:0]
+connect \debug_cr13_word1 $639 [63:32]
+connect \debug_cr13_word1$352 $639 [63:32]
+connect \debug_cr13_word2 $639 [95:64]
+connect \debug_cr13_word2$354 $639 [95:64]
+connect \debug_dr13$356 \debug_dr13 [31:0]
 connect \debug_cr14_word0 \cr14_code [31:0]
-connect \debug_cr14_word0$359 \cr14_code [31:0]
+connect \debug_cr14_word0$358 \cr14_code [31:0]
 connect \debug_cr14_word1 \cr14_code [63:32]
-connect \debug_cr14_word1$361 \cr14_code [63:32]
+connect \debug_cr14_word1$360 \cr14_code [63:32]
 connect \debug_cr14_word2 \cr14_code [95:64]
-connect \debug_cr14_word2$363 \cr14_code [95:64]
-connect \debug_dr14$365 \debug_dr14 [31:0]
+connect \debug_cr14_word2$362 \cr14_code [95:64]
+connect \debug_dr14$364 \debug_dr14 [31:0]
 connect \debug_cr15_word0 \cr15_namespace [31:0]
-connect \debug_cr15_word0$367 \cr15_namespace [31:0]
+connect \debug_cr15_word0$366 \cr15_namespace [31:0]
 connect \debug_cr15_word1 \cr15_namespace [63:32]
-connect \debug_cr15_word1$369 \cr15_namespace [63:32]
+connect \debug_cr15_word1$368 \cr15_namespace [63:32]
 connect \debug_cr15_word2 \cr15_namespace [95:64]
-connect \debug_cr15_word2$371 \cr15_namespace [95:64]
-connect \debug_dr15$373 \debug_dr15 [31:0]
+connect \debug_cr15_word2$370 \cr15_namespace [95:64]
+connect \debug_dr15$372 \debug_dr15 [31:0]
 connect \debug_m_flag \dbg_m_bit_state [15]
 connect \debug_isolated_m_flags \dbg_m_bit_state [15:12]
 connect \switch_src_gt \cr_rd_data [31:0]
@@ -35106,155 +35056,153 @@ connect \src_cr \instruction [18:15]
 connect \src_cr_data \cr_rd_data [95:0]
 connect \call_start \call_start_sig [0]
 connect \boot_window \boot_microcode_active [0]
-connect \cr_src$484 \instruction [18:15]
+connect \cr_src$483 \instruction [18:15]
 connect \index 16'0000000000000000
 connect \call_imm \instruction [14:0]
-connect \call_imm$487 \instruction [14:0]
+connect \call_imm$486 \instruction [14:0]
 connect \mask 16'0000000000000000
 connect \call_mask 15'000000000000000
-connect \cr_rd_data$490 \cr_rd_data [95:0]
-connect \cr15_namespace$491 \cr15_namespace [95:0]
-connect \cr14_code$493 \cr14_code [95:0]
+connect \cr_rd_data$489 \cr_rd_data [95:0]
+connect \cr15_namespace$490 \cr15_namespace [95:0]
+connect \cr14_code$492 \cr14_code [95:0]
 connect \dmem_rd_data \mem_rd_data [31:0]
 connect \dmem_rd_valid \mem_rd_valid [0]
-connect \cr5_heap$499 \cr5_heap [95:0]
+connect \cr5_heap$498 \cr5_heap [95:0]
 connect \caller_pc \imem_addr [16:2]
-connect \cr12_thread$501 \cr12_thread [95:0]
+connect \cr12_thread$500 \cr12_thread [95:0]
 connect \active_thread_base \thread_base [31:0]
 connect \thread_hdr_out \thread_hdr [31:0]
-connect \flags$506 \flags [3:0]
-connect \cr_b_clear_mask$508 \cr_b_clear_mask [11:0]
-connect \cr_null_mask$510 \cr_null_mask [11:0]
+connect \flags$505 \flags [3:0]
+connect \cr_b_clear_mask$507 \cr_b_clear_mask [11:0]
+connect \cr_null_mask$509 \cr_null_mask [11:0]
 connect \return_start \ret_start_sig [0]
-connect \cr_src$513 \instruction [17:15]
-connect \cr_rd_data$514 \cr_rd_data [95:0]
 connect \lambda_active \lambda_active_reg [0]
 connect \lambda_pc_reg \lambda_pc [31:0]
-connect \cr5_heap$518 \cr5_heap [95:0]
-connect \cr12_thread$519 \cr12_thread [95:0]
-connect \thread_base$520 \thread_base [31:0]
-connect \mem_rd_data$521 \mem_rd_data [31:0]
-connect \mem_rd_valid$522 \mem_rd_valid [0]
+connect \cr5_heap$515 \cr5_heap [95:0]
+connect \cr12_thread$516 \cr12_thread [95:0]
+connect \thread_base$517 \thread_base [31:0]
+connect \mem_rd_data$518 \mem_rd_data [31:0]
+connect \mem_rd_valid$519 \mem_rd_valid [0]
 connect \cload_start \cload_pending [0]
 connect \cload_e_gt \e_gt [31:0]
-connect \cr15_namespace$526 \cr15_namespace [95:0]
-connect \mem_rd_data$527 \mem_rd_data [31:0]
-connect \mem_rd_valid$528 \mem_rd_valid [0]
+connect \cr15_namespace$523 \cr15_namespace [95:0]
+connect \mem_rd_data$524 \mem_rd_data [31:0]
+connect \mem_rd_valid$525 \mem_rd_valid [0]
 connect \lambda_start \lambda_start_sig [0]
 connect \cr_target \instruction [22:19]
-connect \cr_rd_data$531 \cr_rd_data [95:0]
-connect \saved_nia $136 [31:0]
+connect \cr_rd_data$528 \cr_rd_data [95:0]
+connect \saved_nia $135 [31:0]
 connect \tperm_start \tperm_start_sig [0]
-connect \cr_target$535 \instruction [22:19]
-connect \cr_src$536 \instruction [18:15]
+connect \cr_target$532 \instruction [22:19]
+connect \cr_src$533 \instruction [18:15]
 connect \preset \instruction [3:0]
 connect \tperm_preset \instruction [3:0]
-connect \cr_rd_data$539 \cr_rd_data [95:0]
+connect \cr_rd_data$536 \cr_rd_data [95:0]
 connect \stack_has_frame 1'0
 connect \save_start \save_start_sig [0]
-connect \cr_src$543 \instruction [18:15]
-connect \cr_dst$544 \instruction [22:19]
-connect \index$545 { 1'0 \instruction [14:0] }
+connect \cr_src$540 \instruction [18:15]
+connect \cr_dst$541 \instruction [22:19]
+connect \index$542 { 1'0 \instruction [14:0] }
 connect \cap_index \instruction [14:0]
-connect \cr_rd_data$548 \cr_rd_data [95:0]
-connect \cr15_namespace$549 \cr15_namespace [95:0]
+connect \cr_rd_data$545 \cr_rd_data [95:0]
+connect \cr15_namespace$546 \cr15_namespace [95:0]
 connect \mem_wr_done 1'1
-connect \mem_rd_data$551 \mem_rd_data [31:0]
-connect \mem_rd_valid$552 \mem_rd_valid [0]
+connect \mem_rd_data$548 \mem_rd_data [31:0]
+connect \mem_rd_valid$549 \mem_rd_valid [0]
 connect \start \dread_start_sig [0]
-connect \cr_src$556 \instruction [18:15]
+connect \cr_src$553 \instruction [18:15]
 connect \dr_dst \instruction [22:19]
 connect \imm \instruction [14:0]
 connect \immediate \instruction [14:0]
-connect \cr_rd_data$560 \cr_rd_data [95:0]
-connect \dmem_rd_data$561 \mem_rd_data [31:0]
+connect \cr_rd_data$557 \cr_rd_data [95:0]
+connect \dmem_rd_data$558 \mem_rd_data [31:0]
 connect \m_bit_rd_word \dbg_m_bit_state [15:0]
 connect \dr_rd_data1 \dr_rd_data [31:0]
 connect \namespace_authorized \namespace_exec_authorized [0]
-connect \start$569 \dwrite_start_sig [0]
-connect \cr_src$570 \instruction [18:15]
+connect \start$566 \dwrite_start_sig [0]
+connect \cr_src$567 \instruction [18:15]
 connect \dr_src \instruction [22:19]
-connect \imm$572 \instruction [14:0]
-connect \cr_rd_data$573 \cr_rd_data [95:0]
-connect \dr_rd_data2 \dr_rd_data$574 [31:0]
-connect \dr_rd_data2$576 \dr_rd_data [31:0]
-connect \namespace_authorized$577 \namespace_exec_authorized [0]
+connect \imm$569 \instruction [14:0]
+connect \cr_rd_data$570 \cr_rd_data [95:0]
+connect \dr_rd_data2 \dr_rd_data$571 [31:0]
+connect \dr_rd_data2$573 \dr_rd_data [31:0]
+connect \namespace_authorized$574 \namespace_exec_authorized [0]
 connect \private_m_word 16'0001000000000000
 connect \arith_imm_sx { 18'000000000000000000 \instruction [13:0] }
 connect \shift_amt \instruction [4:0]
 connect \asr_mode \instruction [5]
 connect \shr_src_sx { \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31] \dr_rd_data [31:0] }
-connect \asr_result $201 [31:0]
-connect \shr_c_shift $202 [4:0]
-connect \shl_c_shift $203 [5:0]
+connect \asr_result $200 [31:0]
+connect \shr_c_shift $201 [4:0]
+connect \shl_c_shift $202 [5:0]
 connect \bf_offset \instruction [4:0]
 connect \bf_width \instruction [9:5]
-connect \bf_mask $213 [31:0]
-connect \bfins_mask_shifted $218 [31:0]
+connect \bf_mask $212 [31:0]
+connect \bfins_mask_shifted $217 [31:0]
 connect \branch_sx32 { \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14] \instruction [14:0] }
 connect \load_start \load_start_sig [0]
-connect \cr_src$615 \instruction [18:15]
-connect \cr_dst$616 \instruction [22:19]
-connect \index$617 { 1'0 \instruction [14:0] }
+connect \cr_src$612 \instruction [18:15]
+connect \cr_dst$613 \instruction [22:19]
+connect \index$614 { 1'0 \instruction [14:0] }
 connect \trace_rd_addr \instruction [22:19]
 connect \change_start \change_start_sig [0]
-connect \change_mask { 1'0 $243 [14:0] }
-connect \active_thread_base$629 \thread_base [31:0]
-connect \cr_rd_data$630 \cr_rd_data [95:0]
-connect \cr12_thread$631 \cr12_thread [95:0]
-connect \cr15_namespace$632 \cr15_namespace [95:0]
-connect \mem_rd_data$633 \mem_rd_data [31:0]
-connect \mem_rd_valid$634 \mem_rd_valid [0]
-connect \mem_wr_done$635 1'1
-connect \dr_rd_data$636 \dr_rd_data [31:0]
-connect \boot_window$637 \boot_microcode_active [0]
-connect \flags_in$638 \flags [3:0]
-connect \nia_current $245 [31:0]
+connect \change_mask { 1'0 $242 [14:0] }
+connect \active_thread_base$626 \thread_base [31:0]
+connect \cr_rd_data$627 \cr_rd_data [95:0]
+connect \cr12_thread$628 \cr12_thread [95:0]
+connect \cr15_namespace$629 \cr15_namespace [95:0]
+connect \mem_rd_data$630 \mem_rd_data [31:0]
+connect \mem_rd_valid$631 \mem_rd_valid [0]
+connect \mem_wr_done$632 1'1
+connect \dr_rd_data$633 \dr_rd_data [31:0]
+connect \boot_window$634 \boot_microcode_active [0]
+connect \flags_in$635 \flags [3:0]
+connect \nia_current $244 [31:0]
 connect \switch_start \switch_start_sig [0]
-connect \cr_src$648 \instruction [18:15]
+connect \cr_src$645 \instruction [18:15]
 connect \target \instruction [22:19]
-connect \index$650 { 1'0 \instruction [14:0] }
-connect \cr_rd_data$652 \cr_rd_data [95:0]
-connect \cr15_namespace$653 \cr15_namespace [95:0]
-connect \mem_rd_data$654 \mem_rd_data [31:0]
-connect \mem_rd_valid$655 \mem_rd_valid [0]
-connect \start$657 \eloadcall_start_sig [0]
-connect \cr_src$658 \instruction [18:15]
-connect \cr_dst$659 \instruction [22:19]
-connect \index$660 { 8'00000000 \instruction [7:0] }
+connect \index$647 { 1'0 \instruction [14:0] }
+connect \cr_rd_data$649 \cr_rd_data [95:0]
+connect \cr15_namespace$650 \cr15_namespace [95:0]
+connect \mem_rd_data$651 \mem_rd_data [31:0]
+connect \mem_rd_valid$652 \mem_rd_valid [0]
+connect \start$654 \eloadcall_start_sig [0]
+connect \cr_src$655 \instruction [18:15]
+connect \cr_dst$656 \instruction [22:19]
+connect \index$657 { 8'00000000 \instruction [7:0] }
 connect \eloadcall_clist_row \instruction [7:0]
-connect \mask$662 16'0000000000000000
-connect \call_imm$663 { 8'00000000 \instruction [14:8] }
+connect \mask$659 16'0000000000000000
+connect \call_imm$660 { 8'00000000 \instruction [14:8] }
 connect \eloadcall_method_index \instruction [14:8]
-connect \cr_rd_data$665 \cr_rd_data [95:0]
-connect \cr15_namespace$666 \cr15_namespace [95:0]
-connect \mem_rd_data$667 \mem_rd_data [31:0]
-connect \mem_rd_valid$668 \mem_rd_valid [0]
-connect \cr5_heap$669 \cr5_heap [95:0]
-connect \thread_base$670 \thread_base [31:0]
-connect \thread_hdr$671 \thread_hdr [31:0]
-connect \cr12_thread$672 \cr12_thread [95:0]
-connect \flags$673 \flags [3:0]
-connect \start$675 \xloadlambda_start_sig [0]
-connect \cr_src$676 \instruction [18:15]
-connect \cr_dst$677 \instruction [22:19]
-connect \index$678 { 1'0 \instruction [14:0] }
-connect \cr_rd_data$679 \cr_rd_data [95:0]
-connect \cr15_namespace$680 \cr15_namespace [95:0]
-connect \mem_rd_data$681 \mem_rd_data [31:0]
-connect \mem_rd_valid$682 \mem_rd_valid [0]
+connect \cr_rd_data$662 \cr_rd_data [95:0]
+connect \cr15_namespace$663 \cr15_namespace [95:0]
+connect \mem_rd_data$664 \mem_rd_data [31:0]
+connect \mem_rd_valid$665 \mem_rd_valid [0]
+connect \cr5_heap$666 \cr5_heap [95:0]
+connect \thread_base$667 \thread_base [31:0]
+connect \thread_hdr$668 \thread_hdr [31:0]
+connect \cr12_thread$669 \cr12_thread [95:0]
+connect \flags$670 \flags [3:0]
+connect \start$672 \xloadlambda_start_sig [0]
+connect \cr_src$673 \instruction [18:15]
+connect \cr_dst$674 \instruction [22:19]
+connect \index$675 { 1'0 \instruction [14:0] }
+connect \cr_rd_data$676 \cr_rd_data [95:0]
+connect \cr15_namespace$677 \cr15_namespace [95:0]
+connect \mem_rd_data$678 \mem_rd_data [31:0]
+connect \mem_rd_valid$679 \mem_rd_valid [0]
 connect \rd_data \pet_name_rd_data [0]
-connect \pet_name_rd_data$688 \pet_name_rd_data [0]
+connect \pet_name_rd_data$685 \pet_name_rd_data [0]
 connect \timer_alarm 1'0
 connect \lazy_resolve_slot \pet_name_rd_addr [15:0]
-connect \lazy_resolve_slot$695 \pet_name_rd_addr$685 [15:0]
-connect \start$700 \irq_dispatch_start [0]
+connect \lazy_resolve_slot$692 \pet_name_rd_addr$682 [15:0]
+connect \start$697 \irq_dispatch_start [0]
 connect \irq_reason \irq_dispatch_reason [1:0]
 connect \irq_slot \irq_dispatch_slot [15:0]
-connect \cr15_namespace$703 \cr15_namespace [95:0]
-connect \mem_rd_data$704 \mem_rd_data [31:0]
-connect \mem_rd_valid$705 \mem_rd_valid [0]
-connect \saved_nia$706 $273 [31:0]
+connect \cr15_namespace$700 \cr15_namespace [95:0]
+connect \mem_rd_data$701 \mem_rd_data [31:0]
+connect \mem_rd_valid$702 \mem_rd_valid [0]
+connect \saved_nia$703 $272 [31:0]
 connect \outform_start_in 1'0
 connect \outform_start \_outform_start [0]
 connect \outform_gt_raw 32'00000000000000000000000000000000
@@ -35268,30 +35216,30 @@ connect \outform_rx_data 8'00000000
 connect \tx_valid \outform_tx_valid [0]
 connect \tx_data \outform_tx_data [7:0]
 connect \result_gt \outform_result_gt [31:0]
-connect \outform_busy$730 \outform_busy [0]
+connect \outform_busy$727 \outform_busy [0]
 connect \outform_fsm_busy \busy$39 [0]
 connect \tx_ack 1'0
 connect \outform_tx_ack 1'0
 connect \outform_fault_type \outform_fault_type_in [4:0]
 connect \dbg_outform_done_inject 1'0
-connect \outform_fault_type_in$744 \outform_fault_type_in [4:0]
+connect \outform_fault_type_in$741 \outform_fault_type_in [4:0]
 connect \dbg_outform_result_gt 32'00000000000000000000000000000000
-connect \alloc_sz_w_noniot $280 [31:0]
-connect \alloc_mask_w_noniot $281 [31:0]
-connect \alloc_aligned_w_noniot $284 [31:0]
-connect \alloc_new_wm_w_noniot $285 [32:0]
-connect \alloc_base $292 [31:0]
-connect \mint_ns_entry_base_ni $294 [31:0]
+connect \alloc_sz_w_noniot $279 [31:0]
+connect \alloc_mask_w_noniot $280 [31:0]
+connect \alloc_aligned_w_noniot $283 [31:0]
+connect \alloc_new_wm_w_noniot $284 [32:0]
+connect \alloc_base $291 [31:0]
+connect \mint_ns_entry_base_ni $293 [31:0]
 connect \mint_clist_slot_base_ni { 7'0000000 \mint_slot_id_p3_ni [16:0] 8'00000000 }
-connect \mint_e_gt_d { 1'0 $295 [30:0] }
-connect \mint_w2_ni { 10'0000000000 $297 [21:0] }
-connect \w0_rot$767 { \mint_base_reg_ni [24:0] \mint_base_reg_ni [31:25] }
-connect \w1_rot$769 { \w1_masked$766 [18:0] \w1_masked$766 [31:19] }
+connect \mint_e_gt_d { 1'0 $294 [30:0] }
+connect \mint_w2_ni { 10'0000000000 $296 [21:0] }
+connect \w0_rot$764 { \mint_base_reg_ni [24:0] \mint_base_reg_ni [31:25] }
+connect \w1_rot$766 { \w1_masked$763 [18:0] \w1_masked$763 [31:19] }
 connect \mint_done \mint_done_comb_ni [0]
 connect \mint_fault \mint_fault_comb_ni [0]
 connect \cr15_m_writeback_trigger 1'0
-connect \w0_rot$799 { \mwin_dr12_lat [24:0] \mwin_dr12_lat [31:25] }
-connect \w1_rot$801 { \w1_masked$797 [18:0] \w1_masked$797 [31:19] }
+connect \w0_rot$796 { \mwin_dr12_lat [24:0] \mwin_dr12_lat [31:25] }
+connect \w1_rot$798 { \w1_masked$794 [18:0] \w1_masked$794 [31:19] }
 connect \mwin_dr11_gt_seq \mwin_dr11_lat [24:16]
 connect \mwin_dr13_gt_seq \mwin_dr13_lat [29:21]
 connect \cr15_m_set 1'0
@@ -35301,30 +35249,30 @@ connect \fault_cr14 32'00000000000000000000000000000000
 connect \fault_stage_latch \fault_stage [3:0]
 connect \nia_set \call_normal_complete [0]
 connect \retire_flags \flags [3:0]
-connect \retire_fault_code \fault$830 [4:0]
+connect \retire_fault_code \fault$827 [4:0]
 connect \trace_load_shadow_gt \retire_trace_load_shadow_gt [31:0]
 connect \retire_trace_cr5_gt \cr5_heap [31:0]
 connect \retire_trace_cr12_gt \cr12_thread [31:0]
 connect \retire_trace_cr14_gt \cr14_code [31:0]
-connect \cr_rd_data$885 \cr_rd_data [95:0]
-connect \cr15_namespace$886 \cr15_namespace [95:0]
-connect \mem_rd_data$887 \mem_rd_data [31:0]
-connect \mem_rd_valid$888 \mem_rd_valid [0]
+connect \cr_rd_data$882 \cr_rd_data [95:0]
+connect \cr15_namespace$883 \cr15_namespace [95:0]
+connect \mem_rd_data$884 \mem_rd_data [31:0]
+connect \mem_rd_valid$885 \mem_rd_valid [0]
 connect \mload_direct 1'1
 connect \mload_m_elevated 1'1
-connect \mload_start$903 1'0
-connect \mload_cr_src$904 4'0000
-connect \mload_cr_dst$905 4'0000
-connect \mload_index$906 16'0000000000000000
-connect \mload_direct$907 1'0
-connect \mload_direct_gt$908 32'00000000000000000000000000000000
-connect \mload_m_elevated$909 1'0
-connect \mload_direct$914 1'0
-connect \mload_direct_gt$915 32'00000000000000000000000000000000
-connect \mload_m_elevated$916 1'0
+connect \mload_start$900 1'0
+connect \mload_cr_src$901 4'0000
+connect \mload_cr_dst$902 4'0000
+connect \mload_index$903 16'0000000000000000
+connect \mload_direct$904 1'0
+connect \mload_direct_gt$905 32'00000000000000000000000000000000
+connect \mload_m_elevated$906 1'0
+connect \mload_direct$911 1'0
+connect \mload_direct_gt$912 32'00000000000000000000000000000000
+connect \mload_m_elevated$913 1'0
 connect \sub_fault_type \mload_fault_type [4:0]
-connect \mload_fault_type$927 \mload_fault_type [4:0]
-connect \mload_fault_type$931 \mload_fault_type [4:0]
+connect \mload_fault_type$924 \mload_fault_type [4:0]
+connect \mload_fault_type$928 \mload_fault_type [4:0]
 connect \gbit_reset_done \valid_key_access [0]
 connect \access_index 16'0000000000000000
 connect \defer_fault_reset 1'1
@@ -35333,20 +35281,20 @@ connect \free_run_nia 32'00000000000000000000000000000000
 connect \outform_clist_addr 32'00000000000000000000000000000000
 connect \outform_clist_addr_out 32'00000000000000000000000000000000
 connect \outform_clist_addr_in 32'00000000000000000000000000000000
-connect \port$6367$0 $630 [95:0]
-connect \port$6369$0 $631 [95:0]
-connect \port$6371$0 $632 [95:0]
-connect \port$6373$0 $633 [95:0]
-connect \port$6375$0 $634 [95:0]
-connect \port$6381$0 $635 [95:0]
-connect \port$6383$0 $636 [95:0]
-connect \port$6385$0 $637 [95:0]
-connect \port$6387$0 $638 [95:0]
-connect \port$6389$0 $639 [95:0]
-connect \port$6393$0 $640 [95:0]
+connect \port$6355$0 $629 [95:0]
+connect \port$6357$0 $630 [95:0]
+connect \port$6359$0 $631 [95:0]
+connect \port$6361$0 $632 [95:0]
+connect \port$6363$0 $633 [95:0]
+connect \port$6369$0 $634 [95:0]
+connect \port$6371$0 $635 [95:0]
+connect \port$6373$0 $636 [95:0]
+connect \port$6375$0 $637 [95:0]
+connect \port$6377$0 $638 [95:0]
+connect \port$6381$0 $639 [95:0]
 connect \cr15_m_flag \dbg_m_bit_state [15]
-connect \retire_trace_load_new_gt \cr_wr_data$176 [31:0]
-connect \retire_trace_return_cr14_gt \cr_wr_data$170 [31:0]
+connect \retire_trace_load_new_gt \cr_wr_data$175 [31:0]
+connect \retire_trace_return_cr14_gt \cr_wr_data$169 [31:0]
 connect \flags.N \flags [0]
 connect \flags.Z \flags [1]
 connect \flags.C \flags [2]
@@ -35428,10 +35376,10 @@ connect \flags_restore_data.N \flags_restore_data [0]
 connect \flags_restore_data.Z \flags_restore_data [1]
 connect \flags_restore_data.C \flags_restore_data [2]
 connect \flags_restore_data.V \flags_restore_data [3]
-connect \flags_restore_data$137.N \flags_restore_data$137 [0]
-connect \flags_restore_data$137.Z \flags_restore_data$137 [1]
-connect \flags_restore_data$137.C \flags_restore_data$137 [2]
-connect \flags_restore_data$137.V \flags_restore_data$137 [3]
+connect \flags_restore_data$136.N \flags_restore_data$136 [0]
+connect \flags_restore_data$136.Z \flags_restore_data$136 [1]
+connect \flags_restore_data$136.C \flags_restore_data$136 [2]
+connect \flags_restore_data$136.V \flags_restore_data$136 [3]
 connect \cr_wr_data.word0_gt \cr_wr_data [31:0]
 connect \cr_wr_data.word0_gt.slot_id \cr_wr_data [15:0]
 connect \cr_wr_data.word0_gt.gt_seq \cr_wr_data [24:16]
@@ -35441,6 +35389,15 @@ connect \cr_wr_data.word0_gt.perm \cr_wr_data [30:28]
 connect \cr_wr_data.word0_gt.b_flag \cr_wr_data [31]
 connect \cr_wr_data.word1_location \cr_wr_data [63:32]
 connect \cr_wr_data.word2_w2 \cr_wr_data [95:64]
+connect \cr_wr_data$165.word0_gt \cr_wr_data$165 [31:0]
+connect \cr_wr_data$165.word0_gt.slot_id \cr_wr_data$165 [15:0]
+connect \cr_wr_data$165.word0_gt.gt_seq \cr_wr_data$165 [24:16]
+connect \cr_wr_data$165.word0_gt.gt_type \cr_wr_data$165 [26:25]
+connect \cr_wr_data$165.word0_gt.dom \cr_wr_data$165 [27]
+connect \cr_wr_data$165.word0_gt.perm \cr_wr_data$165 [30:28]
+connect \cr_wr_data$165.word0_gt.b_flag \cr_wr_data$165 [31]
+connect \cr_wr_data$165.word1_location \cr_wr_data$165 [63:32]
+connect \cr_wr_data$165.word2_w2 \cr_wr_data$165 [95:64]
 connect \cr_wr_data$166.word0_gt \cr_wr_data$166 [31:0]
 connect \cr_wr_data$166.word0_gt.slot_id \cr_wr_data$166 [15:0]
 connect \cr_wr_data$166.word0_gt.gt_seq \cr_wr_data$166 [24:16]
@@ -35486,15 +35443,6 @@ connect \cr_wr_data$170.word0_gt.perm \cr_wr_data$170 [30:28]
 connect \cr_wr_data$170.word0_gt.b_flag \cr_wr_data$170 [31]
 connect \cr_wr_data$170.word1_location \cr_wr_data$170 [63:32]
 connect \cr_wr_data$170.word2_w2 \cr_wr_data$170 [95:64]
-connect \cr_wr_data$171.word0_gt \cr_wr_data$171 [31:0]
-connect \cr_wr_data$171.word0_gt.slot_id \cr_wr_data$171 [15:0]
-connect \cr_wr_data$171.word0_gt.gt_seq \cr_wr_data$171 [24:16]
-connect \cr_wr_data$171.word0_gt.gt_type \cr_wr_data$171 [26:25]
-connect \cr_wr_data$171.word0_gt.dom \cr_wr_data$171 [27]
-connect \cr_wr_data$171.word0_gt.perm \cr_wr_data$171 [30:28]
-connect \cr_wr_data$171.word0_gt.b_flag \cr_wr_data$171 [31]
-connect \cr_wr_data$171.word1_location \cr_wr_data$171 [63:32]
-connect \cr_wr_data$171.word2_w2 \cr_wr_data$171 [95:64]
 connect \dbg_cr_wr_data.word0_gt 32'00000000000000000000000000000000
 connect \dbg_cr_wr_data.word0_gt.slot_id 16'0000000000000000
 connect \dbg_cr_wr_data.word0_gt.gt_seq 9'000000000
@@ -35504,15 +35452,24 @@ connect \dbg_cr_wr_data.word0_gt.perm 3'000
 connect \dbg_cr_wr_data.word0_gt.b_flag 1'0
 connect \dbg_cr_wr_data.word1_location 32'00000000000000000000000000000000
 connect \dbg_cr_wr_data.word2_w2 32'00000000000000000000000000000000
-connect \cr_wr_data$173.word0_gt 32'00000000000000000000000000000000
-connect \cr_wr_data$173.word0_gt.slot_id 16'0000000000000000
-connect \cr_wr_data$173.word0_gt.gt_seq 9'000000000
-connect \cr_wr_data$173.word0_gt.gt_type 2'00
-connect \cr_wr_data$173.word0_gt.dom 1'0
-connect \cr_wr_data$173.word0_gt.perm 3'000
-connect \cr_wr_data$173.word0_gt.b_flag 1'0
-connect \cr_wr_data$173.word1_location 32'00000000000000000000000000000000
-connect \cr_wr_data$173.word2_w2 32'00000000000000000000000000000000
+connect \cr_wr_data$172.word0_gt 32'00000000000000000000000000000000
+connect \cr_wr_data$172.word0_gt.slot_id 16'0000000000000000
+connect \cr_wr_data$172.word0_gt.gt_seq 9'000000000
+connect \cr_wr_data$172.word0_gt.gt_type 2'00
+connect \cr_wr_data$172.word0_gt.dom 1'0
+connect \cr_wr_data$172.word0_gt.perm 3'000
+connect \cr_wr_data$172.word0_gt.b_flag 1'0
+connect \cr_wr_data$172.word1_location 32'00000000000000000000000000000000
+connect \cr_wr_data$172.word2_w2 32'00000000000000000000000000000000
+connect \cr_wr_data$173.word0_gt \cr_wr_data$173 [31:0]
+connect \cr_wr_data$173.word0_gt.slot_id \cr_wr_data$173 [15:0]
+connect \cr_wr_data$173.word0_gt.gt_seq \cr_wr_data$173 [24:16]
+connect \cr_wr_data$173.word0_gt.gt_type \cr_wr_data$173 [26:25]
+connect \cr_wr_data$173.word0_gt.dom \cr_wr_data$173 [27]
+connect \cr_wr_data$173.word0_gt.perm \cr_wr_data$173 [30:28]
+connect \cr_wr_data$173.word0_gt.b_flag \cr_wr_data$173 [31]
+connect \cr_wr_data$173.word1_location \cr_wr_data$173 [63:32]
+connect \cr_wr_data$173.word2_w2 \cr_wr_data$173 [95:64]
 connect \cr_wr_data$174.word0_gt \cr_wr_data$174 [31:0]
 connect \cr_wr_data$174.word0_gt.slot_id \cr_wr_data$174 [15:0]
 connect \cr_wr_data$174.word0_gt.gt_seq \cr_wr_data$174 [24:16]
@@ -35531,15 +35488,6 @@ connect \cr_wr_data$175.word0_gt.perm \cr_wr_data$175 [30:28]
 connect \cr_wr_data$175.word0_gt.b_flag \cr_wr_data$175 [31]
 connect \cr_wr_data$175.word1_location \cr_wr_data$175 [63:32]
 connect \cr_wr_data$175.word2_w2 \cr_wr_data$175 [95:64]
-connect \cr_wr_data$176.word0_gt \cr_wr_data$176 [31:0]
-connect \cr_wr_data$176.word0_gt.slot_id \cr_wr_data$176 [15:0]
-connect \cr_wr_data$176.word0_gt.gt_seq \cr_wr_data$176 [24:16]
-connect \cr_wr_data$176.word0_gt.gt_type \cr_wr_data$176 [26:25]
-connect \cr_wr_data$176.word0_gt.dom \cr_wr_data$176 [27]
-connect \cr_wr_data$176.word0_gt.perm \cr_wr_data$176 [30:28]
-connect \cr_wr_data$176.word0_gt.b_flag \cr_wr_data$176 [31]
-connect \cr_wr_data$176.word1_location \cr_wr_data$176 [63:32]
-connect \cr_wr_data$176.word2_w2 \cr_wr_data$176 [95:64]
 connect \boot_cap_wr_data.word0_gt \boot_cap_wr_data [31:0]
 connect \boot_cap_wr_data.word0_gt.slot_id \boot_cap_wr_data [15:0]
 connect \boot_cap_wr_data.word0_gt.gt_seq \boot_cap_wr_data [24:16]
@@ -35576,10 +35524,10 @@ connect \cr15_namespace.word0_gt.perm \cr15_namespace [30:28]
 connect \cr15_namespace.word0_gt.b_flag \cr15_namespace [31]
 connect \cr15_namespace.word1_location \cr15_namespace [63:32]
 connect \cr15_namespace.word2_w2 \cr15_namespace [95:64]
-connect \flags$245.N \flags [0]
-connect \flags$245.Z \flags [1]
-connect \flags$245.C \flags [2]
-connect \flags$245.V \flags [3]
+connect \flags$244.N \flags [0]
+connect \flags$244.Z \flags [1]
+connect \flags$244.C \flags [2]
+connect \flags$244.V \flags [3]
 connect \thrd_gt.slot_id \thrd_gt [15:0]
 connect \thrd_gt.gt_seq \thrd_gt [24:16]
 connect \thrd_gt.gt_type \thrd_gt [26:25]
@@ -35895,24 +35843,24 @@ connect \src_cr_data.word0_gt.perm \cr_rd_data [30:28]
 connect \src_cr_data.word0_gt.b_flag \cr_rd_data [31]
 connect \src_cr_data.word1_location \cr_rd_data [63:32]
 connect \src_cr_data.word2_w2 \cr_rd_data [95:64]
-connect \cr_rd_data$490.word0_gt \cr_rd_data [31:0]
-connect \cr_rd_data$490.word0_gt.slot_id \cr_rd_data [15:0]
-connect \cr_rd_data$490.word0_gt.gt_seq \cr_rd_data [24:16]
-connect \cr_rd_data$490.word0_gt.gt_type \cr_rd_data [26:25]
-connect \cr_rd_data$490.word0_gt.dom \cr_rd_data [27]
-connect \cr_rd_data$490.word0_gt.perm \cr_rd_data [30:28]
-connect \cr_rd_data$490.word0_gt.b_flag \cr_rd_data [31]
-connect \cr_rd_data$490.word1_location \cr_rd_data [63:32]
-connect \cr_rd_data$490.word2_w2 \cr_rd_data [95:64]
-connect \cr15_namespace$491.word0_gt \cr15_namespace [31:0]
-connect \cr15_namespace$491.word0_gt.slot_id \cr15_namespace [15:0]
-connect \cr15_namespace$491.word0_gt.gt_seq \cr15_namespace [24:16]
-connect \cr15_namespace$491.word0_gt.gt_type \cr15_namespace [26:25]
-connect \cr15_namespace$491.word0_gt.dom \cr15_namespace [27]
-connect \cr15_namespace$491.word0_gt.perm \cr15_namespace [30:28]
-connect \cr15_namespace$491.word0_gt.b_flag \cr15_namespace [31]
-connect \cr15_namespace$491.word1_location \cr15_namespace [63:32]
-connect \cr15_namespace$491.word2_w2 \cr15_namespace [95:64]
+connect \cr_rd_data$489.word0_gt \cr_rd_data [31:0]
+connect \cr_rd_data$489.word0_gt.slot_id \cr_rd_data [15:0]
+connect \cr_rd_data$489.word0_gt.gt_seq \cr_rd_data [24:16]
+connect \cr_rd_data$489.word0_gt.gt_type \cr_rd_data [26:25]
+connect \cr_rd_data$489.word0_gt.dom \cr_rd_data [27]
+connect \cr_rd_data$489.word0_gt.perm \cr_rd_data [30:28]
+connect \cr_rd_data$489.word0_gt.b_flag \cr_rd_data [31]
+connect \cr_rd_data$489.word1_location \cr_rd_data [63:32]
+connect \cr_rd_data$489.word2_w2 \cr_rd_data [95:64]
+connect \cr15_namespace$490.word0_gt \cr15_namespace [31:0]
+connect \cr15_namespace$490.word0_gt.slot_id \cr15_namespace [15:0]
+connect \cr15_namespace$490.word0_gt.gt_seq \cr15_namespace [24:16]
+connect \cr15_namespace$490.word0_gt.gt_type \cr15_namespace [26:25]
+connect \cr15_namespace$490.word0_gt.dom \cr15_namespace [27]
+connect \cr15_namespace$490.word0_gt.perm \cr15_namespace [30:28]
+connect \cr15_namespace$490.word0_gt.b_flag \cr15_namespace [31]
+connect \cr15_namespace$490.word1_location \cr15_namespace [63:32]
+connect \cr15_namespace$490.word2_w2 \cr15_namespace [95:64]
 connect \cr14_code.word0_gt \cr14_code [31:0]
 connect \cr14_code.word0_gt.slot_id \cr14_code [15:0]
 connect \cr14_code.word0_gt.gt_seq \cr14_code [24:16]
@@ -35922,15 +35870,15 @@ connect \cr14_code.word0_gt.perm \cr14_code [30:28]
 connect \cr14_code.word0_gt.b_flag \cr14_code [31]
 connect \cr14_code.word1_location \cr14_code [63:32]
 connect \cr14_code.word2_w2 \cr14_code [95:64]
-connect \cr14_code$493.word0_gt \cr14_code [31:0]
-connect \cr14_code$493.word0_gt.slot_id \cr14_code [15:0]
-connect \cr14_code$493.word0_gt.gt_seq \cr14_code [24:16]
-connect \cr14_code$493.word0_gt.gt_type \cr14_code [26:25]
-connect \cr14_code$493.word0_gt.dom \cr14_code [27]
-connect \cr14_code$493.word0_gt.perm \cr14_code [30:28]
-connect \cr14_code$493.word0_gt.b_flag \cr14_code [31]
-connect \cr14_code$493.word1_location \cr14_code [63:32]
-connect \cr14_code$493.word2_w2 \cr14_code [95:64]
+connect \cr14_code$492.word0_gt \cr14_code [31:0]
+connect \cr14_code$492.word0_gt.slot_id \cr14_code [15:0]
+connect \cr14_code$492.word0_gt.gt_seq \cr14_code [24:16]
+connect \cr14_code$492.word0_gt.gt_type \cr14_code [26:25]
+connect \cr14_code$492.word0_gt.dom \cr14_code [27]
+connect \cr14_code$492.word0_gt.perm \cr14_code [30:28]
+connect \cr14_code$492.word0_gt.b_flag \cr14_code [31]
+connect \cr14_code$492.word1_location \cr14_code [63:32]
+connect \cr14_code$492.word2_w2 \cr14_code [95:64]
 connect \cr5_heap.word0_gt \cr5_heap [31:0]
 connect \cr5_heap.word0_gt.slot_id \cr5_heap [15:0]
 connect \cr5_heap.word0_gt.gt_seq \cr5_heap [24:16]
@@ -35940,234 +35888,225 @@ connect \cr5_heap.word0_gt.perm \cr5_heap [30:28]
 connect \cr5_heap.word0_gt.b_flag \cr5_heap [31]
 connect \cr5_heap.word1_location \cr5_heap [63:32]
 connect \cr5_heap.word2_w2 \cr5_heap [95:64]
-connect \cr5_heap$499.word0_gt \cr5_heap [31:0]
-connect \cr5_heap$499.word0_gt.slot_id \cr5_heap [15:0]
-connect \cr5_heap$499.word0_gt.gt_seq \cr5_heap [24:16]
-connect \cr5_heap$499.word0_gt.gt_type \cr5_heap [26:25]
-connect \cr5_heap$499.word0_gt.dom \cr5_heap [27]
-connect \cr5_heap$499.word0_gt.perm \cr5_heap [30:28]
-connect \cr5_heap$499.word0_gt.b_flag \cr5_heap [31]
-connect \cr5_heap$499.word1_location \cr5_heap [63:32]
-connect \cr5_heap$499.word2_w2 \cr5_heap [95:64]
-connect \cr12_thread$501.word0_gt \cr12_thread [31:0]
-connect \cr12_thread$501.word0_gt.slot_id \cr12_thread [15:0]
-connect \cr12_thread$501.word0_gt.gt_seq \cr12_thread [24:16]
-connect \cr12_thread$501.word0_gt.gt_type \cr12_thread [26:25]
-connect \cr12_thread$501.word0_gt.dom \cr12_thread [27]
-connect \cr12_thread$501.word0_gt.perm \cr12_thread [30:28]
-connect \cr12_thread$501.word0_gt.b_flag \cr12_thread [31]
-connect \cr12_thread$501.word1_location \cr12_thread [63:32]
-connect \cr12_thread$501.word2_w2 \cr12_thread [95:64]
-connect \flags$506.N \flags [0]
-connect \flags$506.Z \flags [1]
-connect \flags$506.C \flags [2]
-connect \flags$506.V \flags [3]
-connect \cr_rd_data$514.word0_gt \cr_rd_data [31:0]
-connect \cr_rd_data$514.word0_gt.slot_id \cr_rd_data [15:0]
-connect \cr_rd_data$514.word0_gt.gt_seq \cr_rd_data [24:16]
-connect \cr_rd_data$514.word0_gt.gt_type \cr_rd_data [26:25]
-connect \cr_rd_data$514.word0_gt.dom \cr_rd_data [27]
-connect \cr_rd_data$514.word0_gt.perm \cr_rd_data [30:28]
-connect \cr_rd_data$514.word0_gt.b_flag \cr_rd_data [31]
-connect \cr_rd_data$514.word1_location \cr_rd_data [63:32]
-connect \cr_rd_data$514.word2_w2 \cr_rd_data [95:64]
-connect \cr5_heap$518.word0_gt \cr5_heap [31:0]
-connect \cr5_heap$518.word0_gt.slot_id \cr5_heap [15:0]
-connect \cr5_heap$518.word0_gt.gt_seq \cr5_heap [24:16]
-connect \cr5_heap$518.word0_gt.gt_type \cr5_heap [26:25]
-connect \cr5_heap$518.word0_gt.dom \cr5_heap [27]
-connect \cr5_heap$518.word0_gt.perm \cr5_heap [30:28]
-connect \cr5_heap$518.word0_gt.b_flag \cr5_heap [31]
-connect \cr5_heap$518.word1_location \cr5_heap [63:32]
-connect \cr5_heap$518.word2_w2 \cr5_heap [95:64]
-connect \cr12_thread$519.word0_gt \cr12_thread [31:0]
-connect \cr12_thread$519.word0_gt.slot_id \cr12_thread [15:0]
-connect \cr12_thread$519.word0_gt.gt_seq \cr12_thread [24:16]
-connect \cr12_thread$519.word0_gt.gt_type \cr12_thread [26:25]
-connect \cr12_thread$519.word0_gt.dom \cr12_thread [27]
-connect \cr12_thread$519.word0_gt.perm \cr12_thread [30:28]
-connect \cr12_thread$519.word0_gt.b_flag \cr12_thread [31]
-connect \cr12_thread$519.word1_location \cr12_thread [63:32]
-connect \cr12_thread$519.word2_w2 \cr12_thread [95:64]
-connect \cr15_namespace$526.word0_gt \cr15_namespace [31:0]
-connect \cr15_namespace$526.word0_gt.slot_id \cr15_namespace [15:0]
-connect \cr15_namespace$526.word0_gt.gt_seq \cr15_namespace [24:16]
-connect \cr15_namespace$526.word0_gt.gt_type \cr15_namespace [26:25]
-connect \cr15_namespace$526.word0_gt.dom \cr15_namespace [27]
-connect \cr15_namespace$526.word0_gt.perm \cr15_namespace [30:28]
-connect \cr15_namespace$526.word0_gt.b_flag \cr15_namespace [31]
-connect \cr15_namespace$526.word1_location \cr15_namespace [63:32]
-connect \cr15_namespace$526.word2_w2 \cr15_namespace [95:64]
-connect \cr_rd_data$531.word0_gt \cr_rd_data [31:0]
-connect \cr_rd_data$531.word0_gt.slot_id \cr_rd_data [15:0]
-connect \cr_rd_data$531.word0_gt.gt_seq \cr_rd_data [24:16]
-connect \cr_rd_data$531.word0_gt.gt_type \cr_rd_data [26:25]
-connect \cr_rd_data$531.word0_gt.dom \cr_rd_data [27]
-connect \cr_rd_data$531.word0_gt.perm \cr_rd_data [30:28]
-connect \cr_rd_data$531.word0_gt.b_flag \cr_rd_data [31]
-connect \cr_rd_data$531.word1_location \cr_rd_data [63:32]
-connect \cr_rd_data$531.word2_w2 \cr_rd_data [95:64]
-connect \cr_rd_data$539.word0_gt \cr_rd_data [31:0]
-connect \cr_rd_data$539.word0_gt.slot_id \cr_rd_data [15:0]
-connect \cr_rd_data$539.word0_gt.gt_seq \cr_rd_data [24:16]
-connect \cr_rd_data$539.word0_gt.gt_type \cr_rd_data [26:25]
-connect \cr_rd_data$539.word0_gt.dom \cr_rd_data [27]
-connect \cr_rd_data$539.word0_gt.perm \cr_rd_data [30:28]
-connect \cr_rd_data$539.word0_gt.b_flag \cr_rd_data [31]
-connect \cr_rd_data$539.word1_location \cr_rd_data [63:32]
-connect \cr_rd_data$539.word2_w2 \cr_rd_data [95:64]
-connect \cr_rd_data$548.word0_gt \cr_rd_data [31:0]
-connect \cr_rd_data$548.word0_gt.slot_id \cr_rd_data [15:0]
-connect \cr_rd_data$548.word0_gt.gt_seq \cr_rd_data [24:16]
-connect \cr_rd_data$548.word0_gt.gt_type \cr_rd_data [26:25]
-connect \cr_rd_data$548.word0_gt.dom \cr_rd_data [27]
-connect \cr_rd_data$548.word0_gt.perm \cr_rd_data [30:28]
-connect \cr_rd_data$548.word0_gt.b_flag \cr_rd_data [31]
-connect \cr_rd_data$548.word1_location \cr_rd_data [63:32]
-connect \cr_rd_data$548.word2_w2 \cr_rd_data [95:64]
-connect \cr15_namespace$549.word0_gt \cr15_namespace [31:0]
-connect \cr15_namespace$549.word0_gt.slot_id \cr15_namespace [15:0]
-connect \cr15_namespace$549.word0_gt.gt_seq \cr15_namespace [24:16]
-connect \cr15_namespace$549.word0_gt.gt_type \cr15_namespace [26:25]
-connect \cr15_namespace$549.word0_gt.dom \cr15_namespace [27]
-connect \cr15_namespace$549.word0_gt.perm \cr15_namespace [30:28]
-connect \cr15_namespace$549.word0_gt.b_flag \cr15_namespace [31]
-connect \cr15_namespace$549.word1_location \cr15_namespace [63:32]
-connect \cr15_namespace$549.word2_w2 \cr15_namespace [95:64]
-connect \cr_rd_data$560.word0_gt \cr_rd_data [31:0]
-connect \cr_rd_data$560.word0_gt.slot_id \cr_rd_data [15:0]
-connect \cr_rd_data$560.word0_gt.gt_seq \cr_rd_data [24:16]
-connect \cr_rd_data$560.word0_gt.gt_type \cr_rd_data [26:25]
-connect \cr_rd_data$560.word0_gt.dom \cr_rd_data [27]
-connect \cr_rd_data$560.word0_gt.perm \cr_rd_data [30:28]
-connect \cr_rd_data$560.word0_gt.b_flag \cr_rd_data [31]
-connect \cr_rd_data$560.word1_location \cr_rd_data [63:32]
-connect \cr_rd_data$560.word2_w2 \cr_rd_data [95:64]
-connect \cr_rd_data$573.word0_gt \cr_rd_data [31:0]
-connect \cr_rd_data$573.word0_gt.slot_id \cr_rd_data [15:0]
-connect \cr_rd_data$573.word0_gt.gt_seq \cr_rd_data [24:16]
-connect \cr_rd_data$573.word0_gt.gt_type \cr_rd_data [26:25]
-connect \cr_rd_data$573.word0_gt.dom \cr_rd_data [27]
-connect \cr_rd_data$573.word0_gt.perm \cr_rd_data [30:28]
-connect \cr_rd_data$573.word0_gt.b_flag \cr_rd_data [31]
-connect \cr_rd_data$573.word1_location \cr_rd_data [63:32]
-connect \cr_rd_data$573.word2_w2 \cr_rd_data [95:64]
-connect \cr_rd_data$630.word0_gt \cr_rd_data [31:0]
-connect \cr_rd_data$630.word0_gt.slot_id \cr_rd_data [15:0]
-connect \cr_rd_data$630.word0_gt.gt_seq \cr_rd_data [24:16]
-connect \cr_rd_data$630.word0_gt.gt_type \cr_rd_data [26:25]
-connect \cr_rd_data$630.word0_gt.dom \cr_rd_data [27]
-connect \cr_rd_data$630.word0_gt.perm \cr_rd_data [30:28]
-connect \cr_rd_data$630.word0_gt.b_flag \cr_rd_data [31]
-connect \cr_rd_data$630.word1_location \cr_rd_data [63:32]
-connect \cr_rd_data$630.word2_w2 \cr_rd_data [95:64]
-connect \cr12_thread$631.word0_gt \cr12_thread [31:0]
-connect \cr12_thread$631.word0_gt.slot_id \cr12_thread [15:0]
-connect \cr12_thread$631.word0_gt.gt_seq \cr12_thread [24:16]
-connect \cr12_thread$631.word0_gt.gt_type \cr12_thread [26:25]
-connect \cr12_thread$631.word0_gt.dom \cr12_thread [27]
-connect \cr12_thread$631.word0_gt.perm \cr12_thread [30:28]
-connect \cr12_thread$631.word0_gt.b_flag \cr12_thread [31]
-connect \cr12_thread$631.word1_location \cr12_thread [63:32]
-connect \cr12_thread$631.word2_w2 \cr12_thread [95:64]
-connect \cr15_namespace$632.word0_gt \cr15_namespace [31:0]
-connect \cr15_namespace$632.word0_gt.slot_id \cr15_namespace [15:0]
-connect \cr15_namespace$632.word0_gt.gt_seq \cr15_namespace [24:16]
-connect \cr15_namespace$632.word0_gt.gt_type \cr15_namespace [26:25]
-connect \cr15_namespace$632.word0_gt.dom \cr15_namespace [27]
-connect \cr15_namespace$632.word0_gt.perm \cr15_namespace [30:28]
-connect \cr15_namespace$632.word0_gt.b_flag \cr15_namespace [31]
-connect \cr15_namespace$632.word1_location \cr15_namespace [63:32]
-connect \cr15_namespace$632.word2_w2 \cr15_namespace [95:64]
-connect \flags_in$638.N \flags [0]
-connect \flags_in$638.Z \flags [1]
-connect \flags_in$638.C \flags [2]
-connect \flags_in$638.V \flags [3]
-connect \cr_rd_data$652.word0_gt \cr_rd_data [31:0]
-connect \cr_rd_data$652.word0_gt.slot_id \cr_rd_data [15:0]
-connect \cr_rd_data$652.word0_gt.gt_seq \cr_rd_data [24:16]
-connect \cr_rd_data$652.word0_gt.gt_type \cr_rd_data [26:25]
-connect \cr_rd_data$652.word0_gt.dom \cr_rd_data [27]
-connect \cr_rd_data$652.word0_gt.perm \cr_rd_data [30:28]
-connect \cr_rd_data$652.word0_gt.b_flag \cr_rd_data [31]
-connect \cr_rd_data$652.word1_location \cr_rd_data [63:32]
-connect \cr_rd_data$652.word2_w2 \cr_rd_data [95:64]
-connect \cr15_namespace$653.word0_gt \cr15_namespace [31:0]
-connect \cr15_namespace$653.word0_gt.slot_id \cr15_namespace [15:0]
-connect \cr15_namespace$653.word0_gt.gt_seq \cr15_namespace [24:16]
-connect \cr15_namespace$653.word0_gt.gt_type \cr15_namespace [26:25]
-connect \cr15_namespace$653.word0_gt.dom \cr15_namespace [27]
-connect \cr15_namespace$653.word0_gt.perm \cr15_namespace [30:28]
-connect \cr15_namespace$653.word0_gt.b_flag \cr15_namespace [31]
-connect \cr15_namespace$653.word1_location \cr15_namespace [63:32]
-connect \cr15_namespace$653.word2_w2 \cr15_namespace [95:64]
-connect \cr_rd_data$665.word0_gt \cr_rd_data [31:0]
-connect \cr_rd_data$665.word0_gt.slot_id \cr_rd_data [15:0]
-connect \cr_rd_data$665.word0_gt.gt_seq \cr_rd_data [24:16]
-connect \cr_rd_data$665.word0_gt.gt_type \cr_rd_data [26:25]
-connect \cr_rd_data$665.word0_gt.dom \cr_rd_data [27]
-connect \cr_rd_data$665.word0_gt.perm \cr_rd_data [30:28]
-connect \cr_rd_data$665.word0_gt.b_flag \cr_rd_data [31]
-connect \cr_rd_data$665.word1_location \cr_rd_data [63:32]
-connect \cr_rd_data$665.word2_w2 \cr_rd_data [95:64]
-connect \cr15_namespace$666.word0_gt \cr15_namespace [31:0]
-connect \cr15_namespace$666.word0_gt.slot_id \cr15_namespace [15:0]
-connect \cr15_namespace$666.word0_gt.gt_seq \cr15_namespace [24:16]
-connect \cr15_namespace$666.word0_gt.gt_type \cr15_namespace [26:25]
-connect \cr15_namespace$666.word0_gt.dom \cr15_namespace [27]
-connect \cr15_namespace$666.word0_gt.perm \cr15_namespace [30:28]
-connect \cr15_namespace$666.word0_gt.b_flag \cr15_namespace [31]
-connect \cr15_namespace$666.word1_location \cr15_namespace [63:32]
-connect \cr15_namespace$666.word2_w2 \cr15_namespace [95:64]
-connect \cr5_heap$669.word0_gt \cr5_heap [31:0]
-connect \cr5_heap$669.word0_gt.slot_id \cr5_heap [15:0]
-connect \cr5_heap$669.word0_gt.gt_seq \cr5_heap [24:16]
-connect \cr5_heap$669.word0_gt.gt_type \cr5_heap [26:25]
-connect \cr5_heap$669.word0_gt.dom \cr5_heap [27]
-connect \cr5_heap$669.word0_gt.perm \cr5_heap [30:28]
-connect \cr5_heap$669.word0_gt.b_flag \cr5_heap [31]
-connect \cr5_heap$669.word1_location \cr5_heap [63:32]
-connect \cr5_heap$669.word2_w2 \cr5_heap [95:64]
-connect \cr12_thread$672.word0_gt \cr12_thread [31:0]
-connect \cr12_thread$672.word0_gt.slot_id \cr12_thread [15:0]
-connect \cr12_thread$672.word0_gt.gt_seq \cr12_thread [24:16]
-connect \cr12_thread$672.word0_gt.gt_type \cr12_thread [26:25]
-connect \cr12_thread$672.word0_gt.dom \cr12_thread [27]
-connect \cr12_thread$672.word0_gt.perm \cr12_thread [30:28]
-connect \cr12_thread$672.word0_gt.b_flag \cr12_thread [31]
-connect \cr12_thread$672.word1_location \cr12_thread [63:32]
-connect \cr12_thread$672.word2_w2 \cr12_thread [95:64]
-connect \flags$673.N \flags [0]
-connect \flags$673.Z \flags [1]
-connect \flags$673.C \flags [2]
-connect \flags$673.V \flags [3]
-connect \cr_rd_data$679.word0_gt \cr_rd_data [31:0]
-connect \cr_rd_data$679.word0_gt.slot_id \cr_rd_data [15:0]
-connect \cr_rd_data$679.word0_gt.gt_seq \cr_rd_data [24:16]
-connect \cr_rd_data$679.word0_gt.gt_type \cr_rd_data [26:25]
-connect \cr_rd_data$679.word0_gt.dom \cr_rd_data [27]
-connect \cr_rd_data$679.word0_gt.perm \cr_rd_data [30:28]
-connect \cr_rd_data$679.word0_gt.b_flag \cr_rd_data [31]
-connect \cr_rd_data$679.word1_location \cr_rd_data [63:32]
-connect \cr_rd_data$679.word2_w2 \cr_rd_data [95:64]
-connect \cr15_namespace$680.word0_gt \cr15_namespace [31:0]
-connect \cr15_namespace$680.word0_gt.slot_id \cr15_namespace [15:0]
-connect \cr15_namespace$680.word0_gt.gt_seq \cr15_namespace [24:16]
-connect \cr15_namespace$680.word0_gt.gt_type \cr15_namespace [26:25]
-connect \cr15_namespace$680.word0_gt.dom \cr15_namespace [27]
-connect \cr15_namespace$680.word0_gt.perm \cr15_namespace [30:28]
-connect \cr15_namespace$680.word0_gt.b_flag \cr15_namespace [31]
-connect \cr15_namespace$680.word1_location \cr15_namespace [63:32]
-connect \cr15_namespace$680.word2_w2 \cr15_namespace [95:64]
-connect \cr15_namespace$703.word0_gt \cr15_namespace [31:0]
-connect \cr15_namespace$703.word0_gt.slot_id \cr15_namespace [15:0]
-connect \cr15_namespace$703.word0_gt.gt_seq \cr15_namespace [24:16]
-connect \cr15_namespace$703.word0_gt.gt_type \cr15_namespace [26:25]
-connect \cr15_namespace$703.word0_gt.dom \cr15_namespace [27]
-connect \cr15_namespace$703.word0_gt.perm \cr15_namespace [30:28]
-connect \cr15_namespace$703.word0_gt.b_flag \cr15_namespace [31]
-connect \cr15_namespace$703.word1_location \cr15_namespace [63:32]
-connect \cr15_namespace$703.word2_w2 \cr15_namespace [95:64]
+connect \cr5_heap$498.word0_gt \cr5_heap [31:0]
+connect \cr5_heap$498.word0_gt.slot_id \cr5_heap [15:0]
+connect \cr5_heap$498.word0_gt.gt_seq \cr5_heap [24:16]
+connect \cr5_heap$498.word0_gt.gt_type \cr5_heap [26:25]
+connect \cr5_heap$498.word0_gt.dom \cr5_heap [27]
+connect \cr5_heap$498.word0_gt.perm \cr5_heap [30:28]
+connect \cr5_heap$498.word0_gt.b_flag \cr5_heap [31]
+connect \cr5_heap$498.word1_location \cr5_heap [63:32]
+connect \cr5_heap$498.word2_w2 \cr5_heap [95:64]
+connect \cr12_thread$500.word0_gt \cr12_thread [31:0]
+connect \cr12_thread$500.word0_gt.slot_id \cr12_thread [15:0]
+connect \cr12_thread$500.word0_gt.gt_seq \cr12_thread [24:16]
+connect \cr12_thread$500.word0_gt.gt_type \cr12_thread [26:25]
+connect \cr12_thread$500.word0_gt.dom \cr12_thread [27]
+connect \cr12_thread$500.word0_gt.perm \cr12_thread [30:28]
+connect \cr12_thread$500.word0_gt.b_flag \cr12_thread [31]
+connect \cr12_thread$500.word1_location \cr12_thread [63:32]
+connect \cr12_thread$500.word2_w2 \cr12_thread [95:64]
+connect \flags$505.N \flags [0]
+connect \flags$505.Z \flags [1]
+connect \flags$505.C \flags [2]
+connect \flags$505.V \flags [3]
+connect \cr5_heap$515.word0_gt \cr5_heap [31:0]
+connect \cr5_heap$515.word0_gt.slot_id \cr5_heap [15:0]
+connect \cr5_heap$515.word0_gt.gt_seq \cr5_heap [24:16]
+connect \cr5_heap$515.word0_gt.gt_type \cr5_heap [26:25]
+connect \cr5_heap$515.word0_gt.dom \cr5_heap [27]
+connect \cr5_heap$515.word0_gt.perm \cr5_heap [30:28]
+connect \cr5_heap$515.word0_gt.b_flag \cr5_heap [31]
+connect \cr5_heap$515.word1_location \cr5_heap [63:32]
+connect \cr5_heap$515.word2_w2 \cr5_heap [95:64]
+connect \cr12_thread$516.word0_gt \cr12_thread [31:0]
+connect \cr12_thread$516.word0_gt.slot_id \cr12_thread [15:0]
+connect \cr12_thread$516.word0_gt.gt_seq \cr12_thread [24:16]
+connect \cr12_thread$516.word0_gt.gt_type \cr12_thread [26:25]
+connect \cr12_thread$516.word0_gt.dom \cr12_thread [27]
+connect \cr12_thread$516.word0_gt.perm \cr12_thread [30:28]
+connect \cr12_thread$516.word0_gt.b_flag \cr12_thread [31]
+connect \cr12_thread$516.word1_location \cr12_thread [63:32]
+connect \cr12_thread$516.word2_w2 \cr12_thread [95:64]
+connect \cr15_namespace$523.word0_gt \cr15_namespace [31:0]
+connect \cr15_namespace$523.word0_gt.slot_id \cr15_namespace [15:0]
+connect \cr15_namespace$523.word0_gt.gt_seq \cr15_namespace [24:16]
+connect \cr15_namespace$523.word0_gt.gt_type \cr15_namespace [26:25]
+connect \cr15_namespace$523.word0_gt.dom \cr15_namespace [27]
+connect \cr15_namespace$523.word0_gt.perm \cr15_namespace [30:28]
+connect \cr15_namespace$523.word0_gt.b_flag \cr15_namespace [31]
+connect \cr15_namespace$523.word1_location \cr15_namespace [63:32]
+connect \cr15_namespace$523.word2_w2 \cr15_namespace [95:64]
+connect \cr_rd_data$528.word0_gt \cr_rd_data [31:0]
+connect \cr_rd_data$528.word0_gt.slot_id \cr_rd_data [15:0]
+connect \cr_rd_data$528.word0_gt.gt_seq \cr_rd_data [24:16]
+connect \cr_rd_data$528.word0_gt.gt_type \cr_rd_data [26:25]
+connect \cr_rd_data$528.word0_gt.dom \cr_rd_data [27]
+connect \cr_rd_data$528.word0_gt.perm \cr_rd_data [30:28]
+connect \cr_rd_data$528.word0_gt.b_flag \cr_rd_data [31]
+connect \cr_rd_data$528.word1_location \cr_rd_data [63:32]
+connect \cr_rd_data$528.word2_w2 \cr_rd_data [95:64]
+connect \cr_rd_data$536.word0_gt \cr_rd_data [31:0]
+connect \cr_rd_data$536.word0_gt.slot_id \cr_rd_data [15:0]
+connect \cr_rd_data$536.word0_gt.gt_seq \cr_rd_data [24:16]
+connect \cr_rd_data$536.word0_gt.gt_type \cr_rd_data [26:25]
+connect \cr_rd_data$536.word0_gt.dom \cr_rd_data [27]
+connect \cr_rd_data$536.word0_gt.perm \cr_rd_data [30:28]
+connect \cr_rd_data$536.word0_gt.b_flag \cr_rd_data [31]
+connect \cr_rd_data$536.word1_location \cr_rd_data [63:32]
+connect \cr_rd_data$536.word2_w2 \cr_rd_data [95:64]
+connect \cr_rd_data$545.word0_gt \cr_rd_data [31:0]
+connect \cr_rd_data$545.word0_gt.slot_id \cr_rd_data [15:0]
+connect \cr_rd_data$545.word0_gt.gt_seq \cr_rd_data [24:16]
+connect \cr_rd_data$545.word0_gt.gt_type \cr_rd_data [26:25]
+connect \cr_rd_data$545.word0_gt.dom \cr_rd_data [27]
+connect \cr_rd_data$545.word0_gt.perm \cr_rd_data [30:28]
+connect \cr_rd_data$545.word0_gt.b_flag \cr_rd_data [31]
+connect \cr_rd_data$545.word1_location \cr_rd_data [63:32]
+connect \cr_rd_data$545.word2_w2 \cr_rd_data [95:64]
+connect \cr15_namespace$546.word0_gt \cr15_namespace [31:0]
+connect \cr15_namespace$546.word0_gt.slot_id \cr15_namespace [15:0]
+connect \cr15_namespace$546.word0_gt.gt_seq \cr15_namespace [24:16]
+connect \cr15_namespace$546.word0_gt.gt_type \cr15_namespace [26:25]
+connect \cr15_namespace$546.word0_gt.dom \cr15_namespace [27]
+connect \cr15_namespace$546.word0_gt.perm \cr15_namespace [30:28]
+connect \cr15_namespace$546.word0_gt.b_flag \cr15_namespace [31]
+connect \cr15_namespace$546.word1_location \cr15_namespace [63:32]
+connect \cr15_namespace$546.word2_w2 \cr15_namespace [95:64]
+connect \cr_rd_data$557.word0_gt \cr_rd_data [31:0]
+connect \cr_rd_data$557.word0_gt.slot_id \cr_rd_data [15:0]
+connect \cr_rd_data$557.word0_gt.gt_seq \cr_rd_data [24:16]
+connect \cr_rd_data$557.word0_gt.gt_type \cr_rd_data [26:25]
+connect \cr_rd_data$557.word0_gt.dom \cr_rd_data [27]
+connect \cr_rd_data$557.word0_gt.perm \cr_rd_data [30:28]
+connect \cr_rd_data$557.word0_gt.b_flag \cr_rd_data [31]
+connect \cr_rd_data$557.word1_location \cr_rd_data [63:32]
+connect \cr_rd_data$557.word2_w2 \cr_rd_data [95:64]
+connect \cr_rd_data$570.word0_gt \cr_rd_data [31:0]
+connect \cr_rd_data$570.word0_gt.slot_id \cr_rd_data [15:0]
+connect \cr_rd_data$570.word0_gt.gt_seq \cr_rd_data [24:16]
+connect \cr_rd_data$570.word0_gt.gt_type \cr_rd_data [26:25]
+connect \cr_rd_data$570.word0_gt.dom \cr_rd_data [27]
+connect \cr_rd_data$570.word0_gt.perm \cr_rd_data [30:28]
+connect \cr_rd_data$570.word0_gt.b_flag \cr_rd_data [31]
+connect \cr_rd_data$570.word1_location \cr_rd_data [63:32]
+connect \cr_rd_data$570.word2_w2 \cr_rd_data [95:64]
+connect \cr_rd_data$627.word0_gt \cr_rd_data [31:0]
+connect \cr_rd_data$627.word0_gt.slot_id \cr_rd_data [15:0]
+connect \cr_rd_data$627.word0_gt.gt_seq \cr_rd_data [24:16]
+connect \cr_rd_data$627.word0_gt.gt_type \cr_rd_data [26:25]
+connect \cr_rd_data$627.word0_gt.dom \cr_rd_data [27]
+connect \cr_rd_data$627.word0_gt.perm \cr_rd_data [30:28]
+connect \cr_rd_data$627.word0_gt.b_flag \cr_rd_data [31]
+connect \cr_rd_data$627.word1_location \cr_rd_data [63:32]
+connect \cr_rd_data$627.word2_w2 \cr_rd_data [95:64]
+connect \cr12_thread$628.word0_gt \cr12_thread [31:0]
+connect \cr12_thread$628.word0_gt.slot_id \cr12_thread [15:0]
+connect \cr12_thread$628.word0_gt.gt_seq \cr12_thread [24:16]
+connect \cr12_thread$628.word0_gt.gt_type \cr12_thread [26:25]
+connect \cr12_thread$628.word0_gt.dom \cr12_thread [27]
+connect \cr12_thread$628.word0_gt.perm \cr12_thread [30:28]
+connect \cr12_thread$628.word0_gt.b_flag \cr12_thread [31]
+connect \cr12_thread$628.word1_location \cr12_thread [63:32]
+connect \cr12_thread$628.word2_w2 \cr12_thread [95:64]
+connect \cr15_namespace$629.word0_gt \cr15_namespace [31:0]
+connect \cr15_namespace$629.word0_gt.slot_id \cr15_namespace [15:0]
+connect \cr15_namespace$629.word0_gt.gt_seq \cr15_namespace [24:16]
+connect \cr15_namespace$629.word0_gt.gt_type \cr15_namespace [26:25]
+connect \cr15_namespace$629.word0_gt.dom \cr15_namespace [27]
+connect \cr15_namespace$629.word0_gt.perm \cr15_namespace [30:28]
+connect \cr15_namespace$629.word0_gt.b_flag \cr15_namespace [31]
+connect \cr15_namespace$629.word1_location \cr15_namespace [63:32]
+connect \cr15_namespace$629.word2_w2 \cr15_namespace [95:64]
+connect \flags_in$635.N \flags [0]
+connect \flags_in$635.Z \flags [1]
+connect \flags_in$635.C \flags [2]
+connect \flags_in$635.V \flags [3]
+connect \cr_rd_data$649.word0_gt \cr_rd_data [31:0]
+connect \cr_rd_data$649.word0_gt.slot_id \cr_rd_data [15:0]
+connect \cr_rd_data$649.word0_gt.gt_seq \cr_rd_data [24:16]
+connect \cr_rd_data$649.word0_gt.gt_type \cr_rd_data [26:25]
+connect \cr_rd_data$649.word0_gt.dom \cr_rd_data [27]
+connect \cr_rd_data$649.word0_gt.perm \cr_rd_data [30:28]
+connect \cr_rd_data$649.word0_gt.b_flag \cr_rd_data [31]
+connect \cr_rd_data$649.word1_location \cr_rd_data [63:32]
+connect \cr_rd_data$649.word2_w2 \cr_rd_data [95:64]
+connect \cr15_namespace$650.word0_gt \cr15_namespace [31:0]
+connect \cr15_namespace$650.word0_gt.slot_id \cr15_namespace [15:0]
+connect \cr15_namespace$650.word0_gt.gt_seq \cr15_namespace [24:16]
+connect \cr15_namespace$650.word0_gt.gt_type \cr15_namespace [26:25]
+connect \cr15_namespace$650.word0_gt.dom \cr15_namespace [27]
+connect \cr15_namespace$650.word0_gt.perm \cr15_namespace [30:28]
+connect \cr15_namespace$650.word0_gt.b_flag \cr15_namespace [31]
+connect \cr15_namespace$650.word1_location \cr15_namespace [63:32]
+connect \cr15_namespace$650.word2_w2 \cr15_namespace [95:64]
+connect \cr_rd_data$662.word0_gt \cr_rd_data [31:0]
+connect \cr_rd_data$662.word0_gt.slot_id \cr_rd_data [15:0]
+connect \cr_rd_data$662.word0_gt.gt_seq \cr_rd_data [24:16]
+connect \cr_rd_data$662.word0_gt.gt_type \cr_rd_data [26:25]
+connect \cr_rd_data$662.word0_gt.dom \cr_rd_data [27]
+connect \cr_rd_data$662.word0_gt.perm \cr_rd_data [30:28]
+connect \cr_rd_data$662.word0_gt.b_flag \cr_rd_data [31]
+connect \cr_rd_data$662.word1_location \cr_rd_data [63:32]
+connect \cr_rd_data$662.word2_w2 \cr_rd_data [95:64]
+connect \cr15_namespace$663.word0_gt \cr15_namespace [31:0]
+connect \cr15_namespace$663.word0_gt.slot_id \cr15_namespace [15:0]
+connect \cr15_namespace$663.word0_gt.gt_seq \cr15_namespace [24:16]
+connect \cr15_namespace$663.word0_gt.gt_type \cr15_namespace [26:25]
+connect \cr15_namespace$663.word0_gt.dom \cr15_namespace [27]
+connect \cr15_namespace$663.word0_gt.perm \cr15_namespace [30:28]
+connect \cr15_namespace$663.word0_gt.b_flag \cr15_namespace [31]
+connect \cr15_namespace$663.word1_location \cr15_namespace [63:32]
+connect \cr15_namespace$663.word2_w2 \cr15_namespace [95:64]
+connect \cr5_heap$666.word0_gt \cr5_heap [31:0]
+connect \cr5_heap$666.word0_gt.slot_id \cr5_heap [15:0]
+connect \cr5_heap$666.word0_gt.gt_seq \cr5_heap [24:16]
+connect \cr5_heap$666.word0_gt.gt_type \cr5_heap [26:25]
+connect \cr5_heap$666.word0_gt.dom \cr5_heap [27]
+connect \cr5_heap$666.word0_gt.perm \cr5_heap [30:28]
+connect \cr5_heap$666.word0_gt.b_flag \cr5_heap [31]
+connect \cr5_heap$666.word1_location \cr5_heap [63:32]
+connect \cr5_heap$666.word2_w2 \cr5_heap [95:64]
+connect \cr12_thread$669.word0_gt \cr12_thread [31:0]
+connect \cr12_thread$669.word0_gt.slot_id \cr12_thread [15:0]
+connect \cr12_thread$669.word0_gt.gt_seq \cr12_thread [24:16]
+connect \cr12_thread$669.word0_gt.gt_type \cr12_thread [26:25]
+connect \cr12_thread$669.word0_gt.dom \cr12_thread [27]
+connect \cr12_thread$669.word0_gt.perm \cr12_thread [30:28]
+connect \cr12_thread$669.word0_gt.b_flag \cr12_thread [31]
+connect \cr12_thread$669.word1_location \cr12_thread [63:32]
+connect \cr12_thread$669.word2_w2 \cr12_thread [95:64]
+connect \flags$670.N \flags [0]
+connect \flags$670.Z \flags [1]
+connect \flags$670.C \flags [2]
+connect \flags$670.V \flags [3]
+connect \cr_rd_data$676.word0_gt \cr_rd_data [31:0]
+connect \cr_rd_data$676.word0_gt.slot_id \cr_rd_data [15:0]
+connect \cr_rd_data$676.word0_gt.gt_seq \cr_rd_data [24:16]
+connect \cr_rd_data$676.word0_gt.gt_type \cr_rd_data [26:25]
+connect \cr_rd_data$676.word0_gt.dom \cr_rd_data [27]
+connect \cr_rd_data$676.word0_gt.perm \cr_rd_data [30:28]
+connect \cr_rd_data$676.word0_gt.b_flag \cr_rd_data [31]
+connect \cr_rd_data$676.word1_location \cr_rd_data [63:32]
+connect \cr_rd_data$676.word2_w2 \cr_rd_data [95:64]
+connect \cr15_namespace$677.word0_gt \cr15_namespace [31:0]
+connect \cr15_namespace$677.word0_gt.slot_id \cr15_namespace [15:0]
+connect \cr15_namespace$677.word0_gt.gt_seq \cr15_namespace [24:16]
+connect \cr15_namespace$677.word0_gt.gt_type \cr15_namespace [26:25]
+connect \cr15_namespace$677.word0_gt.dom \cr15_namespace [27]
+connect \cr15_namespace$677.word0_gt.perm \cr15_namespace [30:28]
+connect \cr15_namespace$677.word0_gt.b_flag \cr15_namespace [31]
+connect \cr15_namespace$677.word1_location \cr15_namespace [63:32]
+connect \cr15_namespace$677.word2_w2 \cr15_namespace [95:64]
+connect \cr15_namespace$700.word0_gt \cr15_namespace [31:0]
+connect \cr15_namespace$700.word0_gt.slot_id \cr15_namespace [15:0]
+connect \cr15_namespace$700.word0_gt.gt_seq \cr15_namespace [24:16]
+connect \cr15_namespace$700.word0_gt.gt_type \cr15_namespace [26:25]
+connect \cr15_namespace$700.word0_gt.dom \cr15_namespace [27]
+connect \cr15_namespace$700.word0_gt.perm \cr15_namespace [30:28]
+connect \cr15_namespace$700.word0_gt.b_flag \cr15_namespace [31]
+connect \cr15_namespace$700.word1_location \cr15_namespace [63:32]
+connect \cr15_namespace$700.word2_w2 \cr15_namespace [95:64]
 connect \retire_flags.N \flags [0]
 connect \retire_flags.Z \flags [1]
 connect \retire_flags.C \flags [2]
@@ -36181,24 +36120,24 @@ connect \cr6_clist.word0_gt.perm \cr6_clist [30:28]
 connect \cr6_clist.word0_gt.b_flag \cr6_clist [31]
 connect \cr6_clist.word1_location \cr6_clist [63:32]
 connect \cr6_clist.word2_w2 \cr6_clist [95:64]
-connect \cr_rd_data$885.word0_gt \cr_rd_data [31:0]
-connect \cr_rd_data$885.word0_gt.slot_id \cr_rd_data [15:0]
-connect \cr_rd_data$885.word0_gt.gt_seq \cr_rd_data [24:16]
-connect \cr_rd_data$885.word0_gt.gt_type \cr_rd_data [26:25]
-connect \cr_rd_data$885.word0_gt.dom \cr_rd_data [27]
-connect \cr_rd_data$885.word0_gt.perm \cr_rd_data [30:28]
-connect \cr_rd_data$885.word0_gt.b_flag \cr_rd_data [31]
-connect \cr_rd_data$885.word1_location \cr_rd_data [63:32]
-connect \cr_rd_data$885.word2_w2 \cr_rd_data [95:64]
-connect \cr15_namespace$886.word0_gt \cr15_namespace [31:0]
-connect \cr15_namespace$886.word0_gt.slot_id \cr15_namespace [15:0]
-connect \cr15_namespace$886.word0_gt.gt_seq \cr15_namespace [24:16]
-connect \cr15_namespace$886.word0_gt.gt_type \cr15_namespace [26:25]
-connect \cr15_namespace$886.word0_gt.dom \cr15_namespace [27]
-connect \cr15_namespace$886.word0_gt.perm \cr15_namespace [30:28]
-connect \cr15_namespace$886.word0_gt.b_flag \cr15_namespace [31]
-connect \cr15_namespace$886.word1_location \cr15_namespace [63:32]
-connect \cr15_namespace$886.word2_w2 \cr15_namespace [95:64]
+connect \cr_rd_data$882.word0_gt \cr_rd_data [31:0]
+connect \cr_rd_data$882.word0_gt.slot_id \cr_rd_data [15:0]
+connect \cr_rd_data$882.word0_gt.gt_seq \cr_rd_data [24:16]
+connect \cr_rd_data$882.word0_gt.gt_type \cr_rd_data [26:25]
+connect \cr_rd_data$882.word0_gt.dom \cr_rd_data [27]
+connect \cr_rd_data$882.word0_gt.perm \cr_rd_data [30:28]
+connect \cr_rd_data$882.word0_gt.b_flag \cr_rd_data [31]
+connect \cr_rd_data$882.word1_location \cr_rd_data [63:32]
+connect \cr_rd_data$882.word2_w2 \cr_rd_data [95:64]
+connect \cr15_namespace$883.word0_gt \cr15_namespace [31:0]
+connect \cr15_namespace$883.word0_gt.slot_id \cr15_namespace [15:0]
+connect \cr15_namespace$883.word0_gt.gt_seq \cr15_namespace [24:16]
+connect \cr15_namespace$883.word0_gt.gt_type \cr15_namespace [26:25]
+connect \cr15_namespace$883.word0_gt.dom \cr15_namespace [27]
+connect \cr15_namespace$883.word0_gt.perm \cr15_namespace [30:28]
+connect \cr15_namespace$883.word0_gt.b_flag \cr15_namespace [31]
+connect \cr15_namespace$883.word1_location \cr15_namespace [63:32]
+connect \cr15_namespace$883.word2_w2 \cr15_namespace [95:64]
 
 end
 
@@ -47908,105 +47847,95 @@ connect \cr6_latched.word2_w2 \cr6_latched [95:64]
 end
 
 attribute \generator "Amaranth"
-attribute \src "/home/runner/workspace/hardware/ret.py:69"
+attribute \src "/home/runner/workspace/hardware/ret.py:65"
 module \top.core.u_return
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:78"
-  wire width 1 \is_null_cap
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:73"
-  attribute \init 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-  wire width 96 \return_cap
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:83"
+  attribute \src "/home/runner/workspace/hardware/ret.py:71"
   wire width 1 \cr5_null
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:84"
+  attribute \src "/home/runner/workspace/hardware/ret.py:72"
   wire width 1 \cr5_has_r
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:85"
+  attribute \src "/home/runner/workspace/hardware/ret.py:73"
   wire width 1 \cr5_has_w
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:94"
+  attribute \src "/home/runner/workspace/hardware/ret.py:82"
   wire width 1 \cr12_null
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:99"
+  attribute \src "/home/runner/workspace/hardware/ret.py:87"
   wire width 32 \protected_sto_addr
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:98"
+  attribute \src "/home/runner/workspace/hardware/ret.py:86"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \thread_base_latched
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:112"
+  attribute \src "/home/runner/workspace/hardware/ret.py:100"
   wire width 1 \frame_sz
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:111"
+  attribute \src "/home/runner/workspace/hardware/ret.py:99"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \frame_word
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:113"
+  attribute \src "/home/runner/workspace/hardware/ret.py:101"
   wire width 15 \frame_ret_pc
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:114"
+  attribute \src "/home/runner/workspace/hardware/ret.py:102"
   wire width 16 \frame_prev_sto
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:121"
-  wire width 1 \local_cr_rd_en
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:126"
+  attribute \src "/home/runner/workspace/hardware/ret.py:109"
   wire width 32 \local_mem_rd_addr
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:127"
+  attribute \src "/home/runner/workspace/hardware/ret.py:110"
   wire width 1 \local_mem_rd_en
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:128"
+  attribute \src "/home/runner/workspace/hardware/ret.py:111"
   wire width 32 \local_mem_wr_addr
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:129"
+  attribute \src "/home/runner/workspace/hardware/ret.py:112"
   wire width 32 \local_mem_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:130"
+  attribute \src "/home/runner/workspace/hardware/ret.py:113"
   wire width 1 \local_mem_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:35"
+  attribute \src "/home/runner/workspace/hardware/ret.py:31"
   wire width 1 \mload_start
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:36"
+  attribute \src "/home/runner/workspace/hardware/ret.py:32"
   wire width 4 \mload_cr_src
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:37"
+  attribute \src "/home/runner/workspace/hardware/ret.py:33"
   wire width 4 \mload_cr_dst
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:38"
+  attribute \src "/home/runner/workspace/hardware/ret.py:34"
   wire width 16 \mload_index
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:39"
+  attribute \src "/home/runner/workspace/hardware/ret.py:35"
   wire width 1 \mload_direct
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:40"
+  attribute \src "/home/runner/workspace/hardware/ret.py:36"
   wire width 32 \mload_direct_gt
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:41"
+  attribute \src "/home/runner/workspace/hardware/ret.py:37"
   wire width 1 \mload_m_elevated
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:24"
+  attribute \src "/home/runner/workspace/hardware/ret.py:20"
   wire width 4 \cr_wr_addr
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
   wire width 96 \cr_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:26"
+  attribute \src "/home/runner/workspace/hardware/ret.py:22"
   wire width 1 \cr_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:105"
+  attribute \src "/home/runner/workspace/hardware/ret.py:93"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \callee_egt_latched
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:106"
+  attribute \src "/home/runner/workspace/hardware/ret.py:94"
   attribute \init 15'000000000000000
   wire width 15 \return_pc_latched
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:109"
+  attribute \src "/home/runner/workspace/hardware/ret.py:97"
   attribute \init 4'0000
   wire width 4 \prev_flags_latched
 
@@ -48014,139 +47943,130 @@ module \top.core.u_return
   attribute \init 4'0000
   wire width 4 \ret_state
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:104"
+  attribute \src "/home/runner/workspace/hardware/ret.py:92"
   attribute \init 12'000000000000
   wire width 12 \sto_latched
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:103"
+  attribute \src "/home/runner/workspace/hardware/ret.py:91"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \sto_indicator
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:107"
+  attribute \src "/home/runner/workspace/hardware/ret.py:95"
   attribute \init 12'000000000000
   wire width 12 \prev_sto_latched
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:108"
+  attribute \src "/home/runner/workspace/hardware/ret.py:96"
   attribute \init 1'0
   wire width 1 \prev_sz_latched
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:165"
+  attribute \src "/home/runner/workspace/hardware/ret.py:148"
   attribute \init 1'0
   wire width 1 \fault_flag
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:166"
+  attribute \src "/home/runner/workspace/hardware/ret.py:149"
   attribute \init 5'00000
   wire width 5 \fault_latched
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:163"
+  attribute \src "/home/runner/workspace/hardware/ret.py:146"
   attribute \init 1'0
   wire width 1 \sub_done_latched
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:164"
+  attribute \src "/home/runner/workspace/hardware/ret.py:147"
   attribute \init 1'0
   wire width 1 \sub_fault_latched
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:170"
+  attribute \src "/home/runner/workspace/hardware/ret.py:153"
   attribute \init 1'0
   wire width 1 \rd_armed
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:97"
+  attribute \src "/home/runner/workspace/hardware/ret.py:85"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \heap_base_latched
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:508"
   wire width 1 input 0  \clk
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:15"
-  wire width 3 input 1  \cr_src
+  attribute \src "/home/runner/workspace/hardware/ret.py:53"
+  wire width 32 input 1  \mem_rd_data
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:57"
-  wire width 32 input 2  \mem_rd_data
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:58"
-  wire width 1 input 3  \mem_rd_valid
+  attribute \src "/home/runner/workspace/hardware/ret.py:54"
+  wire width 1 input 2  \mem_rd_valid
 
   attribute \src "/home/runner/workspace/hardware/core.py:278"
-  wire width 1 input 4  \clear_all
+  wire width 1 input 3  \clear_all
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:14"
-  wire width 1 input 5  \return_start
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 96 input 6  \cr_rd_data
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:22"
-  wire width 4 output 7  \cr_rd_addr
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:33"
-  wire width 1 output 8  \boot_rom_return
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:16"
-  wire width 1 output 9  \busy
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:17"
-  wire width 1 output 10  \complete
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:20"
-  wire width 1 output 11  \reboot_request
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:47"
-  wire width 1 input 12  \lambda_active
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:48"
-  wire width 32 input 13  \lambda_pc
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:53"
-  wire width 32 input 14  \thread_base
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
-  wire width 96 input 15  \cr5_heap
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
-  wire width 96 input 16  \cr12_thread
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:65"
-  wire width 1 output 17  \flags_restore_en
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:28"
-  wire width 1 output 18  \nia_set
+  attribute \src "/home/runner/workspace/hardware/ret.py:13"
+  wire width 1 input 4  \return_start
 
   attribute \src "/home/runner/workspace/hardware/ret.py:29"
-  wire width 32 output 19  \nia_value
+  wire width 1 output 5  \boot_rom_return
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:14"
+  wire width 1 output 6  \busy
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:15"
+  wire width 1 output 7  \complete
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:18"
+  wire width 1 output 8  \reboot_request
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:43"
+  wire width 1 input 9  \lambda_active
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:44"
+  wire width 32 input 10  \lambda_pc
 
   attribute \src "/home/runner/workspace/hardware/ret.py:49"
-  wire width 1 output 20  \lambda_clear
+  wire width 32 input 11  \thread_base
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:126"
-  wire width 32 output 21  \mem_rd_addr
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
+  wire width 96 input 12  \cr5_heap
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:127"
-  wire width 1 output 22  \mem_rd_en
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
+  wire width 96 input 13  \cr12_thread
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:128"
-  wire width 32 output 23  \mem_wr_addr
+  attribute \src "/home/runner/workspace/hardware/ret.py:61"
+  wire width 1 output 14  \flags_restore_en
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:129"
-  wire width 32 output 24  \mem_wr_data
+  attribute \src "/home/runner/workspace/hardware/ret.py:24"
+  wire width 1 output 15  \nia_set
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:130"
-  wire width 1 output 25  \mem_wr_en
+  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  wire width 32 output 16  \nia_value
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:165"
-  attribute \init 1'0
-  wire width 1 output 26  \fault_valid
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:166"
-  attribute \init 5'00000
-  wire width 5 output 27  \fault_type
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:105"
-  attribute \init 32'00000000000000000000000000000000
-  wire width 32 output 28  \cload_e_gt
+  attribute \src "/home/runner/workspace/hardware/ret.py:45"
+  wire width 1 output 17  \lambda_clear
 
   attribute \src "/home/runner/workspace/hardware/ret.py:109"
+  wire width 32 output 18  \mem_rd_addr
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:110"
+  wire width 1 output 19  \mem_rd_en
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:111"
+  wire width 32 output 20  \mem_wr_addr
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:112"
+  wire width 32 output 21  \mem_wr_data
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:113"
+  wire width 1 output 22  \mem_wr_en
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:148"
+  attribute \init 1'0
+  wire width 1 output 23  \fault_valid
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:149"
+  attribute \init 5'00000
+  wire width 5 output 24  \fault_type
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:93"
+  attribute \init 32'00000000000000000000000000000000
+  wire width 32 output 25  \cload_e_gt
+
+  attribute \src "/home/runner/workspace/hardware/ret.py:97"
   attribute \init 4'0000
-  wire width 4 output 29  \flags_restore_data
+  wire width 4 output 26  \flags_restore_data
 
   wire width 1 $1
 
@@ -48200,219 +48120,143 @@ module \top.core.u_return
 
   wire width 1 $26
 
-  wire width 1 $27
+  wire width 5 $27
 
   wire width 1 $28
 
   wire width 1 $29
 
-  wire width 1 $30
+  wire width 32 $30
 
-  wire width 5 $31
+  wire width 1 $31
 
-  wire width 1 $32
+  wire width 4 $32
 
-  wire width 1 $33
+  wire width 32 $33
 
   wire width 32 $34
 
-  wire width 1 $35
+  wire width 32 $35
 
-  wire width 4 $36
+  wire width 12 $36
 
-  wire width 96 $37
+  wire width 32 $37
 
-  wire width 32 $38
+  wire width 15 $38
 
-  wire width 32 $39
+  wire width 12 $39
 
-  wire width 32 $40
+  wire width 1 $40
 
-  wire width 12 $41
+  wire width 4 $41
 
-  wire width 32 $42
-
-  wire width 15 $43
-
-  wire width 12 $44
-
-  wire width 1 $45
-
-  wire width 4 $46
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:73"
-  wire width 32 \return_cap.word0_gt
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:73"
-  wire width 16 \return_cap.word0_gt.slot_id
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:73"
-  wire width 9 \return_cap.word0_gt.gt_seq
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:73"
-  wire width 2 \return_cap.word0_gt.gt_type
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:73"
-  wire width 1 \return_cap.word0_gt.dom
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:73"
-  wire width 3 \return_cap.word0_gt.perm
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:73"
-  wire width 1 \return_cap.word0_gt.b_flag
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:73"
-  wire width 32 \return_cap.word1_location
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:73"
-  wire width 32 \return_cap.word2_w2
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
   wire width 32 \cr5_heap.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
   wire width 16 \cr5_heap.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
   wire width 9 \cr5_heap.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
   wire width 2 \cr5_heap.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
   wire width 1 \cr5_heap.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
   wire width 3 \cr5_heap.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
   wire width 1 \cr5_heap.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
   wire width 32 \cr5_heap.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:51"
+  attribute \src "/home/runner/workspace/hardware/ret.py:47"
   wire width 32 \cr5_heap.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
   wire width 32 \cr12_thread.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
   wire width 16 \cr12_thread.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
   wire width 9 \cr12_thread.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
   wire width 2 \cr12_thread.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
   wire width 1 \cr12_thread.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
   wire width 3 \cr12_thread.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
   wire width 1 \cr12_thread.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
   wire width 32 \cr12_thread.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:52"
+  attribute \src "/home/runner/workspace/hardware/ret.py:48"
   wire width 32 \cr12_thread.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
   wire width 32 \cr_wr_data.word0_gt
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
   wire width 16 \cr_wr_data.word0_gt.slot_id
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
   wire width 9 \cr_wr_data.word0_gt.gt_seq
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
   wire width 2 \cr_wr_data.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
   wire width 1 \cr_wr_data.word0_gt.dom
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
   wire width 3 \cr_wr_data.word0_gt.perm
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
   wire width 1 \cr_wr_data.word0_gt.b_flag
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
   wire width 32 \cr_wr_data.word1_location
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  attribute \src "/home/runner/workspace/hardware/ret.py:21"
   wire width 32 \cr_wr_data.word2_w2
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:66"
+  attribute \src "/home/runner/workspace/hardware/ret.py:62"
   wire width 1 \flags_restore_data.N
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:66"
+  attribute \src "/home/runner/workspace/hardware/ret.py:62"
   wire width 1 \flags_restore_data.Z
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:66"
+  attribute \src "/home/runner/workspace/hardware/ret.py:62"
   wire width 1 \flags_restore_data.C
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:66"
+  attribute \src "/home/runner/workspace/hardware/ret.py:62"
   wire width 1 \flags_restore_data.V
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:109"
+  attribute \src "/home/runner/workspace/hardware/ret.py:97"
   wire width 1 \prev_flags_latched.N
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:109"
+  attribute \src "/home/runner/workspace/hardware/ret.py:97"
   wire width 1 \prev_flags_latched.Z
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:109"
+  attribute \src "/home/runner/workspace/hardware/ret.py:97"
   wire width 1 \prev_flags_latched.C
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:109"
+  attribute \src "/home/runner/workspace/hardware/ret.py:97"
   wire width 1 \prev_flags_latched.V
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 32 \cr_rd_data.word0_gt
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 16 \cr_rd_data.word0_gt.slot_id
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 9 \cr_rd_data.word0_gt.gt_seq
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 2 \cr_rd_data.word0_gt.gt_type
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 1 \cr_rd_data.word0_gt.dom
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 3 \cr_rd_data.word0_gt.perm
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 1 \cr_rd_data.word0_gt.b_flag
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 32 \cr_rd_data.word1_location
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:23"
-  wire width 32 \cr_rd_data.word2_w2
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:79"
-  cell $eq $47
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 2
-    parameter \B_WIDTH 0
-    parameter \Y_WIDTH 1
-    connect \A \return_cap [26:25]
-    connect \B {  }
-    connect \Y \is_null_cap
-  end
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:87"
-  cell $eq $48
+  attribute \src "/home/runner/workspace/hardware/ret.py:75"
+  cell $eq $42
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 2
@@ -48423,8 +48267,8 @@ module \top.core.u_return
     connect \Y \cr5_null
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:88"
-  cell $not $49
+  attribute \src "/home/runner/workspace/hardware/ret.py:76"
+  cell $not $43
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
@@ -48432,8 +48276,8 @@ module \top.core.u_return
     connect \Y $1
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:88"
-  cell $and $50
+  attribute \src "/home/runner/workspace/hardware/ret.py:76"
+  cell $and $44
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -48444,8 +48288,8 @@ module \top.core.u_return
     connect \Y \cr5_has_r
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:89"
-  cell $not $51
+  attribute \src "/home/runner/workspace/hardware/ret.py:77"
+  cell $not $45
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
@@ -48453,8 +48297,8 @@ module \top.core.u_return
     connect \Y $2
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:89"
-  cell $and $52
+  attribute \src "/home/runner/workspace/hardware/ret.py:77"
+  cell $and $46
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -48465,8 +48309,8 @@ module \top.core.u_return
     connect \Y \cr5_has_w
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:95"
-  cell $eq $53
+  attribute \src "/home/runner/workspace/hardware/ret.py:83"
+  cell $eq $47
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 2
@@ -48477,8 +48321,8 @@ module \top.core.u_return
     connect \Y \cr12_null
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:101"
-  cell $add $54
+  attribute \src "/home/runner/workspace/hardware/ret.py:89"
+  cell $add $48
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -48489,17 +48333,8 @@ module \top.core.u_return
     connect \Y $3
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:123"
-  cell $mux $55
-    parameter \WIDTH 4
-    connect \S \local_cr_rd_en [0]
-    connect \A 4'0000
-    connect \B { 1'0 \cr_src [2:0] }
-    connect \Y \cr_rd_addr
-  end
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:156"
-  cell $eq $56
+  attribute \src "/home/runner/workspace/hardware/ret.py:139"
+  cell $eq $49
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 15
@@ -48510,8 +48345,8 @@ module \top.core.u_return
     connect \Y \boot_rom_return
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:247"
-  cell $mux $57
+  attribute \src "/home/runner/workspace/hardware/ret.py:218"
+  cell $mux $50
     parameter \WIDTH 2
     connect \S \sto_indicator [12]
     connect \A 2'01
@@ -48519,8 +48354,8 @@ module \top.core.u_return
     connect \Y $4
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:247"
-  cell $add $58
+  attribute \src "/home/runner/workspace/hardware/ret.py:218"
+  cell $add $51
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 12
@@ -48531,8 +48366,8 @@ module \top.core.u_return
     connect \Y $5
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:247"
-  cell $shl $59
+  attribute \src "/home/runner/workspace/hardware/ret.py:218"
+  cell $shl $52
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 13
@@ -48543,8 +48378,8 @@ module \top.core.u_return
     connect \Y $6
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:246"
-  cell $add $60
+  attribute \src "/home/runner/workspace/hardware/ret.py:217"
+  cell $add $53
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -48556,7 +48391,7 @@ module \top.core.u_return
   end
 
   attribute \src "/home/runner/workspace/hardware/stack_frame.py:43"
-  cell $add $61
+  cell $add $54
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 12
@@ -48568,7 +48403,7 @@ module \top.core.u_return
   end
 
   attribute \src "/home/runner/workspace/hardware/stack_frame.py:43"
-  cell $shl $62
+  cell $shl $55
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 13
@@ -48580,7 +48415,7 @@ module \top.core.u_return
   end
 
   attribute \src "/home/runner/workspace/hardware/stack_frame.py:43"
-  cell $add $63
+  cell $add $56
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -48591,8 +48426,8 @@ module \top.core.u_return
     connect \Y $10
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:292"
-  cell $shl $64
+  attribute \src "/home/runner/workspace/hardware/ret.py:263"
+  cell $shl $57
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 15
@@ -48603,8 +48438,8 @@ module \top.core.u_return
     connect \Y $11
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:306"
-  cell $not $65
+  attribute \src "/home/runner/workspace/hardware/ret.py:277"
+  cell $not $58
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
@@ -48613,7 +48448,7 @@ module \top.core.u_return
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $66
+  cell $eq $59
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -48625,7 +48460,7 @@ module \top.core.u_return
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $67
+  cell $eq $60
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -48637,7 +48472,7 @@ module \top.core.u_return
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $68
+  cell $eq $61
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -48649,7 +48484,7 @@ module \top.core.u_return
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $69
+  cell $eq $62
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -48661,7 +48496,7 @@ module \top.core.u_return
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $70
+  cell $eq $63
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -48673,7 +48508,7 @@ module \top.core.u_return
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $71
+  cell $eq $64
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -48681,11 +48516,11 @@ module \top.core.u_return
     parameter \Y_WIDTH 1
     connect \A \ret_state [3:0]
     connect \B 3'101
-    connect \Y \reboot_request
+    connect \Y $16
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $72
+  cell $eq $65
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -48693,11 +48528,11 @@ module \top.core.u_return
     parameter \Y_WIDTH 1
     connect \A \ret_state [3:0]
     connect \B 3'110
-    connect \Y $16
+    connect \Y $17
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $73
+  cell $eq $66
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -48705,11 +48540,11 @@ module \top.core.u_return
     parameter \Y_WIDTH 1
     connect \A \ret_state [3:0]
     connect \B 3'111
-    connect \Y $17
+    connect \Y $18
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $74
+  cell $eq $67
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -48717,11 +48552,11 @@ module \top.core.u_return
     parameter \Y_WIDTH 1
     connect \A \ret_state [3:0]
     connect \B 4'1000
-    connect \Y $18
+    connect \Y $19
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $75
+  cell $eq $68
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -48729,11 +48564,11 @@ module \top.core.u_return
     parameter \Y_WIDTH 1
     connect \A \ret_state [3:0]
     connect \B 4'1001
-    connect \Y $19
+    connect \Y $20
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $76
+  cell $eq $69
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -48741,74 +48576,29 @@ module \top.core.u_return
     parameter \Y_WIDTH 1
     connect \A \ret_state [3:0]
     connect \B 4'1010
-    connect \Y $20
+    connect \Y \reboot_request
   end
 
-  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $77
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 4
-    parameter \B_WIDTH 4
-    parameter \Y_WIDTH 1
-    connect \A \ret_state [3:0]
-    connect \B 4'1011
-    connect \Y $21
-  end
-
-  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $78
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 4
-    parameter \B_WIDTH 4
-    parameter \Y_WIDTH 1
-    connect \A \ret_state [3:0]
-    connect \B 4'1100
-    connect \Y $22
-  end
-
-  attribute \src "/home/runner/workspace/hardware/perm_check.py:29"
-  cell $and $79
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \return_cap [27]
-    connect \B \return_cap [30]
-    connect \Y $23
-  end
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:207"
-  cell $not $80
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $23 [0]
-    connect \Y $24
-  end
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:217"
-  cell $not $81
+  attribute \src "/home/runner/workspace/hardware/ret.py:188"
+  cell $not $70
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \cr5_has_r [0]
-    connect \Y $25
+    connect \Y $21
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:220"
-  cell $not $82
+  attribute \src "/home/runner/workspace/hardware/ret.py:191"
+  cell $not $71
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \cr5_has_w [0]
-    connect \Y $26
+    connect \Y $22
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:235"
-  cell $and $83
+  attribute \src "/home/runner/workspace/hardware/ret.py:206"
+  cell $and $72
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -48816,11 +48606,11 @@ module \top.core.u_return
     parameter \Y_WIDTH 1
     connect \A \mem_rd_valid [0]
     connect \B \rd_armed [0]
-    connect \Y $27
+    connect \Y $23
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:251"
-  cell $and $84
+  attribute \src "/home/runner/workspace/hardware/ret.py:222"
+  cell $and $73
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -48828,11 +48618,11 @@ module \top.core.u_return
     parameter \Y_WIDTH 1
     connect \A \mem_rd_valid [0]
     connect \B \rd_armed [0]
-    connect \Y $28
+    connect \Y $24
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:271"
-  cell $and $85
+  attribute \src "/home/runner/workspace/hardware/ret.py:242"
+  cell $and $74
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -48840,925 +48630,799 @@ module \top.core.u_return
     parameter \Y_WIDTH 1
     connect \A \mem_rd_valid [0]
     connect \B \rd_armed [0]
-    connect \Y $29
+    connect \Y $25
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:65"
-  process $86
+  attribute \src "/home/runner/workspace/hardware/ret.py:61"
+  process $75
     assign \flags_restore_en [0] 1'0
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
-      case 4'0100
-      case 4'0111
-      case 4'1000
-      case 4'1001
-      case 4'1010
-      case 4'1011
-        assign \flags_restore_en [0] 1'1
-      case 4'1100
-      case 4'0011
       case 4'0101
       case 4'0110
+      case 4'0111
+      case 4'1000
+        assign \flags_restore_en [0] 1'1
+      case 4'1001
+      case 4'0011
+      case 4'1010
+      case 4'0100
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:28"
-  process $87
+  attribute \src "/home/runner/workspace/hardware/ret.py:24"
+  process $76
     assign \nia_set [0] 1'0
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
         assign \nia_set [0] 1'1
       case 4'0010
-      case 4'0100
+      case 4'0101
+      case 4'0110
       case 4'0111
       case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1011
-      case 4'1100
         assign \nia_set [0] 1'1
       case 4'0011
-      case 4'0101
-      case 4'0110
+      case 4'1010
+      case 4'0100
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:29"
-  process $88
+  attribute \src "/home/runner/workspace/hardware/ret.py:25"
+  process $77
     assign \nia_value [31:0] 32'00000000000000000000000000000000
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
         assign \nia_value [31:0] \lambda_pc [31:0]
       case 4'0010
-      case 4'0100
+      case 4'0101
+      case 4'0110
       case 4'0111
       case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1011
-      case 4'1100
         assign \nia_value [31:0] { 14'00000000000000 $11 [17:0] }
       case 4'0011
-      case 4'0101
-      case 4'0110
+      case 4'1010
+      case 4'0100
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:49"
-  process $89
+  attribute \src "/home/runner/workspace/hardware/ret.py:45"
+  process $78
     assign \lambda_clear [0] 1'0
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
         assign \lambda_clear [0] 1'1
       case 4'0010
-      case 4'0100
+      case 4'0101
+      case 4'0110
       case 4'0111
       case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1011
-      case 4'1100
       case 4'0011
-      case 4'0101
-      case 4'0110
-    end
-  end
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:121"
-  process $90
-    assign \local_cr_rd_en [0] 1'0
-    switch \ret_state [3:0]
-      case 4'0000
-      case 4'0001
-      case 4'0010
-        assign \local_cr_rd_en [0] 1'1
+      case 4'1010
       case 4'0100
-      case 4'0111
-      case 4'1000
-      case 4'1001
-      case 4'1010
-      case 4'1011
-      case 4'1100
-      case 4'0011
-      case 4'0101
-      case 4'0110
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:126"
-  process $91
+  attribute \src "/home/runner/workspace/hardware/ret.py:109"
+  process $79
     assign \mem_rd_addr [31:0] 32'00000000000000000000000000000000
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
-      case 4'0100
-      case 4'0111
-      case 4'1000
-        assign \mem_rd_addr [31:0] $3 [31:0]
-      case 4'1001
-        assign \mem_rd_addr [31:0] $7 [31:0]
-      case 4'1010
-        assign \mem_rd_addr [31:0] $10 [31:0]
-      case 4'1011
-      case 4'1100
-      case 4'0011
       case 4'0101
+        assign \mem_rd_addr [31:0] $3 [31:0]
       case 4'0110
+        assign \mem_rd_addr [31:0] $7 [31:0]
+      case 4'0111
+        assign \mem_rd_addr [31:0] $10 [31:0]
+      case 4'1000
+      case 4'1001
+      case 4'0011
+      case 4'1010
+      case 4'0100
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:127"
-  process $92
+  attribute \src "/home/runner/workspace/hardware/ret.py:110"
+  process $80
     assign \mem_rd_en [0] 1'0
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
-      case 4'0100
-      case 4'0111
-      case 4'1000
-        assign \mem_rd_en [0] 1'1
-      case 4'1001
-        assign \mem_rd_en [0] 1'1
-      case 4'1010
-        assign \mem_rd_en [0] 1'1
-      case 4'1011
-      case 4'1100
-      case 4'0011
       case 4'0101
+        assign \mem_rd_en [0] 1'1
       case 4'0110
+        assign \mem_rd_en [0] 1'1
+      case 4'0111
+        assign \mem_rd_en [0] 1'1
+      case 4'1000
+      case 4'1001
+      case 4'0011
+      case 4'1010
+      case 4'0100
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:128"
-  process $93
+  attribute \src "/home/runner/workspace/hardware/ret.py:111"
+  process $81
     assign \mem_wr_addr [31:0] 32'00000000000000000000000000000000
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
-      case 4'0100
-      case 4'0111
-      case 4'1000
-      case 4'1001
-      case 4'1010
-      case 4'1011
-        assign \mem_wr_addr [31:0] $3 [31:0]
-      case 4'1100
-      case 4'0011
       case 4'0101
       case 4'0110
+      case 4'0111
+      case 4'1000
+        assign \mem_wr_addr [31:0] $3 [31:0]
+      case 4'1001
+      case 4'0011
+      case 4'1010
+      case 4'0100
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:129"
-  process $94
+  attribute \src "/home/runner/workspace/hardware/ret.py:112"
+  process $82
     assign \mem_wr_data [31:0] 32'00000000000000000000000000000000
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
-      case 4'0100
-      case 4'0111
-      case 4'1000
-      case 4'1001
-      case 4'1010
-      case 4'1011
-        assign \mem_wr_data [31:0] { \flags_restore_data [3:0] 15'000000000000000 \prev_sz_latched [0] \prev_sto_latched [11:0] }
-      case 4'1100
-      case 4'0011
       case 4'0101
       case 4'0110
+      case 4'0111
+      case 4'1000
+        assign \mem_wr_data [31:0] { \flags_restore_data [3:0] 15'000000000000000 \prev_sz_latched [0] \prev_sto_latched [11:0] }
+      case 4'1001
+      case 4'0011
+      case 4'1010
+      case 4'0100
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:130"
-  process $95
+  attribute \src "/home/runner/workspace/hardware/ret.py:113"
+  process $83
     assign \mem_wr_en [0] 1'0
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
-      case 4'0100
-      case 4'0111
-      case 4'1000
-      case 4'1001
-      case 4'1010
-      case 4'1011
-        assign \mem_wr_en [0] 1'1
-      case 4'1100
-      case 4'0011
       case 4'0101
       case 4'0110
+      case 4'0111
+      case 4'1000
+        assign \mem_wr_en [0] 1'1
+      case 4'1001
+      case 4'0011
+      case 4'1010
+      case 4'0100
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:165"
-  process $96
-    assign $30 [0] \fault_valid [0]
+  attribute \src "/home/runner/workspace/hardware/ret.py:148"
+  process $84
+    assign $26 [0] \fault_valid [0]
     switch \ret_state [3:0]
       case 4'0000
-        assign $30 [0] 1'0
+        assign $26 [0] 1'0
       case 4'0001
       case 4'0010
-      case 4'0100
-        switch { $24 [0] \is_null_cap [0] }
-          case 2'-1
-          case 2'1-
-            assign $30 [0] 1'1
-          case
-        end
-      case 4'0111
-        switch { \cr12_null [0] $26 [0] $25 [0] \cr5_null [0] }
+        switch { \cr12_null [0] $22 [0] $21 [0] \cr5_null [0] }
           case 4'---1
-            assign $30 [0] 1'1
+            assign $26 [0] 1'1
           case 4'--1-
-            assign $30 [0] 1'1
+            assign $26 [0] 1'1
           case 4'-1--
-            assign $30 [0] 1'1
+            assign $26 [0] 1'1
           case 4'1---
-            assign $30 [0] 1'1
+            assign $26 [0] 1'1
           case
         end
-      case 4'1000
-      case 4'1001
-      case 4'1010
-      case 4'1011
-      case 4'1100
-      case 4'0011
       case 4'0101
       case 4'0110
+      case 4'0111
+      case 4'1000
+      case 4'1001
+      case 4'0011
+      case 4'1010
+      case 4'0100
     end
     switch \clear_all [0]
       case 1'1
-        assign $30 [0] 1'0
+        assign $26 [0] 1'0
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:165"
-  cell $dff $97
+  attribute \src "/home/runner/workspace/hardware/ret.py:148"
+  cell $dff $85
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $30 [0]
+    connect \D $26 [0]
     connect \CLK \clk [0]
     connect \Q \fault_valid
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:166"
-  process $98
-    assign $31 [4:0] \fault_type [4:0]
+  attribute \src "/home/runner/workspace/hardware/ret.py:149"
+  process $86
+    assign $27 [4:0] \fault_type [4:0]
     switch \ret_state [3:0]
       case 4'0000
-        assign $31 [4:0] 5'00000
+        assign $27 [4:0] 5'00000
       case 4'0001
       case 4'0010
-      case 4'0100
-        switch { $24 [0] \is_null_cap [0] }
-          case 2'-1
-          case 2'1-
-            assign $31 [4:0] 5'00110
-          case
-        end
-      case 4'0111
-        switch { \cr12_null [0] $26 [0] $25 [0] \cr5_null [0] }
+        switch { \cr12_null [0] $22 [0] $21 [0] \cr5_null [0] }
           case 4'---1
-            assign $31 [4:0] 5'00111
+            assign $27 [4:0] 5'00111
           case 4'--1-
-            assign $31 [4:0] 5'00001
+            assign $27 [4:0] 5'00001
           case 4'-1--
-            assign $31 [4:0] 5'00010
+            assign $27 [4:0] 5'00010
           case 4'1---
-            assign $31 [4:0] 5'00111
+            assign $27 [4:0] 5'00111
           case
         end
-      case 4'1000
-      case 4'1001
-      case 4'1010
-      case 4'1011
-      case 4'1100
-      case 4'0011
       case 4'0101
       case 4'0110
+      case 4'0111
+      case 4'1000
+      case 4'1001
+      case 4'0011
+      case 4'1010
+      case 4'0100
     end
     switch \clear_all [0]
       case 1'1
-        assign $31 [4:0] 5'00000
+        assign $27 [4:0] 5'00000
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:166"
-  cell $dff $99
+  attribute \src "/home/runner/workspace/hardware/ret.py:149"
+  cell $dff $87
     parameter \WIDTH 5
     parameter \CLK_POLARITY 1
-    connect \D $31 [4:0]
+    connect \D $27 [4:0]
     connect \CLK \clk [0]
     connect \Q \fault_type
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:163"
-  process $100
-    assign $32 [0] \sub_done_latched [0]
+  attribute \src "/home/runner/workspace/hardware/ret.py:146"
+  process $88
+    assign $28 [0] \sub_done_latched [0]
     switch \ret_state [3:0]
       case 4'0000
-        assign $32 [0] 1'0
+        assign $28 [0] 1'0
       case 4'0001
       case 4'0010
-      case 4'0100
+      case 4'0101
+      case 4'0110
       case 4'0111
       case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1011
-      case 4'1100
       case 4'0011
-      case 4'0101
-      case 4'0110
+      case 4'1010
+      case 4'0100
     end
     switch \clear_all [0]
       case 1'1
-        assign $32 [0] 1'0
+        assign $28 [0] 1'0
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:163"
-  cell $dff $101
+  attribute \src "/home/runner/workspace/hardware/ret.py:146"
+  cell $dff $89
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $32 [0]
+    connect \D $28 [0]
     connect \CLK \clk [0]
     connect \Q \sub_done_latched
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:164"
-  process $102
-    assign $33 [0] \sub_fault_latched [0]
+  attribute \src "/home/runner/workspace/hardware/ret.py:147"
+  process $90
+    assign $29 [0] \sub_fault_latched [0]
     switch \ret_state [3:0]
       case 4'0000
-        assign $33 [0] 1'0
+        assign $29 [0] 1'0
       case 4'0001
       case 4'0010
-      case 4'0100
+      case 4'0101
+      case 4'0110
       case 4'0111
       case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1011
-      case 4'1100
       case 4'0011
-      case 4'0101
-      case 4'0110
+      case 4'1010
+      case 4'0100
     end
     switch \clear_all [0]
       case 1'1
-        assign $33 [0] 1'0
+        assign $29 [0] 1'0
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:164"
-  cell $dff $103
+  attribute \src "/home/runner/workspace/hardware/ret.py:147"
+  cell $dff $91
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $33 [0]
+    connect \D $29 [0]
     connect \CLK \clk [0]
     connect \Q \sub_fault_latched
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:105"
-  process $104
-    assign $34 [31:0] \cload_e_gt [31:0]
+  attribute \src "/home/runner/workspace/hardware/ret.py:93"
+  process $92
+    assign $30 [31:0] \cload_e_gt [31:0]
     switch \ret_state [3:0]
       case 4'0000
-        assign $34 [31:0] 32'00000000000000000000000000000000
+        assign $30 [31:0] 32'00000000000000000000000000000000
       case 4'0001
       case 4'0010
-      case 4'0100
-      case 4'0111
-      case 4'1000
-      case 4'1001
-      case 4'1010
-        switch $29 [0]
-          case 1'1
-            assign $34 [31:0] \mem_rd_data [31:0]
-        end
-      case 4'1011
-      case 4'1100
-      case 4'0011
       case 4'0101
       case 4'0110
+      case 4'0111
+        switch $25 [0]
+          case 1'1
+            assign $30 [31:0] \mem_rd_data [31:0]
+        end
+      case 4'1000
+      case 4'1001
+      case 4'0011
+      case 4'1010
+      case 4'0100
     end
     switch \clear_all [0]
       case 1'1
-        assign $34 [31:0] 32'00000000000000000000000000000000
+        assign $30 [31:0] 32'00000000000000000000000000000000
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:105"
-  cell $dff $105
+  attribute \src "/home/runner/workspace/hardware/ret.py:93"
+  cell $dff $93
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
-    connect \D $34 [31:0]
+    connect \D $30 [31:0]
     connect \CLK \clk [0]
     connect \Q \cload_e_gt
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:170"
-  process $106
-    assign $35 [0] \rd_armed [0]
+  attribute \src "/home/runner/workspace/hardware/ret.py:153"
+  process $94
+    assign $31 [0] \rd_armed [0]
     switch \ret_state [3:0]
       case 4'0000
-        assign $35 [0] 1'0
+        assign $31 [0] 1'0
       case 4'0001
       case 4'0010
-      case 4'0100
-      case 4'0111
-      case 4'1000
-        assign $35 [0] 1'1
-        switch $27 [0]
-          case 1'1
-            assign $35 [0] 1'0
-        end
-      case 4'1001
-        assign $35 [0] 1'1
-        switch $28 [0]
-          case 1'1
-            assign $35 [0] 1'0
-        end
-      case 4'1010
-        assign $35 [0] 1'1
-        switch $29 [0]
-          case 1'1
-            assign $35 [0] 1'0
-        end
-      case 4'1011
-      case 4'1100
-      case 4'0011
       case 4'0101
+        assign $31 [0] 1'1
+        switch $23 [0]
+          case 1'1
+            assign $31 [0] 1'0
+        end
       case 4'0110
+        assign $31 [0] 1'1
+        switch $24 [0]
+          case 1'1
+            assign $31 [0] 1'0
+        end
+      case 4'0111
+        assign $31 [0] 1'1
+        switch $25 [0]
+          case 1'1
+            assign $31 [0] 1'0
+        end
+      case 4'1000
+      case 4'1001
+      case 4'0011
+      case 4'1010
+      case 4'0100
     end
     switch \clear_all [0]
       case 1'1
-        assign $35 [0] 1'0
+        assign $31 [0] 1'0
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:170"
-  cell $dff $107
+  attribute \src "/home/runner/workspace/hardware/ret.py:153"
+  cell $dff $95
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $35 [0]
+    connect \D $31 [0]
     connect \CLK \clk [0]
     connect \Q \rd_armed
   end
 
   attribute \src "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144"
-  process $108
-    assign $36 [3:0] \ret_state [3:0]
+  process $96
+    assign $32 [3:0] \ret_state [3:0]
     switch \ret_state [3:0]
       case 4'0000
         switch \return_start [0]
           case 1'1
             switch \lambda_active [0]
               case 1'1
-                assign $36 [3:0] 4'0001
+                assign $32 [3:0] 4'0001
               case
-                assign $36 [3:0] 4'0010
+                assign $32 [3:0] 4'0010
             end
         end
       case 4'0001
-        assign $36 [3:0] 4'0011
+        assign $32 [3:0] 4'0011
       case 4'0010
-        assign $36 [3:0] 4'0100
-      case 4'0100
-        switch { $24 [0] \is_null_cap [0] }
-          case 2'-1
-            assign $36 [3:0] 4'0101
-          case 2'1-
-            assign $36 [3:0] 4'0110
-          case
-            assign $36 [3:0] 4'0111
-        end
-      case 4'0111
-        switch { \cr12_null [0] $26 [0] $25 [0] \cr5_null [0] }
+        switch { \cr12_null [0] $22 [0] $21 [0] \cr5_null [0] }
           case 4'---1
-            assign $36 [3:0] 4'0110
+            assign $32 [3:0] 4'0100
           case 4'--1-
-            assign $36 [3:0] 4'0110
+            assign $32 [3:0] 4'0100
           case 4'-1--
-            assign $36 [3:0] 4'0110
+            assign $32 [3:0] 4'0100
           case 4'1---
-            assign $36 [3:0] 4'0110
+            assign $32 [3:0] 4'0100
           case
-            assign $36 [3:0] 4'1000
+            assign $32 [3:0] 4'0101
         end
-      case 4'1000
-        switch $27 [0]
+      case 4'0101
+        switch $23 [0]
           case 1'1
-            assign $36 [3:0] 4'1001
+            assign $32 [3:0] 4'0110
         end
-      case 4'1001
-        switch $28 [0]
+      case 4'0110
+        switch $24 [0]
           case 1'1
             switch \sto_indicator [12]
               case 1'1
-                assign $36 [3:0] 4'1010
+                assign $32 [3:0] 4'0111
               case
-                assign $36 [3:0] 4'1011
+                assign $32 [3:0] 4'1000
             end
         end
-      case 4'1010
-        switch $29 [0]
+      case 4'0111
+        switch $25 [0]
           case 1'1
-            assign $36 [3:0] 4'1011
+            assign $32 [3:0] 4'1000
         end
-      case 4'1011
-        assign $36 [3:0] 4'1100
-      case 4'1100
-        assign $36 [3:0] 4'0011
+      case 4'1000
+        assign $32 [3:0] 4'1001
+      case 4'1001
+        assign $32 [3:0] 4'0011
       case 4'0011
-        assign $36 [3:0] 4'0000
-      case 4'0101
-        assign $36 [3:0] 4'0000
-      case 4'0110
-        assign $36 [3:0] 4'0000
+        assign $32 [3:0] 4'0000
+      case 4'1010
+        assign $32 [3:0] 4'0000
+      case 4'0100
+        assign $32 [3:0] 4'0000
     end
     switch \clear_all [0]
       case 1'1
-        assign $36 [3:0] 4'0000
+        assign $32 [3:0] 4'0000
     end
   end
 
   attribute \src "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144"
-  cell $dff $109
+  cell $dff $97
     parameter \WIDTH 4
     parameter \CLK_POLARITY 1
-    connect \D $36 [3:0]
+    connect \D $32 [3:0]
     connect \CLK \clk [0]
     connect \Q \ret_state
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:73"
-  process $110
-    assign $37 [95:0] \return_cap [95:0]
+  attribute \src "/home/runner/workspace/hardware/ret.py:85"
+  process $98
+    assign $33 [31:0] \heap_base_latched [31:0]
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
-        assign $37 [95:0] \cr_rd_data [95:0]
-      case 4'0100
+        assign $33 [31:0] \cr5_heap [63:32]
+      case 4'0101
+      case 4'0110
       case 4'0111
       case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1011
-      case 4'1100
       case 4'0011
-      case 4'0101
-      case 4'0110
-    end
-    switch \clear_all [0]
-      case 1'1
-        assign $37 [95:0] 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-    end
-  end
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:73"
-  cell $dff $111
-    parameter \WIDTH 96
-    parameter \CLK_POLARITY 1
-    connect \D $37 [95:0]
-    connect \CLK \clk [0]
-    connect \Q \return_cap
-  end
-
-  attribute \src "/home/runner/workspace/hardware/ret.py:97"
-  process $112
-    assign $38 [31:0] \heap_base_latched [31:0]
-    switch \ret_state [3:0]
-      case 4'0000
-      case 4'0001
-      case 4'0010
-        assign $38 [31:0] \cr5_heap [63:32]
+      case 4'1010
       case 4'0100
-      case 4'0111
-      case 4'1000
-      case 4'1001
-      case 4'1010
-      case 4'1011
-      case 4'1100
-      case 4'0011
-      case 4'0101
-      case 4'0110
     end
     switch \clear_all [0]
       case 1'1
-        assign $38 [31:0] 32'00000000000000000000000000000000
+        assign $33 [31:0] 32'00000000000000000000000000000000
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:97"
-  cell $dff $113
+  attribute \src "/home/runner/workspace/hardware/ret.py:85"
+  cell $dff $99
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
-    connect \D $38 [31:0]
+    connect \D $33 [31:0]
     connect \CLK \clk [0]
     connect \Q \heap_base_latched
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:98"
-  process $114
-    assign $39 [31:0] \thread_base_latched [31:0]
+  attribute \src "/home/runner/workspace/hardware/ret.py:86"
+  process $100
+    assign $34 [31:0] \thread_base_latched [31:0]
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
-        assign $39 [31:0] \thread_base [31:0]
-      case 4'0100
+        assign $34 [31:0] \thread_base [31:0]
+      case 4'0101
+      case 4'0110
       case 4'0111
       case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1011
-      case 4'1100
       case 4'0011
-      case 4'0101
-      case 4'0110
+      case 4'1010
+      case 4'0100
     end
     switch \clear_all [0]
       case 1'1
-        assign $39 [31:0] 32'00000000000000000000000000000000
+        assign $34 [31:0] 32'00000000000000000000000000000000
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:98"
-  cell $dff $115
+  attribute \src "/home/runner/workspace/hardware/ret.py:86"
+  cell $dff $101
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
-    connect \D $39 [31:0]
+    connect \D $34 [31:0]
     connect \CLK \clk [0]
     connect \Q \thread_base_latched
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:103"
-  process $116
-    assign $40 [31:0] \sto_indicator [31:0]
+  attribute \src "/home/runner/workspace/hardware/ret.py:91"
+  process $102
+    assign $35 [31:0] \sto_indicator [31:0]
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
-      case 4'0100
+      case 4'0101
+        switch $23 [0]
+          case 1'1
+            assign $35 [31:0] \mem_rd_data [31:0]
+        end
+      case 4'0110
       case 4'0111
       case 4'1000
-        switch $27 [0]
-          case 1'1
-            assign $40 [31:0] \mem_rd_data [31:0]
-        end
       case 4'1001
-      case 4'1010
-      case 4'1011
-      case 4'1100
       case 4'0011
-      case 4'0101
-      case 4'0110
+      case 4'1010
+      case 4'0100
     end
     switch \clear_all [0]
       case 1'1
-        assign $40 [31:0] 32'00000000000000000000000000000000
+        assign $35 [31:0] 32'00000000000000000000000000000000
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:103"
-  cell $dff $117
+  attribute \src "/home/runner/workspace/hardware/ret.py:91"
+  cell $dff $103
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
-    connect \D $40 [31:0]
+    connect \D $35 [31:0]
     connect \CLK \clk [0]
     connect \Q \sto_indicator
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:104"
-  process $118
-    assign $41 [11:0] \sto_latched [11:0]
+  attribute \src "/home/runner/workspace/hardware/ret.py:92"
+  process $104
+    assign $36 [11:0] \sto_latched [11:0]
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
-      case 4'0100
+      case 4'0101
+        switch $23 [0]
+          case 1'1
+            assign $36 [11:0] \mem_rd_data [11:0]
+        end
+      case 4'0110
       case 4'0111
       case 4'1000
-        switch $27 [0]
-          case 1'1
-            assign $41 [11:0] \mem_rd_data [11:0]
-        end
       case 4'1001
-      case 4'1010
-      case 4'1011
-      case 4'1100
       case 4'0011
-      case 4'0101
-      case 4'0110
+      case 4'1010
+      case 4'0100
     end
     switch \clear_all [0]
       case 1'1
-        assign $41 [11:0] 12'000000000000
+        assign $36 [11:0] 12'000000000000
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:104"
-  cell $dff $119
+  attribute \src "/home/runner/workspace/hardware/ret.py:92"
+  cell $dff $105
     parameter \WIDTH 12
     parameter \CLK_POLARITY 1
-    connect \D $41 [11:0]
+    connect \D $36 [11:0]
     connect \CLK \clk [0]
     connect \Q \sto_latched
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:111"
-  process $120
-    assign $42 [31:0] \frame_word [31:0]
+  attribute \src "/home/runner/workspace/hardware/ret.py:99"
+  process $106
+    assign $37 [31:0] \frame_word [31:0]
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
-      case 4'0100
+      case 4'0101
+      case 4'0110
+        switch $24 [0]
+          case 1'1
+            assign $37 [31:0] \mem_rd_data [31:0]
+        end
       case 4'0111
       case 4'1000
       case 4'1001
-        switch $28 [0]
-          case 1'1
-            assign $42 [31:0] \mem_rd_data [31:0]
-        end
-      case 4'1010
-      case 4'1011
-      case 4'1100
       case 4'0011
-      case 4'0101
-      case 4'0110
+      case 4'1010
+      case 4'0100
     end
     switch \clear_all [0]
       case 1'1
-        assign $42 [31:0] 32'00000000000000000000000000000000
+        assign $37 [31:0] 32'00000000000000000000000000000000
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:111"
-  cell $dff $121
+  attribute \src "/home/runner/workspace/hardware/ret.py:99"
+  cell $dff $107
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
-    connect \D $42 [31:0]
+    connect \D $37 [31:0]
     connect \CLK \clk [0]
     connect \Q \frame_word
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:106"
-  process $122
-    assign $43 [14:0] \return_pc_latched [14:0]
+  attribute \src "/home/runner/workspace/hardware/ret.py:94"
+  process $108
+    assign $38 [14:0] \return_pc_latched [14:0]
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
-      case 4'0100
+      case 4'0101
+      case 4'0110
+        switch $24 [0]
+          case 1'1
+            assign $38 [14:0] \mem_rd_data [27:13]
+        end
       case 4'0111
       case 4'1000
       case 4'1001
-        switch $28 [0]
-          case 1'1
-            assign $43 [14:0] \mem_rd_data [27:13]
-        end
-      case 4'1010
-      case 4'1011
-      case 4'1100
       case 4'0011
-      case 4'0101
-      case 4'0110
+      case 4'1010
+      case 4'0100
     end
     switch \clear_all [0]
       case 1'1
-        assign $43 [14:0] 15'000000000000000
+        assign $38 [14:0] 15'000000000000000
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:106"
-  cell $dff $123
+  attribute \src "/home/runner/workspace/hardware/ret.py:94"
+  cell $dff $109
     parameter \WIDTH 15
     parameter \CLK_POLARITY 1
-    connect \D $43 [14:0]
+    connect \D $38 [14:0]
     connect \CLK \clk [0]
     connect \Q \return_pc_latched
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:107"
-  process $124
-    assign $44 [11:0] \prev_sto_latched [11:0]
+  attribute \src "/home/runner/workspace/hardware/ret.py:95"
+  process $110
+    assign $39 [11:0] \prev_sto_latched [11:0]
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
-      case 4'0100
+      case 4'0101
+      case 4'0110
+        switch $24 [0]
+          case 1'1
+            assign $39 [11:0] \mem_rd_data [11:0]
+        end
       case 4'0111
       case 4'1000
       case 4'1001
-        switch $28 [0]
-          case 1'1
-            assign $44 [11:0] \mem_rd_data [11:0]
-        end
-      case 4'1010
-      case 4'1011
-      case 4'1100
       case 4'0011
-      case 4'0101
-      case 4'0110
+      case 4'1010
+      case 4'0100
     end
     switch \clear_all [0]
       case 1'1
-        assign $44 [11:0] 12'000000000000
+        assign $39 [11:0] 12'000000000000
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:107"
-  cell $dff $125
+  attribute \src "/home/runner/workspace/hardware/ret.py:95"
+  cell $dff $111
     parameter \WIDTH 12
     parameter \CLK_POLARITY 1
-    connect \D $44 [11:0]
+    connect \D $39 [11:0]
     connect \CLK \clk [0]
     connect \Q \prev_sto_latched
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:108"
-  process $126
-    assign $45 [0] \prev_sz_latched [0]
+  attribute \src "/home/runner/workspace/hardware/ret.py:96"
+  process $112
+    assign $40 [0] \prev_sz_latched [0]
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
-      case 4'0100
+      case 4'0101
+      case 4'0110
+        switch $24 [0]
+          case 1'1
+            assign $40 [0] \mem_rd_data [12]
+        end
       case 4'0111
       case 4'1000
       case 4'1001
-        switch $28 [0]
-          case 1'1
-            assign $45 [0] \mem_rd_data [12]
-        end
-      case 4'1010
-      case 4'1011
-      case 4'1100
       case 4'0011
-      case 4'0101
-      case 4'0110
+      case 4'1010
+      case 4'0100
     end
     switch \clear_all [0]
       case 1'1
-        assign $45 [0] 1'0
+        assign $40 [0] 1'0
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:108"
-  cell $dff $127
+  attribute \src "/home/runner/workspace/hardware/ret.py:96"
+  cell $dff $113
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $45 [0]
+    connect \D $40 [0]
     connect \CLK \clk [0]
     connect \Q \prev_sz_latched
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:109"
-  process $128
-    assign $46 [3:0] \flags_restore_data [3:0]
+  attribute \src "/home/runner/workspace/hardware/ret.py:97"
+  process $114
+    assign $41 [3:0] \flags_restore_data [3:0]
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
-      case 4'0100
+      case 4'0101
+      case 4'0110
+        switch $24 [0]
+          case 1'1
+            assign $41 [3:0] \mem_rd_data [31:28]
+        end
       case 4'0111
       case 4'1000
       case 4'1001
-        switch $28 [0]
-          case 1'1
-            assign $46 [3:0] \mem_rd_data [31:28]
-        end
-      case 4'1010
-      case 4'1011
-      case 4'1100
       case 4'0011
-      case 4'0101
-      case 4'0110
+      case 4'1010
+      case 4'0100
     end
     switch \clear_all [0]
       case 1'1
-        assign $46 [3:0] 4'0000
+        assign $41 [3:0] 4'0000
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/ret.py:109"
-  cell $dff $129
+  attribute \src "/home/runner/workspace/hardware/ret.py:97"
+  cell $dff $115
     parameter \WIDTH 4
     parameter \CLK_POLARITY 1
-    connect \D $46 [3:0]
+    connect \D $41 [3:0]
     connect \CLK \clk [0]
     connect \Q \flags_restore_data
   end
@@ -49786,15 +49450,6 @@ connect \callee_egt_latched \cload_e_gt [31:0]
 connect \prev_flags_latched \flags_restore_data [3:0]
 connect \fault_flag \fault_valid [0]
 connect \fault_latched \fault_type [4:0]
-connect \return_cap.word0_gt \return_cap [31:0]
-connect \return_cap.word0_gt.slot_id \return_cap [15:0]
-connect \return_cap.word0_gt.gt_seq \return_cap [24:16]
-connect \return_cap.word0_gt.gt_type \return_cap [26:25]
-connect \return_cap.word0_gt.dom \return_cap [27]
-connect \return_cap.word0_gt.perm \return_cap [30:28]
-connect \return_cap.word0_gt.b_flag \return_cap [31]
-connect \return_cap.word1_location \return_cap [63:32]
-connect \return_cap.word2_w2 \return_cap [95:64]
 connect \cr5_heap.word0_gt \cr5_heap [31:0]
 connect \cr5_heap.word0_gt.slot_id \cr5_heap [15:0]
 connect \cr5_heap.word0_gt.gt_seq \cr5_heap [24:16]
@@ -49830,15 +49485,6 @@ connect \prev_flags_latched.N \flags_restore_data [0]
 connect \prev_flags_latched.Z \flags_restore_data [1]
 connect \prev_flags_latched.C \flags_restore_data [2]
 connect \prev_flags_latched.V \flags_restore_data [3]
-connect \cr_rd_data.word0_gt \cr_rd_data [31:0]
-connect \cr_rd_data.word0_gt.slot_id \cr_rd_data [15:0]
-connect \cr_rd_data.word0_gt.gt_seq \cr_rd_data [24:16]
-connect \cr_rd_data.word0_gt.gt_type \cr_rd_data [26:25]
-connect \cr_rd_data.word0_gt.dom \cr_rd_data [27]
-connect \cr_rd_data.word0_gt.perm \cr_rd_data [30:28]
-connect \cr_rd_data.word0_gt.b_flag \cr_rd_data [31]
-connect \cr_rd_data.word1_location \cr_rd_data [63:32]
-connect \cr_rd_data.word2_w2 \cr_rd_data [95:64]
 
 end
 
@@ -57190,7 +56836,7 @@ module \top.core.u_gc_unit
   attribute \src "/home/runner/workspace/hardware/gc_unit.py:13"
   wire width 1 output 2  \gc_busy
 
-  wire width 32 input 3  \port$5745$0
+  wire width 32 input 3  \port$5733$0
 
   attribute \src "/home/runner/workspace/hardware/gc_unit.py:28"
   wire width 1 input 4  \g_bit_reset
@@ -57808,10 +57454,10 @@ module \top.core.u_gc_unit
     switch \gc_state [2:0]
       case 3'000
       case 3'001
-        assign $25 [127:0] { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$5745$0 [31:0] }
+        assign $25 [127:0] { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$5733$0 [31:0] }
       case 3'011
       case 3'010
-        assign $25 [127:0] { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$5745$0 [31:0] }
+        assign $25 [127:0] { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$5733$0 [31:0] }
       case 3'101
       case 3'110
       case 3'100
@@ -57839,7 +57485,7 @@ connect \gc_start 1'0
 connect \gc_mark_en 1'1
 connect \gc_sweep_en 1'1
 connect \ns_start_index 16'0000000000000001
-connect \ns_rd_data { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$5745$0 [31:0] }
+connect \ns_rd_data { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$5733$0 [31:0] }
 connect \ns_end_index 16'0001000000000000
 
 end
@@ -58695,7 +58341,7 @@ module \top.core.u_change
   attribute \src "/home/runner/workspace/hardware/change.py:23"
   wire width 16 input 9  \index
 
-  wire width 15 input 10  \port$1518$0
+  wire width 15 input 10  \port$1517$0
 
   attribute \src "/home/runner/workspace/hardware/change.py:80"
   wire width 32 input 11  \nia_current
@@ -65222,7 +64868,7 @@ module \top.core.u_change
       case 6'000000
         switch \change_start [0]
           case 1'1
-            assign $275 [15:0] { 1'0 \port$1518$0 [14:0] }
+            assign $275 [15:0] { 1'0 \port$1517$0 [14:0] }
         end
       case 6'000001
       case 6'000010
@@ -67771,7 +67417,7 @@ connect \thread_hdr_out \thread_hdr_reg [31:0]
 connect \thread_base_restore_val \incoming_thread_base [31:0]
 connect \fault_latched \change_fault [0]
 connect \fault_type_latched \fault_type [4:0]
-connect \change_mask { 1'0 \port$1518$0 [14:0] }
+connect \change_mask { 1'0 \port$1517$0 [14:0] }
 connect \mem_wr_done 1'1
 connect \crn_reg_latched.word0_gt \crn_reg_latched [31:0]
 connect \crn_reg_latched.word0_gt.slot_id \crn_reg_latched [15:0]

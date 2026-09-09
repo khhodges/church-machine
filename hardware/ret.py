@@ -3,7 +3,6 @@ from amaranth.lib.data import View
 
 from .hw_types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT
-from .perm_check import perm_bit
 from .mload_seq import mload_wait_body
 from .stack_frame import stack_slot_addr
 from .thread_design import THREAD_STO_OFFSET
@@ -12,15 +11,12 @@ from .thread_design import THREAD_STO_OFFSET
 class ChurchReturn(Elaboratable):
     def __init__(self):
         self.return_start = Signal()
-        self.cr_src = Signal(3)
         self.busy = Signal()
         self.complete = Signal()
         self.fault_valid = Signal()
         self.fault_type = Signal(5)  # 5 bits: FaultType values up to 0x18
         self.reboot_request = Signal()
 
-        self.cr_rd_addr = Signal(4)
-        self.cr_rd_data = Signal(CAP_REG_LAYOUT)
         self.cr_wr_addr = Signal(4)
         self.cr_wr_data = Signal(CAP_REG_LAYOUT)
         self.cr_wr_en = Signal()
@@ -70,14 +66,6 @@ class ChurchReturn(Elaboratable):
 
         CR5_HEAP  = 5
 
-        return_cap = Signal(CAP_REG_LAYOUT)
-        ret_view   = View(CAP_REG_LAYOUT, return_cap)
-        ret_gt     = View(GT_LAYOUT, ret_view.word0_gt)
-
-        has_e_perm = perm_bit(ret_view.word0_gt, PERM_E)
-        is_null_cap = Signal()
-        m.d.comb += is_null_cap.eq(ret_gt.gt_type == GT_TYPE_NULL)
-
         cr5_view  = View(CAP_REG_LAYOUT, self.cr5_heap)
         cr5_gt    = View(GT_LAYOUT, cr5_view.word0_gt)
         cr5_null  = Signal()
@@ -117,11 +105,6 @@ class ChurchReturn(Elaboratable):
             frame_ret_pc.eq(frame_word[13:28]),
             frame_prev_sto.eq(frame_word[0:12]),
         ]
-
-        local_cr_rd_en = Signal()
-        m.d.comb += self.cr_rd_addr.eq(
-            Mux(local_cr_rd_en, Cat(self.cr_src, Const(0, 1)), 0)
-        )
 
         local_mem_rd_addr = Signal(32)
         local_mem_rd_en   = Signal()
@@ -182,7 +165,9 @@ class ChurchReturn(Elaboratable):
                     with m.If(self.lambda_active):
                         m.next = "LAMBDA_FAST"
                     with m.Else():
-                        m.next = "READ_SRC"
+                        # RETURN has no CR source operand. Its authority is the
+                        # saved Enter E-GT in the architectural stack frame.
+                        m.next = "CHECK_CR5_CR12"
 
             with m.State("LAMBDA_FAST"):
                 m.d.comb += [
@@ -192,25 +177,11 @@ class ChurchReturn(Elaboratable):
                 ]
                 m.next = "COMPLETE"
 
-            with m.State("READ_SRC"):
-                m.d.comb += local_cr_rd_en.eq(1)
+            with m.State("CHECK_CR5_CR12"):
                 m.d.sync += [
-                    return_cap.eq(self.cr_rd_data),
                     heap_base_latched.eq(cr5_view.word1_location),
                     thread_base_latched.eq(self.thread_base),
                 ]
-                m.next = "CHECK_PERM"
-
-            with m.State("CHECK_PERM"):
-                with m.If(is_null_cap):
-                    m.next = "REBOOT"
-                with m.Elif(~has_e_perm):
-                    m.d.sync += [fault_flag.eq(1), fault_latched.eq(FaultType.PERM_E)]
-                    m.next = "FAULT"
-                with m.Else():
-                    m.next = "CHECK_CR5_CR12"
-
-            with m.State("CHECK_CR5_CR12"):
                 with m.If(cr5_null):
                     m.d.sync += [fault_flag.eq(1), fault_latched.eq(FaultType.NULL_CAP)]
                     m.next = "FAULT"

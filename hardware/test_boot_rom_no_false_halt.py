@@ -149,7 +149,7 @@ def _build_nested_call_dmem():
     dmem[middle_word + 3] = encode_church(
         ChurchOpcode.CALL, CondCode.AL, cr_src=1)
     dmem[middle_word + 4] = encode_church(
-        ChurchOpcode.RETURN, CondCode.AL, cr_src=2)
+        ChurchOpcode.RETURN, CondCode.AL)
     middle_clist = middle_word + alloc_words - 2
     dmem[middle_clist + 0] = leaf_gt
     dmem[middle_clist + 1] = middle_gt
@@ -160,7 +160,7 @@ def _build_nested_call_dmem():
     dmem[leaf_word + 1] = encode_church(
         ChurchOpcode.LOAD, CondCode.AL, cr_dst=2, cr_src=6, imm=0)
     dmem[leaf_word + 2] = encode_church(
-        ChurchOpcode.RETURN, CondCode.AL, cr_src=2)
+        ChurchOpcode.RETURN, CondCode.AL)
     leaf_clist = leaf_word + alloc_words - 2
     dmem[leaf_clist + 0] = leaf_gt
     dmem[leaf_clist + 1] = 0
@@ -624,16 +624,6 @@ _DELAYED_FAULT_CASES = [
         make_gt(GT_TYPE_INFORM, 0, slot_id=1),
         False,
         id="call-permission",
-    ),
-    pytest.param(
-        "RETURN",
-        encode_church(
-            ChurchOpcode.RETURN, CondCode.AL,
-            cr_src=1),
-        FaultType.PERM_E,
-        make_gt(GT_TYPE_INFORM, 0, slot_id=1),
-        False,
-        id="return-permission",
     ),
     pytest.param(
         "SWITCH",
@@ -1181,7 +1171,7 @@ def test_nested_call_return_without_boot_special_case():
     assert retires[10]["cycle"] > retires[9]["cycle"] + 1, retires
     assert retires[11]["cycle"] > retires[10]["cycle"] + 1, retires
     assert retires[10]["instr"] == encode_church(
-        ChurchOpcode.RETURN, CondCode.AL, cr_src=2)
+        ChurchOpcode.RETURN, CondCode.AL)
     assert retires[11]["instr"] == encode_turing(
         TuringOpcode.BRANCH, CondCode.AL, imm=0)
 
