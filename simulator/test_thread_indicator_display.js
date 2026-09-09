@@ -59,15 +59,16 @@ check(
 );
 check(
   run.includes('sim.resetThreadToBaseline(row.slot)') &&
-  run.includes('sim.selectConfiguredThread(row.slot)'),
+  run.includes('sim.selectConfiguredThread(requestedSlot)'),
   'modal Reset and dormant Run use simulator-owned baseline and canonical CHANGE'
 );
 check(
-  run.includes('sim.bootComplete && !_pendingSimLoad && !executing') &&
-  run.includes('Boot the machine before running a specific Thread') &&
+  run.includes('!_pendingSimLoad && !executing && !bootAnimating') &&
+  !run.includes('Boot the machine before running a specific Thread') &&
+  run.includes('if (!sim.bootComplete && !instantBoot())') &&
   run.includes('Run or clear the pending compiled program before resuming a Thread') &&
-  run.includes('if (!row || !sim.bootComplete || _pendingSimLoad'),
-  'Thread-specific Run stays disabled while boot or a pending compile could replace its ownership'
+  run.includes('if (!row || _pendingSimLoad'),
+  'Thread-specific Run boots on demand but stays disabled for pending compile or active execution'
 );
 check(
   sim.includes('this.memory.set(previousWords, baseline.base)') &&

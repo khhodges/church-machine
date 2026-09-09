@@ -1332,13 +1332,11 @@ function updateThreadContextModal() {
     const stop = document.getElementById('threadContextStop');
     const reset = document.getElementById('threadContextReset');
     _setThreadModalAction(run,
-        sim.bootComplete && !_pendingSimLoad && !executing && !bootAnimating,
+        !_pendingSimLoad && !executing && !bootAnimating,
         executing ? 'Stop the current Run or Walk before starting this Thread'
-            : (!sim.bootComplete
-                ? 'Boot the machine before running a specific Thread'
-                : (_pendingSimLoad
-                    ? 'Run or clear the pending compiled program before resuming a Thread'
-                    : 'Wait for the boot animation to finish')));
+            : (_pendingSimLoad
+                ? 'Run or clear the pending compiled program before resuming a Thread'
+                : 'Wait for the boot animation to finish'));
     _setThreadModalAction(stop, owns && executing,
         owns ? 'This Thread is paused' : 'Only the active Thread can stop execution');
     _setThreadModalAction(reset, row.baselineAvailable,
@@ -1435,10 +1433,20 @@ function closeThreadContextModal(restoreFocus = true) {
 
 function runThreadFromModal() {
     const row = _threadModalRow();
-    if (!row || !sim.bootComplete || _pendingSimLoad || _simRunActive || sim.running ||
+    if (!row || _pendingSimLoad || _simRunActive || sim.running ||
             walkRunning || sim.walkActive || bootAnimating) return;
-    if (!_threadExecutionOwner(row)) {
-        const outcome = sim.selectConfiguredThread(row.slot);
+    const requestedSlot = row.slot;
+    if (!sim.bootComplete && !instantBoot()) {
+        updateThreadContextModal();
+        return;
+    }
+    const bootedRow = sim.threadStatusRows(10).find(item => item.slot === requestedSlot);
+    if (!bootedRow) {
+        updateThreadContextModal();
+        return;
+    }
+    if (!_threadExecutionOwner(bootedRow)) {
+        const outcome = sim.selectConfiguredThread(requestedSlot);
         if (!outcome.ok) {
             updateThreadContextModal();
             return;
