@@ -905,9 +905,11 @@
                         <span id="asmWarnBadge" class="asm-warn-badge" style="display:none;" title="Assembly warnings — scroll up to review">&#x26A0; <span id="asmWarnBadgeCount"></span></span>
                     </div>
                 </div>
-                <div class="example-tabs-row">
-                    <button class="example-arrow" onclick="scrollExamples(-1)" data-tooltip="Scroll Left — See more examples">&lsaquo;</button>
-                    <div class="example-tabs-scroll" id="exampleTabsScroll">
+                <!-- Built-in example tab markup retired. Open File Catalog owns
+                     these entries; loader functions remain available to it.
+                <div class="retired-catalog-source">
+                    <button>
+                    <div>
                         <button class="example-tab" onclick="loadExample('ada_note_g')" data-example="ada_note_g" style="color:#f0c674;" data-tooltip="Ada Note G — Ada Lovelace's Bernoulli algorithm in assembly">Ada Note G</button>
                         <button class="example-tab" onclick="loadExample('capability_test')" data-example="capability_test" data-tooltip="Capability Test — Self-test of LOAD, TPERM, CALL, SWITCH and Turing ISA">Capability Test</button>
                         <button class="example-tab" onclick="loadExample('system_patterns')" data-example="system_patterns" data-tooltip="System Patterns — Load/Save, conditional execution, GC test as three sections">System Patterns</button>
@@ -968,8 +970,8 @@
                     </div>
                     <div id="userTabsContainer" class="user-tabs-container"></div>
                     <button class="new-tab-btn" onclick="showNewTabDialog()" data-tooltip="New Program — Create a new blank program tab">+</button>
-                    <button class="example-arrow" onclick="scrollExamples(1)" data-tooltip="Scroll Right — See more examples">&rsaquo;</button>
-                </div>
+                    <button>
+                </div> -->
                 <div id="newTabDialog" class="new-tab-dialog" style="display:none;">
                     <input type="text" id="newTabName" class="new-tab-input" placeholder="Program name" maxlength="32" onkeydown="if(event.key==='Enter')confirmNewTab();if(event.key==='Escape')hideNewTabDialog();">
                     <select id="newTabLang" class="lang-selector new-tab-lang">
@@ -1000,7 +1002,6 @@
                 <div class="asm-picker-toolbar">
                 <button class="btn-instr-picker" title="Open instruction picker" data-tooltip="Instruction Picker — Browse and insert assembly instructions" onclick="(function(){var ed=document.getElementById('asmEditor');if(ed&&window.AsmInstructionPicker){ed.focus();window.AsmInstructionPicker.show(ed);}})()">&#x2295; Instructions</button>
                 <button class="btn-clist-viewer" title="View C-List capabilities" data-tooltip="C-List Viewer — Browse Golden Tokens in CR6" onclick="window.CListViewer&&window.CListViewer.toggle()">&#x2295; C-List</button>
-                    <input type="text" id="exampleSearchBox" class="example-search-box" placeholder="&#x1F50D; Search examples..." data-tooltip="Search Examples — live-filter the example tabs above by name" oninput="filterExampleTabs(this.value)">
                 </div>
                 <div id="compileFailedBanner" class="compile-failed-banner" role="alert" aria-live="assertive" style="display:none;">
                     <span class="compile-failed-banner-icon">&#x2716;</span>
@@ -3352,15 +3353,15 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
         </div>
     </div>
 
-    <!-- ── Open File dialog ─────────────────────────────────────────────── -->
+    <!-- ── Unified Open File catalog ───────────────────────────────────── -->
     <div id="openFileDialog" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeOpenFileDialog()">
         <div class="modal-dialog" style="max-width:520px;width:92vw;max-height:80vh;display:flex;flex-direction:column;gap:0;" role="dialog" aria-modal="true" aria-label="Open File">
             <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-                <span>Open File</span>
+                <span>Open File Catalog</span>
                 <button onclick="closeOpenFileDialog()" style="background:none;border:none;color:#9ca3af;font-size:1.2rem;cursor:pointer;line-height:1;padding:0;">&times;</button>
             </div>
             <input type="text" id="openFileSearch" class="modal-input"
-                   placeholder="Filter by name or folder&hellip;"
+                   placeholder="Search name, language, or path&hellip;"
                    oninput="_renderOpenFileList(this.value)"
                    onkeydown="if(event.key==='Escape')closeOpenFileDialog()"
                    style="flex-shrink:0;margin-bottom:0.5rem;">

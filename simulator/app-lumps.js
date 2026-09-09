@@ -5249,6 +5249,10 @@ function _scrollToLumpMethod(tk, methodName, _attempt) {
 // every other view.  sim.memory is used only for structural location info
 // (baseLoc / nsIdx / crIdx) needed by the patch bar and c-list picker.
 async function openLumpInEditor(token) {
+    if (typeof window._clearAuthoritativeDraftBanner === 'function') {
+        window._clearAuthoritativeDraftBanner();
+    }
+    window._activeBuiltInKey = null;
     if (window._savedLumpEditorMode) exitSavedLumpEditorMode();
     var _openRequestId = (window._savedLumpOpenRequestId || 0) + 1;
     window._savedLumpOpenRequestId = _openRequestId;
@@ -5682,8 +5686,6 @@ async function openLumpInEditor(token) {
         // ── Always make the editor fully editable on LUMP-panel open ──────
         asmEd.readOnly = false;
         asmEd.classList.remove('cm-editor-sealed');
-        var _tabsRow = document.querySelector('.example-tabs-row');
-        if (_tabsRow) _tabsRow.style.display = '';
 
         // ── Determine compiled disassembly, independently of recovered source ─
         var _compiledDisasm;
@@ -5716,7 +5718,8 @@ async function openLumpInEditor(token) {
         // ── Check for a saved draft from a previous session ───────────────
         var _savedDraft = _draftLsGet(token);
         if (_savedDraft !== null) _savedDraft = _migrateBfextBfinsSyntax(_savedDraft);
-        var _hasDraft   = _savedDraft !== null && _savedDraft.trim() !== '' && _savedDraft !== _recoveredSource;
+        var _hasDraft   = _sourceRestored && _savedDraft !== null &&
+            _savedDraft.trim() !== '' && _savedDraft !== _recoveredSource;
         // Saved-LUMP source changes are programmatic, so they do not emit the
         // native input event used by the normal editor freshness watcher.
         // Keep a previous run visibly stale when this editor context changes.
@@ -5755,6 +5758,7 @@ async function openLumpInEditor(token) {
             if (_bannerRestoreBtn) {
                 _bannerRestoreBtn.addEventListener('click', function() {
                     _setSavedLumpEditorSource(_savedDraft);
+                    if (typeof saveEditorState === 'function') saveEditorState();
                     asmEd.classList.add('cm-editor-draft');
                     var _strong = _draftBanner.querySelector('strong');
                     var _copy = _draftBanner.querySelector('.lump-draft-copy');
@@ -5769,6 +5773,7 @@ async function openLumpInEditor(token) {
                 _bannerDiscardBtn.addEventListener('click', function() {
                     _draftLsDel(token);
                     _setSavedLumpEditorSource(window._editorOriginalDisasm || '');
+                    if (typeof saveEditorState === 'function') saveEditorState();
                     asmEd.classList.remove('cm-editor-draft');
                     _draftBanner.remove();
                     if (typeof updateLineNumbers === 'function') updateLineNumbers();
@@ -5795,13 +5800,18 @@ async function openLumpInEditor(token) {
         }
 
         if (!_sourceRestored) {
+            // A binary-only artifact is not an editable source document. Do
+            // not present a blank textarea as if it were recovered source.
+            _setSavedLumpEditorSource('');
+            asmEd.readOnly = true;
+            asmEd.classList.add('cm-editor-sealed');
             var _sourceMissingBanner = document.createElement('div');
             _sourceMissingBanner.id = '_lumpSourceMissingBanner';
             _sourceMissingBanner.className = 'lump-malformed-banner';
             _sourceMissingBanner.textContent =
                 _binaryFrameIsApiOnly
-                    ? 'This LUMP was saved as API only, so no source was embedded. The left pane is a new editable source buffer; the right pane is compiled disassembly.'
-                    : 'Embedded source is unavailable. Legacy sidecar and catalog source are not trusted as artifact content. The left pane is a new editable source buffer; the right pane is compiled disassembly.';
+                    ? 'Binary-only LUMP: no source is embedded. The source pane is intentionally unavailable; compiled disassembly is shown on the right.'
+                    : 'Embedded source is unavailable. Legacy sidecar and catalog source are not trusted as artifact content. The source pane is intentionally unavailable; compiled disassembly is shown on the right.';
             var _sourceMissingParent = asmEd.parentNode && asmEd.parentNode.parentNode;
             if (_sourceMissingParent) _sourceMissingParent.insertBefore(_sourceMissingBanner, asmEd.parentNode);
             else if (asmEd.parentNode) asmEd.parentNode.insertBefore(_sourceMissingBanner, asmEd);
@@ -5854,6 +5864,7 @@ async function openLumpInEditor(token) {
             _ed.classList.remove('cm-editor-draft');
             if (typeof updateLineNumbers === 'function') updateLineNumbers();
         }
+        if (typeof saveEditorState === 'function') saveEditorState();
         // Detach dirty listener
         if (window._editorLumpDirtyListener && window._editorLumpDirtyListenerEl) {
             window._editorLumpDirtyListenerEl.removeEventListener('input', window._editorLumpDirtyListener);

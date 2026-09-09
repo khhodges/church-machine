@@ -1428,14 +1428,6 @@
     outline: 1px solid var(--church-gold);
 }
 
-.example-tabs-row {
-    display: flex;
-    align-items: center;
-    margin-bottom: 0.35rem;
-    flex-shrink: 0;
-    gap: 0;
-}
-
 .example-arrow {
     background: var(--bg-secondary);
     color: var(--text-secondary);

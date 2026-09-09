@@ -667,39 +667,9 @@ function onLangChange(restoring) {
     const btnExportLump = document.getElementById('btnExportLump');
     if (btnExportLump) btnExportLump.disabled = (lang !== 'assembly' || !_hasMemLump);
 
-    const langExampleGroups = LANG_EXAMPLE_GROUPS;
-
-    const scroll = document.getElementById('exampleTabsScroll');
-    if (scroll) {
-        const allowedSet = langExampleGroups[lang] || [];
-        // If this language has tabs, ensure the row container is visible — it may
-        // have been hidden by _applySealedLumpState.  Keep it hidden while a
-        // sealed lump is active (the editor is read-only so example tabs are
-        // irrelevant until the user unseals).
-        if (allowedSet.length > 0) {
-            const tabsRow = document.querySelector('.example-tabs-row');
-            const _isSealed = !!localStorage.getItem('cm_sealed_lump');
-            if (tabsRow && !_isSealed) tabsRow.style.display = '';
-        }
-        // Built-in example tabs: hide all when in personal mode, else show only this lang's set
-        const tabs = scroll.querySelectorAll('.example-tab:not(.user-tab)');
-        tabs.forEach(tab => {
-            const ex = tab.getAttribute('data-example');
-            const visible = allowedSet.includes(ex);
-            tab.style.display = visible ? '' : 'none';
-            tab.dataset.langHidden = visible ? '0' : '1';
-            // Deactivate tabs that are being hidden (belong to a different language)
-            if (!visible) tab.classList.remove('active');
-        });
-        // User tabs container: only visible in personal mode
-        const userTabsCont = document.getElementById('userTabsContainer');
-        if (userTabsCont) userTabsCont.style.display = lang === 'personal' ? '' : 'none';
-
-        // Re-apply any active search filter now that language-based visibility
-        // has been recomputed, so the two rules compose correctly.
-        const searchBox = document.getElementById('exampleSearchBox');
-        if (searchBox && searchBox.value) filterExampleTabs(searchBox.value);
-    }
+    // Built-ins are opened from the unified Open File catalog.  Do not
+    // manipulate the retired horizontal tab row here.
+    if (typeof renderUserTabs === 'function') renderUserTabs();
 
     // Only update the tab's stored lang when switching to a real language (not 'personal')
     if (activeUserTabId && lang !== 'personal') {
@@ -1965,15 +1935,6 @@ function _applySealedLumpState(absName) {
         editor.readOnly = true;
         editor.classList.add('cm-editor-sealed');
     }
-    // Always hide the example-tabs-row when sealing.  Sealing only ever
-    // happens after compiling in Assembly mode, so hiding example tabs (which
-    // are only useful when the editor is editable) is always correct here.
-    // Previously this only hid the row when curLang==='assembly', but on page
-    // reload the language selector may have been restored to a different value
-    // by loadEditorState() before _applySealedLumpState() runs, causing the
-    // row to remain visible despite the seal.
-    const tabsRow = document.querySelector('.example-tabs-row');
-    if (tabsRow) tabsRow.style.display = 'none';
     localStorage.setItem('cm_sealed_lump', JSON.stringify({ abstraction: absName || 'Unnamed', sealedAt: Date.now() }));
 }
 
@@ -2426,6 +2387,10 @@ function compileAndCreateAbstraction() {
 }
 
 function loadCLOOMCExample(name) {
+    if (typeof _beginBuiltInEditorTransition === 'function') {
+        _beginBuiltInEditorTransition();
+    }
+    window._activeBuiltInKey = 'cloomc_' + name;
     if (typeof window.exitSavedLumpEditorMode === 'function') {
         window.exitSavedLumpEditorMode();
     }
@@ -2457,16 +2422,8 @@ function loadCLOOMCExample(name) {
                 saveEditorState();
                 updateLineNumbers();
                 if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
-                // Activate the matching tab — data-example may have a 'cloomc_' prefix
-                document.querySelectorAll('.example-tab').forEach(t => {
-                    const de = t.dataset.example || '';
-                    t.classList.toggle('active',
-                        de === name || de === 'cloomc_' + name);
-                });
-                // Title must always follow the active tab label without exception.
                 if (typeof _updateEditorCodeName === 'function') {
-                    const _activeBtn = document.querySelector('.example-tab.active');
-                    _updateEditorCodeName(_activeBtn ? _activeBtn.textContent.trim() : name);
+                    _updateEditorCodeName(name);
                 }
                 // Set the correct language for this file
                 const sel = document.getElementById('langSelector');

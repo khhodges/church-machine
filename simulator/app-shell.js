@@ -492,14 +492,21 @@ function createUserTab(name, lang, initialCode) {
     const code = (initialCode !== undefined) ? initialCode : '';
     const tab = { id: generateTabId(), name: name, lang: lang || 'assembly', code };
     userTabs.push(tab);
+    _openFileCache = null;
     saveUserTabsToStorage();
     renderUserTabs();
+    if (document.getElementById('openFileDialog') &&
+        document.getElementById('openFileDialog').style.display !== 'none') {
+        _openFileCache = null;
+        _loadOpenFileCatalog();
+    }
     selectUserTab(tab.id);
     return tab;
 }
 
 function deleteUserTab(id) {
     userTabs = userTabs.filter(t => t.id !== id);
+    _openFileCache = null;
     saveUserTabsToStorage();
     if (activeUserTabId === id) {
         activeUserTabId = null;
@@ -517,6 +524,9 @@ function deleteUserTab(id) {
 }
 
 function selectUserTab(id) {
+    if (typeof window._clearAuthoritativeDraftBanner === 'function') {
+        window._clearAuthoritativeDraftBanner();
+    }
     if (activeUserTabId && userTabDirty) {
         saveActiveUserTab();
     }
@@ -706,10 +716,40 @@ function savePseudoCode() {
 // Fetches the server file list, shows a searchable picker, and loads the
 // chosen file into the editor with its path tracked for Ctrl+Shift+F saves.
 
-var _openFileCache = null;  // cached [{path, name, dir}] from last fetch
+var _openFileCache = null;  // unified catalog entries
+var _openFileLoading = null;
+var _catalogActiveIdentity = null;
+var _CATALOG_BUILTIN_NAMES = {
+    led_control: 'LED Flash ✦',
+    led_dr_test: 'LED DR Test ✦',
+    constants_dot: 'Constants Dot ★',
+    stack_overflow: 'Stack Overflow ✦',
+    recall_demo: 'recall() ✦'
+};
 
 var _openFileTrigger = null;
 var _openFileTrap = null;
+// All built-in loaders use this handoff so a server file, saved LUMP, or
+// personal tab can never leak into the next built-in's Save File destination.
+function _beginBuiltInEditorTransition() {
+    if (typeof window._clearAuthoritativeDraftBanner === 'function') {
+        window._clearAuthoritativeDraftBanner();
+    }
+    if (typeof window.exitSavedLumpEditorMode === 'function') {
+        window.exitSavedLumpEditorMode();
+    }
+    window._editorSourceFilePath = null;
+    window._editorOpenLumpToken = null;
+    window._editorOpenLumpMeta = null;
+    if (typeof activeUserTabId !== 'undefined' && activeUserTabId &&
+            typeof userTabDirty !== 'undefined' && userTabDirty &&
+            typeof saveActiveUserTab === 'function') saveActiveUserTab();
+    if (typeof activeUserTabId !== 'undefined') activeUserTabId = null;
+    if (typeof userTabDirty !== 'undefined') userTabDirty = false;
+    if (typeof clearPseudoEditContext === 'function') clearPseudoEditContext();
+    if (typeof renderUserTabs === 'function') renderUserTabs();
+    if (typeof updateSaveUserTabBtn === 'function') updateSaveUserTabBtn();
+}
 function showOpenFileDialog() {
     var dlg = document.getElementById('openFileDialog');
     if (!dlg) return;
@@ -720,21 +760,81 @@ function showOpenFileDialog() {
     var search = document.getElementById('openFileSearch');
     if (search) { search.value = ''; search.focus(); }
     _renderOpenFileList('');
+    _loadOpenFileCatalog();
+}
 
-    if (!_openFileCache) {
-        fetch('/api/source-files')
-            .then(function(r) { return r.json(); })
-            .then(function(j) {
-                _openFileCache = j.files || [];
-                _renderOpenFileList(document.getElementById('openFileSearch')
-                                        ? document.getElementById('openFileSearch').value
-                                        : '');
-            })
-            .catch(function() {
-                var list = document.getElementById('openFileList');
-                if (list) list.innerHTML = '<div class="of-empty">Could not load file list.</div>';
+/* One catalog is deliberately assembled here rather than maintaining another
+ * tab registry.  Built-ins retain their existing loader, while server files
+ * and LUMPs use their canonical open paths. */
+function _loadOpenFileCatalog() {
+    if (_openFileLoading) return _openFileLoading;
+    _openFileLoading = Promise.allSettled([
+        fetch('/api/source-files').then(function(r) {
+            if (!r.ok) throw new Error('source-files HTTP ' + r.status);
+            return r.json();
+        }),
+        fetch('/api/lumps/list').then(function(r) {
+            if (!r.ok) throw new Error('lumps/list HTTP ' + r.status);
+            return r.json();
+        })
+    ]).then(function(results) {
+        var filesPayload = results[0].status === 'fulfilled' ? results[0].value : {};
+        var lumpsPayload = results[1].status === 'fulfilled' ? results[1].value : [];
+        var files = filesPayload.files || [];
+        var lumps = Array.isArray(lumpsPayload) ? lumpsPayload : [];
+        var entries = [];
+        var groups = (typeof LANG_EXAMPLE_GROUPS !== 'undefined') ? LANG_EXAMPLE_GROUPS : {};
+        var labels = {cloomc:'CLOOMC++', javascript:'CLOOMC++', english:'English',
+            symbolic:'Symbolic Math', assembly:'Assembly', haskell:'Haskell',
+            lambda:'Lambda Calculus', personal:'My Programs'};
+        var seen = {};
+        Object.keys(groups).forEach(function(lang) {
+            (groups[lang] || []).forEach(function(key) {
+                if (lang === 'personal' || seen[key]) return;
+                seen[key] = true;
+                var builtKey = key.indexOf('cloomc_') === 0 ? key.slice(7) : key;
+                entries.push({kind:'builtin', key:key, name:_CATALOG_BUILTIN_NAMES[builtKey] ||
+                    builtKey.replace(/_/g, ' '),
+                    language:labels[lang] || lang, path:'built-in/' + lang + '/' + builtKey,
+                    lang:lang});
             });
-    }
+        });
+        files.forEach(function(f) {
+            entries.push({kind:'file', name:f.name, language:'CLOOMC++',
+                path:f.path, detail:f.dir || 'simulator'});
+        });
+        lumps.filter(function(l) { return l.archived !== true && l.current !== false; })
+        .forEach(function(l) {
+            var name = l.dot_name || l.abstraction || l.pet_name || l.token;
+            var lumpLanguage = l.language || l.source_language || l.lang ||
+                l.sourceLanguage || l.content_language || 'Assembly';
+            var revision = l.lump_version == null ? '' : ' · v' + l.lump_version;
+            entries.push({kind:'lump', name:name, language:lumpLanguage,
+                path:'LUMP ' + (l.token || '') + revision, token:l.token,
+                detail:l.binary_valid === false ? 'binary unavailable' :
+                    (l.has_source ? 'source embedded' : 'binary only'),
+                binaryOnly:!l.has_source});
+        });
+        userTabs.forEach(function(t) {
+            entries.push({kind:'personal', name:t.name, language:labels[t.lang] || t.lang,
+                path:'personal/' + t.name, id:t.id, lang:t.lang});
+        });
+        var languageOrder = ['CLOOMC++','Assembly','Haskell','Symbolic Math','English',
+            'Lambda Calculus','My Programs'];
+        entries.sort(function(a,b) {
+            var la = languageOrder.indexOf(a.language), lb = languageOrder.indexOf(b.language);
+            if (la < 0) la = 99; if (lb < 0) lb = 99;
+            return la - lb || a.name.localeCompare(b.name) || a.path.localeCompare(b.path);
+        });
+        _openFileCache = entries;
+        _openFileLoading = null;
+        _renderOpenFileList((document.getElementById('openFileSearch') || {}).value || '');
+    }).catch(function() {
+        _openFileLoading = null;
+        var list = document.getElementById('openFileList');
+        if (list) list.innerHTML = '<div class="of-empty">Could not load file catalog.</div>';
+    });
+    return _openFileLoading;
 }
 
 function closeOpenFileDialog() {
@@ -754,30 +854,102 @@ function _renderOpenFileList(query) {
     }
     var q = (query || '').trim().toLowerCase();
     var files = _openFileCache.filter(function(f) {
-        return !q || f.name.toLowerCase().includes(q) || f.dir.toLowerCase().includes(q);
+        return !q || [f.name, f.language, f.path, f.detail || ''].join(' ').toLowerCase().includes(q);
     });
     if (!files.length) {
         list.innerHTML = '<div class="of-empty">No files match.</div>';
         return;
     }
-    // Group by dir
+    // Group by stable language order (the catalog is already sorted).
     var groups = {};
     var order  = [];
     files.forEach(function(f) {
-        var g = f.dir || 'simulator';
+        var g = f.language || 'Other';
         if (!groups[g]) { groups[g] = []; order.push(g); }
         groups[g].push(f);
     });
-    var html = '';
+    var html = '<div class="of-catalog-actions"><button class="btn btn-sm" onclick="showNewTabDialog()">+ New Program</button></div>';
     order.forEach(function(g) {
-        html += '<div class="of-group-title">' + _escHtml(g || 'simulator') + '/</div>';
+        html += '<div class="of-group-title">' + _escHtml(g) + '</div>';
         groups[g].forEach(function(f) {
-            var active = (window._editorSourceFilePath === f.path) ? ' of-item-active' : '';
-            html += '<button class="of-item' + active + '" onclick="openSourceFile(\'' +
-                    f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\')">' + _escHtml(f.name) + '<span class="of-item-ext">.cloomc</span></button>';
+            var active = ((_catalogActiveIdentity === f.path) ||
+                (window._editorSourceFilePath === f.path)) ? ' of-item-active' : '';
+            var encoded = encodeURIComponent(JSON.stringify(f)).replace(/'/g, '%27');
+            var action = f.kind === 'builtin' ? 'openCatalogBuiltin' :
+                f.kind === 'lump' ? 'openCatalogLump' :
+                f.kind === 'personal' ? 'openCatalogPersonal' : 'openCatalogFile';
+            var disabled = f.binaryOnly ? ' title="Binary-only LUMP: opens with an explicit source-unavailable state"' : '';
+            html += '<div class="of-item' + active + '"' + disabled + '>' +
+                '<button type="button" class="of-item-open" onclick="' + action + '(decodeURIComponent(\'' + encoded + '\'))">' +
+                _escHtml(f.name) + '<span class="of-item-ext">' + _escHtml(f.path) +
+                (f.detail ? ' · ' + _escHtml(f.detail) : '') + '</span>' +
+                '</button>' +
+                (f.kind === 'personal' ? '<span class="of-item-actions">' +
+                  '<button type="button" onclick="event.stopPropagation();renameUserTab(\'' +
+                  f.id + '\')" title="Rename program">Rename</button>' +
+                  '<button type="button" onclick="event.stopPropagation();deleteCatalogPersonal(\'' +
+                  f.id + '\')" title="Delete program">Delete</button></span>' : '') +
+                '</div>';
         });
     });
     list.innerHTML = html;
+}
+
+function _catalogArg(raw) { return JSON.parse(raw); }
+function openCatalogBuiltin(raw) {
+    var e = _catalogArg(raw), fn = e.lang === 'assembly' ? loadExample : loadCLOOMCExample;
+    closeOpenFileDialog();
+    _catalogActiveIdentity = e.path;
+    fn(e.lang === 'assembly' ? e.key : e.key.replace(/^cloomc_/, ''));
+}
+function openCatalogFile(raw) { var e = _catalogArg(raw); _catalogActiveIdentity = e.path; openSourceFile(e.path); }
+function openCatalogLump(raw) {
+    var e = _catalogArg(raw); if (e.token && typeof openLumpInEditor === 'function') {
+        closeOpenFileDialog(); _catalogActiveIdentity = e.path; openLumpInEditor(e.token);
+    }
+}
+function openCatalogPersonal(raw) {
+    var e = _catalogArg(raw); closeOpenFileDialog(); _catalogActiveIdentity = e.path; selectUserTab(e.id);
+}
+function deleteCatalogPersonal(id) {
+    var tab = userTabs.find(function(t) { return t.id === id; });
+    if (tab && confirm('Delete program "' + tab.name + '"?')) {
+        var cachedCatalog = _openFileCache;
+        deleteUserTab(id);
+        if (cachedCatalog) {
+            _openFileCache = cachedCatalog.filter(function(entry) {
+                return !(entry.kind === 'personal' && entry.id === id);
+            });
+            _renderOpenFileList((document.getElementById('openFileSearch') || {}).value || '');
+        } else {
+            _loadOpenFileCatalog();
+        }
+    }
+}
+
+function renameUserTab(id, requestedName) {
+    var tab = userTabs.find(function(t) { return t.id === id; });
+    if (!tab) return false;
+    var name = (requestedName == null) ? prompt('Rename program', tab.name) : requestedName;
+    name = String(name || '').trim();
+    if (!name) return false;
+    tab.name = name.slice(0, 32);
+    saveUserTabsToStorage();
+    renderUserTabs();
+    if (activeUserTabId === id) _updateEditorCodeName(tab.name);
+    if (_openFileCache) {
+        var catalogEntry = _openFileCache.find(function(entry) {
+            return entry.kind === 'personal' && entry.id === id;
+        });
+        if (catalogEntry) {
+            catalogEntry.name = tab.name;
+            catalogEntry.path = 'personal/' + tab.name;
+        }
+        _renderOpenFileList((document.getElementById('openFileSearch') || {}).value || '');
+    } else {
+        _loadOpenFileCatalog();
+    }
+    return true;
 }
 
 function _escHtml(s) {
@@ -786,6 +958,9 @@ function _escHtml(s) {
 
 function openSourceFile(path) {
     closeOpenFileDialog();
+    if (typeof window._clearAuthoritativeDraftBanner === 'function') {
+        window._clearAuthoritativeDraftBanner();
+    }
     if (typeof window.exitSavedLumpEditorMode === 'function') {
         window.exitSavedLumpEditorMode();
     }
@@ -807,6 +982,7 @@ function openSourceFile(path) {
             }
             activeUserTabId = null;
             userTabDirty = false;
+            window._activeBuiltInKey = null;
             document.querySelectorAll('.example-tab').forEach(function(tab) {
                 tab.classList.remove('active');
             });
@@ -1084,6 +1260,8 @@ function renderUserTabs() {
 }
 
 function showNewTabDialog() {
+    // The named-program dialog must not sit behind the Open File modal.
+    closeOpenFileDialog();
     const dialog = document.getElementById('newTabDialog');
     if (!dialog) return;
     dialog.style.display = 'flex';

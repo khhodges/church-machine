@@ -148,3 +148,4 @@
 - [Namespace header boot fallback](namespace-header-boot-fallback.md) — a missing selected dynamic boot slot must not crash reset; header falls back to a resident canonical entry
 - [Resident image binding validation](resident-image-binding-validation.md) — compare immutable artifact payload plus slot/sequence/allocation; c-list rows are destination-localized
 - [Localized c-list provenance](localized-clist-provenance.md) — bind generated images to both selected artifact hashes and resulting localized capability rows
+- [Editor source authority](editor-source-authority.md) — persisted sources reopen from current authority; divergent browser buffers remain explicit recoverable drafts
