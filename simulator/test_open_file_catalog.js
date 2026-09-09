@@ -26,8 +26,13 @@ assert(shell.includes("_renderOpenFileList((document.getElementById('openFileSea
 // siblings, never nested interactive buttons.
 assert(shell.includes("html += '<div class=\"of-item'"));
 assert(!shell.includes("'<button class=\"of-item'"));
-assert(shell.includes('languageOrder'));
+assert(shell.includes("var groups = { 'LUMPs': [], 'Code Examples': [] }"));
+assert(shell.includes("f.kind === 'lump' ? 'LUMPs' : 'Code Examples'"));
+assert(shell.includes("(Number(b.date) || 0) - (Number(a.date) || 0)"));
+assert(shell.includes("date:l.compiled_at || 0"));
+assert(shell.includes("date:f.modified_at || 0"));
 assert(shell.includes('f.name, f.language, f.path'));
+assert(html.includes('class="of-item-date"') || html.includes('.of-item-date'));
 assert(run.includes('window._activeBuiltInKey'));
 assert(run.includes("return { type: 'example', id: window._activeBuiltInKey }"));
 assert(run.includes('Restore Draft') && run.includes('Discard Draft'));

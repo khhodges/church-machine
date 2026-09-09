@@ -202,13 +202,21 @@
         .ham-item.ham-is-default::after { content:'⚡'; font-size:0.7rem; margin-left:auto; color:#daa520; flex-shrink:0; }
         .ham-separator { height:1px; background:var(--border,#2a2a4a); margin:0.3rem 0; }
         /* Open-file picker */
-        .of-group-title { padding:0.35rem 0.75rem 0.1rem; font-size:0.68rem; color:#55557a; text-transform:uppercase; letter-spacing:0.06em; user-select:none; }
-        .of-item { display:block; width:100%; box-sizing:border-box; padding:0.32rem 0.75rem; text-align:left; background:none; border:none; color:#c8c8e0; font-size:0.85rem; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .of-item:hover { background:rgba(255,255,255,0.06); color:#fff; }
-        .of-item-active { color:#daa520 !important; }
-        .of-item-active::before { content:'\2022 '; }
-        .of-item-ext { color:#55557a; font-size:0.78rem; }
-        .of-empty { padding:0.75rem; color:#55557a; font-style:italic; font-size:0.82rem; }
+        .of-catalog-actions { display:flex; justify-content:flex-end; padding:0.3rem 0.5rem 0.45rem; }
+        .of-group { padding:0 0.45rem 0.5rem; }
+        .of-group + .of-group { border-top:1px solid rgba(218,165,32,0.18); padding-top:0.35rem; }
+        .of-group-title { display:flex; align-items:center; gap:0.45rem; padding:0.55rem 0.45rem 0.35rem; font-size:0.72rem; font-weight:700; color:#daa520; text-transform:uppercase; letter-spacing:0.09em; user-select:none; }
+        .of-group-count { min-width:1.25rem; padding:1px 5px; border:1px solid rgba(218,165,32,0.28); border-radius:9px; color:#8f7b45; font-size:0.62rem; text-align:center; }
+        .of-item { display:flex; width:100%; box-sizing:border-box; margin:2px 0; background:rgba(8,14,28,0.28); border:1px solid transparent; border-radius:5px; color:#c8c8e0; }
+        .of-item:hover { background:rgba(55,104,160,0.16); border-color:rgba(96,165,250,0.25); color:#fff; }
+        .of-item:focus-within { border-color:#60a5fa; box-shadow:0 0 0 2px rgba(96,165,250,0.15); }
+        .of-item-active { background:rgba(218,165,32,0.1); border-color:rgba(218,165,32,0.35); }
+        .of-item-open { display:flex; align-items:center; gap:0.75rem; width:100%; min-width:0; padding:0.52rem 0.65rem; text-align:left; color:inherit; background:none; border:0; cursor:pointer; }
+        .of-item-main { display:flex; flex-direction:column; min-width:0; flex:1; }
+        .of-item-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.86rem; font-weight:600; }
+        .of-item-meta { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#747b94; font-size:0.69rem; margin-top:2px; }
+        .of-item-date { flex-shrink:0; color:#7f879d; font-size:0.68rem; }
+        .of-empty { padding:1rem; color:#747b94; font-style:italic; font-size:0.82rem; text-align:center; }
         .ham-debug-section { display:none; flex-direction:column; }
         html.r1-debug-mode .ham-debug-section { display:flex; }
         .ham-subhead.ham-learn-section { display:none; }
@@ -562,8 +570,6 @@
                         <button class="btn btn-view sim-icon-btn wukong-trace-toggle-btn" id="wukongTraceToggleBtn"
                                 onclick="toggleWukongTracePanel()" aria-pressed="true"
                                 data-tooltip="HW Trace — Show or hide the hardware trace popup">&#x26A1; Trace</button>
-                        <button class="btn sim-icon-btn" id="nextThreadBtn" onclick="nextConfiguredThread()"
-                                aria-label="Next Thread" data-tooltip="Next Thread — save this Thread and resume the next configured Thread">&#x21BB;</button>
                         <span id="activeThreadStatus" class="fault-free-badge ff-zero" aria-live="polite"
                               data-tooltip="Active configured Thread">Thread.1 · 1/1</span>
                         <div class="run-wrap" id="runWrap">
@@ -3355,7 +3361,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
 
     <!-- ── Unified Open File catalog ───────────────────────────────────── -->
     <div id="openFileDialog" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeOpenFileDialog()">
-        <div class="modal-dialog" style="max-width:520px;width:92vw;max-height:80vh;display:flex;flex-direction:column;gap:0;" role="dialog" aria-modal="true" aria-label="Open File">
+        <div class="modal-dialog" style="max-width:640px;width:92vw;max-height:82vh;display:flex;flex-direction:column;gap:0;" role="dialog" aria-modal="true" aria-label="Open File">
             <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
                 <span>Open File Catalog</span>
                 <button onclick="closeOpenFileDialog()" style="background:none;border:none;color:#9ca3af;font-size:1.2rem;cursor:pointer;line-height:1;padding:0;">&times;</button>
@@ -3365,7 +3371,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
                    oninput="_renderOpenFileList(this.value)"
                    onkeydown="if(event.key==='Escape')closeOpenFileDialog()"
                    style="flex-shrink:0;margin-bottom:0.5rem;">
-            <div id="openFileList" style="overflow-y:auto;flex:1;min-height:120px;max-height:52vh;border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:2px 0;"></div>
+            <div id="openFileList" style="overflow-y:auto;flex:1;min-height:160px;max-height:58vh;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:2px 0;background:rgba(4,8,18,0.18);"></div>
         </div>
     </div>
 
@@ -3465,7 +3471,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="abstract_gt_manager.js"></script>
     <script src="thread_design.js?v=sha256-6c9b749e878a"></script>
     <script src="architecture_contracts.js?v=sha256-1d50622f8024"></script>
-    <script src="simulator.js?v=sha256-6078b0ed9846"></script>
+    <script src="simulator.js?v=sha256-35dcb93ed8de"></script>
     <script src="capability_tokens.js?v=sha256-47002971f6f6"></script>
     <script src="portable_lump_binding.js?v=sha256-1565bea4b151"></script>
     <script src="assembler.js?v=sha256-91248bb82841"></script>
@@ -3494,13 +3500,13 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script defer src="app-startup-wizard.js?v=sha256-501bb88367f8"></script>
     <script src="lump-registry.js?v=sha256-816d38b00991"></script>
     <script src="target-state.js?v=sha256-cc7981e52e84"></script>
-    <script src="app-shell.js?v=sha256-1ce6cb2c2d35"></script>
+    <script src="app-shell.js?v=sha256-8018afc60db5"></script>
     <script src="app-tools.js?v=sha256-98260bf84d81"></script>
     <script src="app-cr-display.js?v=sha256-4c3d0a217802"></script>
     <script src="app-cr-detail.js?v=sha256-ed0d60bebd25"></script>
     <script src="tab-correction.js?v=sha256-c8d226d6edc8"></script>
     <script src="pet_name_audit.js"></script>
-    <script src="app-memory.js?v=sha256-eac8c5379441"></script>
+    <script src="app-memory.js?v=sha256-0c182656db8a"></script>
     <script src="app-abstractions.js?v=sha256-fb112d930f03"></script>
     <script src="app-ns-dna.js"></script>
     <script src="lump-audit.js?v=sha256-9d73e51954ab"></script>
@@ -3515,7 +3521,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="app-editor-find.js?v=sha256-aeb1fa51e855"></script>
     <script src="lump_save_handler.js?v=sha256-7df7e9f047ec"></script>
     <script src="whats-new-feed.js?v=sha256-4f1499720d0d"></script>
-    <script src="app-run.js?v=sha256-124a337e55c2"></script>
+    <script src="app-run.js?v=sha256-0d2ea5c40b5b"></script>
     <script src="app-build-approval.js?v=sha256-0c42efb53175"></script>
     <script src="app-source-library.js?v=sha256-f0acb36b8999"></script>
     <script src="app-invoke.js?v=sha256-376a499e341a"></script>

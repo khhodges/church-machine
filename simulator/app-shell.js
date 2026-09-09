@@ -801,7 +801,7 @@ function _loadOpenFileCatalog() {
         });
         files.forEach(function(f) {
             entries.push({kind:'file', name:f.name, language:'CLOOMC++',
-                path:f.path, detail:f.dir || 'simulator'});
+                path:f.path, detail:f.dir || 'simulator', date:f.modified_at || 0});
         });
         lumps.filter(function(l) { return l.archived !== true && l.current !== false; })
         .forEach(function(l) {
@@ -813,18 +813,20 @@ function _loadOpenFileCatalog() {
                 path:'LUMP ' + (l.token || '') + revision, token:l.token,
                 detail:l.binary_valid === false ? 'binary unavailable' :
                     (l.has_source ? 'source embedded' : 'binary only'),
+                date:l.compiled_at || 0,
                 binaryOnly:!l.has_source});
         });
         userTabs.forEach(function(t) {
             entries.push({kind:'personal', name:t.name, language:labels[t.lang] || t.lang,
                 path:'personal/' + t.name, id:t.id, lang:t.lang});
         });
-        var languageOrder = ['CLOOMC++','Assembly','Haskell','Symbolic Math','English',
-            'Lambda Calculus','My Programs'];
         entries.sort(function(a,b) {
-            var la = languageOrder.indexOf(a.language), lb = languageOrder.indexOf(b.language);
-            if (la < 0) la = 99; if (lb < 0) lb = 99;
-            return la - lb || a.name.localeCompare(b.name) || a.path.localeCompare(b.path);
+            var sectionA = a.kind === 'lump' ? 0 : 1;
+            var sectionB = b.kind === 'lump' ? 0 : 1;
+            return sectionA - sectionB ||
+                a.name.localeCompare(b.name, undefined, {sensitivity:'base'}) ||
+                (Number(b.date) || 0) - (Number(a.date) || 0) ||
+                a.path.localeCompare(b.path);
         });
         _openFileCache = entries;
         _openFileLoading = null;
@@ -860,17 +862,21 @@ function _renderOpenFileList(query) {
         list.innerHTML = '<div class="of-empty">No files match.</div>';
         return;
     }
-    // Group by stable language order (the catalog is already sorted).
-    var groups = {};
-    var order  = [];
+    // Keep saved LUMPs separate from every editable/built-in code example.
+    var groups = { 'LUMPs': [], 'Code Examples': [] };
     files.forEach(function(f) {
-        var g = f.language || 'Other';
-        if (!groups[g]) { groups[g] = []; order.push(g); }
+        var g = f.kind === 'lump' ? 'LUMPs' : 'Code Examples';
         groups[g].push(f);
     });
     var html = '<div class="of-catalog-actions"><button class="btn btn-sm" onclick="showNewTabDialog()">+ New Program</button></div>';
-    order.forEach(function(g) {
-        html += '<div class="of-group-title">' + _escHtml(g) + '</div>';
+    ['LUMPs', 'Code Examples'].forEach(function(g) {
+        if (!groups[g].length) return;
+        html += '<section class="of-group" aria-labelledby="of-' +
+            g.toLowerCase().replace(/[^a-z]+/g, '-') + '">' +
+            '<div class="of-group-title" id="of-' +
+            g.toLowerCase().replace(/[^a-z]+/g, '-') + '">' +
+            '<span>' + _escHtml(g) + '</span><span class="of-group-count">' +
+            groups[g].length + '</span></div>';
         groups[g].forEach(function(f) {
             var active = ((_catalogActiveIdentity === f.path) ||
                 (window._editorSourceFilePath === f.path)) ? ' of-item-active' : '';
@@ -879,10 +885,14 @@ function _renderOpenFileList(query) {
                 f.kind === 'lump' ? 'openCatalogLump' :
                 f.kind === 'personal' ? 'openCatalogPersonal' : 'openCatalogFile';
             var disabled = f.binaryOnly ? ' title="Binary-only LUMP: opens with an explicit source-unavailable state"' : '';
+            var dateText = f.date ? new Date(Number(f.date) * 1000).toLocaleDateString(
+                undefined, {year:'numeric', month:'short', day:'numeric'}) : '';
             html += '<div class="of-item' + active + '"' + disabled + '>' +
                 '<button type="button" class="of-item-open" onclick="' + action + '(decodeURIComponent(\'' + encoded + '\'))">' +
-                _escHtml(f.name) + '<span class="of-item-ext">' + _escHtml(f.path) +
-                (f.detail ? ' · ' + _escHtml(f.detail) : '') + '</span>' +
+                '<span class="of-item-main"><span class="of-item-name">' + _escHtml(f.name) +
+                '</span><span class="of-item-meta">' + _escHtml(f.language || '') +
+                (f.detail ? ' · ' + _escHtml(f.detail) : '') + '</span></span>' +
+                (dateText ? '<time class="of-item-date">' + _escHtml(dateText) + '</time>' : '') +
                 '</button>' +
                 (f.kind === 'personal' ? '<span class="of-item-actions">' +
                   '<button type="button" onclick="event.stopPropagation();renameUserTab(\'' +
@@ -891,6 +901,7 @@ function _renderOpenFileList(query) {
                   f.id + '\')" title="Delete program">Delete</button></span>' : '') +
                 '</div>';
         });
+        html += '</section>';
     });
     list.innerHTML = html;
 }

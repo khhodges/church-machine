@@ -80,6 +80,8 @@ const findSrcLumpSrc = extractTopLevelFn('app-memory.js', '_findSrcLump');
 function makeSandbox(lumpsCache) {
     const sandbox = {
         _lumpsCache: lumpsCache,
+        window: { _nsState: null },
+        sim: { lumpTokenAtSlot() { return null; } },
         console,
     };
     const ctx = vm.createContext(sandbox);
@@ -172,7 +174,11 @@ console.log('\n--- T05: floating lump with ns_slot: undefined is found by label 
 console.log('\n--- T06: _lumpsCache undefined → null without throwing ---');
 {
     // Intentionally do NOT set _lumpsCache in the sandbox.
-    const sandbox = { console };
+    const sandbox = {
+        console,
+        window: { _nsState: null },
+        sim: { lumpTokenAtSlot() { return null; } },
+    };
     const ctx = vm.createContext(sandbox);
     vm.runInContext(findSrcLumpSrc, ctx, { filename: 'app-memory.js' });
 
@@ -186,6 +192,40 @@ console.log('\n--- T06: _lumpsCache undefined → null without throwing ---');
 
     check('T06a: _findSrcLump does not throw when _lumpsCache is undefined', !threw);
     check('T06b: returns null when _lumpsCache is undefined',                result === null);
+}
+
+// ── T08: committed slot token beats stale same-name cache order ───────────────
+console.log('\n--- T08: committed slot token beats stale same-name cache order ---');
+{
+    const stale = {
+        ns_slot: null, abstraction: 'CapabilityTest', token: 'dead0001',
+        archived: true, lump_version: 24,
+    };
+    const current = {
+        ns_slot: null, abstraction: 'CapabilityTest', token: '4a00000a',
+        lump_version: 2,
+    };
+    const ctx = makeSandbox([stale, current]);
+    ctx.window._nsState = {
+        abstractions: [{ slot: 10, name: 'CapabilityTest', token: '4A00000A' }],
+    };
+    const result = vm.runInContext('_findSrcLump(10, "CapabilityTest")', ctx);
+    check('T08a: exact committed token is returned', result === current);
+    check('T08b: archived first same-name record is ignored', result !== stale);
+}
+
+// ── T09: missing cache metadata still preserves committed token ──────────────
+console.log('\n--- T09: committed token survives before cache warmup ---');
+{
+    const ctx = makeSandbox([]);
+    ctx.window._nsState = {
+        abstractions: [{ slot: 10, name: 'CapabilityTest', token: '4a00000a' }],
+    };
+    const result = vm.runInContext('_findSrcLump(10, "CapabilityTest")', ctx);
+    check('T09a: returns a token-bearing binding before cache warmup',
+        result && result.token === '4a00000a');
+    check('T09b: preserves the committed abstraction name',
+        result && result.abstraction === 'CapabilityTest');
 }
 
 // ── T07: Floating lump not matched when slotLabel is null ────────────────────

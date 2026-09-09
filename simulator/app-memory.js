@@ -132,8 +132,51 @@ function _nsSavedLoadPolicy(slot, manifest) {
 
 function _findSrcLump(slotIdx, slotLabel) {
     if (typeof _lumpsCache === 'undefined' || !Array.isArray(_lumpsCache)) return null;
+    const normaliseToken = function(token) {
+        const text = String(token || '').trim().toLowerCase();
+        return /^[0-9a-f]{1,8}$/.test(text) ? text.padStart(8, '0') : text;
+    };
+    const byToken = function(token) {
+        const wanted = normaliseToken(token);
+        return wanted
+            ? (_lumpsCache.find(function(l) {
+                return l && normaliseToken(l.token) === wanted;
+            }) || null)
+            : null;
+    };
+
+    // The committed Namespace binding is authoritative when several immutable
+    // revisions share one abstraction name. Never let cache order select an
+    // archived same-name artifact for a known slot.
+    const savedRows = window._nsState && Array.isArray(window._nsState.abstractions)
+        ? window._nsState.abstractions : [];
+    const saved = savedRows.find(function(row) {
+        return row && Number(row.slot) === Number(slotIdx);
+    });
+    if (saved && saved.token) {
+        const exactSaved = byToken(saved.token);
+        if (exactSaved) return exactSaved;
+        return Object.assign({
+            abstraction: saved.name || slotLabel || `NS[${slotIdx}]`,
+        }, saved, { token: normaliseToken(saved.token) });
+    }
+
+    // Unsaved/current runtime bindings may not be in ns-state.json yet.
+    const liveToken = sim && typeof sim.lumpTokenAtSlot === 'function'
+        ? sim.lumpTokenAtSlot(slotIdx) : null;
+    const exactLive = byToken(liveToken);
+    if (exactLive) return exactLive;
+
+    const fixed = _lumpsCache.find(function(l) {
+        return l && l.ns_slot !== null && l.ns_slot !== undefined &&
+            Number.isInteger(Number(l.ns_slot)) &&
+            Number(l.ns_slot) === Number(slotIdx);
+    });
+    if (fixed) return fixed;
     if (!slotLabel) return null;
-    return _lumpsCache.find(l => l.abstraction === slotLabel) || null;
+    return _lumpsCache.find(function(l) {
+        return l && l.abstraction === slotLabel && !l.archived;
+    }) || null;
 }
 
 function _resolveCListPetName(gtWord) {

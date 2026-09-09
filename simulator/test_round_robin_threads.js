@@ -419,17 +419,21 @@ outgoingUnderflow._writeCR(0, entryWords[0], outgoingEntry);
 outgoingUnderflow._installLumpHeaderContext(
     outgoingUnderflow.parseGT(entryWords[0]), entryWords[0] & 0xFFFF,
     outgoingEntry, outgoingHeader);
-const outgoingLayout = outgoingUnderflow._threadLayoutAtBase(0);
+const outgoingThreadBase = outgoingUnderflow.readNSEntry(1).word0_location;
+const outgoingLayout = outgoingUnderflow._threadLayoutAtBase(outgoingThreadBase);
 outgoingUnderflow.sto = outgoingLayout.stackStart;
 const outgoingSourceDRHomes = outgoingUnderflow.memory.slice(1, 17);
 const outgoingSourceCaps = outgoingUnderflow.memory.slice(
-    outgoingLayout.capsStart, outgoingLayout.capsEnd + 1);
+    outgoingThreadBase + outgoingLayout.capsStart,
+    outgoingThreadBase + outgoingLayout.capsEnd + 1);
 assert.strictEqual(outgoingUnderflow.advanceConfiguredThread().ok, false,
     'CHANGE rejects an outgoing Thread without two-word frame space');
 assert.deepStrictEqual(outgoingUnderflow.memory.slice(1, 17), outgoingSourceDRHomes,
     'outgoing frame-space rejection is atomic for DR homes');
 assert.deepStrictEqual(
-    outgoingUnderflow.memory.slice(outgoingLayout.capsStart, outgoingLayout.capsEnd + 1),
+    outgoingUnderflow.memory.slice(
+        outgoingThreadBase + outgoingLayout.capsStart,
+        outgoingThreadBase + outgoingLayout.capsEnd + 1),
     outgoingSourceCaps,
     'outgoing frame-space rejection is atomic for CR homes');
 
@@ -457,7 +461,8 @@ assert(malformed.faultLog.length > 0,
 // binding rather than silently returning when window.sim is absent.
 function functionSource(source, name) {
     const functionStart = source.indexOf(`function ${name}(`);
-    const start = functionStart >= 0 ? functionStart : source.indexOf(`${name}() {`);
+    const methodStart = source.search(new RegExp(`\\n\\s*${name}\\([^)]*\\) \\{`));
+    const start = functionStart >= 0 ? functionStart : methodStart;
     assert(start >= 0, `${name} must exist in app-run.js`);
     const brace = source.indexOf('{', start);
     let depth = 0;
@@ -471,10 +476,18 @@ function functionSource(source, name) {
 const appRunSource = fs.readFileSync(__dirname + '/app-run.js', 'utf8');
 const simulatorSource = fs.readFileSync(__dirname + '/simulator.js', 'utf8');
 const advanceSource = functionSource(simulatorSource, 'advanceConfiguredThread');
-assert(advanceSource.includes("crDst: 14, crSrc: 15, imm: target, mnemonic: 'CHANGE'"),
-    'manual advance invokes the decoded CHANGE descriptor shape');
-assert(!/\b(scheduler|saveOutgoing|deferEntryFault)\s*:/.test(advanceSource),
-    'manual advance carries no alternate save/defer semantics');
+const selectSource = functionSource(simulatorSource, 'selectConfiguredThread');
+assert(selectSource.includes("crDst: 14, crSrc: 15, imm: target, mnemonic: 'CHANGE'"),
+    'exact manual selection invokes the decoded CHANGE descriptor shape');
+assert(!/\b(scheduler|saveOutgoing|deferEntryFault)\s*:/.test(selectSource),
+    'exact manual selection carries no alternate save/defer semantics');
+assert(advanceSource.includes('this.selectConfiguredThread('),
+    'round-robin compatibility delegates to exact Thread selection');
+assert(!appRunSource.includes('nextThreadBtn') && !appRunSource.includes('nextConfiguredThread'),
+    'browser control code no longer exposes the redundant Next Thread control');
+const indexSource = fs.readFileSync(__dirname + '/index.html', 'utf8');
+assert(!indexSource.includes('nextThreadBtn') && !indexSource.includes('Next Thread'),
+    'rendered toolbar no longer contains the Next Thread button');
 const uiSim = new ChurchSimulator();
 assert.strictEqual(uiSim.loadBootImage(image), true,
     `UI fixture image must load: ${uiSim.lastBootImageError || 'unknown error'}`);
@@ -521,11 +534,6 @@ assert.strictEqual(uiSim.threadStatusRows(99).length, 3,
     'Thread status output remains capped by the configured Thread count');
 assert.strictEqual(uiSim.threadStatusRows(2).length, 2,
     'Thread status output honours a smaller requested display limit');
-const button = {
-    disabled: false,
-    attrs: {},
-    setAttribute(name, value) { this.attrs[name] = value; },
-};
 const status = { textContent: '' };
 const consoleEl = { textContent: '', scrollTop: 0, scrollHeight: 0 };
 let dashboardUpdates = 0;
@@ -536,7 +544,6 @@ const uiContext = {
     document: {
         getElementById(id) {
             return {
-                nextThreadBtn: button,
                 activeThreadStatus: status,
                 editorConsole: consoleEl,
             }[id] || null;
@@ -547,25 +554,24 @@ const uiContext = {
 };
 vm.createContext(uiContext);
 vm.runInContext([
+    'let _simRunActive = false;',
     functionSource(appRunSource, 'updateThreadControl'),
-    functionSource(appRunSource, 'nextConfiguredThread'),
+    functionSource(appRunSource, 'selectThreadContext'),
 ].join('\n'), uiContext);
 uiContext.updateThreadControl();
-assert.strictEqual(button.disabled, false,
-    'Next Thread button is enabled with three configured Threads');
-uiSim.bootComplete = false;
-uiContext.updateThreadControl();
-assert.strictEqual(button.disabled, false,
-    'Next Thread button remains enabled for saved images before boot');
-uiSim.bootComplete = true;
+assert.strictEqual(status.textContent, 'Thread.1 · 1/3',
+    'active Thread status remains visible without a Next Thread button');
 uiSim.running = true;
-uiContext.updateThreadControl();
-assert.strictEqual(button.disabled, true,
-    'Next Thread button is disabled while the simulator is actively running');
+const runningSlot = uiSim.activeThreadStatus().slot;
+uiContext.selectThreadContext(12);
+assert.strictEqual(uiSim.activeThreadStatus().slot, runningSlot,
+    'direct Thread selection is rejected while Run owns execution');
 uiSim.running = false;
-uiContext.updateThreadControl();
-assert.strictEqual(button.disabled, false,
-    'Next Thread button is re-enabled after the simulator pauses');
+vm.runInContext('_simRunActive = true;', uiContext);
+uiContext.selectThreadContext(12);
+assert.strictEqual(uiSim.activeThreadStatus().slot, runningSlot,
+    'direct Thread selection is rejected between Run batches while the UI run lifecycle owns execution');
+vm.runInContext('_simRunActive = false;', uiContext);
 
 // Walk executes one instruction and then waits for its next timer tick. During
 // that interval sim.running is false, so invoke the real Walk lifecycle with
@@ -586,8 +592,6 @@ assert.strictEqual(uiSim.walkActive, true,
     'Walk start holds the simulator Thread-switch lock');
 assert.strictEqual(uiSim.running, false,
     'the Walk between-ticks fixture is not covered by sim.running');
-assert.strictEqual(button.disabled, true,
-    'Next Thread stays disabled between Walk ticks');
 
 const walkContextBefore = {
     slot: uiSim.activeThreadStatus().slot,
@@ -599,7 +603,7 @@ const walkContextBefore = {
     running: uiSim.running,
     stepCount: uiSim.stepCount,
 };
-uiContext.nextConfiguredThread();
+uiContext.selectThreadContext(12);
 assert.deepStrictEqual({
     slot: uiSim.activeThreadStatus().slot,
     cr: JSON.parse(JSON.stringify(uiSim.cr)),
@@ -615,32 +619,52 @@ assert.deepStrictEqual({
 vm.runInContext('walkToggle();', uiContext);
 assert.strictEqual(uiSim.walkActive, false,
     'Walk stop releases the simulator Thread-switch lock');
-assert.strictEqual(button.disabled, false,
-    'Next Thread is re-enabled after Walk releases its lock');
 
 const finishRunSource = functionSource(appRunSource, 'finishRun');
 assert(finishRunSource.includes('updateThreadControl();'),
     'run cleanup refreshes the independently-owned Thread toolbar state');
 const dashboardUpdatesBeforeThreadClicks = dashboardUpdates;
-uiContext.nextConfiguredThread();
-assert.strictEqual(uiSim.activeThreadStatus().slot, 11,
-    'browser-shaped Next Thread click switches to Thread#2 without window.sim');
-assert.strictEqual(openedCR, 12,
-    'Next Thread opens the selected Thread CR12 memory-map view');
-assert.strictEqual(status.textContent, 'Thread.2 · 2/3',
-    'toolbar status follows the newly active Thread LUMP');
-uiContext.nextConfiguredThread();
+uiContext.selectThreadContext(12);
 assert.strictEqual(uiSim.activeThreadStatus().slot, 12,
-    'second browser-shaped click switches to Thread#3');
+    'browser-shaped row selection switches directly from Thread.1 to Thread.3');
+assert.strictEqual(openedCR, 12,
+    'Thread row selection opens the selected Thread CR12 memory-map view');
 assert.strictEqual(status.textContent, 'Thread.3 · 3/3',
-    'toolbar status follows Thread#3');
-uiContext.nextConfiguredThread();
+    'toolbar status follows the newly active Thread LUMP');
+const dashboardAfterSwitch = dashboardUpdates;
+uiContext.selectThreadContext(12);
+assert.strictEqual(dashboardUpdates, dashboardAfterSwitch + 1,
+    'active-row selection is architecturally unchanged');
+assert.strictEqual(openedCR, 12,
+    'active-row no-op does not replace the open CR12 detail');
+uiContext.selectThreadContext(1);
 assert.strictEqual(uiSim.activeThreadStatus().slot, 1,
-    'third browser-shaped click restores the saved boot Thread');
+    'direct row selection restores the saved boot Thread');
 assert.strictEqual(status.textContent, 'Thread.1 · 1/3',
-    'toolbar status wraps to the boot Thread');
+    'toolbar status follows the restored boot Thread');
 assert.strictEqual(dashboardUpdates - dashboardUpdatesBeforeThreadClicks, 3,
-    'each Next Thread click refreshes the dashboard');
+    'each row selection refreshes the Thread strip and dashboard');
+
+const activeBeforeInvalid = uiSim.activeThreadStatus().slot;
+const invalidExact = uiSim.selectConfiguredThread(999);
+assert.strictEqual(invalidExact.ok, false, 'exact selection rejects a non-Thread Namespace slot');
+assert.strictEqual(uiSim.activeThreadStatus().slot, activeBeforeInvalid,
+    'invalid exact selection leaves the active context unchanged');
+
+const stripSource = functionSource(appRunSource, 'updateThreadIdentityStrip');
+assert(stripSource.includes('_simRunActive || sim.running || sim.walkActive'),
+    'Thread rows remain locked during the full asynchronous Run lifecycle');
+assert(stripSource.includes("card.setAttribute('role', 'button')"),
+    'Thread rows expose button semantics');
+assert(stripSource.includes("card.setAttribute('tabindex', selectable ? '0' : '-1')"),
+    'only selectable inactive Thread rows enter keyboard tab order');
+assert(stripSource.includes("event.key !== 'Enter' && event.key !== ' '"),
+    'Thread rows support Enter and Space activation');
+assert(stripSource.includes("card.setAttribute('aria-current', 'true')"),
+    'active Thread rows expose their current state');
+const selectHandlerSource = functionSource(appRunSource, 'selectThreadContext');
+assert(selectHandlerSource.includes('_simRunActive || sim.walkActive || sim.running'),
+    'activation-time guard rejects stale row handlers between Run batches');
 
 // The configured maximum is architectural Namespace order, not a four-card UI
 // limit: every Thread.1..Thread.10 resolves through the identical CHANGE path.

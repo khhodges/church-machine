@@ -4952,15 +4952,17 @@ class ChurchSimulator {
         };
     }
 
-    // Select the next configured Thread through the architectural CHANGE path.
-    advanceConfiguredThread() {
+    // Select an exact configured Thread through the architectural CHANGE path.
+    selectConfiguredThread(target) {
         const slots = this.configuredThreadSlots();
         if (!slots.length) return { ok: false, reason: 'No configured Thread context is available' };
-        if (slots.length === 1) return { ok: true, unchanged: true, ...this.activeThreadStatus() };
-
         const current = Number.isInteger(this._currentThreadSlot) ? this._currentThreadSlot : 1;
-        const currentIndex = Math.max(0, slots.indexOf(current));
-        const target = slots[(currentIndex + 1) % slots.length];
+        if (!Number.isInteger(target) || !slots.includes(target)) {
+            return { ok: false, reason: `Thread slot ${target} is not configured` };
+        }
+        if (target === current) {
+            return { ok: true, unchanged: true, ...this.activeThreadStatus() };
+        }
         const entry = this.readNSEntry(target);
         const header = entry ? this.parseLumpHeader(this.memory[entry.word0_location] >>> 0) : null;
         const layout = header && header.valid && header.typ === 2
@@ -4983,6 +4985,15 @@ class ChurchSimulator {
         this.emit('threadChange', status);
         this.emit('stateChange', this.getState());
         return { ok: true, ...status, result };
+    }
+
+    // Preserve round-robin callers while routing them through exact selection.
+    advanceConfiguredThread() {
+        const slots = this.configuredThreadSlots();
+        if (!slots.length) return { ok: false, reason: 'No configured Thread context is available' };
+        const current = Number.isInteger(this._currentThreadSlot) ? this._currentThreadSlot : 1;
+        const currentIndex = Math.max(0, slots.indexOf(current));
+        return this.selectConfiguredThread(slots[(currentIndex + 1) % slots.length]);
     }
 
     _writeDR(drIdx, value) {

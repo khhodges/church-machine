@@ -9811,7 +9811,12 @@ def list_source_files():
             if rel_dir == '.':
                 rel_dir = ''
             stem = fname[:-len('.cloomc')]
-            results.append({'path': rel_f, 'name': stem, 'dir': rel_dir})
+            results.append({
+                'path': rel_f,
+                'name': stem,
+                'dir': rel_dir,
+                'modified_at': os.path.getmtime(abs_f),
+            })
 
     # Sort: examples/ before cloomc/, then by dir, then by name
     def _sort_key(e):

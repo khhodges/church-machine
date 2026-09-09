@@ -1085,26 +1085,11 @@ let _simRunActive = false;
 let _runClickTimer = null;
 
 function updateThreadControl() {
-    const button = document.getElementById('nextThreadBtn');
     const status = document.getElementById('activeThreadStatus');
     if (typeof updateThreadIdentityStrip === 'function') updateThreadIdentityStrip();
     if (!sim || typeof sim.activeThreadStatus !== 'function') return;
     const state = sim.activeThreadStatus();
     if (status) status.textContent = `${state.name} · ${state.position}/${state.count}`;
-    if (button) {
-        // Saved Thread images are independently switchable whenever the
-        // machine is stopped.  Boot is not an execution prerequisite here:
-        // the Namespace and Thread LUMPs are already present in the loaded
-        // memory image, and CHANGE restores the selected image's context.
-        const unavailable = sim.running || sim.walkActive || state.count <= 1;
-        button.disabled = unavailable;
-        button.setAttribute('aria-disabled', unavailable ? 'true' : 'false');
-        button.setAttribute('data-tooltip', unavailable
-            ? (state.count <= 1 ? 'Next Thread — only Thread.1 is configured'
-                : sim.walkActive ? 'Next Thread — stop Walk before switching Threads'
-                : 'Next Thread — pause execution before switching Threads')
-            : `Next Thread — switch to ${state.slots[(state.position % state.count)] === 1 ? 'Thread.1' : (sim.nsLabels[state.slots[(state.position % state.count)]] || 'next Thread')}`);
-    }
 }
 
 function updateThreadIdentityStrip() {
@@ -1117,11 +1102,18 @@ function updateThreadIdentityStrip() {
     }
 
     const rows = sim.threadStatusRows(4);
+    const executionLocked = Boolean(_simRunActive || sim.running || sim.walkActive);
     strip.replaceChildren();
     strip.hidden = rows.length === 0;
     rows.forEach((row) => {
         const card = document.createElement('div');
-        card.className = `thread-identity-card${row.active ? ' is-active' : ''}`;
+        card.className = `thread-identity-card${row.active ? ' is-active' : ''}${executionLocked ? ' is-locked' : ''}`;
+        const selectable = !row.active && !executionLocked;
+        card.dataset.threadSlot = String(row.slot);
+        card.setAttribute('role', 'button');
+        card.setAttribute('tabindex', selectable ? '0' : '-1');
+        card.setAttribute('aria-disabled', selectable ? 'false' : 'true');
+        if (row.active) card.setAttribute('aria-current', 'true');
         const niaText = Number.isInteger(row.nia)
             ? `0x${(row.nia >>> 0).toString(16).toUpperCase().padStart(4, '0')}`
             : '\u2014';
@@ -1145,6 +1137,15 @@ function updateThreadIdentityStrip() {
             `Thread context: ${row.name}${row.active ? ' (active)' : ''}\n` +
             `${gtKeyText}: ${gtName}\nLUMP-relative NIA: ${niaText}\n` +
             `Physical instruction address: ${physicalText}\n${flagsKeyText}: ${flagText}`);
+        if (selectable) {
+            card.setAttribute('title', `${card.getAttribute('title')}\nSelect ${row.name}`);
+            card.addEventListener('click', () => selectThreadContext(row.slot));
+            card.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                selectThreadContext(row.slot);
+            });
+        }
 
         const marker = document.createElement('span');
         marker.className = 'thread-identity-marker';
@@ -1211,11 +1212,11 @@ function updateThreadIdentityStrip() {
     });
 }
 
-function nextConfiguredThread() {
-    if (!sim || typeof sim.advanceConfiguredThread !== 'function') return;
+function selectThreadContext(slot) {
+    if (!sim || typeof sim.selectConfiguredThread !== 'function') return;
     // Run/Walk ownership belongs to the UI control plane, not CHANGE
     // architecture.  Programmatic/decoded CHANGE remains canonical.
-    if (sim.walkActive || sim.running) {
+    if (_simRunActive || sim.walkActive || sim.running) {
         const consoleEl = document.getElementById('editorConsole');
         if (consoleEl) {
             consoleEl.textContent += `\n⊿ ${sim.walkActive
@@ -1225,7 +1226,7 @@ function nextConfiguredThread() {
         }
         return;
     }
-    const outcome = sim.advanceConfiguredThread();
+    const outcome = sim.selectConfiguredThread(slot);
     const consoleEl = document.getElementById('editorConsole');
     if (consoleEl && outcome.reason) {
         consoleEl.textContent += `\n⊿ ${outcome.reason}`;
@@ -1233,7 +1234,7 @@ function nextConfiguredThread() {
     }
     updateThreadControl();
     updateDashboard();
-    if (outcome.ok && typeof openCRDetail === 'function') {
+    if (outcome.ok && !outcome.unchanged && typeof openCRDetail === 'function') {
         // The manual CHANGE has made this Thread the live stopped context.
         // Open its CR12 memory map while Step/Walk/Run remain ready to execute
         // the restored CR/DR bank.
