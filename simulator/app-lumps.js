@@ -5262,7 +5262,8 @@ async function openLumpInEditor(token) {
     window._savedLumpOpenRequestId = _openRequestId;
     var lump = window.LumpRegistry ? (window.LumpRegistry.resolve(token)?.sources?.server || null) : null;
 
-    // An immutable-history row may still be the newest saved revision (notably
+    // An immutable-history row may still be the most recently compiled saved
+    // revision (notably
     // when a fixed boot-resident binary remains installed). Redirect only when
     // this token is older than another saved revision of the same abstraction.
     if (lump && lump.archived === true && window.LumpRegistry) {
@@ -5274,11 +5275,18 @@ async function openLumpInEditor(token) {
         _primaryCandidates.sort(function(a, b) {
             var as = a.sources.server;
             var bs = b.sources.server;
-            var versionOrder = (parseInt(bs.lump_version) || 0) -
+            var _compiledTime = function(server) {
+                var raw = server && server.compiled_at;
+                if (raw === null || raw === undefined || raw === '') return 0;
+                var numeric = Number(raw);
+                if (Number.isFinite(numeric)) return numeric;
+                var parsed = Date.parse(String(raw));
+                return Number.isFinite(parsed) ? parsed / 1000 : 0;
+            };
+            var compiledOrder = _compiledTime(bs) - _compiledTime(as);
+            if (compiledOrder) return compiledOrder;
+            return (parseInt(bs.lump_version) || 0) -
                 (parseInt(as.lump_version) || 0);
-            if (versionOrder) return versionOrder;
-            return String(bs.compiled_at || '').localeCompare(
-                String(as.compiled_at || ''));
         });
         if (_primaryCandidates.length > 0 &&
                 _primaryCandidates[0].token !== token) {

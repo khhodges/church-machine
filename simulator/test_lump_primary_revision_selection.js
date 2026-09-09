@@ -24,7 +24,7 @@ function extractFunction(name) {
     throw new Error('unterminated ' + name);
 }
 
-const sandbox = { Number, Boolean, parseInt, String };
+const sandbox = { Number, Boolean, parseInt, String, Date };
 vm.createContext(sandbox);
 vm.runInContext(extractFunction('_latestPrimaryLump'), sandbox);
 
@@ -46,7 +46,7 @@ assert.strictEqual(selected.token, '00000a00',
     'current approved documented revision wins over archived legacy revisions');
 const latestSavedRows = [
     { token: 'boot-capability-test', abstraction: 'CapabilityTest',
-      lump_version: 18, approved: true, compiled_at: '2026-09-08T12:00:00Z' },
+      lump_version: 99, approved: true, compiled_at: '2026-09-08T12:00:00Z' },
     { token: 'latest-capability-test', abstraction: 'CapabilityTest',
       lump_version: 19, approved: false, archived: true,
       compiled_at: '2026-09-09T12:00:00Z' },
@@ -54,7 +54,7 @@ const latestSavedRows = [
 assert.strictEqual(
     sandbox._latestPrimaryLump(latestSavedRows, 'CapabilityTest').token,
     'latest-capability-test',
-    'latest saved revision wins over an older approved boot-resident revision');
+    'most recently compiled save wins even when an older save has a higher version');
 assert(source.includes('latest && latest.token === l.token'),
     'top-level repository chooses the latest saved revision per abstraction');
 assert(source.includes('_currentRow.archived === true'),

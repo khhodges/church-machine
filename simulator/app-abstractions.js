@@ -1179,12 +1179,19 @@ function _latestPrimaryLump(lumps, abstraction) {
     const matches = (lumps || []).filter(l =>
         l && l.abstraction === abstraction);
     matches.sort((a, b) => {
+        const _compiledTime = lump => {
+            const raw = lump && lump.compiled_at;
+            if (raw === null || raw === undefined || raw === '') return 0;
+            const numeric = Number(raw);
+            if (Number.isFinite(numeric)) return numeric;
+            const parsed = Date.parse(String(raw));
+            return Number.isFinite(parsed) ? parsed / 1000 : 0;
+        };
+        const compiled = _compiledTime(b) - _compiledTime(a);
+        if (compiled) return compiled;
         const version = (parseInt(b.lump_version) || 0) -
             (parseInt(a.lump_version) || 0);
         if (version) return version;
-        const compiled = String(b.compiled_at || '').localeCompare(
-            String(a.compiled_at || ''));
-        if (compiled) return compiled;
         return Number(Boolean(b.approved)) - Number(Boolean(a.approved));
     });
     return matches[0] || null;
