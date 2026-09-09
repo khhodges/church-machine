@@ -1911,6 +1911,90 @@ def _load_boot_resident_entries(manifest_path, selected_by_slot=None):
     return [(slot, tok, filename) for slot, tok, filename, _version in chosen.values()]
 
 
+def validate_resident_artifact_bindings(image_bytes, lumps_dir):
+    """Require each Namespace-selected resident artifact to match the image.
+
+    The Namespace descriptor does not serialize a filename, so exact binding is
+    established by the selected slot/sequence plus the complete approved LUMP
+    allocation at that slot.  This deliberately does not regenerate a composite:
+    callers can reject an old image even when an unrelated artifact currently
+    prevents regeneration.
+    """
+    validate_boot_image(image_bytes)
+    n_words = len(image_bytes) // 4
+    image_words = struct.unpack(f"<{n_words}I", image_bytes)
+    try:
+        with open(os.path.join(lumps_dir, "ns-state.json"), encoding="utf-8") as state_file:
+            state = json.load(state_file)
+    except (OSError, ValueError, TypeError) as exc:
+        raise ValueError(f"resident binding inventory is unavailable: {exc}") from exc
+    state_by_slot = {
+        row["slot"]: row for row in state.get("abstractions", [])
+        if isinstance(row, dict) and isinstance(row.get("slot"), int)
+    }
+    bindings = [
+        row for row in state_by_slot.values()
+        if row.get("type") in ("Inform", "Resident")
+        and row.get("resident") is not False
+        and row.get("boot_resident") is not False
+        and (row.get("filename") or row.get("token") or row.get("cache_token"))
+    ]
+    for binding in bindings:
+        slot = binding["slot"]
+        filename = binding.get("filename")
+        if not isinstance(filename, str) or not filename:
+            raise ValueError(
+                f"Namespace-selected resident NS slot {slot} has no exact artifact filename")
+        artifact_path = os.path.realpath(os.path.join(lumps_dir, filename))
+        if not artifact_path.startswith(os.path.realpath(lumps_dir) + os.sep):
+            raise ValueError(
+                f"Namespace-selected resident NS slot {slot} artifact path is invalid")
+        try:
+            with open(artifact_path, "rb") as lump_file:
+                raw = lump_file.read()
+            if not raw or len(raw) % 4:
+                raise ValueError("artifact is empty or not word-aligned")
+            expected = struct.unpack(f">{len(raw) // 4}I", raw)
+        except (OSError, ValueError, struct.error) as exc:
+            raise ValueError(
+                f"Namespace-selected resident NS slot {slot} artifact "
+                f"{filename!r} is unavailable: {exc}") from exc
+        selected_hash = binding.get("binary_hash", binding.get("binaryHash"))
+        if selected_hash and hashlib.sha256(raw).hexdigest() != str(selected_hash).lower():
+            raise ValueError(
+                f"Namespace-selected resident NS slot {slot} artifact hash no longer "
+                "matches the committed selection")
+        ns_base = n_words - (slot + 1) * NS_ENTRY_WORDS
+        if ns_base < 0 or ns_base + 1 >= n_words:
+            raise ValueError(f"resident NS slot {slot} is absent from the boot image")
+        location, authority = image_words[ns_base], image_words[ns_base + 1]
+        selected_seq = int(state_by_slot.get(slot, {}).get("seq", 0))
+        image_seq = _ns_word1_get(authority, "gt_seq")
+        if image_seq != selected_seq:
+            raise ValueError(
+                f"resident NS slot {slot} sequence is stale "
+                f"(image {image_seq}, selected {selected_seq})")
+        if location < NAMESPACE_HEADER_V2_WORDS or location + len(expected) > n_words:
+            raise ValueError(f"resident NS slot {slot} has an invalid image location")
+        actual = image_words[location:location + len(expected)]
+        image_cc = image_words[location] & 0xFF
+        image_allocation = _ns_word1_get(authority, "limit_offset") + image_cc + 1
+        if image_allocation != len(expected):
+            raise ValueError(
+                f"resident NS slot {slot} allocation is stale "
+                f"(image {image_allocation} words, selected artifact {len(expected)} words)")
+        # C-list rows are localized for the destination image (SelfTest.Next,
+        # portable capability bindings). Header + code/data words remain the
+        # immutable artifact payload and are sufficient to reject an older
+        # saved program without misclassifying legitimate localization.
+        immutable_words = 1 + ((expected[0] >> 10) & 0x1FFF)
+        if tuple(actual[:immutable_words]) != tuple(expected[:immutable_words]):
+            raise ValueError(
+                f"resident NS slot {slot} does not contain the currently selected "
+                f"artifact {filename!r}; regenerate the boot image")
+    return True
+
+
 def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
                         require_entry_resident=False):
     """Produce the binary boot image bytes for the given config dict.

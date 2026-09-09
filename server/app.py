@@ -9095,7 +9095,10 @@ def save_lump():
                 boot_refresh_note = f'boot config unavailable: {err_bi}'
                 raise RuntimeError(boot_refresh_note)
         except Exception as _bie:
-            boot_refresh_note = f"boot image was not regenerated: {_bie}"
+            boot_refresh_note = (
+                "LUMP saved but not yet installed in the hardware image; "
+                f"boot-image.bin was not regenerated: {_bie}"
+            )
             logging.warning(
                 "[lumps] saved %s but boot image refresh was deferred: %s",
                 lump_filename, _bie)
@@ -15546,6 +15549,17 @@ def boot_image_send_to_hardware():
                             f"(expected 0x{_entry_info['expected_gt']:08X}); the "
                             'board would boot a different slot than reported. '
                             'Regenerate the boot image.'}), 400
+
+        try:
+            _boot_image_gen.validate_resident_artifact_bindings(_raw, LUMPS_DIR)
+        except ValueError as _exc:
+            return jsonify({
+                'error': (
+                    'hardware upload rejected — boot-image.bin does not match '
+                    f'the current Namespace selections: {_exc}'
+                ),
+                'decision': 'resident_artifact_binding_mismatch',
+            }), 409
 
         # ``boot-image.bin`` is the simulator's generic, tail-table image.
         # Never stream it raw into Wukong's 16K forward-table DMEM: a 32K

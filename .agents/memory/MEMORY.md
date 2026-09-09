@@ -156,3 +156,4 @@
 - [Inform MMIO simulation](inform-mmio-simulation.md) — canonical device capabilities use architectural addresses outside RAM and must route through device state, not RAM bounds
 - [Pending compile ownership](pending-compile-ownership.md) — delayed simulator loads consume the exact immutable compile snapshot that initiated them, never mutable registry selection
 - [Namespace header boot fallback](namespace-header-boot-fallback.md) — a missing selected dynamic boot slot must not crash reset; header falls back to a resident canonical entry
+- [Resident image binding validation](resident-image-binding-validation.md) — compare immutable artifact payload plus slot/sequence/allocation; c-list rows are destination-localized

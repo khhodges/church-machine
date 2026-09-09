@@ -11,6 +11,7 @@ _trace_stub.trace_metadata = lambda _nia: None
 _trace_stub._disassemble_word = lambda word: f"0x{word:08X}"
 sys.modules.setdefault("hardware.wukong_trace_symbols", _trace_stub)
 import server.app as app_module
+import server.boot_image as boot_image
 
 
 def _words(marker):
@@ -116,9 +117,39 @@ def test_boot_failure_keeps_approved_capabilitytest_save_and_old_boot(
     assert response.status_code == 200, response.get_data(as_text=True)
     result = response.get_json()
     assert result["boot_image_refreshed"] is False
+    assert "saved but not yet installed in the hardware image" in result["boot_image_note"]
     assert "boot failure" in result["boot_image_note"]
     assert boot.read_bytes() == before["boot-image.bin"]
     assert (root / result["lump"]).read_bytes() == _raw(2)
     current = json.loads((root / "manifest.json").read_text())
     assert next(entry for entry in current
                 if entry["token"] == "00000a00")["filename"] == result["lump"]
+
+
+def test_old_eloadcall_halt_image_rejected_after_two_eloadcall_branch_save(
+        repository, monkeypatch):
+    root, state_path, _boot = repository
+    total, location, slot = 256, 64, 10
+    old_words = _words((8 << 27) | (6 << 15))
+    old_words[0] = (old_words[0] & ~(0x1FFF << 10)) | (2 << 10)
+    old_words[2] = 31 << 27
+    image_words = [0] * total
+    image_words[location:location + len(old_words)] = old_words
+    boot_image.write_ns_entry(
+        image_words, total, boot_image.NS_ENTRY_WORDS, slot, location,
+        len(old_words) - 2, 0, 0, 1, 7, 1, int("00000a00", 16))
+    previous_image = struct.pack(f"<{total}I", *image_words)
+
+    new_words = _words((8 << 27) | (6 << 15))
+    new_words[0] = (new_words[0] & ~(0x1FFF << 10)) | (3 << 10)
+    new_words[2] = (8 << 27) | (6 << 15) | 1
+    new_words[3] = (23 << 27) | 1
+    new_raw = struct.pack(">64I", *new_words)
+    (root / "new.lump").write_bytes(new_raw)
+    state = json.loads(state_path.read_text())
+    state["abstractions"][0]["filename"] = "new.lump"
+    state_path.write_text(json.dumps(state))
+    monkeypatch.setattr(boot_image, "validate_boot_image", lambda _image: None)
+
+    with pytest.raises(ValueError, match="currently selected artifact"):
+        boot_image.validate_resident_artifact_bindings(previous_image, str(root))
