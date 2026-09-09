@@ -146,15 +146,38 @@
             padding-bottom:0;
         }
         .programming-target { display:flex; align-items:center; gap:5px; max-width:min(720px,55vw); padding:2px 6px; border:1px solid #3a3a5a; border-radius:5px; background:#10101c; font-size:.7rem; overflow:hidden; }
+        .programming-target:not(.is-collapsed) {
+            display:grid;
+            grid-template-columns:auto minmax(0,1fr) auto;
+            align-items:center;
+            width:min(310px,90vw);
+            max-width:min(310px,90vw);
+        }
         .programming-target label { color:#daa520; font-weight:700; }
         .programming-target select { max-width:185px; color:#e7e7f2; background:#1a1a2a; border:1px solid #4a4a68; border-radius:3px; font-size:.7rem; padding:2px; }
         .programming-target-toggle { flex:0 0 auto; width:22px; height:22px; padding:0; color:#c8cade; background:#1a1a2a; border:1px solid #4a4a68; border-radius:3px; cursor:pointer; line-height:1; }
         .programming-target-toggle::before { content:"›"; display:inline-block; transition:transform .15s ease; }
         .programming-target-toggle[aria-expanded="true"]::before { transform:rotate(90deg); }
         .programming-target-details { display:flex; align-items:center; gap:5px; min-width:0; overflow:hidden; }
+        .programming-target:not(.is-collapsed) .programming-target-details {
+            grid-column:1 / -1;
+            flex-direction:column;
+            align-items:stretch;
+            width:100%;
+        }
         .programming-target.is-collapsed { max-width:min(310px,38vw); }
         .programming-target.is-collapsed .programming-target-details { display:none; }
         .programming-target input { width:88px; min-width:64px; color:#e7e7f2; background:#1a1a2a; border:1px solid #4a4a68; border-radius:3px; font-size:.7rem; padding:2px 4px; }
+        .programming-target:not(.is-collapsed) input { box-sizing:border-box; width:100%; }
+        .programming-target:not(.is-collapsed) #programmingTargetStatus,
+        .programming-target:not(.is-collapsed) #programmingTargetIdentity,
+        .programming-target:not(.is-collapsed) #programmingRuntimeIdentity,
+        .programming-target:not(.is-collapsed) #programmingBitstreamIdentity {
+            max-width:none;
+            white-space:normal;
+            overflow:visible;
+            text-overflow:clip;
+        }
         #programmingTargetIdentity, #programmingRuntimeIdentity, #programmingBitstreamIdentity { color:#c8cade; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:155px; }
         #programmingTargetStatus { color:#aab0c9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:145px; }
         [data-exact-bitstream-download].is-target-blocked { opacity:.42; filter:grayscale(1); cursor:not-allowed; }
