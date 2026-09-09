@@ -12370,6 +12370,7 @@ function showSaveToNamespace() {
     const _csWords = window.LumpRegistry?.resolve(window.LumpRegistry?.getCurrent())?.sources?.memory?.words;
     const _csLen = _csWords ? _csWords.length : 0;
     info.textContent = `Code size: ${_csLen} words (${_csLen * 4} bytes)`;
+    _setSaveNSFeedback('', '');
     _saveNSTrigger = document.activeElement;
     document.getElementById('saveNSDialog').style.display = '';
     if (!_saveNSTrap) _saveNSTrap = _makeModalFocusTrap('saveNSDialog', closeSaveDialog);
@@ -12426,6 +12427,64 @@ function closeSaveDialog() {
     // Clear any pending Format Lump binary so it cannot be accidentally reused
     // by a future Save to Namespace invocation opened independently.
     window._pendingLumpData = null;
+    _setSaveNSFeedback('', '');
+}
+
+function _setSaveNSFeedback(kind, message) {
+    const status = document.getElementById('saveNSStatus');
+    const button = document.getElementById('saveNSConfirmBtn');
+    const busy = kind === 'loading';
+    if (button) {
+        button.disabled = busy;
+        button.textContent = busy ? 'Saving…' : 'Save';
+        button.setAttribute('aria-busy', busy ? 'true' : 'false');
+    }
+    if (!status) return;
+    if (!message) {
+        status.style.display = 'none';
+        status.textContent = '';
+        return;
+    }
+    status.style.display = '';
+    status.textContent = message;
+    status.style.color = kind === 'error' ? '#fecaca' : '#dbeafe';
+    status.style.background = kind === 'error'
+        ? 'rgba(127, 29, 29, .45)'
+        : 'rgba(30, 64, 175, .38)';
+    status.style.border = kind === 'error'
+        ? '1px solid rgba(248, 113, 113, .65)'
+        : '1px solid rgba(96, 165, 250, .55)';
+}
+
+let _saveNSRequestInFlight = false;
+async function beginSaveToNamespace() {
+    if (_saveNSRequestInFlight) return;
+    _saveNSRequestInFlight = true;
+    _setSaveNSFeedback('loading',
+        'Saving this revision… Keep this window open until the result appears.');
+    try {
+        await confirmSaveToNamespace();
+    } catch (err) {
+        console.error('[SaveNS] unexpected save failure:', err);
+        _setSaveNSFeedback('error',
+            'Save did not complete. Review the settings, then click Save again.');
+    } finally {
+        _saveNSRequestInFlight = false;
+        const dialog = document.getElementById('saveNSDialog');
+        const status = document.getElementById('saveNSStatus');
+        if (dialog && dialog.style.display !== 'none' &&
+                status && status.dataset.terminal !== 'true') {
+            _setSaveNSFeedback('error',
+                'Save did not complete. Review the settings, then click Save again.');
+        }
+        const button = document.getElementById('saveNSConfirmBtn');
+        if (button) {
+            button.disabled = false;
+            button.textContent = 'Save';
+            button.setAttribute('aria-busy', 'false');
+        }
+        if (status) delete status.dataset.terminal;
+    }
 }
 
 function getNextStepTip(lang) {
@@ -15190,7 +15249,10 @@ async function confirmSaveToNamespace() {
     const slotSel = document.getElementById('saveNSSlot');
     const label = document.getElementById('saveNSLabel').value.trim();
     if (!label) {
-        alert('Please enter a label for this namespace entry.');
+        const message = 'Enter a LUMP / Namespace Name, then click Save again.';
+        _setSaveNSFeedback('error', message);
+        const status = document.getElementById('saveNSStatus');
+        if (status) status.dataset.terminal = 'true';
         return;
     }
     const perms = {
@@ -15456,10 +15518,14 @@ async function confirmSaveToNamespace() {
             _svPayload.metadata.approval_intent = _saveApproval.intent.intent;
             _svPayload.metadata.save_plan_id = _saveApproval.plan.plan_id;
         } catch (err) {
+            const message = `${err.message}. Review the save plan, then click Save again.`;
+            _setSaveNSFeedback('error', message);
+            const status = document.getElementById('saveNSStatus');
+            if (status) status.dataset.terminal = 'true';
             _showFpgaToast('LUMP Save Plan Failed', err.message, 'error', 10000);
             return;
         }
-        _lumpSaveRequest(fetch, '/api/lumps/save', _svPayload, function(resp) {
+        return _lumpSaveRequest(fetch, '/api/lumps/save', _svPayload, function(resp) {
             // The repository has committed the save. Close immediately so a
             // later client-state/render exception cannot leave a successful
             // transaction looking unfinished.
@@ -15542,6 +15608,9 @@ async function confirmSaveToNamespace() {
                     : (err.kind === 'server'
                         ? `${err.message} The modal remains open; resolve the server error, then click Save again.`
                         : `${err.message} Retry Save. If this repeats, inspect the server logs for the invalid response.`));
+            _setSaveNSFeedback('error', body);
+            const status = document.getElementById('saveNSStatus');
+            if (status) status.dataset.terminal = 'true';
             _showFpgaToast(title, body, 'error', 10000);
         });
     }
