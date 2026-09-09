@@ -220,6 +220,8 @@ class ChurchCore(Elaboratable):
         self.dbg_cr_wr_data = Signal(CAP_REG_LAYOUT)
         self.dbg_m_bit_wr_en = Signal()
         self.dbg_m_bit_word = Signal(16)
+        self.dbg_m_bit_state = Signal(16)
+        self.dbg_return_m_commit = Signal()
 
         # dbg_outform_done_inject / dbg_outform_result_gt — fake a completed
         #   Mode 2 outform download in test harnesses without driving the full
@@ -884,6 +886,12 @@ class ChurchCore(Elaboratable):
                 u_switch.m_consume_target if not self.iot_profile else 0),
             u_regs.m_save_consume_en.eq(u_save.m_consume_en),
             u_regs.m_save_consume_target.eq(u_save.m_consume_target),
+            # RETURN commits architecturally only after cLoad has rebuilt CR6.
+            # At that exact write, clear all boundary M state and grant CR6.M.
+            u_regs.m_return_commit_en.eq(
+                u_cload.cr_wr_en & (u_cload.cr_wr_addr == CR_CLIST)),
+            self.dbg_return_m_commit.eq(
+                u_cload.cr_wr_en & (u_cload.cr_wr_addr == CR_CLIST)),
             # Expose M-flag and shadow DR reads
             self.cr15_m_flag.eq(u_regs.cr15_m_flag),
             self.dbg_m_dr11.eq(u_regs.m_dr11),
@@ -894,6 +902,7 @@ class ChurchCore(Elaboratable):
             # Test-observability: CR12 GT word0 — must be INFORM(slot=1) after boot
             self.dbg_cr12_gt.eq(View(CAP_REG_LAYOUT, u_regs.cr12_thread).word0_gt),
             self.dbg_isolated_m_flags.eq(u_regs.isolated_m_flags),
+            self.dbg_m_bit_state.eq(u_regs.m_bit_device_state),
         ]
         # Test-observability: CR8 GT word0 via the cr_word_rd port (unused at runtime).
         # cr_word_rd_addr/sel are driven statically here; no runtime logic uses this port.

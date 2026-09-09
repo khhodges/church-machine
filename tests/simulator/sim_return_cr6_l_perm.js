@@ -199,6 +199,10 @@ console.log('\n--- PHASE 1: direct frame injection ---');
         cr6w0 === (callerCR6GT >>> 0),
         `got 0x${cr6w0.toString(16).toUpperCase()}, expected 0x${(callerCR6GT >>> 0).toString(16).toUpperCase()}`);
 
+    assert('P1-M: RETURN microcode explicitly sets CR6.M',
+        sim.cr[6].m === 1,
+        `got M=${sim.cr[6].m}, expected 1`);
+
     assert('P1-PC: RETURN restored PC to frame.returnPC',
         result && result.pc === RETURN_PC,
         `got pc=${result && result.pc}, expected ${RETURN_PC}`);
@@ -503,6 +507,10 @@ console.log('\n--- PHASE E2E: full fetch/decode/execute via sim.step() ---');
     assert('E2E-WORD: CR6.word0 is byte-identical to the caller\'s original L-GT',
         cr6w0 === (callerCR6GT >>> 0),
         `got 0x${cr6w0.toString(16).toUpperCase()}, expected 0x${(callerCR6GT >>> 0).toString(16).toUpperCase()}`);
+
+    assert('E2E-M: decoded RETURN explicitly sets CR6.M',
+        sim.cr[6].m === 1,
+        `got M=${sim.cr[6].m}, expected 1`);
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

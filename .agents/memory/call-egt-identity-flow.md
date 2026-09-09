@@ -12,10 +12,14 @@ RETURN frames must store the caller identity normalized as a Church E-GT.
 CR6's live word 0 is only a transient L-only c-list view, so copying it raw
 creates a frame that cLoad cannot use to reconstruct the caller.
 
+RETURN must explicitly set CR6.M after rebuilding the caller's CR6. M is
+boundary microcode state, not ordinary register state to restore from a frame.
+
 **Why:** The boot CALL's direct-resolution path masked both mistakes; a normal
 nested cross-domain CALL failed before entry, and an L-only frame could not
 complete the RETURN cLoad handoff.
 
-**How to apply:** For CALL/RETURN RTL changes, test at least two nested ordinary
-domains after the boot window closes. Verify exact frame E-GTs, cLoad commits,
-restored STO values, return fetch settling, and the absence of extra retires.
+**How to apply:** For CALL/RETURN RTL or simulator changes, test at least two
+nested ordinary domains after the boot window closes. Verify exact frame E-GTs,
+cLoad commits, CR6.M=1 after RETURN, restored STO values, return fetch settling,
+and the absence of extra retires.

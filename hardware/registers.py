@@ -122,6 +122,9 @@ class ChurchRegisters(Elaboratable):
         self.m_switch_consume_target = Signal(2)
         self.m_save_consume_en = Signal()
         self.m_save_consume_target = Signal(2)
+        # RETURN commit replaces boundary M state with the caller's c-list
+        # authority: CR6.M=1 and every other CR M bit cleared.
+        self.m_return_commit_en = Signal()
 
     def elaborate(self, platform):
         m = Module()
@@ -232,6 +235,10 @@ class ChurchRegisters(Elaboratable):
             with m.If(self.m_save_consume_en):
                 m.d.sync += m_bit_regs.bit_select(
                     self.m_save_consume_target + 12, 1).eq(0)
+            # Last M-state writer in the cycle: only a successful RETURN cLoad
+            # CR6 commit may establish this boundary state.
+            with m.If(self.m_return_commit_en):
+                m.d.sync += m_bit_regs.eq(1 << CR_CLIST)
 
             with m.If(self.flags_wr_en):
                 m.d.sync += flags_reg.eq(self.flags_in)

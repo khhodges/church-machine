@@ -40,7 +40,7 @@ from .boot_rom import (
     WUKONG_WCH_CLIST, WUKONG_WCH_CLIST_WORD, wukong_wch_header,
 )
 from .hw_types import (
-    ChurchOpcode, CondCode, FaultType, GT_TYPE_INFORM, PERM_MASK_E, PERM_MASK_R,
+    CR_CLIST, ChurchOpcode, CondCode, FaultType, GT_TYPE_INFORM, PERM_MASK_E, PERM_MASK_R,
     PERM_MASK_L, PERM_MASK_S, PERM_MASK_X, SWITCH_TGT_CR12, SWITCH_TGT_CR13,
     TpermPreset, TuringOpcode, make_gt,
 )
@@ -1101,6 +1101,7 @@ def test_nested_call_return_without_boot_special_case():
         "retires": [],
         "writes": [],
         "cloads": [],
+        "return_m_commits": [],
         "active_bases": [],
     }
 
@@ -1109,7 +1110,13 @@ def test_nested_call_return_without_boot_special_case():
         if not results["boot_ok"]:
             return
 
+        pending_m_commit = None
         for cycle in range(1600):
+            if pending_m_commit is not None:
+                results["return_m_commits"].append((
+                    pending_m_commit, ctx.get(dut.core.dbg_m_bit_state),
+                ))
+                pending_m_commit = None
             if ctx.get(dut.core.dmem_wr_en):
                 addr = ctx.get(dut.core.dmem_addr)
                 results["writes"].append((
@@ -1124,6 +1131,9 @@ def test_nested_call_return_without_boot_special_case():
                     cycle,
                     ctx.get(dut.core.retire_trace_return_cr14_gt),
                 ))
+            if ctx.get(dut.core.dbg_return_m_commit):
+                # Register-file state updates on the upcoming edge.
+                pending_m_commit = cycle
             if ctx.get(dut.core.retire_valid):
                 results["retires"].append({
                     "cycle": cycle,
@@ -1190,6 +1200,13 @@ def test_nested_call_return_without_boot_special_case():
     ], f"RETURN cLoad commits missing or out of order: {cloads}"
     assert retires[9]["cycle"] < cloads[0][0] < retires[10]["cycle"]
     assert retires[10]["cycle"] < cloads[1][0] < retires[11]["cycle"]
+    assert [word for _, word in results["return_m_commits"]] == [
+        1 << CR_CLIST,
+        1 << CR_CLIST,
+    ], (
+        "each nested RETURN must commit exactly CR6.M=1 with all other "
+        f"M bits clear: {results['return_m_commits']}"
+    )
 
     thread_base = WUKONG_THREAD_BASE_WORD * 4
     assert results["active_bases"]

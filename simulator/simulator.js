@@ -7029,6 +7029,11 @@ class ChurchSimulator {
                 clearedCRs.push(`CR${i}`);
             }
         }
+        // RETURN microcode establishes the caller's c-list as the one
+        // isolated-register authority carried across the domain boundary.
+        // M is not ordinary saved-register state: the boundary reset above
+        // clears every M bit, then RETURN explicitly grants CR6.M.
+        this.cr[6].m = 1;
 
         if (frame.savedDRs) {
             // DR1–DR3 are caller-saved argument/return registers.  Preserve the
