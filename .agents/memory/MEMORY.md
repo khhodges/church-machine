@@ -1,9 +1,7 @@
-- [System CR register layout](system-cr-register-layout.md) — DR0 and CR5/6/12/13/14/15 are system-reserved; available params start at DR1, CR0–CR4, CR7–CR11
 - [Dot pet name identity architecture](dot-pet-name-identity.md) — petname.Abstraction#n is global identity; two seals (identity_hash + binary_hash); self Inform GT at c-list row 0
 - [ns-state.json rich NS-entry format](ns-state-dot-name-format.md) — one rich object per occupied slot (name, slot, location, type, f, g, limit, seq, seal, boot?); no flat-name list or top-level boot_entry
 - [NS slot restore post-c-list-write read](ns-slot-restore-post-clist-read.md) — NS slot 1 location must be captured BEFORE the c-list write loop; same bug existed in both boot_image.py and simulator.js
 - [NULL GT type canonicalisation](null-gt-type-canon.md) — isNullGT checks bits[26:25]===0b00; only replace ===0 with isNullGT at hardware gates (mLoad, _fetchInstruction); UI presence checks (CR6 in resolvePendingSlot) must stay ===0
-- [THREAD_NS_SLOTS in E2E test GTs](thread-ns-slots-e2e-trap.md) — synthetic GT word0 index bits[15:0] must NOT be 1 or 45 (THREAD_NS_SLOTS); those trigger showThread→crDetailTab='lump' override; use index=0x20 (32) in test fixtures
 - [Wukong single-step trace architecture](wukong-trace-arch.md) — 11-byte 0xAA packets; F3 UART; 4-bit NZCV; step mode guarantees TraceUnit is idle
 - [TraceUnit per-event packet format](trace-unit-per-event-format.md) — 12-byte per-event packets; multi-event queue (1–3 per retire); trace_stall backpressure; ELOADCALL/RETURN-CR14 known gaps
 - [Wukong boot three-bug root cause](wukong-boot-perm-l-trap.md) — three cooperating bugs (u_perm timing, CR6 S+E→L+E, BRAM address-stability valid); all fixed; NUC runs clean 2M+ cycles
@@ -22,9 +20,7 @@
 - [Wukong NS base is not ISA-safe at zero](wukong-ns-base-isa-conflict.md) — standalone Wukong currently overrides the ISA top-of-memory NS base to 0; do not promote that shortcut into a new image without resolving DMEM size/base
 - [BRAM NUC_PROGRAM staleness trap](bram-nuc-program-staleness.md) — church_ti60_f225.v BRAM goes stale when boot_rom.py NUC_PROGRAM changes; regen or patch via gen_cm_dmem_direct.py
 - [Verilog/RTLIL regeneration procedure](verilog-regen-procedure.md) — 9 gen commands for all actively-synthesised targets; legacy-frozen files; builder tab visibility trap
-- [ChurchAssembler Node global shim](church-assembler-node-shim.md) — compileAssembly() checks typeof global; set global.ChurchAssembler before requiring CLOOMCCompiler in Node subprocesses
 - [CLOOMC source expression subset](cloomc-source-expression-subset.md) — split compound guards and nested expressions into single-op temporaries; use bfext/bfins for bitfield work
-- [app.py raw SQL pattern](app-py-raw-sql.md) — server/app.py has no sqlite3 import; all DB access must use db.session.execute(_sa_text(...)); never _sqlite3.connect()
 - [v2.0 hardware format audit](v2-format-audit.md) — ARM cond order; Turing opcodes 16–25; ROL-XOR integrity; g_bit toggles; hardware WORD2 differs from simulator NS
 - [OBBS single-patch-location bug class](obbs-single-patch-location.md) — a newer patch step + an un-removed older patch step for the same artifact eventually double-run; make the later step a read-only self-test, not a fallback patch
 - [Ti60 one-button build](ti60-one-button-build.md) — CM DMEM/firmware patches must happen BEFORE synthesis (build_ti60_bitstream.sh, not run_efx_map.sh); patching map.v in PNR is ignored (PNR reads BRAM from top.vdb written by MAP)
@@ -36,16 +32,12 @@
 - [EFXPT_HOME needs /pt suffix](efxpt-home-must-include-pt-suffix.md) — must equal $EFINITY_HOME/pt or Interface Designer's device-name check silently always fails ("unusupported device")
 - [LUMP abstraction-name consistency scoping](lump-abstraction-name-consistency.md) — drift check must exempt user-compiled + dynamic/NULL lumps or it false-fails on legitimate non-registry names (also in CM_LUMP_SPECIFICATION.md §Developer Traps)
 - [NS slot migration GT-bypass trap](ns-slot-gt-bypass-trap.md) — when NS slot N migrates, audit ALL c-list fallback paths; old slot number silently maps to wrong GT (was LED_DEV, not SelfTest)
-- [Stale-version redirect strips query strings](stale-version-redirect-strips-query.md) — server AND client cache-bust redirects must each forward the full query string or URL flags (?debug=1 etc.) silently die on every page load
-- [Async in-flight flag needs catch reset](async-inflight-flag-needs-catch-reset.md) — an in-flight/saving boolean gating a disabled UI control must reset on ALL 3 async outcomes (success, explicit failure, AND rejected promise) or the control sticks disabled forever
-- [Language detection mnemonic collisions](language-detection-mnemonic-collision.md) — CALL/LOAD and `capabilities {` overlap languages; only assembleAndLoad's high-level gate exposes it
 - [Editor-state migration coverage gap](editor-state-migration-coverage-gap.md) — a one-shot text migration must be wired into every independent save/restore path (keyed draft store AND generic "last session" snapshot), or the "fixed" bug reappears via the unpatched path
 - [Assembler nsLoaded vs _capBlockSlots slot confusion](assembler-nsloaded-slot-confusion.md) — for 2-op LOAD/SAVE, nsLoaded stores CR register number (not c-list slot); _capBlockSlots[name] is always the correct slot for a fresh c-list access
 - [Sapphire BRAM guard false-positive modes](sapphire-bram-guard-false-positive.md) — RC=3 has 2 modes: stale real content (bad) vs all-FF MAP placeholder (2026.1 normal/false-positive); RC=1 (all-zero) is always fatal
 - [GitHub API PUT for cross-repo file delivery](github-api-put-delivery.md) — when git histories diverge, PUT individual files via Contents API from Replit bash ($GITHUB_PAT); droplet uses `git checkout origin/main -- <file>` to receive them
 - [Ti60 firmware update pipeline](ti60-firmware-update-pipeline.md) — PNR-only skips 3 required steps (patch sapphire.v, delete VDB, MAP); must run full OBBS; serve hex from $SOC_DIR/outflow/ not repo bitstreams/ (git pull overwrites)
 - [QMTECH Wukong V3 pinout + BUFG trap](wukong-v3-pinout.md) — clk=M21 SRCC bank34, led=G21/G20 active-LOW; never use Instance("BUFG") in Amaranth for Vivado — opt_design silently drops it; use direct comb assign so Vivado auto-infers IBUF→BUFG
-- [LUMP Viewing label sync](lump-viewing-label-sync.md) — update synchronously at entry and direct render; cross-script declarations need window exports
 - [CR14.word0 GT update on NS slot migration](cr14-gt-update-on-slot-migration.md) — loadProgram only updates CR14.word1/word2/word3; after changing bootEntrySlot you must also set CR14.word0 to a fresh R+X GT or every fetch faults before stepCount++
 - [A7 v1.2 stored nsCount anti-inflation pattern](a7-nscount-stored-word.md) — c-list at NS TABLE tail inflates nsCount to MAX_NS_ENTRIES; fix: store clean count at NS_TABLE_BASE-3 (scan before c-list + emptyCount); loadBootImage() reads it, forward scan only as fallback
 - [IRQ LUMP lazy-load manifest guard](irq-lump-lazy-gate-guard.md) — gate on a manifest entry; pre-seeded test slots otherwise bypass it via abstractionRegistry
@@ -59,12 +51,10 @@
 - [Mint gate for NS slot registration](mint-gate-ns-registration.md) — only Mint.RegisterOutform→Navana.ADD→writeNSEntry may add NS slots; _seedIrqLazyManifest handles post-allocation state; no direct writeNSEntry outside this chain
 - [Wukong build-host policy](wukong-build-host-policy.md) — serialize resource-constrained Vivado builds and accept releases only with fresh, timing-clean provenance
 - [Wukong sentinel build version](wukong-sentinel-build-version.md) — 4-byte sentinel (0xBC N_INIT TU VER BUILD_VER); 'f' cmd re-arms; WUKONG_BUILD_VERSION in wukong_top.py; bump before each synthesis
-- [UartTx DONE-gap double-increment](uart-tx-done-gap-double-increment.md) — TX requesters gating on ~busy alone skip every other byte; must use ~busy & ~done (sentinel looked dead on hardware)
 - [Wukong boot CALL/LOAD/retire fixes](wukong-boot-callhome-fixes.md) — sync-BRAM fetch-settle bubble, issue-cycle busy gaps, operand latching, busy-gated decoder faults, boot_retire_count reset on FAULT_RST
 - [Wukong IRQ arm gate](wukong-irq-arm-gate.md) — irq_armed_reg+first_call_done_reg cleared on FAULT_RST; dispatch disabled until first CALL→method→RETURN completes
 - [Wukong boot CALL direct-GT resolution](wukong-boot-call-resolution.md) — decoder call_mask=0 always; boot window uses BOOT_RESTORE_MASK (CR0+CR12); CALL bypasses c-list via mload_direct+boot_window_lat
 - [UART magic-byte frame resync](uart-frame-resync.md) — 0xAA-framed streams slip on mid-stream attach/dropped bytes; validate candidate frames (aligned NIA, known ev, sane flags) and advance 1 byte on failure
-- [networkidle never fires on /simulator/](networkidle-never-fires-simulator.md) — background polling keeps network busy; e2e tests must wait for concrete readiness globals, not 'networkidle'
 - [Single delivery record needs client command lock](single-slot-delivery-watch-lock.md) — hold busy until watcher terminal; record replaced after consumed = likely delivered, not superseded
 - [Single-slot command ack correlation](single-slot-cmd-ack-correlation.md) — correlate queue/consume/ack/confirm stages by monotonic id, never by command letter; no time-window heuristics
 - [Wukong trace disassembly](wukong-trace-disassembly.md) — current packets carry NIA but no instruction word; exact labels/mnemonics require a matching source map or a versioned packet extension
@@ -157,3 +147,4 @@
 - [Pending compile ownership](pending-compile-ownership.md) — delayed simulator loads consume the exact immutable compile snapshot that initiated them, never mutable registry selection
 - [Namespace header boot fallback](namespace-header-boot-fallback.md) — a missing selected dynamic boot slot must not crash reset; header falls back to a resident canonical entry
 - [Resident image binding validation](resident-image-binding-validation.md) — compare immutable artifact payload plus slot/sequence/allocation; c-list rows are destination-localized
+- [Localized c-list provenance](localized-clist-provenance.md) — bind generated images to both selected artifact hashes and resulting localized capability rows

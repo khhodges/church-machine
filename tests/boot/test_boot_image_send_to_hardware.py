@@ -272,9 +272,15 @@ def boot_bin_path(tmp_path, monkeypatch):
 
     existed_before = os.path.exists(bin_path)
     old_data = open(bin_path, 'rb').read() if existed_before else None
+    provenance_path = os.path.join(lumps_dir, 'boot-image.provenance.json')
+    old_provenance = (open(provenance_path, 'rb').read()
+                      if os.path.exists(provenance_path) else None)
 
     with open(bin_path, 'wb') as fh:
         fh.write(payload)
+    with open(provenance_path, 'w') as fh:
+        json.dump(_app_module._boot_image_gen.build_boot_image_provenance(
+            payload, lumps_dir), fh)
 
     yield bin_path, payload
 
@@ -284,6 +290,11 @@ def boot_bin_path(tmp_path, monkeypatch):
             fh.write(old_data)
     elif not existed_before and os.path.exists(bin_path):
         os.remove(bin_path)
+    if old_provenance is not None:
+        with open(provenance_path, 'wb') as fh:
+            fh.write(old_provenance)
+    elif os.path.exists(provenance_path):
+        os.remove(provenance_path)
 
 
 # ── send-to-hardware: 404 when file absent ────────────────────────────────────
@@ -328,23 +339,27 @@ def test_exact_browser_runtime_image_is_digest_bound_and_queued(client):
     """Edited memory is accepted only with exact source facts and the queued
     UART artifact receives a server-derived digest identity."""
     payload = _valid_image(entry_slot=6)
+    p, old = _install_boot_bin(payload)
     source_digest = hashlib.sha256(payload).hexdigest()
-    response = client.post('/api/boot-image/send-to-hardware', json={
-        'source_image_base64': base64.b64encode(payload).decode('ascii'),
-        'source_sha256': source_digest,
-        'source_size': len(payload),
-        'source_identity': 'church-simulator-memory-v1:' + source_digest,
-    })
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data['source_size'] == len(payload)
-    assert data['artifact_identity'] == (
-        'wukong-native-dmem-v1:' + data['artifact_sha256'])
-    with _app_module._wukong_command_lock:
-        queued = dict(_app_module._wukong_cmd_delivery)
-    assert queued['artifact_size'] == data['size']
-    assert queued['artifact_sha256'] == data['artifact_sha256']
-    assert queued['artifact_identity'] == data['artifact_identity']
+    try:
+        response = client.post('/api/boot-image/send-to-hardware', json={
+            'source_image_base64': base64.b64encode(payload).decode('ascii'),
+            'source_sha256': source_digest,
+            'source_size': len(payload),
+            'source_identity': 'church-simulator-memory-v1:' + source_digest,
+        })
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['source_size'] == len(payload)
+        assert data['artifact_identity'] == (
+            'wukong-native-dmem-v1:' + data['artifact_sha256'])
+        with _app_module._wukong_command_lock:
+            queued = dict(_app_module._wukong_cmd_delivery)
+        assert queued['artifact_size'] == data['size']
+        assert queued['artifact_sha256'] == data['artifact_sha256']
+        assert queued['artifact_identity'] == data['artifact_identity']
+    finally:
+        _restore_boot_bin(p, old)
 
 
 def test_send_to_hardware_base64_payload_decodes_correctly(client, boot_bin_path):
@@ -831,6 +846,14 @@ def _install_boot_bin(payload):
     old_data = open(bin_path, 'rb').read() if os.path.exists(bin_path) else None
     with open(bin_path, 'wb') as fh:
         fh.write(payload)
+    provenance_path = os.path.join(lumps_dir, 'boot-image.provenance.json')
+    old_provenance = (open(provenance_path, 'rb').read()
+                      if os.path.exists(provenance_path) else None)
+    provenance = _app_module._boot_image_gen.build_boot_image_provenance(
+        payload, lumps_dir)
+    with open(provenance_path, 'w') as fh:
+        json.dump(provenance, fh)
+    _install_boot_bin.provenance_backup = (provenance_path, old_provenance)
     return bin_path, old_data
 
 
@@ -840,6 +863,51 @@ def _restore_boot_bin(bin_path, old_data):
             fh.write(old_data)
     elif os.path.exists(bin_path):
         os.remove(bin_path)
+    backup = getattr(_install_boot_bin, 'provenance_backup', None)
+    if backup:
+        provenance_path, old_provenance = backup
+        if old_provenance is None:
+            if os.path.exists(provenance_path):
+                os.remove(provenance_path)
+        else:
+            with open(provenance_path, 'wb') as fh:
+                fh.write(old_provenance)
+        _install_boot_bin.provenance_backup = None
+
+
+def test_send_to_hardware_rejects_image_after_clist_only_artifact_change(client):
+    payload = _valid_image(entry_slot=7)
+    p, old = _install_boot_bin(payload)
+    provenance_path = os.path.join(LUMPS_DIR, 'boot-image.provenance.json')
+    provenance = json.loads(open(provenance_path).read())
+    binding = next(row for row in provenance['resident_bindings'] if row['slot'] == 7)
+    artifact_path = os.path.join(LUMPS_DIR, binding['filename'])
+    state_path = os.path.join(LUMPS_DIR, 'ns-state.json')
+    original = open(artifact_path, 'rb').read()
+    original_state = open(state_path, 'rb').read()
+    words = list(struct.unpack(f'>{len(original) // 4}I', original))
+    cc = words[0] & 0xFF
+    assert cc > 0
+    words[-1] ^= 1
+    changed = struct.pack(f'>{len(words)}I', *words)
+    with open(artifact_path, 'wb') as fh:
+        fh.write(changed)
+    state = json.loads(original_state)
+    selected = next(row for row in state['abstractions'] if row.get('slot') == 7)
+    selected['binary_hash'] = hashlib.sha256(changed).hexdigest()
+    with open(state_path, 'w') as fh:
+        json.dump(state, fh)
+    try:
+        response = client.post('/api/boot-image/send-to-hardware', json={})
+        assert response.status_code == 409
+        assert response.get_json()['decision'] == 'resident_artifact_binding_mismatch'
+        assert 'selected artifact changed' in response.get_json()['error']
+    finally:
+        with open(artifact_path, 'wb') as fh:
+            fh.write(original)
+        with open(state_path, 'wb') as fh:
+            fh.write(original_state)
+        _restore_boot_bin(p, old)
 
 
 def test_send_to_hardware_rejects_non_resident_entry(client):

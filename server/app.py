@@ -3345,6 +3345,8 @@ def boot_config_slot_label():
 # server/lumps/boot-image.bin so the IDE can offer it as a download AND so
 # the simulator can fetch and apply it at boot via /api/boot-image/binary.
 BOOT_IMAGE_PATH = os.path.join(os.path.dirname(LUMPS_MANIFEST_PATH), "boot-image.bin")
+BOOT_IMAGE_PROVENANCE_PATH = os.path.join(
+    os.path.dirname(LUMPS_MANIFEST_PATH), "boot-image.provenance.json")
 NS_STATE_PATH   = os.path.join(os.path.dirname(LUMPS_MANIFEST_PATH), "ns-state.json")
 LUMPS_DIR = os.path.dirname(LUMPS_MANIFEST_PATH)
 _namespace_commit_lock = threading.RLock()
@@ -3383,17 +3385,24 @@ def _namespace_commit_guard():
 def _write_boot_image_bytes(image_bytes):
     """Atomically replace the committed boot image under the Namespace lock."""
     tmp_path = BOOT_IMAGE_PATH + ".tmp"
+    provenance_tmp_path = BOOT_IMAGE_PROVENANCE_PATH + ".tmp"
     with _namespace_commit_guard():
         try:
+            provenance = _boot_image_gen.build_boot_image_provenance(
+                image_bytes, LUMPS_DIR)
             with open(tmp_path, "wb") as image_file:
                 image_file.write(image_bytes)
+            with open(provenance_tmp_path, "w", encoding="utf-8") as provenance_file:
+                json.dump(provenance, provenance_file, sort_keys=True, indent=2)
             os.replace(tmp_path, BOOT_IMAGE_PATH)
+            os.replace(provenance_tmp_path, BOOT_IMAGE_PROVENANCE_PATH)
             _invalidate_ns_state_raw_binding()
         except Exception:
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
+            for pending_path in (tmp_path, provenance_tmp_path):
+                try:
+                    os.remove(pending_path)
+                except OSError:
+                    pass
             raise
 
 
@@ -15551,7 +15560,9 @@ def boot_image_send_to_hardware():
                             'Regenerate the boot image.'}), 400
 
         try:
-            _boot_image_gen.validate_resident_artifact_bindings(_raw, LUMPS_DIR)
+            _boot_image_gen.validate_resident_artifact_bindings(
+                _raw, LUMPS_DIR,
+                require_provenance_image_digest=(_source_b64 is None))
         except ValueError as _exc:
             return jsonify({
                 'error': (

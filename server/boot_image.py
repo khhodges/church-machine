@@ -1911,7 +1911,8 @@ def _load_boot_resident_entries(manifest_path, selected_by_slot=None):
     return [(slot, tok, filename) for slot, tok, filename, _version in chosen.values()]
 
 
-def validate_resident_artifact_bindings(image_bytes, lumps_dir):
+def validate_resident_artifact_bindings(
+        image_bytes, lumps_dir, require_provenance_image_digest=True):
     """Require each Namespace-selected resident artifact to match the image.
 
     The Namespace descriptor does not serialize a filename, so exact binding is
@@ -1923,6 +1924,22 @@ def validate_resident_artifact_bindings(image_bytes, lumps_dir):
     validate_boot_image(image_bytes)
     n_words = len(image_bytes) // 4
     image_words = struct.unpack(f"<{n_words}I", image_bytes)
+    provenance_path = os.path.join(lumps_dir, "boot-image.provenance.json")
+    try:
+        with open(provenance_path, encoding="utf-8") as provenance_file:
+            provenance = json.load(provenance_file)
+        image_digest = hashlib.sha256(image_bytes).hexdigest()
+        if (not isinstance(provenance, dict)
+                or provenance.get("version") != 1
+                or (require_provenance_image_digest
+                    and provenance.get("image_sha256") != image_digest)):
+            raise ValueError("generation provenance does not authenticate this boot image")
+        provenance_by_slot = {
+            row["slot"]: row for row in provenance.get("resident_bindings", [])
+            if isinstance(row, dict) and isinstance(row.get("slot"), int)
+        }
+    except (OSError, ValueError, TypeError) as exc:
+        raise ValueError(f"boot image generation provenance is unavailable: {exc}") from exc
     try:
         with open(os.path.join(lumps_dir, "ns-state.json"), encoding="utf-8") as state_file:
             state = json.load(state_file)
@@ -1960,10 +1977,18 @@ def validate_resident_artifact_bindings(image_bytes, lumps_dir):
                 f"Namespace-selected resident NS slot {slot} artifact "
                 f"{filename!r} is unavailable: {exc}") from exc
         selected_hash = binding.get("binary_hash", binding.get("binaryHash"))
-        if selected_hash and hashlib.sha256(raw).hexdigest() != str(selected_hash).lower():
+        artifact_digest = hashlib.sha256(raw).hexdigest()
+        if selected_hash and artifact_digest != str(selected_hash).lower():
             raise ValueError(
                 f"Namespace-selected resident NS slot {slot} artifact hash no longer "
                 "matches the committed selection")
+        generation_binding = provenance_by_slot.get(slot)
+        if (generation_binding is None
+                or generation_binding.get("artifact_sha256") != artifact_digest
+                or generation_binding.get("filename") != filename):
+            raise ValueError(
+                f"resident NS slot {slot} selected artifact changed since this "
+                "boot image was generated")
         ns_base = n_words - (slot + 1) * NS_ENTRY_WORDS
         if ns_base < 0 or ns_base + 1 >= n_words:
             raise ValueError(f"resident NS slot {slot} is absent from the boot image")
@@ -1992,7 +2017,66 @@ def validate_resident_artifact_bindings(image_bytes, lumps_dir):
             raise ValueError(
                 f"resident NS slot {slot} does not contain the currently selected "
                 f"artifact {filename!r}; regenerate the boot image")
+        localized_rows = actual[len(expected) - image_cc:] if image_cc else ()
+        localized_digest = hashlib.sha256(struct.pack(
+            f"<{len(localized_rows)}I", *localized_rows)).hexdigest()
+        if generation_binding.get("localized_clist_sha256") != localized_digest:
+            raise ValueError(
+                f"resident NS slot {slot} localized capability rows do not match "
+                "the authenticated generation provenance")
     return True
+
+
+def build_boot_image_provenance(image_bytes, lumps_dir):
+    """Bind a generated image to exact selected artifacts and localized rows."""
+    validate_boot_image(image_bytes)
+    n_words = len(image_bytes) // 4
+    image_words = struct.unpack(f"<{n_words}I", image_bytes)
+    with open(os.path.join(lumps_dir, "ns-state.json"), encoding="utf-8") as state_file:
+        state = json.load(state_file)
+    rows = []
+    for binding in state.get("abstractions", []):
+        if (not isinstance(binding, dict)
+                or not isinstance(binding.get("slot"), int)
+                or binding.get("type") not in ("Inform", "Resident")
+                or binding.get("resident") is False
+                or binding.get("boot_resident") is False):
+            continue
+        filename = binding.get("filename")
+        if not isinstance(filename, str) or not filename:
+            continue
+        slot = binding["slot"]
+        artifact_path = os.path.realpath(os.path.join(lumps_dir, filename))
+        if not artifact_path.startswith(os.path.realpath(lumps_dir) + os.sep):
+            raise ValueError(f"resident NS slot {slot} artifact path is invalid")
+        with open(artifact_path, "rb") as artifact_file:
+            raw = artifact_file.read()
+        if not raw or len(raw) % 4:
+            raise ValueError(
+                f"resident NS slot {slot} artifact is empty or not word-aligned")
+        expected_words = len(raw) // 4
+        ns_base = n_words - (slot + 1) * NS_ENTRY_WORDS
+        if ns_base < 0 or ns_base + 1 >= n_words:
+            raise ValueError(f"resident NS slot {slot} is absent from the boot image")
+        location = image_words[ns_base]
+        if location < NAMESPACE_HEADER_V2_WORDS or location + expected_words > n_words:
+            raise ValueError(f"resident NS slot {slot} has an invalid image location")
+        image_cc = image_words[location] & 0xFF
+        localized_rows = image_words[
+            location + expected_words - image_cc:location + expected_words
+        ] if image_cc else ()
+        rows.append({
+            "slot": slot,
+            "filename": filename,
+            "artifact_sha256": hashlib.sha256(raw).hexdigest(),
+            "localized_clist_sha256": hashlib.sha256(struct.pack(
+                f"<{len(localized_rows)}I", *localized_rows)).hexdigest(),
+        })
+    return {
+        "version": 1,
+        "image_sha256": hashlib.sha256(image_bytes).hexdigest(),
+        "resident_bindings": sorted(rows, key=lambda row: row["slot"]),
+    }
 
 
 def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,

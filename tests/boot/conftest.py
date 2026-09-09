@@ -169,6 +169,8 @@ def isolated_boot_lumps(tmp_path_factory):
         "LUMPS_DIR": isolated_dir,
         "LUMPS_MANIFEST_PATH": os.path.join(isolated_dir, "manifest.json"),
         "BOOT_IMAGE_PATH": os.path.join(isolated_dir, "boot-image.bin"),
+        "BOOT_IMAGE_PROVENANCE_PATH": os.path.join(
+            isolated_dir, "boot-image.provenance.json"),
         "NS_STATE_PATH": os.path.join(isolated_dir, "ns-state.json"),
         "BOOT_CONFIG_PATH": isolated_boot_config_path,
         "_LUMPS_DIR": isolated_dir,
