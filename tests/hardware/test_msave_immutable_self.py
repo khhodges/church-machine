@@ -32,9 +32,9 @@ def _run_msave(index, immutable_row0=False):
     return observed
 
 
-def test_msave_cr6_row_zero_faults_before_any_memory_or_permission_path():
-    """CR6's row-0 selector faults before any memory or permission path."""
-    result = _run_msave(0, immutable_row0=True)
+def test_msave_any_clist_row_zero_faults_before_any_memory_or_permission_path():
+    """Every c-list's row-0 selector faults before memory or permission paths."""
+    result = _run_msave(0, immutable_row0=False)
 
     assert result["fault"] == int(FaultType.IMMUTABLE_SELF_CAP)
     assert not any(result["writes"])
@@ -114,8 +114,8 @@ def test_save_instruction_wrapper_propagates_immutable_row_zero_fault():
     assert not any(observed["writes"])
 
 
-def test_save_non_cr6_row_zero_retains_existing_bind_fault():
-    """Non-CR6 architectural row 0 must not be captured by the CR6-only rule."""
+def test_save_non_cr6_row_zero_is_also_immutable():
+    """A target c-list reached through any CR still protects its SELF row."""
     dut = ChurchSave()
     observed = {"fault": None, "writes": []}
 
@@ -140,5 +140,35 @@ def test_save_non_cr6_row_zero_retains_existing_bind_fault():
     sim.add_testbench(testbench)
     sim.run()
 
-    assert observed["fault"] == int(FaultType.BIND)
+    assert observed["fault"] == int(FaultType.IMMUTABLE_SELF_CAP)
+    assert not any(observed["writes"])
+
+
+def test_save_row_zero_fault_precedes_isolated_source_m_check():
+    """SELF protection wins even when an isolated SAVE source has M=0."""
+    dut = ChurchSave()
+    observed = {"fault": None, "writes": []}
+
+    async def testbench(ctx):
+        ctx.set(dut.save_start, 1)
+        ctx.set(dut.cr_src, 5)
+        ctx.set(dut.cr_dst, 14)
+        ctx.set(dut.source_m, 0)
+        ctx.set(dut.index, 0)
+        await ctx.tick()
+        ctx.set(dut.save_start, 0)
+
+        for _ in range(8):
+            observed["writes"].append(ctx.get(dut.mem_wr_en))
+            if ctx.get(dut.save_fault):
+                observed["fault"] = ctx.get(dut.fault_type)
+                return
+            await ctx.tick()
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(testbench)
+    sim.run()
+
+    assert observed["fault"] == int(FaultType.IMMUTABLE_SELF_CAP)
     assert not any(observed["writes"])

@@ -822,7 +822,11 @@ function _getActiveSourceLabel() {
 // every ordinary source capability starts at row one, while installation mints
 // the live self E-GT from the selected slot and its current sequence.
 function _isCompilerSelfCapability(cap) {
-    return !!(cap && typeof cap === 'object' && cap.compiler_owned_self === true &&
+    if (!cap) return false;
+    if (typeof CapabilityTokens !== 'undefined' &&
+            typeof CapabilityTokens.isContextualSelf === 'function' &&
+            CapabilityTokens.isContextualSelf(cap)) return true;
+    return !!(typeof cap === 'object' && cap.compiler_owned_self === true &&
         String(cap.name || '').toUpperCase() === '__SELF__');
 }
 

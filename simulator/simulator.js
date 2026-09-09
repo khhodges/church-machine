@@ -6400,6 +6400,14 @@ class ChurchSimulator {
     }
 
     _execSave(d) {
+        // ISA rule: row 0 of every c-list is the resident identity credential.
+        // This must fault before any operand, M-bit, permission, Namespace, or
+        // memory path can mask the violation.
+        if (d.imm === 0) {
+            this.fault('IMMUTABLE_SELF_CAP',
+                `SAVE: CR${d.crSrc} c-list row 0 is the immutable SELF capability`);
+            return null;
+        }
         // M is the explicit authority for reading an isolated register.  Keep
         // ordinary SAVE behavior unchanged; CR12–CR15 require M at acceptance
         // and consume it only once the c-list write has completed.
@@ -6408,14 +6416,6 @@ class ChurchSimulator {
         if (isolatedSource && !this.mElevation && !sourceMAuthorized) {
             this.fault('PERM_L',
                 `SAVE: source CR${d.crDst} had M=0 when the instruction was accepted`);
-            return null;
-        }
-        // Hardware rule: CR6 is the active c-list and row 0 is always the
-        // resident identity credential.  This must fault before any operand,
-        // permission, Namespace, or memory path can mask the violation.
-        if (d.crSrc === 6 && d.imm === 0) {
-            this.fault('IMMUTABLE_SELF_CAP',
-                'SAVE: CR6 c-list row 0 is the immutable self capability');
             return null;
         }
         const srcGT = this.cr[d.crDst].word0;

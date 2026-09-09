@@ -64,6 +64,12 @@
         return String(a || '').toUpperCase() === String(b || '').toUpperCase();
     }
 
+    function isContextualSelf(cap) {
+        const name = _nameOf(cap).toUpperCase();
+        return name === 'SELF' || name === '__SELF__' ||
+            !!(cap && typeof cap === 'object' && cap.symbolic_self === true);
+    }
+
     function _validTarget(value) {
         if (value === null || value === undefined || value === '') return null;
         const n = Number(value);
@@ -97,6 +103,22 @@
 
         if (!name) {
             return { name, rights, grants, nsIndex: -1, source, error: 'Capability has no name.' };
+        }
+
+        if (isContextualSelf(cap)) {
+            if (rights.length !== 1 || rights[0] !== 'E') {
+                return {
+                    name: 'SELF', rights, grants: ['E'], nsIndex: null,
+                    source: 'contextual-self', symbolic_self: true,
+                    compiler_owned_self: true,
+                    error: 'Capability "SELF" must declare exactly E permission.',
+                };
+            }
+            return {
+                name: '__SELF__', rights: ['E'], grants: ['E'], nsIndex: null,
+                source: 'contextual-self', symbolic_self: true,
+                compiler_owned_self: true, placeholder: true, error: null,
+            };
         }
 
         const allAbs = (sim && sim.abstractionRegistry && sim.abstractionRegistry.abstractions) || {};
@@ -245,7 +267,16 @@
     }
 
     function resolveCapabilities(caps, context) {
-        return (Array.isArray(caps) ? caps : []).map(cap => resolveCapability(cap, context));
+        return (Array.isArray(caps) ? caps : []).map((cap, index) => {
+            const resolved = resolveCapability(cap, context);
+            if (resolved.symbolic_self === true && index !== 0) {
+                return {
+                    ...resolved,
+                    error: 'Capability "SELF" is contextual owner authority and may appear only in C-list row 0.',
+                };
+            }
+            return resolved;
+        });
     }
 
     function _parseGT(word, context) {
@@ -311,6 +342,13 @@
                 parsed,
             };
         }
+        if (cap.symbolic_self === true) {
+            const actual = parsed.permissions || {};
+            const isEOnly = !!actual.E && !actual.R && !actual.W && !actual.X && !actual.L && !actual.S;
+            return isEOnly
+                ? { ok: true, error: null, parsed }
+                : { ok: false, error: 'Capability "SELF" must contain an Inform E-only Golden Token.', parsed };
+        }
         if (parsed.index !== cap.nsIndex) {
             return { ok: false, error: `Capability "${name}" targets NS[${parsed.index}] but the active registry resolves it to NS[${cap.nsIndex}].`, parsed };
         }
@@ -351,19 +389,34 @@
                 words[clistStart + i] = 0;
                 continue;
             }
+            if (resolvedCaps[i].symbolic_self === true) {
+                words[clistStart + i] = 0xFEED5E1F;
+                continue;
+            }
             words[clistStart + i] = _createGT(
                 resolvedCaps[i].nsIndex,
                 rightsToPerms(resolvedCaps[i].rights),
                 context || {}
             );
         }
-        const validated = validateClist(words, clistStart, resolvedCaps, context || {});
-        return { ok: validated.ok, errors: validated.errors, resolvedCaps, results: validated.results };
+        const errors = [];
+        const results = [];
+        for (let i = 0; i < resolvedCaps.length; i++) {
+            if (resolvedCaps[i].symbolic_self === true) {
+                results.push({ ok: true, error: null, parsed: null, symbolic_self: true });
+                continue;
+            }
+            const check = validateToken((words[clistStart + i] || 0) >>> 0, resolvedCaps[i], context || {});
+            results.push(check);
+            if (!check.ok) errors.push(check.error);
+        }
+        return { ok: errors.length === 0, errors, resolvedCaps, results };
     }
 
     return {
         normalizeRights,
         rightsToPerms,
+        isContextualSelf,
         resolveCapability,
         resolveCapabilities,
         validateToken,

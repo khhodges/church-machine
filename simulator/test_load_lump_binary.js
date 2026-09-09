@@ -1403,15 +1403,23 @@ console.log('\n--- LLB-22: SAVE cannot mutate ordinary self row ---');
         sim.faultLog.some(f => f.type === 'IMMUTABLE_SELF_CAP'),
         JSON.stringify(sim.faultLog.slice(-1)));
 
-    // This is a hardware rule, not compiler provenance policy: even an
-    // architectural/raw c-list presented through CR6 cannot write row 0.
+    // This is a universal ISA rule, not compiler provenance policy: even an
+    // architectural/raw c-list presented through a non-CR6 target cannot write
+    // row 0.
     const architectural = setupAndLoad({ cw: 4, cc: 1, typ: 2, row0: 0x4A00002A });
     const architecturalBefore = architectural.sim.memory[EXTENDED_BASE + 63] >>> 0;
-    architectural.sim._execSave({ crDst: 1, crSrc: 6, imm: 0 });
-    check('LLB-22b: SAVE CR6 row 0 faults for architectural c-lists before operand checks',
+    architectural.sim._execSave({ crDst: 1, crSrc: 5, imm: 0 });
+    check('LLB-22b: SAVE through any target CR faults on row 0 before operand checks',
         architectural.sim.memory[EXTENDED_BASE + 63] === architecturalBefore &&
         architectural.sim.faultLog.some(f => f.type === 'IMMUTABLE_SELF_CAP'),
         JSON.stringify(architectural.sim.faultLog.slice(-1)));
+
+    architectural.sim.faultLog.length = 0;
+    architectural.sim._execSave({ crDst: 14, crSrc: 5, imm: 0 });
+    check('LLB-22c: row-zero protection precedes isolated-source M authorization',
+        architectural.sim.faultLog.length === 1 &&
+        architectural.sim.faultLog[0].type === 'IMMUTABLE_SELF_CAP',
+        JSON.stringify(architectural.sim.faultLog));
 }
 
 // ── LLB-23: raw assembly type-0 LUMPs are explicit self-row exceptions ──────

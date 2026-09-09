@@ -697,11 +697,12 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
         b.errors.some(e => e.message.includes('CR15')),
         b.errors.map(e => e.message).join('; '));
 
-    // P12c: SAVE CR14 is syntactically valid; runtime requires CR14.M
+    // P12c: CR14 may be a SAVE source when M-authorized, but row zero remains
+    // immutable and must be rejected before runtime authorization matters.
     const c = new ChurchAssembler();
     c.assemble('SAVE CR14, CR6, 0');
-    assert('P12c SAVE CR14: accepted for runtime M-bit authorization',
-        c.errors.length === 0,
+    assert('P12c SAVE CR14 to row zero: rejected as immutable SELF',
+        c.errors.some(e => /immutable SELF owner capability/.test(e.message)),
         c.errors.map(e => e.message).join('; '));
 
     // P12d: ELOADCALL CR13 → error
@@ -10299,22 +10300,23 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
 }
 
 {
-    // BC114: SAVE CR3, LED0 — capabilities block with LED0 at position 0.
-    // SAVE two-operand shorthand uses the same _resolveNSNameBracket path;
-    // must encode imm=0 (cap-block position), NOT imm=8 (boot slot).
+    // BC114: row zero is SELF/owner identity and SAVE must never target it.
     const a = new ChurchAssembler();
     const r = a.assemble('capabilities { LED0 RW }\nSAVE CR3, LED0\nHALT');
-    assert('BC114 SAVE with LED0 at cap-block position 0 — no errors',
-        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
-    assert('BC114 SAVE with LED0 at cap-block position 0 — emits 2 words',
+    assert('BC114 SAVE with a named capability at C-list row 0 is rejected',
+        a.errors.some(e => /immutable SELF owner capability/.test(e.message)),
+        a.errors.map(e => e.message).join('; '));
+    assert('BC114 subsequent instructions still assemble for diagnostics',
         r.words.length === 2, `got ${r.words.length}`);
-    {
-        const w   = r.words[0] >>> 0;
-        const opc = (w >>> 27) & 0x1F;
-        const imm = w & 0x7FFF;
-        assert('BC114 SAVE CR3,LED0 — opcode=1 (SAVE)', opc === 1, `got opcode=${opc}`);
-        assert('BC114 SAVE CR3,LED0 — imm=0 (cap-block position 0, not boot slot 8)',
-            imm === 0, `got imm=${imm}`);
+}
+
+{
+    for (const target of ['SAVE CR2, CR6, #0', 'SAVE CR2, CR5, #0x0', 'SAVE CR2, CR4, #0b0']) {
+        const a = new ChurchAssembler();
+        a.assemble(target);
+        assert(`SAVE row-zero guard rejects ${target}`,
+            a.errors.some(e => /immutable SELF owner capability/.test(e.message)),
+            a.errors.map(e => e.message).join('; '));
     }
 }
 
@@ -10527,6 +10529,21 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     assert('CAP-GT-13: raw-assembly Run gate blocks unresolved named capability',
         !rawUnknown.ok && /TotallyUnknownCapability/.test(rawUnknown.errors.join(' ')),
         rawUnknown.errors.join('; '));
+    const rawSelf = materializeForRun(
+        [{ name: 'SELF', rights: ['E'] }], 'Run');
+    assert('CAP-GT-13b: raw Run treats SELF as contextual row-zero authority',
+        rawSelf.ok &&
+            rawSelf.capabilities.length === 1 &&
+            rawSelf.capabilities[0].compiler_owned_self === true &&
+            (rawSelf.capabilities[0].token >>> 0) === 0xFEED5E1F,
+        rawSelf.ok ? JSON.stringify(rawSelf.capabilities) : rawSelf.errors.join('; '));
+    const misplacedSelf = CapabilityTokens.resolveCapabilities([
+        { name: 'LED0', rights: ['R', 'W'] },
+        { name: 'SELF', rights: ['E'] },
+    ], { sim, lumps });
+    assert('CAP-GT-13c: contextual SELF remains restricted to C-list row zero',
+        !!misplacedSelf[1].error && /row 0/.test(misplacedSelf[1].error),
+        misplacedSelf[1].error || 'missing error');
     const rawWrongTarget = materializeForRun(
         [{ name: 'LED0', rights: ['R', 'W'], nsIndex: 99 }], 'Run');
     assert('CAP-GT-14: raw-assembly Run gate blocks wrong namespace target',

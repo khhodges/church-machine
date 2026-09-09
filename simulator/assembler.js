@@ -1383,6 +1383,13 @@ class ChurchAssembler {
                     this._checkPrivCR(crSrc, 'SAVE', lineNum);
                     imm   = this._parseImm(parts[3], lineNum);
                 }
+                if (imm === 0) {
+                    this.errors.push({
+                        line: lineNum + 1,
+                        ...this._tokenCols(this._currentLineText, parts[3] || parts[2] || 'SAVE'),
+                        message: 'SAVE may not write C-list row 0; row 0 is the immutable SELF owner capability.',
+                    });
+                }
                 break;
             }
             case 2: {

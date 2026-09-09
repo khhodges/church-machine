@@ -178,9 +178,12 @@ function _materializeRunCapabilities(capabilities, actionLabel) {
         };
     }
 
-    const hasSelf = !!(caps[0] && typeof caps[0] === 'object' &&
-        caps[0].compiler_owned_self === true &&
-        String(caps[0].name || '').toUpperCase() === '__SELF__');
+    const hasSelf = !!(caps[0] && (
+        (typeof CapabilityTokens.isContextualSelf === 'function' &&
+            CapabilityTokens.isContextualSelf(caps[0])) ||
+        (typeof caps[0] === 'object' && caps[0].compiler_owned_self === true &&
+            String(caps[0].name || '').toUpperCase() === '__SELF__')
+    ));
     const userCaps = hasSelf ? caps.slice(1) : caps;
     const tokenWords = new Array(caps.length).fill(0);
     if (hasSelf) {

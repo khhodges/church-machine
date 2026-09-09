@@ -99,7 +99,8 @@ class ChurchSave(Elaboratable):
                 ]
                 m.d.sync += [sub_done_latched.eq(0), sub_fault_latched.eq(0)]
                 with m.If(self.save_start):
-                    # Capture the instruction's CR6 identity at acceptance.
+                    # Capture all transaction inputs at acceptance. ChurchMSave
+                    # independently rejects row zero for every target c-list.
                     # Decoder inputs may advance while this multi-cycle SAVE
                     # is running, so the sub-unit must never inspect them live.
                     m.d.sync += [
@@ -111,6 +112,19 @@ class ChurchSave(Elaboratable):
                         dst_reg_num_latched.eq(self.cr_src),
                         index_latched.eq(self.index),
                     ]
+                    m.next = "CHECK_IMMUTABLE_ROW"
+
+            # Reject row zero before source M, register, permission, Namespace,
+            # or memory checks. ChurchMSave repeats this check as defense in
+            # depth for direct sub-unit users.
+            with m.State("CHECK_IMMUTABLE_ROW"):
+                with m.If(index_latched == 0):
+                    m.d.sync += [
+                        fault_latched.eq(1),
+                        fault_type_latched.eq(FaultType.IMMUTABLE_SELF_CAP),
+                    ]
+                    m.next = "IDLE"
+                with m.Else():
                     m.next = "CHECK_SOURCE_M"
 
             with m.State("CHECK_SOURCE_M"):

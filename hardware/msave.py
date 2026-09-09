@@ -97,12 +97,13 @@ class ChurchMSave(Elaboratable):
                     ]
                     m.next = "CHECK_IMMUTABLE_ROW"
 
-            # CR6 row 0 is the resident identity credential. This guard must
+            # Row 0 of every c-list is the resident identity credential. This
+            # guard must
             # run before permissions, Namespace reads, or write-address
             # generation: no valid SAVE operand may replace identity and no
             # invalid operand may turn the violation into a BIND/PERM fault.
             with m.State("CHECK_IMMUTABLE_ROW"):
-                with m.If(immutable_row0_reg & (index_reg == 0)):
+                with m.If(index_reg == 0):
                     m.d.sync += fault_type_reg.eq(FaultType.IMMUTABLE_SELF_CAP)
                     m.next = "FAULT"
                 with m.Else():
