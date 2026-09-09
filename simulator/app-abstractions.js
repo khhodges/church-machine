@@ -826,7 +826,10 @@ async function renderLumps() {
         // Keep the Live LUMP banner and repository detail on one identity.
         // Priority order:
         //   1. Pending token (already consumed above) — highest priority.
-        //   2. Live CR14 token — the green header and "Viewing" detail must agree.
+        //   2. Live CR14 abstraction — select its latest saved primary revision.
+        //      The exact live token still belongs in the execution-identity
+        //      banner, but it must not force editor/Run back to an older
+        //      boot-resident binary after a newer revision has been saved.
         //   3. Browsing history — only when there is no live executable LUMP.
         if (!_pendingTokenResolved && window.LumpRegistry) {
             const _liveState = (typeof _getLiveLumpState === 'function') ? _getLiveLumpState() : null;
@@ -835,7 +838,12 @@ async function renderLumps() {
                 ? sim.lumpTokenAtSlot(_liveState.nsIdx) : null;
             const _liveSaved = _liveToken && lumps.some(l => l.token === _liveToken);
             if (_liveSaved) {
-                window.LumpRegistry.setCurrent(_liveToken);
+                const _liveRow = lumps.find(l => l.token === _liveToken);
+                const _latestLiveRevision = _liveRow
+                    ? _latestPrimaryLump(lumps, _liveRow.abstraction)
+                    : null;
+                window.LumpRegistry.setCurrent(
+                    _latestLiveRevision ? _latestLiveRevision.token : _liveToken);
             } else if (!window.LumpRegistry.getCurrent()) {
                 let _histToken = null;
                 try { _histToken = localStorage.getItem('lastSelectedLumpToken'); } catch (_e) {}
@@ -862,10 +870,13 @@ async function renderLumps() {
         if (!lumps || lumps.length === 0) {
             html = '<div class="lumps-placeholder">No lumps saved yet. Use Build LUMP in the editor to compile and save an abstraction.</div>';
         } else {
-            // Archived binaries belong in each LUMP's History tab. Showing them
-            // as indistinguishable top-level cards caused legacy source-less
-            // revisions to be opened instead of the current documented binary.
-            const _primaryLumps = lumps.filter(l => l.archived !== true);
+            // Show one top-level artifact per abstraction: the latest saved
+            // revision. Immutable-history storage must not make an older
+            // resident image authoritative for editor or simulator selection.
+            const _primaryLumps = lumps.filter(l => {
+                const latest = _latestPrimaryLump(lumps, l.abstraction);
+                return latest && latest.token === l.token;
+            });
             const _sortedLumps = _lumpsSorted(_primaryLumps.length ? _primaryLumps : lumps);
             html += `<select id="lumpPickerSelect" class="lump-picker-select" onchange="lumpPickerChanged(this.value)">`;
             html += `<option value="">— pick a lump —</option>`;
@@ -1166,14 +1177,15 @@ function _lumpsSorted(lumps) {
 
 function _latestPrimaryLump(lumps, abstraction) {
     const matches = (lumps || []).filter(l =>
-        l && l.abstraction === abstraction && l.archived !== true);
+        l && l.abstraction === abstraction);
     matches.sort((a, b) => {
-        const approved = Number(Boolean(b.approved)) - Number(Boolean(a.approved));
-        if (approved) return approved;
         const version = (parseInt(b.lump_version) || 0) -
             (parseInt(a.lump_version) || 0);
         if (version) return version;
-        return String(b.compiled_at || '').localeCompare(String(a.compiled_at || ''));
+        const compiled = String(b.compiled_at || '').localeCompare(
+            String(a.compiled_at || ''));
+        if (compiled) return compiled;
+        return Number(Boolean(b.approved)) - Number(Boolean(a.approved));
     });
     return matches[0] || null;
 }

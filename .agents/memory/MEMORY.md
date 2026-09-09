@@ -151,3 +151,4 @@
 - [Editor source authority](editor-source-authority.md) — persisted sources reopen from current authority; divergent browser buffers remain explicit recoverable drafts
 - [Thread selection vs live ownership](thread-selection-vs-live-ownership.md) — a selected slot may coexist with reset scratch banks; only boot or successful restore establishes ownership
 - [C-list row zero advisory SELF](clist-row-zero-advisory-self.md) — new C-lists start with SELF; existing owner-token mismatches warn only and preserve programmer data
+- [Latest saved LUMP selection](latest-saved-lump-selection.md) — live identity stays exact, while editor and Run choose the newest saved revision even if history-marked
