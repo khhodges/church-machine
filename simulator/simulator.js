@@ -578,6 +578,10 @@ class ChurchSimulator {
 
         this.output += `[BOOTIMG] Loaded ${n}-word boot image; ${count} NS entries active.\n`;
         this._bootImageLoaded = true;
+        // Replacing the complete image invalidates any previously restored
+        // register-bank ownership. The next manual CHANGE starts from reset
+        // scratch state unless boot establishes a live Thread first.
+        this._liveThreadOwned = false;
         this.emit('stateChange', this.getState());
         return true;
     }
@@ -980,6 +984,9 @@ class ChurchSimulator {
         this._instrHistory = [];
         this._currentInstrLabel = null;
         this._currentThreadSlot = 1;
+        // Selection and ownership are distinct before boot: slot 1 is the
+        // configured default, but the reset CR/DR banks do not belong to it.
+        this._liveThreadOwned = false;
         this.faultViolationData = null;   // populated by B:00 FAULT_RST from last faultLog entry
         // Last complete state received from physical Wukong.  This is kept
         // separately from simulator breakpoint state and includes the raw
@@ -1142,6 +1149,7 @@ class ChurchSimulator {
         this.halted = false;
         this.running = false;
         this.bootComplete = false;
+        this._liveThreadOwned = false;
         this.mElevation = false;
         this.bootStep = 0;
         this._initThrdEntry = null;
@@ -2893,6 +2901,15 @@ class ChurchSimulator {
                 } else {
                     this.faultViolationData = null;  // cold boot — no prior fault
                 }
+                // A manual pre-boot selection owns the live banks even though
+                // bootComplete is false. Preserve it before FAULT_RST wipes the
+                // banks, then synchronize selection with the Thread boot installs.
+                if (this._liveThreadOwned &&
+                        !this._suspendLiveThread(this._currentThreadSlot)) {
+                    return false;
+                }
+                this._liveThreadOwned = false;
+                this._currentThreadSlot = BOOT_NS_SLOT_THREAD;
                 // ── Now wipe all architectural state ─────────────────────────────────
                 for (let i = 0; i < 16; i++) {   // iterate CR0–CR15 (all 16 capability registers)
                     this._clearCR(i);             // set each CR to NULL (word0=0, word1=0, …)
@@ -3442,6 +3459,9 @@ class ChurchSimulator {
                 }
 
                 this.bootComplete = true;           // signal the step-loop to start dispatching instructions
+                // Boot has installed the selected Thread into the live banks.
+                this._currentThreadSlot = BOOT_NS_SLOT_THREAD;
+                this._liveThreadOwned = true;
                 this.ledBits = 0b111111;            // all 6 LEDs on = boot complete
                 this.ledMode = 'boot';              // LED display stays in boot-progress mode until first user toggle
                 // [BOOT] COMPLETE — replaced by per-event trace packets
@@ -4830,6 +4850,46 @@ class ChurchSimulator {
         return { savedSTO, enterGT };
     }
 
+    _suspendLiveThread(threadSlot = this._currentThreadSlot, prepared = null) {
+        if (!this._liveThreadOwned || !Number.isInteger(threadSlot)) return true;
+        let { threadBase, layout, suspend } = prepared || {};
+        if (!prepared) {
+            const entry = this.readNSEntry(threadSlot);
+            if (!entry) {
+                this.fault('BOUNDS', `CHANGE: outgoing Thread slot ${threadSlot} is unavailable`);
+                return false;
+            }
+            threadBase = entry.word0_location;
+            layout = this._threadLayoutAtBase(threadBase);
+            if (!layout || !layout.valid) {
+                this.fault('BOUNDS', `CHANGE: outgoing Thread slot ${threadSlot} has invalid Thread geometry`);
+                return false;
+            }
+            suspend = this._prepareThreadSuspendFrame(
+                threadBase, layout, threadSlot);
+            if (!suspend) return false;
+        }
+        for (let i = 0; i < 16; i++) {
+            this._writeRuntimeWord(threadBase + 1 + i, this.dr[i]);
+        }
+        for (let i = 0; i < 12; i++) {
+            this._writeRuntimeWord(
+                threadBase + layout.capsStart + i,
+                this.cr[i].word0);
+        }
+        const frameWord = this._packFrameWord(
+            this.pc, 1, suspend.savedSTO);
+        this._writeRuntimeWord(
+            threadBase + suspend.savedSTO - 1, suspend.enterGT);
+        this._writeRuntimeWord(
+            threadBase + suspend.savedSTO, frameWord);
+        this._writeRuntimeWord(
+            threadBase + THREAD_STO_OFFSET,
+            this._packProtectedIndicator(
+                suspend.savedSTO - 2, 1, this.flags, 0));
+        return true;
+    }
+
     // The configured Thread order is intentionally derived from the
     // Namespace table rather than browser-only designer state.  This keeps a
     // restored boot image, a freshly generated image, and the visible UI on
@@ -4960,7 +5020,7 @@ class ChurchSimulator {
         if (!Number.isInteger(target) || !slots.includes(target)) {
             return { ok: false, reason: `Thread slot ${target} is not configured` };
         }
-        if (target === current) {
+        if (target === current && this._liveThreadOwned) {
             return { ok: true, unchanged: true, ...this.activeThreadStatus() };
         }
         const entry = this.readNSEntry(target);
@@ -7316,23 +7376,25 @@ class ChurchSimulator {
         // Complete outgoing geometry, frame-space, and CR14-to-Enter-GT
         // admission before touching either Thread image. CHANGE is atomic:
         // a rejected target or source leaves every home word intact.
-        let suspend = null;
-        let outBase = null;
-        let outLayout = null;
-        if (threadSwitch && this.bootComplete && outSlot !== null) {
+        let outgoingPrepared = null;
+        if (threadSwitch && this._liveThreadOwned && outSlot !== null) {
             const outEntry = this.readNSEntry(outSlot);
             if (!outEntry) {
                 this.fault('BOUNDS', `CHANGE: outgoing Thread slot ${outSlot} is unavailable`);
                 return null;
             }
-            outBase = outEntry.word0_location;
-            outLayout = this._threadLayoutAtBase(outBase);
+            const outBase = outEntry.word0_location;
+            const outLayout = this._threadLayoutAtBase(outBase);
             if (!outLayout || !outLayout.valid) {
                 this.fault('BOUNDS', `CHANGE: outgoing Thread slot ${outSlot} has invalid Thread geometry`);
                 return null;
             }
-            suspend = this._prepareThreadSuspendFrame(outBase, outLayout, outSlot);
+            const suspend = this._prepareThreadSuspendFrame(
+                outBase, outLayout, outSlot);
             if (!suspend) return null;
+            outgoingPrepared = {
+                threadBase: outBase, layout: outLayout, suspend,
+            };
         }
         this._flushLambdaCache();
         // Before boot, the live CR/DR banks are reset scratch state rather
@@ -7340,25 +7402,8 @@ class ChurchSimulator {
         // must not overwrite a valid saved Thread with those zero registers.
         // Reset-bank state preceding boot is not a Thread context and is never
         // serialized.  This is an architectural boot-state rule.
-        if (threadSwitch && this.bootComplete && outSlot !== null) {
-            if (outBase !== null) {
-                for (let i = 0; i < 16; i++) {
-                    this._writeRuntimeWord(outBase + 1 + i, this.dr[i]);
-                }
-                for (let i = 0; i < 12; i++) {
-                    this._writeRuntimeWord(
-                        outBase + outLayout.capsStart + i,
-                        this.cr[i].word0);
-                }
-                const frameWord = this._packFrameWord(
-                    this.pc, 1, suspend.savedSTO);
-                this._writeRuntimeWord(outBase + suspend.savedSTO - 1, suspend.enterGT);
-                this._writeRuntimeWord(outBase + suspend.savedSTO, frameWord);
-                this._writeRuntimeWord(
-                    outBase + THREAD_STO_OFFSET,
-                    this._packProtectedIndicator(
-                        suspend.savedSTO - 2, 1, this.flags, 0));
-            }
+        if (threadSwitch && this._liveThreadOwned && outSlot !== null) {
+            if (!this._suspendLiveThread(outSlot, outgoingPrepared)) return null;
         }
 
         // CHANGE makes the incoming Thread the active CR12 context before any
@@ -7402,6 +7447,7 @@ class ChurchSimulator {
         const headerContext = this._installLumpHeaderContext(
             codeParsed, codeParsed.index, codeEntry, codeHeader);
         this._currentThreadSlot = targetIdx;
+        this._liveThreadOwned = true;
         const desc = `CHANGE CR${d.crDst} (Thread object restored for slot ${targetIdx}; ${headerContext.desc}; CHURCH frame NIA 0x${resume.frame.returnPC.toString(16).toUpperCase()})`;
         this.output += desc + '\n';
         this.pc = resume.frame.returnPC;

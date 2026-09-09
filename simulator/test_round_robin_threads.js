@@ -46,6 +46,7 @@ assert.strictEqual(retiredIdentitySim.loadBootImage(retiredIdentityImage), false
 assert(retiredIdentitySim.lastBootImageError.includes('Namespace Header V2'),
     'retired Thread ABI rejection requests regeneration');
 committed.bootComplete = true;
+committed._liveThreadOwned = true;
 committed._currentThreadSlot = 1;
 committed.cr[15].word0 = 0x1A000000;
 assert.deepStrictEqual(committed.configuredThreadSlots(), [1, 11, 12],
@@ -225,6 +226,7 @@ const invalidGT = new ChurchSimulator();
 assert.strictEqual(invalidGT.loadBootImage(image), true,
     `invalid-GT fixture image must load: ${invalidGT.lastBootImageError || 'unknown error'}`);
 invalidGT.bootComplete = true;
+invalidGT._liveThreadOwned = true;
 invalidGT._currentThreadSlot = 1;
 invalidGT.dr.splice(0, 16, ...thread1InitialDRs);
 const invalidTargetBase = invalidGT.readNSEntry(11).word0_location;
@@ -310,22 +312,106 @@ assert.strictEqual(preBoot.cr[0].word0, 0,
     'pre-boot live CR0 starts reset and does not represent Thread.1');
 assert.strictEqual(preBoot.advanceConfiguredThread().slot, 11,
     'saved Thread images can be selected before the boot ceremony runs');
+assert.strictEqual(preBoot._liveThreadOwned, true,
+    'the first pre-boot restore establishes live Thread ownership');
 assert.strictEqual(preBoot.memory[
     preBootThread1Base + preBootThread1Layout.capsStart], preBootThread1EntryGT,
     'pre-boot browsing does not overwrite Thread.1 saved CR0 with reset live state');
-assert.strictEqual(preBoot.advanceConfiguredThread().slot, 12,
-    'pre-boot browsing continues to Thread#3');
-assert.strictEqual(preBoot.advanceConfiguredThread().slot, 1,
+const preBootThread2 = {
+    dr3: 0xA1B2C3D4,
+    cr2: preBoot.cr[2].word0,
+    pc: 3,
+    flags: { N: true, Z: false, C: true, V: false },
+    sto: preBoot.sto,
+};
+preBoot.dr[3] = preBootThread2.dr3;
+preBoot.pc = preBootThread2.pc;
+preBoot.flags = { ...preBootThread2.flags };
+assert.strictEqual(preBoot.selectConfiguredThread(1).slot, 1,
+    'pre-boot browsing can revisit Thread.1 non-sequentially');
+const thread2Base = preBoot.readNSEntry(11).word0_location;
+const thread2Protected = preBoot._unpackProtectedIndicator(
+    preBoot.memory[thread2Base + 17] >>> 0);
+assert.strictEqual(thread2Protected.sz, 1,
+    'switching away leaves the restored pre-boot Thread dormant with a protected CHURCH frame');
+assert.strictEqual(preBoot.selectConfiguredThread(12).slot, 12,
+    'pre-boot browsing can jump directly from Thread.1 to Thread.3');
+assert.strictEqual(preBoot.selectConfiguredThread(11).slot, 11,
+    'pre-boot browsing restores a previously active Thread');
+assert.strictEqual(preBoot.dr[3], preBootThread2.dr3,
+    'pre-boot switch-back restores the exact saved DR homes');
+assert.strictEqual(preBoot.cr[2].word0, preBootThread2.cr2,
+    'pre-boot switch-back restores the exact saved CR homes');
+assert.strictEqual(preBoot.pc, preBootThread2.pc,
+    'pre-boot switch-back restores the exact saved NIA');
+assert.deepStrictEqual(preBoot.flags, preBootThread2.flags,
+    'pre-boot switch-back restores the exact saved flags');
+assert.strictEqual(preBoot.sto, preBootThread2.sto,
+    'pre-boot switch-back restores the exact saved STO');
+const preBootNoOpMemory = new Uint32Array(preBoot.memory);
+assert.strictEqual(preBoot.selectConfiguredThread(11).unchanged, true,
+    'selecting the active pre-boot Thread remains a no-op');
+assert.deepStrictEqual(preBoot.memory, preBootNoOpMemory,
+    'active pre-boot selection does not rewrite any Thread image');
+assert.strictEqual(preBoot.selectConfiguredThread(1).slot, 1,
     'pre-boot browsing cycles back to Thread.1');
 assert.strictEqual(preBoot.cr[0].word0, preBootThread1EntryGT,
     'cycling back restores Thread.1 original saved CR0');
 assert.strictEqual(preBoot.faultLog.length, 0,
     'cycling among stopped saved images never raises a machine fault');
+assert.strictEqual(preBoot.loadBootImage(new ArrayBuffer(0)), false,
+    'a rejected replacement image remains non-mutating');
+assert.strictEqual(preBoot._liveThreadOwned, true,
+    'rejected image replacement preserves live Thread ownership');
+assert.strictEqual(preBoot.loadBootImage(image), true,
+    'a valid replacement image can replace an owned pre-boot context');
+assert.strictEqual(preBoot._liveThreadOwned, false,
+    'successful image replacement clears live Thread ownership');
+const unownedSameSlot = preBoot.selectConfiguredThread(1);
+assert.strictEqual(unownedSameSlot.ok, true,
+    'selecting the displayed slot while unowned restores its Thread');
+assert.strictEqual(unownedSameSlot.unchanged, undefined,
+    'same-slot selection is only a no-op when that Thread owns the live banks');
+assert.strictEqual(preBoot._liveThreadOwned, true,
+    'same-slot restoration establishes ownership after image replacement');
+
+assert.strictEqual(preBoot.selectConfiguredThread(11).slot, 11,
+    'pre-boot boot-transition fixture selects a non-default Thread');
+const beforeBootThread2 = {
+    dr3: 0xC0DEC0DE,
+    pc: 2,
+    flags: { N: false, Z: true, C: false, V: true },
+    sto: preBoot.sto,
+};
+preBoot.dr[3] = beforeBootThread2.dr3;
+preBoot.pc = beforeBootThread2.pc;
+preBoot.flags = { ...beforeBootThread2.flags };
+let bootSafety = 0;
+while (!preBoot.bootComplete && !preBoot.halted && bootSafety++ < 32) {
+    preBoot._bootStep();
+}
+assert.strictEqual(preBoot.bootComplete, true,
+    'boot completes after browsing a non-default Thread');
+assert.strictEqual(preBoot._currentThreadSlot, 1,
+    'boot synchronizes selection with the Thread installed into CR12');
+assert.strictEqual(preBoot._liveThreadOwned, true,
+    'boot establishes ownership for its installed Thread');
+assert.strictEqual(preBoot.selectConfiguredThread(11).slot, 11,
+    'the pre-boot selected Thread remains resumable after boot');
+assert.strictEqual(preBoot.dr[3], beforeBootThread2.dr3,
+    'boot preserves the pre-boot selected Thread data homes');
+assert.strictEqual(preBoot.pc, beforeBootThread2.pc,
+    'boot preserves the pre-boot selected Thread NIA');
+assert.deepStrictEqual(preBoot.flags, beforeBootThread2.flags,
+    'boot preserves the pre-boot selected Thread flags');
+assert.strictEqual(preBoot.sto, beforeBootThread2.sto,
+    'boot preserves the pre-boot selected Thread STO');
 
 const invalidResumeFrame = new ChurchSimulator();
 assert.strictEqual(invalidResumeFrame.loadBootImage(image), true,
     `resume-frame fixture image must load: ${invalidResumeFrame.lastBootImageError || 'unknown error'}`);
 invalidResumeFrame.bootComplete = true;
+invalidResumeFrame._liveThreadOwned = true;
 invalidResumeFrame._currentThreadSlot = 1;
 const invalidCodeTargetBase = invalidResumeFrame.readNSEntry(11).word0_location;
 const invalidCodeLayout = invalidResumeFrame._threadLayoutAtBase(invalidCodeTargetBase);
@@ -375,6 +461,7 @@ assert.strictEqual(outOfCodeSim.loadBootImage(outOfCodeImage), false,
 const underflowFrame = new ChurchSimulator();
 assert.strictEqual(underflowFrame.loadBootImage(image), true);
 underflowFrame.bootComplete = true;
+underflowFrame._liveThreadOwned = true;
 underflowFrame._currentThreadSlot = 1;
 const underflowTargetBase = underflowFrame.readNSEntry(11).word0_location;
 const underflowLayout = underflowFrame._threadLayoutAtBase(underflowTargetBase);
@@ -395,6 +482,7 @@ assert.deepStrictEqual(
 const malformedSavedSTO = new ChurchSimulator();
 assert.strictEqual(malformedSavedSTO.loadBootImage(image), true);
 malformedSavedSTO.bootComplete = true;
+malformedSavedSTO._liveThreadOwned = true;
 malformedSavedSTO._currentThreadSlot = 1;
 const malformedFrameBase = malformedSavedSTO.readNSEntry(11).word0_location;
 const malformedFrameLayout = malformedSavedSTO._threadLayoutAtBase(malformedFrameBase);
@@ -411,6 +499,7 @@ assert.deepStrictEqual(malformedSavedSTO.memory.slice(1, 17), malformedSourceDRH
 const outgoingUnderflow = new ChurchSimulator();
 assert.strictEqual(outgoingUnderflow.loadBootImage(image), true);
 outgoingUnderflow.bootComplete = true;
+outgoingUnderflow._liveThreadOwned = true;
 outgoingUnderflow._currentThreadSlot = 1;
 const outgoingEntry = outgoingUnderflow.readNSEntry(entryWords[0] & 0xFFFF);
 const outgoingHeader = outgoingUnderflow.parseLumpHeader(
@@ -441,6 +530,7 @@ const malformed = new ChurchSimulator();
 assert.strictEqual(malformed.loadBootImage(image), true,
     `malformed-header fixture image must load: ${malformed.lastBootImageError || 'unknown error'}`);
 malformed.bootComplete = true;
+malformed._liveThreadOwned = true;
 malformed._currentThreadSlot = 1;
 const malformedTargetBase = malformed.readNSEntry(11).word0_location;
 const malformedTargetLayout = malformed._threadLayoutAtBase(malformedTargetBase);
@@ -492,6 +582,7 @@ const uiSim = new ChurchSimulator();
 assert.strictEqual(uiSim.loadBootImage(image), true,
     `UI fixture image must load: ${uiSim.lastBootImageError || 'unknown error'}`);
 uiSim.bootComplete = true;
+uiSim._liveThreadOwned = true;
 uiSim._currentThreadSlot = 1;
 const uiBootBase = uiSim.readNSEntry(1).word0_location;
 const uiBootLayout = uiSim._threadLayoutAtBase(uiBootBase);
