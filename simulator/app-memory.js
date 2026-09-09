@@ -144,10 +144,38 @@ function _findSrcLump(slotIdx, slotLabel) {
             }) || null)
             : null;
     };
+    const compiledTime = function(lump) {
+        const raw = lump && lump.compiled_at;
+        if (raw === null || raw === undefined || raw === '') return 0;
+        const numeric = Number(raw);
+        if (Number.isFinite(numeric)) return numeric;
+        const parsed = Date.parse(String(raw));
+        return Number.isFinite(parsed) ? parsed / 1000 : 0;
+    };
+    const latestForName = function(name, preferred) {
+        if (!name) return null;
+        const candidates = _lumpsCache.filter(function(lump) {
+            return lump && lump.abstraction === name;
+        });
+        candidates.sort(function(a, b) {
+            const compiledOrder = compiledTime(b) - compiledTime(a);
+            if (compiledOrder) return compiledOrder;
+            const versionOrder = (parseInt(b.lump_version) || 0) -
+                (parseInt(a.lump_version) || 0);
+            if (versionOrder) return versionOrder;
+            const approvalOrder = Number(Boolean(b.approved)) -
+                Number(Boolean(a.approved));
+            if (approvalOrder) return approvalOrder;
+            if (a === preferred) return -1;
+            if (b === preferred) return 1;
+            return 0;
+        });
+        return candidates[0] || null;
+    };
 
-    // The committed Namespace binding is authoritative when several immutable
-    // revisions share one abstraction name. Never let cache order select an
-    // archived same-name artifact for a known slot.
+    // The committed Namespace row identifies the abstraction occupying this
+    // slot. Source/repository views then choose that abstraction's most recent
+    // compilation; the exact row token remains the live execution identity.
     const savedRows = window._nsState && Array.isArray(window._nsState.abstractions)
         ? window._nsState.abstractions : [];
     const saved = savedRows.find(function(row) {
@@ -155,6 +183,9 @@ function _findSrcLump(slotIdx, slotLabel) {
     });
     if (saved && saved.token) {
         const exactSaved = byToken(saved.token);
+        const latestSaved = latestForName(saved.name ||
+            (exactSaved && exactSaved.abstraction) || slotLabel, exactSaved);
+        if (latestSaved) return latestSaved;
         if (exactSaved) return exactSaved;
         return Object.assign({
             abstraction: saved.name || slotLabel || `NS[${slotIdx}]`,
@@ -165,18 +196,16 @@ function _findSrcLump(slotIdx, slotLabel) {
     const liveToken = sim && typeof sim.lumpTokenAtSlot === 'function'
         ? sim.lumpTokenAtSlot(slotIdx) : null;
     const exactLive = byToken(liveToken);
-    if (exactLive) return exactLive;
+    if (exactLive) return latestForName(exactLive.abstraction, exactLive) || exactLive;
 
     const fixed = _lumpsCache.find(function(l) {
         return l && l.ns_slot !== null && l.ns_slot !== undefined &&
             Number.isInteger(Number(l.ns_slot)) &&
             Number(l.ns_slot) === Number(slotIdx);
     });
-    if (fixed) return fixed;
+    if (fixed) return latestForName(fixed.abstraction, fixed) || fixed;
     if (!slotLabel) return null;
-    return _lumpsCache.find(function(l) {
-        return l && l.abstraction === slotLabel && !l.archived;
-    }) || null;
+    return latestForName(slotLabel);
 }
 
 function _resolveCListPetName(gtWord) {
@@ -4615,6 +4644,8 @@ function _showNSLumpModal(slotIdx, nsEntry) {
     const label = (nsEntry.label || `NS[${slotIdx}]`).replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const base  = nsEntry.word0_location;
 
+    const _preferredSource = (typeof _findSrcLump === 'function')
+        ? _findSrcLump(slotIdx, nsEntry.label) : null;
     const hdrWord = sim.memory ? (sim.memory[base] >>> 0) : 0;
     const hdr     = (typeof sim.parseLumpHeader === 'function') ? sim.parseLumpHeader(hdrWord) : null;
 
@@ -4626,7 +4657,7 @@ function _showNSLumpModal(slotIdx, nsEntry) {
     let _lazyFetchToken = null;
     let _modalToken = null, _modalMode = null;
 
-    if (hdr && hdr.valid) {
+    if (hdr && hdr.valid && !(_preferredSource && _preferredSource.token)) {
         const { cw, cc, lumpSize } = hdr;
 
         headerHtml = `<div style="margin-bottom:14px;">
@@ -4763,6 +4794,16 @@ function _showNSLumpModal(slotIdx, nsEntry) {
             _modalMode = (_lazyEntry.ns_slot_policy === 'static' && _lazyEntry.boot_resident) ? 'resident'
                        : (_lazyEntry.ns_slot_policy === 'static')                             ? 'lazy'
                        :                                                                        'dynamic';
+            const _rawCompiledAt = _lazyEntry.compiled_at;
+            let _compiledAtText = '';
+            if (_rawCompiledAt !== null && _rawCompiledAt !== undefined && _rawCompiledAt !== '') {
+                const _compiledNumeric = Number(_rawCompiledAt);
+                const _compiledDate = Number.isFinite(_compiledNumeric)
+                    ? new Date(_compiledNumeric * 1000) : new Date(String(_rawCompiledAt));
+                if (!Number.isNaN(_compiledDate.getTime())) {
+                    _compiledAtText = _compiledDate.toLocaleString();
+                }
+            }
             tokenHtml = `<div style="margin-bottom:12px;">
                 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
                     <span style="color:#888;font-size:0.78rem;">Token:</span>
@@ -4776,7 +4817,10 @@ function _showNSLumpModal(slotIdx, nsEntry) {
                     <button class="btn btn-xs" onclick="document.getElementById('_nsLumpModalOverlay').remove();(typeof openLumpInEditor==='function'?openLumpInEditor('${_lazyFetchToken}'):_openLumpSource('${_lazyFetchToken}'))"
                         style="background:#1e3a5f;color:#60a5fa;border:1px solid rgba(96,165,250,0.35);">Open in Editor \u270e</button>
                 </div>
-                <div style="color:#555;font-size:0.72rem;font-family:monospace;">&#x1F3E0; server/lumps/${_lazyFetchToken}.lump</div>
+                <div style="color:#555;font-size:0.72rem;font-family:monospace;">&#x1F3E0; server/lumps/${_lazyFetchToken}.lump${_compiledAtText ? ` · compiled ${_compiledAtText}` : ''}</div>
+                <div style="margin-top:7px;padding:6px 9px;border-left:3px solid #60a5fa;background:rgba(96,165,250,0.08);color:#9ca3af;font-size:0.76rem;">
+                    Showing the most recently compiled saved code. Resident memory may differ until this revision is loaded.
+                </div>
             </div>`;
             headerHtml = `<div id="_nsLumpLazyBody" style="color:#f0a040;font-size:0.8rem;padding:8px 0;">&#9680; Loading lump data\u2026</div>`;
         } else {
@@ -4927,7 +4971,7 @@ function _showNSLumpModal(slotIdx, nsEntry) {
 
                 // Header table
                 fetchHtml += `<div style="margin-bottom:14px;">
-                    <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">LUMP HEADER <span style="color:#f0a040;font-weight:400;">(lazy \u2014 fetched from server)</span></div>
+                    <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">LUMP HEADER <span style="color:#60a5fa;font-weight:400;">(latest compilation \u2014 fetched from server)</span></div>
                     <table ${_nsMT}><tbody>
                         <tr><td ${_nsTD} style="color:#888;width:140px;">Magic</td><td ${_nsTD}><code>0x${_hdr2.magic.toString(16).toUpperCase()}</code> <span style="color:#4ec9b0;">&#10003; valid</span></td></tr>
                         <tr><td ${_nsTD} style="color:#888;">Code words (cw)</td><td ${_nsTD}>${cw}</td></tr>

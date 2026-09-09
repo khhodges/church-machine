@@ -72,6 +72,7 @@ function extractTopLevelFn(sourceFile, fnName) {
 }
 
 const findSrcLumpSrc = extractTopLevelFn('app-memory.js', '_findSrcLump');
+const appMemorySource = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
 
 // ── Sandbox factory ───────────────────────────────────────────────────────────
 // Each test gets a fresh VM context with its own _lumpsCache so tests cannot
@@ -194,24 +195,27 @@ console.log('\n--- T06: _lumpsCache undefined → null without throwing ---');
     check('T06b: returns null when _lumpsCache is undefined',                result === null);
 }
 
-// ── T08: committed slot token beats stale same-name cache order ───────────────
-console.log('\n--- T08: committed slot token beats stale same-name cache order ---');
+// ── T08: newest compilation beats the committed slot token ───────────────────
+console.log('\n--- T08: newest compilation beats committed slot token ---');
 {
-    const stale = {
+    const latest = {
         ns_slot: null, abstraction: 'CapabilityTest', token: 'dead0001',
-        archived: true, lump_version: 24,
+        archived: true, lump_version: 24, compiled_at: '2026-09-09T12:00:00Z',
     };
-    const current = {
+    const committed = {
         ns_slot: null, abstraction: 'CapabilityTest', token: '4a00000a',
-        lump_version: 2,
+        lump_version: 99, compiled_at: '2026-09-08T12:00:00Z',
     };
-    const ctx = makeSandbox([stale, current]);
+    const ctx = makeSandbox([latest, committed]);
     ctx.window._nsState = {
         abstractions: [{ slot: 10, name: 'CapabilityTest', token: '4A00000A' }],
     };
     const result = vm.runInContext('_findSrcLump(10, "CapabilityTest")', ctx);
-    check('T08a: exact committed token is returned', result === current);
-    check('T08b: archived first same-name record is ignored', result !== stale);
+    check('T08a: most recently compiled artifact is returned', result === latest);
+    check('T08b: higher version does not override compilation time', result !== committed);
+    check('T08c: resident popup fetches the selected saved compilation',
+        appMemorySource.includes('hdr && hdr.valid && !(_preferredSource && _preferredSource.token)') &&
+        appMemorySource.includes('(latest compilation \\u2014 fetched from server)'));
 }
 
 // ── T09: missing cache metadata still preserves committed token ──────────────
