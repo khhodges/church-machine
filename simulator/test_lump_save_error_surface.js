@@ -12,7 +12,12 @@
 //
 // Run:  node simulator/test_lump_save_error_surface.js
 
-const { _lumpSaveHandleResponse, _lumpSaveHandleNetworkError } =
+const {
+    _lumpSaveHandleResponse,
+    _lumpSaveHandleNetworkError,
+    _lumpSaveStaleConflictAction,
+    _lumpSaveSubmittedSource,
+} =
     require('./lump_save_handler.js');
 
 let pass = 0;
@@ -176,6 +181,38 @@ function withMocks(opts, fn) {
     }
     check('T8a: no toast function → no crash',         true /* reached here */);
     check('T8b: no toast function → renderLumps fires', renderCalled);
+}
+
+// T9: stale editor conflicts offer all three safe outcomes
+{
+    check('T9a: stale editor conflict can reload latest source',
+        _lumpSaveStaleConflictAction(
+            { stale_editor_base: true }, () => true) === 'reload');
+    const preserveAnswers = [false, true];
+    check('T9b: stale editor conflict can preserve buffer separately',
+        _lumpSaveStaleConflictAction(
+            { stale_editor_base: true }, () => preserveAnswers.shift()) === 'preserve');
+    const cancelAnswers = [false, false];
+    check('T9c: stale editor conflict can cancel without saving',
+        _lumpSaveStaleConflictAction(
+            { stale_editor_base: true }, () => cancelAnswers.shift()) === 'cancel');
+    check('T9d: ordinary errors are not stale editor conflicts',
+        _lumpSaveStaleConflictAction({ error: 'bad binary' }, () => true) === null);
+}
+
+// T10: source verification follows the exact retained/rebuilt binary
+{
+    const retained = { selectedProfile: 'full', sourceText: 'method Main { RETURN }' };
+    check('T10a: retained full-profile binary keeps its matching source',
+        _lumpSaveSubmittedSource(retained, true, null, null) === retained.sourceText);
+    check('T10b: retained API-only binary submits null source',
+        _lumpSaveSubmittedSource(
+            { selectedProfile: 'api', sourceText: retained.sourceText },
+            true, null, null) === null);
+    check('T10c: fallback compact binary keeps rebuilt source',
+        _lumpSaveSubmittedSource(null, false, 'compact', 'RETURN') === 'RETURN');
+    check('T10d: fallback API-only binary submits null source',
+        _lumpSaveSubmittedSource(null, false, 'api', 'RETURN') === null);
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

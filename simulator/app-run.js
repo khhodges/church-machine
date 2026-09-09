@@ -15237,6 +15237,7 @@ async function confirmSaveToNamespace() {
         // compile has happened in the interim.
         var _snapshotPending = window._pendingLumpData || null;
         window._pendingLumpData = null; // consumed; prevent any later reuse
+        var _submittedSource = null;
         var _pendingCanReuse = (function() {
             if (!_snapshotPending || !_snapshotPending.binary) return false;
             var _curAt = (_svRegMem && _svRegMem.registeredAt) ? _svRegMem.registeredAt : 0;
@@ -15248,6 +15249,8 @@ async function confirmSaveToNamespace() {
         })();
         if (_pendingCanReuse) {
             _svBinary = _snapshotPending.binary;
+            _submittedSource = _lumpSaveSubmittedSource(
+                _snapshotPending, true, null, null);
             if (Array.isArray(_snapshotPending.caps)) {
                 _caps = _snapshotPending.caps.slice();
             }
@@ -15287,6 +15290,8 @@ async function confirmSaveToNamespace() {
                 _fallbackSourceText,
                 { profile: _fallbackProfile }
             );
+            _submittedSource = _lumpSaveSubmittedSource(
+                _snapshotPending, false, _fallbackProfile, _fallbackSourceText);
             var _fallbackFrameWords = _fallbackFrame.frameWords;
             var _fallbackFrameStart = 1 + _svCW;
             var _svLumpSize = 64;
@@ -15432,6 +15437,8 @@ async function confirmSaveToNamespace() {
                 // addressable immediately. The server canonicalizes this field
                 // from the verified SELF row for an existing resident binding.
                 token:        _svTok || undefined,
+                editor_base: window._editorOpenLumpBaseIdentity || undefined,
+                submitted_source: _submittedSource,
             }
         };
         let _saveApproval;

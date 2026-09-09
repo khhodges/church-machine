@@ -24,6 +24,19 @@ def _raw(words):
     return struct.pack(">64I", *words)
 
 
+def _words_with_source(source):
+    source_bytes = source.encode("utf-8")
+    api_bytes = b"{}"
+    words = _words(cw=1, marker=36)
+    words[2] = (0xAB << 24) | (0x01 << 16) | len(api_bytes)
+    words[3] = int.from_bytes(api_bytes.ljust(4, b"\0"), "big")
+    words[4] = len(source_bytes)
+    for offset in range(0, len(source_bytes), 4):
+        words[5 + offset // 4] = int.from_bytes(
+            source_bytes[offset:offset + 4].ljust(4, b"\0"), "big")
+    return words
+
+
 @pytest.fixture
 def isolated_lumps(tmp_path, monkeypatch):
     (tmp_path / "manifest.json").write_text("[]")
@@ -43,6 +56,7 @@ def _approved_payload(client, words, token="7c501001", name="LumpSaveTest"):
             "token": token, "abstraction": name, "content_type": "code",
             "language": "assembly", "ns_slot": None, "capabilities": [],
             "methods": [], "grants": ["E"],
+            "submitted_source": None,
         },
     }
     plan_response = client.post("/api/lumps/save-plan", json=candidate)
@@ -65,6 +79,7 @@ def _approved_payload(client, words, token="7c501001", name="LumpSaveTest"):
             "token": token, "abstraction": name, "content_type": "code",
             "language": "assembly", "ns_slot": None, "capabilities": [],
             "methods": [], "grants": ["E"],
+            "submitted_source": None,
             "save_plan_id": plan["plan_id"],
             "approval_intent": issued.get_json()["intent"],
         },
@@ -167,6 +182,81 @@ def test_same_abstraction_new_token_is_server_authored_create(isolated_lumps):
     assert plan["action"] == "save"
     assert plan["consequence"] == "create"
     assert plan["current_lump"] is None
+
+
+def test_stale_editor_base_is_blocked_or_explicitly_preserved(isolated_lumps):
+    with app_module.app.test_client() as client:
+        first = client.post("/api/lumps/save", json=_approved_payload(
+            client, _words(marker=32), token="7c501032"))
+        assert first.status_code == 200
+        first_saved = first.get_json()
+        base = {
+            "token": first_saved["token"],
+            "source_hash": None,
+            "compiled_at": first_saved["compiled_at"],
+            "abstraction": "LumpSaveTest",
+        }
+
+        second = client.post("/api/lumps/save", json=_approved_payload(
+            client, _words(marker=33), token="7c501033"))
+        assert second.status_code == 200
+
+        stale_candidate = {
+            "binary": _words(marker=34),
+            "metadata": {
+                "token": "7c501034",
+                "abstraction": "LumpSaveTest",
+                "content_type": "code",
+                "language": "assembly",
+                "capabilities": [],
+                "submitted_source": None,
+                "editor_base": base,
+            },
+        }
+        blocked = client.post("/api/lumps/save-plan", json=stale_candidate)
+        assert blocked.status_code == 409
+        assert blocked.get_json()["stale_editor_base"] is True
+        assert blocked.get_json()["latest"]["token"] == "7c501033"
+
+        stale_candidate["metadata"]["preserve_stale_revision"] = True
+        preserved = client.post("/api/lumps/save-plan", json=stale_candidate)
+        assert preserved.status_code == 201
+        assert preserved.get_json()["consequence"] == "create"
+
+
+def test_submitted_source_must_match_embedded_source(isolated_lumps):
+    with app_module.app.test_client() as client:
+        response = client.post("/api/lumps/save-plan", json={
+            "binary": _words(marker=35),
+            "metadata": {
+                "token": "7c501035",
+                "abstraction": "LumpSaveTest",
+                "content_type": "code",
+                "language": "assembly",
+                "capabilities": [],
+                "submitted_source": "source that is not embedded",
+            },
+        })
+    assert response.status_code == 422
+    assert response.get_json()["source_mismatch"] is True
+    assert not list(isolated_lumps.glob("*.lump"))
+
+
+def test_matching_submitted_and_embedded_source_is_accepted(isolated_lumps):
+    source = "method Main { RETURN }"
+    with app_module.app.test_client() as client:
+        response = client.post("/api/lumps/save-plan", json={
+            "binary": _words_with_source(source),
+            "metadata": {
+                "token": "7c501036",
+                "abstraction": "LumpSaveTest",
+                "content_type": "code",
+                "language": "assembly",
+                "capabilities": [],
+                "submitted_source": source,
+            },
+        })
+    assert response.status_code == 201, response.get_data(as_text=True)
 
 
 def test_expired_or_other_session_plan_requires_fresh_review(isolated_lumps):

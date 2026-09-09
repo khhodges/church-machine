@@ -8635,6 +8635,27 @@ def save_lump():
     lump_bytes   = _struct.pack(f'>{len(_sl_words)}I', *_sl_words)
     _binary_hash = _hl_save.sha256(lump_bytes).hexdigest()
 
+    # The browser supplies the exact source buffer used to construct the
+    # self-defining binary. Never commit metadata/source claims that disagree
+    # with the immutable content frame.
+    _intrinsic_content = _parse_intrinsic_lump_content(_sl_words)
+    _embedded_source = (
+        _intrinsic_content.get("source")
+        if isinstance(_intrinsic_content, dict) else None
+    )
+    if "submitted_source" in metadata:
+        _submitted_source = metadata.get("submitted_source")
+        if _submitted_source is not None and not isinstance(_submitted_source, str):
+            return jsonify({
+                "error": "Save rejected: submitted_source must be text or null.",
+                "source_mismatch": True,
+            }), 422
+        if _submitted_source != _embedded_source:
+            return jsonify({
+                "error": "Save rejected: submitted editor source does not match the source embedded in the binary.",
+                "source_mismatch": True,
+            }), 422
+
     # ── Read authoritative cw/cc from the (post-modification) binary header ───
     # The client-supplied metadata.cw / metadata.cc are UNTRUSTED: they reflect
     # whatever the JavaScript assembled in memory and may be stale or zero even
@@ -8697,6 +8718,71 @@ def save_lump():
             "The save has been aborted to prevent overwriting previously-saved LUMPs. "
             f"Details: {_mf_err}"
         )}), 500
+
+    # An editor opened from a saved revision must still be based on the latest
+    # compiled revision of that abstraction. This is checked while holding the
+    # history lock, before a plan is issued or any artifact is changed.
+    _editor_base = metadata.get("editor_base")
+    if _editor_base is not None:
+        if not isinstance(_editor_base, dict):
+            return jsonify({"error": "Invalid editor base identity."}), 400
+        _same_abstraction = [
+            entry for entry in manifest
+            if isinstance(entry, dict) and entry.get("abstraction") == abs_name
+        ]
+        def _compiled_sort_value(entry):
+            try:
+                return float(entry.get("compiled_at") or 0)
+            except (TypeError, ValueError):
+                return 0
+        _latest_entry = max(
+            _same_abstraction,
+            key=lambda entry: (_compiled_sort_value(entry),
+                               int(entry.get("lump_version") or 0)),
+            default=None,
+        )
+        _base_token = str(_editor_base.get("token") or "").lower()
+        _base_compiled_at = _editor_base.get("compiled_at")
+        _latest_token = str((_latest_entry or {}).get("token") or "").lower()
+        _identity_matches = _latest_entry is not None and _base_token == _latest_token
+        if _identity_matches:
+            try:
+                _identity_matches = (
+                    float(_base_compiled_at) ==
+                    float(_latest_entry.get("compiled_at"))
+                )
+            except (TypeError, ValueError):
+                _identity_matches = False
+        if _identity_matches:
+            _latest_path = os.path.join(
+                lumps_dir, _latest_entry.get("filename") or f"{_latest_token}.lump")
+            try:
+                with open(_latest_path, "rb") as _latest_file:
+                    _latest_words = list(_struct.unpack(
+                        f">{os.path.getsize(_latest_path) // 4}I",
+                        _latest_file.read()))
+                _latest_content = _parse_intrinsic_lump_content(_latest_words)
+                _latest_source = (
+                    _latest_content.get("source")
+                    if isinstance(_latest_content, dict) else None
+                )
+                _latest_source_hash = (
+                    _hl_save.sha256(_latest_source.encode("utf-8")).hexdigest()
+                    if isinstance(_latest_source, str) else None
+                )
+                _identity_matches = _editor_base.get("source_hash") == _latest_source_hash
+            except (OSError, _struct.error):
+                _identity_matches = False
+        if not _identity_matches and metadata.get("preserve_stale_revision") is not True:
+            return jsonify({
+                "error": "A newer saved revision exists. Reload it or explicitly preserve this buffer as a separate revision.",
+                "stale_editor_base": True,
+                "latest": {
+                    "token": (_latest_entry or {}).get("token"),
+                    "compiled_at": (_latest_entry or {}).get("compiled_at"),
+                    "abstraction": (_latest_entry or {}).get("abstraction"),
+                },
+            }), 409
 
     _existing_entry = next((e for e in manifest if e.get('token') == token8), None)
     _exist_filename = (_existing_entry or {}).get('filename', f'{token8}.lump')
@@ -9120,6 +9206,7 @@ def save_lump():
         "issue_n":        _issue_n_save,
         "size_bytes":     len(lump_bytes),
         "lump_version":   next_lump_version,
+        "compiled_at":    _compiled_at,
         "binary_hash":    _binary_hash,
         "boot_image_refreshed": boot_refreshed,
         **(_bootstrap_identity or {"identity_hash": _identity_hash}),

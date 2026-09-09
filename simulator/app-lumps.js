@@ -1583,6 +1583,7 @@ function exitSavedLumpEditorMode() {
     window._editorLumpDirtyToken = null;
     window._editorOpenLumpToken = null;
     window._editorOpenLumpMeta = null;
+    window._editorOpenLumpBaseIdentity = null;
     var discardBtn = document.getElementById('btnDiscardLumpEdit');
     if (discardBtn) discardBtn.remove();
     if (typeof switchCodeTab === 'function') switchCodeTab('console');
@@ -3069,6 +3070,7 @@ function _commitSavedLumpClientState(resp, fallback, draftToken) {
             (resp.issue_number != null ? resp.issue_number : base.issue_n),
         filename: resp.filename || resp.lump || base.filename,
         lump_version: resp.lump_version != null ? resp.lump_version : base.lump_version,
+        compiled_at: resp.compiled_at != null ? resp.compiled_at : base.compiled_at,
         binary_hash: resp.binary_hash || base.binary_hash || null,
         identity_hash: resp.identity_hash || base.identity_hash || null,
     });
@@ -5884,6 +5886,7 @@ async function openLumpInEditor(token) {
         window._editorLumpDirtyListener    = null;
         window._editorOpenLumpToken        = null;
         window._editorOpenLumpMeta         = null;
+        window._editorOpenLumpBaseIdentity = null;
         if (window.LumpRegistry) window.LumpRegistry.evictMemory(window.LumpRegistry.getCurrent());
         // Remove banners and the discard toolbar button
         var _db = document.getElementById('_lumpDraftBanner');
@@ -5910,6 +5913,23 @@ async function openLumpInEditor(token) {
     // button always knows which LUMP it is working with.
     window._editorOpenLumpToken = token   || null;
     window._editorOpenLumpMeta  = lump    || null;
+    var _openedSourceHash = null;
+    if (!_inMemoryLump && typeof _binaryFrameSource === 'string' &&
+            typeof crypto !== 'undefined' && crypto.subtle &&
+            typeof TextEncoder !== 'undefined') {
+        var _openedSourceDigest = await crypto.subtle.digest(
+            'SHA-256', new TextEncoder().encode(_binaryFrameSource));
+        _openedSourceHash = Array.from(new Uint8Array(_openedSourceDigest))
+            .map(function(byte) { return byte.toString(16).padStart(2, '0'); })
+            .join('');
+    }
+    if (window._savedLumpOpenRequestId !== _openRequestId) return;
+    window._editorOpenLumpBaseIdentity = _inMemoryLump ? null : {
+        token: token || null,
+        source_hash: _openedSourceHash,
+        compiled_at: lump.compiled_at == null ? null : lump.compiled_at,
+        abstraction: lump.abstraction || null
+    };
     // Opening a saved LUMP is a distinct context from a catalog-method edit —
     // clear any stale abstraction/method context so the jump links reflect
     // this LUMP, not a previously-edited method.
@@ -6806,7 +6826,10 @@ async function _requestLumpSavePlan(words, metadata) {
     if (!resp.ok || !planId || !result ||
         (result.action !== 'save' && result.action !== 'replace') ||
         (result.consequence !== 'create' && result.consequence !== 'replace')) {
-        throw new Error((result && result.error) || 'Invalid save-plan response');
+        const error = new Error((result && result.error) || 'Invalid save-plan response');
+        error.response = result;
+        error.status = resp.status;
+        throw error;
     }
     return Object.assign({}, result, { plan_id: planId });
 }
@@ -6843,7 +6866,26 @@ window._requestLumpSavePlan = _requestLumpSavePlan;
 window._formatLumpSavePlan = _formatLumpSavePlan;
 
 async function _confirmLumpSavePlan(words, metadata, prompt) {
-    const plan = await _requestLumpSavePlan(words, metadata);
+    let plan;
+    try {
+        plan = await _requestLumpSavePlan(words, metadata);
+    } catch (error) {
+        const conflict = error && error.response && error.response.stale_editor_base;
+        if (!conflict) throw error;
+        const latest = error.response.latest || {};
+        const action = typeof _lumpSaveStaleConflictAction === 'function'
+            ? _lumpSaveStaleConflictAction(error.response, confirm)
+            : null;
+        if (action === 'reload') {
+            if (latest.token && typeof openLumpInEditor === 'function') {
+                await openLumpInEditor(latest.token);
+            }
+            return null;
+        }
+        if (action !== 'preserve') return null;
+        metadata.preserve_stale_revision = true;
+        plan = await _requestLumpSavePlan(words, metadata);
+    }
     const message = typeof prompt === 'function' ? prompt(plan) : String(prompt || '');
     if (!confirm(`${_formatLumpSavePlan(plan)}\n\n${message}`.trim())) return null;
     const intent = await _requestLumpApprovalIntent(words, plan.action, metadata, plan);

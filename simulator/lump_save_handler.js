@@ -47,6 +47,36 @@ function _lumpSaveHandleNetworkError(err) {
 }
 
 /**
+ * Ask how to resolve a stale editor-base rejection.
+ *
+ * @returns {'reload'|'preserve'|'cancel'|null} null when this is not a stale
+ *          editor conflict.
+ */
+function _lumpSaveStaleConflictAction(response, confirmImpl) {
+    if (!response || response.stale_editor_base !== true) return null;
+    var ask = typeof confirmImpl === 'function' ? confirmImpl : function() { return false; };
+    if (ask(
+        'This editor was opened from an older saved revision. A newer revision is now current.\n\n' +
+        'Choose OK to reload the latest source. Choose Cancel to keep this buffer and save it as a separate revision.'
+    )) return 'reload';
+    return ask(
+        'Preserve this older buffer as a separate revision? It will not silently replace the newer source.'
+    ) ? 'preserve' : 'cancel';
+}
+
+/**
+ * Return the source corresponding to the exact binary selected for this save.
+ * The pending global is consumed before the network request, so callers must
+ * pass the retained snapshot rather than reading window._pendingLumpData.
+ */
+function _lumpSaveSubmittedSource(snapshot, reusedSnapshot, fallbackProfile, fallbackSource) {
+    var profile = reusedSnapshot && snapshot ? snapshot.selectedProfile : fallbackProfile;
+    if (profile === 'api') return null;
+    var source = reusedSnapshot && snapshot ? snapshot.sourceText : fallbackSource;
+    return typeof source === 'string' ? source : '';
+}
+
+/**
  * POST a save and classify failures without conflating response parsing with
  * transport.  The commit callback is invoked only for a valid successful JSON
  * response, allowing callers to keep simulator/UI state unchanged until the
@@ -102,6 +132,8 @@ if (typeof module !== 'undefined') {
     module.exports = {
         _lumpSaveHandleResponse,
         _lumpSaveHandleNetworkError,
+        _lumpSaveStaleConflictAction,
+        _lumpSaveSubmittedSource,
         _lumpSaveRequest,
     };
 }
