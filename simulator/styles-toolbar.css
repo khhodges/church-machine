@@ -1067,6 +1067,15 @@
     opacity: 0.58;
 }
 
+.active-thread-control {
+    cursor: pointer;
+}
+
+.active-thread-control:focus-visible {
+    outline: 2px solid #8fc8ff;
+    outline-offset: 2px;
+}
+
 .thread-identity-marker {
     grid-area: marker;
     width: 0.38rem;
@@ -1190,6 +1199,111 @@
 .thread-identity-page-position {
     color: #7f91a7;
     font-size: 0.62rem;
+}
+
+.thread-context-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10020;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: rgba(3, 8, 16, 0.78);
+    backdrop-filter: blur(4px);
+}
+
+.thread-context-modal {
+    width: min(38rem, 96vw);
+    max-height: 90vh;
+    overflow: auto;
+    padding: 1.15rem;
+    border: 1px solid rgba(92, 173, 255, 0.5);
+    border-radius: 10px;
+    background: linear-gradient(145deg, #101e30, #0a111d);
+    color: #d7e2f0;
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.7);
+}
+
+.thread-context-modal header,
+.thread-context-modal footer,
+.thread-context-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.thread-context-modal h2 {
+    margin: 0.12rem 0 0;
+    color: #f0d47b;
+    font-size: 1.25rem;
+}
+
+.thread-context-kicker,
+.thread-context-details dt {
+    color: #748aa3;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.thread-context-close {
+    border: 0;
+    background: transparent;
+    color: #a9b8cb;
+    font-size: 1.6rem;
+    cursor: pointer;
+}
+
+.thread-context-summary {
+    margin: 1rem 0;
+    padding: 0.65rem 0.8rem;
+    border: 1px solid rgba(218, 165, 32, 0.35);
+    border-radius: 6px;
+    background: rgba(77, 56, 12, 0.2);
+}
+
+.thread-context-state {
+    color: #8de3c5;
+    font-weight: 700;
+}
+
+.thread-context-details {
+    display: grid;
+    gap: 0.55rem;
+    margin: 0;
+}
+
+.thread-context-details > div {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(116, 138, 163, 0.18);
+}
+
+.thread-context-details dd {
+    margin: 0;
+    color: #c9d6e5;
+    font-family: 'Courier New', monospace;
+    overflow-wrap: anywhere;
+}
+
+.thread-context-reasons {
+    min-height: 1.2em;
+    color: #d7a7a7;
+    font-size: 0.72rem;
+}
+
+.thread-context-modal footer {
+    justify-content: flex-end;
+    margin-top: 1rem;
+}
+
+.thread-context-modal button:focus-visible {
+    outline: 2px solid #8fc8ff;
+    outline-offset: 2px;
 }
 
 @media (max-width: 1180px) {

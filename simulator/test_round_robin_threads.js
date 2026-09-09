@@ -388,6 +388,100 @@ assert.strictEqual(unownedSameSlot.unchanged, undefined,
 assert.strictEqual(preBoot._liveThreadOwned, true,
     'same-slot restoration establishes ownership after image replacement');
 
+// Thread Reset restores only the selected immutable loaded-image body.
+const resetFixture = new ChurchSimulator();
+assert.strictEqual(resetFixture.loadBootImage(image), true,
+    'Thread Reset fixture loads an immutable image baseline');
+const resetSlots = resetFixture.configuredThreadSlots();
+const resetBodies = new Map(resetSlots.map(slot => {
+    const entry = resetFixture.readNSEntry(slot);
+    const layout = resetFixture._threadLayoutAtBase(entry.word0_location);
+    return [slot, new Uint32Array(resetFixture.memory.slice(
+        entry.word0_location, entry.word0_location + layout.lumpSize))];
+}));
+const dormantResetSlot = 11;
+const dormantResetEntry = resetFixture.readNSEntry(dormantResetSlot);
+resetFixture.memory[dormantResetEntry.word0_location + 1] ^= 0xFFFFFFFF;
+const otherResetEntry = resetFixture.readNSEntry(12);
+resetFixture.memory[otherResetEntry.word0_location + 1] = 0x12345678;
+const dormantReset = resetFixture.resetThreadToBaseline(dormantResetSlot);
+assert.deepStrictEqual(dormantReset, { ok: true, slot: dormantResetSlot, active: false },
+    'dormant Thread Reset succeeds without selecting the Thread');
+assert.deepStrictEqual(
+    resetFixture.memory.slice(
+        dormantResetEntry.word0_location,
+        dormantResetEntry.word0_location + resetBodies.get(dormantResetSlot).length),
+    resetBodies.get(dormantResetSlot),
+    'dormant Thread Reset restores the exact loaded-image body');
+assert.strictEqual(resetFixture.memory[otherResetEntry.word0_location + 1], 0x12345678,
+    'dormant Thread Reset leaves every other Thread body untouched');
+assert.strictEqual(resetFixture._liveThreadOwned, false,
+    'dormant Thread Reset does not acquire the live register bank');
+
+assert.strictEqual(resetFixture.selectConfiguredThread(11).ok, true,
+    'active Reset fixture restores the selected Thread through CHANGE');
+resetFixture.dr[3] = 0xDEADBEEF;
+resetFixture.pc = 7;
+resetFixture.flags = { N: true, Z: true, C: false, V: true };
+resetFixture.halted = true;
+const activeReset = resetFixture.resetThreadToBaseline(11);
+assert.deepStrictEqual(activeReset, { ok: true, slot: 11, active: true },
+    'active Thread Reset restores and re-selects that same Thread');
+assert.strictEqual(resetFixture._currentThreadSlot, 11,
+    'active Thread Reset leaves the selected Thread active');
+assert.strictEqual(resetFixture._liveThreadOwned, true,
+    'active Thread Reset re-establishes live register ownership');
+assert.strictEqual(resetFixture.running, false,
+    'active Thread Reset leaves execution paused');
+assert.strictEqual(resetFixture.halted, false,
+    'active Thread Reset clears the execution HALT latch');
+const activeResetBody = resetFixture.memory.slice(
+    dormantResetEntry.word0_location,
+    dormantResetEntry.word0_location + resetBodies.get(11).length);
+const activeResetLayout = resetFixture._threadLayoutAtBase(
+    dormantResetEntry.word0_location);
+const baselineForActiveCompare = new Uint32Array(resetBodies.get(11));
+baselineForActiveCompare[activeResetLayout.protectedStoOffset] =
+    activeResetBody[activeResetLayout.protectedStoOffset];
+assert.deepStrictEqual(activeResetBody, baselineForActiveCompare,
+    'active Thread Reset preserves every initial home and CHURCH frame word');
+const activeResetIndicator = resetFixture._unpackProtectedIndicator(
+    activeResetBody[activeResetLayout.protectedStoOffset]);
+assert.strictEqual(activeResetIndicator.sto, resetFixture.sto,
+    'active Thread Reset projects the restored frame STO into live protected state');
+assert.strictEqual(resetFixture.memory[otherResetEntry.word0_location + 1], 0x12345678,
+    'active Thread Reset remains isolated from other Thread images');
+const beforeRejectedResetBody = new Uint32Array(resetFixture.memory.slice(
+    dormantResetEntry.word0_location,
+    dormantResetEntry.word0_location + resetBodies.get(11).length));
+const beforeRejectedResetCR = resetFixture.cr.map(cap => ({ ...cap }));
+const beforeRejectedFaultCount = resetFixture.faultLog.length;
+let rejectedResetFaultEvents = 0;
+resetFixture.on('fault', () => { rejectedResetFaultEvents++; });
+const activeBaseline = resetFixture._threadBaselines.get(11);
+activeBaseline.words[activeResetIndicator.sto + 1] = 0xFFFFFFFF;
+const rejectedActiveReset = resetFixture.resetThreadToBaseline(11);
+assert.strictEqual(rejectedActiveReset.ok, false,
+    'active Thread Reset rejects a baseline whose saved entry identity no longer validates');
+assert.deepStrictEqual(
+    resetFixture.memory.slice(
+        dormantResetEntry.word0_location,
+        dormantResetEntry.word0_location + beforeRejectedResetBody.length),
+    beforeRejectedResetBody,
+    'rejected active Thread Reset atomically restores the prior Thread body');
+assert.deepStrictEqual(resetFixture.cr, beforeRejectedResetCR,
+    'rejected active Thread Reset atomically restores the live register bank');
+assert.strictEqual(resetFixture._liveThreadOwned, true,
+    'rejected active Thread Reset preserves live ownership');
+assert.strictEqual(resetFixture._currentThreadSlot, 11,
+    'rejected active Thread Reset preserves the selected Thread');
+assert.strictEqual(resetFixture.faultLog.length, beforeRejectedFaultCount,
+    'rejected active Thread Reset does not retain a transient restore fault');
+assert.strictEqual(rejectedResetFaultEvents, 0,
+    'rejected active Thread Reset does not emit a transient fault to UI or persistence listeners');
+assert.strictEqual(resetFixture.resetThreadToBaseline(999).ok, false,
+    'Thread Reset rejects a non-Thread Namespace slot');
+
 assert.strictEqual(preBoot.selectConfiguredThread(11).slot, 11,
     'pre-boot boot-transition fixture selects a non-default Thread');
 const beforeBootThread2 = {
@@ -599,8 +693,13 @@ assert.strictEqual(capabilityTestRows[0].gtPetName, 'CapabilityTest',
     'active Thread card distinguishes the executing CapabilityTest identity');
 assert.strictEqual(capabilityTestRows[0].physicalAddress, 0x0D0D,
     'CapabilityTest base 0x0D00 + header + relative NIA 0x000C is 0x0D0D');
-assert.strictEqual(capabilityTestRows[1].physicalAddress, null,
-    'dormant Thread cards do not synthesize a physical address from live code state');
+const dormantCodeEntry = capabilityTestRows[1].gtTargetSlot === null
+    ? null : uiSim.readNSEntry(capabilityTestRows[1].gtTargetSlot);
+assert.strictEqual(capabilityTestRows[1].physicalAddress,
+    dormantCodeEntry
+        ? dormantCodeEntry.word0_location + 1 + capabilityTestRows[1].nia
+        : null,
+    'dormant Thread resolves a physical address only from its saved canonical code binding');
 assert.strictEqual(initialThreadRows[1].nia, 0,
     'never-selected dormant Threads expose their Thread object initial NIA');
 assert(initialThreadRows.every(row => row.gtPetName && row.gtPetName !== 'Invalid GT'),
@@ -735,15 +834,15 @@ assert(stripSource.includes('const pageSize = 4'),
     'Thread strip keeps the dashboard limited to four simultaneous rows');
 assert(stripSource.includes("pager.setAttribute('aria-label', 'Thread context pages')"),
     'overflow Thread paging exposes an accessible group label');
-assert(stripSource.includes('previous.disabled = executionLocked') &&
-       stripSource.includes('next.disabled = executionLocked'),
-    'overflow paging is locked for the same Run and Walk lifecycle as Thread rows');
+assert(!stripSource.includes('previous.disabled = executionLocked') &&
+       !stripSource.includes('next.disabled = executionLocked'),
+    'read-only Thread paging remains available during Run and Walk');
 assert(stripSource.includes('updateThreadIdentityStrip();'),
     'paging reveals another ordered group without changing Thread allocation');
 assert(stripSource.includes("card.setAttribute('role', 'button')"),
     'Thread rows expose button semantics');
-assert(stripSource.includes("card.setAttribute('tabindex', selectable ? '0' : '-1')"),
-    'only selectable inactive Thread rows enter keyboard tab order');
+assert(stripSource.includes("card.setAttribute('tabindex', '0')"),
+    'every visible active or dormant Thread row enters keyboard tab order');
 assert(stripSource.includes("event.key !== 'Enter' && event.key !== ' '"),
     'Thread rows support Enter and Space activation');
 assert(stripSource.includes("card.setAttribute('aria-current', 'true')"),
@@ -751,8 +850,10 @@ assert(stripSource.includes("card.setAttribute('aria-current', 'true')"),
 const selectHandlerSource = functionSource(appRunSource, 'selectThreadContext');
 assert(selectHandlerSource.includes('_simRunActive || sim.walkActive || sim.running'),
     'activation-time guard rejects stale row handlers between Run batches');
-assert(stripSource.includes('selectThreadContext(row.slot)'),
-    'overflow pages select Threads through the canonical visible-row handler');
+assert(stripSource.includes('openThreadContextModal(row.slot, card)'),
+    'overflow pages open controls for the exact visible Namespace Thread slot');
+assert(!stripSource.includes('selectThreadContext(row.slot)'),
+    'opening a Thread row does not invoke CHANGE or mutate machine state');
 
 // The configured maximum is architectural Namespace order, not a four-card UI
 // limit: every Thread.1..Thread.10 resolves through the identical CHANGE path.
@@ -804,7 +905,7 @@ const pagingContext = {
         getElementById(id) { return id === 'threadIdentityStrip' ? pagingStrip : null; },
         createElement(tagName) { return new FakeElement(tagName); },
     },
-    selectThreadContext(slot) { pagingSelections.push(slot); },
+    openThreadContextModal(slot) { pagingSelections.push(slot); },
 };
 vm.createContext(pagingContext);
 vm.runInContext([
@@ -848,7 +949,7 @@ renderedThreadCards()[3].listeners.keydown({
     preventDefault() {},
 });
 assert.deepStrictEqual(pagingSelections, [maxSlots[7]],
-    'keyboard activation on an overflow row uses the canonical selectThreadContext handler');
+    'keyboard activation opens the exact overflow-row Thread controls');
 
 pager = renderedPager();
 pager.children[2].click();
@@ -865,21 +966,21 @@ assert.strictEqual(pager.children[0].disabled, false,
 pagingContext.sim.running = true;
 pagingContext.updateThreadIdentityStrip();
 pager = renderedPager();
-assert.strictEqual(pager.children[0].disabled, true);
+assert.strictEqual(pager.children[0].disabled, false);
 assert.strictEqual(pager.children[2].disabled, true,
-    'Run ownership disables both overflow paging controls');
-assert(renderedThreadCards().every(card => card.attributes.tabindex === '-1'),
-    'Run ownership removes overflow Thread rows from keyboard tab order');
+    'Run ownership preserves ordinary paging boundary state');
+assert(renderedThreadCards().every(card => card.attributes.tabindex === '0'),
+    'Run ownership still permits read-only Thread status modal access');
 
 pagingContext.sim.running = false;
 pagingContext.sim.walkActive = true;
 pagingContext.updateThreadIdentityStrip();
 pager = renderedPager();
-assert.strictEqual(pager.children[0].disabled, true);
+assert.strictEqual(pager.children[0].disabled, false);
 assert.strictEqual(pager.children[2].disabled, true,
-    'Walk ownership disables both overflow paging controls');
-assert(renderedThreadCards().every(card => card.attributes.tabindex === '-1'),
-    'Walk ownership removes overflow Thread rows from keyboard tab order');
+    'Walk ownership preserves ordinary paging boundary state');
+assert(renderedThreadCards().every(card => card.attributes.tabindex === '0'),
+    'Walk ownership still permits read-only Thread status modal access');
 
 const visitedMaxSlots = [];
 for (let i = 0; i < maxSlots.length; i++) {

@@ -1084,6 +1084,8 @@ let _simRunActive = false;
 
 let _runClickTimer = null;
 let _threadIdentityPage = 0;
+let _threadContextModalSlot = null;
+let _threadContextModalOrigin = null;
 
 function updateThreadControl() {
     const status = document.getElementById('activeThreadStatus');
@@ -1091,6 +1093,11 @@ function updateThreadControl() {
     if (!sim || typeof sim.activeThreadStatus !== 'function') return;
     const state = sim.activeThreadStatus();
     if (status) status.textContent = `${state.name} · ${state.position}/${state.count}`;
+    if (typeof _threadContextModalSlot !== 'undefined' &&
+            _threadContextModalSlot !== null &&
+            typeof updateThreadContextModal === 'function') {
+        updateThreadContextModal();
+    }
 }
 
 function updateThreadIdentityStrip() {
@@ -1114,12 +1121,12 @@ function updateThreadIdentityStrip() {
     strip.hidden = allRows.length === 0;
     rows.forEach((row) => {
         const card = document.createElement('div');
-        card.className = `thread-identity-card${row.active ? ' is-active' : ''}${executionLocked ? ' is-locked' : ''}`;
-        const selectable = !row.active && !executionLocked;
+        card.className = `thread-identity-card${row.active ? ' is-active' : ''}`;
         card.dataset.threadSlot = String(row.slot);
         card.setAttribute('role', 'button');
-        card.setAttribute('tabindex', selectable ? '0' : '-1');
-        card.setAttribute('aria-disabled', selectable ? 'false' : 'true');
+        card.setAttribute('tabindex', '0');
+        card.setAttribute('aria-haspopup', 'dialog');
+        card.setAttribute('aria-disabled', 'false');
         if (row.active) card.setAttribute('aria-current', 'true');
         const niaText = Number.isInteger(row.nia)
             ? `0x${(row.nia >>> 0).toString(16).toUpperCase().padStart(4, '0')}`
@@ -1144,15 +1151,13 @@ function updateThreadIdentityStrip() {
             `Thread context: ${row.name}${row.active ? ' (active)' : ''}\n` +
             `${gtKeyText}: ${gtName}\nLUMP-relative NIA: ${niaText}\n` +
             `Physical instruction address: ${physicalText}\n${flagsKeyText}: ${flagText}`);
-        if (selectable) {
-            card.setAttribute('title', `${card.getAttribute('title')}\nSelect ${row.name}`);
-            card.addEventListener('click', () => selectThreadContext(row.slot));
-            card.addEventListener('keydown', (event) => {
-                if (event.key !== 'Enter' && event.key !== ' ') return;
-                event.preventDefault();
-                selectThreadContext(row.slot);
-            });
-        }
+        card.setAttribute('title', `${card.getAttribute('title')}\nOpen ${row.name} controls`);
+        card.addEventListener('click', () => openThreadContextModal(row.slot, card));
+        card.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            openThreadContextModal(row.slot, card);
+        });
 
         const marker = document.createElement('span');
         marker.className = 'thread-identity-marker';
@@ -1228,9 +1233,9 @@ function updateThreadIdentityStrip() {
         previous.className = 'thread-identity-page-button';
         previous.textContent = '\u2039';
         previous.setAttribute('aria-label', 'Show previous Thread contexts');
-        previous.disabled = executionLocked || _threadIdentityPage === 0;
+        previous.disabled = _threadIdentityPage === 0;
         previous.addEventListener('click', () => {
-            if (executionLocked || _threadIdentityPage === 0) return;
+            if (_threadIdentityPage === 0) return;
             _threadIdentityPage--;
             updateThreadIdentityStrip();
         });
@@ -1247,9 +1252,9 @@ function updateThreadIdentityStrip() {
         next.className = 'thread-identity-page-button';
         next.textContent = '\u203a';
         next.setAttribute('aria-label', 'Show next Thread contexts');
-        next.disabled = executionLocked || _threadIdentityPage === pageCount - 1;
+        next.disabled = _threadIdentityPage === pageCount - 1;
         next.addEventListener('click', () => {
-            if (executionLocked || _threadIdentityPage === pageCount - 1) return;
+            if (_threadIdentityPage === pageCount - 1) return;
             _threadIdentityPage++;
             updateThreadIdentityStrip();
         });
@@ -1257,6 +1262,215 @@ function updateThreadIdentityStrip() {
         pager.append(previous, position, next);
         strip.appendChild(pager);
     }
+}
+
+function _threadModalRow() {
+    if (!sim || _threadContextModalSlot === null ||
+            typeof sim.threadStatusRows !== 'function') return null;
+    return sim.threadStatusRows(10).find(row => row.slot === _threadContextModalSlot) || null;
+}
+
+function _threadExecutionOwner(row) {
+    return Boolean(row && row.active && sim._liveThreadOwned);
+}
+
+function _latestThreadFault(slot) {
+    if (!sim.faultLog) return null;
+    for (let i = sim.faultLog.length - 1; i >= 0; i--) {
+        if (sim.faultLog[i].threadSlot === slot) return sim.faultLog[i];
+    }
+    return null;
+}
+
+function _threadModalState(row) {
+    if (!row) return 'Unavailable';
+    const owns = _threadExecutionOwner(row);
+    const executing = Boolean(_simRunActive || sim.running || walkRunning || sim.walkActive);
+    const lastFault = _latestThreadFault(row.slot);
+    if (owns && lastFault && sim.halted && lastFault.step === sim.stepCount) return 'Faulted';
+    if (owns && sim.halted) return 'Halted';
+    if (owns && executing) return 'Running';
+    if (owns) return 'Paused';
+    return 'Dormant';
+}
+
+function _setThreadModalAction(button, enabled, reason) {
+    if (!button) return;
+    button.disabled = !enabled;
+    button.title = enabled ? '' : reason;
+    button.setAttribute('aria-describedby', enabled ? '' : 'threadContextDisabledReason');
+}
+
+function updateThreadContextModal() {
+    const overlay = document.getElementById('threadContextModalOverlay');
+    if (!overlay) return;
+    const row = _threadModalRow();
+    if (!row) {
+        closeThreadContextModal();
+        return;
+    }
+    const owns = _threadExecutionOwner(row);
+    const executing = Boolean(_simRunActive || sim.running || walkRunning || sim.walkActive);
+    const flags = row.indicatorFlags
+        ? ['N', 'Z', 'C', 'V'].map(k => `${k}${row.indicatorFlags[k] ? 1 : 0}`).join(' ')
+        : 'Unavailable';
+    const hex = value => Number.isInteger(value)
+        ? `0x${(value >>> 0).toString(16).toUpperCase().padStart(4, '0')}` : 'unresolved';
+    const location = `${row.gtPetName || 'Unknown code'} + ${hex(row.nia)} \u2192 ${hex(row.physicalAddress)}`;
+    document.getElementById('threadContextModalTitle').textContent = row.name;
+    document.getElementById('threadContextState').textContent = _threadModalState(row);
+    document.getElementById('threadContextSlot').textContent = `NS[${row.slot}]`;
+    document.getElementById('threadContextFlags').textContent = flags;
+    document.getElementById('threadContextSto').textContent =
+        `${hex(row.sto)} · ${row.frameState}`;
+    document.getElementById('threadContextLocation').textContent = location;
+    const lastFault = _latestThreadFault(row.slot);
+    document.getElementById('threadContextFault').textContent = lastFault
+        ? `${lastFault.type}: ${lastFault.message}` : 'None';
+
+    const run = document.getElementById('threadContextRun');
+    const stop = document.getElementById('threadContextStop');
+    const reset = document.getElementById('threadContextReset');
+    _setThreadModalAction(run,
+        sim.bootComplete && !_pendingSimLoad && !executing && !bootAnimating,
+        executing ? 'Stop the current Run or Walk before starting this Thread'
+            : (!sim.bootComplete
+                ? 'Boot the machine before running a specific Thread'
+                : (_pendingSimLoad
+                    ? 'Run or clear the pending compiled program before resuming a Thread'
+                    : 'Wait for the boot animation to finish')));
+    _setThreadModalAction(stop, owns && executing,
+        owns ? 'This Thread is paused' : 'Only the active Thread can stop execution');
+    _setThreadModalAction(reset, row.baselineAvailable,
+        'No matching immutable loaded-image baseline is available');
+    const reasons = [run, stop, reset].filter(b => b && b.disabled && b.title)
+        .map(b => `${b.textContent}: ${b.title}`);
+    document.getElementById('threadContextDisabledReason').textContent =
+        reasons.join(' · ');
+}
+
+function openThreadContextModal(slot, origin) {
+    if (!sim || !sim.configuredThreadSlots().includes(slot)) return;
+    closeThreadContextModal(false);
+    _threadContextModalSlot = slot;
+    _threadContextModalOrigin = origin || document.activeElement;
+    const overlay = document.createElement('div');
+    overlay.id = 'threadContextModalOverlay';
+    overlay.className = 'thread-context-modal-overlay';
+    overlay.innerHTML = `
+      <section class="thread-context-modal" role="dialog" aria-modal="true"
+               aria-labelledby="threadContextModalTitle">
+        <header><div><span class="thread-context-kicker">Thread context</span>
+          <h2 id="threadContextModalTitle"></h2></div>
+          <button type="button" class="thread-context-close" aria-label="Close Thread controls">\u00d7</button>
+        </header>
+        <div class="thread-context-summary">
+          <span id="threadContextState" class="thread-context-state"></span>
+          <code id="threadContextSlot"></code>
+        </div>
+        <dl class="thread-context-details">
+          <div><dt>Code location</dt><dd id="threadContextLocation"></dd></div>
+          <div><dt>FLAGS</dt><dd id="threadContextFlags"></dd></div>
+          <div><dt>STO / frame</dt><dd id="threadContextSto"></dd></div>
+          <div><dt>Fault</dt><dd id="threadContextFault"></dd></div>
+        </dl>
+        <p id="threadContextDisabledReason" class="thread-context-reasons" aria-live="polite"></p>
+        <footer>
+          <button type="button" id="threadContextRun" class="btn btn-success">Run</button>
+          <button type="button" id="threadContextStop" class="btn btn-danger">Stop</button>
+          <button type="button" id="threadContextReset" class="btn btn-warning">Reset Thread</button>
+        </footer>
+      </section>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', event => {
+        if (event.target === overlay) closeThreadContextModal();
+    });
+    overlay.querySelector('.thread-context-close').addEventListener('click', closeThreadContextModal);
+    overlay.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closeThreadContextModal();
+            return;
+        }
+        if (event.key === 'Tab') {
+            const focusable = [...overlay.querySelectorAll('button:not(:disabled)')];
+            if (!focusable.length) return;
+            const first = focusable[0], last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault(); last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault(); first.focus();
+            }
+        }
+    });
+    document.getElementById('threadContextRun').addEventListener('click', runThreadFromModal);
+    document.getElementById('threadContextStop').addEventListener('click', stopThreadFromModal);
+    document.getElementById('threadContextReset').addEventListener('click', resetThreadFromModal);
+    updateThreadContextModal();
+    overlay.querySelector('.thread-context-close').focus();
+}
+
+function openActiveThreadContextModal(origin) {
+    if (!sim || typeof sim.activeThreadStatus !== 'function') return;
+    openThreadContextModal(sim.activeThreadStatus().slot, origin);
+}
+
+function closeThreadContextModal(restoreFocus = true) {
+    const overlay = document.getElementById('threadContextModalOverlay');
+    if (overlay) overlay.remove();
+    const origin = _threadContextModalOrigin;
+    const originSlot = _threadContextModalSlot;
+    _threadContextModalSlot = null;
+    _threadContextModalOrigin = null;
+    if (!restoreFocus) return;
+    if (origin && origin.isConnected && typeof origin.focus === 'function') {
+        origin.focus();
+        return;
+    }
+    const replacement = Number.isInteger(originSlot)
+        ? document.querySelector(`[data-thread-slot="${originSlot}"]`)
+        : null;
+    if (replacement && typeof replacement.focus === 'function') replacement.focus();
+}
+
+function runThreadFromModal() {
+    const row = _threadModalRow();
+    if (!row || !sim.bootComplete || _pendingSimLoad || _simRunActive || sim.running ||
+            walkRunning || sim.walkActive || bootAnimating) return;
+    if (!_threadExecutionOwner(row)) {
+        const outcome = sim.selectConfiguredThread(row.slot);
+        if (!outcome.ok) {
+            updateThreadContextModal();
+            return;
+        }
+    }
+    updateThreadControl();
+    runSimGo();
+}
+
+function stopThreadFromModal() {
+    const row = _threadModalRow();
+    if (!_threadExecutionOwner(row)) return;
+    if (walkRunning || sim.walkActive) finishWalk();
+    if (_simRunActive || sim.running) stopSim();
+    updateThreadControl();
+}
+
+function resetThreadFromModal() {
+    const row = _threadModalRow();
+    if (!row || !row.baselineAvailable) return;
+    if (!window.confirm(`Reset ${row.name} to its immutable loaded-image state?`)) return;
+    if (_threadExecutionOwner(row)) {
+        if (walkRunning || sim.walkActive) finishWalk();
+        if (_simRunActive || sim.running) stopSim();
+    }
+    const outcome = sim.resetThreadToBaseline(row.slot);
+    if (!outcome.ok) {
+        const consoleEl = document.getElementById('editorConsole');
+        if (consoleEl) consoleEl.textContent += `\n\u22bf ${outcome.reason}`;
+    }
+    updateThreadControl();
+    updateDashboard();
 }
 
 function selectThreadContext(slot) {

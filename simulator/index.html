@@ -82,7 +82,7 @@
     <link rel="icon" type="image/svg+xml" sizes="16x16" href="favicon.svg">
     <link rel="stylesheet" href="styles-base.css?v=20260905-bitstream-source-version1">
     <link rel="stylesheet" href="styles-landing.css?v=20260820-card-dnd2">
-    <link rel="stylesheet" href="styles-toolbar.css?v=20260905-dashboard-menu1">
+    <link rel="stylesheet" href="styles-toolbar.css?v=20260909-thread-context-modal">
     <link rel="stylesheet" href="styles-editor.css?v=20260820-petname-help1">
     <link rel="stylesheet" href="styles-dashboard.css?v=20260830-thread-heap-formula1">
     <link rel="stylesheet" href="styles-lumps.css?v=sha256-94221c027517">
@@ -570,8 +570,11 @@
                         <button class="btn btn-view sim-icon-btn wukong-trace-toggle-btn" id="wukongTraceToggleBtn"
                                 onclick="toggleWukongTracePanel()" aria-pressed="true"
                                 data-tooltip="HW Trace — Show or hide the hardware trace popup">&#x26A1; Trace</button>
-                        <span id="activeThreadStatus" class="fault-free-badge ff-zero" aria-live="polite"
-                              data-tooltip="Active configured Thread">Thread.1 · 1/1</span>
+                        <span id="activeThreadStatus" class="fault-free-badge ff-zero active-thread-control"
+                              role="button" tabindex="0" aria-live="polite" aria-haspopup="dialog"
+                              onclick="openActiveThreadContextModal(this)"
+                              onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openActiveThreadContextModal(this)}"
+                              data-tooltip="Active configured Thread — open controls">Thread.1 · 1/1</span>
                         <div class="run-wrap" id="runWrap">
                             <button class="btn btn-success sim-icon-btn" id="btnRunSim" onclick="onRunBtnClick()" data-tooltip="Run — single-click to run · double-click for options">&#x1F3C3;</button>
                             <button class="btn btn-danger sim-icon-btn" id="btnStopSim" onclick="stopSim()" style="display:none;" data-tooltip="Stop — Halt execution immediately">&#x23F9;</button>
@@ -3471,7 +3474,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="abstract_gt_manager.js"></script>
     <script src="thread_design.js?v=sha256-6c9b749e878a"></script>
     <script src="architecture_contracts.js?v=sha256-1d50622f8024"></script>
-    <script src="simulator.js?v=sha256-35dcb93ed8de"></script>
+    <script src="simulator.js?v=sha256-861b14ca120d"></script>
     <script src="capability_tokens.js?v=sha256-47002971f6f6"></script>
     <script src="portable_lump_binding.js?v=sha256-1565bea4b151"></script>
     <script src="assembler.js?v=sha256-91248bb82841"></script>
@@ -3512,16 +3515,16 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="lump-audit.js?v=sha256-9d73e51954ab"></script>
     <script src="rci-show-errs.js?v=sha256-652eda848fcc"></script>
     <script src="lump-content-frame.js?v=sha256-7f87f1cd93c1"></script>
-    <script src="app-lumps.js?v=sha256-f0b2b1046cbc"></script>
+    <script src="app-lumps.js?v=sha256-edd02d6b9b8a"></script>
     <script src="app-absdetail.js?v=sha256-2e17a8394e67"></script>
     <!-- Load order matters: app-compile must precede app-run (exports LANG_EXAMPLE_GROUPS
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->
-    <script src="app-compile.js?v=sha256-a750510fd074"></script>
+    <script src="app-compile.js?v=sha256-2b32c05be63e"></script>
     <script src="app-lump-editor.js?v=sha256-ccf7babdea06"></script>
     <script src="app-editor-find.js?v=sha256-aeb1fa51e855"></script>
     <script src="lump_save_handler.js?v=sha256-7df7e9f047ec"></script>
     <script src="whats-new-feed.js?v=sha256-4f1499720d0d"></script>
-    <script src="app-run.js?v=sha256-0d2ea5c40b5b"></script>
+    <script src="app-run.js?v=sha256-51bef46ceb3e"></script>
     <script src="app-build-approval.js?v=sha256-0c42efb53175"></script>
     <script src="app-source-library.js?v=sha256-f0acb36b8999"></script>
     <script src="app-invoke.js?v=sha256-376a499e341a"></script>

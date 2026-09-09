@@ -21,9 +21,9 @@ check(
   'Thread status rows expose live or saved indicator flags'
 );
 check(
-  sim.includes('const nextPhysicalAddr = active ? this._nextPhysicalAddr() : -1;') &&
-  sim.includes('physicalAddress: active && nextPhysicalAddr >= 0'),
-  'physical instruction address is derived only for the active Thread'
+  sim.includes('const bindingMatches = parsedGT && codeEntry && codeHeader') &&
+  sim.includes('resolvedPhysicalAddress'),
+  'physical instruction address requires a validated canonical code binding'
 );
 check(
   /thread-identity-flags[\s\S]{0,500}flagsCode\.textContent = flagText/.test(run),
@@ -45,6 +45,45 @@ check(
 check(
   /\.thread-identity-flags\s*\{/.test(css),
   'indicator flags have a dedicated compact card style'
+);
+check(
+  run.includes('openThreadContextModal(row.slot, card)') &&
+  run.includes("aria-haspopup', 'dialog'"),
+  'Thread rows open an accessible control modal instead of switching immediately'
+);
+check(
+  /id="activeThreadStatus"[\s\S]{0,300}aria-haspopup="dialog"/.test(
+    fs.readFileSync('simulator/index.html', 'utf8')) &&
+  run.includes('openActiveThreadContextModal'),
+  'the always-visible active Thread status also opens the same controls'
+);
+check(
+  run.includes('sim.resetThreadToBaseline(row.slot)') &&
+  run.includes('sim.selectConfiguredThread(row.slot)'),
+  'modal Reset and dormant Run use simulator-owned baseline and canonical CHANGE'
+);
+check(
+  run.includes('sim.bootComplete && !_pendingSimLoad && !executing') &&
+  run.includes('Boot the machine before running a specific Thread') &&
+  run.includes('Run or clear the pending compiled program before resuming a Thread') &&
+  run.includes('if (!row || !sim.bootComplete || _pendingSimLoad'),
+  'Thread-specific Run stays disabled while boot or a pending compile could replace its ownership'
+);
+check(
+  sim.includes('this.memory.set(previousWords, baseline.base)') &&
+  sim.includes('faultLogLength: this.faultLog.length') &&
+  sim.includes('if (this._suppressFaultEffects) return'),
+  'active Thread Reset rolls back without publishing transient CHANGE faults'
+);
+check(
+  run.includes('_latestThreadFault(row.slot)') &&
+  sim.includes('threadSlot: this._liveThreadOwned') &&
+  run.includes('lastFault.step === sim.stepCount'),
+  'fault details remain attributed to the owning Thread and current halt'
+);
+check(
+  run.includes('document.querySelector(`[data-thread-slot="${originSlot}"]`)'),
+  'modal focus returns to a rebuilt originating Thread row'
 );
 
 if (process.exitCode) process.exit(process.exitCode);

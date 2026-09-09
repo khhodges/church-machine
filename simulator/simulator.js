@@ -582,6 +582,7 @@ class ChurchSimulator {
         // register-bank ownership. The next manual CHANGE starts from reset
         // scratch state unless boot establishes a live Thread first.
         this._liveThreadOwned = false;
+        this._captureThreadBaselines();
         this.emit('stateChange', this.getState());
         return true;
     }
@@ -1107,6 +1108,7 @@ class ChurchSimulator {
         this._slotIdentityGen = 0;
 
         this._initNamespaceTable();
+        this._captureThreadBaselines();
         this.output += '--- HARD RESET: all registers zeroed ---\n';
         this.output += 'Boot microcode ready. Step or Run to begin boot sequence.\n';
         this.emit('reset', {});
@@ -4916,6 +4918,112 @@ class ChurchSimulator {
         return slots;
     }
 
+    // Preserve the exact immutable Thread objects supplied by the most recent
+    // generated or loaded Namespace image. Runtime CHANGE writes homes and the
+    // CHURCH frame into these objects, so Reset must never derive its source
+    // from mutable live memory.
+    _captureThreadBaselines() {
+        this._threadBaselines = new Map();
+        for (const slot of this.configuredThreadSlots()) {
+            const entry = this.readNSEntry(slot);
+            const layout = entry && this._threadLayoutAtBase(entry.word0_location);
+            if (!entry || !layout || !layout.valid) continue;
+            const base = entry.word0_location >>> 0;
+            this._threadBaselines.set(slot, {
+                base,
+                words: new Uint32Array(this.memory.slice(base, base + layout.lumpSize)),
+            });
+        }
+    }
+
+    hasThreadBaseline(slot) {
+        const baseline = this._threadBaselines && this._threadBaselines.get(slot);
+        const entry = this.readNSEntry(slot);
+        return Boolean(baseline && entry &&
+            (entry.word0_location >>> 0) === baseline.base);
+    }
+
+    resetThreadToBaseline(slot) {
+        if (!Number.isInteger(slot) || !this.configuredThreadSlots().includes(slot)) {
+            return { ok: false, reason: `Thread slot ${slot} is not configured` };
+        }
+        const baseline = this._threadBaselines && this._threadBaselines.get(slot);
+        const entry = this.readNSEntry(slot);
+        if (!baseline || !entry ||
+                (entry.word0_location >>> 0) !== baseline.base) {
+            return { ok: false, reason: 'The immutable loaded-image baseline no longer matches this Thread binding' };
+        }
+        const active = this._liveThreadOwned && this._currentThreadSlot === slot;
+        const previousWords = new Uint32Array(
+            this.memory.slice(baseline.base, baseline.base + baseline.words.length));
+        const liveSnapshot = active ? {
+            cr: this.cr.map(cap => ({ ...cap })),
+            dr: [...this.dr],
+            flags: { ...this.flags },
+            sto: this.sto,
+            pc: this.pc,
+            physicalPC: this.physicalPC,
+            running: this.running,
+            walkActive: this.walkActive,
+            halted: this.halted,
+            liveThreadOwned: this._liveThreadOwned,
+            currentThreadSlot: this._currentThreadSlot,
+            callStack: this.callStack.map(frame => ({ ...frame })),
+            lambdaActive: this.lambdaActive,
+            lambdaCachedFrame: this.lambdaCachedFrame
+                ? { ...this.lambdaCachedFrame } : null,
+            faultLogLength: this.faultLog.length,
+            output: this.output,
+            executionStats: this.executionStats ? { ...this.executionStats } : null,
+        } : null;
+        this.memory.set(baseline.words, baseline.base);
+        if (active) {
+            // Do not suspend the old live bank over the freshly restored image.
+            // Canonical CHANGE rehydrates the initial CR/DR homes and frame.
+            this.running = false;
+            this.walkActive = false;
+            this.halted = false;
+            this._liveThreadOwned = false;
+            this.callStack = [];
+            this.lambdaActive = false;
+            this.lambdaCachedFrame = null;
+            this._suppressFaultEffects = (this._suppressFaultEffects || 0) + 1;
+            let selected;
+            try {
+                selected = this.selectConfiguredThread(slot);
+            } finally {
+                this._suppressFaultEffects--;
+            }
+            if (!selected.ok) {
+                this.memory.set(previousWords, baseline.base);
+                this.cr = liveSnapshot.cr;
+                this.dr = liveSnapshot.dr;
+                this.flags = liveSnapshot.flags;
+                this.sto = liveSnapshot.sto;
+                this.pc = liveSnapshot.pc;
+                this.physicalPC = liveSnapshot.physicalPC;
+                this.running = liveSnapshot.running;
+                this.walkActive = liveSnapshot.walkActive;
+                this.halted = liveSnapshot.halted;
+                this._liveThreadOwned = liveSnapshot.liveThreadOwned;
+                this._currentThreadSlot = liveSnapshot.currentThreadSlot;
+                this.callStack = liveSnapshot.callStack;
+                this.lambdaActive = liveSnapshot.lambdaActive;
+                this.lambdaCachedFrame = liveSnapshot.lambdaCachedFrame;
+                this.faultLog.length = liveSnapshot.faultLogLength;
+                this.output = liveSnapshot.output;
+                if (liveSnapshot.executionStats) {
+                    this.executionStats = liveSnapshot.executionStats;
+                }
+                this.emit('stateChange', this.getState());
+                return selected;
+            }
+        }
+        this.emit('threadReset', { slot, active });
+        this.emit('stateChange', this.getState());
+        return { ok: true, slot, active };
+    }
+
     _threadDisplayGT(slot, activeSlot) {
         // CR14 is the live executable GT; dormant Thread objects retain their
         // Enter identity in the canonical CHURCH resume frame.
@@ -4959,11 +5067,12 @@ class ChurchSimulator {
         const requested = Number.isInteger(maxRows) ? maxRows : 4;
         const limit = Math.max(0, Math.min(10, requested));
         const slots = this.configuredThreadSlots().slice(0, limit);
-        const activeSlot = Number.isInteger(this._currentThreadSlot)
+        const activeSlot = this._liveThreadOwned && Number.isInteger(this._currentThreadSlot)
             ? this._currentThreadSlot : 1;
+        const liveSlot = this._liveThreadOwned ? activeSlot : null;
         return slots.map((slot, index) => {
-            const active = slot === activeSlot;
-            const gtWord = this._threadDisplayGT(slot, activeSlot);
+            const active = slot === liveSlot;
+            const gtWord = this._threadDisplayGT(slot, liveSlot);
             const gtIdentity = this._threadDisplayGTIdentity(gtWord);
             const nextPhysicalAddr = active ? this._nextPhysicalAddr() : -1;
             const entry = this.readNSEntry(slot);
@@ -4975,6 +5084,25 @@ class ChurchSimulator {
                 ? this._unpackFrameWord(
                     this.memory[entry.word0_location + savedIndicator.sto + 2] >>> 0)
                 : null;
+            const logicalNia = active ? (this.pc >>> 0)
+                : (savedFrame ? (savedFrame.returnPC >>> 0) : null);
+            let resolvedPhysicalAddress = active && nextPhysicalAddr >= 0
+                ? (nextPhysicalAddr >>> 0) : null;
+            if (!active && Number.isInteger(logicalNia) &&
+                    Number.isInteger(gtIdentity.gtTargetSlot)) {
+                const codeEntry = this.readNSEntry(gtIdentity.gtTargetSlot);
+                const codeHeader = codeEntry &&
+                    this.parseLumpHeader(this.memory[codeEntry.word0_location] >>> 0);
+                let parsedGT = null;
+                try { parsedGT = this.parseGT(gtWord); } catch (_e) {}
+                const bindingMatches = parsedGT && codeEntry && codeHeader &&
+                    codeHeader.valid && codeHeader.cw > 0 &&
+                    this.parseNSWord1(codeEntry.word1_limit).gtSeq === parsedGT.gt_seq;
+                if (bindingMatches && logicalNia < codeHeader.cw) {
+                    resolvedPhysicalAddress =
+                        (codeEntry.word0_location + 1 + logicalNia) >>> 0;
+                }
+            }
             return {
                 slot,
                 name: slot === 1 ? 'Thread.1'
@@ -4982,15 +5110,20 @@ class ChurchSimulator {
                         this.nsLabels[slot] || `Thread slot ${slot}`),
                 position: index + 1,
                 active,
-                nia: active ? (this.pc >>> 0)
-                    : (savedFrame ? (savedFrame.returnPC >>> 0) : null),
-                physicalAddress: active && nextPhysicalAddr >= 0
-                    ? (nextPhysicalAddr >>> 0) : null,
+                nia: logicalNia,
+                physicalAddress: resolvedPhysicalAddress,
                 indicatorFlags: active
                     ? { ...this.flags }
                     : (savedFrame && savedFrame.flags
                         ? { ...savedFrame.flags } : null),
                 gtWord,
+                sto: active ? (this.sto >>> 0)
+                    : (savedIndicator ? (savedIndicator.sto >>> 0) : null),
+                frameState: savedIndicator
+                    ? (savedIndicator.sz === 1
+                        ? 'CHURCH resume frame' : 'No CHURCH resume frame')
+                    : 'Unavailable',
+                baselineAvailable: this.hasThreadBaseline(slot),
                 ...gtIdentity,
             };
         });
@@ -5414,6 +5547,8 @@ class ChurchSimulator {
 
         const entry = {
             type, message, pc: this.pc, physicalPC: this.physicalPC, step: this.stepCount,
+            threadSlot: this._liveThreadOwned && Number.isInteger(this._currentThreadSlot)
+                ? this._currentThreadSlot : null,
             crSnapshot: this.cr ? this.cr.map(c => c ? {...c} : null) : [],
             drSnapshot: this.dr ? [...this.dr] : [],
             flagsSnapshot: this.flags ? {...this.flags} : {},
@@ -5455,6 +5590,7 @@ class ChurchSimulator {
         this.faultLog.push(entry);
         this.halted = true;
         this.running = false;
+        if (this._suppressFaultEffects) return;
         _reportToRegistry();
         this.emit('fault', entry);
         this.emit('output', this.output);
