@@ -3053,6 +3053,44 @@ function _draftLsGet(token) {
 function _draftLsSet(token, v) { try { localStorage.setItem(_draftLsKey(token), v); } catch(_) {} }
 function _draftLsDel(token) { try { localStorage.removeItem(_draftLsKey(token)); } catch(_) {} }
 
+function _commitSavedLumpClientState(resp, fallback, draftToken) {
+    if (!resp || !resp.token) throw new Error('Saved LUMP response has no token');
+    const base = fallback || {};
+    const descriptor = Object.assign({}, base, {
+        token: resp.token,
+        abstraction: resp.abstraction || base.abstraction || resp.petname || resp.dot_name,
+        dot_name: resp.dot_name || base.dot_name || null,
+        petname: resp.petname || base.petname || resp.dot_name || null,
+        issue_n: resp.issue_n != null ? resp.issue_n :
+            (resp.issue_number != null ? resp.issue_number : base.issue_n),
+        filename: resp.filename || resp.lump || base.filename,
+        lump_version: resp.lump_version != null ? resp.lump_version : base.lump_version,
+        binary_hash: resp.binary_hash || base.binary_hash || null,
+        identity_hash: resp.identity_hash || base.identity_hash || null,
+    });
+    if (window.LumpRegistry) {
+        window.LumpRegistry.registerFromServer([descriptor]);
+        window.LumpRegistry.evictMemory(resp.token);
+    }
+    if (draftToken) {
+        _draftLsDel(draftToken);
+        delete _lumpEditorDraftText[_lumpTokenIdentity(draftToken)];
+    }
+    const ownsDraft = draftToken && (
+        window._editorOpenLumpToken === draftToken ||
+        window._editorLumpDirtyToken === draftToken
+    );
+    if (ownsDraft && typeof exitSavedLumpEditorMode === 'function') {
+        exitSavedLumpEditorMode();
+    }
+    if (window.LumpRegistry) {
+        window.LumpRegistry.setCurrent(resp.token);
+        window.LumpRegistry.setPending(resp.token);
+    }
+    return descriptor;
+}
+window._commitSavedLumpClientState = _commitSavedLumpClientState;
+
 function _buildTextEditor(token, text, bodyEl, lump, renderFn) {
     const tk = _lumpTokenIdentity(token);
     const hasDraft = Object.prototype.hasOwnProperty.call(_lumpEditorDraftText, tk);

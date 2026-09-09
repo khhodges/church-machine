@@ -18,6 +18,21 @@ compilation into a persisted LUMP must register the returned canonical server
 token and filename, then remove the pre-save memory representation for that
 token before selecting or reopening it.
 
+The save response must carry the server-derived canonical dot name, issue,
+filename, abstraction, and hashes. Register that complete descriptor before
+selecting the new token. If the save began from a restored draft, delete the
+exact old draft token and relinquish its editor ownership only after the
+durable save succeeds.
+
+**Why:** Selecting an unregistered response token makes a valid fresh artifact
+look unknown until a later repository refresh. Leaving the old draft key or
+dirty listener active makes that draft reappear and mask the newly saved source.
+
+**How to apply:** Centralize every save-success path through one client commit
+step: register canonical response metadata, evict code-only memory, delete the
+captured pre-save draft identity, exit saved-LUMP editor ownership, then set
+current and pending selection to the new token.
+
 Resolve archived tokens again at the editor action boundary. Repository
 filtering and reload-time selection repair are insufficient because stale
 pending navigation or an already-rendered detail panel can still call the

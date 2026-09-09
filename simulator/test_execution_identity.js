@@ -56,6 +56,15 @@ function makeEnv() {
 const HASH_A = 'a'.repeat(64);
 const HASH_B = 'b'.repeat(64);
 
+(function testEmptyStateIsQuiet() {
+    const { dom, api } = makeEnv();
+    api.render();
+    const strip = dom.window.document.getElementById('executionIdentityEditor');
+    check('EI-0 empty state shows only no-program message',
+        strip.textContent === 'No program loaded' &&
+        !/UNVERIFIED|Token|Source|Binary|NS|Run/.test(strip.textContent));
+})();
+
 (function testEditorRunAndStaleness() {
     const { dom, api } = makeEnv();
     api.begin({
@@ -91,7 +100,7 @@ const HASH_B = 'b'.repeat(64);
     check('EI-5 editor strip shows accessible stale text',
         /STALE EDITOR/.test(editorStrip.textContent) &&
         /Program/.test(editorStrip.textContent) &&
-        /Token/.test(editorStrip.textContent) &&
+        !/Token/.test(editorStrip.textContent) &&
         /Source/.test(editorStrip.textContent) &&
         /Binary/.test(editorStrip.textContent) &&
         /NS/.test(editorStrip.textContent) &&
@@ -100,6 +109,20 @@ const HASH_B = 'b'.repeat(64);
     check('EI-6a only the dedicated announcement region is live',
         !editorStrip.hasAttribute('role') && !traceStrip.hasAttribute('role') &&
         dom.window.document.getElementById('executionIdentityAnnouncement').getAttribute('role') === 'status');
+})();
+
+(function testCanonicalDotNameReplacesRawToken() {
+    const { dom, api } = makeEnv();
+    api.begin({
+        abstraction: 'CapabilityTest',
+        dot_name: 'Ada.CapabilityTest',
+        token: 'b6182a95',
+        source: 'RETURN',
+    });
+    api.markLive({ runStatus: 'ready' });
+    const text = dom.window.document.getElementById('executionIdentityEditor').textContent;
+    check('EI-6b loaded identity shows canonical dot pet name',
+        /Ada\.CapabilityTest/.test(text) && !/b6182a95|Token/.test(text));
 })();
 
 (function testBinaryStatesAndSavedLumpSource() {

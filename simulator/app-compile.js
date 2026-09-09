@@ -1268,8 +1268,13 @@ async function _doWipVersionSave() {
             document.body.removeChild(_a);
             URL.revokeObjectURL(_dlU);
             appendOutput(`Saved to library: lumps/${resp.lump} \u2014 token 0x${resp.token} \u00b7 v${_autoVer} \u2014 ${_lumpSummaryLabel(absName, resp.lump_version != null ? resp.lump_version : _autoVer, savePayload.metadata.ns_slot, savePayload.metadata.cw)}`, 'info');
-            if (_compileDraftToken && typeof _draftLsDel === 'function') { _draftLsDel(_compileDraftToken); _compileDraftToken = null; }
-            if (window.LumpRegistry) { window.LumpRegistry.setCurrent(resp.token); window.LumpRegistry.setPending(resp.token); }
+            if (typeof window._commitSavedLumpClientState === 'function') {
+                window._commitSavedLumpClientState(resp, {
+                    abstraction: absName, ns_slot: savePayload.metadata.ns_slot,
+                    language: savePayload.metadata.language
+                }, _compileDraftToken);
+            }
+            _compileDraftToken = null;
             if (typeof switchView === 'function') switchView('lumps');
             // switchView('lumps') already calls renderLumps(); the pending token
             // ensures the compiled lump is selected.  Do NOT call renderLumps()
@@ -1400,8 +1405,13 @@ async function _confirmLumpRelease() {
             document.body.removeChild(a);
             URL.revokeObjectURL(dlUrl);
             appendOutput(`Saved to library: lumps/${resp.lump} \u2014 token 0x${resp.token} \u00b7 v${ver} \u2014 ${_lumpSummaryLabel(data.absName, resp.lump_version != null ? resp.lump_version : ver, data.savePayload.metadata.ns_slot, data.savePayload.metadata.cw)}`, 'info');
-            if (_compileDraftToken && typeof _draftLsDel === 'function') { _draftLsDel(_compileDraftToken); _compileDraftToken = null; }
-            if (window.LumpRegistry) { window.LumpRegistry.setCurrent(resp.token); window.LumpRegistry.setPending(resp.token); }
+            if (typeof window._commitSavedLumpClientState === 'function') {
+                window._commitSavedLumpClientState(resp, {
+                    abstraction: data.absName, ns_slot: data.savePayload.metadata.ns_slot,
+                    language: data.savePayload.metadata.language
+                }, _compileDraftToken);
+            }
+            _compileDraftToken = null;
             if (typeof switchView === 'function') switchView('lumps');
             // switchView('lumps') already calls renderLumps(); the pending token
             // ensures the compiled lump is selected.  No second renderLumps().
@@ -1430,7 +1440,8 @@ async function compileAndBuild() {
     switchCodeTab('console');
     // Capture any active LUMP-edit draft token before resetting to null.
     // Both compile success paths use _compileDraftToken to delete the draft.
-    _compileDraftToken = window.LumpRegistry ? window.LumpRegistry.getCurrent() : null;
+    _compileDraftToken = window._editorOpenLumpToken ||
+        (window.LumpRegistry ? window.LumpRegistry.getCurrent() : null);
     if (typeof _invalidateLastSavedToken === 'function') _invalidateLastSavedToken();
     _runStopped = true;
     sim.running = false;
@@ -1874,10 +1885,13 @@ async function compileAndBuild() {
         // and sees stub bytes (cw=1 / bare RETURN) instead of real code.
         // Token-first: LumpRegistry is updated with the server-assigned token
         // so all subsequent IDE object lookups use the canonical token.
-        var _wipSaveDone = function(tok) {
-            if (tok && window.LumpRegistry) {
-                window.LumpRegistry.setCurrent(tok);
-                window.LumpRegistry.setPending(tok);
+        var _wipSaveDone = function(resp) {
+            if (resp && resp.ok && typeof window._commitSavedLumpClientState === 'function') {
+                window._commitSavedLumpClientState(resp, {
+                    abstraction: absName, ns_slot: resolvedNsSlot,
+                    language: result.language
+                }, _compileDraftToken);
+                _compileDraftToken = null;
             }
             _renderWipMethodGate(con, methodMeta, listing);
             trackAction('build_lump', { name: absName, lang: result.language, size: lumpSize });
@@ -1889,7 +1903,7 @@ async function compileAndBuild() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(savePayload)
         }).then(_readLumpSaveResponse).then(function(resp) {
-            _wipSaveDone(resp && resp.ok ? resp.token : null);
+            _wipSaveDone(resp);
         }).catch(function() {
             _wipSaveDone(null);
         });
@@ -1911,8 +1925,13 @@ async function compileAndBuild() {
             document.body.removeChild(_a);
             URL.revokeObjectURL(_dlUrl);
             appendOutput(`Saved to library: lumps/${resp.lump} \u2014 token 0x${resp.token} \u00b7 v${_autoVer} \u2014 ${_lumpSummaryLabel(absName, resp.lump_version != null ? resp.lump_version : _autoVer, resolvedNsSlot, cw)}`, 'info');
-            if (_compileDraftToken && typeof _draftLsDel === 'function') { _draftLsDel(_compileDraftToken); _compileDraftToken = null; }
-            if (window.LumpRegistry) { window.LumpRegistry.setCurrent(resp.token); window.LumpRegistry.setPending(resp.token); }
+            if (typeof window._commitSavedLumpClientState === 'function') {
+                window._commitSavedLumpClientState(resp, {
+                    abstraction: absName, ns_slot: resolvedNsSlot,
+                    language: result.language
+                }, _compileDraftToken);
+            }
+            _compileDraftToken = null;
             if (typeof switchView === 'function') switchView('lumps');
             // switchView('lumps') already calls renderLumps(); the pending token
             // ensures the compiled lump is selected.  No second renderLumps().

@@ -15049,17 +15049,26 @@ async function confirmSaveToNamespace() {
                 // those are code words only, so treating them as the saved
                 // artifact drops the embedded API/source frame and makes a
                 // Fully documented LUMP reopen as "source unavailable".
-                window.LumpRegistry.registerFromServer([{
-                    token: resp.token,
+                if (typeof window._commitSavedLumpClientState === 'function') {
+                    window._commitSavedLumpClientState(resp, {
                     abstraction: label,
-                    filename: resp.lump,
                     ns_slot: idx,
                     language: _svLang,
                     capabilities: _caps
-                }]);
-                window.LumpRegistry.evictMemory(resp.token);
-                window.LumpRegistry.setCurrent(resp.token);
-                window.LumpRegistry.setPending(resp.token);
+                    }, window._editorOpenLumpToken || null);
+                } else {
+                    window.LumpRegistry.registerFromServer([{
+                        token: resp.token,
+                        abstraction: label,
+                        filename: resp.lump,
+                        ns_slot: idx,
+                        language: _svLang,
+                        capabilities: _caps
+                    }]);
+                    window.LumpRegistry.evictMemory(resp.token);
+                    window.LumpRegistry.setCurrent(resp.token);
+                    window.LumpRegistry.setPending(resp.token);
+                }
             }
             window._lastSavedNsToken = resp.token;
             closeSaveDialog();

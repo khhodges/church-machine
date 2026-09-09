@@ -175,6 +175,7 @@ function _clearPendingSimLoad() {
 let _executionIdentity = {
     status: 'unverified',
     abstraction: null,
+    dotName: null,
     token: null,
     sourceHashUsed: null,
     editorSourceHash: null,
@@ -252,6 +253,13 @@ function _executionIdentityRenderOne(id) {
     const host = document.getElementById(id);
     if (!host) return;
     const s = _executionIdentity;
+    if (!s.abstraction && !s.dotName && !s.token && !s.liveMemoryKnown) {
+        host.className = 'execution-identity-strip execution-identity-empty';
+        host.setAttribute('aria-label', 'Execution identity: no program loaded');
+        host.title = 'Assemble or load a program to establish execution identity';
+        host.textContent = 'No program loaded';
+        return;
+    }
     const labels = {
         current: 'CURRENT',
         stale: 'STALE EDITOR',
@@ -259,8 +267,13 @@ function _executionIdentityRenderOne(id) {
         unverified: 'UNVERIFIED',
     };
     const statusLabel = labels[s.status] || 'UNVERIFIED';
-    const abstraction = s.abstraction || 'No program loaded';
-    const token = s.token || '—';
+    let programName = s.dotName || null;
+    if (!programName && s.token && window.LumpRegistry) {
+        const entry = window.LumpRegistry.resolve(s.token);
+        const server = entry && entry.sources && entry.sources.server;
+        programName = server && (server.dot_name || server.petname);
+    }
+    programName = programName || s.abstraction || 'Unknown program';
     const binary = s.binaryStatus === 'verified' ? 'verified' :
         s.binaryStatus === 'mismatched' ? 'mismatch' : 'unverified';
     const source = s.sourceStatus === 'stale' ? 'editor differs' :
@@ -273,9 +286,8 @@ function _executionIdentityRenderOne(id) {
     host.title = s.reason;
     host.innerHTML =
         `<span class="execution-identity-state" title="${_executionIdentityEsc(s.reason)}">${statusLabel}</span>` +
-        `<span class="execution-identity-program" title="Executing abstraction: ${_executionIdentityEsc(abstraction)}">` +
-            `<b>Program</b> ${_executionIdentityEsc(_executionIdentityShort(abstraction, 28))}</span>` +
-        `<span title="LUMP token: ${_executionIdentityEsc(token)}"><b>Token</b> ${_executionIdentityEsc(_executionIdentityShort(token, 18))}</span>` +
+        `<span class="execution-identity-program" title="Executing program: ${_executionIdentityEsc(programName)}">` +
+            `<b>Program</b> ${_executionIdentityEsc(_executionIdentityShort(programName, 36))}</span>` +
         `<span title="Source used for run: ${_executionIdentityEsc(s.sourceHashUsed || 'not recorded')}"><b>Source</b> ${_executionIdentityEsc(source)}</span>` +
         `<span title="Binary verification: ${_executionIdentityEsc(s.fetchedBinaryHash || s.binaryHash || 'no baseline')}"><b>Binary</b> ${binary}</span>` +
         `<span title="Namespace slot and retained sequence"><b>NS</b> ${_executionIdentityEsc(slot)}</span>` +
@@ -309,7 +321,7 @@ function _executionIdentityGet() {
 function _executionIdentityClear(reason) {
     _executionIdentity = {
         status: 'unverified',
-        abstraction: null, token: null, sourceHashUsed: null, editorSourceHash: null, sourceComparable: false,
+        abstraction: null, dotName: null, token: null, sourceHashUsed: null, editorSourceHash: null, sourceComparable: false,
         binaryHash: null, fetchedBinaryHash: null, binaryStatus: 'unverified',
         sourceStatus: 'unverified', nsSlot: null, nsSequence: null,
         runStatus: 'idle', runKind: null, liveMemoryKnown: false,
@@ -325,6 +337,7 @@ function _executionIdentityBegin(meta) {
     _executionIdentity = {
         status: 'unverified',
         abstraction: m.abstraction || m.name || null,
+        dotName: m.dotName || m.dot_name || null,
         token: m.token || null,
         sourceHashUsed: m.sourceHash || (m.source != null ? _executionIdentityHashSource(m.source) : null),
         editorSourceHash: m.source != null ? _executionIdentityHashSource(m.source) : null,
@@ -348,6 +361,7 @@ function _executionIdentityBegin(meta) {
 function _executionIdentityMarkLive(meta) {
     const m = meta || {};
     if (m.abstraction || m.name) _executionIdentity.abstraction = m.abstraction || m.name;
+    if (m.dotName || m.dot_name) _executionIdentity.dotName = m.dotName || m.dot_name;
     if (m.token) _executionIdentity.token = m.token;
     if (!_executionIdentity.token && window.LumpRegistry &&
             typeof window.LumpRegistry.getCurrent === 'function') {

@@ -87,6 +87,12 @@ def test_save_persists_exact_binary_and_exact_approval(isolated_lumps):
     manifest = json.loads((isolated_lumps / "manifest.json").read_text())
     assert manifest[0]["filename"] == path.name
     assert "sidecar_file" not in manifest[0]
+    saved = response.get_json()
+    assert saved["filename"] == path.name
+    assert saved["abstraction"] == "LumpSaveTest"
+    assert saved["dot_name"] == approval["dot_name"]
+    assert saved["issue_n"] == approval["issue_n"]
+    assert saved["binary_hash"] == approval["binary_hash"]
 
 
 def test_missing_approval_intent_fails_closed_without_mutation(isolated_lumps):
