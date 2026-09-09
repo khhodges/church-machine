@@ -1,0 +1,24 @@
+{
+  "image_sha256": "1cc96613a0581e4d8f6b9969ea70c5c5e944363ca71016d4591c0b7d6f094ad1",
+  "resident_bindings": [
+    {
+      "artifact_sha256": "efa0e4323679355a530f0ce9bcf8cf19f962204bba7a45b543ca308f1ece17d7",
+      "filename": "SelfTest.84.f37bafd6.lump",
+      "localized_clist_sha256": "d07843a6ce6e1ca7cde0a7f2bcf2c0ec2e90ead4d0c63ffe9c33f33d3200f675",
+      "slot": 6
+    },
+    {
+      "artifact_sha256": "ff06e6976cf6694192337e600512b5b37c167532e4b16285f1ec8ca9a3973633",
+      "filename": "WukongCallHome.1.823c4d65.lump",
+      "localized_clist_sha256": "9490f2f2d477701107d2bb38df964a4b286eb808d9a5bfa243086954bdda006c",
+      "slot": 7
+    },
+    {
+      "artifact_sha256": "7f36b8a385f82a7b1548deb37b7b25999492b58934b0905fadf06b83d3f659f0",
+      "filename": "CapabilityTest.2.225da6fc.lump",
+      "localized_clist_sha256": "429ad6a68465ebb16616d7a5974ceb6314759bb3d9451f873a69734856c03477",
+      "slot": 10
+    }
+  ],
+  "version": 1
+}
