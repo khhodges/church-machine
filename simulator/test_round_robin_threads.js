@@ -33,8 +33,37 @@ assert.strictEqual(generated.status, 0,
 const image = generated.stdout.buffer.slice(
     generated.stdout.byteOffset,
     generated.stdout.byteOffset + generated.stdout.byteLength);
-assert.strictEqual(committed.loadBootImage(image), true,
-    `committed image must load: ${committed.lastBootImageError || 'unknown error'}`);
+
+function establishBootedThreadFixture(sim, label) {
+    assert.strictEqual(sim.loadBootImage(image), true,
+        `${label} image must load: ${sim.lastBootImageError || 'unknown error'}`);
+    let bootSafety = 0;
+    while (!sim.bootComplete && !sim.halted && bootSafety++ < 32) {
+        sim._bootStep();
+    }
+    assert.strictEqual(sim.bootComplete, true, `${label} must complete canonical boot`);
+    assert.strictEqual(sim._currentThreadSlot, 1,
+        `${label} canonical boot selects Thread.1`);
+    assert.strictEqual(sim._liveThreadOwned, true,
+        `${label} canonical boot gives Thread.1 ownership of the live banks`);
+    const threadEntry = sim.readNSEntry(1);
+    assert(threadEntry, `${label} canonical boot Thread entry must exist`);
+    assert.strictEqual(sim.cr[12].word1, threadEntry.word0_location,
+        `${label} canonical boot installs the Thread.1 base in CR12`);
+    assert.strictEqual(sim.parseGT(sim.cr[12].word0).index, 1,
+        `${label} canonical boot installs the Thread.1 identity in CR12`);
+    assert.strictEqual(sim.sto, sim._readProtectedSto(threadEntry.word0_location),
+        `${label} canonical boot installs Thread.1 protected STO`);
+    assert(sim.cr[14].word0 && !ChurchSimulator.isNullGT(sim.cr[14].word0),
+        `${label} canonical boot installs an executable identity`);
+    return sim;
+}
+
+function makeBootedThreadFixture(label) {
+    return establishBootedThreadFixture(new ChurchSimulator(), label);
+}
+
+establishBootedThreadFixture(committed, 'committed fixture');
 const retiredIdentityImage = image.slice(0);
 const retiredIdentityWords = new Uint32Array(retiredIdentityImage);
 assert.strictEqual(retiredIdentityWords[1], 0x4E534832,
@@ -45,9 +74,6 @@ assert.strictEqual(retiredIdentitySim.loadBootImage(retiredIdentityImage), false
     'boot loader rejects a retired Namespace Header format tag');
 assert(retiredIdentitySim.lastBootImageError.includes('Namespace Header V2'),
     'retired Thread ABI rejection requests regeneration');
-committed.bootComplete = true;
-committed._liveThreadOwned = true;
-committed._currentThreadSlot = 1;
 committed.cr[15].word0 = 0x1A000000;
 assert.deepStrictEqual(committed.configuredThreadSlots(), [1, 11, 12],
     'committed image exposes all three Thread contexts');
@@ -62,14 +88,6 @@ assert(committedBases[0] + entryLayouts[0].lumpSize <= committedBases[1] &&
     'committed Thread bodies are non-overlapping at their derived sizes');
 const entryWords = [1, 11, 12].map((slot, i) =>
     committed.memory[committedBases[i] + entryLayouts[i].capsStart] >>> 0);
-const initialEntry = committed.readNSEntry(entryWords[0] & 0xFFFF);
-committed._writeCR(0, entryWords[0], initialEntry);
-const initialHeader = committed.parseLumpHeader(
-    committed.memory[initialEntry.word0_location] >>> 0);
-committed._installLumpHeaderContext(
-    committed.parseGT(entryWords[0]), entryWords[0] & 0xFFFF,
-    initialEntry, initialHeader);
-committed.sto = committed._readProtectedSto(committedBases[0]);
 const thread1InitialDRs = Array.from(
     {length: 16}, (_, i) => (0xA1001000 + i) >>> 0);
 const thread2InitialDRs = Array.from(
@@ -222,12 +240,7 @@ assert.strictEqual(committed.sto, suspendedThread2.sto,
 
 // CHANGE must pass every non-NULL saved capability through mLoad before it
 // saves the outgoing context or exposes any incoming register.
-const invalidGT = new ChurchSimulator();
-assert.strictEqual(invalidGT.loadBootImage(image), true,
-    `invalid-GT fixture image must load: ${invalidGT.lastBootImageError || 'unknown error'}`);
-invalidGT.bootComplete = true;
-invalidGT._liveThreadOwned = true;
-invalidGT._currentThreadSlot = 1;
+const invalidGT = makeBootedThreadFixture('invalid-GT fixture');
 invalidGT.dr.splice(0, 16, ...thread1InitialDRs);
 const invalidTargetBase = invalidGT.readNSEntry(11).word0_location;
 const invalidTargetLayout = invalidGT._threadLayoutAtBase(invalidTargetBase);
@@ -407,12 +420,7 @@ assert.deepStrictEqual(preBoot.flags, beforeBootThread2.flags,
 assert.strictEqual(preBoot.sto, beforeBootThread2.sto,
     'boot preserves the pre-boot selected Thread STO');
 
-const invalidResumeFrame = new ChurchSimulator();
-assert.strictEqual(invalidResumeFrame.loadBootImage(image), true,
-    `resume-frame fixture image must load: ${invalidResumeFrame.lastBootImageError || 'unknown error'}`);
-invalidResumeFrame.bootComplete = true;
-invalidResumeFrame._liveThreadOwned = true;
-invalidResumeFrame._currentThreadSlot = 1;
+const invalidResumeFrame = makeBootedThreadFixture('resume-frame fixture');
 const invalidCodeTargetBase = invalidResumeFrame.readNSEntry(11).word0_location;
 const invalidCodeLayout = invalidResumeFrame._threadLayoutAtBase(invalidCodeTargetBase);
 const invalidResumeSTO = invalidResumeFrame.memory[
@@ -458,11 +466,7 @@ const outOfCodeSim = new ChurchSimulator();
 assert.strictEqual(outOfCodeSim.loadBootImage(outOfCodeImage), false,
     'boot loader rejects a resume NIA outside the Enter target code extent');
 
-const underflowFrame = new ChurchSimulator();
-assert.strictEqual(underflowFrame.loadBootImage(image), true);
-underflowFrame.bootComplete = true;
-underflowFrame._liveThreadOwned = true;
-underflowFrame._currentThreadSlot = 1;
+const underflowFrame = makeBootedThreadFixture('underflow-frame fixture');
 const underflowTargetBase = underflowFrame.readNSEntry(11).word0_location;
 const underflowLayout = underflowFrame._threadLayoutAtBase(underflowTargetBase);
 underflowFrame.memory[underflowTargetBase + underflowLayout.protectedStoOffset] =
@@ -479,11 +483,7 @@ assert.deepStrictEqual(
     underflowOutgoingCaps,
     'incoming frame rejection is atomic for outgoing CR homes');
 
-const malformedSavedSTO = new ChurchSimulator();
-assert.strictEqual(malformedSavedSTO.loadBootImage(image), true);
-malformedSavedSTO.bootComplete = true;
-malformedSavedSTO._liveThreadOwned = true;
-malformedSavedSTO._currentThreadSlot = 1;
+const malformedSavedSTO = makeBootedThreadFixture('malformed-saved-STO fixture');
 const malformedFrameBase = malformedSavedSTO.readNSEntry(11).word0_location;
 const malformedFrameLayout = malformedSavedSTO._threadLayoutAtBase(malformedFrameBase);
 const malformedFramePointer = malformedSavedSTO.memory[
@@ -496,11 +496,7 @@ assert.strictEqual(malformedSavedSTO.advanceConfiguredThread().ok, false,
 assert.deepStrictEqual(malformedSavedSTO.memory.slice(1, 17), malformedSourceDRHomes,
     'malformed packed saved STO rejects atomically before DR-home save');
 
-const outgoingUnderflow = new ChurchSimulator();
-assert.strictEqual(outgoingUnderflow.loadBootImage(image), true);
-outgoingUnderflow.bootComplete = true;
-outgoingUnderflow._liveThreadOwned = true;
-outgoingUnderflow._currentThreadSlot = 1;
+const outgoingUnderflow = makeBootedThreadFixture('outgoing-underflow fixture');
 const outgoingEntry = outgoingUnderflow.readNSEntry(entryWords[0] & 0xFFFF);
 const outgoingHeader = outgoingUnderflow.parseLumpHeader(
     outgoingUnderflow.memory[outgoingEntry.word0_location] >>> 0);
@@ -526,12 +522,7 @@ assert.deepStrictEqual(
     outgoingSourceCaps,
     'outgoing frame-space rejection is atomic for CR homes');
 
-const malformed = new ChurchSimulator();
-assert.strictEqual(malformed.loadBootImage(image), true,
-    `malformed-header fixture image must load: ${malformed.lastBootImageError || 'unknown error'}`);
-malformed.bootComplete = true;
-malformed._liveThreadOwned = true;
-malformed._currentThreadSlot = 1;
+const malformed = makeBootedThreadFixture('malformed-header fixture');
 const malformedTargetBase = malformed.readNSEntry(11).word0_location;
 const malformedTargetLayout = malformed._threadLayoutAtBase(malformedTargetBase);
 const malformedEntryGT = malformed.memory[
@@ -578,17 +569,10 @@ assert(!appRunSource.includes('nextThreadBtn') && !appRunSource.includes('nextCo
 const indexSource = fs.readFileSync(__dirname + '/index.html', 'utf8');
 assert(!indexSource.includes('nextThreadBtn') && !indexSource.includes('Next Thread'),
     'rendered toolbar no longer contains the Next Thread button');
-const uiSim = new ChurchSimulator();
-assert.strictEqual(uiSim.loadBootImage(image), true,
-    `UI fixture image must load: ${uiSim.lastBootImageError || 'unknown error'}`);
-uiSim.bootComplete = true;
-uiSim._liveThreadOwned = true;
-uiSim._currentThreadSlot = 1;
+const uiSim = makeBootedThreadFixture('UI fixture');
 const uiBootBase = uiSim.readNSEntry(1).word0_location;
 const uiBootLayout = uiSim._threadLayoutAtBase(uiBootBase);
 const uiBootEntryGT = uiSim.memory[uiBootBase + uiBootLayout.capsStart] >>> 0;
-uiSim._writeCR(0, uiBootEntryGT, uiSim.readNSEntry(uiBootEntryGT & 0xFFFF));
-uiSim.sto = uiSim._readProtectedSto(uiBootBase);
 uiSim.pc = 0x2A;
 const initialThreadRows = uiSim.threadStatusRows();
 assert.strictEqual(initialThreadRows.length, 3,
