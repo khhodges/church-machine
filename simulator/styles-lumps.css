@@ -2799,6 +2799,17 @@
         font-size: 0.75rem;
     }
 
+    .sim-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.35rem;
+    }
+
+    .sim-controls > #toolbarIdeBadge {
+        display: flex;
+        justify-content: center;
+    }
+
     .view {
         top: 52px;
         padding: 0.35rem;
