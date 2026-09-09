@@ -654,6 +654,17 @@ assert.strictEqual(uiSim.activeThreadStatus().slot, activeBeforeInvalid,
 const stripSource = functionSource(appRunSource, 'updateThreadIdentityStrip');
 assert(stripSource.includes('_simRunActive || sim.running || sim.walkActive'),
     'Thread rows remain locked during the full asynchronous Run lifecycle');
+assert(stripSource.includes('sim.threadStatusRows(10)'),
+    'Thread strip obtains every architecturally supported configured Thread');
+assert(stripSource.includes('const pageSize = 4'),
+    'Thread strip keeps the dashboard limited to four simultaneous rows');
+assert(stripSource.includes("pager.setAttribute('aria-label', 'Thread context pages')"),
+    'overflow Thread paging exposes an accessible group label');
+assert(stripSource.includes('previous.disabled = executionLocked') &&
+       stripSource.includes('next.disabled = executionLocked'),
+    'overflow paging is locked for the same Run and Walk lifecycle as Thread rows');
+assert(stripSource.includes('updateThreadIdentityStrip();'),
+    'paging reveals another ordered group without changing Thread allocation');
 assert(stripSource.includes("card.setAttribute('role', 'button')"),
     'Thread rows expose button semantics');
 assert(stripSource.includes("card.setAttribute('tabindex', selectable ? '0' : '-1')"),
@@ -665,6 +676,8 @@ assert(stripSource.includes("card.setAttribute('aria-current', 'true')"),
 const selectHandlerSource = functionSource(appRunSource, 'selectThreadContext');
 assert(selectHandlerSource.includes('_simRunActive || sim.walkActive || sim.running'),
     'activation-time guard rejects stale row handlers between Run batches');
+assert(stripSource.includes('selectThreadContext(row.slot)'),
+    'overflow pages select Threads through the canonical visible-row handler');
 
 // The configured maximum is architectural Namespace order, not a four-card UI
 // limit: every Thread.1..Thread.10 resolves through the identical CHANGE path.
@@ -677,6 +690,122 @@ maxThreads.bootComplete = false; // canonical boot rule: no reset-bank save
 maxThreads._currentThreadSlot = 1;
 const maxSlots = maxThreads.configuredThreadSlots();
 assert.strictEqual(maxSlots.length, 10, 'maximum configuration exposes Thread.1 through Thread.10');
+assert.strictEqual(maxThreads.threadStatusRows(10).length, 10,
+    'status-row API exposes all ten configured Threads for paged rendering');
+
+class FakeElement {
+    constructor(tagName) {
+        this.tagName = tagName.toUpperCase();
+        this.children = [];
+        this.attributes = {};
+        this.dataset = {};
+        this.listeners = {};
+        this.hidden = false;
+        this.disabled = false;
+        this.textContent = '';
+    }
+    setAttribute(name, value) { this.attributes[name] = String(value); }
+    getAttribute(name) { return this.attributes[name] || null; }
+    addEventListener(type, listener) { this.listeners[type] = listener; }
+    appendChild(child) { this.children.push(child); return child; }
+    append(...children) { this.children.push(...children); }
+    replaceChildren(...children) { this.children = [...children]; }
+    click() {
+        if (!this.disabled && this.listeners.click) this.listeners.click({type: 'click'});
+    }
+}
+
+const pagingStrip = new FakeElement('div');
+const pagingSelections = [];
+const pagingContext = {
+    sim: {
+        running: false,
+        walkActive: false,
+        threadStatusRows(limit) {
+            return maxThreads.threadStatusRows(limit);
+        },
+    },
+    document: {
+        getElementById(id) { return id === 'threadIdentityStrip' ? pagingStrip : null; },
+        createElement(tagName) { return new FakeElement(tagName); },
+    },
+    selectThreadContext(slot) { pagingSelections.push(slot); },
+};
+vm.createContext(pagingContext);
+vm.runInContext([
+    'let _simRunActive = false;',
+    'let _threadIdentityPage = 0;',
+    functionSource(appRunSource, 'updateThreadIdentityStrip'),
+].join('\n'), pagingContext);
+
+function renderedThreadCards() {
+    return pagingStrip.children.filter(child =>
+        child.className && child.className.includes('thread-identity-card'));
+}
+function renderedPager() {
+    return pagingStrip.children.find(child =>
+        child.className === 'thread-identity-pager');
+}
+
+pagingContext.updateThreadIdentityStrip();
+assert.deepStrictEqual(
+    renderedThreadCards().map(card => Number(card.dataset.threadSlot)),
+    maxSlots.slice(0, 4),
+    'first page renders the first four configured Threads in Namespace order');
+let pager = renderedPager();
+assert(pager, 'ten configured Threads render paging controls');
+assert.strictEqual(pager.attributes.role, 'group',
+    'paging controls expose group semantics');
+assert.strictEqual(pager.children[0].tagName, 'BUTTON',
+    'previous-page control uses a keyboard-native button');
+assert.strictEqual(pager.children[0].disabled, true,
+    'previous-page control is disabled at the first boundary');
+assert.strictEqual(pager.children[2].disabled, false,
+    'next-page control is enabled before the last page');
+
+pager.children[2].click();
+assert.deepStrictEqual(
+    renderedThreadCards().map(card => Number(card.dataset.threadSlot)),
+    maxSlots.slice(4, 8),
+    'next-page control reveals the next four configured Threads');
+renderedThreadCards()[3].listeners.keydown({
+    key: 'Enter',
+    preventDefault() {},
+});
+assert.deepStrictEqual(pagingSelections, [maxSlots[7]],
+    'keyboard activation on an overflow row uses the canonical selectThreadContext handler');
+
+pager = renderedPager();
+pager.children[2].click();
+assert.deepStrictEqual(
+    renderedThreadCards().map(card => Number(card.dataset.threadSlot)),
+    maxSlots.slice(8, 10),
+    'last page renders the final two configured Threads without extra rows');
+pager = renderedPager();
+assert.strictEqual(pager.children[2].disabled, true,
+    'next-page control is disabled at the last boundary');
+assert.strictEqual(pager.children[0].disabled, false,
+    'previous-page control remains available on the last page');
+
+pagingContext.sim.running = true;
+pagingContext.updateThreadIdentityStrip();
+pager = renderedPager();
+assert.strictEqual(pager.children[0].disabled, true);
+assert.strictEqual(pager.children[2].disabled, true,
+    'Run ownership disables both overflow paging controls');
+assert(renderedThreadCards().every(card => card.attributes.tabindex === '-1'),
+    'Run ownership removes overflow Thread rows from keyboard tab order');
+
+pagingContext.sim.running = false;
+pagingContext.sim.walkActive = true;
+pagingContext.updateThreadIdentityStrip();
+pager = renderedPager();
+assert.strictEqual(pager.children[0].disabled, true);
+assert.strictEqual(pager.children[2].disabled, true,
+    'Walk ownership disables both overflow paging controls');
+assert(renderedThreadCards().every(card => card.attributes.tabindex === '-1'),
+    'Walk ownership removes overflow Thread rows from keyboard tab order');
+
 const visitedMaxSlots = [];
 for (let i = 0; i < maxSlots.length; i++) {
     const switched = maxThreads.advanceConfiguredThread();

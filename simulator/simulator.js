@@ -4897,7 +4897,7 @@ class ChurchSimulator {
 
     threadStatusRows(maxRows = 4) {
         const requested = Number.isInteger(maxRows) ? maxRows : 4;
-        const limit = Math.max(0, Math.min(4, requested));
+        const limit = Math.max(0, Math.min(10, requested));
         const slots = this.configuredThreadSlots().slice(0, limit);
         const activeSlot = Number.isInteger(this._currentThreadSlot)
             ? this._currentThreadSlot : 1;

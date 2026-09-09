@@ -1151,6 +1151,47 @@
     color: #f0d47b;
 }
 
+.thread-identity-pager {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.35rem;
+    min-height: 1.35rem;
+    font-family: 'Courier New', monospace;
+}
+
+.thread-identity-page-button {
+    min-width: 1.65rem;
+    padding: 0.05rem 0.35rem;
+    border: 1px solid rgba(58, 134, 255, 0.38);
+    border-radius: 4px;
+    background: rgba(11, 23, 38, 0.9);
+    color: #8fc8ff;
+    font: inherit;
+    line-height: 1.05;
+    cursor: pointer;
+}
+
+.thread-identity-page-button:hover:not(:disabled) {
+    border-color: rgba(92, 173, 255, 0.82);
+    background: rgba(18, 42, 66, 0.96);
+}
+
+.thread-identity-page-button:focus-visible {
+    outline: 2px solid #8fc8ff;
+    outline-offset: 2px;
+}
+
+.thread-identity-page-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.42;
+}
+
+.thread-identity-page-position {
+    color: #7f91a7;
+    font-size: 0.62rem;
+}
+
 @media (max-width: 1180px) {
     .thread-identity-strip {
         flex-basis: 24rem;

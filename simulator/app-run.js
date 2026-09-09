@@ -1083,6 +1083,7 @@ let _runStopped = false;
 let _simRunActive = false;
 
 let _runClickTimer = null;
+let _threadIdentityPage = 0;
 
 function updateThreadControl() {
     const status = document.getElementById('activeThreadStatus');
@@ -1101,10 +1102,16 @@ function updateThreadIdentityStrip() {
         return;
     }
 
-    const rows = sim.threadStatusRows(4);
+    const allRows = sim.threadStatusRows(10);
     const executionLocked = Boolean(_simRunActive || sim.running || sim.walkActive);
+    const pageSize = 4;
+    const pageCount = Math.max(1, Math.ceil(allRows.length / pageSize));
+    _threadIdentityPage = Math.min(_threadIdentityPage, pageCount - 1);
+    const rows = allRows.slice(
+        _threadIdentityPage * pageSize,
+        (_threadIdentityPage + 1) * pageSize);
     strip.replaceChildren();
-    strip.hidden = rows.length === 0;
+    strip.hidden = allRows.length === 0;
     rows.forEach((row) => {
         const card = document.createElement('div');
         card.className = `thread-identity-card${row.active ? ' is-active' : ''}${executionLocked ? ' is-locked' : ''}`;
@@ -1210,6 +1217,46 @@ function updateThreadIdentityStrip() {
         card.append(marker, name, values);
         strip.appendChild(card);
     });
+    if (pageCount > 1) {
+        const pager = document.createElement('div');
+        pager.className = 'thread-identity-pager';
+        pager.setAttribute('role', 'group');
+        pager.setAttribute('aria-label', 'Thread context pages');
+
+        const previous = document.createElement('button');
+        previous.type = 'button';
+        previous.className = 'thread-identity-page-button';
+        previous.textContent = '\u2039';
+        previous.setAttribute('aria-label', 'Show previous Thread contexts');
+        previous.disabled = executionLocked || _threadIdentityPage === 0;
+        previous.addEventListener('click', () => {
+            if (executionLocked || _threadIdentityPage === 0) return;
+            _threadIdentityPage--;
+            updateThreadIdentityStrip();
+        });
+
+        const position = document.createElement('span');
+        position.className = 'thread-identity-page-position';
+        position.textContent = `${_threadIdentityPage + 1}/${pageCount}`;
+        position.setAttribute('aria-live', 'polite');
+        position.setAttribute('aria-label',
+            `Thread context page ${_threadIdentityPage + 1} of ${pageCount}`);
+
+        const next = document.createElement('button');
+        next.type = 'button';
+        next.className = 'thread-identity-page-button';
+        next.textContent = '\u203a';
+        next.setAttribute('aria-label', 'Show next Thread contexts');
+        next.disabled = executionLocked || _threadIdentityPage === pageCount - 1;
+        next.addEventListener('click', () => {
+            if (executionLocked || _threadIdentityPage === pageCount - 1) return;
+            _threadIdentityPage++;
+            updateThreadIdentityStrip();
+        });
+
+        pager.append(previous, position, next);
+        strip.appendChild(pager);
+    }
 }
 
 function selectThreadContext(slot) {
