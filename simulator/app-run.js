@@ -15460,53 +15460,73 @@ async function confirmSaveToNamespace() {
             return;
         }
         _lumpSaveRequest(fetch, '/api/lumps/save', _svPayload, function(resp) {
+            // The repository has committed the save. Close immediately so a
+            // later client-state/render exception cannot leave a successful
+            // transaction looking unfinished.
+            closeSaveDialog();
             try {
                 // The preflight-selected index is part of the server payload;
                 // commit that exact slot rather than running allocation again.
                 sim.saveToNamespaceAt(
                     idx, label, _svWords, perms, gtType, _caps, _svClistWords);
             } catch (err) {
-                console.error('[SaveNS] save failed:', err);
-                _showFpgaToast('Save to Namespace Failed',
-                    'Server committed the save, but simulator update failed: ' + err.message,
+                console.error('[SaveNS] local update failed after repository commit:', err);
+                const recovery = `Saved "${label}" to NS[${idx}], but the local view could not update. ` +
+                    'Open Namespace and refresh its contents before running the LUMP.';
+                _showFpgaToast('LUMP Saved — Refresh Needed',
+                    recovery + ' ' + err.message,
                     'error', 10000);
+                if (typeof appendOutput === 'function') appendOutput(recovery, 'error');
                 return;
             }
-            _persistNamespaceSlotLabel(idx, label);
-            if (window.LumpRegistry) {
-                // A successful save makes the server's immutable binary the
-                // authority for this token.  Do not register _svWords here:
-                // those are code words only, so treating them as the saved
-                // artifact drops the embedded API/source frame and makes a
-                // Fully documented LUMP reopen as "source unavailable".
-                if (typeof window._commitSavedLumpClientState === 'function') {
-                    window._commitSavedLumpClientState(resp, {
-                    abstraction: label,
-                    ns_slot: idx,
-                    language: _svLang,
-                    capabilities: _caps
-                    }, window._editorOpenLumpToken || null);
-                } else {
-                    window.LumpRegistry.registerFromServer([{
-                        token: resp.token,
+            try {
+                _persistNamespaceSlotLabel(idx, label);
+                if (window.LumpRegistry) {
+                    // A successful save makes the server's immutable binary the
+                    // authority for this token.  Do not register _svWords here:
+                    // those are code words only, so treating them as the saved
+                    // artifact drops the embedded API/source frame and makes a
+                    // Fully documented LUMP reopen as "source unavailable".
+                    if (typeof window._commitSavedLumpClientState === 'function') {
+                        window._commitSavedLumpClientState(resp, {
                         abstraction: label,
-                        filename: resp.lump,
                         ns_slot: idx,
                         language: _svLang,
                         capabilities: _caps
-                    }]);
-                    window.LumpRegistry.evictMemory(resp.token);
-                    window.LumpRegistry.setCurrent(resp.token);
-                    window.LumpRegistry.setPending(resp.token);
+                        }, window._editorOpenLumpToken || null);
+                    } else {
+                        window.LumpRegistry.registerFromServer([{
+                            token: resp.token,
+                            abstraction: label,
+                            filename: resp.lump,
+                            ns_slot: idx,
+                            language: _svLang,
+                            capabilities: _caps
+                        }]);
+                        window.LumpRegistry.evictMemory(resp.token);
+                        window.LumpRegistry.setCurrent(resp.token);
+                        window.LumpRegistry.setPending(resp.token);
+                    }
                 }
+                window._lastSavedNsToken = resp.token;
+                updateDashboard();
+                if (typeof renderLumps === 'function') renderLumps();
+            } catch (err) {
+                console.error('[SaveNS] post-save UI refresh failed:', err);
+                const recovery = `Saved "${label}" to NS[${idx}], but the screen could not refresh. ` +
+                    'Open Namespace and refresh its contents before running the LUMP.';
+                _showFpgaToast('LUMP Saved — Refresh Needed',
+                    recovery + ' ' + err.message,
+                    'error', 10000);
+                if (typeof appendOutput === 'function') appendOutput(recovery, 'error');
+                return;
             }
-            window._lastSavedNsToken = resp.token;
-            closeSaveDialog();
-            updateDashboard();
-            if (typeof renderLumps === 'function') renderLumps();
+            const nextAction = `Saved "${label}" to NS[${idx}]. ` +
+                'Open Namespace to inspect it, or choose Run to execute the latest saved revision.';
             _showFpgaToast('Lump Saved',
-                `NS[${idx}] "${label}" — ${_svWords.length} word${_svWords.length === 1 ? '' : 's'}`,
+                nextAction,
                 'ok', 9000);
+            if (typeof appendOutput === 'function') appendOutput(nextAction, 'info');
         }).catch(function(err) {
             const title = err.kind === 'validation'
                 ? 'LUMP Repository Save Rejected'
@@ -15516,8 +15536,12 @@ async function confirmSaveToNamespace() {
                         ? 'LUMP Repository Server Failure'
                         : 'LUMP Repository Protocol Failure'));
             const body = err.kind === 'transport'
-                ? 'Network error — check your connection.'
-                : err.message;
+                ? 'Check your connection, then click Save again. Nothing was committed.'
+                : (err.kind === 'validation'
+                    ? `${err.message} Correct the LUMP or Namespace settings, then click Save again.`
+                    : (err.kind === 'server'
+                        ? `${err.message} The modal remains open; resolve the server error, then click Save again.`
+                        : `${err.message} Retry Save. If this repeats, inspect the server logs for the invalid response.`));
             _showFpgaToast(title, body, 'error', 10000);
         });
     }
