@@ -218,6 +218,29 @@ console.log('\n--- T08: newest compilation beats committed slot token ---');
         appMemorySource.includes('(latest compilation \\u2014 fetched from server)'));
 }
 
+// ── T10: invalid newest compilation remains visible as a programmer fault ─────
+console.log('\n--- T10: newest invalid artifact is selected and surfaced as a fault ---');
+{
+    const invalidNewest = {
+        ns_slot: null, abstraction: 'CapabilityTest', token: 'b6182a95',
+        compiled_at: '2026-09-09T15:20:41Z', binary_valid: false,
+        validation_errors: ['bootstrap SELF GT differs from owning Namespace descriptor'],
+    };
+    const validPrevious = {
+        ns_slot: null, abstraction: 'CapabilityTest', token: 'c1972022',
+        compiled_at: '2026-09-08T20:12:27Z', binary_valid: true,
+    };
+    const ctx = makeSandbox([invalidNewest, validPrevious]);
+    ctx.window._nsState = {
+        abstractions: [{ slot: 10, name: 'CapabilityTest', token: 'b6182a95' }],
+    };
+    const result = vm.runInContext('_findSrcLump(10, "CapabilityTest")', ctx);
+    check('T10a: invalid newest artifact remains selected', result === invalidNewest);
+    check('T10b: popup labels invalid saved artifact as a FAULT',
+        appMemorySource.includes('FAULT \\u2014 INVALID SAVED LUMP') &&
+        appMemorySource.includes('The server refused to expose these bytes.'));
+}
+
 // ── T09: missing cache metadata still preserves committed token ──────────────
 console.log('\n--- T09: committed token survives before cache warmup ---');
 {

@@ -4655,6 +4655,7 @@ function _showNSLumpModal(slotIdx, nsEntry) {
 
     let headerHtml = '', clistHtml = '', codeHtml = '', tokenHtml = '';
     let _lazyFetchToken = null;
+    let _lazyFetchBlockedError = null;
     let _modalToken = null, _modalMode = null;
 
     if (hdr && hdr.valid && !(_preferredSource && _preferredSource.token)) {
@@ -4790,6 +4791,12 @@ function _showNSLumpModal(slotIdx, nsEntry) {
         const _lazyEntry = (typeof _findSrcLump === 'function') ? _findSrcLump(slotIdx, nsEntry.label) : null;
         if (_lazyEntry && _lazyEntry.token) {
             _lazyFetchToken = _lazyEntry.token;
+            if (_lazyEntry.binary_valid === false) {
+                const _validationErrors = Array.isArray(_lazyEntry.validation_errors)
+                    ? _lazyEntry.validation_errors.filter(Boolean) : [];
+                _lazyFetchBlockedError = _validationErrors.join('; ') ||
+                    'The saved binary failed canonical integrity validation.';
+            }
             _modalToken = _lazyFetchToken;
             _modalMode = (_lazyEntry.ns_slot_policy === 'static' && _lazyEntry.boot_resident) ? 'resident'
                        : (_lazyEntry.ns_slot_policy === 'static')                             ? 'lazy'
@@ -4818,11 +4825,19 @@ function _showNSLumpModal(slotIdx, nsEntry) {
                         style="background:#1e3a5f;color:#60a5fa;border:1px solid rgba(96,165,250,0.35);">Open in Editor \u270e</button>
                 </div>
                 <div style="color:#555;font-size:0.72rem;font-family:monospace;">&#x1F3E0; server/lumps/${_lazyFetchToken}.lump${_compiledAtText ? ` · compiled ${_compiledAtText}` : ''}</div>
-                <div style="margin-top:7px;padding:6px 9px;border-left:3px solid #60a5fa;background:rgba(96,165,250,0.08);color:#9ca3af;font-size:0.76rem;">
-                    Showing the most recently compiled saved code. Resident memory may differ until this revision is loaded.
+                <div style="margin-top:7px;padding:6px 9px;border-left:3px solid ${_lazyFetchBlockedError ? '#f87171' : '#60a5fa'};background:${_lazyFetchBlockedError ? 'rgba(248,113,113,0.10)' : 'rgba(96,165,250,0.08)'};color:${_lazyFetchBlockedError ? '#fca5a5' : '#9ca3af'};font-size:0.76rem;">
+                    ${_lazyFetchBlockedError
+                        ? '<strong>FAULT:</strong> The most recently compiled saved artifact is invalid and cannot be loaded.'
+                        : 'Showing the most recently compiled saved code. Resident memory may differ until this revision is loaded.'}
                 </div>
             </div>`;
-            headerHtml = `<div id="_nsLumpLazyBody" style="color:#f0a040;font-size:0.8rem;padding:8px 0;">&#9680; Loading lump data\u2026</div>`;
+            headerHtml = _lazyFetchBlockedError
+                ? `<div id="_nsLumpLazyBody" role="alert" style="border:1px solid rgba(248,113,113,0.55);border-left:4px solid #f87171;border-radius:6px;background:rgba(127,29,29,0.22);padding:12px 14px;color:#fecaca;">
+                    <div style="font-size:0.78rem;font-weight:800;letter-spacing:0.06em;color:#f87171;margin-bottom:7px;">FAULT \u2014 INVALID SAVED LUMP</div>
+                    <div style="font-size:0.82rem;line-height:1.5;">${String(_lazyFetchBlockedError).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+                    <div style="font-size:0.75rem;line-height:1.45;color:#fca5a5;margin-top:8px;">The server refused to expose these bytes. The artifact remains selected so the integrity failure is not hidden by an older revision.</div>
+                </div>`
+                : `<div id="_nsLumpLazyBody" style="color:#f0a040;font-size:0.8rem;padding:8px 0;">&#9680; Loading lump data\u2026</div>`;
         } else {
             const loc = `0x${(base*4).toString(16).toUpperCase().padStart(8,'0')}`;
             // ── Hardware register table for known MMIO devices ────────────────────
@@ -4938,7 +4953,7 @@ function _showNSLumpModal(slotIdx, nsEntry) {
     // When _lazyFetchToken is set the modal was opened for a lump whose binary is
     // not in sim.memory (out-of-range MMIO stub, post-Add+Save reload, etc.).
     // Fetch the real binary from the server and replace the loading placeholder.
-    if (_lazyFetchToken) {
+    if (_lazyFetchToken && !_lazyFetchBlockedError) {
         const _lzTok = _lazyFetchToken;
         (async () => {
             const _lazyBody = document.getElementById('_nsLumpLazyBody');
