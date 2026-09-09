@@ -1086,6 +1086,7 @@ let _runClickTimer = null;
 let _threadIdentityPage = 0;
 let _threadContextModalSlot = null;
 let _threadContextModalOrigin = null;
+const _threadRunOutcomes = new Map();
 
 function updateThreadControl() {
     const status = document.getElementById('activeThreadStatus');
@@ -1288,10 +1289,33 @@ function _threadModalState(row) {
     const executing = Boolean(_simRunActive || sim.running || walkRunning || sim.walkActive);
     const lastFault = _latestThreadFault(row.slot);
     if (owns && lastFault && sim.halted && lastFault.step === sim.stepCount) return 'Faulted';
-    if (owns && sim.halted) return 'Halted';
+    if (owns && sim.halted) {
+        const outcome = _threadRunOutcomes.get(row.slot);
+        return outcome && outcome.stopReason === 'halted' && !outcome.faulted
+            ? 'Completed' : 'Halted';
+    }
     if (owns && executing) return 'Running';
     if (owns) return 'Paused';
     return 'Dormant';
+}
+
+function _threadStopReason(row) {
+    if (!row) return 'Unavailable';
+    const outcome = _threadRunOutcomes.get(row.slot);
+    if (!outcome) return _threadExecutionOwner(row) ? 'Not recorded' : 'Not run in this session';
+    if (outcome.faulted) return 'Stopped by a simulator fault';
+    if (outcome.stopReason === 'halted') return 'Program completed normally (HALT)';
+    if (outcome.stopReason === 'breakpoint') {
+        return Number.isInteger(outcome.breakpointAddr)
+            ? `Breakpoint at 0x${outcome.breakpointAddr.toString(16).toUpperCase().padStart(4, '0')}`
+            : 'Breakpoint reached';
+    }
+    if (outcome.stopReason === 'maxSteps') return 'Maximum instruction count reached';
+    if (outcome.stopReason === 'faultFreeLimit') return 'Paused after 1,000 fault-free instructions';
+    if (outcome.stopReason === 'userStopped') return 'Stopped by user';
+    if (outcome.stopReason === 'bootExit') return 'Returned to the boot sequence';
+    if (outcome.stopReason === 'error') return 'Runtime error';
+    return `Stopped: ${outcome.stopReason || 'unknown reason'}`;
 }
 
 function _setThreadModalAction(button, enabled, reason) {
@@ -1327,6 +1351,8 @@ function updateThreadContextModal() {
     const lastFault = _latestThreadFault(row.slot);
     document.getElementById('threadContextFault').textContent = lastFault
         ? `${lastFault.type}: ${lastFault.message}` : 'None';
+    document.getElementById('threadContextStopReason').textContent =
+        _threadStopReason(row);
 
     const run = document.getElementById('threadContextRun');
     const stop = document.getElementById('threadContextStop');
@@ -1371,6 +1397,7 @@ function openThreadContextModal(slot, origin) {
           <div><dt>FLAGS</dt><dd id="threadContextFlags"></dd></div>
           <div><dt>STO / frame</dt><dd id="threadContextSto"></dd></div>
           <div><dt>Fault</dt><dd id="threadContextFault"></dd></div>
+          <div><dt>Stop reason</dt><dd id="threadContextStopReason"></dd></div>
         </dl>
         <p id="threadContextDisabledReason" class="thread-context-reasons" aria-live="polite"></p>
         <footer>
@@ -1453,6 +1480,10 @@ function runThreadFromModal() {
         }
     }
     updateThreadControl();
+    _threadRunOutcomes.delete(requestedSlot);
+    // Do not leave this dialog covering completion/fault UI while the run
+    // proceeds. The Thread row remains available to reopen with the outcome.
+    closeThreadContextModal();
     runSimGo();
 }
 
@@ -2866,6 +2897,17 @@ function runSim() {
     function finishRun(stopReason, breakpointAddr) {
         _simRunActive = false;
         _showStopBtn(false);
+        if (sim && typeof sim.activeThreadStatus === 'function') {
+            const thread = sim.activeThreadStatus();
+            if (thread && Number.isInteger(thread.slot)) {
+                _threadRunOutcomes.set(thread.slot, {
+                    stopReason,
+                    breakpointAddr,
+                    faulted: sim.faultLog.length > 0,
+                    step: sim.stepCount,
+                });
+            }
+        }
         // updateThreadControl() disabled the switch button while sim.running
         // was true.  sim.run() has returned now, so refresh that independent
         // toolbar control explicitly; updateDashboard() does not own it.

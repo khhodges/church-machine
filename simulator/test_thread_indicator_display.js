@@ -83,6 +83,17 @@ check(
   'fault details remain attributed to the owning Thread and current halt'
 );
 check(
+  run.includes('const _threadRunOutcomes = new Map()') &&
+  run.includes('Program completed normally (HALT)') &&
+  run.includes('id="threadContextStopReason"') &&
+  run.includes('_threadRunOutcomes.set(thread.slot'),
+  'Thread controls retain and display the terminal stop reason'
+);
+check(
+  /closeThreadContextModal\(\);\s*runSimGo\(\);/.test(run),
+  'Thread Run closes its dialog so completion and fault UI remains visible'
+);
+check(
   run.includes('document.querySelector(`[data-thread-slot="${originSlot}"]`)'),
   'modal focus returns to a rebuilt originating Thread row'
 );
