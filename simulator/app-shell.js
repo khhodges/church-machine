@@ -1334,7 +1334,7 @@ function _newAbstractionProforma(name) {
 ; Provides: the functions of ...
 abstraction ${name} {
     capabilities {
-        SELF E  ; cList[0], compiler-owned
+        SELF E  ; cList[0], current abstraction Golden Token
         ; (capability grants added here)
     }
     method Status {

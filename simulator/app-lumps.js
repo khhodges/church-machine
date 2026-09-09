@@ -3055,6 +3055,10 @@ function _draftLsDel(token) { try { localStorage.removeItem(_draftLsKey(token));
 
 function _commitSavedLumpClientState(resp, fallback, draftToken) {
     if (!resp || !resp.token) throw new Error('Saved LUMP response has no token');
+    if (Array.isArray(resp.warnings) && resp.warnings.length &&
+            typeof _showAsmWarnings === 'function') {
+        _showAsmWarnings(resp.warnings);
+    }
     const base = fallback || {};
     const descriptor = Object.assign({}, base, {
         token: resp.token,
@@ -5033,7 +5037,7 @@ async function _absOpenInEditorByName(name, methodName) {
             var _capEntries = Array.isArray(_absEntry.capabilities) ? _absEntry.capabilities : [];
                 var _capLines = [
                     'capabilities {',
-                    '  SELF E  ; cList[0], compiler-owned'
+                    '  SELF E  ; cList[0], current abstraction Golden Token'
                 ];
                 for (var _ci = 0; _ci < _capEntries.length; _ci++) {
                     var _ce = _capEntries[_ci];
@@ -5959,6 +5963,12 @@ async function _saveLumpDirectVersion(token, lump, btn) {
             _lines.push('\u2713 boot-image.bin refreshed \u2014 change persists on reboot');
         } else if (_sj.boot_image_note) {
             _lines.push('\u26A0 ' + _sj.boot_image_note);
+        }
+        if (Array.isArray(_sj.warnings)) {
+            _sj.warnings.forEach(function(warning) {
+                _lines.push('\u26A0 ' + (warning && warning.message
+                    ? warning.message : String(warning)));
+            });
         }
         if (typeof showPatchModal === 'function') showPatchModal(true, opName, _lines.join('\n'));
         if (typeof renderLumps   === 'function') renderLumps();

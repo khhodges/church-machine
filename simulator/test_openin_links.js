@@ -1052,7 +1052,7 @@ trackAsync((async function t15() {
 
     // 6. SELF is visible at row 0; source-declared entries begin at row 1.
     assert('T20 template path: compiler-owned SELF is shown at cList[0]',
-        editorValue.includes('SELF E  ; cList[0], compiler-owned'),
+        editorValue.includes('SELF E  ; cList[0], current abstraction Golden Token'),
         JSON.stringify(editorValue.slice(0, 240)));
     assert('T20 template path: capabilities block pre-filled with SlideRule E at cList[1]',
         editorValue.includes('SlideRule E  ; cList[1]'),
@@ -1116,7 +1116,7 @@ trackAsync((async function t15() {
     assert('T20c empty caps: description included in header',
         editorValue.includes('32-bit integer arithmetic'), editorValue.slice(0, 200));
     assert('T20c empty caps: compiler-owned SELF remains cList[0]',
-        editorValue.includes('SELF E  ; cList[0], compiler-owned'), editorValue.slice(0, 220));
+        editorValue.includes('SELF E  ; cList[0], current abstraction Golden Token'), editorValue.slice(0, 220));
     assert('T20c empty caps: editable user-capability placeholder remains',
         editorValue.includes('; (capability grants added here)'), editorValue.slice(0, 220));
     assert('T20c empty caps: all 6 method stubs present',

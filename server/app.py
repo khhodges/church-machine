@@ -8043,6 +8043,7 @@ def save_lump():
     else:
         _identity_string = f"{abs_name}#{_issue_number}"
     _identity_hash = _hl_id.sha256(_identity_string.encode('utf-8')).hexdigest()
+    _save_warnings = []
 
     # Build the word array. Structural and canonical checks run before the
     # cc=0→1 auto-rewrite so it cannot be used as a bypass.
@@ -8130,15 +8131,25 @@ def save_lump():
         _sl_words.extend([0] * (_sl_lsz - len(_sl_words)))
 
     _clist_row0_idx = _sl_lsz - _sl_cc2
-    if _compiler_self_row and not _is_bootstrap_canonical:
-        if ns_slot is None:
-            return jsonify({
-                "error": (
-                    "Namespace identity validation failed: compiler-owned "
-                    "__SELF__ requires a programmer-selected Namespace slot."
-                ),
-                "namespace_identity_failed": True,
-            }), 422
+    def _warn_clist0_owner_mismatch(_expected, _actual):
+        _expected &= 0xFFFFFFFF
+        _actual &= 0xFFFFFFFF
+        if _actual == _expected:
+            return
+        _save_warnings.append({
+            "code": "clist0_owner_golden_token_mismatch",
+            "message": (
+                f"C-list[0] should be the owning abstraction's Golden Token "
+                f"0x{_expected:08X}; submitted value is 0x{_actual:08X}. "
+                "The submitted value was preserved and no corrective action was taken."
+            ),
+            "expected_golden_token": _expected,
+            "actual_word": _actual,
+            "clist_row": 0,
+            "abstraction": abs_name,
+        })
+
+    if ns_slot is not None and not _is_bootstrap_canonical:
         _selected_sequence = metadata.get("namespace_sequence", 0)
         try:
             _selected_sequence = int(_selected_sequence)
@@ -8163,8 +8174,10 @@ def save_lump():
                 ),
                 "namespace_identity_failed": True,
             }), 422
-        _sl_words[_clist_row0_idx] = _boot_image_gen.create_gt(
+        _expected_owner_gt = _boot_image_gen.create_gt(
             _selected_sequence, ns_slot, {"E": 1}, 1)
+        _warn_clist0_owner_mismatch(
+            _expected_owner_gt, _sl_words[_clist_row0_idx])
 
     if _is_bootstrap_canonical and not _is_selftest_canonical:
         if _sl_cc2 < 1:
@@ -8173,14 +8186,10 @@ def save_lump():
         try:
             _live_bootstrap_gt = _resident_inform_egt(_bootstrap_binding)
             _actual_bootstrap_gt = _sl_words[_clist_row0_idx] & 0xFFFFFFFF
-            if _compiler_self_row:
-                # SELF is compiler-owned, so any browser materialization is
-                # advisory and may be stale. Bind it from the programmer-
-                # selected destination, never from the prior name or client GT.
-                _actual_bootstrap_gt = _live_bootstrap_gt
-                _sl_words[_clist_row0_idx] = _actual_bootstrap_gt
+            _warn_clist0_owner_mismatch(
+                _live_bootstrap_gt, _actual_bootstrap_gt)
             _runtime_t = _verify_bootstrap_self_gt(
-                _bootstrap_binding, _actual_bootstrap_gt,
+                _bootstrap_binding, _live_bootstrap_gt,
                 f"{_live_bootstrap_gt:08x}")
             # The programmer may replace any Namespace entry. A browser-supplied
             # content token is therefore only a
@@ -8188,7 +8197,7 @@ def save_lump():
             # verified row-zero SELF GT is canonical for the committed artifact.
             token8 = _runtime_t
             _bootstrap_identity = _bootstrap_identity_record(
-                _bootstrap_binding, _actual_bootstrap_gt)
+                _bootstrap_binding, _live_bootstrap_gt)
         except ValueError as _bootstrap_error:
             return jsonify({
                 "error": f"Bootstrap identity validation failed: {_bootstrap_error}",
@@ -8253,8 +8262,8 @@ def save_lump():
             token=f"{_selftest_egt:08x}",
         )
         _actual_selftest_gt = _sl_words[_clist_row0_idx] & 0xFFFFFFFF
-        if _compiler_self_row:
-            _sl_words[_clist_row0_idx] = _selftest_egt
+        _warn_clist0_owner_mismatch(
+            _selftest_egt, _actual_selftest_gt)
         try:
             _bootstrap_identity = _bootstrap_identity_record(
                 _bootstrap_binding, _selftest_egt)
@@ -8324,10 +8333,8 @@ def save_lump():
         _next_egt = _boot_image_gen.create_gt(
             _starter_sequence, _starter_slot, {"E": 1}, 1)
         for _row, _expected, _label, _expected_slot, _expected_sequence in (
-                (0, _selftest_egt, "self E-GT",
-                 ns_slot, _selftest_sequence),
                 (1, _next_egt, "Next continuation E-GT",
-                 _starter_slot, _starter_sequence)):
+                 _starter_slot, _starter_sequence),):
             _word_index = _clist_row0_idx + _row
             _actual = _sl_words[_word_index] & 0xFFFFFFFF
             if _actual != _expected:
@@ -8460,13 +8467,13 @@ def save_lump():
                 })
                 continue
 
-            # Row zero is neither caller-declared nor server-editable.  Its
-            # placeholder was checked above; the live E-GT is minted only once
-            # the selected Namespace slot has a current sequence.
-            if _compiler_self_row and _cap_row == 0:
+            # C-list[0] belongs to the abstraction. Its only special rule is
+            # advisory: it should equal the owner's Golden Token. The warning
+            # is emitted above; never reject, rewrite, or otherwise act on it.
+            if _cap_row == 0:
                 _validated_declared_caps.append({
-                    "name": "__SELF__", "rights": ["E"], "grants": ["E"],
-                    "compiler_owned_self": True,
+                    **_cap_obj,
+                    "name": _cap_name or "__SELF__",
                 })
                 continue
 
@@ -8595,54 +8602,28 @@ def save_lump():
             _cap_obj["nsIndex"] = _cap_target
             _validated_declared_caps.append(_cap_obj)
 
-    # Inject the self-GT identity seal at c-list[0].
-    # Skipped for canonical SelfTest: its c-list[0] is the live SelfTest E-GT
-    # (validated above) and must not be overwritten with the petname seal.
-    # Also skipped when c-list rows belong to declared capabilities; in that
-    # case identity_string + identity_hash are the canonical metadata seal.
-    if not _is_bootstrap_canonical and not _has_declared_caps and _portable_binding is None:
-        # Legacy ordinary no-capability saves retain their deferred identity
-        # seal contract.  Bootstrap residents take the separate live-GT path.
+    # C-list[0] is programmer-owned data. Compare it with the owning
+    # abstraction's Golden Token, warn on mismatch, and preserve it unchanged.
+    if (ns_slot is None and not _is_bootstrap_canonical
+            and not _has_declared_caps and _portable_binding is None):
         _self_gt = (0x0A000000 | (int(_identity_hash[:8], 16) & 0x1FFFFFF)) & 0xFFFFFFFF
-        if 0 < _clist_row0_idx < len(_sl_words):
-            _sl_words[_clist_row0_idx] = _self_gt
-
-        # Verify the injection landed before touching any file on disk.
-        # Two failure modes: index out of range (lump_size/cc mismatch) or future
-        # code accidentally overwrites the slot.  Either way: reject, don't save.
         _actual_seal = (
             _sl_words[_clist_row0_idx]
-            if 0 < _clist_row0_idx < len(_sl_words)
+            if 0 <= _clist_row0_idx < len(_sl_words)
             else 0
         )
-        if _actual_seal != _self_gt:
-            return jsonify({
-                "error": (
-                    f"Identity seal mismatch: expected self-GT {_self_gt:#010x} "
-                    f"but c-list[0] contains {_actual_seal:#010x}. "
-                    f"identity_string used: {_identity_string!r}. "
-                    f"The LUMP has not been saved. "
-                    f"Re-compile and ensure cc >= 1 and lump_size is consistent."
-                ),
-                "identity_seal_mismatch": True,
-                "expected_self_gt":       _self_gt,
-                "actual_clist0":          _actual_seal,
-                "identity_string":        _identity_string,
-            }), 422
+        _warn_clist0_owner_mismatch(_self_gt, _actual_seal)
 
-    # Recheck the final word array immediately at the persistence boundary.
-    # This catches every later mutation regardless of whether the compiler
-    # supplied an explicit capability list.
+    # Approval metadata remains bound to the canonical bootstrap identity, but
+    # C-list[0] itself is advisory and is never rewritten or rejected.
     if _is_bootstrap_canonical:
         try:
-            _final_bootstrap_gt = _sl_words[_clist_row0_idx] & 0xFFFFFFFF
             _final_bootstrap_t = _verify_bootstrap_self_gt(
-                _bootstrap_binding, _final_bootstrap_gt,
+                _bootstrap_binding,
+                _bootstrap_identity["bootstrap_runtime_gt"],
                 _bootstrap_identity["bootstrap_t"])
             if token8 != _final_bootstrap_t:
-                raise ValueError("final bootstrap token differs from c-list row 0")
-            if _bootstrap_identity["bootstrap_runtime_gt"] != _final_bootstrap_gt:
-                raise ValueError("final bootstrap approval GT differs from c-list row 0")
+                raise ValueError("final bootstrap token differs from canonical identity")
         except (IndexError, KeyError, TypeError, ValueError) as _final_bootstrap_error:
             return jsonify({
                 "error": f"Final bootstrap identity validation failed: {_final_bootstrap_error}",
@@ -8869,6 +8850,7 @@ def save_lump():
                 "filename": _existing_entry.get("filename"),
             } if _existing_entry else None),
             "expires_in": 300,
+            "warnings": _save_warnings,
         }), 201
 
     try:
@@ -9144,6 +9126,7 @@ def save_lump():
         "identity_string": _identity_string,
         "petname":        _petname,
         "issue_number":   _issue_number,
+        "warnings":       _save_warnings,
     }
     if boot_refresh_note:
         resp["boot_image_note"] = boot_refresh_note

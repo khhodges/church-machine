@@ -163,43 +163,35 @@ class CLOOMCCompiler {
         } finally {
             this._reserveCompilerSelfRow = previousReserveSelfRow;
         }
-        // Ordinary source abstractions always reserve c-list row zero for the
-        // resident self capability.  Its final E-GT cannot be emitted here:
+        // Help the programmer start a new C-list with symbolic SELF in row zero.
+        // Its final E-GT cannot be emitted here:
         // allocation has not yet selected a Namespace slot or minted its
-        // sequence.  The build pipeline writes the compiler-owned placeholder
-        // and the installation path resolves it atomically.
+        // sequence. The build pipeline carries a symbolic placeholder until the
+        // current abstraction's Golden Token can be resolved.
         //
         // Assembly is deliberately excluded.  It is also used to author Thread,
         // Namespace-root and hardware c-lists whose row-zero contracts are
         // architectural rather than ordinary-abstraction identity.
         if (result.language !== 'assembly' && result.methods && result.methods.length > 0) {
             const declared = Array.isArray(result.capabilities) ? result.capabilities : [];
-            const attemptsToOwnSelf = declared.some(cap => {
+            // SELF is the compiler's initial suggestion for a newly opened
+            // C-list, not an ownership constraint. Keep one symbolic row zero
+            // and leave later programmer changes untouched for advisory
+            // validation at save time.
+            const userDeclared = declared.filter(cap => {
                 const name = typeof cap === 'string' ? cap : (cap && cap.name);
-                return String(name || '').trim().toUpperCase() === '__SELF__';
+                return !['SELF', '__SELF__'].includes(
+                    String(name || '').trim().toUpperCase());
             });
-            if (attemptsToOwnSelf) {
-                result.errors.push({
-                    line: null,
-                    message: 'capabilities { } cannot declare __SELF__: c-list row 0 is compiler-owned resident identity.'
-                });
-            } else {
-                // New-abstraction templates show `SELF E` as the visible row-0
-                // contract. It is descriptive: the compiler still owns and
-                // materializes that row, so do not append it as a user row.
-                const userDeclared = declared.filter(cap => {
-                    const name = typeof cap === 'string' ? cap : (cap && cap.name);
-                    return String(name || '').trim().toUpperCase() !== 'SELF';
-                });
-                result.capabilities = [{
-                    name: '__SELF__',
-                    rights: ['E'],
-                    grants: ['E'],
-                    compiler_owned_self: true,
-                    placeholder: true,
-                }, ...userDeclared];
-                result.compilerSelfCapability = true;
-            }
+            result.capabilities = [{
+                name: '__SELF__',
+                rights: ['E'],
+                grants: ['E'],
+                compiler_owned_self: true,
+                compiler_assisted_self: true,
+                placeholder: true,
+            }, ...userDeclared];
+            result.compilerSelfCapability = true;
         }
         // A numeric SAVE into this abstraction's own CR6 C-List is also a
         // declaration of writable storage.  CLOOMC++ has no separate `cc`
@@ -1169,7 +1161,7 @@ class CLOOMCCompiler {
             const excess = capNames.length - maxUserCaps;
             outErrors.push({
                 line: 1, col: 0, endCol: 0,
-                message: `capabilities block declares ${capNames.length} entries but row 0 is the compiler-owned self capability; only 31 source entries fit in the 32-row hardware c-list. Remove ${excess} entr${excess === 1 ? 'y' : 'ies'} or split the abstraction into smaller ones.`
+                message: `capabilities block declares ${capNames.length} entries but row 0 starts with the current abstraction's SELF Golden Token; only 31 additional entries fit in the 32-row hardware c-list. Remove ${excess} entr${excess === 1 ? 'y' : 'ies'} or split the abstraction into smaller ones.`
             });
         }
         for (let i = 0; i < capNames.length; i++) {

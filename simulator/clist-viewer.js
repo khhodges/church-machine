@@ -468,7 +468,7 @@
         return '';
     }
 
-    // CR0 is the compiler-owned self capability. Its pet name is always SELF;
+    // A newly opened C-list starts row 0 with the suggested SELF capability.
     // the target name comes from the currently executing CR14/NS entry rather
     // than the ordinary per-row pet-name map, which can contain a stale name
     // from a previously loaded program.
@@ -487,7 +487,7 @@
     }
 
     function _selfNameHtml(targetName) {
-        return '<span class="clist-self-name" title="compiler-owned self capability">SELF</span>' +
+        return '<span class="clist-self-name" title="current abstraction Golden Token">SELF</span>' +
             (targetName
                 ? '<span class="clist-self-target" title="SELF targets the executing abstraction">(' +
                   escHtml(targetName) + ')</span>'
@@ -748,7 +748,7 @@
                     })
                     .filter(function (cap) {
                         // `SELF E` is the visible template declaration for the
-                        // compiler-owned row 0, which is rendered separately.
+                        // suggested row 0, which is rendered separately.
                         return cap && String(cap.name).toUpperCase() !== 'SELF';
                     });
                 // A capabilities { } block exists in the source — always treat
@@ -758,13 +758,13 @@
                 // in a completely different data source and look like POLA
                 // "added" capabilities instead of cleaning them up.
                 var _srcSim = (typeof sim !== 'undefined') ? sim : null;
-                // CR0 is compiler-owned SELF and is not declared in source.
-                // User capabilities therefore begin at the displayed CR1.
+                // The compiler initializes row 0 as SELF for a new C-list.
+                // Additional capabilities therefore begin at displayed row 1.
                 var srcRows = '<div class="clist-row" data-slot="0" tabindex="-1">' +
                     '<span class="clist-slot">0</span>' +
                     '<span class="clist-name clist-pet-name">' + _selfNameHtml(_currentLumpName(_srcSim)) + '</span>' +
                     '<span class="clist-dot-name">' + escHtml(_currentLumpName(_srcSim) || '\u2014') + '</span>' +
-                    '<span class="clist-token" title="compiler-owned; not declared in source">compiler-owned</span>' +
+                    '<span class="clist-token" title="compiler-suggested current abstraction token">SELF</span>' +
                     '<span class="clist-perms"><span class="clist-perm-chip clist-perm-chip--on" style="background:#f4b94222;color:#f4b942;border-color:#f4b94255;">E</span></span>' +
                     '<span class="clist-action-placeholder">\u2014</span><span class="clist-action-placeholder">\u2014</span>' +
                     '</div>';
