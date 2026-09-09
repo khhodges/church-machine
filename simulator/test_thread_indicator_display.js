@@ -47,9 +47,10 @@ check(
   'indicator flags have a dedicated compact card style'
 );
 check(
+  run.includes("card.addEventListener('pointerdown'") &&
   run.includes('openThreadContextModal(row.slot, card)') &&
   run.includes("aria-haspopup', 'dialog'"),
-  'Thread rows open an accessible control modal instead of switching immediately'
+  'Thread rows open controls before live dashboard replacement can swallow a click'
 );
 check(
   /id="activeThreadStatus"[\s\S]{0,300}aria-haspopup="dialog"/.test(

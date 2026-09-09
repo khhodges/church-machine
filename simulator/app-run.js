@@ -1153,7 +1153,13 @@ function updateThreadIdentityStrip() {
             `${gtKeyText}: ${gtName}\nLUMP-relative NIA: ${niaText}\n` +
             `Physical instruction address: ${physicalText}\n${flagsKeyText}: ${flagText}`);
         card.setAttribute('title', `${card.getAttribute('title')}\nOpen ${row.name} controls`);
-        card.addEventListener('click', () => openThreadContextModal(row.slot, card));
+        // Live execution rebuilds this card on each dashboard refresh. A
+        // normal click can be lost when replacement occurs between pointer
+        // down and pointer up, so activate while the current card still exists.
+        card.addEventListener('pointerdown', (event) => {
+            if (event.button !== 0) return;
+            openThreadContextModal(row.slot, card);
+        });
         card.addEventListener('keydown', (event) => {
             if (event.key !== 'Enter' && event.key !== ' ') return;
             event.preventDefault();

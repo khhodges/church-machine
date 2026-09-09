@@ -133,9 +133,9 @@
       "slot": 10,
       "location": "0x00000590",
       "type": "Inform",
-      "token": "4a00000a",
-      "filename": "CapabilityTest.2.225da6fc.lump",
-      "lump_version": 2,
+      "token": "b6182a95",
+      "filename": "CapabilityTest.1.edfd9e62.lump",
+      "lump_version": 25,
       "resident": true,
       "boot_resident": true,
       "f": 0,
@@ -183,5 +183,6 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1788912749.0392554
+  "generated_at": 1788981641.7514355,
+  "committed_raw_fingerprint": "c68451b1f0134d4766cab50d975caccf309e97ce04578331687d3175d135abd4"
 }
