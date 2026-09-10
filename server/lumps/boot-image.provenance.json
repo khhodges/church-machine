@@ -1,5 +1,5 @@
 {
-  "image_sha256": "c728542edb3a5cb3e579a817e32dce39d80cfc01c75c52e35fe57858b09a45ce",
+  "image_sha256": "cca9191ee83bfa399b34e3a7d070f69504000e02adb574b7ce323b7f42a0b7cd",
   "resident_bindings": [
     {
       "artifact_sha256": "efa0e4323679355a530f0ce9bcf8cf19f962204bba7a45b543ca308f1ece17d7",
@@ -14,9 +14,9 @@
       "slot": 7
     },
     {
-      "artifact_sha256": "e3d052902cc76748d57af0881b79b5b5d71abe88c3e64cccc9af23d58e42c9da",
-      "filename": "CapabilityTest.1.53f8b0c4.lump",
-      "localized_clist_sha256": "08c5b4b66376113c6c9dad3471b4195a2dacc3ccd55d110922bf8debcf67a2cc",
+      "artifact_sha256": "7f36b8a385f82a7b1548deb37b7b25999492b58934b0905fadf06b83d3f659f0",
+      "filename": "CapabilityTest.2.225da6fc.lump",
+      "localized_clist_sha256": "429ad6a68465ebb16616d7a5974ceb6314759bb3d9451f873a69734856c03477",
       "slot": 10
     }
   ],
