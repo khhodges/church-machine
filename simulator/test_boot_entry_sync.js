@@ -36,6 +36,15 @@ const SystemAbstractions  = require('./system_abstractions.js');
 
 let pass = 0;
 let fail = 0;
+const temporaryTestRoots = [];
+
+// Keep generated-image inputs out of the workspace.  The process-exit cleanup
+// also covers assertion failures and signals handled by the test runner.
+process.on('exit', () => {
+    for (const root of temporaryTestRoots) {
+        try { fs.rmSync(root, { recursive: true, force: true }); } catch (_) {}
+    }
+});
 
 function check(label, cond) {
     if (cond) {
@@ -464,14 +473,33 @@ console.log('\n--- T208: acceptance state gated on loadBootImage() verdict ---')
 console.log('\n--- T211: late boot-image arrival replaces fallback CR state ---');
 {
     const appShellSrc = fs.readFileSync(path.join(__dirname, 'app-shell.js'), 'utf8');
-    // Generate a current physical V2 image rather than depending on the
-    // workspace artifact, which may deliberately be a retired image.
+    // Generate a current physical V2 image from a disposable LUMP copy rather
+    // than allowing a future generator change to touch the workspace catalog.
+    const isolatedLumps = fs.mkdtempSync(path.join(require('os').tmpdir(), 'church-boot-entry-'));
+    temporaryTestRoots.push(isolatedLumps);
+    fs.cpSync(path.join(process.cwd(), 'server', 'lumps'), isolatedLumps, {
+        recursive: true,
+        dereference: false,
+    });
     const generated = spawnSync('python', ['-c', [
-        'import json, sys',
+        'import io, json, sys',
+        'import os',
         'from server.boot_image import generate_boot_image',
         'cfg=json.load(open("server/boot-config.json"))',
-        'sys.stdout.buffer.write(generate_boot_image(cfg, "server/lumps"))',
-    ].join(';')], { cwd: process.cwd(), encoding: null });
+        // generate_boot_image may emit approval diagnostics.  Keep stdout a
+        // byte-exact image stream and send diagnostics to the child stderr.
+        'old_stdout=sys.stdout',
+        'sys.stdout=io.StringIO()',
+        'image=generate_boot_image(cfg, os.environ["CHURCH_TEST_LUMPS_DIR"])',
+        'diagnostics=sys.stdout.getvalue()',
+        'sys.stdout=old_stdout',
+        'sys.stderr.write(diagnostics)',
+        'sys.stdout.buffer.write(image)',
+    ].join(';')], {
+        cwd: process.cwd(),
+        encoding: null,
+        env: { ...process.env, CHURCH_TEST_LUMPS_DIR: isolatedLumps },
+    });
     if (generated.status !== 0) {
         throw new Error(`Could not generate boot image: ${String(generated.stderr || '')}`);
     }

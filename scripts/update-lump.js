@@ -72,7 +72,12 @@ if (!/^[0-9a-f]{1,8}$/.test(TOKEN)) {
 // ── Paths ─────────────────────────────────────────────────────────────────────
 
 const ROOT       = path.resolve(__dirname, '..');
-const LUMPS_DIR  = path.join(ROOT, 'server', 'lumps');
+// Tests may point the writable LUMP library at a disposable copy.  Keep the
+// repository root unchanged so source discovery and the assembler still use
+// the checked-in code.
+const LUMPS_DIR  = path.resolve(
+    process.env.CHURCH_TEST_LUMPS_DIR || path.join(ROOT, 'server', 'lumps')
+);
 const MANIFEST   = path.join(LUMPS_DIR, 'manifest.json');
 const ASSEMBLER  = path.join(ROOT, 'simulator', 'assembler.js');
 const EXAMPLES   = path.join(ROOT, 'simulator', 'examples');

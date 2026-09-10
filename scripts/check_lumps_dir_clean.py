@@ -86,25 +86,28 @@ def _compare(before: dict, after: dict) -> list[str]:
 
     for name, bentry in before.items():
         if name not in after:
-            problems.append(f"  DELETED:              {name}")
+            problems.append(f"  DELETED:              server/lumps/{name}")
             continue
         aentry = after[name]
         if bentry["kind"] != aentry["kind"]:
             problems.append(
-                f"  KIND CHANGED:         {name}"
+                f"  KIND CHANGED:         server/lumps/{name}"
                 f"  ({bentry['kind']} → {aentry['kind']})"
             )
         elif bentry["kind"] == "file" and bentry["val"] != aentry["val"]:
-            problems.append(f"  MODIFIED:             {name}")
+            problems.append(f"  MODIFIED:             server/lumps/{name}")
         elif bentry["kind"] == "link" and bentry["val"] != aentry["val"]:
             problems.append(
-                f"  SYMLINK RETARGETED:   {name}"
+                f"  SYMLINK RETARGETED:   server/lumps/{name}"
                 f"  ({bentry['val']} → {aentry['val']})"
             )
 
     for name in after:
         if name not in before and name != _SENTINEL:
-            problems.append(f"  CREATED (not cleaned up): {name}")
+            problems.append(
+                "  CREATED (test-owned file not cleaned up): "
+                f"server/lumps/{name}"
+            )
 
     return problems
 
@@ -188,6 +191,8 @@ def cmd_selftest() -> None:  # pragma: no cover
             after2 = _take_snapshot(fake_lumps)
             probs2 = _compare(before, after2)
             assert any("MODIFIED" in p for p in probs2), f"expected MODIFIED, got {probs2}"
+            assert any("server/lumps/aaa.lump" in p for p in probs2), \
+                f"modified report must include exact test-owned path, got {probs2}"
 
             # Restore
             with open(f1, "wb") as fh:
@@ -210,6 +215,8 @@ def cmd_selftest() -> None:  # pragma: no cover
             after4 = _take_snapshot(fake_lumps)
             probs4 = _compare(before, after4)
             assert any("CREATED" in p for p in probs4), f"expected CREATED, got {probs4}"
+            assert any("server/lumps/ccc.lump" in p for p in probs4), \
+                f"created report must include exact test-owned path, got {probs4}"
             os.remove(f3)
 
             # Test 5: missing directory at snapshot time → no problems reported

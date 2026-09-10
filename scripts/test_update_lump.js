@@ -37,45 +37,29 @@ function check(label, cond, detail) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-// Run update-lump.js with the given args in the given cwd (overriding LUMPS_DIR
-// is done by creating a fake env via a wrapper; instead we pass a custom ROOT
-// by temporarily writing the test manifest to the real lumps dir + a unique
-// test-only token that does not collide with production entries).
-//
-// We use a temp directory overlay: the script reads ROOT from __dirname, so we
-// launch the script from a modified working directory where we have placed:
-//   simulator/examples/<source>.cloomc
-//   server/lumps/manifest.json  (our test manifest)
-//   server/lumps/<token>.lump
-//
-// To avoid modifying the real repo files, we launch the script with a NODE_PATH
-// that re-exports fs with patched readFileSync/writeFileSync calls.
-// That is complex. The simpler approach: use a temp dir as ROOT by patching the
-// script's path resolution — not feasible without forking the script.
-//
-// Simplest safe approach: use a UNIQUE test token that cannot collide with real
-// manifest entries (we use "ffffffff"), inject it into a COPY of the manifest,
-// and clean up afterwards, restoring the original manifest on exit.
-//
-// All writes are undone by the cleanup() function registered with process.on('exit').
+// The update tool supports CHURCH_TEST_LUMPS_DIR, so keep the manifest and
+// generated binary in a disposable directory.  This is deliberately stronger
+// than restoring the real manifest on exit: a killed test process cannot leave
+// a half-written catalog or a TestAbs source file in the workspace.
 
 const TEST_TOKEN   = 'ffffffff';
-const LUMPS_DIR    = path.join(ROOT, 'server', 'lumps');
+const TEST_ROOT    = fs.mkdtempSync(path.join(os.tmpdir(), 'church-update-lump-'));
+const LUMPS_DIR    = path.join(TEST_ROOT, 'lumps');
+fs.mkdirSync(LUMPS_DIR, { recursive: true });
+const SOURCE_DIR   = path.join(TEST_ROOT, 'sources');
+fs.mkdirSync(SOURCE_DIR, { recursive: true });
 const MANIFEST_PATH = path.join(LUMPS_DIR, 'manifest.json');
 const TEST_LUMP    = path.join(LUMPS_DIR, `${TEST_TOKEN}.lump`);
-const TEST_SOURCE  = path.join(ROOT, 'simulator', 'examples', `${TEST_TOKEN}.cloomc`);
+const TEST_SOURCE  = path.join(SOURCE_DIR, `${TEST_TOKEN}.cloomc`);
 
-// Save original manifest for restore
-const originalManifest = fs.readFileSync(MANIFEST_PATH, 'utf8');
-
-// Track all test-created files for cleanup
-const createdFiles = [];
+// The real manifest is input only; all test mutations happen in the copy.
+const originalManifest = fs.readFileSync(
+    path.join(ROOT, 'server', 'lumps', 'manifest.json'), 'utf8'
+);
+fs.writeFileSync(MANIFEST_PATH, originalManifest, 'utf8');
 
 function cleanup() {
-    fs.writeFileSync(MANIFEST_PATH, originalManifest, 'utf8');
-    for (const f of createdFiles) {
-        try { fs.unlinkSync(f); } catch (_) {}
-    }
+    try { fs.rmSync(TEST_ROOT, { recursive: true, force: true }); } catch (_) {}
 }
 process.on('exit', cleanup);
 process.on('SIGINT',  () => { cleanup(); process.exit(1); });
@@ -118,7 +102,7 @@ function packLump(words, clistWords) {
 
 function setupTestEntry(opts = {}) {
     const source = opts.source === undefined
-        ? `simulator/examples/${TEST_TOKEN}.cloomc`
+        ? TEST_SOURCE
         : opts.source;
     const manifest = JSON.parse(originalManifest);
     manifest.push({
@@ -148,7 +132,6 @@ RETURN
 
 function writeSource(src) {
     fs.writeFileSync(TEST_SOURCE, src, 'utf8');
-    if (!createdFiles.includes(TEST_SOURCE)) createdFiles.push(TEST_SOURCE);
 }
 
 function buildAndWriteLump(src, clistWords = []) {
@@ -157,7 +140,6 @@ function buildAndWriteLump(src, clistWords = []) {
     if (res.errors.length) throw new Error('Assembly failed: ' + res.errors[0].message);
     const { buf, cw, cc, lump_size } = packLump(Array.from(res.words), clistWords);
     fs.writeFileSync(TEST_LUMP, buf);
-    if (!createdFiles.includes(TEST_LUMP))    createdFiles.push(TEST_LUMP);
     return { cw, cc, lump_size };
 }
 
@@ -166,6 +148,7 @@ function buildAndWriteLump(src, clistWords = []) {
 function runUpdateLump(args) {
     return cp.spawnSync(process.execPath, [UPDATE_LUMP, ...args], {
         cwd: ROOT,
+        env: { ...process.env, CHURCH_TEST_LUMPS_DIR: LUMPS_DIR },
         encoding: 'utf8',
     });
 }
@@ -249,7 +232,7 @@ console.log('\n── Check mode (--check) ────────────�
     const r = runUpdateLump(['--token', TEST_TOKEN, '--check']);
     check('T7: --check exits non-zero when .lump missing', r.status !== 0);
     check('T7: --check reports DRIFT on missing file', r.stderr.includes('DRIFT'));
-    // restore for cleanup
+    // Restore the disposable test binary for the next assertion.
     buildAndWriteLump(SIMPLE_SOURCE);
 }
 
@@ -317,17 +300,20 @@ console.log('\n── Update mode ───────────────�
 
 console.log('\n── Consistency gate ─────────────────────────────────────────────');
 
-// T11: focused binary/manifest filename coverage gate passes after update.
-//      Clean up test files first so the gate does not see them.
+// T11: the test-owned catalog and source are gone after the update exercise.
+//      Do not run the repository-wide consistency gate here: that gate audits
+//      historical tracked artifacts outside this test's ownership and can
+//      fail for an unrelated catalog migration.
 {
     cleanup();
-    const r = cp.spawnSync('python3', ['-m', 'pytest',
-        'tests/lump/test_lump_consistency.py::TestR25_GitTrackedLumpsInManifest',
-        '-v', '--tb=short'],
-        { cwd: ROOT, encoding: 'utf8' });
-    const passed = r.status === 0;
-    check('T11: consistency gate passes after update', passed,
-        passed ? '' : (r.stdout.slice(-800) + r.stderr.slice(-400))
+    const realManifest = fs.readFileSync(
+        path.join(ROOT, 'server', 'lumps', 'manifest.json'), 'utf8'
+    );
+    check('T11: disposable test catalog is removed', !fs.existsSync(TEST_ROOT));
+    check('T11: test source is not created in the workspace',
+        !fs.existsSync(path.join(ROOT, 'simulator', 'examples', `${TEST_TOKEN}.cloomc`)));
+    check('T11: test token is not written to the workspace manifest',
+        !realManifest.includes(`"token": "${TEST_TOKEN}"`)
     );
 }
 
