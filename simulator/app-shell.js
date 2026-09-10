@@ -770,12 +770,16 @@ function _loadOpenFileCatalog() {
     if (_openFileLoading) return _openFileLoading;
     _openFileLoading = Promise.allSettled([
         fetch('/api/source-files').then(function(r) {
-            if (!r.ok) throw new Error('source-files HTTP ' + r.status);
-            return r.json();
+            return _actionableJsonResponse(r, 'Load source files for Open File', {
+                dataChanged: false,
+                nextAction: 'Check the IDE connection, then reopen Open File.',
+            });
         }),
         fetch('/api/lumps/list').then(function(r) {
-            if (!r.ok) throw new Error('lumps/list HTTP ' + r.status);
-            return r.json();
+            return _actionableJsonResponse(r, 'Load LUMPs for Open File', {
+                dataChanged: false,
+                nextAction: 'Check the IDE connection, then reopen Open File.',
+            });
         })
     ]).then(function(results) {
         var filesPayload = results[0].status === 'fulfilled' ? results[0].value : {};
@@ -977,7 +981,10 @@ function openSourceFile(path) {
     }
     fetch('/' + path)
         .then(function(r) {
-            if (!r.ok) throw new Error('HTTP ' + r.status);
+            if (!r.ok) return _actionableResponseError(r, 'Open the source file', {
+                dataChanged: false,
+                nextAction: 'Reload Open File, then choose the source again.',
+            }).then(function(error) { throw error; });
             return r.text();
         })
         .then(function(code) {

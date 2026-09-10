@@ -4774,12 +4774,14 @@ async function triggerLazyLoad(absentResult, mode) {
             trust:        resp.headers.get('X-Lump-Trust') || undefined,
         };
         if (!resp.ok) {
-            let errText = '';
-            try { const j = await resp.json(); errText = j.error || ''; } catch(_) {}
-            log(`⊿ Lazy load failed (HTTP ${resp.status}) for 0x${token}: ${errText}`);
+            const error = await _actionableResponseError(resp, 'Lazy-load LUMP 0x' + token, {
+                dataChanged: false,
+                nextAction: 'Reload the Namespace binding, then retry the instruction.',
+            });
+            log('⊿ ' + error.message);
             // Fetch failure: awaiting state + Outform data intact; do not install.
             updateDashboard(); switchView('editor'); switchCodeTab('console');
-            return { ok: false, error: `HTTP ${resp.status}` };
+            return { ok: false, error: error.message };
         }
         const buf = await resp.arrayBuffer();
         words = [];
@@ -12071,7 +12073,10 @@ function _reconcileAuthoritativeEditor(owner, localCode, editor) {
     };
     if (owner.type === 'source' && owner.id) {
         request = fetch('/' + owner.id).then(function(r) {
-            if (!r.ok) throw new Error('HTTP ' + r.status);
+            if (!r.ok) return _actionableResponseError(r, 'Reopen the authoritative source', {
+                dataChanged: false,
+                nextAction: 'Reload the file list, then reopen this source.',
+            }).then(function(error) { throw error; });
             return r.text();
         });
     } else if (owner.type === 'example') {
@@ -13152,8 +13157,10 @@ const VersionsView = {
         if (response.status === 401 || response.status === 403) {
             return { auth_required: true };
         }
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        return response.json();
+        return _actionableJsonResponse(response, 'Load Wukong build status', {
+            dataChanged: false,
+            nextAction: 'Refresh Versions after checking the build service.',
+        });
     },
 
     toggleAdvice(force) {
@@ -13921,8 +13928,10 @@ async function _loadBuildHistory() {
     if (!el) return;
     try {
         const resp = await fetch('/api/builds');
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        const data = await resp.json();
+        const data = await _actionableJsonResponse(resp, 'Load build history', {
+            dataChanged: false,
+            nextAction: 'Check the IDE connection, then reopen Build History.',
+        });
         _renderBuildHistory(data.builds || []);
     } catch (e) {
         if (el) el.innerHTML = '<div class="build-file-empty">Could not load history: ' + e.message + '</div>';
@@ -14091,8 +14100,10 @@ async function recallBuildNamespace(buildId, origin) {
     _renderHistoricalNamespaceContext({available: false, reason: 'Loading saved Namespace…'});
     try {
         const response = await fetch('/api/builds/' + encodeURIComponent(buildId) + '/namespace');
-        const data = await response.json();
-        if (!response.ok || !data.ok) throw new Error(data.error || ('HTTP ' + response.status));
+        const data = await _actionableJsonResponse(response, 'Load the saved build Namespace', {
+            dataChanged: false,
+            nextAction: 'Reload Build History, then inspect this build again.',
+        });
         if (data.available) {
             // Intentionally an isolated browser-memory context.  It is never
             // assigned into sim._nsState, persisted, or sent to an NS write API.
@@ -15233,8 +15244,10 @@ function _persistNamespaceSlotLabel(slot, label) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slot: slot, label: label })
     }).then(function(response) {
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        return response.json();
+        return _actionableJsonResponse(response, 'Save the Namespace slot label', {
+            dataChanged: null,
+            nextAction: 'Reload Namespace to verify the label before retrying.',
+        });
     });
     window._nsLabelPersistPromises = window._nsLabelPersistPromises || [];
     window._nsLabelPersistPromises.push(pending);
@@ -15699,7 +15712,10 @@ async function buildFPGAOnly() {
         const resp = await fetch(`/api/build/fpga?board=${encodeURIComponent(board)}`);
         const data = await resp.json();
         if (!resp.ok || data.error) {
-            const msg = data.error || `Server returned ${resp.status}`;
+            const msg = _formatActionableHttpError('Build the FPGA package', resp.status, data, {
+                dataChanged: null,
+                nextAction: 'Refresh build history before starting another build.',
+            });
             _buildLogAppend('\nFailed: ' + msg + (data.stderr ? '\n\n--- stderr ---\n' + data.stderr : '') + '\n');
             _setBuildStatus('error', 'Build failed — see log', boardLabel);
             // Recording happens server-side inside /api/build/fpga for all outcomes.
@@ -15750,11 +15766,10 @@ async function downloadFPGAPackage() {
     try {
         const resp = await fetch(`/api/download/fpga-zip?board=${encodeURIComponent(board)}`);
         if (!resp.ok) {
-            let errMsg = `Server returned ${resp.status}`;
-            try {
-                const errData = await resp.json();
-                errMsg = errData.error || errMsg;
-            } catch (_) {}
+            const errMsg = (await _actionableResponseError(resp, 'Download the FPGA package', {
+                dataChanged: false,
+                nextAction: 'Confirm a build completed, then click Download FPGA Package again.',
+            })).message;
             _buildLogAppend('\nFailed: ' + errMsg + '\n');
             if (errMsg.includes('No build found')) {
                 _buildLogAppend('Run "Build" first to synthesise the RTL.\n');

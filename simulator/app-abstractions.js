@@ -691,11 +691,17 @@ async function _pushBootEntryToHardware(idx, anchorEl) {
         ok = (await _wukongLoadToHardware()) === true;
     } catch (e) {
         ok = false;
+        console.error(_formatActionableNetworkError(
+            'Upload boot entry to the board', e, {
+                dataChanged: null,
+                nextAction: 'Check the selected board connection, then click the lightning bolt again.',
+            }));
     }
     _bootPushInFlight = false;
     if (pending && pending.remove) pending.remove();
     _showBootPushBadge(anchorEl,
-        ok ? '\u2713 Sent to board (slot ' + idx + ')' : '\u2717 Upload failed \u2014 see console',
+        ok ? '\u2713 Sent to board (slot ' + idx + ')' :
+            '\u2717 Upload failed. Board state is unknown. Next: check the connection, then retry.',
         ok ? 'ok' : 'err', 3000);
 }
 window._pushBootEntryToHardware = _pushBootEntryToHardware;
@@ -782,7 +788,10 @@ async function renderLumps() {
 
     try {
         const r = await fetch('/api/lumps/list');
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        if (!r.ok) throw await _actionableResponseError(r, 'Load the LUMP repository', {
+            dataChanged: false,
+            nextAction: 'Check the IDE connection, then click Refresh.',
+        });
         const lumps = await r.json();
         if (window.LumpRegistry) window.LumpRegistry.registerFromServer(lumps);
 

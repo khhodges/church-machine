@@ -16,6 +16,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const actionableErrors = require('./actionable_errors.js');
 
 const source = fs.readFileSync(
     path.join(__dirname, 'app-build-approval.js'), 'utf8');
@@ -33,6 +34,7 @@ const context = {
     },
     window: {},
     fetch: async () => { throw new Error('unexpected fetch'); },
+    ...actionableErrors,
 };
 vm.createContext(context);
 vm.runInContext(source, context, { filename: 'app-build-approval.js' });

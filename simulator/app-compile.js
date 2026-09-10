@@ -933,13 +933,19 @@ function _readLumpSaveResponse(response) {
                 const kind = contentType.includes('text/html') ? 'HTML error page' : 'non-JSON response';
                 return {
                     ok: false,
-                    error: `Server returned an ${kind} (HTTP ${response.status}). Check the server log for the underlying save error.`,
+                    error: _formatActionableHttpError('Save the compiled LUMP', response.status, text, {
+                        dataChanged: null,
+                        nextAction: `The server returned an ${kind}; check the server log, then reload the LUMP before retrying.`,
+                    }),
                 };
             }
         }
         return {
             ok: false,
-            error: `Server returned an empty response (HTTP ${response.status}).`,
+            error: _formatActionableHttpError('Save the compiled LUMP', response.status, '', {
+                dataChanged: null,
+                nextAction: 'Check the server log, then reload the LUMP before retrying.',
+            }),
         };
     });
 }

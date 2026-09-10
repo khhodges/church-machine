@@ -14,9 +14,19 @@ const TangSerial = (function() {
     let _bridgeOpen = false;
 
     async function _bFetch(path, opts) {
-        const r = await fetch(_bridgeUrl + path, opts);
-        if (!r.ok) throw new Error(`Bridge HTTP ${r.status}`);
-        return r.json();
+        let r;
+        try {
+            r = await fetch(_bridgeUrl + path, opts);
+        } catch (error) {
+            throw new Error(_formatActionableNetworkError('Contact the device bridge', error, {
+                dataChanged: null,
+                nextAction: 'Check that the bridge is running and reachable, then retry the board action.',
+            }));
+        }
+        return _actionableJsonResponse(r, 'Contact the device bridge', {
+            dataChanged: null,
+            nextAction: 'Check the bridge log and selected board, then retry the board action.',
+        });
     }
 
     async function connectBridge(url) {
@@ -24,7 +34,10 @@ const TangSerial = (function() {
         const r = await _bFetch('/connect', { method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({}) });
-        if (!r.ok) throw new Error(r.error || 'Bridge connect failed');
+        if (!r.ok) throw new Error(
+            'Connect to the device bridge failed. Reason: ' +
+            (r.error || 'The bridge did not provide a reason.') +
+            ' No data was changed. Next: check the bridge and board connection, then click Connect again.');
         _bridgeMode = true;
         _bridgeOpen = true;
     }
@@ -505,7 +518,11 @@ const TangSerial = (function() {
 
         if (_bridgeMode) {
             var res = await _bTransact(Array.from(frame), 4, 5000);
-            if (!res.ok) { status('Bridge error: ' + res.error); return { success: false }; }
+            if (!res.ok) {
+                status('Patch the board LUMP failed. Reason: ' + (res.error || 'The bridge did not provide a reason.') +
+                    ' Board memory may have changed. Next: read back the target range before retrying.');
+                return { success: false };
+            }
             var rb = res.rx || [];
             if (rb.length >= 4) {
                 var bAddr  = (rb[0] << 8) | rb[1];
@@ -612,7 +629,11 @@ const TangSerial = (function() {
 
         if (_bridgeMode) {
             var res = await _bTransact(Array.from(frame), count * 4, 8000);
-            if (!res.ok) { status('Bridge error: ' + res.error); return { success: false, words: [], rxLen: 0 }; }
+            if (!res.ok) {
+                status('Read board memory failed. Reason: ' + (res.error || 'The bridge did not provide a reason.') +
+                    ' No data was changed. Next: check the board connection, then retry Read BRAM.');
+                return { success: false, words: [], rxLen: 0 };
+            }
             var rb = res.rx || [];
             var bWords = [];
             for (var bi = 0; bi + 3 < rb.length; bi += 4) {
@@ -675,7 +696,11 @@ const TangSerial = (function() {
         await drainInput();
         if (_bridgeMode) {
             const res = await _bTransact(Array.from(frame), 0, 500);
-            if (!res.ok) { status('Bridge error: ' + res.error); return { success: false }; }
+            if (!res.ok) {
+                status('Start board execution failed. Reason: ' + (res.error || 'The bridge did not provide a reason.') +
+                    ' Board execution state is unknown. Next: refresh board status before retrying Run.');
+                return { success: false };
+            }
             status('RUN sent — core executing from PC=0.');
             return { success: true };
         }

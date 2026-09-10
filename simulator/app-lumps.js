@@ -550,7 +550,10 @@ async function _patchCcFromBinary(token, lump, tk) {
             words = _cached.words || [];
         } else {
             const resp = await fetch(`/api/lump/${token}/words`);
-            if (!resp.ok) throw new Error(`exact words unavailable: HTTP ${resp.status}`);
+            if (!resp.ok) throw await _actionableResponseError(resp, 'Inspect exact LUMP words', {
+                dataChanged: false,
+                nextAction: 'Reload the LUMP repository, then reopen this LUMP.',
+            });
             const data = await resp.json();
             words = data.words || [];
         }
@@ -691,7 +694,10 @@ async function _fetchAndShowLumpBinary(token, lump) {
 
     try {
         const resp = await fetch(`/api/lump/${token}/words`);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        if (!resp.ok) throw await _actionableResponseError(resp, 'Load the LUMP hex dump', {
+            dataChanged: false,
+            nextAction: 'Reload the saved LUMP, then reopen Hex Dump.',
+        });
         const data  = await resp.json();
         const words = data.words || [];
         const numWords = words.length;
@@ -769,7 +775,12 @@ async function _fetchAndShowLumpBinary(token, lump) {
         bodyEl.className = '';
 
     } catch (err) {
-        bodyEl.textContent = `Failed to load hex dump: ${err.message}`;
+        bodyEl.textContent = err && /\bData-change status\b|\bNo data was changed\b/.test(err.message)
+            ? err.message
+            : _formatActionableNetworkError('Load the LUMP hex dump', err, {
+                dataChanged: false,
+                nextAction: 'Check the IDE connection, then reopen Hex Dump.',
+            });
     }
 }
 
@@ -1331,7 +1342,11 @@ async function _populateLumpSourceTab(lump, targetId) {
         const resp = await fetch(`/api/lump/${lump.token}/words`, { cache: 'no-store' });
 
         if (!resp.ok) {
-            el.innerHTML = `<div class="lump-source-status err">Error loading source (HTTP ${resp.status}).</div>`;
+            const error = await _actionableResponseError(resp, 'Open embedded LUMP source', {
+                dataChanged: false,
+                nextAction: 'Reload the saved LUMP, then reopen Source.',
+            });
+            el.innerHTML = `<div class="lump-source-status err">${e(error.message)}</div>`;
             return;
         }
         const data = await resp.json();
@@ -1428,7 +1443,11 @@ async function _populateLumpSourceTab(lump, targetId) {
                         // a transient network failure does not permanently disable forking.
                         try {
                             const _wordsResp = await fetch(`/api/lump/${lump.token}/words`, { cache: 'no-store' });
-                            if (!_wordsResp.ok) throw new Error(`could not inspect current binary: HTTP ${_wordsResp.status}`);
+                            if (!_wordsResp.ok) throw await _actionableResponseError(
+                                _wordsResp, 'Inspect the current LUMP before forking', {
+                                    dataChanged: false,
+                                    nextAction: 'Reload the LUMP, then edit Source again.',
+                                });
                             const _wordsData = await _wordsResp.json();
                             const _words = Array.isArray(_wordsData) ? _wordsData : _wordsData.words;
                             if (!Array.isArray(_words) || !_words.length) throw new Error('current binary is empty');
@@ -2263,8 +2282,11 @@ function _populateLumpApiTab(lump, panelId) {
     if (lump.token && !lump._apiInspectionComplete) {
         lump.api_definition = null;
         fetch(`/api/lump/${lump.token}/words`, { cache: 'no-store' })
-        .then(resp => {
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        .then(async resp => {
+            if (!resp.ok) throw await _actionableResponseError(resp, 'Inspect the LUMP API', {
+                dataChanged: false,
+                nextAction: 'Reload the LUMP, then reopen API.',
+            });
             return resp.json();
         }).then(async data => {
             const inspect = typeof LumpContentFrame !== 'undefined' &&
@@ -2484,8 +2506,14 @@ async function _fetchAndShowLumpSavedSource(token, lump, tk) {
     const e = _escHtml;
     try {
         const resp = await fetch(`/api/lump/${token}/words`, { cache: 'no-store' });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
+        if (!resp.ok) throw await _actionableResponseError(resp, 'Inspect embedded LUMP source', {
+            dataChanged: false,
+            nextAction: 'Reload the LUMP, then reopen Content.',
+        });
+        const data = await _actionableJsonResponse(resp, 'Record the device LUMP upgrade', {
+            dataChanged: false,
+            nextAction: 'Reload device status, then retry the bulk upgrade.',
+        });
         const inspect = typeof LumpContentFrame !== 'undefined' &&
             LumpContentFrame && LumpContentFrame.lumpInspectContentFrame;
         if (!inspect) throw new Error('Binary content inspector is unavailable');
@@ -2745,11 +2773,13 @@ async function _promptUpgradeLump(absName, fromToken, fromVersion, toToken, toVe
             delete _lumpTimelineLoaded[tk];
             const lump = _lumpsCache.find(l => l.token === toToken || l.abstraction === absName);
             if (lump) _fetchAndShowLumpTimeline(toToken, lump);
-        } else {
-            alert('Bulk upgrade failed: ' + (data.error || 'unknown error'));
         }
     } catch (err) {
-        alert('Bulk upgrade request failed: ' + err.message);
+        alert(/\bNo data was changed\b/.test(err.message) ? err.message :
+            _formatActionableNetworkError('Record the device LUMP upgrade', err, {
+                dataChanged: null,
+                nextAction: 'Reload device status to verify versions before retrying.',
+            }));
     }
 }
 
@@ -2787,7 +2817,14 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk) {
             fetch(`/api/lumps/${token}/words/${version}`),
             fetch(`/api/lump/${token}/words`)
         ]);
-        if (!archResp.ok) { _noPreview(`could not load archive (HTTP ${archResp.status})`); return; }
+        if (!archResp.ok) {
+            const error = await _actionableResponseError(archResp, 'Load archived LUMP words', {
+                dataChanged: false,
+                nextAction: 'Reload History, then select this revision again.',
+            });
+            _noPreview(error.message);
+            return;
+        }
         const data = await archResp.json();
         const words = data.words || [];
         const numWords = words.length;
@@ -2878,7 +2915,11 @@ async function _restoreLumpFromHistory(token, version) {
 
     try {
         const wordsResp = await fetch(`/api/lumps/${token}/words/${version}`);
-        if (!wordsResp.ok) throw new Error(`Failed to fetch archived binary: HTTP ${wordsResp.status}`);
+        if (!wordsResp.ok) throw await _actionableResponseError(
+            wordsResp, 'Load the archived LUMP for restore', {
+                dataChanged: false,
+                nextAction: 'Reload History, then retry Restore.',
+            });
         const wordsData = await wordsResp.json();
         const words = wordsData.words;
         if (!words || !words.length) throw new Error('Archived binary is empty');
@@ -2898,8 +2939,11 @@ async function _restoreLumpFromHistory(token, version) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ binary: words, metadata }),
         });
-        const saveData = await saveResp.json();
-        if (!saveResp.ok || !saveData.ok) throw new Error(saveData.error || `HTTP ${saveResp.status}`);
+        const saveData = await _actionableJsonResponse(
+            saveResp, 'Restore the archived LUMP', {
+                dataChanged: false,
+                nextAction: 'Reload History, verify the selected revision, then retry Restore.',
+            });
 
         if (typeof _showFpgaToast === 'function') {
             _showFpgaToast('Restored', `v${version} of "${displayName}" is now the current LUMP.`, 'ok', 4000);
@@ -2909,7 +2953,11 @@ async function _restoreLumpFromHistory(token, version) {
         delete _lumpTimelineLoaded[tk];
         if (typeof refreshLumps === 'function') refreshLumps();
     } catch (err) {
-        alert(`Restore failed: ${err.message}`);
+        alert(/\bNo data was changed\b/.test(err.message) ? err.message :
+            _formatActionableNetworkError('Restore the archived LUMP', err, {
+                dataChanged: null,
+                nextAction: 'Reload the repository to verify the current revision before retrying.',
+            }));
     }
 }
 
@@ -2964,8 +3012,10 @@ async function _saveLumpText(token, text, bodyEl, lump) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ binary: words, metadata }),
         });
-        const result = await resp.json();
-        if (!resp.ok) throw new Error(result.error || `HTTP ${resp.status}`);
+        const result = await _actionableJsonResponse(resp, 'Save edited LUMP content', {
+            dataChanged: false,
+            nextAction: 'Review the edited content, then click Save again.',
+        });
         _lumpEditDirty = false;
         const _tk = _lumpTokenIdentity(token);
         _lumpEditorOpen[_tk] = false;
@@ -2974,7 +3024,14 @@ async function _saveLumpText(token, text, bodyEl, lump) {
         if (statusEl) { statusEl.textContent = 'Saved.'; statusEl.style.color = 'var(--accent-green, #4caf50)'; }
         setTimeout(() => _loadLumpContent(token, lump), 800);
     } catch (err) {
-        if (statusEl) { statusEl.textContent = `Error: ${err.message}`; statusEl.style.color = 'var(--red, #e53935)'; }
+        if (statusEl) {
+            statusEl.textContent = /\bNo data was changed\b/.test(err.message) ? err.message :
+                _formatActionableNetworkError('Save edited LUMP content', err, {
+                    dataChanged: null,
+                    nextAction: 'Reload History to verify the current revision before retrying.',
+                });
+            statusEl.style.color = 'var(--red, #e53935)';
+        }
         if (saveBtn) saveBtn.disabled = false;
     }
 }
@@ -3399,7 +3456,10 @@ async function _loadLumpContent(token, lump) {
     if (!bodyEl) return;
     try {
         const resp = await fetch(`/api/lump/${token}/words`);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        if (!resp.ok) throw await _actionableResponseError(resp, 'Open LUMP content', {
+            dataChanged: false,
+            nextAction: 'Reload the LUMP repository, then reopen Content.',
+        });
         const data  = await resp.json();
         const words = data.words || [];
         if (!words.length) throw new Error('Empty lump');
@@ -3471,8 +3531,7 @@ async function _loadLumpContent(token, lump) {
             const m = err.message || '';
             if (m.includes('token') && m.includes('not defined')) return 'The lump is missing a valid token — check that it has been saved correctly.';
             if (m.includes('Empty lump'))   return 'This lump has no content words yet. Compile or upload content to populate it.';
-            if (m.includes('HTTP 404'))     return 'The lump could not be found on the server — it may have been deleted or its token is wrong.';
-            if (m.includes('HTTP 4') || m.includes('HTTP 5')) return 'The server returned an error when fetching this lump.';
+            if (m.includes('Reason:')) return m;
             return 'An unexpected error occurred while rendering this lump.';
         })();
 
@@ -4285,7 +4344,10 @@ async function _loadLumpTokens(token, lump) {
             words = _cachedEntry.words || [];
         } else {
             const resp = await fetch(`/api/lump/${token}/words`);
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            if (!resp.ok) throw await _actionableResponseError(resp, 'Load LUMP token words', {
+                dataChanged: false,
+                nextAction: 'Reload the LUMP, then reopen Tokens.',
+            });
             const data = await resp.json();
             words = data.words || [];
         }
@@ -4477,13 +4539,19 @@ function _renderLumpImageContent(bodyEl, lump, dataWords, token) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ binary: words, metadata }),
                 });
-                const result = await resp.json();
-                if (!resp.ok) throw new Error(result.error || `HTTP ${resp.status}`);
+                await _actionableJsonResponse(resp, 'Replace the LUMP file', {
+                    dataChanged: false,
+                    nextAction: 'Choose a valid replacement file, then click Replace again.',
+                });
                 statusEl.textContent = 'Replaced.';
                 statusEl.style.color = 'var(--accent-green, #4caf50)';
                 setTimeout(() => _loadLumpContent(token, lump), 800);
             } catch (err) {
-                statusEl.textContent = `Error: ${err.message}`;
+                statusEl.textContent = /\bNo data was changed\b/.test(err.message) ? err.message :
+                    _formatActionableNetworkError('Replace the LUMP file', err, {
+                        dataChanged: null,
+                        nextAction: 'Reload the LUMP to verify its content before retrying.',
+                    });
                 statusEl.style.color = 'var(--red, #e53935)';
                 replaceBtn.disabled = false;
             }
@@ -4715,13 +4783,25 @@ async function _submitLumpImport() {
     submitBtn.textContent = 'Importing…';
     try {
         const resp = await fetch(endpoint, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-        const result = await resp.json();
-        if (!resp.ok || !result.ok) throw new Error(result.error || `HTTP ${resp.status}`);
+        const text = await resp.text();
+        let result = null;
+        try { result = JSON.parse(text); } catch (_) {}
+        if (!resp.ok || !result || !result.ok) {
+            throw new Error(_formatActionableHttpError('Import the LUMP', resp.status, text, {
+                dataChanged: false,
+                nextAction: 'Correct the selected file or metadata, then click Import again.',
+            }));
+        }
         closeLumpImportModal();
         await renderLumps();
         showLumpDetail(result.token);
     } catch (err) {
-        errEl.textContent = `Import failed: ${err.message}`;
+        errEl.textContent = err && /\bNo data was changed\b/.test(err.message)
+            ? err.message
+            : _formatActionableNetworkError('Import the LUMP', err, {
+                dataChanged: false,
+                nextAction: 'Check the IDE connection, then click Import again.',
+            });
     } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Import';
@@ -4735,9 +4815,14 @@ async function _resizeLump(token) {
     if (btn) { btn.disabled = true; btn.textContent = 'Shrinking…'; }
     try {
         const resp = await fetch(`/api/lump/${token}/resize`, { method: 'POST' });
-        const data = await resp.json();
+        const text = await resp.text();
+        let data = null;
+        try { data = JSON.parse(text); } catch (_) {}
         if (!resp.ok) {
-            appendOutput(`Resize failed: ${data.error || resp.status}`, 'error');
+            appendOutput(_formatActionableHttpError('Resize the LUMP', resp.status, text, {
+                dataChanged: false,
+                nextAction: 'Reload the LUMP, then retry Shrink.',
+            }), 'error');
             if (btn) { btn.disabled = false; btn.textContent = btn._origText || 'Shrink ▼'; }
             return;
         }
@@ -4757,7 +4842,10 @@ async function _resizeLump(token) {
         renderLumps();
         appendOutput(`Lump 0x${token} shrunk: ${data.old_size}w → ${data.lump_size}w (saved ${data.saved_words}w)`, 'info');
     } catch (err) {
-        appendOutput(`Resize error: ${err.message}`, 'error');
+        appendOutput(_formatActionableNetworkError('Resize the LUMP', err, {
+            dataChanged: null,
+            nextAction: 'Reload the LUMP to verify its size before retrying.',
+        }), 'error');
         if (btn) { btn.disabled = false; btn.textContent = btn._origText || 'Shrink ▼'; }
     }
 }
@@ -4765,7 +4853,24 @@ async function _resizeLump(token) {
 function deleteLump(token) {
     if (!confirm(`Delete lump 0x${token}? This cannot be undone.`)) return;
     fetch(`/api/lumps/${token}`, { method: 'DELETE' })
-        .then(r => { if (!r.ok && r.status !== 404) throw new Error(`HTTP ${r.status}`); return r.json(); })
+        .then(async r => {
+            const text = await r.text();
+            let body = null;
+            try { body = JSON.parse(text); } catch (_) {}
+            if (!r.ok && r.status !== 404) {
+                throw new Error(_formatActionableHttpError('Delete the LUMP', r.status, text, {
+                    dataChanged: false,
+                    nextAction: 'Reload the repository, then retry Delete.',
+                }));
+            }
+            if (!body || body.ok === false) {
+                throw new Error(_formatActionableHttpError('Delete the LUMP', r.status, body, {
+                    dataChanged: false,
+                    nextAction: 'Reload the repository to verify whether the LUMP still exists.',
+                }));
+            }
+            return body;
+        })
         .then(resp => {
             if (resp.ok) {
                 if (window.LumpRegistry) { window.LumpRegistry.evictMemory(token); window.LumpRegistry.setCurrent(null); }
@@ -4777,12 +4882,14 @@ function deleteLump(token) {
                     if (typeof _updateLumpViewingLabel === 'function') _updateLumpViewingLabel(_selectedLumpToken || '');
                 });
                 appendOutput(`Deleted lump 0x${token}`, 'info');
-            } else {
-                appendOutput(`Delete failed: ${resp.error || 'unknown error'}`, 'error');
             }
         })
         .catch(err => {
-            appendOutput(`Delete error: ${err.message}`, 'error');
+            appendOutput(/\bNo data was changed\b/.test(err.message) ? err.message :
+                _formatActionableNetworkError('Delete the LUMP', err, {
+                    dataChanged: null,
+                    nextAction: 'Reload the repository to verify whether the LUMP still exists.',
+                }), 'error');
         });
 }
 
@@ -4979,9 +5086,12 @@ function _nsBuild() {
             entries: entries,
         })
     })
-    .then(r => {
+    .then(async r => {
         if (!r.ok) {
-            return r.json().then(j => { throw new Error(j.error || `HTTP ${r.status}`); });
+            throw await _actionableResponseError(r, 'Build the Namespace archive', {
+                dataChanged: false,
+                nextAction: 'Correct the Namespace entries, then click Build again.',
+            });
         }
         return r.blob();
     })
@@ -4999,8 +5109,14 @@ function _nsBuild() {
         renderLumps();
     })
     .catch(err => {
-        appendOutput(`Namespace build error: ${err.message}`, 'error');
-        alert(`Build failed: ${err.message}`);
+        const message = err && /\bNo data was changed\b/.test(err.message)
+            ? err.message
+            : _formatActionableNetworkError('Build the Namespace archive', err, {
+                dataChanged: false,
+                nextAction: 'Check the IDE connection, then click Build again.',
+            });
+        appendOutput(message, 'error');
+        alert(message);
         if (btn) { btn.disabled = false; btn.textContent = 'Build namespace.zip'; }
     });
 }
@@ -5458,13 +5574,11 @@ async function openLumpInEditor(token) {
                 var _wj = await _wr.json();
                 if (_wj && Array.isArray(_wj.words)) serverWords = _wj.words;
             } else {
-                try {
-                    var _wrErr = await _wr.json();
-                    _diagnosticError = _wrErr && _wrErr.error
-                        ? String(_wrErr.error) : ('Server rejected the saved binary (HTTP ' + _wr.status + ').');
-                } catch (_wre) {
-                    _diagnosticError = 'Server rejected the saved binary (HTTP ' + _wr.status + ').';
-                }
+                _diagnosticError = _formatActionableHttpError(
+                    'Open the saved LUMP binary', _wr.status, await _wr.text(), {
+                        dataChanged: false,
+                        nextAction: 'Open the diagnostic source, repair the LUMP, then save a new revision.',
+                    });
                 // Keep binary delivery fail-closed, but recover intrinsic
                 // embedded source through a diagnostic-only endpoint so the
                 // programmer can repair the exact rejected artifact.
@@ -5977,7 +6091,11 @@ async function _saveLumpDirectVersion(token, lump, btn) {
         // source this version from live simulator memory: runtime word changes
         // are execution state and are not POLA-persisted.
         var _wr = await fetch('/api/lump/' + token + '/words', { cache: 'no-store' });
-        if (!_wr.ok) throw new Error('Could not fetch lump binary (HTTP ' + _wr.status + ')');
+        if (!_wr.ok) throw await _actionableResponseError(
+            _wr, 'Load the saved LUMP binary for versioning', {
+                dataChanged: false,
+                nextAction: 'Reload the LUMP, then click Save Lump again.',
+            });
         var _wj = await _wr.json();
         var _words = _wj && Array.isArray(_wj.words) ? _wj.words : null;
         if (!_words || _words.length < 2) throw new Error('Server returned empty or invalid binary');
@@ -6707,8 +6825,10 @@ async function _gtPickCommit(lumpToken, slotIndex) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ gt_word }),
         });
-        const data = await resp.json();
-        if (!resp.ok || !data.ok) throw new Error(data.error || 'Server error');
+        await _actionableJsonResponse(resp, 'Assign the capability GT', {
+            dataChanged: false,
+            nextAction: 'Review the selected capability and permissions, then click Assign GT again.',
+        });
 
         document.getElementById('gt-slot-picker-modal')?.remove();
 
@@ -6721,7 +6841,11 @@ async function _gtPickCommit(lumpToken, slotIndex) {
         }
     } catch (err) {
         if (btn) { btn.disabled = false; btn.textContent = 'Assign GT'; }
-        alert(`Failed to assign GT: ${err.message}`);
+        alert(/\bNo data was changed\b/.test(err.message) ? err.message :
+            _formatActionableNetworkError('Assign the capability GT', err, {
+                dataChanged: null,
+                nextAction: 'Reload Tokens to verify the C-List before retrying.',
+            }));
     }
 }
 
@@ -6827,7 +6951,10 @@ async function _readLumpMutationJson(resp, operation) {
         return resp.json();
     }
     if (!text) {
-        throw new Error(`${operation} returned an empty response (HTTP ${resp.status}).`);
+        throw new Error(_formatActionableHttpError(operation, resp.status, '', {
+            dataChanged: false,
+            nextAction: 'Retry the operation; if it fails again, reload the LUMP repository.',
+        }));
     }
     try {
         return JSON.parse(text);
@@ -6837,8 +6964,10 @@ async function _readLumpMutationJson(resp, operation) {
         const detail = contentType.includes('text/html')
             ? 'The browser and server may be running different revisions.'
             : 'The server did not return JSON.';
-        throw new Error(
-            `${operation} returned an invalid response (HTTP ${resp.status}). ${detail}`);
+        throw new Error(_formatActionableHttpError(operation, resp.status, detail, {
+            dataChanged: false,
+            nextAction: 'Reload the IDE so the browser and server use the same revision, then retry.',
+        }));
     }
 }
 
@@ -7180,7 +7309,10 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
     if (btn) { btn.disabled = true; btn.textContent = 'Loading\u2026'; }
     try {
         const resp = await fetch(`/api/lump/${token}/words`, { cache: 'no-store' });
-        if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+        if (!resp.ok) throw await _actionableResponseError(resp, 'Load the LUMP into the simulator', {
+            dataChanged: false,
+            nextAction: 'Reload the saved LUMP, then click Load into Sim again.',
+        });
         const data = await resp.json();
         const rawWords = data.words || [];
         if (!rawWords.length) throw new Error('Empty LUMP \u2014 no words returned');
@@ -7281,10 +7413,10 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ token, approval_intent: _deployIntent.intent })
         });
-        const _deployResult = await _deployAuth.json();
-        if (!_deployAuth.ok || !_deployResult.ok) {
-            throw new Error(_deployResult.error || `deployment authorization failed: HTTP ${_deployAuth.status}`);
-        }
+        await _actionableJsonResponse(_deployAuth, 'Authorize LUMP deployment', {
+            dataChanged: false,
+            nextAction: 'Reapprove the exact saved binary, then click Load into Sim again.',
+        });
 
         // Mutate boot selection only after the server consumed authorization.
         // The canonical boot LUMP must run before the selected target is loaded.
@@ -7402,7 +7534,11 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
         switchView('dashboard');
     } catch (err) {
         if (btn) { btn.disabled = false; btn.textContent = 'Load into Sim \u25b6'; }
-        alert(`Failed to load LUMP into simulator: ${err.message}`);
+        alert(/\bNo data was changed\b/.test(err.message) ? err.message :
+            _formatActionableNetworkError('Load the LUMP into the simulator', err, {
+                dataChanged: null,
+                nextAction: 'Reset the simulator, reload the LUMP, then retry.',
+            }));
     }
 }
 
@@ -7579,7 +7715,10 @@ async function runSelftestLump() {
                 .then(r => r.ok ? r.json() : null)
                 .catch(() => null),
         ]);
-        if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+        if (!resp.ok) throw await _actionableResponseError(resp, 'Load the SelfTest LUMP', {
+            dataChanged: false,
+            nextAction: 'Reload the LUMP repository, then click Run Selftest again.',
+        });
         const data = await resp.json();
         const words = data.words || [];
         if (!words.length) throw new Error('Empty LUMP');
@@ -7691,7 +7830,11 @@ async function runSelftestLump() {
         switchDashTab('state');
     } catch (err) {
         if (btn) { btn.disabled = false; btn.textContent = 'Run Selftest'; }
-        alert(`Selftest failed: ${err.message}`);
+        alert(/\bNo data was changed\b/.test(err.message) ? err.message :
+            _formatActionableNetworkError('Run the SelfTest LUMP', err, {
+                dataChanged: null,
+                nextAction: 'Reset the simulator, then click Run Selftest again.',
+            }));
     }
 }
 

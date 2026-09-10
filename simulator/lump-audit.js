@@ -1128,8 +1128,8 @@ async function lumpAuditFromServer(token, _manifest, container, opts) {
                         dataChanged: false,
                         nextAction: 'Reload the saved LUMP and run Audit again. If it repeats, save a new revision or inspect the repository integrity record.',
                     })
-                : `Audit of this saved LUMP failed (HTTP ${resp.status}). ` +
-                  `No data was changed. Next: reload the LUMP and run Audit again.`;
+                : 'Audit of this saved LUMP failed. Reason: the error formatter is unavailable. ' +
+                  'No data was changed. Next: reload the IDE, then reload the LUMP and run Audit again.';
             const httpError = new Error(message);
             httpError.actionable = true;
             throw httpError;

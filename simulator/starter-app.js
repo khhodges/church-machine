@@ -480,7 +480,12 @@ function _loadLumpCatalog() {
     var btn = _el('l5ImportBtn');
     if (!sel) return;
     fetch('/api/lumps/list')
-        .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function(r) {
+            return _actionableJsonResponse(r, 'Load Starter abstractions', {
+                dataChanged: false,
+                nextAction: 'Check the IDE connection, then reopen Lesson 5.',
+            });
+        })
         .then(function(lumps) {
             _l5LumpCatalog = Array.isArray(lumps) ? lumps : (lumps.lumps || []);
             sel.innerHTML = '<option value="">\u2014 pick an abstraction to start from \u2014</option>';
@@ -496,8 +501,13 @@ function _loadLumpCatalog() {
             });
             sel.disabled = false;
         })
-        .catch(function() {
-            sel.innerHTML = '<option value="">\u2014 could not load abstractions \u2014</option>';
+        .catch(function(error) {
+            sel.innerHTML = '<option value="">\u2014 ' +
+                String(/\bNo data was changed\b/.test(error.message) ? error.message :
+                    _formatActionableNetworkError('Load Starter abstractions', error, {
+                        dataChanged: false,
+                        nextAction: 'Check the IDE connection, then reopen Lesson 5.',
+                    })).replace(/</g, '&lt;') + ' \u2014</option>';
         });
 }
 

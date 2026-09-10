@@ -154,14 +154,27 @@ const BuildApprovalView = {
             response = await fetch(url.toString(), { cache: 'no-store' });
         } catch (error) {
             if (typeof appendOutput === 'function') appendOutput(
-                'Bitstream download failed: ' + error.message, 'error');
+                _formatActionableNetworkError('Download the exact bitstream', error, {
+                    dataChanged: false,
+                    nextAction: 'Check the IDE connection, then click Download again.',
+                }), 'error');
             return false;
         }
-        if (!response.ok ||
-                response.headers.get('X-Wukong-Provenance-Identity') !== identity ||
+        if (!response.ok) {
+            if (typeof appendOutput === 'function') appendOutput(
+                _formatActionableHttpError(
+                    'Download the exact bitstream', response.status,
+                    await response.text(), {
+                        dataChanged: false,
+                        nextAction: 'Refresh build approval, select the exact approved artifact, then retry Download.',
+                    }), 'error');
+            return false;
+        }
+        if (response.headers.get('X-Wukong-Provenance-Identity') !== identity ||
                 response.headers.get('X-Wukong-Artifact-SHA256') !== digest) {
             if (typeof appendOutput === 'function') appendOutput(
-                'Bitstream download blocked: server target/artifact correlation failed.', 'error');
+                'Download the exact bitstream failed. Reason: server target/artifact correlation failed. ' +
+                'No data was changed. Next: refresh build approval and select the exact approved artifact.', 'error');
             return false;
         }
         const blob = await response.blob();
@@ -273,8 +286,10 @@ const BuildApprovalView = {
                 this._renderIssueComments(null);
                 return;
             }
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            const data = await res.json();
+            const data = await _actionableJsonResponse(res, 'Load the Build Approval NS map', {
+                dataChanged: false,
+                nextAction: 'Check the build token, then click Refresh.',
+            });
             this._validateApprovalPayload(data);
             this._lastMap = data;
             // Store the CSRF nonce for the build-start call.
@@ -292,7 +307,12 @@ const BuildApprovalView = {
                 this._renderApprovalContractError(e);
                 this._updateApproveBtn();
             } else if (body) {
-                body.innerHTML = `<div class="ba-error">Failed to load NS map: ${this._esc(e.message)}</div>`;
+                const message = /\bNo data was changed\b/.test(e.message) ? e.message :
+                    _formatActionableNetworkError('Load the Build Approval NS map', e, {
+                        dataChanged: false,
+                        nextAction: 'Check the IDE connection and build token, then click Refresh.',
+                    });
+                body.innerHTML = `<div class="ba-error">${this._esc(message)}</div>`;
             }
             this._renderIssueComments(null);
         } finally {
@@ -340,11 +360,17 @@ const BuildApprovalView = {
         }
         try {
             const res = await fetch('/api/bitstream-versions');
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            const data = await res.json();
+            const data = await _actionableJsonResponse(res, 'Load pending release context', {
+                dataChanged: false,
+                nextAction: 'Check the IDE connection, then reopen Build Approval.',
+            });
             this._release = data && data.release ? data.release : null;
         } catch (e) {
-            this._release = { error: 'Could not load release context: ' + e.message };
+            this._release = { error: /\bNo data was changed\b/.test(e.message) ? e.message :
+                _formatActionableNetworkError('Load pending release context', e, {
+                    dataChanged: false,
+                    nextAction: 'Check the IDE connection, then reopen Build Approval.',
+                }) };
         }
         this._renderReleaseContext();
     },
@@ -463,8 +489,10 @@ const BuildApprovalView = {
         if (select) select.disabled = true;
         try {
             const getRes = await fetch('/api/boot-config');
-            const data = await getRes.json();
-            if (!getRes.ok) throw new Error(data.error || `HTTP ${getRes.status}`);
+            const data = await _actionableJsonResponse(getRes, 'Load the boot configuration', {
+                dataChanged: false,
+                nextAction: 'Refresh Build Approval, then change the slot rule again.',
+            });
             const base = data.config || data.defaults;
             if (!base || !base.step1) throw new Error('Boot configuration is unavailable.');
             const config = JSON.parse(JSON.stringify(base));
@@ -549,10 +577,10 @@ const BuildApprovalView = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(config),
             });
-            const postBody = await postRes.json();
-            if (!postRes.ok || postBody.ok === false) {
-                throw new Error(postBody.error || `HTTP ${postRes.status}`);
-            }
+            const postBody = await _actionableJsonResponse(postRes, 'Save the slot rule', {
+                dataChanged: false,
+                nextAction: 'Review the slot rule and approval checks, then save it again.',
+            });
             if (typeof window !== 'undefined' && typeof window._setActiveBootConfig === 'function') {
                 window._setActiveBootConfig(
                     postBody.config || config,
@@ -563,10 +591,14 @@ const BuildApprovalView = {
         } catch (e) {
             if (select) {
                 select.value = previous || select.dataset.committedValue || select.value;
-                select.title = `Save failed: ${e.message}`;
+                select.title = /\bNo data was changed\b/.test(e.message) ? e.message :
+                    _formatActionableNetworkError('Save the slot rule', e, {
+                        dataChanged: null,
+                        nextAction: 'Refresh the NS map to verify the rule before retrying.',
+                    });
             }
             const status = document.getElementById('baSnapshotStatus');
-            if (status) status.textContent = `❌ Slot ${slot} rule not saved: ${e.message}`;
+            if (status) status.textContent = '❌ ' + (select && select.title ? select.title : e.message);
         } finally {
             if (select) select.disabled = false;
         }
@@ -731,13 +763,19 @@ const BuildApprovalView = {
                 headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
                 body: JSON.stringify({}),
             });
-            const data = await res.json();
-            if (!res.ok || !data.ok) throw new Error(data.error || 'HTTP ' + res.status);
+            const data = await _actionableJsonResponse(res, 'Freeze the build snapshot', {
+                dataChanged: false,
+                nextAction: 'Fix blocking approval checks, then click Freeze again.',
+            });
             this._snapFrozen = true;
             if (status) status.textContent = '✅ Snapshot frozen: ' + (data.filename || '');
             this._updateApproveBtn();
         } catch (e) {
-            if (status) status.textContent = '❌ Freeze failed: ' + e.message;
+            if (status) status.textContent = '❌ ' + (/\bNo data was changed\b/.test(e.message) ? e.message :
+                _formatActionableNetworkError('Freeze the build snapshot', e, {
+                    dataChanged: null,
+                    nextAction: 'Refresh Build Approval to verify snapshot state before retrying.',
+                }));
             if (btn) btn.disabled = false;
         }
     },
@@ -813,13 +851,20 @@ const BuildApprovalView = {
                 headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
                 body: JSON.stringify(Object.assign({ build_nonce: this._buildNonce || '' }, targetAuthorization.request)),
             });
-            const data = await res.json();
-            if (!res.ok || !data.ok) throw new Error(data.error || 'HTTP ' + res.status);
+            const data = await _actionableJsonResponse(res, 'Start the approved hardware build', {
+                dataChanged: false,
+                nextAction: 'Check the build token and frozen approval snapshot, then click Build again.',
+            });
             this._renderConsole({ phase: 'launching', done: false, log_tail: ['Remote build accepted; connecting…'] });
             if (statusEl) statusEl.textContent = 'Build running… (~22 min)';
             this._startBuildPoll();
         } catch (e) {
-            if (logEl) logEl.textContent += '❌ Failed to start: ' + e.message + '\n';
+            const actionable = /\bNo data was changed\b/.test(e.message) ? e.message :
+                _formatActionableNetworkError('Start the approved hardware build', e, {
+                    dataChanged: null,
+                    nextAction: 'Refresh build status before retrying so a delayed build is not started twice.',
+                });
+            if (logEl) logEl.textContent += '❌ ' + actionable + '\n';
             this._renderConsole({
                 phase: 'failed',
                 done: true,
@@ -827,7 +872,7 @@ const BuildApprovalView = {
                 diagnosis: {
                     phase: 'launch',
                     what_failed: 'The build could not be started.',
-                    next_action: e.message || 'Check the build token, approval snapshot, and remote build configuration.',
+                    next_action: actionable,
                 },
             });
             if (statusEl) { statusEl.textContent = 'Build failed to start'; statusEl.className = 'ba-build-status ba-build-bad'; }
@@ -890,8 +935,10 @@ const BuildApprovalView = {
     },
 };
 window.BuildApprovalView = BuildApprovalView;
-document.addEventListener('click', function(event) {
-    const link = event.target && event.target.closest
-        ? event.target.closest('[data-exact-bitstream-download]') : null;
-    if (link) return BuildApprovalView.downloadExactBitstream(event, link);
-});
+if (document && typeof document.addEventListener === 'function') {
+    document.addEventListener('click', function(event) {
+        const link = event.target && event.target.closest
+            ? event.target.closest('[data-exact-bitstream-download]') : null;
+        if (link) return BuildApprovalView.downloadExactBitstream(event, link);
+    });
+}

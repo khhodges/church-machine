@@ -81,13 +81,16 @@ function withMocks(opts, fn) {
     check('T1b: 422 toast level is error',   r.toastCalls[0] && r.toastCalls[0].level === 'error');
     check('T1c: 422 toast title correct',
         r.toastCalls[0] && r.toastCalls[0].title === 'LUMP Repository Save Failed');
-    check('T1d: 422 toast body is server message',
-        r.toastCalls[0] && r.toastCalls[0].body === 'c-list slot 5 >= cc=1');
+    check('T1d: 422 toast body is actionable and preserves server message',
+        r.toastCalls[0] &&
+        r.toastCalls[0].body.includes('c-list slot 5 >= cc=1') &&
+        r.toastCalls[0].body.includes('No data was changed.') &&
+        r.toastCalls[0].body.includes('Next:'));
     check('T1e: 422 calls renderLumps',      r.renderCalled);
     check('T1f: 422 does not touch registry', r.registryCalls.setCurrent.length === 0);
 }
 
-// T2: !r.ok with no error field → fallback to 'HTTP N'
+// T2: !r.ok with no error field → explicitly states the missing reason
 {
     const r = withMocks({}, () =>
         _lumpSaveHandleResponse(
@@ -96,7 +99,10 @@ function withMocks(opts, fn) {
         )
     );
     check('T2a: no error field → toast fires',          r.toastCalls.length === 1);
-    check('T2b: no error field → body is HTTP fallback', r.toastCalls[0] && r.toastCalls[0].body === 'HTTP 422');
+    check('T2b: no error field → missing reason and recovery are explicit',
+        r.toastCalls[0] &&
+        r.toastCalls[0].body.includes('The server did not provide a reason.') &&
+        r.toastCalls[0].body.includes('Next:'));
     check('T2c: no error field → renderLumps called',   r.renderCalled);
 }
 
@@ -110,7 +116,11 @@ function withMocks(opts, fn) {
     );
     check('T3a: 500 fires one toast',       r.toastCalls.length === 1);
     check('T3b: 500 toast level is error',  r.toastCalls[0] && r.toastCalls[0].level === 'error');
-    check('T3c: 500 toast body is message', r.toastCalls[0] && r.toastCalls[0].body === 'Internal server error');
+    check('T3c: 500 toast body preserves reason and recovery',
+        r.toastCalls[0] &&
+        r.toastCalls[0].body.includes('Internal server error') &&
+        r.toastCalls[0].body.includes('No data was changed.') &&
+        r.toastCalls[0].body.includes('Next:'));
 }
 
 // T4: r.ok=true, resp.ok=true, token present → registry updated, no toast
@@ -156,14 +166,18 @@ function withMocks(opts, fn) {
 
 // ── Tests for _lumpSaveHandleNetworkError ─────────────────────────────────────
 
-// T7: network error → toast fires with 'Network error' body, level=error
+// T7: network error → toast identifies operation, unchanged data, and recovery
 {
     const r = withMocks({}, () =>
         _lumpSaveHandleNetworkError(new Error('connection refused'))
     );
     check('T7a: network error fires one toast',       r.toastCalls.length === 1);
     check('T7b: network error toast level is error',  r.toastCalls[0] && r.toastCalls[0].level === 'error');
-    check('T7c: network error body mentions Network', r.toastCalls[0] && /network error/i.test(r.toastCalls[0].body));
+    check('T7c: network error body is actionable',
+        r.toastCalls[0] &&
+        r.toastCalls[0].body.includes('Save could not reach the repository.') &&
+        r.toastCalls[0].body.includes('No data was changed.') &&
+        r.toastCalls[0].body.includes('Next:'));
     check('T7d: network error calls renderLumps',     r.renderCalled);
     check('T7e: network error does not touch registry',
         r.registryCalls.setCurrent.length === 0);

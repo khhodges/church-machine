@@ -2860,13 +2860,11 @@ function generateBootImage(onApplied) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entrySlot: bootEntrySlot }),
     })
-        .then(r => r.json().then(j => ({ ok: r.ok, body: j })))
-        .then(({ ok, body }) => {
-            if (!ok || body.ok === false) {
-                if (result) result.textContent = (body && body.error) || 'Generation failed.';
-                notifyApplied(false);
-                return;
-            }
+        .then(r => _actionableJsonResponse(r, 'Generate the boot image', {
+            dataChanged: false,
+            nextAction: 'Correct the Namespace or boot configuration, then click Generate again.',
+        }))
+        .then(body => {
             const kib = (body.bytes / 1024).toFixed(1);
             if (result) {
                 let html =
@@ -2915,7 +2913,11 @@ function generateBootImage(onApplied) {
             });
         })
         .catch(err => {
-            if (result) result.textContent = 'Generation failed: ' + err;
+            if (result) result.textContent = /\bNo data was changed\b/.test(err.message) ? err.message :
+                _formatActionableNetworkError('Generate the boot image', err, {
+                    dataChanged: false,
+                    nextAction: 'Check the IDE connection, then click Generate again.',
+                });
             notifyApplied(false);
         })
         .finally(() => {
@@ -2941,12 +2943,11 @@ function uploadBootImageFile(file) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ data_b64 }),
         })
-            .then(r => r.json().then(j => ({ ok: r.ok, body: j })))
-            .then(({ ok, body }) => {
-                if (!ok || body.ok === false) {
-                    if (result) result.textContent = (body && body.error) || 'Upload failed.';
-                    return;
-                }
+            .then(r => _actionableJsonResponse(r, 'Upload the boot image', {
+                dataChanged: false,
+                nextAction: 'Choose a valid boot-image file, then click Upload again.',
+            }))
+            .then(body => {
                 const kib = (body.bytes / 1024).toFixed(1);
                 if (result) {
                     result.innerHTML =
@@ -2980,14 +2981,20 @@ function uploadBootImageFile(file) {
                 });
             })
             .catch(err => {
-                if (result) result.textContent = 'Upload failed: ' + err;
+                if (result) result.textContent = /\bNo data was changed\b/.test(err.message) ? err.message :
+                    _formatActionableNetworkError('Upload the boot image', err, {
+                        dataChanged: null,
+                        nextAction: 'Refresh the Namespace to verify the active image before retrying.',
+                    });
             })
             .finally(() => {
                 if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
             });
     };
     reader.onerror = function() {
-        if (result) result.textContent = 'Failed to read file.';
+        if (result) result.textContent =
+            'Upload the boot image failed. Reason: The selected file could not be read. ' +
+            'No data was changed. Next: choose the file again or select a different boot-image file.';
         if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
     };
     reader.readAsArrayBuffer(file);
@@ -3230,10 +3237,11 @@ function updateNamespace() {
         let serverData = null;
         if (!localCfg.step1) {
             const configResponse = await fetch('/api/boot-config');
-            serverData = await configResponse.json();
-            if (!configResponse.ok) {
-                throw new Error((serverData && serverData.error) || `HTTP ${configResponse.status}`);
-            }
+            serverData = await _actionableJsonResponse(
+                configResponse, 'Load the Namespace build configuration', {
+                    dataChanged: false,
+                    nextAction: 'Check the IDE connection, then reopen Namespace.',
+                });
         }
         const baseCfg = (serverData && (serverData.config || serverData.defaults)) || {};
         const cfg = {
@@ -3261,8 +3269,11 @@ function updateNamespace() {
                 step3: cfg.step3 || { emptySlotCount: 0 }
             })
         });
-        const body = await response.json();
-        if (!response.ok || body.ok === false) throw new Error(body.error || `HTTP ${response.status}`);
+        const body = await _actionableJsonResponse(
+            response, 'Save the Namespace build configuration', {
+                dataChanged: false,
+                nextAction: 'Review the Namespace policies, then click Save again.',
+            });
         _setActiveBootConfig(
             body.config || cfg,
             body.bootImageInvalidated === true,
@@ -3565,7 +3576,13 @@ function _nsTableAdd() {
     document.body.appendChild(_overlay);
 
     fetch('/api/lumps/list')
-        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(async function(r) {
+            if (!r.ok) throw await _actionableResponseError(r, 'Load LUMPs for Namespace', {
+                dataChanged: false,
+                nextAction: 'Check the IDE connection, then reopen Add LUMP.',
+            });
+            return r.json();
+        })
         .then(function(list) {
             if (!Array.isArray(list) || list.length === 0) {
                 document.getElementById('_nsAddStatus').textContent = 'No LUMPs available on the server.';
@@ -3617,7 +3634,11 @@ function _nsTableAdd() {
         })
         .catch(function(err) {
             const st = document.getElementById('_nsAddStatus');
-            if (st) st.textContent = 'Failed to load LUMP list: ' + err;
+            if (st) st.textContent = err && /\bNo data was changed\b/.test(err.message) ? err.message :
+                _formatActionableNetworkError('Load LUMPs for Namespace', err, {
+                    dataChanged: false,
+                    nextAction: 'Check the IDE connection, then reopen Add LUMP.',
+                });
         });
 }
 
@@ -3659,7 +3680,11 @@ async function _nsPopulateAddMeta(token) {
             const nowSel = document.getElementById('_nsAddSelect');
             if (!nowSel || nowSel.value !== token) return;
 
-            if (!wordsResp.ok) throw new Error('HTTP ' + wordsResp.status + ' from /words');
+            if (!wordsResp.ok) throw await _actionableResponseError(
+                wordsResp, 'Load LUMP metadata for Namespace', {
+                    dataChanged: false,
+                    nextAction: 'Reload the LUMP list, then select this LUMP again.',
+                });
 
             const wordsData = await wordsResp.json();
 
@@ -3685,7 +3710,13 @@ async function _nsPopulateAddMeta(token) {
         } catch (fetchErr) {
             const nowSel2 = document.getElementById('_nsAddSelect');
             if (!nowSel2 || nowSel2.value !== token) return;
-            container.innerHTML = `<div style="color:#f87171;font-size:0.78rem;padding:4px 0;">&#9888; Failed to load LUMP: ${String(fetchErr).replace(/</g,'&lt;')}</div>`;
+            const message = fetchErr && /\bNo data was changed\b/.test(fetchErr.message)
+                ? fetchErr.message
+                : _formatActionableNetworkError('Load LUMP metadata for Namespace', fetchErr, {
+                    dataChanged: false,
+                    nextAction: 'Check the IDE connection, then select this LUMP again.',
+                });
+            container.innerHTML = `<div style="color:#f87171;font-size:0.78rem;padding:4px 0;">&#9888; ${String(message).replace(/</g,'&lt;')}</div>`;
             return;
         }
     }
@@ -4202,7 +4233,11 @@ function _nsTableAddConfirm() {
 
     const _onError = function(err) {
         const message = err instanceof Error ? err.message : String(err);
-        if (errEl) errEl.textContent = 'Error: ' + message;
+        if (errEl) errEl.textContent = /\bNo data was changed\b/.test(message) ? message :
+            _formatActionableNetworkError('Install the LUMP in Namespace', err, {
+                dataChanged: null,
+                nextAction: 'Reload Namespace to verify the slot before retrying Install.',
+            });
         if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Install'; }
     };
 
@@ -4211,7 +4246,14 @@ function _nsTableAddConfirm() {
         _doInstall(window._nsAddCurrentWords).catch(_onError);
     } else {
         fetch('/api/lump/' + token + '/words')
-            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+            .then(async function(r) {
+                if (!r.ok) throw await _actionableResponseError(
+                    r, 'Load the LUMP for Namespace installation', {
+                        dataChanged: false,
+                        nextAction: 'Reload the LUMP list, then click Install again.',
+                    });
+                return r.json();
+            })
             .then(function(data) {
                 const words = Array.isArray(data) ? data : (data && Array.isArray(data.words) ? data.words : null);
                 if (!words || words.length === 0) return Promise.reject(new Error('Empty word list from server'));
@@ -4277,10 +4319,10 @@ window._nsTableSave = async function(btn) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ entrySlot: bootEntrySlot }),
                 });
-                const _genBody = await _genResp.json();
-                if (!_genResp.ok || _genBody.ok === false) {
-                    throw new Error((_genBody && _genBody.error) || `HTTP ${_genResp.status}`);
-                }
+                await _actionableJsonResponse(_genResp, 'Generate the image for Namespace save', {
+                    dataChanged: false,
+                    nextAction: 'Review the boot configuration, then click Save for next build again.',
+                });
                 const _generated = await _probeBootImage();
                 if (!_generated) {
                     throw new Error('Generated boot image could not be loaded.');
@@ -4431,8 +4473,10 @@ window._nsTableSave = async function(btn) {
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ data_b64, ns_state: nsState }),
         });
-        const data = await resp.json();
-        if (!resp.ok || data.ok === false) throw new Error((data && data.error) || `HTTP ${resp.status}`);
+        const data = await _actionableJsonResponse(resp, 'Save the Namespace', {
+            dataChanged: false,
+            nextAction: 'Review the Namespace entries, then click Save for next build again.',
+        });
 
         // Keep the live table and the next-build policy in one explicit save
         // action.  This also creates the default Step 1 configuration on a
@@ -4969,7 +5013,12 @@ function _showNSLumpModal(slotIdx, nsEntry) {
                 const _lazyBody2 = document.getElementById('_nsLumpLazyBody');
                 if (!_lazyBody2) return;
                 if (!wordsResp.ok) {
-                    _lazyBody2.innerHTML = `<div style="color:#f87171;font-size:0.8rem;">&#9888; Server returned ${wordsResp.status} for token ${_lzTok}.</div>`;
+                    const error = await _actionableResponseError(
+                        wordsResp, 'Open the Namespace LUMP', {
+                            dataChanged: false,
+                            nextAction: 'Reload Namespace, then open this slot again.',
+                        });
+                    _lazyBody2.innerHTML = `<div style="color:#f87171;font-size:0.8rem;">&#9888; ${String(error.message).replace(/</g,'&lt;')}</div>`;
                     return;
                 }
                 const wordsData = await wordsResp.json();
@@ -5063,7 +5112,14 @@ function _showNSLumpModal(slotIdx, nsEntry) {
                 _lazyBody3.innerHTML = fetchHtml;
             } catch (err) {
                 const _lb = document.getElementById('_nsLumpLazyBody');
-                if (_lb) _lb.innerHTML = `<div style="color:#f87171;font-size:0.8rem;">&#9888; Failed to load: ${String(err).replace(/</g,'&lt;')}</div>`;
+                if (_lb) {
+                    const message = err && /\bNo data was changed\b/.test(err.message) ? err.message :
+                        _formatActionableNetworkError('Open the Namespace LUMP', err, {
+                            dataChanged: false,
+                            nextAction: 'Check the IDE connection, then open this slot again.',
+                        });
+                    _lb.innerHTML = `<div style="color:#f87171;font-size:0.8rem;">&#9888; ${String(message).replace(/</g,'&lt;')}</div>`;
+                }
             }
         })();
     }

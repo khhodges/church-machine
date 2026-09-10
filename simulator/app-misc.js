@@ -172,7 +172,10 @@ async function showLibrary() {
         const langFilter = document.getElementById('libraryLangFilter');
         const langParam = langFilter && langFilter.value ? '?language=' + langFilter.value : '';
         const resp = await fetch('/api/library/browse' + langParam);
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        if (!resp.ok) throw await _actionableResponseError(resp, 'Load the shared abstraction library', {
+            dataChanged: false,
+            nextAction: 'Check the IDE connection, then reopen the library.',
+        });
         const data = await resp.json();
         libraryAllItems = data.items || [];
 
@@ -212,7 +215,11 @@ async function showLibrary() {
             '',
             'Check your network connection and try again.'
         ]}, tok);
-        updateGitHubStatus('Fetch failed — ' + e.message, true, tok);
+        updateGitHubStatus(/\bNo data was changed\b/.test(e.message) ? e.message :
+            _formatActionableNetworkError('Load the shared abstraction library', e, {
+                dataChanged: false,
+                nextAction: 'Check the IDE connection, then reopen the library.',
+            }), true, tok);
     }
 }
 
@@ -225,12 +232,20 @@ async function loadLibraryItems() {
         const langFilter = document.getElementById('libraryLangFilter');
         const langParam = langFilter && langFilter.value ? `?language=${langFilter.value}` : '';
         const resp = await fetch(`/api/library/browse${langParam}`);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        if (!resp.ok) throw await _actionableResponseError(resp, 'Refresh the shared abstraction library', {
+            dataChanged: false,
+            nextAction: 'Check the IDE connection, then click Refresh.',
+        });
         const data = await resp.json();
         libraryAllItems = data.items || [];
         renderLibraryGrid(libraryAllItems);
     } catch (e) {
-        grid.innerHTML = `<div class="library-empty">Could not load library: ${e.message}</div>`;
+        const message = /\bNo data was changed\b/.test(e.message) ? e.message :
+            _formatActionableNetworkError('Refresh the shared abstraction library', e, {
+                dataChanged: false,
+                nextAction: 'Check the IDE connection, then click Refresh.',
+            });
+        grid.innerHTML = `<div class="library-empty">${escapeHTML(message)}</div>`;
     }
 }
 
@@ -382,24 +397,31 @@ async function confirmPublish() {
             body: JSON.stringify(payload)
         });
 
-        if (!resp.ok) {
-            const err = await resp.json().catch(() => ({}));
-            throw new Error(err.error || `HTTP ${resp.status}`);
-        }
+        if (!resp.ok) throw await _actionableResponseError(resp, 'Publish the abstraction', {
+            dataChanged: false,
+            nextAction: 'Correct the publish settings, then click Publish again.',
+        });
 
         const data = await resp.json();
         modal.style.display = 'none';
         appendOutput(`Published "${result.abstractionName}" to Mum Tunnel Library`, 'info');
         await loadLibraryItems();
     } catch (e) {
-        alert(`Publish failed: ${e.message}`);
+        alert(/\bNo data was changed\b/.test(e.message) ? e.message :
+            _formatActionableNetworkError('Publish the abstraction', e, {
+                dataChanged: null,
+                nextAction: 'Refresh the library to verify whether it was published before retrying.',
+            }));
     }
 }
 
 async function importFromLibrary(path) {
     try {
         const resp = await fetch(`/api/library/get/${encodeURIComponent(path)}`);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        if (!resp.ok) throw await _actionableResponseError(resp, 'Import the shared abstraction', {
+            dataChanged: false,
+            nextAction: 'Refresh the library, then click Import again.',
+        });
         const data = await resp.json();
 
         if (data.source) {
@@ -423,7 +445,11 @@ async function importFromLibrary(path) {
             switchCodeTab('console');
         }
     } catch (e) {
-        alert(`Import failed: ${e.message}`);
+        alert(/\bNo data was changed\b/.test(e.message) ? e.message :
+            _formatActionableNetworkError('Import the shared abstraction', e, {
+                dataChanged: false,
+                nextAction: 'Check the IDE connection, then click Import again.',
+            }));
     }
 }
 
@@ -438,7 +464,10 @@ async function loadDocsView() {
     _docsLoadPromise = (async () => {
         try {
             const resp = await fetch('/api/docs/list');
-            docsData = await resp.json();
+            docsData = await _actionableJsonResponse(resp, 'Load the Reference document list', {
+                dataChanged: false,
+                nextAction: 'Check the IDE connection, then reopen Reference.',
+            });
             renderDocsFileList();
             docsLoaded = true;
             if (!_pendingDocAnchorNav) {
@@ -447,7 +476,11 @@ async function loadDocsView() {
         } catch (e) {
             _docsLoadPromise = null;
             const body = document.getElementById('docsContentBody');
-            if (body) body.innerHTML = '<div class="docs-placeholder">Failed to load document list.</div>';
+            if (body) body.textContent = /\bNo data was changed\b/.test(e.message) ? e.message :
+                _formatActionableNetworkError('Load the Reference document list', e, {
+                    dataChanged: false,
+                    nextAction: 'Check the IDE connection, then reopen Reference.',
+                });
         }
     })();
     return _docsLoadPromise;
@@ -634,7 +667,10 @@ async function loadDoc(filename, anchor) {
 
     try {
         const resp = await fetch('/api/docs/read/' + filename);
-        const data = await resp.json();
+            const data = await _actionableJsonResponse(resp, 'Load the Reference document', {
+                dataChanged: false,
+                nextAction: 'Reload the Reference list, then open this document again.',
+            });
         if (body) {
             body.innerHTML = renderMarkdown(data.content);
             if (anchor) {
@@ -644,7 +680,11 @@ async function loadDoc(filename, anchor) {
             }
         }
     } catch (e) {
-        if (body) body.innerHTML = '<div class="docs-placeholder">Failed to load document.</div>';
+        if (body) body.textContent = /\bNo data was changed\b/.test(e.message) ? e.message :
+            _formatActionableNetworkError('Load the Reference document', e, {
+                dataChanged: false,
+                nextAction: 'Check the IDE connection, then open this document again.',
+            });
     }
 
     if (isMobile && !anchor) {
@@ -2240,12 +2280,12 @@ function _devHardwareSendCommand(devId, cmd, label, extra) {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(Object.assign({cmd: cmd}, extra || {}))
     }).then(function(response) {
-        return response.json().then(function(data) { return {ok: response.ok, data: data}; });
-    }).then(function(result) {
-        if (!result.ok || !result.data || !result.data.ok) {
-            throw new Error(result.data && result.data.error || 'command rejected');
-        }
-        var id = result.data.id;
+        return _actionableJsonResponse(response, label + ' on the board', {
+            dataChanged: false,
+            nextAction: 'Check the selected board and bridge connection, then retry the action.',
+        });
+    }).then(function(data) {
+        var id = data.id;
         var deadline = Date.now() + 10000;
         function waitForDelivery() {
             return fetch('/hardware/wukong/status').then(function(response) { return response.json(); }).then(function(status) {
@@ -2263,7 +2303,11 @@ function _devHardwareSendCommand(devId, cmd, label, extra) {
         }
         return waitForDelivery();
     }).catch(function(error) {
-        _devHardwareSetMessage(devId, label + ' failed: ' + error.message, 'error');
+        _devHardwareSetMessage(devId, /\bNo data was changed\b/.test(error.message) ? error.message :
+            _formatActionableNetworkError(label + ' on the board', error, {
+                dataChanged: null,
+                nextAction: 'Refresh board status before retrying the action.',
+            }), 'error');
     }).finally(function() {
         state.busy = false;
         _devHardwareControls(devId, false);

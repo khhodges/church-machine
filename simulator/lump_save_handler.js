@@ -6,28 +6,10 @@
 // All browser globals (_showFpgaToast, window, renderLumps) are accessed
 // through typeof guards so the module loads cleanly in Node.js test harnesses.
 
-/**
- * Format an HTTP failure so the report always answers four questions:
- * what failed, why, whether data changed, and what the programmer should do.
- */
-function _formatActionableHttpError(operation, status, body, options) {
-    var opts = options || {};
-    var parsed = body;
-    if (typeof body === 'string') {
-        try { parsed = JSON.parse(body); } catch (_err) { parsed = null; }
-    }
-    var reason = parsed && (parsed.error || parsed.reason || parsed.message);
-    if (!reason && typeof body === 'string') {
-        var plain = body.replace(/\s+/g, ' ').trim();
-        if (plain && plain[0] !== '<') reason = plain.slice(0, 240);
-    }
-    if (!reason) reason = 'The server did not provide a reason.';
-    var changed = opts.dataChanged === true
-        ? 'Data may have changed.'
-        : (opts.dataChanged === false ? 'No data was changed.' : 'Data-change status is unknown.');
-    var next = opts.nextAction ||
-        'Retry the operation. If it fails again, inspect the server logs using the same operation and status.';
-    return `${operation} failed (HTTP ${status}). Reason: ${reason} ${changed} Next: ${next}`;
+if (typeof require === 'function' && typeof _formatActionableHttpError === 'undefined') {
+    var _actionableErrors = require('./actionable_errors.js');
+    var _formatActionableHttpError = _actionableErrors._formatActionableHttpError;
+    var _formatActionableNetworkError = _actionableErrors._formatActionableNetworkError;
 }
 
 /**
@@ -126,15 +108,20 @@ function _lumpSaveRequest(fetchImpl, url, payload, onCommit) {
             } catch (parseError) {
                 var excerpt = String(body || '').replace(/\s+/g, ' ').trim().slice(0, 240);
                 var protocolError = new Error(
-                    'Server/protocol error (HTTP ' + r.status + '): expected JSON' +
-                    (excerpt ? '; received: ' + excerpt : '.'));
+                    _formatActionableHttpError('Save to the LUMP repository', r.status, excerpt, {
+                        dataChanged: null,
+                        nextAction: 'Reload the LUMP repository to verify the save before retrying.',
+                    }));
                 protocolError.kind = 'protocol';
                 protocolError.status = r.status;
                 throw protocolError;
             }
             if (!r.ok || !resp || resp.ok !== true) {
                 var responseError = new Error(
-                    (resp && resp.error) || ('Server rejected save (HTTP ' + r.status + ').'));
+                    _formatActionableHttpError('Save to the LUMP repository', r.status, resp, {
+                        dataChanged: false,
+                        nextAction: 'Correct the LUMP or Namespace settings, then click Save again.',
+                    }));
                 responseError.kind = r.status >= 500
                     ? 'server'
                     : (!r.ok ? 'validation' : 'protocol');
@@ -152,7 +139,10 @@ function _lumpSaveRequest(fetchImpl, url, payload, onCommit) {
             err.kind === 'server'
         )) throw err;
         var transportError = new Error(
-            'Network error \u2014 the save request did not reach the server.');
+            _formatActionableNetworkError('Save to the LUMP repository', err, {
+                dataChanged: null,
+                nextAction: 'Reload the LUMP repository to verify the save before retrying.',
+            }));
         transportError.kind = 'transport';
         transportError.cause = err;
         throw transportError;

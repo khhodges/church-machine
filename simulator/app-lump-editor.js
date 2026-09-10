@@ -1896,7 +1896,10 @@
                 try {
                     body = text ? JSON.parse(text) : {};
                 } catch (parseErr) {
-                    throw new Error('Save failed: server returned an invalid response (HTTP ' + r.status + ').');
+                    throw new Error(_formatActionableHttpError('Save the resident layout', r.status, text, {
+                        dataChanged: null,
+                        nextAction: 'Reload the resident layout to verify it before retrying Save.',
+                    }));
                 }
                 return { ok: r.ok, body: body };
             });
