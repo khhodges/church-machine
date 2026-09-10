@@ -7328,16 +7328,6 @@ def _prepare_saved_lump_ns_state(
     return entries
 
 
-def _bind_saved_lump_to_ns_state(
-        abstraction, ns_slot, token, filename, issue_n, lump_version):
-    """Commit a saved artifact's deployment facts to canonical Namespace state."""
-    entries = _prepare_saved_lump_ns_state(
-        abstraction, ns_slot, token, filename, issue_n, lump_version)
-    if entries is None:
-        return False
-    _write_ns_state(entries)
-    return True
-
 def _ensure_ns_state():
     """Create/migrate ns-state.json to the rich per-slot format on startup.
 
@@ -9067,31 +9057,34 @@ def save_lump():
         return jsonify({"error": str(_intent_error)}), 403
 
     # Build and validate the complete Namespace update before the transition
-    # stages any repository destination. The transition callback only adjusts
-    # the version if archive collision handling advanced it.
-    _prepared_bootstrap_ns_entries = None
-    if _is_bootstrap_canonical:
+    # stages any repository destination. Every slot-bound resident save commits
+    # this state beside its binary, approval, history, and manifest. The
+    # transition callback only adjusts the version if archive collision handling
+    # advanced it.
+    _prepared_ns_entries = None
+    if isinstance(ns_slot, int):
         try:
-            _prepared_bootstrap_ns_entries = _prepare_saved_lump_ns_state(
+            _prepared_ns_entries = _prepare_saved_lump_ns_state(
                 abs_name, ns_slot, token8, lump_filename, _issue_n_save,
                 next_lump_version)
-            if _prepared_bootstrap_ns_entries is None:
-                raise ValueError("bootstrap save has no Namespace destination")
+            if _prepared_ns_entries is None:
+                raise ValueError("resident save has no Namespace destination")
         except (OSError, ValueError, TypeError, json.JSONDecodeError) as _ns_error:
+            _save_kind = "bootstrap " if _is_bootstrap_canonical else ""
             return jsonify({
                 "error": (
-                    "The IDE refused the bootstrap save before changing any data. "
+                    f"The IDE refused the {_save_kind}save before changing any data. "
                     "It can retry from the unchanged source after rebuilding the "
                     f"candidate: Namespace binding is invalid: {_ns_error}"
                 ),
                 "namespace_identity_failed": True,
             }), 422
 
-    def _bootstrap_additional_json(final_manifest_entry):
-        if _prepared_bootstrap_ns_entries is None:
+    def _resident_additional_json(final_manifest_entry):
+        if _prepared_ns_entries is None:
             return {}
         import copy as _copy
-        entries = _copy.deepcopy(_prepared_bootstrap_ns_entries)
+        entries = _copy.deepcopy(_prepared_ns_entries)
         selected = next(
             row for row in entries
             if isinstance(row, dict) and row.get("slot") == ns_slot)
@@ -9164,56 +9157,6 @@ def save_lump():
         _arch_ver is not None
         and _exist_filename == f"{safe_name}_v{_arch_ver}.lump"
     )
-    # Snapshot the complete flat repository revision so any later bind failure
-    # can restore every artifact, including archive names and compatibility aliases.
-    _protected_snapshot = {}
-    _protected_lock_existed = False
-    if True:
-        _protected_lock_existed = os.path.exists(
-            os.path.join(lumps_dir, ".history-transition.lock"))
-        _snapshot_paths = [
-            os.path.join(lumps_dir, name)
-            for name in os.listdir(lumps_dir)
-            if name != ".history-transition.lock"
-        ]
-        for _extra_path in (NS_STATE_PATH, BOOT_IMAGE_PATH):
-            if _extra_path not in _snapshot_paths:
-                _snapshot_paths.append(_extra_path)
-        for _snapshot_path in _snapshot_paths:
-            if os.path.islink(_snapshot_path):
-                _protected_snapshot[_snapshot_path] = ("link", os.readlink(_snapshot_path))
-            elif os.path.isfile(_snapshot_path):
-                with open(_snapshot_path, "rb") as _snapshot_file:
-                    _protected_snapshot[_snapshot_path] = ("file", _snapshot_file.read())
-
-    def _rollback_protected_save():
-        if _protected_snapshot is None:
-            return
-        current_paths = [
-            os.path.join(lumps_dir, name)
-            for name in os.listdir(lumps_dir)
-            if name != ".history-transition.lock"
-        ]
-        for _current_path in current_paths:
-            if _current_path not in _protected_snapshot and os.path.lexists(_current_path):
-                os.remove(_current_path)
-        for _snapshot_path, (_snapshot_kind, _snapshot_value) in _protected_snapshot.items():
-            if os.path.lexists(_snapshot_path):
-                os.remove(_snapshot_path)
-            os.makedirs(os.path.dirname(_snapshot_path), exist_ok=True)
-            if _snapshot_kind == "link":
-                os.symlink(_snapshot_value, _snapshot_path)
-            else:
-                _snapshot_tmp = _snapshot_path + ".protected-resident-rollback"
-                with open(_snapshot_tmp, "wb") as _snapshot_file:
-                    _snapshot_file.write(_snapshot_value)
-                os.replace(_snapshot_tmp, _snapshot_path)
-        if not _protected_lock_existed:
-            try:
-                os.remove(os.path.join(lumps_dir, ".history-transition.lock"))
-            except FileNotFoundError:
-                pass
-
     try:
         _transition = _commit_lump_history_transition(
             lumps_dir=lumps_dir,
@@ -9247,31 +9190,28 @@ def save_lump():
             ns_slot=ns_slot,
             expected_manifest_entry=_existing_entry,
             additional_json_builder=(
-                _bootstrap_additional_json if _is_bootstrap_canonical else None
+                _resident_additional_json
+                if _prepared_ns_entries is not None else None
             ),
         )
     except _LumpTransitionConflict as _transition_conflict:
-        _rollback_protected_save()
         return jsonify({"error": str(_transition_conflict)}), 409
     except _LumpApprovalStoreError as _approval_err:
-        _rollback_protected_save()
         return jsonify({"error": (
             "approvals.json is corrupt and cannot be read safely. "
             "The save has been aborted to prevent weakening prior approvals. "
             f"Details: {_approval_err}"
         )}), 500
     except ValueError as _mf_lock_err:
-        _rollback_protected_save()
         return jsonify({"error": (
             "manifest.json is corrupt and cannot be read safely. "
             "The save has been aborted to prevent overwriting previously-saved LUMPs. "
             f"Details: {_mf_lock_err}"
         )}), 500
     except Exception as _transition_error:
-        _rollback_protected_save()
         logging.exception("[lumps] save transaction failed")
         return jsonify({
-            "error": f"LUMP save transaction failed; prior revision restored: {_transition_error}"
+            "error": f"LUMP save transaction failed; no partial revision was retained: {_transition_error}"
         }), 500
 
     next_lump_version = _transition.get("next_version", next_lump_version)
@@ -9297,23 +9237,6 @@ def save_lump():
                     os.remove(_old_path)
             except OSError as _e:
                 logging.warning('[lumps] Could not prune %s: %s', _old_path, _e)
-
-    # A save replaces the artifact bound to an existing Namespace identity.
-    # Record the exact token/filename before regenerating the boot image so the
-    # generator cannot rediscover an older build by filename ordering.
-    if _is_bootstrap_canonical:
-        _bound_saved_lump = True
-    else:
-        try:
-            _bound_saved_lump = _bind_saved_lump_to_ns_state(
-                abs_name, ns_slot, token8, lump_filename, _issue_n_save,
-                next_lump_version)
-        except Exception as _ns_bind_exc:
-            _rollback_protected_save()
-            return jsonify({"error": (
-                f"LUMP save transaction failed; prior revision restored: "
-                f"Namespace binding could not be refreshed: {_ns_bind_exc}"
-            )}), 500
 
     print(f'[lumps] Saved {lump_filename} ({len(lump_bytes)} bytes)', flush=True)
 

@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import struct
 import sys
 import types
@@ -104,6 +105,51 @@ def test_replacement_updates_binary_approval_namespace_and_boot(repository):
     assert not list(root.glob("*.json")) or all(
         p.name in {"manifest.json", "approvals.json", "ns-state.json"}
         for p in root.glob("*.json"))
+
+
+def test_replacement_stages_namespace_in_history_transition(
+        repository, monkeypatch):
+    captured = {}
+    original = app_module._commit_lump_history_transition
+
+    def capture_transition(**kwargs):
+        captured["builder"] = kwargs.get("additional_json_builder")
+        return original(**kwargs)
+
+    monkeypatch.setattr(
+        app_module, "_commit_lump_history_transition", capture_transition)
+
+    with app_module.app.test_client() as client:
+        response = client.post("/api/lumps/save", json=_payload(client))
+
+    assert response.status_code == 200, response.get_data(as_text=True)
+    assert callable(captured["builder"])
+
+
+def test_namespace_commit_failure_restores_whole_resident_transition(
+        repository, monkeypatch):
+    root, state_path, _boot = repository
+    with app_module.app.test_client() as client:
+        payload = _payload(client)
+        before = {p.name: p.read_bytes() for p in root.iterdir()}
+        real_replace = os.replace
+        failed = False
+
+        def fail_namespace_replace(source, destination):
+            nonlocal failed
+            if (not failed
+                    and os.path.abspath(destination) == os.path.abspath(state_path)):
+                failed = True
+                raise OSError("injected Namespace commit failure")
+            return real_replace(source, destination)
+
+        monkeypatch.setattr(app_module.os, "replace", fail_namespace_replace)
+        response = client.post("/api/lumps/save", json=payload)
+
+    assert response.status_code == 500
+    assert "no partial revision was retained" in response.get_json()["error"]
+    assert failed is True
+    assert {p.name: p.read_bytes() for p in root.iterdir()} == before
 
 
 def test_boot_failure_keeps_approved_capabilitytest_save_and_old_boot(

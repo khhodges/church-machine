@@ -337,3 +337,37 @@ def test_every_slot_accepts_programmer_selected_identity(
             },
         })
     assert response.status_code == 201, response.get_data(as_text=True)
+
+
+def test_resident_namespace_failure_never_enters_commit_helper(
+        isolated_lumps, monkeypatch):
+    state = isolated_lumps / "ns-state.json"
+    state.write_text(json.dumps({"abstractions": []}))
+    monkeypatch.setattr(app_module, "NS_STATE_PATH", str(state))
+    commit_entered = False
+
+    def fail_binding(*_args, **_kwargs):
+        raise ValueError("injected binding failure")
+
+    def record_commit(**_kwargs):
+        nonlocal commit_entered
+        commit_entered = True
+        raise AssertionError("commit helper must not run")
+
+    words = _words(marker=103)
+    with app_module.app.test_client() as client:
+        payload = _approved_payload(
+            client, words, token="7c501103", name="ResidentFailure")
+        payload["metadata"]["ns_slot"] = 11
+        monkeypatch.setattr(
+            app_module, "_prepare_saved_lump_ns_state", fail_binding)
+        monkeypatch.setattr(
+            app_module, "_commit_lump_history_transition", record_commit)
+        response = client.post("/api/lumps/save", json=payload)
+
+    assert response.status_code == 422
+    assert response.get_json()["namespace_identity_failed"] is True
+    assert "injected binding failure" in response.get_json()["error"]
+    assert commit_entered is False
+    assert json.loads(state.read_text()) == {"abstractions": []}
+    assert not list(isolated_lumps.glob("*.lump"))
