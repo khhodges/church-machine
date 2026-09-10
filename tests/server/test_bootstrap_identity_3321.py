@@ -122,6 +122,147 @@ def test_every_frozen_resident_manifest_approval_row0_and_boot_w3_share_t():
         assert words[len(words) - (binding["slot"] + 1) * 4 + 3] == row0
 
 
+def test_archived_capabilitytest_hash_token_is_classified_legacy_incompatible():
+    root = Path(__file__).resolve().parents[2]
+    lumps = root / "server" / "lumps"
+    manifest = json.loads((lumps / "manifest.json").read_text())
+    archived = next(
+        row for row in manifest
+        if row.get("token") == "b6182a95"
+        and row.get("abstraction") == "CapabilityTest")
+    inspected = app_module._inspect_lump_binary(lumps / archived["filename"])
+
+    identity = app_module._bootstrap_snapshot_identity(
+        str(lumps), archived, inspected)
+
+    assert identity == {
+        "applies": True,
+        "valid": False,
+        "archived": True,
+        "record_token": "b6182a95",
+        "row0_gt": "4a000006",
+        "expected_gt": "4a00000a",
+        "slot": 10,
+        "sequence": 0,
+        "errors": [
+            "record Token 0xb6182a95 != expected GT 0x4a00000a",
+            "sealed row-zero GT 0x4a000006 != expected GT 0x4a00000a",
+            "record Token 0xb6182a95 != sealed row-zero GT 0x4a000006",
+        ],
+        "data_changed": False,
+    }
+
+
+def test_current_capabilitytest_snapshot_proves_t_equals_row0_equals_destination():
+    root = Path(__file__).resolve().parents[2]
+    lumps = root / "server" / "lumps"
+    manifest = json.loads((lumps / "manifest.json").read_text())
+    current = next(
+        row for row in manifest
+        if row.get("token") == "4a00000a"
+        and row.get("abstraction") == "CapabilityTest"
+        and not row.get("archived"))
+    inspected = app_module._inspect_lump_binary(lumps / current["filename"])
+
+    identity = app_module._bootstrap_snapshot_identity(
+        str(lumps), current, inspected)
+
+    assert identity["valid"] is True
+    assert identity["record_token"] == "4a00000a"
+    assert identity["row0_gt"] == "4a00000a"
+    assert identity["expected_gt"] == "4a00000a"
+    assert identity["errors"] == []
+
+
+def test_archived_bootstrap_snapshot_cannot_enable_history_restore():
+    root = Path(__file__).resolve().parents[2]
+    lumps = root / "server" / "lumps"
+    manifest = json.loads((lumps / "manifest.json").read_text())
+    archived = next(
+        row for row in manifest
+        if row.get("token") == "b6182a95")
+    snapshot = app_module._validate_lump_snapshot(
+        lumps / archived["filename"], archived)
+
+    assert snapshot["valid"] is False
+    assert snapshot["bootstrap_identity"]["valid"] is False
+    assert any("bootstrap T-equals-GT validation failed" in error
+               for error in snapshot["errors"])
+    assert any("no data was changed" in error for error in snapshot["errors"])
+
+
+@pytest.mark.parametrize("state_mode", ["missing", "malformed", "duplicate"])
+def test_bootstrap_history_fails_closed_when_binding_is_unavailable(
+        tmp_path, monkeypatch, state_mode):
+    root = Path(__file__).resolve().parents[2]
+    source_lump = (
+        root / "server" / "lumps" / "CapabilityTest.1.edfd9e62.lump")
+    current_name = "CapabilityTest.1.edfd9e62.lump"
+    archive_name = "CapabilityTest.1.edfd9e62_v1.lump"
+    binary = source_lump.read_bytes()
+    (tmp_path / current_name).write_bytes(binary)
+    (tmp_path / archive_name).write_bytes(binary)
+    manifest_entry = {
+        "token": "b6182a95",
+        "abstraction": "CapabilityTest",
+        "filename": current_name,
+        "lump_version": 2,
+        "archived": True,
+    }
+    (tmp_path / "manifest.json").write_text(
+        json.dumps([manifest_entry]), encoding="utf-8")
+    if state_mode == "malformed":
+        (tmp_path / "ns-state.json").write_text("{", encoding="utf-8")
+    elif state_mode == "duplicate":
+        binding = {
+            "name": "CapabilityTest",
+            "slot": 10,
+            "seq": 0,
+            "resident": True,
+            "boot_resident": True,
+            "type": "Inform",
+            "load_policy": "Resident",
+            "ns_slot_policy": "static",
+        }
+        (tmp_path / "ns-state.json").write_text(
+            json.dumps({"abstractions": [binding, dict(binding)]}),
+            encoding="utf-8")
+
+    monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
+    with app_module.app.test_client() as client:
+        response = client.get("/api/lumps/b6182a95/history")
+
+    assert response.status_code == 200
+    history = response.get_json()["history"]
+    archived = next(row for row in history if row["version"] == 1)
+    assert archived["binary_valid"] is False
+    assert archived["preview_enabled"] is False
+    assert archived["restore_enabled"] is False
+    assert archived["bootstrap_identity"]["valid"] is False
+    assert "authoritative bootstrap identity audit is unavailable" in (
+        archived["validation_errors"][0])
+
+
+def test_lump_list_and_words_expose_bootstrap_identity_comparison():
+    with app_module.app.test_client() as client:
+        listed_response = client.get("/api/lumps/list")
+        words_response = client.get("/api/lump/b6182a95/words")
+
+    assert listed_response.status_code == 200
+    archived = next(
+        row for row in listed_response.get_json()
+        if row.get("token") == "b6182a95")
+    assert archived["legacy_incompatible"] is True
+    assert archived["bootstrap_identity"]["record_token"] == "b6182a95"
+    assert archived["bootstrap_identity"]["row0_gt"] == "4a000006"
+    assert archived["bootstrap_identity"]["expected_gt"] == "4a00000a"
+
+    assert words_response.status_code == 200
+    words_identity = words_response.get_json()["bootstrap_identity"]
+    assert words_identity["valid"] is False
+    assert words_identity["data_changed"] is False
+
+
 def test_programmer_can_plan_slot7_replacement_with_content_token_hint():
     """A content token must not turn a programmer-owned slot into a protected slot."""
     words = [(0x1F << 27) | (1 << 10) | 1, 0] + [0] * 62

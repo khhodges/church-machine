@@ -73,6 +73,20 @@ function showLumpDetail(token) {
             _headerStrip += `<span class="lump-hs-chip lump-issue-badge" title="Issue #${_issueN}\u2014ownership generation; \u00231 = sole original author"><span class="lump-hs-label">#</span>${_issueN}</span>`;
     }
     _headerStrip += `<span class="lump-hs-chip"><span class="lump-hs-label">Token</span>0x${_e(lump.token || '')}</span>`;
+    const _bootstrapIdentityInvalid = !!(
+        lump.bootstrap_identity &&
+        lump.bootstrap_identity.applies === true &&
+        lump.bootstrap_identity.valid === false
+    );
+    if (_bootstrapIdentityInvalid) {
+        const _bi = lump.bootstrap_identity;
+        const _bootstrapMismatchTitle =
+            `Legacy bootstrap identity mismatch: Token 0x${_e(_bi.record_token || '????????')}; ` +
+            `sealed row-zero GT 0x${_e(_bi.row0_gt || '????????')}; ` +
+            `expected GT 0x${_e(_bi.expected_gt || '????????')}. This archived revision cannot be active or restored.`;
+        _headerStrip += `<span class="lump-malformed-chip" title="${_bootstrapMismatchTitle}">` +
+            `\u26a0 Archived \u2014 bootstrap identity invalid</span>`;
+    }
     // Number chip — 8-hex content-identity digest from the canonical filename.
     // Derived as sha256(dot_name_utf8 + lump_bytes)[:8]; stable across identical
     // rebuilds; changes whenever the binary changes.
@@ -118,7 +132,7 @@ function showLumpDetail(token) {
     if (!isNamespace) {
         _headerStrip += `<button class="lump-hs-btn lump-edit-btn" data-edit-token="${_e(token)}" title="Open this saved code and its compiled binary in the editor">&#9998; Open in Editor</button>`;
         _headerStrip += `<button class="lump-hs-btn lump-audit-btn" data-audit-token="${_e(token)}" title="Audit \u2014 Run pre-save consistency checks">\u2699 Audit</button>`;
-        if (_isCodeLump) {
+        if (_isCodeLump && !_bootstrapIdentityInvalid) {
             _headerStrip += `<button class="lump-hs-btn lump-hs-btn-run" id="lumpWsRunBtn" onclick="_runSelectedLumpInSim(this)" title="Run in Simulator \u2014 Load binary into simulator">&#x25b6; Run</button>`;
         }
     }

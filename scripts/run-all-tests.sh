@@ -338,7 +338,7 @@ register_suite "boot-image-matches-sim" \
     'python3 -m pytest tests/boot/test_boot_image_matches_simulator.py -v'
 
 register_suite "bootstrap-resident-identity-tests" \
-    'python3 -m pytest tests/server/test_bootstrap_identity_3321.py tests/server/test_bootstrap_migration_atomic_3321.py -v'
+    'python3 -m pytest tests/server/test_bootstrap_identity_3321.py tests/server/test_bootstrap_migration_atomic_3321.py -v && node simulator/test_bootstrap_resident_identity.js && node simulator/test_bootstrap_token_audit.js'
 
 register_suite "boot-image-loads-and-boots" \
     'python -m pytest tests/boot/test_boot_image_loads_and_boots.py -v'

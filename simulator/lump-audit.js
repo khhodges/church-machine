@@ -143,6 +143,35 @@ function lumpAudit(words, manifest, lineNums, opts) {
     const _typNames = { 0: 'lump', 1: 'data', 2: 'clist-only', 3: 'Outform' };
     const _typName  = _typNames[typ] || 'unknown';
     const _typBits  = typ.toString(2).padStart(2, '0');
+    const _bootstrapIdentity = manifest && manifest.bootstrap_identity;
+    if (_bootstrapIdentity && _bootstrapIdentity.applies === true) {
+        const _fmtGt = value => value
+            ? `0x${String(value).toUpperCase().padStart(8, '0')}`
+            : 'unavailable';
+        const _recordToken = _fmtGt(_bootstrapIdentity.record_token);
+        const _row0Gt = _fmtGt(_bootstrapIdentity.row0_gt);
+        const _expectedGt = _fmtGt(_bootstrapIdentity.expected_gt);
+        if (_bootstrapIdentity.valid === true) {
+            results.push({
+                ruleId: 'RBT',
+                severity: 'pass',
+                message: `Bootstrap identity exact — Token = row-zero GT = destination GT = ${_expectedGt} ✓`,
+                detail: `Displayed/record Token ${_recordToken}; sealed row-zero GT ${_row0Gt}; ` +
+                    `expected NS[${_bootstrapIdentity.slot}] sequence ${_bootstrapIdentity.sequence} GT ${_expectedGt}. ` +
+                    'All values are bit-for-bit equal.',
+            });
+        } else {
+            results.push({
+                ruleId: 'RBT',
+                severity: 'error',
+                message: 'Bootstrap identity mismatch — this revision is legacy-incompatible and cannot be active or restored.',
+                detail: `Displayed/record Token ${_recordToken}; sealed row-zero GT ${_row0Gt}; ` +
+                    `expected NS[${_bootstrapIdentity.slot}] sequence ${_bootstrapIdentity.sequence} GT ${_expectedGt}. ` +
+                    `${(_bootstrapIdentity.errors || []).join('; ')}. No data was changed. ` +
+                    'The IDE must create a destination-bound revision; the programmer must not edit identity fields.',
+            });
+        }
+    }
 
     if (magic === 0x1F) {
         results.push({
@@ -1145,7 +1174,7 @@ async function lumpAuditFromServer(token, _manifest, container, opts) {
         }
 
         container.innerHTML = '';
-        const results = lumpAudit(words, null, null);
+        const results = lumpAudit(words, data, null);
         return lumpAuditRenderPanel(container, results, opts);
     } catch (err) {
         const report = err && err.actionable

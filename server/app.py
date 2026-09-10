@@ -9378,6 +9378,100 @@ def patch_wip_source(token):
     }), 410
 
 
+def _bootstrap_snapshot_identity(lumps_dir, manifest_entry, inspected):
+    """Compare one exact saved binary with its name's live bootstrap binding.
+
+    Archived bootstrap revisions are immutable, but they are not exempt from
+    the current frozen-resident identity contract.  This helper is read-only:
+    it reports whether the record token, sealed row-zero word, and live
+    destination GT are the same unsigned word.
+    """
+    if not isinstance(manifest_entry, dict) or not isinstance(inspected, dict):
+        return None
+    abstraction = manifest_entry.get("abstraction")
+    if not isinstance(abstraction, str) or not abstraction:
+        return None
+    # These are the ratified frozen bootstrap chain.  Historical manifest rows
+    # predate explicit resident flags, so ancestry must be recognized by stable
+    # abstraction identity rather than by a current token or filename.
+    if abstraction.casefold() not in {
+            "selftest", "capabilitytest", "wukongcallhome"}:
+        return None
+
+    record_token = str(manifest_entry.get("token") or "").strip().lower()
+
+    def _unavailable(reason):
+        return {
+            "applies": True,
+            "valid": False,
+            "archived": bool(manifest_entry.get("archived")),
+            "record_token": record_token,
+            "row0_gt": None,
+            "expected_gt": None,
+            "slot": None,
+            "sequence": None,
+            "errors": [
+                "authoritative bootstrap identity audit is unavailable: "
+                + reason
+            ],
+            "data_changed": False,
+        }
+
+    try:
+        with open(os.path.join(lumps_dir, "ns-state.json"), encoding="utf-8") as source:
+            state_rows = json.load(source).get("abstractions", [])
+        if not isinstance(state_rows, list):
+            return _unavailable("ns-state abstractions is not an array")
+    except (OSError, ValueError, AttributeError) as exc:
+        return _unavailable(f"ns-state could not be read ({exc})")
+    bindings = [
+        row for row in state_rows
+        if isinstance(row, dict)
+        and str(row.get("name") or "").casefold() == abstraction.casefold()
+    ]
+    if len(bindings) != 1:
+        return _unavailable(
+            f"expected exactly one {abstraction} Namespace binding; found {len(bindings)}")
+    binding = bindings[0]
+    try:
+        expected_gt = _resident_inform_egt(binding)
+    except ValueError as exc:
+        return _unavailable(str(exc))
+    words = inspected.get("words")
+    allocation = inspected.get("lump_size")
+    cc = inspected.get("cc")
+    row0_gt = None
+    if (isinstance(words, (list, tuple)) and isinstance(allocation, int)
+            and isinstance(cc, int) and cc >= 1 and len(words) >= allocation):
+        row0_gt = int(words[allocation - cc]) & 0xFFFFFFFF
+    expected_token = f"{expected_gt:08x}"
+    row0_token = f"{row0_gt:08x}" if row0_gt is not None else None
+    errors = []
+    if row0_gt is None:
+        errors.append("sealed binary has no readable c-list row-zero GT")
+    if record_token != expected_token:
+        errors.append(
+            f"record Token 0x{record_token or '????????'} != expected GT 0x{expected_token}")
+    if row0_token != expected_token:
+        errors.append(
+            f"sealed row-zero GT 0x{row0_token or '????????'} != expected GT 0x{expected_token}")
+    if row0_token is not None and record_token != row0_token:
+        errors.append(
+            f"record Token 0x{record_token or '????????'} != sealed row-zero GT 0x{row0_token}")
+    return {
+        "applies": True,
+        "valid": not errors,
+        "archived": bool(manifest_entry.get("archived")),
+        "record_token": record_token,
+        "row0_gt": row0_token,
+        "expected_gt": expected_token,
+        "slot": binding.get("slot"),
+        "sequence": binding.get("seq", 0),
+        "errors": errors,
+        "data_changed": False,
+    }
+
+
 @app.route("/api/lumps/list")
 def list_lumps():
     """Return the manifest catalogue reconciled with binary/approval facts."""
@@ -9407,6 +9501,12 @@ def list_lumps():
             row["approved"] = approval is not None
             row["clist_entries"] = inspected["clist_entries"]
             row["has_source"] = bool(inspected["source"])
+            bootstrap_identity = _bootstrap_snapshot_identity(
+                lumps_dir, entry, inspected)
+            if bootstrap_identity is not None:
+                row["bootstrap_identity"] = bootstrap_identity
+                row["legacy_incompatible"] = bool(
+                    entry.get("archived") and not bootstrap_identity["valid"])
             if approval:
                 row.update({k: v for k, v in approval.items()
                             if k not in {"source", "cw", "cc", "typ", "lump_size"}})
@@ -9467,6 +9567,12 @@ def get_lump_detail(token):
                    "approved": approval is not None,
                    "trusted": approval is not None and canonical is True,
                    "api_definition_source": "lump"})
+    bootstrap_identity = _bootstrap_snapshot_identity(
+        lumps_dir, entry, inspected)
+    if bootstrap_identity is not None:
+        detail["bootstrap_identity"] = bootstrap_identity
+        detail["legacy_incompatible"] = bool(
+            entry.get("archived") and not bootstrap_identity["valid"])
     return jsonify(detail)
 
 
@@ -9570,6 +9676,21 @@ def get_lump_words(token_hex):
         "approved":        _approval_ret is not None,
         "trusted":         _approval_ret is not None and _integrity_result is True,
     }
+    try:
+        manifest = _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json"))
+    except ValueError:
+        manifest = []
+    manifest_entry = next(
+        (row for row in manifest
+         if isinstance(row, dict)
+         and str(row.get("token") or "").lower() == key8),
+        None)
+    bootstrap_identity = _bootstrap_snapshot_identity(
+        LUMPS_DIR, manifest_entry, inspected)
+    if bootstrap_identity is not None:
+        response["bootstrap_identity"] = bootstrap_identity
+        response["legacy_incompatible"] = bool(
+            manifest_entry.get("archived") and not bootstrap_identity["valid"])
     if _approval_ret is not None:
         for field in ("pet_name", "dot_name", "issue_n", "identity_hash"):
             if field in _approval_ret:
@@ -9577,7 +9698,7 @@ def get_lump_words(token_hex):
     return jsonify(response)
 
 
-def _validate_lump_snapshot(lump_path):
+def _validate_lump_snapshot(lump_path, manifest_entry=None):
     """Validate one exact binary and report any hash-bound approval.
 
     History, Preview, and Restore must agree on whether an archive is usable.
@@ -9601,6 +9722,7 @@ def _validate_lump_snapshot(lump_path):
         "approved": False,
         "trusted": False,
         "valid": False,
+        "bootstrap_identity": None,
     }
     if not binary_available:
         errors.append("archived binary is missing")
@@ -9615,6 +9737,16 @@ def _validate_lump_snapshot(lump_path):
         ("raw_bytes", "words", "cw", "cc", "lump_size", "binary_hash",
          "content_profile", "source")
     })
+    bootstrap_identity = _bootstrap_snapshot_identity(
+        os.path.dirname(os.path.abspath(lump_path)),
+        manifest_entry,
+        inspected)
+    result["bootstrap_identity"] = bootstrap_identity
+    if bootstrap_identity is not None and not bootstrap_identity["valid"]:
+        errors.append(
+            "bootstrap T-equals-GT validation failed: "
+            + "; ".join(bootstrap_identity["errors"])
+            + "; no data was changed")
     try:
         approval = _matching_lump_approval(
             os.path.dirname(os.path.abspath(lump_path)), inspected["binary_hash"])
@@ -9677,7 +9809,7 @@ def get_lump_history(token):
                      for _stem in _safe_stems_h]
 
     def _snapshot_entry_h(version, lump_path, *, current=False):
-        snapshot = _validate_lump_snapshot(lump_path)
+        snapshot = _validate_lump_snapshot(lump_path, _current_manifest_h)
         approval = snapshot["approval"] or {}
         errors = snapshot["errors"]
         entry = {
@@ -9699,6 +9831,10 @@ def get_lump_history(token):
             "restore_enabled": bool(
                 not current and snapshot["valid"] and snapshot["approved"]),
             "validation_errors": errors,
+            "bootstrap_identity": snapshot["bootstrap_identity"],
+            "legacy_incompatible": bool(
+                snapshot["bootstrap_identity"] is not None
+                and not snapshot["bootstrap_identity"]["valid"]),
         }
         if isinstance(approval.get("mtbf"), dict):
             entry["mtbf"] = approval["mtbf"]
@@ -9953,12 +10089,14 @@ def get_lump_version_words(token, version):
     # <AbsName>_v<N>.lump. The latter preserves access to versions written
     # before a dot-name filename became the manifest's active artifact.
     _mf_v = os.path.join(lumps_dir, 'manifest.json')
+    _manifest_entry_v = None
     if os.path.isfile(_mf_v):
         try:
             with open(_mf_v) as _f:
                 _mf_vd = json.load(_f)
             for _e in _mf_vd:
                 if _e.get('token') == key8:
+                    _manifest_entry_v = _e
                     _fn = _e.get('filename', '')
                     if _fn and _fn.endswith('.lump'):
                         import re as _re_vv
@@ -9978,7 +10116,7 @@ def get_lump_version_words(token, version):
             pass
     if not os.path.isfile(lump_path_v):
         return jsonify({"error": f"No archived version v{version} for token 0x{key8}"}), 404
-    snapshot = _validate_lump_snapshot(lump_path_v)
+    snapshot = _validate_lump_snapshot(lump_path_v, _manifest_entry_v)
     approval = snapshot["approval"] or {}
     validation_errors = snapshot["errors"]
     if validation_errors:
@@ -10010,6 +10148,10 @@ def get_lump_version_words(token, version):
         "grants":        approval.get('grants', []),
         "pet_names":     approval.get('pet_names', {}),
         "source":        snapshot.get('source') or '',
+        "bootstrap_identity": snapshot.get("bootstrap_identity"),
+        "legacy_incompatible": bool(
+            snapshot.get("bootstrap_identity")
+            and not snapshot["bootstrap_identity"]["valid"]),
     })
 
 

@@ -1093,7 +1093,13 @@ function _updateLumpViewingLabel(token) {
     const ct      = (lump.content_type || '').toLowerCase();
     const typ     = lump.typ;
     const isFloat = (lump.ns_slot === null || lump.ns_slot === undefined);
-    const badge   = lt === 'boot'                     ? '[BOOT]'
+    const bootstrapInvalid = !!(
+        lump.bootstrap_identity &&
+        lump.bootstrap_identity.applies === true &&
+        lump.bootstrap_identity.valid === false
+    );
+    const badge   = bootstrapInvalid                   ? '[ARCHIVED — BOOTSTRAP IDENTITY INVALID]'
+                  : lt === 'boot'                     ? '[BOOT]'
                   : lt === 'namespace' || typ === 10  ? '[NS]'
                   : ct === 'outform'   || typ === 3   ? '[OTF]'
                   : ct === 'thread'    || typ === 2   ? '[THR]'
