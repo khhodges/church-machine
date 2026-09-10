@@ -134,7 +134,7 @@
       "location": "0x00001190",
       "type": "Inform",
       "token": "4a00000a",
-      "filename": "CapabilityTest.2.225da6fc.lump",
+      "filename": "CapabilityTest.2.e794a764.lump",
       "lump_version": 25,
       "resident": true,
       "boot_resident": true,
@@ -146,7 +146,7 @@
       "boot": true,
       "issue_n": 2,
       "load_policy": "Resident",
-      "binary_hash": "7f36b8a385f82a7b1548deb37b7b25999492b58934b0905fadf06b83d3f659f0",
+      "binary_hash": "55f07137513625e0749de30f5d67a7d979e3fa4eedfef3b499a67f358f28db32",
       "ns_slot_policy": "static"
     },
     {

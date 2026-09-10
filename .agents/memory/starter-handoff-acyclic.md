@@ -11,5 +11,6 @@ and hardware contract. A reciprocal SelfTest/Starter ELOADCALL cycle therefore
 grows the protected LIFO until stack overflow; it is not a tail-call loop.
 
 **How to apply:** Keep negative terminal-fault checks in isolated tests, not in
-the continuing Starter path. Regressions should verify the chain is acyclic and
-that the Starter's final continuation is not SelfTest.
+the continuing Starter path. Regressions should verify the handoff never calls
+SelfTest again. If the downstream continuation returns, the Starter may branch
+to its own entry to rerun checks without growing a reciprocal SelfTest frame.

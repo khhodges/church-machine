@@ -432,6 +432,14 @@ function checkPair(pair) {
         lines.push(`   ERROR: no CLIST array found in ${buildRel}`);
         return { ok: false, lines };
     }
+    if (pair.label === 'capability_test') {
+        const compilerRows = clistEntries.filter(row => row.role === 'compiler-owned');
+        if (compilerRows.length !== 1 || compilerRows[0].name !== '__SELF__') {
+            lines.push('   ERROR: CapabilityTest must have one separately labelled compiler-owned __SELF__ row');
+            return { ok: false, lines };
+        }
+        clistEntries = clistEntries.filter(row => row.role !== 'compiler-owned');
+    }
     if (pair.label === 'wukong_callhome') {
         const compilerRows = clistEntries.filter(row => row.role === 'compiler-owned');
         const runtimeRows = clistEntries.filter(row => row.role === 'runtime-only');

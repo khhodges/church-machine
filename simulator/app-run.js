@@ -7385,6 +7385,7 @@ capabilities {
     WukongCallHome.hw E
 }
 
+Start:
 ; ============================================================
 ; TEST 1: LOAD -- materialise all declared capabilities from c-list
 ; ============================================================
@@ -7450,8 +7451,8 @@ SHR  DR4, DR4, 1      ; DR4 = 4
 ; creates the unbounded SelfTest → CapabilityTest → SelfTest frame cycle.
 ELOADCALL CR0, WukongCallHome.hw, 0
 
-; --- All tests complete ---
-HALT
+; If call-home returns, rerun the capability checks without re-entering SelfTest.
+BRANCH Start
 `,
         'system_patterns': `; ============================================================
 ; Abstraction:  SystemPatterns

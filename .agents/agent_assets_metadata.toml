@@ -318,3 +318,17 @@ mtime_ms = 1789080652100
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/8199677e-3893-49c7-8db7-25cababb6c6d/c3297490-0482-49a7-bd3a-de99d4109a53"
 storage_version_token = "1789080661431021"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "Be4Blnobp4_1zHejEzXKn"
+uri = "file://server/lumps/CapabilityTest.2.e794a764.lump"
+type = "unspecified"
+title = "CapabilityTest compliant LUMP"
+description = "8,192-byte frozen resident LUMP for Namespace slot 10. Token 0x4A00000A; 31 code words; 8 C-list rows; embedded source ends with BRANCH Start."
+logical_id = "7361846c-14fa-444d-a337-d9c9772265c3"
+content_hash = "sha256:55f07137513625e0749de30f5d67a7d979e3fa4eedfef3b499a67f358f28db32"
+size = 8192
+mtime_ms = 1789083879744
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/7361846c-14fa-444d-a337-d9c9772265c3/c6b09ab1-35a3-4608-8655-8912d2885c0c"
+storage_version_token = "1789084016719635"
+content_type = "application/octet-stream"

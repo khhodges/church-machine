@@ -361,6 +361,20 @@
       "issue_n": 1,
       "filename": "TestAbs.1.71742676.lump",
       "identity_hash": "1a7d7e5da79aa2a8153d909e97160628cc411b1a3a4782a3a8f1f9fb655450b5"
+    },
+    "55f07137513625e0749de30f5d67a7d979e3fa4eedfef3b499a67f358f28db32": {
+      "binary_hash": "55f07137513625e0749de30f5d67a7d979e3fa4eedfef3b499a67f358f28db32",
+      "filename": "CapabilityTest.2.e794a764.lump",
+      "dot_name": "CapabilityTest",
+      "issue_n": 2,
+      "bootstrap_t": "4a00000a",
+      "bootstrap_runtime_gt": 1241513994,
+      "token": "4a00000a",
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
     }
   }
 }

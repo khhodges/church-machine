@@ -9,7 +9,7 @@
 // name/content hash. Content is still named by sha256(dot_name_utf8 +
 // lump_bytes)[:8], per lump_integrity.py.
 //
-// C-List (cc=7) — tail of the lump, 7 slots:
+// Physical C-List (cc=8): compiler-owned SELF row plus 7 declarations:
 //   Slot 0  SelfTest   (NS slot 6, E)    — E-perm callable abstraction
 //   Slot 1  LED_DEV    (NS slot 3, RW)   — hardware LED register file
 //   Slot 2  UART_DEV   (NS slot 2, RW)   — hardware UART TX/STATUS/RX
@@ -126,7 +126,7 @@ const FRAME = contentFrame(DOT_NAME, source);
 
 // ── C-List definition ─────────────────────────────────────────────────────────
 //
-// cc = 7  (one GT per declared capability).
+// cc = 8  (compiler-owned SELF plus one GT per declared capability).
 //
 // GT layout (v2.0):
 //   [31]    b_flag  = 0
@@ -138,6 +138,7 @@ const FRAME = contentFrame(DOT_NAME, source);
 //
 const CLIST = [
     { gt: 0x4A00000A, name: '__SELF__', ns_slot: 10, rights: ['E'],
+      role: 'compiler-owned',
       note: 'CapabilityTest frozen resident SELF E Inform GT (NS slot 10)' },
     { gt: 0x4A000006, name: 'SelfTest',   ns_slot: 6, rights: ['E'],
       note: 'SelfTest    Church E-perm Inform GT (NS slot 6)' },
@@ -168,7 +169,7 @@ const token = CLIST[0].gt.toString(16).padStart(8, '0');
 //   Words lumpSize-cc..lumpSize-1 : c-list GT words (tail-packed)
 //
 const cw = words.length;
-const cc = CLIST.length;   // 6
+const cc = CLIST.length;   // 8
 const totalNeeded = 1 + cw + FRAME.length + cc;
 
 let lumpSize = 64;
@@ -246,7 +247,8 @@ if (CHECK_ONLY) {
         failures.push('manifest is missing or invalid');
     }
     if (checkedManifest) {
-        const bindings = checkedManifest.filter(e => e.token === token);
+        const bindings = checkedManifest.filter(
+            e => e.token === token && e.archived !== true);
         if (bindings.length !== 1 ||
             bindings[0].abstraction !== 'CapabilityTest' ||
             bindings[0].filename !== filename) {

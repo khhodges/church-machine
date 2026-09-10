@@ -315,7 +315,7 @@ def test_lump_list_hides_archived_bootstrap_but_words_expose_identity_comparison
     [
         ("4a000006", "SelfTest", "SelfTest.80.f37bafd6.lump"),
         ("4a000007", "WukongCallHome", "WukongCallHome.1.9bf03976.lump"),
-        ("4a00000a", "CapabilityTest", "CapabilityTest.2.225da6fc.lump"),
+        ("4a00000a", "CapabilityTest", "CapabilityTest.2.e794a764.lump"),
     ],
 )
 def test_active_bootstrap_history_groups_all_legacy_manifest_records_read_only(

@@ -25,10 +25,10 @@ for (const source of [canonical, appRun]) {
         source,
         /ELOADCALL\s+CR0,\s*WukongCallHome\.hw,\s*0/,
         'CapabilityTest must continue to WukongCallHome.hw');
-    assert.doesNotMatch(
+    assert.match(
         source,
         /BRANCH\s+Start\b/,
-        'continuing CapabilityTest must not restore the recovered infinite loop');
+        'CapabilityTest must rerun from Start if WukongCallHome returns');
 }
 
 assert.match(
