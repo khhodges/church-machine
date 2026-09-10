@@ -351,6 +351,16 @@
         "E"
       ],
       "capability_type": "inform"
+    },
+    "baccca61a25497a7e44c9fbd80d87838472f676b494604e4b5dc9289f52fc122": {
+      "version": 1,
+      "abstraction": "TestAbs",
+      "author": "",
+      "binary_hash": "baccca61a25497a7e44c9fbd80d87838472f676b494604e4b5dc9289f52fc122",
+      "dot_name": "TestAbs",
+      "issue_n": 1,
+      "filename": "TestAbs.1.71742676.lump",
+      "identity_hash": "1a7d7e5da79aa2a8153d909e97160628cc411b1a3a4782a3a8f1f9fb655450b5"
     }
   }
 }

@@ -2952,7 +2952,7 @@ class ChurchSimulator {
                 const gt15 = this.createGT(_seq0, BOOT_NS_SLOT_HEADER, {R:0,W:0,X:0,L:0,S:0,E:0}, 1); // zero-perm Inform GT for NS Slot 0 (the namespace table itself)
                 const check = this.mLoad(gt15, null, undefined);                   // mLoad with M-elevation; reads NS word0/word1 for Slot 0
                 if (!check.ok) {
-                    this.fault('BOOT', `LOAD_NS mLoad failed: ${check.message}`);  // NS entry missing or corrupted — unrecoverable
+                    this.fault('BOOT', `LOAD_NS mLoad(CR15) failed: ${check.message}`);  // NS entry missing or corrupted — unrecoverable
                     return false;
                 }
                 this._writeCR(15, gt15, check.entry);                              // write validated GT + NS entry into CR15
@@ -2991,7 +2991,7 @@ class ChurchSimulator {
                 const gt12 = this.createGT(_seq1, BOOT_NS_SLOT_THREAD, {R:0,W:0,X:0,L:0,S:0,E:0}, 1); // zero-perm Inform GT for NS Slot 1 (thread lump)
                 const check12 = this.mLoad(gt12, null, undefined);                 // M-elevation mLoad; reads thread lump NS entry
                 if (!check12.ok) {
-                    this.fault('BOOT', `INIT_THRD mLoad(Thread) failed: ${check12.message}`);
+                    this.fault('BOOT', `INIT_THRD mLoad(CR12, Thread) failed: ${check12.message}`);
                     return false;
                 }
                 this._writeCR(12, gt12, check12.entry);                            // CR12 ← thread stack token (encodes lump base + size)
@@ -3153,7 +3153,7 @@ class ChurchSimulator {
                 const check6 = this.mLoad(gt6, null, undefined);                                    // M-elevation mLoad; validates boot entry NS entry
                 const _b3Label = (this.nsLabels && this.nsLabels[this.bootEntrySlot]) || `Slot ${this.bootEntrySlot}`;
                 if (!check6.ok) {
-                    this.fault('BOOT', `INIT_ABSTR mLoad(${_b3Label}) failed: ${check6.message}`);
+                    this.fault('BOOT', `INIT_ABSTR mLoad(CR6, ${_b3Label}) failed: ${check6.message}`);
                     return false;
                 }
                 const _b3ActualNSType     = check6.entry.gtType;
@@ -3229,7 +3229,7 @@ class ChurchSimulator {
                 const bootEntryGT = this.createGT(_b6Seq, this.bootEntrySlot, {R:0,W:0,X:0,L:0,S:0,E:1}, 1); // E-GT for boot entry
                 const entryCheck  = this.mLoad(bootEntryGT, 'E', undefined);                              // E-perm mLoad: validates NS entry
                 if (!entryCheck.ok) {
-                    this.fault('BOOT', `NUC_CLIST mLoad(${_b4Label}) failed: ${entryCheck.message}`);
+                    this.fault('BOOT', `NUC_CLIST mLoad(CR6, ${_b4Label}) failed: ${entryCheck.message}`);
                     return false;
                 }
                 const _actualNSType     = entryCheck.entry.gtType;

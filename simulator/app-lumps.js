@@ -576,9 +576,12 @@ async function _showLatestCompilationPromotion(archivedToken) {
                     ? ((err && err.message) ||
                       'Promotion was refused before changing data. Reload the repository and retry.')
                     : (saveRequestStarted && !committed
-                    ? 'Promotion request outcome is unknown — verify the repository before retrying.'
-                    : ((err && err.message) ||
-                      'Promotion failed — no data was changed. Reload and retry.'));
+                    ? `Promotion request outcome is unknown. Reason: ${(err && err.message) || 'The save response was not received'}. ` +
+                      'Next: verify the repository before retrying.'
+                    : _formatActionableNetworkError('Promote the latest compilation', err, {
+                        dataChanged: false,
+                        nextAction: 'Reload the IDE and retry. The saved source preview remains unchanged.',
+                    }));
             }
         };
     } catch (err) {

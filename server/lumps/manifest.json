@@ -14,13 +14,6 @@
     "filename": "SlideRule.Haskell.1.3542a2db.lump"
   },
   {
-    "token": "ab1e86af",
-    "abstraction": "WordString",
-    "version": "3.0.0",
-    "lump_version": 0,
-    "filename": "WordString.1.a1682b26.lump"
-  },
-  {
     "token": "00001f00",
     "abstraction": "Tunnel",
     "lump_version": 0,
@@ -440,5 +433,12 @@
     "abstraction": "WukongCallHome",
     "filename": "WukongCallHome.1.9bf03976.lump",
     "lump_version": 1
+  },
+  {
+    "token": "ab1e86af",
+    "abstraction": "TestAbs",
+    "filename": "TestAbs.1.71742676.lump",
+    "lump_version": 1,
+    "compiled_at": 1789076202.6733189
   }
 ]

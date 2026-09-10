@@ -12,10 +12,8 @@
 - [Public code search allowlist](public-code-search-allowlist.md) — landing search may expose only allowlisted text source roots/extensions through the escaped code viewer, never arbitrary workspace paths
 - [Post-mutation comparison caches](post-mutation-comparison-caches.md) — a successful push or sync must invalidate its derived comparison cache before the UI refreshes
 - [Dev server port collision](dev-server-port-collision.md) — check-then-act "free port then bind" isn't race-proof between two independently-starting servers; give secondary servers their own default port + retry-with-backoff on bind
-- [Efinity headless Interface Designer patches](efinity-headless-interface-designer.md) — check_design() crashes headless without installed-Efinity-source patches; use scripts/apply_efinity_headless_patches.py; not every sub-build needs every patch (P1/P6 optional)
 - [EFX_MAP $readmemb path resolution + VDB caching](efx-map-readmemb.md) — bins must be in $SOC_DIR/ (not just work_syn/); 2026.1 MAP leaves INIT_0=all-FF in map.v (placeholder); PNR resolves $readmemb
 - [Sapphire BRAM init — Variant B stub block](sapphire-bram-init-variant.md) — Efinity 2026.1 IP has stub initial begin (4 zeros) not $readmemb; depth=8192 words; patch_sapphire_init.py handles both variants
-- [Chromebook call-home bridge workflow](chromebook-callhome-workflow.md) — confirmed working flow; bridge baud=57600 (CLOCKDIV=53, 25 MHz, no PLL); --insecure required; make MUST run after git pull
 - [Sapphire SoC as Trusted Security Base](sapphire-soc-tsb.md) — RISC-V private RAM is the keystore; APB3 register map; 5 free capabilities; FAULT_RST gap; FP verdict; SHA32 commissioning impact
 - [Wukong NS base is not ISA-safe at zero](wukong-ns-base-isa-conflict.md) — standalone Wukong currently overrides the ISA top-of-memory NS base to 0; do not promote that shortcut into a new image without resolving DMEM size/base
 - [BRAM NUC_PROGRAM staleness trap](bram-nuc-program-staleness.md) — church_ti60_f225.v BRAM goes stale when boot_rom.py NUC_PROGRAM changes; regen or patch via gen_cm_dmem_direct.py
@@ -29,7 +27,6 @@
 - [LUMP name casing staleness gap](lump-name-casing-staleness-gap.md) — case drift hides orphaned LUMPs from guards; independently audit UI hardcoded tokens
 - [Self-diagnosing remote build guards](self-diagnosing-remote-guards.md) — version-stamp script output and dump actual-vs-expected state on failure when the script runs on a machine you can't directly access
 - [Freshness guards on idempotent patches must be content-based](freshness-guard-content-vs-mtime.md) — if a patch's output text never changes once applied, an mtime comparison against it will eventually false-positive forever
-- [EFXPT_HOME needs /pt suffix](efxpt-home-must-include-pt-suffix.md) — must equal $EFINITY_HOME/pt or Interface Designer's device-name check silently always fails ("unusupported device")
 - [LUMP abstraction-name consistency scoping](lump-abstraction-name-consistency.md) — drift check must exempt user-compiled + dynamic/NULL lumps or it false-fails on legitimate non-registry names (also in CM_LUMP_SPECIFICATION.md §Developer Traps)
 - [NS slot migration GT-bypass trap](ns-slot-gt-bypass-trap.md) — when NS slot N migrates, audit ALL c-list fallback paths; old slot number silently maps to wrong GT (was LED_DEV, not SelfTest)
 - [Editor-state migration coverage gap](editor-state-migration-coverage-gap.md) — a one-shot text migration must be wired into every independent save/restore path (keyed draft store AND generic "last session" snapshot), or the "fixed" bug reappears via the unpatched path
@@ -37,7 +34,6 @@
 - [Sapphire BRAM guard false-positive modes](sapphire-bram-guard-false-positive.md) — RC=3 has 2 modes: stale real content (bad) vs all-FF MAP placeholder (2026.1 normal/false-positive); RC=1 (all-zero) is always fatal
 - [GitHub API PUT for cross-repo file delivery](github-api-put-delivery.md) — when git histories diverge, PUT individual files via Contents API from Replit bash ($GITHUB_PAT); droplet uses `git checkout origin/main -- <file>` to receive them
 - [Ti60 firmware update pipeline](ti60-firmware-update-pipeline.md) — PNR-only skips 3 required steps (patch sapphire.v, delete VDB, MAP); must run full OBBS; serve hex from $SOC_DIR/outflow/ not repo bitstreams/ (git pull overwrites)
-- [QMTECH Wukong V3 pinout + BUFG trap](wukong-v3-pinout.md) — clk=M21 SRCC bank34, led=G21/G20 active-LOW; never use Instance("BUFG") in Amaranth for Vivado — opt_design silently drops it; use direct comb assign so Vivado auto-infers IBUF→BUFG
 - [CR14.word0 GT update on NS slot migration](cr14-gt-update-on-slot-migration.md) — loadProgram only updates CR14.word1/word2/word3; after changing bootEntrySlot you must also set CR14.word0 to a fresh R+X GT or every fetch faults before stepCount++
 - [A7 v1.2 stored nsCount anti-inflation pattern](a7-nscount-stored-word.md) — c-list at NS TABLE tail inflates nsCount to MAX_NS_ENTRIES; fix: store clean count at NS_TABLE_BASE-3 (scan before c-list + emptyCount); loadBootImage() reads it, forward scan only as fallback
 - [IRQ LUMP lazy-load manifest guard](irq-lump-lazy-gate-guard.md) — gate on a manifest entry; pre-seeded test slots otherwise bypass it via abstractionRegistry
@@ -59,11 +55,10 @@
 - [Single-slot command ack correlation](single-slot-cmd-ack-correlation.md) — correlate queue/consume/ack/confirm stages by monotonic id, never by command letter; no time-window heuristics
 - [Wukong trace disassembly](wukong-trace-disassembly.md) — current packets carry NIA but no instruction word; exact labels/mnemonics require a matching source map or a versioned packet extension
 - [Wukong dev/production event relay](wukong-dev-production-relay.md) — local simulator previews need the production relay when the physical bridge is attached to lab.cloomc.org
-- [Wukong physical Halt isolation](wukong-halt-isolation.md) — full-top UART simulation latches Halt; physical failures are downstream of source/RTL correctness
 - [Hardware snapshot separation](hardware-snapshot-separation.md) — hardware NIA/cursor and stored thread context must stay separate from simulator PC, live CR12, and breakpoints
+- [Boot fault register context](boot-fault-register-context.md) — boot mLoad diagnostics name the destination CR, not the executing abstraction's CR14
 - [Wukong bridge Windows support](wukong-windows-bridge.md) — use pyserial port enumeration so the same bridge supports COM ports natively without WSL
 - [Wukong dual-link connectivity](wukong-dual-link-connectivity.md) — JTAG programs the FPGA; a separate USB-UART port carries trace, commands, and upload; COM3 is only a common Windows label
-- [Wukong server symbol import](wukong-server-symbol-import.md) — direct server workflow needs the repository root on sys.path or known pet-name listings fall back to `<unknown>`
 - [mLoad inclusive c-list bounds](mload-inclusive-c-list-bounds.md) — limit_offset stores count−1, so valid index checks must use inclusive `<=`
 - [Wukong RTL generation initializer bottleneck](wukong-rtl-generation-init-bottleneck.md) — fixed 64 KiB DMEM is not proof of a BRAM issue; Amaranth conversion can stall before Yosys/Vivado
 - [Amaranth shape() memoization](amaranth-shape-memoization.md) — Operator/SwitchValue.shape() uncached in 0.5.8; monkey-patch both before convert() for O(n) instead of O(n²)
@@ -74,14 +69,12 @@
 - [Freespace validation zone per typ](freespace-validation-zone-per-typ.md) — freespace scans must branch on lump typ: Thread uses the collision zone, Namespace skips; generic cw/cc bounds reject valid Threads
 - [T7 freespace self-definition format](t7-freespace-format.md) — embedded API JSON must never carry token/issue (circular hash / identity rule); Mint validates framing only
 - [Lump V1.3 self-defining freespace](lump-v13-self-definition.md) — 0xAB frame at word cw+1 (API JSON + optional source); JS/Python emitters must stay in lockstep; compile cache key must include tier
-- [Schema field removal must sweep all readers](schema-field-removal-sweep.md) — purge CI workflow steps + doc-figure HTML viewers too; add a CI invariant so the key stays gone
 - [Boot-suite test isolation](boot-suite-triage-clusters.md) — destructive tests on shared live dirs need a cross-process write lock or temp-dir isolation, not snapshot/restore alone; bulk-failure triage needs reconciled per-cluster F/E counts
 - [Case-insensitive metadata aliases](case-insensitive-metadata-aliases.md) — case-equivalent registry aliases must update atomically; diagnostics dedupe only within one source location
 - [Direct LUMP call selector](direct-lump-call-selector.md) — single-entry LUMPs whose first code word is executable must use selector 0, never method-table selector 1
 - [Declared C-list B-flag rule](declared-clist-b-flag-rule.md) — declared capability rows must use B=0; browser and server validators must reject B-set Inform tokens consistently
 - [Canonical T vs lookup aliases](canonical-t-vs-lookup-aliases.md) — historical LUMP tokens may locate bytes, but only recomputed canonical T may populate W3 or drive promotion
 - [boot_resident manifest-only](boot-resident-manifest-only.md) — generator reads boot_resident from manifest.json only; sidecar-only flag = NS descriptor with zero-filled body
-- [Wukong native upload projection](wukong-native-upload-projection.md) — generic tail-table boot images must be projected to 16K forward-table DMEM before serial upload
 - [Namespace reissue generation](boot-entry-generation-minting.md) — every GT minted for a reused slot must inherit the live/retained Word-1 sequence
 - [Boot test private runtime state](boot-test-private-runtime-state.md) — LUMP isolation must include every boot-regeneration persistence input, including saved config
 - [Latched multi-cycle hardware inputs](latched-multicycle-hardware-inputs.md) — capture operands, control-flow state, and security decisions at acceptance; never consume live inputs later
@@ -92,7 +85,6 @@
 - [Hardware readiness fingerprints](hardware-readiness-fingerprint.md) — generated Verilog/RTLIL must carry a content fingerprint of active Python inputs before synthesis
 - [Namespace Table authority](namespace-table-bitstream-source.md) — Namespace Table first, then its assigned slots/LUMPs; manifest is never authoritative for membership or metadata
 - [Canonical dot-name LUMP integrity](canonical-dot-name-clist-integrity.md) — every LUMP is dot.name.1.token, with compiled data and dot-name C-list content covered by its integrity value
-- [LUMP documentation cases](lump-documentation-cases.md) — classify each LUMP as fully documented, source without comments, or API only
 - [Fault snapshot reboot correlation](fault-snapshot-reboot-correlation.md) — auto-reboot only after the exact fault's complete snapshot is durably promoted
 - [Bitstream release candidate baseline](bitstream-release-candidate-baseline.md) — Versions must surface pending hardware commits; never claim an artifact released without a trusted source commit
 - [Wukong release-host staging](wukong-release-host-staging.md) — Build each candidate in a fresh commit-pinned vendor checkout; never reuse stale or dirty historical build directories

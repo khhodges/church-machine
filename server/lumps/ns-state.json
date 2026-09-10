@@ -181,7 +181,18 @@
       "limit": "0x00000",
       "seq": 0,
       "seal": "0x21523090"
+    },
+    {
+      "name": "TestAbs",
+      "slot": 20,
+      "seq": 0,
+      "token": "ab1e86af",
+      "filename": "TestAbs.1.71742676.lump",
+      "issue_n": 1,
+      "lump_version": 1,
+      "resident": true,
+      "load_policy": "Resident"
     }
   ],
-  "generated_at": 1788985690.7620127
+  "generated_at": 1789076202.7499115
 }

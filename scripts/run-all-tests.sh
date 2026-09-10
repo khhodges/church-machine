@@ -212,7 +212,7 @@ register_suite "catalog-compile-tests" \
     'node simulator/test_catalog_compile.js'
 
 register_suite "boot-entry-sync-tests" \
-    'node simulator/test_boot_entry_sync.js'
+    'node simulator/test_boot_entry_sync.js && node simulator/test_boot_fault_register_context.js'
 
 register_suite "install-boot-entry-cr0-tests" \
     'python -m pytest tests/simulator/test_install_boot_entry_cr0.py -v'
@@ -341,7 +341,7 @@ register_suite "bootstrap-resident-identity-tests" \
     'python3 -m pytest tests/server/test_bootstrap_identity_3321.py tests/server/test_bootstrap_migration_atomic_3321.py -v && node simulator/test_bootstrap_resident_identity.js && node simulator/test_bootstrap_token_audit.js'
 
 register_suite "latest-compilation-promotion-tests" \
-    'python3 -m pytest tests/server/test_latest_compilation_promotion_3393.py -q && node simulator/test_bootstrap_token_audit.js && node simulator/test_latest_compilation_promotion.js'
+    'node scripts/check_assembler_browser_freshness.js && python3 -m pytest tests/server/test_latest_compilation_promotion_3393.py -q && node simulator/test_bootstrap_token_audit.js && node simulator/test_latest_compilation_promotion.js'
 
 register_suite "boot-image-loads-and-boots" \
     'python -m pytest tests/boot/test_boot_image_loads_and_boots.py -v'

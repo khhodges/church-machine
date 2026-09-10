@@ -1,185 +1,349 @@
 'use strict';
 
-// Behavioral regression coverage for Task #3393.  This deliberately loads the
-// production recovery function into a small jsdom context; it does not copy its
-// implementation or assert on source text.
+// Browser-script integration coverage for promotion repair. Load
+// all of app-lumps.js so this test exercises its real approval/save-plan
+// helpers and catches missing browser globals or integration-time failures.
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { webcrypto } = require('crypto');
 const { JSDOM } = require('jsdom');
+const actionableErrors = require('./actionable_errors.js');
+const { checkCacheKeys } = require('../scripts/check_assembler_browser_freshness.js');
 
-const source = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8');
-function extractFunction(name) {
-    const start = source.indexOf(`async function ${name}(`);
-    assert(start >= 0, `${name} exists`);
-    const brace = source.indexOf('{', start);
-    let depth = 0;
-    for (let i = brace; i < source.length; i++) {
-        if (source[i] === '{') depth++;
-        else if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1);
+// Behavior alone cannot detect an entry page pinned to incompatible old helpers.
+const entryPage = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+assert.deepStrictEqual(checkCacheKeys(entryPage).failures, [],
+    'every pinned browser script must match its current content');
+for (const name of ['actionable_errors.js', 'app-lumps.js', 'lump_save_handler.js']) {
+    const pin = new RegExp(`${name.replace(/\./g, '\\.')}\\?v=sha256-[a-f0-9]{12}`);
+    assert(pin.test(entryPage), `${name} must remain pinned`);
+    for (const invalid of ['sha256-000000000000', 'sha256-000000000000-promotion1']) {
+        const stalePage = entryPage.replace(pin, `${name}?v=${invalid}`);
+        assert(checkCacheKeys(stalePage).failures.some(failure => failure.includes(name)),
+            `${name}: freshness guard must reject ${invalid}`);
     }
-    throw new Error(`unterminated ${name}`);
 }
 
+const appSource = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8');
 const HASH = 'a'.repeat(64);
 const ARCHIVE = { token: 'old-token', abstraction: 'Demo', lump_version: 1 };
 const CANDIDATE = {
-    ok: true, abstraction: 'Demo', revision: 2, token: 'new-token',
-    binary_hash: HASH, intrinsic_source: true, immutable: true,
+    ok: true,
+    abstraction: 'Demo',
+    revision: 2,
+    token: 'new-token',
+    binary_hash: HASH,
+    intrinsic_source: true,
+    immutable: true,
     source: '.abstraction Demo\n.method Main\n  RETURN AL\n.end',
     words: [0xf8000401, 0x1f000000],
-    approval: { binary_hash: HASH, grants: ['E'], capability_type: 'inform' },
+    approval: {
+        binary_hash: HASH,
+        author: 'Alice',
+        grants: ['E'],
+        capability_type: 'inform',
+    },
     promotion_binding: {
-        binding_id: 'server-binding', abstraction: 'Demo',
-        token: 'new-token', revision: 2, binary_hash: HASH,
-        ns_slot: null, namespace_sequence: null, bootstrap_snapshot: null,
+        binding_id: 'server-binding',
+        abstraction: 'Demo',
+        token: 'new-token',
+        revision: 2,
+        binary_hash: HASH,
+        ns_slot: null,
+        namespace_sequence: null,
+        bootstrap_snapshot: null,
     },
 };
 
 function response(payload, ok = true, status = 200) {
-    return { ok, status, json: async () => payload, text: async () => JSON.stringify(payload) };
+    return {
+        ok,
+        status,
+        headers: { get: () => 'application/json' },
+        text: async () => JSON.stringify(payload),
+        json: async () => payload,
+    };
 }
 
-function makeContext(fetchImpl) {
-    const dom = new JSDOM('<!doctype html><body><div id="lumpsDetailContent"></div></body>');
-    const calls = { fetch: [], saves: [], detail: [], render: 0, namespace: 0, boot: 0 };
+function clone(value) {
+    return JSON.parse(JSON.stringify(value));
+}
+
+function makeContext(fetchImpl, confirmed = true) {
+    const dom = new JSDOM(
+        '<!doctype html><html><body><div id="lumpsDetailContent"></div></body></html>',
+        { url: 'http://localhost/' });
+    const calls = { fetch: [], confirms: [], render: 0, namespace: 0, boot: 0 };
     const sandbox = {
-        window: { _latestPromotionRequestId: 0 },
+        window: dom.window,
         document: dom.window.document,
-        _lumpsCache: [ARCHIVE],
+        navigator: dom.window.navigator,
+        location: dom.window.location,
+        crypto: webcrypto,
+        TextEncoder,
+        TextDecoder,
+        Uint8Array,
+        ArrayBuffer,
+        Blob: dom.window.Blob,
+        URL: dom.window.URL,
+        console,
+        setTimeout,
+        clearTimeout,
+        encodeURIComponent,
+        decodeURIComponent,
+        _lumpsCache: [clone(ARCHIVE)],
         _escHtml: value => String(value == null ? '' : value)
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
-        _actionableJsonResponse: async (resp, operation) => {
-            const data = await resp.json();
-            if (!resp.ok) throw new Error(data.error || `${operation} failed`);
-            return data;
+        ...actionableErrors,
+        confirm: message => {
+            calls.confirms.push(message);
+            return typeof confirmed === 'function' ? confirmed(message) : confirmed;
         },
-        _hashBoundLumpApproval: (payload, hash) => {
-            assert.strictEqual(payload.approval.binary_hash, hash);
-            return payload.approval;
-        },
-        _confirmLumpSavePlan: async (words, metadata) => {
-            calls.saves.push({ words, metadata });
-            return sandbox.confirmResult;
-        },
-        showLumpDetail: token => calls.detail.push(token),
+        alert: () => {},
         renderLumps: async () => { calls.render++; },
-        updateNamespace: () => { calls.namespace++; },
+        updateNamespace: async () => { calls.namespace++; },
         _loadBootConfig: async () => { calls.boot++; },
         fetch: async (...args) => {
             calls.fetch.push(args);
             return fetchImpl(...args);
         },
-        console,
     };
+    dom.window.confirm = sandbox.confirm;
+    dom.window.alert = sandbox.alert;
+    dom.window.fetch = sandbox.fetch;
     vm.createContext(sandbox);
-    vm.runInContext(extractFunction('_showLatestCompilationPromotion'), sandbox);
+    vm.runInContext(appSource, sandbox, { filename: 'app-lumps.js' });
+    assert.strictEqual(typeof sandbox.window._showLatestCompilationPromotion, 'function',
+        'complete app-lumps.js exposes promotion integration');
     return { sandbox, calls, document: dom.window.document };
 }
 
 async function open(ctx) {
-    await vm.runInContext('_showLatestCompilationPromotion("old-token")', ctx.sandbox);
+    await ctx.sandbox.window._showLatestCompilationPromotion('old-token');
 }
-function candidateFetch(_url) { return response(CANDIDATE); }
+
+function preview(ctx) {
+    return ctx.document.querySelector('.lump-promotion-source');
+}
+
+function status(ctx) {
+    const element = ctx.document.getElementById('lumpPromotionStatus');
+    return element ? element.textContent : '';
+}
+
+function request(ctx, endpoint) {
+    return ctx.calls.fetch.find(call => String(call[0]) === endpoint);
+}
+
+function assertPreviewPreserved(ctx) {
+    assert(preview(ctx), 'source preview remains mounted');
+    assert.strictEqual(preview(ctx).textContent, CANDIDATE.source,
+        'exact immutable candidate source remains visible');
+}
 
 (async () => {
-    // Exact source is rendered and cancellation is non-destructive.
+    // Candidate GET renders exact intrinsic source, and the preview's Cancel
+    // action performs no planning, approval, or mutation request.
     {
-        const ctx = makeContext(candidateFetch);
-        ctx.sandbox.confirmResult = null;
+        const ctx = makeContext(() => response(CANDIDATE));
         await open(ctx);
-        assert(ctx.document.querySelector('.lump-promotion-source').textContent
-            .includes(CANDIDATE.source));
+        assert.strictEqual(ctx.calls.fetch[0][0],
+            '/api/lumps/latest-primary/Demo?from_token=old-token&from_revision=1');
+        assert.deepStrictEqual(clone(ctx.calls.fetch[0][1]), { cache: 'no-store' });
+        assertPreviewPreserved(ctx);
         ctx.document.getElementById('lumpPromotionCancel').click();
-        assert.deepStrictEqual(ctx.calls.detail, ['old-token']);
-        assert.strictEqual(ctx.calls.saves.length, 0);
+        assert.strictEqual(ctx.calls.fetch.length, 1);
     }
 
-    // A slower first request cannot overwrite the second request's preview.
+    // The production confirmation path must obtain a server-authored plan,
+    // then a one-time approval intent, then submit the canonical save.
     {
-        let resolveFirst;
-        const first = new Promise(resolve => { resolveFirst = resolve; });
-        let count = 0;
-        const ctx = makeContext(() => (++count === 1 ? first : Promise.resolve(response({
-            ...CANDIDATE, source: 'SECOND SOURCE',
-        }))));
-        const firstOpen = vm.runInContext(
-            '_showLatestCompilationPromotion("old-token")', ctx.sandbox);
-        await vm.runInContext('_showLatestCompilationPromotion("old-token")', ctx.sandbox);
-        resolveFirst(response({ ...CANDIDATE, source: 'STALE FIRST SOURCE' }));
-        await firstOpen;
-        assert(ctx.document.querySelector('.lump-promotion-source').textContent
-            .includes('SECOND SOURCE'));
-        assert(!ctx.document.body.textContent.includes('STALE FIRST SOURCE'));
-    }
-
-    // Confirmation carries the exact candidate words/hash-bound approval to save.
-    {
-        const ctx = makeContext(async function(url, options) {
+        const ctx = makeContext(async (url, options) => {
             if (String(url).includes('/latest-primary/')) return response(CANDIDATE);
-            ctx.calls.savePayload = JSON.parse((options || {}).body || '{}');
-            return response({ ok: true, token: 'final-token', seal: 'final-seal' });
+            const body = JSON.parse(options.body);
+            if (url === '/api/lumps/save-plan') {
+                return response({
+                    ok: true,
+                    plan_id: 'promotion-plan',
+                    action: 'save',
+                    consequence: 'create',
+                    digest: HASH,
+                });
+            }
+            if (url === '/api/lumps/approval-intent') {
+                return response({
+                    ok: true,
+                    intent: 'promotion-intent',
+                    digest: body.digest,
+                    action: body.action,
+                    plan_id: body.plan,
+                });
+            }
+            if (url === '/api/lumps/save') {
+                return response({ ok: true, token: 'final-token', seal: 'final-seal' });
+            }
+            throw new Error(`unexpected request ${url}`);
         });
-        ctx.sandbox.confirmResult = { plan: { plan_id: 'p' }, intent: { intent: 'i' } };
         await open(ctx);
         await ctx.document.getElementById('lumpPromotionConfirm').onclick();
-        // The fetch mock above cannot use arrow `arguments`; make the save
-        // assertion from the metadata/word inputs recorded by the save-plan
-        // shim and the resulting success DOM.
-        assert.deepStrictEqual(ctx.calls.saves[0].words, CANDIDATE.words);
-        assert.strictEqual(ctx.calls.saves[0].metadata.binary_hash, HASH);
-        const saveCall = ctx.calls.fetch.find(call => String(call[0]).endsWith('/api/lumps/save'));
-        assert(saveCall, 'promotion posts through canonical save endpoint');
-        const saveBody = JSON.parse(saveCall[1].body);
-        assert.deepStrictEqual(saveBody.binary, CANDIDATE.words);
-        assert.strictEqual(saveBody.metadata.approval_intent, 'i');
-        assert(ctx.document.getElementById('lumpPromotionStatus').textContent.includes('final-token'));
-        assert(ctx.document.getElementById('lumpPromotionStatus').textContent.includes('final-seal'));
-        assert.strictEqual(ctx.calls.render, 1);
-        assert.strictEqual(ctx.calls.namespace, 1);
-        assert.strictEqual(ctx.calls.boot, 1);
-    }
 
-    // A committed save followed by a view-refresh failure remains a committed
-    // result; it must not be presented as a no-change failure.
-    {
-        const ctx = makeContext(async function(url) {
-            return String(url).includes('/latest-primary/')
-                ? response(CANDIDATE)
-                : response({ ok: true, token: 'committed-token', seal: 'committed-seal' });
+        assert.deepStrictEqual(ctx.calls.fetch.map(call => call[0]), [
+            '/api/lumps/latest-primary/Demo?from_token=old-token&from_revision=1',
+            '/api/lumps/save-plan',
+            '/api/lumps/approval-intent',
+            '/api/lumps/save',
+        ]);
+        const plan = JSON.parse(request(ctx, '/api/lumps/save-plan')[1].body);
+        assert.deepStrictEqual(plan.binary, CANDIDATE.words);
+        assert.strictEqual(plan.metadata.binary_hash, HASH);
+        assert.strictEqual(plan.metadata.promotion_binding.binding_id, 'server-binding');
+        const approval = JSON.parse(request(ctx, '/api/lumps/approval-intent')[1].body);
+        assert.deepStrictEqual(approval, {
+            digest: HASH,
+            action: 'save',
+            confirmation: true,
+            plan: 'promotion-plan',
+            approval: {
+                abstraction: 'Demo',
+                author: 'Alice',
+                grants: ['E'],
+                capability_type: 'inform',
+            },
         });
-        ctx.sandbox.confirmResult = { plan: { plan_id: 'p' }, intent: { intent: 'i' } };
-        ctx.sandbox.renderLumps = async () => { throw new Error('repository refresh failed'); };
-        await open(ctx);
-        await ctx.document.getElementById('lumpPromotionConfirm').onclick();
-        const text = ctx.document.getElementById('lumpPromotionStatus').textContent;
-        assert(text.includes('committed-token'));
-        assert(text.includes('committed-seal'));
-        assert(text.includes('Refresh needed'));
-        assert(!text.includes('no data was changed'));
+        const save = JSON.parse(request(ctx, '/api/lumps/save')[1].body);
+        assert.deepStrictEqual(save.binary, CANDIDATE.words);
+        assert.strictEqual(save.metadata.save_plan_id, 'promotion-plan');
+        assert.strictEqual(save.metadata.approval_intent, 'promotion-intent');
+        assert.strictEqual(save.metadata.promoted_from_token, 'new-token');
+        assert(status(ctx).includes('final-token'));
+        assert(status(ctx).includes('final-seal'));
+        assert.deepStrictEqual(
+            [ctx.calls.render, ctx.calls.namespace, ctx.calls.boot], [1, 1, 1]);
     }
 
-    // Server failure is explicit and says that no data changed.
-    {
-        const ctx = makeContext(() => response({ error: 'candidate unavailable' }, false, 409));
-        await open(ctx);
-        assert(ctx.document.body.textContent.includes('No data was changed'));
-        assert.strictEqual(ctx.calls.saves.length, 0);
-    }
-
-    // An authoritative save rejection is not mislabeled as an unknown outcome.
+    // Declining the real plan confirmation occurs after planning but before
+    // approval or save, and leaves the candidate available for reconsideration.
     {
         const ctx = makeContext((url) => String(url).includes('/latest-primary/')
             ? response(CANDIDATE)
-            : response({ error: 'candidate became stale', committed: false }, false, 409));
-        ctx.sandbox.confirmResult = { plan: { plan_id: 'p' }, intent: { intent: 'i' } };
+            : response({
+                ok: true, plan_id: 'cancel-plan', action: 'save',
+                consequence: 'create', digest: HASH,
+            }), false);
         await open(ctx);
         await ctx.document.getElementById('lumpPromotionConfirm').onclick();
-        const text = ctx.document.getElementById('lumpPromotionStatus').textContent;
-        assert(text.includes('candidate became stale'));
-        assert(!text.includes('outcome is unknown'));
+        assert.deepStrictEqual(ctx.calls.fetch.map(call => call[0]), [
+            '/api/lumps/latest-primary/Demo?from_token=old-token&from_revision=1',
+            '/api/lumps/save-plan',
+        ]);
+        assert.strictEqual(ctx.calls.confirms.length, 1);
+        assert(status(ctx).includes('Cancelled'));
+        assert(status(ctx).includes('no data was changed'));
+        assertPreviewPreserved(ctx);
     }
+
+    // Candidate endpoint errors retain the authentic server reason and give a
+    // non-mutating recovery action.
+    {
+        const ctx = makeContext(() =>
+            response({ ok: false, error: 'candidate unavailable' }, false, 409));
+        await open(ctx);
+        const text = ctx.document.body.textContent;
+        assert(text.includes('candidate unavailable'));
+        assert(text.includes('No data was changed'));
+        assert(text.includes('Reload the LUMP repository'));
+        assert.strictEqual(ctx.calls.fetch.length, 1);
+    }
+
+    // A pre-save server rejection is actionable without removing the preview.
+    {
+        const ctx = makeContext((url) => String(url).includes('/latest-primary/')
+            ? response(CANDIDATE)
+            : response({ ok: false, error: 'policy denied this save plan' }, false, 403));
+        await open(ctx);
+        await ctx.document.getElementById('lumpPromotionConfirm').onclick();
+        assert(status(ctx).includes('policy denied this save plan'));
+        assert(status(ctx).includes('No data was changed'));
+        assert(status(ctx).includes('Next:'));
+        assertPreviewPreserved(ctx);
+        assert(!request(ctx, '/api/lumps/save'));
+    }
+
+    // Client-side hash/approval validation also remains explicitly pre-save and
+    // keeps the immutable source visible.
+    {
+        const badCandidate = clone(CANDIDATE);
+        badCandidate.approval.binary_hash = 'b'.repeat(64);
+        const ctx = makeContext(() => response(badCandidate));
+        await open(ctx);
+        await ctx.document.getElementById('lumpPromotionConfirm').onclick();
+        assert(status(ctx).includes('not bound to the fetched LUMP binary hash'));
+        assert(status(ctx).includes('No data was changed'));
+        assert(status(ctx).includes('Next:'));
+        assertPreviewPreserved(ctx);
+        assert.strictEqual(ctx.calls.fetch.length, 1);
+    }
+
+    // An authoritative save rejection is known not to have committed and
+    // preserves both the reason and preview.
+    {
+        const ctx = makeContext((url, options) => {
+            if (String(url).includes('/latest-primary/')) return response(CANDIDATE);
+            if (url === '/api/lumps/save-plan') {
+                return response({
+                    ok: true, plan_id: 'p', action: 'save',
+                    consequence: 'create', digest: HASH,
+                });
+            }
+            if (url === '/api/lumps/approval-intent') {
+                const body = JSON.parse(options.body);
+                return response({
+                    ok: true, intent: 'i', digest: body.digest,
+                    action: body.action, plan_id: body.plan,
+                });
+            }
+            return response({
+                ok: false, error: 'candidate became stale', committed: false,
+            }, false, 409);
+        });
+        await open(ctx);
+        await ctx.document.getElementById('lumpPromotionConfirm').onclick();
+        assert(status(ctx).includes('candidate became stale'));
+        assert(status(ctx).includes('No data was changed'));
+        assert(!status(ctx).includes('outcome is unknown'));
+        assertPreviewPreserved(ctx);
+    }
+
+    // Once the canonical save transport starts, loss of the response is an
+    // unknown outcome.  Do not discard the original transport diagnosis.
+    {
+        const ctx = makeContext((url, options) => {
+            if (String(url).includes('/latest-primary/')) return response(CANDIDATE);
+            if (url === '/api/lumps/save-plan') {
+                return response({
+                    ok: true, plan_id: 'p', action: 'save',
+                    consequence: 'create', digest: HASH,
+                });
+            }
+            if (url === '/api/lumps/approval-intent') {
+                const body = JSON.parse(options.body);
+                return response({
+                    ok: true, intent: 'i', digest: body.digest,
+                    action: body.action, plan_id: body.plan,
+                });
+            }
+            throw new Error('socket reset while sending canonical save');
+        });
+        await open(ctx);
+        await ctx.document.getElementById('lumpPromotionConfirm').onclick();
+        assert(status(ctx).includes('socket reset while sending canonical save'));
+        assert(status(ctx).includes('outcome is unknown'));
+        assert(status(ctx).includes('verify the repository'));
+        assertPreviewPreserved(ctx);
+    }
+
     console.log('PASS latest compilation promotion behavioral tests');
 })().catch(error => {
     console.error(error);

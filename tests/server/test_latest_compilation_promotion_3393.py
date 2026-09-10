@@ -3,6 +3,7 @@ from pathlib import Path
 import hashlib
 import struct
 import json
+import re
 import pytest
 
 
@@ -104,3 +105,44 @@ def test_present_but_malformed_promotion_binding_fails_closed():
 
     with pytest.raises(ValueError, match="malformed"):
         server._validate_promotion_binding({"promotion_binding": {}}, "d" * 64)
+
+
+def test_served_promotion_assets_match_pins_and_require_revalidation():
+    from server import app as server
+
+    client = server.app.test_client()
+    page = client.get("/simulator/", follow_redirects=True)
+    assert page.status_code == 200
+    assert "no-store" in page.headers["Cache-Control"]
+    html = page.get_data(as_text=True)
+    for name in ("actionable_errors.js", "app-lumps.js", "lump_save_handler.js",
+                 "app-run.js", "app-build-approval.js"):
+        match = re.search(r'src="(' + re.escape(name) +
+                          r'\?v=sha256-([a-f0-9]{12}))"', html)
+        assert match, f"{name} must have an exact content-derived pin"
+        asset = client.get("/simulator/" + match[1])
+        assert asset.status_code == 200
+        assert hashlib.sha256(asset.data).hexdigest()[:12] == match[2]
+        assert "no-cache" in asset.headers["Cache-Control"]
+        assert "must-revalidate" in asset.headers["Cache-Control"]
+
+
+def test_reload_of_old_versioned_page_serves_new_promotion_pin(tmp_path, monkeypatch):
+    from server import app as server
+
+    # Use a private entry page; never edit the working IDE or any LUMP data.
+    entry = tmp_path / "index.html"
+    old_html = '<head></head><script src="app-lumps.js?v=sha256-111111111111"></script>'
+    new_html = old_html.replace("111111111111", "222222222222")
+    entry.write_text(old_html)
+    monkeypatch.setattr(server, "SIMULATOR_DIR", str(tmp_path))
+    client = server.app.test_client()
+    old = client.get("/simulator/~/previous-build")
+    assert "111111111111" in old.get_data(as_text=True)
+    entry.write_text(new_html)
+    reloaded = client.get("/simulator/~/previous-build",
+                          headers={"If-None-Match": '"previous-build"'})
+    assert reloaded.status_code == 200
+    assert "222222222222" in reloaded.get_data(as_text=True)
+    assert "111111111111" not in reloaded.get_data(as_text=True)
+    assert "no-store" in reloaded.headers["Cache-Control"]
