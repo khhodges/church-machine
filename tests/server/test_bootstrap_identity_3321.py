@@ -30,6 +30,16 @@ def test_bootstrap_t_serializes_the_complete_unsigned_self_gt():
     assert verify_bootstrap_self_gt(_RESIDENT, gt, record["bootstrap_t"]) == "4a01beef"
 
 
+def test_bootstrap_self_mismatch_reports_values_and_recovery_action():
+    with pytest.raises(ValueError) as raised:
+        verify_bootstrap_self_gt(_RESIDENT, 0x4A000006, "4a000006")
+    message = str(raised.value)
+    assert "actual 0x4a000006" in message
+    assert "expected 0x4a01beef" in message
+    assert "Rebuild and save" in message
+    assert "regenerate and re-approve" in message
+
+
 @pytest.mark.parametrize("binding", [
     {"resident": False, "boot_resident": True, "type": "Inform"},
     {"resident": True, "boot_resident": False, "type": "Inform"},

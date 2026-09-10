@@ -1119,20 +1119,45 @@ async function lumpAuditFromServer(token, _manifest, container, opts) {
 
     try {
         const resp = await fetch(`/api/lump/${token}/words`);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        if (!resp.ok) {
+            const body = await resp.text();
+            const message = typeof _formatActionableHttpError === 'function'
+                ? _formatActionableHttpError(
+                    'Audit of this saved LUMP', resp.status, body,
+                    {
+                        dataChanged: false,
+                        nextAction: 'Reload the saved LUMP and run Audit again. If it repeats, save a new revision or inspect the repository integrity record.',
+                    })
+                : `Audit of this saved LUMP failed (HTTP ${resp.status}). ` +
+                  `No data was changed. Next: reload the LUMP and run Audit again.`;
+            const httpError = new Error(message);
+            httpError.actionable = true;
+            throw httpError;
+        }
         const data = await resp.json();
         const words = data.words || [];
-        if (!words.length) throw new Error('Empty binary returned from server');
+        if (!words.length) {
+            const emptyError = new Error(
+                'Audit could not inspect this saved LUMP because the server returned no binary words. ' +
+                'No data was changed. Next: save a new revision, then run Audit again.');
+            emptyError.actionable = true;
+            throw emptyError;
+        }
 
         container.innerHTML = '';
         const results = lumpAudit(words, null, null);
         return lumpAuditRenderPanel(container, results, opts);
     } catch (err) {
+        const report = err && err.actionable
+            ? err.message
+            : 'Audit could not reach the saved LUMP. No data was changed. ' +
+              'Next: check your connection, then run Audit again.' +
+              (err && err.message ? ` Technical detail: ${err.message}` : '');
         container.innerHTML = '';
         const errEl = document.createElement('div');
         errEl.className = 'lump-audit-panel lump-audit-panel-error';
         errEl.innerHTML = `<div class="lump-audit-header"><span class="lump-audit-icon">\u2717</span>` +
-            `<span class="lump-audit-summary">Audit failed: ${_escHtml ? _escHtml(err.message) : err.message}</span></div>`;
+            `<span class="lump-audit-summary">${_escHtml ? _escHtml(report) : report}</span></div>`;
         container.appendChild(errEl);
         return { hasErrors: true, hasWarnings: false };
     }

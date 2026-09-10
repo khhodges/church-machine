@@ -53,10 +53,25 @@ def bootstrap_identity_record(binding, self_gt):
 def verify_bootstrap_self_gt(binding, row0, serialized_t=None):
     """Fail closed unless row zero and serialized T are the exact same word."""
     token = bootstrap_t_from_self_gt(binding, row0)
-    if row0 != resident_inform_egt(binding):
-        raise ValueError("bootstrap SELF GT differs from owning Namespace descriptor")
+    expected = resident_inform_egt(binding)
+    if row0 != expected:
+        raise ValueError(
+            "bootstrap SELF GT differs from owning Namespace descriptor "
+            f"(actual 0x{row0:08x}, expected 0x{expected:08x}). "
+            "Rebuild and save the LUMP for the selected Namespace slot; "
+            "if this is an approved bootstrap artifact, regenerate and re-approve it."
+        )
     if binding.get("token") != token:
-        raise ValueError("bootstrap Namespace token differs from SELF GT")
+        raise ValueError(
+            "bootstrap Namespace token differs from SELF GT "
+            f"(Namespace token {binding.get('token')!r}, SELF token {token!r}). "
+            "Reload the current Namespace entry before saving; if this is an approved "
+            "bootstrap artifact, regenerate and re-approve it."
+        )
     if serialized_t is not None and serialized_t != token:
-        raise ValueError("bootstrap T must equal c-list row-0 SELF GT bit-for-bit")
+        raise ValueError(
+            "bootstrap T must equal c-list row-0 SELF GT bit-for-bit "
+            f"(serialized T {serialized_t!r}, SELF token {token!r}). "
+            "Rebuild the artifact from its current binary and re-run approval."
+        )
     return token

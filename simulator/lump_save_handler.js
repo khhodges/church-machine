@@ -7,6 +7,30 @@
 // through typeof guards so the module loads cleanly in Node.js test harnesses.
 
 /**
+ * Format an HTTP failure so the report always answers four questions:
+ * what failed, why, whether data changed, and what the programmer should do.
+ */
+function _formatActionableHttpError(operation, status, body, options) {
+    var opts = options || {};
+    var parsed = body;
+    if (typeof body === 'string') {
+        try { parsed = JSON.parse(body); } catch (_err) { parsed = null; }
+    }
+    var reason = parsed && (parsed.error || parsed.reason || parsed.message);
+    if (!reason && typeof body === 'string') {
+        var plain = body.replace(/\s+/g, ' ').trim();
+        if (plain && plain[0] !== '<') reason = plain.slice(0, 240);
+    }
+    if (!reason) reason = 'The server did not provide a reason.';
+    var changed = opts.dataChanged === true
+        ? 'Data may have changed.'
+        : (opts.dataChanged === false ? 'No data was changed.' : 'Data-change status is unknown.');
+    var next = opts.nextAction ||
+        'Retry the operation. If it fails again, inspect the server logs using the same operation and status.';
+    return `${operation} failed (HTTP ${status}). Reason: ${reason} ${changed} Next: ${next}`;
+}
+
+/**
  * Handle the server response (resolved branch) from a /api/lumps/save POST.
  *
  * @param {object} r    — Fetch Response-like object: { ok, status }
@@ -15,7 +39,12 @@
 function _lumpSaveHandleResponse(r, resp) {
     if (!r.ok) {
         // Surface the server's rejection reason so the user can act on it.
-        var _errMsg = (resp && resp.error) ? resp.error : ('HTTP ' + r.status);
+        var _errMsg = _formatActionableHttpError(
+            'Save to the LUMP repository', r.status, resp,
+            {
+                dataChanged: false,
+                nextAction: 'Correct the LUMP or Namespace settings, then click Save again.',
+            });
         console.error('[confirmSaveToNamespace] server rejected save:', _errMsg, resp);
         if (typeof _showFpgaToast === 'function') {
             _showFpgaToast('LUMP Repository Save Failed', _errMsg, 'error', 10000);
@@ -41,7 +70,9 @@ function _lumpSaveHandleNetworkError(err) {
     console.error('[confirmSaveToNamespace] network error during save:', err);
     if (typeof _showFpgaToast === 'function') {
         _showFpgaToast('LUMP Repository Save Failed',
-                       'Network error \u2014 check your connection.', 'error', 8000);
+                       'Save could not reach the repository. No data was changed. ' +
+                       'Next: check your connection, then click Save again.',
+                       'error', 8000);
     }
     if (typeof renderLumps === 'function') renderLumps();
 }
@@ -135,5 +166,6 @@ if (typeof module !== 'undefined') {
         _lumpSaveStaleConflictAction,
         _lumpSaveSubmittedSource,
         _lumpSaveRequest,
+        _formatActionableHttpError,
     };
 }

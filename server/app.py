@@ -8191,6 +8191,11 @@ def save_lump():
             _runtime_t = _verify_bootstrap_self_gt(
                 _bootstrap_binding, _live_bootstrap_gt,
                 f"{_live_bootstrap_gt:08x}")
+            # The selected frozen-resident Namespace descriptor owns SELF.
+            # Commit the same reminted row that save-plan hashed; otherwise the
+            # repository can accept a stale browser row (for example slot 6)
+            # while recording the artifact as another slot (for example 10).
+            _sl_words[_clist_row0_idx] = _live_bootstrap_gt
             # The programmer may replace any Namespace entry. A browser-supplied
             # content token is therefore only a
             # lookup hint here, never authority over a resident binding. The
