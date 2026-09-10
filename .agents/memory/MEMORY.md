@@ -155,3 +155,4 @@
 - [Trace-symbol preview isolation](trace-symbol-preview-isolation.md) — invalid factory artifacts must block hardware builds without taking down the web IDE’s fallback trace labels
 - [Actionable error reports](actionable-error-reporting.md) — visible errors must state what failed, the real reason, whether data changed, and a concrete next action
 - [Bootstrap migration validation boundary](bootstrap-migration-validation-boundary.md) — validate staged catalog and boot graph before swap; published RTL freshness is a separate release gate
+- [Save retry ownership](save-retry-ownership.md) — retry IDE-owned saves only with explicit not-committed and safe-retry proof; never make programmers repair generated identity

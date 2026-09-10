@@ -8191,6 +8191,9 @@ def save_lump():
                     f"NS[{ns_slot}]: {_selected_error}"
                 ),
                 "namespace_identity_failed": True,
+                "failure_owner": "ide",
+                "committed": False,
+                "safe_retry": True,
             }), 422
         _expected_owner_gt = _boot_image_gen.create_gt(
             _selected_sequence, ns_slot, {"E": 1}, 1)
@@ -8248,12 +8251,18 @@ def save_lump():
                     f"candidate: {_bootstrap_error}"
                 ),
                 "namespace_identity_failed": True,
+                "failure_owner": "ide",
+                "committed": False,
+                "safe_retry": True,
             }), 422
     if _is_selftest_canonical:
         if not isinstance(ns_slot, int):
             return jsonify({
                 "error": "SelfTest requires a programmer-selected Namespace slot.",
                 "namespace_identity_failed": True,
+                "failure_owner": "ide",
+                "committed": False,
+                "safe_retry": True,
             }), 422
         # ns-state is the authority for a reissued descriptor's sequence.  A
         # previously unused slot starts at sequence zero and is materialized by
@@ -8320,6 +8329,9 @@ def save_lump():
             return jsonify({
                 "error": f"Bootstrap identity validation failed: {_bootstrap_error}",
                 "namespace_identity_failed": True,
+                "failure_owner": "ide",
+                "committed": False,
+                "safe_retry": True,
             }), 422
         # T is not a projection and not a cache alias in the frozen resident
         # bootstrap: its eight hex digits serialize the full row-0 GT.
@@ -8796,6 +8808,9 @@ def save_lump():
                     f"retry from the unchanged source: {_fresh_error}"
                 ),
                 "namespace_identity_failed": True,
+                "failure_owner": "ide",
+                "committed": False,
+                "safe_retry": True,
             }), 409
 
     import re as _re_arch
@@ -9054,7 +9069,13 @@ def save_lump():
             metadata.get("approval_intent"), _binary_hash, _approval_action,
             _save_plan_id, consume=False)
     except ValueError as _intent_error:
-        return jsonify({"error": str(_intent_error)}), 403
+        return jsonify({
+            "error": str(_intent_error),
+            "failure_owner": "ide",
+            "approval_binding_failed": True,
+            "committed": False,
+            "safe_retry": True,
+        }), 403
 
     # Build and validate the complete Namespace update before the transition
     # stages any repository destination. Every slot-bound resident save commits
@@ -9078,6 +9099,9 @@ def save_lump():
                     f"candidate: Namespace binding is invalid: {_ns_error}"
                 ),
                 "namespace_identity_failed": True,
+                "failure_owner": "ide",
+                "committed": False,
+                "safe_retry": True,
             }), 422
 
     def _resident_additional_json(final_manifest_entry):
@@ -9127,6 +9151,9 @@ def save_lump():
                     f"candidate: {_bootstrap_error}"
                 ),
                 "namespace_identity_failed": True,
+                "failure_owner": "ide",
+                "committed": False,
+                "safe_retry": True,
             }), 422
 
     # Consume authorization only after every byte/Namespace/approval check has
@@ -9144,7 +9171,13 @@ def save_lump():
             metadata.get("approval_intent"), _binary_hash, _approval_action,
             _save_plan_id, consume=True)
     except ValueError as _intent_error:
-        return jsonify({"error": str(_intent_error)}), 403
+        return jsonify({
+            "error": str(_intent_error),
+            "failure_owner": "ide",
+            "approval_binding_failed": True,
+            "committed": False,
+            "safe_retry": True,
+        }), 403
 
 
     _remove_after_commit = ()
@@ -9211,7 +9244,11 @@ def save_lump():
     except Exception as _transition_error:
         logging.exception("[lumps] save transaction failed")
         return jsonify({
-            "error": f"LUMP save transaction failed; no partial revision was retained: {_transition_error}"
+            "error": f"LUMP save transaction failed; no partial revision was retained: {_transition_error}",
+            "failure_owner": "ide",
+            "atomic_transition_failed": True,
+            "committed": False,
+            "safe_retry": False,
         }), 500
 
     next_lump_version = _transition.get("next_version", next_lump_version)

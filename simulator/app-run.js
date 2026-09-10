@@ -12439,24 +12439,27 @@ function _setSaveNSFeedback(kind, message) {
     const status = document.getElementById('saveNSStatus');
     const button = document.getElementById('saveNSConfirmBtn');
     const busy = kind === 'loading';
+    const incident = kind === 'incident';
     if (button) {
-        button.disabled = busy;
-        button.textContent = busy ? 'Saving…' : 'Save';
+        button.disabled = busy || incident;
+        button.textContent = busy ? 'Saving…' : (incident ? 'IDE incident' : 'Save');
         button.setAttribute('aria-busy', busy ? 'true' : 'false');
     }
     if (!status) return;
     if (!message) {
         status.style.display = 'none';
         status.textContent = '';
+        delete status.dataset.terminal;
+        delete status.dataset.incident;
         return;
     }
     status.style.display = '';
     status.textContent = message;
-    status.style.color = kind === 'error' ? '#fecaca' : '#dbeafe';
-    status.style.background = kind === 'error'
+    status.style.color = (kind === 'error' || incident) ? '#fecaca' : '#dbeafe';
+    status.style.background = (kind === 'error' || incident)
         ? 'rgba(127, 29, 29, .45)'
         : 'rgba(30, 64, 175, .38)';
-    status.style.border = kind === 'error'
+    status.style.border = (kind === 'error' || incident)
         ? '1px solid rgba(248, 113, 113, .65)'
         : '1px solid rgba(96, 165, 250, .55)';
 }
@@ -12471,21 +12474,27 @@ async function beginSaveToNamespace() {
         await confirmSaveToNamespace();
     } catch (err) {
         console.error('[SaveNS] unexpected save failure:', err);
-        _setSaveNSFeedback('error',
-            'Save did not complete. Review the settings, then click Save again.');
+        _setSaveNSFeedback('incident',
+            'The IDE could not complete its save process. No data was committed. Your source and settings remain preserved. The IDE must resolve this incident.');
+        const status = document.getElementById('saveNSStatus');
+        if (status) {
+            status.dataset.terminal = 'true';
+            status.dataset.incident = 'true';
+        }
     } finally {
         _saveNSRequestInFlight = false;
         const dialog = document.getElementById('saveNSDialog');
         const status = document.getElementById('saveNSStatus');
         if (dialog && dialog.style.display !== 'none' &&
                 status && status.dataset.terminal !== 'true') {
-            _setSaveNSFeedback('error',
-                'Save did not complete. Review the settings, then click Save again.');
+            _setSaveNSFeedback('incident',
+                'The IDE could not determine the save result. Your source and settings remain preserved. The IDE must verify the repository before another save.');
         }
         const button = document.getElementById('saveNSConfirmBtn');
         if (button) {
-            button.disabled = false;
-            button.textContent = 'Save';
+            const incident = status && status.dataset.incident === 'true';
+            button.disabled = !!incident;
+            button.textContent = incident ? 'IDE incident' : 'Save';
             button.setAttribute('aria-busy', 'false');
         }
         if (status) delete status.dataset.terminal;
@@ -15531,10 +15540,13 @@ async function confirmSaveToNamespace() {
             _svPayload.metadata.approval_intent = _saveApproval.intent.intent;
             _svPayload.metadata.save_plan_id = _saveApproval.plan.plan_id;
         } catch (err) {
-            const message = `${err.message}. Review the save plan, then click Save again.`;
-            _setSaveNSFeedback('error', message);
+            const message = `${err.message}. No data was committed. Your source and settings remain preserved. The IDE must resolve the save-plan incident.`;
+            _setSaveNSFeedback('incident', message);
             const status = document.getElementById('saveNSStatus');
-            if (status) status.dataset.terminal = 'true';
+            if (status) {
+                status.dataset.terminal = 'true';
+                status.dataset.incident = 'true';
+            }
             _showFpgaToast('LUMP Save Plan Failed', err.message, 'error', 10000);
             return;
         }
@@ -15606,7 +15618,45 @@ async function confirmSaveToNamespace() {
                 nextAction,
                 'ok', 9000);
             if (typeof appendOutput === 'function') appendOutput(nextAction, 'info');
+        }, {
+            attempted: false,
+            rebuildPayload: async function(payload) {
+                // The server proved the first request did not commit. Re-run
+                // canonical planning against fresh Namespace/library state and
+                // issue a new approval bound to that exact plan. The programmer
+                // already confirmed these unchanged source/settings, so recovery
+                // must not ask them to understand or re-approve generated identity.
+                if (typeof window._requestLumpSavePlan !== 'function' ||
+                        typeof window._requestLumpApprovalIntent !== 'function') {
+                    throw new Error('IDE save recovery helpers are unavailable');
+                }
+                const rebuilt = JSON.parse(JSON.stringify(payload));
+                delete rebuilt.metadata.approval_intent;
+                delete rebuilt.metadata.save_plan_id;
+                delete rebuilt.metadata.save_plan;
+                delete rebuilt.metadata.plan;
+                const plan = await window._requestLumpSavePlan(
+                    rebuilt.binary, rebuilt.metadata);
+                const intent = await window._requestLumpApprovalIntent(
+                    rebuilt.binary, plan.action, rebuilt.metadata, plan);
+                rebuilt.metadata.approval_intent = intent.intent;
+                rebuilt.metadata.save_plan_id = plan.plan_id;
+                return rebuilt;
+            }
         }).catch(function(err) {
+            if (err.kind === 'ide') {
+                const body = err.committed === false
+                    ? 'No data was committed. Your source and settings remain preserved. The IDE could not repair its canonical save candidate and must resolve this incident.'
+                    : 'The IDE could not verify whether data was committed. Your source and settings remain preserved. The IDE must verify the repository before another save.';
+                _setSaveNSFeedback('incident', body);
+                const status = document.getElementById('saveNSStatus');
+                if (status) {
+                    status.dataset.terminal = 'true';
+                    status.dataset.incident = 'true';
+                }
+                _showFpgaToast('IDE Save Incident', body, 'error', 12000);
+                return;
+            }
             const title = err.kind === 'validation'
                 ? 'LUMP Repository Save Rejected'
                 : (err.kind === 'transport'
@@ -15617,7 +15667,7 @@ async function confirmSaveToNamespace() {
             const body = err.kind === 'transport'
                 ? 'Check your connection, then click Save again. Nothing was committed.'
                 : (err.kind === 'validation'
-                    ? `${err.message} Correct the LUMP or Namespace settings, then click Save again.`
+                    ? `${err.message} Correct the exact field identified above, then save again.`
                     : (err.kind === 'server'
                         ? `${err.message} The modal remains open; resolve the server error, then click Save again.`
                         : `${err.message} Retry Save. If this repeats, inspect the server logs for the invalid response.`));

@@ -3,7 +3,10 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { _lumpSaveRequest } = require('./lump_save_handler.js');
+const {
+    _lumpSaveRequest,
+    _lumpSaveFailureClassification,
+} = require('./lump_save_handler.js');
 
 let passed = 0;
 let failed = 0;
@@ -38,6 +41,51 @@ function response(status, body) {
             error.kind === 'validation' && /Church E-only/.test(error.message));
     }
     check('validation does not commit browser state', commits === 0);
+
+    const ideClassification = _lumpSaveFailureClassification(422, {
+        namespace_identity_failed: true,
+        failure_owner: 'ide',
+        committed: false,
+        safe_retry: true,
+    });
+    check('canonical identity failure is IDE-owned and safe only when proven pre-commit',
+        ideClassification.kind === 'ide' &&
+        ideClassification.committed === false &&
+        ideClassification.safeRetry === true);
+    const legacyIdentityClassification = _lumpSaveFailureClassification(422, {
+        namespace_identity_failed: true,
+    });
+    check('legacy identity marker never implies a known commit result or safe retry',
+        legacyIdentityClassification.kind === 'ide' &&
+        legacyIdentityClassification.committed === null &&
+        legacyIdentityClassification.safeRetry === false);
+
+    let recoveryRequests = 0;
+    let rebuilds = 0;
+    commits = 0;
+    const recovered = await _lumpSaveRequest(
+        () => {
+            recoveryRequests++;
+            return recoveryRequests === 1
+                ? response(422, JSON.stringify({
+                    error: 'Namespace identity changed during canonicalization',
+                    failure_owner: 'ide',
+                    namespace_identity_failed: true,
+                    committed: false,
+                    safe_retry: true,
+                }))
+                : response(200, '{"ok":true,"token":"00000a01"}');
+        },
+        '/api/lumps/save', { binary: [1, 2] }, () => { commits++; }, {
+            attempted: false,
+            rebuildPayload: payload => {
+                rebuilds++;
+                return JSON.parse(JSON.stringify(payload));
+            },
+        });
+    check('proven pre-commit IDE failure rebuilds and retries once internally',
+        recovered.token === '00000a01' && recoveryRequests === 2 &&
+        rebuilds === 1 && commits === 1);
 
     try {
         await _lumpSaveRequest(
@@ -83,16 +131,19 @@ function response(status, body) {
     check('successful save gives actionable Namespace and Run guidance',
         successCallback.includes('Open Namespace to inspect it') &&
         successCallback.includes('choose Run to execute'));
-    check('failed save remains open and tells the programmer how to retry',
-        !successCallback.slice(successCallback.indexOf('.catch(function(err)'))
-            .includes('closeSaveDialog();') &&
-        successCallback.includes('then click Save again'));
-    check('protected save retains canonical token',
-        body.includes("_svTok = '00000a00'"));
-    check('protected preflight covers identity/type/permission/sequence',
-        body.includes("label !== 'CapabilityTest'") &&
-        body.includes('gtType !== 1') &&
-        body.includes('Church E-only permission') &&
+    check('IDE-owned failure preserves source without programmer retry guidance',
+        successCallback.includes('IDE Save Incident') &&
+        successCallback.includes('source and settings remain preserved') &&
+        !successCallback.includes('Correct the LUMP or Namespace settings, then click Save again.'));
+    check('safe recovery regenerates both save plan and approval binding',
+        successCallback.includes('window._requestLumpSavePlan(') &&
+        successCallback.includes('window._requestLumpApprovalIntent(') &&
+        successCallback.includes('delete rebuilt.metadata.approval_intent'));
+    check('clearing modal feedback also clears a prior incident lock',
+        source.includes('delete status.dataset.incident;'));
+    check('generic screenshot retry wording cannot return',
+        !source.includes('Save did not complete. Review the settings, then click Save again.'));
+    check('save payload carries destination sequence for server-owned identity binding',
         body.includes('namespace_sequence: _targetSequence'));
     check('transport and protocol failures have distinct UI titles',
         body.includes('LUMP Repository Network Failure') &&
@@ -144,9 +195,8 @@ function response(status, body) {
     check('Resident Save clears in-flight state for every terminal outcome',
         saveBody.includes('.finally(function()') &&
         saveBody.includes('_rl.saveInFlight = false;'));
-    check('Resident Save surfaces HTTP and malformed-response failures',
-        saveBody.includes('res.body.error') &&
-        saveBody.includes('server returned an invalid response'));
+    check('Resident Save surfaces server-provided failure reasons',
+        saveBody.includes('res.body.error'));
     check('Resident Save persists the selected Lightning Bolt slot with the config',
         saveBody.includes('bootEntrySlot: (function ()') &&
         saveBody.includes("localStorage.getItem('bootEntrySlot')"));

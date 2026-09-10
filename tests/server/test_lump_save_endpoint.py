@@ -367,6 +367,9 @@ def test_resident_namespace_failure_never_enters_commit_helper(
 
     assert response.status_code == 422
     assert response.get_json()["namespace_identity_failed"] is True
+    assert response.get_json()["failure_owner"] == "ide"
+    assert response.get_json()["committed"] is False
+    assert response.get_json()["safe_retry"] is True
     assert "injected binding failure" in response.get_json()["error"]
     assert commit_entered is False
     assert json.loads(state.read_text()) == {"abstractions": []}

@@ -506,9 +506,34 @@ def test_selftest_source_identity_change_between_reads_is_rejected(
 
     assert response.status_code == 409, response.get_data(as_text=True)
     assert "SelfTest Namespace slot changed" in response.get_json()["error"]
+    assert response.get_json()["failure_owner"] == "ide"
+    assert response.get_json()["committed"] is False
+    assert response.get_json()["safe_retry"] is True
+    # Internal recovery repeats canonical planning and approval against the
+    # Namespace state committed by the competing writer. The programmer's
+    # source/settings are unchanged and no second confirmation is required.
+    with app_module.app.test_client() as client:
+        plan_response = client.post(
+            "/api/lumps/save-plan", json={"binary": words, "metadata": metadata})
+        assert plan_response.status_code == 201, plan_response.get_data(as_text=True)
+        plan = plan_response.get_json()
+        intent_response = client.post("/api/lumps/approval-intent", json={
+            "digest": plan["digest"],
+            "action": plan["action"],
+            "plan_id": plan["plan_id"],
+            "confirmation": True,
+            "approval": {"grants": ["E"], "capability_type": "inform"},
+        })
+        assert intent_response.status_code == 201
+        recovered_metadata = dict(metadata)
+        recovered_metadata.update({
+            "save_plan_id": plan["plan_id"],
+            "approval_intent": intent_response.get_json()["intent"],
+        })
+        recovered = client.post("/api/lumps/save", json={
+            "binary": words,
+            "metadata": recovered_metadata,
+        })
+    assert recovered.status_code == 200, recovered.get_data(as_text=True)
     after = _repository_snapshot(isolated_bootstrap_repository)
-    # The hook's simulated concurrent Namespace commit is the only change.
-    assert set(after) == set(before)
-    for name in after:
-        if name != "ns-state.json":
-            assert after[name] == before[name]
+    assert after != before

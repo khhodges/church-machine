@@ -20,12 +20,15 @@ if (typeof require === 'function' && typeof _formatActionableHttpError === 'unde
  */
 function _lumpSaveHandleResponse(r, resp) {
     if (!r.ok) {
+        var classification = _lumpSaveFailureClassification(r.status, resp);
         // Surface the server's rejection reason so the user can act on it.
         var _errMsg = _formatActionableHttpError(
             'Save to the LUMP repository', r.status, resp,
             {
-                dataChanged: false,
-                nextAction: 'Correct the LUMP or Namespace settings, then click Save again.',
+                dataChanged: classification.committed,
+                nextAction: classification.kind === 'ide'
+                    ? 'The IDE must resolve this incident; your source and settings remain preserved.'
+                    : 'Correct the exact field identified by the IDE, then save again.',
             });
         console.error('[confirmSaveToNamespace] server rejected save:', _errMsg, resp);
         if (typeof _showFpgaToast === 'function') {
@@ -89,13 +92,34 @@ function _lumpSaveSubmittedSource(snapshot, reusedSnapshot, fallbackProfile, fal
     return typeof source === 'string' ? source : '';
 }
 
+function _lumpSaveFailureClassification(status, response) {
+    var resp = response && typeof response === 'object' ? response : {};
+    var ideOwned = resp.failure_owner === 'ide' || resp.namespace_identity_failed === true ||
+        resp.canonicalization_failed === true || resp.approval_binding_failed === true ||
+        resp.atomic_transition_failed === true;
+    if (ideOwned) {
+        return {
+            kind: 'ide',
+            committed: resp.committed === true ? true :
+                (resp.committed === false ? false : null),
+            safeRetry: resp.committed === false && resp.safe_retry === true,
+        };
+    }
+    return {
+        kind: status >= 500 ? 'server' : (status >= 400 ? 'validation' : 'protocol'),
+        committed: resp.committed === true ? true :
+            (resp.committed === false ? false : null),
+        safeRetry: false,
+    };
+}
+
 /**
  * POST a save and classify failures without conflating response parsing with
  * transport.  The commit callback is invoked only for a valid successful JSON
  * response, allowing callers to keep simulator/UI state unchanged until the
  * durable server transaction has committed.
  */
-function _lumpSaveRequest(fetchImpl, url, payload, onCommit) {
+function _lumpSaveRequest(fetchImpl, url, payload, onCommit, recovery) {
     return fetchImpl(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -117,14 +141,26 @@ function _lumpSaveRequest(fetchImpl, url, payload, onCommit) {
                 throw protocolError;
             }
             if (!r.ok || !resp || resp.ok !== true) {
+                var classification = _lumpSaveFailureClassification(r.status, resp);
+                if (classification.kind === 'ide' && classification.safeRetry &&
+                        recovery && recovery.attempted !== true &&
+                        typeof recovery.rebuildPayload === 'function') {
+                    recovery.attempted = true;
+                    return Promise.resolve(recovery.rebuildPayload(payload, resp))
+                        .then(function(rebuilt) {
+                            return _lumpSaveRequest(
+                                fetchImpl, url, rebuilt, onCommit, recovery);
+                        });
+                }
                 var responseError = new Error(
                     _formatActionableHttpError('Save to the LUMP repository', r.status, resp, {
-                        dataChanged: false,
-                        nextAction: 'Correct the LUMP or Namespace settings, then click Save again.',
+                        dataChanged: classification.committed,
+                        nextAction: classification.kind === 'ide'
+                            ? 'The IDE must resolve this incident; your source and settings remain preserved.'
+                            : 'Correct the identified field, then save again.',
                     }));
-                responseError.kind = r.status >= 500
-                    ? 'server'
-                    : (!r.ok ? 'validation' : 'protocol');
+                responseError.kind = classification.kind;
+                responseError.committed = classification.committed;
                 responseError.status = r.status;
                 responseError.response = resp;
                 throw responseError;
@@ -135,6 +171,7 @@ function _lumpSaveRequest(fetchImpl, url, payload, onCommit) {
     }).catch(function(err) {
         if (err && (
             err.kind === 'validation' ||
+            err.kind === 'ide' ||
             err.kind === 'protocol' ||
             err.kind === 'server'
         )) throw err;
@@ -155,6 +192,7 @@ if (typeof module !== 'undefined') {
         _lumpSaveHandleNetworkError,
         _lumpSaveStaleConflictAction,
         _lumpSaveSubmittedSource,
+        _lumpSaveFailureClassification,
         _lumpSaveRequest,
         _formatActionableHttpError,
     };
