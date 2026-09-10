@@ -8206,6 +8206,8 @@ def save_lump():
             _selected_sequence, ns_slot, {"E": 1}, 1)
         _warn_clist0_owner_mismatch(
             _expected_owner_gt, _sl_words[_clist_row0_idx])
+        if _compiler_self_row:
+            _sl_words[_clist_row0_idx] = _expected_owner_gt
 
     if _is_bootstrap_canonical and not _is_selftest_canonical:
         if _sl_cc2 < 1:

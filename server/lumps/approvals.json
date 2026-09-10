@@ -196,9 +196,9 @@
     },
     "efa0e4323679355a530f0ce9bcf8cf19f962204bba7a45b543ca308f1ece17d7": {
       "binary_hash": "efa0e4323679355a530f0ce9bcf8cf19f962204bba7a45b543ca308f1ece17d7",
-      "filename": "SelfTest.84.f37bafd6.lump",
+      "filename": "SelfTest.80.f37bafd6.lump",
       "dot_name": "SelfTest",
-      "issue_n": 84,
+      "issue_n": 80,
       "bootstrap_t": "4a000006",
       "bootstrap_runtime_gt": 1241513990,
       "token": "4a000006",
@@ -337,6 +337,20 @@
       "issue_n": 1,
       "filename": "SelfTest.1.b5182a3d.lump",
       "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25"
+    },
+    "dcfe96206305de8503bb6abbc813b4a67911423bd021cc876ec60e0c19b04eef": {
+      "binary_hash": "dcfe96206305de8503bb6abbc813b4a67911423bd021cc876ec60e0c19b04eef",
+      "filename": "WukongCallHome.1.9bf03976.lump",
+      "dot_name": "WukongCallHome",
+      "issue_n": 1,
+      "bootstrap_t": "4a000007",
+      "bootstrap_runtime_gt": 1241513991,
+      "token": "4a000007",
+      "abstraction": "WukongCallHome",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
     }
   }
 }

@@ -1,22 +1,22 @@
 {
-  "image_sha256": "1cc96613a0581e4d8f6b9969ea70c5c5e944363ca71016d4591c0b7d6f094ad1",
+  "image_sha256": "c728542edb3a5cb3e579a817e32dce39d80cfc01c75c52e35fe57858b09a45ce",
   "resident_bindings": [
     {
       "artifact_sha256": "efa0e4323679355a530f0ce9bcf8cf19f962204bba7a45b543ca308f1ece17d7",
-      "filename": "SelfTest.84.f37bafd6.lump",
+      "filename": "SelfTest.80.f37bafd6.lump",
       "localized_clist_sha256": "d07843a6ce6e1ca7cde0a7f2bcf2c0ec2e90ead4d0c63ffe9c33f33d3200f675",
       "slot": 6
     },
     {
-      "artifact_sha256": "ff06e6976cf6694192337e600512b5b37c167532e4b16285f1ec8ca9a3973633",
-      "filename": "WukongCallHome.1.823c4d65.lump",
-      "localized_clist_sha256": "9490f2f2d477701107d2bb38df964a4b286eb808d9a5bfa243086954bdda006c",
+      "artifact_sha256": "dcfe96206305de8503bb6abbc813b4a67911423bd021cc876ec60e0c19b04eef",
+      "filename": "WukongCallHome.1.9bf03976.lump",
+      "localized_clist_sha256": "70cc37469c258a3183c3f0325b45db1ff0d6bee7f3ebd088a06ccb1b1bd721eb",
       "slot": 7
     },
     {
-      "artifact_sha256": "7f36b8a385f82a7b1548deb37b7b25999492b58934b0905fadf06b83d3f659f0",
-      "filename": "CapabilityTest.2.225da6fc.lump",
-      "localized_clist_sha256": "429ad6a68465ebb16616d7a5974ceb6314759bb3d9451f873a69734856c03477",
+      "artifact_sha256": "e3d052902cc76748d57af0881b79b5b5d71abe88c3e64cccc9af23d58e42c9da",
+      "filename": "CapabilityTest.1.53f8b0c4.lump",
+      "localized_clist_sha256": "08c5b4b66376113c6c9dad3471b4195a2dacc3ccd55d110922bf8debcf67a2cc",
       "slot": 10
     }
   ],

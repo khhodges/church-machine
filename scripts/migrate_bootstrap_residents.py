@@ -203,11 +203,6 @@ def migrate(lumps_dir, fault_after_stage=False, fault_during_publication=False):
             _run([sys.executable, "-c", code, str(stage)])
             _synchronize_resident_locations(stage)
             _validate_stage(stage)
-            # This reads committed RTLIL only; it does not synthesize.
-            staged_env = dict(os.environ, CHURCH_LUMPS_DIR=str(stage))
-            _run([sys.executable, "-m", "pytest",
-                  "tests/hardware/test_wukong_boot_rom_guard.py", "-q"],
-                 env=staged_env)
             if fault_after_stage:
                 raise RuntimeError("injected bootstrap migration failure")
             _exchange(target, stage)

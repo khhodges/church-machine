@@ -69,9 +69,12 @@
 ; ============================================================
 
 capabilities {
-    SELF E
-    LED0 RW
-    UART_TX W
+    Salvation E,
+    Navana E,
+    Mint E,
+    Memory E,
+    LED0 RW,
+    UART_TX W,
     WukongCallHome.hw E
 }
 

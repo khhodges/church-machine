@@ -295,7 +295,7 @@
     "filename": "CapabilityTest.2.225da6fc.lump",
     "variant_group": "capabilitytest-history",
     "lump_version": 2,
-    "compiled_at": 1788187312.1902559
+    "compiled_at": 1788981641.722638
   },
   {
     "token": "c7657c2d",
@@ -385,7 +385,8 @@
     "abstraction": "SelfTest",
     "filename": "SelfTest.84.f37bafd6.lump",
     "lump_version": 84,
-    "variant_group": "selftest-history"
+    "variant_group": "selftest-history",
+    "archived": true
   },
   {
     "token": "85fcac64",
@@ -407,7 +408,8 @@
     "abstraction": "WukongCallHome",
     "filename": "WukongCallHome.1.823c4d65.lump",
     "lump_version": 10,
-    "compiled_at": 1788909925.4678128
+    "compiled_at": 1788909925.4678128,
+    "archived": true
   },
   {
     "token": "c1972022",
@@ -422,13 +424,21 @@
     "abstraction": "CapabilityTest",
     "filename": "CapabilityTest.1.edfd9e62.lump",
     "lump_version": 25,
-    "compiled_at": 1788981641.722638
+    "compiled_at": 1788981641.722638,
+    "archived": true
   },
   {
-    "token": "3b466efc",
+    "token": "4a000006",
     "abstraction": "SelfTest",
-    "filename": "SelfTest.1.b5182a3d.lump",
+    "filename": "SelfTest.80.f37bafd6.lump",
     "lump_version": 80,
-    "compiled_at": 1788985689.2249203
+    "compiled_at": 1788985689.2249203,
+    "variant_group": "selftest-history"
+  },
+  {
+    "token": "4a000007",
+    "abstraction": "WukongCallHome",
+    "filename": "WukongCallHome.1.9bf03976.lump",
+    "lump_version": 1
   }
 ]
