@@ -681,6 +681,14 @@ launch_suite() {
     local out="$WORK_DIR/${name}.out"
     local pid_file="$WORK_DIR/${name}.pid"
     local isolated_lumps=""
+    local isolated_boot_config=""
+    if [ "$name" = "bootstrap-resident-identity-tests" ]; then
+        isolated_lumps="$WORK_DIR/${name}-lumps"
+        isolated_boot_config="$WORK_DIR/${name}-boot-config.json"
+        mkdir -p "$isolated_lumps"
+        cp -a server/lumps/. "$isolated_lumps/"
+        cp -a server/boot-config.json "$isolated_boot_config"
+    fi
     case " ${ALL_GROUPS[hardware]} " in
         *" ${name} "*)
             isolated_lumps="$WORK_DIR/${name}-lumps"
@@ -702,7 +710,14 @@ launch_suite() {
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         if [ -n "$isolated_lumps" ]; then
             echo "  [lumps-isolation] using $isolated_lumps"
-            CHURCH_TEST_LUMPS_DIR="$isolated_lumps" eval "$cmd"
+            if [ -n "$isolated_boot_config" ]; then
+                echo "  [boot-config-isolation] using $isolated_boot_config"
+                CHURCH_TEST_LUMPS_DIR="$isolated_lumps" \
+                    CHURCH_TEST_BOOT_CONFIG_PATH="$isolated_boot_config" \
+                    eval "$cmd"
+            else
+                CHURCH_TEST_LUMPS_DIR="$isolated_lumps" eval "$cmd"
+            fi
         else
             eval "$cmd"
         fi

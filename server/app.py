@@ -2415,8 +2415,14 @@ def api_state_delete(state_id):
 # (resident lumps), `step3` (reserved empty NS slots), and the binary image
 # generator settings.
 # File spec uses a hyphen (boot-config.json) per docs/foundation-lump-design.md §4.
-BOOT_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                "boot-config.json")
+_BOOT_CONFIG_PATH_OVERRIDE = os.environ.get(
+    "CHURCH_TEST_BOOT_CONFIG_PATH", "").strip()
+BOOT_CONFIG_PATH = (
+    os.path.abspath(_BOOT_CONFIG_PATH_OVERRIDE)
+    if _BOOT_CONFIG_PATH_OVERRIDE
+    else os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                      "boot-config.json")
+)
 # Legacy filename from an earlier draft of this task — read for backward
 # compatibility, then migrated to the canonical name on next save.
 BOOT_CONFIG_LEGACY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),

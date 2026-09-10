@@ -1,10 +1,44 @@
 """Focused regression coverage for Task #3321 bootstrap T == GT."""
+import atexit
+import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import struct
+import subprocess
+import tempfile
 
 import pytest
+
+
+_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _tracked_boot_artifact_snapshot():
+    tracked = subprocess.run(
+        ["git", "ls-files", "server/boot-config.json", "server/lumps/boot-image*",
+         "server/lumps/ns-state.json", "server/lumps/manifest.json",
+         "server/lumps/approvals.json"],
+        cwd=_ROOT, check=True, capture_output=True, text=True,
+    ).stdout.splitlines()
+    return {
+        name: hashlib.sha256((_ROOT / name).read_bytes()).hexdigest()
+        for name in tracked
+    }
+
+
+_TRACKED_BOOT_ARTIFACTS_BEFORE = _tracked_boot_artifact_snapshot()
+_BOOTSTRAP_TEST_ROOT = None
+if not os.environ.get("CHURCH_TEST_LUMPS_DIR"):
+    _BOOTSTRAP_TEST_ROOT = Path(tempfile.mkdtemp(prefix="bootstrap-identity-"))
+    isolated_lumps = _BOOTSTRAP_TEST_ROOT / "lumps"
+    shutil.copytree(_ROOT / "server" / "lumps", isolated_lumps, symlinks=True)
+    isolated_config = _BOOTSTRAP_TEST_ROOT / "boot-config.json"
+    shutil.copy2(_ROOT / "server" / "boot-config.json", isolated_config)
+    os.environ["CHURCH_TEST_LUMPS_DIR"] = str(isolated_lumps)
+    os.environ["CHURCH_TEST_BOOT_CONFIG_PATH"] = str(isolated_config)
+    atexit.register(shutil.rmtree, _BOOTSTRAP_TEST_ROOT, ignore_errors=True)
 
 from server import app as app_module
 from server.bootstrap_identity import (
@@ -16,6 +50,16 @@ from server.bootstrap_identity import (
 from server.lump_approvals import read_approvals
 from server.lump_integrity import resolve_canonical_lump, canonical_binding_headers
 from server.boot_image import generate_boot_image
+
+
+@pytest.fixture(scope="module", autouse=True)
+def bootstrap_suite_preserves_tracked_boot_artifacts():
+    assert Path(app_module.LUMPS_DIR) != _ROOT / "server" / "lumps"
+    assert Path(app_module.BOOT_IMAGE_PATH).parent == Path(app_module.LUMPS_DIR)
+    assert Path(app_module.BOOT_IMAGE_PROVENANCE_PATH).parent == Path(app_module.LUMPS_DIR)
+    assert Path(app_module.BOOT_CONFIG_PATH) != _ROOT / "server" / "boot-config.json"
+    yield
+    assert _tracked_boot_artifact_snapshot() == _TRACKED_BOOT_ARTIFACTS_BEFORE
 
 
 _RESIDENT = {
