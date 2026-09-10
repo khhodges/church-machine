@@ -24,6 +24,7 @@
 // Tests wait for concrete JS globals (_onSimFaultSnapshot defined) instead.
 
 const { test, expect } = require('@playwright/test');
+const { loadSimulator } = require('./helpers/simulator');
 
 // ─── Stub fault snapshot ──────────────────────────────────────────────────────
 
@@ -288,6 +289,67 @@ test.describe('Last Fault panel — emit → POST → GET round-trip', () => {
         await expect(accepted.locator('img')).toHaveCount(0);
         expect(await page.evaluate(() => window.__faultXss)).toBeUndefined();
         await expect(page.locator('#faultState')).toContainText('running');
+    });
+
+    test('boot mLoad fault modal shows destination CR and preserves executing CR14 context', async ({ page }) => {
+        test.setTimeout(60000);
+
+        // Start from the same deterministic IDE harness used by the boot E2E
+        // tests, then drive the real boot state machine into B:05.
+        await loadSimulator(page);
+
+        const faultState = await page.evaluate(() => {
+            sim.reset();
+            // Slot 14 is intentionally absent from the reset namespace image.
+            sim.bootEntrySlot = 14;
+
+            // Advance through FAULT_RST, LOAD_NS, INIT_THRD, INIT_HEAP, and
+            // CALL_HOME.  Seed CR14 after reset so the fault record can prove
+            // that the executing abstraction and failed destination are
+            // reported independently.
+            for (let i = 0; i < 5; i++) sim._bootStep();
+            const executingEntry = sim.readNSEntry(6);
+            const executingSeq = sim.parseNSWord1(executingEntry.word1_limit).gtSeq;
+            const executingGT = sim.createGT(
+                executingSeq, 6, { R: 0, W: 0, X: 1, L: 0, S: 0, E: 0 }, 1
+            );
+            sim._writeCR(14, executingGT, executingEntry);
+
+            // B:05 INIT_ABSTR calls mLoad for the destination CR6 and must
+            // report the precise mLoad reason when Slot 14 is invalid.
+            sim._bootStep();
+            const fault = sim.faultLog[sim.faultLog.length - 1];
+            return {
+                halted: sim.halted,
+                message: fault && fault.message,
+                faultingAbstractionSlot: fault && fault.faultingAbstractionSlot,
+                faultingAbstractionLabel: fault && fault.faultingAbstractionLabel,
+            };
+        });
+
+        expect(faultState.halted).toBe(true);
+        expect(faultState.message).toBe(
+            'INIT_ABSTR mLoad(CR6, Slot 14) failed: namespace index 14 out of bounds'
+        );
+        expect(faultState.faultingAbstractionSlot).toBe(6);
+        expect(faultState.faultingAbstractionLabel).toBe('SelfTest');
+
+        const modal = page.locator('#faultModalOverlay');
+        await expect(modal).toBeVisible();
+
+        // Assert the rendered browser content rather than only the simulator
+        // record.  CR6 is the failed destination; Slot 14 and the original
+        // mLoad reason must remain visible in the user-facing dialog.
+        const message = modal.locator('.fault-modal-message');
+        await expect(message).toContainText('CR6');
+        await expect(message).toContainText('Slot 14');
+        await expect(message).toContainText('namespace index 14 out of bounds');
+
+        // CR14 remains the executing abstraction context in the modal.  This
+        // guards against replacing the destination CR with the context CR.
+        const location = modal.locator('.fault-modal-lump-chip');
+        await expect(location).toContainText('SelfTest');
+        await expect(message).not.toContainText('mLoad(CR14');
     });
 
 });
