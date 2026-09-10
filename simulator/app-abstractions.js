@@ -792,7 +792,7 @@ async function renderLumps() {
             dataChanged: false,
             nextAction: 'Check the IDE connection, then click Refresh.',
         });
-        const lumps = await r.json();
+        let lumps = await r.json();
         if (window.LumpRegistry) window.LumpRegistry.registerFromServer(lumps);
 
         // Abstraction-name-based pending navigation (set by _goToLumpByAbstractionName).
@@ -818,6 +818,21 @@ async function renderLumps() {
         if (window.LumpRegistry) {
             const _ptToken = window.LumpRegistry.consumePending();
             if (_ptToken) {
+                if (!lumps.some(l => l.token === _ptToken)) {
+                    try {
+                        const _detailResponse = await fetch(
+                            `/api/lumps/${encodeURIComponent(_ptToken)}/detail`);
+                        if (_detailResponse.ok) {
+                            const _historicalDetail = await _detailResponse.json();
+                            if (_historicalDetail && _historicalDetail.archived === true) {
+                                lumps = lumps.concat([_historicalDetail]);
+                                window.LumpRegistry.registerFromServer(lumps);
+                            }
+                        }
+                    } catch (_historicalError) {
+                        console.warn('[lumps] historical deep link unavailable', _historicalError);
+                    }
+                }
                 window.LumpRegistry.setCurrent(_ptToken);
                 _pendingTokenResolved = true;
                 // If the token is not in the server list (freshly assembled, not yet saved),
@@ -883,6 +898,7 @@ async function renderLumps() {
             // revision. Immutable-history storage must not make an older
             // resident image authoritative for editor or simulator selection.
             const _primaryLumps = lumps.filter(l => {
+                if (l.archived === true) return false;
                 const latest = _latestPrimaryLump(lumps, l.abstraction);
                 return latest && latest.token === l.token;
             });
@@ -1192,7 +1208,7 @@ function _lumpsSorted(lumps) {
 
 function _latestPrimaryLump(lumps, abstraction) {
     const matches = (lumps || []).filter(l =>
-        l && l.abstraction === abstraction);
+        l && l.abstraction === abstraction && l.archived !== true);
     matches.sort((a, b) => {
         const _compiledTime = lump => {
             const raw = lump && lump.compiled_at;

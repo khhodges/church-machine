@@ -78,6 +78,7 @@ function showLumpDetail(token) {
         lump.bootstrap_identity.applies === true &&
         lump.bootstrap_identity.valid === false
     );
+    const _historicalReadOnly = lump.archived === true || lump.read_only === true;
     if (_bootstrapIdentityInvalid) {
         const _bi = lump.bootstrap_identity;
         const _bootstrapMismatchTitle =
@@ -129,7 +130,7 @@ function showLumpDetail(token) {
         _headerStrip += `<span class="lump-malformed-chip" id="lumpMalformedChip_${_tk}" style="display:none" title="Click Edit to repair with canonical source">\u26a0 Binary may be malformed<button class="lump-malformed-chip-dismiss" onclick="this.parentElement.style.display='none'" title="Dismiss">\u00d7</button></span>`;
     // ── Inline actions group (pushed right by margin-left:auto) ───────────────
     _headerStrip += `<div class="lump-hs-actions">`;
-    if (!isNamespace) {
+    if (!isNamespace && !_historicalReadOnly) {
         _headerStrip += `<button class="lump-hs-btn lump-edit-btn" data-edit-token="${_e(token)}" title="Open this saved code and its compiled binary in the editor">&#9998; Open in Editor</button>`;
         _headerStrip += `<button class="lump-hs-btn lump-audit-btn" data-audit-token="${_e(token)}" title="Audit \u2014 Run pre-save consistency checks">\u2699 Audit</button>`;
         if (_isCodeLump && !_bootstrapIdentityInvalid) {
@@ -146,7 +147,8 @@ function showLumpDetail(token) {
     if (_lumpAbsMatch) {
         _headerStrip += `<button class="lump-hs-btn lump-view-abs-btn" onclick="_goToAbstractionByName('${_e(lump.abstraction)}')" title="View Abstraction \u2014 Jump to the Abstraction Catalog entry">&#8599; Abstraction</button>`;
     }
-    _headerStrip += `<button class="btn lump-delete-btn lump-hs-delete-btn" data-delete-token="${_e(token)}" title="Delete this lump">&#128465;</button>`;
+    if (!_historicalReadOnly)
+        _headerStrip += `<button class="btn lump-delete-btn lump-hs-delete-btn" data-delete-token="${_e(token)}" title="Delete this lump">&#128465;</button>`;
     _headerStrip += `</div>`;
     _headerStrip += `</div>`;
     _headerStrip += `<div class="lump-audit-results-wrap" id="lumpAuditResults_${_tk}"></div>`;
@@ -2666,15 +2668,19 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                 const metadataOnly = Boolean(hist && hist.metadata_only);
                 const validationErrors = hist && Array.isArray(hist.validation_errors)
                     ? hist.validation_errors : [];
-                const archiveUsable = Boolean(hist && !isCurrent &&
-                    hist.preview_enabled !== false && hist.restore_enabled !== false &&
-                    histInspection && hist.binary_valid === true);
+                const previewUsable = Boolean(hist && !isCurrent &&
+                    hist.preview_enabled !== false && histInspection);
+                const archiveUsable = Boolean(previewUsable &&
+                    hist.restore_enabled !== false && hist.binary_valid === true);
+                const previewToken = hist && hist.record_token
+                    ? hist.record_token : token;
+                const historicalRecord = Boolean(hist && hist.historical_record);
 
                 let _rowAttrs = '';
                 if (isCurrent) {
                     _rowAttrs = ' style="background:var(--bg-selected,rgba(99,102,241,0.08));"';
-                } else if (archiveUsable) {
-                    _rowAttrs = ` style="cursor:pointer;" onclick="_lumpHistorySelectRow(this,'${e(token)}',${ver},${histInspection.cw||0},${histInspection.cc||0},${histInspection.lump_size||0},'${tk}')"`;
+                } else if (previewUsable) {
+                    _rowAttrs = ` style="cursor:pointer;" onclick="_lumpHistorySelectRow(this,'${e(previewToken)}',${ver},${histInspection.cw||0},${histInspection.cc||0},${histInspection.lump_size||0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(token)}')"`;
                 }
                 html += `<tr class="lump-history-row" data-version="${ver}"${_rowAttrs}>`;
 
@@ -2711,9 +2717,12 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                 }
 
                 // Preview + Restore (only for archived binaries)
-                if (archiveUsable) {
-                    html += `<td><button class="btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_lumpHistoryPreview('${e(token)}',${ver},${histInspection.cw||0},${histInspection.cc||0},${histInspection.lump_size||0},'${tk}')" title="Preview hex diff of v${ver}">Preview</button></td>`;
-                    html += `<td><button class="btn lump-history-restore-btn" id="lumpHistoryRestoreBtn_${tk}_${ver}" style="font-size:0.7rem;padding:2px 8px;" disabled onclick="event.stopPropagation();_restoreLumpFromHistory('${e(token)}',${ver})" title="Preview this version first, then restore">Restore</button></td>`;
+                if (previewUsable) {
+                    html += `<td><button class="btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_lumpHistoryPreview('${e(previewToken)}',${ver},${histInspection.cw||0},${histInspection.cc||0},${histInspection.lump_size||0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(token)}')" title="Preview hex diff of v${ver}">Preview</button></td>`;
+                    if (archiveUsable)
+                        html += `<td><button class="btn lump-history-restore-btn" id="lumpHistoryRestoreBtn_${tk}_${ver}" style="font-size:0.7rem;padding:2px 8px;" disabled onclick="event.stopPropagation();_restoreLumpFromHistory('${e(token)}',${ver})" title="Preview this version first, then restore">Restore</button></td>`;
+                    else
+                        html += `<td><span class="lump-history-unavailable" title="Historical bootstrap evidence is read-only">Read only</span></td>`;
                 } else if (hist && !isCurrent) {
                     const reason = validationErrors.length
                         ? validationErrors.join('; ')
@@ -2798,14 +2807,14 @@ async function _promptUpgradeLump(absName, fromToken, fromVersion, toToken, toVe
 }
 
 
-function _lumpHistorySelectRow(rowEl, token, version, cw, cc, lumpSize, tk) {
+function _lumpHistorySelectRow(rowEl, token, version, cw, cc, lumpSize, tk, historicalRecord, currentToken) {
     const table = document.getElementById(`lumpHistoryTable_${tk}`);
     if (table) table.querySelectorAll('tr').forEach(r => r.classList.remove('lump-hex-hdr-row'));
     rowEl.classList.add('lump-hex-hdr-row');
-    _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk);
+    _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, historicalRecord, currentToken);
 }
 
-async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk) {
+async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, historicalRecord, currentToken) {
     const previewEl = document.getElementById(`lumpHistoryHexPreview_${tk}`);
     if (!previewEl) return;
     const e = _escHtml;
@@ -2828,8 +2837,10 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk) {
     };
     try {
         const [archResp, curResp] = await Promise.all([
-            fetch(`/api/lumps/${token}/words/${version}`),
-            fetch(`/api/lump/${token}/words`)
+            fetch(historicalRecord
+                ? `/api/lump/${token}/words`
+                : `/api/lumps/${token}/words/${version}`),
+            fetch(`/api/lump/${currentToken || token}/words`)
         ]);
         if (!archResp.ok) {
             const error = await _actionableResponseError(archResp, 'Load archived LUMP words', {
@@ -2847,11 +2858,15 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk) {
             _noPreview('binary inspection fields are unavailable');
             return;
         }
-        if (data.binary_valid !== true && !_lumpApprovalMatchesBinary(data)) {
+        if (!historicalRecord && data.binary_valid !== true && !_lumpApprovalMatchesBinary(data)) {
             _noPreview('matching hash-bound approval record is unavailable');
             return;
         }
 
+        const historicalWarning = historicalRecord && data.bootstrap_identity &&
+                data.bootstrap_identity.valid === false
+            ? `<div class="lump-history-provenance-note">\u26a0 Archived bootstrap identity mismatch. This binary is preview-only and cannot be restored.</div>`
+            : '';
         let curWords = [];
         let curFetchFailed = false;
         if (curResp.ok) {
@@ -2916,8 +2931,8 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk) {
             t += `<tr class="${rowClass}"><td class="lump-hex-addr">0x${baseAddr}</td>${rowHex}${ascCell}</tr>`;
         }
         t += '</tbody></table></div>';
-        previewEl.innerHTML = t;
-        _enableRestoreBtn();
+        previewEl.innerHTML = historicalWarning + t;
+        if (!historicalRecord) _enableRestoreBtn();
     } catch (err) {
         _noPreview(err.message);
     }

@@ -246,15 +246,22 @@ def test_bootstrap_history_fails_closed_when_binding_is_unavailable(
     binary = source_lump.read_bytes()
     (tmp_path / current_name).write_bytes(binary)
     (tmp_path / archive_name).write_bytes(binary)
-    manifest_entry = {
+    archived_manifest_entry = {
+        "token": "b6182a95",
+        "abstraction": "CapabilityTest",
+        "filename": archive_name,
+        "lump_version": 1,
+        "archived": True,
+    }
+    active_manifest_entry = {
         "token": "b6182a95",
         "abstraction": "CapabilityTest",
         "filename": current_name,
         "lump_version": 2,
-        "archived": True,
     }
     (tmp_path / "manifest.json").write_text(
-        json.dumps([manifest_entry]), encoding="utf-8")
+        json.dumps([archived_manifest_entry, active_manifest_entry]),
+        encoding="utf-8")
     if state_mode == "malformed":
         (tmp_path / "ns-state.json").write_text("{", encoding="utf-8")
     elif state_mode == "duplicate":
@@ -287,24 +294,66 @@ def test_bootstrap_history_fails_closed_when_binding_is_unavailable(
         archived["validation_errors"][0])
 
 
-def test_lump_list_and_words_expose_bootstrap_identity_comparison():
+def test_lump_list_hides_archived_bootstrap_but_words_expose_identity_comparison():
     with app_module.app.test_client() as client:
         listed_response = client.get("/api/lumps/list")
         words_response = client.get("/api/lump/b6182a95/words")
 
     assert listed_response.status_code == 200
-    archived = next(
-        row for row in listed_response.get_json()
-        if row.get("token") == "b6182a95")
-    assert archived["legacy_incompatible"] is True
-    assert archived["bootstrap_identity"]["record_token"] == "b6182a95"
-    assert archived["bootstrap_identity"]["row0_gt"] == "4a000006"
-    assert archived["bootstrap_identity"]["expected_gt"] == "4a00000a"
+    assert not any(
+        row.get("token") == "b6182a95"
+        for row in listed_response.get_json())
 
     assert words_response.status_code == 200
     words_identity = words_response.get_json()["bootstrap_identity"]
     assert words_identity["valid"] is False
     assert words_identity["data_changed"] is False
+
+
+@pytest.mark.parametrize(
+    ("token", "abstraction", "active_filename"),
+    [
+        ("4a000006", "SelfTest", "SelfTest.80.f37bafd6.lump"),
+        ("4a000007", "WukongCallHome", "WukongCallHome.1.9bf03976.lump"),
+        ("4a00000a", "CapabilityTest", "CapabilityTest.2.225da6fc.lump"),
+    ],
+)
+def test_active_bootstrap_history_groups_all_legacy_manifest_records_read_only(
+        token, abstraction, active_filename):
+    manifest = json.loads(
+        (Path(__file__).resolve().parents[2] / "server" / "lumps"
+         / "manifest.json").read_text())
+    archived_rows = [
+        row for row in manifest
+        if row.get("abstraction") == abstraction and row.get("archived") is True
+    ]
+
+    with app_module.app.test_client() as client:
+        response = client.get(f"/api/lumps/{token}/history")
+
+    assert response.status_code == 200
+    history = response.get_json()["history"]
+    current = [row for row in history if row.get("current") is True]
+    assert len(current) == 1
+    active_manifest = next(
+        row for row in manifest
+        if row.get("filename") == active_filename
+        and row.get("archived") is not True)
+    assert current[0]["version"] == active_manifest["lump_version"]
+
+    historical = [row for row in history if row.get("historical_record")]
+    assert len(historical) == len(archived_rows)
+    expected_records = {
+        (row["token"], row["filename"], row["lump_version"])
+        for row in archived_rows
+    }
+    actual_records = {
+        (row["record_token"], row["record_filename"], row["version"])
+        for row in historical
+    }
+    assert actual_records == expected_records
+    assert all(row["restore_enabled"] is False for row in historical)
+    assert all(row["read_only"] is True for row in historical)
 
 
 def test_programmer_can_plan_slot7_replacement_with_content_token_hint():

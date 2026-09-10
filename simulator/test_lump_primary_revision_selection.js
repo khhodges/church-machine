@@ -53,8 +53,8 @@ const latestSavedRows = [
 ];
 assert.strictEqual(
     sandbox._latestPrimaryLump(latestSavedRows, 'CapabilityTest').token,
-    'latest-capability-test',
-    'most recently compiled save wins even when an older save has a higher version');
+    'boot-capability-test',
+    'archived revisions never replace the active catalogue selection');
 assert(source.includes('latest && latest.token === l.token'),
     'top-level repository chooses the latest saved revision per abstraction');
 assert(source.includes('_currentRow.archived === true'),

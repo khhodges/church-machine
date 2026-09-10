@@ -9490,6 +9490,11 @@ def list_lumps():
         return jsonify({"error": str(exc)}), 409
     result = []
     for entry in manifest:
+        # Archived manifest rows are immutable historical evidence, not active
+        # catalogue entries. They remain available through detail/words routes
+        # and are grouped under the active abstraction's History response.
+        if entry.get("archived") is True:
+            continue
         token8 = entry.get('token', '')
         row = dict(entry)
         path = os.path.join(lumps_dir, entry.get("filename") or f"{token8}.lump")
@@ -9565,6 +9570,10 @@ def get_lump_detail(token):
     if isinstance(canonical, str):
         return jsonify({"error": canonical}), 409
     detail = dict(approval or {})
+    detail.update({
+        key: value for key, value in entry.items()
+        if key not in {"source", "api_definition", "clist_entries"}
+    })
     detail.update({k: inspected[k] for k in
                    ("cw", "cc", "typ", "lump_size", "binary_hash",
                     "content_profile", "sourceStorageTier", "api_definition",
@@ -9572,7 +9581,8 @@ def get_lump_detail(token):
     detail.update({"token": token8, "filename": entry.get("filename"),
                    "approved": approval is not None,
                    "trusted": approval is not None and canonical is True,
-                   "api_definition_source": "lump"})
+                   "api_definition_source": "lump",
+                   "read_only": bool(entry.get("archived"))})
     bootstrap_identity = _bootstrap_snapshot_identity(
         lumps_dir, entry, inspected)
     if bootstrap_identity is not None:
@@ -9793,23 +9803,44 @@ def get_lump_history(token):
     # archive stem. Older archives may predate a tokenized dot-name filename.
     _safe_stems_h = set()
     _current_manifest_h = None
+    _related_archived_h = []
     _mf_path_h = os.path.join(lumps_dir, 'manifest.json')
     if os.path.isfile(_mf_path_h):
         try:
             with open(_mf_path_h) as _mf:
                 _mf_d = json.load(_mf)
-            for _e in _mf_d:
-                if _e.get('token') == key8:
-                    _current_manifest_h = _e
-                    _fn = _e.get('filename', '')
-                    if _fn and _fn.endswith('.lump'):
-                        _safe_stems_h.add(_re.sub(r'_v\d+$', '', _fn[:-5]))
-                    _name_h = _e.get('abstraction', '')
-                    if isinstance(_name_h, str) and _name_h:
-                        _safe_stems_h.add(_re.sub(r'[^A-Za-z0-9_.-]+', '_', _name_h))
-                    break
+            _active_matches_h = [
+                _e for _e in _mf_d
+                if isinstance(_e, dict)
+                and _e.get("token") == key8
+                and _e.get("archived") is not True
+            ]
+            if len(_active_matches_h) > 1:
+                return jsonify({
+                    "error": f"Duplicate active manifest token {key8}"
+                }), 409
+            if _active_matches_h:
+                _current_manifest_h = _active_matches_h[0]
+                _fn = _current_manifest_h.get('filename', '')
+                if _fn and _fn.endswith('.lump'):
+                    _safe_stems_h.add(_re.sub(r'_v\d+$', '', _fn[:-5]))
+                _name_h = _current_manifest_h.get('abstraction', '')
+                if isinstance(_name_h, str) and _name_h:
+                    _safe_stems_h.add(
+                        _re.sub(r'[^A-Za-z0-9_.-]+', '_', _name_h))
+            if _current_manifest_h:
+                _current_name_h = str(
+                    _current_manifest_h.get("abstraction") or "").casefold()
+                _related_archived_h = [
+                    _e for _e in _mf_d
+                    if isinstance(_e, dict)
+                    and _e.get("archived") is True
+                    and str(_e.get("abstraction") or "").casefold() == _current_name_h
+                ]
         except Exception:
             pass
+    if _current_manifest_h is None:
+        return jsonify({"error": f"No active LUMP found for token {key8}"}), 404
     pattern_token = _re.compile(rf'^{_re.escape(key8)}-v(\d+)\.lump$')
     pattern_named = [_re.compile(rf'^{_re.escape(_stem)}_v(\d+)\.lump$')
                      for _stem in _safe_stems_h]
@@ -9866,6 +9897,51 @@ def get_lump_history(token):
         lump_path_v = os.path.join(lumps_dir, stem + ".lump")
         entries.append(_snapshot_entry_h(ver, lump_path_v))
 
+    # Frozen bootstrap migrations retained their old manifest rows and tokens.
+    # Surface those exact immutable records beneath the current abstraction,
+    # without treating them as restorable versions of the active token.
+    for _archived_manifest_h in _related_archived_h:
+        _archived_filename_h = _archived_manifest_h.get("filename")
+        if not isinstance(_archived_filename_h, str) or not _archived_filename_h:
+            continue
+        try:
+            _archived_version_h = int(
+                _archived_manifest_h.get("lump_version")
+                or _archived_manifest_h.get("version")
+                or 0)
+        except (TypeError, ValueError):
+            _archived_version_h = 0
+        _archived_path_h = os.path.join(lumps_dir, _archived_filename_h)
+        _archived_snapshot_h = _validate_lump_snapshot(
+            _archived_path_h, _archived_manifest_h)
+        _archived_approval_h = _archived_snapshot_h["approval"] or {}
+        entries.append({
+            "version": _archived_version_h,
+            "current": False,
+            "compiled_at": _archived_approval_h.get("compiled_at"),
+            "abstraction": _archived_manifest_h.get("abstraction"),
+            "cw": _archived_snapshot_h["cw"],
+            "cc": _archived_snapshot_h["cc"],
+            "lump_size": _archived_snapshot_h["lump_size"],
+            "content_profile": _archived_snapshot_h["content_profile"],
+            "binary_hash": _archived_snapshot_h["binary_hash"],
+            "binary_available": _archived_snapshot_h["binary_available"],
+            "binary_valid": _archived_snapshot_h["valid"],
+            "approved": _archived_snapshot_h["approved"],
+            "trusted": False,
+            "metadata_only": not _archived_snapshot_h["binary_available"],
+            "preview_enabled": _archived_snapshot_h["binary_available"],
+            "restore_enabled": False,
+            "validation_errors": _archived_snapshot_h["errors"],
+            "bootstrap_identity": _archived_snapshot_h["bootstrap_identity"],
+            "legacy_incompatible": True,
+            "historical_record": True,
+            "record_token": str(
+                _archived_manifest_h.get("token") or "").lower(),
+            "record_filename": _archived_filename_h,
+            "read_only": True,
+        })
+
     # The live artifact is part of version history too. Resolve it only through
     # the manifest locator and inspect its exact binary bytes.
     if _current_manifest_h:
@@ -9875,7 +9951,10 @@ def get_lump_history(token):
         if _cur_ver is not None:
             try:
                 _cur_ver = int(_cur_ver)
-                entries = [e for e in entries if e["version"] != _cur_ver]
+                entries = [
+                    e for e in entries
+                    if e["version"] != _cur_ver or e.get("historical_record")
+                ]
                 entries.append(
                     _snapshot_entry_h(
                         _cur_ver, _cur_lp, current=True

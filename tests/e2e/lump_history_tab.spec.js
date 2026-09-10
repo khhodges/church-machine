@@ -80,6 +80,10 @@ const STUB_HISTORY_V1 = {
     cc:          2,
     compiled_at: COMPILED_AT,
     abstraction: 'TestAbs',
+    binary_hash: 'a'.repeat(64),
+    binary_valid: true,
+    preview_enabled: true,
+    restore_enabled: true,
 };
 
 // Response for GET /api/lumps/<token>/history — single entry.
@@ -112,6 +116,8 @@ const STUB_WORDS_V1 = {
     profile:     'IoT',
     language:    'assembly',
     author:      '',
+    binary_hash: 'a'.repeat(64),
+    binary_valid: true,
 };
 
 // Response for GET /api/lump/<token>/words — current (live) version, 64 words.
@@ -639,6 +645,66 @@ test.describe('LUMP History tab — Preview button renders hex dump', () => {
 
 });
 
+test.describe('LUMP History tab — legacy bootstrap evidence', () => {
+    test('legacy manifest record is previewable but read only', async ({ page }) => {
+        test.setTimeout(40000);
+        const legacyToken = 'b6182a95';
+        const invalidIdentity = {
+            applies: true,
+            valid: false,
+            record_token: legacyToken,
+            row0_gt: '4a000006',
+            expected_gt: '4a00000a',
+        };
+        await page.route('**/api/lumps/list', route => route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify([STUB_LUMP]),
+        }));
+        await page.route(`**/api/lumps/${STUB_TOKEN}/history`, route => route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                token: STUB_TOKEN,
+                history: [{
+                    ...STUB_HISTORY_V1,
+                    historical_record: true,
+                    record_token: legacyToken,
+                    preview_enabled: true,
+                    restore_enabled: false,
+                    binary_valid: false,
+                    legacy_incompatible: true,
+                    bootstrap_identity: invalidIdentity,
+                }],
+            }),
+        }));
+        await page.route(`**/api/lump/${legacyToken}/words`, route => route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                ...STUB_WORDS_V1,
+                token: legacyToken,
+                bootstrap_identity: invalidIdentity,
+            }),
+        }));
+        await page.route(`**/api/lump/${STUB_TOKEN}/words`, route => route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(STUB_WORDS_CURRENT),
+        }));
+
+        await openLumpDetail(page);
+        await clickHistoryTab(page);
+        const row = page.locator(`#lumpHistoryBody_${STUB_TK} tr.lump-history-row`).first();
+        await expect(row.getByRole('button', { name: 'Preview' })).toBeVisible();
+        await expect(row.getByText('Read only')).toBeVisible();
+        await expect(row.locator('button.lump-history-restore-btn')).toHaveCount(0);
+        await row.getByRole('button', { name: 'Preview' }).click();
+        const preview = await waitForHexTable(page);
+        await expect(preview).toContainText('Archived bootstrap identity mismatch');
+    });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Suite 5 — Row onclick (_lumpHistorySelectRow) also triggers the hex preview
 // ─────────────────────────────────────────────────────────────────────────────
@@ -717,6 +783,7 @@ test.describe('LUMP History tab — current provenance and unobserved health', (
                             cw: 21,
                             cc: 5,
                             lump_size: 512,
+                            binary_hash: 'a'.repeat(64),
                             binary_valid: true,
                             preview_enabled: false,
                             restore_enabled: false,
@@ -728,6 +795,7 @@ test.describe('LUMP History tab — current provenance and unobserved health', (
                             cw: 19,
                             cc: 4,
                             lump_size: 128,
+                            binary_hash: 'b'.repeat(64),
                             binary_valid: true,
                             preview_enabled: true,
                             restore_enabled: true,
