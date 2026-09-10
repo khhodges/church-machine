@@ -304,3 +304,17 @@ mtime_ms = 1788711212147
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/849f4822-3406-499a-95b8-e303ce47b69c/b2723004-9b49-425e-8727-1c9eb4a96f0f"
 storage_version_token = "1788711313872104"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "Wjry0s4lWhkyi_urIpdKd"
+uri = "file://screenshots/latest-lump-preview.jpg"
+type = "image"
+title = "Church Machine IDE — current LUMP view"
+description = "Current IDE preview. Open Namespace or Abstractions to select the newly saved LUMP and view its Token, Seal, source, and revision details."
+logical_id = "8199677e-3893-49c7-8db7-25cababb6c6d"
+content_hash = "sha256:4c880589e0e81026db873f72cabb5b356382b7bffa978c2bba88a9619d71c012"
+size = 69011
+mtime_ms = 1789080652100
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/8199677e-3893-49c7-8db7-25cababb6c6d/c3297490-0482-49a7-bd3a-de99d4109a53"
+storage_version_token = "1789080661431021"
+content_type = "image/jpeg"
