@@ -12438,13 +12438,16 @@ function closeSaveDialog() {
 function _setSaveNSFeedback(kind, message) {
     const status = document.getElementById('saveNSStatus');
     const button = document.getElementById('saveNSConfirmBtn');
+    const cancelButton = document.getElementById('saveNSCancelBtn');
     const busy = kind === 'loading';
     const incident = kind === 'incident';
     if (button) {
         button.disabled = busy || incident;
-        button.textContent = busy ? 'Saving…' : (incident ? 'IDE incident' : 'Save');
+        button.hidden = incident;
+        button.textContent = busy ? 'Saving…' : 'Save';
         button.setAttribute('aria-busy', busy ? 'true' : 'false');
     }
+    if (cancelButton) cancelButton.textContent = incident ? 'Close' : 'Cancel';
     if (!status) return;
     if (!message) {
         status.style.display = 'none';
@@ -12487,14 +12490,19 @@ async function beginSaveToNamespace() {
         const status = document.getElementById('saveNSStatus');
         if (dialog && dialog.style.display !== 'none' &&
                 status && status.dataset.terminal !== 'true') {
-            _setSaveNSFeedback('incident',
-                'The IDE could not determine the save result. Your source and settings remain preserved. The IDE must verify the repository before another save.');
+            // No repository request is left unresolved here: _lumpSaveRequest
+            // resolves on commit and rejects through a classified terminal path.
+            // A normal early return (for example, cancelling approval) must not
+            // be turned into an invented incident that asks the programmer to
+            // verify IDE-owned repository state.
+            _setSaveNSFeedback('', '');
         }
         const button = document.getElementById('saveNSConfirmBtn');
         if (button) {
             const incident = status && status.dataset.incident === 'true';
             button.disabled = !!incident;
-            button.textContent = incident ? 'IDE incident' : 'Save';
+            button.hidden = !!incident;
+            button.textContent = 'Save';
             button.setAttribute('aria-busy', 'false');
         }
         if (status) delete status.dataset.terminal;

@@ -143,6 +143,14 @@ function response(status, body) {
         source.includes('delete status.dataset.incident;'));
     check('generic screenshot retry wording cannot return',
         !source.includes('Save did not complete. Review the settings, then click Save again.'));
+    check('IDE incident removes Save and leaves only a Close action',
+        source.includes('button.hidden = incident;') &&
+        source.includes("cancelButton.textContent = incident ? 'Close' : 'Cancel';") &&
+        source.includes("status.dataset.incident = 'true';"));
+    check('IDE never invents an unresolved save result after a normal early return',
+        !source.includes('The IDE could not determine the save result') &&
+        source.includes("status.dataset.terminal !== 'true'") &&
+        source.includes("_setSaveNSFeedback('', '');"));
     check('save payload carries destination sequence for server-owned identity binding',
         body.includes('namespace_sequence: _targetSequence'));
     check('transport and protocol failures have distinct UI titles',
