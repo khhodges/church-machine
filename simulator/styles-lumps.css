@@ -784,6 +784,20 @@
 }
 .lump-malformed-chip-dismiss:hover { opacity: 1; }
 
+.lump-promotion-source {
+    max-height: 55vh;
+    overflow: auto;
+    white-space: pre;
+    padding: 0.75rem;
+    margin: 0.6rem 0;
+    color: #c8d4e8;
+    background: #07070f;
+    border: 1px solid rgba(100, 160, 255, 0.18);
+    font: 0.78rem/1.55 'Courier New', monospace;
+}
+.lump-promotion-actions { display:flex; gap:0.5rem; justify-content:flex-end; }
+.lump-promote-latest-btn { color:#fbbf24; border-color:rgba(251,191,36,.35); }
+
 .lump-source-status {
     padding: 5px 14px;
     font-size: 0.72rem;

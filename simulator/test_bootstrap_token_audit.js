@@ -93,6 +93,15 @@ check('invalid bootstrap revisions lose the Run action',
     lumpsSource.includes('_isCodeLump && !_bootstrapIdentityInvalid'));
 check('viewing label identifies invalid archived bootstrap identity',
     abstractionsSource.includes('[ARCHIVED — BOOTSTRAP IDENTITY INVALID]'));
+check('invalid archived revisions offer server-authoritative promotion',
+    lumpsSource.includes('_showLatestCompilationPromotion') &&
+    lumpsSource.includes('/api/lumps/latest-primary/'));
+check('promotion preview is intrinsic and stale-request isolated',
+    lumpsSource.includes('candidate.intrinsic_source !== true') &&
+    lumpsSource.includes('_latestPromotionRequestId !== requestId'));
+check('promotion uses canonical save-plan and reports Token plus Seal',
+    lumpsSource.includes('_confirmLumpSavePlan') &&
+    lumpsSource.includes('saved.token') && lumpsSource.includes('saved.seal'));
 
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

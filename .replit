@@ -835,6 +835,18 @@ outputType = "console"
 isValidation = true
 
 [[workflows.workflow]]
+name = "latest-compilation-promotion-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python3 -m pytest tests/server/test_latest_compilation_promotion_3393.py -q && node simulator/test_bootstrap_token_audit.js && node simulator/test_latest_compilation_promotion.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+isValidation = true
+
+[[workflows.workflow]]
 name = "editor-roundtrip-tests"
 author = "agent"
 

@@ -6644,6 +6644,8 @@ _LUMP_APPROVAL_INTENTS = {}
 _LUMP_APPROVAL_INTENTS_LOCK = threading.Lock()
 _LUMP_SAVE_PLANS = {}
 _LUMP_SAVE_PLANS_LOCK = threading.Lock()
+_LUMP_PROMOTION_BINDINGS = {}
+_LUMP_PROMOTION_BINDINGS_LOCK = threading.Lock()
 # The preflight endpoint runs the exact save canonicalisation path with this
 # request-local payload override.  It is deliberately not a client-visible
 # save mode.
@@ -7923,8 +7925,27 @@ def save_lump():
     _ct_default_map = {0: 'code', 1: 'data', 2: 'thread', 3: 'outform'}
     content_type = metadata.get("content_type") or _ct_default_map.get(hdr_typ, 'binary')
 
-    abs_name     = metadata.get("abstraction", "Unnamed")
-    ns_slot      = metadata.get("ns_slot", None)
+    _promotion_hint = metadata.get("promotion_binding")
+    # Structural destination facts are authoritative only when supplied by a
+    # server-issued promotion binding; browser metadata is never used for this.
+    if isinstance(_promotion_hint, dict):
+        if not _promotion_hint.get("binding_id"):
+            return jsonify({
+                "error": "Promotion binding is missing its server-issued identifier",
+                "promotion_binding_failed": True,
+                "committed": False,
+                "safe_retry": True,
+            }), 409
+        metadata = dict(metadata)
+        abs_name = _promotion_hint.get("abstraction", "")
+        ns_slot = _promotion_hint.get("ns_slot")
+        if _promotion_hint.get("bootstrap_snapshot") is not None:
+            metadata["enforce_bootstrap_identity"] = True
+        if _promotion_hint.get("namespace_sequence") is not None:
+            metadata["namespace_sequence"] = _promotion_hint["namespace_sequence"]
+    else:
+        abs_name = metadata.get("abstraction", "Unnamed")
+        ns_slot = metadata.get("ns_slot", None)
     token_hint   = metadata.get("token", None)
     _petname     = str(metadata.get("petname", "")).strip()
     _issue_number = int(metadata.get("issue_number", 1) or 1)
@@ -8682,6 +8703,15 @@ def save_lump():
     import hashlib as _hl_save
     lump_bytes   = _struct.pack(f'>{len(_sl_words)}I', *_sl_words)
     _binary_hash = _hl_save.sha256(lump_bytes).hexdigest()
+    try:
+        _validate_promotion_binding(metadata, _binary_hash)
+    except (LookupError, OSError, TypeError, ValueError) as _promotion_error:
+        return jsonify({
+            "error": f"Promotion candidate is no longer current: {_promotion_error}",
+            "promotion_binding_failed": True,
+            "committed": False,
+            "safe_retry": True,
+        }), 409
     if _is_bootstrap_canonical:
         try:
             _validate_bootstrap_candidate(
@@ -9358,6 +9388,10 @@ def save_lump():
         "lump_version":   next_lump_version,
         "compiled_at":    _compiled_at,
         "binary_hash":    _binary_hash,
+        # Seal is the server-issued artifact identity returned to promotion
+        # clients; never derive it from browser metadata.
+        "seal":           ((_bootstrap_identity or {}).get("bootstrap_runtime_gt")
+                          if _bootstrap_identity is not None else _identity_hash),
         "boot_image_refreshed": boot_refreshed,
         **(_bootstrap_identity or {"identity_hash": _identity_hash}),
         "identity_string": _identity_string,
@@ -9589,7 +9623,184 @@ def get_lump_detail(token):
         detail["bootstrap_identity"] = bootstrap_identity
         detail["legacy_incompatible"] = bool(
             entry.get("archived") and not bootstrap_identity["valid"])
+    if entry.get("archived") is True:
+        detail["promotion_available"] = _promotion_candidate_for_view(entry) is not None
     return jsonify(detail)
+
+
+def _latest_primary_compilation(abstraction):
+    """Resolve one immutable, source-bearing primary revision on the server."""
+    name = str(abstraction or "").strip()
+    if not name:
+        raise ValueError("abstraction is required")
+    manifest = _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json"))
+    rows = [row for row in manifest if isinstance(row, dict)
+            and str(row.get("abstraction") or "") == name
+            and not row.get("system_managed")]
+    candidates = []
+    for row in rows:
+        filename = row.get("filename")
+        if not isinstance(filename, str) or os.path.basename(filename) != filename:
+            continue
+        try:
+            inspected = _inspect_lump_binary(os.path.join(LUMPS_DIR, filename))
+            if not isinstance(inspected.get("source"), str) or not inspected["source"]:
+                continue
+            if _check_lump_canonical_integrity(
+                    LUMPS_DIR, str(row.get("token") or "").lower().zfill(8),
+                    inspected["raw_bytes"]) is not True:
+                continue
+            if _matching_lump_approval(LUMPS_DIR, inspected["binary_hash"]) is None:
+                continue
+            candidates.append((row, inspected))
+        except (OSError, ValueError):
+            continue
+    if not candidates:
+        raise LookupError("no unambiguous saved primary compilation with intrinsic source")
+    # Version is the authoritative saved-revision order.  Ties are ambiguous.
+    candidates.sort(key=lambda pair: int(pair[0].get("lump_version") or 0),
+                   reverse=True)
+    newest_version = int(candidates[0][0].get("lump_version") or 0)
+    newest = [pair for pair in candidates
+              if int(pair[0].get("lump_version") or 0) == newest_version]
+    if len(newest) != 1:
+        raise LookupError("latest saved primary compilation is ambiguous")
+    return newest[0]
+
+
+def _promotion_candidate_for_view(viewed):
+    """Return a candidate only when it is strictly newer than *viewed*."""
+    try:
+        viewed_revision = int(viewed.get("lump_version") or viewed.get("version") or 0)
+    except (TypeError, ValueError):
+        return None
+    try:
+        candidate = _latest_primary_compilation(viewed.get("abstraction"))
+    except (LookupError, ValueError, OSError):
+        return None
+    if int(candidate[0].get("lump_version") or 0) <= viewed_revision:
+        return None
+    return candidate
+
+
+def _promotion_binding_for_candidate(row, inspected):
+    """Build server-owned facts consumed by both save-plan and save."""
+    abstraction = str(row.get("abstraction") or "")
+    try:
+        with open(NS_STATE_PATH, encoding="utf-8") as state_file:
+            rows = json.load(state_file).get("abstractions", [])
+    except (OSError, ValueError, AttributeError):
+        rows = []
+    bindings = [item for item in rows if isinstance(item, dict)
+                and item.get("name") == abstraction]
+    ns = bindings[0] if len(bindings) == 1 else None
+    snapshot = _bootstrap_snapshot_identity(LUMPS_DIR, row, inspected)
+    if snapshot is not None and not snapshot.get("valid"):
+        raise ValueError("latest candidate has invalid bootstrap identity")
+    if snapshot is not None:
+        if ns is None:
+            raise ValueError("latest bootstrap candidate has no unique Namespace binding")
+        if (int(ns.get("slot")) != int(snapshot.get("slot"))
+                or int(ns.get("seq")) != int(snapshot.get("sequence"))):
+            raise ValueError("latest bootstrap candidate does not match the Namespace binding")
+    return {
+        "binding_id": secrets.token_urlsafe(32),
+        "abstraction": abstraction,
+        "token": str(row.get("token") or "").lower().zfill(8),
+        "revision": int(row.get("lump_version") or 0),
+        "binary_hash": inspected["binary_hash"],
+        "ns_slot": ns.get("slot") if ns else None,
+        "namespace_sequence": ns.get("seq") if ns else None,
+        "bootstrap_snapshot": snapshot,
+    }
+
+
+def _validate_promotion_binding(metadata, binary_hash):
+    binding = metadata.get("promotion_binding")
+    if binding is None:
+        return None
+    if not isinstance(binding, dict) or not binding.get("binding_id"):
+        raise ValueError("promotion binding is malformed")
+    if binding.get("binary_hash") != binary_hash:
+        raise ValueError("promotion binding does not match submitted binary")
+    with _LUMP_PROMOTION_BINDINGS_LOCK:
+        issued = _LUMP_PROMOTION_BINDINGS.get(binding["binding_id"])
+    if not issued or issued != binding:
+        raise ValueError("promotion binding is unknown or expired")
+    row, inspected = _latest_primary_compilation(binding["abstraction"])
+    if (str(row.get("token") or "").lower().zfill(8) != binding["token"]
+            or int(row.get("lump_version") or 0) != int(binding["revision"])
+            or inspected["binary_hash"] != binary_hash):
+        raise ValueError("promotion candidate is stale; reload the latest compilation")
+    if binding.get("bootstrap_snapshot") is not None:
+        current = _bootstrap_snapshot_identity(LUMPS_DIR, row, inspected)
+        if current != binding["bootstrap_snapshot"] or not current.get("valid"):
+            raise ValueError("authoritative bootstrap identity changed; reload candidate")
+    return binding
+
+
+@app.route("/api/lumps/latest-primary/<path:abstraction>")
+@app.route("/api/lumps/promotion-candidate/<path:abstraction>")
+def get_latest_primary_compilation(abstraction):
+    """Return exact intrinsic source and bytes for a promotion candidate."""
+    try:
+        before_token = request.args.get("from_token")
+        before_revision = request.args.get("from_revision")
+        if before_token is not None:
+            manifest = _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json"))
+            matches = [row for row in manifest if isinstance(row, dict)
+                       and str(row.get("token") or "").lower().zfill(8)
+                       == str(before_token).lower().zfill(8)]
+            if len(matches) != 1 or matches[0].get("archived") is not True:
+                return jsonify({"error": "viewed archive is not an authoritative immutable row",
+                                "promotion_available": False,
+                                "data_changed": False}), 409
+            if before_revision is None or int(matches[0].get("lump_version") or 0) != int(before_revision):
+                return jsonify({"error": "viewed archive revision does not match the server record",
+                                "promotion_available": False,
+                                "data_changed": False}), 409
+            candidate = _promotion_candidate_for_view(matches[0])
+            if candidate is None:
+                return jsonify({"error": "no strictly newer valid intrinsic-source primary revision exists",
+                                "promotion_available": False,
+                                "data_changed": False}), 404
+        else:
+            candidate = None
+    except (TypeError, ValueError):
+        return jsonify({"error": "viewed archive revision is invalid",
+                        "promotion_available": False, "data_changed": False}), 400
+    try:
+        row, inspected = candidate or _latest_primary_compilation(abstraction)
+    except LookupError as exc:
+        return jsonify({"error": str(exc), "data_changed": False}), 409
+    except (OSError, ValueError) as exc:
+        return jsonify({"error": str(exc), "data_changed": False}), 409
+    try:
+        promotion_binding = _promotion_binding_for_candidate(row, inspected)
+    except ValueError as exc:
+        return jsonify({"error": str(exc), "promotion_available": False,
+                        "data_changed": False}), 409
+    with _LUMP_PROMOTION_BINDINGS_LOCK:
+        _LUMP_PROMOTION_BINDINGS[promotion_binding["binding_id"]] = promotion_binding
+    token = str(row.get("token") or "").lower().zfill(8)
+    return jsonify({
+        "ok": True,
+        "abstraction": row.get("abstraction"),
+        "revision": int(row.get("lump_version") or 0),
+        "lump_version": int(row.get("lump_version") or 0),
+        "token": token,
+        "filename": row.get("filename"),
+        "binary_hash": inspected["binary_hash"],
+        "seal": row.get("seal") or row.get("identity_seal") or inspected["binary_hash"],
+        "source": inspected["source"],
+        "words": inspected["words"],
+        "intrinsic_source": True,
+        "immutable": True,
+        "archived": bool(row.get("archived")),
+        "promotion_available": True,
+        "approval": _matching_lump_approval(LUMPS_DIR, inspected["binary_hash"]),
+        "promotion_binding": promotion_binding,
+    })
 
 
 @app.route("/api/lump/<token_hex>/diagnostic-source")

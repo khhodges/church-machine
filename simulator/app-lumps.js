@@ -87,6 +87,12 @@ function showLumpDetail(token) {
             `expected GT 0x${_e(_bi.expected_gt || '????????')}. This archived revision cannot be active or restored.`;
         _headerStrip += `<span class="lump-malformed-chip" title="${_bootstrapMismatchTitle}">` +
             `\u26a0 Archived \u2014 bootstrap identity invalid</span>`;
+        if (lump.abstraction && lump.promotion_available === true) {
+            _headerStrip += `<button class="lump-hs-btn lump-promote-latest-btn" ` +
+                `onclick="_showLatestCompilationPromotion('${_e(token)}')" ` +
+                `title="Preview and promote the latest saved source for this abstraction">` +
+                `Make latest compilation current</button>`;
+        }
     }
     // Number chip — 8-hex content-identity digest from the canonical filename.
     // Derived as sha256(dot_name_utf8 + lump_bytes)[:8]; stable across identical
@@ -457,6 +463,132 @@ function showLumpDetail(token) {
     // Outer workspace tab bar is collapsed into the inner tab bar — always hide it
     _hideLumpWorkspaceTabs();
 }
+
+// Recovery for an archived bootstrap-invalid revision.  Every byte and every
+// source character displayed here comes from the server-side immutable
+// promotion candidate; editor drafts, catalog text, and sidecars are excluded.
+async function _showLatestCompilationPromotion(archivedToken) {
+    const archived = _lumpsCache.find(row => row.token === archivedToken);
+    if (!archived || !archived.abstraction) return;
+    const token = archivedToken;
+    const requestId = (window._latestPromotionRequestId || 0) + 1;
+    window._latestPromotionRequestId = requestId;
+    const contentEl = document.getElementById('lumpsDetailContent');
+    if (!contentEl) return;
+    const e = _escHtml;
+    contentEl.innerHTML = '<div class="lump-detail-section"><div class="lump-hex-loading">Loading latest saved compilation\u2026</div></div>';
+    try {
+        const resp = await fetch('/api/lumps/latest-primary/' +
+            encodeURIComponent(archived.abstraction) +
+            `?from_token=${encodeURIComponent(archived.token)}&from_revision=${encodeURIComponent(archived.lump_version)}`,
+            { cache: 'no-store' });
+        const candidate = await _actionableJsonResponse(resp, 'Load the latest saved compilation', {
+            dataChanged: false,
+            nextAction: 'Reload the LUMP repository and retry the recovery action.',
+        });
+        if (window._latestPromotionRequestId !== requestId) return;
+        if (!candidate || !Array.isArray(candidate.words) ||
+            candidate.intrinsic_source !== true || candidate.immutable !== true ||
+            typeof candidate.source !== 'string' || !candidate.source ||
+            !candidate.promotion_binding ||
+            typeof candidate.promotion_binding.binding_id !== 'string' ||
+            !candidate.promotion_binding.binding_id) {
+            throw new Error('Server did not return an immutable intrinsic-source candidate');
+        }
+        const source = candidate.source;
+        contentEl.innerHTML =
+            `<div class="lump-detail-section lump-promotion-confirmation">` +
+            `<div class="lump-section-title">Make latest compilation current</div>` +
+            `<p>Abstraction <b>${e(candidate.abstraction)}</b>, saved revision ` +
+            `<b>v${e(candidate.revision)}</b> (Token <code>0x${e(candidate.token)}</code>).</p>` +
+            `<p class="lump-history-provenance-note">This is the complete source embedded in the immutable server LUMP. ` +
+            `The archived revision will not be modified.</p>` +
+            `<pre class="lump-promotion-source">${e(source)}</pre>` +
+            `<div class="lump-promotion-actions">` +
+            `<button class="btn" id="lumpPromotionCancel">Cancel</button>` +
+            `<button class="btn lump-source-btn-build" id="lumpPromotionConfirm">Make latest compilation current</button>` +
+            `</div><div id="lumpPromotionStatus" class="lump-source-status"></div></div>`;
+        const cancel = document.getElementById('lumpPromotionCancel');
+        if (cancel) cancel.onclick = () => showLumpDetail(token);
+        const confirmButton = document.getElementById('lumpPromotionConfirm');
+        if (confirmButton) confirmButton.onclick = async () => {
+            if (window._latestPromotionRequestId !== requestId) return;
+            confirmButton.disabled = true;
+            const status = document.getElementById('lumpPromotionStatus');
+            let saveRequestStarted = false;
+            let committed = false;
+            let authoritativeRejection = false;
+            try {
+                const metadata = Object.assign({}, _hashBoundLumpApproval(
+                    candidate, candidate.binary_hash), {
+                    abstraction: candidate.abstraction,
+                    source,
+                    promoted_from_token: candidate.token,
+                    promoted_from_revision: candidate.revision,
+                    binary_hash: candidate.binary_hash,
+                    promotion_binding: candidate.promotion_binding,
+                });
+                const approval = await _confirmLumpSavePlan(
+                    candidate.words, metadata,
+                    plan => `Promote immutable saved revision v${candidate.revision} as a new current revision?`);
+                if (!approval) {
+                    confirmButton.disabled = false;
+                    if (status) status.textContent = 'Cancelled — no data was changed.';
+                    return;
+                }
+                metadata.approval_intent = approval.intent.intent;
+                metadata.save_plan_id = approval.plan.plan_id;
+                saveRequestStarted = true;
+                const saveResp = await fetch('/api/lumps/save', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({binary: candidate.words, metadata}),
+                });
+                authoritativeRejection = !saveResp.ok;
+                const saved = await _actionableJsonResponse(saveResp, 'Promote the latest compilation', {
+                    dataChanged: false,
+                    nextAction: 'Reload the repository and verify the current revision before retrying.',
+                });
+                committed = true;
+                if (status) status.innerHTML =
+                    `Saved current revision: Token <code>0x${e(saved.token || '')}</code>, ` +
+                    `Seal <code>${e(saved.seal || saved.identity_hash || saved.binary_hash || 'unavailable')}</code>.`;
+                const refreshFailures = [];
+                for (const [label, refresh] of [
+                    ['LUMP repository', () => typeof renderLumps === 'function' ? renderLumps() : null],
+                    ['Namespace', () => typeof updateNamespace === 'function' ? updateNamespace() : null],
+                    ['boot configuration', () => typeof _loadBootConfig === 'function' ? _loadBootConfig() : null],
+                ]) {
+                    try {
+                        await refresh();
+                    } catch (refreshError) {
+                        refreshFailures.push(`${label}: ${refreshError.message || 'refresh failed'}`);
+                    }
+                }
+                if (refreshFailures.length && status) {
+                    if (status) status.innerHTML +=
+                        ` <span class="lump-source-status err">Refresh needed: ${e(refreshFailures.join('; '))}. ` +
+                        `Reload the IDE and verify the LUMP, Namespace, and boot views.</span>`;
+                }
+            } catch (err) {
+                confirmButton.disabled = false;
+                if (status) status.textContent = authoritativeRejection
+                    ? ((err && err.message) ||
+                      'Promotion was refused before changing data. Reload the repository and retry.')
+                    : (saveRequestStarted && !committed
+                    ? 'Promotion request outcome is unknown — verify the repository before retrying.'
+                    : ((err && err.message) ||
+                      'Promotion failed — no data was changed. Reload and retry.'));
+            }
+        };
+    } catch (err) {
+        if (window._latestPromotionRequestId !== requestId) return;
+        contentEl.innerHTML = `<div class="lump-detail-section lump-source-status err">` +
+            `${e(err.message || 'Promotion candidate unavailable')} ` +
+            `<span> No data was changed. Reload the repository and retry.</span></div>`;
+    }
+}
+window._showLatestCompilationPromotion = _showLatestCompilationPromotion;
 
 // Returns the physical field sizes of a LUMP binary. The five reported fields
 // deliberately exclude the one-word LUMP header so Code + API + Source + Empty
