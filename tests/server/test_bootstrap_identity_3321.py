@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 import shutil
+import struct
 
 import pytest
 
@@ -9,6 +10,7 @@ from server import app as app_module
 from server.bootstrap_identity import (
     bootstrap_identity_record,
     bootstrap_t_from_self_gt,
+    validate_bootstrap_candidate,
     verify_bootstrap_self_gt,
 )
 from server.lump_approvals import read_approvals
@@ -36,8 +38,49 @@ def test_bootstrap_self_mismatch_reports_values_and_recovery_action():
     message = str(raised.value)
     assert "actual 0x4a000006" in message
     assert "expected 0x4a01beef" in message
-    assert "Rebuild and save" in message
-    assert "regenerate and re-approve" in message
+    assert "SELF GT differs" in message
+
+
+def _candidate(row0, cc=1):
+    words = [(0x1F << 27) | (1 << 10) | cc, 0] + [0] * 62
+    words[-cc] = row0
+    return __import__("struct").pack(">64I", *words)
+
+
+def test_candidate_validation_uses_sealed_row_zero_as_ultimate_truth():
+    raw = _candidate(0x4A01BEEF)
+    digest = __import__("hashlib").sha256(raw).hexdigest()
+    metadata = bootstrap_identity_record(_RESIDENT, 0x4A01BEEF)
+    assert validate_bootstrap_candidate(
+        _RESIDENT, raw, "4a01beef", digest, metadata)["binary_hash"] == digest
+
+    with pytest.raises(ValueError, match="actual 0x4a000006"):
+        validate_bootstrap_candidate(
+            _RESIDENT, _candidate(0x4A000006), "4a01beef",
+            __import__("hashlib").sha256(_candidate(0x4A000006)).hexdigest(),
+            metadata)
+
+
+@pytest.mark.parametrize("field,value,match", [
+    ("canonical_token", "4a00beef", "serialized T"),
+    ("approval_digest", "0" * 64, "approval digest"),
+    ("bootstrap_runtime_gt", 0x4A000006, "metadata GT"),
+    ("bootstrap_t", "4a000006", "metadata token"),
+])
+def test_candidate_validation_rejects_subordinate_identity_disagreement(
+        field, value, match):
+    raw = _candidate(0x4A01BEEF)
+    digest = __import__("hashlib").sha256(raw).hexdigest()
+    metadata = bootstrap_identity_record(_RESIDENT, 0x4A01BEEF)
+    token = "4a01beef"
+    if field == "canonical_token":
+        token = value
+    elif field == "approval_digest":
+        digest = value
+    else:
+        metadata[field] = value
+    with pytest.raises(ValueError, match=match):
+        validate_bootstrap_candidate(_RESIDENT, raw, token, digest, metadata)
 
 
 @pytest.mark.parametrize("binding", [
@@ -210,3 +253,262 @@ def test_boot_rejects_identity_hash_downgrade_of_frozen_approval(tmp_path):
         generate_boot_image({"step1": {"totalNamespaceWords": 16384,
                                       "namespaceLumpWords": 1024,
                                       "threadLumpWords": 256}}, str(lumps))
+
+
+def _repository_snapshot(root):
+    return {
+        str(path.relative_to(root)): (
+            "link", path.readlink()
+        ) if path.is_symlink() else (
+            "file", path.read_bytes()
+        )
+        for path in root.rglob("*")
+        if path.is_file() or path.is_symlink()
+    }
+
+
+@pytest.fixture
+def isolated_bootstrap_repository(tmp_path, monkeypatch):
+    root = Path(__file__).resolve().parents[2]
+    lumps = tmp_path / "lumps"
+    shutil.copytree(root / "server" / "lumps", lumps, symlinks=True)
+    state_path = lumps / "ns-state.json"
+    state = json.loads(state_path.read_text())
+    capability_test = next(
+        row for row in state["abstractions"]
+        if row.get("name") == "CapabilityTest")
+    capability_test["token"] = "4a00000a"
+    state_path.write_text(json.dumps(state))
+    monkeypatch.setattr(app_module, "LUMPS_DIR", str(lumps))
+    monkeypatch.setattr(app_module, "_LUMPS_DIR", str(lumps))
+    monkeypatch.setattr(app_module, "LUMPS_MANIFEST_PATH", str(lumps / "manifest.json"))
+    monkeypatch.setattr(app_module, "NS_STATE_PATH", str(lumps / "ns-state.json"))
+    monkeypatch.setattr(app_module, "BOOT_IMAGE_PATH", str(lumps / "boot-image.bin"))
+    return lumps
+
+
+def _bootstrap_save_payload(client, *, sequence=0):
+    words = [(0x1F << 27) | (1 << 10) | 1, 0] + [0] * 62
+    words[-1] = 0x4A000006  # stale browser SELF from the former slot 6
+    metadata = {
+        "abstraction": "CapabilityTest",
+        "ns_slot": 10,
+        "namespace_sequence": sequence,
+        "token": "4a00000a",
+        "content_type": "code",
+        "capabilities": [{
+            "name": "__SELF__", "rights": ["E"], "compiler_owned_self": True,
+        }],
+        "grants": ["E"],
+        "enforce_bootstrap_identity": True,
+    }
+    plan_response = client.post(
+        "/api/lumps/save-plan", json={"binary": words, "metadata": metadata})
+    assert plan_response.status_code == 201, plan_response.get_data(as_text=True)
+    plan = plan_response.get_json()
+    canonical = list(words)
+    canonical[-1] = 0x4A00000A
+    assert plan["digest"] == __import__("hashlib").sha256(
+        struct.pack(">64I", *canonical)).hexdigest()
+    intent_response = client.post("/api/lumps/approval-intent", json={
+        "digest": plan["digest"], "action": plan["action"],
+        "plan_id": plan["plan_id"], "confirmation": True,
+        "approval": {"grants": ["E"], "capability_type": "inform"},
+    })
+    assert intent_response.status_code == 201
+    metadata.update({
+        "save_plan_id": plan["plan_id"],
+        "approval_intent": intent_response.get_json()["intent"],
+    })
+    return {"binary": words, "metadata": metadata}
+
+
+def test_final_bootstrap_gate_rejects_before_any_repository_mutation(
+        isolated_bootstrap_repository, monkeypatch):
+    original = app_module._validate_bootstrap_candidate
+    calls = {"count": 0}
+
+    def injected_failure(*args, **kwargs):
+        calls["count"] += 1
+        if calls["count"] == 3:
+            raise ValueError("injected final validation failure")
+        return original(*args, **kwargs)
+
+    with app_module.app.test_client() as client:
+        payload = _bootstrap_save_payload(client)
+        before = _repository_snapshot(isolated_bootstrap_repository)
+        monkeypatch.setattr(
+            app_module, "_validate_bootstrap_candidate", injected_failure)
+        response = client.post("/api/lumps/save", json=payload)
+
+    assert response.status_code == 422
+    assert "IDE refused" in response.get_json()["error"]
+    assert "before changing any data" in response.get_json()["error"]
+    assert _repository_snapshot(isolated_bootstrap_repository) == before
+
+
+def test_valid_slot10_bootstrap_save_commits_exact_sealed_self(
+        isolated_bootstrap_repository):
+    with app_module.app.test_client() as client:
+        payload = _bootstrap_save_payload(client)
+        response = client.post("/api/lumps/save", json=payload)
+    assert response.status_code == 200, response.get_data(as_text=True)
+    saved = (
+        isolated_bootstrap_repository / response.get_json()["lump"]
+    ).read_bytes()
+    header = int.from_bytes(saved[:4], "big")
+    allocation = 1 << (((header >> 23) & 0xF) + 6)
+    cc = header & 0xFF
+    row0 = int.from_bytes(
+        saved[(allocation - cc) * 4:(allocation - cc + 1) * 4], "big")
+    digest = __import__("hashlib").sha256(saved).hexdigest()
+    approvals = read_approvals(
+        str(isolated_bootstrap_repository / "approvals.json"))
+    assert row0 == 0x4A00000A
+    assert response.get_json()["token"] == "4a00000a"
+    assert approvals[digest]["binary_hash"] == digest
+    assert approvals[digest]["bootstrap_runtime_gt"] == row0
+    assert approvals[digest]["bootstrap_t"] == "4a00000a"
+
+
+def test_bootstrap_sequence_mismatch_is_rejected_without_mutation(
+        isolated_bootstrap_repository):
+    before = _repository_snapshot(isolated_bootstrap_repository)
+    words = [(0x1F << 27) | (1 << 10) | 1, 0] + [0] * 62
+    words[-1] = 0x4A000006
+    with app_module.app.test_client() as client:
+        response = client.post("/api/lumps/save-plan", json={
+            "binary": words,
+            "metadata": {
+                "abstraction": "CapabilityTest", "ns_slot": 10,
+                "namespace_sequence": 1, "token": "4a00000a",
+                "content_type": "code", "enforce_bootstrap_identity": True,
+                "capabilities": [{"name": "__SELF__", "rights": ["E"]}],
+                "grants": ["E"],
+            },
+        })
+    assert response.status_code == 422
+    assert "IDE refused" in response.get_json()["error"]
+    assert _repository_snapshot(isolated_bootstrap_repository) == before
+
+
+def test_bootstrap_token_mismatch_is_rejected_without_mutation(
+        isolated_bootstrap_repository):
+    before = _repository_snapshot(isolated_bootstrap_repository)
+    words = [(0x1F << 27) | (1 << 10) | 1, 0] + [0] * 62
+    words[-1] = 0x4A000006
+    with app_module.app.test_client() as client:
+        response = client.post("/api/lumps/save-plan", json={
+            "binary": words,
+            "metadata": {
+                "abstraction": "CapabilityTest", "ns_slot": 10,
+                "namespace_sequence": 0, "token": "4a000006",
+                "content_type": "code", "enforce_bootstrap_identity": True,
+                "capabilities": [{"name": "__SELF__", "rights": ["E"]}],
+                "grants": ["E"],
+            },
+        })
+    assert response.status_code == 422
+    assert "canonical token differs" in response.get_json()["error"]
+    assert _repository_snapshot(isolated_bootstrap_repository) == before
+
+
+def test_bootstrap_namespace_bind_failure_never_enters_commit(
+        isolated_bootstrap_repository, monkeypatch):
+    with app_module.app.test_client() as client:
+        payload = _bootstrap_save_payload(client)
+        before = _repository_snapshot(isolated_bootstrap_repository)
+        commit_called = {"value": False}
+
+        def fail_prepare(*_args, **_kwargs):
+            raise ValueError("injected Namespace bind validation failure")
+
+        def observe_commit(*_args, **_kwargs):
+            commit_called["value"] = True
+            raise AssertionError("commit must not run")
+
+        monkeypatch.setattr(
+            app_module, "_prepare_saved_lump_ns_state", fail_prepare)
+        monkeypatch.setattr(
+            app_module, "_commit_lump_history_transition", observe_commit)
+        response = client.post("/api/lumps/save", json=payload)
+
+    assert response.status_code == 422
+    assert "Namespace binding is invalid" in response.get_json()["error"]
+    assert commit_called["value"] is False
+    assert _repository_snapshot(isolated_bootstrap_repository) == before
+
+
+def test_namespace_change_before_final_lock_preserves_repository_and_authorization(
+        isolated_bootstrap_repository):
+    with app_module.app.test_client() as client:
+        payload = _bootstrap_save_payload(client)
+        state_path = isolated_bootstrap_repository / "ns-state.json"
+        state = json.loads(state_path.read_text())
+        row = next(item for item in state["abstractions"]
+                   if item.get("slot") == 10)
+        row["seq"] = 1
+        row["token"] = "4a01000a"
+        state_path.write_text(json.dumps(state))
+        before = _repository_snapshot(isolated_bootstrap_repository)
+        plan_id = payload["metadata"]["save_plan_id"]
+        intent_id = payload["metadata"]["approval_intent"]
+
+        response = client.post("/api/lumps/save", json=payload)
+
+        assert plan_id in app_module._LUMP_SAVE_PLANS
+        assert intent_id in app_module._LUMP_APPROVAL_INTENTS
+
+    assert response.status_code == 422
+    assert "IDE refused" in response.get_json()["error"]
+    assert _repository_snapshot(isolated_bootstrap_repository) == before
+
+
+def test_selftest_source_identity_change_between_reads_is_rejected(
+        isolated_bootstrap_repository, monkeypatch):
+    state_path = isolated_bootstrap_repository / "ns-state.json"
+    state = json.loads(state_path.read_text())
+    selftest = next(row for row in state["abstractions"]
+                    if row.get("name") == "SelfTest")
+    selftest["token"] = "4a000006"
+    state_path.write_text(json.dumps(state))
+    words = [(0x1F << 27) | (1 << 10) | 2, 0] + [0] * 62
+    words[-2] = 0x4A000006
+    words[-1] = 0x4A00000A
+    metadata = {
+        "abstraction": "SelfTest", "ns_slot": 6,
+        "token": "4a000006", "content_type": "code",
+        "enforce_bootstrap_identity": True,
+        "capabilities": [
+            {"name": "__SELF__", "rights": ["E"]},
+            {"name": "Next", "rights": ["E"], "nsIndex": 10},
+        ],
+        "grants": ["E"],
+    }
+    changed = {"done": False}
+
+    def mutate_between_reads():
+        if changed["done"]:
+            return
+        changed["done"] = True
+        current = json.loads(state_path.read_text())
+        row = next(item for item in current["abstractions"]
+                   if item.get("name") == "SelfTest")
+        row["slot"] = 11
+        row["token"] = "4a00000b"
+        state_path.write_text(json.dumps(current))
+
+    monkeypatch.setattr(app_module, "_bootstrap_pre_lock_hook", mutate_between_reads)
+    with app_module.app.test_client() as client:
+        before = _repository_snapshot(isolated_bootstrap_repository)
+        response = client.post(
+            "/api/lumps/save-plan", json={"binary": words, "metadata": metadata})
+
+    assert response.status_code == 409, response.get_data(as_text=True)
+    assert "SelfTest Namespace slot changed" in response.get_json()["error"]
+    after = _repository_snapshot(isolated_bootstrap_repository)
+    # The hook's simulated concurrent Namespace commit is the only change.
+    assert set(after) == set(before)
+    for name in after:
+        if name != "ns-state.json":
+            assert after[name] == before[name]

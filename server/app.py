@@ -39,6 +39,7 @@ _lump_history_lock_state = threading.local()
 # finished their Phase-1 manifest read before either enters Phase 7, making
 # the race window deterministic.  None in production (no overhead).
 _lumps_manifest_pre_write_hook: "threading.Callable | None" = None
+_bootstrap_pre_lock_hook: "threading.Callable | None" = None
 import hashlib
 import hmac
 import time
@@ -6595,6 +6596,7 @@ try:
     from bootstrap_identity import (
         bootstrap_identity_record as _bootstrap_identity_record,
         bootstrap_t_from_self_gt as _bootstrap_t_from_self_gt,
+        validate_bootstrap_candidate as _validate_bootstrap_candidate,
         verify_bootstrap_self_gt as _verify_bootstrap_self_gt,
         resident_inform_egt as _resident_inform_egt,
     )
@@ -6602,6 +6604,7 @@ except ImportError:
     from server.bootstrap_identity import (
         bootstrap_identity_record as _bootstrap_identity_record,
         bootstrap_t_from_self_gt as _bootstrap_t_from_self_gt,
+        validate_bootstrap_candidate as _validate_bootstrap_candidate,
         verify_bootstrap_self_gt as _verify_bootstrap_self_gt,
         resident_inform_egt as _resident_inform_egt,
     )
@@ -6909,19 +6912,23 @@ def create_lump_approval_intent():
                     "expires_in": 300}), 201
 
 
-def _consume_lump_approval_intent(intent, digest, action, plan=None):
+def _consume_lump_approval_intent(intent, digest, action, plan=None, consume=True):
     # This process-local lock makes removal atomic among all server threads.
     # Deployments with multiple workers must provide shared process-safe intent
     # storage rather than routing one intent between workers.
     with _LUMP_APPROVAL_INTENTS_LOCK:
-        record = _LUMP_APPROVAL_INTENTS.pop(str(intent or ""), None)
-    session_id = session.get("_lump_approval_session")
-    if (not record or record["expires"] < time.time() or
-            record["session"] != session_id or record["digest"] != digest or
-            record["action"] != action or
-            (action in {"save", "replace"} and record.get("plan") != str(plan or ""))):
-        raise ValueError("a valid, unexpired session-bound approval intent is required")
-    return record["approval"]
+        key = str(intent or "")
+        record = _LUMP_APPROVAL_INTENTS.get(key)
+        session_id = session.get("_lump_approval_session")
+        if (not record or record["expires"] < time.time() or
+                record["session"] != session_id or record["digest"] != digest or
+                record["action"] != action or
+                (action in {"save", "replace"}
+                 and record.get("plan") != str(plan or ""))):
+            raise ValueError("a valid, unexpired session-bound approval intent is required")
+        if consume:
+            _LUMP_APPROVAL_INTENTS.pop(key, None)
+        return dict(record["approval"])
 
 
 @app.route("/api/lumps/deploy-authorize", methods=["POST"])
@@ -7238,20 +7245,26 @@ def _read_boot_entry_name_from_image():
     name = _wukong_lump_name_for_slot(_slot)
     return None if name == f"Slot{_slot}" else name
 
+def _build_ns_state_document(entries):
+    """Build the exact rich Namespace document without mutating the repository."""
+    import time as _tm_ns
+    state = {
+        "abstractions": list(entries or []),
+        "generated_at": _tm_ns.time(),
+    }
+    if os.path.isfile(BOOT_IMAGE_PATH):
+        with open(BOOT_IMAGE_PATH, "rb") as image_file:
+            raw = _boot_image_gen.parse_ns_table_raw(image_file.read())
+        if isinstance(raw, dict):
+            state["committed_raw_fingerprint"] = _raw_namespace_fingerprint(raw)
+    return state
+
+
 def _write_ns_state(entries):
     """Write ns-state.json atomically — rich list of NS row objects."""
-    import time as _tm_ns
     _tmp = NS_STATE_PATH + ".tmp"
     with _namespace_commit_guard():
-        _state = {
-            "abstractions": list(entries or []),
-            "generated_at": _tm_ns.time(),
-        }
-        if os.path.isfile(BOOT_IMAGE_PATH):
-            with open(BOOT_IMAGE_PATH, "rb") as image_file:
-                raw = _boot_image_gen.parse_ns_table_raw(image_file.read())
-            if isinstance(raw, dict):
-                _state["committed_raw_fingerprint"] = _raw_namespace_fingerprint(raw)
+        _state = _build_ns_state_document(entries)
         try:
             with open(_tmp, "w") as _fh:
                 json.dump(_state, _fh, indent=2)
@@ -7264,11 +7277,11 @@ def _write_ns_state(entries):
             raise
 
 
-def _bind_saved_lump_to_ns_state(
+def _prepare_saved_lump_ns_state(
         abstraction, ns_slot, token, filename, issue_n, lump_version):
-    """Commit a saved artifact's deployment facts to canonical Namespace state."""
+    """Validate and build a saved artifact's next Namespace state without writing."""
     if not isinstance(ns_slot, int):
-        return False
+        return None
     if os.path.isfile(NS_STATE_PATH):
         with open(NS_STATE_PATH, encoding="utf-8") as state_file:
             state = json.load(state_file)
@@ -7312,6 +7325,16 @@ def _bind_saved_lump_to_ns_state(
         "resident": True,
         "load_policy": "Resident",
     })
+    return entries
+
+
+def _bind_saved_lump_to_ns_state(
+        abstraction, ns_slot, token, filename, issue_n, lump_version):
+    """Commit a saved artifact's deployment facts to canonical Namespace state."""
+    entries = _prepare_saved_lump_ns_state(
+        abstraction, ns_slot, token, filename, issue_n, lump_version)
+    if entries is None:
+        return False
     _write_ns_state(entries)
     return True
 
@@ -7985,6 +8008,7 @@ def save_lump():
     # unprotected Namespace slot, and ns-state supplies its live sequence.
     _is_selftest_canonical = str(abs_name).strip() == "SelfTest"
     _bootstrap_binding = None
+    _bootstrap_source_binding = None
     try:
         if os.path.isfile(NS_STATE_PATH):
             with open(NS_STATE_PATH, encoding="utf-8") as _bootstrap_state_file:
@@ -8009,6 +8033,9 @@ def save_lump():
             # that destination supplies only the local slot/sequence needed to
             # mint SELF; its previous abstraction name does not own the slot.
             _bootstrap_binding = _target_frozen_rows[0]
+            if (_is_selftest_canonical
+                    and _bootstrap_binding.get("name") == "SelfTest"):
+                _bootstrap_source_binding = dict(_bootstrap_binding)
         elif _is_selftest_canonical:
             _selftest_frozen_rows = [
                 row for row in _frozen_rows if row.get("name") == "SelfTest"
@@ -8018,6 +8045,7 @@ def save_lump():
             if _selftest_frozen_rows:
                 # SelfTest may be migrated to another programmer-selected slot.
                 # Its target slot/sequence are filled after target validation.
+                _bootstrap_source_binding = dict(_selftest_frozen_rows[0])
                 _bootstrap_binding = dict(_selftest_frozen_rows[0])
     except (OSError, ValueError, TypeError, json.JSONDecodeError) as _bootstrap_state_error:
         return jsonify({
@@ -8191,6 +8219,23 @@ def save_lump():
             _runtime_t = _verify_bootstrap_self_gt(
                 _bootstrap_binding, _live_bootstrap_gt,
                 f"{_live_bootstrap_gt:08x}")
+            if token_hint and token8 != _runtime_t:
+                raise ValueError(
+                    "submitted canonical token differs from the selected "
+                    "Namespace descriptor and final row-zero SELF")
+            if "namespace_sequence" in metadata:
+                _submitted_sequence = metadata.get("namespace_sequence")
+                if isinstance(_submitted_sequence, bool):
+                    raise ValueError("submitted Namespace sequence is invalid")
+                try:
+                    _submitted_sequence = int(_submitted_sequence)
+                except (TypeError, ValueError):
+                    raise ValueError(
+                        "submitted Namespace sequence is invalid") from None
+                if _submitted_sequence != _bootstrap_binding.get("seq", 0):
+                    raise ValueError(
+                        "submitted Namespace sequence differs from the selected "
+                        "Namespace descriptor")
             # The selected frozen-resident Namespace descriptor owns SELF.
             # Commit the same reminted row that save-plan hashed; otherwise the
             # repository can accept a stale browser row (for example slot 6)
@@ -8205,7 +8250,11 @@ def save_lump():
                 _bootstrap_binding, _live_bootstrap_gt)
         except ValueError as _bootstrap_error:
             return jsonify({
-                "error": f"Bootstrap identity validation failed: {_bootstrap_error}",
+                "error": (
+                    "The IDE refused the bootstrap save before changing any data. "
+                    "It can retry from the unchanged source after rebuilding the "
+                    f"candidate: {_bootstrap_error}"
+                ),
                 "namespace_identity_failed": True,
             }), 422
     if _is_selftest_canonical:
@@ -8619,26 +8668,24 @@ def save_lump():
         )
         _warn_clist0_owner_mismatch(_self_gt, _actual_seal)
 
-    # Approval metadata remains bound to the canonical bootstrap identity, but
-    # C-list[0] itself is advisory and is never rewritten or rejected.
-    if _is_bootstrap_canonical:
-        try:
-            _final_bootstrap_t = _verify_bootstrap_self_gt(
-                _bootstrap_binding,
-                _bootstrap_identity["bootstrap_runtime_gt"],
-                _bootstrap_identity["bootstrap_t"])
-            if token8 != _final_bootstrap_t:
-                raise ValueError("final bootstrap token differs from canonical identity")
-        except (IndexError, KeyError, TypeError, ValueError) as _final_bootstrap_error:
-            return jsonify({
-                "error": f"Final bootstrap identity validation failed: {_final_bootstrap_error}",
-                "namespace_identity_failed": True,
-            }), 422
-
     # Pre-pack and hash the verified binary now; Phase 5 only writes it.
     import hashlib as _hl_save
     lump_bytes   = _struct.pack(f'>{len(_sl_words)}I', *_sl_words)
     _binary_hash = _hl_save.sha256(lump_bytes).hexdigest()
+    if _is_bootstrap_canonical:
+        try:
+            _validate_bootstrap_candidate(
+                _bootstrap_binding, lump_bytes, token8, _binary_hash,
+                _bootstrap_identity)
+        except (IndexError, KeyError, TypeError, ValueError) as _bootstrap_error:
+            return jsonify({
+                "error": (
+                    "The IDE refused the bootstrap save before changing any data. "
+                    "It can retry from the unchanged source after rebuilding the "
+                    f"candidate: {_bootstrap_error}"
+                ),
+                "namespace_identity_failed": True,
+            }), 422
 
     # The browser supplies the exact source buffer used to construct the
     # self-defining binary. Never commit metadata/source claims that disagree
@@ -8690,17 +8737,74 @@ def save_lump():
         }), 422
     # ── End pre-flight ────────────────────────────────────────────────────────
 
-    # Acquire before reading Namespace, manifest, and boot-image state: those
-    # reads are transaction-wide preflight and must describe one revision.
+    # Freeze Namespace authority before taking the history lock. The same order
+    # is used for this whole request, so final identity validation and commit
+    # cannot observe different slot/sequence/token revisions.
     lumps_dir = LUMPS_DIR
     os.makedirs(lumps_dir, exist_ok=True)
+    if _bootstrap_pre_lock_hook is not None:
+        _bootstrap_pre_lock_hook()
+    _save_namespace_guard = _namespace_commit_guard()
+    _save_namespace_guard.__enter__()
     _save_transaction_guard = _lump_history_transition_lock(lumps_dir)
     _save_transaction_guard.__enter__()
 
     @after_this_request
     def _release_lump_save_transaction(response):
         _save_transaction_guard.__exit__(None, None, None)
+        _save_namespace_guard.__exit__(None, None, None)
         return response
+
+    # The candidate was constructed from an earlier read so planning could
+    # report errors cheaply. Re-read under both commit locks and make that fresh
+    # descriptor authoritative for the final byte gate.
+    if _is_bootstrap_canonical:
+        try:
+            with open(NS_STATE_PATH, encoding="utf-8") as _fresh_state_file:
+                _fresh_rows = json.load(_fresh_state_file).get("abstractions")
+            if not isinstance(_fresh_rows, list):
+                raise ValueError("ns-state.json has no abstractions array")
+            if _is_selftest_canonical:
+                _fresh_sources = [
+                    row for row in _fresh_rows if isinstance(row, dict)
+                    and row.get("name") == "SelfTest"
+                ]
+                if len(_fresh_sources) != 1:
+                    raise ValueError("Namespace no longer has one SelfTest descriptor")
+                if _bootstrap_source_binding is None:
+                    raise ValueError("initial SelfTest Namespace descriptor is unavailable")
+                for _identity_field in (
+                        "slot", "seq", "token", "resident", "boot_resident",
+                        "type", "load_policy", "ns_slot_policy"):
+                    if (_fresh_sources[0].get(_identity_field)
+                            != _bootstrap_source_binding.get(_identity_field)):
+                        raise ValueError(
+                            f"SelfTest Namespace {_identity_field} changed")
+                _fresh_binding = dict(
+                    _fresh_sources[0], slot=ns_slot,
+                    seq=_bootstrap_binding.get("seq"), token=token8)
+            else:
+                _fresh_targets = [
+                    row for row in _fresh_rows if isinstance(row, dict)
+                    and row.get("slot") == ns_slot
+                ]
+                if len(_fresh_targets) != 1:
+                    raise ValueError(
+                        f"Namespace no longer has one descriptor at NS[{ns_slot}]")
+                _fresh_binding = _fresh_targets[0]
+            _validate_bootstrap_candidate(
+                _fresh_binding, lump_bytes, token8, _binary_hash,
+                _bootstrap_identity)
+            _bootstrap_binding = _fresh_binding
+        except (OSError, ValueError, TypeError, json.JSONDecodeError) as _fresh_error:
+            return jsonify({
+                "error": (
+                    "The IDE refused the bootstrap save before changing any data. "
+                    "The Namespace changed while the candidate was being prepared; "
+                    f"retry from the unchanged source: {_fresh_error}"
+                ),
+                "namespace_identity_failed": True,
+            }), 409
 
     import re as _re_arch
     import shutil as _shutil
@@ -8953,12 +9057,45 @@ def save_lump():
                 action=_approval_action, token=token8, filename=lump_filename,
                 consequence=_plan_consequence,
                 replacement_identity=_replacement_identity,
-                generation=_library_generation, consume=True)
+                generation=_library_generation, consume=False)
         _intent_approval = _consume_lump_approval_intent(
             metadata.get("approval_intent"), _binary_hash, _approval_action,
-            _save_plan_id)
+            _save_plan_id, consume=False)
     except ValueError as _intent_error:
         return jsonify({"error": str(_intent_error)}), 403
+
+    # Build and validate the complete Namespace update before the transition
+    # stages any repository destination. The transition callback only adjusts
+    # the version if archive collision handling advanced it.
+    _prepared_bootstrap_ns_entries = None
+    if _is_bootstrap_canonical:
+        try:
+            _prepared_bootstrap_ns_entries = _prepare_saved_lump_ns_state(
+                abs_name, ns_slot, token8, lump_filename, _issue_n_save,
+                next_lump_version)
+            if _prepared_bootstrap_ns_entries is None:
+                raise ValueError("bootstrap save has no Namespace destination")
+        except (OSError, ValueError, TypeError, json.JSONDecodeError) as _ns_error:
+            return jsonify({
+                "error": (
+                    "The IDE refused the bootstrap save before changing any data. "
+                    "It can retry from the unchanged source after rebuilding the "
+                    f"candidate: Namespace binding is invalid: {_ns_error}"
+                ),
+                "namespace_identity_failed": True,
+            }), 422
+
+    def _bootstrap_additional_json(final_manifest_entry):
+        if _prepared_bootstrap_ns_entries is None:
+            return {}
+        import copy as _copy
+        entries = _copy.deepcopy(_prepared_bootstrap_ns_entries)
+        selected = next(
+            row for row in entries
+            if isinstance(row, dict) and row.get("slot") == ns_slot)
+        selected["filename"] = final_manifest_entry["filename"]
+        selected["lump_version"] = final_manifest_entry["lump_version"]
+        return {NS_STATE_PATH: _build_ns_state_document(entries)}
     # Only explicit-intent allowlisted extrinsic fields are retained. Every
     # structural/identity fact is derived from the exact inspected binary.
     approval = {
@@ -8979,6 +9116,40 @@ def save_lump():
         approval.pop("identity_seal_location", None)
     else:
         approval["identity_hash"] = _identity_hash
+
+    # Mutation boundary: authenticate the exact bytes supplied to the atomic
+    # transition, then bind their row-zero GT, token, descriptor, and approval.
+    if _is_bootstrap_canonical:
+        try:
+            _validate_bootstrap_candidate(
+                _bootstrap_binding, lump_bytes, token8,
+                approval.get("binary_hash"), approval)
+        except (IndexError, KeyError, TypeError, ValueError) as _bootstrap_error:
+            return jsonify({
+                "error": (
+                    "The IDE refused the bootstrap save before changing any data. "
+                    "It can retry from the unchanged source after rebuilding the "
+                    f"candidate: {_bootstrap_error}"
+                ),
+                "namespace_identity_failed": True,
+            }), 422
+
+    # Consume authorization only after every byte/Namespace/approval check has
+    # passed. A rejected bootstrap candidate leaves both authorization records
+    # available for a corrected retry within their normal expiry window.
+    try:
+        if _approval_action in {"save", "replace"}:
+            _check_lump_save_plan(
+                _save_plan_id, digest=_binary_hash,
+                action=_approval_action, token=token8, filename=lump_filename,
+                consequence=_plan_consequence,
+                replacement_identity=_replacement_identity,
+                generation=_library_generation, consume=True)
+        _consume_lump_approval_intent(
+            metadata.get("approval_intent"), _binary_hash, _approval_action,
+            _save_plan_id, consume=True)
+    except ValueError as _intent_error:
+        return jsonify({"error": str(_intent_error)}), 403
 
 
     _remove_after_commit = ()
@@ -9073,6 +9244,9 @@ def save_lump():
             variant_group=f"compiled_{abs_name.lower().replace(' ', '_')}",
             ns_slot=ns_slot,
             expected_manifest_entry=_existing_entry,
+            additional_json_builder=(
+                _bootstrap_additional_json if _is_bootstrap_canonical else None
+            ),
         )
     except _LumpTransitionConflict as _transition_conflict:
         _rollback_protected_save()
@@ -9125,16 +9299,19 @@ def save_lump():
     # A save replaces the artifact bound to an existing Namespace identity.
     # Record the exact token/filename before regenerating the boot image so the
     # generator cannot rediscover an older build by filename ordering.
-    try:
-        _bound_saved_lump = _bind_saved_lump_to_ns_state(
-            abs_name, ns_slot, token8, lump_filename, _issue_n_save,
-            next_lump_version)
-    except Exception as _ns_bind_exc:
-        _rollback_protected_save()
-        return jsonify({"error": (
-            f"LUMP save transaction failed; prior revision restored: "
-            f"Namespace binding could not be refreshed: {_ns_bind_exc}"
-        )}), 500
+    if _is_bootstrap_canonical:
+        _bound_saved_lump = True
+    else:
+        try:
+            _bound_saved_lump = _bind_saved_lump_to_ns_state(
+                abs_name, ns_slot, token8, lump_filename, _issue_n_save,
+                next_lump_version)
+        except Exception as _ns_bind_exc:
+            _rollback_protected_save()
+            return jsonify({"error": (
+                f"LUMP save transaction failed; prior revision restored: "
+                f"Namespace binding could not be refreshed: {_ns_bind_exc}"
+            )}), 500
 
     print(f'[lumps] Saved {lump_filename} ({len(lump_bytes)} bytes)', flush=True)
 
@@ -17831,6 +18008,7 @@ def _commit_lump_history_transition(
     current_version: int | None = None,
     expected_manifest_entry=_LUMP_TRANSITION_UNSET,
     idempotent_if_forked: bool = False,
+    additional_json_builder=None,
 ) -> dict:
     """Atomically commit one LUMP history transition.
 
@@ -18011,6 +18189,15 @@ def _commit_lump_history_transition(
             updated_manifest.append(dict(manifest_entry))
             manifest_stage = _stage_json(updated_manifest)
             staged.append((_destination(os.path.basename(manifest_path)), manifest_stage))
+            if additional_json_builder is not None:
+                additional_json = additional_json_builder(dict(manifest_entry))
+                if not isinstance(additional_json, dict):
+                    raise ValueError("additional_json_builder must return a mapping")
+                for destination, document in additional_json.items():
+                    destination = os.path.abspath(destination)
+                    if not destination.startswith(os.path.abspath(lumps_dir) + os.sep):
+                        raise ValueError("additional JSON destination is outside lumps_dir")
+                    staged.append((destination, _stage_json(document)))
 
             # A compatibility alias is installed only after the new canonical
             # pair has been staged.  It is included in the same rollback set.

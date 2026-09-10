@@ -5,6 +5,9 @@ row zero.  Portable identity and dynamic-slot binding deliberately live in
 their own modules; callers must opt in to this narrow resident-only rule.
 """
 
+import hashlib
+import struct
+
 _U32_MAX = 0xFFFFFFFF
 
 
@@ -57,21 +60,49 @@ def verify_bootstrap_self_gt(binding, row0, serialized_t=None):
     if row0 != expected:
         raise ValueError(
             "bootstrap SELF GT differs from owning Namespace descriptor "
-            f"(actual 0x{row0:08x}, expected 0x{expected:08x}). "
-            "Rebuild and save the LUMP for the selected Namespace slot; "
-            "if this is an approved bootstrap artifact, regenerate and re-approve it."
+            f"(actual 0x{row0:08x}, expected 0x{expected:08x})"
         )
     if binding.get("token") != token:
         raise ValueError(
             "bootstrap Namespace token differs from SELF GT "
-            f"(Namespace token {binding.get('token')!r}, SELF token {token!r}). "
-            "Reload the current Namespace entry before saving; if this is an approved "
-            "bootstrap artifact, regenerate and re-approve it."
+            f"(Namespace token {binding.get('token')!r}, SELF token {token!r})"
         )
     if serialized_t is not None and serialized_t != token:
         raise ValueError(
             "bootstrap T must equal c-list row-0 SELF GT bit-for-bit "
-            f"(serialized T {serialized_t!r}, SELF token {token!r}). "
-            "Rebuild the artifact from its current binary and re-run approval."
+            f"(serialized T {serialized_t!r}, SELF token {token!r})"
         )
     return token
+
+
+def validate_bootstrap_candidate(binding, candidate_bytes, canonical_token,
+                                 approval_digest, bootstrap_metadata):
+    """Validate the exact immutable bootstrap bytes before repository mutation."""
+    frozen_resident_bootstrap(binding)
+    if not isinstance(candidate_bytes, bytes) or not candidate_bytes:
+        raise ValueError("bootstrap candidate must be a non-empty immutable byte string")
+    if len(candidate_bytes) % 4:
+        raise ValueError("bootstrap candidate byte length is not word-aligned")
+    digest = hashlib.sha256(candidate_bytes).hexdigest()
+    if approval_digest != digest:
+        raise ValueError(
+            "bootstrap approval digest does not authenticate the final candidate bytes")
+    words = struct.unpack(f">{len(candidate_bytes) // 4}I", candidate_bytes)
+    header = words[0]
+    allocation = 1 << (((header >> 23) & 0xF) + 6)
+    cc = header & 0xFF
+    if allocation != len(words) or cc < 1 or cc > allocation:
+        raise ValueError("bootstrap candidate has an invalid c-list layout")
+    row0 = words[allocation - cc]
+    token = verify_bootstrap_self_gt(binding, row0, canonical_token)
+    if not isinstance(bootstrap_metadata, dict):
+        raise ValueError("bootstrap approval metadata is missing")
+    if bootstrap_metadata.get("bootstrap_runtime_gt") != row0:
+        raise ValueError("bootstrap metadata GT differs from sealed row-zero SELF")
+    if bootstrap_metadata.get("bootstrap_t") != token:
+        raise ValueError("bootstrap metadata token differs from sealed row-zero SELF")
+    return {
+        "binary_hash": digest,
+        "bootstrap_runtime_gt": row0,
+        "bootstrap_t": token,
+    }
