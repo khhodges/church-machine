@@ -904,7 +904,10 @@
                             <option value="abstraction">Abstraction</option>
                             <option value="personal">My Programs</option>
                         </select>
-                        <span id="editorCodeName" class="editor-code-name"></span>
+                        <!-- The short code name remains in the DOM for editor state
+                             and identity fallback, but the toolbar shows only the
+                             canonical full dot.name#issue identity below. -->
+                        <span id="editorCodeName" class="editor-code-name" aria-hidden="true" hidden></span>
                         <button class="btn btn-sm editor-jump-btn" id="editorJumpToAbsBtn" style="display:none;" onclick="_editorJumpToAbstraction()" data-tooltip="Open in Abstraction Catalog — Jump to this code's Abstraction entry">&#8594; Abstraction</button>
                         <span id="editorIdentityName" class="editor-identity-name" aria-label="Current LUMP identity" title="Current LUMP identity"></span>
 
