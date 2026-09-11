@@ -290,32 +290,10 @@
     font-weight: 600;
 }
 
-.editor-actions-context {
-    padding: 0.55rem 0.85rem 0.5rem;
-    border-bottom: 1px solid var(--border);
-    background: rgba(96,165,250,0.06);
-    overflow-wrap: anywhere;
-}
-
-.editor-actions-context-label {
-    display: block;
-    color: var(--text-secondary);
-    font-size: 0.63rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    margin-bottom: 0.2rem;
-}
-
-.editor-actions-context strong {
-    display: block;
-    color: #9cc7f5;
-    font: 0.74rem/1.35 var(--font-mono, "Courier New", monospace);
-    overflow-wrap: anywhere;
-}
-
 .editor-identity-name {
     display: inline-block;
-    max-width: min(34vw, 28rem);
+    flex: 0 1 auto;
+    max-width: none;
     color: #9cc7f5;
     font: 0.68rem/1.2 var(--font-mono, "Courier New", monospace);
     overflow-wrap: anywhere;
@@ -325,7 +303,7 @@
 
 @media (max-width: 700px) {
     .editor-identity-name {
-        max-width: 42vw;
+        flex-basis: 100%;
     }
 }
 
@@ -455,6 +433,22 @@
     width: 100%;
 }
 
+#editor > .editor-toolbar {
+    flex: 0 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#editor > .saved-lump-disassembly-panel {
+    flex: 0 0 min(36vh, 360px);
+    width: 100%;
+    min-height: 0;
+    max-height: min(36vh, 360px);
+    box-sizing: border-box;
+    overflow: hidden;
+    padding: 0.45rem 0;
+}
+
 #editor .console-panel {
     display: flex;
     flex-direction: column;
@@ -464,7 +458,6 @@
 
 .saved-lump-disassembly-panel {
     display: flex;
-    flex: 1;
     min-height: 0;
     flex-direction: column;
 }
@@ -1603,6 +1596,7 @@
 .editor-toolbar {
     display: flex;
     gap: 0.5rem;
+    width: 100%;
     padding: 0.4rem 0;
     margin-bottom: 0.25rem;
     flex-wrap: wrap;
@@ -1613,6 +1607,9 @@
     display: flex;
     align-items: center;
     gap: 0.35rem;
+    flex-wrap: wrap;
+    max-width: 100%;
+    box-sizing: border-box;
     border: 1px solid rgba(200, 155, 60, 0.35);
     border-radius: 6px;
     padding: 0.25rem 0.5rem;

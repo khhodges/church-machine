@@ -82,10 +82,10 @@
     <link rel="icon" type="image/svg+xml" sizes="16x16" href="favicon.svg">
     <link rel="stylesheet" href="styles-base.css?v=20260905-bitstream-source-version1">
     <link rel="stylesheet" href="styles-landing.css?v=20260820-card-dnd2">
-    <link rel="stylesheet" href="styles-toolbar.css?v=20260911-editor-actions-row2">
+    <link rel="stylesheet" href="styles-toolbar.css?v=sha256-d5e2bc5a40a7">
     <link rel="stylesheet" href="styles-editor.css?v=sha256-371b4cd27b42">
     <link rel="stylesheet" href="styles-dashboard.css?v=20260830-thread-heap-formula1">
-    <link rel="stylesheet" href="styles-lumps.css?v=sha256-e79630290deb">
+    <link rel="stylesheet" href="styles-lumps.css?v=sha256-d04317766755">
     <link rel="stylesheet" href="styles-gatelog.css?v=20260831-nia-standard1">
     <link rel="stylesheet" href="styles-fault.css?v=20260830-thread-heap-formula1">
     <link rel="stylesheet" href="styles-tools.css?v=20260831-wukong-download-layout1">
@@ -847,10 +847,8 @@
 
     <div id="editor" class="view">
         <section id="lastFaultHost" class="last-fault-host" aria-live="polite" aria-label="Last Accepted Fault"></section>
-        <div class="editor-layout editor-source-disassembly-row" aria-label="Source and disassembly workspace">
-            <div class="editor-panel">
-                <div class="editor-toolbar">
-                    <div class="toolbar-phase">
+        <div class="editor-toolbar">
+            <div class="toolbar-phase">
                         <span class="phase-label">Editor</span>
                         <div class="ham-wrap" id="editorActionsWrap">
                             <button class="btn ham-btn editor-actions-btn" id="editorActionsBtn" onclick="toggleEditorActions()" data-tooltip="Actions — Compile · Create · Save">&#9776;</button>
@@ -865,10 +863,6 @@
                                 <button class="ham-item" onclick="_editorFindOpen(false);closeEditorActions()" data-tooltip="Find — Search for text in the editor">Find&hellip;</button>
                                 <button class="ham-item" onclick="_editorFindOpen(true);closeEditorActions()" data-tooltip="Find &amp; Replace — Search and replace text in the editor">Find &amp; Replace&hellip;</button>
                                 <div class="ham-divider"></div>
-                                <div class="editor-actions-context" id="editorActionsIdentity" aria-live="polite">
-                                    <span class="editor-actions-context-label">Current LUMP identity</span>
-                                    <strong id="editorActionsIdentityValue">—</strong>
-                                </div>
                                 <div class="ham-group-title">Build &amp; inspect</div>
                                 <button class="ham-item" id="btnHamCompile" onclick="smartCompile();closeEditorActions()" data-tooltip="Compile — Compile with auto-detected or selected source language">Compile</button>
                                 <button class="ham-item" id="btnHamSaveLump" onclick="editorSaveLump();closeEditorActions()" style="color:#7dd3a8;" data-tooltip="Save Lump — Save a new dated version of the current LUMP; or compile-then-save if no LUMP is open">Save Lump</button>
@@ -915,8 +909,15 @@
                         <span id="editorIdentityName" class="editor-identity-name" aria-label="Current LUMP identity" title="Current LUMP identity"></span>
 
                         <span id="asmWarnBadge" class="asm-warn-badge" style="display:none;" title="Assembly warnings — scroll up to review">&#x26A0; <span id="asmWarnBadgeCount"></span></span>
-                    </div>
                 </div>
+        </div>
+        <section id="savedLumpDisassemblyPanel" class="saved-lump-disassembly-panel" style="display:none;" aria-label="Compiled LUMP disassembly">
+            <h2 id="savedLumpDisassemblyTitle">Compiled Disassembly</h2>
+            <p>This read-only view is the exact compiled binary opened from the saved LUMP.</p>
+            <pre id="savedLumpDisassembly" tabindex="0" aria-readonly="true"></pre>
+        </section>
+        <div class="editor-layout editor-source-console-row" aria-label="Source and console workspace">
+            <div class="editor-panel">
                 <!-- Built-in example tab markup retired. Open File Catalog owns
                      these entries; loader functions remain available to it.
                 <div class="retired-catalog-source">
@@ -1047,11 +1048,6 @@
                     <button class="sidebar-tab" id="codeTabHistory" onclick="switchCodeTab('history')" data-tooltip="History — Stories and context about Church Machine concepts">History</button>
                     <button class="sidebar-tab" id="codeTabJs" onclick="switchCodeTab('js')" data-tooltip="JS Source — Browse the simulator JS files that implement the boot code">JS</button>
                 </div>
-                <section id="savedLumpDisassemblyPanel" class="saved-lump-disassembly-panel" style="display:none;" aria-label="Compiled LUMP disassembly">
-                    <h2 id="savedLumpDisassemblyTitle">Compiled Disassembly</h2>
-                    <p>This read-only view is the exact compiled binary opened from the saved LUMP.</p>
-                    <pre id="savedLumpDisassembly" tabindex="0" aria-readonly="true"></pre>
-                </section>
                 <div id="asmErrorPanel" class="asm-error-panel" style="display:none;"></div>
                 <div id="asmWarningPanel" class="asm-warning-panel" style="display:none;"></div>
                 <div id="codeConsoleContent" style="display:flex;">
@@ -3517,7 +3513,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="lump-audit.js?v=sha256-803baf1fb1fb"></script>
     <script src="rci-show-errs.js?v=sha256-652eda848fcc"></script>
     <script src="lump-content-frame.js?v=sha256-7f87f1cd93c1"></script>
-    <script src="app-lumps.js?v=sha256-8ac1e3c8d115"></script>
+    <script src="app-lumps.js?v=sha256-ebaba60c7e02"></script>
     <script src="app-absdetail.js?v=sha256-2e17a8394e67"></script>
     <!-- Load order matters: app-compile must precede app-run (exports LANG_EXAMPLE_GROUPS
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->
@@ -3526,7 +3522,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="app-editor-find.js?v=sha256-aeb1fa51e855"></script>
     <script src="lump_save_handler.js?v=sha256-0e78b98b1810"></script>
     <script src="whats-new-feed.js?v=sha256-4f1499720d0d"></script>
-    <script src="app-run.js?v=sha256-b60411617896"></script>
+    <script src="app-run.js?v=sha256-5950f3fbe0e7"></script>
     <script src="app-build-approval.js?v=sha256-a0bc03cc9ce0"></script>
     <script src="app-source-library.js?v=sha256-f0acb36b8999"></script>
     <script src="app-invoke.js?v=sha256-376a499e341a"></script>

@@ -11852,23 +11852,11 @@ function _editorActionIdentity(name) {
 
 function _refreshEditorActionIdentity(name) {
     const identity = _editorActionIdentity(name || (document.getElementById('editorCodeName') || {}).textContent);
-    const identityValue = document.getElementById('editorActionsIdentityValue');
     const identityName = document.getElementById('editorIdentityName');
-    if (identityValue) identityValue.textContent = identity || 'No LUMP identity yet';
     if (identityName) {
         identityName.textContent = identity;
         identityName.title = identity ? `Current LUMP identity: ${identity}` : 'Current LUMP identity';
     }
-    [
-        ['btnHamCompile', 'Compile'],
-        ['btnHamInstructions', 'Instructions'],
-        ['btnHamCList', 'C-List'],
-    ].forEach(([id, label]) => {
-        const button = document.getElementById(id);
-        if (!button) return;
-        button.textContent = identity ? `${label} · ${identity}` : label;
-        button.setAttribute('aria-label', identity ? `${label} for ${identity}` : label);
-    });
 }
 
 const _EDITOR_DOCUMENT_STATE_KEY = 'church_editor_document_v1';

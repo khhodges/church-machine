@@ -2435,6 +2435,24 @@
     padding: 0.5rem 0;
 }
 
+.lump-source-restored-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    margin: 0.3rem 0.45rem 0.3rem 0;
+    border: 1px solid #4ade80;
+    border-radius: 50%;
+    background: #0a2010;
+    color: #4ade80 !important;
+    font-size: 0.85rem;
+    line-height: 1;
+    cursor: help;
+}
+.lump-source-restored-indicator span {
+    color: #4ade80 !important;
+}
 .lump-source-restored-banner {
     display: flex;
     align-items: center;
@@ -2453,6 +2471,15 @@
 .lump-draft-restore-btn:hover { background: #f59e0b; }
 .lump-draft-discard-btn { background: transparent; border: 1px solid #fbbf24; color: #fbbf24; }
 .lump-editor-discard-btn { background: transparent; border: 1px solid #f87171; color: #f87171; margin-left: 0.4rem; font-size: 0.78rem; padding: 2px 10px; border-radius: 4px; cursor: pointer; }
+.editor-actions-dropdown .lump-editor-discard-btn {
+    width: 100%;
+    box-sizing: border-box;
+    margin-left: 0;
+    border: 0;
+    border-radius: 0;
+    padding: 0.4rem 0.85rem;
+    text-align: left;
+}
 .lump-editor-discard-btn:hover { background: rgba(248,113,113,0.15); }
 .lump-editor-save-btn { background: transparent; border: 1px solid #4ade80; color: #4ade80; margin-left: 0.4rem; font-size: 0.78rem; padding: 2px 10px; border-radius: 4px; cursor: pointer; }
 .lump-editor-save-btn:hover:not(:disabled) { background: rgba(74,222,128,0.15); }
@@ -3004,12 +3031,19 @@
     }
 
     .editor-layout {
-        flex-direction: column;
+        grid-template-columns: 1fr;
+        grid-template-rows: auto;
         height: auto;
+        overflow: auto;
     }
 
     .editor-divider {
         display: none;
+    }
+
+    #editor > .saved-lump-disassembly-panel {
+        flex-basis: min(42vh, 300px);
+        max-height: min(42vh, 300px);
     }
 
     .repl-layout {

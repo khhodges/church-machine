@@ -1301,10 +1301,10 @@ trackAsync((async function t21() {
     const appCompileSource = fs.readFileSync(path.resolve(__dirname, 'app-compile.js'), 'utf8');
     const appShellSource = fs.readFileSync(path.resolve(__dirname, 'app-shell.js'), 'utf8');
     assert('T24 ordinary assembly examples exit saved-LUMP split mode',
-        /function loadExample\(name\) \{\s*if \(typeof window\.exitSavedLumpEditorMode/.test(
+        /function loadExample\(name\) \{[\s\S]*?window\.exitSavedLumpEditorMode\(\)/.test(
             appRunSource));
     assert('T24 ordinary CLOOMC examples exit saved-LUMP split mode',
-        /function loadCLOOMCExample\(name\) \{\s*if \(typeof window\.exitSavedLumpEditorMode/.test(
+        /function loadCLOOMCExample\(name\) \{[\s\S]*?window\.exitSavedLumpEditorMode\(\)/.test(
             appCompileSource));
     assert('T24 personal tabs exit saved-LUMP split mode',
         /function selectUserTab\(id\)[\s\S]*?window\.exitSavedLumpEditorMode\(\)/.test(

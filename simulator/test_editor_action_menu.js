@@ -25,26 +25,36 @@ check(index.includes('id="btnHamCompile"') &&
       index.includes('id="btnHamInstructions"') &&
       index.includes('id="btnHamCList"'),
     'compile, instructions, and C-List actions are in the hamburger menu');
-check(index.includes('id="editorActionsIdentityValue"'),
-    'the hamburger menu has a full identity context area');
+check(!index.includes('id="editorActionsIdentity"') &&
+      !index.includes('id="editorActionsIdentityValue"'),
+    'the hamburger menu has no duplicate identity context');
 check(run.includes('function _editorActionIdentity(name)') &&
       run.includes('return `${dotName}#${issue}`;'),
     'the action identity is built as the full dot.pet.name issue identity');
-check(run.includes('button.textContent = identity ? `${label} · ${identity}` : label;'),
-    'action labels include the full identity');
+check(!run.includes('button.textContent = identity ? `${label} · ${identity}` : label;') &&
+      run.includes('identityName.textContent = identity;'),
+    'only the toolbar displays the full identity');
 check(shell.includes('_refreshEditorActionIdentity('),
     'execution identity changes refresh the action context');
-check(toolbar.includes('.editor-actions-context') &&
-      toolbar.includes('.editor-identity-name'),
+check(!toolbar.includes('.editor-actions-context') &&
+      toolbar.includes('.editor-identity-name') &&
+      toolbar.includes('max-width: none'),
     'the full identity has dedicated responsive toolbar styling');
-check(index.includes('class="editor-layout editor-source-disassembly-row"') &&
-      index.includes('aria-label="Source and disassembly workspace"'),
-    'source and disassembly use one explicit full-width workspace row');
+check(index.includes('class="editor-toolbar"') &&
+      index.includes('id="savedLumpDisassemblyPanel"') &&
+      index.includes('class="editor-layout editor-source-console-row"') &&
+      index.indexOf('class="editor-toolbar"') <
+          index.indexOf('id="savedLumpDisassemblyPanel"') &&
+      index.indexOf('id="savedLumpDisassemblyPanel"') <
+          index.indexOf('class="editor-layout editor-source-console-row"'),
+    'the toolbar, full-width disassembly, and editor workspace are ordered vertically');
 check(toolbar.includes('grid-template-columns: minmax(0, 1fr) 6px minmax(0, 1fr)') &&
       toolbar.includes('grid-template-rows: minmax(0, 1fr)'),
-    'the source/disassembly workspace is a static three-column row');
+    'the source/console workspace is a static three-column row');
 check(!lumps.includes('getElementById(\'btnToolbarCompile\')') &&
-      lumps.includes('getElementById(\'editorActionsWrap\')'),
-    'saved-LUMP discard insertion no longer depends on retired toolbar buttons');
+      lumps.includes('getElementById(\'btnHamSaveLump\')') &&
+      lumps.includes('getElementById(\'editorActionsDropdown\')') &&
+      lumps.includes('lump-source-restored-indicator'),
+    'saved-LUMP discard and recovery state use the action menu and compact indicator');
 
 console.log('Editor action menu regression: PASS');

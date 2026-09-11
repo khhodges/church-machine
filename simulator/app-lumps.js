@@ -1662,9 +1662,8 @@ function _lumpSrcEditMethod(absIdx, mName) {
     if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
 }
 
-// Saved LUMPs are edited as source on the left while their immutable binary is
-// shown alongside it.  These helpers intentionally only alter the right pane,
-// so the regular editor console/reference UI remains unchanged outside this mode.
+// Saved LUMPs are edited as source while their immutable binary is shown in
+// the full-width row below the editor toolbar.
 function _enterSavedLumpEditorMode(compiledDisasm, lumpName) {
     window._savedLumpEditorMode = true;
     var tabs = document.getElementById('codeSidebarTabs');
@@ -6488,21 +6487,23 @@ async function openLumpInEditor(token) {
                 });
             }
         } else {
-            // No draft — show recovered source only; disassembly stays on right.
+            // No draft — show recovered source only.
             _setSavedLumpEditorSource(_recoveredSource);
             asmEd.classList.remove('cm-editor-draft');
-            // Show "source restored" banner when original source was fetched
+            // Show a compact, non-text recovery indicator when original source
+            // was fetched. The title/ARIA label carries the explanation.
             if (_sourceRestored) {
                 var _existingSourceBanner = document.getElementById('_lumpSourceRestoredBanner');
                 if (_existingSourceBanner) _existingSourceBanner.remove();
                 var _srcBanner = document.createElement('div');
                 _srcBanner.id = '_lumpSourceRestoredBanner';
-                _srcBanner.className = 'lump-source-restored-banner';
-                _srcBanner.innerHTML =
-                    '<span>' + (_diagnosticError
-                        ? 'Faulty artifact source opened for repair'
-                        : 'Source restored from saved LUMP') + '</span>' +
-                    '<button class="lump-malformed-banner-dismiss" onclick="this.parentNode.remove()" title="Dismiss">\u00D7</button>';
+                _srcBanner.className = 'lump-source-restored-indicator';
+                _srcBanner.setAttribute('role', 'status');
+                _srcBanner.setAttribute('aria-label', _diagnosticError
+                    ? 'Faulty artifact source opened for repair'
+                    : 'Source restored from saved LUMP');
+                _srcBanner.title = _srcBanner.getAttribute('aria-label');
+                _srcBanner.innerHTML = '<span aria-hidden="true">&#10003;</span>';
                 var _srcBannerParent = asmEd.parentNode && asmEd.parentNode.parentNode;
                 if (_srcBannerParent) _srcBannerParent.insertBefore(_srcBanner, asmEd.parentNode);
                 else if (asmEd.parentNode) asmEd.parentNode.insertBefore(_srcBanner, asmEd);
@@ -6558,12 +6559,12 @@ async function openLumpInEditor(token) {
     var outEl = document.getElementById('assemblyOutput');
     if (outEl) outEl.innerHTML = '';
 
-    // ── Inject / refresh Discard toolbar button ───────────────────────────
+    // ── Inject / refresh Discard action-menu button ───────────────────────
     var _existingDiscardBtn = document.getElementById('btnDiscardLumpEdit');
     if (_existingDiscardBtn) _existingDiscardBtn.remove();
     var _discardBtn = document.createElement('button');
     _discardBtn.id = 'btnDiscardLumpEdit';
-    _discardBtn.className = 'btn btn-sm lump-editor-discard-btn';
+    _discardBtn.className = 'ham-item lump-editor-discard-btn';
     _discardBtn.setAttribute('data-tooltip', 'Discard Draft — Clear recovered edits, restore the last saved source, and return to the LUMP panel');
     _discardBtn.textContent = 'Discard Draft';
     _discardBtn.addEventListener('click', function() {
@@ -6593,15 +6594,15 @@ async function openLumpInEditor(token) {
         if (typeof switchView === 'function') switchView('lumps');
     });
 
-    // Insert Discard into the editor action area.  Compile and Save Lump now
-    // live in the hamburger menu, so do not depend on their retired toolbar IDs.
-    var _actionAnchor = document.getElementById('editorActionsWrap');
+    // Insert Discard directly after Save Lump in the hamburger's Build &
+    // inspect group, keeping all editor actions in one place.
+    var _actionAnchor = document.getElementById('btnHamSaveLump');
     var _actionParent = _actionAnchor && _actionAnchor.parentNode;
     if (_actionParent) {
         _actionParent.insertBefore(_discardBtn, _actionAnchor.nextSibling);
     } else {
-        var _toolbarPhase = document.querySelector('.toolbar-phase');
-        if (_toolbarPhase) _toolbarPhase.appendChild(_discardBtn);
+        var _actionMenu = document.getElementById('editorActionsDropdown');
+        if (_actionMenu) _actionMenu.appendChild(_discardBtn);
     }
 
     // Expose this lump's token so the C-List viewer can show its baked-in
