@@ -9522,10 +9522,82 @@ def _bootstrap_snapshot_identity(lumps_dir, manifest_entry, inspected):
         "record_token": record_token,
         "row0_gt": row0_token,
         "expected_gt": expected_token,
+        "active_namespace_gt": expected_token,
         "slot": binding.get("slot"),
         "sequence": binding.get("seq", 0),
         "errors": errors,
         "data_changed": False,
+    }
+
+
+def _lump_preview_issues(validation_errors, bootstrap_identity=None, *,
+                         historical=False, current=False,
+                         restore_enabled=None):
+    """Return ordered, user-facing diagnostics for a read-only Preview.
+
+    Keep the raw validation messages as individual entries.  Bootstrap
+    identity facts are added separately so a Preview cannot reduce a
+    multi-part identity failure to one generic "invalid binary" message.
+    """
+    issues = []
+    for message in validation_errors or []:
+        if message:
+            issues.append({"kind": "validation", "message": str(message)})
+
+    identity = bootstrap_identity
+    if isinstance(identity, dict) and identity.get("applies") is True:
+        if identity.get("valid") is False:
+            issues.append({
+                "kind": "bootstrap-identity",
+                "message": "Bootstrap identity is inconsistent.",
+            })
+            for message in identity.get("errors") or []:
+                if message:
+                    issues.append({
+                        "kind": "bootstrap-identity-detail",
+                        "message": str(message),
+                    })
+
+    if historical and not current:
+        if restore_enabled is False:
+            issues.append({
+                "kind": "activation",
+                "message": (
+                    "Direct History activation is disabled because this "
+                    "revision is not a valid live candidate."
+                ),
+            })
+        else:
+            issues.append({
+                "kind": "activation",
+                "message": (
+                    "Direct History activation is available only after the "
+                    "existing validation and approval checks succeed."
+                ),
+            })
+    return issues
+
+
+def _lump_archive_provenance(filename, *, pattern_discovered=False,
+                              correction_supported=False):
+    """Describe how an immutable History archive was located."""
+    if pattern_discovered:
+        return {
+            "kind": "standard-filename-pattern",
+            "filename": filename,
+            "description": (
+                "This archive was discovered from the active LUMP's standard "
+                "filename pattern; it has no separate archived manifest row."
+            ),
+            "correction_supported": bool(correction_supported),
+        }
+    return {
+        "kind": "archived-manifest-row",
+        "filename": filename,
+        "description": (
+            "This archive is identified by its immutable archived manifest row."
+        ),
+        "correction_supported": bool(correction_supported),
     }
 
 
@@ -9884,10 +9956,12 @@ def get_lump_words(token_hex):
     key8  = (raw[:8] if len(raw) >= 8 else raw).zfill(8)
     archive_filename = request.args.get("archive_filename")
     archive_manifest_entry = None
+    archive_provenance = None
     if archive_filename is not None:
-        # History supplies this immutable locator for archived bootstrap
-        # records. Do not accept an arbitrary path: it must be the filename of
-        # exactly one archived manifest row for this token.
+        # History supplies this immutable locator for archived records. Do not
+        # accept an arbitrary path: it must be either an exact archived
+        # manifest filename for this abstraction or one of the active LUMP's
+        # standard generated archive filenames.
         if (
             not archive_filename
             or os.path.basename(archive_filename) != archive_filename
@@ -9899,23 +9973,61 @@ def get_lump_words(token_hex):
                 os.path.join(LUMPS_DIR, "manifest.json"))
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 409
+        active_matches = [
+            row for row in archive_manifest
+            if isinstance(row, dict)
+            and row.get("archived") is not True
+            and str(row.get("token") or "").lower() == key8
+        ]
+        if len(active_matches) != 1:
+            return jsonify({"error": f"No active LUMP found for token {key8}"}), 404
+        active_entry = active_matches[0]
         archive_matches = [
             row for row in archive_manifest
             if isinstance(row, dict)
             and row.get("archived") is True
-            and str(row.get("token") or "").lower() == key8
             and row.get("filename") == archive_filename
+            and str(row.get("abstraction") or "").casefold()
+                == str(active_entry.get("abstraction") or "").casefold()
         ]
-        if len(archive_matches) != 1:
-            status = 404 if not archive_matches else 409
+        if len(archive_matches) > 1:
             return jsonify({
-                "error": (
-                    "Archived LUMP record is unavailable"
-                    if status == 404
-                    else "Archived filename maps to multiple manifest records"
-                )
-            }), status
-        archive_manifest_entry = archive_matches[0]
+                "error": "Archived filename maps to multiple manifest records"
+            }), 409
+        if len(archive_matches) == 1:
+            archive_manifest_entry = archive_matches[0]
+            archive_provenance = _lump_archive_provenance(
+                archive_filename, pattern_discovered=False)
+        else:
+            active_filename = str(active_entry.get("filename") or "")
+            active_stem = (
+                _re.sub(r"_v\d+$", "", active_filename[:-5])
+                if active_filename.endswith(".lump") else "")
+            safe_name = _re.sub(
+                r"[^A-Za-z0-9_.-]+", "_",
+                str(active_entry.get("abstraction") or ""))
+            version_match = _re.search(r"_v(\d+)\.lump$", archive_filename)
+            generated_filenames = {
+                f"{key8}-v{version_match.group(1)}.lump"
+                if version_match else "",
+                f"{active_stem}_v{version_match.group(1)}.lump"
+                if active_stem and version_match else "",
+                f"{safe_name}_v{version_match.group(1)}.lump"
+                if safe_name and version_match else "",
+            }
+            if archive_filename not in generated_filenames:
+                return jsonify({
+                    "error": "Archived LUMP record is unavailable"
+                }), 404
+            archive_manifest_entry = dict(active_entry)
+            archive_manifest_entry.update({
+                "archived": True,
+                "filename": archive_filename,
+                "lump_version": (
+                    int(version_match.group(1)) if version_match else None),
+            })
+            archive_provenance = _lump_archive_provenance(
+                archive_filename, pattern_discovered=True)
         lump_path = os.path.join(LUMPS_DIR, archive_filename)
     else:
         # The live manifest is authoritative for tokenized dot-name binaries.
@@ -10032,12 +10144,28 @@ def get_lump_words(token_hex):
             if field in _approval_ret:
                 response[field] = _approval_ret[field]
     if archive_manifest_entry is not None:
+        if archive_provenance is None:
+            archive_provenance = _lump_archive_provenance(archive_filename)
+        if bootstrap_identity is not None:
+            archive_provenance["correction_supported"] = bool(
+                not bootstrap_identity.get("valid", True))
+        response["archive_provenance"] = archive_provenance
+        response["preview_issues"] = _lump_preview_issues(
+            validation_errors, bootstrap_identity,
+            historical=True,
+            restore_enabled=bool(
+                not validation_errors
+                and _approval_ret is not None
+                and _integrity_result is True))
         response.update({
             "version": archive_manifest_entry.get("lump_version"),
             "archive_filename": archive_filename,
             "historical_record": True,
             "read_only": True,
         })
+    else:
+        response["preview_issues"] = _lump_preview_issues(
+            validation_errors, bootstrap_identity, current=True)
     return jsonify(response)
 
 
@@ -10514,6 +10642,15 @@ def get_lump_history(token):
         snapshot = _validate_lump_snapshot(lump_path, _current_manifest_h)
         approval = snapshot["approval"] or {}
         errors = snapshot["errors"]
+        archive_filename_h = os.path.basename(lump_path) if not current else None
+        archived_manifest_h = next(
+            (row for row in _related_archived_h
+             if row.get("filename") == archive_filename_h),
+            None)
+        pattern_discovered_h = bool(
+            not current and archive_filename_h
+            and archived_manifest_h is None)
+        bootstrap_identity_h = snapshot["bootstrap_identity"]
         entry = {
             "version": version,
             "current": current,
@@ -10535,12 +10672,29 @@ def get_lump_history(token):
             "restore_enabled": bool(
                 not current and snapshot["valid"] and snapshot["approved"]),
             "validation_errors": errors,
-            "bootstrap_identity": snapshot["bootstrap_identity"],
+            "preview_issues": _lump_preview_issues(
+                errors, bootstrap_identity_h,
+                historical=not current, current=current,
+                restore_enabled=bool(
+                    not current and snapshot["valid"] and snapshot["approved"])),
+            "bootstrap_identity": bootstrap_identity_h,
+            "archive_provenance": (
+                _lump_archive_provenance(
+                    archive_filename_h,
+                    pattern_discovered=pattern_discovered_h,
+                    correction_supported=bool(
+                        bootstrap_identity_h
+                        and not bootstrap_identity_h.get("valid", True)))
+                if archive_filename_h else None),
+            "record_token": (
+                str((_current_manifest_h or {}).get("token") or "").lower()
+                if not current else None),
+            "record_filename": archive_filename_h,
             "archive_filename": (
-                os.path.basename(lump_path) if not current else None),
+                archive_filename_h),
             "legacy_incompatible": bool(
-                snapshot["bootstrap_identity"] is not None
-                and not snapshot["bootstrap_identity"]["valid"]),
+                bootstrap_identity_h is not None
+                and not bootstrap_identity_h["valid"]),
         }
         if isinstance(approval.get("mtbf"), dict):
             entry["mtbf"] = approval["mtbf"]
@@ -10611,6 +10765,16 @@ def get_lump_history(token):
             "record_filename": _archived_filename_h,
             "archive_filename": _archived_filename_h,
             "read_only": True,
+            "preview_issues": _lump_preview_issues(
+                _archived_snapshot_h["errors"],
+                _archived_snapshot_h["bootstrap_identity"],
+                historical=True, restore_enabled=False),
+            "archive_provenance": _lump_archive_provenance(
+                _archived_filename_h, pattern_discovered=False,
+                correction_supported=bool(
+                    _archived_snapshot_h["bootstrap_identity"]
+                    and not _archived_snapshot_h["bootstrap_identity"].get(
+                        "valid", True))),
         })
 
     # The live artifact is part of version history too. Resolve it only through
@@ -11071,10 +11235,20 @@ def get_lump_version_words(token, version):
         "grants":        approval.get('grants', []),
         "pet_names":     approval.get('pet_names', {}),
         "source":        snapshot.get('source') or '',
+        "archive_filename": archive_filename,
         "bootstrap_identity": snapshot.get("bootstrap_identity"),
         "legacy_incompatible": bool(
             snapshot.get("bootstrap_identity")
             and not snapshot["bootstrap_identity"]["valid"]),
+        "preview_issues": _lump_preview_issues(
+            validation_errors, snapshot.get("bootstrap_identity"),
+            historical=True, restore_enabled=False),
+        "archive_provenance": _lump_archive_provenance(
+            archive_filename,
+            pattern_discovered=not bool(_manifest_entry_v.get("archived")),
+            correction_supported=bool(
+                snapshot.get("bootstrap_identity")
+                and not snapshot["bootstrap_identity"].get("valid", True))),
     })
 
 

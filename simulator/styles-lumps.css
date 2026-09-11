@@ -338,6 +338,62 @@
     overflow: visible;
 }
 
+.lump-history-issues {
+    margin: 0 0 0.9rem;
+    padding: 0.85rem;
+    border: 1px solid rgba(239, 68, 68, 0.48);
+    border-radius: 6px;
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.lump-history-issues .lump-section-title {
+    color: #fecaca;
+}
+
+.lump-history-issues-list,
+.lump-history-identity-facts ul {
+    margin: 0.45rem 0 0;
+    padding-left: 1.2rem;
+}
+
+.lump-history-issue {
+    margin: 0.22rem 0;
+    color: var(--text-primary, #e5e7eb);
+    font-size: 0.76rem;
+    line-height: 1.4;
+}
+
+.lump-history-issue--activation {
+    font-weight: 700;
+    color: #fca5a5;
+}
+
+.lump-history-issues-clear {
+    margin: 0.35rem 0 0;
+    color: var(--text-secondary, #a8b3c5);
+    font-size: 0.76rem;
+}
+
+.lump-history-identity-facts {
+    margin-top: 0.7rem;
+    padding-top: 0.55rem;
+    border-top: 1px solid rgba(239, 68, 68, 0.22);
+    color: #fecaca;
+    font-size: 0.76rem;
+}
+
+.lump-history-identity-facts code,
+.lump-history-archive-provenance code {
+    color: #fde68a;
+}
+
+.lump-history-archive-provenance {
+    margin: 0.7rem 0 0;
+    color: var(--text-secondary, #a8b3c5);
+    font-size: 0.74rem;
+    line-height: 1.4;
+}
+
 .lump-bootstrap-repair {
     margin: 0 0 0.9rem;
     padding: 0.8rem;

@@ -2780,9 +2780,11 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                     ? hist.validation_errors : [];
                 const historicalRecord = Boolean(hist && hist.historical_record);
                 const bootstrapCorrectionAvailable = Boolean(
-                    hist && historicalRecord && hist.bootstrap_identity &&
+                    hist && hist.bootstrap_identity &&
                     hist.bootstrap_identity.applies === true &&
-                    hist.bootstrap_identity.valid === false
+                    hist.bootstrap_identity.valid === false &&
+                    (!hist.archive_provenance ||
+                        hist.archive_provenance.correction_supported !== false)
                 );
                 const previewUsable = Boolean(hist &&
                     hist.binary_available !== false);
@@ -3051,7 +3053,7 @@ function _showLumpHistoryPreviewModal(version, bodyHtml) {
 
 function _lumpBootstrapRepairControls(data, currentToken, version, archiveFilename, tk, historicalRecord, isCurrent) {
     const identity = data && data.bootstrap_identity;
-    if (!historicalRecord || isCurrent || !identity || identity.applies !== true ||
+    if (isCurrent || !identity || identity.applies !== true ||
         identity.valid !== false || !archiveFilename ||
         !/^[0-9a-f]{8}$/i.test(String(identity.expected_gt || ''))) {
         return '';
@@ -3091,6 +3093,80 @@ function _lumpBootstrapRepairControls(data, currentToken, version, archiveFilena
         `<div class="lump-bootstrap-repair-status" aria-live="polite"></div>` +
         `</section>`
     );
+}
+
+function _lumpHistoryPreviewIssueSummary(data, isCurrent, historicalRecord) {
+    const identity = data && data.bootstrap_identity;
+    const validationErrors = data && Array.isArray(data.validation_errors)
+        ? data.validation_errors : [];
+    const serverIssues = data && Array.isArray(data.preview_issues)
+        ? data.preview_issues : [];
+    const messages = [];
+    const addMessage = (message, kind) => {
+        const text = String(message || '').trim();
+        if (!text || messages.some(item => item.message === text)) return;
+        messages.push({ message: text, kind: kind || 'validation' });
+    };
+    serverIssues.forEach(issue => {
+        if (issue && typeof issue === 'object') {
+            addMessage(issue.message, issue.kind);
+        } else {
+            addMessage(issue);
+        }
+    });
+    validationErrors.forEach(message => addMessage(message, 'validation'));
+    if (identity && identity.applies === true && identity.valid === false) {
+        addMessage('Bootstrap identity is inconsistent.', 'bootstrap-identity');
+        (Array.isArray(identity.errors) ? identity.errors : [])
+            .forEach(message => addMessage(message, 'bootstrap-identity-detail'));
+    }
+    if (!isCurrent && (historicalRecord || data && data.binary_valid === false)) {
+        addMessage(
+            'Direct History activation is disabled because the revision is not a valid live candidate.',
+            'activation'
+        );
+    }
+
+    const provenance = data && data.archive_provenance;
+    let html =
+        `<section class="lump-history-issues" aria-label="Issues / Why this cannot be set">` +
+        `<div class="lump-section-title">Issues / Why this cannot be set</div>`;
+    if (messages.length) {
+        html += `<ul class="lump-history-issues-list">` +
+            messages.map(item =>
+                `<li class="lump-history-issue lump-history-issue--${_escHtml(item.kind)}">${_escHtml(item.message)}</li>`
+            ).join('') +
+            `</ul>`;
+    } else {
+        html += `<p class="lump-history-issues-clear">No blocking issues were reported for this revision.</p>`;
+    }
+
+    if (identity && identity.applies === true && identity.valid === false) {
+        const row0 = String(identity.row0_gt || '????????').toUpperCase();
+        const expected = String(
+            identity.active_namespace_gt || identity.expected_gt || '????????'
+        ).toUpperCase();
+        const record = String(identity.record_token || '????????').toUpperCase();
+        html +=
+            `<div class="lump-history-identity-facts">` +
+            `<strong>Bootstrap identity details</strong>` +
+            `<ul>` +
+            `<li>Sealed row-zero GT: <code>0x${_escHtml(row0)}</code></li>` +
+            `<li>Active Namespace GT: <code>0x${_escHtml(expected)}</code></li>` +
+            `<li>Record Token: <code>0x${_escHtml(record)}</code></li>` +
+            `</ul></div>`;
+    }
+    if (provenance && provenance.filename) {
+        html +=
+            `<p class="lump-history-archive-provenance">` +
+            `<strong>Archive:</strong> <code>${_escHtml(provenance.filename)}</code>. ` +
+            `${_escHtml(provenance.description || 'Located as an immutable History archive.')}` +
+            (provenance.correction_supported
+                ? ` The bootstrap correction path supports this archive.`
+                : '') +
+            `</p>`;
+    }
+    return html + `</section>`;
 }
 
 function _updateLumpBootstrapRepairControls(repairId) {
@@ -3306,6 +3382,9 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             data, currentToken || token, version, archiveFilename, tk,
             historicalRecord, isCurrent
         );
+        const issueSummary = _lumpHistoryPreviewIssueSummary(
+            data, isCurrent, historicalRecord
+        );
         let curWords = [];
         let curFetchFailed = false;
         if (isCurrent) {
@@ -3386,7 +3465,7 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
                 `</div>`;
         }
         _showLumpHistoryPreviewModal(
-            version, repairControls + sourcePreview + t
+            version, issueSummary + repairControls + sourcePreview + t
         );
     } catch (err) {
         _noPreview(err.message);

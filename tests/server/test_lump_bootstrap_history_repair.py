@@ -161,6 +161,58 @@ def test_history_preview_reads_existing_archive_and_current_bytes_without_validi
     assert current_response.get_json()["words"][-1] == bootstrap_history["expected_gt"]
 
 
+def test_standard_filename_archive_is_previewable_with_complete_identity_diagnostics(
+        bootstrap_history
+):
+    root = bootstrap_history["root"]
+    standard_name = "CapabilityTest_v23.lump"
+    (root / standard_name).write_bytes(bootstrap_history["legacy"])
+
+    with app_module.app.test_client() as client:
+        history_response = client.get(f"/api/lumps/{CURRENT_TOKEN}/history")
+        archive_response = client.get(
+            f"/api/lumps/{CURRENT_TOKEN}/words/23",
+            query_string={"archive_filename": standard_name},
+        )
+
+    assert history_response.status_code == 200
+    standard_entry = next(
+        entry for entry in history_response.get_json()["history"]
+        if entry.get("archive_filename") == standard_name
+    )
+    assert standard_entry["preview_enabled"] is True
+    assert standard_entry["restore_enabled"] is False
+    assert standard_entry["archive_provenance"] == {
+        "kind": "standard-filename-pattern",
+        "filename": standard_name,
+        "description": (
+            "This archive was discovered from the active LUMP's standard "
+            "filename pattern; it has no separate archived manifest row."
+        ),
+        "correction_supported": True,
+    }
+
+    assert archive_response.status_code == 200
+    archive = archive_response.get_json()
+    assert archive["archive_filename"] == standard_name
+    assert archive["archive_provenance"]["kind"] == "standard-filename-pattern"
+    assert archive["archive_provenance"]["correction_supported"] is True
+    identity = archive["bootstrap_identity"]
+    assert identity["row0_gt"] == "4a000006"
+    assert identity["active_namespace_gt"] == "4a00000a"
+    assert identity["record_token"] == CURRENT_TOKEN
+    assert identity["valid"] is False
+    issue_text = "\n".join(
+        issue["message"] for issue in archive["preview_issues"])
+    assert "Bootstrap identity is inconsistent." in issue_text
+    assert "sealed row-zero GT 0x4a000006" in issue_text
+    assert "record Token 0x4a00000a" in issue_text
+    assert (
+        "Direct History activation is disabled because this revision is not "
+        "a valid live candidate."
+    ) in issue_text
+
+
 def test_approved_repair_reissues_canonical_live_lump_and_preserves_evidence(
         bootstrap_history
 ):

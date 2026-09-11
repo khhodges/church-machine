@@ -1010,6 +1010,90 @@ test.describe('LUMP History tab — inspectable invalid and binary-only archives
         await expect(row.locator('button.lump-history-restore-btn')).toHaveCount(0);
     });
 
+    test('standard filename bootstrap archive leads with complete issues and provenance', async ({ page }) => {
+        test.setTimeout(40000);
+        const invalidIdentity = {
+            applies: true,
+            valid: false,
+            record_token: '4a00000a',
+            row0_gt: '4a000006',
+            active_namespace_gt: '4a00000a',
+            expected_gt: '4a00000a',
+            errors: [
+                'sealed row-zero GT 0x4a000006 != expected GT 0x4a00000a',
+            ],
+        };
+        await stubHistoryWithArchive(page, {
+            ...STUB_WORDS_V1,
+            binary_valid: false,
+            validation_errors: [
+                'bootstrap T-equals-GT validation failed',
+            ],
+            bootstrap_identity: invalidIdentity,
+            source: '',
+            archive_provenance: {
+                kind: 'standard-filename-pattern',
+                filename: 'CapabilityTest_v23.lump',
+                description: "This archive was discovered from the active LUMP's standard filename pattern; it has no separate archived manifest row.",
+                correction_supported: true,
+            },
+            preview_issues: [
+                { kind: 'validation', message: 'bootstrap T-equals-GT validation failed' },
+                { kind: 'bootstrap-identity', message: 'Bootstrap identity is inconsistent.' },
+                { kind: 'bootstrap-identity-detail', message: 'sealed row-zero GT 0x4a000006 != expected GT 0x4a00000a' },
+                { kind: 'activation', message: 'Direct History activation is disabled because the revision is not a valid live candidate.' },
+            ],
+        }, {
+            archive_filename: 'CapabilityTest_v23.lump',
+            record_filename: 'CapabilityTest_v23.lump',
+            historical_record: false,
+            binary_valid: false,
+            preview_enabled: true,
+            restore_enabled: false,
+            bootstrap_identity: invalidIdentity,
+            archive_provenance: {
+                kind: 'standard-filename-pattern',
+                filename: 'CapabilityTest_v23.lump',
+                description: "This archive was discovered from the active LUMP's standard filename pattern; it has no separate archived manifest row.",
+                correction_supported: true,
+            },
+            preview_issues: [
+                { kind: 'validation', message: 'bootstrap T-equals-GT validation failed' },
+                { kind: 'bootstrap-identity', message: 'Bootstrap identity is inconsistent.' },
+                { kind: 'bootstrap-identity-detail', message: 'sealed row-zero GT 0x4a000006 != expected GT 0x4a00000a' },
+                { kind: 'activation', message: 'Direct History activation is disabled because the revision is not a valid live candidate.' },
+            ],
+        });
+
+        await openLumpDetail(page);
+        await clickHistoryTab(page);
+        const row = page.locator(`#lumpHistoryBody_${STUB_TK} tr.lump-history-row`).first();
+        await row.getByRole('button', { name: 'Preview' }).click();
+        const preview = await waitForHexTable(page);
+        const issues = preview.locator('.lump-history-issues');
+        await expect(issues).toContainText('Issues / Why this cannot be set');
+        await expect(issues).toContainText('Sealed row-zero GT: 0x4A000006');
+        await expect(issues).toContainText('Active Namespace GT: 0x4A00000A');
+        await expect(issues).toContainText('Record Token: 0x4A00000A');
+        await expect(issues).toContainText('Bootstrap identity is inconsistent');
+        await expect(issues).toContainText(
+            'Direct History activation is disabled because the revision is not a valid live candidate.'
+        );
+        await expect(issues).toContainText('CapabilityTest_v23.lump');
+        await expect(issues).toContainText('correction path supports this archive');
+        await expect(preview.locator('.lump-bootstrap-repair')).toBeVisible();
+        await expect(preview.locator('table.lump-hex-table')).toBeVisible();
+
+        const order = await preview.evaluate(container =>
+            Array.from(container.children).map(child => child.className)
+        );
+        expect(order.indexOf('lump-history-issues')).toBeGreaterThanOrEqual(0);
+        expect(order.indexOf('lump-history-issues'))
+            .toBeLessThan(order.findIndex(name => name.includes('lump-history-source-section')));
+        expect(order.indexOf('lump-history-issues'))
+            .toBeLessThan(order.findIndex(name => name.includes('lump-detail-section')));
+    });
+
     test('binary-only archive explicitly explains that source is not embedded', async ({ page }) => {
         test.setTimeout(40000);
         await stubHistoryWithArchive(page, {
