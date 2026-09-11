@@ -505,7 +505,7 @@ class CLOOMCCompiler {
                 } else {
                     i++;
                     while (i < lines.length) {
-                        const capLine = lines[i].trim();
+                        const capLine = CLOOMCCompiler._stripCapabilityComment(lines[i]);
                         if (capLine === '}') { i++; break; }
                         if (capLine && !capLine.startsWith('--')) {
                             for (const item of capLine.split(',')) {
@@ -1236,6 +1236,16 @@ class CLOOMCCompiler {
     // Examples: "LED0 RW" → {name:'LED0', rights:['R','W']}
     //           "Memory E" → {name:'Memory', rights:['E']}
     //           "LED0" → {name:'LED0', rights:[]}  (missing rights — caller should warn/error)
+    static _stripCapabilityComment(line) {
+        const text = String(line || '');
+        let cut = text.length;
+        for (const marker of [';', '--', '//']) {
+            const index = text.indexOf(marker);
+            if (index >= 0 && index < cut) cut = index;
+        }
+        return text.slice(0, cut).trim();
+    }
+
     static _parseCapItem(itemStr) {
         const tokens = itemStr.trim().split(/\s+/).filter(Boolean);
         if (!tokens.length) return null;
@@ -1379,7 +1389,7 @@ class CLOOMCCompiler {
                 } else {
                     i++;
                     while (i < lines.length) {
-                        const capLine = lines[i].trim();
+                        const capLine = CLOOMCCompiler._stripCapabilityComment(lines[i]);
                         if (capLine === '}') { i++; break; }
                         if (capLine && !capLine.startsWith('//')) {
                             for (const item of capLine.split(',')) {
@@ -2606,7 +2616,7 @@ class CLOOMCCompiler {
                 } else {
                     i++;
                     while (i < lines.length) {
-                        const capLine = lines[i].trim();
+                        const capLine = CLOOMCCompiler._stripCapabilityComment(lines[i]);
                         if (capLine === '}') { i++; break; }
                         if (capLine && !capLine.startsWith('--')) {
                             for (const item of capLine.split(',')) {
@@ -3604,7 +3614,7 @@ class CLOOMCCompiler {
                 } else {
                     i++;
                     while (i < lines.length) {
-                        const capLine = lines[i].trim();
+                        const capLine = CLOOMCCompiler._stripCapabilityComment(lines[i]);
                         if (capLine === '}') { i++; break; }
                         if (capLine && !capLine.startsWith('--')) {
                             result.capabilities.push(...capLine.replace(/,/g, ' ').split(/\s+/).filter(Boolean));

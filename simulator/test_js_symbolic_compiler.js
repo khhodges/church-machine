@@ -90,6 +90,28 @@ console.log('\n--- JS-DOT: dotted abstraction name from New template ---');
         JSON.stringify(result.capabilities));
 }
 
+console.log('\n--- JS-CAP-COMMENT: generated SELF declaration comments ---');
+{
+    const c = new CLOOMCCompiler();
+    const src = `abstraction New.CapTest {
+    capabilities {
+        SELF E  ; cList[0], current abstraction Golden Token
+        ; (capability grants added here)
+    }
+    method Status() {
+        return 0
+    }
+}`;
+    const result = c.compile(src, []);
+    check('JS-CAP-COMMENT-a: inline semicolon comment is not parsed as capabilities',
+        result.errors.length === 0, errMsg(result));
+    check('JS-CAP-COMMENT-b: SELF remains the only declared capability',
+        result.capabilities.length === 1 &&
+        result.capabilities[0].name === '__SELF__' &&
+        result.capabilities[0].rights.join('') === 'E',
+        JSON.stringify(result.capabilities));
+}
+
 console.log('\n--- JS-SELF: SELF is a case-insensitive contextual pet name ---');
 for (const spelling of ['self', 'SeLf', '__self__']) {
     const c = new CLOOMCCompiler();
