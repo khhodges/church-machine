@@ -298,6 +298,19 @@
     white-space: nowrap;
 }
 
+.lump-history-table {
+    /* The shared detail-table rule uses overflow:hidden for rounded borders.
+       History tooltips must be allowed to escape the table and sit above
+       adjacent rows and the scrollable detail panel. */
+    overflow: visible;
+}
+
+.lump-history-size-cell:hover,
+.lump-history-size-cell:focus-within {
+    position: relative;
+    z-index: 12000;
+}
+
 .lump-history-size-trigger {
     display: inline-block;
     border-bottom: 1px dotted var(--text-secondary, #8b93a7);
@@ -312,7 +325,7 @@
 
 .lump-history-size-popup {
     position: absolute;
-    z-index: 20;
+    z-index: 12001;
     left: 50%;
     bottom: calc(100% + 0.45rem);
     display: flex;

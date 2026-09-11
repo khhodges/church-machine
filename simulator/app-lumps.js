@@ -2749,7 +2749,7 @@ async function _fetchAndShowLumpTimeline(token, lump) {
         if (rows.length === 0) {
             html += '<div style="color:var(--text-secondary);font-style:italic;padding:0.5rem 0;">No archived versions yet. Each time you save a LUMP, the previous binary is automatically archived here.</div>';
         } else {
-            html += `<table class="lump-detail-table" id="lumpHistoryTable_${tk}"><thead><tr>`;
+             html += `<table class="lump-detail-table lump-history-table" id="lumpHistoryTable_${tk}"><thead><tr>`;
             html += '<th>Ver</th><th>This</th><th>Compiled</th><th>CW</th><th>CC</th><th>Size</th>';
              html += '<th colspan="3"></th>';
             if (hasTel) html += '<th></th>';
