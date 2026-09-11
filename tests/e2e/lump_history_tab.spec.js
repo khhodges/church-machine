@@ -105,7 +105,11 @@ const STUB_HISTORY_RESPONSE = {
 const STUB_HISTORY_RESPONSE_2 = {
     token:   STUB_TOKEN,
     history: [
-        { version: 2, lump_size: 64, cw: 10, cc: 2, compiled_at: COMPILED_AT + 3600, abstraction: 'TestAbs' },
+        {
+            version: 2, current: true, lump_size: 64, cw: 10, cc: 2,
+            compiled_at: COMPILED_AT + 3600, abstraction: 'TestAbs',
+            binary_hash: 'b'.repeat(64), binary_available: true,
+        },
         STUB_HISTORY_V1,
     ],
 };
@@ -137,6 +141,11 @@ const STUB_WORDS_CURRENT = {
     token:  STUB_TOKEN,
     words:  CURRENT_WORDS,
     count:  CURRENT_WORDS.length,
+    binary_hash: 'b'.repeat(64),
+    binary_valid: true,
+    lump_size: 64,
+    cw: 10,
+    cc: 2,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -228,11 +237,11 @@ test.describe('LUMP History tab — table renders rows', () => {
         const row = histBody.locator('tr.lump-history-row').first();
         await expect(row).toBeVisible({ timeout: 8000 });
 
-        // The timestamp cell (second column, index 1) — fmtDate renders as
+        // The timestamp cell (third column, index 2) — fmtDate renders as
         // "<day> <MonthAbbr> <year> HH:MM".  The epoch 1716206400 is
         // 2024-05-20 12:00 UTC; noon UTC stays on May 20 across all ±12
         // timezones, so "May" and "2024" must both appear in the cell text.
-        const tsCell = row.locator('td').nth(1);
+        const tsCell = row.locator('td').nth(2);
         const tsText = await tsCell.innerText();
         expect(tsText).toMatch(/May/);
         expect(tsText).toMatch(/2024/);
@@ -249,15 +258,17 @@ test.describe('LUMP History tab — table renders rows', () => {
         const row = histBody.locator('tr.lump-history-row').first();
         await expect(row).toBeVisible({ timeout: 8000 });
 
-        // CW column (index 2).
-        await expect(row.locator('td').nth(2)).toHaveText('10');
-        // CC column (index 3).
-        await expect(row.locator('td').nth(3)).toHaveText('2');
-        // Size column (index 4) — rendered as "<n>w" plus the content profile.
-        await expect(row.locator('td').nth(4)).toContainText('32w');
+        // The programmer-controlled "This" checkbox is index 1.
+        await expect(row.getByRole('checkbox', { name: 'Make v1 the current LUMP' })).toBeVisible();
+        // CW column (index 3).
+        await expect(row.locator('td').nth(3)).toHaveText('10');
+        // CC column (index 4).
+        await expect(row.locator('td').nth(4)).toHaveText('2');
+        // Size column (index 5) — rendered as "<n>w" plus the content profile.
+        await expect(row.locator('td').nth(5)).toContainText('32w');
     });
 
-    test('history row has a Restore button', async ({ page }) => {
+    test('history row has an unchecked This checkbox for a valid archive', async ({ page }) => {
         test.setTimeout(40000);
         await openLumpDetail(page);
         await clickHistoryTab(page);
@@ -266,10 +277,10 @@ test.describe('LUMP History tab — table renders rows', () => {
         const row = histBody.locator('tr.lump-history-row').first();
         await expect(row).toBeVisible({ timeout: 8000 });
 
-        const restoreBtn = row.locator('button.lump-history-restore-btn');
-        await expect(restoreBtn).toBeVisible();
-        // Restore is disabled until a Preview has been loaded for that row.
-        await expect(restoreBtn).toBeDisabled();
+        const currentBox = row.getByRole('checkbox', { name: 'Make v1 the current LUMP' });
+        await expect(currentBox).toBeVisible();
+        await expect(currentBox).not.toBeChecked();
+        await expect(currentBox).toBeEnabled();
     });
 
 });
@@ -278,15 +289,16 @@ test.describe('LUMP History tab — table renders rows', () => {
 // Suite 2 — save via UI then browse: clicking Restore saves and History updates
 // ─────────────────────────────────────────────────────────────────────────────
 //
-// The Restore button is the UI control users click to trigger a LUMP save
-// (_restoreLumpFromHistory → POST /api/lumps/save).  After the save lands,
+// The This checkbox is the UI control users click to trigger a LUMP save
+// (_setLumpHistoryCurrent → _restoreLumpFromHistory → POST /api/lumps/save).
+// After the save lands,
 // _restoreLumpFromHistory deletes _lumpHistoryLoaded[tk].  Re-clicking the
 // History tab then re-fetches, and the updated endpoint returns a second
 // archived version — confirming the save was seen by the history view.
 
 test.describe('LUMP History tab — save via UI then browse', () => {
 
-    test('after Restore-triggered save, re-opening History shows a new archived version', async ({ page }) => {
+    test('after selecting This, re-opening History shows a new archived version', async ({ page }) => {
         test.setTimeout(40000);
 
         let historyCallCount = 0;
@@ -341,15 +353,11 @@ test.describe('LUMP History tab — save via UI then browse', () => {
         // Before save: exactly 1 history row (v1).
         await expect(histBody.locator('tr.lump-history-row')).toHaveCount(1, { timeout: 8000 });
 
-        // Click Preview to load the hex dump — this enables the Restore button.
-        await histBody.getByRole('button', { name: 'Preview' }).first().click();
-        await waitForHexTable(page);
-
-        // Click the Restore button — this is the UI-level save action.
+        // Select the This checkbox — this is the UI-level activation action.
         // _restoreLumpFromHistory fetches the archived binary, POSTs it to
         // /api/lumps/save, then clears _lumpHistoryLoaded[tk] so the next
         // History tab click will re-fetch.
-        await histBody.locator('button.lump-history-restore-btn').first().click();
+        await histBody.getByRole('checkbox', { name: 'Make v1 the current LUMP' }).click();
 
         // Wait for the save POST to complete.
         await page.waitForResponse(
@@ -365,20 +373,25 @@ test.describe('LUMP History tab — save via UI then browse', () => {
         await tabBar.locator('button.lump-tab', { hasText: 'History' }).click();
         await expect(histBody.locator('text=Loading history')).toHaveCount(0, { timeout: 8000 });
 
-        // After save: 2 history rows — v2 (created by restore save) and v1.
+        // After save: 2 history rows — v2 (created by activation) and v1.
         await expect(histBody.locator('tr.lump-history-row')).toHaveCount(2, { timeout: 8000 });
-        await expect(histBody.locator('tr.lump-history-row').first().locator('td strong')).toHaveText('v2');
+        const activeRow = histBody.locator('tr.lump-history-row').first();
+        await expect(activeRow.locator('td strong')).toHaveText('v2');
+        await expect(activeRow.getByRole('checkbox', { name: 'v2 is the current LUMP' })).toBeChecked();
+        await activeRow.getByRole('button', { name: 'Preview' }).click();
+        const activePreview = await waitForHexTable(page);
+        await expect(activePreview).toContainText('Viewing the current live binary');
     });
 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Suite 3 — Restore fires /api/lumps/save and preserves exact binary metadata
+// Suite 3 — This checkbox activates via /api/lumps/save and preserves exact binary metadata
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('LUMP History tab — Restore fires /api/lumps/save', () => {
+test.describe('LUMP History tab — This checkbox activates via /api/lumps/save', () => {
 
-    test('clicking Restore POSTs the archived binary and keeps the exact current size', async ({ page }) => {
+    test('selecting This POSTs the archived binary and keeps the exact current size', async ({ page }) => {
         test.setTimeout(40000);
 
         let capturedSaveBody = null;
@@ -441,12 +454,8 @@ test.describe('LUMP History tab — Restore fires /api/lumps/save', () => {
         const row = histBody.locator('tr.lump-history-row').first();
         await expect(row).toBeVisible({ timeout: 8000 });
 
-        // Click Preview to load the hex dump — this enables the Restore button.
-        await row.getByRole('button', { name: 'Preview' }).click();
-        await waitForHexTable(page);
-
-        // Click Restore.
-        await row.locator('button.lump-history-restore-btn').click();
+        // Select This to make this archive live.
+        await row.getByRole('checkbox', { name: 'Make v1 the current LUMP' }).click();
 
         // Wait for the POST to /api/lumps/save to complete.
         await page.waitForResponse(
@@ -488,7 +497,7 @@ test.describe('LUMP History tab — Restore fires /api/lumps/save', () => {
         await expect(sizeChip).toContainText('64w', { timeout: 8000 });
     });
 
-    test('clicking Restore with dialog dismissed does not fire /api/lumps/save', async ({ page }) => {
+    test('selecting This with dialog dismissed does not fire /api/lumps/save', async ({ page }) => {
         test.setTimeout(40000);
 
         let saveCallCount = 0;
@@ -536,11 +545,8 @@ test.describe('LUMP History tab — Restore fires /api/lumps/save', () => {
         const row = histBody.locator('tr.lump-history-row').first();
         await expect(row).toBeVisible({ timeout: 8000 });
 
-        // Click Preview to enable the Restore button, then click Restore (dialog dismissed).
-        await row.getByRole('button', { name: 'Preview' }).click();
-        await waitForHexTable(page);
-
-        await row.locator('button.lump-history-restore-btn').click();
+        // Select This, then dismiss the approval dialog.
+        await row.getByRole('checkbox', { name: 'Make v1 the current LUMP' }).click();
 
         // Give the page a moment to fire any inadvertent fetch.
         await page.waitForTimeout(500);
