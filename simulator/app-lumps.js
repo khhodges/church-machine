@@ -6593,11 +6593,15 @@ async function openLumpInEditor(token) {
         if (typeof switchView === 'function') switchView('lumps');
     });
 
-    // Insert Discard into the toolbar, after the inline Compile button.
-    // Save Lump is a static button (btnToolbarSaveLumpPerm) — no injection needed.
-    var _compileInlineBtn = document.getElementById('btnToolbarCompile');
-    if (_compileInlineBtn && _compileInlineBtn.parentNode) {
-        _compileInlineBtn.parentNode.insertBefore(_discardBtn, _compileInlineBtn.nextSibling);
+    // Insert Discard into the editor action area.  Compile and Save Lump now
+    // live in the hamburger menu, so do not depend on their retired toolbar IDs.
+    var _actionAnchor = document.getElementById('editorActionsWrap');
+    var _actionParent = _actionAnchor && _actionAnchor.parentNode;
+    if (_actionParent) {
+        _actionParent.insertBefore(_discardBtn, _actionAnchor.nextSibling);
+    } else {
+        var _toolbarPhase = document.querySelector('.toolbar-phase');
+        if (_toolbarPhase) _toolbarPhase.appendChild(_discardBtn);
     }
 
     // Expose this lump's token so the C-List viewer can show its baked-in

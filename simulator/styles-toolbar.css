@@ -452,6 +452,7 @@
 #editor .editor-layout {
     flex: 1;
     min-height: 0;
+    width: 100%;
 }
 
 #editor .console-panel {
@@ -1516,9 +1517,12 @@
 }
 
 .editor-layout {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 6px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     flex: 1;
     min-height: 0;
+    width: 100%;
     overflow: hidden;
 }
 

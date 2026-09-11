@@ -7,6 +7,7 @@ const index = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const run = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
 const shell = fs.readFileSync(path.join(__dirname, 'app-shell.js'), 'utf8');
 const toolbar = fs.readFileSync(path.join(__dirname, 'styles-toolbar.css'), 'utf8');
+const lumps = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8');
 
 function check(condition, message) {
     if (!condition) throw new Error(`Editor action menu regression: ${message}`);
@@ -36,5 +37,14 @@ check(shell.includes('_refreshEditorActionIdentity('),
 check(toolbar.includes('.editor-actions-context') &&
       toolbar.includes('.editor-identity-name'),
     'the full identity has dedicated responsive toolbar styling');
+check(index.includes('class="editor-layout editor-source-disassembly-row"') &&
+      index.includes('aria-label="Source and disassembly workspace"'),
+    'source and disassembly use one explicit full-width workspace row');
+check(toolbar.includes('grid-template-columns: minmax(0, 1fr) 6px minmax(0, 1fr)') &&
+      toolbar.includes('grid-template-rows: minmax(0, 1fr)'),
+    'the source/disassembly workspace is a static three-column row');
+check(!lumps.includes('getElementById(\'btnToolbarCompile\')') &&
+      lumps.includes('getElementById(\'editorActionsWrap\')'),
+    'saved-LUMP discard insertion no longer depends on retired toolbar buttons');
 
 console.log('Editor action menu regression: PASS');
