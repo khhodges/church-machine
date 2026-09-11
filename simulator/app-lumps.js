@@ -2919,6 +2919,38 @@ function _lumpHistorySelectRow(rowEl, token, version, cw, cc, lumpSize, tk, hist
     _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, historicalRecord, currentToken, archiveFilename);
 }
 
+function _closeLumpHistoryPreviewModal() {
+    const overlay = document.getElementById('lumpHistoryPreviewModal');
+    if (!overlay) return;
+    if (overlay._escHandler) document.removeEventListener('keydown', overlay._escHandler);
+    overlay.remove();
+}
+
+function _showLumpHistoryPreviewModal(version, bodyHtml) {
+    _closeLumpHistoryPreviewModal();
+    const overlay = document.createElement('div');
+    overlay.id = 'lumpHistoryPreviewModal';
+    overlay.className = 'modal-overlay lump-history-preview-overlay';
+    overlay.innerHTML =
+        `<div class="modal-dialog lump-history-preview-dialog" role="dialog" aria-modal="true" aria-label="LUMP preview v${version}">` +
+        `<div class="modal-title lump-history-preview-title">` +
+        `<span>LUMP Preview \u2014 v${version}</span>` +
+        `<button type="button" class="lump-history-preview-close" aria-label="Close preview">\u00d7</button>` +
+        `</div>` +
+        `<div class="lump-history-preview-body">${bodyHtml}</div>` +
+        `</div>`;
+    const close = () => _closeLumpHistoryPreviewModal();
+    overlay.querySelector('.lump-history-preview-close').addEventListener('click', close);
+    overlay.addEventListener('click', event => {
+        if (event.target === overlay) close();
+    });
+    overlay._escHandler = event => {
+        if (event.key === 'Escape') close();
+    };
+    document.addEventListener('keydown', overlay._escHandler);
+    document.body.appendChild(overlay);
+}
+
 async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, historicalRecord, currentToken, archiveFilename) {
     const previewEl = document.getElementById(`lumpHistoryHexPreview_${tk}`);
     if (!previewEl) return;
@@ -2932,13 +2964,19 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
         }
         return s;
     };
-    previewEl.innerHTML = `<div class="lump-hex-loading">Loading v${version} binary\u2026</div>`;
+    _showLumpHistoryPreviewModal(
+        version,
+        '<div class="lump-hex-loading">Loading archived source\u2026</div>'
+    );
     const _enableRestoreBtn = () => {
         const btn = document.getElementById(`lumpHistoryRestoreBtn_${tk}_${version}`);
         if (btn) { btn.disabled = false; btn.title = `Restore v${version} as the current LUMP`; }
     };
     const _noPreview = (msg, nextAction) => {
-        previewEl.innerHTML = `<div class="lump-history-no-preview">\u26a0\ufe0f No preview available \u2014 ${_escHtml(msg)}. Next: ${_escHtml(nextAction || 'Reload History and select this revision again.')}</div>`;
+        _showLumpHistoryPreviewModal(
+            version,
+            `<div class="lump-history-no-preview">\u26a0\ufe0f No preview available \u2014 ${_escHtml(msg)}. Next: ${_escHtml(nextAction || 'Reload History and select this revision again.')}</div>`
+        );
     };
     try {
         const archivedUrl = historicalRecord
@@ -3076,7 +3114,7 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             t += `<tr class="${rowClass}"><td class="lump-hex-addr">0x${baseAddr}</td>${rowHex}${ascCell}</tr>`;
         }
         t += '</tbody></table></div>';
-        previewEl.innerHTML = validationWarning + historicalWarning + sourcePreview + t;
+        _showLumpHistoryPreviewModal(version, validationWarning + historicalWarning + sourcePreview + t);
         if (!historicalRecord) _enableRestoreBtn();
     } catch (err) {
         _noPreview(err.message);
