@@ -189,10 +189,10 @@
       "token": "ab1e86af",
       "filename": "TestAbs.1.71742676.lump",
       "issue_n": 1,
-      "lump_version": 1,
+      "lump_version": 2,
       "resident": true,
       "load_policy": "Resident"
     }
   ],
-  "generated_at": 1789076202.7499115
+  "generated_at": 1789114654.4799125
 }

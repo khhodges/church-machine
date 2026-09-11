@@ -436,18 +436,18 @@
     "lump_version": 1
   },
   {
-    "token": "ab1e86af",
-    "abstraction": "TestAbs",
-    "filename": "TestAbs.1.71742676.lump",
-    "lump_version": 1,
-    "compiled_at": 1789076202.6733189
-  },
-  {
     "token": "4a00000a",
     "abstraction": "CapabilityTest",
     "filename": "CapabilityTest.2.e794a764.lump",
     "variant_group": "capabilitytest-history",
     "lump_version": 2,
     "compiled_at": 1788981641.722638
+  },
+  {
+    "token": "ab1e86af",
+    "abstraction": "TestAbs",
+    "filename": "TestAbs.1.71742676.lump",
+    "lump_version": 2,
+    "compiled_at": 1789114654.2411513
   }
 ]
