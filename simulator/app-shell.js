@@ -298,7 +298,7 @@ function _executionIdentityRender() {
     _executionIdentityRecompute();
     if (typeof _refreshEditorActionIdentity === 'function') {
         _refreshEditorActionIdentity(
-            (document.getElementById('editorCodeName') || {}).textContent || '');
+            window._editorCodeNameValue || '');
     }
     _executionIdentityRenderOne('executionIdentityEditor');
     _executionIdentityRenderOne('executionIdentityTrace');

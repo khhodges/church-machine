@@ -11814,8 +11814,7 @@ function escapeHtml(str) {
 }
 
 function _updateEditorCodeName(name) {
-    const el = document.getElementById('editorCodeName');
-    if (el) el.textContent = name || '';
+    window._editorCodeNameValue = name || '';
     _refreshEditorActionIdentity(name);
 }
 
@@ -11851,7 +11850,7 @@ function _editorActionIdentity(name) {
 }
 
 function _refreshEditorActionIdentity(name) {
-    const identity = _editorActionIdentity(name || (document.getElementById('editorCodeName') || {}).textContent);
+    const identity = _editorActionIdentity(name || window._editorCodeNameValue || '');
     const identityName = document.getElementById('editorIdentityName');
     if (identityName) {
         identityName.textContent = identity;
@@ -14584,7 +14583,7 @@ function saveSettings() {
         localStorage.setItem('church_issue_number', String(_inVal));
     }
     _refreshEditorActionIdentity(
-        (document.getElementById('editorCodeName') || {}).textContent || '');
+        window._editorCodeNameValue || '');
 
     const boardSel = document.getElementById('settingFPGABoard');
     if (boardSel) setSelectedBoard(boardSel.value);
