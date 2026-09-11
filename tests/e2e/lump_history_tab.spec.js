@@ -742,13 +742,210 @@ test.describe('LUMP History tab — legacy bootstrap evidence', () => {
         await expect(row.locator('button.lump-history-restore-btn')).toHaveCount(0);
         await row.getByRole('button', { name: 'Preview' }).click();
         const preview = await waitForHexTable(page);
-        await expect(preview).toContainText('Archived bootstrap identity mismatch');
+        const repair = preview.locator('.lump-bootstrap-repair');
+        await expect(repair).toContainText('Specification corrections required');
+        await expect(repair.locator('.lump-bootstrap-repair-checkbox')).toHaveCount(2);
+        const confirmButton = repair.locator('.lump-bootstrap-repair-confirm');
+        await expect(confirmButton).toBeDisabled();
+        await repair.locator('.lump-bootstrap-repair-checkbox').first().check();
+        await expect(confirmButton).toBeDisabled();
+        await repair.locator('.lump-bootstrap-repair-checkbox').nth(1).check();
+        await expect(confirmButton).toBeEnabled();
 
         await page.locator('#lumpHistoryPreviewModal .lump-history-preview-close').click();
         page.once('dialog', dialog => dialog.accept());
         await row.getByRole('button', { name: 'Delete' }).click();
         await expect.poll(() => deleteRequest && deleteRequest.method()).toBe('DELETE');
         expect(JSON.parse(deleteRequest.postData()).archive_filename).toBe('CapabilityTest_legacy.lump');
+    });
+});
+
+test.describe('LUMP History tab — approved bootstrap corrections', () => {
+    const legacyToken = 'b6182a95';
+    const invalidIdentity = {
+        applies: true,
+        valid: false,
+        record_token: legacyToken,
+        row0_gt: '4a000006',
+        expected_gt: '4a00000a',
+    };
+
+    async function stubRepairableHistory(page) {
+        let repaired = false;
+        await page.route('**/api/lumps/list', route => route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify([STUB_LUMP]),
+        }));
+        await page.route(`**/api/lumps/${STUB_TOKEN}/history`, route => route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                token: STUB_TOKEN,
+                history: repaired ? [{
+                    ...STUB_HISTORY_V1,
+                    version: 3,
+                    current: true,
+                    binary_hash: 'f'.repeat(64),
+                    binary_valid: true,
+                    preview_enabled: false,
+                    restore_enabled: false,
+                }] : [{
+                    ...STUB_HISTORY_V1,
+                    historical_record: true,
+                    record_token: legacyToken,
+                    preview_enabled: true,
+                    restore_enabled: false,
+                    binary_valid: false,
+                    archive_filename: 'CapabilityTest_legacy.lump',
+                    record_filename: 'CapabilityTest_legacy.lump',
+                    legacy_incompatible: true,
+                    bootstrap_identity: invalidIdentity,
+                }],
+            }),
+        }));
+        await page.route(`**/api/lump/${legacyToken}/words**`, route => route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                ...STUB_WORDS_V1,
+                token: legacyToken,
+                bootstrap_identity: invalidIdentity,
+            }),
+        }));
+        await page.route(`**/api/lump/${STUB_TOKEN}/words`, route => route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(STUB_WORDS_CURRENT),
+        }));
+        return {
+            markRepaired: () => { repaired = true; },
+        };
+    }
+
+    test('applies every approved correction through plan, intent, and repair then refreshes History', async ({ page }) => {
+        test.setTimeout(40000);
+        const state = await stubRepairableHistory(page);
+        let planRequest = null;
+        let approvalRequest = null;
+        let repairRequest = null;
+        await page.route(`**/api/lumps/${STUB_TOKEN}/history/1/bootstrap-repair-plan`, async route => {
+            planRequest = route.request();
+            await route.fulfill({
+                status: 201,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    plan_id: 'repair-plan-1',
+                    digest: 'd'.repeat(64),
+                    action: 'replace',
+                    corrections: [
+                        { id: 'repair-sealed-row-zero-gt' },
+                        { id: 'issue-canonical-bootstrap-identity' },
+                    ],
+                    consequence: 'A new compliant live revision will be saved.',
+                }),
+            });
+        });
+        await page.route('**/api/lumps/approval-intent', async route => {
+            approvalRequest = route.request();
+            await route.fulfill({
+                status: 201,
+                contentType: 'application/json',
+                body: JSON.stringify({ intent: 'repair-intent-1' }),
+            });
+        });
+        await page.route(`**/api/lumps/${STUB_TOKEN}/history/1/bootstrap-repair`, async route => {
+            repairRequest = route.request();
+            state.markRepaired();
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ ok: true, lump_version: 3 }),
+            });
+        });
+
+        await openLumpDetail(page);
+        await clickHistoryTab(page);
+        await page.locator(`#lumpHistoryBody_${STUB_TK} button`, { hasText: 'Preview' }).click();
+        const repair = page.locator('#lumpHistoryPreviewModal .lump-bootstrap-repair');
+        await repair.locator('.lump-bootstrap-repair-checkbox').nth(0).check();
+        await repair.locator('.lump-bootstrap-repair-checkbox').nth(1).check();
+        const confirmButton = repair.locator('.lump-bootstrap-repair-confirm');
+        await expect(confirmButton).toHaveText('Confirm 2 approved corrections');
+        page.once('dialog', dialog => dialog.accept());
+        await confirmButton.click();
+
+        await expect.poll(() => repairRequest && repairRequest.method()).toBe('POST');
+        expect(JSON.parse(planRequest.postData())).toEqual({
+            archive_filename: 'CapabilityTest_legacy.lump',
+        });
+        expect(JSON.parse(approvalRequest.postData())).toMatchObject({
+            digest: 'd'.repeat(64),
+            action: 'replace',
+            plan_id: 'repair-plan-1',
+            confirmation: true,
+        });
+        expect(JSON.parse(repairRequest.postData())).toMatchObject({
+            archive_filename: 'CapabilityTest_legacy.lump',
+            plan_id: 'repair-plan-1',
+            approval_intent: 'repair-intent-1',
+            corrections: [
+                'repair-sealed-row-zero-gt',
+                'issue-canonical-bootstrap-identity',
+            ],
+        });
+        await expect(page.locator('#lumpHistoryPreviewModal')).toHaveCount(0);
+
+        await clickHistoryTab(page);
+        const refreshed = page.locator(`#lumpHistoryBody_${STUB_TK}`);
+        const currentRow = refreshed.locator('tr.lump-history-row[data-version="3"]');
+        await expect(currentRow.getByRole('checkbox', {
+            name: 'v3 is the current LUMP',
+        })).toBeChecked();
+    });
+
+    test('cancelling confirmation keeps the archive untouched and sends no approval or repair request', async ({ page }) => {
+        test.setTimeout(40000);
+        await stubRepairableHistory(page);
+        let approvalRequests = 0;
+        let repairRequests = 0;
+        await page.route(`**/api/lumps/${STUB_TOKEN}/history/1/bootstrap-repair-plan`, route => route.fulfill({
+            status: 201,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                plan_id: 'repair-plan-cancel',
+                digest: 'c'.repeat(64),
+                action: 'replace',
+                corrections: [
+                    { id: 'repair-sealed-row-zero-gt' },
+                    { id: 'issue-canonical-bootstrap-identity' },
+                ],
+            }),
+        }));
+        await page.route('**/api/lumps/approval-intent', route => {
+            approvalRequests += 1;
+            return route.abort();
+        });
+        await page.route(`**/api/lumps/${STUB_TOKEN}/history/1/bootstrap-repair`, route => {
+            repairRequests += 1;
+            return route.abort();
+        });
+
+        await openLumpDetail(page);
+        await clickHistoryTab(page);
+        await page.locator(`#lumpHistoryBody_${STUB_TK} button`, { hasText: 'Preview' }).click();
+        const repair = page.locator('#lumpHistoryPreviewModal .lump-bootstrap-repair');
+        await repair.locator('.lump-bootstrap-repair-checkbox').nth(0).check();
+        await repair.locator('.lump-bootstrap-repair-checkbox').nth(1).check();
+        page.once('dialog', dialog => dialog.dismiss());
+        await repair.locator('.lump-bootstrap-repair-confirm').click();
+
+        await expect(repair.locator('.lump-bootstrap-repair-status')).toContainText(
+            'No data was changed. Corrections were not confirmed.'
+        );
+        expect(approvalRequests).toBe(0);
+        expect(repairRequests).toBe(0);
+        await expect(page.locator(`#lumpHistoryBody_${STUB_TK} tr.lump-history-row`)).toHaveCount(1);
     });
 });
 
@@ -857,8 +1054,8 @@ test.describe('LUMP History tab — row onclick triggers hex preview', () => {
         // Click the version cell (first <td>) to avoid hitting a button.
         await row.locator('td').first().click();
 
-        // The hex table must appear in the preview div.
-        const previewDiv = page.locator(`#lumpHistoryHexPreview_${STUB_TK}`);
+        // The hex table must appear in the History preview popup.
+        const previewDiv = page.locator('#lumpHistoryPreviewModal .lump-history-preview-body');
         await expect(previewDiv.locator('table.lump-hex-table')).toBeVisible({ timeout: 10000 });
 
         // Address column for offset 0x000000 must be present.
@@ -974,11 +1171,16 @@ test.describe('LUMP History tab — current provenance and unobserved health', (
         await expect(row).toContainText('Not observed');
         await expect(row).toContainText('Unknown');
         await expect(row).not.toContainText('Stable');
-        await expect(row.locator('button')).toHaveCount(0);
+        await expect(row.getByRole('button', { name: 'Preview', exact: true })).toBeVisible();
+        await expect(row.getByRole('checkbox', {
+            name: 'v10 is the current LUMP',
+        })).toBeChecked();
         const archivedRow = body.locator('tr.lump-history-row[data-version="9"]');
         await expect(archivedRow).not.toContainText('(this)');
         await expect(archivedRow.getByRole('button', { name: 'Preview', exact: true })).toBeVisible();
-        await expect(archivedRow.getByRole('button', { name: 'Restore', exact: true })).toBeVisible();
+        await expect(archivedRow.getByRole('checkbox', {
+            name: 'Make v9 the current LUMP',
+        })).toBeEnabled();
         await expect(body.locator('.lump-history-provenance-note')).toContainText('v3');
     });
 });

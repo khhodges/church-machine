@@ -3030,6 +3030,174 @@ function _showLumpHistoryPreviewModal(version, bodyHtml) {
     document.body.appendChild(overlay);
 }
 
+function _lumpBootstrapRepairControls(data, currentToken, version, archiveFilename, tk, historicalRecord, isCurrent) {
+    const identity = data && data.bootstrap_identity;
+    if (!historicalRecord || isCurrent || !identity || identity.applies !== true ||
+        identity.valid !== false || !archiveFilename ||
+        !/^[0-9a-f]{8}$/i.test(String(identity.expected_gt || ''))) {
+        return '';
+    }
+    const expected = String(identity.expected_gt).toUpperCase();
+    const row0 = String(identity.row0_gt || '').toUpperCase();
+    const repairId = `lumpBootstrapRepair_${tk}_${version}`;
+    const corrections = [];
+    if (row0 !== expected) {
+        corrections.push({
+            id: 'repair-sealed-row-zero-gt',
+            title: 'Correct the sealed c-list row-zero GT',
+            detail: `Replace 0x${_escHtml(row0 || '????????')} with the Namespace-derived GT 0x${_escHtml(expected)}.`,
+        });
+    }
+    corrections.push({
+        id: 'issue-canonical-bootstrap-identity',
+        title: 'Issue the repaired bytes as the canonical live LUMP',
+        detail: `The new live revision will use Token and serialized T 0x${_escHtml(expected)}. The historical archive will not be changed.`,
+    });
+    const list = corrections.map(correction =>
+        `<label class="lump-bootstrap-repair-choice">` +
+        `<input type="checkbox" class="lump-bootstrap-repair-checkbox" value="${correction.id}" ` +
+        `onchange="_updateLumpBootstrapRepairControls('${repairId}')">` +
+        `<span><strong>${correction.title}</strong><small>${correction.detail}</small></span>` +
+        `</label>`
+    ).join('');
+    return (
+        `<section class="lump-bootstrap-repair" id="${repairId}" ` +
+        `data-required-count="${corrections.length}">` +
+        `<div class="lump-section-title">Specification corrections required</div>` +
+        `<p>Review and approve every required correction below. This creates a new compliant live revision; it never edits this historical archive.</p>` +
+        `<div class="lump-bootstrap-repair-list">${list}</div>` +
+        `<button class="btn lump-bootstrap-repair-confirm" disabled ` +
+        `onclick="_confirmLumpBootstrapRepairs('${repairId}','${_escHtml(currentToken)}',${version},'${_escHtml(archiveFilename)}')">` +
+        `Confirm 0 approved corrections</button>` +
+        `<div class="lump-bootstrap-repair-status" aria-live="polite"></div>` +
+        `</section>`
+    );
+}
+
+function _updateLumpBootstrapRepairControls(repairId) {
+    const panel = document.getElementById(repairId);
+    if (!panel) return;
+    const boxes = Array.from(panel.querySelectorAll('.lump-bootstrap-repair-checkbox'));
+    const selected = boxes.filter(box => box.checked).length;
+    const required = Number(panel.dataset.requiredCount) || boxes.length;
+    const button = panel.querySelector('.lump-bootstrap-repair-confirm');
+    if (button) {
+        button.disabled = selected !== required;
+        button.textContent = `Confirm ${selected} approved correction${selected === 1 ? '' : 's'}`;
+    }
+}
+
+async function _confirmLumpBootstrapRepairs(repairId, currentToken, version, archiveFilename) {
+    const panel = document.getElementById(repairId);
+    if (!panel) return;
+    const button = panel.querySelector('.lump-bootstrap-repair-confirm');
+    const status = panel.querySelector('.lump-bootstrap-repair-status');
+    const corrections = Array.from(
+        panel.querySelectorAll('.lump-bootstrap-repair-checkbox:checked'),
+        box => box.value
+    );
+    const required = Number(panel.dataset.requiredCount) || 0;
+    if (corrections.length !== required) {
+        if (status) status.textContent = 'Approve every listed correction before confirming.';
+        return;
+    }
+    if (button) button.disabled = true;
+    if (status) status.textContent = 'Preparing a server-verified correction plan…';
+    try {
+        const planResp = await fetch(
+            `/api/lumps/${encodeURIComponent(currentToken)}/history/${version}/bootstrap-repair-plan`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ archive_filename: archiveFilename }),
+            }
+        );
+        const plan = await _actionableJsonResponse(
+            planResp, 'Prepare bootstrap corrections', {
+                dataChanged: false,
+                nextAction: 'Reload the History panel and review the archive again.',
+            }
+        );
+        const plannedIds = (plan.corrections || []).map(correction => correction.id).sort();
+        if (plannedIds.length !== corrections.length ||
+                plannedIds.join('|') !== corrections.slice().sort().join('|')) {
+            throw new Error(
+                'The live Namespace changed and the listed corrections are no longer current. No data was changed.'
+            );
+        }
+        const confirmed = confirm(
+            `Apply ${corrections.length} approved specification correction${corrections.length === 1 ? '' : 's'}?\n\n` +
+            (plan.consequence || 'A new compliant live revision will be created.') +
+            '\n\nThe defective historical archive remains immutable evidence.'
+        );
+        if (!confirmed) {
+            if (status) status.textContent = 'No data was changed. Corrections were not confirmed.';
+            _updateLumpBootstrapRepairControls(repairId);
+            return;
+        }
+        if (status) status.textContent = 'Recording approval…';
+        const intentResp = await fetch('/api/lumps/approval-intent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                digest: plan.digest,
+                action: plan.action,
+                plan_id: plan.plan_id,
+                confirmation: true,
+                approval: {},
+            }),
+        });
+        const intent = await _actionableJsonResponse(
+            intentResp, 'Approve bootstrap corrections', {
+                dataChanged: false,
+                nextAction: 'Reload History and select all corrections again.',
+            }
+        );
+        if (status) status.textContent = 'Saving the compliant live revision…';
+        const repairResp = await fetch(
+            `/api/lumps/${encodeURIComponent(currentToken)}/history/${version}/bootstrap-repair`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    archive_filename: archiveFilename,
+                    plan_id: plan.plan_id,
+                    approval_intent: intent.intent,
+                    corrections,
+                }),
+            }
+        );
+        const result = await _actionableJsonResponse(
+            repairResp, 'Apply bootstrap corrections', {
+                dataChanged: false,
+                nextAction: 'Reload History to verify the current live revision.',
+            }
+        );
+        const liveVersion = result.lump_version || result.version;
+        if (typeof _showFpgaToast === 'function') {
+            _showFpgaToast(
+                'Corrections applied',
+                `A compliant live LUMP${liveVersion != null ? ` v${liveVersion}` : ''} was created. The defective archive was preserved.`,
+                'ok',
+                5000
+            );
+        }
+        delete _lumpTimelineLoaded[_lumpTokenIdentity(currentToken)];
+        _closeLumpHistoryPreviewModal();
+        if (typeof renderLumps === 'function') await renderLumps();
+    } catch (err) {
+        if (status) {
+            status.textContent = /\bNo data was changed\b/.test(err.message)
+                ? err.message
+                : _formatActionableNetworkError('Apply bootstrap corrections', err, {
+                    dataChanged: null,
+                    nextAction: 'Reload History to verify whether a new revision was saved.',
+                });
+        }
+        _updateLumpBootstrapRepairControls(repairId);
+    }
+}
+
 async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, historicalRecord, currentToken, archiveFilename, isCurrent) {
     const previewEl = document.getElementById(`lumpHistoryHexPreview_${tk}`);
     if (!previewEl) return;
@@ -3120,13 +3288,14 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
                 `</div>`;
         }
 
-        const validationWarning = data.binary_valid === false &&
-            Array.isArray(data.validation_errors) && data.validation_errors.length
-            ? `<div class="lump-history-provenance-note">\u26a0 This binary is inspectable only; validation failed: ${e(data.validation_errors.join('; '))}. It cannot become live.</div>`
-            : '';
-        const historicalWarning = historicalRecord && data.bootstrap_identity &&
-                data.bootstrap_identity.valid === false
-            ? `<div class="lump-history-provenance-note">\u26a0 Archived bootstrap identity mismatch. This binary is preview-only and cannot be restored.</div>`
+        const repairControls = _lumpBootstrapRepairControls(
+            data, currentToken || token, version, archiveFilename, tk,
+            historicalRecord, isCurrent
+        );
+        const validationNotice = data.binary_valid === false &&
+            Array.isArray(data.validation_errors) && data.validation_errors.length &&
+            !repairControls
+            ? `<div class="lump-history-provenance-note">This binary is inspectable only. Validation prevents it from becoming live: ${e(data.validation_errors.join('; '))}.</div>`
             : '';
         let curWords = [];
         let curFetchFailed = false;
@@ -3196,7 +3365,9 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             t += `<tr class="${rowClass}"><td class="lump-hex-addr">0x${baseAddr}</td>${rowHex}${ascCell}</tr>`;
         }
         t += '</tbody></table></div>';
-        _showLumpHistoryPreviewModal(version, validationWarning + historicalWarning + sourcePreview + t);
+        _showLumpHistoryPreviewModal(
+            version, repairControls + validationNotice + sourcePreview + t
+        );
     } catch (err) {
         _noPreview(err.message);
     }

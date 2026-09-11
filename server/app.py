@@ -6651,6 +6651,13 @@ _LUMP_PROMOTION_BINDINGS_LOCK = threading.Lock()
 # save mode.
 _lump_save_payload_override = contextvars.ContextVar(
     "_lump_save_payload_override", default=None)
+# Only the server-created bootstrap-history repair plan may preserve legacy
+# undeclared c-list rows while it reissues a corrected immutable revision.
+# A browser-supplied metadata flag must never activate this narrow exception.
+_lump_bootstrap_history_repair_override = contextvars.ContextVar(
+    "_lump_bootstrap_history_repair_override", default=False)
+_LUMP_BOOTSTRAP_REPAIR_PLANS = {}
+_LUMP_BOOTSTRAP_REPAIR_PLANS_LOCK = threading.Lock()
 _LUMP_APPROVAL_INTENT_FIELDS = frozenset({
     "abstraction", "author", "version", "release_notes", "history_note",
     "display_name", "documentation", "annotations",
@@ -8076,6 +8083,10 @@ def save_lump():
         _bootstrap_binding is not None
         and metadata.get("enforce_bootstrap_identity") is True
     )
+    _is_server_bootstrap_history_repair = bool(
+        _lump_bootstrap_history_repair_override.get()
+        and metadata.get("_bootstrap_history_repair") is True
+    )
     _is_selftest_canonical = _is_bootstrap_canonical and _is_selftest_canonical
 
     # ── Pre-flight: identity computation + seal verification ──────────────────
@@ -8455,10 +8466,16 @@ def save_lump():
     if (not _has_declared_caps
             and _portable_binding is None
             and _sl_cc2 > 1):
-        _undeclared_nonzero_rows = [
-            _row for _row in range(_sl_cc2)
-            if _sl_words[_clist_row0_idx + _row] != 0
-        ]
+        if _is_server_bootstrap_history_repair and _is_bootstrap_canonical:
+            # A repair reissues previously-approved immutable bootstrap bytes
+            # after changing row zero only.  Its pre-existing c-list rows are
+            # not browser metadata and must remain byte-for-byte unchanged.
+            _undeclared_nonzero_rows = []
+        else:
+            _undeclared_nonzero_rows = [
+                _row for _row in range(_sl_cc2)
+                if _sl_words[_clist_row0_idx + _row] != 0
+            ]
         if _undeclared_nonzero_rows:
             return jsonify({
                 "error": (
@@ -10084,6 +10101,294 @@ def _validate_lump_snapshot(lump_path, manifest_entry=None):
         result["trusted"] = True
     result["valid"] = not errors
     return result
+
+
+def _bootstrap_history_repair_candidate(current_token, version, archive_filename):
+    """Build a new bootstrap candidate from one immutable historical archive.
+
+    The archive is never modified.  This is deliberately limited to an
+    otherwise readable bootstrap artifact whose only validation failure is the
+    T/row-zero/Namespace identity relationship.  The returned candidate has
+    exactly one changed binary word: c-list row zero.
+    """
+    key8 = str(current_token or "").lower().removeprefix("0x").zfill(8)
+    if not re.fullmatch(r"[0-9a-f]{8}", key8):
+        raise ValueError("current LUMP token is invalid")
+    if (not isinstance(archive_filename, str) or not archive_filename
+            or os.path.basename(archive_filename) != archive_filename
+            or not archive_filename.endswith(".lump")):
+        raise ValueError("an exact historical archive filename is required")
+
+    lumps_dir = LUMPS_DIR
+    manifest_path = os.path.join(lumps_dir, "manifest.json")
+    manifest = _read_manifest_safe(manifest_path)
+    active_rows = [
+        row for row in manifest
+        if isinstance(row, dict) and row.get("archived") is not True
+        and str(row.get("token") or "").lower() == key8
+    ]
+    if len(active_rows) != 1:
+        raise ValueError("the current LUMP manifest identity is unavailable")
+    active = active_rows[0]
+    abstraction = str(active.get("abstraction") or "").strip()
+    if not abstraction:
+        raise ValueError("the current LUMP has no abstraction identity")
+
+    archived_rows = [
+        row for row in manifest
+        if isinstance(row, dict) and row.get("archived") is True
+        and row.get("filename") == archive_filename
+        and str(row.get("abstraction") or "").casefold() == abstraction.casefold()
+    ]
+    if len(archived_rows) != 1:
+        raise ValueError("the requested archive is not immutable history for this LUMP")
+    archived = archived_rows[0]
+    try:
+        archive_version = int(archived.get("lump_version", archived.get("version")))
+    except (TypeError, ValueError):
+        raise ValueError("the requested archive has no usable version") from None
+    if archive_version != int(version):
+        raise ValueError("the requested archive version does not match its record")
+
+    archive_path = _lump_transition_path(lumps_dir, archive_filename)
+    snapshot = _validate_lump_snapshot(archive_path, archived)
+    identity = snapshot.get("bootstrap_identity")
+    errors = snapshot.get("errors") or []
+    if (not snapshot.get("raw_inspectable") or not isinstance(identity, dict)
+            or identity.get("applies") is not True
+            or identity.get("valid") is not False
+            or len(errors) != 1
+            or not str(errors[0]).startswith(
+                "bootstrap T-equals-GT validation failed:")):
+        raise ValueError(
+            "this archive is not an otherwise readable bootstrap identity mismatch")
+    expected_hex = str(identity.get("expected_gt") or "").lower()
+    if not re.fullmatch(r"[0-9a-f]{8}", expected_hex):
+        raise ValueError("the authoritative expected bootstrap GT is unavailable")
+    expected_gt = int(expected_hex, 16)
+    words = list(snapshot.get("words") or [])
+    allocation, cc = snapshot.get("lump_size"), snapshot.get("cc")
+    if (not isinstance(allocation, int) or not isinstance(cc, int)
+            or cc < 1 or len(words) < allocation):
+        raise ValueError("the archive has no writable c-list row zero")
+    row0_index = allocation - cc
+    if row0_index < 0 or row0_index >= len(words):
+        raise ValueError("the archive c-list row-zero location is invalid")
+
+    # The new candidate is proven against the destination's current descriptor,
+    # never the archival record's now-obsolete token.
+    repaired_words = list(words)
+    repaired_words[row0_index] = expected_gt
+    candidate_bytes = _struct.pack(f">{len(repaired_words)}I", *repaired_words)
+    candidate_inspected = _inspect_lump_binary(candidate_bytes)
+    candidate_entry = dict(active, token=expected_hex, abstraction=abstraction)
+    candidate_identity = _bootstrap_snapshot_identity(
+        lumps_dir, candidate_entry, candidate_inspected)
+    if candidate_identity is None or candidate_identity.get("valid") is not True:
+        raise ValueError("the repaired candidate does not satisfy the live bootstrap descriptor")
+
+    active_path = _lump_transition_path(
+        lumps_dir, active.get("filename") or f"{key8}.lump")
+    active_snapshot = _validate_lump_snapshot(active_path, active)
+    if not active_snapshot.get("valid"):
+        raise ValueError(
+            "the current live LUMP must pass validation before it can be superseded")
+    archive_approval = snapshot.get("approval") or {}
+    active_approval = active_snapshot.get("approval") or {}
+    dot_name = str(
+        active_approval.get("dot_name")
+        or active.get("dot_name")
+        or archive_approval.get("dot_name")
+        or abstraction
+    ).strip()
+    petname = ""
+    suffix = f".{abstraction}"
+    if dot_name == abstraction:
+        pass
+    elif dot_name.endswith(suffix) and dot_name[:-len(suffix)]:
+        petname = dot_name[:-len(suffix)]
+    else:
+        raise ValueError(
+            "the current LUMP has a noncanonical dot name and cannot be reissued safely")
+    issue_n = active_approval.get(
+        "issue_n", active.get("issue_n", archive_approval.get("issue_n", 1)))
+    try:
+        issue_n = int(issue_n)
+    except (TypeError, ValueError):
+        raise ValueError("the current LUMP has an invalid issue number") from None
+    if issue_n < 1:
+        raise ValueError("the current LUMP has an invalid issue number")
+
+    typ = (repaired_words[0] >> 8) & 0x3
+    content_type = {0: "code", 1: "data", 2: "thread", 3: "outform"}[typ]
+    metadata = {
+        "token": expected_hex,
+        "abstraction": abstraction,
+        "content_type": content_type,
+        "language": active_approval.get(
+            "language", archive_approval.get("language", "assembly")),
+        "ns_slot": identity.get("slot"),
+        "namespace_sequence": identity.get("sequence"),
+        "enforce_bootstrap_identity": True,
+        "capabilities": [],
+        "grants": active_approval.get(
+            "grants", archive_approval.get("grants", ["E"])),
+        "capability_type": active_approval.get(
+            "capability_type", archive_approval.get("capability_type", "inform")),
+        "issue_number": issue_n,
+        "submitted_source": snapshot.get("source"),
+        "_bootstrap_history_repair": True,
+    }
+    if petname:
+        metadata["petname"] = petname
+    corrections = []
+    if int(words[row0_index]) != expected_gt:
+        corrections.append({
+            "id": "repair-sealed-row-zero-gt",
+            "title": "Correct the sealed c-list row-zero GT",
+            "detail": (
+                f"Replace 0x{int(words[row0_index]) & 0xFFFFFFFF:08X} with "
+                f"the Namespace-derived GT 0x{expected_gt:08X}."),
+        })
+    corrections.append({
+        "id": "issue-canonical-bootstrap-identity",
+        "title": "Issue the repaired bytes as the canonical live LUMP",
+        "detail": (
+            f"Bind the new live revision's Token and serialized T to "
+            f"0x{expected_gt:08X}; the original archive remains unchanged."),
+    })
+    return {
+        "active": active,
+        "archived": archived,
+        "archive_filename": archive_filename,
+        "archive_hash": snapshot.get("binary_hash"),
+        "candidate_words": repaired_words,
+        "candidate_hash": candidate_inspected["binary_hash"],
+        "metadata": metadata,
+        "corrections": corrections,
+        "expected_gt": expected_hex,
+    }
+
+
+@app.route(
+    "/api/lumps/<token>/history/<int:version>/bootstrap-repair-plan",
+    methods=["POST"],
+)
+def plan_bootstrap_history_repair(token, version):
+    """Produce a short-lived, server-derived correction plan without writing."""
+    payload = request.get_json(force=True, silent=True) or {}
+    try:
+        candidate = _bootstrap_history_repair_candidate(
+            token, version, payload.get("archive_filename"))
+        session.setdefault("_lump_approval_session", secrets.token_urlsafe(24))
+        planned = {
+            "binary": candidate["candidate_words"],
+            "metadata": dict(candidate["metadata"], _save_plan_preflight=True),
+        }
+        repair_mode = _lump_bootstrap_history_repair_override.set(True)
+        payload_override = _lump_save_payload_override.set(planned)
+        try:
+            preflight_response = app.make_response(save_lump())
+        finally:
+            _lump_save_payload_override.reset(payload_override)
+            _lump_bootstrap_history_repair_override.reset(repair_mode)
+        if preflight_response.status_code != 201:
+            return preflight_response
+        plan = preflight_response.get_json()
+        plan_id = str(plan.get("plan_id") or "")
+        if not plan_id:
+            raise ValueError("the server did not return a correction save plan")
+        with _LUMP_BOOTSTRAP_REPAIR_PLANS_LOCK:
+            _LUMP_BOOTSTRAP_REPAIR_PLANS[plan_id] = {
+                "session": session["_lump_approval_session"],
+                "expires": time.time() + 300,
+                "active_identity": _manifest_entry_identity(candidate["active"]),
+                "archive_filename": candidate["archive_filename"],
+                "archive_hash": candidate["archive_hash"],
+                "candidate_hash": candidate["candidate_hash"],
+                "correction_ids": tuple(
+                    correction["id"] for correction in candidate["corrections"]),
+            }
+        return jsonify({
+            "plan_id": plan_id,
+            "digest": plan["digest"],
+            "action": plan["action"],
+            "expires_in": 300,
+            "source_version": version,
+            "archive_filename": candidate["archive_filename"],
+            "expected_gt": candidate["expected_gt"],
+            "corrections": candidate["corrections"],
+            "consequence": (
+                "A new compliant live revision will be saved. The current live "
+                "revision is archived, and the defective historical archive is unchanged."
+            ),
+        }), 201
+    except _LumpApprovalStoreError as exc:
+        return jsonify({"error": str(exc), "committed": False}), 500
+    except (OSError, TypeError, ValueError, _struct.error) as exc:
+        return jsonify({
+            "error": f"No data was changed: correction plan was not created: {exc}",
+            "committed": False,
+            "safe_retry": True,
+        }), 409
+
+
+@app.route(
+    "/api/lumps/<token>/history/<int:version>/bootstrap-repair",
+    methods=["POST"],
+)
+def apply_bootstrap_history_repair(token, version):
+    """Apply an approved bootstrap repair through the normal atomic save path."""
+    payload = request.get_json(force=True, silent=True) or {}
+    plan_id = str(payload.get("plan_id") or "")
+    selected_ids = payload.get("corrections")
+    if not isinstance(selected_ids, list):
+        return jsonify({"error": "corrections must be an array", "committed": False}), 400
+    selected_ids = tuple(sorted({str(item) for item in selected_ids}))
+    try:
+        candidate = _bootstrap_history_repair_candidate(
+            token, version, payload.get("archive_filename"))
+        with _LUMP_BOOTSTRAP_REPAIR_PLANS_LOCK:
+            repair_plan = _LUMP_BOOTSTRAP_REPAIR_PLANS.get(plan_id)
+            if (repair_plan is None or repair_plan["expires"] < time.time()
+                    or repair_plan["session"] != session.get("_lump_approval_session")):
+                raise ValueError("a valid, unexpired correction plan is required")
+            required_ids = tuple(sorted(repair_plan["correction_ids"]))
+            if selected_ids != required_ids:
+                raise ValueError("every server-listed correction must be approved")
+            if (repair_plan["active_identity"]
+                    != _manifest_entry_identity(candidate["active"])
+                    or repair_plan["archive_filename"] != candidate["archive_filename"]
+                    or repair_plan["archive_hash"] != candidate["archive_hash"]
+                    or repair_plan["candidate_hash"] != candidate["candidate_hash"]):
+                raise ValueError(
+                    "the archive or live LUMP changed while the correction was awaiting approval")
+
+        metadata = dict(candidate["metadata"])
+        metadata["save_plan_id"] = plan_id
+        metadata["approval_intent"] = payload.get("approval_intent")
+        repair_mode = _lump_bootstrap_history_repair_override.set(True)
+        payload_override = _lump_save_payload_override.set({
+            "binary": candidate["candidate_words"],
+            "metadata": metadata,
+        })
+        try:
+            save_response = app.make_response(save_lump())
+        finally:
+            _lump_save_payload_override.reset(payload_override)
+            _lump_bootstrap_history_repair_override.reset(repair_mode)
+        if save_response.status_code < 300:
+            with _LUMP_BOOTSTRAP_REPAIR_PLANS_LOCK:
+                _LUMP_BOOTSTRAP_REPAIR_PLANS.pop(plan_id, None)
+        return save_response
+    except _LumpApprovalStoreError as exc:
+        return jsonify({"error": str(exc), "committed": False}), 500
+    except (OSError, TypeError, ValueError, _struct.error) as exc:
+        return jsonify({
+            "error": f"No data was changed: bootstrap correction was refused: {exc}",
+            "committed": False,
+            "safe_retry": True,
+        }), 409
 
 
 @app.route("/api/lumps/<token>/history")
