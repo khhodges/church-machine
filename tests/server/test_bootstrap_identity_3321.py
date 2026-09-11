@@ -287,7 +287,10 @@ def test_bootstrap_history_fails_closed_when_binding_is_unavailable(
     history = response.get_json()["history"]
     archived = next(row for row in history if row["version"] == 1)
     assert archived["binary_valid"] is False
-    assert archived["preview_enabled"] is False
+    # The immutable bytes remain safe to inspect even when the historical
+    # bootstrap binding cannot be audited. Identity failure must only make
+    # the record read-only; it must not hide the archive from Preview.
+    assert archived["preview_enabled"] is True
     assert archived["restore_enabled"] is False
     assert archived["bootstrap_identity"]["valid"] is False
     assert "authoritative bootstrap identity audit is unavailable" in (

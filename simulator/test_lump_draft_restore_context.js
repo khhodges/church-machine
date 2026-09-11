@@ -39,7 +39,7 @@ expect(
   'discard must clear both draft stores and opening alone must not create a draft'
 );
 expect(
-  index.includes('app-lumps.js?v=sha256-f0b2b1046cbc'),
+  index.includes('app-lumps.js?v=sha256-13f4a432a55a'),
   'the editor must request the corrected draft script'
 );
 

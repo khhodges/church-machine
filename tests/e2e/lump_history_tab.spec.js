@@ -333,7 +333,6 @@ test.describe('LUMP History tab — save via UI then browse', () => {
 
         // Auto-accept the confirm() dialog shown by _restoreLumpFromHistory.
         page.on('dialog', dialog => dialog.accept());
-
         await openLumpDetail(page);
         await clickHistoryTab(page);
 
@@ -354,7 +353,8 @@ test.describe('LUMP History tab — save via UI then browse', () => {
 
         // Wait for the save POST to complete.
         await page.waitForResponse(
-            resp => resp.url().includes('/api/lumps/save') && resp.request().method() === 'POST',
+            resp => new URL(resp.url()).pathname === '/api/lumps/save' &&
+                resp.request().method() === 'POST',
             { timeout: 10000 }
         );
 
@@ -373,25 +373,24 @@ test.describe('LUMP History tab — save via UI then browse', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Suite 3 — Restore fires /api/lumps/save and the word-count chip reverts
+// Suite 3 — Restore fires /api/lumps/save and preserves exact binary metadata
 // ─────────────────────────────────────────────────────────────────────────────
 
 test.describe('LUMP History tab — Restore fires /api/lumps/save', () => {
 
-    test('clicking Restore POSTs the archived binary and the size chip reverts to 32w', async ({ page }) => {
+    test('clicking Restore POSTs the archived binary and keeps the exact current size', async ({ page }) => {
         test.setTimeout(40000);
 
         let capturedSaveBody = null;
-        let listCallCount    = 0;
+        let restored         = false;
 
         // First /api/lumps/list call serves the current 64-word lump.
         // Subsequent calls (after restore triggers renderLumps) serve the
         // reverted 32-word lump so the header strip can be asserted.
         await page.route('**/api/lumps/list', async route => {
-            listCallCount++;
-            const lump = listCallCount === 1
-                ? STUB_LUMP                                         // 64w before restore
-                : { ...STUB_LUMP, lump_size: 32 };                 // 32w after restore
+            const lump = restored
+                ? { ...STUB_LUMP, lump_size: 32 }                   // 32w after restore
+                : STUB_LUMP;                                        // 64w before restore
             await route.fulfill({
                 status:      200,
                 contentType: 'application/json',
@@ -413,14 +412,18 @@ test.describe('LUMP History tab — Restore fires /api/lumps/save', () => {
             });
         });
         await page.route(`**/api/lump/${STUB_TOKEN}/words`, async route => {
+            const currentWords = restored
+                ? { ...STUB_WORDS_CURRENT, words: ARCHIVED_WORDS, count: ARCHIVED_WORDS.length }
+                : STUB_WORDS_CURRENT;
             await route.fulfill({
                 status:      200,
                 contentType: 'application/json',
-                body:        JSON.stringify(STUB_WORDS_CURRENT),
+                body:        JSON.stringify(currentWords),
             });
         });
         await page.route('**/api/lumps/save', async route => {
             capturedSaveBody = JSON.parse(route.request().postData() || '{}');
+            restored = true;
             await route.fulfill({
                 status:      200,
                 contentType: 'application/json',
@@ -447,7 +450,8 @@ test.describe('LUMP History tab — Restore fires /api/lumps/save', () => {
 
         // Wait for the POST to /api/lumps/save to complete.
         await page.waitForResponse(
-            resp => resp.url().includes('/api/lumps/save') && resp.request().method() === 'POST',
+            resp => new URL(resp.url()).pathname === '/api/lumps/save' &&
+                resp.request().method() === 'POST',
             { timeout: 10000 }
         );
 
@@ -466,20 +470,22 @@ test.describe('LUMP History tab — Restore fires /api/lumps/save', () => {
         await expect(toast).toBeVisible({ timeout: 5000 });
         await expect(toast.locator('.fpga-toast-title')).toHaveText('Restored');
 
-        // ── Assert 3: lump header strip reverts to 32w after re-render ─────
-        // Force a renderLumps() pass so the header strip reads the updated
-        // lump_size: 32 from the second /api/lumps/list call.
+        // ── Assert 3: exact current binary metadata remains authoritative ───
+        // Force a renderLumps() pass. The fixture's current words use a
+        // 64-word allocation header, so the binary-derived chip remains 64w
+        // even though the archived compact fixture reports 32 words.
         await page.evaluate((token) => {
             if (typeof renderLumps === 'function') {
                 return renderLumps().then(() => showLumpDetail(token));
             }
         }, STUB_TOKEN);
 
-        // The Size chip in the lump header strip must now read "32w".
+        // The Size chip is derived from the inspected current words, not the
+        // historical row's compact metadata.
         const sizeChip = page.locator(
             `.lump-header-strip .lump-hs-chip:has(.lump-hs-label:text("Size"))`
         );
-        await expect(sizeChip).toContainText('32w', { timeout: 8000 });
+        await expect(sizeChip).toContainText('64w', { timeout: 8000 });
     });
 
     test('clicking Restore with dialog dismissed does not fire /api/lumps/save', async ({ page }) => {
@@ -715,6 +721,87 @@ test.describe('LUMP History tab — legacy bootstrap evidence', () => {
         await row.getByRole('button', { name: 'Preview' }).click();
         const preview = await waitForHexTable(page);
         await expect(preview).toContainText('Archived bootstrap identity mismatch');
+    });
+});
+
+test.describe('LUMP History tab — inspectable invalid and binary-only archives', () => {
+    async function stubHistoryWithArchive(page, archivePayload, historyOverrides = {}) {
+        await page.route('**/api/lumps/list', route => route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify([STUB_LUMP]),
+        }));
+        await page.route(`**/api/lumps/${STUB_TOKEN}/history`, route => route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                token: STUB_TOKEN,
+                history: [{
+                    ...STUB_HISTORY_V1,
+                    ...historyOverrides,
+                }],
+            }),
+        }));
+        await page.route(`**/api/lumps/${STUB_TOKEN}/words/1`, route => route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(archivePayload),
+        }));
+        await page.route(`**/api/lump/${STUB_TOKEN}/words`, route => route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(STUB_WORDS_CURRENT),
+        }));
+    }
+
+    test('invalid but word-readable archive renders hex and stays read only', async ({ page }) => {
+        test.setTimeout(40000);
+        await stubHistoryWithArchive(page, {
+            ...STUB_WORDS_V1,
+            binary_valid: false,
+            validation_errors: ['invalid header magic 0x02'],
+            source: '',
+        }, {
+            binary_hash: 'c'.repeat(64),
+            binary_valid: false,
+            preview_enabled: true,
+            restore_enabled: false,
+            validation_errors: ['invalid header magic 0x02'],
+        });
+
+        await openLumpDetail(page);
+        await clickHistoryTab(page);
+        const row = page.locator(`#lumpHistoryBody_${STUB_TK} tr.lump-history-row`).first();
+        await expect(row.getByRole('button', { name: 'Preview' })).toBeVisible();
+        await expect(row.getByText('Read only')).toBeVisible();
+        await row.getByRole('button', { name: 'Preview' }).click();
+
+        const preview = await waitForHexTable(page);
+        await expect(preview).toContainText('inspectable only');
+        await expect(preview.locator('.lump-history-source-section')).toContainText(
+            'No source is embedded'
+        );
+        await expect(preview.locator('table.lump-hex-table')).toBeVisible();
+        await expect(row.locator('button.lump-history-restore-btn')).toHaveCount(0);
+    });
+
+    test('binary-only archive explicitly explains that source is not embedded', async ({ page }) => {
+        test.setTimeout(40000);
+        await stubHistoryWithArchive(page, {
+            ...STUB_WORDS_V1,
+            source: '',
+        });
+
+        await openLumpDetail(page);
+        await clickHistoryTab(page);
+        const row = page.locator(`#lumpHistoryBody_${STUB_TK} tr.lump-history-row`).first();
+        await row.getByRole('button', { name: 'Preview' }).click();
+
+        const preview = await waitForHexTable(page);
+        await expect(preview.locator('.lump-history-source-section')).toContainText(
+            'No source is embedded in this archived revision.'
+        );
+        await expect(preview.locator('table.lump-hex-table')).toBeVisible();
     });
 });
 

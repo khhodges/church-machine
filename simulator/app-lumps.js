@@ -2777,13 +2777,15 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                     hist.restore_enabled !== false && hist.binary_valid === true);
                 const previewToken = hist && hist.record_token
                     ? hist.record_token : token;
+                const archiveFilename = hist && (
+                    hist.archive_filename || hist.record_filename || '');
                 const historicalRecord = Boolean(hist && hist.historical_record);
 
                 let _rowAttrs = '';
                 if (isCurrent) {
                     _rowAttrs = ' style="background:var(--bg-selected,rgba(99,102,241,0.08));"';
                 } else if (previewUsable) {
-                    _rowAttrs = ` style="cursor:pointer;" onclick="_lumpHistorySelectRow(this,'${e(previewToken)}',${ver},${histInspection.cw||0},${histInspection.cc||0},${histInspection.lump_size||0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(token)}')"`;
+                    _rowAttrs = ` style="cursor:pointer;" onclick="_lumpHistorySelectRow(this,'${e(previewToken)}',${ver},${histInspection.cw||0},${histInspection.cc||0},${histInspection.lump_size||0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(token)}','${e(archiveFilename)}')"`;
                 }
                 html += `<tr class="lump-history-row" data-version="${ver}"${_rowAttrs}>`;
 
@@ -2821,7 +2823,7 @@ async function _fetchAndShowLumpTimeline(token, lump) {
 
                 // Preview + Restore (only for archived binaries)
                 if (previewUsable) {
-                    html += `<td><button class="btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_lumpHistoryPreview('${e(previewToken)}',${ver},${histInspection.cw||0},${histInspection.cc||0},${histInspection.lump_size||0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(token)}')" title="Preview source and hex diff of v${ver}">Preview</button></td>`;
+                     html += `<td><button class="btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_lumpHistoryPreview('${e(previewToken)}',${ver},${histInspection.cw||0},${histInspection.cc||0},${histInspection.lump_size||0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(token)}','${e(archiveFilename)}')" title="Preview source and hex diff of v${ver}">Preview</button></td>`;
                     if (archiveUsable)
                         html += `<td><button class="btn lump-history-restore-btn" id="lumpHistoryRestoreBtn_${tk}_${ver}" style="font-size:0.7rem;padding:2px 8px;" disabled onclick="event.stopPropagation();_restoreLumpFromHistory('${e(token)}',${ver})" title="Preview this version first, then restore">Restore</button></td>`;
                     else
@@ -2910,14 +2912,14 @@ async function _promptUpgradeLump(absName, fromToken, fromVersion, toToken, toVe
 }
 
 
-function _lumpHistorySelectRow(rowEl, token, version, cw, cc, lumpSize, tk, historicalRecord, currentToken) {
+function _lumpHistorySelectRow(rowEl, token, version, cw, cc, lumpSize, tk, historicalRecord, currentToken, archiveFilename) {
     const table = document.getElementById(`lumpHistoryTable_${tk}`);
     if (table) table.querySelectorAll('tr').forEach(r => r.classList.remove('lump-hex-hdr-row'));
     rowEl.classList.add('lump-hex-hdr-row');
-    _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, historicalRecord, currentToken);
+    _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, historicalRecord, currentToken, archiveFilename);
 }
 
-async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, historicalRecord, currentToken) {
+async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, historicalRecord, currentToken, archiveFilename) {
     const previewEl = document.getElementById(`lumpHistoryHexPreview_${tk}`);
     if (!previewEl) return;
     const e = _escHtml;
@@ -2935,14 +2937,18 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
         const btn = document.getElementById(`lumpHistoryRestoreBtn_${tk}_${version}`);
         if (btn) { btn.disabled = false; btn.title = `Restore v${version} as the current LUMP`; }
     };
-    const _noPreview = msg => {
-        previewEl.innerHTML = `<div class="lump-history-no-preview">\u26a0\ufe0f No preview available \u2014 ${_escHtml(msg)}</div>`;
+    const _noPreview = (msg, nextAction) => {
+        previewEl.innerHTML = `<div class="lump-history-no-preview">\u26a0\ufe0f No preview available \u2014 ${_escHtml(msg)}. Next: ${_escHtml(nextAction || 'Reload History and select this revision again.')}</div>`;
     };
     try {
+        const archivedUrl = historicalRecord
+            ? `/api/lump/${token}/words${
+                archiveFilename
+                    ? `?archive_filename=${encodeURIComponent(archiveFilename)}`
+                    : ''}`
+            : `/api/lumps/${token}/words/${version}`;
         const [archResp, curResp] = await Promise.all([
-            fetch(historicalRecord
-                ? `/api/lump/${token}/words`
-                : `/api/lumps/${token}/words/${version}`),
+            fetch(archivedUrl),
             fetch(`/api/lump/${currentToken || token}/words`)
         ]);
         if (!archResp.ok) {
@@ -2950,19 +2956,19 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
                 dataChanged: false,
                 nextAction: 'Reload History, then select this revision again.',
             });
-            _noPreview(error.message);
+            _noPreview(error.message, 'Reload History, then select this revision again.');
             return;
         }
         const data = await archResp.json();
         const words = data.words || [];
         const numWords = words.length;
-        if (!numWords) { _noPreview('archived binary is empty'); return; }
-        if (!_lumpBinaryInspection(data)) {
-            _noPreview('binary inspection fields are unavailable');
+        if (!numWords) {
+            _noPreview('archived binary is empty', 'Save a new revision before previewing it.');
             return;
         }
-        if (!historicalRecord && data.binary_valid !== true && !_lumpApprovalMatchesBinary(data)) {
-            _noPreview('matching hash-bound approval record is unavailable');
+        const inspection = _lumpBinaryInspection(data);
+        if (!inspection) {
+            _noPreview('binary inspection fields are unavailable', 'Reload History so the server can revalidate the archive.');
             return;
         }
 
@@ -2998,6 +3004,10 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
                 `</div>`;
         }
 
+        const validationWarning = data.binary_valid === false &&
+            Array.isArray(data.validation_errors) && data.validation_errors.length
+            ? `<div class="lump-history-provenance-note">\u26a0 This archive is inspectable only; validation failed: ${e(data.validation_errors.join('; '))}. Restore remains disabled.</div>`
+            : '';
         const historicalWarning = historicalRecord && data.bootstrap_identity &&
                 data.bootstrap_identity.valid === false
             ? `<div class="lump-history-provenance-note">\u26a0 Archived bootstrap identity mismatch. This binary is preview-only and cannot be restored.</div>`
@@ -3066,7 +3076,7 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             t += `<tr class="${rowClass}"><td class="lump-hex-addr">0x${baseAddr}</td>${rowHex}${ascCell}</tr>`;
         }
         t += '</tbody></table></div>';
-        previewEl.innerHTML = historicalWarning + sourcePreview + t;
+        previewEl.innerHTML = validationWarning + historicalWarning + sourcePreview + t;
         if (!historicalRecord) _enableRestoreBtn();
     } catch (err) {
         _noPreview(err.message);

@@ -55,3 +55,76 @@ def test_snapshot_rejects_trailing_binary_even_when_approved(tmp_path):
     snapshot = app_module._validate_lump_snapshot(str(path))
     assert not snapshot["valid"]
     assert any("whole number" in x.lower() for x in snapshot["errors"])
+
+
+def test_archived_preview_returns_safe_raw_words_but_stays_invalid(
+    tmp_path, monkeypatch
+):
+    token = "aabbccdd"
+    current = _binary()
+    invalid_archive = struct.pack(">64I", 0x12345678, *([0] * 63))
+    (tmp_path / "Current.lump").write_bytes(current)
+    (tmp_path / "Current_v1.lump").write_bytes(invalid_archive)
+    (tmp_path / "manifest.json").write_text(json.dumps([
+        {
+            "token": token,
+            "abstraction": "History",
+            "filename": "Current.lump",
+            "lump_version": 2,
+        }
+    ]))
+    monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
+    monkeypatch.setattr(app_module, "_LUMPS_DIR", str(tmp_path))
+
+    with app_module.app.test_client() as client:
+        response = client.get(f"/api/lumps/{token}/words/1")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["words"] == list(struct.unpack(">64I", invalid_archive))
+    assert payload["binary_valid"] is False
+    assert payload["validation_errors"]
+    assert payload["approved"] is False
+
+
+def test_historical_preview_uses_recorded_archive_filename(
+    tmp_path, monkeypatch
+):
+    token = "aabbccdd"
+    record_token = "11223344"
+    current = _binary(cw=7, cc=2)
+    historical = _binary(cw=11, cc=3)
+    (tmp_path / "History.lump").write_bytes(current)
+    (tmp_path / "CapabilityTest_legacy.lump").write_bytes(historical)
+    (tmp_path / "manifest.json").write_text(json.dumps([
+        {
+            "token": token,
+            "abstraction": "History",
+            "filename": "History.lump",
+            "lump_version": 2,
+        },
+        {
+            "token": record_token,
+            "abstraction": "History",
+            "filename": "CapabilityTest_legacy.lump",
+            "lump_version": 1,
+            "archived": True,
+        },
+    ]))
+    monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
+    monkeypatch.setattr(app_module, "_LUMPS_DIR", str(tmp_path))
+
+    with app_module.app.test_client() as client:
+        response = client.get(
+            f"/api/lump/{record_token}/words",
+            query_string={"archive_filename": "CapabilityTest_legacy.lump"},
+        )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["historical_record"] is True
+    assert payload["read_only"] is True
+    assert payload["archive_filename"] == "CapabilityTest_legacy.lump"
+    assert payload["cw"] == 11
+    assert payload["cc"] == 3
+    assert payload["words"] == list(struct.unpack(">64I", historical))

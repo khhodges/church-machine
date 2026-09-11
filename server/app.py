@@ -9865,14 +9865,74 @@ def get_lump_words(token_hex):
     if not _re_words.fullmatch(r'[0-9a-f]{1,8}', raw):
         return jsonify({"error": "Invalid token"}), 400
     key8  = (raw[:8] if len(raw) >= 8 else raw).zfill(8)
-    key   = key8.lstrip('0') or '0'
-    lump_path = _resolve_lump_path(key8, LUMPS_DIR)
+    archive_filename = request.args.get("archive_filename")
+    archive_manifest_entry = None
+    if archive_filename is not None:
+        # History supplies this immutable locator for archived bootstrap
+        # records. Do not accept an arbitrary path: it must be the filename of
+        # exactly one archived manifest row for this token.
+        if (
+            not archive_filename
+            or os.path.basename(archive_filename) != archive_filename
+            or not archive_filename.endswith(".lump")
+        ):
+            return jsonify({"error": "Invalid archived filename"}), 400
+        try:
+            archive_manifest = _read_manifest_safe(
+                os.path.join(LUMPS_DIR, "manifest.json"))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 409
+        archive_matches = [
+            row for row in archive_manifest
+            if isinstance(row, dict)
+            and row.get("archived") is True
+            and str(row.get("token") or "").lower() == key8
+            and row.get("filename") == archive_filename
+        ]
+        if len(archive_matches) != 1:
+            status = 404 if not archive_matches else 409
+            return jsonify({
+                "error": (
+                    "Archived LUMP record is unavailable"
+                    if status == 404
+                    else "Archived filename maps to multiple manifest records"
+                )
+            }), status
+        archive_manifest_entry = archive_matches[0]
+        lump_path = os.path.join(LUMPS_DIR, archive_filename)
+    else:
+        lump_path = _resolve_lump_path(key8, LUMPS_DIR)
     if not lump_path:
         return jsonify({"error": f"Unknown lump 0x{key8}"}), 404
+    validation_errors = []
     try:
         inspected = _inspect_lump_binary(lump_path)
     except (OSError, ValueError) as exc:
-        return jsonify({"error": f"LUMP integrity failure: {exc}"}), 409
+        if archive_manifest_entry is None:
+            return jsonify({"error": f"LUMP integrity failure: {exc}"}), 409
+        # Historical Preview is allowed to display safely readable raw words,
+        # but it must expose the validation failure and remain non-restorable.
+        snapshot = _validate_lump_snapshot(
+            lump_path, archive_manifest_entry)
+        if not snapshot["raw_inspectable"]:
+            return jsonify({"error": f"LUMP integrity failure: {exc}"}), 409
+        inspected = {
+            "raw_bytes": snapshot["raw_bytes"],
+            "words": snapshot["words"],
+            "binary_hash": snapshot["binary_hash"],
+            "cw": snapshot["cw"],
+            "cc": snapshot["cc"],
+            "typ": None,
+            "lump_size": snapshot["lump_size"],
+            "content_profile": snapshot["content_profile"],
+            "source": snapshot["source"],
+        }
+        validation_errors = snapshot["errors"]
+    else:
+        if archive_manifest_entry is not None:
+            snapshot = _validate_lump_snapshot(
+                lump_path, archive_manifest_entry)
+            validation_errors = snapshot["errors"]
     lump_raw = inspected["raw_bytes"]
     words = inspected["words"]
     num_words = len(words)
@@ -9901,7 +9961,18 @@ def get_lump_words(token_hex):
         "count":           num_words,
         "binary_hash":     _bh_live,
         "approved":        _approval_ret is not None,
-        "trusted":         _approval_ret is not None and _integrity_result is True,
+        "trusted": (
+            _approval_ret is not None
+            and _integrity_result is True
+            and not validation_errors
+        ),
+        "binary_valid": not validation_errors,
+        "validation_errors": validation_errors,
+        "cw": inspected.get("cw"),
+        "cc": inspected.get("cc"),
+        "lump_size": inspected.get("lump_size"),
+        "content_profile": inspected.get("content_profile"),
+        "source": inspected.get("source") or "",
     }
     try:
         manifest = _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json"))
@@ -9911,7 +9982,7 @@ def get_lump_words(token_hex):
         (row for row in manifest
          if isinstance(row, dict)
          and str(row.get("token") or "").lower() == key8),
-        None)
+        archive_manifest_entry)
     bootstrap_identity = _bootstrap_snapshot_identity(
         LUMPS_DIR, manifest_entry, inspected)
     if bootstrap_identity is not None:
@@ -9922,6 +9993,13 @@ def get_lump_words(token_hex):
         for field in ("pet_name", "dot_name", "issue_n", "identity_hash"):
             if field in _approval_ret:
                 response[field] = _approval_ret[field]
+    if archive_manifest_entry is not None:
+        response.update({
+            "version": archive_manifest_entry.get("lump_version"),
+            "archive_filename": archive_filename,
+            "historical_record": True,
+            "read_only": True,
+        })
     return jsonify(response)
 
 
@@ -9938,6 +10016,7 @@ def _validate_lump_snapshot(lump_path, manifest_entry=None):
         "approval": None,
         "errors": errors,
         "binary_available": binary_available,
+        "raw_inspectable": False,
         "raw_bytes": None,
         "words": [],
         "cw": None,
@@ -9958,12 +10037,29 @@ def _validate_lump_snapshot(lump_path, manifest_entry=None):
         inspected = _inspect_lump_binary(lump_path)
     except (OSError, ValueError) as exc:
         errors.append(str(exc))
+        # Invalid history bytes may still be useful for read-only inspection
+        # when their raw stream is safely word-aligned. Keep those intrinsic
+        # words available, while leaving valid=False for restore/trust gates.
+        try:
+            with open(lump_path, "rb") as fh:
+                raw_bytes = fh.read()
+            if len(raw_bytes) >= 4 and len(raw_bytes) % 4 == 0:
+                result.update({
+                    "raw_bytes": raw_bytes,
+                    "words": list(_struct.unpack(
+                        f">{len(raw_bytes) // 4}I", raw_bytes)),
+                    "binary_hash": hashlib.sha256(raw_bytes).hexdigest(),
+                    "raw_inspectable": True,
+                })
+        except (OSError, ValueError):
+            pass
         return result
     result.update({
         key: inspected[key] for key in
         ("raw_bytes", "words", "cw", "cc", "lump_size", "binary_hash",
          "content_profile", "source")
     })
+    result["raw_inspectable"] = True
     bootstrap_identity = _bootstrap_snapshot_identity(
         os.path.dirname(os.path.abspath(lump_path)),
         manifest_entry,
@@ -10071,11 +10167,13 @@ def get_lump_history(token):
             "content_profile": snapshot["content_profile"],
             "binary_hash": snapshot["binary_hash"],
             "binary_available": snapshot["binary_available"],
+            "raw_inspectable": snapshot["raw_inspectable"],
             "binary_valid": snapshot["valid"],
             "approved": snapshot["approved"],
             "trusted": snapshot["trusted"],
             "metadata_only": not snapshot["binary_available"],
-            "preview_enabled": bool(not current and snapshot["valid"]),
+            "preview_enabled": bool(
+                not current and snapshot["raw_inspectable"]),
             "restore_enabled": bool(
                 not current and snapshot["valid"] and snapshot["approved"]),
             "validation_errors": errors,
@@ -10137,11 +10235,12 @@ def get_lump_history(token):
             "content_profile": _archived_snapshot_h["content_profile"],
             "binary_hash": _archived_snapshot_h["binary_hash"],
             "binary_available": _archived_snapshot_h["binary_available"],
+            "raw_inspectable": _archived_snapshot_h["raw_inspectable"],
             "binary_valid": _archived_snapshot_h["valid"],
             "approved": _archived_snapshot_h["approved"],
             "trusted": False,
             "metadata_only": not _archived_snapshot_h["binary_available"],
-            "preview_enabled": _archived_snapshot_h["binary_available"],
+            "preview_enabled": _archived_snapshot_h["raw_inspectable"],
             "restore_enabled": False,
             "validation_errors": _archived_snapshot_h["errors"],
             "bootstrap_identity": _archived_snapshot_h["bootstrap_identity"],
@@ -10150,6 +10249,7 @@ def get_lump_history(token):
             "record_token": str(
                 _archived_manifest_h.get("token") or "").lower(),
             "record_filename": _archived_filename_h,
+            "archive_filename": _archived_filename_h,
             "read_only": True,
         })
 
@@ -10415,7 +10515,7 @@ def get_lump_version_words(token, version):
     snapshot = _validate_lump_snapshot(lump_path_v, _manifest_entry_v)
     approval = snapshot["approval"] or {}
     validation_errors = snapshot["errors"]
-    if validation_errors:
+    if validation_errors and not snapshot["raw_inspectable"]:
         return jsonify({
             "error": (
                 f"Archived version v{version} failed integrity validation: "
@@ -10427,14 +10527,16 @@ def get_lump_version_words(token, version):
         "token":         key8,
         "version":       version,
         "words":         snapshot["words"],
-        "count":         snapshot["lump_size"],
+        "count":         len(snapshot["words"]),
         "cw":            snapshot["cw"],
         "cc":            snapshot["cc"],
         "lump_size":     snapshot["lump_size"],
         "binary_hash":   snapshot["binary_hash"],
-        "binary_valid":  True,
+        "binary_valid":  not validation_errors,
+        "validation_errors": validation_errors,
         "approved":      snapshot["approved"],
         "trusted":       snapshot["trusted"],
+        "content_profile": snapshot["content_profile"],
         "ns_slot":       approval.get('ns_slot'),
         "abstraction":   approval.get('abstraction'),
         "compiled_at":   approval.get('compiled_at'),

@@ -151,3 +151,4 @@
 - [Save retry ownership](save-retry-ownership.md) — retry IDE-owned saves only with explicit not-committed and safe-retry proof; never make programmers repair generated identity
 - [Boot-image byte-stream tests](boot-image-byte-stream-tests.md) — generators may print approval diagnostics; redirect stdout before treating output as a raw image
 - [Malformed LUMP inspection UI](lump-malformed-inspection-ui.md) — raw malformed bytes stay inspectable while audit, load, and runtime validation remain authoritative
+- [History preview archive identity](history-preview-archive-identity.md) — historical previews must resolve the exact immutable archive named by the history record
