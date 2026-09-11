@@ -590,22 +590,22 @@ async function stubPreviewRoutes(page) {
     });
 }
 
-// Waits until the hex preview div contains a rendered lump-hex-table.
+// Waits until the Preview popup contains a rendered lump-hex-table.
 async function waitForHexTable(page) {
-    const previewDiv = page.locator(`#lumpHistoryHexPreview_${STUB_TK}`);
+    const previewDiv = page.locator('#lumpHistoryPreviewModal .lump-history-preview-body');
     await expect(previewDiv.locator('table.lump-hex-table')).toBeVisible({ timeout: 10000 });
     return previewDiv;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Suite 4 — Preview button fetches archived binary, shows source, and renders
-// the hex dump table
+// the hex dump table in a popup
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // Clicking the "Preview" button on a history row calls _lumpHistoryPreview,
 // which fetches /api/lumps/<token>/words/<version> (archived binary) and
 // /api/lump/<token>/words (current binary for diff), then renders the embedded
-// source and a lump-hex-table inside #lumpHistoryHexPreview_<tk>.
+// source and a lump-hex-table inside the Preview popup.
 
 test.describe('LUMP History tab — Preview button renders hex dump', () => {
 
