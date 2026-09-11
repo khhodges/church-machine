@@ -2772,7 +2772,7 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                 const validationErrors = hist && Array.isArray(hist.validation_errors)
                     ? hist.validation_errors : [];
                 const previewUsable = Boolean(hist && !isCurrent &&
-                    hist.preview_enabled !== false && histInspection);
+                    hist.binary_available !== false && histInspection);
                 const archiveUsable = Boolean(previewUsable &&
                     hist.restore_enabled !== false && hist.binary_valid === true);
                 const previewToken = hist && hist.record_token
