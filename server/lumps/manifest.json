@@ -283,15 +283,6 @@
     "compiled_at": 1788014967.3553412
   },
   {
-    "token": "4a00000a",
-    "abstraction": "CapabilityTest",
-    "filename": "CapabilityTest.2.225da6fc.lump",
-    "variant_group": "capabilitytest-history",
-    "lump_version": 2,
-    "compiled_at": 1788981641.722638,
-    "archived": true
-  },
-  {
     "token": "c7657c2d",
     "abstraction": "CapabilityTest",
     "filename": "CapabilityTest.1.b49e8eca.lump",
@@ -414,14 +405,6 @@
     "archived": true
   },
   {
-    "token": "b6182a95",
-    "abstraction": "CapabilityTest",
-    "filename": "CapabilityTest.1.edfd9e62.lump",
-    "lump_version": 25,
-    "compiled_at": 1788981641.722638,
-    "archived": true
-  },
-  {
     "token": "4a000006",
     "abstraction": "SelfTest",
     "filename": "SelfTest.80.f37bafd6.lump",
@@ -436,18 +419,17 @@
     "lump_version": 1
   },
   {
-    "token": "4a00000a",
-    "abstraction": "CapabilityTest",
-    "filename": "CapabilityTest.2.e794a764.lump",
-    "variant_group": "capabilitytest-history",
-    "lump_version": 2,
-    "compiled_at": 1788981641.722638
-  },
-  {
     "token": "ab1e86af",
     "abstraction": "TestAbs",
     "filename": "TestAbs.1.71742676.lump",
     "lump_version": 3,
     "compiled_at": 1789115235.6156342
+  },
+  {
+    "token": "4a00000a",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.2.5e701b59.lump",
+    "lump_version": 3,
+    "compiled_at": 1789126189.4050355
   }
 ]

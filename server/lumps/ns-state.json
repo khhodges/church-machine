@@ -134,8 +134,8 @@
       "location": "0x00001190",
       "type": "Inform",
       "token": "4a00000a",
-      "filename": "CapabilityTest.2.e794a764.lump",
-      "lump_version": 25,
+      "filename": "CapabilityTest.2.5e701b59.lump",
+      "lump_version": 3,
       "resident": true,
       "boot_resident": true,
       "f": 0,
@@ -194,5 +194,5 @@
       "load_policy": "Resident"
     }
   ],
-  "generated_at": 1789115235.625268
+  "generated_at": 1789126189.4142005
 }
