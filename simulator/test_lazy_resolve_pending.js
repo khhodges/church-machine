@@ -274,7 +274,7 @@ console.log('\n--- T004: _injectClistNow CASE B — integration test ---');
     const appRunLines = appRunSrc.split('\n');
     let fnStart = -1, fnEnd = -1, depth = 0;
     for (let i = 0; i < appRunLines.length; i++) {
-        if (fnStart < 0 && appRunLines[i].startsWith('function _injectClistNow()')) {
+        if (fnStart < 0 && /^function _injectClistNow\(/.test(appRunLines[i])) {
             fnStart = i;
         }
         if (fnStart >= 0) {

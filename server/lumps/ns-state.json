@@ -180,8 +180,22 @@
       "symbolic": true,
       "implementationMissing": true,
       "resident": false
+    },
+    {
+      "name": "New.SelfTest",
+      "slot": 15,
+      "location": "0x00000000",
+      "type": "Inform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x00000",
+      "seq": 0,
+      "seal": "0xDEADBEEF",
+      "symbolic": true,
+      "implementationMissing": true,
+      "resident": false
     }
   ],
-  "generated_at": 1789130617.2975945,
+  "generated_at": 1789135509.3084564,
   "committed_raw_fingerprint": "30fdf92b8b6885465f19c259e3c4550213c4c3c8e474befc39c84db739c4c8d5"
 }

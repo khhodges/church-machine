@@ -259,7 +259,8 @@
         if (nsIndex === null) {
             return {
                 name, rights, grants, nsIndex: -1, source,
-                error: `Capability "${name}" is unresolved in the active namespace/device registry.`,
+                pending: true,
+                error: null,
             };
         }
 
@@ -321,6 +322,9 @@
                 : { ok: false, error: `C-list NULL row contains nonzero word 0x${word.toString(16).padStart(8, '0')}.`, parsed };
         }
         if (cap.error) return { ok: false, error: cap.error, parsed: null };
+        if ((word >>> 16) === 0xFEED && cap.pending === true) {
+            return { ok: true, error: null, parsed: null, pending: true };
+        }
         if ((word >>> 16) === 0xFEED) {
             return { ok: false, error: `Capability "${name}" is still an unresolved placeholder (0x${word.toString(16).padStart(8, '0')}).`, parsed: null };
         }
@@ -391,6 +395,13 @@
             }
             if (resolvedCaps[i].symbolic_self === true) {
                 words[clistStart + i] = 0xFEED5E1F;
+                continue;
+            }
+            if (resolvedCaps[i].pending === true) {
+                const simClass = context && context.sim && context.sim.constructor;
+                words[clistStart + i] = simClass && typeof simClass.makePendingGT === 'function'
+                    ? simClass.makePendingGT(resolvedCaps[i].name)
+                    : 0xFEEDFFFF;
                 continue;
             }
             words[clistStart + i] = _createGT(

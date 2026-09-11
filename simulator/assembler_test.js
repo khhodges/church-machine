@@ -10423,9 +10423,10 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     const unknown = CapabilityTokens.materialize(
         [{ name: 'TotallyUnknownCapability', rights: ['E'] }],
         unknownWords, 63, { sim, lumps });
-    assert('CAP-GT-5: unresolved capability fails closed instead of writing NULL',
-        !unknown.ok && /TotallyUnknownCapability/.test(unknown.errors.join(' ')),
-        unknown.errors.join('; '));
+    assert('CAP-GT-5: unresolved capability is emitted as an ISA pending-GT sentinel',
+        unknown.ok && (unknownWords[63] >>> 16) === 0xFEED &&
+            unknown.resolvedCaps[0].pending === true,
+        unknown.ok ? `got 0x${(unknownWords[63] >>> 0).toString(16)}` : unknown.errors.join('; '));
 
     const badRights = CapabilityTokens.materialize(
         [{ name: 'LED0', rights: ['RWZ'] }],
@@ -10526,9 +10527,11 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
             : rawRun.errors.join('; '));
     const rawUnknown = materializeForRun(
         [{ name: 'TotallyUnknownCapability', rights: ['E'] }], 'Run');
-    assert('CAP-GT-13: raw-assembly Run gate blocks unresolved named capability',
-        !rawUnknown.ok && /TotallyUnknownCapability/.test(rawUnknown.errors.join(' ')),
-        rawUnknown.errors.join('; '));
+    assert('CAP-GT-13: raw-assembly Run passes unresolved names to ISA lazy resolution',
+        rawUnknown.ok && (rawUnknown.capabilities[0].token >>> 16) === 0xFEED,
+        rawUnknown.ok
+            ? `got 0x${(rawUnknown.capabilities[0].token >>> 0).toString(16)}`
+            : rawUnknown.errors.join('; '));
     const rawSelf = materializeForRun(
         [{ name: 'SELF', rights: ['E'] }], 'Run');
     assert('CAP-GT-13b: raw Run treats SELF as contextual row-zero authority',
