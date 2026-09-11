@@ -750,11 +750,6 @@ async function _patchCcFromBinary(token, lump, tk) {
 
     } catch (err) {
         markUnavailable(err && err.message ? err.message : 'exact words unavailable');
-        const chip = document.getElementById(`lumpMalformedChip_${tk}`);
-        if (chip) {
-            chip.style.display = '';
-            chip.title = err && err.message ? err.message : 'Exact LUMP words unavailable';
-        }
     }
 }
 
@@ -5960,9 +5955,7 @@ async function openLumpInEditor(token) {
 
     var asmEd = document.getElementById('asmEditor');
     if (asmEd) {
-        // Always clear any stale banners from a previous open.
-        var _existingMfBanner = document.getElementById('_lumpMalformedBanner');
-        if (_existingMfBanner) _existingMfBanner.remove();
+        // Always clear stale source-state banners from a previous open.
         var _existingSrcBanner = document.getElementById('_lumpSourceRestoredBanner');
         if (_existingSrcBanner) _existingSrcBanner.remove();
         var _existingMissingBanner = document.getElementById('_lumpSourceMissingBanner');
@@ -5979,11 +5972,6 @@ async function openLumpInEditor(token) {
         } else {
             _compiledDisasm = '; ' + lumpName +
                           '\n; Compiled disassembly is unavailable because this binary is malformed.\n';
-            var _mfBannerMsg = _diagnosticError
-                ? '<strong>Saved LUMP integrity fault:</strong> ' +
-                    String(_diagnosticError).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') +
-                    '<br><span>Check C-List row 0 / <code>SELF E</code>, then Save Lump to regenerate the artifact with the owning Namespace identity.</span>'
-                : 'Binary is malformed \u2014 compiled disassembly is unavailable. Recoverable source, if any, remains editable.';
             // Do not add an automatic warning banner here. The recovered source
             // remains editable, while the explicit Audit action and the raw Hex
             // Dump expose the structural diagnostics needed for manual repair.
