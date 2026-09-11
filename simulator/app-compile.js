@@ -1571,7 +1571,44 @@ async function compileAndBuild() {
             con.scrollTop = 0;
         }
         if (typeof _showAsmErrors === 'function') {
-            _showAsmErrors(_capErrors, 'Capability validation failed — code not applied');
+            const _newDotNames = Array.from(new Set((_capMaterialized.errors || []).map(message => {
+                const match = String(message).match(/^Capability "([^"]+\.[^"]+)" has no declared permissions\.$/);
+                return match ? match[1] : null;
+            }).filter(Boolean))).filter(name => {
+                if (!sim || !sim.nsLabels) return true;
+                return !Object.values(sim.nsLabels).some(label =>
+                    String(label || '').toLowerCase() === String(name).toLowerCase());
+            });
+            const _addDotNames = _newDotNames.length ? {
+                label: `Add ${_newDotNames.length} new dot-name${_newDotNames.length === 1 ? '' : 's'} to Namespace`,
+                onClick: async function(button) {
+                    button.disabled = true;
+                    button.textContent = 'Adding…';
+                    const added = [];
+                    try {
+                        for (const name of _newDotNames) {
+                            const created = sim.defineSymbolicAbstraction(name, null);
+                            added.push(`${created.name} → NS[${created.slot}]`);
+                        }
+                        if (typeof _setNsDirty === 'function') _setNsDirty(true);
+                        if (typeof updateNamespace === 'function') updateNamespace();
+                        if (typeof window._nsTableSave === 'function') {
+                            const saved = await window._nsTableSave(null);
+                            if (!saved) throw new Error('The rows were added locally but could not be persisted. Use Namespace Save to retry.');
+                        }
+                        button.textContent = `Added ${added.length} row${added.length === 1 ? '' : 's'}`;
+                        if (con) {
+                            con.textContent = `Added to Namespace:\n${added.join('\n')}\n\nAdd explicit permissions (for example E) to each capability declaration, then compile again.`;
+                            con.scrollTop = 0;
+                        }
+                    } catch (error) {
+                        button.disabled = false;
+                        button.textContent = 'Retry adding dot-names';
+                        if (con) con.textContent = `Namespace update failed: ${error && error.message ? error.message : error}`;
+                    }
+                }
+            } : null;
+            _showAsmErrors(_capErrors, 'Capability validation failed — code not applied', _addDotNames);
         }
         showNextSteps('error');
         return;

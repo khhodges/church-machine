@@ -64,6 +64,15 @@ vm.runInContext('_showAsmErrors([{line:66,message:"Expected a capability registe
 assert.equal(disassembly.style.display, 'none', 'errors replace saved disassembly');
 assert.equal(errors.style.display, 'flex', 'compiler errors are visible');
 
+let actionCalled = false;
+context.testAction = function() { actionCalled = true; };
+vm.runInContext('_showAsmErrors([{line:null,message:"Capability \\"New.Service\\" has no declared permissions."}], "Capability validation failed", {label:"Add 1 new dot-name to Namespace", onClick:testAction})', context);
+const actionButton = errors.querySelector('.asm-error-action-btn');
+assert(actionButton, 'capability errors can render a Namespace action');
+assert.equal(actionButton.textContent, 'Add 1 new dot-name to Namespace');
+actionButton.click();
+assert.equal(actionCalled, true, 'Namespace action invokes its callback');
+
 vm.runInContext('_clearAsmErrors()', context);
 assert.equal(errors.style.display, 'none', 'cleared compiler errors are hidden');
 assert.equal(disassembly.style.display, 'flex', 'saved disassembly returns after clearing errors');
