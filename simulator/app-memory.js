@@ -3635,11 +3635,7 @@ function _nsTableAdd() {
     _overlay.id = '_nsAddModalOverlay';
     _overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
     _overlay.innerHTML = `<div style="background:#12121f;border:1px solid #2a2a4a;border-radius:8px;padding:24px 28px;min-width:340px;max-width:580px;width:100%;color:#d0d0e8;font-size:0.85rem;max-height:90vh;overflow-y:auto;">
-      <div style="color:#c89b3c;font-size:1rem;font-weight:600;margin-bottom:12px;">Add to Namespace</div>
-      <div style="display:flex;gap:8px;margin-bottom:14px;">
-        <button id="_nsInstallModeBtn" onclick="_nsAddSetMode('install')" class="btn">Install existing LUMP</button>
-        <button id="_nsSymbolicModeBtn" onclick="_nsAddSetMode('symbolic')" class="btn">Define new abstraction</button>
-      </div>
+      <div style="color:#c89b3c;font-size:1rem;font-weight:600;margin-bottom:12px;">+ Add LUMP to Namespace</div>
       <div id="_nsInstallPane"><div id="_nsAddStatus" style="color:#888;">Loading LUMP list\u2026</div></div>
       <div id="_nsSymbolicPane" style="display:none;">
         <label style="display:block;color:#a78bfa;font-size:.72rem;margin-bottom:4px;">Canonical dotted name</label>
@@ -3649,7 +3645,13 @@ function _nsTableAdd() {
         <div id="_nsSymbolicPreview" data-testid="ns-symbolic-preview" style="margin:12px 0;color:#f0a040;">Enter a dotted name to preview the binding.</div>
         <div style="color:#aaa;font-size:.76rem;margin-bottom:12px;">This defines identity and local authority only. Code is missing, so the binding cannot execute until a matching LUMP is installed.</div>
         <div id="_nsSymbolicError" style="color:#f87171;min-height:1.2em;"></div>
-        <div style="display:flex;justify-content:flex-end;gap:8px;"><button onclick="document.getElementById('_nsAddModalOverlay').remove()" class="btn">Cancel</button><button id="_nsSymbolicConfirm" onclick="_nsDefineSymbolicConfirm()" class="btn">Define abstraction</button></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px;">
+        <button id="_nsNewButton" data-testid="ns-new-button" onclick="_nsAddSetMode('symbolic')" class="btn" style="margin-right:auto;color:#c89b3c;border-color:#c89b3c;">NEW</button>
+        <button id="_nsInstallModeBtn" onclick="_nsAddSetMode('install')" class="btn" style="display:none;margin-right:auto;">Back to LUMPs</button>
+        <button onclick="document.getElementById('_nsAddModalOverlay').remove()" class="btn">Cancel</button>
+        <button id="_nsAddConfirmBtn" onclick="_nsTableAddConfirm()" class="btn" disabled>Install</button>
+        <button id="_nsSymbolicConfirm" onclick="_nsDefineSymbolicConfirm()" class="btn" style="display:none;">Define abstraction</button>
       </div>
     </div>`;
     _overlay.addEventListener('click', function(ev) { if (ev.target === _overlay) _overlay.remove(); });
@@ -3696,15 +3698,10 @@ function _nsTableAdd() {
                 optHtml += `<option value="${l.token}">${name}</option>`;
             }
             inner.innerHTML = `
-                <div style="color:#c89b3c;font-size:1rem;font-weight:600;margin-bottom:12px;">+ Add LUMP to Namespace</div>
                 <div style="margin-bottom:8px;color:#888;font-size:0.8rem;">${_available.length} LUMP${_available.length === 1 ? '' : 's'} available</div>
                 <select id="_nsAddSelect" style="width:100%;background:#0d0d1a;color:#d0d0e8;border:1px solid #2a2a4a;border-radius:4px;padding:6px 8px;font-size:0.85rem;margin-bottom:10px;">${optHtml}</select>
                 <div id="_nsAddMeta" style="margin-bottom:8px;"></div>
-                <div id="_nsAddError" style="color:#f87171;font-size:0.78rem;min-height:1.2em;margin-bottom:8px;"></div>
-                <div style="display:flex;gap:8px;justify-content:flex-end;">
-                    <button onclick="document.getElementById('_nsAddModalOverlay').remove()" style="background:transparent;color:#888;border:1px solid #2a2a4a;border-radius:4px;padding:5px 14px;font-size:0.82rem;cursor:pointer;">Cancel</button>
-                    <button id="_nsAddConfirmBtn" onclick="_nsTableAddConfirm()" style="background:#1a4a2e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.4);border-radius:4px;padding:5px 14px;font-size:0.82rem;cursor:pointer;font-weight:600;">Install</button>
-                </div>`;
+                <div id="_nsAddError" style="color:#f87171;font-size:0.78rem;min-height:1.2em;margin-bottom:8px;"></div>`;
 
             // Wire change event → populate metadata panel
             const sel = document.getElementById('_nsAddSelect');
@@ -3725,8 +3722,16 @@ function _nsTableAdd() {
 function _nsAddSetMode(mode) {
     const install = document.getElementById('_nsInstallPane');
     const symbolic = document.getElementById('_nsSymbolicPane');
+    const newButton = document.getElementById('_nsNewButton');
+    const backButton = document.getElementById('_nsInstallModeBtn');
+    const installButton = document.getElementById('_nsAddConfirmBtn');
+    const defineButton = document.getElementById('_nsSymbolicConfirm');
     if (install) install.style.display = mode === 'install' ? '' : 'none';
     if (symbolic) symbolic.style.display = mode === 'symbolic' ? '' : 'none';
+    if (newButton) newButton.style.display = mode === 'install' ? '' : 'none';
+    if (backButton) backButton.style.display = mode === 'symbolic' ? '' : 'none';
+    if (installButton) installButton.style.display = mode === 'install' ? '' : 'none';
+    if (defineButton) defineButton.style.display = mode === 'symbolic' ? '' : 'none';
     if (mode === 'symbolic') {
         const name = document.getElementById('_nsSymbolicName');
         const slot = document.getElementById('_nsSymbolicSlot');
