@@ -2735,7 +2735,6 @@ async function _fetchAndShowLumpTimeline(token, lump) {
 
         const STABLE_ICONS  = { stable: '\u2705', amber: '\u26a0\ufe0f', red: '\u274c', unknown: '\u2014' };
         const STABLE_LABELS = { stable: 'Stable', amber: 'Tier-3 reboots', red: 'Unrecovered halts', unknown: 'Unknown' };
-        const STABLE_COLORS = { stable: 'var(--mtbf-green, #22c55e)', amber: '#f59e0b', red: '#ef4444', unknown: '#9ca3af' };
 
         let html = '<div class="lump-detail-section">';
         html += '<div class="lump-section-title">Version History</div>';
@@ -2752,7 +2751,6 @@ async function _fetchAndShowLumpTimeline(token, lump) {
         } else {
             html += `<table class="lump-detail-table" id="lumpHistoryTable_${tk}"><thead><tr>`;
             html += '<th>Ver</th><th>This</th><th>Compiled</th><th>CW</th><th>CC</th><th>Size</th>';
-            if (hasTel) html += '<th>Devices</th><th>Faults/1k</th><th>Health</th>';
              html += '<th colspan="3"></th>';
             if (hasTel) html += '<th></th>';
             html += '</tr></thead><tbody>';
@@ -2782,7 +2780,6 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                     devices: '\u2014',
                     faults: '\u2014',
                     health: '\u2014',
-                    healthLabel: 'Health unavailable',
                 };
                 if (tel) {
                     const observed = tel.observed !== false &&
@@ -2800,7 +2797,6 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                         devices: observed ? String(tel.device_count) : 'Not observed',
                         faults: faultStr,
                         health: `${statusIcon} ${statusLabel}`.trim(),
-                        healthLabel: statusLabel,
                     };
                 }
                 const metadataOnly = Boolean(hist && hist.metadata_only);
@@ -2862,29 +2858,6 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                     `<span><b>Faults/1k</b> ${e(telemetrySummary.faults)}</span>` +
                     `<span><b>Health</b> ${e(telemetrySummary.health)}</span>` +
                     `</span></span></td>`;
-
-                // Telemetry columns (only rendered when hasTel)
-                if (hasTel) {
-                    if (tel) {
-                        const observed = tel.observed !== false &&
-                            (tel.device_count > 0 || tel.total_faults > 0 ||
-                             tel.total_steps > 0 || tel.stable_status !== 'unknown');
-                        const rate1k = tel.fault_rate_per_1000 != null ? tel.fault_rate_per_1000
-                                     : (tel.fault_rate > 0 ? tel.fault_rate * 1000 : 0);
-                        const faultStr = observed
-                            ? (rate1k > 0 ? `${rate1k.toFixed(4)}/1k` : '0')
-                            : 'Not observed';
-                        const status   = observed ? (tel.stable_status || 'stable') : 'unknown';
-                        const statusIcon  = STABLE_ICONS[status]  || '';
-                        const statusLabel = STABLE_LABELS[status] || status;
-                        const statusColor = STABLE_COLORS[status] || '#9ca3af';
-                        html += `<td>${e(telemetrySummary.devices)}</td>`;
-                        html += `<td>${e(telemetrySummary.faults)}</td>`;
-                        html += `<td><span style="color:${statusColor};font-size:0.8rem;" title="${e(statusLabel)}">${statusIcon} ${e(statusLabel)}</span></td>`;
-                    } else {
-                        html += '<td>\u2014</td><td>\u2014</td><td>\u2014</td>';
-                    }
-                }
 
                 // Preview is safe for every readable binary. The active checkbox
                 // performs the protected restore transition for eligible archives.

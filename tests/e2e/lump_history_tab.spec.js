@@ -1353,9 +1353,12 @@ test.describe('LUMP History tab — current provenance and unobserved health', (
         await expect(row).toContainText('21');
         await expect(row).toContainText('5');
         await expect(row).toContainText('512w');
-        await expect(row).toContainText('Not observed');
-        await expect(row).toContainText('Unknown');
-        await expect(row).not.toContainText('Stable');
+        const sizeTrigger = row.locator('.lump-history-size-trigger');
+        await sizeTrigger.hover();
+        const popup = sizeTrigger.locator('.lump-history-size-popup');
+        await expect(popup).toContainText('Devices Not observed');
+        await expect(popup).toContainText('Health \u2014 Unknown');
+        await expect(popup).not.toContainText('Stable');
         await expect(row.getByRole('button', { name: 'Preview', exact: true })).toBeVisible();
         await expect(row.getByRole('checkbox', {
             name: 'v10 is the current LUMP',
