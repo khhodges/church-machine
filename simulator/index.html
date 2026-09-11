@@ -82,7 +82,7 @@
     <link rel="icon" type="image/svg+xml" sizes="16x16" href="favicon.svg">
     <link rel="stylesheet" href="styles-base.css?v=20260905-bitstream-source-version1">
     <link rel="stylesheet" href="styles-landing.css?v=20260820-card-dnd2">
-    <link rel="stylesheet" href="styles-toolbar.css?v=20260909-thread-context-modal">
+    <link rel="stylesheet" href="styles-toolbar.css?v=20260911-editor-actions">
     <link rel="stylesheet" href="styles-editor.css?v=sha256-371b4cd27b42">
     <link rel="stylesheet" href="styles-dashboard.css?v=20260830-thread-heap-formula1">
     <link rel="stylesheet" href="styles-lumps.css?v=sha256-420ddae75f81">
@@ -847,7 +847,6 @@
 
     <div id="editor" class="view">
         <section id="lastFaultHost" class="last-fault-host" aria-live="polite" aria-label="Last Accepted Fault"></section>
-        <div id="executionIdentityEditor" class="execution-identity-strip execution-identity-empty" aria-label="Execution identity: no program loaded">No program loaded</div>
         <div class="editor-layout">
             <div class="editor-panel">
                 <div class="editor-toolbar">
@@ -866,15 +865,20 @@
                                 <button class="ham-item" onclick="_editorFindOpen(false);closeEditorActions()" data-tooltip="Find — Search for text in the editor">Find&hellip;</button>
                                 <button class="ham-item" onclick="_editorFindOpen(true);closeEditorActions()" data-tooltip="Find &amp; Replace — Search and replace text in the editor">Find &amp; Replace&hellip;</button>
                                 <div class="ham-divider"></div>
-                                <div class="ham-group-title">Build</div>
-                                <button class="ham-item" onclick="smartCompile();closeEditorActions()" data-tooltip="Compile — Compile with auto-detected or selected source language">Compile</button>
+                                <div class="editor-actions-context" id="editorActionsIdentity" aria-live="polite">
+                                    <span class="editor-actions-context-label">Current LUMP identity</span>
+                                    <strong id="editorActionsIdentityValue">—</strong>
+                                </div>
+                                <div class="ham-group-title">Build &amp; inspect</div>
+                                <button class="ham-item" id="btnHamCompile" onclick="smartCompile();closeEditorActions()" data-tooltip="Compile — Compile with auto-detected or selected source language">Compile</button>
                                 <button class="ham-item" id="btnHamSaveLump" onclick="editorSaveLump();closeEditorActions()" style="color:#7dd3a8;" data-tooltip="Save Lump — Save a new dated version of the current LUMP; or compile-then-save if no LUMP is open">Save Lump</button>
                                 <button class="ham-item" onclick="compileDraft();closeEditorActions()" style="color:#C89B3C;" data-tooltip="Draft — Show compilation draft: methods, capabilities, and lump layout">Draft</button>
                                 <button class="ham-item" onclick="showCreateNamespace();closeEditorActions()" data-tooltip="Create Namespace — Reserve a namespace slot for your abstraction">Create Namespace</button>
                                 <button class="ham-item" onclick="compileAndCreateAbstraction();closeEditorActions()" data-tooltip="Create Abstraction — Compile and create via Navana.Abstraction.Add">Create Abstraction</button>
                                 <button class="ham-item" onclick="auditLumpOnly();closeEditorActions()" data-tooltip="Audit LUMP — Compile and run structural consistency checks without downloading or saving">Audit LUMP</button>
                                 <button class="ham-item" onclick="exportLumpAsPatch();closeEditorActions()" style="color:#66bb6a;" data-tooltip="Export Lump as Patch — Load a pre-built .lump file and convert to a .patch file for FPGA flashing">Lump → Patch ↓</button>
-                                <button class="ham-item" onclick="showEditorCListPopup(event);closeEditorActions()" style="color:#7dd3fc;" data-tooltip="C-List — Browse capability names and insert into editor">C-List</button>
+                                <button class="ham-item" id="btnHamInstructions" onclick="(function(){var ed=document.getElementById('asmEditor');if(ed&&window.AsmInstructionPicker){ed.focus();window.AsmInstructionPicker.show(ed);}})();closeEditorActions()" style="color:#c4b5fd;" data-tooltip="Instructions — Browse and insert assembly instructions">Instructions</button>
+                                <button class="ham-item" id="btnHamCList" onclick="showEditorCListPopup(event);closeEditorActions()" style="color:#7dd3fc;" data-tooltip="C-List — Browse capability names and insert into editor">C-List</button>
                                 <div class="ham-divider"></div>
                                 <div class="ham-group-title">Install</div>
                                 <button class="ham-item" onclick="saveUploadJSON();closeEditorActions()" data-tooltip="Save Abstraction — Compile and save the abstraction definition file">Save Abstraction</button>
@@ -908,8 +912,7 @@
                         </select>
                         <span id="editorCodeName" class="editor-code-name"></span>
                         <button class="btn btn-sm editor-jump-btn" id="editorJumpToAbsBtn" style="display:none;" onclick="_editorJumpToAbstraction()" data-tooltip="Open in Abstraction Catalog — Jump to this code's Abstraction entry">&#8594; Abstraction</button>
-                        <button class="btn btn-compile-inline" id="btnToolbarCompile" onclick="smartCompile()" data-tooltip="Compile — Compile with auto-detected or selected language">Compile</button>
-                        <button class="btn btn-compile-inline" id="btnToolbarSaveLumpPerm" onclick="editorSaveLump()" style="background:rgba(125,211,168,0.15);border-color:rgba(125,211,168,0.5);color:#7dd3a8;" data-tooltip="Save Lump — Compile and save to a namespace slot, or save a new dated version of the open LUMP">Save Lump</button>
+                        <span id="editorIdentityName" class="editor-identity-name" aria-label="Current LUMP identity" title="Current LUMP identity"></span>
 
                         <span id="asmWarnBadge" class="asm-warn-badge" style="display:none;" title="Assembly warnings — scroll up to review">&#x26A0; <span id="asmWarnBadgeCount"></span></span>
                     </div>
@@ -1007,10 +1010,6 @@
                 <div id="presetNoticeBar" class="preset-notice-bar" style="display:none;">
                     <span class="preset-notice-icon">&#x2139;</span>
                     <span class="preset-notice-text">Integer arithmetic only — load the CLOOMC preset for exact fractions.</span>
-                </div>
-                <div class="asm-picker-toolbar">
-                <button class="btn-instr-picker" title="Open instruction picker" data-tooltip="Instruction Picker — Browse and insert assembly instructions" onclick="(function(){var ed=document.getElementById('asmEditor');if(ed&&window.AsmInstructionPicker){ed.focus();window.AsmInstructionPicker.show(ed);}})()">&#x2295; Instructions</button>
-                <button class="btn-clist-viewer" title="View C-List capabilities" data-tooltip="C-List Viewer — Browse Golden Tokens in CR6" onclick="window.CListViewer&&window.CListViewer.toggle()">&#x2295; C-List</button>
                 </div>
                 <div id="compileFailedBanner" class="compile-failed-banner" role="alert" aria-live="assertive" style="display:none;">
                     <span class="compile-failed-banner-icon">&#x2716;</span>

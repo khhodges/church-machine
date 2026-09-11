@@ -11816,6 +11816,59 @@ function escapeHtml(str) {
 function _updateEditorCodeName(name) {
     const el = document.getElementById('editorCodeName');
     if (el) el.textContent = name || '';
+    _refreshEditorActionIdentity(name);
+}
+
+function _editorActionIdentity(name) {
+    let dotName = '';
+    let issue = '';
+    const baseName = String(name || '').trim();
+    try {
+        const identity = window.ExecutionIdentity && window.ExecutionIdentity.get
+            ? window.ExecutionIdentity.get() : null;
+        dotName = identity && identity.dotName || '';
+        if (identity && identity.token && window.LumpRegistry) {
+            const entry = window.LumpRegistry.resolve(identity.token);
+            const server = entry && entry.sources && entry.sources.server;
+            dotName = (server && (server.dot_name || server.identity_string)) || dotName;
+            issue = server && (server.issue_n || server.issue) || '';
+        }
+    } catch (_) {}
+    if (baseName.includes('.') || /#\d+$/.test(baseName)) {
+        dotName = baseName.replace(/#\d+$/, '');
+        const baseIssue = baseName.match(/#(\d+)$/);
+        if (baseIssue) issue = baseIssue[1];
+    } else if (!dotName) {
+        try { dotName = localStorage.getItem('church_petname') || ''; } catch (_) {}
+        if (baseName) dotName = dotName ? `${dotName}.${baseName}` : baseName;
+    }
+    if (!dotName) return '';
+    if (/#\d+$/.test(dotName)) return dotName;
+    if (!issue) {
+        try { issue = localStorage.getItem('church_issue_number') || '1'; } catch (_) { issue = '1'; }
+    }
+    return `${dotName}#${issue}`;
+}
+
+function _refreshEditorActionIdentity(name) {
+    const identity = _editorActionIdentity(name || (document.getElementById('editorCodeName') || {}).textContent);
+    const identityValue = document.getElementById('editorActionsIdentityValue');
+    const identityName = document.getElementById('editorIdentityName');
+    if (identityValue) identityValue.textContent = identity || 'No LUMP identity yet';
+    if (identityName) {
+        identityName.textContent = identity;
+        identityName.title = identity ? `Current LUMP identity: ${identity}` : 'Current LUMP identity';
+    }
+    [
+        ['btnHamCompile', 'Compile'],
+        ['btnHamInstructions', 'Instructions'],
+        ['btnHamCList', 'C-List'],
+    ].forEach(([id, label]) => {
+        const button = document.getElementById(id);
+        if (!button) return;
+        button.textContent = identity ? `${label} · ${identity}` : label;
+        button.setAttribute('aria-label', identity ? `${label} for ${identity}` : label);
+    });
 }
 
 const _EDITOR_DOCUMENT_STATE_KEY = 'church_editor_document_v1';
@@ -14542,6 +14595,8 @@ function saveSettings() {
         const _inVal = parseInt(_inEl.value) || 1;
         localStorage.setItem('church_issue_number', String(_inVal));
     }
+    _refreshEditorActionIdentity(
+        (document.getElementById('editorCodeName') || {}).textContent || '');
 
     const boardSel = document.getElementById('settingFPGABoard');
     if (boardSel) setSelectedBoard(boardSel.value);

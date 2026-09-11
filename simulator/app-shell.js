@@ -296,6 +296,10 @@ function _executionIdentityRenderOne(id) {
 
 function _executionIdentityRender() {
     _executionIdentityRecompute();
+    if (typeof _refreshEditorActionIdentity === 'function') {
+        _refreshEditorActionIdentity(
+            (document.getElementById('editorCodeName') || {}).textContent || '');
+    }
     _executionIdentityRenderOne('executionIdentityEditor');
     _executionIdentityRenderOne('executionIdentityTrace');
     _executionIdentityRenderOne('executionIdentityHwTrace');

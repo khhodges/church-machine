@@ -117,6 +117,9 @@ register_suite "check-selftest-lump-stale" \
 register_suite "lump-save-snapshot-tests" \
     'node simulator/test_lump_save_snapshot.js'
 
+register_suite "editor-action-menu-tests" \
+    'node simulator/test_editor_action_menu.js'
+
 register_suite "check-capabilities-blocks" \
     'node scripts/check-capabilities-blocks.js'
 

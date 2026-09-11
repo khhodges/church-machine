@@ -290,6 +290,45 @@
     font-weight: 600;
 }
 
+.editor-actions-context {
+    padding: 0.55rem 0.85rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+    background: rgba(96,165,250,0.06);
+    overflow-wrap: anywhere;
+}
+
+.editor-actions-context-label {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.63rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.2rem;
+}
+
+.editor-actions-context strong {
+    display: block;
+    color: #9cc7f5;
+    font: 0.74rem/1.35 var(--font-mono, "Courier New", monospace);
+    overflow-wrap: anywhere;
+}
+
+.editor-identity-name {
+    display: inline-block;
+    max-width: min(34vw, 28rem);
+    color: #9cc7f5;
+    font: 0.68rem/1.2 var(--font-mono, "Courier New", monospace);
+    overflow-wrap: anywhere;
+    white-space: normal;
+    min-width: 0;
+}
+
+@media (max-width: 700px) {
+    .editor-identity-name {
+        max-width: 42vw;
+    }
+}
+
 /* ── Toolbar context groups ───────────────────────────── */
 .toolbar-group {
     display: flex;
