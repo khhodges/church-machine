@@ -665,7 +665,7 @@ test.describe('LUMP History tab — Preview button renders hex dump', () => {
 });
 
 test.describe('LUMP History tab — legacy bootstrap evidence', () => {
-    test('legacy manifest record is previewable but read only', async ({ page }) => {
+    test('legacy manifest record is previewable and can be deleted', async ({ page }) => {
         test.setTimeout(40000);
         const legacyToken = 'b6182a95';
         const invalidIdentity = {
@@ -692,12 +692,14 @@ test.describe('LUMP History tab — legacy bootstrap evidence', () => {
                     preview_enabled: true,
                     restore_enabled: false,
                     binary_valid: false,
+                    archive_filename: 'CapabilityTest_legacy.lump',
+                    record_filename: 'CapabilityTest_legacy.lump',
                     legacy_incompatible: true,
                     bootstrap_identity: invalidIdentity,
                 }],
             }),
         }));
-        await page.route(`**/api/lump/${legacyToken}/words`, route => route.fulfill({
+        await page.route(`**/api/lump/${legacyToken}/words**`, route => route.fulfill({
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify({
@@ -711,6 +713,20 @@ test.describe('LUMP History tab — legacy bootstrap evidence', () => {
             contentType: 'application/json',
             body: JSON.stringify(STUB_WORDS_CURRENT),
         }));
+        let deleteRequest = null;
+        await page.route(`**/api/lumps/${STUB_TOKEN}/history/1`, async route => {
+            deleteRequest = route.request();
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    ok: true,
+                    token: STUB_TOKEN,
+                    version: 1,
+                    deleted: ['CapabilityTest_legacy.lump'],
+                }),
+            });
+        });
 
         await openLumpDetail(page);
         await clickHistoryTab(page);
@@ -721,6 +737,12 @@ test.describe('LUMP History tab — legacy bootstrap evidence', () => {
         await row.getByRole('button', { name: 'Preview' }).click();
         const preview = await waitForHexTable(page);
         await expect(preview).toContainText('Archived bootstrap identity mismatch');
+
+        await page.locator('#lumpHistoryPreviewModal .lump-history-preview-close').click();
+        page.once('dialog', dialog => dialog.accept());
+        await row.getByRole('button', { name: 'Delete' }).click();
+        await expect.poll(() => deleteRequest && deleteRequest.method()).toBe('DELETE');
+        expect(JSON.parse(deleteRequest.postData()).archive_filename).toBe('CapabilityTest_legacy.lump');
     });
 });
 
