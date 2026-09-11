@@ -2821,7 +2821,7 @@ async function _fetchAndShowLumpTimeline(token, lump) {
 
                 // Preview + Restore (only for archived binaries)
                 if (previewUsable) {
-                    html += `<td><button class="btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_lumpHistoryPreview('${e(previewToken)}',${ver},${histInspection.cw||0},${histInspection.cc||0},${histInspection.lump_size||0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(token)}')" title="Preview hex diff of v${ver}">Preview</button></td>`;
+                    html += `<td><button class="btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_lumpHistoryPreview('${e(previewToken)}',${ver},${histInspection.cw||0},${histInspection.cc||0},${histInspection.lump_size||0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(token)}')" title="Preview source and hex diff of v${ver}">Preview</button></td>`;
                     if (archiveUsable)
                         html += `<td><button class="btn lump-history-restore-btn" id="lumpHistoryRestoreBtn_${tk}_${ver}" style="font-size:0.7rem;padding:2px 8px;" disabled onclick="event.stopPropagation();_restoreLumpFromHistory('${e(token)}',${ver})" title="Preview this version first, then restore">Restore</button></td>`;
                     else
@@ -2966,6 +2966,38 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             return;
         }
 
+        // The archived endpoint returns the source embedded in the exact
+        // historical bytes. Show that source as the primary preview instead
+        // of making the programmer reverse-engineer the binary from the hex
+        // diff. Keep the diff below it because it is still useful when
+        // comparing the revision with the current artifact.
+        const archivedSource = (typeof data.source === 'string' && data.source.trim())
+            ? data.source
+            : (typeof inspection.source === 'string' && inspection.source.trim()
+                ? inspection.source : '');
+        let sourcePreview = '';
+        if (archivedSource) {
+            const sourceIsAssembly = typeof _isRawISASource === 'function' &&
+                _isRawISASource(archivedSource);
+            const sourceLanguage = sourceIsAssembly ? 'assembly' : 'cloomc';
+            const sourceLabel = sourceIsAssembly ? 'Assembly' : 'CLOOMC++';
+            sourcePreview =
+                `<div class="lump-detail-section lump-history-source-section">` +
+                `<div class="lump-section-title">Source \u2014 v${version}</div>` +
+                `<div class="lump-stored-src-meta-bar lump-stored-src-meta">` +
+                `<span class="lump-stored-src-lang-badge">${sourceLabel}</span>` +
+                `<span class="lump-stored-src-ts">Embedded in the archived binary</span>` +
+                `</div>` +
+                `<pre class="lump-stored-src-pre lump-stored-src-pre-full lump-history-source-pre">${_highlightCLOOMCSource(archivedSource, sourceLanguage)}</pre>` +
+                `</div>`;
+        } else {
+            sourcePreview =
+                `<div class="lump-detail-section lump-history-source-section">` +
+                `<div class="lump-section-title">Source \u2014 v${version}</div>` +
+                `<div class="lump-stored-src-empty">No source is embedded in this archived revision.</div>` +
+                `</div>`;
+        }
+
         const historicalWarning = historicalRecord && data.bootstrap_identity &&
                 data.bootstrap_identity.valid === false
             ? `<div class="lump-history-provenance-note">\u26a0 Archived bootstrap identity mismatch. This binary is preview-only and cannot be restored.</div>`
@@ -3034,7 +3066,7 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             t += `<tr class="${rowClass}"><td class="lump-hex-addr">0x${baseAddr}</td>${rowHex}${ascCell}</tr>`;
         }
         t += '</tbody></table></div>';
-        previewEl.innerHTML = historicalWarning + t;
+        previewEl.innerHTML = historicalWarning + sourcePreview + t;
         if (!historicalRecord) _enableRestoreBtn();
     } catch (err) {
         _noPreview(err.message);

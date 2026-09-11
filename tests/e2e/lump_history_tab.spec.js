@@ -31,6 +31,15 @@ test.beforeEach(async ({ page }) => {
     await page.route('**/hardware/wukong/status', route => route.abort());
     await page.route('**/hardware/wukong/events**', route => route.abort());
     await page.route('**/hardware/wukong/boot-info', route => route.abort());
+    // Keep the history fixtures deterministic. Tests that need telemetry
+    // register their own more-specific response below.
+    await page.route('**/api/lump/version-telemetry/TestAbs', async route => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ versions: [] }),
+        });
+    });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -116,6 +125,7 @@ const STUB_WORDS_V1 = {
     profile:     'IoT',
     language:    'assembly',
     author:      '',
+    source:      'Abstraction TestAbs {\n    Method Init() {\n        RETURN\n    }\n}',
     binary_hash: 'a'.repeat(64),
     binary_valid: true,
 };
@@ -243,8 +253,8 @@ test.describe('LUMP History tab — table renders rows', () => {
         await expect(row.locator('td').nth(2)).toHaveText('10');
         // CC column (index 3).
         await expect(row.locator('td').nth(3)).toHaveText('2');
-        // Size column (index 4) — rendered as "<n>w".
-        await expect(row.locator('td').nth(4)).toHaveText('32w');
+        // Size column (index 4) — rendered as "<n>w" plus the content profile.
+        await expect(row.locator('td').nth(4)).toContainText('32w');
     });
 
     test('history row has a Restore button', async ({ page }) => {
@@ -582,17 +592,18 @@ async function waitForHexTable(page) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Suite 4 — Preview button fetches archived binary and renders hex dump table
+// Suite 4 — Preview button fetches archived binary, shows source, and renders
+// the hex dump table
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // Clicking the "Preview" button on a history row calls _lumpHistoryPreview,
 // which fetches /api/lumps/<token>/words/<version> (archived binary) and
-// /api/lump/<token>/words (current binary for diff), then renders a
-// lump-hex-table inside #lumpHistoryHexPreview_<tk>.
+// /api/lump/<token>/words (current binary for diff), then renders the embedded
+// source and a lump-hex-table inside #lumpHistoryHexPreview_<tk>.
 
 test.describe('LUMP History tab — Preview button renders hex dump', () => {
 
-    test('clicking Preview button fetches /api/lumps/<token>/words/1 and renders lump-hex-table', async ({ page }) => {
+    test('clicking Preview button fetches the archived source and renders lump-hex-table', async ({ page }) => {
         test.setTimeout(40000);
 
         await stubPreviewRoutes(page);
@@ -610,6 +621,8 @@ test.describe('LUMP History tab — Preview button renders hex dump', () => {
 
         // The hex table must appear inside the preview div.
         const previewDiv = await waitForHexTable(page);
+        await expect(previewDiv.locator('.lump-history-source-section')).toContainText('Abstraction TestAbs');
+        await expect(previewDiv.locator('.lump-history-source-pre')).toContainText('RETURN');
         const hexTable = previewDiv.locator('table.lump-hex-table');
         await expect(hexTable).toBeVisible();
 
@@ -640,7 +653,7 @@ test.describe('LUMP History tab — Preview button renders hex dump', () => {
         await expect(dataRows).toHaveCount(4);
 
         // The diff summary section must also be present (changed or identical).
-        await expect(previewDiv.locator('.lump-detail-section')).toBeVisible();
+        await expect(previewDiv.locator('.lump-detail-section:not(.lump-history-source-section)')).toBeVisible();
     });
 
 });
