@@ -268,6 +268,44 @@ test.describe('LUMP History tab — table renders rows', () => {
         await expect(row.locator('td').nth(5)).toContainText('32w');
     });
 
+    test('hovering or focusing Size reveals device, fault, and health telemetry', async ({ page }) => {
+        test.setTimeout(40000);
+        await page.route(`**/api/lump/version-telemetry/TestAbs`, async route => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    versions: [{
+                        lump_version: 1,
+                        lump_token: STUB_TOKEN,
+                        compiled_at: COMPILED_AT,
+                        device_count: 7,
+                        total_faults: 2,
+                        total_steps: 2000,
+                        observed: true,
+                        fault_rate_per_1000: 1,
+                        stable_status: 'amber',
+                    }],
+                }),
+            });
+        });
+        await openLumpDetail(page);
+        await clickHistoryTab(page);
+
+        const sizeTrigger = page.locator(
+            `#lumpHistoryBody_${STUB_TK} .lump-history-size-trigger`
+        );
+        await sizeTrigger.hover();
+        const popup = sizeTrigger.locator('.lump-history-size-popup');
+        await expect(popup).toBeVisible();
+        await expect(popup).toContainText('Devices 7');
+        await expect(popup).toContainText('Faults/1k 1.0000/1k');
+        await expect(popup).toContainText('Health');
+
+        await sizeTrigger.focus();
+        await expect(popup).toBeVisible();
+    });
+
     test('history row has an unchecked This checkbox for a valid archive', async ({ page }) => {
         test.setTimeout(40000);
         await openLumpDetail(page);

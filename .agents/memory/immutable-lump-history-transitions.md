@@ -13,3 +13,9 @@ Historical and current manifest rows may share one immutable token when both row
 **Why:** Archiving a current row without changing its immutable bytes can leave an archived record and a current record for the same token. Treating every duplicate as ambiguous made valid saved LUMPs unavailable to source navigation.
 
 **How to apply:** Normalize matching manifest rows by filename before enforcing token uniqueness. One unique filename is safe; zero or multiple filenames is an integrity error.
+
+History version numbers are abstraction-wide, not token-wide. Allocation must include active manifest rows, historical manifest rows, and on-disk archive stems; the immutable approval should carry the save timestamp, with manifest metadata as a legacy fallback.
+
+**Why:** Migrations and replacement saves can use different tokens or filename stems for one abstraction. Token-local allocation creates duplicate visible V# rows, and approval-only timestamps leave older history rows undated.
+
+**How to apply:** Recheck version collisions under the transition lock and bind `compiled_at` to every new approval before publishing the manifest.

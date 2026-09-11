@@ -9031,6 +9031,51 @@ def save_lump():
 
     safe_name = _safe_stem(abs_name)
 
+    def _history_versions_for_abstraction(entries):
+        """Return every version already visible for this abstraction.
+
+        The active manifest is not the only source of history: older saves may
+        survive as files with a different archive stem, and historical
+        manifest rows can retain those exact filenames.  Version allocation
+        must consider all of them or a replacement can create two visible
+        rows with the same V#.
+        """
+        versions = set()
+        stems = {safe_name}
+        token_stems = set()
+        for entry in entries:
+            if not isinstance(entry, dict) or entry.get("abstraction") != abs_name:
+                continue
+            try:
+                if entry.get("lump_version") is not None:
+                    versions.add(int(entry["lump_version"]))
+            except (TypeError, ValueError):
+                pass
+            filename = os.path.basename(str(entry.get("filename") or ""))
+            if filename.endswith(".lump"):
+                stem = filename[:-5]
+                stem = _re_arch.sub(r"_v\d+$", "", stem)
+                if stem:
+                    stems.add(stem)
+            token = str(entry.get("token") or "").lower()
+            if token:
+                token_stems.add(token)
+
+        patterns = [
+            _re_arch.compile(rf"^{_re_arch.escape(stem)}_v(\d+)\.lump$")
+            for stem in stems
+        ] + [
+            _re_arch.compile(rf"^{_re_arch.escape(stem)}-v(\d+)\.lump$")
+            for stem in token_stems
+        ]
+        for filename in (os.listdir(lumps_dir) if os.path.isdir(lumps_dir) else []):
+            for pattern in patterns:
+                match = pattern.match(filename)
+                if match:
+                    versions.add(int(match.group(1)))
+                    break
+        return versions
+
     # ── Phase 1: Read manifest to find current entry + file paths ─────────────
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
     try:
@@ -9111,6 +9156,7 @@ def save_lump():
     _exist_filename = (_existing_entry or {}).get('filename', f'{token8}.lump')
     _existing_lump  = os.path.join(lumps_dir, _exist_filename)
     _existing_sc    = None
+    _history_versions = _history_versions_for_abstraction(manifest)
 
     # ── Phase 2: Determine current version number ──────────────────────────────
     _is_forked_save = False
@@ -9143,19 +9189,11 @@ def save_lump():
                                 'deriving archive version from disk (%d)', token8, _arch_ver)
 
     # ── Phase 3: Compute next version number and new file paths ───────────────
-    if _is_forked_save and _arch_ver is not None:
-        next_lump_version = _arch_ver
-    elif _arch_ver is not None:
-        next_lump_version = _arch_ver + 1
-    else:
-        existing_versions_for_abs = [
-            int(e.get("lump_version", 0))
-            for e in manifest
-            if e.get("abstraction") == abs_name
-            and e.get("lump_version") is not None
-            and e.get("token") != token8
-        ]
-        next_lump_version = (max(existing_versions_for_abs) + 1) if existing_versions_for_abs else 1
+    # A save is always a new revision, including a save made from an older
+    # archived editor buffer.  The transition helper rechecks archive
+    # collisions under its filesystem lock; this provisional value is used by
+    # Namespace preparation before that final value is returned.
+    next_lump_version = (max(_history_versions) + 1) if _history_versions else 1
 
     # ── Canonical filename derivation ─────────────────────────────────────────
     # All new saves use Dot.Name.issue_n.Number.lump format.
@@ -9344,6 +9382,7 @@ def save_lump():
         "binary_hash": _binary_hash, "dot_name": _dot_name_save,
         "issue_n": _issue_n_save,
         "abstraction": abs_name, "filename": lump_filename,
+        "compiled_at": _compiled_at,
     })
     if _bootstrap_identity is not None:
         # Frozen resident bootstrap has exactly one identity word; do not
@@ -10892,10 +10931,15 @@ def get_lump_history(token):
             not current and archive_filename_h
             and archived_manifest_h is None)
         bootstrap_identity_h = snapshot["bootstrap_identity"]
+        compiled_at_h = approval.get("compiled_at")
+        if compiled_at_h is None:
+            compiled_at_h = (
+                (_current_manifest_h if current else archived_manifest_h) or {}
+            ).get("compiled_at")
         entry = {
             "version": version,
             "current": current,
-            "compiled_at": approval.get("compiled_at"),
+            "compiled_at": compiled_at_h,
             "abstraction": approval.get("abstraction"),
             "cw": snapshot["cw"],
             "cc": snapshot["cc"],
@@ -10942,7 +10986,7 @@ def get_lump_history(token):
         return entry
 
     entries = []
-    archive_files = {}
+    archive_files = []
     for fn in (os.listdir(lumps_dir) if os.path.isdir(lumps_dir) else []):
         if not fn.endswith(".lump"):
             continue
@@ -10955,9 +10999,9 @@ def get_lump_history(token):
                 None,
             )
         if m:
-            archive_files.setdefault(int(m.group(1)), binary_name[:-5])
+            archive_files.append((int(m.group(1)), binary_name[:-5]))
 
-    for ver, stem in archive_files.items():
+    for ver, stem in archive_files:
         lump_path_v = os.path.join(lumps_dir, stem + ".lump")
         entries.append(_snapshot_entry_h(ver, lump_path_v))
 
@@ -10979,10 +11023,13 @@ def get_lump_history(token):
         _archived_snapshot_h = _validate_lump_snapshot(
             _archived_path_h, _archived_manifest_h)
         _archived_approval_h = _archived_snapshot_h["approval"] or {}
+        _archived_compiled_at_h = _archived_approval_h.get("compiled_at")
+        if _archived_compiled_at_h is None:
+            _archived_compiled_at_h = _archived_manifest_h.get("compiled_at")
         entries.append({
             "version": _archived_version_h,
             "current": False,
-            "compiled_at": _archived_approval_h.get("compiled_at"),
+            "compiled_at": _archived_compiled_at_h,
             "abstraction": _archived_manifest_h.get("abstraction"),
             "cw": _archived_snapshot_h["cw"],
             "cc": _archived_snapshot_h["cc"],
@@ -11029,7 +11076,7 @@ def get_lump_history(token):
                 _cur_ver = int(_cur_ver)
                 entries = [
                     e for e in entries
-                    if e["version"] != _cur_ver or e.get("historical_record")
+                    if e.get("record_filename") != _cur_fn
                 ]
                 entries.append(
                     _snapshot_entry_h(
@@ -19513,6 +19560,52 @@ def _commit_lump_history_transition(
         committed: list[str] = []
         temp_paths: list[str] = []
 
+        # Version numbers are abstraction-wide, not token-wide.  A bootstrap
+        # migration or an older filename stem can leave multiple immutable
+        # files related to the same abstraction, so checking only the target
+        # filename is insufficient to keep the history table unambiguous.
+        history_versions = set()
+        history_stems = set()
+        history_tokens = set()
+        target_abstraction = manifest_entry.get("abstraction")
+        source_filename = os.path.basename(archive_binary_path or "")
+        for entry in locked_manifest:
+            if not isinstance(entry, dict) or entry.get("abstraction") != target_abstraction:
+                continue
+            entry_filename = os.path.basename(str(entry.get("filename") or ""))
+            is_source_entry = (
+                entry.get("token") == token8 and
+                entry_filename == source_filename
+            )
+            try:
+                if entry.get("lump_version") is not None and not is_source_entry:
+                    history_versions.add(int(entry["lump_version"]))
+            except (TypeError, ValueError):
+                pass
+            filename = entry_filename
+            if filename.endswith(".lump"):
+                history_stems.add(re.sub(r"_v\d+$", "", filename[:-5]))
+            entry_token = str(entry.get("token") or "").lower()
+            if entry_token:
+                history_tokens.add(entry_token)
+        if archive_stem:
+            history_stems.add(str(archive_stem))
+        history_patterns = [
+            re.compile(rf"^{re.escape(stem)}_v(\d+)\.lump$")
+            for stem in history_stems if stem
+        ] + [
+            re.compile(rf"^{re.escape(entry_token)}-v(\d+)\.lump$")
+            for entry_token in history_tokens if entry_token
+        ]
+        for filename in (os.listdir(lumps_dir) if os.path.isdir(lumps_dir) else []):
+            if filename == source_filename:
+                continue
+            for pattern in history_patterns:
+                match = pattern.match(filename)
+                if match:
+                    history_versions.add(int(match.group(1)))
+                    break
+
         def _stage_bytes(data: bytes, suffix: str) -> str:
             fd, path = tempfile.mkstemp(dir=lumps_dir, prefix=".lump-transition-", suffix=suffix)
             temp_paths.append(path)
@@ -19560,7 +19653,8 @@ def _commit_lump_history_transition(
                     archive_lump_name = f"{archive_stem}_v{archive_version}.lump"
                     archive_lump_dest = _destination(archive_lump_name)
                     same_lump = os.path.abspath(archive_source) == os.path.abspath(archive_lump_dest)
-                    if not os.path.lexists(archive_lump_dest) or same_lump:
+                    if (archive_version not in history_versions and
+                            (not os.path.lexists(archive_lump_dest) or same_lump)):
                         break
                     archive_version += 1
 
@@ -19581,7 +19675,8 @@ def _commit_lump_history_transition(
                 while True:
                     candidate_binary = f"{versioned_current_stem}_v{next_version}.lump"
                     candidate_binary_path = _destination(candidate_binary)
-                    if not os.path.lexists(candidate_binary_path):
+                    if (next_version not in history_versions and
+                            not os.path.lexists(candidate_binary_path)):
                         break
                     next_version += 1
                 binary_filename = candidate_binary
@@ -19594,13 +19689,17 @@ def _commit_lump_history_transition(
                     "next_version": next_version,
                     "current_lump": binary_filename,
                 })
+                history_versions.add(next_version)
             elif advance_current_version_from_archive:
                 if archive_info is None:
                     raise ValueError("cannot advance current version without an archive")
                 next_version = archive_info["version"] + 1
+                while next_version in history_versions:
+                    next_version += 1
                 manifest_entry = dict(manifest_entry)
                 manifest_entry["lump_version"] = next_version
                 archive_info["next_version"] = next_version
+                history_versions.add(next_version)
 
             if binary_filename is not None:
                 if binary_bytes is None:

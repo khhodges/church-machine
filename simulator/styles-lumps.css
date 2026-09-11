@@ -293,6 +293,68 @@
     margin-top: 0.35rem;
 }
 
+.lump-history-size-cell {
+    position: relative;
+    white-space: nowrap;
+}
+
+.lump-history-size-trigger {
+    display: inline-block;
+    border-bottom: 1px dotted var(--text-secondary, #8b93a7);
+    cursor: help;
+    outline: none;
+}
+
+.lump-history-size-trigger:focus-visible {
+    border-radius: 3px;
+    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.55);
+}
+
+.lump-history-size-popup {
+    position: absolute;
+    z-index: 20;
+    left: 50%;
+    bottom: calc(100% + 0.45rem);
+    display: flex;
+    flex-direction: column;
+    gap: 0.22rem;
+    min-width: 10.5rem;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 5px;
+    background: var(--bg-panel, #172033);
+    color: var(--text-primary, #e5e7eb);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3);
+    font-size: 0.72rem;
+    line-height: 1.35;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, 0.25rem);
+    transition: opacity 120ms ease, transform 120ms ease;
+    visibility: hidden;
+}
+
+.lump-history-size-popup::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    width: 0;
+    height: 0;
+    border: 5px solid transparent;
+    border-top-color: rgba(148, 163, 184, 0.35);
+    transform: translateX(-50%);
+}
+
+.lump-history-size-cell:hover .lump-history-size-popup,
+.lump-history-size-trigger:focus .lump-history-size-popup,
+.lump-history-size-trigger:focus-visible .lump-history-size-popup {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, 0);
+    visibility: visible;
+}
+
 .lump-history-preview-overlay {
     z-index: 1200;
     padding: 1.25rem;

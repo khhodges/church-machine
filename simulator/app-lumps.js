@@ -2778,6 +2778,31 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                         : (contentProfile === 'full' ? 'Full source' : 'Legacy / unavailable'));
                 const szStr = histInspection && histInspection.lump_size != null
                     ? `${histInspection.lump_size}w \u00b7 ${profileLabel}` : '\u2014';
+                let telemetrySummary = {
+                    devices: '\u2014',
+                    faults: '\u2014',
+                    health: '\u2014',
+                    healthLabel: 'Health unavailable',
+                };
+                if (tel) {
+                    const observed = tel.observed !== false &&
+                        (tel.device_count > 0 || tel.total_faults > 0 ||
+                         tel.total_steps > 0 || tel.stable_status !== 'unknown');
+                    const rate1k = tel.fault_rate_per_1000 != null ? tel.fault_rate_per_1000
+                                 : (tel.fault_rate > 0 ? tel.fault_rate * 1000 : 0);
+                    const faultStr = observed
+                        ? (rate1k > 0 ? `${rate1k.toFixed(4)}/1k` : '0')
+                        : 'Not observed';
+                    const status = observed ? (tel.stable_status || 'stable') : 'unknown';
+                    const statusIcon = STABLE_ICONS[status] || '';
+                    const statusLabel = STABLE_LABELS[status] || status;
+                    telemetrySummary = {
+                        devices: observed ? String(tel.device_count) : 'Not observed',
+                        faults: faultStr,
+                        health: `${statusIcon} ${statusLabel}`.trim(),
+                        healthLabel: statusLabel,
+                    };
+                }
                 const metadataOnly = Boolean(hist && hist.metadata_only);
                 const validationErrors = hist && Array.isArray(hist.validation_errors)
                     ? hist.validation_errors : [];
@@ -2827,7 +2852,16 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                 html += `<td style="font-size:0.75rem;">${e(compiledStr)}</td>`;
                 html += `<td>${e(String(cwStr))}</td>`;
                 html += `<td>${e(String(ccStr))}</td>`;
-                html += `<td>${e(szStr)}</td>`;
+                const sizeAria = `Size ${szStr}; Devices ${telemetrySummary.devices}; ` +
+                    `Faults per 1,000 ${telemetrySummary.faults}; Health ${telemetrySummary.health}`;
+                html += `<td class="lump-history-size-cell">` +
+                    `<span class="lump-history-size-trigger" tabindex="0" role="button" ` +
+                    `aria-label="${e(sizeAria)}">${e(szStr)}` +
+                    `<span class="lump-history-size-popup" role="tooltip">` +
+                    `<span><b>Devices</b> ${e(telemetrySummary.devices)}</span>` +
+                    `<span><b>Faults/1k</b> ${e(telemetrySummary.faults)}</span>` +
+                    `<span><b>Health</b> ${e(telemetrySummary.health)}</span>` +
+                    `</span></span></td>`;
 
                 // Telemetry columns (only rendered when hasTel)
                 if (hasTel) {
@@ -2844,8 +2878,8 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                         const statusIcon  = STABLE_ICONS[status]  || '';
                         const statusLabel = STABLE_LABELS[status] || status;
                         const statusColor = STABLE_COLORS[status] || '#9ca3af';
-                        html += `<td>${observed ? tel.device_count : 'Not observed'}</td>`;
-                        html += `<td>${e(faultStr)}</td>`;
+                        html += `<td>${e(telemetrySummary.devices)}</td>`;
+                        html += `<td>${e(telemetrySummary.faults)}</td>`;
                         html += `<td><span style="color:${statusColor};font-size:0.8rem;" title="${e(statusLabel)}">${statusIcon} ${e(statusLabel)}</span></td>`;
                     } else {
                         html += '<td>\u2014</td><td>\u2014</td><td>\u2014</td>';
