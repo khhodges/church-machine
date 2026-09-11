@@ -14,6 +14,22 @@ function _hideCompileFailedBanner() {
     if (banner) banner.style.display = 'none';
 }
 
+function _dismissStaleAsmErrorsOnEdit() {
+    if (_activeAsmErrors.length === 0) return;
+    _activeAsmErrors = [];
+    var panel = document.getElementById('asmErrorPanel');
+    if (panel) {
+        panel.style.display = 'none';
+        panel.innerHTML = '';
+    }
+    var overlay = document.getElementById('asmErrorOverlay');
+    if (overlay) overlay.innerHTML = '';
+    document.querySelectorAll('#lineNumbers span.line-num-error').forEach(function(el) {
+        el.classList.remove('line-num-error');
+    });
+    _hideCompileFailedBanner();
+}
+
 var _asmAdvisoryPopupEl = null;
 var _asmAdvisoryKeydownBound = false;
 
@@ -261,7 +277,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (ed) {
         ed.addEventListener('input', function() {
             _asmSrcSave(_asmEditorNsIdx, ed.value);
-            _clearAsmErrors();
+            _dismissStaleAsmErrorsOnEdit();
             _dismissAsmAdvisoryPopup();
         });
 
