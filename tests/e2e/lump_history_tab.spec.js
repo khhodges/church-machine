@@ -705,7 +705,7 @@ test.describe('LUMP History tab — legacy bootstrap evidence', () => {
                 }],
             }),
         }));
-        await page.route(`**/api/lump/${legacyToken}/words**`, route => route.fulfill({
+        await page.route(`**/api/lumps/${STUB_TOKEN}/words/1**`, route => route.fulfill({
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify({
@@ -804,7 +804,7 @@ test.describe('LUMP History tab — approved bootstrap corrections', () => {
                 }],
             }),
         }));
-        await page.route(`**/api/lump/${legacyToken}/words**`, route => route.fulfill({
+        await page.route(`**/api/lumps/${STUB_TOKEN}/words/1**`, route => route.fulfill({
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify({
@@ -967,7 +967,7 @@ test.describe('LUMP History tab — inspectable invalid and binary-only archives
                 }],
             }),
         }));
-        await page.route(`**/api/lumps/${STUB_TOKEN}/words/1`, route => route.fulfill({
+        await page.route(`**/api/lumps/${STUB_TOKEN}/words/1**`, route => route.fulfill({
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify(archivePayload),
@@ -1002,7 +1002,7 @@ test.describe('LUMP History tab — inspectable invalid and binary-only archives
         await row.getByRole('button', { name: 'Preview' }).click();
 
         const preview = await waitForHexTable(page);
-        await expect(preview).toContainText('inspectable only');
+        await expect(preview).not.toContainText('Validation prevents it from becoming live');
         await expect(preview.locator('.lump-history-source-section')).toContainText(
             'No source is embedded'
         );
@@ -1027,6 +1027,54 @@ test.describe('LUMP History tab — inspectable invalid and binary-only archives
             'No source is embedded in this archived revision.'
         );
         await expect(preview.locator('table.lump-hex-table')).toBeVisible();
+    });
+
+    test('keeps separate preview rows when multiple immutable archives share a version', async ({ page }) => {
+        test.setTimeout(40000);
+        await page.route('**/api/lumps/list', route => route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify([STUB_LUMP]),
+        }));
+        await page.route(`**/api/lumps/${STUB_TOKEN}/history`, route => route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                token: STUB_TOKEN,
+                history: [
+                    {
+                        ...STUB_HISTORY_V1,
+                        historical_record: true,
+                        record_token: '11111111',
+                        archive_filename: 'TestAbs.one.lump',
+                        record_filename: 'TestAbs.one.lump',
+                    },
+                    {
+                        ...STUB_HISTORY_V1,
+                        historical_record: true,
+                        record_token: '22222222',
+                        archive_filename: 'TestAbs.two.lump',
+                        record_filename: 'TestAbs.two.lump',
+                    },
+                ],
+            }),
+        }));
+        await page.route(`**/api/lumps/${STUB_TOKEN}/words/1**`, route => route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(STUB_WORDS_V1),
+        }));
+        await page.route(`**/api/lump/${STUB_TOKEN}/words`, route => route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(STUB_WORDS_CURRENT),
+        }));
+
+        await openLumpDetail(page);
+        await clickHistoryTab(page);
+        const rows = page.locator(`#lumpHistoryBody_${STUB_TK} tr.lump-history-row`);
+        await expect(rows).toHaveCount(2);
+        await expect(rows.getByRole('button', { name: 'Preview', exact: true })).toHaveCount(2);
     });
 });
 

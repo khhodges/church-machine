@@ -131,6 +131,36 @@ def test_repair_requires_plan_and_exact_historical_archive(bootstrap_history):
     assert _snapshot(root) == before
 
 
+def test_history_preview_reads_existing_archive_and_current_bytes_without_validity_gate(
+        bootstrap_history
+):
+    """Read-only Preview is available even where restore validation fails."""
+    with app_module.app.test_client() as client:
+        history_response = client.get(f"/api/lumps/{CURRENT_TOKEN}/history")
+        archive_response = client.get(
+            f"/api/lumps/{CURRENT_TOKEN}/words/1",
+            query_string={"archive_filename": ARCHIVE_NAME},
+        )
+        current_response = client.get(f"/api/lump/{CURRENT_TOKEN}/words")
+
+    assert history_response.status_code == 200
+    history = history_response.get_json()["history"]
+    archive_entry = next(
+        entry for entry in history
+        if entry.get("archive_filename") == ARCHIVE_NAME
+    )
+    assert archive_entry["preview_enabled"] is True
+    assert archive_entry["restore_enabled"] is False
+
+    assert archive_response.status_code == 200
+    archive = archive_response.get_json()
+    assert archive["words"][-1] == 0x4A000006
+    assert archive["binary_valid"] is False
+
+    assert current_response.status_code == 200
+    assert current_response.get_json()["words"][-1] == bootstrap_history["expected_gt"]
+
+
 def test_approved_repair_reissues_canonical_live_lump_and_preserves_evidence(
         bootstrap_history
 ):

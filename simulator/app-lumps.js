@@ -2715,13 +2715,20 @@ async function _fetchAndShowLumpTimeline(token, lump) {
 
         // Merge: history drives the list; telemetry-only rows (old fleet versions
         // no longer in the local archive) are appended.
-        const versionMap = new Map();
-        for (const h of history) versionMap.set(h.version, { ver: h.version, hist: h, tel: telByVer[h.version] || null });
+        // Do not key archive rows by version alone. Frozen and legacy
+        // artifacts can legitimately share a version number, and each file
+        // must retain its own read-only Preview entry.
+        const rows = history.map(h => ({
+            ver: h.version,
+            hist: h,
+            tel: telByVer[h.version] || null,
+        }));
         for (const tv of telRows) {
-            if (!versionMap.has(tv.lump_version))
-                versionMap.set(tv.lump_version, { ver: tv.lump_version, hist: null, tel: tv });
+            if (!history.some(h => h.version === tv.lump_version)) {
+                rows.push({ ver: tv.lump_version, hist: null, tel: tv });
+            }
         }
-        const rows = Array.from(versionMap.values()).sort((a, b) => b.ver - a.ver);
+        rows.sort((a, b) => b.ver - a.ver);
 
         const STABLE_ICONS  = { stable: '\u2705', amber: '\u26a0\ufe0f', red: '\u274c', unknown: '\u2014' };
         const STABLE_LABELS = { stable: 'Stable', amber: 'Tier-3 reboots', red: 'Unrecovered halts', unknown: 'Unknown' };
@@ -2773,12 +2780,11 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                     ? hist.validation_errors : [];
                 const historicalRecord = Boolean(hist && hist.historical_record);
                 const previewUsable = Boolean(hist &&
-                    hist.binary_available !== false && histInspection);
+                    hist.binary_available !== false);
                 const activationUsable = Boolean(!isCurrent && !historicalRecord &&
                     previewUsable && hist.restore_enabled !== false &&
                     hist.binary_valid === true);
-                const previewToken = hist && hist.record_token
-                    ? hist.record_token : token;
+                const previewToken = token;
                 const archiveFilename = hist && (
                     hist.archive_filename || hist.record_filename || '');
 
@@ -2788,7 +2794,7 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                 let _rowAttrs = '';
                 if (previewUsable) {
                     _rowStyle += 'cursor:pointer;';
-                    _rowAttrs = ` style="${_rowStyle}" onclick="_lumpHistorySelectRow(this,'${e(previewToken)}',${ver},${histInspection.cw||0},${histInspection.cc||0},${histInspection.lump_size||0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(token)}','${e(archiveFilename)}',${isCurrent ? 'true' : 'false'})"`;
+                    _rowAttrs = ` style="${_rowStyle}" onclick="_lumpHistorySelectRow(this,'${e(previewToken)}',${ver},${histInspection ? (histInspection.cw||0) : 0},${histInspection ? (histInspection.cc||0) : 0},${histInspection ? (histInspection.lump_size||0) : 0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(token)}','${e(archiveFilename)}',${isCurrent ? 'true' : 'false'})"`;
                 } else if (_rowStyle) {
                     _rowAttrs = ` style="${_rowStyle}"`;
                 }
@@ -2836,7 +2842,7 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                 // Preview is safe for every readable binary. The active checkbox
                 // performs the protected restore transition for eligible archives.
                 if (previewUsable) {
-                     html += `<td><button class="btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_lumpHistoryPreview('${e(previewToken)}',${ver},${histInspection.cw||0},${histInspection.cc||0},${histInspection.lump_size||0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(token)}','${e(archiveFilename)}',${isCurrent ? 'true' : 'false'})" title="Preview source and hex of v${ver}">Preview</button></td>`;
+                     html += `<td><button class="btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_lumpHistoryPreview('${e(previewToken)}',${ver},${histInspection ? (histInspection.cw||0) : 0},${histInspection ? (histInspection.cc||0) : 0},${histInspection ? (histInspection.lump_size||0) : 0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(token)}','${e(archiveFilename)}',${isCurrent ? 'true' : 'false'})" title="Preview source and hex of v${ver}">Preview</button></td>`;
                     if (!isCurrent && !activationUsable)
                         html += `<td><button class="btn lump-history-delete-btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_deleteLumpHistoryRevision('${e(token)}',${ver},'${e(archiveFilename)}','${tk}')" title="Delete this archived revision">Delete</button></td>`;
                     else
@@ -3223,14 +3229,15 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
     };
     try {
         const liveUrl = `/api/lump/${currentToken || token}/words`;
+        // A History panel is scoped to the active LUMP. Ask the server for
+        // that panel's exact archive filename rather than guessing a path
+        // from an archived record's old token.
         const archivedUrl = isCurrent
             ? liveUrl
-            : (historicalRecord
-                ? `/api/lump/${token}/words${
+            : `/api/lumps/${currentToken || token}/words/${version}${
                 archiveFilename
                     ? `?archive_filename=${encodeURIComponent(archiveFilename)}`
-                    : ''}`
-                : `/api/lumps/${token}/words/${version}`);
+                    : ''}`;
         const [archResp, curResp] = await Promise.all([
             fetch(archivedUrl),
             isCurrent ? Promise.resolve(null) : fetch(liveUrl)
@@ -3245,16 +3252,10 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
         }
         const data = await archResp.json();
         const words = data.words || [];
+        const rawTailHex = typeof data.raw_tail_hex === 'string'
+            ? data.raw_tail_hex : '';
         const numWords = words.length;
-        if (!numWords) {
-            _noPreview('archived binary is empty', 'Save a new revision before previewing it.');
-            return;
-        }
         const inspection = _lumpBinaryInspection(data);
-        if (!inspection) {
-            _noPreview('binary inspection fields are unavailable', 'Reload History so the server can revalidate the archive.');
-            return;
-        }
 
         // The archived endpoint returns the source embedded in the exact
         // historical bytes. Show that source as the primary preview instead
@@ -3263,7 +3264,7 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
         // comparing the revision with the current artifact.
         const archivedSource = (typeof data.source === 'string' && data.source.trim())
             ? data.source
-            : (typeof inspection.source === 'string' && inspection.source.trim()
+            : (inspection && typeof inspection.source === 'string' && inspection.source.trim()
                 ? inspection.source : '');
         let sourcePreview = '';
         if (archivedSource) {
@@ -3292,11 +3293,6 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             data, currentToken || token, version, archiveFilename, tk,
             historicalRecord, isCurrent
         );
-        const validationNotice = data.binary_valid === false &&
-            Array.isArray(data.validation_errors) && data.validation_errors.length &&
-            !repairControls
-            ? `<div class="lump-history-provenance-note">This binary is inspectable only. Validation prevents it from becoming live: ${e(data.validation_errors.join('; '))}.</div>`
-            : '';
         let curWords = [];
         let curFetchFailed = false;
         if (isCurrent) {
@@ -3365,8 +3361,19 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             t += `<tr class="${rowClass}"><td class="lump-hex-addr">0x${baseAddr}</td>${rowHex}${ascCell}</tr>`;
         }
         t += '</tbody></table></div>';
+        if (rawTailHex) {
+            t += `<div class="lump-detail-section lump-history-raw-tail">` +
+                `<div class="lump-section-title">Trailing raw bytes</div>` +
+                `<code>${e(rawTailHex)}</code>` +
+                `</div>`;
+        }
+        if (numWords === 0 && !rawTailHex) {
+            t += `<div class="lump-detail-section">` +
+                `<div class="lump-stored-src-empty">This LUMP file is empty.</div>` +
+                `</div>`;
+        }
         _showLumpHistoryPreviewModal(
-            version, repairControls + validationNotice + sourcePreview + t
+            version, repairControls + sourcePreview + t
         );
     } catch (err) {
         _noPreview(err.message);
