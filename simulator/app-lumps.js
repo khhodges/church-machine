@@ -132,8 +132,6 @@ function showLumpDetail(token) {
     _headerStrip += `<span class="lump-hs-chip" id="lumpSizeChip_${_tk}"><span class="lump-hs-label">Size</span>unavailable</span>`;
     _headerStrip += `<span class="lump-hs-chip" id="lumpCwChip_${_tk}"><span class="lump-hs-label">CW</span>unavailable</span>`;
     _headerStrip += `<span class="lump-hs-chip" id="lumpCcChip_${_tk}"><span class="lump-hs-label">CC</span>unavailable</span>`;
-    if (!isNamespace)
-        _headerStrip += `<span class="lump-malformed-chip" id="lumpMalformedChip_${_tk}" style="display:none" title="Click Edit to repair with canonical source">\u26a0 Binary may be malformed<button class="lump-malformed-chip-dismiss" onclick="this.parentElement.style.display='none'" title="Dismiss">\u00d7</button></span>`;
     // ── Inline actions group (pushed right by margin-left:auto) ───────────────
     _headerStrip += `<div class="lump-hs-actions">`;
     if (!isNamespace && !_historicalReadOnly) {
@@ -456,9 +454,6 @@ function showLumpDetail(token) {
     const _defaultTab = isNamespace ? 'overview' : 'api';
     const restoreTab = (_prevTab && _prevTab !== 'overview' && _prevTab !== 'source' && _prevTab !== 'tokens') ? _prevTab : _defaultTab;
     _switchLumpTab(_tk, restoreTab);
-
-    // Passive malformed-binary check — shows amber chip in header without requiring Edit click.
-    if (!isNamespace) _checkLumpBinaryHealth(token, lump, _tk);
 
     // Outer workspace tab bar is collapsed into the inner tab bar — always hide it
     _hideLumpWorkspaceTabs();
@@ -856,16 +851,22 @@ async function _fetchAndShowLumpBinary(token, lump) {
         if (!numWords) throw new Error('Empty lump');
         const hdr = (typeof sim !== 'undefined' && sim && sim.parseLumpHeader)
             ? sim.parseLumpHeader(words[0] >>> 0) : null;
-        if (!hdr || !hdr.valid || !_getLumpFieldSizeLayout(words))
-            throw new Error('Malformed LUMP binary');
-        const cw = hdr.cw;
-        const cc = hdr.cc;
-        const lumpSize = hdr.lumpSize;
+        const fieldLayout = hdr && hdr.valid ? _getLumpFieldSizeLayout(words) : null;
+        // Keep the raw-word view available even when structural validation fails.
+        // Audit remains the enforcement path; Hex Dump is deliberately an inspection
+        // surface so a programmer can see and repair the offending bytes.
+        const cw = hdr && hdr.valid ? hdr.cw : 0;
+        const cc = hdr && hdr.valid ? hdr.cc : 0;
+        const lumpSize = hdr && hdr.valid ? hdr.lumpSize : numWords;
+        const binaryDiagnostics = [];
+        if (!hdr) binaryDiagnostics.push('Header decoder unavailable');
+        else if (!hdr.valid) binaryDiagnostics.push('Invalid header magic');
+        if (hdr && hdr.valid && !fieldLayout) binaryDiagnostics.push('Declared layout exceeds the returned word array');
 
         // Method boundaries (word index → method covering that word), used to
         // annotate the code region and to let _scrollToLumpHexMethod() jump
         // straight to a method's byte range from the Abstraction detail view.
-        const methodRanges = _computeLumpMethodWordRanges(lump, words);
+        const methodRanges = fieldLayout ? _computeLumpMethodWordRanges(lump, words) : [];
         const methodAtWord = idx => {
             for (const r of methodRanges) if (idx >= r.start && idx < r.end) return r.name;
             return null;
@@ -878,6 +879,11 @@ async function _fetchAndShowLumpBinary(token, lump) {
             + '<th>Addr</th>';
         for (let c = 0; c < COLS; c++) t += `<th>+${c}</th>`;
         t += '<th>Pack4 ASCII</th></tr></thead><tbody>';
+        if (binaryDiagnostics.length) {
+            t += `<tr class="lump-hex-region-row"><td colspan="${COLS + 2}">`
+               + `<strong>Binary diagnostics:</strong> ${e(binaryDiagnostics.join('; '))}`
+               + `</td></tr>`;
+        }
 
         let _lastAnnotatedMethod = null;
         for (let row = 0; row < rowCount; row++) {
@@ -933,39 +939,6 @@ async function _fetchAndShowLumpBinary(token, lump) {
                 nextAction: 'Check the IDE connection, then reopen Hex Dump.',
             });
     }
-}
-
-// Fetches the lump's words and reveals the amber "Binary may be malformed" chip
-// in the card header if parseLumpHeader reports invalid or the array is empty.
-// Fires passively on every showLumpDetail so the user sees the warning without
-// having to click Edit.
-async function _checkLumpBinaryHealth(token, lump, tk) {
-    try {
-        const resp = await fetch('/api/lump/' + token + '/words', { cache: 'no-store' });
-        if (!resp.ok) return;
-        const data = await resp.json();
-        const words = data.words || [];
-        let malformed = words.length === 0;
-        if (!malformed) {
-            const hdr = (typeof sim !== 'undefined' && sim && sim.parseLumpHeader)
-                ? sim.parseLumpHeader(words[0] >>> 0) : null;
-            if (hdr && !hdr.valid) {
-                malformed = true;
-            } else if (hdr) {
-                // Overwrite CW / CC chips with values from the authoritative binary header,
-                // so the header strip always reflects the binary even when the manifest cache
-                // is stale (e.g. after an in-place recompile that changed cc or cw).
-                const cwChip = document.getElementById('lumpCwChip_' + tk);
-                const ccChip = document.getElementById('lumpCcChip_' + tk);
-                if (cwChip) cwChip.innerHTML = '<span class="lump-hs-label">CW</span>' + hdr.cw;
-                if (ccChip) ccChip.innerHTML = '<span class="lump-hs-label">CC</span>' + hdr.cc;
-            }
-        }
-        if (malformed) {
-            const chip = document.getElementById('lumpMalformedChip_' + tk);
-            if (chip) chip.style.display = '';
-        }
-    } catch (_err) {}
 }
 
 // Set to false to disable the automatic audit that runs whenever a lump is selected.
@@ -6011,15 +5984,9 @@ async function openLumpInEditor(token) {
                     String(_diagnosticError).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') +
                     '<br><span>Check C-List row 0 / <code>SELF E</code>, then Save Lump to regenerate the artifact with the owning Namespace identity.</span>'
                 : 'Binary is malformed \u2014 compiled disassembly is unavailable. Recoverable source, if any, remains editable.';
-            // Show malformed-binary banner above the editor.
-            var _mfBanner = document.createElement('div');
-            _mfBanner.id = '_lumpMalformedBanner';
-            _mfBanner.className = 'lump-malformed-banner';
-            _mfBanner.innerHTML = _mfBannerMsg +
-                '<button class="lump-malformed-banner-dismiss" onclick="this.parentNode.remove()" title="Dismiss">\u00D7</button>';
-            var _mfBannerParent = asmEd.parentNode && asmEd.parentNode.parentNode;
-            if (_mfBannerParent) _mfBannerParent.insertBefore(_mfBanner, asmEd.parentNode);
-            else if (asmEd.parentNode) asmEd.parentNode.insertBefore(_mfBanner, asmEd);
+            // Do not add an automatic warning banner here. The recovered source
+            // remains editable, while the explicit Audit action and the raw Hex
+            // Dump expose the structural diagnostics needed for manual repair.
         }
 
         // Restore only source embedded in the selected immutable binary.
