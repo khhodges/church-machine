@@ -6506,9 +6506,13 @@ async function openLumpInEditor(token) {
                     : 'Source restored from saved LUMP');
                 _srcBanner.title = _srcBanner.getAttribute('aria-label');
                 _srcBanner.innerHTML = '<span aria-hidden="true">&#10003;</span>';
-                var _srcBannerParent = asmEd.parentNode && asmEd.parentNode.parentNode;
-                if (_srcBannerParent) _srcBannerParent.insertBefore(_srcBanner, asmEd.parentNode);
-                else if (asmEd.parentNode) asmEd.parentNode.insertBefore(_srcBanner, asmEd);
+                // Keep the compact status beside the editor actions hamburger,
+                // rather than taking a row in the source workspace.
+                var _editorActionsWrap = document.getElementById('editorActionsWrap');
+                if (_editorActionsWrap && _editorActionsWrap.parentNode) {
+                    _editorActionsWrap.parentNode.insertBefore(
+                        _srcBanner, _editorActionsWrap.nextSibling);
+                }
             }
         }
 

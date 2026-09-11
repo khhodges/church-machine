@@ -66,5 +66,7 @@ check(!lumps.includes('getElementById(\'btnToolbarCompile\')') &&
       lumps.includes('getElementById(\'editorActionsDropdown\')') &&
       lumps.includes('lump-source-restored-indicator'),
     'saved-LUMP discard and recovery state use the action menu and compact indicator');
+check(/getElementById\('editorActionsWrap'\)[\s\S]*?insertBefore\([\s\S]*?_srcBanner[\s\S]*?_editorActionsWrap\.nextSibling/.test(lumps),
+    'saved-LUMP recovery indicator is placed to the right of the hamburger');
 
 console.log('Editor action menu regression: PASS');
