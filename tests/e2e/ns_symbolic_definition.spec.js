@@ -1,7 +1,7 @@
 'use strict';
 const { test, expect } = require('@playwright/test');
 
-test('NEW remains available after a selected LUMP returns 404 and defines a code-free abstraction', async ({ page }) => {
+test('NEW remains available after a selected LUMP returns 404 and opens a fresh assembler editor', async ({ page }) => {
     let wordsRequests = 0;
     await page.route('**/api/lumps/list', route => route.fulfill({
         contentType: 'application/json',
@@ -24,18 +24,26 @@ test('NEW remains available after a selected LUMP returns 404 and defines a code
     await expect(page.getByRole('button', { name: 'NEW', exact: true })).toBeEnabled();
     expect(wordsRequests).toBe(1);
     await page.getByRole('button', { name: 'NEW', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Back to LUMPs' })).toBeVisible();
-    await expect(page.locator('#_nsSymbolicName')).toBeVisible();
-    expect(wordsRequests).toBe(1);
-    await page.locator('#_nsSymbolicName').fill('Future.Service');
-    await expect(page.locator('#_nsSymbolicPreview')).toContainText('Inform E GT');
-    await page.locator('#_nsSymbolicConfirm').click();
     await expect(page.locator('#_nsAddModalOverlay')).toHaveCount(0);
-    await expect(page.locator('[data-testid="ns-symbolic-badge"]')).toContainText('code missing');
+    await expect(page.locator('#editor')).toBeVisible();
+    await expect(page.locator('#asmEditor')).toHaveValue(/abstraction New\.Abstraction \{/);
+    await expect(page.locator('#asmEditor')).toHaveValue(/capabilities \{/);
+    await expect(page.locator('[data-testid="ns-symbolic-badge"]')).toHaveCount(0);
     expect(wordsRequests).toBe(1);
-    await page.reload();
-    await page.waitForFunction(() => typeof sim !== 'undefined');
+});
+
+test('clicking a Namespace label without saved source opens its named assembler editor', async ({ page }) => {
+    await page.goto('/simulator/');
+    await page.waitForFunction(() => typeof sim !== 'undefined' && sim &&
+        typeof sim.defineSymbolicAbstraction === 'function' && typeof _nsLabelOpen === 'function');
+    const slot = await page.evaluate(() => {
+        const created = sim.defineSymbolicAbstraction('Future.Service');
+        updateNamespace();
+        return created.slot;
+    });
     await page.evaluate(() => switchView('namespace'));
-    await expect(page.locator('[data-testid="ns-symbolic-badge"]')).toContainText('code missing');
-    expect(wordsRequests).toBe(1);
+    await page.locator(`#ns-row-${slot} .ns-label`).click();
+    await expect(page.locator('#editor')).toBeVisible();
+    await expect(page.locator('#asmEditor')).toHaveValue(/abstraction Future\.Service \{/);
+    await expect(page.locator('#_nsLumpModalOverlay')).toHaveCount(0);
 });

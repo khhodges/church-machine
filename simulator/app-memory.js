@@ -3376,7 +3376,7 @@ function updateNamespace() {
             html += `<td class="ns-idx-cell"><span style="color:#666;">${i}</span></td>`;
             const _gapLabel = (sim.nsLabels && sim.nsLabels[i] && sim.nsLabels[i] !== '(free)' && sim.nsLabels[i] !== '(reserved)') ? sim.nsLabels[i] : '';
             if (_gapLabel) {
-                html += `<td style="color:#666;font-style:italic;">${_gapLabel}</td>`;
+                html += `<td class="ns-label ns-label-clickable" style="color:#666;font-style:italic;cursor:pointer;text-decoration:underline dotted;" onclick="_nsLabelOpen(${i})" title="Open ${_escHtml(_gapLabel)}">${_escHtml(_gapLabel)}</td>`;
                 html += `<td colspan="7" style="color:#555;font-style:italic;font-size:0.8rem;">(no DMEM entry)</td>`;
             } else {
                 html += `<td colspan="8" style="color:#555;font-style:italic;font-size:0.8rem;">(no entry installed)</td>`;
@@ -3389,7 +3389,7 @@ function updateNamespace() {
         if (privateBankSlot) {
             html += `<tr id="ns-row-${i}" class="ns-row" style="opacity:0.78;">`;
             html += `<td class="ns-idx-cell"><span style="color:#8f7ac8;">◈</span></td>`;
-            html += `<td class="ns-label" style="color:#c4a7ff;">Bank private custody</td>`;
+            html += `<td class="ns-label ns-label-clickable" style="color:#c4a7ff;cursor:pointer;text-decoration:underline dotted;" onclick="_nsLabelOpen(${i})" title="Open Bank private custody">Bank private custody</td>`;
             html += `<td colspan="6" style="color:#777;font-size:0.78rem;">Lockbox ${privateBankSlot.lockboxId} — protected backing record</td>`;
             html += `<td class="ns-entry-actions"></td></tr>`;
             continue;
@@ -3437,7 +3437,7 @@ function updateNamespace() {
                 }
             }
         }
-        html += `<td class="ns-label ns-label-clickable" style="${warmStyle}${stubLabelStyle}cursor:pointer;text-decoration:underline dotted;" onclick="_nsLabelOpen(${i})" title="Open full view for NS[${i}]">${nsLabelInner}${stubBadge}</td>`;
+        html += `<td class="ns-label ns-label-clickable" style="${warmStyle}${stubLabelStyle}cursor:pointer;text-decoration:underline dotted;" onclick="_nsLabelOpen(${i})" title="Open ${_escHtml(e.label || `NS[${i}]`)}">${nsLabelInner}${stubBadge}</td>`;
         html += `<td style="${warmStyle}cursor:pointer;text-decoration:underline dotted;color:#4ec9b0;" title="Open memory view at this address" onclick="event.stopPropagation();jumpToMemory(${e.word0_location})">0x${e.word0_location.toString(16).toUpperCase().padStart(8, '0')}</td>`;
         if (codeNotResident) {
             const priorityTag = manifest.priority === 'hot' ? 'Hot' : (manifest.priority === 'cold' ? 'Cold' : 'Warm');
@@ -3637,21 +3637,10 @@ function _nsTableAdd() {
     _overlay.innerHTML = `<div style="background:#12121f;border:1px solid #2a2a4a;border-radius:8px;padding:24px 28px;min-width:340px;max-width:580px;width:100%;color:#d0d0e8;font-size:0.85rem;max-height:90vh;overflow-y:auto;">
       <div style="color:#c89b3c;font-size:1rem;font-weight:600;margin-bottom:12px;">+ Add LUMP to Namespace</div>
       <div id="_nsInstallPane"><div id="_nsAddStatus" style="color:#888;">Loading LUMP list\u2026</div></div>
-      <div id="_nsSymbolicPane" style="display:none;">
-        <label style="display:block;color:#a78bfa;font-size:.72rem;margin-bottom:4px;">Canonical dotted name</label>
-        <input id="_nsSymbolicName" placeholder="Example.Service" style="width:100%;box-sizing:border-box;background:#0d0d1a;color:#ddd;border:1px solid #2a2a4a;padding:7px;">
-        <label style="display:block;color:#a78bfa;font-size:.72rem;margin:10px 0 4px;">Namespace slot (optional)</label>
-        <input id="_nsSymbolicSlot" type="number" min="${sim.firstUserNsSlot()}" max="${sim.MAX_NS_ENTRIES - 1}" placeholder="Auto-assign" style="width:100%;box-sizing:border-box;background:#0d0d1a;color:#ddd;border:1px solid #2a2a4a;padding:7px;">
-        <div id="_nsSymbolicPreview" data-testid="ns-symbolic-preview" style="margin:12px 0;color:#f0a040;">Enter a dotted name to preview the binding.</div>
-        <div style="color:#aaa;font-size:.76rem;margin-bottom:12px;">This defines identity and local authority only. Code is missing, so the binding cannot execute until a matching LUMP is installed.</div>
-        <div id="_nsSymbolicError" style="color:#f87171;min-height:1.2em;"></div>
-      </div>
       <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px;">
-        <button id="_nsNewButton" data-testid="ns-new-button" onclick="_nsAddSetMode('symbolic')" class="btn" style="margin-right:auto;color:#c89b3c;border-color:#c89b3c;">NEW</button>
-        <button id="_nsInstallModeBtn" onclick="_nsAddSetMode('install')" class="btn" style="display:none;margin-right:auto;">Back to LUMPs</button>
+        <button id="_nsNewButton" data-testid="ns-new-button" onclick="_nsOpenNewAssembler()" class="btn" style="margin-right:auto;color:#c89b3c;border-color:#c89b3c;">NEW</button>
         <button onclick="document.getElementById('_nsAddModalOverlay').remove()" class="btn">Cancel</button>
         <button id="_nsAddConfirmBtn" onclick="_nsTableAddConfirm()" class="btn" disabled>Install</button>
-        <button id="_nsSymbolicConfirm" onclick="_nsDefineSymbolicConfirm()" class="btn" style="display:none;">Define abstraction</button>
       </div>
     </div>`;
     _overlay.addEventListener('click', function(ev) { if (ev.target === _overlay) _overlay.remove(); });
@@ -3717,6 +3706,13 @@ function _nsTableAdd() {
                     nextAction: 'Check the IDE connection, then reopen Add LUMP.',
                 });
         });
+}
+
+function _nsOpenNewAssembler() {
+    const overlay = document.getElementById('_nsAddModalOverlay');
+    if (overlay) overlay.remove();
+    if (typeof newAbstraction === 'function') newAbstraction();
+    else if (typeof switchView === 'function') switchView('editor');
 }
 
 function _nsAddSetMode(mode) {
@@ -4670,36 +4666,36 @@ window._nsTableSave = async function(btn) {
     }
 };
 
-// ── NS label click — dispatch on GT type ──────────────────────────────────────
-// Rule: Inform → lump detail modal (header + c-list + disassembly)
-//       Null / Outform / Abstract → type description panel
-
+// ── NS label click ────────────────────────────────────────────────────────────
+// Installed LUMPs retain their existing detail popup. Labels without an
+// implementation start the canonical assembler proforma under that name.
 function _nsLabelOpen(slotIdx) {
     if (!sim) return;
     const e = sim.readNSEntry(slotIdx);
-    if (!e) { _showNSTypeDescModal(slotIdx, null); return; }
-    const symbolic = typeof sim.symbolicEntryAt === 'function' ? sim.symbolicEntryAt(slotIdx) : null;
+    const rawLabel = (e && e.label) ||
+        (sim.nsLabels && sim.nsLabels[slotIdx]) ||
+        `NS.${slotIdx}`;
+    const symbolic = typeof sim.symbolicEntryAt === 'function'
+        ? sim.symbolicEntryAt(slotIdx)
+        : null;
     if (symbolic && symbolic.implementationMissing) {
-        const old = document.getElementById('_nsLumpModalOverlay');
-        if (old) old.remove();
-        document.body.insertAdjacentHTML('beforeend',
-            `<div id="_nsLumpModalOverlay" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.72);" onclick="if(event.target===this)this.remove()"><div style="background:#1e1e1e;border:1px solid #f0a040;border-radius:8px;padding:20px;max-width:520px;"><strong style="color:#f0a040;">Implementation missing</strong><p>${_escHtml(symbolic.name)} is bound to NS[${slotIdx}], but no code is installed. Install a matching LUMP before using Load, Run, or CALL.</p><button class="btn" onclick="document.getElementById('_nsLumpModalOverlay').remove()">Close</button></div></div>`);
+        if (typeof newAbstraction === 'function') newAbstraction(symbolic.name || rawLabel);
+        else if (typeof switchView === 'function') switchView('editor');
         return;
     }
     if (_isThreadNamespaceSlot(slotIdx, e)) {
         _showNSThreadModal(slotIdx);
         return;
     }
-    // If a server-side LUMP is registered for this slot, always show the lump
-    // detail modal — even when the boot-image NS entry has gtType != 1.
-    // Boot-image lazy stubs pack gtType=3 in the hardware bit layout until the
-    // lump is promoted to Inform at runtime; the server binary is authoritative.
-    const _hasSrcLump = typeof _findSrcLump === 'function' && !!_findSrcLump(slotIdx, e.label);
-    if (e.gtType === 1 || _hasSrcLump) {
+    const srcLump = typeof _findSrcLump === 'function'
+        ? _findSrcLump(slotIdx, rawLabel)
+        : null;
+    if (e && (e.gtType === 1 || srcLump)) {
         _showNSLumpModal(slotIdx, e);
-    } else {
-        _showNSTypeDescModal(slotIdx, e);
+        return;
     }
+    if (typeof newAbstraction === 'function') newAbstraction(rawLabel);
+    else if (typeof switchView === 'function') switchView('editor');
 }
 
 // Dedicated read-only popup for a selected Thread instance.  It intentionally

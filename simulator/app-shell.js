@@ -1313,13 +1313,14 @@ function confirmNewTab() {
     createUserTab(name, lang, initialCode);
 }
 
-// File → New starts working immediately: it replaces the visible editor with a
-// fresh proforma instead of opening the optional named-tab dialog first.
-function newAbstraction() {
-    const name = 'New.Abstraction';
+// File → New and Namespace labels without saved source open the same canonical
+// assembler proforma instead of maintaining separate editor templates.
+function newAbstraction(requestedName) {
+    const name = _newAbstractionSourceName(requestedName || 'New.Abstraction');
     const lang = 'assembly';
     const initialCode = _newAbstractionProforma(name);
     window._editorSourceFilePath = null;
+    if (typeof switchView === 'function') switchView('editor');
     createUserTab(name, lang, initialCode);
 }
 
