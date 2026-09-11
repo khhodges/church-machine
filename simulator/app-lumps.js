@@ -2827,7 +2827,7 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                     if (archiveUsable)
                         html += `<td><button class="btn lump-history-restore-btn" id="lumpHistoryRestoreBtn_${tk}_${ver}" style="font-size:0.7rem;padding:2px 8px;" disabled onclick="event.stopPropagation();_restoreLumpFromHistory('${e(token)}',${ver})" title="Preview this version first, then restore">Restore</button></td>`;
                     else
-                        html += `<td><span class="lump-history-unavailable" title="Historical bootstrap evidence is read-only">Read only</span></td>`;
+                        html += `<td><button class="btn lump-history-delete-btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_deleteLumpHistoryRevision('${e(token)}',${ver},'${e(archiveFilename)}','${tk}')" title="Delete this archived revision">Delete</button></td>`;
                 } else if (hist && !isCurrent) {
                     const reason = validationErrors.length
                         ? validationErrors.join('; ')
@@ -2908,6 +2908,55 @@ async function _promptUpgradeLump(absName, fromToken, fromVersion, toToken, toVe
                 dataChanged: null,
                 nextAction: 'Reload device status to verify versions before retrying.',
             }));
+    }
+}
+
+async function _deleteLumpHistoryRevision(token, version, archiveFilename, tk) {
+    if (!confirm(
+        `Delete archived LUMP revision v${version}?\n\n` +
+        'This removes the archived binary from History and cannot be undone. ' +
+        'The current live LUMP will not be changed.'
+    )) return;
+
+    const btn = document.querySelector(
+        `#lumpHistoryBody_${tk} .lump-history-row[data-version="${version}"] .lump-history-delete-btn`
+    );
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Deleting\u2026';
+    }
+    try {
+        const resp = await fetch(`/api/lumps/${token}/history/${version}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                archive_filename: archiveFilename || null,
+            }),
+        });
+        const text = await resp.text();
+        let data = null;
+        try { data = JSON.parse(text); } catch (_) {}
+        if (!resp.ok || !data || data.ok !== true) {
+            throw new Error(_formatActionableHttpError('Delete the archived LUMP revision', resp.status, text, {
+                dataChanged: false,
+                nextAction: 'Reload History to verify whether the revision still exists.',
+            }));
+        }
+        _closeLumpHistoryPreviewModal();
+        delete _lumpTimelineLoaded[tk];
+        const lump = _lumpsCache.find(item => item.token === token);
+        if (lump) await _fetchAndShowLumpTimeline(token, lump);
+        appendOutput(`Deleted archived LUMP revision v${version}`, 'info');
+    } catch (err) {
+        appendOutput(/\bNo data was changed\b/.test(err.message) ? err.message :
+            _formatActionableNetworkError('Delete the archived LUMP revision', err, {
+                dataChanged: null,
+                nextAction: 'Reload History to verify whether the revision still exists.',
+            }), 'error');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Delete';
+        }
     }
 }
 

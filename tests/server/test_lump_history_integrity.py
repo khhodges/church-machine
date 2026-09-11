@@ -128,3 +128,45 @@ def test_historical_preview_uses_recorded_archive_filename(
     assert payload["cw"] == 11
     assert payload["cc"] == 3
     assert payload["words"] == list(struct.unpack(">64I", historical))
+
+
+def test_delete_historical_revision_removes_exact_archive_only(
+    tmp_path, monkeypatch
+):
+    token = "aabbccdd"
+    record_token = "11223344"
+    current = _binary(cw=7, cc=2)
+    historical = _binary(cw=11, cc=3)
+    (tmp_path / "History.lump").write_bytes(current)
+    (tmp_path / "CapabilityTest_legacy.lump").write_bytes(historical)
+    manifest = [
+        {
+            "token": token,
+            "abstraction": "History",
+            "filename": "History.lump",
+            "lump_version": 2,
+        },
+        {
+            "token": record_token,
+            "abstraction": "History",
+            "filename": "CapabilityTest_legacy.lump",
+            "lump_version": 1,
+            "archived": True,
+        },
+    ]
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest))
+    monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
+    monkeypatch.setattr(app_module, "_LUMPS_DIR", str(tmp_path))
+
+    with app_module.app.test_client() as client:
+        response = client.delete(
+            f"/api/lumps/{token}/history/1",
+            json={"archive_filename": "CapabilityTest_legacy.lump"},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json()["deleted"] == ["CapabilityTest_legacy.lump"]
+    assert (tmp_path / "History.lump").read_bytes() == current
+    assert not (tmp_path / "CapabilityTest_legacy.lump").exists()
+    remaining = json.loads((tmp_path / "manifest.json").read_text())
+    assert remaining == [manifest[0]]

@@ -10287,6 +10287,124 @@ def get_lump_history(token):
     })
 
 
+@app.route("/api/lumps/<token>/history/<int:version>", methods=["DELETE"])
+def delete_lump_history_revision(token, version):
+    """Delete one immutable archived revision without touching the live LUMP."""
+    import re as _re
+
+    raw = token.lower().replace("0x", "", 1)
+    if not _re.fullmatch(r"[0-9a-f]{1,8}", raw):
+        return jsonify({"error": "Invalid token"}), 400
+    if version < 0:
+        return jsonify({"error": "Invalid history version"}), 400
+    key8 = raw.zfill(8)
+    payload = request.get_json(silent=True) or {}
+    archive_filename = payload.get("archive_filename")
+    if archive_filename is not None and (
+        not isinstance(archive_filename, str)
+        or not archive_filename
+        or os.path.basename(archive_filename) != archive_filename
+        or not archive_filename.endswith(".lump")
+    ):
+        return jsonify({"error": "Invalid archived filename"}), 400
+
+    lumps_dir = LUMPS_DIR
+    manifest_path = os.path.join(lumps_dir, "manifest.json")
+    with _lump_history_transition_lock(lumps_dir):
+        try:
+            manifest = _read_manifest_safe(manifest_path)
+        except ValueError as exc:
+            return jsonify({
+                "error": (
+                    "manifest.json is corrupt and the archived revision "
+                    f"cannot be deleted safely. Details: {exc}"
+                )
+            }), 500
+
+        active_matches = [
+            row for row in manifest
+            if isinstance(row, dict)
+            and str(row.get("token") or "").lower() == key8
+            and row.get("archived") is not True
+        ]
+        if len(active_matches) != 1:
+            return jsonify({
+                "error": "The active LUMP identity is unavailable or ambiguous"
+            }), 409
+        active = active_matches[0]
+        active_filename = active.get("filename") or ""
+        active_abstraction = str(active.get("abstraction") or "").casefold()
+
+        # Normal history archives use either the token stem or the active
+        # artifact stem. Historical bootstrap records use their manifest row's
+        # exact immutable filename instead.
+        candidate_filenames = {
+            f"{key8}-v{version}.lump",
+        }
+        if isinstance(active_filename, str) and active_filename.endswith(".lump"):
+            active_stem = _re.sub(r"_v\d+$", "", active_filename[:-5])
+            candidate_filenames.add(f"{active_stem}_v{version}.lump")
+
+        archived_matches = [
+            row for row in manifest
+            if isinstance(row, dict)
+            and row.get("archived") is True
+            and row.get("filename") == archive_filename
+            and str(row.get("abstraction") or "").casefold() == active_abstraction
+            and int(row.get("lump_version") or row.get("version") or -1) == version
+        ] if archive_filename else []
+
+        if archive_filename:
+            if archive_filename == active_filename:
+                return jsonify({
+                    "error": "The live LUMP cannot be deleted from History"
+                }), 409
+            if archive_filename not in candidate_filenames and len(archived_matches) != 1:
+                return jsonify({"error": "Archived revision is not part of this history"}), 404
+            selected_filename = archive_filename
+        else:
+            existing_candidates = [
+                filename for filename in sorted(candidate_filenames)
+                if os.path.isfile(os.path.join(lumps_dir, filename))
+            ]
+            if len(existing_candidates) != 1:
+                return jsonify({
+                    "error": (
+                        "Archived revision is unavailable"
+                        if not existing_candidates
+                        else "Archived revision has ambiguous archive files"
+                    )
+                }), 404 if not existing_candidates else 409
+            selected_filename = existing_candidates[0]
+
+        selected_path = os.path.abspath(os.path.join(lumps_dir, selected_filename))
+        if os.path.dirname(selected_path) != os.path.abspath(lumps_dir):
+            return jsonify({"error": "Invalid archived filename"}), 400
+        if not os.path.isfile(selected_path):
+            return jsonify({"error": "Archived revision is unavailable"}), 404
+
+        os.remove(selected_path)
+        remaining_manifest = [
+            row for row in manifest
+            if not (
+                isinstance(row, dict)
+                and row.get("archived") is True
+                and row.get("filename") == selected_filename
+                and str(row.get("abstraction") or "").casefold() == active_abstraction
+            )
+        ]
+        if remaining_manifest != manifest:
+            _atomic_write_json(manifest_path, remaining_manifest)
+
+    print(f"[lumps] Deleted archived revision {selected_filename}", flush=True)
+    return jsonify({
+        "ok": True,
+        "token": key8,
+        "version": version,
+        "deleted": [selected_filename],
+    })
+
+
 @app.route("/api/lump/<token>/fork-version", methods=["POST"])
 def lump_fork_version(token):
     """Fork a sealed LUMP: archive the current compiled binary as v<N> so it is

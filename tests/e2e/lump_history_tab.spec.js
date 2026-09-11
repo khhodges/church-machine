@@ -716,7 +716,7 @@ test.describe('LUMP History tab — legacy bootstrap evidence', () => {
         await clickHistoryTab(page);
         const row = page.locator(`#lumpHistoryBody_${STUB_TK} tr.lump-history-row`).first();
         await expect(row.getByRole('button', { name: 'Preview' })).toBeVisible();
-        await expect(row.getByText('Read only')).toBeVisible();
+        await expect(row.getByRole('button', { name: 'Delete' })).toBeVisible();
         await expect(row.locator('button.lump-history-restore-btn')).toHaveCount(0);
         await row.getByRole('button', { name: 'Preview' }).click();
         const preview = await waitForHexTable(page);
@@ -773,7 +773,7 @@ test.describe('LUMP History tab — inspectable invalid and binary-only archives
         await clickHistoryTab(page);
         const row = page.locator(`#lumpHistoryBody_${STUB_TK} tr.lump-history-row`).first();
         await expect(row.getByRole('button', { name: 'Preview' })).toBeVisible();
-        await expect(row.getByText('Read only')).toBeVisible();
+        await expect(row.getByRole('button', { name: 'Delete' })).toBeVisible();
         await row.getByRole('button', { name: 'Preview' }).click();
 
         const preview = await waitForHexTable(page);
