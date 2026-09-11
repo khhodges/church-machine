@@ -1354,8 +1354,9 @@ function editCRCodeInEditor() {
             parseInt(l.ns_slot) === nsIdx);
         if (_lumpMeta && Array.isArray(_lumpMeta.capabilities) && _lumpMeta.capabilities.length > 0) {
             const _capItems = _lumpMeta.capabilities.map(c => {
-                const _n = c.name || String(c);
-                const _r = (c.grants || c.rights || []).join('');
+                const _cap = (c && typeof c === 'object') ? c : { name: c };
+                const _n = _cap.name || '';
+                const _r = (_cap.grants || _cap.rights || []).join('');
                 return _r ? `${_n} ${_r}` : _n;
             }).filter(Boolean).join(', ');
             lines.push(`capabilities { ${_capItems} }`);

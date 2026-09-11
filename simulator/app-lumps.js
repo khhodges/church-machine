@@ -6864,7 +6864,7 @@ function _formatLumpApiDefinition(absName, caps) {
 // binary carries the token that was actually stored in the C-list row.
 function _formatSavedLumpCapabilities(caps, serverWords, clistStart) {
     if (!Array.isArray(caps) || caps.length === 0) return '';
-    return caps.map(function(cap, idx) {
+    var _items = caps.map(function(cap, idx) {
         var _cap = (cap && typeof cap === 'object') ? cap : { name: cap };
         var _dotName = _cap.dot_name || _cap.dotName || _cap.name || '';
         var _rights = Array.isArray(_cap.rights) ? _cap.rights :
@@ -6877,7 +6877,8 @@ function _formatSavedLumpCapabilities(caps, serverWords, clistStart) {
         var _label = _dotName ? _dotName + '  ' : '';
         var _rightsLabel = _rights.length ? '  rights=' + _rights.join('') : '';
         return '#' + idx + ' ' + _label + 'token=' + _token + _rightsLabel;
-    }).join(', ');
+    }).filter(Boolean);
+    return _items.join(', ');
 }
 
 function _fmtLumpByteSize(bytes) {
