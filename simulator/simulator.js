@@ -1909,6 +1909,48 @@ class ChurchSimulator {
         ).gtSeq;
     }
 
+    symbolicEntryAt(idx) {
+        return this._nsSymbolicEntries && this._nsSymbolicEntries[idx] || null;
+    }
+
+    defineSymbolicAbstraction(name, requestedSlot) {
+        const canonical = String(name || '').trim();
+        if (!/^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$/.test(canonical)) {
+            throw new Error('Use a canonical dotted name such as Example.Service.');
+        }
+        for (let i = 0; i < this.MAX_NS_ENTRIES; i++) {
+            const symbolic = this.symbolicEntryAt(i);
+            const label = symbolic ? symbolic.name : (this.isNSEntryValid(i) && this.nsLabels[i]);
+            if (label && String(label).toLowerCase() === canonical.toLowerCase()) {
+                throw new Error(`"${canonical}" is already defined in Namespace slot ${i}.`);
+            }
+        }
+        let slot = requestedSlot;
+        if (slot === null || slot === undefined || slot === '') {
+            slot = this.allocOrFindNsSlot(null, canonical);
+        }
+        if (!Number.isInteger(slot) || slot < this.firstUserNsSlot() || slot >= this.MAX_NS_ENTRIES) {
+            throw new Error(`Slot must be between ${this.firstUserNsSlot()} and ${this.MAX_NS_ENTRIES - 1}.`);
+        }
+        if (this.isNSEntryValid(slot)) {
+            throw new Error(`Slot ${slot} is already occupied. Choose a free slot.`);
+        }
+        const seq = this._nsSequenceForWrite(slot);
+        this.withNamespaceWrite('define symbolic Namespace abstraction', () => {
+            this.writeNSEntry(slot, 0, 0, 0, 0, 1, seq, 0, 0);
+        });
+        if (!this._nsSymbolicEntries) this._nsSymbolicEntries = {};
+        this._nsSymbolicEntries[slot] = {
+            name: canonical, slot, seq, type: 'Inform',
+            symbolic: true, implementationMissing: true
+        };
+        this.nsLabels[slot] = canonical;
+        return {
+            name: canonical, slot, seq,
+            gt: this.createGT(seq, slot, { E: 1 }, 1)
+        };
+    }
+
     withNamespaceWrite(reason, callback) {
         if (typeof callback !== 'function') {
             throw new TypeError('withNamespaceWrite requires a callback');
@@ -1996,6 +2038,7 @@ class ChurchSimulator {
         if (this._nsClistCount) delete this._nsClistCount[idx];
         if (this.nsLabels) delete this.nsLabels[idx];
         if (this._compilerOwnedSelfSlots) delete this._compilerOwnedSelfSlots[idx];
+        if (this._nsSymbolicEntries) delete this._nsSymbolicEntries[idx];
         if (this._tokenSlotMap) {
             for (const [token, slot] of this._tokenSlotMap) {
                 if (slot === idx) this._tokenSlotMap.delete(token);
@@ -2104,7 +2147,7 @@ class ChurchSimulator {
         const w1 = this.memory[base + 1];
         const w2 = this.memory[base + 2];
         const w3 = this.memory[base + 3];
-        if (w0 === 0 && w1 === 0) return null;
+        if (w0 === 0 && w1 === 0 && !this.symbolicEntryAt(idx)) return null;
         const parsed = this.parseNSWord1(w1);
         let clistCount = (this._nsClistCount && this._nsClistCount[idx]) || 0;
         if (w0 < this.memory.length) {
@@ -2133,6 +2176,7 @@ class ChurchSimulator {
 
     isNSEntryValid(idx) {
         if (idx < 0 || idx >= this.MAX_NS_ENTRIES) return false;
+        if (this.symbolicEntryAt(idx)) return true;
         const base = this._nsSlotBase(idx);
         return (this.memory[base] !== 0 || this.memory[base + 1] !== 0);
     }
@@ -3996,6 +4040,14 @@ class ChurchSimulator {
         const entry = this.readNSEntry(parsed.index);
         if (!entry) {
             return { ok: false, fault: 'BOUNDS', message: `namespace entry ${parsed.index} is null` };
+        }
+        const symbolic = this.symbolicEntryAt(parsed.index);
+        if (symbolic && symbolic.implementationMissing) {
+            return {
+                ok: false,
+                fault: 'CODE_NOT_RESIDENT',
+                message: `"${symbolic.name}" is defined in NS[${parsed.index}], but its implementation is missing. Install a matching LUMP before using Load, Run, or CALL.`
+            };
         }
         // Bank lockbox backing entries are Namespace bookkeeping only.  They
         // must never become a memory-resolution oracle even if an attacker
@@ -6597,6 +6649,12 @@ class ChurchSimulator {
         // Fires before NS lookup and stack push; not called on Abstract-GT dispatch.
         if (!this._mwinWriteback()) return null;
         const callTargetIdx = srcParsed.index;
+        const symbolicTarget = this.symbolicEntryAt(callTargetIdx);
+        if (symbolicTarget && symbolicTarget.implementationMissing) {
+            this.fault('CODE_NOT_RESIDENT',
+                `CALL: "${symbolicTarget.name}" is defined in NS[${callTargetIdx}], but its implementation is missing. Install a matching LUMP before calling it.`);
+            return null;
+        }
         if (this.lazyManifest[callTargetIdx] && !this.lazyManifest[callTargetIdx].loaded) {
             // Mode 1 — Restore: NS entry is valid but lump header magic is 0x00
             // (entire lump was zeroed on eviction).  Dispatch the Loader to

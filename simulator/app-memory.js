@@ -43,10 +43,68 @@ window._openSimulatorInstructionSource = _openSimulatorInstructionSource;
 // Fetched once at load and refreshed after every successful Save Namespace.
 // _findSrcLump uses this as its primary lookup to avoid the 3-level fallback.
 window._nsState = null;
+function _hydrateNsSymbolicState() {
+    const rows = window._nsState && Array.isArray(window._nsState.abstractions)
+        ? window._nsState.abstractions : [];
+    if (!sim) return;
+    for (const row of rows) {
+        if (!row || row.symbolic !== true || row.implementationMissing !== true) continue;
+        const slot = Number(row.slot);
+        if (!Number.isInteger(slot) || slot < sim.firstUserNsSlot() ||
+                slot >= sim.MAX_NS_ENTRIES) continue;
+        const seq = Number(row.seq) & 0x1FF;
+        const base = sim._nsSlotBase(slot);
+        const location = sim.memory[base] >>> 0;
+        const authority = sim.memory[base + 1] >>> 0;
+        const discardStaleSymbolicMetadata = function() {
+            const existing = sim.symbolicEntryAt(slot);
+            if (existing && String(existing.name).toLowerCase() === String(row.name).toLowerCase()) {
+                delete sim._nsSymbolicEntries[slot];
+            }
+        };
+        // A binary-backed row owns this slot and must never be reclassified by
+        // stale sidecar metadata. A code-free descriptor may already be present
+        // when the boot image wins the load race; restore its symbolic metadata
+        // after confirming the retained generation agrees.
+        if (location !== 0) {
+            discardStaleSymbolicMetadata();
+            continue;
+        }
+        if (authority !== 0) {
+            if ((sim.parseNSWord1(authority).gtSeq & 0x1FF) !== seq) {
+                discardStaleSymbolicMetadata();
+                continue;
+            }
+        } else {
+            sim.withNamespaceWrite('restore symbolic Namespace abstraction', function() {
+                sim.writeNSEntry(slot, 0, 0, 0, 0, 1, seq, 0, 0);
+            });
+        }
+        sim._nsSymbolicEntries = sim._nsSymbolicEntries || {};
+        sim._nsSymbolicEntries[slot] = Object.assign({}, row, { slot, seq });
+        sim.nsLabels[slot] = row.name;
+    }
+}
+
+function _nsInheritSavedArtifactMetadata(rich, saved, symbolic) {
+    if (symbolic || !saved || saved.name !== rich.name) return rich;
+    for (const key of [
+        'token', 'filename', 'issue_n', 'resident',
+        'binaryHash', 'identityHash', 'cacheToken'
+    ]) {
+        if (saved[key] !== undefined && saved[key] !== null) rich[key] = saved[key];
+    }
+    return rich;
+}
 (function _initNsStateFetch() {
     fetch('/api/boot-image/ns-state', { cache: 'no-store' })
         .then(function(r) { return r.ok ? r.json() : null; })
-        .then(function(s) { if (s && typeof s === 'object') window._nsState = s; })
+        .then(function(s) {
+            if (!s || typeof s !== 'object') return;
+            window._nsState = s;
+            _hydrateNsSymbolicState();
+            if (typeof updateNamespace === 'function') updateNamespace();
+        })
         .catch(function() {});
 })();
 
@@ -3029,6 +3087,7 @@ function updateNamespace() {
     const container = document.getElementById('namespaceTable');
     if (!container) return;
     if (!sim) return;
+    _hydrateNsSymbolicState();
     if (window._nsPrefetchDirty === undefined) window._nsPrefetchDirty = false;
     // Lazily warm the LumpRegistry server list so Source buttons appear even on
     // first NS view load, before the user has visited the Repository view.
@@ -3336,6 +3395,7 @@ function updateNamespace() {
             continue;
         }
         const manifest = sim.lazyManifest ? sim.lazyManifest[i] : null;
+        const symbolic = typeof sim.symbolicEntryAt === 'function' ? sim.symbolicEntryAt(i) : null;
         let codeNotResident = false;
         if (manifest && e.word0_location > 0) {
             // Use lump header magic as the authoritative residency signal:
@@ -3349,7 +3409,7 @@ function updateNamespace() {
         const ver = lim.gtSeq;
         const seal = e.word2_seals >>> 0;
         const isBootNS = (i === bootEntrySlot);
-        const warmStyle = codeNotResident ? 'color:#f0a040;font-style:italic;' : '';
+        const warmStyle = (codeNotResident || symbolic) ? 'color:#f0a040;font-style:italic;' : '';
         const rowOpacity = codeNotResident ? 'opacity:0.8;' : '';
         const isStub = sim._nsStubFlags && sim._nsStubFlags[i] === true;
         const stubLabelStyle = isStub ? 'color:#f87171;' : '';
@@ -3360,6 +3420,7 @@ function updateNamespace() {
         html += `<tr id="ns-row-${i}" class="ns-row" data-ns-slot="${i}" style="${rowOpacity}">`;
         html += `<td class="ns-idx-cell" style="white-space:nowrap;">${_clearBtn}<span class="ns-boot-btn${isBootNS ? ' boot-entry-active' : ''}" onclick="event.stopPropagation();setBootEntrySlot(${i})" title="${isBootNS ? 'Current boot entry' : 'Set as boot entry'}">${isBootNS ? '\u26a1' : i}</span></td>`;
         let nsLabelInner = e.label || '-';
+        if (symbolic) nsLabelInner += ' <span data-testid="ns-symbolic-badge" style="color:#f0a040;font-size:0.68rem;border:1px solid #f0a04066;border-radius:8px;padding:1px 5px;text-decoration:none;" title="This Namespace binding has no installed implementation">symbolic · code missing</span>';
         {
             const _reg = (abstractionRegistry && typeof abstractionRegistry.getAbstraction === 'function')
                 ? abstractionRegistry
@@ -3411,7 +3472,9 @@ function updateNamespace() {
                                 _isThreadNamespaceSlot(i, e) ||
                                 _hwCapRe.test(e.label || '') ||
                                 _residentIO;
-            if (codeNotResident) {
+            if (symbolic) {
+                html += `<td class="ns-entry-actions"><span style="${warmStyle}">implementation missing</span>${_identityBtn}</td>`;
+            } else if (codeNotResident) {
                 html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span>${_nsPrefetchRow(i, manifest, e.label)}${_identityBtn}</td>`;
             } else {
                 let _srcBtn = '';
@@ -3571,7 +3634,24 @@ function _nsTableAdd() {
     const _overlay = document.createElement('div');
     _overlay.id = '_nsAddModalOverlay';
     _overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
-    _overlay.innerHTML = '<div style="background:#12121f;border:1px solid #2a2a4a;border-radius:8px;padding:24px 28px;min-width:340px;max-width:580px;width:100%;color:#d0d0e8;font-size:0.85rem;max-height:90vh;overflow-y:auto;"><div style="color:#c89b3c;font-size:1rem;font-weight:600;margin-bottom:12px;">+ Add LUMP to Namespace</div><div id="_nsAddStatus" style="color:#888;">Loading LUMP list\u2026</div></div>';
+    _overlay.innerHTML = `<div style="background:#12121f;border:1px solid #2a2a4a;border-radius:8px;padding:24px 28px;min-width:340px;max-width:580px;width:100%;color:#d0d0e8;font-size:0.85rem;max-height:90vh;overflow-y:auto;">
+      <div style="color:#c89b3c;font-size:1rem;font-weight:600;margin-bottom:12px;">Add to Namespace</div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <button id="_nsInstallModeBtn" onclick="_nsAddSetMode('install')" class="btn">Install existing LUMP</button>
+        <button id="_nsSymbolicModeBtn" onclick="_nsAddSetMode('symbolic')" class="btn">Define new abstraction</button>
+      </div>
+      <div id="_nsInstallPane"><div id="_nsAddStatus" style="color:#888;">Loading LUMP list\u2026</div></div>
+      <div id="_nsSymbolicPane" style="display:none;">
+        <label style="display:block;color:#a78bfa;font-size:.72rem;margin-bottom:4px;">Canonical dotted name</label>
+        <input id="_nsSymbolicName" placeholder="Example.Service" style="width:100%;box-sizing:border-box;background:#0d0d1a;color:#ddd;border:1px solid #2a2a4a;padding:7px;">
+        <label style="display:block;color:#a78bfa;font-size:.72rem;margin:10px 0 4px;">Namespace slot (optional)</label>
+        <input id="_nsSymbolicSlot" type="number" min="${sim.firstUserNsSlot()}" max="${sim.MAX_NS_ENTRIES - 1}" placeholder="Auto-assign" style="width:100%;box-sizing:border-box;background:#0d0d1a;color:#ddd;border:1px solid #2a2a4a;padding:7px;">
+        <div id="_nsSymbolicPreview" data-testid="ns-symbolic-preview" style="margin:12px 0;color:#f0a040;">Enter a dotted name to preview the binding.</div>
+        <div style="color:#aaa;font-size:.76rem;margin-bottom:12px;">This defines identity and local authority only. Code is missing, so the binding cannot execute until a matching LUMP is installed.</div>
+        <div id="_nsSymbolicError" style="color:#f87171;min-height:1.2em;"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;"><button onclick="document.getElementById('_nsAddModalOverlay').remove()" class="btn">Cancel</button><button id="_nsSymbolicConfirm" onclick="_nsDefineSymbolicConfirm()" class="btn">Define abstraction</button></div>
+      </div>
+    </div>`;
     _overlay.addEventListener('click', function(ev) { if (ev.target === _overlay) _overlay.remove(); });
     document.body.appendChild(_overlay);
 
@@ -3609,7 +3689,7 @@ function _nsTableAdd() {
             window._nsAddAvailableList = _available;
 
             // Render picker
-            const inner = _overlay.querySelector('div');
+            const inner = document.getElementById('_nsInstallPane');
             let optHtml = '';
             for (const l of _available) {
                 const name = (l.abstraction || l.name || l.token).replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -3640,6 +3720,53 @@ function _nsTableAdd() {
                     nextAction: 'Check the IDE connection, then reopen Add LUMP.',
                 });
         });
+}
+
+function _nsAddSetMode(mode) {
+    const install = document.getElementById('_nsInstallPane');
+    const symbolic = document.getElementById('_nsSymbolicPane');
+    if (install) install.style.display = mode === 'install' ? '' : 'none';
+    if (symbolic) symbolic.style.display = mode === 'symbolic' ? '' : 'none';
+    if (mode === 'symbolic') {
+        const name = document.getElementById('_nsSymbolicName');
+        const slot = document.getElementById('_nsSymbolicSlot');
+        const update = function() {
+            const preview = document.getElementById('_nsSymbolicPreview');
+            if (!preview || !sim) return;
+            const requested = slot && slot.value.trim() !== '' ? Number(slot.value) : null;
+            const selected = requested === null ? sim.allocOrFindNsSlot(null, name && name.value) : requested;
+            if (!Number.isInteger(selected)) { preview.textContent = 'No free Namespace slot is available.'; return; }
+            const seq = sim._nsSequenceForWrite(selected);
+            const gt = sim.createGT(seq, selected, { E: 1 }, 1) >>> 0;
+            preview.textContent = `NS[${selected}] · Inform E GT 0x${gt.toString(16).toUpperCase().padStart(8, '0')} · sequence ${seq}`;
+        };
+        if (name) { name.oninput = update; name.focus(); }
+        if (slot) slot.oninput = update;
+        update();
+    }
+}
+
+async function _nsDefineSymbolicConfirm() {
+    const nameEl = document.getElementById('_nsSymbolicName');
+    const slotEl = document.getElementById('_nsSymbolicSlot');
+    const errEl = document.getElementById('_nsSymbolicError');
+    const btn = document.getElementById('_nsSymbolicConfirm');
+    try {
+        const slotText = slotEl ? slotEl.value.trim() : '';
+        const result = sim.defineSymbolicAbstraction(nameEl ? nameEl.value : '',
+            slotText === '' ? null : Number(slotText));
+        if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+        _setNsDirty(true);
+        updateNamespace();
+        const saved = await window._nsTableSave(document.getElementById('nsSaveBtn'));
+        if (!saved) throw new Error('The binding was created locally but could not be persisted. Use Save for next build to retry.');
+        const overlay = document.getElementById('_nsAddModalOverlay');
+        if (overlay) overlay.remove();
+        return result;
+    } catch (err) {
+        if (errEl) errEl.textContent = err && err.message ? err.message : String(err);
+        if (btn) { btn.disabled = false; btn.textContent = 'Define abstraction'; }
+    }
 }
 
 // ── Render the metadata panel below the LUMP dropdown ─────────────────────────
@@ -3863,6 +3990,8 @@ function _nsTableAddConfirm() {
     if (!sel || !sim) return;
     const token = sel.value;
     const name = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : token;
+    const listed = (window._nsAddAvailableList || []).find(function(row) { return row.token === token; }) || {};
+    const installCanonicalName = listed.dot_name || listed.dotName || listed.abstraction || listed.name || name;
     if (!token) { if (errEl) errEl.textContent = 'Please select a LUMP.'; return; }
 
     // Guard: refuse to install until immutable binary inspection has completed.
@@ -3896,7 +4025,11 @@ function _nsTableAddConfirm() {
             if (errEl) errEl.textContent = `Slot must be between ${firstUserSlot} and ${sim.MAX_NS_ENTRIES - 1}.`;
             return;
         }
-        if (sim.isNSEntryValid(userSlot)) {
+        const occupiedSymbolic = typeof sim.symbolicEntryAt === 'function'
+            ? sim.symbolicEntryAt(userSlot) : null;
+        const replacesMatchingSymbolic = occupiedSymbolic &&
+            String(occupiedSymbolic.name).toLowerCase() === String(installCanonicalName).toLowerCase();
+        if (sim.isNSEntryValid(userSlot) && !replacesMatchingSymbolic) {
             if (errEl) errEl.textContent = `Slot ${userSlot} is already occupied. Choose a free slot.`;
             return;
         }
@@ -3933,7 +4066,19 @@ function _nsTableAddConfirm() {
         // Dynamic: always auto-allocate (slot may change between reboots).
         // Static: use user-specified slot, or fall back to auto-allocate.
         let slot;
-        if (slotPolicy === 'dynamic') {
+        let matchingSymbolicSlot = null;
+        if (sim._nsSymbolicEntries) {
+            for (const key of Object.keys(sim._nsSymbolicEntries)) {
+                const candidate = sim._nsSymbolicEntries[key];
+                if (candidate && String(candidate.name).toLowerCase() === String(installCanonicalName).toLowerCase()) {
+                    matchingSymbolicSlot = Number(key);
+                    break;
+                }
+            }
+        }
+        if (userSlot === null && matchingSymbolicSlot !== null) {
+            slot = matchingSymbolicSlot;
+        } else if (slotPolicy === 'dynamic') {
             // Probe for a free slot without reserving this token yet.  The
             // identity and Outform preflight below can still reject the LUMP;
             // reserving early would make the picker hide a failed install as
@@ -4120,6 +4265,7 @@ function _nsTableAddConfirm() {
                 _identity.ordinary ? _identity.entry.seq : slotGtSeq, hdr.cc,
                 _identity.ordinary ? _identity.entry.cacheToken : w3CacheToken);
         });
+        if (sim._nsSymbolicEntries) delete sim._nsSymbolicEntries[slot];
         if (sim._tokenSlotMap) sim._tokenSlotMap.set(token, slot);
         sim.nsLabels[slot] = name;
 
@@ -4437,22 +4583,20 @@ window._nsTableSave = async function(btn) {
                 seq:      _seq,
                 seal:     _hex8(_seal),
             };
+            const _symbolic = typeof sim.symbolicEntryAt === 'function'
+                ? sim.symbolicEntryAt(_si) : null;
+            if (_symbolic) {
+                _rich.symbolic = true;
+                _rich.implementationMissing = true;
+                _rich.resident = false;
+            }
             // Artifact identity is sidecar/catalog metadata, not part of the
             // four-word Namespace entry.  Preserve it when the same slot and
             // abstraction are still present; otherwise a save can leave a
             // perfectly valid resident LUMP impossible for the resolver to
             // locate on the next regeneration.
             const _saved = _savedBySlot.get(_si);
-            if (_saved && _saved.name === _lbl) {
-                for (const _key of [
-                    'token', 'filename', 'issue_n', 'resident',
-                    'binaryHash', 'identityHash', 'cacheToken'
-                ]) {
-                    if (_saved[_key] !== undefined && _saved[_key] !== null) {
-                        _rich[_key] = _saved[_key];
-                    }
-                }
-            }
+            _nsInheritSavedArtifactMetadata(_rich, _saved, Boolean(_symbolic));
             if (_si === bootEntrySlot) _rich.boot = true;
             nsAbstractions.push(_rich);
         }
@@ -4529,6 +4673,14 @@ function _nsLabelOpen(slotIdx) {
     if (!sim) return;
     const e = sim.readNSEntry(slotIdx);
     if (!e) { _showNSTypeDescModal(slotIdx, null); return; }
+    const symbolic = typeof sim.symbolicEntryAt === 'function' ? sim.symbolicEntryAt(slotIdx) : null;
+    if (symbolic && symbolic.implementationMissing) {
+        const old = document.getElementById('_nsLumpModalOverlay');
+        if (old) old.remove();
+        document.body.insertAdjacentHTML('beforeend',
+            `<div id="_nsLumpModalOverlay" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.72);" onclick="if(event.target===this)this.remove()"><div style="background:#1e1e1e;border:1px solid #f0a040;border-radius:8px;padding:20px;max-width:520px;"><strong style="color:#f0a040;">Implementation missing</strong><p>${_escHtml(symbolic.name)} is bound to NS[${slotIdx}], but no code is installed. Install a matching LUMP before using Load, Run, or CALL.</p><button class="btn" onclick="document.getElementById('_nsLumpModalOverlay').remove()">Close</button></div></div>`);
+        return;
+    }
     if (_isThreadNamespaceSlot(slotIdx, e)) {
         _showNSThreadModal(slotIdx);
         return;

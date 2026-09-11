@@ -65,6 +65,8 @@ function extractTopLevelFn(sourceFile, fnName) {
 }
 
 const nsTableClearSrc = extractTopLevelFn('app-memory.js', '_nsTableClear');
+const hydrateSymbolicSrc = extractTopLevelFn('app-memory.js', '_hydrateNsSymbolicState');
+const inheritSavedMetadataSrc = extractTopLevelFn('app-memory.js', '_nsInheritSavedArtifactMetadata');
 
 // ── Minimal simulator factory ─────────────────────────────────────────────────
 function makeSim() {
@@ -340,6 +342,94 @@ function callNsTableClear(simInst, slot) {
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
+// ── Symbolic definitions: validation, allocation, sequence, and GT ─────────────
+{
+    const sim = makeSim();
+    const first = sim.firstUserNsSlot();
+    sim._nsFreeSequences[first] = 7;
+    const result = sim.defineSymbolicAbstraction('Future.Service', null);
+    check('T414: symbolic abstraction auto-allocates through shared allocator',
+        result.slot === first);
+    check('T415: symbolic abstraction uses retained sequence',
+        result.seq === 7);
+    check('T416: symbolic abstraction mints local Inform E GT',
+        result.gt === sim.createGT(7, first, { E: 1 }, 1));
+    check('T417: symbolic abstraction is a valid code-free Namespace entry',
+        sim.isNSEntryValid(first) && sim.readNSEntry(first).word0_location === 0 &&
+        sim.symbolicEntryAt(first).implementationMissing === true);
+    let malformedRejected = false;
+    try { sim.defineSymbolicAbstraction('NotDotted', null); } catch (_) { malformedRejected = true; }
+    check('T418: symbolic abstraction rejects malformed non-dotted name', malformedRejected);
+    let duplicateRejected = false;
+    try { sim.defineSymbolicAbstraction('future.service', null); } catch (_) { duplicateRejected = true; }
+    check('T419: symbolic abstraction rejects duplicate live dot-name', duplicateRejected);
+}
+
+{
+    const sim = makeSim();
+    const result = sim.defineSymbolicAbstraction('Fresh.Sequence', null);
+    check('T420: fresh symbolic abstraction starts at sequence zero',
+        result.seq === 0);
+    const load = sim.mLoad(result.gt, 'X', result.slot);
+    check('T421: symbolic mLoad fails with actionable implementation-missing error',
+        load && load.ok === false && load.fault === 'CODE_NOT_RESIDENT' &&
+        /implementation is missing.*Install a matching LUMP/i.test(load.message),
+        load && load.message);
+
+    let callFault = null;
+    sim.cr[0].word0 = result.gt;
+    sim._mwinWriteback = () => true;
+    sim.fault = (type, message) => { callFault = { type, message }; };
+    sim._execCall({ crDst: 0, imm: 0 });
+    check('T422: symbolic CALL fails with actionable implementation-missing error',
+        callFault && callFault.type === 'CODE_NOT_RESIDENT' &&
+        /implementation is missing.*Install a matching LUMP/i.test(callFault.message),
+        callFault && callFault.message);
+}
+
+{
+    const sim = makeSim();
+    const slot = sim.firstUserNsSlot();
+    sim._nsFreeSequences[slot] = 7;
+    sim.defineSymbolicAbstraction('Race.Safe', slot);
+    sim._nsSymbolicEntries = {};
+    sim.nsLabels[slot] = 'Slot ' + slot;
+    const sandbox = vm.createContext({
+        sim,
+        window: { _nsState: { abstractions: [{
+            name: 'Race.Safe', slot, seq: 7, type: 'Inform',
+            symbolic: true, implementationMissing: true, resident: false,
+        }] } },
+    });
+    vm.runInContext(hydrateSymbolicSrc, sandbox);
+    vm.runInContext('_hydrateNsSymbolicState();', sandbox);
+    check('T423: boot-first hydration restores retained-sequence symbolic metadata',
+        sim.symbolicEntryAt(slot) && sim.symbolicEntryAt(slot).seq === 7 &&
+        sim.nsLabels[slot] === 'Race.Safe');
+
+    const namespaceWords = sim.exportHardwareImage().namespace;
+    sim.loadImageFromBinary(namespaceWords, new Uint32Array(64), null);
+    vm.runInContext('_hydrateNsSymbolicState();', sandbox);
+    check('T423b: ns-state-first hydration survives the later boot-image load',
+        sim.symbolicEntryAt(slot) && sim.symbolicEntryAt(slot).seq === 7 &&
+        sim.parseNSWord1(sim.memory[sim._nsSlotBase(slot) + 1]).gtSeq === 7);
+}
+
+{
+    const sandbox = vm.createContext({});
+    vm.runInContext(inheritSavedMetadataSrc, sandbox);
+    const inherited = vm.runInContext(
+        `_nsInheritSavedArtifactMetadata(
+            {name:'Old.Service', symbolic:true, implementationMissing:true, resident:false},
+            {name:'Old.Service', token:'deadbeef', filename:'Old.Service.lump',
+             binaryHash:'a'.repeat(64), resident:true},
+            true)`,
+        sandbox);
+    check('T424: symbolic saves never inherit stale binary metadata',
+        inherited.token === undefined && inherited.filename === undefined &&
+        inherited.binaryHash === undefined && inherited.resident === false);
+}
+
 // ── T414: binary image paths preserve W1/W2/W3 exactly ───────────────────────
 {
     const seed = makeSim();

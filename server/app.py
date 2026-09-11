@@ -4056,6 +4056,20 @@ def boot_image_ns_state():
         return jsonify({"error": str(_exc)}), 500
 
 
+def _validate_symbolic_namespace_entries(entries):
+    """Reject symbolic rows that claim an implementation or binary identity."""
+    for entry in entries:
+        if entry.get("symbolic") is not True:
+            continue
+        if entry.get("implementationMissing") is not True:
+            raise ValueError("Symbolic Namespace entries must be explicitly marked implementationMissing")
+        if any(entry.get(key) not in (None, "", False) for key in (
+                "token", "filename", "binaryHash", "binary_hash",
+                "identityHash", "identity_hash", "cacheToken", "cache_token",
+                "resident", "boot_resident")):
+            raise ValueError("Symbolic Namespace entries cannot carry binary or resident metadata")
+
+
 @app.route("/api/boot-image/save-ns", methods=["POST"])
 def boot_image_save_ns():
     """Single write path for NS table: writes boot-image.bin + ns-state.json atomically.
@@ -4116,6 +4130,7 @@ def boot_image_save_ns():
             _a for _a in _raw_abs
             if isinstance(_a, dict) and _a.get("name") and isinstance(_a.get("slot"), int)
         ]
+        _validate_symbolic_namespace_entries(_ns_entries)
         # The four-word NS entry does not carry the resident artifact locator.
         # Preserve an existing locator when an older/browser client submits the
         # same slot and name without the sidecar fields.  This prevents a
@@ -4135,6 +4150,8 @@ def boot_image_save_ns():
         for _entry in _ns_entries:
             _old_entry = _old_by_slot.get(_entry["slot"])
             if not _old_entry or _old_entry.get("name") != _entry.get("name"):
+                continue
+            if _entry.get("symbolic") is True:
                 continue
             for _key in (
                 "token", "filename", "issue_n", "resident",

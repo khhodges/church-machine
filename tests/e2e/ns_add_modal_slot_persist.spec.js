@@ -38,23 +38,33 @@ test('Namespace Add retains slot policy without artifact metadata endpoints', as
     });
 
     await page.goto('/simulator/');
-    await page.waitForFunction(() => typeof sim !== 'undefined' && typeof _nsTableAdd === 'function');
+    await page.waitForFunction(() => typeof sim !== 'undefined' && sim &&
+        typeof sim.firstUserNsSlot === 'function' && typeof _nsTableAdd === 'function');
     await page.evaluate(() => {
+        const existingSlot = sim._tokenSlotMap && sim._tokenSlotMap.get('abc12345');
+        if (Number.isInteger(existingSlot) && existingSlot >= sim.firstUserNsSlot()) {
+            sim.clearNSEntry(existingSlot);
+        }
         switchView('namespace');
         _nsTableAdd();
     });
     await expect(page.locator('#_nsAddConfirmBtn')).toBeEnabled();
 
-    const slot = 11;
+    const slot = await page.evaluate(() => {
+        for (let candidate = sim.firstUserNsSlot(); candidate < sim.MAX_NS_ENTRIES; candidate++) {
+            if (!sim.isNSEntryValid(candidate)) return candidate;
+        }
+        throw new Error('No free Namespace slot is available for the test');
+    });
     await page.locator('#_nsSlotPolicy').selectOption('static');
     await page.locator('#_nsSlotInput').fill(String(slot));
     await page.locator('#_nsAddConfirmBtn').click();
     await expect(page.locator('#_nsAddModalOverlay')).toHaveCount(0);
 
-    await page.evaluate(() => {
-        if (sim.isNSEntryValid(11)) sim.clearNSEntry(11);
+    await page.evaluate(selectedSlot => {
+        if (sim.isNSEntryValid(selectedSlot)) sim.clearNSEntry(selectedSlot);
         _nsTableAdd();
-    });
+    }, slot);
     await expect(page.locator('#_nsAddConfirmBtn')).toBeEnabled();
     await expect(page.locator('#_nsSlotPolicy')).toHaveValue('static');
     await expect(page.locator('#_nsSlotInput')).toHaveValue(String(slot));
