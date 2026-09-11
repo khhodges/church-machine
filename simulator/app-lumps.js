@@ -6228,11 +6228,9 @@ async function openLumpInEditor(token) {
             var _lCaps = _binaryFrameApi && Array.isArray(_binaryFrameApi.capabilities)
                 ? _binaryFrameApi.capabilities : null;
             if (Array.isArray(_lCaps) && _lCaps.length > 0) {
-                var _capItems = _lCaps.map(function(c, idx) {
-                    var _n = c.name || String(c);
-                    var _r = (c.grants || c.rights || []).join('');
-                    return _n + (_r ? ' ' + _r : '');
-                }).filter(Boolean).join(', ');
+                var _clistStart = lhdr.lumpSize - lhdr.cc;
+                var _capItems = _formatSavedLumpCapabilities(
+                    _lCaps, serverWords, _clistStart);
                 disasmLines.push('capabilities { ' + _capItems + ' }');
                 disasmLines.push('');
             }
@@ -6848,6 +6846,27 @@ function _formatLumpApiDefinition(absName, caps) {
             };
         })
     };
+}
+
+// Format the C-list from the immutable embedded API plus the immutable binary.
+// The API carries the canonical declared dot.name and requested rights; the
+// binary carries the token that was actually stored in the C-list row.
+function _formatSavedLumpCapabilities(caps, serverWords, clistStart) {
+    if (!Array.isArray(caps) || caps.length === 0) return '';
+    return caps.map(function(cap, idx) {
+        var _cap = (cap && typeof cap === 'object') ? cap : { name: cap };
+        var _dotName = _cap.dot_name || _cap.dotName || _cap.name || '';
+        var _rights = Array.isArray(_cap.rights) ? _cap.rights :
+            (Array.isArray(_cap.grants) ? _cap.grants : []);
+        var _tokenIndex = Number(clistStart) + idx;
+        var _tokenWord = serverWords && _tokenIndex >= 0 &&
+            _tokenIndex < serverWords.length
+            ? (serverWords[_tokenIndex] >>> 0) : 0;
+        var _token = '0x' + _tokenWord.toString(16).toUpperCase().padStart(8, '0');
+        var _label = _dotName ? _dotName + '  ' : '';
+        var _rightsLabel = _rights.length ? '  rights=' + _rights.join('') : '';
+        return '#' + idx + ' ' + _label + 'token=' + _token + _rightsLabel;
+    }).join(', ');
 }
 
 function _fmtLumpByteSize(bytes) {
