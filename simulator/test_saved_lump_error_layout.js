@@ -46,6 +46,10 @@ context.window._savedLumpEditorMode = false;
 
 const errorsSource = fs.readFileSync(path.join(__dirname, 'app-cr-detail.js'), 'utf8');
 const lumpsSource = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8');
+assert(
+    /ed\.addEventListener\('input',[\s\S]*?_clearAsmErrors\(\);[\s\S]*?_dismissAsmAdvisoryPopup\(\);/.test(errorsSource),
+    'editing source clears stale compiler diagnostics'
+);
 vm.runInContext([
     extractFunction(errorsSource, '_showCompileFailedBanner'),
     extractFunction(errorsSource, '_hideCompileFailedBanner'),

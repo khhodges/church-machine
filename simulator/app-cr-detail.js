@@ -261,7 +261,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (ed) {
         ed.addEventListener('input', function() {
             _asmSrcSave(_asmEditorNsIdx, ed.value);
-            _hideCompileFailedBanner();
+            _clearAsmErrors();
             _dismissAsmAdvisoryPopup();
         });
 
