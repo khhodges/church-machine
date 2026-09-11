@@ -439,14 +439,26 @@
     box-sizing: border-box;
 }
 
-#editor > .saved-lump-disassembly-panel {
-    flex: 0 0 min(36vh, 360px);
-    width: 100%;
+.editor-layout.saved-lump-editor-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.5rem;
+}
+
+.editor-layout.saved-lump-editor-layout > .editor-divider,
+.editor-layout.saved-lump-editor-layout > .console-panel {
+    display: none;
+}
+
+.editor-layout.saved-lump-editor-layout > .saved-lump-disassembly-panel {
+    grid-column: 2;
+    grid-row: 1;
+    width: auto;
+    flex: 1;
     min-height: 0;
-    max-height: min(36vh, 360px);
+    max-height: none;
     box-sizing: border-box;
     overflow: hidden;
-    padding: 0.45rem 0;
+    padding: 0;
 }
 
 #editor .console-panel {

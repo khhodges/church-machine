@@ -48,10 +48,14 @@ check(index.includes('class="editor-toolbar"') &&
       index.includes('id="savedLumpDisassemblyPanel"') &&
       index.includes('class="editor-layout editor-source-console-row"') &&
       index.indexOf('class="editor-toolbar"') <
-          index.indexOf('id="savedLumpDisassemblyPanel"') &&
-      index.indexOf('id="savedLumpDisassemblyPanel"') <
-          index.indexOf('class="editor-layout editor-source-console-row"'),
-    'the toolbar, full-width disassembly, and editor workspace are ordered vertically');
+          index.indexOf('class="editor-layout editor-source-console-row"') &&
+      index.indexOf('class="editor-layout editor-source-console-row"') <
+          index.indexOf('id="savedLumpDisassemblyPanel"'),
+    'the toolbar sits above the two-column source and disassembly workspace');
+check(toolbar.includes('.editor-layout.saved-lump-editor-layout') &&
+      toolbar.includes('grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)') &&
+      toolbar.includes('.saved-lump-editor-layout > .console-panel'),
+    'saved-LUMP mode places source left and disassembly right while hiding the console');
 check(toolbar.includes('grid-template-columns: minmax(0, 1fr) 6px minmax(0, 1fr)') &&
       toolbar.includes('grid-template-rows: minmax(0, 1fr)'),
     'the source/console workspace is a static three-column row');

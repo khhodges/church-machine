@@ -1662,15 +1662,17 @@ function _lumpSrcEditMethod(absIdx, mName) {
     if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
 }
 
-// Saved LUMPs are edited as source while their immutable binary is shown in
-// the full-width row below the editor toolbar.
+// Saved LUMPs are edited as source on the left while their immutable binary is
+// shown in the right-hand column beside it.
 function _enterSavedLumpEditorMode(compiledDisasm, lumpName) {
     window._savedLumpEditorMode = true;
     var tabs = document.getElementById('codeSidebarTabs');
+    var layout = document.querySelector('#editor .editor-layout');
     var panel = document.getElementById('savedLumpDisassemblyPanel');
     var title = document.getElementById('savedLumpDisassemblyTitle');
     var text = document.getElementById('savedLumpDisassembly');
     if (tabs) tabs.style.display = 'none';
+    if (layout) layout.classList.add('saved-lump-editor-layout');
     if (typeof _clearAsmErrors === 'function') _clearAsmErrors();
     ['codeConsoleContent', 'codeHistoryPanel', 'codeSyntaxPanel', 'codeJsPanel',
         'asmWarningPanel'].forEach(function(id) {
@@ -1695,6 +1697,8 @@ function exitSavedLumpEditorMode() {
         if (_sourceEditor.classList) _sourceEditor.classList.remove('cm-editor-sealed');
     }
     try { localStorage.removeItem('cm_sealed_lump'); } catch (_e) {}
+    var layout = document.querySelector('#editor .editor-layout');
+    if (layout) layout.classList.remove('saved-lump-editor-layout');
     if (!window._savedLumpEditorMode) return;
     window._savedLumpEditorMode = false;
     var tabs = document.getElementById('codeSidebarTabs');

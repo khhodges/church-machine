@@ -3041,9 +3041,16 @@
         display: none;
     }
 
-    #editor > .saved-lump-disassembly-panel {
-        flex-basis: min(42vh, 300px);
-        max-height: min(42vh, 300px);
+    .editor-layout.saved-lump-editor-layout {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 0.5rem;
+    }
+
+    .editor-layout.saved-lump-editor-layout > .saved-lump-disassembly-panel {
+        grid-column: 1;
+        grid-row: 2;
+        min-height: 0;
     }
 
     .repl-layout {

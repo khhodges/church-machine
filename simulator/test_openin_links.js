@@ -1227,6 +1227,7 @@ trackAsync((async function t21() {
 // ── T23: read-only split disassembly and normal-panel restoration ─────────────
 (function t23() {
     const dom = new JSDOM(`<!DOCTYPE html><body>
+        <div id="editor"><div class="editor-layout"></div></div>
         <div id="codeSidebarTabs"></div>
         <div id="savedLumpDisassemblyPanel" style="display:none">
           <h2 id="savedLumpDisassemblyTitle"></h2>
@@ -1265,12 +1266,16 @@ trackAsync((async function t21() {
     assert('T23 normal right-side tabs are replaced in split mode',
         doc.getElementById('codeSidebarTabs').style.display === 'none' &&
         doc.getElementById('savedLumpDisassemblyPanel').style.display === 'flex');
+    assert('T23 saved-LUMP workspace uses the source-left/disassembly-right layout',
+        doc.querySelector('#editor .editor-layout').classList.contains('saved-lump-editor-layout'));
 
     vm.runInContext('exitSavedLumpEditorMode()', sandbox);
     assert('T23 leaving split mode restores normal tabs and console',
         doc.getElementById('codeSidebarTabs').style.display === '' &&
         doc.getElementById('savedLumpDisassemblyPanel').style.display === 'none' &&
         doc.getElementById('codeConsoleContent').style.display === 'flex');
+    assert('T23 leaving split mode removes the saved-LUMP two-column layout',
+        !doc.querySelector('#editor .editor-layout').classList.contains('saved-lump-editor-layout'));
     assert('T23 leaving split mode clears stale compiled text',
         pre.textContent === '', JSON.stringify(pre.textContent));
     assert('T23 leaving split mode clears saved-LUMP editor context',

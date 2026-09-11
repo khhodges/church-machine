@@ -914,11 +914,6 @@
                         <span id="asmWarnBadge" class="asm-warn-badge" style="display:none;" title="Assembly warnings — scroll up to review">&#x26A0; <span id="asmWarnBadgeCount"></span></span>
                 </div>
         </div>
-        <section id="savedLumpDisassemblyPanel" class="saved-lump-disassembly-panel" style="display:none;" aria-label="Compiled LUMP disassembly">
-            <h2 id="savedLumpDisassemblyTitle">Compiled Disassembly</h2>
-            <p>This read-only view is the exact compiled binary opened from the saved LUMP.</p>
-            <pre id="savedLumpDisassembly" tabindex="0" aria-readonly="true"></pre>
-        </section>
         <div class="editor-layout editor-source-console-row" aria-label="Source and console workspace">
             <div class="editor-panel">
                 <!-- Built-in example tab markup retired. Open File Catalog owns
@@ -1043,6 +1038,11 @@
                     <textarea id="asmEditor" spellcheck="false" wrap="off"></textarea>
                 </div>
             </div>
+             <section id="savedLumpDisassemblyPanel" class="saved-lump-disassembly-panel" style="display:none;" aria-label="Compiled LUMP disassembly">
+                 <h2 id="savedLumpDisassemblyTitle">Compiled Disassembly</h2>
+                 <p>This read-only view is the exact compiled binary opened from the saved LUMP.</p>
+                 <pre id="savedLumpDisassembly" tabindex="0" aria-readonly="true"></pre>
+             </section>
             <div class="editor-divider" id="editorDivider"></div>
             <div class="editor-panel console-panel">
                 <div class="sidebar-tabs" id="codeSidebarTabs">
