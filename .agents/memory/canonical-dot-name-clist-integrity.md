@@ -9,12 +9,15 @@ The compiled artifact must preserve the C-list in dot-name form, and the LUMP in
 
 The C-list row 0 must contain the LUMP's `SELF` name. That row is read-only compiled identity data and is included in the LUMP integrity calculation. The lazy loader is responsible for converting 32-bit Outform tokens into Inform GTs at runtime; it must not rewrite the compiled SELF row or treat the token as the canonical name.
 
+Repository/catalog views must group active revisions by canonical `dot_name`, falling back to `abstraction` only for legacy rows without a dot name. Distinct pet-name objects may share the legacy abstraction field.
+
 **Why:** Numeric GTs, slots, and catalog records are local or mutable; they cannot independently prove which named compilation and capability set produced a LUMP.
 
 **How to apply:** Accept source abstraction names as identifier segments joined by
 dots across every language parser and auto-wrap probe; templates intentionally
 emit this form. Validate the canonical dot-name identity and recompute integrity
 from the complete compiled representation, including the read-only SELF row and
-dot-name C-list content. Resolve Outform tokens to Inform GTs only in the
-lazy-loader/runtime path. Do not trust a manifest token, slot, sidecar, or
-numeric GT as a substitute for this check.
+dot-name C-list content. Use canonical dot names for repository grouping and
+display, and exact tokens for navigation. Resolve Outform tokens to Inform GTs
+only in the lazy-loader/runtime path. Do not trust a manifest token, slot,
+sidecar, or numeric GT as a substitute for this check.

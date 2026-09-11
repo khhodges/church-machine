@@ -26,7 +26,10 @@ function extractFunction(name) {
 
 const sandbox = { Number, Boolean, parseInt, String, Date };
 vm.createContext(sandbox);
+vm.runInContext(extractFunction('_lumpRepositoryName'), sandbox);
 vm.runInContext(extractFunction('_latestPrimaryLump'), sandbox);
+vm.runInContext(extractFunction('_latestRepositoryLump'), sandbox);
+vm.runInContext(extractFunction('_repositoryPrimaryLumps'), sandbox);
 
 const rows = [
     { token: 'c7425d6c', abstraction: 'CapabilityTest',
@@ -55,8 +58,28 @@ assert.strictEqual(
     sandbox._latestPrimaryLump(latestSavedRows, 'CapabilityTest').token,
     'boot-capability-test',
     'archived revisions never replace the active catalogue selection');
-assert(source.includes('latest && latest.token === l.token'),
-    'top-level repository chooses the latest saved revision per abstraction');
+
+const dotNameRows = [
+    { token: 'bare-anyname', abstraction: 'anyname',
+      compiled_at: '2026-09-10T12:00:00Z' },
+    { token: 'new-anyname', abstraction: 'anyname', dot_name: 'New.anyname',
+      compiled_at: '2026-09-10T12:00:00Z' },
+    { token: 'old-new-anyname', abstraction: 'anyname', dot_name: 'New.anyname',
+      archived: true, lump_version: 99,
+      compiled_at: '2026-09-11T12:00:00Z' },
+];
+const repositoryRows = sandbox._repositoryPrimaryLumps(dotNameRows);
+assert.deepStrictEqual(
+    repositoryRows.map(row => row.token).sort(),
+    ['bare-anyname', 'new-anyname'],
+    'Repository keeps distinct canonical dot names, including New.anyname, while excluding archived history');
+assert.strictEqual(
+    sandbox._latestRepositoryLump(dotNameRows, 'New.anyname').token,
+    'new-anyname',
+    'archived New.anyname history cannot replace its active revision');
+assert(source.includes('const _primaryLumps = _repositoryPrimaryLumps(lumps)') &&
+       source.includes('const name  = lump.dot_name || lump.abstraction ||'),
+    'top-level repository groups by canonical dot name and displays it');
 assert(source.includes('_currentRow.archived === true'),
     'persisted archived selection is repaired on reload');
 assert(source.includes('_latestPrimaryLump(lumps, _liveRow.abstraction)') &&

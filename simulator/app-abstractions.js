@@ -894,20 +894,17 @@ async function renderLumps() {
         if (!lumps || lumps.length === 0) {
             html = '<div class="lumps-placeholder">No lumps saved yet. Use Build LUMP in the editor to compile and save an abstraction.</div>';
         } else {
-            // Show one top-level artifact per abstraction: the latest saved
-            // revision. Immutable-history storage must not make an older
-            // resident image authoritative for editor or simulator selection.
-            const _primaryLumps = lumps.filter(l => {
-                if (l.archived === true) return false;
-                const latest = _latestPrimaryLump(lumps, l.abstraction);
-                return latest && latest.token === l.token;
-            });
+            // Show one top-level artifact per canonical dot name: the latest
+            // saved revision.  A pet-name such as New.anyname is a distinct
+            // repository object even when its legacy abstraction field is
+            // shared with another row.
+            const _primaryLumps = _repositoryPrimaryLumps(lumps);
             const _sortedLumps = _lumpsSorted(_primaryLumps.length ? _primaryLumps : lumps);
             html += `<select id="lumpPickerSelect" class="lump-picker-select" onchange="lumpPickerChanged(this.value)">`;
             html += `<option value="">— pick a lump —</option>`;
             for (const lump of _sortedLumps) {
                 const token = lump.token || '????????';
-                const name  = lump.abstraction || 'Unknown';
+                const name  = lump.dot_name || lump.abstraction || 'Unknown';
                 const lt    = (lump.lump_type    || '').toLowerCase();
                 const ct    = (lump.content_type || '').toLowerCase();
                 const typ   = lump.typ;
@@ -1206,6 +1203,13 @@ function _lumpsSorted(lumps) {
     return arr;
 }
 
+function _lumpRepositoryName(lump) {
+    if (!lump) return '';
+    const dotName = typeof lump.dot_name === 'string' ? lump.dot_name.trim() : '';
+    if (dotName) return dotName;
+    return typeof lump.abstraction === 'string' ? lump.abstraction.trim() : '';
+}
+
 function _latestPrimaryLump(lumps, abstraction) {
     const matches = (lumps || []).filter(l =>
         l && l.abstraction === abstraction && l.archived !== true);
@@ -1226,6 +1230,37 @@ function _latestPrimaryLump(lumps, abstraction) {
         return Number(Boolean(b.approved)) - Number(Boolean(a.approved));
     });
     return matches[0] || null;
+}
+
+function _latestRepositoryLump(lumps, repositoryName) {
+    const matches = (lumps || []).filter(l =>
+        l && _lumpRepositoryName(l) === repositoryName && l.archived !== true);
+    matches.sort((a, b) => {
+        const _compiledTime = lump => {
+            const raw = lump && lump.compiled_at;
+            if (raw === null || raw === undefined || raw === '') return 0;
+            const numeric = Number(raw);
+            if (Number.isFinite(numeric)) return numeric;
+            const parsed = Date.parse(String(raw));
+            return Number.isFinite(parsed) ? parsed / 1000 : 0;
+        };
+        const compiled = _compiledTime(b) - _compiledTime(a);
+        if (compiled) return compiled;
+        const version = (parseInt(b.lump_version) || 0) -
+            (parseInt(a.lump_version) || 0);
+        if (version) return version;
+        return Number(Boolean(b.approved)) - Number(Boolean(a.approved));
+    });
+    return matches[0] || null;
+}
+
+function _repositoryPrimaryLumps(lumps) {
+    const rows = Array.isArray(lumps) ? lumps : [];
+    return rows.filter(l => {
+        if (!l || l.archived === true) return false;
+        const latest = _latestRepositoryLump(rows, _lumpRepositoryName(l));
+        return latest && latest.token === l.token;
+    });
 }
 
 // Called by the sort <select> when the user changes sort order.

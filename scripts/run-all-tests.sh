@@ -175,6 +175,9 @@ register_suite "lambda-exec-tests" \
 register_suite "lump-binary-tests" \
     'node simulator/test_load_lump_binary.js'
 
+register_suite "lump-primary-revision-selection-tests" \
+    'node simulator/test_lump_primary_revision_selection.js'
+
 register_suite "wukong-callhome-hw-lump-tests" \
     'node simulator/test_wukong_callhome_hw_lump.js'
 

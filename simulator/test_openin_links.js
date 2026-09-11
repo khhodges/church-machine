@@ -82,6 +82,12 @@ const EDITOR_TO_ABS_SRC  = extractFunctionByName('app-shell.js', '_editorJumpToA
 // WHICH token _pendingLumpAbstractionName/_pendingLumpMethodName resolve
 // against when several lumps share one abstraction name (different versions).
 const RENDER_LUMPS_SRC   = extractFunctionByName('app-abstractions.js', 'renderLumps');
+const LUMP_REPOSITORY_NAME_SRC =
+    extractFunctionByName('app-abstractions.js', '_lumpRepositoryName');
+const LATEST_REPOSITORY_LUMP_SRC =
+    extractFunctionByName('app-abstractions.js', '_latestRepositoryLump');
+const REPOSITORY_PRIMARY_LUMPS_SRC =
+    extractFunctionByName('app-abstractions.js', '_repositoryPrimaryLumps');
 const SAVED_LUMP_SOURCE_SRC = extractFunctionByName('app-lumps.js', '_resolveSavedLumpEditorSource');
 const SAVED_LUMP_ENTER_SRC  = extractFunctionByName('app-lumps.js', '_enterSavedLumpEditorMode');
 const SAVED_LUMP_EXIT_SRC   = extractFunctionByName('app-lumps.js', 'exitSavedLumpEditorMode');
@@ -91,7 +97,8 @@ const SWITCH_CODE_TAB_SRC   = extractFunctionByName('app-run.js', 'switchCodeTab
 const ALL_SRC = [TOAST_SRC, ABS_TO_EDITOR_SRC, ABS_TO_LUMP_SRC,
                   LUMP_VERSION_LABEL_SRC, LUMP_TOKEN_ID_SRC, SWITCH_LUMP_VERSION_SRC, INSPECTED_METHOD_SRC, SCROLL_METHOD_SRC,
                  REFRESH_LINKS_SRC, EDITOR_TO_LUMP_SRC, EDITOR_TO_ABS_SRC,
-                 RENDER_LUMPS_SRC].join('\n\n');
+                 LUMP_REPOSITORY_NAME_SRC, LATEST_REPOSITORY_LUMP_SRC,
+                 REPOSITORY_PRIMARY_LUMPS_SRC, RENDER_LUMPS_SRC].join('\n\n');
 
 // ── Minimal LumpRegistry mock ────────────────────────────────────────────────
 // Provides the same API as lump-registry.js (window.LumpRegistry) without
