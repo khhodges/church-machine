@@ -7343,6 +7343,92 @@ def _prepare_saved_lump_ns_state(
     return entries
 
 
+def _namespace_state_fingerprint(entries):
+    """Return the exact identity of the authoritative Namespace rows."""
+    return hashlib.sha256(json.dumps(
+        entries, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")).hexdigest()
+
+
+def _read_authoritative_namespace_rows():
+    """Read rich Namespace state and return rows plus its exact fingerprint."""
+    if not os.path.isfile(NS_STATE_PATH):
+        rows = []
+    else:
+        with open(NS_STATE_PATH, encoding="utf-8") as state_file:
+            state = json.load(state_file)
+        rows = state.get("abstractions") if isinstance(state, dict) else None
+        if not isinstance(rows, list):
+            raise ValueError("ns-state.json has no abstractions array")
+    return rows, _namespace_state_fingerprint(rows)
+
+
+def _allocate_bootstrap_history_repair_destination(abstraction):
+    """Select the first Namespace slot eligible for a corrected resident LUMP.
+
+    Slots 0 and 1 are architectural reservations.  A row blocks allocation
+    only when it is both resident and already installed (with a token and
+    filename).  The returned binding is a proposed destination identity; the
+    caller must carry its Namespace fingerprint through approval and verify it
+    again while holding the commit locks.
+    """
+    rows, namespace_identity = _read_authoritative_namespace_rows()
+    by_slot = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("ns-state.json contains a non-object Namespace row")
+        slot = row.get("slot")
+        if isinstance(slot, bool) or not isinstance(slot, int) \
+                or not 0 <= slot < MAX_NS_ENTRIES:
+            raise ValueError(f"ns-state.json contains invalid Namespace slot {slot!r}")
+        if slot in by_slot:
+            raise ValueError(f"ns-state.json has duplicate Namespace slot {slot}")
+        by_slot[slot] = row
+
+    reserved = {0, 1}
+    reserved.update(
+        slot for slot, row in by_slot.items()
+        if row.get("resident") is True
+        and isinstance(row.get("token"), str) and bool(row.get("token"))
+        and isinstance(row.get("filename"), str) and bool(row.get("filename"))
+    )
+    for slot in range(2, MAX_NS_ENTRIES):
+        if slot in reserved:
+            continue
+        source = by_slot.get(slot)
+        sequence = 0 if source is None else source.get("seq", 0)
+        if isinstance(sequence, bool) or not isinstance(sequence, int) \
+                or not 0 <= sequence <= 0x1FF:
+            raise ValueError(
+                f"ns-state.json has invalid sequence for Namespace slot {slot}")
+        binding = dict(source or {})
+        binding.update({
+            "name": str(abstraction or "").strip(),
+            "slot": slot,
+            "seq": sequence,
+            "resident": True,
+            "boot_resident": True,
+            "type": "Inform",
+            "load_policy": "Resident",
+            "ns_slot_policy": "static",
+        })
+        runtime_gt = _resident_inform_egt(binding)
+        binding["token"] = f"{runtime_gt:08x}"
+        return {
+            "slot": slot,
+            "sequence": sequence,
+            "runtime_gt": runtime_gt,
+            "token": binding["token"],
+            "binding": binding,
+            "source_row": dict(source) if source is not None else None,
+            "namespace_identity": namespace_identity,
+        }
+    raise ValueError(
+        f"no eligible Namespace slot is available in the configured capacity "
+        f"(slots 0 and 1 are reserved; capacity is {MAX_NS_ENTRIES})"
+    )
+
+
 def _ensure_ns_state():
     """Create/migrate ns-state.json to the rich per-slot format on startup.
 
@@ -8079,13 +8165,35 @@ def save_lump():
     # Bootstrap identity enforcement is explicit, never inherited from the
     # previous occupant of a programmer-selected slot. Generic Namespace saves
     # may replace every slot with any abstraction.
-    _is_bootstrap_canonical = (
-        _bootstrap_binding is not None
-        and metadata.get("enforce_bootstrap_identity") is True
-    )
     _is_server_bootstrap_history_repair = bool(
         _lump_bootstrap_history_repair_override.get()
         and metadata.get("_bootstrap_history_repair") is True
+    )
+    if _is_server_bootstrap_history_repair:
+        _repair_destination = metadata.get("_bootstrap_repair_destination")
+        if not isinstance(_repair_destination, dict):
+            return jsonify({
+                "error": "Bootstrap correction destination identity is missing.",
+                "namespace_identity_failed": True,
+                "committed": False,
+                "safe_retry": True,
+            }), 409
+        _bootstrap_binding = dict(_repair_destination)
+        ns_slot = _bootstrap_binding.get("slot")
+        token_hint = _bootstrap_binding.get("token")
+        token8 = str(token_hint or "").lower()
+        if (not re.fullmatch(r"[0-9a-f]{8}", token8)
+                or not isinstance(ns_slot, int)):
+            return jsonify({
+                "error": "Bootstrap correction destination identity is invalid.",
+                "namespace_identity_failed": True,
+                "committed": False,
+                "safe_retry": True,
+            }), 409
+        metadata["namespace_sequence"] = _bootstrap_binding.get("seq", 0)
+    _is_bootstrap_canonical = (
+        _bootstrap_binding is not None
+        and metadata.get("enforce_bootstrap_identity") is True
     )
     _is_selftest_canonical = _is_bootstrap_canonical and _is_selftest_canonical
 
@@ -8821,6 +8929,13 @@ def save_lump():
                 _fresh_rows = json.load(_fresh_state_file).get("abstractions")
             if not isinstance(_fresh_rows, list):
                 raise ValueError("ns-state.json has no abstractions array")
+            if _is_server_bootstrap_history_repair:
+                expected_namespace_identity = metadata.get(
+                    "_bootstrap_repair_namespace_identity")
+                if (_namespace_state_fingerprint(_fresh_rows)
+                        != expected_namespace_identity):
+                    raise ValueError(
+                        "Namespace state changed while the correction was awaiting approval")
             if _is_selftest_canonical:
                 _fresh_sources = [
                     row for row in _fresh_rows if isinstance(row, dict)
@@ -8845,10 +8960,17 @@ def save_lump():
                     row for row in _fresh_rows if isinstance(row, dict)
                     and row.get("slot") == ns_slot
                 ]
-                if len(_fresh_targets) != 1:
+                if _is_server_bootstrap_history_repair and not _fresh_targets:
+                    # A newly allocated slot is intentionally absent until
+                    # this transition installs its Namespace row.  The full
+                    # Namespace fingerprint above proves that the planned
+                    # empty destination is still the same destination.
+                    _fresh_binding = dict(_bootstrap_binding)
+                elif len(_fresh_targets) != 1:
                     raise ValueError(
                         f"Namespace no longer has one descriptor at NS[{ns_slot}]")
-                _fresh_binding = _fresh_targets[0]
+                else:
+                    _fresh_binding = _fresh_targets[0]
             _validate_bootstrap_candidate(
                 _fresh_binding, lump_bytes, token8, _binary_hash,
                 _bootstrap_identity)
@@ -9167,6 +9289,18 @@ def save_lump():
             if isinstance(row, dict) and row.get("slot") == ns_slot)
         selected["filename"] = final_manifest_entry["filename"]
         selected["lump_version"] = final_manifest_entry["lump_version"]
+        if _is_server_bootstrap_history_repair:
+            selected.update({
+                "name": abs_name,
+                "slot": ns_slot,
+                "seq": _bootstrap_binding.get("seq", 0),
+                "token": token8,
+                "resident": True,
+                "boot_resident": True,
+                "type": "Inform",
+                "load_policy": "Resident",
+                "ns_slot_policy": "static",
+            })
         return {NS_STATE_PATH: _build_ns_state_document(entries)}
     # Only explicit-intent allowlisted extrinsic fields are retained. Every
     # structural/identity fact is derived from the exact inspected binary.
@@ -9418,6 +9552,12 @@ def save_lump():
     }
     if boot_refresh_note:
         resp["boot_image_note"] = boot_refresh_note
+    if _is_server_bootstrap_history_repair:
+        resp.update({
+            "namespace_slot": ns_slot,
+            "namespace_sequence": _bootstrap_binding.get("seq", 0),
+            "destination_token": token8,
+        })
     return jsonify(resp)
 
 @app.route("/api/lumps/save-wip", methods=["POST"])
@@ -9435,7 +9575,8 @@ def patch_wip_source(token):
     }), 410
 
 
-def _bootstrap_snapshot_identity(lumps_dir, manifest_entry, inspected):
+def _bootstrap_snapshot_identity(
+        lumps_dir, manifest_entry, inspected, *, binding_override=None):
     """Compare one exact saved binary with its name's live bootstrap binding.
 
     Archived bootstrap revisions are immutable, but they are not exempt from
@@ -9481,15 +9622,34 @@ def _bootstrap_snapshot_identity(lumps_dir, manifest_entry, inspected):
             return _unavailable("ns-state abstractions is not an array")
     except (OSError, ValueError, AttributeError) as exc:
         return _unavailable(f"ns-state could not be read ({exc})")
-    bindings = [
-        row for row in state_rows
-        if isinstance(row, dict)
-        and str(row.get("name") or "").casefold() == abstraction.casefold()
-    ]
-    if len(bindings) != 1:
-        return _unavailable(
-            f"expected exactly one {abstraction} Namespace binding; found {len(bindings)}")
-    binding = bindings[0]
+    if binding_override is not None:
+        binding = binding_override
+    else:
+        bindings = [
+            row for row in state_rows
+            if isinstance(row, dict)
+            and str(row.get("name") or "").casefold() == abstraction.casefold()
+        ]
+        if len(bindings) == 1:
+            binding = bindings[0]
+        else:
+            # A corrected history revision can coexist with the original
+            # resident binding. Resolve live records by their serialized GT;
+            # an archive that has no matching live binding remains explicitly
+            # unavailable rather than being attributed to the wrong slot.
+            matching = []
+            for row in bindings:
+                try:
+                    if f"{_resident_inform_egt(row) & 0xFFFFFFFF:08x}" \
+                            == str(record_token).lower():
+                        matching.append(row)
+                except (TypeError, ValueError):
+                    continue
+            if len(matching) != 1:
+                return _unavailable(
+                    f"expected one matching {abstraction} Namespace binding; "
+                    f"found {len(bindings)} rows and {len(matching)} token matches")
+            binding = matching[0]
     try:
         expected_gt = _resident_inform_egt(binding)
     except ValueError as exc:
@@ -10169,7 +10329,8 @@ def get_lump_words(token_hex):
     return jsonify(response)
 
 
-def _validate_lump_snapshot(lump_path, manifest_entry=None):
+def _validate_lump_snapshot(
+        lump_path, manifest_entry=None, *, bootstrap_binding=None):
     """Validate one exact binary and report any hash-bound approval.
 
     History, Preview, and Restore must agree on whether an archive is usable.
@@ -10238,7 +10399,8 @@ def _validate_lump_snapshot(lump_path, manifest_entry=None):
     bootstrap_identity = _bootstrap_snapshot_identity(
         os.path.dirname(os.path.abspath(lump_path)),
         manifest_entry,
-        inspected)
+        inspected,
+        binding_override=bootstrap_binding)
     result["bootstrap_identity"] = bootstrap_identity
     if bootstrap_identity is not None and not bootstrap_identity["valid"]:
         errors.append(
@@ -10291,6 +10453,26 @@ def _bootstrap_history_repair_candidate(current_token, version, archive_filename
     abstraction = str(active.get("abstraction") or "").strip()
     if not abstraction:
         raise ValueError("the current LUMP has no abstraction identity")
+    state_rows, _ = _read_authoritative_namespace_rows()
+    active_bindings = [
+        row for row in state_rows
+        if isinstance(row, dict)
+        and str(row.get("name") or "").casefold() == abstraction.casefold()
+    ]
+    matching_active_bindings = []
+    for row in active_bindings:
+        try:
+            if f"{_resident_inform_egt(row):08x}" == key8:
+                matching_active_bindings.append(row)
+        except (TypeError, ValueError):
+            continue
+    if len(matching_active_bindings) == 1:
+        active_binding = dict(matching_active_bindings[0])
+    elif len(active_bindings) == 1:
+        active_binding = dict(active_bindings[0])
+    else:
+        raise ValueError(
+            "the current LUMP has no unambiguous authoritative Namespace binding")
 
     archived_rows = [
         row for row in manifest
@@ -10332,7 +10514,8 @@ def _bootstrap_history_repair_candidate(current_token, version, archive_filename
         raise ValueError("the requested archive version does not match its record")
 
     archive_path = _lump_transition_path(lumps_dir, archive_filename)
-    snapshot = _validate_lump_snapshot(archive_path, archived)
+    snapshot = _validate_lump_snapshot(
+        archive_path, archived, bootstrap_binding=active_binding)
     identity = snapshot.get("bootstrap_identity")
     errors = snapshot.get("errors") or []
     if (not snapshot.get("raw_inspectable") or not isinstance(identity, dict)
@@ -10356,21 +10539,27 @@ def _bootstrap_history_repair_candidate(current_token, version, archive_filename
     if row0_index < 0 or row0_index >= len(words):
         raise ValueError("the archive c-list row-zero location is invalid")
 
-    # The new candidate is proven against the destination's current descriptor,
-    # never the archival record's now-obsolete token.
+    destination = _allocate_bootstrap_history_repair_destination(abstraction)
+    destination_binding = destination["binding"]
+    expected_gt = destination["runtime_gt"]
+
+    # The new candidate is proven against the newly allocated destination
+    # descriptor, never the archival record's now-obsolete token.
     repaired_words = list(words)
     repaired_words[row0_index] = expected_gt
     candidate_bytes = _struct.pack(f">{len(repaired_words)}I", *repaired_words)
     candidate_inspected = _inspect_lump_binary(candidate_bytes)
-    candidate_entry = dict(active, token=expected_hex, abstraction=abstraction)
+    candidate_entry = dict(active, token=destination["token"], abstraction=abstraction)
     candidate_identity = _bootstrap_snapshot_identity(
-        lumps_dir, candidate_entry, candidate_inspected)
+        lumps_dir, candidate_entry, candidate_inspected,
+        binding_override=destination_binding)
     if candidate_identity is None or candidate_identity.get("valid") is not True:
         raise ValueError("the repaired candidate does not satisfy the live bootstrap descriptor")
 
     active_path = _lump_transition_path(
         lumps_dir, active.get("filename") or f"{key8}.lump")
-    active_snapshot = _validate_lump_snapshot(active_path, active)
+    active_snapshot = _validate_lump_snapshot(
+        active_path, active, bootstrap_binding=active_binding)
     if not active_snapshot.get("valid"):
         raise ValueError(
             "the current live LUMP must pass validation before it can be superseded")
@@ -10403,13 +10592,13 @@ def _bootstrap_history_repair_candidate(current_token, version, archive_filename
     typ = (repaired_words[0] >> 8) & 0x3
     content_type = {0: "code", 1: "data", 2: "thread", 3: "outform"}[typ]
     metadata = {
-        "token": expected_hex,
+        "token": destination["token"],
         "abstraction": abstraction,
         "content_type": content_type,
         "language": active_approval.get(
             "language", archive_approval.get("language", "assembly")),
-        "ns_slot": identity.get("slot"),
-        "namespace_sequence": identity.get("sequence"),
+        "ns_slot": destination["slot"],
+        "namespace_sequence": destination["sequence"],
         "enforce_bootstrap_identity": True,
         "capabilities": [],
         "grants": active_approval.get(
@@ -10419,6 +10608,13 @@ def _bootstrap_history_repair_candidate(current_token, version, archive_filename
         "issue_number": issue_n,
         "submitted_source": snapshot.get("source"),
         "_bootstrap_history_repair": True,
+        "_bootstrap_repair_destination": destination_binding,
+        "_bootstrap_repair_namespace_identity": destination["namespace_identity"],
+        "_bootstrap_repair_destination_identity": _manifest_entry_identity({
+            "slot": destination["slot"],
+            "seq": destination["sequence"],
+            "source_row": destination["source_row"],
+        }),
     }
     if petname:
         metadata["petname"] = petname
@@ -10447,7 +10643,8 @@ def _bootstrap_history_repair_candidate(current_token, version, archive_filename
         "candidate_hash": candidate_inspected["binary_hash"],
         "metadata": metadata,
         "corrections": corrections,
-        "expected_gt": expected_hex,
+        "expected_gt": destination["token"],
+        "destination": destination,
     }
 
 
@@ -10487,6 +10684,10 @@ def plan_bootstrap_history_repair(token, version):
                 "archive_filename": candidate["archive_filename"],
                 "archive_hash": candidate["archive_hash"],
                 "candidate_hash": candidate["candidate_hash"],
+                "namespace_identity": candidate["metadata"][
+                    "_bootstrap_repair_namespace_identity"],
+                "destination_identity": candidate["metadata"][
+                    "_bootstrap_repair_destination_identity"],
                 "correction_ids": tuple(
                     correction["id"] for correction in candidate["corrections"]),
             }
@@ -10498,6 +10699,9 @@ def plan_bootstrap_history_repair(token, version):
             "source_version": version,
             "archive_filename": candidate["archive_filename"],
             "expected_gt": candidate["expected_gt"],
+            "namespace_slot": candidate["destination"]["slot"],
+            "namespace_sequence": candidate["destination"]["sequence"],
+            "destination_token": candidate["destination"]["token"],
             "corrections": candidate["corrections"],
             "consequence": (
                 "A new compliant live revision will be saved. The current live "
@@ -10541,9 +10745,14 @@ def apply_bootstrap_history_repair(token, version):
                     != _manifest_entry_identity(candidate["active"])
                     or repair_plan["archive_filename"] != candidate["archive_filename"]
                     or repair_plan["archive_hash"] != candidate["archive_hash"]
-                    or repair_plan["candidate_hash"] != candidate["candidate_hash"]):
+                    or repair_plan["candidate_hash"] != candidate["candidate_hash"]
+                    or repair_plan["namespace_identity"]
+                    != candidate["metadata"]["_bootstrap_repair_namespace_identity"]
+                    or repair_plan["destination_identity"]
+                    != candidate["metadata"]["_bootstrap_repair_destination_identity"]):
                 raise ValueError(
-                    "the archive or live LUMP changed while the correction was awaiting approval")
+                    "the archive, live LUMP, or Namespace destination changed "
+                    "while the correction was awaiting approval")
 
         metadata = dict(candidate["metadata"])
         metadata["save_plan_id"] = plan_id

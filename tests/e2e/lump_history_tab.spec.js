@@ -837,7 +837,10 @@ test.describe('LUMP History tab — approved bootstrap corrections', () => {
                 body: JSON.stringify({
                     plan_id: 'repair-plan-1',
                     digest: 'd'.repeat(64),
-                    action: 'replace',
+                    action: 'save',
+                    namespace_slot: 2,
+                    namespace_sequence: 0,
+                    destination_token: '4a000002',
                     corrections: [
                         { id: 'repair-sealed-row-zero-gt' },
                         { id: 'issue-canonical-bootstrap-identity' },
@@ -860,7 +863,13 @@ test.describe('LUMP History tab — approved bootstrap corrections', () => {
             await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({ ok: true, lump_version: 3 }),
+                body: JSON.stringify({
+                    ok: true,
+                    lump_version: 3,
+                    namespace_slot: 2,
+                    namespace_sequence: 0,
+                    destination_token: '4a000002',
+                }),
             });
         });
 
@@ -881,7 +890,7 @@ test.describe('LUMP History tab — approved bootstrap corrections', () => {
         });
         expect(JSON.parse(approvalRequest.postData())).toMatchObject({
             digest: 'd'.repeat(64),
-            action: 'replace',
+            action: 'save',
             plan_id: 'repair-plan-1',
             confirmation: true,
         });
@@ -894,6 +903,12 @@ test.describe('LUMP History tab — approved bootstrap corrections', () => {
                 'issue-canonical-bootstrap-identity',
             ],
         });
+        const toast = page.locator('#fpgaToastEl');
+        await expect(toast).toBeVisible();
+        await expect(toast.locator('.fpga-toast-title')).toHaveText('Corrections applied');
+        await expect(toast.locator('.fpga-toast-body')).toContainText(
+            'Namespace slot 2'
+        );
         await expect(page.locator('#lumpHistoryPreviewModal')).toHaveCount(0);
 
         await clickHistoryTab(page);

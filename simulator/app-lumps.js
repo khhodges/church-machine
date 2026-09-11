@@ -3270,9 +3270,13 @@ async function _confirmLumpBootstrapRepairs(repairId, currentToken, version, arc
         );
         const liveVersion = result.lump_version || result.version;
         if (typeof _showFpgaToast === 'function') {
+            const destinationSlot = result.namespace_slot;
+            const destinationText = destinationSlot != null
+                ? ` in Namespace slot ${destinationSlot}`
+                : '';
             _showFpgaToast(
                 'Corrections applied',
-                `A compliant live LUMP${liveVersion != null ? ` v${liveVersion}` : ''} was created. The defective archive was preserved.`,
+                `A compliant live LUMP${liveVersion != null ? ` v${liveVersion}` : ''}${destinationText} was created. The defective archive was preserved.`,
                 'ok',
                 5000
             );
