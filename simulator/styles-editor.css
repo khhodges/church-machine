@@ -249,14 +249,6 @@
 
 .asm-advisory-popup-jump:hover { color: #bfdbfe; }
 
-/* ── Sealed editor — read-only state after a clean compile ───────────────── */
-#asmEditor.cm-editor-sealed {
-    opacity: 0.72;
-    background: #141414;
-    cursor: not-allowed;
-    border-color: var(--church-gold, #C89B3C);
-}
-
 /* ── POLA-rewritten line gutter marker ───────────────────────────────────── */
 #lineNumbers span.line-num-pola {
     color: #f59e0b;

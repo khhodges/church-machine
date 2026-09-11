@@ -1978,15 +1978,6 @@ async function compileAndBuild() {
     showNextSteps('compiled');
 }
 
-function _applySealedLumpState(absName) {
-    const editor = document.getElementById('asmEditor');
-    if (editor) {
-        editor.readOnly = true;
-        editor.classList.add('cm-editor-sealed');
-    }
-    localStorage.setItem('cm_sealed_lump', JSON.stringify({ abstraction: absName || 'Unnamed', sealedAt: Date.now() }));
-}
-
 function auditLumpOnly() {
     if (typeof lumpAudit !== 'function') return;
     const editor = document.getElementById('asmEditor');

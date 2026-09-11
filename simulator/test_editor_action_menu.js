@@ -5,6 +5,7 @@ const path = require('path');
 
 const index = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const run = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
+const compile = fs.readFileSync(path.join(__dirname, 'app-compile.js'), 'utf8');
 const shell = fs.readFileSync(path.join(__dirname, 'app-shell.js'), 'utf8');
 const toolbar = fs.readFileSync(path.join(__dirname, 'styles-toolbar.css'), 'utf8');
 const lumps = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8');
@@ -42,6 +43,9 @@ check(!run.includes('button.textContent = identity ? `${label} · ${identity}` :
     'only the toolbar displays the full identity');
 check(shell.includes('_refreshEditorActionIdentity('),
     'execution identity changes refresh the action context');
+check(!compile.includes('_applySealedLumpState') &&
+      !compile.includes('cm-editor-sealed'),
+    'compilation does not hide or seal the source editor');
 check(!toolbar.includes('.editor-actions-context') &&
       toolbar.includes('.editor-identity-name') &&
       toolbar.includes('max-width: none'),
