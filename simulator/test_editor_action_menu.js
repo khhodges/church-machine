@@ -28,11 +28,12 @@ check(index.includes('id="btnHamCompile"') &&
 check(!index.includes('id="editorActionsIdentity"') &&
       !index.includes('id="editorActionsIdentityValue"'),
     'the hamburger menu has no duplicate identity context');
-check(!index.includes('id="editorCodeName"') &&
+check(index.includes('id="editorCodeName" class="editor-identity-name"') &&
       run.includes('window._editorCodeNameValue = name || \'\';') &&
       run.includes('_editorActionIdentity(name || window._editorCodeNameValue || \'\')') &&
-      index.includes('id="editorIdentityName"'),
-    'the toolbar has no duplicate short label and keeps only the canonical full identity visible');
+      !index.includes('id="editorIdentityName"') &&
+      run.includes('document.getElementById(\'editorCodeName\')'),
+    'the DOM uses one visible full dot.name identity and has no duplicate label');
 check(run.includes('function _editorActionIdentity(name)') &&
       run.includes('return `${dotName}#${issue}`;'),
     'the action identity is built as the full dot.pet.name issue identity');

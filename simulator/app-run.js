@@ -11851,7 +11851,7 @@ function _editorActionIdentity(name) {
 
 function _refreshEditorActionIdentity(name) {
     const identity = _editorActionIdentity(name || window._editorCodeNameValue || '');
-    const identityName = document.getElementById('editorIdentityName');
+    const identityName = document.getElementById('editorCodeName');
     if (identityName) {
         identityName.textContent = identity;
         identityName.title = identity ? `Current LUMP identity: ${identity}` : 'Current LUMP identity';
