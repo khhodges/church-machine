@@ -266,6 +266,25 @@ function _findSrcLump(slotIdx, slotLabel) {
     return latestForName(slotLabel);
 }
 
+function _nsFormatLumpCompiledAt(raw) {
+    if (raw === null || raw === undefined || raw === '') return 'Unavailable';
+    const numeric = Number(raw);
+    const date = Number.isFinite(numeric)
+        ? new Date(numeric * 1000)
+        : new Date(String(raw));
+    return Number.isNaN(date.getTime()) ? 'Unavailable' : date.toLocaleString();
+}
+
+function _nsOpenLumpLibrary(token) {
+    const overlay = document.getElementById('_nsLumpModalOverlay');
+    if (overlay) overlay.remove();
+    if (typeof switchView === 'function') switchView('lumps');
+    setTimeout(function() {
+        if (typeof showLumpDetail === 'function') showLumpDetail(token);
+        else if (window.showLumpDetail) window.showLumpDetail(token);
+    }, 0);
+}
+
 function _resolveCListPetName(gtWord) {
     if (!gtWord || gtWord === 0) return null;
     try {
@@ -4958,6 +4977,11 @@ function _showNSLumpModal(slotIdx, nsEntry) {
         const srcLump = (typeof _findSrcLump === 'function') ? _findSrcLump(slotIdx, nsEntry.label) : null;
         if (srcLump && srcLump.token) {
             const _slTok = srcLump.token;
+            const _slVersionRaw = srcLump.lump_version ?? srcLump.version;
+            const _slVersion = (_slVersionRaw === null || _slVersionRaw === undefined || _slVersionRaw === '')
+                ? 'Unavailable'
+                : (/^v/i.test(String(_slVersionRaw)) ? String(_slVersionRaw) : `v${_slVersionRaw}`);
+            const _slCompiledAt = _nsFormatLumpCompiledAt(srcLump.compiled_at);
             _modalToken = _slTok;
             _modalMode = (srcLump.ns_slot_policy === 'static' && srcLump.boot_resident) ? 'resident'
                        : (srcLump.ns_slot_policy === 'static')                        ? 'lazy'
@@ -4974,7 +4998,10 @@ function _showNSLumpModal(slotIdx, nsEntry) {
                         style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);">Open in Repository →</button>
                     <button class="btn btn-xs" onclick="document.getElementById('_nsLumpModalOverlay').remove();(typeof openLumpInEditor==='function'?openLumpInEditor('${_slTok}'):_openLumpSource('${_slTok}'))"
                         style="background:#1e3a5f;color:#60a5fa;border:1px solid rgba(96,165,250,0.35);">Open in Editor ✎</button>
+                    <button class="btn btn-xs" data-testid="ns-show-lump-library" onclick="_nsOpenLumpLibrary('${_slTok}')"
+                        style="background:#3b2f16;color:#f4c95d;border:1px solid rgba(244,201,93,0.4);">Show in LUMP Library</button>
                 </div>
+                <div style="color:#9ca3af;font-size:0.75rem;margin-bottom:4px;">Version: <strong style="color:#d0d0e8;">${_escHtml(_slVersion)}</strong> · Compiled: <strong style="color:#d0d0e8;">${_escHtml(_slCompiledAt)}</strong></div>
                 <div style="color:#555;font-size:0.72rem;font-family:monospace;">&#x1F3E0; server/lumps/${_slTok}.lump</div>
             </div>`;
         } else {
@@ -4998,16 +5025,11 @@ function _showNSLumpModal(slotIdx, nsEntry) {
             _modalMode = (_lazyEntry.ns_slot_policy === 'static' && _lazyEntry.boot_resident) ? 'resident'
                        : (_lazyEntry.ns_slot_policy === 'static')                             ? 'lazy'
                        :                                                                        'dynamic';
-            const _rawCompiledAt = _lazyEntry.compiled_at;
-            let _compiledAtText = '';
-            if (_rawCompiledAt !== null && _rawCompiledAt !== undefined && _rawCompiledAt !== '') {
-                const _compiledNumeric = Number(_rawCompiledAt);
-                const _compiledDate = Number.isFinite(_compiledNumeric)
-                    ? new Date(_compiledNumeric * 1000) : new Date(String(_rawCompiledAt));
-                if (!Number.isNaN(_compiledDate.getTime())) {
-                    _compiledAtText = _compiledDate.toLocaleString();
-                }
-            }
+            const _compiledAtText = _nsFormatLumpCompiledAt(_lazyEntry.compiled_at);
+            const _lazyVersionRaw = _lazyEntry.lump_version ?? _lazyEntry.version;
+            const _lazyVersion = (_lazyVersionRaw === null || _lazyVersionRaw === undefined || _lazyVersionRaw === '')
+                ? 'Unavailable'
+                : (/^v/i.test(String(_lazyVersionRaw)) ? String(_lazyVersionRaw) : `v${_lazyVersionRaw}`);
             tokenHtml = `<div style="margin-bottom:12px;">
                 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
                     <span style="color:#888;font-size:0.78rem;">Token:</span>
@@ -5020,8 +5042,11 @@ function _showNSLumpModal(slotIdx, nsEntry) {
                         style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);">Open in Repository \u2192</button>
                     <button class="btn btn-xs" onclick="document.getElementById('_nsLumpModalOverlay').remove();(typeof openLumpInEditor==='function'?openLumpInEditor('${_lazyFetchToken}'):_openLumpSource('${_lazyFetchToken}'))"
                         style="background:#1e3a5f;color:#60a5fa;border:1px solid rgba(96,165,250,0.35);">Open in Editor \u270e</button>
+                    <button class="btn btn-xs" data-testid="ns-show-lump-library" onclick="_nsOpenLumpLibrary('${_lazyFetchToken}')"
+                        style="background:#3b2f16;color:#f4c95d;border:1px solid rgba(244,201,93,0.4);">Show in LUMP Library</button>
                 </div>
-                <div style="color:#555;font-size:0.72rem;font-family:monospace;">&#x1F3E0; server/lumps/${_lazyFetchToken}.lump${_compiledAtText ? ` · compiled ${_compiledAtText}` : ''}</div>
+                <div style="color:#9ca3af;font-size:0.75rem;margin-bottom:4px;">Version: <strong style="color:#d0d0e8;">${_escHtml(_lazyVersion)}</strong> · Compiled: <strong style="color:#d0d0e8;">${_escHtml(_compiledAtText)}</strong></div>
+                <div style="color:#555;font-size:0.72rem;font-family:monospace;">&#x1F3E0; server/lumps/${_lazyFetchToken}.lump</div>
                 <div style="margin-top:7px;padding:6px 9px;border-left:3px solid ${_lazyFetchBlockedError ? '#f87171' : '#60a5fa'};background:${_lazyFetchBlockedError ? 'rgba(248,113,113,0.10)' : 'rgba(96,165,250,0.08)'};color:${_lazyFetchBlockedError ? '#fca5a5' : '#9ca3af'};font-size:0.76rem;">
                     ${_lazyFetchBlockedError
                         ? '<strong>FAULT:</strong> The most recently compiled saved artifact is invalid and cannot be loaded.'

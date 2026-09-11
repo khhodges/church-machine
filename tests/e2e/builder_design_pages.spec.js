@@ -294,5 +294,11 @@ test.describe('Namespace Thread instance details', () => {
         await page.locator('.ns-label', { hasText: 'SelfTest' }).click();
         await expect(page.locator('[data-testid="thread-detail-modal"]')).toHaveCount(0);
         await expect(page.locator('#_nsLumpModalOverlay')).toContainText('LUMP HEADER');
+        await expect(page.locator('#_nsLumpModalOverlay')).toContainText('Version:');
+        await expect(page.locator('#_nsLumpModalOverlay')).toContainText('Compiled:');
+        await expect(page.getByRole('button', { name: 'Show in LUMP Library' })).toBeVisible();
+        await page.getByRole('button', { name: 'Show in LUMP Library' }).click();
+        await expect(page.locator('#lumps')).toBeVisible();
+        await expect(page.locator('#lumpsDetailTitle')).toContainText('SelfTest');
     });
 });
