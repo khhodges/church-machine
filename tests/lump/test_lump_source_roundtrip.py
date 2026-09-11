@@ -46,6 +46,31 @@ end
 """
 
 
+def _binary_for_source(source: str):
+    """Build the smallest valid source-bearing V1.3 frame for this test."""
+    api = json.dumps(
+        {"name": "RoundTripDemo", "methods": []},
+        separators=(",", ":"),
+    ).encode("utf-8")
+    source_bytes = source.encode("utf-8")
+    frame = [
+        (0xAB << 24) | (0x01 << 16) | len(api),
+        *[
+            int.from_bytes(api[offset:offset + 4].ljust(4, b"\0"), "big")
+            for offset in range(0, len(api), 4)
+        ],
+        len(source_bytes),
+        *[
+            int.from_bytes(
+                source_bytes[offset:offset + 4].ljust(4, b"\0"), "big")
+            for offset in range(0, len(source_bytes), 4)
+        ],
+    ]
+    size = 256
+    header = (0x1F << 27) | (2 << 23) | (1 << 10)
+    return [header, 0, *frame] + [0] * (size - 2 - len(frame))
+
+
 def _build_meta(source: str = _SOURCE_TEXT):
     return {
         "token":           _TEST_TOKEN,
@@ -68,6 +93,29 @@ def _build_meta(source: str = _SOURCE_TEXT):
         "mtbf_status":     "unknown",
         "source":          source,
     }
+
+
+def _save(client, metadata):
+    """Exercise the production save-plan and one-time approval contract."""
+    binary = _binary_for_source(metadata.get("source", ""))
+    candidate = {"binary": binary, "metadata": dict(metadata)}
+    planned = client.post("/api/lumps/save-plan", json=candidate)
+    assert planned.status_code == 201, planned.get_data(as_text=True)
+    plan = planned.get_json()
+    issued = client.post("/api/lumps/approval-intent", json={
+        "digest": plan["digest"],
+        "action": plan["action"],
+        "plan_id": plan["plan_id"],
+        "confirmation": True,
+        "approval": {"grants": ["E"], "capability_type": "inform"},
+    })
+    assert issued.status_code == 201, issued.get_data(as_text=True)
+    payload = {
+        "binary": binary,
+        "metadata": dict(metadata, save_plan_id=plan["plan_id"],
+                         approval_intent=issued.get_json()["intent"]),
+    }
+    return client.post("/api/lumps/save", json=payload)
 
 
 _ABS_STEM = "RoundTripDemo"
@@ -187,10 +235,7 @@ class TestSourceRoundTrip:
     def test_source_present_in_detail_after_save(self, client):
         """A non-empty source string posted to /api/lumps/save is returned
         verbatim by /api/lumps/<token>/detail."""
-        resp = client.post(
-            "/api/lumps/save",
-            json={"binary": _BINARY, "metadata": _build_meta()},
-        )
+        resp = _save(client, _build_meta())
         data = resp.get_json()
         assert resp.status_code == 200, f"Save returned {resp.status_code}: {data}"
         assert data.get("ok"), f"Save response not ok: {data}"
@@ -210,10 +255,7 @@ class TestSourceRoundTrip:
     def test_source_empty_string_round_trips(self, client):
         """An empty source string must also round-trip (not become None or be
         dropped)."""
-        resp = client.post(
-            "/api/lumps/save",
-            json={"binary": _BINARY, "metadata": _build_meta(source="")},
-        )
+        resp = _save(client, _build_meta(source=""))
         assert resp.get_json().get("ok"), f"Save failed: {resp.get_json()}"
 
         detail = client.get(f"/api/lumps/{_TEST_TOKEN}/detail").get_json()
@@ -226,10 +268,7 @@ class TestSourceRoundTrip:
         """Source strings containing Unicode, tabs, and newlines must
         survive JSON serialisation/deserialisation unchanged."""
         special = "λx.x\n\t; unicode λ ∀ ∃\n; emoji 🏁\n"
-        resp = client.post(
-            "/api/lumps/save",
-            json={"binary": _BINARY, "metadata": _build_meta(source=special)},
-        )
+        resp = _save(client, _build_meta(source=special))
         assert resp.get_json().get("ok"), f"Save failed: {resp.get_json()}"
 
         detail = client.get(f"/api/lumps/{_TEST_TOKEN}/detail").get_json()
@@ -246,10 +285,7 @@ class TestLeanListContract:
     def test_source_absent_from_list_entry(self, client):
         """After saving a lump with a source field, the list endpoint must
         not include 'source' on any entry."""
-        resp = client.post(
-            "/api/lumps/save",
-            json={"binary": _BINARY, "metadata": _build_meta()},
-        )
+        resp = _save(client, _build_meta())
         assert resp.get_json().get("ok"), f"Save failed: {resp.get_json()}"
 
         list_resp = client.get("/api/lumps/list")
@@ -269,10 +305,7 @@ class TestLeanListContract:
     def test_detail_has_source_while_list_does_not(self, client):
         """Detail endpoint includes source; list endpoint omits it — both
         for the same token."""
-        resp = client.post(
-            "/api/lumps/save",
-            json={"binary": _BINARY, "metadata": _build_meta()},
-        )
+        resp = _save(client, _build_meta())
         assert resp.get_json().get("ok"), f"Save failed: {resp.get_json()}"
 
         detail = client.get(f"/api/lumps/{_TEST_TOKEN}/detail").get_json()

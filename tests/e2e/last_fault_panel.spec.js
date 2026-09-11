@@ -192,8 +192,8 @@ test.describe('Last Fault panel — emit → POST → GET round-trip', () => {
             if (typeof switchView === 'function') switchView('editor');
         });
 
-        // Call _fetchAndShowLastFaultPanel — the stable host must explain the
-        // unavailable state instead of silently doing nothing.
+        // Call _fetchAndShowLastFaultPanel — the normal no-record state should
+        // not reserve editor space or show an empty status panel.
         await page.evaluate(() => {
             if (typeof _fetchAndShowLastFaultPanel === 'function') {
                 _fetchAndShowLastFaultPanel();
@@ -204,9 +204,8 @@ test.describe('Last Fault panel — emit → POST → GET round-trip', () => {
         await page.waitForTimeout(800);
 
         const panel = page.locator('#lastFaultHost');
-        await expect(panel).toBeVisible();
-        await expect(panel).toContainText('UNAVAILABLE');
-        await expect(panel).toContainText('No durable accepted fault record');
+        await expect(panel).toBeHidden();
+        await expect(panel).toHaveText('');
     });
 
     test('promoted hardware fault remains fully visible after recovery Boot.0', async ({ page }) => {

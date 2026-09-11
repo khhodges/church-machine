@@ -95,7 +95,7 @@ def _push_device_event(payload: dict):
 # ─────────────────────────────────────────────────────────────────────────────
 from flask import (
     Flask, after_this_request, jsonify, send_from_directory, send_file,
-    redirect, make_response, request, session,
+    redirect, make_response, request, session, g,
 )
 
 # Ensure the server/ directory is on sys.path so local modules (boot_image, etc.)
@@ -248,6 +248,72 @@ db = SQLAlchemy(model_class=Base)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key")
+
+# Save diagnostics are intentionally append-only and metadata-only. They give
+# a failed browser save a server-side correlation point without persisting
+# source text, approval tokens, session cookies, or other secrets.
+_LUMP_SAVE_DIAGNOSTIC_LOCK = threading.Lock()
+_LUMP_SAVE_DIAGNOSTIC_FILENAME = "save-diagnostics.jsonl"
+
+
+def _save_diagnostic_identity(metadata):
+    metadata = metadata if isinstance(metadata, dict) else {}
+    identity = {}
+    for key in (
+            "abstraction", "token", "dot_name", "petname", "issue_number",
+            "output_profile", "profile", "ns_slot"):
+        value = metadata.get(key)
+        if isinstance(value, (str, int, float)) and not isinstance(value, bool):
+            identity[key] = value
+    return identity
+
+
+@app.after_request
+def _record_lump_save_diagnostic(response):
+    record = getattr(g, "_lump_save_diagnostic", None)
+    if record is None:
+        return response
+    try:
+        body = response.get_json(silent=True)
+    except Exception:
+        body = None
+    body = body if isinstance(body, dict) else {}
+    committed = body.get("committed")
+    if not isinstance(committed, bool):
+        committed = bool(body.get("ok") is True and response.status_code < 300)
+    if response.status_code >= 400 and "committed" not in body:
+        # Every save failure is returned before the atomic transition commits,
+        # or from a transition that has already rolled back. Make that fact
+        # explicit to the browser instead of forcing it to infer state from
+        # the HTTP status alone.
+        body["committed"] = False
+        response.set_data(json.dumps(body))
+        response.content_type = "application/json"
+    record.update({
+        "status": response.status_code,
+        "committed": committed,
+        "token": body.get("token") or record.get("token"),
+        "binary_hash": body.get("binary_hash") or record.get("binary_hash"),
+        "lump_version": body.get("lump_version"),
+        "failure_reason": (
+            None if committed else str(body.get("error") or
+                                      response.status or "save failed")
+        ),
+    })
+    try:
+        os.makedirs(LUMPS_DIR, exist_ok=True)
+        diagnostic_path = os.path.join(
+            LUMPS_DIR, _LUMP_SAVE_DIAGNOSTIC_FILENAME)
+        line = json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n"
+        with _LUMP_SAVE_DIAGNOSTIC_LOCK:
+            with open(diagnostic_path, "a", encoding="utf-8") as diagnostic_file:
+                diagnostic_file.write(line)
+    except Exception:
+        # Diagnostics must never turn a successful atomic save into a failed
+        # HTTP response. The server log still records the operational issue.
+        logging.exception("[lumps] unable to append save diagnostic")
+    response.headers["X-Lump-Save-Operation"] = record["operation_id"]
+    return response
 
 @app.route("/api/m-bit-ide-access", methods=["GET", "POST"])
 def api_m_bit_ide_access():
@@ -6783,7 +6849,10 @@ def _parse_intrinsic_lump_content(words):
             return None
         source_len = words[pos] & 0xFFFFFFFF
         source_words = (source_len + 3) // 4
-        if not source_len or pos + 1 + source_words > end:
+        # An explicitly embedded empty source is still source: preserve the
+        # distinction between a source frame containing "" and an API-only or
+        # legacy binary that has no source frame at all.
+        if pos + 1 + source_words > end:
             return None
         packed = _struct.pack(
             f">{source_words}I", *words[pos + 1:pos + 1 + source_words])[:source_len]
@@ -8018,6 +8087,19 @@ def save_lump():
     payload = _lump_save_payload_override.get()
     if payload is None:
         payload = request.get_json(force=True, silent=True)
+    _metadata_for_diagnostic = (
+        payload.get("metadata", {}) if isinstance(payload, dict) else {})
+    _operation_id = request.headers.get("X-Lump-Save-Operation", "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9._:-]{8,128}", _operation_id):
+        _operation_id = uuid.uuid4().hex
+    g._lump_save_diagnostic = {
+        "operation_id": _operation_id,
+        "operation": "lump-save",
+        "identity": _save_diagnostic_identity(_metadata_for_diagnostic),
+        "source_present": bool(
+            isinstance(_metadata_for_diagnostic, dict) and
+            isinstance(_metadata_for_diagnostic.get("submitted_source"), str)),
+    }
     if not payload:
         return jsonify({"error": "Invalid JSON payload"}), 400
 
@@ -8232,6 +8314,34 @@ def save_lump():
     _sl_hdr   = _sl_words[0]
     _sl_cc2   = _sl_hdr & 0xFF
     _sl_lsz   = 1 << (((_sl_hdr >> 23) & 0xF) + 6)
+    # The browser sends the exact compiled word region as part of the save
+    # snapshot. Validate it against the submitted binary so stale registry
+    # state cannot be paired with a different source/editor snapshot.
+    _submitted_compiled_words = metadata.get("compiled_words")
+    if _submitted_compiled_words is not None:
+        if (not isinstance(_submitted_compiled_words, list) or
+                any(isinstance(word, bool) or
+                    not isinstance(word, (int, float)) or
+                    int(word) != word or not 0 <= int(word) <= 0xFFFFFFFF
+                    for word in _submitted_compiled_words)):
+            return jsonify({
+                "error": "Save rejected: compiled_words is not a uint32 word array.",
+                "snapshot_mismatch": True,
+                "committed": False,
+                "safe_retry": True,
+            }), 422
+        _submitted_compiled_words = [
+            int(word) & 0xFFFFFFFF for word in _submitted_compiled_words]
+        if _submitted_compiled_words != _sl_words[1:1 + _sl_cw]:
+            return jsonify({
+                "error": (
+                    "Save rejected: compiled words do not match the submitted "
+                    "LUMP binary."
+                ),
+                "snapshot_mismatch": True,
+                "committed": False,
+                "safe_retry": True,
+            }), 422
     _declared_caps_raw = metadata.get("capabilities", [])
     if _declared_caps_raw is None:
         _declared_caps_raw = []
@@ -8889,6 +8999,21 @@ def save_lump():
                 "error": "Save rejected: submitted editor source does not match the source embedded in the binary.",
                 "source_mismatch": True,
             }), 422
+    _submitted_profile = metadata.get("output_profile")
+    if _submitted_profile is not None:
+        _intrinsic_profile = (
+            _intrinsic_content.get("tier")
+            if isinstance(_intrinsic_content, dict) else None)
+        if _submitted_profile != _intrinsic_profile:
+            return jsonify({
+                "error": (
+                    "Save rejected: output profile does not match the "
+                    "profile encoded in the LUMP binary."
+                ),
+                "snapshot_mismatch": True,
+                "committed": False,
+                "safe_retry": True,
+            }), 422
     # A source-bearing editor save must carry the source inside the immutable
     # binary.  Without this guard an API-only profile could still return a
     # successful save while silently discarding the user's editor contents.
@@ -9249,6 +9374,20 @@ def save_lump():
         "filename":      lump_filename,
         "lump_version":  next_lump_version,
         "compiled_at":   _compiled_at,
+        # Intrinsic content facts and user identity metadata are retained in
+        # the manifest alongside the binary. The binary remains authoritative
+        # for words/source/profile; these fields make repository recovery and
+        # diagnostics complete without trusting them for validation.
+        "dot_name":      _dot_name_save,
+        "issue_n":       _issue_n_save,
+        "petname":       _petname,
+        "content_profile": (
+            _intrinsic_content.get("tier")
+            if isinstance(_intrinsic_content, dict) else None),
+        "output_profile": (
+            _intrinsic_content.get("tier")
+            if isinstance(_intrinsic_content, dict) else None),
+        "capabilities":  list(_validated_declared_caps),
     }
     # Namespace state and boot configuration are the sole deployment authority.
 
@@ -9619,6 +9758,12 @@ def save_lump():
         "identity_string": _identity_string,
         "petname":        _petname,
         "issue_number":   _issue_number,
+        "output_profile": (
+            _intrinsic_content.get("tier")
+            if isinstance(_intrinsic_content, dict) else None),
+        "capabilities":   list(_validated_declared_caps),
+        "operation_id":   getattr(g, "_lump_save_diagnostic", {}).get(
+            "operation_id"),
         "warnings":       _save_warnings,
     }
     if boot_refresh_note:

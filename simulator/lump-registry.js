@@ -74,8 +74,11 @@
 
         // Register in-memory assembled lump content.
         // Called immediately after every successful assemble/compile.
-        // Argument order matches the task spec: (token, abstraction, words, capabilities)
-        registerMemory: function (token, abstraction, words, capabilities) {
+        // Argument order matches the task spec: (token, abstraction, words,
+        // capabilities). The optional snapshot records the source/compiler
+        // context that produced the words, so a later Save cannot silently
+        // pair a newer editor buffer with an older binary.
+        registerMemory: function (token, abstraction, words, capabilities, snapshot) {
             if (!token) return;
             var entry = _entries.get(token) || {
                 token: token,
@@ -88,6 +91,20 @@
                 capabilities:  capabilities ? Array.prototype.slice.call(capabilities) : [],
                 registeredAt:  Date.now()
             };
+            if (snapshot && typeof snapshot === 'object') {
+                if (typeof snapshot.sourceText === 'string') {
+                    entry.sources.memory.sourceText = snapshot.sourceText;
+                }
+                if (typeof snapshot.language === 'string') {
+                    entry.sources.memory.language = snapshot.language;
+                }
+                if (typeof snapshot.petname === 'string') {
+                    entry.sources.memory.petname = snapshot.petname;
+                }
+                if (snapshot.issueNumber != null) {
+                    entry.sources.memory.issueNumber = snapshot.issueNumber;
+                }
+            }
             _entries.set(token, entry);
         },
 

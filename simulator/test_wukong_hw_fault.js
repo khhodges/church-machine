@@ -574,6 +574,15 @@ assert('T6e: hw disconnected + sim not booted → RESET',
     assert('T10: bounded retry schedule is explicit',
         appRunSrc.indexOf('[0, 250, 500, 1000, 2000]') !== -1,
         'retry schedule missing');
+    const renderStart = appRunSrc.indexOf('function _renderLastAcceptedFaultState(');
+    const renderEnd = renderStart >= 0
+        ? appRunSrc.indexOf('\n}', renderStart) : -1;
+    const renderBody = renderStart >= 0 && renderEnd >= 0
+        ? appRunSrc.slice(renderStart, renderEnd + 2) : '';
+    assert('T10: empty unavailable state hides the host',
+        renderBody.includes('host.hidden = true') &&
+        renderBody.includes("host.innerHTML = ''"),
+        'empty unavailable state must not reserve editor space');
 }
 
 // ── T11: failed board reboot leaves the Reboot button clickable ───────────────

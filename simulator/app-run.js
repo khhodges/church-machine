@@ -342,7 +342,10 @@ function assembleAndLoad() {
         });
         if (_cluTok) {
             if (window.LumpRegistry) {
-                window.LumpRegistry.registerMemory(_cluTok, sim.programName, _cluWords, _cluCaps);
+                window.LumpRegistry.registerMemory(_cluTok, sim.programName, _cluWords, _cluCaps, {
+                    sourceText: source,
+                    language: 'cloomc',
+                });
                 window.LumpRegistry.setCurrent(_cluTok);
                 // A new compile invalidates any pending Format Lump binary.
                 window._pendingLumpData = null;
@@ -592,7 +595,10 @@ function assembleAndLoad() {
     });
     if (_asmTok) {
         if (window.LumpRegistry) {
-            window.LumpRegistry.registerMemory(_asmTok, sim.programName, _rawWords, _rawCaps);
+            window.LumpRegistry.registerMemory(_asmTok, sim.programName, _rawWords, _rawCaps, {
+                sourceText: source,
+                language: 'assembly',
+            });
             window.LumpRegistry.setCurrent(_asmTok);
             // A new compile invalidates any pending Format Lump binary.
             window._pendingLumpData = null;
@@ -12394,24 +12400,53 @@ function _captureLumpSaveSnapshot() {
         ? entry.sources.memory : null;
     const editor = document.getElementById('asmEditor');
     const pending = window._pendingLumpData || null;
-    const sourceText = pending && typeof pending.sourceText === 'string'
+    const registeredAt = memory && memory.registeredAt ? memory.registeredAt : 0;
+    // A pending Format dialog belongs to the exact registry/compiler pair
+    // that produced it. Older dialogs may remain in memory while the user
+    // navigates or compiles again; accepting their source would detach the
+    // saved binary from the active editor. Current dialogs carry the token;
+    // the timestamp also protects legacy pending dialogs.
+    const pendingMatches = !!pending &&
+        (!pending.token || pending.token === token) &&
+        (!pending.registeredAt || pending.registeredAt === registeredAt);
+    const sourceText = pendingMatches && typeof pending.sourceText === 'string'
         ? pending.sourceText
         : (editor ? String(editor.value || '') : '');
+    let petname = '';
+    let issueNumber = 1;
+    try {
+        petname = (pendingMatches && typeof pending.petname === 'string')
+            ? pending.petname : (localStorage.getItem('church_petname') || '');
+    } catch (_) {}
+    try {
+        issueNumber = (pendingMatches && pending.issueNumber != null)
+            ? (parseInt(pending.issueNumber, 10) || 1)
+            : (parseInt(localStorage.getItem('church_issue_number') || '1', 10) || 1);
+    } catch (_) {}
     return {
         token: token || null,
         words: memory && Array.isArray(memory.words) ? memory.words.slice() : [],
         capabilities: _cloneLumpSaveCapabilities(memory && memory.capabilities),
-        registeredAt: memory && memory.registeredAt ? memory.registeredAt : 0,
+        registeredAt: registeredAt,
         sourceText: sourceText,
         language: entry && entry.sources && entry.sources.server
             ? (entry.sources.server.language || '') : '',
-        pending: pending ? {
+        petname: petname,
+        issueNumber: issueNumber,
+        pending: pendingMatches ? {
             binary: Array.isArray(pending.binary) ? pending.binary.slice() : null,
             caps: _cloneLumpSaveCapabilities(pending.caps),
             sourceText: typeof pending.sourceText === 'string'
                 ? pending.sourceText : sourceText,
             selectedProfile: pending.selectedProfile || null,
             registeredAt: pending.registeredAt || 0,
+            token: pending.token || token || null,
+            abstractionName: pending.abstractionName || (entry && entry.abstraction) || '',
+            language: pending.language || (entry && entry.sources && entry.sources.server
+                ? (entry.sources.server.language || '') : ''),
+            petname: typeof pending.petname === 'string' ? pending.petname : petname,
+            issueNumber: pending.issueNumber != null
+                ? (parseInt(pending.issueNumber, 10) || 1) : issueNumber,
         } : null,
     };
 }
@@ -15422,8 +15457,13 @@ async function confirmSaveToNamespace() {
         _svAbsName = label;
         _svLang = (_svEntryPre && _svEntryPre.sources && _svEntryPre.sources.server
                    && _svEntryPre.sources.server.language)
+                 || (_saveSnapshot && _saveSnapshot.language)
                  || (typeof sim !== 'undefined' && sim._lastCompiledLanguage)
                  || '';
+        var _svPetname = (_saveSnapshot && typeof _saveSnapshot.petname === 'string')
+            ? _saveSnapshot.petname : '';
+        var _svIssueNumber = (_saveSnapshot && _saveSnapshot.issueNumber != null)
+            ? (parseInt(_saveSnapshot.issueNumber, 10) || 1) : 1;
 
         // Re-use the binary built in Step 1 (showFormatLump) when the registry
         // has not changed since the Format panel was shown.  _pendingLumpData
@@ -15626,6 +15666,19 @@ async function confirmSaveToNamespace() {
                 language:     _svLang,
                 ns_slot:      idx,
                 capabilities: _caps,
+                // Keep the complete immutable editor snapshot visible to the
+                // server-side approval/manifest layer. The binary remains the
+                // authority for code words, c-list bytes, source frame, and
+                // exact content profile; these fields make the saved record
+                // auditable without trusting browser metadata for validation.
+                compiled_words: _svWords.slice(),
+                output_profile: (_snapshotPending &&
+                    ['api', 'compact', 'full'].includes(_snapshotPending.selectedProfile))
+                    ? _snapshotPending.selectedProfile
+                    : (typeof _fallbackProfile !== 'undefined' && _fallbackProfile
+                        ? _fallbackProfile : null),
+                petname: _svPetname,
+                issue_number: _svIssueNumber,
                 grants:       Object.keys(perms).filter(function(p) { return perms[p]; }),
                 capability_type: gtType === 1 ? 'inform' :
                     (gtType === 2 ? 'outform' : 'abstract'),
@@ -20948,6 +21001,18 @@ function _renderLastAcceptedFaultState(state, detail, candidate) {
     if (!host) return;
     var labels = { pending: 'PENDING', rejected: 'REJECTED', unavailable: 'UNAVAILABLE' };
     candidate = candidate || {};
+    var emptyUnavailable = state === 'unavailable' &&
+        (!detail || /no durable accepted fault record|missing_trace/i.test(String(detail)));
+    if (emptyUnavailable) {
+        // Do not reserve editor space for the normal no-fault condition.
+        // Pending, rejected, and actionable lookup failures still render
+        // below so the operator is not left without useful status.
+        host.hidden = true;
+        host.className = 'last-fault-host';
+        host.innerHTML = '';
+        return;
+    }
+    host.hidden = false;
     var localDetails = '';
     if (state === 'pending' && (candidate.fault_name || candidate.fault_code !== undefined)) {
         var faultName = candidate.fault_name || ('Code ' + _lastFaultValue(candidate.fault_code));

@@ -7021,7 +7021,10 @@ window.showFormatLump = async function() {
         return;
     }
 
-    var _svWords = _regMem.memory.words;
+    var _regToken = window.LumpRegistry
+        ? window.LumpRegistry.getCurrent()
+        : null;
+    var _svWords = _regMem.memory.words.slice();
     var _caps    = (_regMem.memory.capabilities || []).slice();
     var _absName = (_regEntry && _regEntry.abstraction) || '';
 
@@ -7039,6 +7042,15 @@ window.showFormatLump = async function() {
     }
     var _srcEl = document.getElementById('asmEditor');
     var _srcText = _srcEl ? (_srcEl.value || '') : '';
+    // Do not package an editor buffer that was changed after the compiled
+    // words were produced. Requiring one fresh compile here is safer than
+    // saving a source frame that describes a different program.
+    if (_regMem.memory && typeof _regMem.memory.sourceText === 'string' &&
+            _regMem.memory.sourceText !== _srcText) {
+        alert('Cannot format this LUMP: the editor changed after compilation. Compile the current source before saving.');
+        if (typeof smartCompile === 'function') smartCompile();
+        return;
+    }
     var _apiObj = _formatLumpApiDefinition(_absName, _caps);
     var _candidates = {};
     var _profiles = ['api'];
@@ -7141,7 +7153,20 @@ window.showFormatLump = async function() {
         selectedProfile: _selectedProfile,
         abstractionName: _absName,
         sourceText: _srcText,
-        api: _apiObj
+        api: _apiObj,
+        // These bindings make the Format → Save handoff an immutable
+        // compiler/editor snapshot.  A stale format dialog must never be
+        // reused for a different registry entry after navigation or a new
+        // compile.
+        token: _regToken || null,
+        language: (_regEntry && _regEntry.sources && _regEntry.sources.server &&
+                   _regEntry.sources.server.language) || '',
+        petname: (function() {
+            try { return localStorage.getItem('church_petname') || ''; } catch (_e) { return ''; }
+        })(),
+        issueNumber: (function() {
+            try { return parseInt(localStorage.getItem('church_issue_number') || '1') || 1; } catch (_e) { return 1; }
+        })()
     };
     var _svLumpSize = _selectedCandidate.lumpSize;
     var _svHdr = _selectedCandidate.binary[0] >>> 0;

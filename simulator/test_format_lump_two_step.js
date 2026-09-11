@@ -58,25 +58,26 @@ const LumpContentFrame = require('./lump-content-frame.js');
         const fnBody = fnEnd !== -1 ? appRunSrc.slice(fnStart, fnEnd + 1) : '';
         check('T1a function body extracted', fnBody.length > 100);
 
-        // Use 'LumpRegistry.registerMemory(' to match the actual JS call, not comments.
-        // A bare 'registerMemory(' search would also hit the comment "BEFORE any
-        // registerMemory call" which appears BEFORE _pendingCanReuse in the source.
+        // confirmSaveToNamespace sends the immutable snapshot to the server;
+        // registry registration happens in the compile paths, not in this
+        // save-confirmation function.
         const pendingDecisionIdx  = fnBody.indexOf('_pendingCanReuse');
-        const registerMemoryIdx   = fnBody.indexOf('LumpRegistry.registerMemory(');
+        const saveRequestIdx      = fnBody.indexOf(
+            "_lumpSaveRequest(fetch, '/api/lumps/save'");
         check(
-            'T1b binary decision (_pendingCanReuse) precedes first LumpRegistry.registerMemory() call',
-            pendingDecisionIdx !== -1 && registerMemoryIdx !== -1 &&
-            pendingDecisionIdx < registerMemoryIdx,
-            `pendingDecision@${pendingDecisionIdx} registerMemory@${registerMemoryIdx}`
+            'T1b binary decision (_pendingCanReuse) precedes the save request',
+            pendingDecisionIdx !== -1 && saveRequestIdx !== -1 &&
+            pendingDecisionIdx < saveRequestIdx,
+            `pendingDecision@${pendingDecisionIdx} saveRequest@${saveRequestIdx}`
         );
 
-        // Also verify that window._pendingLumpData is nulled inside the decision block,
-        // before the sim save and registerMemory.
+        // Also verify that window._pendingLumpData is nulled inside the
+        // decision block before the server save.
         const nullifyIdx = fnBody.indexOf('window._pendingLumpData = null;');
         check(
-            'T1c _pendingLumpData cleared inside decision block (before LumpRegistry.registerMemory)',
-            nullifyIdx !== -1 && nullifyIdx < registerMemoryIdx,
-            `nullify@${nullifyIdx} registerMemory@${registerMemoryIdx}`
+            'T1c _pendingLumpData cleared inside decision block (before save)',
+            nullifyIdx !== -1 && nullifyIdx < saveRequestIdx,
+            `nullify@${nullifyIdx} saveRequest@${saveRequestIdx}`
         );
 
         const fallbackFrameBuildIdx = fnBody.indexOf(
@@ -87,8 +88,8 @@ const LumpContentFrame = require('./lump-content-frame.js');
             'T1d stale/direct-save fallback preserves the V1.3 content frame',
             fallbackFrameBuildIdx !== -1 && fallbackFrameCopyIdx !== -1 &&
             fallbackFrameBuildIdx < fallbackFrameCopyIdx &&
-            fallbackFrameCopyIdx < registerMemoryIdx,
-            `frameBuild@${fallbackFrameBuildIdx} frameCopy@${fallbackFrameCopyIdx} registerMemory@${registerMemoryIdx}`
+            fallbackFrameCopyIdx < saveRequestIdx,
+            `frameBuild@${fallbackFrameBuildIdx} frameCopy@${fallbackFrameCopyIdx} saveRequest@${saveRequestIdx}`
         );
     }
 }
@@ -167,8 +168,9 @@ const LumpContentFrame = require('./lump-content-frame.js');
             confirmBody.includes('sim.saveNamespaceStartSlot()') &&
             confirmBody.includes('Save blocked: choose a Namespace slot'));
         check('T2d2 explicit save exceptions are surfaced instead of escaping',
-            confirmBody.includes("console.error('[SaveNS] save failed:', err)") &&
-            confirmBody.includes("Save to Namespace Failed"));
+            confirmBody.includes("console.error('[SaveNS] local update failed after repository commit:', err)") &&
+            confirmBody.includes('Saved "') &&
+            confirmBody.includes('Refresh Needed'));
     }
 }
 
@@ -307,7 +309,7 @@ const LumpContentFrame = require('./lump-content-frame.js');
     const cluIdx = appRunSrc.indexOf('registerMemory(_cluTok,');
     check('T10 CLU registerMemory found in app-run.js', cluIdx !== -1);
     if (cluIdx !== -1) {
-        const snippet = appRunSrc.slice(cluIdx, cluIdx + 250);
+        const snippet = appRunSrc.slice(cluIdx, cluIdx + 400);
         check('T10a CLU path clears _pendingLumpData after registerMemory',
             snippet.includes('window._pendingLumpData = null'), snippet);
     }
@@ -316,7 +318,7 @@ const LumpContentFrame = require('./lump-content-frame.js');
     const asmIdx = appRunSrc.indexOf('registerMemory(_asmTok,');
     check('T10b asm registerMemory found in app-run.js', asmIdx !== -1);
     if (asmIdx !== -1) {
-        const snippet = appRunSrc.slice(asmIdx, asmIdx + 250);
+        const snippet = appRunSrc.slice(asmIdx, asmIdx + 400);
         check('T10c asm path clears _pendingLumpData after registerMemory',
             snippet.includes('window._pendingLumpData = null'), snippet);
     }
@@ -326,7 +328,7 @@ const LumpContentFrame = require('./lump-content-frame.js');
     const cmpIdx = compileSrc.indexOf('registerMemory(_cmpTok,');
     check('T10d compile registerMemory found in app-compile.js', cmpIdx !== -1);
     if (cmpIdx !== -1) {
-        const snippet = compileSrc.slice(cmpIdx, cmpIdx + 250);
+        const snippet = compileSrc.slice(cmpIdx, cmpIdx + 400);
         check('T10e compile path clears _pendingLumpData after registerMemory',
             snippet.includes('window._pendingLumpData = null'), snippet);
     }

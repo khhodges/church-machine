@@ -129,6 +129,23 @@ def _save(client, words, abstraction="Adder", token="00aa1234", source=None):
             "language": "cloomc", "grants": ["E"]}
     if source is not None:
         meta["source"] = source
+    candidate = client.post("/api/lumps/save-plan", json={
+        "binary": words, "metadata": meta,
+    })
+    assert candidate.status_code == 201, candidate.get_data(as_text=True)
+    plan = candidate.get_json()
+    issued = client.post("/api/lumps/approval-intent", json={
+        "digest": plan["digest"],
+        "action": plan["action"],
+        "plan_id": plan["plan_id"],
+        "confirmation": True,
+        "approval": {"grants": ["E"], "capability_type": "inform"},
+    })
+    assert issued.status_code == 201, issued.get_data(as_text=True)
+    meta.update({
+        "save_plan_id": plan["plan_id"],
+        "approval_intent": issued.get_json()["intent"],
+    })
     r = client.post("/api/lumps/save", json={"binary": words, "metadata": meta})
     assert r.status_code == 200, r.get_data(as_text=True)
     return r.get_json()
@@ -187,7 +204,7 @@ def test_t6_legacy_binary_has_no_tier(client, isolated_lumps):
     words = [hdr, 0x30000000] + [0] * 62              # all-zero freespace
     resp = _save(client, words, abstraction="Legacy", token="00aa9999")
     detail = client.get(f"/api/lumps/{resp['token']}/detail").get_json()
-    assert "sourceStorageTier" not in detail
+    assert detail.get("sourceStorageTier") is None
 
 
 @needs_server
@@ -200,7 +217,7 @@ def test_t7_detail_extracts_embedded_source(client, isolated_lumps):
 
 
 @needs_server
-def test_t8_resize_preserves_content_frame(client, isolated_lumps):
+def test_t8_resize_is_retired(client, isolated_lumps):
     result, words = _compile()
     h = _header(words)
     # Force a needlessly large lump so resize has something to shrink.
@@ -214,22 +231,8 @@ def test_t8_resize_preserves_content_frame(client, isolated_lumps):
     assert len(big) == 1 << big_n
     resp = _save(client, big)
     r = client.post(f"/api/lump/{resp['token']}/resize")
-    assert r.status_code == 200, r.get_data(as_text=True)
-    body = r.get_json()
-    assert body.get("ok"), body
-    with open(os.path.join(isolated_lumps, resp["lump"]), "rb") as fh:
-        raw = fh.read()
-    new_words = list(struct.unpack(f">{len(raw) // 4}I", raw))
-    nh = _header(new_words)
-    assert nh["size"] < (1 << big_n), "lump should have shrunk"
-    flags, api, src = _frame(new_words)                # frame survived
-    assert flags == 0x03 and api["name"] == "Adder" and src == SOURCE
-    # Minimum size accommodates the frame: content must fit.
-    content_end = 1 + nh["cw"]
-    ch = new_words[content_end]
-    api_nw = ((ch & 0xFFFF) + 3) // 4
-    src_nw = (new_words[content_end + 1 + api_nw] + 3) // 4
-    assert content_end + 1 + api_nw + 1 + src_nw <= nh["size"] - nh["cc"]
+    assert r.status_code == 410, r.get_data(as_text=True)
+    assert "retired" in r.get_json()["error"].lower()
 
 
 def _ide_store():

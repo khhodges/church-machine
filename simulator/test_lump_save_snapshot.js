@@ -88,4 +88,20 @@ if (snapshot.token !== 'old-token' ||
     throw new Error('save snapshot changed after focus/navigation state changed');
 }
 
+// A pending Format dialog from an older compiled token must not supply source
+// to a new direct Save-to-NS request. The active editor remains recoverable,
+// but the stale binary/source handoff is discarded.
+context.window._pendingLumpData = {
+    token: 'old-token',
+    registeredAt: 101,
+    binary: [0x1F000000, 0xAAAAAAAA],
+    sourceText: 'old source',
+    selectedProfile: 'full',
+};
+const freshSnapshot = context.capture();
+if (freshSnapshot.pending !== null ||
+    freshSnapshot.sourceText !== 'stale live editor text') {
+    throw new Error('stale pending Format snapshot crossed a registry-token change');
+}
+
 console.log('LUMP save snapshot regression: PASS');

@@ -2200,7 +2200,10 @@ function loadCLOOMCIntoSim() {
         // or replace an unresolved name with a pending placeholder.
         _cmpTok = window._computeLumpToken(words, _asmCaps);
         if (window.LumpRegistry) {
-            window.LumpRegistry.registerMemory(_cmpTok, sim.programName, words.slice(), _asmCaps);
+            window.LumpRegistry.registerMemory(_cmpTok, sim.programName, words.slice(), _asmCaps, {
+                sourceText: source,
+                language: result.language || 'javascript',
+            });
             window.LumpRegistry.setCurrent(_cmpTok);
             // A new compile invalidates any pending Format Lump binary.
             window._pendingLumpData = null;

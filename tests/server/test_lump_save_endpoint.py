@@ -109,6 +109,15 @@ def test_save_persists_exact_binary_and_exact_approval(isolated_lumps):
     assert saved["dot_name"] == approval["dot_name"]
     assert saved["issue_n"] == approval["issue_n"]
     assert saved["binary_hash"] == approval["binary_hash"]
+    assert saved["operation_id"]
+    assert response.headers["X-Lump-Save-Operation"] == saved["operation_id"]
+    diagnostics = (isolated_lumps / "save-diagnostics.jsonl").read_text().splitlines()
+    assert diagnostics
+    diagnostic = json.loads(diagnostics[-1])
+    assert diagnostic["operation_id"] == saved["operation_id"]
+    assert diagnostic["committed"] is True
+    assert "source_text" not in json.dumps(diagnostic)
+    assert "submitted_source" not in json.dumps(diagnostic)
 
 
 def test_each_replacement_save_gets_a_new_history_version_and_timestamp(isolated_lumps):
