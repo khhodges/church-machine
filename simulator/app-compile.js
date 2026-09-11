@@ -1782,6 +1782,8 @@ async function compileAndBuild() {
             mtbf_status:     mtbfStatus,
             source_hash:     _simRunHash || _currentEditorHash(),
             source:          source,
+             submitted_source: source,
+             source_required: typeof source === 'string' && source.trim().length > 0,
             target_board:   'wukong-xc7a100t',
             grants:         ['E'],
             petname:        _savePetname,

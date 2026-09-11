@@ -8889,6 +8889,21 @@ def save_lump():
                 "error": "Save rejected: submitted editor source does not match the source embedded in the binary.",
                 "source_mismatch": True,
             }), 422
+    # A source-bearing editor save must carry the source inside the immutable
+    # binary.  Without this guard an API-only profile could still return a
+    # successful save while silently discarding the user's editor contents.
+    if metadata.get("source_required") is True and (
+            not isinstance(_embedded_source, str) or not _embedded_source):
+        return jsonify({
+            "error": (
+                "Save rejected: the editor contains source, but the selected "
+                "LUMP binary has no embedded source frame."
+            ),
+            "source_required": True,
+            "source_mismatch": True,
+            "committed": False,
+            "safe_retry": True,
+        }), 422
 
     # ── Read authoritative cw/cc from the (post-modification) binary header ───
     # The client-supplied metadata.cw / metadata.cc are UNTRUSTED: they reflect

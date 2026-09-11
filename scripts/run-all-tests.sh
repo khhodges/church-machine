@@ -114,6 +114,9 @@ register_suite "check-stale-cr7" \
 register_suite "check-selftest-lump-stale" \
     'node scripts/check_selftest_lump_stale.js && node scripts/test_check_selftest_lump_stale.js && node scripts/test_build_selftest_lump_cleanup.js'
 
+register_suite "lump-save-snapshot-tests" \
+    'node simulator/test_lump_save_snapshot.js'
+
 register_suite "check-capabilities-blocks" \
     'node scripts/check-capabilities-blocks.js'
 

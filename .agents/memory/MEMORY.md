@@ -149,6 +149,7 @@
 - [Bootstrap migration validation boundary](bootstrap-migration-validation-boundary.md) — validate staged catalog and boot graph before swap; published RTL freshness is a separate release gate
 - [Archived bootstrap identity](archived-bootstrap-identity.md) — keep historical bytes immutable, but audit and restore them against the live destination GT by abstraction ancestry
 - [Save retry ownership](save-retry-ownership.md) — retry IDE-owned saves only with explicit not-committed and safe-retry proof; never make programmers repair generated identity
+- [Save dialog snapshot](save-dialog-snapshot.md) — freeze source, compiled data, identity, and pending binary at dialog open; confirmation and retry must not read live editor state
 - [Boot-image byte-stream tests](boot-image-byte-stream-tests.md) — generators may print approval diagnostics; redirect stdout before treating output as a raw image
 - [Malformed LUMP inspection UI](lump-malformed-inspection-ui.md) — raw malformed bytes stay inspectable while audit, load, and runtime validation remain authoritative
 - [History preview archive identity](history-preview-archive-identity.md) — historical previews must resolve the exact immutable archive named by the history record

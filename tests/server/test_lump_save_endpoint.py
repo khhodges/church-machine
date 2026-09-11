@@ -47,7 +47,8 @@ def isolated_lumps(tmp_path, monkeypatch):
     return tmp_path
 
 
-def _approved_payload(client, words, token="7c501001", name="LumpSaveTest"):
+def _approved_payload(client, words, token="7c501001", name="LumpSaveTest",
+                      submitted_source=None):
     identity = hashlib.sha256(f"{name}#1".encode()).hexdigest()
     words[-1] = 0x0A000000 | (int(identity[:8], 16) & 0x1FFFFFF)
     candidate = {
@@ -56,7 +57,7 @@ def _approved_payload(client, words, token="7c501001", name="LumpSaveTest"):
             "token": token, "abstraction": name, "content_type": "code",
             "language": "assembly", "ns_slot": None, "capabilities": [],
             "methods": [], "grants": ["E"],
-            "submitted_source": None,
+            "submitted_source": submitted_source,
         },
     }
     plan_response = client.post("/api/lumps/save-plan", json=candidate)
@@ -79,7 +80,7 @@ def _approved_payload(client, words, token="7c501001", name="LumpSaveTest"):
             "token": token, "abstraction": name, "content_type": "code",
             "language": "assembly", "ns_slot": None, "capabilities": [],
             "methods": [], "grants": ["E"],
-            "submitted_source": None,
+            "submitted_source": submitted_source,
             "save_plan_id": plan["plan_id"],
             "approval_intent": issued.get_json()["intent"],
         },
@@ -257,6 +258,33 @@ def test_matching_submitted_and_embedded_source_is_accepted(isolated_lumps):
             },
         })
     assert response.status_code == 201, response.get_data(as_text=True)
+
+
+def test_source_required_rejects_api_only_binary_before_commit(isolated_lumps):
+    words = _words(marker=37)
+    with app_module.app.test_client() as client:
+        payload = _approved_payload(client, words, token="7c501037")
+        payload["metadata"]["source_required"] = True
+        response = client.post("/api/lumps/save", json=payload)
+    assert response.status_code == 422, response.get_data(as_text=True)
+    body = response.get_json()
+    assert body["source_required"] is True
+    assert body["committed"] is False
+    assert body["safe_retry"] is True
+    assert not list(isolated_lumps.glob("*.lump"))
+
+
+def test_source_required_accepts_matching_embedded_source(isolated_lumps):
+    source = "method Main { RETURN }"
+    words = _words_with_source(source)
+    with app_module.app.test_client() as client:
+        payload = _approved_payload(
+            client, words, token="7c501038", submitted_source=source)
+        payload["metadata"]["source_required"] = True
+        response = client.post("/api/lumps/save", json=payload)
+    assert response.status_code == 200, response.get_data(as_text=True)
+    saved = response.get_json()
+    assert saved["binary_hash"] == hashlib.sha256(_raw(words)).hexdigest()
 
 
 def test_expired_or_other_session_plan_requires_fresh_review(isolated_lumps):

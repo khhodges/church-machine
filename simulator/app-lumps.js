@@ -6863,8 +6863,14 @@ function _renderFormatLumpCandidate(pending) {
         _profilesEl.innerHTML = ['api', 'compact', 'full'].map(function(profile) {
             var item = pending.candidates[profile];
             var info = _profileInfo[profile];
-            var disabled = !item;
-            var detail = disabled ? 'Requires saved source' : info.detail;
+            var sourceRequired = typeof pending.sourceText === 'string' &&
+                pending.sourceText.trim().length > 0;
+            var disabled = !item || (profile === 'api' && sourceRequired);
+            var detail = disabled
+                ? (item && profile === 'api' && sourceRequired
+                    ? 'Source retention requires an embedded source frame'
+                    : 'Requires saved source')
+                : info.detail;
             var size = disabled ? 'Unavailable' :
                 item.frame.frameWords.length + ' frame words · ' +
                 item.lumpSize + ' words / ' + _fmtLumpByteSize(item.lumpSize * 4);
@@ -6942,6 +6948,10 @@ function _renderFormatLumpCandidate(pending) {
 function _selectFormatLumpProfile(profile) {
     var pending = window._pendingLumpData;
     if (!pending || !pending.candidates || !pending.candidates[profile]) return;
+    if (profile === 'api' && typeof pending.sourceText === 'string' &&
+            pending.sourceText.trim().length > 0) {
+        return;
+    }
     pending.selectedProfile = profile;
     if (pending.abstractionName) {
         try {
@@ -7066,6 +7076,11 @@ window.showFormatLump = async function() {
     var _selectedProfile = _preferredProfile && _candidates[_preferredProfile]
         ? _preferredProfile
         : (_candidates.full ? 'full' : 'api');
+    // A non-empty editor source is part of the save contract.  Never allow a
+    // remembered API-only preference to silently discard it.
+    if (_srcText.trim().length > 0 && _selectedProfile === 'api') {
+        _selectedProfile = _candidates.full ? 'full' : 'compact';
+    }
     // Persist inferred/default selections too. A programmer should not have to
     // re-click an already-selected profile merely to keep it for the next save.
     try {

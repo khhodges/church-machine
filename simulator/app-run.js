@@ -12330,6 +12330,52 @@ function _populateSaveNamespaceSlotPicker(options) {
 }
 
 var _saveNSTrigger = null;
+
+function _cloneLumpSaveCapabilities(capabilities) {
+    return (Array.isArray(capabilities) ? capabilities : []).map(function(cap) {
+        if (!cap || typeof cap !== 'object') return cap;
+        var copy = Object.assign({}, cap);
+        if (Array.isArray(cap.rights)) copy.rights = cap.rights.slice();
+        if (Array.isArray(cap.grants)) copy.grants = cap.grants.slice();
+        return copy;
+    });
+}
+
+// Capture the exact editor/compiler pair when the save dialog opens. Focus can
+// move through the IDE while the dialog is open, and view refreshes can change
+// the registry selection. Neither is allowed to change what this save commits.
+function _captureLumpSaveSnapshot() {
+    const registry = window.LumpRegistry;
+    const token = registry && typeof registry.getCurrent === 'function'
+        ? registry.getCurrent() : null;
+    const entry = registry && typeof registry.resolve === 'function'
+        ? registry.resolve(token) : null;
+    const memory = entry && entry.sources && entry.sources.memory
+        ? entry.sources.memory : null;
+    const editor = document.getElementById('asmEditor');
+    const pending = window._pendingLumpData || null;
+    const sourceText = pending && typeof pending.sourceText === 'string'
+        ? pending.sourceText
+        : (editor ? String(editor.value || '') : '');
+    return {
+        token: token || null,
+        words: memory && Array.isArray(memory.words) ? memory.words.slice() : [],
+        capabilities: _cloneLumpSaveCapabilities(memory && memory.capabilities),
+        registeredAt: memory && memory.registeredAt ? memory.registeredAt : 0,
+        sourceText: sourceText,
+        language: entry && entry.sources && entry.sources.server
+            ? (entry.sources.server.language || '') : '',
+        pending: pending ? {
+            binary: Array.isArray(pending.binary) ? pending.binary.slice() : null,
+            caps: _cloneLumpSaveCapabilities(pending.caps),
+            sourceText: typeof pending.sourceText === 'string'
+                ? pending.sourceText : sourceText,
+            selectedProfile: pending.selectedProfile || null,
+            registeredAt: pending.registeredAt || 0,
+        } : null,
+    };
+}
+
 function showSaveToNamespace() {
     // Use LumpRegistry as the authoritative source — the compile path
     // (app-run.js ~L464) registers words there, NOT into lastAssembledWords.
@@ -12343,6 +12389,7 @@ function showSaveToNamespace() {
         if (typeof smartCompile === 'function') smartCompile();
         return;
     }
+    window._saveNSPreparedSnapshot = _captureLumpSaveSnapshot();
     // Close the Format Lump dialog (Step 1) if it is still open.
     const _fmtDlg = document.getElementById('formatLumpDialog');
     if (_fmtDlg) _fmtDlg.style.display = 'none';
@@ -12433,6 +12480,7 @@ function closeSaveDialog() {
     // Clear any pending Format Lump binary so it cannot be accidentally reused
     // by a future Save to Namespace invocation opened independently.
     window._pendingLumpData = null;
+    window._saveNSPreparedSnapshot = null;
     _setSaveNSFeedback('', '');
 }
 
@@ -15295,9 +15343,16 @@ async function confirmSaveToNamespace() {
         E: document.getElementById('permE').checked ? 1 : 0,
     };
     const gtType = parseInt(document.getElementById('saveNSType').value) || 0;
-    const _svRegMem = window.LumpRegistry
-        ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())?.sources?.memory
-        : null;
+    const _saveSnapshot = window._saveNSPreparedSnapshot || null;
+    const _svRegMem = _saveSnapshot
+        ? {
+            words: Array.isArray(_saveSnapshot.words) ? _saveSnapshot.words.slice() : [],
+            capabilities: _cloneLumpSaveCapabilities(_saveSnapshot.capabilities),
+            registeredAt: _saveSnapshot.registeredAt || 0,
+        }
+        : (window.LumpRegistry
+            ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())?.sources?.memory
+            : null);
     const _svWords = _svRegMem ? (_svRegMem.words || []) : [];
     let _caps      = _svRegMem ? (_svRegMem.capabilities || []).slice() : [];
 
@@ -15312,9 +15367,11 @@ async function confirmSaveToNamespace() {
     var _svAbsName;
     var _svLang;
     if (_svWords.length > 0) {
-        var _svEntryPre = window.LumpRegistry
-            ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())
-            : null;
+        var _svEntryPre = _saveSnapshot
+            ? { sources: { server: { language: _saveSnapshot.language || '' } } }
+            : (window.LumpRegistry
+                ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())
+                : null);
         // The Save-to-Namespace name is the explicit identity the programmer
         // chose for this artifact.  It must not be replaced with a transient
         // compiler label such as "start": this permits a user-derived revision
@@ -15331,7 +15388,8 @@ async function confirmSaveToNamespace() {
         // carries the registeredAt timestamp captured at that moment; comparing
         // it against the current entry's timestamp tells us whether a new
         // compile has happened in the interim.
-        var _snapshotPending = window._pendingLumpData || null;
+        var _snapshotPending = (_saveSnapshot && _saveSnapshot.pending) ||
+            window._pendingLumpData || null;
         window._pendingLumpData = null; // consumed; prevent any later reuse
         var _submittedSource = null;
         var _pendingCanReuse = (function() {
@@ -15359,8 +15417,10 @@ async function confirmSaveToNamespace() {
             var _svCC = _caps.length;
             var _svCW = _svWords.length;
             var _fallbackSourceEl = document.getElementById('asmEditor');
-            var _fallbackSourceText = _fallbackSourceEl
-                ? (_fallbackSourceEl.value || '') : '';
+            var _fallbackSourceText = _saveSnapshot &&
+                typeof _saveSnapshot.sourceText === 'string'
+                ? _saveSnapshot.sourceText
+                : (_fallbackSourceEl ? (_fallbackSourceEl.value || '') : '');
             var _fallbackProfile = _snapshotPending &&
                 ['api', 'compact', 'full'].includes(_snapshotPending.selectedProfile)
                 ? _snapshotPending.selectedProfile : null;
@@ -15535,6 +15595,9 @@ async function confirmSaveToNamespace() {
                 token:        _svTok || undefined,
                 editor_base: window._editorOpenLumpBaseIdentity || undefined,
                 submitted_source: _submittedSource,
+                source_required: !!(_saveSnapshot &&
+                    typeof _saveSnapshot.sourceText === 'string' &&
+                    _saveSnapshot.sourceText.trim()),
             }
         };
         let _saveApproval;
