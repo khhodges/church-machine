@@ -2750,7 +2750,7 @@ async function _fetchAndShowLumpTimeline(token, lump) {
             html += `<table class="lump-detail-table" id="lumpHistoryTable_${tk}"><thead><tr>`;
             html += '<th>Ver</th><th>This</th><th>Compiled</th><th>CW</th><th>CC</th><th>Size</th>';
             if (hasTel) html += '<th>Devices</th><th>Faults/1k</th><th>Health</th>';
-            html += '<th colspan="2"></th>';
+             html += '<th colspan="3"></th>';
             if (hasTel) html += '<th></th>';
             html += '</tr></thead><tbody>';
 
@@ -2779,6 +2779,11 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                 const validationErrors = hist && Array.isArray(hist.validation_errors)
                     ? hist.validation_errors : [];
                 const historicalRecord = Boolean(hist && hist.historical_record);
+                const bootstrapCorrectionAvailable = Boolean(
+                    hist && historicalRecord && hist.bootstrap_identity &&
+                    hist.bootstrap_identity.applies === true &&
+                    hist.bootstrap_identity.valid === false
+                );
                 const previewUsable = Boolean(hist &&
                     hist.binary_available !== false);
                 const activationUsable = Boolean(!isCurrent && !historicalRecord &&
@@ -2807,7 +2812,10 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                 } else if (activationUsable) {
                     html += `<td><input class="lump-history-current-checkbox" type="checkbox" aria-label="Make v${ver} the current LUMP" title="Make v${ver} the current live LUMP" onclick="event.stopPropagation();" onchange="_setLumpHistoryCurrent(this,'${e(token)}',${ver})"></td>`;
                 } else {
-                    html += `<td><input class="lump-history-current-checkbox" type="checkbox" disabled aria-label="v${ver} cannot become the current LUMP" title="This revision cannot become live until it has a valid approved binary"></td>`;
+                    const disabledTitle = bootstrapCorrectionAvailable
+                        ? `v${ver} has a bootstrap identity mismatch. Open Preview or Correct to review the required corrections.`
+                        : 'This revision cannot become live until it has a valid approved binary';
+                    html += `<td><input class="lump-history-current-checkbox" type="checkbox" disabled aria-label="v${ver} cannot become the current LUMP" title="${e(disabledTitle)}"></td>`;
                 }
 
                 // Binary columns
@@ -2842,6 +2850,11 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                 // Preview is safe for every readable binary. The active checkbox
                 // performs the protected restore transition for eligible archives.
                 if (previewUsable) {
+                     if (bootstrapCorrectionAvailable) {
+                         html += `<td><button class="btn lump-history-correct-btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_lumpHistoryPreview('${e(previewToken)}',${ver},${histInspection ? (histInspection.cw||0) : 0},${histInspection ? (histInspection.cc||0) : 0},${histInspection ? (histInspection.lump_size||0) : 0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(token)}','${e(archiveFilename)}',${isCurrent ? 'true' : 'false'})" title="Review and apply correction options for v${ver}">Correct</button></td>`;
+                     } else {
+                         html += '<td></td>';
+                     }
                      html += `<td><button class="btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_lumpHistoryPreview('${e(previewToken)}',${ver},${histInspection ? (histInspection.cw||0) : 0},${histInspection ? (histInspection.cc||0) : 0},${histInspection ? (histInspection.lump_size||0) : 0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(token)}','${e(archiveFilename)}',${isCurrent ? 'true' : 'false'})" title="Preview source and hex of v${ver}">Preview</button></td>`;
                     if (!isCurrent && !activationUsable)
                         html += `<td><button class="btn lump-history-delete-btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_deleteLumpHistoryRevision('${e(token)}',${ver},'${e(archiveFilename)}','${tk}')" title="Delete this archived revision">Delete</button></td>`;
@@ -2851,7 +2864,7 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                     const reason = validationErrors.length
                         ? validationErrors.join('; ')
                         : 'No immutable validated binary is available';
-                    html += `<td colspan="2"><span class="lump-history-unavailable" title="${e(reason)}">Unavailable</span></td>`;
+                     html += `<td colspan="3"><span class="lump-history-unavailable" title="${e(reason)}">Unavailable</span></td>`;
                 } else {
                     html += '<td></td><td></td>';
                 }

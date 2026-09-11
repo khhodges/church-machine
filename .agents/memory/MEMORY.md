@@ -153,3 +153,4 @@
 - [Malformed LUMP inspection UI](lump-malformed-inspection-ui.md) — raw malformed bytes stay inspectable while audit, load, and runtime validation remain authoritative
 - [History preview archive identity](history-preview-archive-identity.md) — historical previews must resolve the exact immutable archive named by the history record
 - [LUMP History active selection](lump-history-active-selection.md) — selection or bootstrap correction creates a new approved live revision; immutable evidence is never edited
+- [Bootstrap repair archive discovery](bootstrap-repair-archive-discovery.md) — repair must accept both manifest-recorded archives and exact files discovered from the active LUMP's standard history filename pattern

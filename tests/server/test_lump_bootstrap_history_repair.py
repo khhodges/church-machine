@@ -219,3 +219,34 @@ def test_approved_repair_reissues_canonical_live_lump_and_preserves_evidence(
     assert live_approval["bootstrap_t"] == CURRENT_TOKEN
     assert live_approval["bootstrap_runtime_gt"] == expected_gt
     assert live_approval["binary_hash"] == hashlib.sha256(live_raw).hexdigest()
+
+
+def test_standard_filename_history_archive_can_be_repaired(bootstrap_history):
+    """Pattern-discovered archives get the same repair options as manifest rows."""
+    root = bootstrap_history["root"]
+    current_name = "CapabilityTest.lump"
+    standard_archive = "CapabilityTest_v1.lump"
+    (root / CURRENT_NAME).rename(root / current_name)
+    (root / ARCHIVE_NAME).rename(root / standard_archive)
+    manifest = json.loads((root / "manifest.json").read_text())
+    manifest = [
+        dict(row, filename=current_name)
+        if row.get("archived") is not True else None
+        for row in manifest
+    ]
+    (root / "manifest.json").write_text(json.dumps([
+        row for row in manifest if row is not None
+    ]))
+
+    with app_module.app.test_client() as client:
+        response = client.post(
+            f"/api/lumps/{CURRENT_TOKEN}/history/1/bootstrap-repair-plan",
+            json={"archive_filename": standard_archive},
+        )
+
+    assert response.status_code == 201, response.get_data(as_text=True)
+    plan = response.get_json()
+    assert [item["id"] for item in plan["corrections"]] == [
+        "repair-sealed-row-zero-gt",
+        "issue-canonical-bootstrap-identity",
+    ]

@@ -10170,9 +10170,32 @@ def _bootstrap_history_repair_candidate(current_token, version, archive_filename
         and row.get("filename") == archive_filename
         and str(row.get("abstraction") or "").casefold() == abstraction.casefold()
     ]
-    if len(archived_rows) != 1:
-        raise ValueError("the requested archive is not immutable history for this LUMP")
-    archived = archived_rows[0]
+    if len(archived_rows) == 1:
+        archived = archived_rows[0]
+    else:
+        # Most ordinary history files are discovered from the active
+        # abstraction's filename pattern and do not have a separate archived
+        # manifest row. They are still immutable history when the exact
+        # filename is one of the active LUMP's generated archive names.
+        active_filename = str(active.get("filename") or "")
+        active_stem = (
+            re.sub(r"_v\d+$", "", active_filename[:-5])
+            if active_filename.endswith(".lump") else ""
+        )
+        safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", abstraction)
+        generated_filenames = {
+            f"{key8}-v{version}.lump",
+            f"{active_stem}_v{version}.lump" if active_stem else "",
+            f"{safe_name}_v{version}.lump",
+        }
+        if len(archived_rows) > 1 or archive_filename not in generated_filenames:
+            raise ValueError("the requested archive is not immutable history for this LUMP")
+        archived = dict(active)
+        archived.update({
+            "archived": True,
+            "filename": archive_filename,
+            "lump_version": version,
+        })
     try:
         archive_version = int(archived.get("lump_version", archived.get("version")))
     except (TypeError, ValueError):
