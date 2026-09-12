@@ -6,7 +6,7 @@
       "location": "0x00000000",
       "type": "Inform",
       "f": 0,
-      "g": 0,
+      "g": 1,
       "limit": "0x000FF",
       "seq": 0,
       "seal": "0xDEB25EEF"
@@ -17,7 +17,7 @@
       "location": "0x00000010",
       "type": "Inform",
       "f": 0,
-      "g": 0,
+      "g": 1,
       "limit": "0x000FF",
       "seq": 0,
       "seal": "0xDEB256EF"
@@ -28,7 +28,7 @@
       "location": "0x40000014",
       "type": "Inform",
       "f": 0,
-      "g": 0,
+      "g": 1,
       "limit": "0x00002",
       "seq": 0,
       "seal": "0xDEADF4CF"
@@ -39,7 +39,7 @@
       "location": "0x40000000",
       "type": "Inform",
       "f": 0,
-      "g": 0,
+      "g": 1,
       "limit": "0x00004",
       "seq": 0,
       "seal": "0xDEAD3ECF"
@@ -79,8 +79,7 @@
       "token": "4a000006",
       "filename": "SelfTest.80.f37bafd6.lump",
       "issue_n": 80,
-      "resident": true,
-      "boot": true
+      "resident": true
     },
     {
       "name": "WukongCallHome",
@@ -88,7 +87,7 @@
       "location": "0x00000110",
       "type": "Inform",
       "f": 0,
-      "g": 0,
+      "g": 1,
       "limit": "0x00FF7",
       "seq": 0,
       "seal": "0xDF53D6EF",
@@ -125,14 +124,15 @@
       "location": "0x00001190",
       "type": "Inform",
       "f": 0,
-      "g": 0,
+      "g": 1,
       "limit": "0x003F8",
       "seq": 0,
       "seal": "0xDEDA76EF",
       "token": "4a00000a",
       "filename": "CapabilityTest.2.5e701b59.lump",
       "issue_n": 2,
-      "resident": true
+      "resident": true,
+      "boot": true
     },
     {
       "name": "Thread.2",
@@ -140,7 +140,7 @@
       "location": "0x00003590",
       "type": "Inform",
       "f": 0,
-      "g": 0,
+      "g": 1,
       "limit": "0x000FF",
       "seq": 0,
       "seal": "0xDEA896EF"
@@ -151,7 +151,7 @@
       "location": "0x00003690",
       "type": "Inform",
       "f": 0,
-      "g": 0,
+      "g": 1,
       "limit": "0x000FF",
       "seq": 0,
       "seal": "0xDEA916EF"
@@ -162,7 +162,7 @@
       "location": "0xFFFFFF1C",
       "type": "Inform",
       "f": 0,
-      "g": 0,
+      "g": 1,
       "limit": "0x00000",
       "seq": 0,
       "seal": "0x21523090"
@@ -207,6 +207,6 @@
       "seal": "0xDEAB9EEF"
     }
   ],
-  "generated_at": 1789159466.9810746,
-  "committed_raw_fingerprint": "685f9ddd0f3222f08a10cd40771db823907707d199891e9697292b9edc8037c7"
+  "generated_at": 1789212845.0967658,
+  "committed_raw_fingerprint": "6cc25b0c39c9b2c083d1ca0c0fc65e85faef567cd9661b00cff5e0cf9e938d19"
 }

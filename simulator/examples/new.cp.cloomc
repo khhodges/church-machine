@@ -1,0 +1,102 @@
+; ============================================================
+; Abstraction:  CapabilityTest
+; Description:  Church Machine capability test -- LOAD, TPERM, CALL
+;               using the real hardware boot namespace.
+; Author:       Church Machine Educational Platform
+; Version:      3.0
+; Created:      2026-08-11
+; Language:     Assembly
+; ============================================================
+; Single source of truth for the CapabilityTest abstraction (NS slot 10).
+; The lump is built from this file by scripts/build_capability_test_lump.js,
+; which supplies hardware GT words for each declared capability.
+;
+; C-list layout (CapabilityTest's own 7-entry c-list, injected at load):
+;   [0] SelfTest   E    (NS  6)  0x4A000006 -- entry-callable abstraction
+;   [1] LED_DEV    RW   (NS  3)  0x32000003 -- hardware LED register file
+;   [2] UART_DEV   RW   (NS  2)  0x32000002 -- hardware UART TX/STATUS/RX
+;   [3] BTN_DEV    R    (NS  4)  0x12000004 -- hardware button state
+;   [4] TIMER_DEV  RW   (NS  5)  0x32000005 -- hardware timer registers
+;   [5] M_BIT_DEV RW (NS 13) 0x3200000D -- isolated-register M-bit control
+;   [6] WukongCallHome.hw E (NS 7) 0x4A000007 -- hardware continuation
+; ============================================================
+
+capabilities {
+    SELF E,
+    New.SelfTest E,
+    LED_DEV RW,
+    UART_DEV RW,
+    BTN_DEV R,
+    TIMER_DEV RW,
+    M_BIT_DEV RW,
+    New.WukongCallHome E
+}
+Start:
+; ============================================================
+; TEST 1: LOAD -- materialise all declared capabilities from c-list
+; ============================================================
+LOAD CR0, New.SelfTest    ; CR0 = SelfTest  E-GT    (c-list[0])
+LOAD CR1, LED_DEV     ; CR1 = LED_DEV   RW-GT   (c-list[1])
+LOAD CR2, UART_DEV    ; CR2 = UART_DEV  RW-GT   (c-list[2])
+LOAD CR3, BTN_DEV     ; CR3 = BTN_DEV   R-GT    (c-list[3])
+LOAD CR4, TIMER_DEV   ; CR4 = TIMER_DEV RW-GT   (c-list[4])
+
+; ============================================================
+; TEST 2: TPERM -- verify E permission on SelfTest
+; ============================================================
+TPERM CR0, E          ; SelfTest has E?  Z=1 (PASS)
+
+; ============================================================
+; TEST 3: TPERM -- verify RW on hardware device caps
+; ============================================================
+TPERM CR1, RW         ; LED_DEV   has R+W?  Z=1 (PASS)
+TPERM CR2, RW         ; UART_DEV  has R+W?  Z=1 (PASS)
+TPERM CR4, RW         ; TIMER_DEV has R+W?  Z=1 (PASS)
+
+; ============================================================
+; TEST 4: TPERM deliberate failure -- wrong permission class
+; ============================================================
+TPERM CR0, L          ; SelfTest has L?  Z=0 (expected FAIL)
+
+; ============================================================
+; TEST 5: Conditional LOADs (Z=0 from the L-perm TPERM above)
+; ============================================================
+LOADEQ CR0, LED_DEV   ; SKIP  -- condition EQ not met (Z=0)
+LOADNE CR0, New.SelfTest  ; EXEC  -- condition NE met (Z=0) -- restore CR0
+
+; ============================================================
+; TEST 6: SWITCH -- isolated-register special LOAD authorization
+; ============================================================
+; Obtain the private M-bit I/O object and explicitly authorize each destination.
+LOAD CR0, M_BIT_DEV
+ISUB   DR1, DR1, DR1
+IADD   DR1, #0b0001000000000000
+DWRITE DR1, CR0, #0
+SWITCH CR12, CR6, #0  ; M-present destination: load c-list[0] into CR12
+ISUB   DR1, DR1, DR1
+IADD   DR1, #1
+SHL    DR1, DR1, 15
+DWRITE DR1, CR0, #0
+SWITCH CR15, CR15      ; M-present destination: exercise CR15 self-switch
+
+; ============================================================
+; TEST 7: Turing ISA -- integer arithmetic on data registers
+; ============================================================
+IADD DR1, DR0, #42    ; DR1 = 42
+IADD DR2, DR1, #8     ; DR2 = 50
+ISUB DR3, DR2, DR1    ; DR3 = 8
+MCMP DR1, DR2         ; 42 < 50  -> N=1, Z=0
+IADD DR4, DR0, #1     ; DR4 = 1
+SHL  DR4, DR4, 3      ; DR4 = 8
+SHR  DR4, DR4, 1      ; DR4 = 4
+
+; ============================================================
+; TEST 8: ELOADCALL -- continue to the hardware call-home abstraction
+; ============================================================
+; SelfTest already ran before Starter/CapabilityTest. Calling it again here
+; creates the unbounded SelfTest → CapabilityTest → SelfTest frame cycle.
+ELOADCALL CR0, New.WukongCallHome, 0
+ELOADCALL CR0, New.SelfTest, 0
+
+; --- All tests complete ---
+BRANCH Start
