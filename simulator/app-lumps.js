@@ -1663,7 +1663,52 @@ function _lumpSrcEditMethod(absIdx, mName) {
 
 // Saved LUMPs are edited as source on the left while their immutable binary is
 // shown in the right-hand column beside it.
-function _enterSavedLumpEditorMode(compiledDisasm, lumpName) {
+function _verifiedSavedLumpIdentity(lump, lookupToken) {
+    var server = lump && lump.token ? lump : null;
+    var text = function(value) {
+        return typeof value === 'string' && value.trim() ? value.trim() : null;
+    };
+    var issue = server && server.issue_n != null && String(server.issue_n).trim()
+        ? String(server.issue_n).trim() : null;
+    var dotName = server ? text(server.dot_name) : null;
+    return {
+        canonicalDotToken: dotName && issue && server && text(server.token)
+            ? dotName + '.' + issue + '.' + text(server.token) : null,
+        lookupToken: server ? text(server.token) : null,
+        goldenT: server ? text(server.golden_t_id) || text(server.identity_hash) : null,
+        goldenToken: server ? text(server.golden_token) : null,
+        binarySeal: server ? text(server.binary_hash) : null,
+        requestedLookupToken: text(lookupToken)
+    };
+}
+window._verifiedSavedLumpIdentity = _verifiedSavedLumpIdentity;
+
+function _renderSavedLumpIdentityPanel(lump, lookupToken) {
+    var panel = document.getElementById('savedLumpIdentityPanel');
+    if (!panel) return;
+    var identity = _verifiedSavedLumpIdentity(lump, lookupToken);
+    var esc = typeof _escHtml === 'function' ? _escHtml : function(value) {
+        return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    };
+    var row = function(label, value, testId) {
+        var unavailable = !value;
+        return '<div class="saved-lump-identity-row' + (unavailable ? ' is-unavailable' : '') + '"' +
+            (testId ? ' data-testid="' + testId + '"' : '') + '>' +
+            '<span>' + label + '</span><code title="' +
+            esc(unavailable ? label + ' unavailable in verified server metadata' : value) + '">' +
+            (unavailable ? 'unavailable' : esc(value)) + '</code></div>';
+    };
+    panel.innerHTML =
+        '<div class="saved-lump-identity-heading">Verified artifact identity</div>' +
+        row('Canonical dot-name token', identity.canonicalDotToken, 'complete-lump-dot-token') +
+        row('Exact lookup token', identity.lookupToken, 'complete-lump-lookup-token') +
+        row('Golden T ID', identity.goldenT, 'complete-lump-golden-t') +
+        row('Golden Token', identity.goldenToken, 'complete-lump-golden-token') +
+        row('Binary seal', identity.binarySeal, 'complete-lump-binary-seal');
+}
+
+function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken) {
     window._savedLumpEditorMode = true;
     var tabs = document.getElementById('codeSidebarTabs');
     var layout = document.querySelector('#editor .editor-layout');
@@ -1679,6 +1724,9 @@ function _enterSavedLumpEditorMode(compiledDisasm, lumpName) {
         if (el) el.style.display = 'none';
     });
     if (title) title.textContent = 'Compiled Disassembly — ' + lumpName;
+    if (typeof _renderSavedLumpIdentityPanel === 'function') {
+        _renderSavedLumpIdentityPanel(lump, lookupToken);
+    }
     if (text) text.textContent = compiledDisasm || '; Compiled disassembly unavailable.';
     if (panel) panel.style.display = 'flex';
 }
@@ -1703,9 +1751,11 @@ function exitSavedLumpEditorMode() {
     var tabs = document.getElementById('codeSidebarTabs');
     var panel = document.getElementById('savedLumpDisassemblyPanel');
     var text = document.getElementById('savedLumpDisassembly');
+    var identityPanel = document.getElementById('savedLumpIdentityPanel');
     if (tabs) tabs.style.display = '';
     if (panel) panel.style.display = 'none';
     if (text) text.textContent = '';
+    if (identityPanel) identityPanel.innerHTML = '';
     ['_lumpSourceRestoredBanner', '_lumpSourceMissingBanner',
         '_lumpMalformedBanner', '_lumpDraftBanner']
         .forEach(function(id) {
@@ -6520,7 +6570,7 @@ async function openLumpInEditor(token) {
             else if (asmEd.parentNode) asmEd.parentNode.insertBefore(_sourceMissingBanner, asmEd);
         }
 
-        _enterSavedLumpEditorMode(_compiledDisasm, lumpName);
+        _enterSavedLumpEditorMode(_compiledDisasm, lumpName, _inMemoryLump ? null : lump, token);
 
         if (typeof updateLineNumbers === 'function') updateLineNumbers();
         // Title must always follow the code module name without exception.

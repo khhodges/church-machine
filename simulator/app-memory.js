@@ -3529,7 +3529,7 @@ function updateNamespace() {
                     const _onclickTarget = _srcToken
                         ? `'${_srcToken}'`
                         : `null,${i}`;
-                    _srcBtn = `<button class="btn btn-xs" onclick="event.stopPropagation();_openLumpSource(${_onclickTarget})" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);" title="Open source in Repository view">Source</button>`;
+                    _srcBtn = `<button class="btn btn-xs" onclick="event.stopPropagation();_openLumpSource(${_onclickTarget})" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);" title="Open the complete saved LUMP workspace">Open LUMP</button>`;
                 }
                 html += `<td class="ns-entry-actions">${_srcBtn}${_nsPrefetchRow(i, manifest, e.label)}${_identityBtn}</td>`;
             }
@@ -4785,7 +4785,12 @@ function _nsLabelOpen(slotIdx) {
     const srcLump = typeof _findSrcLump === 'function'
         ? _findSrcLump(slotIdx, rawLabel)
         : null;
-    if (e && (e.gtType === 1 || srcLump)) {
+    if (srcLump && srcLump.token) {
+        if (typeof openLumpInEditor === 'function') openLumpInEditor(srcLump.token);
+        else if (window.openLumpInEditor) window.openLumpInEditor(srcLump.token);
+        return;
+    }
+    if (e && e.gtType === 1) {
         _showNSLumpModal(slotIdx, e);
         return;
     }
@@ -5506,21 +5511,17 @@ function _showNSTypeDescModal(slotIdx, nsEntry) {
 window.memoryViewAddr = 0;
 
 function _openLumpSource(token, nsSlotFallback) {
-    // Pass a pending-token and pending-tab to renderLumps() via window properties.
-    // renderLumps() reads these after all auto-select logic runs, so the user's
-    // explicit slot click always wins over the live CR14 auto-select.
-
     if (token) {
-        // Fast path: token already known — navigate immediately.
-        window._pendingLumpToken = token;
-        window._pendingLumpTab = 'clooms';
-        if (typeof switchView === 'function') switchView('lumps');
+        // Any action that claims to open a code LUMP uses the authoritative
+        // source + identity + exact-disassembly workspace.
+        if (typeof openLumpInEditor === 'function') openLumpInEditor(token);
+        else if (window.openLumpInEditor) window.openLumpInEditor(token);
         return;
     }
 
     if (typeof nsSlotFallback !== 'number') {
-        // No useful hint — just open the Lumps view at whatever is currently selected.
-        window._pendingLumpTab = 'clooms';
+        // No artifact identity is available, so do not pretend a repository
+        // source record is the complete LUMP.
         if (typeof switchView === 'function') switchView('lumps');
         return;
     }
@@ -5546,9 +5547,12 @@ function _openLumpSource(token, nsSlotFallback) {
             });
             if (_byLabel) resolvedToken = _byLabel.token;
         }
-        if (resolvedToken) window._pendingLumpToken = resolvedToken;
-        window._pendingLumpTab = 'clooms';
-        if (typeof switchView === 'function') switchView('lumps');
+        if (resolvedToken) {
+            if (typeof openLumpInEditor === 'function') openLumpInEditor(resolvedToken);
+            else if (window.openLumpInEditor) window.openLumpInEditor(resolvedToken);
+        } else if (typeof switchView === 'function') {
+            switchView('lumps');
+        }
     }());
 }
 
