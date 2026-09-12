@@ -79,7 +79,8 @@
       "token": "4a000006",
       "filename": "SelfTest.80.f37bafd6.lump",
       "issue_n": 80,
-      "resident": true
+      "resident": true,
+      "boot": true
     },
     {
       "name": "WukongCallHome",
@@ -131,8 +132,7 @@
       "token": "4a00000a",
       "filename": "CapabilityTest.2.5e701b59.lump",
       "issue_n": 2,
-      "resident": true,
-      "boot": true
+      "resident": true
     },
     {
       "name": "Thread.2",
@@ -207,6 +207,6 @@
       "seal": "0xDEAB9EEF"
     }
   ],
-  "generated_at": 1789212845.0967658,
+  "generated_at": 1789213945.9198003,
   "committed_raw_fingerprint": "6cc25b0c39c9b2c083d1ca0c0fc65e85faef567cd9661b00cff5e0cf9e938d19"
 }
