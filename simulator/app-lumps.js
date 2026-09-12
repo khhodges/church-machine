@@ -1757,6 +1757,7 @@ function exitSavedLumpEditorMode() {
     if (text) text.textContent = '';
     if (identityPanel) identityPanel.innerHTML = '';
     ['_lumpSourceRestoredBanner', '_lumpSourceMissingBanner',
+        '_lumpSourceIntegrityBanner',
         '_lumpMalformedBanner', '_lumpDraftBanner']
         .forEach(function(id) {
             var banner = document.getElementById(id);
@@ -1801,9 +1802,34 @@ function _restoreSavedLumpEditorOwnership(token, editor) {
 }
 window._restoreSavedLumpEditorOwnership = _restoreSavedLumpEditorOwnership;
 
-function _resolveSavedLumpEditorSource(embeddedSource) {
-    if (typeof embeddedSource === 'string') {
-        return { source: embeddedSource, restored: true, origin: 'embedded' };
+function _resolveSavedLumpEditorSource(serverSource, browserSource, browserDecodeConfirmed) {
+    var hasServerSource = typeof serverSource === 'string' && serverSource.length > 0;
+    var hasBrowserSource = typeof browserSource === 'string' && browserSource.length > 0;
+    if (hasServerSource && hasBrowserSource && serverSource !== browserSource) {
+        return {
+            source: '',
+            restored: false,
+            origin: 'integrity-error',
+            integrityError:
+                'Embedded source integrity failure: the server extraction from the exact saved binary ' +
+                'does not match the browser content-frame decoder.'
+        };
+    }
+    if (hasServerSource) {
+        return { source: serverSource, restored: true, origin: 'server-extracted' };
+    }
+    if (hasBrowserSource) {
+        return { source: browserSource, restored: true, origin: 'browser-decoded' };
+    }
+    if (browserDecodeConfirmed === false) {
+        return {
+            source: '',
+            restored: false,
+            origin: 'integrity-error',
+            integrityError:
+                'Embedded source integrity failure: the exact saved binary response contains no ' +
+                'server-extracted source, and the browser decoder could not confirm that source is absent.'
+        };
     }
     return {
         source:
@@ -6163,6 +6189,7 @@ async function openLumpInEditor(token) {
     // For in-memory assembled lumps (not yet saved): build serverWords directly
     // from lastAssembledWords so no server round-trip is needed.
     var serverWords = null;
+    var _wordsResponse = null;
     var _diagnosticSource = null;
     var _diagnosticError = null;
     if (_inMemoryLump && _regMemData && _regMemData.words && _regMemData.words.length > 0) {
@@ -6180,7 +6207,10 @@ async function openLumpInEditor(token) {
             var _wr = await fetch('/api/lump/' + token + '/words', { cache: 'no-store' });
             if (_wr.ok) {
                 var _wj = await _wr.json();
-                if (_wj && Array.isArray(_wj.words)) serverWords = _wj.words;
+                if (_wj && Array.isArray(_wj.words)) {
+                    serverWords = _wj.words;
+                    _wordsResponse = _wj;
+                }
             } else {
                 _diagnosticError = _formatActionableHttpError(
                     'Open the saved LUMP binary', _wr.status, await _wr.text(), {
@@ -6204,7 +6234,11 @@ async function openLumpInEditor(token) {
     if (window._savedLumpOpenRequestId !== _openRequestId) return;
 
     // ── Inspect embedded content from the immutable binary ──────────────────
-    var _binaryFrameSource = _diagnosticSource;
+    var _serverFrameSource = _wordsResponse &&
+        typeof _wordsResponse.source === 'string' && _wordsResponse.source.length > 0
+        ? _wordsResponse.source : null;
+    var _browserFrameSource = null;
+    var _browserFrameDecodeConfirmed = false;
     var _binaryFrameIsApiOnly = false;
     var _binaryFrameApi = null;
     if (serverWords && serverWords.length > 0) {
@@ -6219,8 +6253,23 @@ async function openLumpInEditor(token) {
                     };
                 }
             }
-            try { _binaryFrameSource = await _lcfDec.lumpDecodeContentFrame(serverWords); }
-            catch (_bfe) { /* fall through */ }
+            try {
+                if (typeof _lcfDec.lumpInspectContentFrameSource === 'function') {
+                    var _browserSourceInspection =
+                        await _lcfDec.lumpInspectContentFrameSource(serverWords);
+                    if (_browserSourceInspection &&
+                            _browserSourceInspection.status === 'source') {
+                        _browserFrameSource = _browserSourceInspection.source;
+                        _browserFrameDecodeConfirmed = true;
+                    } else if (_browserSourceInspection &&
+                            _browserSourceInspection.status === 'absent') {
+                        _browserFrameDecodeConfirmed = true;
+                    }
+                } else {
+                    _browserFrameSource = await _lcfDec.lumpDecodeContentFrame(serverWords);
+                    _browserFrameDecodeConfirmed = typeof _browserFrameSource === 'string';
+                }
+            } catch (_bfe) { /* leave absence unconfirmed */ }
             if (typeof _lcfDec.lumpDecodeContentFrameApi === 'function') {
                 _binaryFrameApi = _lcfDec.lumpDecodeContentFrameApi(serverWords);
             }
@@ -6236,7 +6285,23 @@ async function openLumpInEditor(token) {
     if (window._savedLumpOpenRequestId !== _openRequestId) return;
 
     if (window._savedLumpOpenRequestId !== _openRequestId) return;
-    var _sourceResolution = _resolveSavedLumpEditorSource(_binaryFrameSource);
+    var _sourceResolution = _diagnosticSource !== null
+        ? _resolveSavedLumpEditorSource(_diagnosticSource, null)
+        : _resolveSavedLumpEditorSource(
+            _serverFrameSource, _browserFrameSource, _browserFrameDecodeConfirmed);
+
+    // Identity displayed beside the disassembly must describe the same exact
+    // immutable response that supplied the words and intrinsic source.
+    var _exactResponseLump = lump;
+    if (!_inMemoryLump && _wordsResponse) {
+        _exactResponseLump = Object.assign({}, lump);
+        ['token', 'binary_hash', 'pet_name', 'dot_name', 'issue_n', 'identity_hash']
+            .forEach(function(field) {
+                if (_wordsResponse[field] !== undefined && _wordsResponse[field] !== null) {
+                    _exactResponseLump[field] = _wordsResponse[field];
+                }
+            });
+    }
 
     // ── Disassemble from server words (authoritative) ──────────────────────
     var disasmLines = null;
@@ -6434,6 +6499,8 @@ async function openLumpInEditor(token) {
         if (_existingSrcBanner) _existingSrcBanner.remove();
         var _existingMissingBanner = document.getElementById('_lumpSourceMissingBanner');
         if (_existingMissingBanner) _existingMissingBanner.remove();
+        var _existingIntegrityBanner = document.getElementById('_lumpSourceIntegrityBanner');
+        if (_existingIntegrityBanner) _existingIntegrityBanner.remove();
 
         // ── Always make the editor fully editable on LUMP-panel open ──────
         asmEd.readOnly = false;
@@ -6552,7 +6619,22 @@ async function openLumpInEditor(token) {
             }
         }
 
-        if (!_sourceRestored) {
+        if (_sourceResolution.integrityError) {
+            _setSavedLumpEditorSource('');
+            asmEd.readOnly = true;
+            asmEd.classList.add('cm-editor-sealed');
+            var _sourceIntegrityBanner = document.createElement('div');
+            _sourceIntegrityBanner.id = '_lumpSourceIntegrityBanner';
+            _sourceIntegrityBanner.className = 'lump-malformed-banner';
+            _sourceIntegrityBanner.textContent = _sourceResolution.integrityError +
+                ' The source pane is sealed; compiled disassembly from the exact response remains visible.';
+            var _sourceIntegrityParent = asmEd.parentNode && asmEd.parentNode.parentNode;
+            if (_sourceIntegrityParent) {
+                _sourceIntegrityParent.insertBefore(_sourceIntegrityBanner, asmEd.parentNode);
+            } else if (asmEd.parentNode) {
+                asmEd.parentNode.insertBefore(_sourceIntegrityBanner, asmEd);
+            }
+        } else if (!_sourceRestored) {
             // A binary-only artifact is not an editable source document. Do
             // not present a blank textarea as if it were recovered source.
             _setSavedLumpEditorSource('');
@@ -6570,7 +6652,8 @@ async function openLumpInEditor(token) {
             else if (asmEd.parentNode) asmEd.parentNode.insertBefore(_sourceMissingBanner, asmEd);
         }
 
-        _enterSavedLumpEditorMode(_compiledDisasm, lumpName, _inMemoryLump ? null : lump, token);
+        _enterSavedLumpEditorMode(
+            _compiledDisasm, lumpName, _inMemoryLump ? null : _exactResponseLump, token);
 
         if (typeof updateLineNumbers === 'function') updateLineNumbers();
         // Title must always follow the code module name without exception.
@@ -6658,11 +6741,12 @@ async function openLumpInEditor(token) {
     window._editorOpenLumpToken = token   || null;
     window._editorOpenLumpMeta  = lump    || null;
     var _openedSourceHash = null;
-    if (!_inMemoryLump && typeof _binaryFrameSource === 'string' &&
+    if (!_inMemoryLump && _sourceResolution.restored &&
+            typeof _sourceResolution.source === 'string' &&
             typeof crypto !== 'undefined' && crypto.subtle &&
             typeof TextEncoder !== 'undefined') {
         var _openedSourceDigest = await crypto.subtle.digest(
-            'SHA-256', new TextEncoder().encode(_binaryFrameSource));
+            'SHA-256', new TextEncoder().encode(_sourceResolution.source));
         _openedSourceHash = Array.from(new Uint8Array(_openedSourceDigest))
             .map(function(byte) { return byte.toString(16).padStart(2, '0'); })
             .join('');

@@ -384,6 +384,19 @@
       "filename": "CapabilityTest.2.5e701b59.lump",
       "bootstrap_t": "4a00000a",
       "bootstrap_runtime_gt": 1241513994
+    },
+    "3b142893afc59b9e2ec2561f5afc19c303fac9bd1b8bd7f752d0294f60601aea": {
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "3b142893afc59b9e2ec2561f5afc19c303fac9bd1b8bd7f752d0294f60601aea",
+      "dot_name": "SelfTest",
+      "issue_n": 1,
+      "filename": "SelfTest.1.a6d49276.lump",
+      "compiled_at": 1789231503.3886263,
+      "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25"
     }
   }
 }

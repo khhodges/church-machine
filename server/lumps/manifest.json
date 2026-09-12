@@ -415,5 +415,36 @@
     "filename": "CapabilityTest.2.5e701b59.lump",
     "lump_version": 3,
     "compiled_at": 1789126189.4050355
+  },
+  {
+    "token": "3b466efc",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.1.a6d49276.lump",
+    "lump_version": 85,
+    "compiled_at": 1789231503.3886263,
+    "dot_name": "SelfTest",
+    "issue_n": 1,
+    "petname": "",
+    "content_profile": 2,
+    "output_profile": 2,
+    "capabilities": [
+      {
+        "name": "SelfTest",
+        "rights": [
+          "E"
+        ],
+        "grants": [],
+        "nsIndex": 6
+      },
+      {
+        "name": "Next",
+        "rights": [
+          "E"
+        ],
+        "grants": [],
+        "nsIndex": 6
+      }
+    ],
+    "operation_id": "b94214c4-d32a-4c94-a582-d90afa38faea"
   }
 ]

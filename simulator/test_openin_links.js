@@ -1156,7 +1156,11 @@ trackAsync((async function t15() {
 
 // ── T21: saved-LUMP source recovery — compressed and uncompressed frames ─────
 trackAsync((async function t21() {
-    const { lumpBuildContentFrame, lumpDecodeContentFrame } =
+    const {
+        lumpBuildContentFrame,
+        lumpDecodeContentFrame,
+        lumpInspectContentFrameSource,
+    } =
         require('./lump-content-frame.js');
 
     async function buildBinary(source, forceUncompressed) {
@@ -1198,6 +1202,21 @@ trackAsync((async function t21() {
         uncompressed.flags === 0x03, uncompressed.flags);
     assert('T21 uncompressed embedded frame restores exact editable source',
         await lumpDecodeContentFrame(uncompressed.words) === uncompressedSource);
+
+    const noFrame = new Array(64).fill(0);
+    noFrame[0] = (((0x1F & 0x1F) << 27) | (1 << 10)) >>> 0;
+    noFrame[1] = 0xF8000000;
+    const absent = await lumpInspectContentFrameSource(noFrame);
+    assert('T21 detailed decoder confirms source is absent only for a valid no-frame binary',
+        absent.status === 'absent', absent);
+
+    const malformedWords = uncompressed.words.slice();
+    const frameStart = 2;
+    const apiWords = Math.ceil((malformedWords[frameStart] & 0xFFFF) / 4);
+    malformedWords[frameStart + 1 + apiWords] = 0x7FFFFFFF;
+    const malformed = await lumpInspectContentFrameSource(malformedWords);
+    assert('T21 detailed decoder distinguishes malformed content from absent source',
+        malformed.status === 'error', malformed);
 })());
 
 // ── T22: embedded-only source authority and explicit missing state ───────────
@@ -1207,16 +1226,35 @@ trackAsync((async function t21() {
     vm.runInContext(SAVED_LUMP_SOURCE_SRC, sandbox);
 
     const embedded = vm.runInContext(
-        '_resolveSavedLumpEditorSource("embedded source", "sidecar source")', sandbox);
+        '_resolveSavedLumpEditorSource("embedded source", null)', sandbox);
+    const browserFallback = vm.runInContext(
+        '_resolveSavedLumpEditorSource(null, "browser source")', sandbox);
+    const matching = vm.runInContext(
+        '_resolveSavedLumpEditorSource("same source", "same source")', sandbox);
+    const mismatch = vm.runInContext(
+        '_resolveSavedLumpEditorSource("server source", "browser source")', sandbox);
     const noFallback = vm.runInContext(
-        '_resolveSavedLumpEditorSource(null, "sidecar source")', sandbox);
+        '_resolveSavedLumpEditorSource(null, null, true)', sandbox);
+    const unconfirmedMissing = vm.runInContext(
+        '_resolveSavedLumpEditorSource(null, null, false)', sandbox);
     const missing = vm.runInContext(
-        '_resolveSavedLumpEditorSource(null, null)', sandbox);
+        '_resolveSavedLumpEditorSource(null, null, true)', sandbox);
 
-    assert('T22 embedded source wins over sidecar source',
-        embedded.origin === 'embedded' && embedded.source === 'embedded source', embedded);
-    assert('T22 older LUMP never falls back to sidecar source',
-        noFallback.origin === 'missing' && !noFallback.source.includes('sidecar source'), noFallback);
+    assert('T22 exact-response server source is authoritative',
+        embedded.origin === 'server-extracted' && embedded.source === 'embedded source', embedded);
+    assert('T22 browser decoder supplies source when server extraction is unavailable',
+        browserFallback.origin === 'browser-decoded' &&
+        browserFallback.source === 'browser source', browserFallback);
+    assert('T22 matching extraction paths preserve exact source',
+        matching.restored && matching.source === 'same source', matching);
+    assert('T22 decoder disagreement is an integrity failure',
+        mismatch.origin === 'integrity-error' && !mismatch.restored &&
+        mismatch.integrityError.includes('does not match'), mismatch);
+    assert('T22 missing source never invents a fallback',
+        noFallback.origin === 'missing', noFallback);
+    assert('T22 unavailable state requires browser confirmation of absence',
+        unconfirmedMissing.origin === 'integrity-error' &&
+        unconfirmedMissing.integrityError.includes('could not confirm'), unconfirmedMissing);
     assert('T22 missing source is explicitly identified',
         missing.origin === 'missing' && missing.restored === false &&
         missing.source.includes('Embedded source is unavailable'), missing.source);
@@ -1375,6 +1413,140 @@ trackAsync((async function t25() {
     assert('T25 late binary response cannot install stale saved-LUMP context',
         sandbox._editorOpenLumpToken === undefined &&
         sandbox._editorLumpDirtyToken === undefined);
+})());
+
+// ── T26: full-profile words response restores source through the open path ──
+trackAsync((async function t26() {
+    const source = '; CapabilityTest full saved source\nmethod Run {\n  RETURN\n}\n' +
+        '; realistic full-profile payload\n'.repeat(140);
+    const header = ((0x1F << 27) | (1 << 23) | (1 << 10)) >>> 0;
+    const words = new Array(128).fill(0);
+    words[0] = header;
+    words[1] = 0xF8000000;
+    const saved = {
+        token: '00c0ffee',
+        abstraction: 'CapabilityTest',
+        dot_name: 'CapabilityTest',
+        issue_n: 7,
+        identity_hash: 'registry-identity-must-not-win',
+        binary_hash: 'registry-binary-must-not-win',
+        ns_slot: null,
+        capabilities: [],
+        lump_type: 'code',
+        content_type: 'code',
+    };
+    const exactResponse = {
+        token: saved.token,
+        words,
+        source,
+        content_profile: 'full',
+        dot_name: 'CapabilityTest',
+        issue_n: 7,
+        identity_hash: 'exact-response-identity',
+        binary_hash: 'exact-response-binary',
+    };
+    const classes = new Set();
+    const asmEditor = {
+        value: '',
+        readOnly: true,
+        parentNode: { parentNode: { insertBefore() {} }, insertBefore() {} },
+        classList: {
+            add(name) { classes.add(name); },
+            remove(name) { classes.delete(name); },
+        },
+        addEventListener() {},
+        removeEventListener() {},
+    };
+    const langSelector = { value: '' };
+    const opened = {};
+    const sandbox = {
+        console,
+        fetch: async function(url) {
+            assert('T26 open path requests exact saved words endpoint',
+                url === '/api/lump/' + saved.token + '/words', url);
+            return { ok: true, json: async function() { return exactResponse; } };
+        },
+        switchView(view) { opened.view = view; },
+        localStorage: { removeItem() {}, getItem() { return null; } },
+        document: {
+            getElementById(id) {
+                if (id === 'asmEditor') return asmEditor;
+                if (id === 'langSelector') return langSelector;
+                return null;
+            },
+            querySelectorAll() { return []; },
+            querySelector() { return null; },
+            createElement() {
+                const attrs = {};
+                return {
+                    className: '', id: '', textContent: '', innerHTML: '',
+                    setAttribute(name, value) { attrs[name] = value; },
+                    getAttribute(name) { return attrs[name]; },
+                    addEventListener() {},
+                    remove() {},
+                    querySelector() { return null; },
+                };
+            },
+        },
+        LumpContentFrame: {
+            // Reproduce the CapabilityTest failure: the duplicate browser
+            // decoder cannot recover source from the otherwise valid response.
+            async lumpInspectContentFrameSource() {
+                return { status: 'error', source: null, error: 'decoder failed' };
+            },
+            async lumpDecodeContentFrame() { return null; },
+            lumpDecodeContentFrameApi() { return null; },
+            lumpContentFrameProfile() { return 'full'; },
+        },
+        ChurchAssembler: {
+            decompileWords(input) {
+                return input.map(word => '0x' + (word >>> 0).toString(16).toUpperCase());
+            },
+        },
+        sim: {
+            parseLumpHeader() {
+                return { valid: true, cw: 1, cc: 0, lumpSize: 128 };
+            },
+        },
+        _draftLsGet() { return null; },
+        _migrateBfextBfinsSyntax(value) { return value; },
+        _draftLsSet() {},
+        _resolveSavedLumpEditorSource: undefined,
+        _enterSavedLumpEditorMode(disasm, name, lump, token) {
+            opened.disasm = disasm;
+            opened.name = name;
+            opened.lump = lump;
+            opened.token = token;
+        },
+        setTimeout,
+    };
+    sandbox.window = sandbox;
+    sandbox.LumpRegistry = {
+        SESSION_EPOCH: 0,
+        resolve(token) {
+            return token === saved.token
+                ? { token, abstraction: saved.abstraction, sources: { server: saved } }
+                : null;
+        },
+        list() { return [{ sources: { server: saved } }]; },
+        setCurrent() {},
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(SAVED_LUMP_SOURCE_SRC + '\n' + OPEN_SAVED_LUMP_SRC, sandbox);
+    await vm.runInContext('openLumpInEditor("' + saved.token + '")', sandbox);
+
+    assert('T26 full-profile exact-response source populates the editor',
+        asmEditor.value === source, asmEditor.value.length);
+    assert('T26 restored source remains editable',
+        asmEditor.readOnly === false && !classes.has('cm-editor-sealed'),
+        { readOnly: asmEditor.readOnly, classes: Array.from(classes) });
+    assert('T26 exact disassembly is visible beside source',
+        opened.disasm && opened.disasm.includes('0xF8000000'), opened.disasm);
+    assert('T26 identity comes from the same exact words response',
+        opened.lump.identity_hash === exactResponse.identity_hash &&
+        opened.lump.binary_hash === exactResponse.binary_hash, opened.lump);
+    assert('T26 exact LUMP identity and name are opened together',
+        opened.token === saved.token && opened.name === saved.abstraction, opened);
 })());
 
 // ── Summary ───────────────────────────────────────────────────────────────────

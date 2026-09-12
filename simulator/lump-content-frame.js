@@ -35,6 +35,10 @@
  *       Returns null when source is not embedded. Callers must not substitute
  *       sidecar or catalog source for missing binary content.
  *
+ *   lumpInspectContentFrameSource(serverWords)
+ *       Return a detailed source result whose status distinguishes source,
+ *       confirmed absence, and malformed/undecodable content.
+ *
  * CM_LUMP_SPECIFICATION.md §Freespace Content and Self-Definition,
  * §Mint Validation Sequence step 7.
  */
@@ -335,9 +339,11 @@ async function lumpInspectContentFrame(serverWords) {
  * @param {number[]|Uint32Array} serverWords — complete LUMP binary word array.
  * @returns {Promise<string|null>}
  */
-async function lumpDecodeContentFrame(serverWords) {
+async function lumpInspectContentFrameSource(serverWords) {
     try {
-        if (!serverWords || serverWords.length === 0) return null;
+        if (!serverWords || serverWords.length === 0) {
+            return { status: 'error', source: null, error: 'LUMP words are unavailable.' };
+        }
         var _bhdr  = serverWords[0] >>> 0;
         var _bCw   = (_bhdr >>> 10) & 0x1FFF;
         var _bCc   = _bhdr & 0xFF;
@@ -345,19 +351,31 @@ async function lumpDecodeContentFrame(serverWords) {
         var _bSz   = 64 << _bNm6;
         var _bFsS  = 1 + _bCw;
         var _bFsE  = _bSz - _bCc;
-        if (_bFsS >= _bFsE || _bFsS >= serverWords.length) return null;
-        if ((((serverWords[_bFsS] >>> 0) >>> 24) & 0xFF) !== 0xAB) return null;
+        if (_bFsS >= _bFsE) return { status: 'absent', source: null };
+        if (_bFsS >= serverWords.length) {
+            return { status: 'error', source: null, error: 'LUMP words end before freespace.' };
+        }
+        if ((((serverWords[_bFsS] >>> 0) >>> 24) & 0xFF) !== 0xAB) {
+            return { status: 'absent', source: null };
+        }
 
         var _fHdr    = serverWords[_bFsS] >>> 0;
         var _fFlags  = (_fHdr >>> 16) & 0xFF;
         var _fApiLen = _fHdr & 0xFFFF;
         var _fApiW   = Math.ceil(_fApiLen / 4);
         var _fCursor = _bFsS + 1 + _fApiW;
-        if ((_fFlags & 0x01) === 0 || _fCursor >= _bFsE) return null;
+        if ((_fFlags & 0x01) === 0) return { status: 'absent', source: null };
+        if (_fCursor >= _bFsE || _fCursor >= serverWords.length) {
+            return { status: 'error', source: null, error: 'Content frame source length is truncated.' };
+        }
 
         var _fSrcLen = serverWords[_fCursor] >>> 0;
         var _fSrcW   = Math.ceil(_fSrcLen / 4);
-        if (_fSrcLen === 0 || _fCursor + 1 + _fSrcW > _bFsE) return null;
+        if (_fSrcLen === 0) return { status: 'absent', source: null };
+        if (_fCursor + 1 + _fSrcW > _bFsE ||
+                _fCursor + 1 + _fSrcW > serverWords.length) {
+            return { status: 'error', source: null, error: 'Content frame source bytes are truncated.' };
+        }
 
         // Unpack big-endian words → byte array, then trim to srcLen.
         var _fBytes = [];
@@ -368,7 +386,14 @@ async function lumpDecodeContentFrame(serverWords) {
         }
         _fBytes = _fBytes.slice(0, _fSrcLen);
 
-        if ((_fFlags & 0x04) !== 0 && typeof DecompressionStream !== 'undefined') {
+        if ((_fFlags & 0x04) !== 0) {
+            if (typeof DecompressionStream === 'undefined') {
+                return {
+                    status: 'error',
+                    source: null,
+                    error: 'Compressed content frames cannot be decoded in this browser.'
+                };
+            }
             // Compressed — inflate with native DecompressionStream.
             var _ds = new DecompressionStream('deflate-raw');
             var _dw = _ds.writable.getWriter();
@@ -379,8 +404,21 @@ async function lumpDecodeContentFrame(serverWords) {
         }
 
         var _decoded = new TextDecoder().decode(new Uint8Array(_fBytes));
-        return _decoded.trim().length > 0 ? _decoded : null;
-    } catch (_e) { return null; }
+        return _decoded.trim().length > 0
+            ? { status: 'source', source: _decoded }
+            : { status: 'absent', source: null };
+    } catch (_e) {
+        return {
+            status: 'error',
+            source: null,
+            error: _e && _e.message ? _e.message : String(_e)
+        };
+    }
+}
+
+async function lumpDecodeContentFrame(serverWords) {
+    var result = await lumpInspectContentFrameSource(serverWords);
+    return result.status === 'source' ? result.source : null;
 }
 
 // ── Module export (Node.js) / browser global ──────────────────────────────────
@@ -392,6 +430,7 @@ var _lcfExports = {
     lumpBuildContentFrame: lumpBuildContentFrame,
     lumpContentFrameProfile: lumpContentFrameProfile,
     lumpInspectContentFrame: lumpInspectContentFrame,
+    lumpInspectContentFrameSource: lumpInspectContentFrameSource,
     lumpDecodeContentFrameApi: lumpDecodeContentFrameApi,
     lumpDecodeContentFrame: lumpDecodeContentFrame,
 };

@@ -35,9 +35,15 @@ assert(nsOpen.indexOf('openLumpInEditor(srcLump.token)') <
     nsOpen.indexOf('_showNSLumpModal(slotIdx, e)'),
     'known Namespace code slots route directly to the complete workspace');
 
-assert(lumps.includes('_resolveSavedLumpEditorSource(_binaryFrameSource)'),
-    'embedded binary source remains authoritative');
-assert(lumps.includes('_enterSavedLumpEditorMode(_compiledDisasm, lumpName,'),
+assert(lumps.includes('_browserFrameSource, _browserFrameDecodeConfirmed)'),
+    'exact-response source is reconciled with browser decoding');
+assert(lumps.includes("origin: 'integrity-error'") &&
+    lumps.includes('_lumpSourceIntegrityBanner'),
+    'source decoder disagreement is surfaced as an integrity failure');
+assert(lumps.includes('_exactResponseLump[field] = _wordsResponse[field]'),
+    'identity metadata stays bound to the exact words response');
+assert(lumps.includes('_enterSavedLumpEditorMode(') &&
+    lumps.includes('_compiledDisasm, lumpName, _inMemoryLump ? null : _exactResponseLump, token'),
     'identity and exact disassembly enter the same workspace');
 assert(css.includes('@media (max-width: 760px)') &&
     css.includes('grid-template-rows: minmax(16rem, 1fr) minmax(16rem, 1fr)'),

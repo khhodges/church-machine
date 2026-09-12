@@ -76,11 +76,13 @@
       "limit": "0x01FFD",
       "seq": 0,
       "seal": "0xDD58D6EF",
-      "token": "4a000006",
-      "filename": "SelfTest.80.f37bafd6.lump",
-      "issue_n": 80,
+      "token": "3b466efc",
+      "filename": "SelfTest.1.a6d49276.lump",
+      "issue_n": 1,
       "resident": true,
-      "boot": true
+      "boot": true,
+      "lump_version": 85,
+      "load_policy": "Resident"
     },
     {
       "name": "WukongCallHome",
@@ -207,6 +209,6 @@
       "seal": "0xDEAB9EEF"
     }
   ],
-  "generated_at": 1789213945.9198003,
+  "generated_at": 1789231503.5360222,
   "committed_raw_fingerprint": "6cc25b0c39c9b2c083d1ca0c0fc65e85faef567cd9661b00cff5e0cf9e938d19"
 }
