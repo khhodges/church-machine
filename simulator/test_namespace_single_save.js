@@ -18,11 +18,13 @@ function check(name, condition) {
     }
 }
 
-const toolbarStart = source.indexOf("html += `<button id=\"nsSaveBtn\"");
+const toolbarStart = source.indexOf('id="nsSaveBtn"');
 const toolbarEnd = source.indexOf("html += '<button", toolbarStart);
 const toolbar = source.slice(toolbarStart, toolbarEnd);
 check('Namespace toolbar has Save for next build button',
-    toolbar.includes('Save for next build'));
+    toolbarStart !== -1 && toolbar.includes('Save for next build'));
+check('Namespace save button acknowledges errors before allowing retry',
+    toolbar.includes('_nsTableSaveClick(this)'));
 check('Namespace toolbar does not expose a separate policy-save button',
     !toolbar.includes('nsPrefetchSaveBtn') && !source.includes('id="nsPrefetchSaveBtn"'));
 
@@ -58,8 +60,9 @@ check('Namespace save preserves a validated live image after cache invalidation'
     save.includes('sim._bootImageLoaded !== true'));
 check('Namespace save preserves resident artifact locators for unchanged rows',
     save.includes('_savedBySlot') &&
-    save.includes("'token', 'filename', 'issue_n'") &&
-    save.includes("_saved.name === _lbl"));
+    save.includes('_nsInheritSavedArtifactMetadata(_rich, _saved, Boolean(_symbolic))') &&
+    source.includes("'token', 'filename', 'issue_n'") &&
+    source.includes('saved.name !== rich.name'));
 
 const editorSource = fs.readFileSync(path.join(__dirname, 'app-lump-editor.js'), 'utf8');
 const step1Start = editorSource.indexOf('function _postStep1(');

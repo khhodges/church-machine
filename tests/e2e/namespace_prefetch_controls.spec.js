@@ -5,6 +5,63 @@
 
 const { test, expect } = require('@playwright/test');
 
+test('Namespace save errors persist until acknowledgement, then allow retry', async ({ page }) => {
+    let saves = 0;
+    const error = 'Slot 6 validation failed: the Namespace entry does not match its LUMP. Review the complete entry before saving again.';
+    await page.route('**/api/boot-image/save-ns', async route => {
+        saves++;
+        await route.fulfill({
+            status: saves === 1 ? 400 : 200,
+            contentType: 'application/json',
+            body: JSON.stringify(saves === 1 ? { error } : { ok: true }),
+        });
+    });
+    await page.goto('/simulator/');
+    await page.addStyleTag({ content: '#faultModalOverlay, #whatsNewModal { display: none !important; }' });
+    await page.waitForFunction(() => typeof sim !== 'undefined' && sim && sim.nsCount > 0 && typeof updateNamespace === 'function');
+    await page.evaluate(() => {
+        // Isolate the feedback interaction from boot-generation/config writes.
+        sim._bootImageLoaded = true;
+        window._ensureNamespaceBuildConfig = async () => {};
+        switchView('namespace');
+        _setNsDirty(true);
+    });
+    const button = page.locator('#nsSaveBtn');
+    await button.click();
+    await expect(button).toContainText(error);
+    await expect(button).toContainText('Click to dismiss');
+    await expect(button).toBeEnabled();
+    await page.waitForTimeout(4500);
+    await page.evaluate(() => {
+        _setNsDirty(false);
+        updateNamespace();
+    });
+    await expect(button).toContainText(error);
+    await page.evaluate(() => _setNsDirty(true));
+    await expect(button).toContainText(error);
+    await button.click();
+    expect(saves).toBe(1);
+    await expect(button).toContainText('Unsaved NS');
+    expect(await page.evaluate(() => window._nsTableDirty)).toBe(true);
+    await button.click();
+    await expect(button).toHaveText('✓ Saved');
+    expect(saves).toBe(2);
+    expect(await page.evaluate(() => window._nsTableDirty)).toBe(false);
+    await expect(button).toContainText('Save for next build', { timeout: 4000 });
+    await expect(button).toBeEnabled();
+
+    // Keyboard acknowledgement restores the current clean state too.
+    await page.evaluate(() => {
+        window._nsTableSaveError = 'A second error';
+        updateNamespace();
+    });
+    await button.focus();
+    await button.press('Enter');
+    await expect(button).toContainText('Save for next build');
+    expect(saves).toBe(2);
+    expect(await page.evaluate(() => window._nsTableDirty)).toBe(false);
+});
+
 test('Namespace Table saves an independent canonical Preload policy', async ({ page }) => {
     test.setTimeout(40000);
     let posted = null;

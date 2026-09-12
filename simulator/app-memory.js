@@ -114,6 +114,16 @@ function _nsInheritSavedArtifactMetadata(rich, saved, symbolic) {
 // programmers should not need to understand the separate binary/config stores.
 // Cleared to false after both saves succeed.
 window._nsTableDirty = false;
+window._nsTableSaveError = null;
+
+function _nsTableSaveClick(btn) {
+    if (window._nsTableSaveError !== null) {
+        window._nsTableSaveError = null;
+        _setNsDirty(window._nsTableDirty);
+        return;
+    }
+    return window._nsTableSave(btn);
+}
 
 // Update the Save NS button appearance to reflect dirty state.
 // Looks for #nsSaveBtn in the DOM (rendered by updateNamespace).
@@ -121,6 +131,21 @@ function _setNsDirty(dirty) {
     window._nsTableDirty = Boolean(dirty);
     const btn = document.getElementById('nsSaveBtn');
     if (!btn) return;
+    const error = window._nsTableSaveError;
+    btn.style.whiteSpace = error !== null ? 'pre-wrap' : 'nowrap';
+    btn.style.overflowWrap = error !== null ? 'anywhere' : '';
+    btn.style.maxWidth = '100%';
+    btn.title = error !== null
+        ? 'Click to dismiss this error. Click again afterward to retry saving.'
+        : 'Save Namespace changes and load policies for the next build';
+    if (error !== null) {
+        btn.textContent = '\u2717 ' + error + '\nClick to dismiss';
+        btn.style.color = '#f87171';
+        btn.style.borderColor = 'rgba(248,113,113,0.5)';
+        btn.style.background = '#2a1414';
+        btn.disabled = false;
+        return;
+    }
     if (dirty) {
         btn.textContent = '\u25cf Unsaved NS';
         btn.style.color = '#f0a040';
@@ -3157,7 +3182,7 @@ function updateNamespace() {
     html += _statChip('Garbage',  _cntGarbage,  '#f87171', 'Cleared slots — GT cycle count bumped, content zeroed');
     html += _statChip('Free',     _cntFree,     '#6a9f6a', 'Slots available for allocation');
     html += `<span id="nsBoltDrag" class="ns-bolt-drag" draggable="true" title="Drag \u26a1 onto any NS row to crown that abstraction as Boot.Thread.CR0 \u2014 the first abstraction invoked after boot">\u26a1 Boot entry</span>`;
-    html += `<button id="nsSaveBtn" onclick="event.stopPropagation();_nsTableSave(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save Namespace changes and load policies for the next build">\u{1F4BE} Save for next build</button>`;
+    html += `<button type="button" id="nsSaveBtn" aria-live="polite" onclick="event.stopPropagation();_nsTableSaveClick(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save Namespace changes and load policies for the next build">\u{1F4BE} Save for next build</button>`;
     html += `<button onclick="event.stopPropagation();_nsTableAdd()" style="background:#1a2e1a;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Install a LUMP from the repository into the next free NS slot">+ Add LUMP</button>`;
     html += '</div>';
     // Bank custody status deliberately projects no raw NS slot, address,
@@ -4461,9 +4486,10 @@ function _nsTableClear(slot) {
 // The boot image binary is little-endian 32-bit words (struct.pack "<{n}I"),
 // matching Uint32Array's native byte order on x86/x64.
 window._nsTableSave = async function(btn) {
+    // Only explicit button acknowledgement clears a retained failure.
+    if (window._nsTableSaveError !== null) return false;
     if (!sim) return false;
 
-    const origText = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; btn.style.color = '#ccc'; }
 
     try {
@@ -4667,20 +4693,14 @@ window._nsTableSave = async function(btn) {
             btn.style.color = '#4ec9b0';
             setTimeout(() => {
                 btn.disabled = false;
-                _setNsDirty(false);   // restore clean button state after timeout
+                _setNsDirty(window._nsTableDirty);
             }, 2000);
         }
         return true;
     } catch (err) {
         console.error('[_nsTableSave]', err);
-        if (btn) {
-            btn.textContent = '\u2717 ' + err.message;
-            btn.style.color = '#f87171';
-            setTimeout(() => {
-                btn.disabled = false;
-                _setNsDirty(window._nsTableDirty);   // restore previous indicator
-            }, 4000);
-        }
+        window._nsTableSaveError = String(err.message || err);
+        _setNsDirty(window._nsTableDirty);
         return false;
     }
 };
