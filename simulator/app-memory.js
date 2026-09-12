@@ -4492,6 +4492,23 @@ window._nsTableSave = async function(btn) {
 
     if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; btn.style.color = '#ccc'; }
 
+    // This is a separate Namespace save entry point from /api/lumps/save.
+    // Keep its client-side attempt linked to the same diagnostic contract,
+    // without putting the correlation value into Namespace identity or
+    // idempotency calculations.
+    const _nsSaveDiagnostics = typeof window !== 'undefined'
+        ? window.LumpSaveDiagnostics : null;
+    const _nsSaveMetadata = {};
+    let _nsCommitAcknowledged = false;
+    let _nsCommitStageStarted = false;
+    try {
+        if (_nsSaveDiagnostics) {
+            _nsSaveDiagnostics.begin(_nsSaveMetadata, 'namespace._nsTableSave');
+            _nsSaveDiagnostics.stageStart(_nsSaveMetadata, 'prepare',
+                'namespace._nsTableSave', { outcome: 'unknown' });
+        }
+    } catch (_) {}
+
     try {
         // A Namespace save must never snapshot the simulator's fallback memory,
         // but it can recover a missing/stale saved image safely.  Persist the
@@ -4657,16 +4674,41 @@ window._nsTableSave = async function(btn) {
         }
         const data_b64 = btoa(binary);
 
+        if (_nsSaveDiagnostics) {
+            try {
+                _nsSaveDiagnostics.stageComplete(_nsSaveMetadata, 'prepare',
+                    'unknown', {});
+                _nsSaveDiagnostics.stageStart(_nsSaveMetadata, 'commit',
+                    'namespace.save-ns', { outcome: 'unknown' });
+                _nsCommitStageStarted = true;
+            } catch (_) {}
+        }
+
         // POST to the single-write-path endpoint that writes both files atomically.
         const resp = await fetch('/api/boot-image/save-ns', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ data_b64, ns_state: nsState }),
+            body:    JSON.stringify({
+                data_b64,
+                ns_state: nsState,
+                // Non-authoritative correlation only; the server's Namespace
+                // state and atomic write identity do not include this field.
+                diagnostic_attempt_id: _nsSaveMetadata.diagnostic_attempt_id,
+            }),
         });
         const data = await _actionableJsonResponse(resp, 'Save the Namespace', {
             dataChanged: false,
             nextAction: 'Review the Namespace entries, then click Save for next build again.',
         });
+        _nsCommitAcknowledged = true;
+        if (_nsSaveDiagnostics) {
+            try {
+                _nsSaveDiagnostics.stageComplete(_nsSaveMetadata, 'commit',
+                    'committed', { http_status: resp.status });
+                _nsSaveDiagnostics.stageStart(_nsSaveMetadata, 'reload',
+                    'namespace.reload', { outcome: 'unknown' });
+            } catch (_) {}
+        }
 
         // Keep the live table and the next-build policy in one explicit save
         // action.  This also creates the default Step 1 configuration on a
@@ -4696,9 +4738,23 @@ window._nsTableSave = async function(btn) {
                 _setNsDirty(window._nsTableDirty);
             }, 2000);
         }
+        if (_nsSaveDiagnostics) {
+            try {
+                _nsSaveDiagnostics.stageComplete(_nsSaveMetadata, 'reload',
+                    'committed', {});
+            } catch (_) {}
+        }
         return true;
     } catch (err) {
-        console.error('[_nsTableSave]', err);
+        try {
+            if (_nsSaveDiagnostics) {
+                _nsSaveDiagnostics.stageException(
+                    _nsSaveMetadata, _nsCommitAcknowledged ? 'reload' :
+                        (_nsCommitStageStarted ? 'commit' : 'prepare'),
+                    err, { outcome: _nsCommitAcknowledged ? 'unknown' : 'unknown' });
+            }
+        } catch (_) {}
+        console.error('[_nsTableSave] Namespace save failed');
         window._nsTableSaveError = String(err.message || err);
         _setNsDirty(window._nsTableDirty);
         return false;

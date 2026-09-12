@@ -11,8 +11,105 @@ if (typeof require === 'function' && typeof _formatActionableHttpError === 'unde
     var _formatActionableHttpError = _actionableErrors._formatActionableHttpError;
     var _formatActionableNetworkError = _actionableErrors._formatActionableNetworkError;
 }
+var _lumpSaveDiagnosticsInstance = null;
+if (typeof require === 'function') {
+    try {
+        var _saveDiagnosticsModule = require('./save_diagnostics.js');
+        var _lumpSaveDiagnosticsInstance = _saveDiagnosticsModule._saveDiagnostics;
+    } catch (_) {
+        var _lumpSaveDiagnosticsInstance = null;
+    }
+}
 const _LUMP_SAVE_OPERATION_PREFIX = 'church.lump-save-operation:';
 const _LUMP_SAVE_PENDING_PREFIX = 'church.lump-save-pending:';
+
+function _lumpSaveDiagnosticsApi() {
+    try {
+        if (typeof window !== 'undefined' && window.LumpSaveDiagnostics) {
+            return window.LumpSaveDiagnostics;
+        }
+        if (typeof globalThis !== 'undefined' && globalThis.LumpSaveDiagnostics &&
+                globalThis.LumpSaveDiagnostics !== _lumpSaveDiagnosticsInstance) {
+            return globalThis.LumpSaveDiagnostics;
+        }
+    } catch (_) {}
+    if (_lumpSaveDiagnosticsInstance) return _lumpSaveDiagnosticsInstance;
+    return null;
+}
+
+function _lumpSaveDiagnosticBegin(payload, entryPoint) {
+    try {
+        var diagnostics = _lumpSaveDiagnosticsApi();
+        if (!diagnostics || !payload) return null;
+        payload.metadata = payload.metadata &&
+            typeof payload.metadata === 'object' ? payload.metadata : {};
+        return diagnostics.begin(payload.metadata, entryPoint);
+    } catch (_) {
+        return null;
+    }
+}
+
+function _lumpSaveDiagnosticEvent(payload, stage, event, values) {
+    try {
+        var diagnostics = _lumpSaveDiagnosticsApi();
+        if (!diagnostics || !payload) return null;
+        payload.metadata = payload.metadata &&
+            typeof payload.metadata === 'object' ? payload.metadata : {};
+        return diagnostics.record(payload.metadata, stage, event, values || {});
+    } catch (_) {
+        return null;
+    }
+}
+
+function _lumpSaveDiagnosticStageStart(payload, stage, entryPoint, values) {
+    try {
+        var diagnostics = _lumpSaveDiagnosticsApi();
+        if (!diagnostics || !payload) return null;
+        payload.metadata = payload.metadata &&
+            typeof payload.metadata === 'object' ? payload.metadata : {};
+        return diagnostics.stageStart(payload.metadata, stage, entryPoint, values || {});
+    } catch (_) {
+        return null;
+    }
+}
+
+function _lumpSaveDiagnosticStageComplete(payload, stage, outcome, values) {
+    try {
+        var diagnostics = _lumpSaveDiagnosticsApi();
+        if (!diagnostics || !payload) return null;
+        payload.metadata = payload.metadata &&
+            typeof payload.metadata === 'object' ? payload.metadata : {};
+        return diagnostics.stageComplete(payload.metadata, stage, outcome, values || {});
+    } catch (_) {
+        return null;
+    }
+}
+
+function _lumpSaveDiagnosticStageException(payload, stage, error, values) {
+    try {
+        var diagnostics = _lumpSaveDiagnosticsApi();
+        if (!diagnostics || !payload) return null;
+        payload.metadata = payload.metadata &&
+            typeof payload.metadata === 'object' ? payload.metadata : {};
+        return diagnostics.stageException(payload.metadata, stage, error, values || {});
+    } catch (_) {
+        return null;
+    }
+}
+
+function _lumpSaveDiagnosticResponseMetadata(payload, response) {
+    try {
+        var diagnostics = _lumpSaveDiagnosticsApi();
+        if (!diagnostics || !payload || !response) return;
+        payload.metadata = payload.metadata &&
+            typeof payload.metadata === 'object' ? payload.metadata : {};
+        diagnostics.update(payload.metadata, {
+            operation_id: response.operation_id,
+            candidate_id: response.candidate_id,
+            plan_id: response.plan_id || response.save_plan_id,
+        });
+    } catch (_) {}
+}
 
 /**
  * Handle the server response (resolved branch) from a /api/lumps/save POST.
@@ -32,7 +129,10 @@ function _lumpSaveHandleResponse(r, resp) {
                     ? 'The IDE must resolve this incident; your source and settings remain preserved.'
                     : 'Correct the exact field identified by the IDE, then save again.',
             });
-        console.error('[confirmSaveToNamespace] server rejected save:', _errMsg, resp);
+        // Keep arbitrary server prose out of the console; the user-facing
+        // formatter and bounded diagnostics carry only safe classifications.
+        console.error('[confirmSaveToNamespace] server rejected save:',
+            _lumpSaveFailureClassification(r.status, resp).kind, r.status);
         if (typeof _showFpgaToast === 'function') {
             _showFpgaToast('LUMP Repository Save Failed', _errMsg, 'error', 10000);
         }
@@ -54,7 +154,7 @@ function _lumpSaveHandleResponse(r, resp) {
  * @param {Error} err — the rejection reason from fetch()
  */
 function _lumpSaveHandleNetworkError(err) {
-    console.error('[confirmSaveToNamespace] network error during save:', err);
+    console.error('[confirmSaveToNamespace] network error during save');
     if (typeof _showFpgaToast === 'function') {
         _showFpgaToast('LUMP Repository Save Failed',
                        'Save could not reach the repository, so its commit outcome is unknown. ' +
@@ -148,6 +248,10 @@ function _lumpSaveEnsureOperationId(payload) {
     }
     if (!payload.metadata || typeof payload.metadata !== 'object') payload.metadata = {};
     var metadata = payload.metadata;
+    // The diagnostic attempt is deliberately separate from operation_key and
+    // operation_id. It links plan/approval/commit/reconciliation retries but
+    // cannot alter canonical identity or idempotency.
+    _lumpSaveDiagnosticBegin(payload, 'save');
     var operationId = String(metadata.operation_id || '');
     if (!metadata.operation_key) metadata.operation_key = _lumpSaveDefaultOperationKey(payload);
     if (!/^[A-Za-z0-9._:-]{8,128}$/.test(operationId)) {
@@ -165,6 +269,10 @@ function _lumpSaveEnsureOperationId(payload) {
         }
         metadata.operation_id = operationId;
     }
+    try {
+        var diagnostics = _lumpSaveDiagnosticsApi();
+        if (diagnostics) diagnostics.update(metadata, { operation_id: operationId });
+    } catch (_) {}
     return operationId;
 }
 
@@ -206,22 +314,42 @@ function _lumpSaveReadJson(response) {
 // The server deliberately returns committed:false only when it can prove no
 // transition occurred, and committed:null when it cannot tell.  Never invent a
 // negative result from a network failure or a missing operation route.
-function _lumpSaveReconcile(fetchImpl, operationId) {
+function _lumpSaveReconcile(fetchImpl, operationId, metadata) {
     if (!operationId) return Promise.resolve({ committed: null });
+    var diagnosticPayload = { metadata: Object.assign({}, metadata || {},
+        { operation_id: operationId }) };
+    _lumpSaveDiagnosticStageStart(diagnosticPayload, 'reconcile',
+        'save.reconcile', { outcome: 'unknown' });
     return fetchImpl('/api/lumps/save-operations/' + encodeURIComponent(operationId), {
         method: 'GET',
         cache: 'no-store',
         headers: { 'X-Lump-Save-Operation': operationId },
     }).then(function(response) {
         return _lumpSaveReadJson(response).then(function(body) {
-            if (!response.ok || !body || typeof body !== 'object') return { committed: null };
+            if (!response.ok || !body || typeof body !== 'object') {
+                _lumpSaveDiagnosticStageComplete(diagnosticPayload, 'reconcile',
+                    'unknown', { http_status: response.status });
+                return { committed: null };
+            }
             if (body.committed === true && body.response && body.response.ok === true) {
+                _lumpSaveDiagnosticResponseMetadata(diagnosticPayload, body.response);
+                _lumpSaveDiagnosticStageComplete(diagnosticPayload, 'reconcile',
+                    'committed', { http_status: response.status });
                 return { committed: true, response: body.response };
             }
-            if (body.committed === false) return { committed: false, response: body.response || null };
+            if (body.committed === false) {
+                _lumpSaveDiagnosticResponseMetadata(diagnosticPayload, body.response);
+                _lumpSaveDiagnosticStageComplete(diagnosticPayload, 'reconcile',
+                    'rejected', { http_status: response.status });
+                return { committed: false, response: body.response || null };
+            }
+            _lumpSaveDiagnosticStageComplete(diagnosticPayload, 'reconcile',
+                'unknown', { http_status: response.status });
             return { committed: null };
         });
-    }).catch(function() {
+    }).catch(function(error) {
+        _lumpSaveDiagnosticStageException(diagnosticPayload, 'reconcile', error,
+            { outcome: 'unknown' });
         return { committed: null };
     });
 }
@@ -238,7 +366,8 @@ function _lumpSaveReconcilePendingOperations(fetchImpl, onOutcome) {
         }
     } catch (_) {}
     return Promise.all(pending.map(function(record) {
-        return _lumpSaveReconcile(fetchImpl, record.operation_id).then(function(outcome) {
+        return _lumpSaveReconcile(fetchImpl, record.operation_id,
+            record.payload && record.payload.metadata).then(function(outcome) {
             if (outcome.committed !== null) {
                 // Clear both the pending journal and its logical-operation
                 // mapping. A future deliberate save of this same payload must
@@ -271,29 +400,53 @@ function _lumpSaveReconcilePendingOperations(fetchImpl, onOutcome) {
  */
 function _lumpSaveRequest(fetchImpl, url, payload, onCommit, recovery) {
     var operationId = _lumpSaveEnsureOperationId(payload);
+    _lumpSaveDiagnosticStageStart(payload, 'commit', 'save.request', {
+        outcome: 'unknown'
+    });
     _lumpSavePersistPendingOperation(operationId, url, payload);
     function commit(resp) {
+        _lumpSaveDiagnosticResponseMetadata(payload, resp);
+        _lumpSaveDiagnosticStageComplete(payload, 'commit', 'committed', {
+            http_status: resp && resp.status
+        });
         // A durable save remains successful if rendering, a toast, or a local
         // simulator refresh throws.  That exception is post-commit UI work, not
         // a transport failure and must not cause a duplicate retry.
         if (typeof onCommit === 'function') {
+            _lumpSaveDiagnosticStageStart(payload, 'reload', 'save.callback',
+                { outcome: 'unknown' });
             try {
                 var callbackResult = onCommit(resp);
                 if (callbackResult && typeof callbackResult.then === 'function') {
                     return callbackResult.catch(function(postCommitError) {
-                        console.error('[LUMP save] committed; post-commit callback failed:', postCommitError);
+                        _lumpSaveDiagnosticStageException(payload, 'reload',
+                            postCommitError, { outcome: 'unknown' });
+                        console.error('[LUMP save] committed; post-commit callback failed');
                         resp.post_commit_error = String(
                             postCommitError && postCommitError.message || postCommitError);
                     }).then(function() {
+                        if (!resp.post_commit_error) {
+                            _lumpSaveDiagnosticStageComplete(payload, 'reload',
+                                'committed', {});
+                        }
                         _lumpSaveRetireOperationId(payload);
                         return resp;
                     });
                 }
+                _lumpSaveDiagnosticStageComplete(payload, 'reload', 'committed', {});
             } catch (postCommitError) {
-                console.error('[LUMP save] committed; post-commit callback failed:', postCommitError);
+                _lumpSaveDiagnosticStageException(payload, 'reload', postCommitError,
+                    { outcome: 'unknown' });
+                console.error('[LUMP save] committed; post-commit callback failed');
                 resp.post_commit_error = String(
                     postCommitError && postCommitError.message || postCommitError);
             }
+        } else {
+            // The caller owns its own refresh when no callback is supplied;
+            // retain that uncertainty rather than claiming UI reload success.
+            _lumpSaveDiagnosticStageStart(payload, 'reload', 'save.request',
+                { outcome: 'unknown' });
+            _lumpSaveDiagnosticStageComplete(payload, 'reload', 'unknown', {});
         }
         _lumpSaveRetireOperationId(payload);
         return resp;
@@ -312,6 +465,10 @@ function _lumpSaveRequest(fetchImpl, url, payload, onCommit, recovery) {
             try {
                 resp = JSON.parse(body);
             } catch (parseError) {
+                _lumpSaveDiagnosticStageException(payload, 'commit', parseError, {
+                    http_status: r.status,
+                    outcome: 'unknown'
+                });
                 var excerpt = String(body || '').replace(/\s+/g, ' ').trim().slice(0, 240);
                 var protocolError = new Error(
                     _formatActionableHttpError('Save to the LUMP repository', r.status, excerpt, {
@@ -324,6 +481,12 @@ function _lumpSaveRequest(fetchImpl, url, payload, onCommit, recovery) {
             }
             if (!r.ok || !resp || resp.ok !== true) {
                 var classification = _lumpSaveFailureClassification(r.status, resp);
+                _lumpSaveDiagnosticResponseMetadata(payload, resp);
+                _lumpSaveDiagnosticStageComplete(payload, 'commit',
+                    classification.committed === false ? 'rejected' : 'unknown', {
+                        http_status: r.status,
+                        error: resp && resp.error ? new Error(String(resp.error)) : null,
+                    });
                 if (classification.kind === 'ide' && classification.safeRetry &&
                         recovery && recovery.attempted !== true &&
                         typeof recovery.rebuildPayload === 'function') {
@@ -358,10 +521,15 @@ function _lumpSaveRequest(fetchImpl, url, payload, onCommit, recovery) {
         });
     }
     return post().catch(function(err) {
+        if (!err || (err.kind !== 'protocol' && err.kind !== 'validation' &&
+                err.kind !== 'ide' && err.kind !== 'server')) {
+            _lumpSaveDiagnosticStageException(payload, 'commit', err,
+                { outcome: 'unknown' });
+        }
         if (err && err.kind === 'protocol') {
             // A proxy can discard a successful JSON response and replace it
             // with HTML. Reconcile before reporting that protocol problem.
-            return _lumpSaveReconcile(fetchImpl, operationId).then(function(reconciliation) {
+            return _lumpSaveReconcile(fetchImpl, operationId, payload.metadata).then(function(reconciliation) {
                 if (reconciliation.committed === true) return commit(reconciliation.response);
                 if (reconciliation.committed === false) _lumpSaveRetireOperationId(payload);
                 err.committed = reconciliation.committed;
@@ -378,7 +546,7 @@ function _lumpSaveRequest(fetchImpl, url, payload, onCommit, recovery) {
             // "uncommitted" unless the operation ledger proves it. This also
             // makes server-created diagnostic candidates discoverable after a
             // validation incident.
-            return _lumpSaveReconcile(fetchImpl, operationId).then(function(reconciliation) {
+            return _lumpSaveReconcile(fetchImpl, operationId, payload.metadata).then(function(reconciliation) {
                 if (reconciliation.committed === true) return commit(reconciliation.response);
                 if (reconciliation.committed === false) _lumpSaveRetireOperationId(payload);
                 err.committed = reconciliation.committed;
@@ -386,7 +554,7 @@ function _lumpSaveRequest(fetchImpl, url, payload, onCommit, recovery) {
                 throw err;
             });
         }
-        return _lumpSaveReconcile(fetchImpl, operationId).then(function(reconciliation) {
+        return _lumpSaveReconcile(fetchImpl, operationId, payload.metadata).then(function(reconciliation) {
             if (reconciliation.committed === true) return commit(reconciliation.response);
             if (reconciliation.committed === false) _lumpSaveRetireOperationId(payload);
             var transportError = new Error(
@@ -412,11 +580,13 @@ if (typeof module !== 'undefined') {
         _lumpSaveStaleConflictAction,
         _lumpSaveSubmittedSource,
         _lumpSaveFailureClassification,
+        _lumpSaveDefaultOperationKey,
         _lumpSaveEnsureOperationId,
         _lumpSaveRetireOperationId,
         _lumpSaveReconcile,
         _lumpSaveReconcilePendingOperations,
         _lumpSaveRequest,
+        _lumpSaveDiagnostics: _lumpSaveDiagnosticsApi,
         _formatActionableHttpError,
     };
 }

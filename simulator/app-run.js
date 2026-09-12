@@ -15969,7 +15969,14 @@ async function confirmSaveToNamespace() {
                 idx = committedSlot;
                 await _reloadCommittedLumpArtifact(resp, label);
             } catch (err) {
-                console.error('[SaveNS] local update failed after repository commit:', err);
+                try {
+                    if (window.LumpSaveDiagnostics) {
+                        window.LumpSaveDiagnostics.stageException(
+                            _svPayload.metadata, 'reload', err, { outcome: 'unknown' });
+                    }
+                    resp.post_commit_error = String(err && err.message || err);
+                } catch (_) {}
+                console.error('[SaveNS] local reload failed after repository commit');
                 const recovery = `Saved "${label}" to NS[${idx}], but the local view could not update. ` +
                     'Open Namespace and refresh its contents before running the LUMP.';
                 _showFpgaToast('LUMP Saved — Refresh Needed',
@@ -16011,7 +16018,14 @@ async function confirmSaveToNamespace() {
                 updateDashboard();
                 if (typeof renderLumps === 'function') renderLumps();
             } catch (err) {
-                console.error('[SaveNS] post-save UI refresh failed:', err);
+                try {
+                    if (window.LumpSaveDiagnostics) {
+                        window.LumpSaveDiagnostics.stageException(
+                            _svPayload.metadata, 'reload', err, { outcome: 'unknown' });
+                    }
+                    resp.post_commit_error = String(err && err.message || err);
+                } catch (_) {}
+                console.error('[SaveNS] post-save UI refresh failed after repository commit');
                 const recovery = `Saved "${label}" to NS[${idx}], but the screen could not refresh. ` +
                     'Open Namespace and refresh its contents before running the LUMP.';
                 _showFpgaToast('LUMP Saved — Refresh Needed',

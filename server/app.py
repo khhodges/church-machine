@@ -251,21 +251,559 @@ app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key")
 
 # Save diagnostics are intentionally append-only and metadata-only. They give
 # a failed browser save a server-side correlation point without persisting
-# source text, approval tokens, session cookies, or other secrets.
+# source text, approval tokens, session cookies, or other secrets. Diagnostics
+# are a separate, bounded operational record; they are never part of a LUMP
+# manifest, approval ledger, or artifact bundle.
 _LUMP_SAVE_DIAGNOSTIC_LOCK = threading.Lock()
-_LUMP_SAVE_DIAGNOSTIC_FILENAME = "save-diagnostics.jsonl"
+# Keep runtime events separate from the legacy synthetic stream so old
+# diagnostics cannot be mistaken for authoritative request outcomes.
+_LUMP_SAVE_DIAGNOSTIC_FILENAME = "save-runtime-diagnostics.jsonl"
+_LUMP_SAVE_DIAGNOSTIC_MAX_BYTES = 256 * 1024
+_LUMP_SAVE_DIAGNOSTIC_ROTATIONS = 3
+_LUMP_SAVE_DIAGNOSTIC_MAX_EVENT_BYTES = 12 * 1024
+_LUMP_SAVE_DIAGNOSTIC_MAX_BATCH_EVENTS = 100
+_LUMP_SAVE_DIAGNOSTIC_MAX_BATCH_BYTES = 64 * 1024
+_LUMP_SAVE_DIAGNOSTIC_RATE_WINDOW = 60.0
+_LUMP_SAVE_DIAGNOSTIC_RATE_LIMIT = 60
+_LUMP_SAVE_DIAGNOSTIC_GLOBAL_RATE_LIMIT = 600
+_LUMP_SAVE_DIAGNOSTIC_MAX_RATE_KEYS = 2048
+_LUMP_SAVE_DIAGNOSTIC_RATE_LOCK = threading.Lock()
+_LUMP_SAVE_DIAGNOSTIC_RATE = {}
+_LUMP_SAVE_DIAGNOSTIC_GLOBAL_RATE = []
+
+_LUMP_DIAGNOSTIC_STRING_LIMITS = {
+    "attempt_id": 128, "operation_id": 128, "candidate_id": 128,
+    "plan_id": 128, "stage": 48, "event": 96, "entry_point": 128,
+    "event_id": 160, "outcome": 24, "client_diagnostic_attempt_id": 128,
+    "client_timestamp": 64, "occurred_at": 64, "name": 128, "message": 96,
+    "stack": 1024,
+}
+_LUMP_DIAGNOSTIC_EVENT_FIELDS = frozenset({
+    "attempt_id", "operation_id", "candidate_id", "plan_id", "stage",
+    "event", "entry_point", "outcome", "elapsed_ms", "http_status", "error",
+    "event_id", "client_timestamp",
+    "occurred_at",
+    # ``committed`` is retained as a compatibility projection for existing
+    # local log readers; ``outcome`` remains the authoritative tri-state field.
+    "committed",
+    "client_diagnostic_attempt_id",
+})
+_LUMP_DIAGNOSTIC_SENSITIVE_VALUE = re.compile(
+    r"(?i)(?:bearer\s+|(?:authorization|cookie|set-cookie|"
+    r"approval|session|access|refresh|api|private|secret|password|"
+    r"credential|proof|binary|source|body)"
+    r"(?:[_-][a-z0-9]+)*\s*[:=]\s*)([^\s,;\"']+)"
+)
+_LUMP_DIAGNOSTIC_LONG_VALUE = re.compile(
+    r"(?i)\b(?:-----BEGIN [^-]+-----|data:[a-z0-9/+.-]+;base64,)[^\s]{32,}"
+)
+_LUMP_DIAGNOSTIC_QUERY_SECRET = re.compile(
+    r"(?i)([?&](?:token|key|secret|password|cookie|session|authorization|"
+    r"proof|approval|credential)[^=&#\s]*=)[^&#\s]+"
+)
+_LUMP_DIAGNOSTIC_STACK_LOCATION = re.compile(
+    r"(?:(?:https?|file)://[^\s)\]]+|[/A-Za-z0-9_.-]+):\d+(?::\d+)?"
+)
+_LUMP_DIAGNOSTIC_ERROR_NAMES = {
+    "approvalerror": "ApprovalError",
+    "approvalstoreerror": "ApprovalStoreError",
+    "bootimageunavailable": "BootImageUnavailable",
+    "error": "Error",
+    "exception": "Error",
+    "invalidpayload": "InvalidPayload",
+    "manifesterror": "ManifestError",
+    "rollbackerror": "RollbackError",
+    "aborterror": "AbortError",
+    "networkerror": "NetworkError",
+    "oserror": "OSError",
+    "rangeerror": "RangeError",
+    "syntaxerror": "SyntaxError",
+    "timeouterror": "TimeoutError",
+    "typeerror": "TypeError",
+    "valueerror": "ValueError",
+    "transitionconflict": "TransitionConflict",
+    "transitionrecovered": "TransitionRecovered",
+}
+_LUMP_DIAGNOSTIC_CODES = frozenset({
+    "capture_failed", "preflight_rejected", "approval_rejected",
+    "commit_rejected", "commit_unknown", "reconciliation_unknown",
+    "repository_unavailable", "invalid_response", "reload_failed",
+    "namespace_save_failed", "timeout", "authorization_rejected",
+    "diagnostic_failure", "unexpected_failure",
+})
+_LUMP_DIAGNOSTIC_CODE_REASONS = {
+    "capture_failed": "Save capture failed before the repository request.",
+    "preflight_rejected": "The repository rejected save preparation.",
+    "approval_rejected": "The repository rejected the approval step.",
+    "commit_rejected": "The repository rejected the save.",
+    "commit_unknown": "The repository could not confirm the save outcome.",
+    "reconciliation_unknown": (
+        "Reconciliation could not confirm the save outcome."),
+    "repository_unavailable": "The repository was unavailable.",
+    "invalid_response": "The repository returned an invalid response.",
+    "reload_failed": "The repository committed, but local reload failed.",
+    "namespace_save_failed": "Namespace state could not be saved.",
+    "timeout": "The save request timed out.",
+    "authorization_rejected": "Repository authorization was rejected.",
+    "diagnostic_failure": "Save diagnostics could not be recorded.",
+    "unexpected_failure": "An unexpected save-stage failure occurred.",
+}
 
 
-def _save_diagnostic_identity(metadata):
-    metadata = metadata if isinstance(metadata, dict) else {}
-    identity = {}
-    for key in (
-            "abstraction", "token", "dot_name", "petname", "issue_number",
-            "output_profile", "profile", "ns_slot"):
-        value = metadata.get(key)
-        if isinstance(value, (str, int, float)) and not isinstance(value, bool):
-            identity[key] = value
-    return identity
+def _safe_lump_diagnostic_string(value, field, *, limit=None):
+    """Return a bounded, log-safe string or ``None``.
+
+    Client diagnostics are untrusted input. In particular, error messages and
+    stacks frequently include request details copied by browser libraries.
+    Keep the useful prose while removing credential-like values and control
+    characters. Unknown fields never reach this helper.
+    """
+    if not isinstance(value, str):
+        return None
+    maximum = int(limit or _LUMP_DIAGNOSTIC_STRING_LIMITS.get(field, 256))
+    value = value.replace("\x00", "")
+    value = "".join(
+        char for char in value
+        if char in "\n\r\t" or ord(char) >= 0x20
+    ).strip()
+    value = _LUMP_DIAGNOSTIC_SENSITIVE_VALUE.sub(
+        lambda match: match.group(0)[:match.start(1) - match.start(0)]
+        + "[REDACTED]",
+        value,
+    )
+    value = _LUMP_DIAGNOSTIC_QUERY_SECRET.sub(r"\1[REDACTED]", value)
+    value = _LUMP_DIAGNOSTIC_LONG_VALUE.sub("[REDACTED]", value)
+    if len(value) > maximum:
+        value = value[:maximum] + "…"
+    return value or None
+
+
+def _lump_diagnostic_error_name(value):
+    try:
+        normalized = re.sub(r"[^a-z0-9]", "", str(value or "").lower())
+    except Exception:
+        normalized = ""
+    return _LUMP_DIAGNOSTIC_ERROR_NAMES.get(normalized, "Error")
+
+
+def _lump_diagnostic_error_code(error):
+    """Accept frontend enum codes only; infer a safe fallback for server errors."""
+    supplied = error.get("code") if isinstance(error, dict) else None
+    if isinstance(supplied, str) and supplied in _LUMP_DIAGNOSTIC_CODES:
+        return supplied
+    text = ""
+    if isinstance(error, dict):
+        text = " ".join(
+            str(error.get(field) or "").lower()
+            for field in ("name", "message"))
+    if re.search(r"authorization|approval|credential|forbidden|session", text):
+        return "authorization_rejected"
+    if re.search(r"reload|boot.?image|refresh|install", text):
+        return "reload_failed"
+    if re.search(r"timeout|abort", text):
+        return "timeout"
+    if re.search(r"network|fetch|transport|connection", text):
+        return "repository_unavailable"
+    if re.search(r"invalid|payload|schema|base64", text):
+        return "preflight_rejected"
+    if re.search(r"operation|reconcil|replay", text):
+        return "reconciliation_unknown"
+    if re.search(r"commit|transition|rollback|manifest", text):
+        return "commit_rejected"
+    return "unexpected_failure"
+
+
+def _lump_diagnostic_stack_locations(value):
+    if not isinstance(value, str):
+        return None
+    locations = []
+    for match in _LUMP_DIAGNOSTIC_STACK_LOCATION.finditer(value):
+        location = match.group(0)
+        # Query strings and fragments are not locations and commonly carry
+        # bearer/session keys. Keep only the path plus line/column.
+        location = re.split(r"[?#]", location, maxsplit=1)[0]
+        location = re.sub(r"(?<=//)[^/@\s]+@", "", location)
+        location = location.rstrip(".,;:")
+        if location and location not in locations:
+            locations.append(location)
+        if len(locations) >= 8:
+            break
+    return "\n".join(locations)[:_LUMP_DIAGNOSTIC_STRING_LIMITS["stack"]] or None
+
+
+def _sanitize_lump_diagnostic_error(error, depth=0):
+    """Keep only classified reasons and source-free stack locations."""
+    if depth > 3:
+        return None
+    if isinstance(error, str):
+        code = "unexpected_failure"
+        return {
+            "code": code,
+            "reason": _LUMP_DIAGNOSTIC_CODE_REASONS[code],
+            "name": "Error",
+            "message": _LUMP_DIAGNOSTIC_CODE_REASONS[code],
+        }
+    if not isinstance(error, dict):
+        return None
+    code = _lump_diagnostic_error_code(error)
+    reason = _LUMP_DIAGNOSTIC_CODE_REASONS[code]
+    result = {
+        "code": code,
+        "reason": reason,
+        "name": _lump_diagnostic_error_name(error.get("name")),
+        # Keep the historical message key for local readers, but only with
+        # the server-derived allowlisted reason, never client prose.
+        "message": reason,
+    }
+    stack = _lump_diagnostic_stack_locations(error.get("stack"))
+    if stack:
+        result["stack"] = stack
+    cause = _sanitize_lump_diagnostic_error(error.get("cause"), depth + 1)
+    if cause:
+        result["cause"] = cause
+    return result or None
+
+
+def _sanitize_lump_diagnostic_event(event, *, source="server",
+                                    authoritative=False, defaults=None):
+    """Normalize one event to the small retained diagnostic contract."""
+    if not isinstance(event, dict):
+        return None
+    defaults = defaults if isinstance(defaults, dict) else {}
+    normalized = {
+        "timestamp": time.time(),
+        "source": "server" if source == "server" else "client",
+        "authoritative": bool(authoritative),
+    }
+    for field in _LUMP_DIAGNOSTIC_EVENT_FIELDS:
+        value = event.get(field, defaults.get(field))
+        if (field == "attempt_id" and value is None
+                and source != "server"):
+            # Browser-only failures historically called this
+            # diagnostic_attempt_id. It is accepted as the non-authoritative
+            # event's attempt_id, never as a server operation identity.
+            value = event.get("diagnostic_attempt_id")
+        if (field in ("client_timestamp", "occurred_at")
+                and value is None and source != "server"):
+            # The retained ``timestamp`` is always ingestion time. Preserve a
+            # bounded browser timestamp under a distinct name for clock/skew
+            # diagnosis without allowing it to replace server chronology.
+            value = event.get("occurred_at", event.get("timestamp"))
+        if field == "error":
+            value = _sanitize_lump_diagnostic_error(value)
+        elif field == "committed":
+            # This compatibility projection is server-authored only. A client
+            # may report an outcome, but cannot make a retained record look
+            # authoritative by supplying ``committed``.
+            value = value if source == "server" and isinstance(value, bool) else None
+        elif field in ("elapsed_ms", "http_status"):
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                value = None
+            else:
+                try:
+                    value = int(value)
+                except (TypeError, ValueError, OverflowError):
+                    value = None
+                if field == "elapsed_ms" and value is not None:
+                    value = max(0, min(value, 86_400_000))
+                if field == "http_status" and value is not None:
+                    value = max(0, min(value, 999))
+        elif field in ("client_timestamp", "occurred_at"):
+            if isinstance(value, bool):
+                value = None
+            elif isinstance(value, (int, float)):
+                try:
+                    value = int(value)
+                except (TypeError, ValueError, OverflowError):
+                    value = None
+                if value is not None:
+                    value = max(0, min(value, 10**15))
+            elif isinstance(value, str):
+                value = value.strip()
+                if (not value or len(value) > 64
+                        or not re.fullmatch(
+                            r"\d{4}-\d{2}-\d{2}T[0-9:.+\- Z]+", value)):
+                    value = None
+            else:
+                value = None
+        else:
+            value = _safe_lump_diagnostic_string(
+                value, field, limit=_LUMP_DIAGNOSTIC_STRING_LIMITS.get(field))
+            if (field in {
+                    "attempt_id", "operation_id", "candidate_id", "plan_id",
+                    "event_id", "client_diagnostic_attempt_id"}
+                    and value is not None
+                    and not re.fullmatch(r"[A-Za-z0-9._:-]{1,160}", value)):
+                value = None
+            if field == "outcome" and value not in {
+                    "committed", "rejected", "unknown"}:
+                value = "unknown" if value is not None else None
+        if value is not None:
+            normalized[field] = value
+    # These are useful for rotation inspection and do not claim transaction
+    # authority. The event's explicit outcome remains the source of truth.
+    return normalized
+
+
+def _lump_diagnostic_operation_context(operation_id):
+    """Read only correlation fields from a durable operation, if available."""
+    if not operation_id:
+        return {}
+    try:
+        operation = _read_lump_save_operation(operation_id)
+    except Exception:
+        operation = None
+    if not isinstance(operation, dict):
+        return {}
+    return {
+        key: operation.get(key)
+        for key in ("attempt_id", "candidate_id", "plan_id",
+                    "client_diagnostic_attempt_id")
+        if operation.get(key) is not None
+    }
+
+
+def _append_lump_diagnostic_event(event, *, source="server",
+                                  authoritative=False, defaults=None):
+    """Best-effort bounded append. Never raises into a save request."""
+    try:
+        normalized = _sanitize_lump_diagnostic_event(
+            event, source=source, authoritative=authoritative, defaults=defaults)
+        if normalized is None:
+            return False
+        line = json.dumps(
+            normalized, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=True,
+        ) + "\n"
+        line_bytes = len(line.encode("utf-8"))
+        if (line_bytes > _LUMP_SAVE_DIAGNOSTIC_MAX_EVENT_BYTES
+                or line_bytes > _LUMP_SAVE_DIAGNOSTIC_MAX_BYTES):
+            return False
+        os.makedirs(LUMPS_DIR, exist_ok=True)
+        path = os.path.join(LUMPS_DIR, _LUMP_SAVE_DIAGNOSTIC_FILENAME)
+        if not _LUMP_SAVE_DIAGNOSTIC_LOCK.acquire(blocking=False):
+            return False
+        try:
+            # The process lock complements the in-process lock so independent
+            # workers cannot rotate the same retained stream simultaneously.
+            with open(os.path.join(
+                    LUMPS_DIR, "save-runtime-diagnostics.lock"), "a+") as lock_file:
+                try:
+                    fcntl.flock(
+                        lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except (BlockingIOError, OSError) as lock_error:
+                    if getattr(lock_error, "errno", None) in (11, 13, 35):
+                        return False
+                    raise
+                try:
+                    current_size = os.path.getsize(path)
+                except OSError:
+                    current_size = 0
+                if current_size and (
+                        current_size + line_bytes
+                        > _LUMP_SAVE_DIAGNOSTIC_MAX_BYTES):
+                    # Rotate only completed files first. The active file is
+                    # moved once, after the loop, so the event that triggered
+                    # rotation is appended to the new active file.
+                    for index in range(
+                            _LUMP_SAVE_DIAGNOSTIC_ROTATIONS - 1, 1, -1):
+                        older = f"{path}.{index - 1}"
+                        newer = f"{path}.{index}"
+                        if os.path.exists(older):
+                            os.replace(older, newer)
+                    os.replace(path, f"{path}.1")
+                with open(path, "a", encoding="utf-8") as diagnostic_file:
+                    diagnostic_file.write(line)
+                try:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                except OSError:
+                    pass
+        finally:
+            _LUMP_SAVE_DIAGNOSTIC_LOCK.release()
+        return True
+    except BaseException:
+        # Diagnostics must never turn a successful atomic save into a failed
+        # HTTP response. The application logger still records the issue.
+        try:
+            logging.exception("[lumps] unable to append save diagnostic")
+        except BaseException:
+            pass
+        return False
+
+
+def _save_lump_diagnostic_event(*, stage, event, outcome="unknown", error=None,
+                                http_status=None, **fields):
+    """Emit an authoritative event for the current SAVE LUMP request."""
+    try:
+        record = getattr(g, "_lump_save_diagnostic", None)
+        if not isinstance(record, dict):
+            return False
+        started = record.get("started_monotonic")
+        elapsed_ms = None
+        if isinstance(started, (int, float)):
+            elapsed_ms = max(0, int((time.monotonic() - started) * 1000))
+        try:
+            entry_point = request.path
+        except RuntimeError:
+            entry_point = "server"
+        payload = {
+            "attempt_id": record.get("attempt_id"),
+            "operation_id": record.get("operation_id"),
+            "candidate_id": record.get("candidate_id"),
+            "plan_id": record.get("plan_id"),
+            "client_diagnostic_attempt_id": record.get(
+                "client_diagnostic_attempt_id"),
+            "stage": stage, "event": event, "outcome": outcome,
+            "entry_point": entry_point,
+            "elapsed_ms": elapsed_ms, "http_status": http_status,
+            "error": error,
+        }
+        payload.update(fields)
+        return _append_lump_diagnostic_event(
+            payload, source="server", authoritative=True)
+    except BaseException:
+        # The diagnostic path is deliberately fail-closed. In particular, a
+        # broken logger or custom event object must not escape into Flask.
+        try:
+            logging.error("[lumps] save diagnostic emission failed")
+        except BaseException:
+            pass
+        return False
+
+
+def _diagnostic_origin_is_same_site():
+    """Accept browser diagnostics only from the current configured origin."""
+    supplied = request.headers.get("Origin")
+    if not supplied:
+        # A normal unauthenticated IDE/CLI test caller may omit Origin, but a
+        # browser-shaped request may not bypass the same-origin boundary.
+        browser_headers = (
+            request.headers.get("Sec-Fetch-Site")
+            or request.headers.get("Sec-Fetch-Mode")
+            or request.headers.get("Sec-Fetch-Dest")
+        )
+        user_agent = request.headers.get("User-Agent", "")
+        if browser_headers or re.search(
+                r"(?:mozilla|chrome|safari|firefox|edg|webkit)",
+                user_agent, re.I):
+            return False
+        return True
+    supplied = supplied.rstrip("/")
+    allowed = {request.url_root.rstrip("/"), request.host_url.rstrip("/")}
+    domains = []
+    for key in ("REPLIT_DEV_DOMAIN", "REPLIT_DOMAINS"):
+        domains.extend(os.environ.get(key, "").replace(",", " ").split())
+    for domain in domains:
+        domain = domain.strip().rstrip("/")
+        if domain:
+            allowed.update((f"https://{domain}", f"http://{domain}"))
+    return supplied in allowed
+
+
+def _diagnostic_has_session_proof():
+    """Require the approval/session cookie for browser-origin reporting."""
+    return bool(session.get("_lump_approval_session"))
+
+
+def _diagnostic_rate_allowed():
+    """Bound browser reporting without retaining the caller address."""
+    binding = session.get("_lump_approval_session")
+    if not binding:
+        binding = session.setdefault(
+            "_lump_approval_session", secrets.token_urlsafe(24))
+    key = hashlib.sha256(
+        (str(app.secret_key) + "|diagnostics|" + str(binding)).encode("utf-8")
+    ).hexdigest()
+    now = time.monotonic()
+    if not _LUMP_SAVE_DIAGNOSTIC_RATE_LOCK.acquire(blocking=False):
+        return False
+    try:
+        global_values = [
+            stamp for stamp in _LUMP_SAVE_DIAGNOSTIC_GLOBAL_RATE
+            if now - stamp < _LUMP_SAVE_DIAGNOSTIC_RATE_WINDOW
+        ]
+        if len(global_values) >= _LUMP_SAVE_DIAGNOSTIC_GLOBAL_RATE_LIMIT:
+            _LUMP_SAVE_DIAGNOSTIC_GLOBAL_RATE[:] = global_values
+            return False
+        # Expired keys are discarded before adding a new one, so attacker
+        # controlled sessions cannot grow this in-memory map without bound.
+        for old_key, old_values in list(_LUMP_SAVE_DIAGNOSTIC_RATE.items()):
+            fresh = [
+                stamp for stamp in old_values
+                if now - stamp < _LUMP_SAVE_DIAGNOSTIC_RATE_WINDOW
+            ]
+            if fresh:
+                _LUMP_SAVE_DIAGNOSTIC_RATE[old_key] = fresh
+            else:
+                _LUMP_SAVE_DIAGNOSTIC_RATE.pop(old_key, None)
+        if (key not in _LUMP_SAVE_DIAGNOSTIC_RATE
+                and len(_LUMP_SAVE_DIAGNOSTIC_RATE)
+                >= _LUMP_SAVE_DIAGNOSTIC_MAX_RATE_KEYS):
+            return False
+        values = [
+            stamp for stamp in _LUMP_SAVE_DIAGNOSTIC_RATE.get(key, [])
+            if now - stamp < _LUMP_SAVE_DIAGNOSTIC_RATE_WINDOW
+        ]
+        if len(values) >= _LUMP_SAVE_DIAGNOSTIC_RATE_LIMIT:
+            _LUMP_SAVE_DIAGNOSTIC_RATE[key] = values
+            return False
+        values.append(now)
+        _LUMP_SAVE_DIAGNOSTIC_RATE[key] = values
+        global_values.append(now)
+        _LUMP_SAVE_DIAGNOSTIC_GLOBAL_RATE[:] = global_values
+        return True
+    finally:
+        _LUMP_SAVE_DIAGNOSTIC_RATE_LOCK.release()
+
+
+@app.route("/api/lumps/save-diagnostics", methods=["POST"])
+def save_lump_diagnostics():
+    """Best-effort browser event ingestion; there is deliberately no GET."""
+    def _rejected(message, status, received=0):
+        return jsonify({
+            "ok": False,
+            "error": message,
+            "accepted": 0,
+            "accepted_event_ids": [],
+            "received": received,
+        }), status
+
+    if not _diagnostic_origin_is_same_site():
+        return _rejected("same-origin diagnostics required", 403)
+    if request.headers.get("Origin") and not _diagnostic_has_session_proof():
+        return _rejected("diagnostic session required", 403)
+    if not _diagnostic_rate_allowed():
+        return _rejected("diagnostic reporting rate limit exceeded", 429)
+    if request.content_length and request.content_length > _LUMP_SAVE_DIAGNOSTIC_MAX_BATCH_BYTES:
+        return _rejected("diagnostic batch is too large", 413)
+    raw_body = request.get_data(cache=True)
+    if len(raw_body) > _LUMP_SAVE_DIAGNOSTIC_MAX_BATCH_BYTES:
+        return _rejected("diagnostic batch is too large", 413)
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or set(payload) - {"events"}:
+        return _rejected("request must contain only events", 400)
+    events = payload.get("events")
+    if not isinstance(events, list):
+        return _rejected("events must be an array", 400)
+    if len(events) > _LUMP_SAVE_DIAGNOSTIC_MAX_BATCH_EVENTS:
+        return _rejected("too many diagnostic events", 413, len(events))
+    accepted = 0
+    accepted_event_ids = []
+    for event in events:
+        normalized = _sanitize_lump_diagnostic_event(
+            event, source="client", authoritative=False)
+        if normalized is not None and _append_lump_diagnostic_event(
+                normalized, source="client", authoritative=False):
+            accepted += 1
+            event_id = normalized.get("event_id")
+            if event_id is not None:
+                accepted_event_ids.append(event_id)
+    return jsonify({
+        "ok": True,
+        "accepted": accepted,
+        "accepted_event_ids": accepted_event_ids,
+        "received": len(events),
+    }), 202
 
 
 @app.after_request
@@ -279,9 +817,18 @@ def _record_lump_save_diagnostic(response):
         body = None
     body = body if isinstance(body, dict) else {}
     committed = body.get("committed")
-    if not isinstance(committed, bool):
+    if (record.get("is_preflight")
+            and "committed" not in body
+            and response.status_code < 300):
+        # A successful plan is preparation, not a committed save. Do not
+        # mislabel it as a rejected artifact in the retained result event.
+        committed = None
+    elif committed is None and "committed" not in body:
         committed = bool(body.get("ok") is True and response.status_code < 300)
-    if response.status_code >= 400 and "committed" not in body:
+    elif committed is not None and not isinstance(committed, bool):
+        committed = None
+    if (record.get("add_committed_projection", True)
+            and response.status_code >= 400 and "committed" not in body):
         # Every save failure is returned before the atomic transition commits,
         # or from a transition that has already rolled back. Make that fact
         # explicit to the browser instead of forcing it to infer state from
@@ -289,38 +836,36 @@ def _record_lump_save_diagnostic(response):
         body["committed"] = False
         response.set_data(json.dumps(body))
         response.content_type = "application/json"
-    record.update({
-        "status": response.status_code,
-        "committed": committed,
-        "token": body.get("token") or record.get("token"),
-        "binary_hash": body.get("binary_hash") or record.get("binary_hash"),
-        "lump_version": body.get("lump_version"),
-        "failure_reason": (
-            None if committed else str(body.get("error") or
-                                      response.status or "save failed")
-        ),
-    })
-    try:
-        os.makedirs(LUMPS_DIR, exist_ok=True)
-        diagnostic_path = os.path.join(
-            LUMPS_DIR, _LUMP_SAVE_DIAGNOSTIC_FILENAME)
-        line = json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n"
-        with _LUMP_SAVE_DIAGNOSTIC_LOCK:
-            with open(diagnostic_path, "a", encoding="utf-8") as diagnostic_file:
-                diagnostic_file.write(line)
-    except Exception:
-        # Diagnostics must never turn a successful atomic save into a failed
-        # HTTP response. The server log still records the operational issue.
-        logging.exception("[lumps] unable to append save diagnostic")
+    outcome = "committed" if committed is True else "rejected"
+    if body.get("atomic_transition_failed") or committed is None:
+        outcome = "unknown"
+    stage = "Commit" if committed is True or body.get(
+        "atomic_transition_failed") else "Prepare"
+    error = None if committed is True or (
+        record.get("is_preflight") and response.status_code < 300) else {
+        "name": "SaveError",
+        "message": body.get("error") or response.status or "save failed",
+    }
+    _save_lump_diagnostic_event(
+        stage=stage, event="request_result", outcome=outcome,
+        error=error, http_status=response.status_code)
+    summary = {
+        "attempt_id": record.get("attempt_id"),
+        "operation_id": record.get("operation_id"),
+        "candidate_id": record.get("candidate_id"),
+        "plan_id": record.get("plan_id"),
+        "stage": stage, "event": "save_result", "outcome": outcome,
+        "entry_point": request.path, "http_status": response.status_code,
+        "error": error, "committed": committed,
+    }
+    _append_lump_diagnostic_event(
+        summary, source="server", authoritative=True)
     if getattr(g, "_lump_save_operation_active", False):
         # Validation failures are proven non-commits because this hook runs
         # after the handler has returned.  A transition exception is explicitly
         # left unknown: a process interruption around a multi-file transition
         # must never be reported as a proven rollback.
         try:
-            outcome = "committed" if committed is True else "rejected"
-            if body.get("atomic_transition_failed") or committed is None:
-                outcome = "unknown"
             _prior = _read_lump_save_operation(record["operation_id"]) or {}
             if (_prior.get("outcome") == "committed"
                     and outcome != "committed"):
@@ -4185,6 +4730,27 @@ def boot_image_save_ns():
     """
     import base64 as _b64_sns
     _payload = request.get_json(force=True, silent=True)
+    _boot_client_attempt = (
+        _payload.get("diagnostic_attempt_id")
+        if isinstance(_payload, dict) else None
+    ) or request.headers.get("X-Diagnostic-Attempt-ID", "")
+    _boot_operation = (
+        _payload.get("operation_id") if isinstance(_payload, dict) else "")
+    _boot_operation = str(_boot_operation or "").strip()
+    if not _LUMP_SAVE_OPERATION_ID_RE.fullmatch(_boot_operation):
+        _boot_operation = ""
+    g._lump_save_diagnostic = {
+        "attempt_id": uuid.uuid4().hex,
+        "operation_id": _boot_operation,
+        "candidate_id": None,
+        "plan_id": None,
+        "client_diagnostic_attempt_id": _boot_client_attempt,
+        "is_preflight": False,
+        "add_committed_projection": False,
+        "started_monotonic": time.monotonic(),
+    }
+    _save_lump_diagnostic_event(
+        stage="Capture", event="request_arrival", outcome="unknown")
     if not _payload:
         return jsonify({"ok": False, "error": "Invalid JSON body"}), 400
 
@@ -6841,6 +7407,20 @@ def _settle_orphaned_lump_save_operation(operation_id, document):
         },
     })
     _write_lump_save_operation(operation_id, settled)
+    _append_lump_diagnostic_event(
+        {
+            "attempt_id": settled.get("attempt_id"),
+            "operation_id": operation_id,
+            "candidate_id": settled.get("candidate_id"),
+            "plan_id": settled.get("plan_id"),
+            "stage": "Commit", "event": "operation_reconcile",
+            "outcome": "rejected", "entry_point": "reconcile",
+            "error": {
+                "name": "InterruptedSave",
+                "message": "save was interrupted before durable publication",
+            },
+        },
+        source="server", authoritative=True)
     return settled
 
 
@@ -6858,12 +7438,15 @@ def _lump_save_operation_guard(operation_id):
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
-def _store_lump_save_candidate(payload, operation_id, *, preflight=False):
+def _store_lump_save_candidate(payload, operation_id, *, preflight=False,
+                                attempt_id=None, plan_id=None):
     """Durably retain the submitted diagnostic artifact outside executable paths."""
     candidate_id = uuid.uuid4().hex
     document = {
         "candidate_id": candidate_id,
         "operation_id": operation_id,
+        "attempt_id": attempt_id,
+        "plan_id": plan_id,
         "created_at": time.time(),
         "kind": "save-plan" if preflight else "save",
         "session_binding": _operation_session_binding(),
@@ -6984,6 +7567,18 @@ def get_lump_save_operation(operation_id):
                     document.update({"outcome": "committed", "status": 200,
                                      "updated_at": time.time()})
                     _write_lump_save_operation(operation_id, document)
+                    _append_lump_diagnostic_event(
+                        {
+                            "attempt_id": document.get("attempt_id"),
+                            "operation_id": operation_id,
+                            "candidate_id": document.get("candidate_id"),
+                            "plan_id": document.get("plan_id"),
+                            "stage": "Commit",
+                            "event": "operation_reconcile",
+                            "outcome": "committed",
+                            "entry_point": "reconcile",
+                        },
+                        source="server", authoritative=True)
                     return jsonify({
                         "operation_id": operation_id, "outcome": "committed",
                         "committed": True, "response": document.get("response"),
@@ -8450,34 +9045,61 @@ def save_lump():
         "X-Lump-Save-Operation", "")).strip()
     if not _LUMP_SAVE_OPERATION_ID_RE.fullmatch(_operation_id):
         _operation_id = uuid.uuid4().hex
+    _client_diagnostic_attempt_id = (
+        _metadata_for_diagnostic.get("diagnostic_attempt_id", "")
+        if isinstance(_metadata_for_diagnostic, dict) else "")
+    _plan_for_diagnostic = (
+        _metadata_for_diagnostic.get(
+            "save_plan", _metadata_for_diagnostic.get(
+                "save_plan_id", _metadata_for_diagnostic.get("plan")))
+        if isinstance(_metadata_for_diagnostic, dict) else "")
+    g._lump_save_diagnostic = {
+        # The server-generated attempt is canonical. A browser-provided
+        # diagnostic_attempt_id is intentionally retained only as a client event
+        # correlation hint and is never used for operation lookup or authority.
+        "attempt_id": uuid.uuid4().hex,
+        "operation_id": _operation_id,
+        "candidate_id": None,
+        "plan_id": _plan_for_diagnostic,
+        "client_diagnostic_attempt_id": _client_diagnostic_attempt_id,
+        "is_preflight": False,
+        "started_monotonic": time.monotonic(),
+    }
+    _save_lump_diagnostic_event(
+        stage="Capture", event="request_arrival", outcome="unknown")
     _is_preflight = bool(
         isinstance(_metadata_for_diagnostic, dict)
         and _metadata_for_diagnostic.get("_save_plan_preflight") is True
         and _lump_save_payload_override.get() is not None)
+    g._lump_save_diagnostic["is_preflight"] = _is_preflight
     # Candidate and operation recovery reuse the existing approval-session
     # boundary.  Establish it before persisting a rejected direct save too.
     session.setdefault("_lump_approval_session", secrets.token_urlsafe(24))
     try:
         _candidate_id = _store_lump_save_candidate(
-            payload, _operation_id, preflight=_is_preflight)
+            payload, _operation_id, preflight=_is_preflight,
+            attempt_id=g._lump_save_diagnostic.get("attempt_id"),
+            plan_id=g._lump_save_diagnostic.get("plan_id"))
+        g._lump_save_diagnostic["candidate_id"] = _candidate_id
+        _save_lump_diagnostic_event(
+            stage="Capture", event="candidate_retained", outcome="unknown")
     except Exception as _candidate_error:
         logging.exception("[lumps] unable to retain original save candidate")
+        _save_lump_diagnostic_event(
+            stage="Capture", event="exception", outcome="unknown",
+            error={"name": type(_candidate_error).__name__,
+                   "message": str(_candidate_error)})
         return jsonify({
             "error": f"unable to durably retain original save candidate: {_candidate_error}",
             "operation_id": _operation_id, "committed": False,
         }), 503
-    g._lump_save_diagnostic = {
-        "operation_id": _operation_id,
-        "operation": "lump-save",
-        "identity": _save_diagnostic_identity(_metadata_for_diagnostic),
-        "source_present": bool(
-            isinstance(_metadata_for_diagnostic, dict) and
-            isinstance(_metadata_for_diagnostic.get(
-                "original_source",
-                _metadata_for_diagnostic.get("submitted_source")), str)),
-    }
     if not payload:
+        _save_lump_diagnostic_event(
+            stage="Prepare", event="rejection", outcome="rejected",
+            error={"name": "InvalidPayload", "message": "Invalid JSON payload"})
         return jsonify({"error": "Invalid JSON payload"}), 400
+    _save_lump_diagnostic_event(
+        stage="Prepare", event="start", outcome="unknown")
 
     # An operation is durable before validation starts.  Returning a previous
     # terminal response makes a lost successful response idempotent without
@@ -8504,6 +9126,22 @@ def save_lump():
                     _existing_operation = _settle_orphaned_lump_save_operation(
                         _operation_id, _existing_operation)
                     if _existing_operation.get("outcome") in {"committed", "rejected"}:
+                        # Keep the retry's fresh attempt separate while linking
+                        # replay diagnostics back to the durable candidate and
+                        # plan that established this operation.
+                        g._lump_save_diagnostic["candidate_id"] = (
+                            _existing_operation.get("candidate_id")
+                            or g._lump_save_diagnostic.get("candidate_id"))
+                        g._lump_save_diagnostic["plan_id"] = (
+                            _existing_operation.get("plan_id")
+                            or g._lump_save_diagnostic.get("plan_id"))
+                        _save_lump_diagnostic_event(
+                            stage="Commit", event="operation_replay",
+                            outcome=(
+                                "committed"
+                                if _existing_operation.get("outcome") == "committed"
+                                else "rejected"
+                            ))
                         _stored_response = _existing_operation.get("response") or {}
                         return jsonify(_stored_response), (
                             200 if _existing_operation.get("outcome") == "committed"
@@ -8517,6 +9155,10 @@ def save_lump():
                     "outcome": "pending",
                     "session_binding": _operation_session_binding(),
                     "candidate_id": _candidate_id,
+                    "attempt_id": g._lump_save_diagnostic.get("attempt_id"),
+                    "plan_id": g._lump_save_diagnostic.get("plan_id"),
+                    "client_diagnostic_attempt_id": g._lump_save_diagnostic.get(
+                        "client_diagnostic_attempt_id"),
                     "original_payload": payload,
                 })
                 g._lump_save_operation_active = True
@@ -9929,8 +10571,12 @@ def save_lump():
             and _lump_save_payload_override.get() is not None):
         _approval_action = _derived_save_action
         plan_id = secrets.token_urlsafe(32)
+        g._lump_save_diagnostic["plan_id"] = plan_id
+        _save_lump_diagnostic_event(
+            stage="Prepare", event="complete", outcome="unknown")
         with _LUMP_SAVE_PLANS_LOCK:
             _LUMP_SAVE_PLANS[plan_id] = {
+                "plan_id": plan_id,
                 "session": session["_lump_approval_session"],
                 "digest": _binary_hash, "action": _approval_action,
                 "token": token8, "filename": lump_filename,
@@ -9944,6 +10590,9 @@ def save_lump():
                 "ns_slot": ns_slot,
                 "new_entry": metadata.get("new_entry") is True,
                 "candidate_id": _candidate_id,
+                "attempt_id": g._lump_save_diagnostic.get("attempt_id"),
+                "client_diagnostic_attempt_id": g._lump_save_diagnostic.get(
+                    "client_diagnostic_attempt_id"),
             }
         return jsonify({
             "plan": plan_id, "plan_id": plan_id, "digest": _binary_hash,
@@ -9979,6 +10628,9 @@ def save_lump():
             metadata.get("approval_intent"), _binary_hash, _approval_action,
             _save_plan_id, consume=False)
     except ValueError as _intent_error:
+        _save_lump_diagnostic_event(
+            stage="Confirm", event="rejection", outcome="rejected",
+            error={"name": "ApprovalError", "message": str(_intent_error)})
         return jsonify({
             "error": str(_intent_error),
             "failure_owner": "ide",
@@ -10136,6 +10788,9 @@ def save_lump():
             metadata.get("approval_intent"), _binary_hash, _approval_action,
             _save_plan_id, consume=True)
     except ValueError as _intent_error:
+        _save_lump_diagnostic_event(
+            stage="Confirm", event="rejection", outcome="rejected",
+            error={"name": "ApprovalError", "message": str(_intent_error)})
         return jsonify({
             "error": str(_intent_error),
             "failure_owner": "ide",
@@ -10153,6 +10808,11 @@ def save_lump():
             pending_operation = _read_lump_save_operation(_operation_id) or {}
             pending_operation.update({
                 "outcome": "pending",
+                "attempt_id": g._lump_save_diagnostic.get("attempt_id"),
+                "plan_id": g._lump_save_diagnostic.get("plan_id"),
+                "client_diagnostic_attempt_id": g._lump_save_diagnostic.get(
+                    "client_diagnostic_attempt_id"),
+                "candidate_id": _candidate_id,
                 "expected": {
                     "token": token8, "filename": lump_filename,
                     "digest": _binary_hash, "ns_slot": ns_slot,
@@ -10163,6 +10823,10 @@ def save_lump():
             })
             _write_lump_save_operation(_operation_id, pending_operation)
         except Exception as exc:
+            _save_lump_diagnostic_event(
+                stage="Commit", event="operation_stage_exception",
+                outcome="unknown",
+                error={"name": type(exc).__name__, "message": str(exc)})
             return jsonify({
                 "error": f"unable to stage durable save operation: {exc}",
                 "operation_id": _operation_id, "committed": None,
@@ -10179,6 +10843,8 @@ def save_lump():
         _arch_ver is not None
         and _exist_filename == f"{safe_name}_v{_arch_ver}.lump"
     )
+    _save_lump_diagnostic_event(
+        stage="Commit", event="start", outcome="unknown")
     try:
         _transition = _commit_lump_history_transition(
             lumps_dir=lumps_dir,
@@ -10218,14 +10884,23 @@ def save_lump():
             ),
         )
     except _LumpTransitionConflict as _transition_conflict:
+        _save_lump_diagnostic_event(
+            stage="Commit", event="rejection", outcome="rejected",
+            error={"name": "TransitionConflict", "message": str(_transition_conflict)})
         return jsonify({"error": str(_transition_conflict)}), 409
     except _LumpApprovalStoreError as _approval_err:
+        _save_lump_diagnostic_event(
+            stage="Commit", event="rejection", outcome="rejected",
+            error={"name": "ApprovalStoreError", "message": str(_approval_err)})
         return jsonify({"error": (
             "approvals.json is corrupt and cannot be read safely. "
             "The save has been aborted to prevent weakening prior approvals. "
             f"Details: {_approval_err}"
         )}), 500
     except ValueError as _mf_lock_err:
+        _save_lump_diagnostic_event(
+            stage="Commit", event="rejection", outcome="rejected",
+            error={"name": "ManifestError", "message": str(_mf_lock_err)})
         return jsonify({"error": (
             "manifest.json is corrupt and cannot be read safely. "
             "The save has been aborted to prevent overwriting previously-saved LUMPs. "
@@ -10233,6 +10908,10 @@ def save_lump():
         )}), 500
     except Exception as _transition_error:
         logging.exception("[lumps] save transaction failed")
+        _save_lump_diagnostic_event(
+            stage="Commit", event="exception", outcome="unknown",
+            error={"name": type(_transition_error).__name__,
+                   "message": str(_transition_error)})
         return jsonify({
             "error": f"LUMP save transaction failed; no partial revision was retained: {_transition_error}",
             "failure_owner": "ide",
@@ -10246,6 +10925,9 @@ def save_lump():
         print(f"[lumps] Archived {_exist_filename} → {_transition['lump']}", flush=True)
 
     print(f'[lumps] Saved {lump_filename} ({len(lump_bytes)} bytes)', flush=True)
+    _save_lump_diagnostic_event(
+        stage="Commit", event="complete", outcome="committed",
+        http_status=200)
 
     # ── Auto-regenerate boot-image.bin ────────────────────────────────────────
     # If boot-image.bin already exists and a boot config is present, regenerate
@@ -10282,6 +10964,9 @@ def save_lump():
                 print(f'[lumps] boot-image.bin regenerated ({len(blob_bi)} bytes)', flush=True)
                 _load_boot_abstr_lump()   # refresh the active SelfTest cache
                 _load_boot_ns_lump()      # refresh _BOOT_NS_META from updated boot-image.bin
+                _save_lump_diagnostic_event(
+                    stage="Reload", event="complete", outcome="committed",
+                    http_status=200)
             else:
                 boot_refresh_note = f'boot config unavailable: {err_bi}'
                 raise RuntimeError(boot_refresh_note)
@@ -10293,6 +10978,14 @@ def save_lump():
             logging.warning(
                 "[lumps] saved %s but boot image refresh was deferred: %s",
                 lump_filename, _bie)
+            _save_lump_diagnostic_event(
+                stage="Reload", event="exception", outcome="committed",
+                error={"name": type(_bie).__name__, "message": str(_bie)})
+    else:
+        _save_lump_diagnostic_event(
+            stage="Reload", event="skipped", outcome="committed",
+            error={"name": "BootImageUnavailable",
+                   "message": "boot-image.bin is not present"})
 
     # ── SelfTest metadata is always refreshed after a SelfTest save ──────────
     # generate_boot_image() locates the SelfTest lump via ns_slot in the
@@ -20221,6 +20914,7 @@ def _recover_lump_history_transition(lumps_dir):
     journal_path = os.path.join(lumps_dir, _LUMP_TRANSITION_JOURNAL)
     if not os.path.isfile(journal_path):
         return
+    journal = None
     try:
         with open(journal_path, encoding="utf-8") as handle:
             journal = json.load(handle)
@@ -20292,8 +20986,43 @@ def _recover_lump_history_transition(lumps_dir):
             # that have already been safely removed.
             journal["state"] = "rolled_back"
             _durable_atomic_json(journal_path, journal)
+            _append_lump_diagnostic_event(
+                {
+                    **_lump_diagnostic_operation_context(
+                        journal.get("operation_id")),
+                    "operation_id": journal.get("operation_id"),
+                    "stage": "Commit",
+                    "event": "journal_recovery_rollback",
+                    "outcome": "rejected",
+                    "entry_point": "journal-recovery",
+                    "error": {
+                        "name": "TransitionRecovered",
+                        "message": "interrupted LUMP transition was rolled back",
+                    },
+                },
+                source="server", authoritative=True)
             logging.warning("[lumps] recovered interrupted LUMP transition by rollback")
-        elif journal.get("state") not in {"committed", "rolled_back"}:
+        elif journal.get("state") == "committed":
+            _append_lump_diagnostic_event(
+                {
+                    **_lump_diagnostic_operation_context(
+                        journal.get("operation_id")),
+                    "operation_id": journal.get("operation_id"),
+                    "stage": "Commit", "event": "journal_recovery_commit",
+                    "outcome": "committed", "entry_point": "journal-recovery",
+                },
+                source="server", authoritative=True)
+        elif journal.get("state") == "rolled_back":
+            _append_lump_diagnostic_event(
+                {
+                    **_lump_diagnostic_operation_context(
+                        journal.get("operation_id")),
+                    "operation_id": journal.get("operation_id"),
+                    "stage": "Commit", "event": "journal_recovery_complete",
+                    "outcome": "rejected", "entry_point": "journal-recovery",
+                },
+                source="server", authoritative=True)
+        else:
             raise ValueError("unrecognized transition journal state")
         for _, backup in backup_rows:
             if os.path.lexists(backup):
@@ -20307,9 +21036,26 @@ def _recover_lump_history_transition(lumps_dir):
             os.fsync(directory_fd)
         finally:
             os.close(directory_fd)
-    except Exception:
+    except Exception as recovery_error:
         # Never guess after a corrupt journal.  It remains visible for operator
         # recovery and all transitions are blocked by the caller.
+        _append_lump_diagnostic_event(
+            {
+                **_lump_diagnostic_operation_context(
+                    journal.get("operation_id") if isinstance(journal, dict)
+                    else None),
+                "operation_id": (
+                    journal.get("operation_id")
+                    if isinstance(journal, dict) else None
+                ),
+                "stage": "Commit", "event": "journal_recovery_exception",
+                "outcome": "unknown", "entry_point": "journal-recovery",
+                "error": {
+                    "name": type(recovery_error).__name__,
+                    "message": str(recovery_error),
+                },
+            },
+            source="server", authoritative=True)
         raise RuntimeError("LUMP transition recovery requires operator intervention")
 
 
@@ -20653,6 +21399,14 @@ def _commit_lump_history_transition(
                     raise ValueError("operation_id is invalid")
                 journal["operation_id"] = operation_id
             _durable_atomic_json(journal_path, journal)
+            _append_lump_diagnostic_event(
+                {
+                    **_lump_diagnostic_operation_context(operation_id),
+                    "operation_id": operation_id,
+                    "stage": "Commit", "event": "journal_prepared",
+                    "outcome": "unknown", "entry_point": "lump-transition",
+                },
+                source="server", authoritative=True)
 
             for destination, stage in staged:
                 os.replace(stage, destination)
@@ -20688,7 +21442,27 @@ def _commit_lump_history_transition(
                 raise ValueError("manifest_path must be inside lumps_dir")
             journal["state"] = "committed"
             _durable_atomic_json(journal_path, journal)
-        except Exception:
+            _append_lump_diagnostic_event(
+                {
+                    **_lump_diagnostic_operation_context(operation_id),
+                    "operation_id": operation_id,
+                    "stage": "Commit", "event": "journal_committed",
+                    "outcome": "committed", "entry_point": "lump-transition",
+                },
+                source="server", authoritative=True)
+        except Exception as transition_error:
+            _append_lump_diagnostic_event(
+                {
+                    **_lump_diagnostic_operation_context(operation_id),
+                    "operation_id": operation_id,
+                    "stage": "Commit", "event": "exception",
+                    "outcome": "unknown", "entry_point": "lump-transition",
+                    "error": {
+                        "name": type(transition_error).__name__,
+                        "message": str(transition_error),
+                    },
+                },
+                source="server", authoritative=True)
             # Remove replacements/symlinks first, then restore every original
             # destination.  Backups remain until the transition succeeds.
             rollback_ok = True
@@ -20725,8 +21499,30 @@ def _commit_lump_history_transition(
                 # Keep the prepared journal and every backup.  Startup recovery
                 # can retry from durable originals; reporting rolled_back here
                 # would make a partial rollback look safe.
+                _append_lump_diagnostic_event(
+                    {
+                        **_lump_diagnostic_operation_context(operation_id),
+                        "operation_id": operation_id,
+                        "stage": "Commit",
+                        "event": "rollback_failed",
+                        "outcome": "unknown",
+                        "entry_point": "lump-transition",
+                        "error": {
+                            "name": "RollbackError",
+                            "message": "LUMP transition rollback did not complete",
+                        },
+                    },
+                    source="server", authoritative=True)
                 raise RuntimeError(
                     "LUMP transition rollback did not complete; recovery journal retained")
+            _append_lump_diagnostic_event(
+                {
+                    **_lump_diagnostic_operation_context(operation_id),
+                    "operation_id": operation_id,
+                    "stage": "Commit", "event": "rollback_complete",
+                    "outcome": "rejected", "entry_point": "lump-transition",
+                },
+                source="server", authoritative=True)
             if journal is not None and os.path.exists(journal_path):
                 try:
                     journal["state"] = "rolled_back"
@@ -20782,6 +21578,11 @@ def _commit_lump_history_transition(
 def _recover_lump_transition_before_request():
     """Recover, then hold the authoritative file locks through the response."""
     path = request.path
+    if path == "/api/lumps/save-diagnostics":
+        # Diagnostics are operational metadata only and must remain available
+        # even while a separate LUMP transition is being recovered. They never
+        # read or mutate Namespace/LUMP authority.
+        return None
     # Only LUMP/Namespace API readers and mutators need a stable
     # multi-file snapshot.  In particular do not serialize compilation,
     # FPGA, report-sync, or boot-image generation requests behind a save.

@@ -57,5 +57,7 @@ server/.lumps.write.lock
 # Runtime save recovery retains private source/artifacts on disk, not in Git.
 server/lumps/save-candidates/
 server/lumps/save-operations/
+server/lumps/save-runtime-diagnostics.jsonl*
+server/lumps/save-runtime-diagnostics.lock
 server/lumps/.lump-transition-journal.json
 server/lumps/.lump-transition-*

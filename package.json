@@ -10,6 +10,7 @@
   "scripts": {
     "test": "node simulator/assembler_test.js && node simulator/test_compiler_capability_indices.js && node tests/simulator/sim_mvn_expansion.js && node scripts/check_assembler_browser_freshness.js && node simulator/test_lump_registry_date_sort.js && node simulator/test_lump_viewing_identity.js && node simulator/test_instruction_picker_catalog.js && node simulator/test_saved_lump_cap_guard.js && node scripts/check-capabilities-blocks.js --glob '**/*.cloomc'",
     "test:e2e": "npx playwright test",
+    "test:save-diagnostics": "node simulator/test_save_diagnostics.js && node simulator/test_save_diagnostics_flow.js && node simulator/test_lump_save_operation_recovery.js",
     "update:browser-cache-keys": "node scripts/check_assembler_browser_freshness.js --update",
     "check:capabilities": "node scripts/check-capabilities-blocks.js --glob '**/*.cloomc'",
     "check:selftest-lump": "node scripts/check_selftest_lump_stale.js",

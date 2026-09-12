@@ -1,3 +1,4 @@
+- [Save diagnostic evidence](save-diagnostic-evidence.md) — shared safe error codes and occurrence times must survive ingestion; missing logs never prove rejection
 - [Dot pet name identity architecture](dot-pet-name-identity.md) — petname.Abstraction#n is global identity; two seals (identity_hash + binary_hash); self Inform GT at c-list row 0
 - [ns-state.json rich NS-entry format](ns-state-dot-name-format.md) — one rich object per occupied slot (name, slot, location, type, f, g, limit, seq, seal, boot?); no flat-name list or top-level boot_entry
 - [NS slot restore post-c-list-write read](ns-slot-restore-post-clist-read.md) — NS slot 1 location must be captured BEFORE the c-list write loop; same bug existed in both boot_image.py and simulator.js

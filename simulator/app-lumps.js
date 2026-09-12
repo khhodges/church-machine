@@ -7587,47 +7587,96 @@ async function _requestLumpSavePlan(words, metadata) {
     // This gives the server's diagnostic-candidate store one stable operation
     // identity across plan, approval, a lost response, and a page refresh.
     metadata = metadata || {};
+    const _saveDiagnostics = typeof window !== 'undefined'
+        ? window.LumpSaveDiagnostics : null;
+    if (_saveDiagnostics) {
+        try {
+            _saveDiagnostics.begin(metadata, 'lump.save-plan');
+            _saveDiagnostics.stageStart(metadata, 'prepare', 'lump.save-plan', {
+                outcome: 'unknown'
+            });
+        } catch (_) {}
+    }
     var operationId = null;
     if (typeof _lumpSaveEnsureOperationId === 'function') {
         operationId = _lumpSaveEnsureOperationId({ metadata: metadata, binary: words });
     }
-    const resp = await fetch('/api/lumps/save-plan', {
-        method: 'POST',
-        headers: Object.assign({ 'Content-Type': 'application/json' },
-            operationId ? { 'X-Lump-Save-Operation': operationId } : {}),
-        body: JSON.stringify({ binary: words, metadata: metadata })
-    });
-    const result = await _readLumpMutationJson(resp, 'LUMP save planning');
-    const planId = result && (result.plan_id || result.id);
-    var finalBinary = result && result.final_binary;
-    var finalSlot = result && result.ns_slot;
-    const finalDigest = Array.isArray(finalBinary)
-        ? await _lumpSha256Words(finalBinary) : '';
-    if (!resp.ok || !planId || !result ||
-        (result.action !== 'save' && result.action !== 'replace') ||
-        (result.consequence !== 'create' && result.consequence !== 'replace') ||
-        !Array.isArray(finalBinary) || finalBinary.length < 2 ||
-        String(result.digest || '').toLowerCase() !== finalDigest ||
-        (metadata && metadata.new_entry === true &&
-            (!Number.isInteger(Number(finalSlot)) || Number(finalSlot) < 0))) {
-        const error = new Error((result && result.error) || 'Invalid save-plan response');
-        error.response = result;
-        error.status = resp.status;
+    try {
+        const resp = await fetch('/api/lumps/save-plan', {
+            method: 'POST',
+            headers: Object.assign({ 'Content-Type': 'application/json' },
+                operationId ? { 'X-Lump-Save-Operation': operationId } : {}),
+            body: JSON.stringify({ binary: words, metadata: metadata })
+        });
+        const result = await _readLumpMutationJson(resp, 'LUMP save planning');
+        const planId = result && (result.plan_id || result.id);
+        var finalBinary = result && result.final_binary;
+        var finalSlot = result && result.ns_slot;
+        const finalDigest = Array.isArray(finalBinary)
+            ? await _lumpSha256Words(finalBinary) : '';
+        if (!resp.ok || !planId || !result ||
+            (result.action !== 'save' && result.action !== 'replace') ||
+            (result.consequence !== 'create' && result.consequence !== 'replace') ||
+            !Array.isArray(finalBinary) || finalBinary.length < 2 ||
+            String(result.digest || '').toLowerCase() !== finalDigest ||
+            (metadata && metadata.new_entry === true &&
+                (!Number.isInteger(Number(finalSlot)) || Number(finalSlot) < 0))) {
+            const error = new Error((result && result.error) || 'Invalid save-plan response');
+            error.response = result;
+            error.status = resp.status;
+            throw error;
+        }
+        // save-plan is the canonicalization boundary.  In particular its
+        // row-zero SELF token and server-selected New Entry slot are not
+        // guesses the browser may reconstruct from stale simulator memory.
+        if (_saveDiagnostics) {
+            try {
+                _saveDiagnostics.update(metadata, {
+                    operation_id: operationId,
+                    candidate_id: result.candidate_id,
+                    plan_id: planId,
+                });
+                _saveDiagnostics.stageComplete(metadata, 'prepare', 'unknown', {
+                    http_status: resp.status
+                });
+            } catch (_) {}
+        }
+        return Object.assign({}, result, {
+            plan_id: planId,
+            final_binary: finalBinary.slice(),
+            ns_slot: finalSlot === null || finalSlot === undefined ? null : Number(finalSlot),
+        });
+    } catch (error) {
+        if (_saveDiagnostics) {
+            try {
+                _saveDiagnostics.stageException(metadata, 'prepare', error, {
+                    http_status: error && error.status,
+                    outcome: 'rejected'
+                });
+            } catch (_) {}
+        }
         throw error;
     }
-    // save-plan is the canonicalization boundary.  In particular its row-zero
-    // SELF token and its server-selected New Entry slot are not guesses the
-    // browser may reconstruct from stale simulator memory.
-    return Object.assign({}, result, {
-        plan_id: planId,
-        final_binary: finalBinary.slice(),
-        ns_slot: finalSlot === null || finalSlot === undefined ? null : Number(finalSlot),
-    });
 }
 
 // Call only after the action's explicit user confirmation. Save intents must
 // reference the exact server-authored plan rather than a browser guess.
 async function _requestLumpApprovalIntent(words, action, metadata, savePlan) {
+    const _saveDiagnostics = typeof window !== 'undefined'
+        ? window.LumpSaveDiagnostics : null;
+    if (_saveDiagnostics) {
+        try {
+            _saveDiagnostics.begin(metadata || {}, 'lump.approval');
+            _saveDiagnostics.stageStart(metadata || {}, 'confirm', 'lump.approval', {
+                outcome: 'unknown'
+            });
+            _saveDiagnostics.update(metadata || {}, {
+                plan_id: savePlan && savePlan.plan_id,
+                candidate_id: savePlan && savePlan.candidate_id,
+            });
+        } catch (_) {}
+    }
+    try {
     const digest = savePlan ? String(savePlan.digest || '').toLowerCase()
         : await _lumpSha256Words(words);
     if (!/^[0-9a-f]{64}$/.test(digest)) {
@@ -7651,12 +7700,35 @@ async function _requestLumpApprovalIntent(words, action, metadata, savePlan) {
     if (!resp.ok || !result.intent || result.digest !== digest || result.action !== action) {
         throw new Error(result.error || 'Invalid approval-intent response');
     }
+    if (_saveDiagnostics) {
+        try {
+            _saveDiagnostics.stageComplete(metadata || {}, 'confirm', 'unknown', {
+                http_status: resp.status
+            });
+        } catch (_) {}
+    }
     return { intent: result.intent, digest, plan_id: result.plan_id };
+    } catch (error) {
+        if (_saveDiagnostics) {
+            try {
+                _saveDiagnostics.stageException(metadata || {}, 'confirm', error, {
+                    http_status: error && error.status,
+                    outcome: 'rejected'
+                });
+            } catch (_) {}
+        }
+        throw error;
+    }
 }
 window._requestLumpSavePlan = _requestLumpSavePlan;
 window._formatLumpSavePlan = _formatLumpSavePlan;
 
 async function _confirmLumpSavePlan(words, metadata, prompt) {
+    const _saveDiagnostics = typeof window !== 'undefined'
+        ? window.LumpSaveDiagnostics : null;
+    if (_saveDiagnostics) {
+        try { _saveDiagnostics.begin(metadata || {}, 'lump.confirm'); } catch (_) {}
+    }
     let plan;
     try {
         plan = await _requestLumpSavePlan(words, metadata);
@@ -7668,6 +7740,13 @@ async function _confirmLumpSavePlan(words, metadata, prompt) {
             ? _lumpSaveStaleConflictAction(error.response, confirm)
             : null;
         if (action === 'reload') {
+            if (_saveDiagnostics) {
+                try {
+                    _saveDiagnostics.record(metadata || {}, 'reload', 'complete', {
+                        outcome: 'unknown'
+                    });
+                } catch (_) {}
+            }
             if (latest.token && typeof openLumpInEditor === 'function') {
                 await openLumpInEditor(latest.token);
             }
@@ -7684,9 +7763,26 @@ async function _confirmLumpSavePlan(words, metadata, prompt) {
     if (!confirmFn) {
         throw new Error('Save confirmation is unavailable; no approval or repository save was requested.');
     }
-    if (!confirmFn(`${_formatLumpSavePlan(plan)}\n\n${message}`.trim())) return null;
+    if (!confirmFn(`${_formatLumpSavePlan(plan)}\n\n${message}`.trim())) {
+        if (_saveDiagnostics) {
+            try {
+                _saveDiagnostics.record(metadata || {}, 'confirm', 'cancelled', {
+                        outcome: 'unknown'
+                });
+            } catch (_) {}
+        }
+        return null;
+    }
     const finalBinary = plan.final_binary;
     const intent = await _requestLumpApprovalIntent(finalBinary, plan.action, metadata, plan);
+    if (_saveDiagnostics) {
+        try {
+            _saveDiagnostics.update(metadata || {}, {
+                plan_id: plan.plan_id,
+                candidate_id: plan.candidate_id,
+            });
+        } catch (_) {}
+    }
     return { plan, intent, final_binary: finalBinary.slice() };
 }
 window._confirmLumpSavePlan = _confirmLumpSavePlan;
