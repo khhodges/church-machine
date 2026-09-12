@@ -5991,6 +5991,11 @@ window.lumpSaveLump = async function(nsIdx) {
         lump_size:    hdr.lumpSize,
     };
     if (_meta.version) metadata.version = _meta.version;
+    // Plan failures are diagnostic candidates too, so provenance must exist
+    // before planning rather than only on the eventual commit request.
+    metadata.original_source = typeof _meta.source === 'string' ? _meta.source : null;
+    metadata.original_compiled_words = words.slice();
+    metadata.original_binary = words.slice();
     try {
         if (typeof window._confirmLumpSavePlan !== 'function') {
             throw new Error('Save-plan approval helper is unavailable');
@@ -5998,15 +6003,12 @@ window.lumpSaveLump = async function(nsIdx) {
         const approval = await window._confirmLumpSavePlan(
             words, metadata, () => `Save "${absName}" to the LUMP repository?`);
         if (!approval) return;
+        const finalBinary = approval.final_binary.slice();
         metadata.approval_intent = approval.intent.intent;
         metadata.save_plan_id = approval.plan.plan_id;
-        const resp = await fetch('/api/lumps/save', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ binary: words, metadata }),
+        const data = await _lumpSaveRequest(fetch, '/api/lumps/save', {
+            binary: finalBinary, metadata,
         });
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.error || 'Server error');
         const biLine = data.boot_image_refreshed
             ? '\u2713 boot-image.bin refreshed \u2014 change persists on reboot'
             : data.boot_image_note

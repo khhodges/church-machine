@@ -11,7 +11,8 @@ const vm = require('vm');
 const source = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
 
 function extractFunction(name) {
-    const start = source.indexOf(`function ${name}(`);
+    let start = source.indexOf(`function ${name}(`);
+    if (start >= 6 && source.slice(start - 6, start) === 'async ') start -= 6;
     if (start < 0) throw new Error(`missing ${name}`);
     let depth = 0;
     let end = -1;
@@ -104,4 +105,85 @@ if (freshSnapshot.pending !== null ||
     throw new Error('stale pending Format snapshot crossed a registry-token change');
 }
 
-console.log('LUMP save snapshot regression: PASS');
+// API-only output has no submitted source frame, but the durable save payload
+// must retain the independent compiler pair for diagnostics.
+if (!source.includes('original_source: _saveSnapshot') ||
+    !source.includes('original_compiled_words: _svWords.slice()') ||
+    !source.includes('original_binary: _svBinary.slice()')) {
+    throw new Error('API-only save path does not retain original compiler source/binary');
+}
+const compileSource = fs.readFileSync(path.join(__dirname, 'app-compile.js'), 'utf8');
+const memorySource = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
+if (!compileSource.includes('original_source: source') ||
+    !compileSource.includes('original_compiled_words: lumpWordsArray.slice()') ||
+    memorySource.indexOf('metadata.original_source') >
+        memorySource.indexOf('window._confirmLumpSavePlan(')) {
+    throw new Error('compile or direct-memory entry point loses provenance before planning');
+}
+
+const preserved = [];
+const diagnosticContext = {
+    window: {
+        _requestLumpSavePlan: async (binary, metadata) => {
+            metadata.operation_id = 'diagnostic-op';
+            preserved.push({ binary, metadata });
+            return { plan_id: 'diagnostic-plan' };
+        },
+    },
+    sessionStorage: { setItem: () => {} },
+};
+vm.createContext(diagnosticContext);
+vm.runInContext(
+    extractFunction('_preserveStaleLumpSaveDiagnostic') +
+    '\nthis.preserve = _preserveStaleLumpSaveDiagnostic;',
+    diagnosticContext
+);
+diagnosticContext.preserve({
+    token: 'compiled-token',
+    registeredAt: 55,
+    sourceText: 'compiler source',
+    editorSourceText: 'edited but not compiled',
+    words: [11, 22],
+    pending: { binary: [0xF8000400, 0], abstractionName: 'API.Only' },
+}, 'API.Only').then(diagnostic => {
+    if (preserved.length !== 1 ||
+        preserved[0].metadata.original_source !== 'compiler source' ||
+        preserved[0].metadata.divergent_editor_buffer !== 'edited but not compiled' ||
+        preserved[0].metadata.original_compiled_words.join(',') !== '11,22' ||
+        preserved[0].metadata.original_binary.join(',') !== `${0xF8000400},0` ||
+        diagnostic.operation_id === undefined) {
+        throw new Error('stale editor preservation did not retain both diagnostic sources');
+    }
+    const confirmBody = extractFunction('confirmSaveToNamespace');
+    if (confirmBody.includes('smartCompile()')) {
+        throw new Error('stale editor drift still auto-compiles and discards diagnostics');
+    }
+    const exactLoadContext = {
+        fetch: () => { throw new Error('mutable token words endpoint was used'); },
+        _lumpSha256Words: async words => words.join(',') === '9,10' ? 'a'.repeat(64) : '',
+        sim: {
+            nsLabels: {},
+            loadLumpBinary: (words, slot) => words.join(',') === '9,10' && slot === 17,
+        },
+    };
+    vm.createContext(exactLoadContext);
+    vm.runInContext(
+        extractFunction('_reloadCommittedLumpArtifact') +
+        '\nthis.reload = _reloadCommittedLumpArtifact;',
+        exactLoadContext
+    );
+    return exactLoadContext.reload({
+        token: 'immutable-token',
+        ns_slot: 17,
+        digest: 'a'.repeat(64),
+        final_binary: [9, 10],
+    }, 'Exact.Load').then(words => {
+        if (words.join(',') !== '9,10' || exactLoadContext.sim.nsLabels[17] !== 'Exact.Load') {
+            throw new Error('committed final_binary was not loaded exactly into authoritative slot');
+        }
+        console.log('LUMP save snapshot regression: PASS');
+    });
+}).catch(error => {
+    console.error(error);
+    process.exit(1);
+});

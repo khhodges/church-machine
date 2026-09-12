@@ -7,7 +7,7 @@ const assert = require('assert');
 
 const appRun = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
 const callbackStart = appRun.indexOf(
-    "_lumpSaveRequest(fetch, '/api/lumps/save', _svPayload, function(resp)");
+    "_lumpSaveRequest(fetch, '/api/lumps/save', _svPayload, async function(resp)");
 assert(callbackStart >= 0, 'save callback exists');
 const callbackSource = appRun.slice(callbackStart, callbackStart + 3500);
 

@@ -29,6 +29,8 @@ const sandbox = {
     Object,
     Array,
     Number,
+    _formatActionableHttpError: (operation, status, detail) =>
+        `${operation} failed (HTTP ${status}): ${detail}`,
     fetch: async (url, options) => {
         const body = JSON.parse(options.body);
         requests.push({ url, options, body });
@@ -39,14 +41,14 @@ const sandbox = {
                     plan_id: body.metadata.token === 'same-token' ? 'replace-plan' : 'create-plan',
                     action: body.metadata.token === 'same-token' ? 'replace' : 'save',
                     consequence: body.metadata.token === 'same-token' ? 'replace' : 'create',
-                    digest: body.metadata.token === 'canonicalized'
-                        ? 'f'.repeat(64)
-                        : createHash('sha256').update(Buffer.from(
+                    digest: createHash('sha256').update(Buffer.from(
                             body.binary.flatMap(word => [
                                 (word >>> 24) & 0xFF, (word >>> 16) & 0xFF,
                                 (word >>> 8) & 0xFF, word & 0xFF
                             ])
                         )).digest('hex'),
+                    final_binary: body.binary.slice(),
+                    ns_slot: body.metadata.ns_slot == null ? null : body.metadata.ns_slot,
                     current_lump: body.metadata.token === 'same-token'
                         ? { abstraction: 'Named.Current', token: 'same-token' } : null
                 })
@@ -98,23 +100,40 @@ vm.runInContext(source.slice(start, end), sandbox);
     await flow(false);
     check('cancellation obtains only a pre-confirmation save plan',
         requests.length === 1 && requests[0].url === '/api/lumps/save-plan');
+    sandbox.window.confirm = () => false;
+    const cancelled = await sandbox.window._confirmLumpSavePlan(
+        words, { abstraction: 'Cancel.Test' }, () => 'cancel this save');
+    check('explicit confirmation cancellation never requests approval or save',
+        cancelled === null && requests.length === 2 &&
+        requests[1].url === '/api/lumps/save-plan');
+    delete sandbox.window.confirm;
+    let missingConfirmation = '';
+    try {
+        await sandbox.window._confirmLumpSavePlan(
+            words, { abstraction: 'Missing.Confirm' }, () => 'cannot confirm');
+    } catch (error) {
+        missingConfirmation = error.message;
+    }
+    check('missing native confirmation is actionable and performs no approval',
+        missingConfirmation.includes('confirmation is unavailable') &&
+        requests.length === 3);
 
     const result = await flow(true);
-    check('intent requested only after a save plan and confirmation', requests.length === 3);
+    check('intent requested only after a save plan and confirmation', requests.length === 5);
     check('request uses approval-intent endpoint',
-        requests[2].url === '/api/lumps/approval-intent');
+        requests[4].url === '/api/lumps/approval-intent');
     check('digest is lowercase SHA-256 of exact big-endian words',
-        requests[2].body.digest === expected && /^[0-9a-f]{64}$/.test(expected));
+        requests[4].body.digest === expected && /^[0-9a-f]{64}$/.test(expected));
     check('request binds action and explicit confirmation',
-        requests[2].body.action === 'save' && requests[2].body.confirmation === true &&
-        requests[2].body.plan === 'create-plan');
+        requests[4].body.action === 'save' && requests[4].body.confirmation === true &&
+        requests[4].body.plan === 'create-plan');
     check('approval object uses strict non-intrinsic allowlist',
-        requests[2].body.approval.abstraction === 'Approved.Name' &&
-        requests[2].body.approval.author === 'Alice' &&
-        !('cw' in requests[2].body.approval) &&
+        requests[4].body.approval.abstraction === 'Approved.Name' &&
+        requests[4].body.approval.author === 'Alice' &&
+        !('cw' in requests[4].body.approval) &&
         !['cc', 'lump_size', 'source', 'methods', 'capabilities', 'language',
             'profile', 'content_type', 'api_definition', 'clist_entries', 'typ']
-            .some(key => key in requests[2].body.approval));
+            .some(key => key in requests[4].body.approval));
     check('server one-time intent is returned to mutation caller',
         result.intent === 'one-time-intent' && result.digest === expected);
     let malformedResponseError = '';
@@ -140,21 +159,21 @@ vm.runInContext(source.slice(start, end), sandbox);
             current_lump: { abstraction: 'Named.Current' }
         }) === 'Replace current LUMP "Named.Current".');
     const newToken = await flow(true);
-    const newTokenPlanRequest = requests[3];
-    const newTokenIntentRequest = requests[4];
+    const newTokenPlanRequest = requests[5];
+    const newTokenIntentRequest = requests[6];
     check('same abstraction with a new token remains a server-authored create',
         newTokenPlanRequest.body.metadata.token === undefined &&
         newTokenIntentRequest.body.action === 'save' && newToken.plan_id === 'create-plan');
     const same = await flow(true, 'same-token');
-    const samePlanRequest = requests[5];
-    const sameIntentRequest = requests[6];
+    const samePlanRequest = requests[7];
+    const sameIntentRequest = requests[8];
     check('same-token replacement binds the returned plan, not a local inference',
         samePlanRequest.url === '/api/lumps/save-plan' &&
         sameIntentRequest.body.action === 'replace' &&
         sameIntentRequest.body.plan === 'replace-plan' && same.plan_id === 'replace-plan');
     await flow(true, 'canonicalized');
-    check('save intent uses the server canonical digest when preflight changes bytes',
-        requests[8].body.digest === 'f'.repeat(64));
+    check('save intent uses the server canonical digest for the returned final binary',
+        requests[10].body.digest === expected);
 
     const memory = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
     const shell = fs.readFileSync(path.join(__dirname, 'app-shell.js'), 'utf8');
@@ -242,7 +261,7 @@ vm.runInContext(source.slice(start, end), sandbox);
         server.includes('@app.route(\"/api/lumps/deploy-authorize\", methods=[\"POST\"])') &&
         server.includes('_consume_lump_approval_intent(payload.get(\"approval_intent\"), digest, \"deploy\")'));
     check('server consumption removes an intent before validating it, preventing replay',
-        server.includes('_LUMP_APPROVAL_INTENTS.pop(str(intent or \"\"), None)'));
+        server.includes('_LUMP_APPROVAL_INTENTS.pop(key, None)'));
 
     const compile = fs.readFileSync(path.join(__dirname, 'app-compile.js'), 'utf8');
     const run = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
@@ -252,7 +271,7 @@ vm.runInContext(source.slice(start, end), sandbox);
         run.includes('window._confirmLumpSavePlan(') &&
         memory.includes('window._confirmLumpSavePlan('));
     check('save-plan request preserves the original binary and metadata payload',
-        lumps.includes('body: JSON.stringify({ binary: words, metadata: metadata || {} })') &&
+        lumps.includes('body: JSON.stringify({ binary: words, metadata: metadata })') &&
         !lumps.includes('metadata.source =') &&
         !compile.includes('savePayload.metadata.source ='));
     const saveStart = compile.indexOf('async function compileAndBuild()');
@@ -261,8 +280,9 @@ vm.runInContext(source.slice(start, end), sandbox);
     check('genuine immutable save submits a confirmed one-time intent atomically',
         saveFlow.includes('window._confirmLumpSavePlan(') &&
         saveFlow.includes('savePayload.metadata.approval_intent = _buildApproval.intent.intent') &&
+        saveFlow.includes('savePayload.binary = _buildApproval.final_binary.slice()') &&
         saveFlow.indexOf('approval_intent = _buildApproval.intent.intent') <
-            saveFlow.indexOf("fetch('/api/lumps/save'"));
+            saveFlow.indexOf("_lumpSaveRequest(fetch, '/api/lumps/save'"));
 
     const forkStart = lumps.indexOf('const _onFirstEdit = async () =>');
     const forkEnd = lumps.indexOf('const _newVer = _fd.new_version', forkStart);

@@ -167,9 +167,9 @@ const LumpContentFrame = require('./lump-content-frame.js');
         check('T2d1 confirm validates the full explicit replacement slot range',
             confirmBody.includes('sim.saveNamespaceStartSlot()') &&
             confirmBody.includes('Save blocked: choose a Namespace slot'));
-        check('T2d2 explicit save exceptions are surfaced instead of escaping',
-            confirmBody.includes("console.error('[SaveNS] local update failed after repository commit:', err)") &&
-            confirmBody.includes('Saved "') &&
+        check('T2d2 committed save reloads the repository artifact, not preflight words',
+            confirmBody.includes('_reloadCommittedLumpArtifact(resp, label)') &&
+            !confirmBody.includes('sim.saveToNamespaceAt(') &&
             confirmBody.includes('Refresh Needed'));
     }
 }

@@ -1226,18 +1226,21 @@ async function _doWipVersionSave() {
     _wipTestedMethods = null;
     // Clear WIP token — this abstraction is now a proper released version
     try { localStorage.removeItem('church_wip_token'); } catch (_e) {}
+    // The earlier WIP publication is a different durable operation from this
+    // tested-version release. Do not replay its idempotency key.
+    delete savePayload.metadata.operation_id;
 
     const _wipApproval = await window._confirmLumpSavePlan(
         savePayload.binary, savePayload.metadata,
         () => `Save the tested version of "${absName}"?`);
     if (!_wipApproval) return;
+    savePayload.binary = _wipApproval.final_binary.slice();
+    if (_wipApproval.plan.ns_slot !== null) {
+        savePayload.metadata.ns_slot = _wipApproval.plan.ns_slot;
+    }
     savePayload.metadata.approval_intent = _wipApproval.intent.intent;
     savePayload.metadata.save_plan_id = _wipApproval.plan.plan_id;
-    fetch('/api/lumps/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(savePayload)
-    }).then(_readLumpSaveResponse).then(resp => {
+    _lumpSaveRequest(fetch, '/api/lumps/save', savePayload).then(resp => {
         if (resp.ok) {
             const _lv  = resp.lump_version != null ? resp.lump_version : _autoVer;
             const _dlN = `${absName}_v${_lv}.lump`;
@@ -1367,14 +1370,14 @@ async function _confirmLumpRelease() {
         data.savePayload.binary, data.savePayload.metadata,
         () => `Release version "${ver}" of "${data.absName}"?`);
     if (!_releaseApproval) return;
+    data.savePayload.binary = _releaseApproval.final_binary.slice();
+    if (_releaseApproval.plan.ns_slot !== null) {
+        data.savePayload.metadata.ns_slot = _releaseApproval.plan.ns_slot;
+    }
     data.savePayload.metadata.approval_intent = _releaseApproval.intent.intent;
     data.savePayload.metadata.save_plan_id = _releaseApproval.plan.plan_id;
 
-    fetch('/api/lumps/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data.savePayload)
-    }).then(_readLumpSaveResponse).then(resp => {
+    _lumpSaveRequest(fetch, '/api/lumps/save', data.savePayload).then(resp => {
         if (resp.ok) {
             const _lumpVer = resp.lump_version != null ? resp.lump_version : ver;
             const _dlName = `${data.absName}_v${_lumpVer}.lump`;
@@ -1783,6 +1786,12 @@ async function compileAndBuild() {
             source_hash:     _simRunHash || _currentEditorHash(),
             source:          source,
              submitted_source: source,
+             // Keep compiler provenance independently of the output frame.
+             // A Format/API-only choice may omit embedded source, but never
+             // discards the compiler source/words needed for diagnostics.
+             original_source: source,
+             original_compiled_words: lumpWordsArray.slice(),
+             original_binary: lumpWordsArray.slice(),
              source_required: typeof source === 'string' && source.trim().length > 0,
             target_board:   'wukong-xc7a100t',
             grants:         ['E'],
@@ -1888,6 +1897,13 @@ async function compileAndBuild() {
         savePayload.binary, savePayload.metadata,
         () => `Save "${absName}" as an immutable LUMP?\n\nApproval will be bound to the exact SHA-256 of the compiled binary.`);
     if (!_buildApproval) return;
+    // Preserve lumpWordsArray/binaryBuf as compiler diagnostics. The POST must
+    // instead use the exact server-canonical final candidate that the approval
+    // intent was bound to.
+    savePayload.binary = _buildApproval.final_binary.slice();
+    if (_buildApproval.plan.ns_slot !== null) {
+        savePayload.metadata.ns_slot = _buildApproval.plan.ns_slot;
+    }
     savePayload.metadata.approval_intent = _buildApproval.intent.intent;
     savePayload.metadata.save_plan_id = _buildApproval.plan.plan_id;
 
@@ -1917,23 +1933,15 @@ async function compileAndBuild() {
             appendOutput('Built LUMP: "' + absName + '" [' + langLabel + '] \u2014 ' + cw + ' words, cc=' + cc + ', ' + sizeBytes + ' bytes \u00b7 v' + _autoVer + ' \u2014 test all methods to unlock version save \u2014 ' + _lumpSummaryLabel(absName, _autoVer, resolvedNsSlot, cw), 'info');
             showNextSteps('compiled');
         };
-        fetch('/api/lumps/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(savePayload)
-        }).then(_readLumpSaveResponse).then(function(resp) {
+        _lumpSaveRequest(fetch, '/api/lumps/save', savePayload).then(function(resp) {
             _wipSaveDone(resp);
-        }).catch(function() {
-            _wipSaveDone(null);
+        }).catch(function(error) {
+            appendOutput(`Server save error: ${error.message}`, 'error');
         });
         return;
     }
 
-    fetch('/api/lumps/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(savePayload)
-    }).then(_readLumpSaveResponse).then(resp => {
+    _lumpSaveRequest(fetch, '/api/lumps/save', savePayload).then(resp => {
         if (resp.ok) {
             const _lumpVer = resp.lump_version != null ? resp.lump_version : _autoVer;
             const _dlName = `${absName}_v${_lumpVer}.lump`;

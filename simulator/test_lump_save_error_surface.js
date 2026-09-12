@@ -84,7 +84,7 @@ function withMocks(opts, fn) {
     check('T1d: 422 toast body is actionable and preserves server message',
         r.toastCalls[0] &&
         r.toastCalls[0].body.includes('c-list slot 5 >= cc=1') &&
-        r.toastCalls[0].body.includes('No data was changed.') &&
+        r.toastCalls[0].body.includes('Data-change status is unknown.') &&
         r.toastCalls[0].body.includes('Next:'));
     check('T1e: 422 calls renderLumps',      r.renderCalled);
     check('T1f: 422 does not touch registry', r.registryCalls.setCurrent.length === 0);
@@ -119,7 +119,7 @@ function withMocks(opts, fn) {
     check('T3c: 500 toast body preserves reason and recovery',
         r.toastCalls[0] &&
         r.toastCalls[0].body.includes('Internal server error') &&
-        r.toastCalls[0].body.includes('No data was changed.') &&
+        r.toastCalls[0].body.includes('Data-change status is unknown.') &&
         r.toastCalls[0].body.includes('Next:'));
 }
 
@@ -175,8 +175,8 @@ function withMocks(opts, fn) {
     check('T7b: network error toast level is error',  r.toastCalls[0] && r.toastCalls[0].level === 'error');
     check('T7c: network error body is actionable',
         r.toastCalls[0] &&
-        r.toastCalls[0].body.includes('Save could not reach the repository.') &&
-        r.toastCalls[0].body.includes('No data was changed.') &&
+        r.toastCalls[0].body.includes('Save could not reach the repository') &&
+        r.toastCalls[0].body.includes('commit outcome is unknown') &&
         r.toastCalls[0].body.includes('Next:'));
     check('T7d: network error calls renderLumps',     r.renderCalled);
     check('T7e: network error does not touch registry',

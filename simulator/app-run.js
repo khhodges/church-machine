@@ -12409,9 +12409,14 @@ function _captureLumpSaveSnapshot() {
     const pendingMatches = !!pending &&
         (!pending.token || pending.token === token) &&
         (!pending.registeredAt || pending.registeredAt === registeredAt);
+    // The compiler's retained source is the only source that can describe its
+    // retained words.  Keep the current editor text separately so confirmation
+    // can reject a post-compile edit instead of embedding it beside stale code.
+    const editorSourceText = editor ? String(editor.value || '') : '';
+    const compilerSourceText = memory && typeof memory.sourceText === 'string'
+        ? memory.sourceText : editorSourceText;
     const sourceText = pendingMatches && typeof pending.sourceText === 'string'
-        ? pending.sourceText
-        : (editor ? String(editor.value || '') : '');
+        ? pending.sourceText : compilerSourceText;
     let petname = '';
     let issueNumber = 1;
     try {
@@ -12429,6 +12434,8 @@ function _captureLumpSaveSnapshot() {
         capabilities: _cloneLumpSaveCapabilities(memory && memory.capabilities),
         registeredAt: registeredAt,
         sourceText: sourceText,
+        editorSourceText: editorSourceText,
+        sourceMatchesEditor: sourceText === editorSourceText,
         language: entry && entry.sources && entry.sources.server
             ? (entry.sources.server.language || '') : '',
         petname: petname,
@@ -12447,8 +12454,53 @@ function _captureLumpSaveSnapshot() {
             petname: typeof pending.petname === 'string' ? pending.petname : petname,
             issueNumber: pending.issueNumber != null
                 ? (parseInt(pending.issueNumber, 10) || 1) : issueNumber,
+            operationId: typeof pending.operationId === 'string' ? pending.operationId : null,
         } : null,
     };
+}
+
+async function _preserveStaleLumpSaveDiagnostic(snapshot, label) {
+    const originalBinary = snapshot && snapshot.pending &&
+        Array.isArray(snapshot.pending.binary)
+        ? snapshot.pending.binary.slice() : null;
+    const diagnostic = {
+        abstraction: label || (snapshot && snapshot.pending &&
+            snapshot.pending.abstractionName) || 'unsaved compilation',
+        content_type: 'diagnostic',
+        diagnostic_candidate: true,
+        // These are intentionally independent of submitted_source/profile:
+        // an API-only publication has no embedded source but still retains the
+        // compiler pair needed to reproduce and diagnose it.
+        original_source: snapshot && typeof snapshot.sourceText === 'string'
+            ? snapshot.sourceText : '',
+        original_compiled_words: snapshot && Array.isArray(snapshot.words)
+            ? snapshot.words.slice() : [],
+        original_binary: originalBinary,
+        divergent_editor_buffer: snapshot && typeof snapshot.editorSourceText === 'string'
+            ? snapshot.editorSourceText : '',
+        operation_key: [
+            'stale-diagnostic',
+            (snapshot && snapshot.token) || '',
+            (snapshot && snapshot.registeredAt) || 0,
+            label || ''
+        ].join(':'),
+    };
+    try {
+        // save-plan is non-mutating; it is the server-supported route that
+        // retains an auditable candidate without publishing the stale pair.
+        if (typeof window._requestLumpSavePlan === 'function') {
+            await window._requestLumpSavePlan(
+                originalBinary || diagnostic.original_compiled_words, diagnostic);
+        }
+    } finally {
+        // Keep a local recovery copy too if planning is unavailable/offline.
+        // It is a diagnostic record only and is never re-submitted implicitly.
+        try {
+            sessionStorage.setItem('church.lump-stale-diagnostic:' +
+                diagnostic.operation_key, JSON.stringify(diagnostic));
+        } catch (_) {}
+    }
+    return diagnostic;
 }
 
 function showSaveToNamespace() {
@@ -12499,6 +12551,8 @@ function showSaveToNamespace() {
     const _csLen = _csWords ? _csWords.length : 0;
     info.textContent = `Code size: ${_csLen} words (${_csLen * 4} bytes)`;
     _setSaveNSFeedback('', '');
+    _restoreSaveOperationStatus(window._saveNSPreparedSnapshot,
+        document.getElementById('saveNSLabel').value.trim());
     _saveNSTrigger = document.activeElement;
     document.getElementById('saveNSDialog').style.display = '';
     if (!_saveNSTrap) _saveNSTrap = _makeModalFocusTrap('saveNSDialog', closeSaveDialog);
@@ -12556,6 +12610,8 @@ function closeSaveDialog() {
     // by a future Save to Namespace invocation opened independently.
     window._pendingLumpData = null;
     window._saveNSPreparedSnapshot = null;
+    const _diagnosticButton = document.getElementById('saveNSDiagnosticCandidate');
+    if (_diagnosticButton) _diagnosticButton.remove();
     _setSaveNSFeedback('', '');
 }
 
@@ -12578,6 +12634,7 @@ function _setSaveNSFeedback(kind, message) {
         status.textContent = '';
         delete status.dataset.terminal;
         delete status.dataset.incident;
+        delete status.dataset.candidateId;
         return;
     }
     status.style.display = '';
@@ -12591,6 +12648,84 @@ function _setSaveNSFeedback(kind, message) {
         : '1px solid rgba(96, 165, 250, .55)';
 }
 
+function _persistSaveOperationStatus(operationId, kind, message) {
+    if (!operationId) return;
+    try {
+        sessionStorage.setItem('church.lump-save-status:' + operationId,
+            JSON.stringify({ operation_id: operationId, kind, message, updated_at: Date.now() }));
+    } catch (_) {}
+}
+
+function _restoreSaveOperationStatus(snapshot, label) {
+    const key = [
+        (snapshot && snapshot.token) || '',
+        (snapshot && snapshot.registeredAt) || 0,
+        label || ''
+    ].join(':');
+    try {
+        const operationId = sessionStorage.getItem('church.lump-save-operation:' + key);
+        if (!operationId) return;
+        const raw = sessionStorage.getItem('church.lump-save-status:' + operationId);
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        if (!saved || !saved.message) return;
+        // An unknown outcome is deliberately an incident: retrying a new
+        // request before reconciliation could create a second revision.
+        _setSaveNSFeedback(saved.kind === 'unknown' ? 'incident' : 'error',
+            `Previous save operation ${operationId}: ${saved.message}`);
+    } catch (_) {}
+}
+
+// Diagnostic candidates are durable server-side snapshots of the exact
+// original payload.  They are deliberately retrieved only by id and offered
+// as a download; a browser must not quietly re-submit or re-pair their source
+// with whatever words happen to be compiled now.
+async function _discoverLumpSaveDiagnosticCandidate(operationId) {
+    if (!operationId) return null;
+    try {
+        const response = await fetch('/api/lumps/save-candidates', { cache: 'no-store' });
+        if (!response.ok) return null;
+        const listing = await response.json();
+        const candidate = (listing.candidates || []).find(item =>
+            item && item.operation_id === operationId && item.candidate_id);
+        if (!candidate) return null;
+        const status = document.getElementById('saveNSStatus');
+        if (status) {
+            status.dataset.candidateId = candidate.candidate_id;
+            status.textContent += ` Recoverable diagnostic candidate: ${candidate.candidate_id}.`;
+            const host = status.parentElement || status;
+            let button = document.getElementById('saveNSDiagnosticCandidate');
+            if (!button) {
+                button = document.createElement('button');
+                button.type = 'button';
+                button.id = 'saveNSDiagnosticCandidate';
+                button.className = 'btn';
+                button.textContent = 'Download diagnostic candidate';
+                host.appendChild(button);
+            }
+            button.onclick = async function() {
+                const detail = await fetch('/api/lumps/save-candidates/' +
+                    encodeURIComponent(candidate.candidate_id), { cache: 'no-store' });
+                if (!detail.ok) throw new Error(`diagnostic candidate returned HTTP ${detail.status}`);
+                const originalPayload = await detail.json();
+                const blob = new Blob([JSON.stringify(originalPayload, null, 2)],
+                    { type: 'application/json' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `lump-save-candidate-${candidate.candidate_id}.json`;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(link.href);
+            };
+        }
+        return candidate;
+    } catch (error) {
+        console.warn('[SaveNS] diagnostic candidate lookup failed:', error);
+        return null;
+    }
+}
+
 let _saveNSRequestInFlight = false;
 async function beginSaveToNamespace() {
     if (_saveNSRequestInFlight) return;
@@ -12602,7 +12737,7 @@ async function beginSaveToNamespace() {
     } catch (err) {
         console.error('[SaveNS] unexpected save failure:', err);
         _setSaveNSFeedback('incident',
-            'The IDE could not complete its save process. No data was committed. Your source and settings remain preserved. The IDE must resolve this incident.');
+            'The IDE could not complete its save process, and the commit outcome is unknown. Your source and settings remain preserved. Reload the IDE to check the saved operation before retrying.');
         const status = document.getElementById('saveNSStatus');
         if (status) {
             status.dataset.terminal = 'true';
@@ -15401,6 +15536,52 @@ function _persistNamespaceSlotLabel(slot, label) {
 }
 window._persistNamespaceSlotLabel = _persistNamespaceSlotLabel;
 
+// The repository's committed .lump is the only binary that may update the
+// simulator after a save.  save-plan can remint a destination-local SELF row,
+// so using the browser's preflight words here would make the simulator diverge
+// from the revision that was actually approved and committed.
+async function _reloadCommittedLumpArtifact(response, fallbackName) {
+    const token = response && response.token;
+    const nsSlot = response && (response.ns_slot !== undefined
+        ? response.ns_slot : response.namespace_slot);
+    if (!token || !Number.isInteger(Number(nsSlot))) {
+        throw new Error('committed save response is missing its token or authoritative Namespace slot');
+    }
+    let committedWords = Array.isArray(response.final_binary)
+        ? response.final_binary.slice() : null;
+    const committedDigest = String(response.digest || response.binary_hash || '').toLowerCase();
+    if (committedWords) {
+        if (!/^[0-9a-f]{64}$/.test(committedDigest) ||
+                typeof _lumpSha256Words !== 'function' ||
+                await _lumpSha256Words(committedWords) !== committedDigest) {
+            throw new Error('committed response final_binary does not match its immutable SHA-256 digest');
+        }
+    } else {
+        // Compatibility path for an older server. New commits must return
+        // final_binary + digest so no mutable token lookup can race a revision.
+        const wordsResponse = await fetch(`/api/lump/${encodeURIComponent(token)}/words`, {
+            cache: 'no-store',
+        });
+        if (!wordsResponse.ok) {
+            throw new Error(`saved artifact reload returned HTTP ${wordsResponse.status}`);
+        }
+        const wordsPayload = await wordsResponse.json();
+        committedWords = Array.isArray(wordsPayload)
+            ? wordsPayload : wordsPayload && wordsPayload.words;
+    }
+    if (!Array.isArray(committedWords) || committedWords.length < 2) {
+        throw new Error('saved artifact reload returned no complete LUMP binary');
+    }
+    if (typeof sim === 'undefined' || !sim || !sim.loadLumpBinary ||
+            !sim.loadLumpBinary(committedWords, Number(nsSlot))) {
+        throw new Error('simulator rejected the exact committed LUMP artifact');
+    }
+    if (sim.nsLabels) sim.nsLabels[Number(nsSlot)] =
+        response.abstraction || fallbackName || token;
+    if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
+    return committedWords;
+}
+
 async function confirmSaveToNamespace() {
     const slotSel = document.getElementById('saveNSSlot');
     const label = document.getElementById('saveNSLabel').value.trim();
@@ -15421,6 +15602,23 @@ async function confirmSaveToNamespace() {
     };
     const gtType = parseInt(document.getElementById('saveNSType').value) || 0;
     const _saveSnapshot = window._saveNSPreparedSnapshot || null;
+    if (_saveSnapshot && _saveSnapshot.sourceMatchesEditor === false) {
+        let diagnostic;
+        try {
+            diagnostic = await _preserveStaleLumpSaveDiagnostic(_saveSnapshot, label);
+        } catch (preservationError) {
+            console.warn('[SaveNS] server diagnostic candidate preservation failed:', preservationError);
+        }
+        const message = 'Save blocked: the editor changed after the compiled source snapshot. ' +
+            'The compiler source/words pair and divergent editor buffer were retained as diagnostics; ' +
+            'compile the current source before saving so source and words remain one immutable pair.' +
+            (diagnostic && diagnostic.operation_id
+                ? ` Diagnostic operation: ${diagnostic.operation_id}.` : '');
+        _setSaveNSFeedback('error', message);
+        const status = document.getElementById('saveNSStatus');
+        if (status) status.dataset.terminal = 'true';
+        return;
+    }
     const _svRegMem = _saveSnapshot
         ? {
             words: Array.isArray(_saveSnapshot.words) ? _saveSnapshot.words.slice() : [],
@@ -15613,18 +15811,10 @@ async function confirmSaveToNamespace() {
         : [];
     let idx;
     if (slotSel.value === 'new') {
+        // Namespace allocation is performed by the save-plan transaction.  A
+        // client-side "first free" scan races other saves and can attach a
+        // correctly approved binary to the wrong server slot.
         idx = null;
-        for (let _candidate = 0;
-             _candidate < sim.MAX_NS_ENTRIES; _candidate++) {
-            if (!sim.isNSEntryValid(_candidate)) {
-                idx = _candidate;
-                break;
-            }
-        }
-        if (!Number.isInteger(idx)) {
-            alert('Save blocked: no free Namespace slot is available.');
-            return;
-        }
     } else {
         idx = parseInt(slotSel.value, 10);
         const _firstSaveSlot = typeof sim.saveNamespaceStartSlot === 'function'
@@ -15641,10 +15831,10 @@ async function confirmSaveToNamespace() {
         }
     }
 
-    const _existingTarget = sim.readNSEntry(idx);
+    const _existingTarget = Number.isInteger(idx) ? sim.readNSEntry(idx) : null;
     const _targetSequence = _existingTarget
         ? sim.parseNSWord1(_existingTarget.word1_limit).gtSeq : 0;
-    if (_existingTarget && _svBinary &&
+    if (Number.isInteger(idx) && _existingTarget && _svBinary &&
         (_existingTarget.word0_location + _svBinary.length > sim.memory.length)) {
         alert(`Save blocked: Namespace slot ${idx} is not backed by enough writable LUMP storage.`);
         return;
@@ -15672,6 +15862,15 @@ async function confirmSaveToNamespace() {
                 // exact content profile; these fields make the saved record
                 // auditable without trusting browser metadata for validation.
                 compiled_words: _svWords.slice(),
+                // Preserve the compiler pair independently from the selected
+                // output profile.  For API-only output submitted_source is
+                // deliberately null, but diagnostics still need this source
+                // and the compiler words that produced the candidate.
+                original_source: _saveSnapshot &&
+                    typeof _saveSnapshot.sourceText === 'string'
+                    ? _saveSnapshot.sourceText : null,
+                original_compiled_words: _svWords.slice(),
+                original_binary: _svBinary.slice(),
                 output_profile: (_snapshotPending &&
                     ['api', 'compact', 'full'].includes(_snapshotPending.selectedProfile))
                     ? _snapshotPending.selectedProfile
@@ -15684,15 +15883,24 @@ async function confirmSaveToNamespace() {
                     (gtType === 2 ? 'outform' : 'abstract'),
                 namespace_sequence: _targetSequence,
                 replacement: slotSel.value !== 'new',
+                // New Entry is a server allocation request, never a browser
+                // assertion that its observed first-free slot remains free.
+                new_entry: slotSel.value === 'new',
                 // Pass the content-derived token so ordinary LUMPs remain
                 // addressable immediately. The server canonicalizes this field
                 // from the verified SELF row for an existing resident binding.
                 token:        _svTok || undefined,
                 editor_base: window._editorOpenLumpBaseIdentity || undefined,
                 submitted_source: _submittedSource,
-                source_required: !!(_saveSnapshot &&
-                    typeof _saveSnapshot.sourceText === 'string' &&
-                    _saveSnapshot.sourceText.trim()),
+                source_required: typeof _submittedSource === 'string' &&
+                    _submittedSource.trim().length > 0,
+                operation_id: (_saveSnapshot && _saveSnapshot.pending &&
+                    _saveSnapshot.pending.operationId) || undefined,
+                operation_key: [
+                    (_saveSnapshot && _saveSnapshot.token) || '',
+                    (_saveSnapshot && _saveSnapshot.registeredAt) || 0,
+                    label
+                ].join(':'),
             }
         };
         let _saveApproval;
@@ -15703,11 +15911,38 @@ async function confirmSaveToNamespace() {
             _saveApproval = await window._confirmLumpSavePlan(
                 _svPayload.binary, _svPayload.metadata,
                 () => `Save "${_svAbsName}" to Namespace slot ${idx}?`);
-            if (!_saveApproval) return;
+            if (!_saveApproval) {
+                _setSaveNSFeedback('info',
+                    'Not saved — confirmation was cancelled. Your compiled source and words remain preserved.');
+                const status = document.getElementById('saveNSStatus');
+                if (status) status.dataset.terminal = 'true';
+                return;
+            }
+            // The server plan is the approval candidate.  It can contain a
+            // server-selected New Entry slot and reminted final bytes; never
+            // send the browser's provisional binary after approving this plan.
+            _svPayload.binary = _saveApproval.final_binary.slice();
+            idx = _saveApproval.plan.ns_slot;
+            if (!Number.isInteger(idx)) {
+                throw new Error('Save plan is missing an authoritative Namespace slot');
+            }
+            _svPayload.metadata.ns_slot = idx;
+            _svPayload.metadata.namespace_sequence =
+                _saveApproval.plan.namespace_sequence !== undefined
+                    ? _saveApproval.plan.namespace_sequence : _targetSequence;
             _svPayload.metadata.approval_intent = _saveApproval.intent.intent;
             _svPayload.metadata.save_plan_id = _saveApproval.plan.plan_id;
         } catch (err) {
+            if (/confirmation is unavailable/i.test(String(err && err.message))) {
+                const message = `${err.message} The save was not started; restore browser confirmation and try again.`;
+                _setSaveNSFeedback('error', message);
+                const status = document.getElementById('saveNSStatus');
+                if (status) status.dataset.terminal = 'true';
+                return;
+            }
             const message = `${err.message}. No data was committed. Your source and settings remain preserved. The IDE must resolve the save-plan incident.`;
+            _persistSaveOperationStatus(_svPayload.metadata.operation_id, 'rejected', message);
+            _discoverLumpSaveDiagnosticCandidate(_svPayload.metadata.operation_id);
             _setSaveNSFeedback('incident', message);
             const status = document.getElementById('saveNSStatus');
             if (status) {
@@ -15717,16 +15952,22 @@ async function confirmSaveToNamespace() {
             _showFpgaToast('LUMP Save Plan Failed', err.message, 'error', 10000);
             return;
         }
-        return _lumpSaveRequest(fetch, '/api/lumps/save', _svPayload, function(resp) {
+        return _lumpSaveRequest(fetch, '/api/lumps/save', _svPayload, async function(resp) {
             // The repository has committed the save. Close immediately so a
             // later client-state/render exception cannot leave a successful
             // transaction looking unfinished.
+            _persistSaveOperationStatus(resp.operation_id ||
+                _svPayload.metadata.operation_id, 'committed',
+                `Saved "${resp.abstraction || label}" as ${resp.lump || resp.token}.`);
             closeSaveDialog();
             try {
-                // The preflight-selected index is part of the server payload;
-                // commit that exact slot rather than running allocation again.
-                sim.saveToNamespaceAt(
-                    idx, label, _svWords, perms, gtType, _caps, _svClistWords);
+                const committedSlot = resp.ns_slot !== undefined
+                    ? Number(resp.ns_slot) : Number(resp.namespace_slot);
+                if (!Number.isInteger(committedSlot)) {
+                    throw new Error('repository response omitted the committed Namespace slot');
+                }
+                idx = committedSlot;
+                await _reloadCommittedLumpArtifact(resp, label);
             } catch (err) {
                 console.error('[SaveNS] local update failed after repository commit:', err);
                 const recovery = `Saved "${label}" to NS[${idx}], but the local view could not update. ` +
@@ -15804,6 +16045,12 @@ async function confirmSaveToNamespace() {
                 delete rebuilt.metadata.plan;
                 const plan = await window._requestLumpSavePlan(
                     rebuilt.binary, rebuilt.metadata);
+                rebuilt.binary = plan.final_binary.slice();
+                if (!Number.isInteger(plan.ns_slot)) {
+                    throw new Error('Rebuilt save plan is missing an authoritative Namespace slot');
+                }
+                rebuilt.metadata.ns_slot = plan.ns_slot;
+                rebuilt.metadata.namespace_sequence = plan.namespace_sequence;
                 const intent = await window._requestLumpApprovalIntent(
                     rebuilt.binary, plan.action, rebuilt.metadata, plan);
                 rebuilt.metadata.approval_intent = intent.intent;
@@ -15811,6 +16058,14 @@ async function confirmSaveToNamespace() {
                 return rebuilt;
             }
         }).catch(function(err) {
+            const operationId = err.operation_id || _svPayload.metadata.operation_id;
+            _persistSaveOperationStatus(operationId,
+                err.committed === true ? 'committed' :
+                    (err.committed === false ? 'rejected' : 'unknown'),
+                err.message || 'Save outcome requires repository reconciliation.');
+            // This is informational and never changes the authoritative
+            // failure classification already shown below.
+            _discoverLumpSaveDiagnosticCandidate(operationId);
             if (err.kind === 'ide') {
                 const body = err.committed === false
                     ? 'No data was committed. Your source and settings remain preserved. The IDE could not repair its canonical save candidate and must resolve this incident.'
@@ -15832,16 +16087,21 @@ async function confirmSaveToNamespace() {
                         ? 'LUMP Repository Server Failure'
                         : 'LUMP Repository Protocol Failure'));
             const body = err.kind === 'transport'
-                ? 'Check your connection, then click Save again. Nothing was committed.'
+                ? (err.committed === false
+                    ? 'The repository proved no data was committed. Check your connection, then retry Save with this same operation.'
+                    : 'The repository could not prove whether data was committed. Reload the LUMP repository before retrying so this operation is reconciled without creating a duplicate revision.')
                 : (err.kind === 'validation'
                     ? `${err.message} Correct the exact field identified above, then save again.`
                     : (err.kind === 'server'
                         ? `${err.message} The modal remains open; resolve the server error, then click Save again.`
                         : `${err.message} Retry Save. If this repeats, inspect the server logs for the invalid response.`));
-            _setSaveNSFeedback('error', body);
+            const reconciledBody = err.kind !== 'transport' && err.committed === false
+                ? `${body} Repository reconciliation proved this operation did not commit.`
+                : body;
+            _setSaveNSFeedback('error', reconciledBody);
             const status = document.getElementById('saveNSStatus');
             if (status) status.dataset.terminal = 'true';
-            _showFpgaToast(title, body, 'error', 10000);
+            _showFpgaToast(title, reconciledBody, 'error', 10000);
         });
     }
 }

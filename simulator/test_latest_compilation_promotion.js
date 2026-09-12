@@ -7,7 +7,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { webcrypto } = require('crypto');
+const { webcrypto, createHash } = require('crypto');
 const { JSDOM } = require('jsdom');
 const actionableErrors = require('./actionable_errors.js');
 const { checkCacheKeys } = require('../scripts/check_assembler_browser_freshness.js');
@@ -105,6 +105,20 @@ function makeContext(fetchImpl, confirmed = true) {
         renderLumps: async () => { calls.render++; },
         updateNamespace: async () => { calls.namespace++; },
         _loadBootConfig: async () => { calls.boot++; },
+        _lumpSaveRequest: async (requestFetch, url, payload) => {
+            const response = await requestFetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                const error = new Error(result.error || 'save failed');
+                error.committed = result.committed;
+                throw error;
+            }
+            return result;
+        },
         fetch: async (...args) => {
             calls.fetch.push(args);
             return fetchImpl(...args);
@@ -164,12 +178,20 @@ function assertPreviewPreserved(ctx) {
             if (String(url).includes('/latest-primary/')) return response(CANDIDATE);
             const body = JSON.parse(options.body);
             if (url === '/api/lumps/save-plan') {
+                const digest = createHash('sha256').update(Buffer.from(
+                    body.binary.flatMap(word => [
+                        (word >>> 24) & 0xFF, (word >>> 16) & 0xFF,
+                        (word >>> 8) & 0xFF, word & 0xFF,
+                    ])
+                )).digest('hex');
                 return response({
                     ok: true,
                     plan_id: 'promotion-plan',
                     action: 'save',
                     consequence: 'create',
-                    digest: HASH,
+                    digest,
+                    final_binary: body.binary.slice(),
+                    ns_slot: null,
                 });
             }
             if (url === '/api/lumps/approval-intent') {
@@ -201,7 +223,12 @@ function assertPreviewPreserved(ctx) {
         assert.strictEqual(plan.metadata.promotion_binding.binding_id, 'server-binding');
         const approval = JSON.parse(request(ctx, '/api/lumps/approval-intent')[1].body);
         assert.deepStrictEqual(approval, {
-            digest: HASH,
+            digest: createHash('sha256').update(Buffer.from(
+                plan.binary.flatMap(word => [
+                    (word >>> 24) & 0xFF, (word >>> 16) & 0xFF,
+                    (word >>> 8) & 0xFF, word & 0xFF,
+                ])
+            )).digest('hex'),
             action: 'save',
             confirmation: true,
             plan: 'promotion-plan',
@@ -230,7 +257,14 @@ function assertPreviewPreserved(ctx) {
             ? response(CANDIDATE)
             : response({
                 ok: true, plan_id: 'cancel-plan', action: 'save',
-                consequence: 'create', digest: HASH,
+                consequence: 'create',
+                digest: createHash('sha256').update(Buffer.from(
+                    CANDIDATE.words.flatMap(word => [
+                        (word >>> 24) & 0xFF, (word >>> 16) & 0xFF,
+                        (word >>> 8) & 0xFF, word & 0xFF,
+                    ])
+                )).digest('hex'),
+                final_binary: CANDIDATE.words.slice(), ns_slot: null,
             }), false);
         await open(ctx);
         await ctx.document.getElementById('lumpPromotionConfirm').onclick();
@@ -294,7 +328,14 @@ function assertPreviewPreserved(ctx) {
             if (url === '/api/lumps/save-plan') {
                 return response({
                     ok: true, plan_id: 'p', action: 'save',
-                    consequence: 'create', digest: HASH,
+                    consequence: 'create',
+                    digest: createHash('sha256').update(Buffer.from(
+                        CANDIDATE.words.flatMap(word => [
+                            (word >>> 24) & 0xFF, (word >>> 16) & 0xFF,
+                            (word >>> 8) & 0xFF, word & 0xFF,
+                        ])
+                    )).digest('hex'),
+                    final_binary: CANDIDATE.words.slice(), ns_slot: null,
                 });
             }
             if (url === '/api/lumps/approval-intent') {
@@ -324,7 +365,14 @@ function assertPreviewPreserved(ctx) {
             if (url === '/api/lumps/save-plan') {
                 return response({
                     ok: true, plan_id: 'p', action: 'save',
-                    consequence: 'create', digest: HASH,
+                    consequence: 'create',
+                    digest: createHash('sha256').update(Buffer.from(
+                        CANDIDATE.words.flatMap(word => [
+                            (word >>> 24) & 0xFF, (word >>> 16) & 0xFF,
+                            (word >>> 8) & 0xFF, word & 0xFF,
+                        ])
+                    )).digest('hex'),
+                    final_binary: CANDIDATE.words.slice(), ns_slot: null,
                 });
             }
             if (url === '/api/lumps/approval-intent') {

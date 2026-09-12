@@ -533,17 +533,10 @@ async function _showLatestCompilationPromotion(archivedToken) {
                 }
                 metadata.approval_intent = approval.intent.intent;
                 metadata.save_plan_id = approval.plan.plan_id;
+                const finalBinary = approval.final_binary.slice();
                 saveRequestStarted = true;
-                const saveResp = await fetch('/api/lumps/save', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({binary: candidate.words, metadata}),
-                });
-                authoritativeRejection = !saveResp.ok;
-                const saved = await _actionableJsonResponse(saveResp, 'Promote the latest compilation', {
-                    dataChanged: false,
-                    nextAction: 'Reload the repository and verify the current revision before retrying.',
-                });
+                const saved = await _lumpSaveRequest(
+                    fetch, '/api/lumps/save', { binary: finalBinary, metadata });
                 committed = true;
                 if (status) status.innerHTML =
                     `Saved current revision: Token <code>0x${e(saved.token || '')}</code>, ` +
@@ -566,10 +559,16 @@ async function _showLatestCompilationPromotion(archivedToken) {
                         `Reload the IDE and verify the LUMP, Namespace, and boot views.</span>`;
                 }
             } catch (err) {
+                authoritativeRejection = !!(err && err.committed === false);
+                if (committed) {
+                    if (status) status.textContent =
+                        `Saved current revision, but refresh failed: ${err.message || err}. Reload the IDE to inspect the committed revision.`;
+                    return;
+                }
                 confirmButton.disabled = false;
                 if (status) status.textContent = authoritativeRejection
-                    ? ((err && err.message) ||
-                      'Promotion was refused before changing data. Reload the repository and retry.')
+                    ? `${(err && err.message) ||
+                      'Promotion was refused before changing data.'} No data was changed; the operation ledger proved the rejection. Reload the repository and retry.`
                     : (saveRequestStarted && !committed
                     ? `Promotion request outcome is unknown. Reason: ${(err && err.message) || 'The save response was not received'}. ` +
                       'Next: verify the repository before retrying.'
@@ -3510,17 +3509,10 @@ async function _restoreLumpFromHistory(token, version) {
         if (!approval) return false;
         metadata.approval_intent = approval.intent.intent;
         metadata.save_plan_id = approval.plan.plan_id;
+        const finalBinary = approval.final_binary.slice();
 
-        const saveResp = await fetch('/api/lumps/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ binary: words, metadata }),
-        });
-        const saveData = await _actionableJsonResponse(
-            saveResp, 'Restore the archived LUMP', {
-                dataChanged: false,
-                nextAction: 'Reload History, verify the selected revision, then retry Restore.',
-            });
+        const saveData = await _lumpSaveRequest(
+            fetch, '/api/lumps/save', { binary: finalBinary, metadata });
 
         if (typeof _showFpgaToast === 'function') {
             _showFpgaToast('Restored', `v${version} of "${displayName}" is now the current LUMP.`, 'ok', 4000);
@@ -3586,15 +3578,9 @@ async function _saveLumpText(token, text, bodyEl, lump) {
         if (statusEl) statusEl.textContent = 'Saving\u2026';
         metadata.approval_intent = approval.intent.intent;
         metadata.save_plan_id = approval.plan.plan_id;
-        const resp = await fetch('/api/lumps/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ binary: words, metadata }),
-        });
-        const result = await _actionableJsonResponse(resp, 'Save edited LUMP content', {
-            dataChanged: false,
-            nextAction: 'Review the edited content, then click Save again.',
-        });
+        const result = await _lumpSaveRequest(
+            fetch, '/api/lumps/save',
+            { binary: approval.final_binary.slice(), metadata });
         _lumpEditDirty = false;
         const _tk = _lumpTokenIdentity(token);
         _lumpEditorOpen[_tk] = false;
@@ -5113,15 +5099,8 @@ function _renderLumpImageContent(bodyEl, lump, dataWords, token) {
                 statusEl.style.color = '';
                 metadata.approval_intent = approval.intent.intent;
                 metadata.save_plan_id = approval.plan.plan_id;
-                const resp = await fetch('/api/lumps/save', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ binary: words, metadata }),
-                });
-                await _actionableJsonResponse(resp, 'Replace the LUMP file', {
-                    dataChanged: false,
-                    nextAction: 'Choose a valid replacement file, then click Replace again.',
-                });
+                await _lumpSaveRequest(fetch, '/api/lumps/save',
+                    { binary: approval.final_binary.slice(), metadata });
                 statusEl.textContent = 'Replaced.';
                 statusEl.style.color = 'var(--accent-green, #4caf50)';
                 setTimeout(() => _loadLumpContent(token, lump), 800);
@@ -6693,13 +6672,9 @@ async function _saveLumpDirectVersion(token, lump, btn) {
         _meta.save_plan_id = _directApproval.plan.plan_id;
 
         // 3. POST to the standard save endpoint
-        var _sr = await fetch('/api/lumps/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ binary: _words, metadata: _meta }),
+        var _sj = await _lumpSaveRequest(fetch, '/api/lumps/save', {
+            binary: _directApproval.final_binary.slice(), metadata: _meta,
         });
-        var _sj = await _sr.json();
-        if (!_sr.ok) throw new Error(_sj.error || 'Server error (' + _sr.status + ')');
 
         // 4. Report success
         var _lines = ['\u2713 Saved \u2014 token: ' + _sj.token];
@@ -7608,22 +7583,46 @@ async function _readLumpMutationJson(resp, operation) {
 }
 
 async function _requestLumpSavePlan(words, metadata) {
+    // Register the idempotency key before planning as well as before commit.
+    // This gives the server's diagnostic-candidate store one stable operation
+    // identity across plan, approval, a lost response, and a page refresh.
+    metadata = metadata || {};
+    var operationId = null;
+    if (typeof _lumpSaveEnsureOperationId === 'function') {
+        operationId = _lumpSaveEnsureOperationId({ metadata: metadata, binary: words });
+    }
     const resp = await fetch('/api/lumps/save-plan', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ binary: words, metadata: metadata || {} })
+        headers: Object.assign({ 'Content-Type': 'application/json' },
+            operationId ? { 'X-Lump-Save-Operation': operationId } : {}),
+        body: JSON.stringify({ binary: words, metadata: metadata })
     });
     const result = await _readLumpMutationJson(resp, 'LUMP save planning');
     const planId = result && (result.plan_id || result.id);
+    var finalBinary = result && result.final_binary;
+    var finalSlot = result && result.ns_slot;
+    const finalDigest = Array.isArray(finalBinary)
+        ? await _lumpSha256Words(finalBinary) : '';
     if (!resp.ok || !planId || !result ||
         (result.action !== 'save' && result.action !== 'replace') ||
-        (result.consequence !== 'create' && result.consequence !== 'replace')) {
+        (result.consequence !== 'create' && result.consequence !== 'replace') ||
+        !Array.isArray(finalBinary) || finalBinary.length < 2 ||
+        String(result.digest || '').toLowerCase() !== finalDigest ||
+        (metadata && metadata.new_entry === true &&
+            (!Number.isInteger(Number(finalSlot)) || Number(finalSlot) < 0))) {
         const error = new Error((result && result.error) || 'Invalid save-plan response');
         error.response = result;
         error.status = resp.status;
         throw error;
     }
-    return Object.assign({}, result, { plan_id: planId });
+    // save-plan is the canonicalization boundary.  In particular its row-zero
+    // SELF token and its server-selected New Entry slot are not guesses the
+    // browser may reconstruct from stale simulator memory.
+    return Object.assign({}, result, {
+        plan_id: planId,
+        final_binary: finalBinary.slice(),
+        ns_slot: finalSlot === null || finalSlot === undefined ? null : Number(finalSlot),
+    });
 }
 
 // Call only after the action's explicit user confirmation. Save intents must
@@ -7679,9 +7678,16 @@ async function _confirmLumpSavePlan(words, metadata, prompt) {
         plan = await _requestLumpSavePlan(words, metadata);
     }
     const message = typeof prompt === 'function' ? prompt(plan) : String(prompt || '');
-    if (!confirm(`${_formatLumpSavePlan(plan)}\n\n${message}`.trim())) return null;
-    const intent = await _requestLumpApprovalIntent(words, plan.action, metadata, plan);
-    return { plan, intent };
+    const confirmFn = typeof window !== 'undefined' && typeof window.confirm === 'function'
+        ? window.confirm
+        : (typeof confirm === 'function' ? confirm : null);
+    if (!confirmFn) {
+        throw new Error('Save confirmation is unavailable; no approval or repository save was requested.');
+    }
+    if (!confirmFn(`${_formatLumpSavePlan(plan)}\n\n${message}`.trim())) return null;
+    const finalBinary = plan.final_binary;
+    const intent = await _requestLumpApprovalIntent(finalBinary, plan.action, metadata, plan);
+    return { plan, intent, final_binary: finalBinary.slice() };
 }
 window._confirmLumpSavePlan = _confirmLumpSavePlan;
 window._requestLumpApprovalIntent = _requestLumpApprovalIntent;

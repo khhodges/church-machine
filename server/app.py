@@ -312,6 +312,32 @@ def _record_lump_save_diagnostic(response):
         # Diagnostics must never turn a successful atomic save into a failed
         # HTTP response. The server log still records the operational issue.
         logging.exception("[lumps] unable to append save diagnostic")
+    if getattr(g, "_lump_save_operation_active", False):
+        # Validation failures are proven non-commits because this hook runs
+        # after the handler has returned.  A transition exception is explicitly
+        # left unknown: a process interruption around a multi-file transition
+        # must never be reported as a proven rollback.
+        try:
+            outcome = "committed" if committed is True else "rejected"
+            if body.get("atomic_transition_failed") or committed is None:
+                outcome = "unknown"
+            _prior = _read_lump_save_operation(record["operation_id"]) or {}
+            if (_prior.get("outcome") == "committed"
+                    and outcome != "committed"):
+                # A concurrent request with the same ID may lose the history
+                # race after the winner has committed.  Never downgrade that
+                # durable proof to its follower's conflict response.
+                response.headers["X-Lump-Save-Operation"] = record["operation_id"]
+                return response
+            _prior.update({
+                "outcome": outcome,
+                "status": response.status_code,
+                "response": body,
+                "updated_at": time.time(),
+            })
+            _write_lump_save_operation(record["operation_id"], _prior)
+        except Exception:
+            logging.exception("[lumps] unable to record save operation result")
     response.headers["X-Lump-Save-Operation"] = record["operation_id"]
     return response
 
@@ -2618,9 +2644,9 @@ def _generated_thread_slots_for_step1(step1):
 def _named_ns_count_for_step1(step1):
     """Fixed catalog plus the configured generated Thread Namespace entries."""
     return BASE_NAMED_NS_COUNT + len(_generated_thread_slots_for_step1(step1))
-LUMP_MAX_ARCHIVE_VERSIONS = 20  # max archived versions kept per token; oldest are pruned
-if LUMP_MAX_ARCHIVE_VERSIONS < 0:
-    raise ValueError(f"LUMP_MAX_ARCHIVE_VERSIONS must be >= 0, got {LUMP_MAX_ARCHIVE_VERSIONS}")
+# Archive revisions are immutable until an explicit history-delete request.
+# Do not add retention/pruning here: automatic deletion makes recovery and
+# audit of approved artifacts impossible.
 LUMPS_MANIFEST_PATH = os.path.join(
     _LUMPS_DIR_OVERRIDE or os.path.join(os.path.dirname(os.path.abspath(__file__)), "lumps"),
     "manifest.json",
@@ -6746,6 +6772,267 @@ _LUMP_APPROVAL_INTENT_FIELDS = frozenset({
     "display_name", "documentation", "annotations",
     "pet_name", "pet_names", "grants", "capability_type", "portable_binding",
 })
+_LUMP_SAVE_OPERATION_ID_RE = re.compile(r"[A-Za-z0-9._:-]{8,128}")
+
+
+def _lump_save_storage_dir(name):
+    """Return a private, non-executable directory in the LUMP file store."""
+    directory = os.path.join(LUMPS_DIR, name)
+    os.makedirs(directory, exist_ok=True)
+    return directory
+
+
+def _lump_save_operation_path(operation_id):
+    if not _LUMP_SAVE_OPERATION_ID_RE.fullmatch(str(operation_id or "")):
+        raise ValueError("invalid save operation id")
+    return os.path.join(_lump_save_storage_dir("save-operations"),
+                        f"{operation_id}.json")
+
+
+def _operation_session_binding():
+    """Bind a durable operation to the existing approval session without storing it."""
+    session_id = session.get("_lump_approval_session", "")
+    return hashlib.sha256(
+        (str(app.secret_key) + "|lump-save-operation|" + str(session_id)).encode()
+    ).hexdigest()
+
+
+def _read_lump_save_operation(operation_id):
+    try:
+        with open(_lump_save_operation_path(operation_id), encoding="utf-8") as fh:
+            value = json.load(fh)
+        return value if isinstance(value, dict) else None
+    except (OSError, ValueError, TypeError):
+        return None
+
+
+def _write_lump_save_operation(operation_id, document):
+    document = dict(document)
+    document["operation_id"] = operation_id
+    _durable_atomic_json(_lump_save_operation_path(operation_id), document)
+
+
+def _settle_orphaned_lump_save_operation(operation_id, document):
+    """Settle a pending operation only after locks prove no publication began."""
+    if not isinstance(document, dict) or document.get("outcome") != "pending":
+        return document
+    if os.path.lexists(os.path.join(LUMPS_DIR, _LUMP_TRANSITION_JOURNAL)):
+        return document
+    try:
+        with open(os.path.join(LUMPS_DIR, "manifest.json"), encoding="utf-8") as source:
+            manifest = json.load(source)
+        if not isinstance(manifest, list):
+            return document
+    except FileNotFoundError:
+        manifest = []
+    except (OSError, ValueError):
+        return document
+    # A marker can be a partial transition, so preserve fail-closed unknown.
+    if any(isinstance(row, dict) and row.get("operation_id") == operation_id
+           for row in manifest):
+        return document
+    settled = dict(document)
+    settled.update({
+        "outcome": "rejected", "status": 409, "updated_at": time.time(),
+        "response": {
+            "ok": False, "committed": False, "operation_id": operation_id,
+            "error": ("save was interrupted before durable publication; "
+                      "retry with a new operation id"),
+        },
+    })
+    _write_lump_save_operation(operation_id, settled)
+    return settled
+
+
+@contextlib.contextmanager
+def _lump_save_operation_guard(operation_id):
+    """Serialize durable operation creation across server worker processes."""
+    if not _LUMP_SAVE_OPERATION_ID_RE.fullmatch(str(operation_id or "")):
+        raise ValueError("invalid save operation id")
+    directory = _lump_save_storage_dir("save-operations")
+    with open(os.path.join(directory, f".{operation_id}.lock"), "a+") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
+def _store_lump_save_candidate(payload, operation_id, *, preflight=False):
+    """Durably retain the submitted diagnostic artifact outside executable paths."""
+    candidate_id = uuid.uuid4().hex
+    document = {
+        "candidate_id": candidate_id,
+        "operation_id": operation_id,
+        "created_at": time.time(),
+        "kind": "save-plan" if preflight else "save",
+        "session_binding": _operation_session_binding(),
+        # This is intentionally a JSON-only quarantine store.  Nothing in the
+        # resolver, manifest, boot builder, or LUMP bundle searches this tree.
+        "payload": payload if isinstance(payload, dict) else None,
+    }
+    _durable_atomic_json(os.path.join(
+        _lump_save_storage_dir("save-candidates"), f"{candidate_id}.json"), document)
+    return candidate_id
+
+
+def _candidate_summary(document):
+    payload = document.get("payload") if isinstance(document, dict) else {}
+    metadata = payload.get("metadata") if isinstance(payload, dict) else {}
+    words = payload.get("binary") if isinstance(payload, dict) else None
+    return {
+        "candidate_id": document.get("candidate_id"),
+        "operation_id": document.get("operation_id"),
+        "created_at": document.get("created_at"),
+        "kind": document.get("kind"),
+        "abstraction": metadata.get("abstraction") if isinstance(metadata, dict) else None,
+        "source_present": isinstance(metadata, dict)
+        and isinstance(metadata.get(
+            "original_source", metadata.get("submitted_source")), str),
+        "binary_words": len(words) if isinstance(words, list) else None,
+    }
+
+
+@app.route("/api/lumps/save-candidates", methods=["GET"])
+def list_lump_save_candidates():
+    """List quarantined original save candidates without exposing executables."""
+    directory = _lump_save_storage_dir("save-candidates")
+    results = []
+    for filename in os.listdir(directory):
+        if not re.fullmatch(r"[0-9a-f]{32}\.json", filename):
+            continue
+        try:
+            with open(os.path.join(directory, filename), encoding="utf-8") as fh:
+                document = json.load(fh)
+            if (isinstance(document, dict)
+                    and document.get("session_binding") == _operation_session_binding()):
+                results.append(_candidate_summary(document))
+        except (OSError, ValueError, TypeError):
+            continue
+    return jsonify({"candidates": sorted(
+        results, key=lambda value: value.get("created_at") or 0, reverse=True)})
+
+
+@app.route("/api/lumps/save-candidates/<candidate_id>", methods=["GET"])
+def get_lump_save_candidate(candidate_id):
+    if not re.fullmatch(r"[0-9a-f]{32}", candidate_id):
+        return jsonify({"error": "invalid candidate id"}), 400
+    try:
+        with open(os.path.join(_lump_save_storage_dir("save-candidates"),
+                               f"{candidate_id}.json"), encoding="utf-8") as fh:
+            document = json.load(fh)
+    except OSError:
+        return jsonify({"error": "save candidate not found"}), 404
+    except (ValueError, TypeError):
+        return jsonify({"error": "save candidate is unreadable"}), 409
+    if (not isinstance(document, dict)
+            or document.get("session_binding") != _operation_session_binding()):
+        return jsonify({"error": "save candidate not found"}), 404
+    # The original JSON payload is deliberately returned only as data. It has
+    # no executable locator and cannot enter the library absent a new approved
+    # save transaction.
+    return jsonify(document)
+
+
+@app.route("/api/lumps/save-operations/<operation_id>", methods=["GET"])
+def get_lump_save_operation(operation_id):
+    if not _LUMP_SAVE_OPERATION_ID_RE.fullmatch(operation_id):
+        return jsonify({"error": "invalid save operation id"}), 400
+    document = _read_lump_save_operation(operation_id)
+    if not document or document.get("session_binding") != _operation_session_binding():
+        return jsonify({"outcome": "unknown", "committed": None}), 404
+    document = _settle_orphaned_lump_save_operation(operation_id, document)
+    outcome = document.get("outcome")
+    if outcome == "committed":
+        return jsonify({"operation_id": operation_id, "outcome": "committed",
+                        "committed": True, "response": document.get("response"),
+                        "original_payload": document.get("original_payload")})
+    if outcome == "rejected":
+        return jsonify({"operation_id": operation_id, "outcome": "rejected",
+                        "committed": False, "response": document.get("response"),
+                        "original_payload": document.get("original_payload")})
+    expected = document.get("expected")
+    if isinstance(expected, dict):
+        try:
+            manifest = _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json"))
+            row = next(
+                (entry for entry in manifest if isinstance(entry, dict)
+                 and entry.get("token") == expected.get("token")
+                 and entry.get("filename") == expected.get("filename")
+                 and entry.get("operation_id") == operation_id),
+                None)
+            if row is not None:
+                inspected = _inspect_lump_binary(os.path.join(
+                    LUMPS_DIR, expected["filename"]))
+                approval = _matching_lump_approval(
+                    LUMPS_DIR, expected.get("digest"))
+                namespace_complete = True
+                expected_slot = expected.get("ns_slot")
+                if isinstance(expected_slot, int):
+                    namespace_rows, _ = _read_authoritative_namespace_rows()
+                    namespace_complete = any(
+                        isinstance(ns_row, dict)
+                        and ns_row.get("slot") == expected_slot
+                        and ns_row.get("token") == expected.get("token")
+                        and ns_row.get("filename") == expected.get("filename")
+                        for ns_row in namespace_rows)
+                if (inspected["binary_hash"] == expected.get("digest")
+                        and isinstance(approval, dict)
+                        and approval.get("binary_hash") == expected.get("digest")
+                        and approval.get("filename") == expected.get("filename")
+                        and namespace_complete):
+                    document.update({"outcome": "committed", "status": 200,
+                                     "updated_at": time.time()})
+                    _write_lump_save_operation(operation_id, document)
+                    return jsonify({
+                        "operation_id": operation_id, "outcome": "committed",
+                        "committed": True, "response": document.get("response"),
+                        "original_payload": document.get("original_payload"),
+                    })
+        except (OSError, ValueError, TypeError):
+            pass
+    # A process can die between the multi-file transition and a normal HTTP
+    # response.  A pending record is not proof that rollback completed.
+    return jsonify({"operation_id": operation_id, "outcome": "unknown",
+                    "committed": None, "response": document.get("response"),
+                    "original_payload": document.get("original_payload")})
+
+
+@app.route("/api/lumps/save-operations/<operation_id>/artifact", methods=["GET"])
+def get_lump_save_operation_artifact(operation_id):
+    """Reload immutable server-finalized bytes, not a mutable token locator."""
+    if not _LUMP_SAVE_OPERATION_ID_RE.fullmatch(operation_id):
+        return jsonify({"error": "invalid save operation id"}), 400
+    document = _read_lump_save_operation(operation_id)
+    if (not isinstance(document, dict)
+            or document.get("session_binding") != _operation_session_binding()
+            or document.get("outcome") != "committed"):
+        return jsonify({"error": "committed save operation not found"}), 404
+    response = document.get("response")
+    words = response.get("final_binary") if isinstance(response, dict) else None
+    digest = response.get("digest") if isinstance(response, dict) else None
+    filename = response.get("filename") if isinstance(response, dict) else None
+    if (not isinstance(words, list) or not isinstance(digest, str)
+            or not isinstance(filename, str)):
+        return jsonify({"error": "committed operation has no immutable artifact"}), 409
+    try:
+        raw = _struct.pack(
+            f">{len(words)}I", *[
+                int(word) if not isinstance(word, bool) else -1 for word in words])
+        if hashlib.sha256(raw).hexdigest() != digest:
+            raise ValueError("operation artifact digest does not match")
+        approval = _matching_lump_approval(LUMPS_DIR, digest)
+        if not isinstance(approval, dict) or approval.get("binary_hash") != digest:
+            raise ValueError("operation artifact approval is unavailable")
+    except (TypeError, ValueError, _struct.error):
+        return jsonify({"error": "committed operation artifact cannot be verified"}), 409
+    return jsonify({
+        "operation_id": operation_id, "filename": filename, "digest": digest,
+        "immutable_filename": response.get("immutable_filename", filename),
+        "ns_slot": response.get("ns_slot"),
+        "candidate_id": response.get("candidate_id"),
+        "final_binary": words,
+    })
 
 def _manifest_entry_identity(entry):
     """A stable identity for the destination being approved."""
@@ -6756,9 +7043,50 @@ def _manifest_entry_identity(entry):
     ).encode("utf-8")).hexdigest()
 
 
-def _authoritative_lump_library_generation(lumps_dir, manifest_path, manifest):
-    """Digest the authoritative manifest and every live artifact it selects."""
+def _authoritative_lump_library_generation(
+        lumps_dir, manifest_path, manifest, *, token8=None, ns_slot=None,
+        dependency_slots=()):
+    """Return the generation relevant to one save destination.
+
+    Historically this hashed every library artifact, causing an unrelated save
+    anywhere in the repository to invalidate an already approved candidate.
+    A save only depends on its destination manifest record and Namespace rows
+    it can install into or name from its c-list.  Keep the old positional
+    signature for callers that genuinely need whole-library identity.
+    """
     try:
+        if token8 is not None:
+            slots = {slot for slot in dependency_slots if isinstance(slot, int)}
+            if isinstance(ns_slot, int):
+                slots.add(ns_slot)
+            rows, _ = _read_authoritative_namespace_rows()
+            relevant_rows = []
+            for row in rows:
+                if not isinstance(row, dict):
+                    raise ValueError("ns-state.json contains a non-object Namespace row")
+                if row.get("slot") in slots:
+                    relevant_rows.append(row)
+            target_entries = [
+                entry for entry in manifest
+                if isinstance(entry, dict) and entry.get("token") == token8
+            ]
+            artifacts = []
+            for entry in target_entries:
+                filename = entry.get("filename")
+                if not isinstance(filename, str) or not filename:
+                    raise ValueError("destination manifest entry has no filename")
+                with open(_lump_transition_path(lumps_dir, filename), "rb") as source:
+                    artifacts.append((filename, hashlib.sha256(source.read()).hexdigest()))
+            material = {
+                "token": token8,
+                "destination": target_entries,
+                "namespace_rows": sorted(
+                    relevant_rows, key=lambda row: row.get("slot", -1)),
+                "artifacts": artifacts,
+            }
+            return hashlib.sha256(json.dumps(
+                material, sort_keys=True, separators=(",", ":"), default=str
+            ).encode("utf-8")).hexdigest()
         selected = []
         for entry in manifest:
             if not isinstance(entry, dict):
@@ -6783,6 +7111,32 @@ def _authoritative_lump_library_generation(lumps_dir, manifest_path, manifest):
     except (OSError, TypeError, ValueError) as exc:
         raise ValueError(
             f"authoritative library generation is unavailable: {exc}") from exc
+
+
+def _allocate_new_lump_slot():
+    """Choose an unoccupied dynamic Namespace slot from authoritative state."""
+    rows, _ = _read_authoritative_namespace_rows()
+    occupied = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("ns-state.json contains a non-object Namespace row")
+        slot = row.get("slot")
+        if isinstance(slot, bool) or not isinstance(slot, int) or not 0 <= slot < MAX_NS_ENTRIES:
+            raise ValueError(f"ns-state.json contains invalid Namespace slot {slot!r}")
+        if slot in occupied:
+            raise ValueError(f"ns-state.json has duplicate Namespace slot {slot}")
+        occupied.add(slot)
+    reserved = set(RESERVED_NS_SLOTS)
+    try:
+        config, error = _read_saved_boot_config()
+        if not error:
+            reserved.update(_generated_thread_slots_for_step1((config or {}).get("step1")))
+    except (OSError, ValueError, TypeError):
+        pass
+    for slot in range(MAX_NS_ENTRIES):
+        if slot not in reserved and slot not in occupied:
+            return slot
+    raise ValueError("no unoccupied Namespace slot is available")
 
 
 def _check_lump_save_plan(plan, *, digest, action, token, filename,
@@ -8089,22 +8443,132 @@ def save_lump():
         payload = request.get_json(force=True, silent=True)
     _metadata_for_diagnostic = (
         payload.get("metadata", {}) if isinstance(payload, dict) else {})
-    _operation_id = request.headers.get("X-Lump-Save-Operation", "").strip()
-    if not re.fullmatch(r"[A-Za-z0-9._:-]{8,128}", _operation_id):
+    _operation_id = (
+        _metadata_for_diagnostic.get("operation_id", "")
+        if isinstance(_metadata_for_diagnostic, dict) else "")
+    _operation_id = str(_operation_id or request.headers.get(
+        "X-Lump-Save-Operation", "")).strip()
+    if not _LUMP_SAVE_OPERATION_ID_RE.fullmatch(_operation_id):
         _operation_id = uuid.uuid4().hex
+    _is_preflight = bool(
+        isinstance(_metadata_for_diagnostic, dict)
+        and _metadata_for_diagnostic.get("_save_plan_preflight") is True
+        and _lump_save_payload_override.get() is not None)
+    # Candidate and operation recovery reuse the existing approval-session
+    # boundary.  Establish it before persisting a rejected direct save too.
+    session.setdefault("_lump_approval_session", secrets.token_urlsafe(24))
+    try:
+        _candidate_id = _store_lump_save_candidate(
+            payload, _operation_id, preflight=_is_preflight)
+    except Exception as _candidate_error:
+        logging.exception("[lumps] unable to retain original save candidate")
+        return jsonify({
+            "error": f"unable to durably retain original save candidate: {_candidate_error}",
+            "operation_id": _operation_id, "committed": False,
+        }), 503
     g._lump_save_diagnostic = {
         "operation_id": _operation_id,
         "operation": "lump-save",
         "identity": _save_diagnostic_identity(_metadata_for_diagnostic),
         "source_present": bool(
             isinstance(_metadata_for_diagnostic, dict) and
-            isinstance(_metadata_for_diagnostic.get("submitted_source"), str)),
+            isinstance(_metadata_for_diagnostic.get(
+                "original_source",
+                _metadata_for_diagnostic.get("submitted_source")), str)),
     }
     if not payload:
         return jsonify({"error": "Invalid JSON payload"}), 400
 
+    # An operation is durable before validation starts.  Returning a previous
+    # terminal response makes a lost successful response idempotent without
+    # repeating archive/history work.  Preflight is intentionally excluded:
+    # it prepares an approval, it does not mutate an operation.
+    if not _is_preflight:
+        try:
+            with _lump_save_operation_guard(_operation_id):
+                _existing_operation = _read_lump_save_operation(_operation_id)
+                if _existing_operation:
+                    if _existing_operation.get("session_binding") != _operation_session_binding():
+                        return jsonify({
+                            "error": "save operation id is unavailable",
+                            "operation_id": _operation_id, "committed": None,
+                        }), 409
+                    if _existing_operation.get("original_payload") != payload:
+                        return jsonify({
+                            "error": (
+                                "save operation id is already bound to different "
+                                "original source/binary payload; use a new operation id"
+                            ),
+                            "operation_id": _operation_id, "committed": False,
+                        }), 409
+                    _existing_operation = _settle_orphaned_lump_save_operation(
+                        _operation_id, _existing_operation)
+                    if _existing_operation.get("outcome") in {"committed", "rejected"}:
+                        _stored_response = _existing_operation.get("response") or {}
+                        return jsonify(_stored_response), (
+                            200 if _existing_operation.get("outcome") == "committed"
+                            else int(_existing_operation.get("status", 409)))
+                    return jsonify({
+                        "error": "save operation outcome is unknown; inspect its status before retrying",
+                        "operation_id": _operation_id, "committed": None,
+                    }), 409
+                _write_lump_save_operation(_operation_id, {
+                    "created_at": time.time(),
+                    "outcome": "pending",
+                    "session_binding": _operation_session_binding(),
+                    "candidate_id": _candidate_id,
+                    "original_payload": payload,
+                })
+                g._lump_save_operation_active = True
+        except Exception:
+            return jsonify({
+                "error": "unable to durably record save operation before validation",
+                "operation_id": _operation_id, "committed": None,
+            }), 503
+
     words    = payload.get("binary", [])
     metadata = payload.get("metadata", {})
+    if not isinstance(metadata, dict):
+        return jsonify({"error": "metadata must be an object"}), 400
+
+    # A previously issued plan is the sole authority for server-localized
+    # bytes and for a New Entry destination.  The supplied final binary must
+    # agree exactly; committing a recomputed browser candidate would reopen the
+    # plan/commit drift this endpoint is meant to close.
+    _early_plan_id = metadata.get(
+        "save_plan", metadata.get("save_plan_id", metadata.get("plan")))
+    _early_plan = None
+    if _early_plan_id:
+        with _LUMP_SAVE_PLANS_LOCK:
+            _early_plan = _LUMP_SAVE_PLANS.get(str(_early_plan_id))
+            if (_early_plan is None or _early_plan.get("expires", 0) < time.time()
+                    or _early_plan.get("session") != session.get("_lump_approval_session")):
+                _early_plan = None
+            else:
+                _early_plan = dict(_early_plan)
+        if _early_plan is None:
+            return jsonify({"error": "a valid save plan is required",
+                            "committed": False}), 403
+        _planned_words = _early_plan.get("final_binary")
+        if (not isinstance(_planned_words, list)
+                or any(isinstance(word, bool) or not isinstance(word, int)
+                       or not 0 <= word <= 0xFFFFFFFF for word in _planned_words)):
+            return jsonify({"error": "save plan has no valid finalized binary",
+                            "committed": None}), 409
+        if words != _planned_words:
+            return jsonify({
+                "error": "submitted binary does not equal the server-finalized save plan",
+                "plan_binary_mismatch": True, "committed": False,
+            }), 409
+        words = list(_planned_words)
+        metadata = dict(metadata, ns_slot=_early_plan.get("ns_slot"),
+                        token=_early_plan.get("token"))
+    elif metadata.get("new_entry") is True:
+        try:
+            metadata = dict(metadata, ns_slot=_allocate_new_lump_slot())
+        except ValueError as exc:
+            return jsonify({"error": f"New Entry allocation failed: {exc}",
+                            "committed": False}), 409
 
     if not words or len(words) < 2:
         return jsonify({"error": "Binary must contain at least a header and one code word"}), 400
@@ -9281,6 +9745,36 @@ def save_lump():
     _exist_filename = (_existing_entry or {}).get('filename', f'{token8}.lump')
     _existing_lump  = os.path.join(lumps_dir, _exist_filename)
     _existing_sc    = None
+    # The approval consequence belongs to the authoritative Namespace
+    # destination, not to an unrelated candidate token supplied by the editor.
+    # Keep _existing_entry below for candidate/history archival only.
+    _destination_entry = _existing_entry
+    if isinstance(ns_slot, int):
+        try:
+            _namespace_rows, _ = _read_authoritative_namespace_rows()
+        except (OSError, ValueError, TypeError, json.JSONDecodeError) as _destination_error:
+            return jsonify({"error": f"Namespace destination is unreadable: {_destination_error}",
+                            "committed": False}), 409
+        _destination_rows = [
+            row for row in _namespace_rows
+            if isinstance(row, dict) and row.get("slot") == ns_slot
+        ]
+        if len(_destination_rows) > 1:
+            return jsonify({"error": f"Namespace destination NS[{ns_slot}] is ambiguous",
+                            "committed": False}), 409
+        if _destination_rows:
+            _destination_state = dict(_destination_rows[0])
+            _destination_token = str(_destination_state.get("token") or "").lower()
+            _destination_manifest = next(
+                (entry for entry in manifest if isinstance(entry, dict)
+                 and entry.get("archived") is not True
+                 and str(entry.get("token") or "").lower() == _destination_token),
+                None,
+            )
+            _destination_entry = (
+                dict(_destination_manifest)
+                if _destination_manifest is not None else _destination_state
+            )
     _history_versions = _history_versions_for_abstraction(manifest)
 
     # ── Phase 2: Determine current version number ──────────────────────────────
@@ -9389,6 +9883,10 @@ def save_lump():
             if isinstance(_intrinsic_content, dict) else None),
         "capabilities":  list(_validated_declared_caps),
     }
+    if not _is_preflight:
+        # This marker is not a client authority.  It lets crash recovery prove
+        # that the exact operation reached the manifest-selected bytes.
+        new_entry["operation_id"] = _operation_id
     # Namespace state and boot configuration are the sole deployment authority.
 
     # Test hook: fires after all per-token I/O (Phase 5/6) but before the lock.
@@ -9397,18 +9895,35 @@ def save_lump():
     if _lumps_manifest_pre_write_hook is not None:
         _lumps_manifest_pre_write_hook()  # noqa: not-callable — callable at runtime
 
-    _plan_consequence = "replace" if _existing_entry else "create"
-    _derived_save_action = "replace" if _existing_entry else "save"
+    _plan_consequence = "replace" if _destination_entry else "create"
+    _derived_save_action = "replace" if _destination_entry else "save"
     # This endpoint only performs save/replace transitions. Alternate approval
     # classes belong to their dedicated mutation endpoints and must never let
     # an API caller bypass this endpoint's authoritative save plan.
     _approval_action = _derived_save_action
-    _replacement_identity = _manifest_entry_identity(_existing_entry)
+    _replacement_identity = _manifest_entry_identity(_destination_entry)
+    _relevant_dependency_slots = set()
+    for _candidate_capability in _validated_declared_caps:
+        if isinstance(_candidate_capability, dict):
+            _dependency_slot = _candidate_capability.get("nsIndex")
+            if isinstance(_dependency_slot, int):
+                _relevant_dependency_slots.add(_dependency_slot)
     try:
         _library_generation = _authoritative_lump_library_generation(
-            lumps_dir, manifest_path, manifest)
+            lumps_dir, manifest_path, manifest, token8=token8, ns_slot=ns_slot,
+            dependency_slots=_relevant_dependency_slots)
     except ValueError as _generation_error:
         return jsonify({"error": str(_generation_error)}), 409
+
+    if _early_plan is not None:
+        if (token8 != _early_plan.get("token")
+                or ns_slot != _early_plan.get("ns_slot")
+                or _binary_hash != _early_plan.get("digest")
+                or list(_sl_words) != _early_plan.get("final_binary")):
+            return jsonify({
+                "error": "server-finalized save plan no longer matches this candidate",
+                "plan_binary_mismatch": True, "committed": False,
+            }), 409
 
     if (metadata.get("_save_plan_preflight") is True
             and _lump_save_payload_override.get() is not None):
@@ -9422,19 +9937,30 @@ def save_lump():
                 "consequence": _plan_consequence,
                 "replacement_identity": _replacement_identity,
                 "generation": _library_generation, "expires": time.time() + 300,
+                # The output of canonicalisation is the approved artifact.  The
+                # commit endpoint accepts only these words, not a browser
+                # reconstruction that happened to share an earlier digest.
+                "final_binary": list(_sl_words),
+                "ns_slot": ns_slot,
+                "new_entry": metadata.get("new_entry") is True,
+                "candidate_id": _candidate_id,
             }
         return jsonify({
             "plan": plan_id, "plan_id": plan_id, "digest": _binary_hash,
+            "final_binary": list(_sl_words), "ns_slot": ns_slot,
+            "candidate_id": _candidate_id,
             "action": _approval_action,
             "destination": lump_filename, "consequence": _plan_consequence,
             "replacement_identity": _replacement_identity,
             "current_lump": ({
-                "abstraction": _existing_entry.get("abstraction"),
-                "display_name": _existing_entry.get("display_name"),
-                "dot_name": _existing_entry.get("dot_name"),
-                "token": _existing_entry.get("token"),
-                "filename": _existing_entry.get("filename"),
-            } if _existing_entry else None),
+                "abstraction": (_destination_entry.get("abstraction")
+                                or _destination_entry.get("name")),
+                "display_name": _destination_entry.get("display_name"),
+                "dot_name": _destination_entry.get("dot_name"),
+                "token": _destination_entry.get("token"),
+                "filename": _destination_entry.get("filename"),
+                "ns_slot": ns_slot,
+            } if _destination_entry else None),
             "expires_in": 300,
             "warnings": _save_warnings,
         }), 201
@@ -9511,6 +10037,48 @@ def save_lump():
                 "ns_slot_policy": "static",
             })
         return {NS_STATE_PATH: _build_ns_state_document(entries)}
+
+    _operation_response = {
+        "ok": True,
+        "committed": True,
+        "token": token8,
+        "lump": lump_filename,
+        "filename": lump_filename,
+        "immutable_filename": lump_filename,
+        "abstraction": abs_name,
+        "dot_name": _dot_name_save,
+        "issue_n": _issue_n_save,
+        "size_bytes": len(lump_bytes),
+        "lump_version": next_lump_version,
+        "compiled_at": _compiled_at,
+        "binary_hash": _binary_hash,
+        "digest": _binary_hash,
+        "ns_slot": ns_slot,
+        "candidate_id": _candidate_id,
+        # Immutable finalized words are stored with the durable operation, not
+        # re-resolved through a token that a later revision may replace.
+        "final_binary": list(_sl_words),
+        "operation_id": _operation_id,
+    }
+
+    def _save_additional_json(final_manifest_entry):
+        documents = _resident_additional_json(final_manifest_entry)
+        if getattr(g, "_lump_save_operation_active", False):
+            # Storing this with the history transition makes a committed status
+            # durable across response loss and process restart.
+            operation_document = _read_lump_save_operation(_operation_id) or {}
+            operation_document.update({
+                "outcome": "committed",
+                "status": 200,
+                "updated_at": time.time(),
+                "session_binding": _operation_session_binding(),
+                "response": dict(_operation_response,
+                                 filename=final_manifest_entry["filename"],
+                                 lump=final_manifest_entry["filename"],
+                                 lump_version=final_manifest_entry["lump_version"]),
+            })
+            documents[_lump_save_operation_path(_operation_id)] = operation_document
+        return documents
     # Only explicit-intent allowlisted extrinsic fields are retained. Every
     # structural/identity fact is derived from the exact inspected binary.
     approval = {
@@ -9576,6 +10144,30 @@ def save_lump():
             "safe_retry": True,
         }), 403
 
+    if getattr(g, "_lump_save_operation_active", False):
+        # This write is intentionally before the transaction.  If the process
+        # dies before the atomic operation record is staged, GET reports
+        # unknown rather than a false non-commit; the manifest marker above can
+        # be used by a later recovery implementation to prove completion.
+        try:
+            pending_operation = _read_lump_save_operation(_operation_id) or {}
+            pending_operation.update({
+                "outcome": "pending",
+                "expected": {
+                    "token": token8, "filename": lump_filename,
+                    "digest": _binary_hash, "ns_slot": ns_slot,
+                    "candidate_id": _candidate_id,
+                },
+                "response": _operation_response,
+                "updated_at": time.time(),
+            })
+            _write_lump_save_operation(_operation_id, pending_operation)
+        except Exception as exc:
+            return jsonify({
+                "error": f"unable to stage durable save operation: {exc}",
+                "operation_id": _operation_id, "committed": None,
+            }), 503
+
 
     _remove_after_commit = ()
     if _exist_filename == f"{token8}.lump":
@@ -9619,9 +10211,10 @@ def save_lump():
             variant_group=f"compiled_{abs_name.lower().replace(' ', '_')}",
             ns_slot=ns_slot,
             expected_manifest_entry=_existing_entry,
-            additional_json_builder=(
-                _resident_additional_json
-                if _prepared_ns_entries is not None else None
+            additional_json_builder=_save_additional_json,
+            operation_id=(
+                _operation_id
+                if getattr(g, "_lump_save_operation_active", False) else None
             ),
         )
     except _LumpTransitionConflict as _transition_conflict:
@@ -9651,26 +10244,6 @@ def save_lump():
     next_lump_version = _transition.get("next_version", next_lump_version)
     if _transition:
         print(f"[lumps] Archived {_exist_filename} → {_transition['lump']}", flush=True)
-
-        # Pruning is deliberately after the atomic transition.  A prune failure
-        # cannot invalidate the newly committed current pair or manifest.
-        _all_arc = []
-        for _fn in (os.listdir(lumps_dir) if os.path.isdir(lumps_dir) else []):
-            for _pp in [
-                _re_arch.compile(rf'^{_re_arch.escape(safe_name)}_v(\d+)\.lump$'),
-                _re_arch.compile(rf'^{_re_arch.escape(token8)}-v(\d+)\.lump$'),
-            ]:
-                _pm = _pp.match(_fn)
-                if _pm:
-                    _all_arc.append((int(_pm.group(1)), _fn))
-        _all_arc.sort()
-        for _, _old_fn in _all_arc[:max(0, len(_all_arc) - LUMP_MAX_ARCHIVE_VERSIONS)]:
-            _old_path = os.path.join(lumps_dir, _old_fn)
-            try:
-                if os.path.isfile(_old_path):
-                    os.remove(_old_path)
-            except OSError as _e:
-                logging.warning('[lumps] Could not prune %s: %s', _old_path, _e)
 
     print(f'[lumps] Saved {lump_filename} ({len(lump_bytes)} bytes)', flush=True)
 
@@ -9738,9 +10311,11 @@ def save_lump():
 
     resp: dict = {
         "ok":             True,
+        "committed":      True,
         "token":          token8,
         "lump":           lump_filename,
         "filename":       lump_filename,
+        "immutable_filename": lump_filename,
         "lump_path":      f'server/lumps/{lump_filename}',
         "abstraction":    abs_name,
         "dot_name":       _dot_name_save,
@@ -9749,6 +10324,10 @@ def save_lump():
         "lump_version":   next_lump_version,
         "compiled_at":    _compiled_at,
         "binary_hash":    _binary_hash,
+        "digest":         _binary_hash,
+        "ns_slot":        ns_slot,
+        "candidate_id":   _candidate_id,
+        "final_binary":   list(_sl_words),
         # Seal is the server-issued artifact identity returned to promotion
         # clients; never derive it from browser metadata.
         "seal":           ((_bootstrap_identity or {}).get("bootstrap_runtime_gt")
@@ -10355,9 +10934,25 @@ def get_lump_words(token_hex):
             and row.get("archived") is not True
             and str(row.get("token") or "").lower() == key8
         ]
-        if len(active_matches) != 1:
-            return jsonify({"error": f"No active LUMP found for token {key8}"}), 404
-        active_entry = active_matches[0]
+        if len(active_matches) == 1:
+            active_entry = active_matches[0]
+        else:
+            # Historical records have their own immutable record token.  A
+            # caller opening such a row must be able to inspect its exact
+            # recorded filename even after its former active token has changed
+            # (for example a capability migration).  This remains fail-closed:
+            # require one exact archived manifest locator bound to the supplied
+            # record token, never a filename-only fallback.
+            recorded_matches = [
+                row for row in archive_manifest
+                if isinstance(row, dict)
+                and row.get("archived") is True
+                and row.get("filename") == archive_filename
+                and str(row.get("token") or "").lower() == key8
+            ]
+            if len(recorded_matches) != 1:
+                return jsonify({"error": f"No active or recorded LUMP found for token {key8}"}), 404
+            active_entry = recorded_matches[0]
         archive_matches = [
             row for row in archive_manifest
             if isinstance(row, dict)
@@ -19593,6 +20188,131 @@ def _bank_custody_authorize_request(vault_id, data):
 class _LumpTransitionConflict(RuntimeError):
     """The current LUMP generation changed before a transition acquired its lock."""
 
+
+_LUMP_TRANSITION_JOURNAL = ".lump-transition-journal.json"
+
+
+def _fsync_path(path):
+    """Persist a staged file and its directory before advancing a journal."""
+    with open(path, "rb") as handle:
+        os.fsync(handle.fileno())
+    directory_fd = os.open(os.path.dirname(os.path.abspath(path)), os.O_RDONLY)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def _durable_atomic_json(path, document):
+    """Atomically write JSON and fsync the replacement and containing directory."""
+    _atomic_write_json(path, document)
+    _fsync_path(path)
+
+
+def _recover_lump_history_transition(lumps_dir):
+    """Recover an interrupted multi-file LUMP transition while its lock is held.
+
+    ``prepared`` deliberately rolls back, even if every replacement happened:
+    there is no durable commit marker proving all authoritative files became a
+    single revision.  ``committed`` retains replacements and merely removes
+    crash debris.  This is conservative by design: an operation status can
+    report true only after the durable commit marker.
+    """
+    journal_path = os.path.join(lumps_dir, _LUMP_TRANSITION_JOURNAL)
+    if not os.path.isfile(journal_path):
+        return
+    try:
+        with open(journal_path, encoding="utf-8") as handle:
+            journal = json.load(handle)
+        if not isinstance(journal, dict) or journal.get("version") != 1:
+            raise ValueError("invalid transition journal")
+        destinations = journal.get("destinations")
+        backups = journal.get("backups")
+        staged = journal.get("staged")
+        if (not isinstance(destinations, list) or not isinstance(backups, list)
+                or not isinstance(staged, list)):
+            raise ValueError("incomplete transition journal")
+        root = os.path.abspath(lumps_dir) + os.sep
+        def _safe(path):
+            path = os.path.abspath(path)
+            if not path.startswith(root):
+                raise ValueError("transition journal path escapes LUMP store")
+            return path
+        destinations = [_safe(path) for path in destinations]
+        backup_rows = []
+        for row in backups:
+            if not isinstance(row, dict):
+                raise ValueError("invalid transition backup record")
+            backup_rows.append((_safe(row["destination"]), _safe(row["backup"])))
+        staged = [_safe(path) for path in staged]
+        if journal.get("state") == "prepared":
+            # Verify every durable original before removing even one published
+            # target.  A missing backup is not a recoverable "best effort":
+            # retain the prepared journal and fail closed for an operator.
+            for _, backup in backup_rows:
+                if not os.path.lexists(backup):
+                    raise ValueError("transition backup is missing")
+            for destination in reversed(destinations):
+                if os.path.lexists(destination):
+                    os.remove(destination)
+            for destination, backup in reversed(backup_rows):
+                with open(backup, "rb") as source, open(destination, "wb") as target:
+                    target.write(source.read())
+                    target.flush()
+                    os.fsync(target.fileno())
+            directory_fd = os.open(lumps_dir, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+            operation_id = journal.get("operation_id")
+            if isinstance(operation_id, str) and _LUMP_SAVE_OPERATION_ID_RE.fullmatch(operation_id):
+                operation_path = os.path.join(
+                    lumps_dir, "save-operations", f"{operation_id}.json")
+                if os.path.isfile(operation_path):
+                    with open(operation_path, encoding="utf-8") as source:
+                        operation = json.load(source)
+                    if isinstance(operation, dict):
+                        operation.update({
+                            "outcome": "rejected",
+                            "status": 409,
+                            "updated_at": time.time(),
+                            "response": {
+                                "ok": False, "committed": False,
+                                "operation_id": operation_id,
+                                "error": (
+                                    "save transaction was durably rolled back "
+                                    "after interruption; retry with a new operation id"
+                                ),
+                            },
+                        })
+                        _durable_atomic_json(operation_path, operation)
+            # Publish completed rollback before deleting recovery material.
+            # A second interruption during cleanup must not require backups
+            # that have already been safely removed.
+            journal["state"] = "rolled_back"
+            _durable_atomic_json(journal_path, journal)
+            logging.warning("[lumps] recovered interrupted LUMP transition by rollback")
+        elif journal.get("state") not in {"committed", "rolled_back"}:
+            raise ValueError("unrecognized transition journal state")
+        for _, backup in backup_rows:
+            if os.path.lexists(backup):
+                os.remove(backup)
+        for staged_path in staged:
+            if os.path.lexists(staged_path):
+                os.remove(staged_path)
+        os.remove(journal_path)
+        directory_fd = os.open(lumps_dir, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except Exception:
+        # Never guess after a corrupt journal.  It remains visible for operator
+        # recovery and all transitions are blocked by the caller.
+        raise RuntimeError("LUMP transition recovery requires operator intervention")
+
+
 @contextlib.contextmanager
 def _lump_history_transition_lock(lumps_dir: str):
     """Serialize LUMP transitions across threads and server worker processes."""
@@ -19614,6 +20334,7 @@ def _lump_history_transition_lock(lumps_dir: str):
             fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
             _lump_history_lock_state.depth = 1
             try:
+                _recover_lump_history_transition(lumps_dir)
                 yield
             finally:
                 _lump_history_lock_state.depth = 0
@@ -19643,6 +20364,7 @@ def _commit_lump_history_transition(
     expected_manifest_entry=_LUMP_TRANSITION_UNSET,
     idempotent_if_forked: bool = False,
     additional_json_builder=None,
+    operation_id: str | None = None,
 ) -> dict:
     """Atomically commit one LUMP history transition.
 
@@ -19704,6 +20426,8 @@ def _commit_lump_history_transition(
         backups: list[tuple[str, str]] = []
         committed: list[str] = []
         temp_paths: list[str] = []
+        journal_path = os.path.join(lumps_dir, _LUMP_TRANSITION_JOURNAL)
+        journal = None
 
         # Version numbers are abstraction-wide, not token-wide.  A bootstrap
         # migration or an older filename stem can leave multiple immutable
@@ -19757,6 +20481,8 @@ def _commit_lump_history_transition(
             try:
                 with os.fdopen(fd, "wb") as fh:
                     fh.write(data)
+                    fh.flush()
+                    os.fsync(fh.fileno())
             except Exception:
                 try:
                     os.close(fd)
@@ -19771,6 +20497,7 @@ def _commit_lump_history_transition(
             path = _stage_bytes(b"", ".json")
             os.remove(path)
             _atomic_write_json(path, data)
+            _fsync_path(path)
             return path
 
         def _stage_copy(source: str, suffix: str) -> str:
@@ -19907,9 +20634,30 @@ def _commit_lump_history_transition(
                     # The staged copy must not be treated as a final artifact.
                     backups.append((destination, backup))
 
+            # The journal is the commit protocol's durable prepare record.
+            # It names every target and its fsynced original before the first
+            # replacement, so a power loss cannot leave a mixed authoritative
+            # manifest/approval/Namespace transaction silently active.
+            journal = {
+                "version": 1,
+                "state": "prepared",
+                "destinations": destinations,
+                "backups": [
+                    {"destination": destination, "backup": backup}
+                    for destination, backup in backups
+                ],
+                "staged": [stage for _, stage in staged],
+            }
+            if operation_id is not None:
+                if not _LUMP_SAVE_OPERATION_ID_RE.fullmatch(str(operation_id)):
+                    raise ValueError("operation_id is invalid")
+                journal["operation_id"] = operation_id
+            _durable_atomic_json(journal_path, journal)
+
             for destination, stage in staged:
                 os.replace(stage, destination)
                 committed.append(destination)
+                _fsync_path(destination)
 
             if compat_dest:
                 # The old path is backed up above, so replacing it with a
@@ -19918,38 +20666,96 @@ def _commit_lump_history_transition(
                     os.remove(compat_dest)
                 os.symlink(compat_new_filename, compat_dest)
                 committed.append(compat_dest)
+                directory_fd = os.open(lumps_dir, os.O_RDONLY)
+                try:
+                    os.fsync(directory_fd)
+                finally:
+                    os.close(directory_fd)
 
             for path in remove_paths:
                 if path and os.path.lexists(path) and os.path.abspath(path) != compat_dest:
                     os.remove(path)
+            directory_fd = os.open(lumps_dir, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
 
             # If the manifest path was not a basename (it normally is), the
             # staged destination above still uses its basename.  Reject that
             # configuration rather than silently committing somewhere else.
             if os.path.abspath(manifest_path) != _destination(os.path.basename(manifest_path)):
                 raise ValueError("manifest_path must be inside lumps_dir")
+            journal["state"] = "committed"
+            _durable_atomic_json(journal_path, journal)
         except Exception:
             # Remove replacements/symlinks first, then restore every original
             # destination.  Backups remain until the transition succeeds.
+            rollback_ok = True
             for destination in reversed(committed):
                 try:
                     if os.path.lexists(destination):
                         os.remove(destination)
                 except OSError:
-                    pass
+                    rollback_ok = False
+                    logging.exception("[lumps] Failed to remove transition target %s", destination)
             for destination, backup in reversed(backups):
                 try:
                     if os.path.lexists(destination):
                         os.remove(destination)
-                    if os.path.exists(backup):
-                        os.replace(backup, destination)
+                    if not os.path.exists(backup):
+                        raise OSError("transition backup is missing")
+                    with open(backup, "rb") as source, open(destination, "wb") as target:
+                        target.write(source.read())
+                        target.flush()
+                        os.fsync(target.fileno())
                 except OSError:
+                    rollback_ok = False
                     logging.exception("[lumps] Failed to restore transition backup %s", destination)
+            try:
+                directory_fd = os.open(lumps_dir, os.O_RDONLY)
+                try:
+                    os.fsync(directory_fd)
+                finally:
+                    os.close(directory_fd)
+            except OSError:
+                rollback_ok = False
+                logging.exception("[lumps] Failed to fsync restored transition")
+            if not rollback_ok:
+                # Keep the prepared journal and every backup.  Startup recovery
+                # can retry from durable originals; reporting rolled_back here
+                # would make a partial rollback look safe.
+                raise RuntimeError(
+                    "LUMP transition rollback did not complete; recovery journal retained")
+            if journal is not None and os.path.exists(journal_path):
+                try:
+                    journal["state"] = "rolled_back"
+                    _durable_atomic_json(journal_path, journal)
+                    # A crash during this cleanup is safe: the durable
+                    # rolled_back marker tells startup recovery to preserve
+                    # restored targets and only remove leftover debris.
+                    for _, backup in backups:
+                        if os.path.lexists(backup):
+                            os.remove(backup)
+                    if os.path.lexists(journal_path):
+                        os.remove(journal_path)
+                    directory_fd = os.open(lumps_dir, os.O_RDONLY)
+                    try:
+                        os.fsync(directory_fd)
+                    finally:
+                        os.close(directory_fd)
+                except Exception:
+                    logging.exception("[lumps] Failed to mark rolled-back transition")
             raise
         finally:
+            preserve_backups = (
+                {backup for _, backup in backups}
+                if journal is not None and journal.get("state") == "prepared"
+                else set()
+            )
             for path in temp_paths:
                 try:
-                    if os.path.lexists(path):
+                    if path not in preserve_backups and os.path.lexists(path):
                         os.remove(path)
                 except OSError:
                     pass
@@ -19961,11 +20767,87 @@ def _commit_lump_history_transition(
                     os.remove(backup)
             except OSError:
                 logging.warning("[lumps] Could not remove transition backup %s", backup)
+        if journal is not None and os.path.lexists(journal_path):
+            os.remove(journal_path)
+            directory_fd = os.open(lumps_dir, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
 
         return archive_info or {}
 
 
+@app.before_request
+def _recover_lump_transition_before_request():
+    """Recover, then hold the authoritative file locks through the response."""
+    path = request.path
+    # Only LUMP/Namespace API readers and mutators need a stable
+    # multi-file snapshot.  In particular do not serialize compilation,
+    # FPGA, report-sync, or boot-image generation requests behind a save.
+    if not (
+        path.startswith("/api/lump")
+        or path.startswith("/api/lumps")
+        or path.startswith("/api/boot-config")
+        or path in {
+            "/api/namespace-lump.json",
+            "/api/boot-image/ns-state",
+            "/api/boot-image/save-ns",
+        }
+    ):
+        return None
+    namespace_guard = None
+    history_guard = None
+    try:
+        namespace_guard = _namespace_commit_guard()
+        namespace_guard.__enter__()
+        history_guard = _lump_history_transition_lock(LUMPS_DIR)
+        history_guard.__enter__()
+        g._lump_request_namespace_guard = namespace_guard
+        g._lump_request_history_guard = history_guard
+    except Exception as exc:
+        if history_guard is not None:
+            try:
+                history_guard.__exit__(None, None, None)
+            except Exception:
+                logging.exception("[lumps] failed to release history guard after acquisition error")
+        if namespace_guard is not None:
+            try:
+                namespace_guard.__exit__(None, None, None)
+            except Exception:
+                logging.exception("[lumps] failed to release Namespace guard after acquisition error")
+        return jsonify({
+            "error": f"LUMP storage recovery is required before requests can proceed: {exc}",
+            "committed": None,
+        }), 503
+
+
+@app.teardown_request
+def _release_lump_transition_request_locks(_exception=None):
+    """Do not expose a prepared multi-file transition to a route reader."""
+    history_guard = getattr(g, "_lump_request_history_guard", None)
+    namespace_guard = getattr(g, "_lump_request_namespace_guard", None)
+    if history_guard is not None:
+        history_guard.__exit__(None, None, None)
+    if namespace_guard is not None:
+        namespace_guard.__exit__(None, None, None)
+
+
+# Imports are startup for both the development server and WSGI workers.  Do an
+# eager best-effort recovery here; the before-request guard above remains the
+# fail-closed boundary if an operator-visible corrupt journal cannot be read.
+try:
+    with _namespace_commit_guard():
+        with _lump_history_transition_lock(LUMPS_DIR):
+            pass
+except RuntimeError:
+    logging.exception("[lumps] startup transition recovery is blocked")
+
+
 if __name__ == "__main__":
     _port = int(os.environ.get("E2E_PORT", 5000))
+    with _namespace_commit_guard():
+        with _lump_history_transition_lock(LUMPS_DIR):
+            pass
     logging.info("Starting Church Machine server on port %d", _port)
     _bind_with_retry(_port)

@@ -122,12 +122,12 @@ function response(status, body) {
     const start = source.indexOf('function confirmSaveToNamespace()');
     const end = source.indexOf('function saveNamespaceState()', start);
     const body = source.slice(start, end);
-    check('server request precedes simulator replacement mutation',
-        body.indexOf('_lumpSaveRequest(') < body.indexOf('sim.saveToNamespaceAt('));
+    check('server request precedes repository-artifact reload',
+        body.indexOf('_lumpSaveRequest(') < body.indexOf('_reloadCommittedLumpArtifact('));
     const successCallback = body.slice(body.indexOf("_lumpSaveRequest(fetch, '/api/lumps/save'"));
-    check('confirmed repository success closes modal before local state work',
+    check('confirmed repository success closes modal before local state reload',
         successCallback.indexOf('closeSaveDialog();') >= 0 &&
-        successCallback.indexOf('closeSaveDialog();') < successCallback.indexOf('sim.saveToNamespaceAt('));
+        successCallback.indexOf('closeSaveDialog();') < successCallback.indexOf('_reloadCommittedLumpArtifact('));
     check('successful save gives actionable Namespace and Run guidance',
         successCallback.includes('Open Namespace to inspect it') &&
         successCallback.includes('choose Run to execute'));
