@@ -171,20 +171,53 @@ def test_runtime_stream_does_not_touch_legacy_synthetic_stream(diagnostic_store)
     assert (diagnostic_store / "save-runtime-diagnostics.jsonl").exists()
 
 
-def test_browser_origin_requires_existing_session_and_origin_header(diagnostic_store):
+def test_browser_origin_requires_origin_but_bootstraps_diagnostic_session(
+        diagnostic_store):
     with app_module.app.test_client() as client:
         missing_origin = client.post(
             "/api/lumps/save-diagnostics",
             headers={"User-Agent": "Mozilla/5.0"},
             json={"events": []},
         )
-        no_session = client.post(
+        fresh_same_origin = client.post(
             "/api/lumps/save-diagnostics",
             headers={"Origin": "http://localhost"},
             json={"events": []},
         )
+        with client.session_transaction() as saved_session:
+            diagnostic_session = saved_session.get(
+                app_module._LUMP_SAVE_DIAGNOSTIC_SESSION_KEY)
+            approval_session = saved_session.get("_lump_approval_session")
     assert missing_origin.status_code == 403
-    assert no_session.status_code == 403
+    assert fresh_same_origin.status_code == 202
+    assert isinstance(diagnostic_session, str)
+    assert len(diagnostic_session) >= 16
+    assert approval_session is None
+
+
+def test_fresh_diagnostics_session_does_not_authorize_save(
+        diagnostic_store):
+    with app_module.app.test_client() as client:
+        diagnostic = client.post(
+            "/api/lumps/save-diagnostics",
+            headers={"Origin": "http://localhost"},
+            json={"events": []},
+        )
+        save = client.post(
+            "/api/lumps/save",
+            json={
+                "binary": [0xF8000401, 0],
+                "metadata": {
+                    "abstraction": "FreshDiagnosticSave",
+                    "capabilities": [],
+                },
+            },
+        )
+
+    assert diagnostic.status_code == 202
+    # A diagnostic bootstrap is not a save preflight or approval intent.
+    assert save.status_code == 403
+    assert "save plan" in save.get_json()["error"]
 
 
 def test_batch_size_and_rate_limits_are_fail_closed(diagnostic_store, monkeypatch):

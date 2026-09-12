@@ -211,7 +211,9 @@ function _materializeRunCapabilities(capabilities, actionLabel) {
         capabilities: [
             ...(hasSelf ? [{
                 name: '__SELF__', rights: ['E'], grants: ['E'], nsIndex: null,
-                compiler_owned_self: true, token: tokenWords[0] >>> 0,
+                compiler_owned_self: true, placeholder: true,
+                identity_contract: 'dynamic-local',
+                token: tokenWords[0] >>> 0,
             }] : []),
             ...materialized.resolvedCaps.map((cap, index) => ({
             name: cap.name,
@@ -219,6 +221,11 @@ function _materializeRunCapabilities(capabilities, actionLabel) {
             grants: cap.grants.slice(),
             nsIndex: cap.nsIndex,
             token: tokenWords[index + (hasSelf ? 1 : 0)] >>> 0,
+            ...(cap.pending === true ? { pending: true } : {}),
+            ...(cap.placeholder === true ? { placeholder: true } : {}),
+            ...(cap.identity_contract
+                ? { identity_contract: cap.identity_contract }
+                : {}),
             }))
         ],
     };
@@ -12503,6 +12510,42 @@ async function _preserveStaleLumpSaveDiagnostic(snapshot, label) {
     return diagnostic;
 }
 
+function _recordEarlyLumpSaveValidationFailure(snapshot, label, message, binary) {
+    const metadata = {
+        abstraction: label || (snapshot && snapshot.pending &&
+            snapshot.pending.abstractionName) || 'unsaved compilation',
+        operation_key: [
+            'step2-validation',
+            (snapshot && snapshot.token) || '',
+            (snapshot && snapshot.registeredAt) || 0,
+            label || '',
+        ].join(':'),
+    };
+    try {
+        if (typeof _lumpSaveEnsureOperationId === 'function') {
+            _lumpSaveEnsureOperationId({ metadata, binary: Array.isArray(binary)
+                ? binary : [] });
+        }
+    } catch (_) {}
+    const diagnostics = typeof window !== 'undefined'
+        ? window.LumpSaveDiagnostics : null;
+    if (diagnostics) {
+        try {
+            diagnostics.begin(metadata, 'lump.save-step2');
+            diagnostics.stageStart(metadata, 'prepare', 'lump.save-step2', {
+                outcome: 'unknown',
+            });
+            diagnostics.stageException(
+                metadata,
+                'prepare',
+                new Error(String(message || 'candidate validation failed')),
+                { outcome: 'rejected' }
+            );
+        } catch (_) {}
+    }
+    return metadata;
+}
+
 function showSaveToNamespace() {
     // Use LumpRegistry as the authoritative source — the compile path
     // (app-run.js ~L464) registers words there, NOT into lastAssembledWords.
@@ -15582,6 +15625,77 @@ async function _reloadCommittedLumpArtifact(response, fallbackName) {
     return committedWords;
 }
 
+function _validateFinalLumpSaveBinary(words, capabilities) {
+    if (!Array.isArray(words) || words.length < 2) {
+        throw new Error('authoritative save plan returned no complete LUMP binary');
+    }
+    if (typeof CapabilityTokens === 'undefined' ||
+            typeof sim === 'undefined' || !sim ||
+            typeof sim.parseLumpHeader !== 'function') {
+        throw new Error('final LUMP capability validator is unavailable');
+    }
+    const header = sim.parseLumpHeader(words[0] >>> 0);
+    const cc = Number(header && header.cc);
+    const lumpSize = Number(header && header.lumpSize);
+    if (!header || header.valid === false ||
+            !Number.isInteger(cc) || cc < 0 ||
+            !Number.isInteger(lumpSize) || lumpSize < 2 ||
+            words.length < lumpSize || lumpSize - cc < 1) {
+        throw new Error('authoritative save plan returned an invalid LUMP header');
+    }
+    const caps = Array.isArray(capabilities) ? capabilities : [];
+    const start = lumpSize - cc;
+    // A capability-free legacy candidate may be expanded by the server to its
+    // row-zero identity seal.  There is no declaration to resolve in that
+    // case, but the final bytes must still be concrete.
+    if (caps.length === 0) {
+        for (let row = 0; row < cc; row++) {
+            const word = (words[start + row] || 0) >>> 0;
+            if (word === 0 || (word >>> 16) === 0xFEED) {
+                throw new Error(
+                    `authoritative save plan left c-list row ${row} unresolved`
+                );
+            }
+        }
+        return true;
+    }
+    if (caps.length !== cc) {
+        throw new Error(
+            `authoritative save plan capability count ${cc} differs from the saved declaration count ${caps.length}`
+        );
+    }
+    const resolved = CapabilityTokens.resolveCapabilities(caps, {
+        sim,
+        lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache))
+            ? _lumpsCache : [],
+    });
+    const validation = CapabilityTokens.validateClist(
+        words, start, resolved,
+        {
+            sim,
+            lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache))
+                ? _lumpsCache : [],
+        }
+    );
+    if (!validation.ok) {
+        throw new Error(
+            'authoritative save plan failed final c-list validation: ' +
+            validation.errors.join(' ')
+        );
+    }
+    // Keep this explicit even though validateClist rejects FEED markers: the
+    // final-byte invariant is security-relevant and must not regress if a
+    // future capability validator grows an intermediate-mode option.
+    for (let row = 0; row < cc; row++) {
+        if (((words[start + row] || 0) >>> 16) === 0xFEED) {
+            throw new Error(
+                `authoritative save plan left c-list row ${row} as an unresolved placeholder`
+            );
+        }
+    }
+    return true;
+}
+
 async function confirmSaveToNamespace() {
     const slotSel = document.getElementById('saveNSSlot');
     const label = document.getElementById('saveNSLabel').value.trim();
@@ -15602,14 +15716,47 @@ async function confirmSaveToNamespace() {
     };
     const gtType = parseInt(document.getElementById('saveNSType').value) || 0;
     const _saveSnapshot = window._saveNSPreparedSnapshot || null;
-    if (_saveSnapshot && _saveSnapshot.sourceMatchesEditor === false) {
+    let _staleSnapshotReason = _saveSnapshot &&
+        _saveSnapshot.sourceMatchesEditor === false
+        ? 'the compiled source snapshot already differed from the editor'
+        : '';
+    if (_saveSnapshot) {
+        // The two-dialog handoff must not silently save an older registry
+        // entry if a compile/navigation refresh happened while Step 2 was
+        // open.  Compare the live registry identity before using the frozen
+        // snapshot; otherwise its own registeredAt value would make the
+        // pending-binary check appear fresh forever.
+        const _liveToken = window.LumpRegistry &&
+            typeof window.LumpRegistry.getCurrent === 'function'
+            ? window.LumpRegistry.getCurrent() : null;
+        const _liveEntry = window.LumpRegistry &&
+            typeof window.LumpRegistry.resolve === 'function'
+            ? window.LumpRegistry.resolve(_liveToken) : null;
+        const _liveMemory = _liveEntry && _liveEntry.sources &&
+            _liveEntry.sources.memory;
+        if (_saveSnapshot.token && _liveToken !== _saveSnapshot.token) {
+            _staleSnapshotReason = 'the active LUMP changed after the save dialog opened';
+        } else if (_saveSnapshot.registeredAt !== undefined &&
+                (!_liveMemory ||
+                    (_liveMemory.registeredAt || 0) !== (_saveSnapshot.registeredAt || 0))) {
+            _staleSnapshotReason = 'the compiled registry entry changed after the save dialog opened';
+        }
+        const _liveEditor = document.getElementById('asmEditor');
+        if (!_staleSnapshotReason &&
+                typeof _saveSnapshot.editorSourceText === 'string' &&
+                _liveEditor &&
+                String(_liveEditor.value || '') !== _saveSnapshot.editorSourceText) {
+            _staleSnapshotReason = 'the editor changed after the save dialog opened';
+        }
+    }
+    if (_staleSnapshotReason) {
         let diagnostic;
         try {
             diagnostic = await _preserveStaleLumpSaveDiagnostic(_saveSnapshot, label);
         } catch (preservationError) {
             console.warn('[SaveNS] server diagnostic candidate preservation failed:', preservationError);
         }
-        const message = 'Save blocked: the editor changed after the compiled source snapshot. ' +
+        const message = 'Save blocked: ' + _staleSnapshotReason + '. ' +
             'The compiler source/words pair and divergent editor buffer were retained as diagnostics; ' +
             'compile the current source before saving so source and words remain one immutable pair.' +
             (diagnostic && diagnostic.operation_id
@@ -15677,6 +15824,12 @@ async function confirmSaveToNamespace() {
             var _curAt = (_svRegMem && _svRegMem.registeredAt) ? _svRegMem.registeredAt : 0;
             if (_curAt !== _snapshotPending.registeredAt) {
                 console.warn('[SaveLump] pending binary is stale (registeredAt mismatch); rebuilding.');
+                return false;
+            }
+            if (_saveSnapshot && _snapshotPending.token &&
+                    _saveSnapshot.token &&
+                    _snapshotPending.token !== _saveSnapshot.token) {
+                console.warn('[SaveLump] pending binary is stale (registry token mismatch); rebuilding.');
                 return false;
             }
             return true;
@@ -15796,10 +15949,26 @@ async function confirmSaveToNamespace() {
             _svBinary,
             _preSaveHdr.lumpSize - _preSaveHdr.cc,
             _preSaveResolved,
-            { sim }
+            {
+                sim,
+                lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache))
+                    ? _lumpsCache : [],
+                // The compiler-owned row-zero SELF is the only marker
+                // allowed before authoritative save preparation chooses the
+                // destination Namespace slot.
+                allowCompilerSelfPlaceholder: true,
+            }
         );
         if (!_preSaveValidation.ok) {
-            alert('Save blocked: ' + _preSaveValidation.errors.join(' '));
+            const _preSaveMessage = 'Save blocked: ' +
+                _preSaveValidation.errors.join(' ');
+            _recordEarlyLumpSaveValidationFailure(
+                _saveSnapshot,
+                label,
+                _preSaveMessage,
+                _svBinary
+            );
+            alert(_preSaveMessage);
             return;
         }
     }
@@ -15876,6 +16045,9 @@ async function confirmSaveToNamespace() {
                     ? _snapshotPending.selectedProfile
                     : (typeof _fallbackProfile !== 'undefined' && _fallbackProfile
                         ? _fallbackProfile : null),
+                compiler_owned_self: !!(_caps[0] &&
+                    _caps[0].compiler_owned_self === true &&
+                    String(_caps[0].name || '').toUpperCase() === '__SELF__'),
                 petname: _svPetname,
                 issue_number: _svIssueNumber,
                 grants:       Object.keys(perms).filter(function(p) { return perms[p]; }),
@@ -15910,7 +16082,13 @@ async function confirmSaveToNamespace() {
             }
             _saveApproval = await window._confirmLumpSavePlan(
                 _svPayload.binary, _svPayload.metadata,
-                () => `Save "${_svAbsName}" to Namespace slot ${idx}?`);
+                () => `Save "${_svAbsName}" to Namespace slot ${idx}?`,
+                {
+                    validateFinalBinary: function(finalBinary) {
+                        _validateFinalLumpSaveBinary(finalBinary, _caps);
+                    },
+                }
+            );
             if (!_saveApproval) {
                 _setSaveNSFeedback('info',
                     'Not saved — confirmation was cancelled. Your compiled source and words remain preserved.');

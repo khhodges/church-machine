@@ -115,7 +115,7 @@ register_suite "check-selftest-lump-stale" \
     'node scripts/check_selftest_lump_stale.js && node scripts/test_check_selftest_lump_stale.js && node scripts/test_build_selftest_lump_cleanup.js'
 
 register_suite "lump-save-snapshot-tests" \
-    'node simulator/test_lump_save_snapshot.js'
+    'node simulator/test_lump_save_snapshot.js && node simulator/test_compile_save_roundtrip.js'
 
 register_suite "editor-action-menu-tests" \
     'node simulator/test_editor_action_menu.js'
@@ -204,6 +204,9 @@ register_suite "lump-meta-patch-validation-tests" \
 
 register_suite "lump-save-error-surface-tests" \
     'python -m pytest tests/server/test_capabilitytest_replacement.py -v && node simulator/test_lump_save_error_surface.js && node simulator/test_capabilitytest_save.js'
+
+register_suite "lump-save-boundary-tests" \
+    'node simulator/test_lump_save_boundaries.js'
 
 register_suite "lump-roundtrip" \
     'node simulator/test_lump_roundtrip.js'
@@ -496,7 +499,7 @@ declare -A ALL_GROUPS
 
 ALL_GROUPS["boot"]="boot-image-matches-sim boot-image-loads-and-boots boot-image-upload-endpoint boot-image-serve-endpoints boot-layout-regression boot-entry-hw-image-tests"
 
-ALL_GROUPS["lump"]="lump-consistency lump-history-tests lump-v13-freespace-tests lump-binary-tests wukong-callhome-hw-lump-tests lump-roundtrip editor-roundtrip-tests lump-gt-display-tests update-lump-tests lump-meta-patch-validation-tests"
+ALL_GROUPS["lump"]="lump-consistency lump-history-tests lump-v13-freespace-tests lump-binary-tests wukong-callhome-hw-lump-tests lump-save-boundary-tests lump-roundtrip editor-roundtrip-tests lump-gt-display-tests update-lump-tests lump-meta-patch-validation-tests"
 
 ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests warning-panel-tests bare-space-ns-fallback-tests disasm-panel-tests lump-dir-disasm-tooltip-tests hw-trace-live-movable-tests execution-identity-tests boot-entry-sync-tests install-boot-entry-cr0-tests ns-slot-dynamic-tests rogue-namespace-slot-tests ns-slot-policy-restore-tests ns-slot-modal-persist-tests build-approval-slot-rule-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests openin-links-tests open-lump-freshness-tests lump-warning-tests call-cr6-l-perm-tests return-cr6-l-perm-tests load-through-l-perm-cr6-tests return-cr14-trace-tests wukong-cr-update-tests wukong-hw-fault-tests wukong-trace-cr-server-tests return-fetch-lump-tests constants-lump-tests"
 

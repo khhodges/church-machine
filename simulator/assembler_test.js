@@ -3654,11 +3654,9 @@ if (false) {
 //
 // ELOADCALL name-resolution behaviour with a prior LOAD in the same assembly:
 //   When "LOAD CR11, Constants" precedes the ELOADCALL lines, the assembler's
-//   nsLoaded map records Constants→11 (the CR number).  _resolveNSName checks
-//   nsLoaded before nsSymbols, so for the ELOADCALL instructions the c-list
-//   row field (imm[7:0]) is set to 11 — the number of the CR that holds the
-//   abstraction — rather than the namespace slot 18.  This is the assembler's
-//   current defined behaviour and the assertions below pin it explicitly.
+//   nsLoaded map records Constants→11 (the CR number).  C-list operands use an
+//   independent lookup, so the row field remains the namespace slot 18 rather
+//   than the number of the CR that holds the abstraction.
 
 {
     const CONSTANTS_CONVENTIONS = {
@@ -3727,10 +3725,10 @@ HALT`;
         result.words.length === 19, `got ${result.words.length}`);
 
     // CD6–CD10: word[10] = ELOADCALL CR8, Constants, Pi  (Style B)
-    // At this point nsLoaded['Constants']=11 from the earlier LOAD, so
-    // _resolveNSName('Constants') returns 11 (CR number) — not the NS slot 18.
-    // R-type split: imm[4:0] = 11 (c-list row); imm[11:5] = 1 (Pi index 0, stored 1-based)
-    // full imm  = (1<<5)|11 = 0x002B = 43
+    // At this point nsLoaded['Constants']=11 from the earlier LOAD, but c-list
+    // operands still resolve Constants to namespace slot 18.
+    // R-type split: imm[4:0] = 18 (c-list row); imm[11:5] = 1 (Pi index 0, stored 1-based)
+    // full imm  = (1<<5)|18 = 0x0032 = 50
     {
         const w      = result.words[10] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
@@ -3745,8 +3743,8 @@ HALT`;
             crDst === 8, `got crDst=${crDst}`);
         assert('CD8 ELOADCALL CR8, Constants, Pi — crSrc=6 (c-list root)',
             crSrc === 6, `got crSrc=${crSrc}`);
-        assert('CD9 ELOADCALL CR8, Constants, Pi — c-list row=11 (nsLoaded[Constants]=11)',
-            row === 11, `got row=${row}`);
+        assert('CD9 ELOADCALL CR8, Constants, Pi — c-list row=18 (namespace slot, independent of nsLoaded)',
+            row === 18, `got row=${row}`);
         assert('CD10 ELOADCALL CR8, Constants, Pi — method=1 (Pi index 0, stored 1-based)',
             method === 1, `got method=${method}`);
     }
@@ -3808,7 +3806,7 @@ HALT`;
     }
 
     // CD23–CD25: word[11] = ELOADCALL CR8, Constants, E  (index 1, stored 1-based → method=2)
-    // R-type split: imm[4:0]=11 (nsLoaded[Constants]), imm[11:5]=2  →  full imm=(2<<5)|11=0x004B=75
+    // R-type split: imm[4:0]=18 (namespace slot), imm[11:5]=2  →  full imm=(2<<5)|18=0x0052=82
     {
         const w      = result.words[11] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
@@ -3818,14 +3816,14 @@ HALT`;
         const method = (imm >>> 5) & 0x7F;
         assert('CD23 ELOADCALL CR8, Constants, E — opcode=8 (ELOADCALL)',
             opcode === 8, `got opcode=${opcode}`);
-        assert('CD24 ELOADCALL CR8, Constants, E — c-list row=11 (nsLoaded[Constants]=11)',
-            row === 11, `got row=${row}`);
+        assert('CD24 ELOADCALL CR8, Constants, E — c-list row=18 (namespace slot, independent of nsLoaded)',
+            row === 18, `got row=${row}`);
         assert('CD25 ELOADCALL CR8, Constants, E — method=2 (E index 1, stored 1-based)',
             method === 2, `got method=${method}`);
     }
 
     // CD26–CD28: word[14] = ELOADCALL CR8, Constants, One  (index 4, stored 1-based → method=5)
-    // R-type split: imm[4:0]=11 (nsLoaded[Constants]), imm[11:5]=5  →  full imm=(5<<5)|11=0x00AB=171
+    // R-type split: imm[4:0]=18 (namespace slot), imm[11:5]=5  →  full imm=(5<<5)|18=0x00B2=178
     {
         const w      = result.words[14] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
@@ -3835,14 +3833,14 @@ HALT`;
         const method = (imm >>> 5) & 0x7F;
         assert('CD26 ELOADCALL CR8, Constants, One — opcode=8 (ELOADCALL)',
             opcode === 8, `got opcode=${opcode}`);
-        assert('CD27 ELOADCALL CR8, Constants, One — c-list row=11 (nsLoaded[Constants]=11)',
-            row === 11, `got row=${row}`);
+        assert('CD27 ELOADCALL CR8, Constants, One — c-list row=18 (namespace slot, independent of nsLoaded)',
+            row === 18, `got row=${row}`);
         assert('CD28 ELOADCALL CR8, Constants, One — method=5 (One index 4, stored 1-based)',
             method === 5, `got method=${method}`);
     }
 
     // CD29–CD31: word[12] = ELOADCALL CR8, Constants, Phi  (index 2, stored 1-based → method=3)
-    // R-type split: imm[4:0]=11 (nsLoaded[Constants]), imm[11:5]=3  →  full imm=(3<<5)|11=0x006B=107
+    // R-type split: imm[4:0]=18 (namespace slot), imm[11:5]=3  →  full imm=(3<<5)|18=0x0072=114
     {
         const w      = result.words[12] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
@@ -3852,14 +3850,14 @@ HALT`;
         const method = (imm >>> 5) & 0x7F;
         assert('CD29 ELOADCALL CR8, Constants, Phi — opcode=8 (ELOADCALL)',
             opcode === 8, `got opcode=${opcode}`);
-        assert('CD30 ELOADCALL CR8, Constants, Phi — c-list row=11 (nsLoaded[Constants]=11)',
-            row === 11, `got row=${row}`);
+        assert('CD30 ELOADCALL CR8, Constants, Phi — c-list row=18 (namespace slot, independent of nsLoaded)',
+            row === 18, `got row=${row}`);
         assert('CD31 ELOADCALL CR8, Constants, Phi — method=3 (Phi index 2, stored 1-based)',
             method === 3, `got method=${method}`);
     }
 
     // CD32–CD34: word[13] = ELOADCALL CR8, Constants, Zero  (index 3, stored 1-based → method=4)
-    // R-type split: imm[4:0]=11 (nsLoaded[Constants]), imm[11:5]=4  →  full imm=(4<<5)|11=0x008B=139
+    // R-type split: imm[4:0]=18 (namespace slot), imm[11:5]=4  →  full imm=(4<<5)|18=0x0092=146
     {
         const w      = result.words[13] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
@@ -3869,10 +3867,100 @@ HALT`;
         const method = (imm >>> 5) & 0x7F;
         assert('CD32 ELOADCALL CR8, Constants, Zero — opcode=8 (ELOADCALL)',
             opcode === 8, `got opcode=${opcode}`);
-        assert('CD33 ELOADCALL CR8, Constants, Zero — c-list row=11 (nsLoaded[Constants]=11)',
-            row === 11, `got row=${row}`);
+        assert('CD33 ELOADCALL CR8, Constants, Zero — c-list row=18 (namespace slot, independent of nsLoaded)',
+            row === 18, `got row=${row}`);
         assert('CD34 ELOADCALL CR8, Constants, Zero — method=4 (Zero index 3, stored 1-based)',
             method === 4, `got method=${method}`);
+    }
+}
+
+// ── Independent c-list lookup and selector bounds (task-3430) ───────────────
+// A LOAD records a register binding for CALL's register form, but it must not
+// change the c-list row selected by later ELOADCALL/XLOADLAMBDA operands.
+{
+    const conventions = {
+        Constants: {
+            Pi: { index: 0 }
+        }
+    };
+    const ns = { Constants: 18 };
+
+    for (const cr of ['CR0', 'CR3']) {
+        const a = new ChurchAssembler(conventions);
+        a.setNamespace(ns);
+        const result = a.assemble(`LOAD ${cr}, Constants\nELOADCALL CR8, Constants, Pi`);
+        const word = result.words[1] >>> 0;
+        assert(`C3430 ${cr} prior LOAD does not replace ELOADCALL row`,
+            result.errors.length === 0 && (word & 0x1F) === 18,
+            result.errors.map(e => e.message).join('; '));
+    }
+
+    for (const cr of ['CR0', 'CR3', 'CR7']) {
+        const a = new ChurchAssembler();
+        const result = a.assemble(
+            `capabilities { SELF E, SelfTest E }\nLOAD ${cr}, SelfTest\nELOADCALL CR1, SelfTest`
+        );
+        const word = result.words[1] >>> 0;
+        assert(`C3430 ${cr} prior LOAD preserves declared SelfTest row 1`,
+            result.errors.length === 0 && (word & 0x1F) === 1,
+            result.errors.map(e => e.message).join('; '));
+    }
+
+    {
+        const a = new ChurchAssembler();
+        a.setNamespace(ns);
+        const result = a.assemble('LOAD CR3, Constants\nXLOADLAMBDA CR8, Constants');
+        const word = result.words[1] >>> 0;
+        assert('C3430 prior LOAD does not replace XLOADLAMBDA row',
+            result.errors.length === 0 && (word & 0x7FFF) === 18,
+            result.errors.map(e => e.message).join('; '));
+    }
+
+    // .pet CR aliases remain numeric method selectors while the encoded CALL
+    // selector uses the full imm15 range.
+    {
+        const a = new ChurchAssembler();
+        const result = a.assemble('.pet selector CR3\nCALL CR0, selector');
+        const word = result.words[0] >>> 0;
+        assert('C3430 CR alias selector encodes alias value + 1',
+            result.errors.length === 0 && (word & 0x7FFF) === 4,
+            result.errors.map(e => e.message).join('; '));
+    }
+    {
+        const a = new ChurchAssembler();
+        const result = a.assemble('CALL CR0, 16383');
+        assert('C3430 CALL accepts maximum selector 16383',
+            result.errors.length === 0 && ((result.words[0] >>> 0) & 0x7FFF) === 16384,
+            result.errors.map(e => e.message).join('; '));
+    }
+    {
+        const a = new ChurchAssembler();
+        a.assemble('CALL CR0, 16384');
+        assert('C3430 CALL rejects selector 16384 without truncating silently',
+            a.errors.some(e => e.message.includes('0–16383')),
+            a.errors.map(e => e.message).join('; '));
+    }
+    {
+        const a = new ChurchAssembler(conventions);
+        a.setNamespace(ns);
+        a.assemble('ELOADCALL CR0, Constants, 126');
+        assert('C3430 ELOADCALL accepts maximum method index 126',
+            a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    }
+    {
+        const a = new ChurchAssembler(conventions);
+        a.setNamespace(ns);
+        a.assemble('ELOADCALL CR0, Constants, 127');
+        assert('C3430 ELOADCALL rejects method index 127',
+            a.errors.some(e => e.message.includes('0–126')),
+            a.errors.map(e => e.message).join('; '));
+    }
+    {
+        const a = new ChurchAssembler();
+        a.assemble('XLOADLAMBDA CR0, CR6, 32768');
+        assert('C3430 XLOADLAMBDA rejects c-list offset 32768',
+            a.errors.some(e => e.message.includes('0–32767')),
+            a.errors.map(e => e.message).join('; '));
     }
 }
 

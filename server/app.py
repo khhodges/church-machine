@@ -109,11 +109,87 @@ _COMPILE_API_TOKEN = os.environ.get('COMPILE_API_TOKEN', '')
 _SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SERVER_DIR not in sys.path:
     sys.path.insert(0, _SERVER_DIR)
-# Release-test subprocesses can point the writable LUMP library at a temporary
-# copy.  Production and normal development keep using server/lumps/.
-_LUMPS_DIR_OVERRIDE = os.environ.get("CHURCH_TEST_LUMPS_DIR", "").strip()
-if _LUMPS_DIR_OVERRIDE:
-    _LUMPS_DIR_OVERRIDE = os.path.abspath(_LUMPS_DIR_OVERRIDE)
+
+
+def _env_flag(name):
+    """Return whether an environment flag is explicitly enabled."""
+    return os.environ.get(name, "").strip().lower() in {
+        "1", "true", "yes", "on",
+    }
+
+
+# Release-test subprocesses can point writable server state at a temporary
+# copy.  The isolated browser harness opts into a stricter mode below; all
+# four writable roots are then mandatory and every override is checked against
+# the real production destination before any application state is opened.
+_ISOLATED_TEST_MODE = (
+    _env_flag("CHURCH_TEST_ISOLATED_MODE")
+    or _env_flag("CHURCH_TEST_ISOLATED")
+)
+_PRODUCTION_WRITABLE_PATHS = {
+    "CHURCH_TEST_LUMPS_DIR": (
+        os.path.realpath(os.path.join(_SERVER_DIR, "lumps")), True),
+    "CHURCH_TEST_BOOT_CONFIG_PATH": (
+        os.path.realpath(os.path.join(_SERVER_DIR, "boot-config.json")), False),
+    "CHURCH_TEST_BUILD_SNAPSHOTS_DIR": (
+        os.path.realpath(os.path.join(_SERVER_DIR, "build-snapshots")), True),
+    "CHURCH_TEST_DB_PATH": (
+        os.path.realpath(os.path.join(_SERVER_DIR, "church_machine.db")), False),
+}
+
+
+def _test_path_override(name):
+    """Read one test path and reject the corresponding production target."""
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return ""
+    candidate = os.path.realpath(os.path.abspath(raw))
+    production, is_directory = _PRODUCTION_WRITABLE_PATHS[name]
+    try:
+        inside_server_tree = os.path.commonpath(
+            (candidate, os.path.realpath(_SERVER_DIR))) == os.path.realpath(_SERVER_DIR)
+    except ValueError:
+        inside_server_tree = False
+    if inside_server_tree:
+        is_production_path = True
+    elif is_directory:
+        try:
+            is_production_path = os.path.commonpath(
+                (candidate, production)) == production
+        except ValueError:
+            is_production_path = False
+    else:
+        is_production_path = candidate == production
+    if is_production_path:
+        raise RuntimeError(
+            f"{name} points to production writable state ({candidate}); "
+            "refusing to start with a production test override"
+        )
+    return candidate
+
+
+_LUMPS_DIR_OVERRIDE = _test_path_override("CHURCH_TEST_LUMPS_DIR")
+_BOOT_CONFIG_PATH_OVERRIDE = _test_path_override(
+    "CHURCH_TEST_BOOT_CONFIG_PATH")
+_BUILD_SNAPSHOTS_DIR_OVERRIDE = _test_path_override(
+    "CHURCH_TEST_BUILD_SNAPSHOTS_DIR")
+_DB_PATH_OVERRIDE = _test_path_override("CHURCH_TEST_DB_PATH")
+
+if _ISOLATED_TEST_MODE:
+    _missing_isolated_overrides = [
+        name for name in _PRODUCTION_WRITABLE_PATHS
+        if not os.environ.get(name, "").strip()
+    ]
+    if _missing_isolated_overrides:
+        raise RuntimeError(
+            "CHURCH_TEST_ISOLATED_MODE requires disposable overrides for: "
+            + ", ".join(_missing_isolated_overrides)
+        )
+    logging.info(
+        "Isolated test mode enabled; external report jobs, GitHub checks, "
+        "and Wukong listeners will not start"
+    )
+
 # `python server/app.py` puts only server/ on sys.path.  The Wukong symbol
 # module lives under the repository root, so make that importable before the
 # optional symbol import below.  Without this, the running workflow silently
@@ -270,6 +346,11 @@ _LUMP_SAVE_DIAGNOSTIC_MAX_RATE_KEYS = 2048
 _LUMP_SAVE_DIAGNOSTIC_RATE_LOCK = threading.Lock()
 _LUMP_SAVE_DIAGNOSTIC_RATE = {}
 _LUMP_SAVE_DIAGNOSTIC_GLOBAL_RATE = []
+# Diagnostic delivery may begin before the IDE has opened a save/approval
+# flow.  Keep its signed-session binding separate from the save authorization
+# binding: accepting a same-origin diagnostic must never create or prove a
+# ``_lump_approval_session``.
+_LUMP_SAVE_DIAGNOSTIC_SESSION_KEY = "_lump_save_diagnostic_session"
 
 _LUMP_DIAGNOSTIC_STRING_LIMITS = {
     "attempt_id": 128, "operation_id": 128, "candidate_id": 128,
@@ -700,17 +781,32 @@ def _diagnostic_origin_is_same_site():
     return supplied in allowed
 
 
+def _diagnostic_session_binding():
+    """Return a diagnostics-only signed-session binding.
+
+    A fresh IDE tab reports capture or validation failures before the save
+    preflight has established an approval session.  The diagnostics stream is
+    intentionally metadata-only and same-origin gated, so it can bootstrap
+    this separate rate-limit binding without granting any save capability.
+    """
+    binding = session.get(_LUMP_SAVE_DIAGNOSTIC_SESSION_KEY)
+    if (not isinstance(binding, str)
+            or not re.fullmatch(r"[A-Za-z0-9_-]{16,128}", binding)):
+        binding = secrets.token_urlsafe(24)
+        session[_LUMP_SAVE_DIAGNOSTIC_SESSION_KEY] = binding
+    return binding
+
+
 def _diagnostic_has_session_proof():
-    """Require the approval/session cookie for browser-origin reporting."""
-    return bool(session.get("_lump_approval_session"))
+    """Return whether this browser has a diagnostics-only session binding."""
+    binding = session.get(_LUMP_SAVE_DIAGNOSTIC_SESSION_KEY)
+    return (isinstance(binding, str)
+            and bool(re.fullmatch(r"[A-Za-z0-9_-]{16,128}", binding)))
 
 
 def _diagnostic_rate_allowed():
     """Bound browser reporting without retaining the caller address."""
-    binding = session.get("_lump_approval_session")
-    if not binding:
-        binding = session.setdefault(
-            "_lump_approval_session", secrets.token_urlsafe(24))
+    binding = _diagnostic_session_binding()
     key = hashlib.sha256(
         (str(app.secret_key) + "|diagnostics|" + str(binding)).encode("utf-8")
     ).hexdigest()
@@ -770,8 +866,6 @@ def save_lump_diagnostics():
 
     if not _diagnostic_origin_is_same_site():
         return _rejected("same-origin diagnostics required", 403)
-    if request.headers.get("Origin") and not _diagnostic_has_session_proof():
-        return _rejected("diagnostic session required", 403)
     if not _diagnostic_rate_allowed():
         return _rejected("diagnostic reporting rate limit exceeded", 429)
     if request.content_length and request.content_length > _LUMP_SAVE_DIAGNOSTIC_MAX_BATCH_BYTES:
@@ -907,7 +1001,11 @@ def api_m_bit_ide_access():
     return response
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "church_machine.db")
+db_path = (
+    _DB_PATH_OVERRIDE
+    if _DB_PATH_OVERRIDE
+    else os.path.join(os.path.dirname(os.path.abspath(__file__)), "church_machine.db")
+)
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -3052,10 +3150,8 @@ def api_state_delete(state_id):
 # (resident lumps), `step3` (reserved empty NS slots), and the binary image
 # generator settings.
 # File spec uses a hyphen (boot-config.json) per docs/foundation-lump-design.md §4.
-_BOOT_CONFIG_PATH_OVERRIDE = os.environ.get(
-    "CHURCH_TEST_BOOT_CONFIG_PATH", "").strip()
 BOOT_CONFIG_PATH = (
-    os.path.abspath(_BOOT_CONFIG_PATH_OVERRIDE)
+    _BOOT_CONFIG_PATH_OVERRIDE
     if _BOOT_CONFIG_PATH_OVERRIDE
     else os.path.join(os.path.dirname(os.path.abspath(__file__)),
                       "boot-config.json")
@@ -9205,7 +9301,17 @@ def save_lump():
         words = list(_planned_words)
         metadata = dict(metadata, ns_slot=_early_plan.get("ns_slot"),
                         token=_early_plan.get("token"))
-    elif metadata.get("new_entry") is True:
+    elif (
+        metadata.get("new_entry") is True
+        # compileAndBuild uses the dynamic Namespace policy with a null slot
+        # rather than the Save-to-Namespace dialog's explicit new_entry flag.
+        # Resolve that destination here, before SELF canonicalisation, so the
+        # authoritative preparation path is identical for both callers.
+        or (
+            metadata.get("ns_slot") is None
+            and metadata.get("ns_slot_policy") == "dynamic"
+        )
+    ):
         try:
             metadata = dict(metadata, ns_slot=_allocate_new_lump_slot())
         except ValueError as exc:
@@ -9528,6 +9634,93 @@ def save_lump():
         _sl_words.extend([0] * (_sl_lsz - len(_sl_words)))
 
     _clist_row0_idx = _sl_lsz - _sl_cc2
+    if (_compiler_self_row and ns_slot is None
+            and _portable_binding is None):
+        # A compiler-owned SELF row is only an intermediate representation.
+        # It may be accepted by preparation when the caller selected a
+        # Namespace destination, but it must never be persisted as an
+        # unresolved artifact with no authoritative sequence/slot.
+        return jsonify({
+            "error": (
+                "Namespace identity validation failed: compiler-owned "
+                "SELF requires a selected Namespace slot before saving."
+            ),
+            "namespace_identity_failed": True,
+            "clist_row": 0,
+            "expected_placeholder": _SELF_CAPABILITY_PLACEHOLDER,
+            "safe_retry": True,
+        }), 422
+
+    if _compiler_self_row and _portable_binding is None and ns_slot is not None:
+        # Only the compiler's exact symbolic SELF marker may be reminted as
+        # part of this preparation stage.  In particular, a FEED-prefixed
+        # value is not evidence that the compiler emitted a placeholder:
+        # malformed, zero, or foreign words must not be silently replaced by
+        # the authoritative Namespace GT.
+        _submitted_self_word = _sl_words[_clist_row0_idx] & 0xFFFFFFFF
+        _compiler_self_provenance = (
+            isinstance(_declared_caps_raw[0], dict)
+            and _declared_caps_raw[0].get("compiler_owned_self") is True
+        )
+        _concrete_self_word = (
+            # The 9-bit sequence occupies bits 24..16, so bit 24 must not
+            # participate in the fixed SELF E-GT shape comparison.  In
+            # particular, sequence 256/511 legitimately produce 0x4B... .
+            (_submitted_self_word & 0xFE000000) == 0x4A000000
+        )
+        _concrete_retry_context = (
+            _is_preflight or _early_plan is not None or
+            _is_bootstrap_canonical
+        )
+        if _submitted_self_word == _SELF_CAPABILITY_PLACEHOLDER:
+            if not (_compiler_self_provenance or _is_bootstrap_canonical):
+                return jsonify({
+                    "error": (
+                        "SELF intermediate contract failed: compiler-owned "
+                        "SELF requires exact marker provenance "
+                        "compiler_owned_self=true before Namespace rewrite."
+                    ),
+                    "self_intermediate_contract_failed": True,
+                    "clist_row": 0,
+                    "expected_placeholder": _SELF_CAPABILITY_PLACEHOLDER,
+                    "actual_word": _submitted_self_word,
+                    "safe_retry": True,
+                }), 422
+        elif not (_concrete_self_word and _concrete_retry_context):
+            return jsonify({
+                "error": (
+                    "SELF intermediate contract failed: c-list row 0 must "
+                    "contain the exact compiler marker "
+                    f"0x{_SELF_CAPABILITY_PLACEHOLDER:08X}, or an already "
+                    "concrete server-finalized SELF GT for a valid retry."
+                ),
+                "self_intermediate_contract_failed": True,
+                "clist_row": 0,
+                "expected_placeholder": _SELF_CAPABILITY_PLACEHOLDER,
+                "actual_word": _submitted_self_word,
+                "safe_retry": True,
+            }), 422
+        _misplaced_self_rows = [
+            _row for _row in range(1, _sl_cc2)
+            if ((_sl_words[_clist_row0_idx + _row] & 0xFFFFFFFF) >> 16) == 0xFEED
+        ]
+        if _misplaced_self_rows:
+            _misplaced_row = _misplaced_self_rows[0]
+            _misplaced_word = (
+                _sl_words[_clist_row0_idx + _misplaced_row] & 0xFFFFFFFF)
+            return jsonify({
+                "error": (
+                    "Capability validation failed: compiler-owned SELF "
+                    f"placeholder is misplaced at c-list row {_misplaced_row} "
+                    f"(0x{_misplaced_word:08X}); row 0 is the only legal "
+                    "intermediate location."
+                ),
+                "capability_validation_failed": True,
+                "clist_row": _misplaced_row,
+                "actual_word": _misplaced_word,
+                "safe_retry": True,
+            }), 422
+
     def _warn_clist0_owner_mismatch(_expected, _actual):
         _expected &= 0xFFFFFFFF
         _actual &= 0xFFFFFFFF
@@ -9799,6 +9992,32 @@ def save_lump():
         except ValueError as _portable_error:
             return jsonify({"error": f"Portable binding validation failed: {_portable_error}",
                             "portable_binding_validation_failed": True}), 422
+
+    # No compiler SELF placeholder may cross the final preparation boundary.
+    # The compiler-owned row is rewritten above from the selected Namespace
+    # descriptor; any marker still present is either misplaced or an
+    # undeclared client-supplied placeholder.  Keep this final byte gate
+    # independent of metadata names so a forged/non-SELF declaration cannot
+    # turn the reserved marker into an accepted artifact.
+    _unresolved_self_rows = [] if _portable_binding is not None else [
+        _row for _row in range(_sl_cc2)
+        if ((_sl_words[_clist_row0_idx + _row] & 0xFFFFFFFF) >> 16) == 0xFEED
+    ]
+    if _unresolved_self_rows:
+        _unresolved_row = _unresolved_self_rows[0]
+        _unresolved_word = (
+            _sl_words[_clist_row0_idx + _unresolved_row] & 0xFFFFFFFF)
+        return jsonify({
+            "error": (
+                "Capability validation failed: c-list row "
+                f"{_unresolved_row} contains an unresolved placeholder "
+                f"(0x{_unresolved_word:08X}); resolve it before saving."
+            ),
+            "capability_validation_failed": True,
+            "clist_row": _unresolved_row,
+            "actual_word": _unresolved_word,
+            "safe_retry": True,
+        }), 422
 
     # Older binaries can reserve several all-zero c-list rows before the
     # server writes the legacy identity seal at row 0. Preserve that inert
@@ -10108,7 +10327,8 @@ def save_lump():
     _submitted_profile = metadata.get("output_profile")
     if _submitted_profile is not None:
         _intrinsic_profile = (
-            _intrinsic_content.get("tier")
+            {0: "api", 1: "compact", 2: "full"}.get(
+                _intrinsic_content.get("tier"))
             if isinstance(_intrinsic_content, dict) else None)
         if _submitted_profile != _intrinsic_profile:
             return jsonify({
@@ -10665,6 +10885,56 @@ def save_lump():
                 "committed": False,
                 "safe_retry": True,
             }), 422
+        if _compiler_self_row:
+            # Recompute the live SELF word from the Namespace state returned by
+            # preparation while the commit locks are held.  The preflight
+            # rewrite is not itself final authority: a stale candidate must
+            # not be allowed to commit if the selected descriptor changed.
+            _prepared_self_rows = [
+                _row for _row in _prepared_ns_entries
+                if isinstance(_row, dict) and _row.get("slot") == ns_slot
+            ]
+            if len(_prepared_self_rows) != 1:
+                return jsonify({
+                    "error": (
+                        "Namespace identity validation failed: final "
+                        f"SELF destination NS[{ns_slot}] is not unique."
+                    ),
+                    "namespace_identity_failed": True,
+                    "committed": False,
+                    "safe_retry": True,
+                }), 422
+            _prepared_self_sequence = _prepared_self_rows[0].get("seq", 0)
+            if (isinstance(_prepared_self_sequence, bool)
+                    or not isinstance(_prepared_self_sequence, int)
+                    or not 0 <= _prepared_self_sequence <= 0x1FF):
+                return jsonify({
+                    "error": (
+                        "Namespace identity validation failed: final SELF "
+                        f"sequence is invalid for NS[{ns_slot}]."
+                    ),
+                    "namespace_identity_failed": True,
+                    "committed": False,
+                    "safe_retry": True,
+                }), 422
+            _final_self_gt = _boot_image_gen.create_gt(
+                _prepared_self_sequence, ns_slot, {"E": 1}, 1)
+            _final_self_word = _sl_words[_clist_row0_idx] & 0xFFFFFFFF
+            if _final_self_word != _final_self_gt:
+                return jsonify({
+                    "error": (
+                        "Namespace identity validation failed: final "
+                        f"c-list row 0 must be 0x{_final_self_gt:08X} for "
+                        f"NS[{ns_slot}] sequence {_prepared_self_sequence}; "
+                        f"got 0x{_final_self_word:08X}."
+                    ),
+                    "namespace_identity_failed": True,
+                    "clist_row": 0,
+                    "expected_word": _final_self_gt,
+                    "actual_word": _final_self_word,
+                    "committed": False,
+                    "safe_retry": True,
+                }), 422
 
     def _resident_additional_json(final_manifest_entry):
         if _prepared_ns_entries is None:
@@ -15768,61 +16038,73 @@ with app.app_context():
 
     logging.info("Database tables created")
 
-    from daily_report import _ensure_tracking_table as _dr_ensure_table, get_report_token as _get_report_token, check_github_pat_lfs_scope as _check_pat_lfs
-    _dr_ensure_table(db_path)
-    _report_token = _get_report_token()
-    logging.info(
-        "Report tracking table ready | auth enabled (set REPORT_TOKEN secret to persist token)"
-    )
-    _check_pat_lfs()
-
-    try:
-        from apscheduler.schedulers.background import BackgroundScheduler
-        from apscheduler.triggers.cron import CronTrigger
-        from apscheduler.triggers.interval import IntervalTrigger
-
-        _scheduler = BackgroundScheduler(timezone="UTC")
-
-        from daily_report import send_daily_report as _send_report, run_lfs_backup as _run_lfs_backup, run_code_sync as _run_code_sync
-
-        _scheduler.add_job(
-            _send_report,
-            CronTrigger(hour=5, minute=0, timezone="UTC"),
-            id="daily_report",
-            replace_existing=True,
-            name="Daily progress and cost report",
-            args=[db_path],
-        )
-
-        _scheduler.add_job(
-            _run_lfs_backup,
-            CronTrigger(hour=3, minute=0, timezone="UTC"),
-            id="nightly_lfs_backup",
-            replace_existing=True,
-            name="Nightly LFS backup to GitHub",
-        )
-
-        _scheduler.add_job(
-            _run_code_sync,
-            IntervalTrigger(minutes=30),
-            id="periodic_code_sync",
-            replace_existing=True,
-            name="Periodic code sync to GitHub (every 30 min)",
-        )
-        _scheduler.start()
+    _scheduler = None
+    if _ISOLATED_TEST_MODE:
+        # The disposable browser harness must not import or initialize report
+        # integrations: importing the scheduler is enough to create a worker
+        # thread, and the PAT scope check performs a live GitHub request.
         logging.info(
-            "APScheduler started — daily report at 05:00 UTC, LFS backup at 03:00 UTC, "
-            "code sync every 30 min"
+            "Isolated test mode: report tracking, GitHub PAT checks, "
+            "APScheduler report/LFS/code-sync jobs disabled"
         )
-    except Exception as _sched_exc:
-        logging.warning("APScheduler could not start: %s", _sched_exc)
+    else:
+        from daily_report import _ensure_tracking_table as _dr_ensure_table, get_report_token as _get_report_token, check_github_pat_lfs_scope as _check_pat_lfs
+        _dr_ensure_table(db_path)
+        _report_token = _get_report_token()
+        logging.info(
+            "Report tracking table ready | auth enabled (set REPORT_TOKEN secret to persist token)"
+        )
+        _check_pat_lfs()
+
+        try:
+            from apscheduler.schedulers.background import BackgroundScheduler
+            from apscheduler.triggers.cron import CronTrigger
+            from apscheduler.triggers.interval import IntervalTrigger
+
+            _scheduler = BackgroundScheduler(timezone="UTC")
+
+            from daily_report import send_daily_report as _send_report, run_lfs_backup as _run_lfs_backup, run_code_sync as _run_code_sync
+
+            _scheduler.add_job(
+                _send_report,
+                CronTrigger(hour=5, minute=0, timezone="UTC"),
+                id="daily_report",
+                replace_existing=True,
+                name="Daily progress and cost report",
+                args=[db_path],
+            )
+
+            _scheduler.add_job(
+                _run_lfs_backup,
+                CronTrigger(hour=3, minute=0, timezone="UTC"),
+                id="nightly_lfs_backup",
+                replace_existing=True,
+                name="Nightly LFS backup to GitHub",
+            )
+
+            _scheduler.add_job(
+                _run_code_sync,
+                IntervalTrigger(minutes=30),
+                id="periodic_code_sync",
+                replace_existing=True,
+                name="Periodic code sync to GitHub (every 30 min)",
+            )
+            _scheduler.start()
+            logging.info(
+                "APScheduler started — daily report at 05:00 UTC, LFS backup at 03:00 UTC, "
+                "code sync every 30 min"
+            )
+        except Exception as _sched_exc:
+            logging.warning("APScheduler could not start: %s", _sched_exc)
 
     # ── Wukong Ethernet UDP listener ─────────────────────────────────────────
     # Listens on UDP port 5900 for Wukong XC7A100T callhome frames.
     # Parses frames by token (0xb169bba4 = Ethernet abstraction Pet-Name GT),
     # logs them to _callhome_log, and replies with lump-serve responses.
     _wukong_listener = None
-    if _wukong_udp is not None:
+    if _ISOLATED_TEST_MODE:
+        logging.info("Isolated test mode: Wukong UDP listener disabled")
+    elif _wukong_udp is not None:
         def _on_wukong_callhome(entry):
             """Handle a Wukong callhome event on the UDP listener thread."""
             log_entry = {
@@ -19020,7 +19302,11 @@ import struct as _ba_struct          # module — call sites use 3-arg unpack_fr
 import hashlib as _ba_hashlib
 import datetime as _ba_datetime
 
-_BUILD_SNAPSHOTS_DIR  = os.path.join(_SERVER_DIR, 'build-snapshots')
+_BUILD_SNAPSHOTS_DIR  = (
+    _BUILD_SNAPSHOTS_DIR_OVERRIDE
+    if _BUILD_SNAPSHOTS_DIR_OVERRIDE
+    else os.path.join(_SERVER_DIR, 'build-snapshots')
+)
 _LUMPS_DIR            = LUMPS_DIR          # alias to the project-wide constant
 
 _BA_NONCE_TTL_SECS    = 300               # nonce valid for 5 minutes

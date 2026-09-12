@@ -416,7 +416,7 @@ class ChurchAssembler {
     }
 
     // _resolveNSNameBracket(nameToken, idxToken)
-    // Tries _resolveNSName(nameToken) first; if that fails:
+    // Tries the independent c-list lookup for nameToken first; if that fails:
     //   • idxToken is a bare decimal  → tries the bracket form "NAME[N]"
     //     (handles the tokenizer splitting "LED[0]" into "LED" "0")
     //   • idxToken is a plain word    → tries the two-word form "NAME WORD"
@@ -427,22 +427,26 @@ class ChurchAssembler {
         const idx  = (idxToken  || '').replace(/,/g, '').trim();
 
         // 1. Single-token lookup (idxToken not needed).
-        const slot = this._resolveNSName(nameToken);
-        if (slot !== null) return { slot, key: name, consumed: false };
+        // This helper is used by the c-list operand forms (LOAD/SAVE and the
+        // fused instructions), so a name already bound to a CR must not win
+        // over its c-list row.  _resolveNSName intentionally gives loaded CR
+        // aliases priority for register operands such as CALL.
+        const cList = this._resolveCListName(nameToken);
+        if (cList !== null) return { slot: cList.slot, key: cList.key, consumed: false };
 
         // 2. Bracket form: tokenizer split "LED[0]" → "LED" + "0".
         if (idx && /^\d+$/.test(idx)) {
             const combined = name + '[' + idx + ']';
-            const slotBr = this._resolveNSName(combined);
-            if (slotBr !== null) return { slot: slotBr, key: combined, consumed: true };
+            const slotBr = this._resolveCListName(combined);
+            if (slotBr !== null) return { slot: slotBr.slot, key: slotBr.key, consumed: true };
         }
 
         // 3. Two-word abstraction name: tokenizer split "Symbolic Math" → "Symbolic" + "Math".
         //    Only when idxToken is a plain identifier (not a number, not empty).
         if (idx && /^[A-Za-z_]\w*$/.test(idx)) {
             const combined2 = name + ' ' + idx;
-            const slot2 = this._resolveNSName(combined2);
-            if (slot2 !== null) return { slot: slot2, key: combined2, consumed: true };
+            const slot2 = this._resolveCListName(combined2);
+            if (slot2 !== null) return { slot: slot2.slot, key: slot2.key, consumed: true };
         }
 
         return null;
@@ -472,32 +476,37 @@ class ChurchAssembler {
         return true;
     }
 
-    _resolveNSName(token) {
+    // Resolve a name to the c-list row it denotes.  This deliberately does
+    // not consult nsLoaded: nsLoaded is a register binding (Name → CRn), while
+    // this helper is for fresh c-list accesses (Name → row).  Keeping those
+    // namespaces separate prevents a preceding `LOAD CR0, Name` or
+    // `LOAD CR3, Name` from changing a later named ELOADCALL/XLOADLAMBDA row.
+    //
+    // Returns { slot, key } so callers can retain the canonical spelling used
+    // by the source maps.  The old _resolveNSName API below still returns only
+    // the numeric value for existing register/immediate callers.
+    _resolveCListName(token) {
         if (!token) return null;
         const name = token.replace(/,/g, '').trim();
 
-        // 1. Currently loaded into a CR (e.g. after  LOAD CR6, LED)
-        const loadedKey = ChurchAssembler._nameKey(this.nsLoaded, name);
-        if (loadedKey !== null) return this.nsLoaded[loadedKey];
-
-        // 1.5. Capabilities-block pre-pass — every capability declared in this
+        // 1. Capabilities-block pre-pass — every capability declared in this
         //      assembly's  capabilities { }  block gets its 0-based position as its
         //      c-list offset.  This covers LED devices, NS-based abstractions, and
         //      null-GT rows alike.  A program with a capabilities block defines its
         //      OWN c-list layout; the DEMO_CLIST slots (paths 2–3) must not override.
         //      For programs without a capabilities block, _capBlockSlots is {}.
         const capKey = ChurchAssembler._nameKey(this._capBlockSlots, name);
-        if (capKey !== null) return this._capBlockSlots[capKey];
+        if (capKey !== null) return { slot: this._capBlockSlots[capKey], key: capKey };
 
         // 2. Namespace Table (populated via setNamespace from the abstraction slot map)
         const nsKey = ChurchAssembler._nameKey(this.nsSymbols, name);
-        if (nsKey !== null) return this.nsSymbols[nsKey];
+        if (nsKey !== null) return { slot: this.nsSymbols[nsKey], key: nsKey };
 
         // 2.5. Null-GT row pet names (setClistSlots) — user-named c-list slots that
         //      hold no NS entry (e.g. "Mum" at slot 5).  These map directly to the
         //      c-list offset used in  LOAD  CRd, CR6[0x0005].
         const clistKey = ChurchAssembler._nameKey(this._clistSlots, name);
-        if (clistKey !== null) return this._clistSlots[clistKey];
+        if (clistKey !== null) return { slot: this._clistSlots[clistKey], key: clistKey };
 
         // 3. LED<N> shorthand — all LED0–LED5 share the LED_DEV GT at boot
         //    c-list slot 3 (clistGTs[3] = LED_DEV, MMIO 0x40000000, lim17=4).
@@ -507,7 +516,7 @@ class ChurchAssembler {
         const ledMatch = name.match(/^LED(\d)$/i) || name.match(/^LED\[(\d)\]$/i);
         if (ledMatch) {
             const n = parseInt(ledMatch[1], 10);
-            if (n >= 0 && n <= 5) return 3;   // all LEDs → LED_DEV GT at clistGTs[3]
+            if (n >= 0 && n <= 5) return { slot: 3, key: name };   // all LEDs → LED_DEV GT at clistGTs[3]
         }
 
         // 3.2. Hardware device shorthands — boot c-list positions in the current
@@ -523,9 +532,9 @@ class ChurchAssembler {
         //      it appears in the Namespace Table and resolves via nsSymbols above.
         {
             const nameUC = name.toUpperCase();
-            if (nameUC === 'UART' || nameUC === 'UART_TX' || nameUC === 'UART_RX')  return 2;
-            if (nameUC === 'BTN')   return 4;
-            if (nameUC === 'TIMER') return 5;
+            if (nameUC === 'UART' || nameUC === 'UART_TX' || nameUC === 'UART_RX')  return { slot: 2, key: name };
+            if (nameUC === 'BTN')   return { slot: 4, key: name };
+            if (nameUC === 'TIMER') return { slot: 5, key: name };
         }
 
         // 3.5. Boot-image fixed capability names — always present in the boot c-list
@@ -539,17 +548,31 @@ class ChurchAssembler {
         //        [4]=BTN_DEV [5]=TIMER_DEV  [6]=SelfTest  [7]=null
         //      Boot.Abstr was historically at slot 3 (before the NS slot migration to 6).
         //      Do NOT revert to 3 — that slot is LED_DEV and the CALL would silently misfire.
-        if (name === 'Boot.Nucs')  return 7;
-        if (name === 'Boot.Abstr') return 6;
+        if (name === 'Boot.Nucs')  return { slot: 7, key: name };
+        if (name === 'Boot.Abstr') return { slot: 6, key: name };
 
         // 4. Abstract registry (last resort — returns the abstraction's own index)
         const reg = ChurchAssembler._sharedRegistry;
         if (reg) {
             const abs = reg.getByName(name);
-            if (abs !== null) return abs.index;
+            if (abs !== null) return { slot: abs.index, key: name };
         }
 
         return null;
+    }
+
+    _resolveNSName(token) {
+        if (!token) return null;
+        const name = token.replace(/,/g, '').trim();
+
+        // Register operands use the loaded-CR binding, not the c-list row.
+        // This is what makes `LOAD CR3, Foo` followed by `CALL Foo` resolve
+        // CALL's source to CR3.
+        const loadedKey = ChurchAssembler._nameKey(this.nsLoaded, name);
+        if (loadedKey !== null) return this.nsLoaded[loadedKey];
+
+        const cList = this._resolveCListName(token);
+        return cList === null ? null : cList.slot;
     }
 
     static setRegistry(registry) {
@@ -1344,21 +1367,30 @@ class ChurchAssembler {
                 if (res0 !== null && (!parts[3] || res0.consumed)) {
                     this._checkCapDeclared(res0.key, lineNum);
                     crSrc = 6;   // CR6 = c-list root by convention
-                    // _resolveNSName path-1 returns the CR register number stored in
-                    // nsLoaded (e.g. 1 for CR1), not the c-list slot index.  For a
-                    // 2-operand LOAD the programmer intends a fresh c-list access; use
-                    // _capBlockSlots directly so slot=0 is encoded, not the CR number.
-                    if (!parts[3] && this._capBlockSlots && this._capBlockSlots[res0.key] !== undefined) {
-                        const capKey0 = ChurchAssembler._nameKey(this._capBlockSlots, res0.key);
-                        imm = this._capBlockSlots[capKey0];
-                    } else {
-                        imm = res0.slot;
+                    // res0 comes from the independent c-list lookup, never
+                    // nsLoaded.  A repeated named LOAD therefore keeps using
+                    // the named row even when the name was previously loaded
+                    // into CR0, CR3, or another register.
+                    imm = res0.slot;
+                    if (!Number.isInteger(imm) || imm < 0 || imm > 0x7FFF) {
+                        this.errors.push({
+                            line: lineNum,
+                            ...this._tokenCols(this._currentLineText, res0.key),
+                            message: `LOAD c-list offset ${imm} is out of range (0–32767 allowed).`
+                        });
                     }
                     this._recordNsLoaded(res0.key, crDst);
                 } else {
                     crSrc = this._parseCR(parts[2], lineNum);
                     this._checkPrivCR(crSrc, 'LOAD', lineNum);
                     imm   = this._parseImm(parts[3], lineNum);
+                    if (imm < 0 || imm > 0x7FFF) {
+                        this.errors.push({
+                            line: lineNum,
+                            ...this._tokenCols(this._currentLineText, parts[3] || ''),
+                            message: `LOAD c-list offset ${imm} is out of range (0–32767 allowed).`
+                        });
+                    }
                 }
                 break;
             }
@@ -1371,17 +1403,28 @@ class ChurchAssembler {
                 const res1 = this._resolveNSNameBracket(parts[2], parts[3]);
                 if (res1 !== null && (!parts[3] || res1.consumed)) {
                     crSrc = 6;
-                    if (!parts[3] && this._capBlockSlots && this._capBlockSlots[res1.key] !== undefined) {
-                        const capKey1 = ChurchAssembler._nameKey(this._capBlockSlots, res1.key);
-                        imm = this._capBlockSlots[capKey1];
-                    } else {
-                        imm = res1.slot;
+                    // As with LOAD, a named SAVE always addresses the named
+                    // c-list row, not the destination CR recorded in nsLoaded.
+                    imm = res1.slot;
+                    if (!Number.isInteger(imm) || imm < 0 || imm > 0x7FFF) {
+                        this.errors.push({
+                            line: lineNum,
+                            ...this._tokenCols(this._currentLineText, res1.key),
+                            message: `SAVE c-list offset ${imm} is out of range (0–32767 allowed).`
+                        });
                     }
                     this._recordNsLoaded(res1.key, crDst);
                 } else {
                     crSrc = this._parseCR(parts[2], lineNum);
                     this._checkPrivCR(crSrc, 'SAVE', lineNum);
                     imm   = this._parseImm(parts[3], lineNum);
+                    if (imm < 0 || imm > 0x7FFF) {
+                        this.errors.push({
+                            line: lineNum,
+                            ...this._tokenCols(this._currentLineText, parts[3] || ''),
+                            message: `SAVE c-list offset ${imm} is out of range (0–32767 allowed).`
+                        });
+                    }
                 }
                 if (imm === 0) {
                     this.errors.push({
@@ -1401,12 +1444,13 @@ class ChurchAssembler {
                 // as WukongCallHome.hw retain their identity.  The direct/default
                 // ELOADCALL selector is zero; it dispatches at the LUMP's entry
                 // point rather than through its method table.
-                const directCapKey = !parts[2] && rawDotTok.includes('.')
-                    ? ChurchAssembler._nameKey(this._capBlockSlots, rawDotTok)
+                const directCap = !parts[2] && rawDotTok.includes('.')
+                    ? this._resolveCListName(rawDotTok)
                     : null;
-                if (directCapKey !== null) {
-                    const clistRow = this._capBlockSlots[directCapKey];
-                    if (clistRow > 31) {
+                if (directCap !== null) {
+                    const clistRow = directCap.slot;
+                    this._checkCapDeclared(directCap.key, lineNum);
+                    if (!Number.isInteger(clistRow) || clistRow < 0 || clistRow > 31) {
                         this.errors.push({
                             line: lineNum,
                             ...this._tokenCols(this._currentLineText, rawDotTok),
@@ -1496,12 +1540,17 @@ class ChurchAssembler {
                 // existing CALL path handles it correctly — do not intercept.
                 if (parts[2] && !rawDotTok.includes('.')) {
                     const _loadedKey = ChurchAssembler._nameKey(this.nsLoaded, rawDotTok);
-                    const _nsKey = ChurchAssembler._nameKey(this.nsSymbols, rawDotTok);
-                    const _nsSlot = (_loadedKey === null && _nsKey !== null)
-                                    ? this.nsSymbols[_nsKey] : null;
+                    // An unloaded named call is a fused c-list access.  Use
+                    // the c-list map directly so a name that also has a
+                    // loaded-CR binding cannot leak its CR number into the
+                    // ELOADCALL row.  Loaded names stay on the ordinary CALL
+                    // register path below.
+                    const _cList = _loadedKey === null
+                        ? this._resolveCListName(rawDotTok) : null;
+                    const _nsSlot = _cList === null ? null : _cList.slot;
                     const _rawConventions = this._methodConventionsFor(rawDotTok);
                     if (_nsSlot !== null && _rawConventions) {
-                        this._checkCapDeclared(rawDotTok, lineNum);
+                        this._checkCapDeclared(_cList.key, lineNum);
                         const _methName = (parts[2] || '').replace(/,/g, '').trim();
                         const _methMatch = this._methodEntryFor(_rawConventions, _methName);
                         if (_methMatch) {
@@ -1512,7 +1561,7 @@ class ChurchAssembler {
                             const _methIdx = typeof _methEntry === 'object' ? _methEntry.index : _methEntry;
                             if (_methIdx < 0 || _methIdx > 126) {
                                 this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, _methName), message: `Method "${_methName}" of ${rawDotTok} has index ${_methIdx} which is out of range (0–126 allowed for ELOADCALL).` });
-                            } else if (_nsSlot > 31) {
+                            } else if (!Number.isInteger(_nsSlot) || _nsSlot < 0 || _nsSlot > 31) {
                                 this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, rawDotTok), message: `ELOADCALL c-list row ${_nsSlot} is out of range (0–31 allowed; ELOADCALL uses a 5-bit row field).` });
                             } else {
                                 imm = ((_methIdx + 1) << 5) | (_nsSlot & 0x1F);
@@ -1527,10 +1576,10 @@ class ChurchAssembler {
                 crDst = this._parseCR(parts[1], lineNum);
                 this._checkPrivCR(crDst, 'CALL', lineNum);
                 if (parts[2]) {
-                    const tok2upper = parts[2].toUpperCase().replace(/,/g, '').trim();
                     const tok2raw   = (parts[2] || '').replace(/,/g, '').trim();
-                    const isNumericSelector = /^CR\d+$/.test(tok2upper) || /^0X[0-9A-F]+$/.test(tok2upper) || /^\d+$/.test(tok2upper)
-                        || this._crAliases[tok2raw] !== undefined;
+                    const isNumericSelector = /^CR\d+$/i.test(tok2raw) ||
+                        this._parseSelectorLiteral(tok2raw) !== null ||
+                        this._crAliases[tok2raw] !== undefined;
                     if (!isNumericSelector) {
                         const rawTok1 = (parts[1] || '').replace(/,/g, '').trim();
                         const rawTok2 = (parts[2] || '').replace(/,/g, '').trim();
@@ -1563,25 +1612,23 @@ class ChurchAssembler {
                         }
                     } else {
                         // Numeric method selector: encode as imm = value + 1 (1-based).
-                        // Accepts CRn (→ n), decimal integer, or 0x... hex. Range: 0–16383.
+                        // Accepts CR0–CR15 (→ n), decimal/hex/binary literals,
+                        // or a CR alias. Range: 0–16383.
                         const tok2 = (parts[2] || '').replace(/,/g, '').trim();
-                        const tok2u = tok2.toUpperCase();
-                        const crM2 = tok2u.match(/^CR(\d+)$/);
-                        const hexM2 = tok2u.match(/^0X([0-9A-F]+)$/);
-                        const decM2 = tok2.match(/^(\d+)$/);
+                        const crM2 = tok2.match(/^CR(\d+)$/i);
                         let numIdx = 0;
+                        let selectorValid = true;
                         if (crM2) {
                             numIdx = parseInt(crM2[1]);
-                        } else if (hexM2) {
-                            numIdx = parseInt(hexM2[1], 16);
-                        } else if (decM2) {
-                            numIdx = parseInt(decM2[1]);
+                        } else if (this._parseSelectorLiteral(tok2) !== null) {
+                            numIdx = this._parseSelectorLiteral(tok2);
                         } else if (this._crAliases[tok2] !== undefined) {
                             numIdx = this._crAliases[tok2];
                         } else {
                             this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, tok2), message: `Expected a method selector (0–16383, CRn, or hex 0x...), but got "${tok2}".` });
+                            selectorValid = false;
                         }
-                        if (numIdx < 0 || numIdx > 16383) {
+                        if (selectorValid && (numIdx < 0 || numIdx > 16383)) {
                             this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, tok2), message: `Method selector ${numIdx} is out of range — must be 0–16383.` });
                             numIdx = 0;
                         }
@@ -1693,7 +1740,7 @@ class ChurchAssembler {
                     // imm15[4:0] = c-list row (5-bit, matches hardware rs2); imm15[11:5] = 0 (fast-path)
                     this._checkCapDeclared(res8.key, lineNum);
                     crSrc = 6;
-                    if (res8.slot < 0 || res8.slot > 31) {
+                    if (!Number.isInteger(res8.slot) || res8.slot < 0 || res8.slot > 31) {
                         this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, res8.key), message: `ELOADCALL c-list row ${res8.slot} is out of range (0–31 allowed; ELOADCALL uses a 5-bit row field).` });
                     }
                     imm   = res8.slot & 0x1F;
@@ -1703,7 +1750,7 @@ class ChurchAssembler {
                     this._checkCapDeclared(res8.key, lineNum);
                     crSrc = 6;
                     const rawSlot8v = res8.slot;
-                    if (rawSlot8v < 0 || rawSlot8v > 31) {
+                    if (!Number.isInteger(rawSlot8v) || rawSlot8v < 0 || rawSlot8v > 31) {
                         this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, res8.key), message: `ELOADCALL c-list row ${rawSlot8v} is out of range (0–31 allowed; ELOADCALL uses a 5-bit row field).` });
                     }
                     const clistRow8 = rawSlot8v & 0x1F;
@@ -1712,9 +1759,12 @@ class ChurchAssembler {
                     // Resolve conventions key: try exact case first (e.g. 'SlideRule'),
                     // fall back to uppercase (e.g. 'SLIDERULE') to match app-shell registration.
                     const conventions8 = this._methodConventionsFor(res8.key);
-                    if (/^\d+$/.test(rawMeth8)) {
-                        // Numeric 0-based index (valid range: 0–126)
-                        const m8 = parseInt(rawMeth8);
+                    const numericMeth8 = this._parseSelectorLiteral(rawMeth8);
+                    if (numericMeth8 !== null) {
+                        // Numeric 0-based index (valid range: 0–126).
+                        // Decimal, hexadecimal, binary, and an optional '#'
+                        // prefix use the same literal rules as other immediates.
+                        const m8 = numericMeth8;
                         if (m8 < 0 || m8 > 126) {
                             this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, rawMeth8), message: `ELOADCALL method index ${m8} is out of range (0–126 allowed).` });
                         } else {
@@ -1749,8 +1799,9 @@ class ChurchAssembler {
                     let methodIdx8e  = 0;
                     if (parts[4]) {
                         const rawMeth8e = (parts[4] || '').replace(/,/g, '').trim();
-                        if (/^\d+$/.test(rawMeth8e)) {
-                            const m8e = parseInt(rawMeth8e);
+                        const numericMeth8e = this._parseSelectorLiteral(rawMeth8e);
+                        if (numericMeth8e !== null) {
+                            const m8e = numericMeth8e;
                             if (m8e < 0 || m8e > 126) {
                                 this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, rawMeth8e), message: `ELOADCALL method index ${m8e} is out of range (0–126 allowed).` });
                             } else {
@@ -1771,11 +1822,26 @@ class ChurchAssembler {
                 if (res9 !== null && (!parts[3] || res9.consumed)) {
                     this._checkCapDeclared(res9.key, lineNum);
                     crSrc = 6;
-                    imm   = res9.slot;
+                    if (!Number.isInteger(res9.slot) || res9.slot < 0 || res9.slot > 0x7FFF) {
+                        this.errors.push({
+                            line: lineNum,
+                            ...this._tokenCols(this._currentLineText, res9.key),
+                            message: `XLOADLAMBDA c-list offset ${res9.slot} is out of range (0–32767 allowed).`
+                        });
+                    }
+                    imm   = res9.slot & 0x7FFF;
                 } else {
                     crSrc = this._parseCR(parts[2], lineNum);
                     this._checkPrivCR(crSrc, 'XLOADLAMBDA', lineNum);
-                    imm   = this._parseImm(parts[3], lineNum);
+                    const rawOffset9 = this._parseImm(parts[3], lineNum);
+                    if (rawOffset9 < 0 || rawOffset9 > 0x7FFF) {
+                        this.errors.push({
+                            line: lineNum,
+                            ...this._tokenCols(this._currentLineText, parts[3] || ''),
+                            message: `XLOADLAMBDA c-list offset ${rawOffset9} is out of range (0–32767 allowed).`
+                        });
+                    }
+                    imm   = rawOffset9 & 0x7FFF;
                 }
                 break;
             }
@@ -2185,6 +2251,33 @@ class ChurchAssembler {
         return 0;
     }
 
+    // Parse a numeric method selector without applying an instruction-specific
+    // bit mask.  Returning null means that the token is a name (or malformed)
+    // and lets the caller try its method-convention lookup.  Keeping the raw
+    // value is important for rejecting -1 and the first value above the field
+    // limit instead of silently wrapping them.
+    _parseSelectorLiteral(token) {
+        if (!token) return null;
+        let raw = token.replace(/,/g, '').trim();
+        if (raw.startsWith('#')) raw = raw.substring(1);
+        if (raw.startsWith('+')) raw = raw.substring(1);
+        if (!raw) return null;
+        if (/^-?\d+$/.test(raw)) return parseInt(raw, 10);
+        if (/^-?0x[0-9a-f]+$/i.test(raw)) {
+            const negative = raw.startsWith('-');
+            const digits = negative ? raw.substring(3) : raw.substring(2);
+            const value = parseInt(digits, 16);
+            return negative ? -value : value;
+        }
+        if (/^-?0b[01]+$/i.test(raw)) {
+            const negative = raw.startsWith('-');
+            const digits = negative ? raw.substring(3) : raw.substring(2);
+            const value = parseInt(digits, 2);
+            return negative ? -value : value;
+        }
+        return null;
+    }
+
     _parseDR(token, lineNum) {
         if (!token) {
             const _mnTok = (this._currentLineText || '').trim().split(/[\s,]+/)[0] || '';
@@ -2236,8 +2329,12 @@ class ChurchAssembler {
             return this.labels[token] & 0xFFFF;
         }
 
-        const nsSlotImm = this._resolveNSName(token);
-        if (nsSlotImm !== null) {
+        // Immediate c-list operands are row lookups, not register operands.
+        // In particular, a name in nsLoaded is the CR that holds the GT and
+        // must not replace the name's actual c-list row here.
+        const cListName = this._resolveCListName(token);
+        const nsSlotImm = cListName === null ? null : cListName.slot;
+        if (nsSlotImm !== null && nsSlotImm !== undefined) {
             // Guard: if a capabilities block is active and this token is a
             // hardware device name, it must have been declared in the block.
             // Without a declaration the name falls through to the boot-slot

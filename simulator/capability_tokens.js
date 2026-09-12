@@ -70,6 +70,35 @@
             !!(cap && typeof cap === 'object' && cap.symbolic_self === true);
     }
 
+    // A compiler-owned SELF is deliberately different from an unresolved
+    // dependency.  The compiler may put this one exact marker in row zero
+    // while the save-plan transaction is choosing the destination Namespace
+    // entry; the server then remints the row from that authoritative entry.
+    // Keep the predicate here so every caller uses the same provenance rule.
+    function isCompilerOwnedSelf(cap) {
+        return !!(cap && typeof cap === 'object' &&
+            cap.compiler_owned_self === true &&
+            (_sameName(cap.name, '__SELF__') || _sameName(cap.name, 'SELF')) &&
+            isContextualSelf(cap));
+    }
+
+    function _selfPlaceholder(context) {
+        const sim = context && context.sim;
+        const simClass = sim && sim.constructor;
+        const candidate = context && (
+            context.selfCapabilityPlaceholder !== undefined
+                ? context.selfCapabilityPlaceholder
+                : context.compilerSelfPlaceholder
+        );
+        if (candidate !== undefined && candidate !== null) {
+            return Number(candidate) >>> 0;
+        }
+        if (simClass && simClass.SELF_CAPABILITY_PLACEHOLDER !== undefined) {
+            return Number(simClass.SELF_CAPABILITY_PLACEHOLDER) >>> 0;
+        }
+        return 0xFEED5E1F;
+    }
+
     function _validTarget(value) {
         if (value === null || value === undefined || value === '') return null;
         const n = Number(value);
@@ -322,7 +351,11 @@
                 : { ok: false, error: `C-list NULL row contains nonzero word 0x${word.toString(16).padStart(8, '0')}.`, parsed };
         }
         if (cap.error) return { ok: false, error: cap.error, parsed: null };
-        if ((word >>> 16) === 0xFEED && cap.pending === true) {
+        // Pending pet-name sentinels are useful while compiling, but they are
+        // never valid in a saved or runnable c-list.  materialize() opts into
+        // the intermediate exception explicitly below.
+        if ((word >>> 16) === 0xFEED && cap.pending === true &&
+                context && context.allowPendingPlaceholders === true) {
             return { ok: true, error: null, parsed: null, pending: true };
         }
         if ((word >>> 16) === 0xFEED) {
@@ -372,10 +405,27 @@
     }
 
     function validateClist(words, clistStart, resolvedCaps, context) {
+        context = context || {};
         const errors = [];
         const results = [];
         for (let i = 0; i < resolvedCaps.length; i++) {
-            const check = validateToken((words[clistStart + i] || 0) >>> 0, resolvedCaps[i], context || {});
+            const word = (words[clistStart + i] || 0) >>> 0;
+            // This is the sole client-side exception for a placeholder during
+            // the save flow.  It is intentionally narrow: exact compiler
+            // provenance, exact c-list row zero, and the exact SELF marker.
+            // Final validation omits allowCompilerSelfPlaceholder, so an
+            // unresolved marker can never be approved or persisted.
+            const allowSelfPlaceholder =
+                context.allowCompilerSelfPlaceholder === true &&
+                i === 0 &&
+                isCompilerOwnedSelf(resolvedCaps[i]) &&
+                word === _selfPlaceholder(context);
+            const check = allowSelfPlaceholder
+                ? {
+                    ok: true, error: null, parsed: null,
+                    compiler_owned_self: true, intermediate: true,
+                }
+                : validateToken(word, resolvedCaps[i], context);
             results.push(check);
             if (!check.ok) errors.push(check.error);
         }
@@ -412,12 +462,22 @@
         }
         const errors = [];
         const results = [];
+        // A materialization is an explicitly intermediate compiler operation.
+        // It may retain named pending sentinels for the later Namespace
+        // resolver, while validateClist() remains strict by default.
+        const materializeContext = Object.assign({}, context || {}, {
+            allowPendingPlaceholders: true,
+        });
         for (let i = 0; i < resolvedCaps.length; i++) {
             if (resolvedCaps[i].symbolic_self === true) {
                 results.push({ ok: true, error: null, parsed: null, symbolic_self: true });
                 continue;
             }
-            const check = validateToken((words[clistStart + i] || 0) >>> 0, resolvedCaps[i], context || {});
+            const check = validateToken(
+                (words[clistStart + i] || 0) >>> 0,
+                resolvedCaps[i],
+                materializeContext
+            );
             results.push(check);
             if (!check.ok) errors.push(check.error);
         }
@@ -428,6 +488,7 @@
         normalizeRights,
         rightsToPerms,
         isContextualSelf,
+        isCompilerOwnedSelf,
         resolveCapability,
         resolveCapabilities,
         validateToken,

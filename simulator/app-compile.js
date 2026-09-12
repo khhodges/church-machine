@@ -694,8 +694,44 @@ function onLangChange(restoring) {
     }
 }
 
-function smartCompile() {
-    if (!requirePermission('compile', 'Compile Programs')) return;
+function smartCompile(options) {
+    const _smartOptions = options && typeof options === 'object' ? options : {};
+    const _smartCompileError = (error, kind) => {
+        const _kind = kind === 'assembly' ? 'Assembly' : 'CLOOMC++';
+        const _message = error && error.message
+            ? error.message : String(error || 'unknown error');
+        console.error(`smartCompile ${_kind.toLowerCase()} error:`, error);
+        const con = document.getElementById('editorConsole');
+        if (con) con.textContent = `${_kind} compile error: ${_message}`;
+        if (typeof _showAsmErrors === 'function') {
+            _showAsmErrors([{ line: null, message: _message }],
+                `${_kind} compile error \u2014 code not applied`);
+        }
+        if (typeof showNextSteps === 'function') showNextSteps('error');
+        return { ok: false, kind, error: _message };
+    };
+    const _smartCompileResult = (kind, result) => {
+        if (result && result.ok === false) return result;
+        const token = window.LumpRegistry &&
+            typeof window.LumpRegistry.getCurrent === 'function'
+            ? window.LumpRegistry.getCurrent() : null;
+        const memory = token && typeof window.LumpRegistry.resolve === 'function'
+            ? window.LumpRegistry.resolve(token)?.sources?.memory : null;
+        if (!memory || !Array.isArray(memory.words) || memory.words.length === 0) {
+            return {
+                ok: false,
+                kind,
+                error: `${kind === 'assembly' ? 'Assembly' : 'CLOOMC++'} compile produced no executable words.`,
+            };
+        }
+        return Object.assign({ ok: true, kind, token }, result || {});
+    };
+
+    if (!requirePermission('compile', 'Compile Programs')) {
+        return Promise.resolve({
+            ok: false, kind: 'permission', error: 'Compile permission denied.',
+        });
+    }
 
     _runStopped = true;
 
@@ -715,20 +751,36 @@ function smartCompile() {
             if (sel) sel.value = 'javascript';
             onLangChange(true);
         } else {
-            // Pure raw assembly — use the assembler path, not the CLOOMC++ compiler.
-            if (typeof assembleAndLoad === 'function') assembleAndLoad();
-            return;
+            // Pure raw assembly \u2014 use the assembler path, not the CLOOMC++ compiler.
+            try {
+                if (typeof assembleAndLoad !== 'function') {
+                    return Promise.resolve(_smartCompileError(
+                        new Error('The raw assembler is unavailable.'), 'assembly'));
+                }
+                const _previousAssemblyToken = window.LumpRegistry &&
+                    typeof window.LumpRegistry.getCurrent === 'function'
+                    ? window.LumpRegistry.getCurrent() : null;
+                if (_previousAssemblyToken && window.LumpRegistry &&
+                        typeof window.LumpRegistry.evictMemory === 'function') {
+                    window.LumpRegistry.evictMemory(_previousAssemblyToken);
+                }
+                assembleAndLoad();
+                return Promise.resolve(_smartCompileResult('assembly'));
+            } catch (error) {
+                return Promise.resolve(_smartCompileError(error, 'assembly'));
+            }
         }
     }
 
     try {
-        compileAndBuild();
-    } catch (e) {
-        console.error('smartCompile error:', e);
-        const con = document.getElementById('editorConsole');
-        if (con) con.textContent = 'Compile error: ' + (e.message || e);
-        if (typeof _showAsmErrors === 'function') _showAsmErrors([{line: null, message: e.message || String(e)}], 'Compile error \u2014 code not applied');
-        showNextSteps('error');
+        const _compileResult = compileAndBuild({
+            skipSavePlan: _smartOptions.skipSavePlan === true,
+        });
+        return Promise.resolve(_compileResult)
+            .then(result => _smartCompileResult('cloomc', result))
+            .catch(error => _smartCompileError(error, 'cloomc'));
+    } catch (error) {
+        return Promise.resolve(_smartCompileError(error, 'cloomc'));
     }
 }
 
@@ -1414,9 +1466,16 @@ async function _confirmLumpRelease() {
     });
 }
 
-async function compileAndBuild() {
+async function compileAndBuild(options) {
+    const _compileOptions = options && typeof options === 'object' ? options : {};
     const editor = document.getElementById('asmEditor');
-    if (!editor || !cloomcCompiler) return;
+    if (!editor || !cloomcCompiler) {
+        return {
+            ok: false,
+            error: 'The CLOOMC++ compiler is unavailable.',
+            kind: 'cloomc',
+        };
+    }
     const source = editor.value;
     const con = document.getElementById('editorConsole');
     if (con) con.className = '';
@@ -1425,6 +1484,15 @@ async function compileAndBuild() {
     // Both compile success paths use _compileDraftToken to delete the draft.
     _compileDraftToken = window._editorOpenLumpToken ||
         (window.LumpRegistry ? window.LumpRegistry.getCurrent() : null);
+    const _previousCompileToken = window.LumpRegistry &&
+        typeof window.LumpRegistry.getCurrent === 'function'
+        ? window.LumpRegistry.getCurrent() : null;
+    if (_previousCompileToken && window.LumpRegistry &&
+            typeof window.LumpRegistry.evictMemory === 'function') {
+        // A failed/replaced compile must never leave an older source/binary
+        // pair eligible for a Save-request compile continuation.
+        window.LumpRegistry.evictMemory(_previousCompileToken);
+    }
     if (typeof _invalidateLastSavedToken === 'function') _invalidateLastSavedToken();
     _runStopped = true;
     sim.running = false;
@@ -1437,7 +1505,12 @@ async function compileAndBuild() {
         if (con) { con.textContent = `Compile — compilation errors:\n${errText}`; con.scrollTop = 0; }
         const _ce = result.errors.length; if (typeof _showAsmErrors === 'function') _showAsmErrors(result.errors, 'Compile error' + (_ce > 1 ? 's' : '') + ' \u2014 code not applied');
         showNextSteps('error');
-        return;
+        return {
+            ok: false,
+            kind: 'cloomc',
+            error: errText,
+            errors: result.errors,
+        };
     }
 
     const langNames = { english: 'English', haskell: 'Haskell', symbolic: 'Symbolic Math (Ada)', javascript: 'JavaScript', cloomc: 'CLOOMC++', lambda: 'Lambda Calculus', assembly: 'Assembly' };
@@ -1464,7 +1537,11 @@ async function compileAndBuild() {
         _ovfListing += `  Remove ${cc - 255} capability reference${cc - 255 !== 1 ? 's' : ''} from the abstraction.\n`;
         if (con) { con.textContent = _ovfListing; con.scrollTop = 0; }
         if (typeof _showAsmErrors === 'function') _showAsmErrors([{line: null, message: `[RCC] C-list overflow: ${cc} capabilities exceed the 8-bit header limit (max 255). Remove ${cc - 255} reference${cc - 255 !== 1 ? 's' : ''}.`}], 'Capability error \u2014 code not applied');
-        return;
+        return {
+            ok: false,
+            kind: 'cloomc',
+            error: `C-list overflow: ${cc} capabilities exceed the 8-bit header limit.`,
+        };
     }
 
     const allCode = [];
@@ -1614,7 +1691,12 @@ async function compileAndBuild() {
             _showAsmErrors(_capErrors, 'Capability validation failed — code not applied', _addDotNames);
         }
         showNextSteps('error');
-        return;
+        return {
+            ok: false,
+            kind: 'cloomc',
+            error: (_capMaterialized.errors || []).join('\n') ||
+                'Capability validation failed.',
+        };
     }
     const resolvedCaps = _capMaterialized.resolvedCaps;
     window._lastCLOOMCLump = {
@@ -1661,7 +1743,12 @@ async function compileAndBuild() {
                 : _auditErrors.map(r => ({ line: null, message: `[${r.ruleId}] ${r.message} \u2014 ${r.detail}` }));
             _showAsmErrors(_showErrs, 'Audit error' + (_auditErrors.length > 1 ? 's' : '') + ' \u2014 code not applied');
         }
-        return;
+        return {
+            ok: false,
+            kind: 'cloomc',
+            error: 'LUMP audit failed.',
+            auditErrors: _auditErrors,
+        };
     }
 
     const binaryBuf = new ArrayBuffer(lumpSize * 4);
@@ -1733,6 +1820,57 @@ async function compileAndBuild() {
     }
 
     const lumpWordsArray = Array.from(lumpWords);
+    // Compile is also the editor's source-of-truth handoff.  Register the
+    // exact provisional binary before the optional save-plan confirmation so
+    // callers can observe and preserve the compiled pair even when approval
+    // is cancelled or the repository rejects the plan.  The server remains
+    // authoritative for the eventual destination-local SELF remint.
+    const _compiledCapabilities = resolvedCaps.map(rc => ({
+        name: rc.name,
+        rights: Array.isArray(rc.rights) ? rc.rights.slice() : [],
+        grants: Array.isArray(rc.grants) ? rc.grants.slice() : [],
+        nsIndex: rc.nsIndex,
+        null_row: rc.null_row === true,
+        ...(rc.compiler_owned_self === true
+            ? { compiler_owned_self: true } : {}),
+        ...(rc.placeholder === true ? { placeholder: true } : {}),
+        ...(rc.identity_contract
+            ? { identity_contract: rc.identity_contract } : {}),
+    }));
+    // Registry words are the instruction-only source region.  The complete
+    // candidate remains in lumpWordsArray for the save-plan payload and
+    // compiler diagnostics; _computeLumpToken/registerMemory rebuild their
+    // canonical header/allocation from code words and c-list metadata.
+    const _registeredCodeWords = codeRegion.slice();
+    const _compiledToken = typeof window._computeLumpToken === 'function'
+        ? window._computeLumpToken(_registeredCodeWords, _compiledCapabilities)
+        : null;
+    if (_compiledToken && window.LumpRegistry) {
+        window.LumpRegistry.registerMemory(
+            _compiledToken,
+            absName,
+            _registeredCodeWords,
+            _compiledCapabilities,
+            { sourceText: source, language: result.language || 'javascript' }
+        );
+        window.LumpRegistry.setCurrent(_compiledToken);
+        window._pendingLumpData = null;
+    }
+    if (_compileOptions.skipSavePlan === true) {
+        return _compiledToken
+            ? {
+                ok: true,
+                kind: 'cloomc',
+                token: _compiledToken,
+                words: _registeredCodeWords.slice(),
+                sourceText: source,
+            }
+            : {
+                ok: false,
+                kind: 'cloomc',
+                error: 'CLOOMC++ compile produced no registry token.',
+            };
+    }
     // Petname: programmer's globally-unique dot identity (e.g. "ken" or "org.dep.proj").
     // Issue number: which specific issuance of this abstraction this is.
     // Together: petname.Abstraction#n is the globally meaningful identity of this LUMP.
@@ -1769,13 +1907,7 @@ async function compileAndBuild() {
             profile:        profile,
             language:       result.language || 'javascript',
             methods:        methodMeta,
-            capabilities:   resolvedCaps.map(rc => ({
-                name: rc.name, rights: rc.rights, grants: rc.grants, nsIndex: rc.nsIndex,
-                null_row: rc.null_row === true,
-                compiler_owned_self: rc.compiler_owned_self === true,
-                placeholder: rc.placeholder === true,
-                identity_contract: rc.identity_contract || null,
-            })),
+            capabilities:   _compiledCapabilities,
             compiler_owned_self: _isCompilerSelfCapability(resolvedCaps[0]),
             identity_contract: resolvedCaps[0] && resolvedCaps[0].identity_contract || 'dynamic-local',
             pet_names_dr:   drPetNames,
@@ -1801,6 +1933,7 @@ async function compileAndBuild() {
             portable_binding: _portableBinding,
             portable_status: _portableStatus,
             portable_mode: result.portableMode || 'legacy',
+            token:          _compiledToken || undefined,
         }
     };
 
@@ -2142,7 +2275,10 @@ function loadCLOOMCIntoSim() {
         _compiledLump.words,
         _compiledLump.clistStart,
         _compiledLump.resolvedCaps,
-        { sim }
+        // Dynamic compiler-owned SELF is intentionally a row-zero marker
+        // until a save/load transaction chooses its destination slot.  All
+        // other placeholders remain strict failures.
+        { sim, allowCompilerSelfPlaceholder: true }
     );
     if (!_preRunValidation.ok) {
         const _message = 'Load into Sim blocked: ' + _preRunValidation.errors.join(' ');
@@ -2196,6 +2332,13 @@ function loadCLOOMCIntoSim() {
         nsIndex: cap.nsIndex,
         token: cap.token >>> 0,
         null_row: cap.null_row === true,
+        ...(cap.compiler_owned_self === true
+            ? { compiler_owned_self: true }
+            : {}),
+        ...(cap.placeholder === true ? { placeholder: true } : {}),
+        ...(cap.identity_contract
+            ? { identity_contract: cap.identity_contract }
+            : {}),
     }));
 
     // Compute and store the token for this assembled lump so "Open Lump"

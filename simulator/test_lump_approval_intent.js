@@ -274,7 +274,7 @@ vm.runInContext(source.slice(start, end), sandbox);
         lumps.includes('body: JSON.stringify({ binary: words, metadata: metadata })') &&
         !lumps.includes('metadata.source =') &&
         !compile.includes('savePayload.metadata.source ='));
-    const saveStart = compile.indexOf('async function compileAndBuild()');
+    const saveStart = compile.indexOf('async function compileAndBuild(');
     const saveEnd = compile.indexOf('\nfunction ', saveStart + 1);
     const saveFlow = compile.slice(saveStart, saveEnd > saveStart ? saveEnd : undefined);
     check('genuine immutable save submits a confirmed one-time intent atomically',

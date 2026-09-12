@@ -31,6 +31,7 @@
         "lambda-exec-tests",
         "lump-builder-dispatch-tests",
         "lump-history-tests",
+        "lump-save-boundary-tests",
         "lump-save-endpoint-tests",
         "lump-save-error-surface-tests",
         "lump-v13-freespace-tests",

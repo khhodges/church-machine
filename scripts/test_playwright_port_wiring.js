@@ -94,13 +94,24 @@ const src = fs.readFileSync(CONFIG_PATH, 'utf8');
         return src.slice(start, start + 800);
     })();
 
-    // Look for an env: { ... } object that contains E2E_PORT as a key
-    const envMatch = wsBlock.match(/env\s*:\s*\{([^}]*)\}/);
-    if (!envMatch) {
+    // Playwright accepts either an inline env object or a variable moved
+    // above defineConfig.  Keep this check structural enough to cover both
+    // forms without evaluating the configuration.
+    const inlineEnvMatch = wsBlock.match(/env\s*:\s*\{([^}]*)\}/);
+    const envRefMatch = wsBlock.match(/env\s*:\s*([A-Za-z_$][\w$]*)\s*[,}]/);
+    let envBody = inlineEnvMatch ? inlineEnvMatch[1] : '';
+    if (!inlineEnvMatch && envRefMatch) {
+        const ref = envRefMatch[1];
+        const identifier = ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const declaration = new RegExp(
+            `(?:const|let|var)\\s+${identifier}\\s*=\\s*\\{([^}]*)\\}`
+        ).exec(src);
+        if (declaration) envBody = declaration[1];
+    }
+    if (!inlineEnvMatch && !envRefMatch) {
         check('PW2: webServer.env passes E2E_PORT to the server process', false,
             'Could not locate an env: { } field inside the webServer block');
     } else {
-        const envBody = envMatch[1];
         // E2E_PORT appears as a property key (shorthand or explicit)
         const hasKey = /\bE2E_PORT\b/.test(envBody);
         check('PW2: webServer.env passes E2E_PORT to the server process',

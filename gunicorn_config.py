@@ -1,3 +1,4 @@
+import os
 import signal
 
 bind = "0.0.0.0:5000"
@@ -47,6 +48,15 @@ def post_fork(server, worker):
         logging.getLogger("gunicorn.error").warning(
             "post_fork: db.engine.dispose() failed: %s", _e
         )
+
+    if os.environ.get("CHURCH_TEST_ISOLATED_MODE", "").strip().lower() in {
+            "1", "true", "yes", "on"} or \
+            os.environ.get("CHURCH_TEST_ISOLATED", "").strip().lower() in {
+                "1", "true", "yes", "on"}:
+        # server.app deliberately leaves both integrations unset in this
+        # mode.  Keep the worker hook fail-closed if a preload or deployment
+        # configuration happens to retain an old object.
+        return
 
     # 2 — restart APScheduler
     try:

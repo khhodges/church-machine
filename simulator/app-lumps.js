@@ -6707,19 +6707,93 @@ window._saveLumpDirectVersion = _saveLumpDirectVersion;
 // Always builds a brand-new LUMP from the compiler output following the v1.3
 // spec.  Prior server binaries with the same name are never reused.
 //   • Compiled words in LumpRegistry → showFormatLump() (build + audit + save).
-//   • No compiled words → trigger smartCompile() so the user ends up in the
-//     first state on the next click.
+//   • No compiled words → trigger smartCompile() and continue into the first
+//     Format Lump state once the fresh compiler/source pair is registered.
 window.editorSaveLump = function() {
+    // Existing compiler memory goes straight to showFormatLump(); a missing
+    // memory source compiles first and reaches the same formatter below.
+    // Record the click before branching on registry state.  A compile-request
+    // Save click is otherwise invisible when an earlier saved artifact has
+    // correctly evicted its in-memory source.
+    var _saveClickMetadata = {};
+    var _saveDiagnostics = window.LumpSaveDiagnostics;
+    if (_saveDiagnostics) {
+        try {
+            _saveDiagnostics.begin(_saveClickMetadata, 'lump.editor-save');
+            _saveDiagnostics.record(
+                _saveClickMetadata, 'capture', 'editor_save_click',
+                { outcome: 'unknown' });
+        } catch (_diagnosticError) {}
+    }
+
+    var _reportCompileSaveFailure = function(resultOrError) {
+        var _message = resultOrError && resultOrError.error
+            ? String(resultOrError.error)
+            : (resultOrError && resultOrError.message
+                ? String(resultOrError.message)
+                : 'Save-request compile did not produce executable words.');
+        if (_saveDiagnostics) {
+            try {
+                _saveDiagnostics.stageException(
+                    _saveClickMetadata, 'prepare', new Error(_message),
+                    { outcome: 'rejected' });
+            } catch (_diagnosticError) {}
+        }
+        return { ok: false, error: _message };
+    };
+
+    var _continueAfterSaveCompile = function(result) {
+        if (result && result.ok === false) return _reportCompileSaveFailure(result);
+        var _currentToken = window.LumpRegistry &&
+            typeof window.LumpRegistry.getCurrent === 'function'
+            ? window.LumpRegistry.getCurrent() : null;
+        var _currentMemory = _currentToken && window.LumpRegistry &&
+            typeof window.LumpRegistry.resolve === 'function'
+            ? window.LumpRegistry.resolve(_currentToken)?.sources?.memory : null;
+        if (!_currentMemory || !Array.isArray(_currentMemory.words) ||
+                _currentMemory.words.length === 0) {
+            return _reportCompileSaveFailure({
+                error: 'Save-request compile produced no executable words.',
+            });
+        }
+        if (typeof showFormatLump !== 'function') {
+            return _reportCompileSaveFailure({
+                error: 'The Format Lump dialog is unavailable after compilation.',
+            });
+        }
+        try {
+            return Promise.resolve(showFormatLump()).catch(_reportCompileSaveFailure);
+        } catch (_formatError) {
+            return _reportCompileSaveFailure(_formatError);
+        }
+    };
+
     var _regMem = window.LumpRegistry
         ? (window.LumpRegistry.resolve(window.LumpRegistry.getCurrent()) || {}).sources
         : null;
     var _hasCompiledWords = !!(_regMem && _regMem.memory && _regMem.memory.words
                                && _regMem.memory.words.length > 0);
     if (_hasCompiledWords) {
-        if (typeof showFormatLump === 'function') showFormatLump();
+        if (typeof showFormatLump === 'function') return showFormatLump();
+        return _reportCompileSaveFailure({
+            error: 'The Format Lump dialog is unavailable.',
+        });
     } else {
-        // Nothing compiled yet — trigger compile so the user gets fresh words.
-        if (typeof smartCompile === 'function') smartCompile();
+        // Nothing compiled yet — compile this exact editor buffer without
+        // entering compileAndBuild's independent save-plan/commit path, then
+        // continue into Format Lump from the freshly registered pair.
+        if (typeof smartCompile !== 'function') {
+            return _reportCompileSaveFailure({
+                error: 'The compiler entry point is unavailable.',
+            });
+        }
+        try {
+            return Promise.resolve(smartCompile({ skipSavePlan: true }))
+                .then(_continueAfterSaveCompile)
+                .catch(_reportCompileSaveFailure);
+        } catch (_compileError) {
+            return _reportCompileSaveFailure(_compileError);
+        }
     }
 };
 
@@ -7063,8 +7137,45 @@ window.showFormatLump = async function() {
             alert(_capFailure);
             return;
         }
+        // Formatting is an intermediate save stage: only compiler-owned
+        // SELF at row zero may still be the exact placeholder.  Named
+        // unresolved capabilities (and misplaced/non-SELF placeholders) are
+        // rejected here rather than being carried into Step 2.
+        var _candidateValidation = CapabilityTokens.validateClist(
+            _svBinary,
+            _svLumpSize - _svCC,
+            _capMaterialized.resolvedCaps,
+            {
+                sim: (typeof sim !== 'undefined' ? sim : null),
+                lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache))
+                    ? _lumpsCache : [],
+                allowCompilerSelfPlaceholder: true,
+            }
+        );
+        if (!_candidateValidation.ok) {
+            var _candidateFailure = 'Cannot save this LUMP until its capabilities resolve:\n' +
+                _candidateValidation.errors.map(function(message) {
+                    return '\u2022 ' + message;
+                }).join('\n');
+            if (typeof appendOutput === 'function') appendOutput(_candidateFailure, 'error');
+            alert(_candidateFailure);
+            return;
+        }
         var _normalizedCaps = _capMaterialized.resolvedCaps.map(function(cap) {
-            return { name: cap.name, rights: cap.rights.slice(), grants: cap.grants.slice(), nsIndex: cap.nsIndex };
+            return {
+                name: cap.name,
+                rights: cap.rights.slice(),
+                grants: cap.grants.slice(),
+                nsIndex: cap.nsIndex,
+                ...(cap.compiler_owned_self === true
+                    ? { compiler_owned_self: true }
+                    : {}),
+                ...(cap.placeholder === true ? { placeholder: true } : {}),
+                ...(cap.pending === true ? { pending: true } : {}),
+                ...(cap.identity_contract
+                    ? { identity_contract: cap.identity_contract }
+                    : {}),
+            };
         });
         var _manifest = { cw: _svCW, cc: _svCC, lump_size: _svLumpSize, capabilities: _normalizedCaps };
         var _auditResults = (typeof lumpAudit === 'function') ? lumpAudit(_svBinary, _manifest, null, {}) : [];
@@ -7723,7 +7834,7 @@ async function _requestLumpApprovalIntent(words, action, metadata, savePlan) {
 window._requestLumpSavePlan = _requestLumpSavePlan;
 window._formatLumpSavePlan = _formatLumpSavePlan;
 
-async function _confirmLumpSavePlan(words, metadata, prompt) {
+async function _confirmLumpSavePlan(words, metadata, prompt, options) {
     const _saveDiagnostics = typeof window !== 'undefined'
         ? window.LumpSaveDiagnostics : null;
     if (_saveDiagnostics) {
@@ -7774,6 +7885,13 @@ async function _confirmLumpSavePlan(words, metadata, prompt) {
         return null;
     }
     const finalBinary = plan.final_binary;
+    // Callers that own an immutable source/compiler pairing may provide a
+    // strict final-byte validator.  Run it after explicit confirmation but
+    // before minting the one-time approval intent, so a malformed server plan
+    // cannot consume approval state or reach commit.
+    if (options && typeof options.validateFinalBinary === 'function') {
+        options.validateFinalBinary(finalBinary, metadata || {}, plan);
+    }
     const intent = await _requestLumpApprovalIntent(finalBinary, plan.action, metadata, plan);
     if (_saveDiagnostics) {
         try {
@@ -7831,6 +7949,14 @@ async function _loadSavedLumpCapabilities(token, wordsPayload) {
         cap.slot = row;
         cap.binary_word = (wordsPayload.words[clistStart + row] || 0) >>> 0;
         if (!cap.name && approvalLabels[row] != null) cap.name = String(approvalLabels[row]);
+        // The embedded API intentionally carries only public capability
+        // declarations, not compiler provenance.  A row-zero __SELF__ name is
+        // therefore the authoritative recoverable marker for a dynamic
+        // compiler-owned row; the binary word itself must still be a concrete
+        // E-GT below (the placeholder remains invalid at final load).
+        if (row === 0 && String(cap.name || '').toUpperCase() === '__SELF__') {
+            cap.compiler_owned_self = true;
+        }
         if (row === 0 &&
             cap.binary_word === ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER) {
             cap.name = '__SELF__';
