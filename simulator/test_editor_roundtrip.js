@@ -23,6 +23,7 @@
 //   T-ER05 — Empty method body reconstructs to "; (empty)" and re-compiles
 //   T-ER06 — re-assembleLump of re-compiled code produces binary-equal table
 //   T-ER08 — startup restores a saved personal owner before a stale generic buffer
+//   T-ER09 — missing saved-LUMP owners are cleared only after authoritative 404/410
 
 const fs   = require('fs');
 const path = require('path');
@@ -94,8 +95,9 @@ function reconstructSource(lumpName, trimmed, methodNames) {
 }
 
 function extractFunction(src, name) {
-    const start = src.indexOf('function ' + name + '(');
+    let start = src.indexOf('function ' + name + '(');
     if (start < 0) throw new Error('missing function ' + name);
+    if (src.slice(Math.max(0, start - 6), start) === 'async ') start -= 6;
     const open = src.indexOf('{', start);
     let depth = 0;
     for (let i = open; i < src.length; i++) {
@@ -553,12 +555,96 @@ console.log('\n--- T-ER08: personal-tab owner restore ordering ---');
         lumpDraft && lumpDraft.token === lumpToken && lumpDraft.code === editor.value);
 }
 
-// ── Summary ───────────────────────────────────────────────────────────────────
-console.log('\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550');
-console.log('Results: ' + pass + ' passed, ' + fail + ' failed');
-if (fail > 0) {
-    console.error('SOME TESTS FAILED');
+// ── T-ER09: orphaned saved-LUMP owner cleanup is authoritative and idempotent ─
+console.log('\n--- T-ER09: orphaned saved-LUMP owner cleanup ---');
+(async function testOrphanedSavedLumpOwnerCleanup() {
+    const appLumpsSrc = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8');
+    const _DRAFT_LS_PREFIX = 'cm_lump_draft_v2_';
+    const _lumpTokenIdentity = function(token) {
+        return String(token == null ? '' : token).replace(/^0x/i, '').toLowerCase();
+    };
+    const _draftLsKey = eval('(' + extractFunction(appLumpsSrc, '_draftLsKey') + ')');
+    const _draftLsDel = eval('(' + extractFunction(appLumpsSrc, '_draftLsDel') + ')');
+    const _isRestoredSavedLumpOwner =
+        eval('(' + extractFunction(appLumpsSrc, '_isRestoredSavedLumpOwner') + ')');
+    const _clearOrphanedSavedLumpOwner =
+        eval('(' + extractFunction(appLumpsSrc, '_clearOrphanedSavedLumpOwner') + ')');
+    const _reconcileMissingRestoredLumpOwner =
+        eval('(' + extractFunction(appLumpsSrc, '_reconcileMissingRestoredLumpOwner') + ')');
+    const token = '14af977b';
+    const documentKey = 'church_editor_document_v1';
+    const draftKey = 'cm_lump_draft_v2_' + token;
+    const stored = Object.create(null);
+    const installOwner = function() {
+        stored[documentKey] = JSON.stringify({
+            owner: { type: 'lump', id: token },
+            code: '; recoverable draft',
+            lang: 'assembly'
+        });
+        stored[draftKey] = '; recoverable draft';
+    };
+    global.localStorage = {
+        getItem: function(key) { return Object.prototype.hasOwnProperty.call(stored, key) ? stored[key] : null; },
+        setItem: function(key, value) { stored[key] = String(value); },
+        removeItem: function(key) { delete stored[key]; },
+    };
+    const editor = {
+        value: '',
+        readOnly: true,
+        classList: { remove: function() {} },
+        removeEventListener: function() {}
+    };
+    let notices = 0;
+    let clearedName = null;
+    global.document = { getElementById: function() { return editor; } };
+    global.window = {
+        _editorOpenLumpToken: token,
+        _editorLumpDirtyToken: token,
+        LumpRegistry: { current: token, setCurrent: function(value) { this.current = value; } }
+    };
+    global._lumpEditorDraftText = { [token]: '; recoverable draft' };
+    global._updateEditorCodeName = function(name) { clearedName = name; };
+    global._showFpgaToast = function() { notices++; };
+
+    installOwner();
+    global.fetch = async function() { throw new Error('offline'); };
+    let cleaned = await _reconcileMissingRestoredLumpOwner(token, editor);
+    check('T-ER09a: network failure preserves restored owner and draft',
+        cleaned === false && !!stored[documentKey] && stored[draftKey] === '; recoverable draft');
+
+    global.fetch = async function() { return { status: 403 }; };
+    cleaned = await _reconcileMissingRestoredLumpOwner(token, editor);
+    check('T-ER09b: authorization failure preserves restored owner and draft',
+        cleaned === false && !!stored[documentKey] && !!stored[draftKey]);
+
+    global.fetch = async function() { return { status: 200 }; };
+    cleaned = await _reconcileMissingRestoredLumpOwner(token, editor);
+    check('T-ER09c: valid saved LUMP preserves restored owner and draft',
+        cleaned === false && !!stored[documentKey] && !!stored[draftKey]);
+
+    global.fetch = async function() { return { status: 404 }; };
+    cleaned = await _reconcileMissingRestoredLumpOwner(token, editor);
+    check('T-ER09d: authoritative not-found clears linked local ownership state',
+        cleaned === true && !stored[documentKey] && !stored[draftKey] &&
+        window._editorOpenLumpToken === null && window.LumpRegistry.current === null);
+    check('T-ER09e: authoritative not-found returns editor to neutral identity',
+        editor.value === '' && editor.readOnly === false && clearedName === '');
+    check('T-ER09f: authoritative not-found shows one no-data-changed notice',
+        notices === 1);
+    const cleanedAgain = await _reconcileMissingRestoredLumpOwner(token, editor);
+    check('T-ER09g: subsequent reload is idempotent and does not repeat notice',
+        cleanedAgain === false && notices === 1);
+
+    // ── Summary ───────────────────────────────────────────────────────────────
+    console.log('\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550');
+    console.log('Results: ' + pass + ' passed, ' + fail + ' failed');
+    if (fail > 0) {
+        console.error('SOME TESTS FAILED');
+        process.exit(1);
+    } else {
+        console.log('ALL TESTS PASSED');
+    }
+})().catch(function(error) {
+    console.error(error);
     process.exit(1);
-} else {
-    console.log('ALL TESTS PASSED');
-}
+});

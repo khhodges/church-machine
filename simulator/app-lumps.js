@@ -3752,6 +3752,73 @@ function _draftLsGet(token) {
 function _draftLsSet(token, v) { try { localStorage.setItem(_draftLsKey(token), v); } catch(_) {} }
 function _draftLsDel(token) { try { localStorage.removeItem(_draftLsKey(token)); } catch(_) {} }
 
+function _isRestoredSavedLumpOwner(token) {
+    try {
+        var raw = localStorage.getItem('church_editor_document_v1');
+        var state = raw ? JSON.parse(raw) : null;
+        return !!(state && state.owner && state.owner.type === 'lump' &&
+            String(state.owner.id || '') === String(token || ''));
+    } catch (_) { return false; }
+}
+
+function _clearOrphanedSavedLumpOwner(token, editor) {
+    if (!_isRestoredSavedLumpOwner(token)) return false;
+    _draftLsDel(token);
+    delete _lumpEditorDraftText[_lumpTokenIdentity(token)];
+    try { localStorage.removeItem('church_editor_document_v1'); } catch (_) {}
+    if (window._editorLumpDirtyListener && window._editorLumpDirtyListenerEl) {
+        window._editorLumpDirtyListenerEl.removeEventListener(
+            'input', window._editorLumpDirtyListener);
+    }
+    window._savedLumpEditorMode = false;
+    window._editorOpenLumpToken = null;
+    window._editorOpenLumpMeta = null;
+    window._editorOpenLumpBaseIdentity = null;
+    window._editorLumpDirtyToken = null;
+    window._editorLumpDirtyListener = null;
+    window._editorLumpDirtyListenerEl = null;
+    window._editorLastSavedToken = null;
+    window._restoredEditorOwnerPending = false;
+    if (window.LumpRegistry) window.LumpRegistry.setCurrent(null);
+    if (editor) {
+        editor.value = '';
+        editor.readOnly = false;
+        if (editor.classList) {
+            editor.classList.remove('cm-editor-sealed');
+            editor.classList.remove('cm-editor-draft');
+        }
+    }
+    if (typeof _updateEditorCodeName === 'function') _updateEditorCodeName('');
+    if (window.ExecutionIdentity && typeof window.ExecutionIdentity.clear === 'function') {
+        window.ExecutionIdentity.clear('The previously opened saved LUMP no longer exists');
+    }
+    if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
+    if (typeof updateLineNumbers === 'function') updateLineNumbers();
+    if (typeof _showFpgaToast === 'function') {
+        _showFpgaToast(
+            'Previously opened LUMP removed',
+            'That saved LUMP no longer exists. The editor was returned to a neutral document; no source or binary was changed.',
+            'info',
+            7000);
+    }
+    return true;
+}
+window._clearOrphanedSavedLumpOwner = _clearOrphanedSavedLumpOwner;
+
+async function _reconcileMissingRestoredLumpOwner(token, editor) {
+    if (!_isRestoredSavedLumpOwner(token)) return false;
+    try {
+        var response = await fetch('/api/lump/' + token + '/words', { cache: 'no-store' });
+        if (response.status === 404 || response.status === 410) {
+            return _clearOrphanedSavedLumpOwner(token, editor);
+        }
+    } catch (_) {
+        // A transport failure is not proof that the saved artifact is gone.
+    }
+    return false;
+}
+window._reconcileMissingRestoredLumpOwner = _reconcileMissingRestoredLumpOwner;
+
 function _commitSavedLumpClientState(resp, fallback, draftToken) {
     if (!resp || !resp.token) throw new Error('Saved LUMP response has no token');
     if (Array.isArray(resp.warnings) && resp.warnings.length &&
@@ -6125,7 +6192,11 @@ async function openLumpInEditor(token) {
             };
     }
 
-    if (!lump) return;
+    if (!lump) {
+        await _reconcileMissingRestoredLumpOwner(
+            token, document.getElementById('asmEditor'));
+        return;
+    }
     var lumpName = lump.abstraction || ('Lump 0x' + token);
 
     // ── Locate the lump in simulator memory (structural info only) ─────────
@@ -6212,6 +6283,11 @@ async function openLumpInEditor(token) {
                     _wordsResponse = _wj;
                 }
             } else {
+                if ((_wr.status === 404 || _wr.status === 410) &&
+                        _clearOrphanedSavedLumpOwner(
+                            token, document.getElementById('asmEditor'))) {
+                    return;
+                }
                 _diagnosticError = _formatActionableHttpError(
                     'Open the saved LUMP binary', _wr.status, await _wr.text(), {
                         dataChanged: false,
