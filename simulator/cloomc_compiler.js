@@ -163,7 +163,9 @@ class CLOOMCCompiler {
         } finally {
             this._reserveCompilerSelfRow = previousReserveSelfRow;
         }
-        // Help the programmer start a new C-list with symbolic SELF in row zero.
+        // The PetName frontend allocates its rows directly (already offset by
+        // one), unlike the other generated frontends which finalize via _buildROM.
+        // Complete only that frontend's symbolic SELF metadata here.
         // Its final E-GT cannot be emitted here:
         // allocation has not yet selected a Namespace slot or minted its
         // sequence. The build pipeline carries a symbolic placeholder until the
@@ -172,7 +174,7 @@ class CLOOMCCompiler {
         // Assembly is deliberately excluded.  It is also used to author Thread,
         // Namespace-root and hardware c-lists whose row-zero contracts are
         // architectural rather than ordinary-abstraction identity.
-        if (result.language !== 'assembly' && result.methods && result.methods.length > 0) {
+        if (result.language === 'petname' && result.methods && result.methods.length > 0) {
             const declared = Array.isArray(result.capabilities) ? result.capabilities : [];
             const isContextualSelf = cap => {
                 const name = typeof cap === 'string' ? cap : (cap && cap.name);
@@ -193,6 +195,10 @@ class CLOOMCCompiler {
                 compiler_assisted_self: true,
                 placeholder: true,
             }, ...userDeclared];
+            result.compilerSelfCapability = true;
+        }
+        if (result.capabilities && result.capabilities[0] &&
+                result.capabilities[0].compiler_owned_self) {
             result.compilerSelfCapability = true;
         }
         // A numeric SAVE into this abstraction's own CR6 C-List is also a
@@ -1137,54 +1143,87 @@ class CLOOMCCompiler {
     }
 
     _buildROM(declaredCaps, uploadCaps, outErrors) {
-        const rom = {};
-        const allCaps = declaredCaps || [];
-        const declaredCompilerSelf = !!(allCaps[0] && typeof allCaps[0] === 'object' &&
-            allCaps[0].compiler_owned_self === true &&
-            String(allCaps[0].name || '').toUpperCase() === '__SELF__');
-        // During public compile(), reservation is enabled before the wrapper
-        // appends the __SELF__ metadata record.  Encode user caps at row one,
-        // but do not discard the first declared user capability in that phase.
-        const hasCompilerSelf = this._reserveCompilerSelfRow === true || declaredCompilerSelf;
-        const sourceCaps = declaredCompilerSelf ? allCaps.slice(1) : allCaps;
-        // `SELF E` is the visible marker for compiler-owned row zero, not a
-        // second user capability. Remove it before assigning source rows.
-        const capNames = hasCompilerSelf
-            ? sourceCaps.filter(cap => {
-                const name = typeof cap === 'string' ? cap : (cap && cap.name);
-                const normalized = String(name || '').trim().toUpperCase();
-                return normalized !== 'SELF' && normalized !== '__SELF__';
-            })
-            : sourceCaps;
-        // SELF is a contextual pet name for this abstraction's owner capability.
-        // Make it usable by method code immediately; localization later replaces
-        // the symbolic row-zero entry with this artifact's concrete Golden Token.
-        if (hasCompilerSelf) {
-            rom.SELF = 0;
-            rom.__SELF__ = 0;
+        const rom = Object.create(null);
+        const symbolicName = value => typeof value === 'string' &&
+            value.trim() && !/^(?:0x[0-9a-f]+|\d+)$/i.test(value.trim()) ? value : '';
+        const nameOf = cap => {
+            if (cap && cap.null_row) return '';
+            const name = typeof cap === 'string' ? cap :
+                cap && (symbolicName(cap.name) || symbolicName(cap.target));
+            const key = String(name || '').trim().toUpperCase();
+            return key === 'SELF' || key === '__SELF__' || (cap && cap.symbolic_self)
+                ? '__SELF__' : key;
+        };
+        const concrete = cap => typeof cap === 'number' || !!(cap &&
+            ['token', 'gt', 'word0'].some(key => typeof cap[key] === 'number'));
+        const normalize = cap => cap == null
+            ? { name: 'NULL', rights: [], null_row: true }
+            : typeof cap === 'object' && !cap.name && symbolicName(cap.target)
+                ? { ...cap, name: cap.target } : cap;
+        const source = Array.from(declaredCaps || [], normalize);
+        const uploaded = Array.from(uploadCaps || [], normalize);
+        // Concrete input is an existing layout, not a bag of name metadata.
+        // Otherwise source order wins, with upload-only rows appended. Decide
+        // ownership before enrichment, never from merged token fields.
+        const sourceConcrete = source.some(concrete);
+        const uploadConcrete = uploaded.some(concrete);
+        const fixedLayout = sourceConcrete || uploadConcrete;
+        const caps = (uploadConcrete && !sourceConcrete ? uploaded : source).slice();
+        const extra = uploadConcrete && !sourceConcrete ? source : uploaded;
+        let matchedNulls = 0;
+        for (const cap of extra) {
+            if (cap && cap.null_row) {
+                const holes = caps.filter(entry => entry && entry.null_row).length;
+                if (matchedNulls++ >= holes) caps.push(cap);
+                continue;
+            }
+            const key = nameOf(cap);
+            const index = key ? caps.findIndex(entry => nameOf(entry) === key) : -1;
+            if (index < 0 && key && fixedLayout &&
+                    (key === '__SELF__' || caps.some(entry => concrete(entry) && !nameOf(entry)))) {
+                if (outErrors) outErrors.push({
+                    line: 1, col: 0, endCol: 0,
+                    message: `Cannot bind capability ${key} to the existing concrete C-list. Supply named metadata for its existing row${key === '__SELF__' ? ' (SELF must be row 0)' : ''}; no concrete rows were moved.`,
+                });
+            } else if (index < 0) caps.push(cap);
+            else if (cap && typeof cap === 'object' && typeof caps[index] !== 'number') {
+                const entry = caps[index];
+                caps[index] = { ...cap, ...(typeof entry === 'string' ? { name: entry } : entry) };
+            }
         }
-        // Only compiler-owned ordinary abstractions reserve row zero.  Assembly
-        // deliberately retains the full 32-row architectural c-list layout.
-        const firstUserRow = hasCompilerSelf ? 1 : 0;
-        const maxUserCaps = hasCompilerSelf ? 31 : 32;
-        if (outErrors && capNames.length > maxUserCaps) {
-            const excess = capNames.length - maxUserCaps;
-            outErrors.push({
-                line: 1, col: 0, endCol: 0,
-                message: `capabilities block declares ${capNames.length} entries but row 0 starts with the current abstraction's SELF Golden Token; only 31 additional entries fit in the 32-row hardware c-list. Remove ${excess} entr${excess === 1 ? 'y' : 'ies'} or split the abstraction into smaller ones.`
+        // Assist new symbolic lists only. Existing concrete rows, including a
+        // zero word, must neither move nor gain a new implicit owner row.
+        const hasCompilerSelf = this._reserveCompilerSelfRow === true && !fixedLayout;
+        if (hasCompilerSelf) {
+            for (let i = caps.length - 1; i >= 0; i--) {
+                if (nameOf(caps[i]) === '__SELF__' && !concrete(caps[i])) caps.splice(i, 1);
+            }
+            caps.unshift({
+                name: '__SELF__', rights: ['E'], grants: ['E'],
+                compiler_owned_self: true, compiler_assisted_self: true, placeholder: true,
             });
         }
-        for (let i = 0; i < capNames.length; i++) {
-            const cap = capNames[i];
-            if (cap && typeof cap === 'object' && cap.null_row === true) continue;
-            rom[(typeof cap === 'string' ? cap : cap.name || '').toUpperCase()] = i + firstUserRow;
+        // Every frontend returns this same array as result.capabilities.
+        // Finalize it BEFORE code generation, not in the public wrapper.
+        if (Array.isArray(declaredCaps)) declaredCaps.splice(0, declaredCaps.length, ...caps);
+        if (outErrors && caps.length > 32) {
+            const excess = caps.length - 32;
+            outErrors.push({
+                line: 1, col: 0, endCol: 0,
+                message: `Final capabilities list has ${caps.length} entries; only 32 rows fit in the hardware c-list${hasCompilerSelf ? ' (SELF plus 31 additional entries)' : ''}. Remove ${excess} entr${excess === 1 ? 'y' : 'ies'} or split the abstraction into smaller ones.`
+            });
         }
-        if (uploadCaps && uploadCaps.length > 0) {
-            for (let i = 0; i < uploadCaps.length; i++) {
-                const name = uploadCaps[i].name || uploadCaps[i].target;
-                if (typeof name === 'string') {
-                    rom[name.toUpperCase()] = i + firstUserRow;
-                }
+        for (let i = 0; i < caps.length; i++) {
+            const key = nameOf(caps[i]);
+            if (fixedLayout && key === '__SELF__' && i !== 0 && outErrors) {
+                outErrors.push({
+                    line: 1, col: 0, endCol: 0,
+                    message: `SELF names concrete C-list row ${i}, not row 0. Correct the supplied row metadata; the compiler has not moved or rewritten the concrete entry.`,
+                });
+            }
+            if (key && rom[key] === undefined) {
+                rom[key] = i;
+                if (key === '__SELF__') rom.SELF = i;
             }
         }
         return rom;
