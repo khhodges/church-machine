@@ -74,6 +74,17 @@ The resident regions are deliberately separated:
 the relocated thread prevents the namespace table and resident LUMPs from
 overlapping.
 
+The saved Boot.Thread context uses the normative two-word frame-chain ABI in
+[`docs/call-stack.md`](call-stack.md). Its protected STO is the machine-owned
+word at Thread `+17`; the first frame word is `STO+2`, its E-GT companion is
+`STO+1`, and each ordinary frame follows `prev_STO+2` toward the
+`NIA=0x7FFF` root sentinel. Boot diagnostics must use the selected Thread
+body's `ThreadDesign` geometry and protected STO, never the active host
+simulator stack cursor. A zero companion, stale E-GT generation, out-of-range
+pointer, non-advancing chain, or duplicate root is malformed saved context
+and must be shown with its raw offsets rather than repaired or redirected to a
+different Thread.
+
 ---
 
 ## What WukongCallHome Does

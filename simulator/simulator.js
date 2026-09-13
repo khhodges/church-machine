@@ -378,6 +378,24 @@ class ChurchSimulator {
                 this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected.\n`;
                 return false;
             }
+            // Thread objects occupy one fixed root slot followed by the
+            // generated Thread slots.  Do not silently accept an image with a
+            // missing middle Thread (or a second root-like descriptor in an
+            // arbitrary slot): CHANGE would otherwise expose a different
+            // private image depending on which UI row happened to be chosen.
+            const expectedThreadSlots = [1];
+            for (let candidate = 11; expectedThreadSlots.length < encodedThreadCount;
+                    candidate++) {
+                if (candidate !== 13) expectedThreadSlots.push(candidate);
+            }
+            if (threadSlots.some((slot, index) => slot !== expectedThreadSlots[index]) ||
+                    threadSlots.length !== expectedThreadSlots.length) {
+                this.lastBootImageError =
+                    `Thread descriptors are not contiguous from the Boot.Thread root ` +
+                    `(found [${threadSlots.join(', ')}], expected [${expectedThreadSlots.join(', ')}]).`;
+                this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected.\n`;
+                return false;
+            }
             discoveredThreadSlots = threadSlots;
             for (const threadSlot of threadSlots) {
                 const nsBase = src.length - (threadSlot + 1) * this.NS_ENTRY_WORDS;
@@ -409,6 +427,16 @@ class ChurchSimulator {
                         resumeSTO !== savedSTO - 2 || nia >= codeHeader.cw) {
                     this.lastBootImageError =
                         `Thread slot ${threadSlot} lacks a canonical two-word CHURCH resume frame.`;
+                    this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected.\n`;
+                    return false;
+                }
+                // The companion Enter identity and persisted CR0 home are one
+                // transaction.  Accepting a frame whose companion is stale
+                // would make a dormant CHANGE resume code selected by bytes
+                // that disagree with the Thread's saved capability bank.
+                if ((src[threadBase + layout.capsStart] >>> 0) !== enterGT) {
+                    this.lastBootImageError =
+                        `Thread slot ${threadSlot} has a stale CHURCH Enter companion.`;
                     this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected.\n`;
                     return false;
                 }
@@ -1105,6 +1133,28 @@ class ChurchSimulator {
     _returnToBoot() {
         // Resetting the live register bank must not write NULL back through
         // CR12 into the prepared Boot.Thread homes.
+        // Re-arm the dormant root frame as part of the reset transaction.
+        // Otherwise the previous root sentinel remains at the top of the
+        // protected stack and the next three-instruction boot would consume
+        // its poison NIA instead of the prepared resume frame.
+        const bootThreadEntry = this.readNSEntry(BOOT_NS_SLOT_THREAD);
+        if (bootThreadEntry) {
+            const bootThreadLayout = this._threadLayoutAtBase(
+                bootThreadEntry.word0_location);
+            if (bootThreadLayout) {
+                const bootBase = bootThreadEntry.word0_location;
+                const resumeSTO = bootThreadLayout.stackEnd - 2;
+                const bootHome = this.memory[
+                    bootBase + bootThreadLayout.capsStart] >>> 0;
+                this.writePersistentWord(
+                    bootBase + THREAD_STO_OFFSET,
+                    this._packProtectedIndicator(resumeSTO, 1, {}, 0));
+                this.writePersistentWord(bootBase + resumeSTO + 1, bootHome);
+                this.writePersistentWord(
+                    bootBase + resumeSTO + 2,
+                    this._packFrameWordRaw(0, 1, bootThreadLayout.stackEnd));
+            }
+        }
         this._liveThreadOwned = false;
         for (let i = 0; i < 16; i++) {
             this.cr[i] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
@@ -1419,8 +1469,20 @@ class ChurchSimulator {
         }
 
         // Validation completed before the first write. The only image words
-        // selected by this operation are Thread.CR0's home and Header V2 W4.
+        // selected by this operation are Thread.CR0's home, its dormant
+        // CHURCH Enter companion, and Header V2 W4.  The home and companion
+        // are one persisted boot credential; updating only one would make
+        // CHANGE reject the otherwise valid selection as stale.
         this.memory[binding.homeAddress] = binding.gt;
+        const protectedWord = this.memory[binding.thread.base + THREAD_STO_OFFSET] >>> 0;
+        const protectedState = this._unpackProtectedIndicator(protectedWord);
+        if (protectedState.sz === 1) {
+            const companionAddress = binding.thread.base + protectedState.sto + 1;
+            if (companionAddress >= binding.thread.base + binding.thread.stackStart &&
+                    companionAddress < binding.thread.base + binding.thread.stackEnd) {
+                this.memory[companionAddress] = binding.gt;
+            }
+        }
         this.memory[4] = ((binding.entry.word0_location >>> 0) * 4) >>> 0;
         this.bootEntrySlot = slot;
         return {
@@ -3160,20 +3222,16 @@ class ChurchSimulator {
             if (!result || this.halted) {
                 return this._bootFailInstruction(index, 'CALL CR0 was rejected.');
             }
-            // The root CALL is the bottom call-frame.  The normal CALL gate
-            // built and validated its frame; tag that same frame as the reset
-            // sentinel so a root RETURN cannot enter boot-ROM memory.
+            // The root CALL transaction installs its poison sentinel
+            // atomically.  Do not patch a normal frame after retirement:
+            // RETURN must be able to validate the protected Thread image as
+            // soon as this instruction completes.
             const sentinel = this.callStack[this.callStack.length - 1];
             const threadBase = this._activeThreadBase();
-            if (!sentinel || threadBase === null) {
+            if (!sentinel || !sentinel.sentinel || threadBase === null) {
                 this.fault('BOOT', 'CALL CR0 did not create a root frame.');
                 return this._bootFailInstruction(index, 'CALL CR0 did not create a root frame.');
             }
-            sentinel.sentinel = true;
-            sentinel.returnPC = 0x7FFF;
-            sentinel.frameWord = this._packFrameWordRaw(
-                0x7FFF, 1, sentinel.savedSTO, sentinel.savedFlags);
-            this._writeRuntimeWord(threadBase + sentinel.savedSTO, sentinel.frameWord);
             this.mElevation = false;
             this._resetAllMBits();
             this.bootComplete = true;
@@ -3661,6 +3719,7 @@ class ChurchSimulator {
                     savedSTO: sp_max,
                     sz: 1,
                     frameWord: sentinelFrameWord,
+                    frameAddress: sp_max,
                 });
                 if (threadBase !== null) {
                     this._writeRuntimeWord(threadBase + sp_max, sentinelFrameWord);
@@ -5164,6 +5223,11 @@ class ChurchSimulator {
                 `CHANGE Thread slot ${threadSlot} CHURCH Enter: ${checked.message}`);
             return null;
         }
+        if (!checked.entry) {
+            this.fault('BOUNDS',
+                `CHANGE Thread slot ${threadSlot}: CHURCH Enter names no Namespace entry`);
+            return null;
+        }
         const frame = this._unpackFrameWord(packedWord);
         if (frame.sz !== 1 || frame.savedSTO < layout.stackStart + 1 ||
                 frame.savedSTO > layout.stackEnd ||
@@ -5183,6 +5247,32 @@ class ChurchSimulator {
             this.fault('BOUNDS',
                 `CHANGE Thread slot ${threadSlot}: CHURCH frame NIA ${frame.returnPC} exceeds code extent ${codeHeader.cw}`);
             return null;
+        }
+        // A dormant frame is written together with the incoming Thread's
+        // persisted CR0 home.  Treat the two words as a coherent identity,
+        // rather than allowing an old companion Enter GT to redirect resume
+        // after the home has been replaced or its Namespace generation moved.
+        // A NULL CR0 is deliberately admitted through CHANGE so the next
+        // architectural CALL reports NULL_CAP at its real gate.  Any
+        // non-null home, however, must be exactly the frame companion.
+        const homeGT = this.memory[threadBase + layout.capsStart] >>> 0;
+        if (homeGT !== 0 && homeGT !== enterGT) {
+            let homeParsed;
+            try {
+                homeParsed = this.parseGT(homeGT);
+            } catch (_e) {
+                homeParsed = null;
+            }
+            // CALL's next gate owns the permission check, so a deliberately
+            // non-E CR0 must still reach CALL.  Coherence here is identity
+            // (slot/sequence/type), not an equality of permission bits.
+            if (!homeParsed || homeParsed.type !== parsed.type ||
+                    homeParsed.index !== parsed.index ||
+                    homeParsed.gt_seq !== parsed.gt_seq) {
+                this.fault('TYPE',
+                    `CHANGE Thread slot ${threadSlot}: CHURCH Enter companion disagrees with CR0 home`);
+                return null;
+            }
         }
         return { enterGT, parsed, checked, codeHeader, frame };
     }
@@ -6937,6 +7027,36 @@ class ChurchSimulator {
         return { pc: this.pc - 1, instr: d, desc };
     }
 
+    _deriveEnterCompanionGT(callerGT, label = 'CALL') {
+        callerGT = callerGT >>> 0;
+        if (!callerGT || ChurchSimulator.isNullGT(callerGT)) {
+            return { ok: false, fault: 'NULL_CAP',
+                message: `${label}: caller CR6 is NULL; cannot construct Enter companion` };
+        }
+        let parsed;
+        try {
+            parsed = this.parseGT(callerGT);
+        } catch (_e) {
+            return { ok: false, fault: 'TYPE',
+                message: `${label}: caller CR6 is malformed; cannot construct Enter companion` };
+        }
+        if (parsed.type !== 1) {
+            return { ok: false, fault: 'TYPE',
+                message: `${label}: caller CR6 must be an Inform capability for Enter companion` };
+        }
+        const entry = this.readNSEntry(parsed.index);
+        if (!entry) {
+            return { ok: false, fault: 'BOUNDS',
+                message: `${label}: caller CR6 names no Namespace entry for Enter companion` };
+        }
+        const seq = this.parseNSWord1(entry.word1_limit).gtSeq;
+        const enterGT = this.createGT(seq, parsed.index, {E: 1}, 1) >>> 0;
+        const check = this.mLoad(enterGT, 'E', 14);
+        if (!check.ok) return { ok: false, fault: check.fault,
+            message: `${label}: caller Enter companion: ${check.message}` };
+        return { ok: true, gt: enterGT, parsed, entry };
+    }
+
     _execCall(d) {
         let sourceGT = this.cr[d.crDst].word0;
         if (sourceGT === 0) {
@@ -7124,25 +7244,69 @@ class ChurchSimulator {
                 return null;
             }
         }
-        const oldCR6GT = this.cr[6].word0 >>> 0;
+        const rootSentinel = d.bootRootContext === true;
+        // Every protected CALL frame carries an Enter E-GT companion.  The
+        // boot-root transaction uses the validated source capability itself;
+        // ordinary CALL derives a fresh E-GT from the caller's CR6 identity,
+        // never serializing the caller's L permission word.
+        let frameCompanionGT;
+        if (rootSentinel) {
+            frameCompanionGT = sourceGT >>> 0;
+        } else {
+            // Legacy lump-only unit fixtures have no protected Thread/CR6
+            // bank.  Their CR14 is the only caller identity available; real
+            // Thread-backed CALLs remain strict about deriving from CR6.
+            const callerGT = (this.cr[6] && this.cr[6].word0) ||
+                (this._activeThreadBase() === null && this.cr[14] &&
+                    this.cr[14].word0);
+            const companion = this._deriveEnterCompanionGT(
+                callerGT, 'CALL');
+            if (!companion.ok) {
+                if (this._activeThreadBase() !== null || callerGT) {
+                    this.fault(companion.fault, companion.message);
+                    return null;
+                }
+                frameCompanionGT = 0;
+            } else {
+                frameCompanionGT = companion.gt;
+            }
+        }
+        // The boot root is a distinct CALL transaction, not a normal frame
+        // patched after the instruction retires.  A second root is always a
+        // malformed boot/context transition and must not create a second
+        // poison return target.
+        if (rootSentinel && this.callStack.some(frame => frame && frame.sentinel)) {
+            this.fault('STACK_CORRUPT',
+                'CALL root transaction attempted to install a duplicate sentinel frame');
+            return null;
+        }
         const priorFrame = this.callStack[this.callStack.length - 1];
+        const returnPC = rootSentinel ? 0x7FFF : this.pc + 1;
         const frameWord = this._packFrameWord(
-            this.pc + 1, priorFrame ? priorFrame.sz : 0, savedSTO);
+            returnPC, rootSentinel ? 1 : (priorFrame ? priorFrame.sz : 0), savedSTO);
         this.callStack.push({
-            returnPC:   this.pc + 1,
+            returnPC,
             savedCRs:   this.cr.map(c => ({...c})),
             savedDRs:   [...this.dr],
             savedFlags: {...this.flags},
             savedSTO,
             sz: 1,
             frameWord,
+            frameAddress: savedSTO,
+            sentinel: rootSentinel,
+            companionGT: frameCompanionGT,
         });
         if (callThreadBase !== null) {
-            if (!this._threadWrite(callThreadBase + savedSTO, frameWord, `CALL CR${d.crDst} frame`)) {
+            // Commit order is architectural: companion Enter E-GT, packed
+            // frame, then protected STO.  A reader can therefore never see a
+            // protected frame whose identity has not been validated.
+            if (!this._threadWrite(callThreadBase + savedSTO - 1,
+                    frameCompanionGT, `CALL CR${d.crDst} Enter companion`)) {
                 this.callStack.pop();
                 return null;
             }
-            if (!this._threadWrite(callThreadBase + savedSTO - 1, oldCR6GT, `CALL CR${d.crDst} CR6-save`)) {
+            if (!this._threadWrite(callThreadBase + savedSTO,
+                    frameWord, `CALL CR${d.crDst} frame`)) {
                 this.callStack.pop();
                 return null;
             }
@@ -7596,22 +7760,150 @@ class ChurchSimulator {
         }
     }
 
+    _readProtectedCallFrame(frameMeta = null) {
+        const threadBase = this._activeThreadBase();
+        if (threadBase === null) {
+            if (frameMeta && frameMeta.sz === 0) {
+                return { ok: true, threadBase: null, indicator: null,
+                    frame: frameMeta, companion: 0,
+                    companionParsed: null, companionCheck: null };
+            }
+            const legacyCR6 = frameMeta && frameMeta.companionGT
+                ? frameMeta.companionGT
+                : (frameMeta && frameMeta.savedCRs && frameMeta.savedCRs[6]
+                    ? frameMeta.savedCRs[6].word0 : 0);
+            if (!legacyCR6) {
+                return { ok: true, threadBase: null, indicator: null,
+                    frame: frameMeta, companion: 0,
+                    companionParsed: null, companionCheck: null };
+            }
+            const companion = this._deriveEnterCompanionGT(legacyCR6, 'RETURN');
+            if (!companion.ok) {
+                this.fault(companion.fault, companion.message);
+                return { ok: false };
+            }
+            let parsed;
+            try { parsed = this.parseGT(companion.gt); } catch (_e) {
+                this.fault('TYPE', 'RETURN: legacy frame companion is malformed');
+                return { ok: false };
+            }
+            return { ok: true, threadBase: null, indicator: null, frame: frameMeta,
+                companion: companion.gt, companionParsed: parsed,
+                companionCheck: { entry: companion.entry } };
+        }
+        const layout = this._threadLayoutAtBase(threadBase);
+        if (!layout) {
+            this.fault('BOUNDS', 'RETURN: active Thread has invalid private-memory geometry');
+            return { ok: false };
+        }
+        const indicatorWord = this.memory[threadBase + THREAD_STO_OFFSET] >>> 0;
+        const indicator = this._unpackProtectedIndicator(indicatorWord);
+        const frameSize = frameMeta
+            ? (frameMeta.sz === 0 ? 0 : 1)
+            : indicator.sz;
+        const frameOffset = frameSize === 0 ? 1 : 2;
+        const frameAddress = indicator.sto + frameOffset;
+        if (indicator.sz !== frameSize || frameAddress < layout.stackStart + 1 ||
+                frameAddress > layout.stackEnd) {
+            this.fault('STACK_CORRUPT',
+                `RETURN: protected Thread STO ${indicator.sto} does not name a CALL frame`);
+            return { ok: false };
+        }
+        const companion = frameSize === 1
+            ? (this.memory[threadBase + frameAddress - 1] >>> 0) : 0;
+        const packed = this.memory[threadBase + frameAddress] >>> 0;
+        const frame = this._unpackFrameWord(packed);
+        // CALL stores savedSTO at the exact address occupied by its frame.
+        // This relation is what makes a corrupt previous-STO loop or a gap
+        // between the indicator and frame unambiguously rejectable.
+        if (frame.savedSTO !== frameAddress ||
+                frameAddress !== indicator.sto + frameOffset) {
+            this.fault('STACK_CORRUPT',
+                `RETURN: malformed protected frame at STO ${indicator.sto}`);
+            return { ok: false };
+        }
+        if (frameSize === 0) {
+            return { ok: true, threadBase, layout, indicator, frameAddress,
+                frame, companion: 0, companionParsed: null,
+                companionCheck: null, packed };
+        }
+        if (companion === 0) {
+            this.fault('TYPE', 'RETURN: protected frame CR6 companion is missing');
+            return { ok: false };
+        }
+        let parsed;
+        try {
+            parsed = this.parseGT(companion);
+        } catch (_e) {
+            this.fault('TYPE', 'RETURN: protected frame CR6 companion is malformed');
+            return { ok: false };
+        }
+        if (parsed.type !== 1 || !parsed.permissions.E) {
+            this.fault('PERM_E',
+                'RETURN: protected frame CR6 companion must be an Inform E-GT');
+            return { ok: false };
+        }
+        const companionCheck = this.mLoad(companion, 'E', 14);
+        if (!companionCheck.ok) {
+            this.fault(companionCheck.fault,
+                `RETURN: protected frame CR6 companion: ${companionCheck.message}`);
+            return { ok: false };
+        }
+        return { ok: true, threadBase, layout, indicator, frameAddress,
+            frame, companion, companionParsed: parsed,
+            companionCheck, packed };
+    }
+
     _execReturn(d) {
-        if (this.callStack.length === 0) {
+        if (this.callStack.length === 0 && this._activeThreadBase() === null) {
             this.fault('STACK_UNDERFLOW', 'RETURN with no call frames — stack is empty (no sentinel pushed). Nothing to return to.');
             return null;
         }
-        // M-window writeback gate: must fire before frame pop and _resetAllMBits().
-        if (!this._mwinWriteback()) return null;
         const mask = d.imm & 0xFFF;
-        const frame = this.callStack.pop();
+        const protectedFrame = this._readProtectedCallFrame(
+            this._activeThreadBase() === null
+                ? this.callStack[this.callStack.length - 1] : null);
+        if (!protectedFrame.ok) return null;
+        // M-window writeback gate: must fire before frame pop and
+        // _resetAllMBits(), but only after the protected frame has passed all
+        // identity/permission checks above.
+        if (!this._mwinWriteback()) return null;
+        // Locate only the non-serialised caller snapshot by the protected
+        // frame address.  The protected Thread image, not callStack ordering,
+        // owns which frame RETURN is unwinding.
+        const runtimeFrame = protectedFrame.threadBase === null
+            ? this.callStack[this.callStack.length - 1]
+            : [...this.callStack].reverse().find(candidate =>
+                candidate &&
+                candidate.frameAddress === protectedFrame.frameAddress &&
+                candidate.frameWord === protectedFrame.packed &&
+                candidate.savedSTO === protectedFrame.frame.savedSTO &&
+                candidate.sz === protectedFrame.frame.sz);
+        // callStack is a diagnostic shadow, never frame-selection authority.
+        // A valid protected frame can outlive that shadow; raw NIA/FLAGS/SZ/
+        // STO remain authoritative while missing snapshots scrub the caller
+        // bank.
+        const snapshot = runtimeFrame || {
+            savedCRs: null, savedDRs: null, savedFlags: null, sentinel: false,
+        };
+        const frame = protectedFrame.frame || snapshot;
+        // Protected words own control state; the runtime record only carries
+        // register snapshots needed by RETURN MASK.
+        frame.savedCRs = snapshot.savedCRs;
+        frame.savedDRs = snapshot.savedDRs;
+        frame.savedFlags = snapshot.savedFlags;
 
         // Sentinel frame: NIA=0x7FFF (poison) signals the bottom of the call stack.
         // RETURN through the sentinel means the top-level abstraction tried to return
         // past the last frame — this is a stack-underflow fault.
-        if (frame.sentinel) {
+        if (frame.returnPC === 0x7FFF ||
+                (protectedFrame.threadBase === null && snapshot.sentinel)) {
             this.fault('STACK_UNDERFLOW', 'RETURN through sentinel frame (NIA=0x7FFF) — stack underflow: no caller above the root abstraction.');
             return null;
+        }
+        if (runtimeFrame) {
+            const runtimeIndex = this.callStack.lastIndexOf(runtimeFrame);
+            this.callStack.splice(runtimeIndex, 1);
         }
 
         this._resetAllMBits();   // RETURN boundary: M is reset on all CRs (architecture rule)
@@ -7619,8 +7911,12 @@ class ChurchSimulator {
         // Capture the CALLER's saved CR14 from the frame — RETURN_CR14 payload per
         // debug-packet-protocol.md: "CR14 ← restored from frame (caller's code cap)".
         // frame.savedCRs includes all 16 CRs snapshotted at CALL/LAMBDA time.
-        const _retCallerCR14GT = (frame.savedCRs && frame.savedCRs[14])
-            ? (frame.savedCRs[14].word0 >>> 0) : 0;
+        const _retCallerCR14GT = protectedFrame.companionParsed
+            ? this.createGT(
+                protectedFrame.companionParsed.gt_seq,
+                protectedFrame.companionParsed.index, {X: 1}, 1) >>> 0
+            : ((frame.savedCRs && frame.savedCRs[14])
+                ? (frame.savedCRs[14].word0 >>> 0) : 0);
 
         // Mask semantics: set bit = PRESERVE callee's CR (return value); clear bit = restore caller's.
         // One combined pass ensures callee internal GTs are never visible to the caller
@@ -7645,6 +7941,24 @@ class ChurchSimulator {
                 clearedCRs.push(`CR${i}`);
             }
         }
+        // The protected Enter companion is the caller identity authority.
+        // Reconstruct the normalized L CR6 from its E identity rather than
+        // trusting a diagnostic snapshot's permission bits.
+        if (!(mask & (1 << 6)) && protectedFrame.companionParsed &&
+                protectedFrame.companionCheck &&
+                protectedFrame.companionCheck.entry) {
+            const callerIdentity = protectedFrame.companionParsed;
+            const callerEntry = protectedFrame.companionCheck.entry;
+            const callerL = this.createGT(
+                callerIdentity.gt_seq, callerIdentity.index, {L: 1}, 1);
+            this.cr[6] = {
+                word0: callerL >>> 0,
+                word1: callerEntry.word0_location >>> 0,
+                word2: callerEntry.word1_limit >>> 0,
+                word3: 0,
+                m: 1,
+            };
+        }
         // RETURN microcode establishes the caller's c-list as the one
         // isolated-register authority carried across the domain boundary.
         // M is not ordinary saved-register state: the boundary reset above
@@ -7660,19 +7974,24 @@ class ChurchSimulator {
                 this._writeDR(di, frame.savedDRs[di]);
             }
         }
-        if (frame.savedFlags) this.flags = {...frame.savedFlags};
+        // FLAGS/NIA/SZ/STO are packed in the protected frame.  Do not replace
+        // them with a stale JavaScript mirror after reading the Thread image.
+        if (protectedFrame.frame && protectedFrame.frame.flags) {
+            this.flags = {...protectedFrame.frame.flags};
+        } else if (frame.savedFlags) {
+            this.flags = {...frame.savedFlags};
+        }
         if (typeof frame.savedSTO === 'number') {
             this.sto = frame.savedSTO;
             if (tnBaseRet !== null) {
-                const priorFrame = this.callStack[this.callStack.length - 1];
                 this._writeProtectedSto(
-                    tnBaseRet, this.sto, priorFrame ? priorFrame.sz : 0, this.flags);
+                    tnBaseRet, this.sto, frame.sz, this.flags);
             }
         }
         const frameTag = frame.sz === 0 ? 'LAMBDA' : 'CALL';
-        const isLeafLambda = frame.sz === 0 && this.lambdaActive && this.lambdaCachedFrame;
+        const isLeafLambda = frame.sz === 0;
         if (isLeafLambda) {
-            const cachedReturnPC = this.lambdaReturnPC;
+            const cachedReturnPC = frame.returnPC;
             this.lambdaActive = false;
             this.lambdaCachedFrame = null;
             this.pc = cachedReturnPC;
@@ -7698,8 +8017,20 @@ class ChurchSimulator {
         // physicalPC from the callee's lump base (stale CR14.word1), so the next
         // step fetches from the wrong location.
         // Lambda frames (sz=0) never overwrite CR14, so no restoration is needed.
-        if (frame.sz === 1 && frame.savedCRs && frame.savedCRs[14] !== undefined) {
-            this.cr[14] = { ...frame.savedCRs[14] };
+        if (frame.sz === 1 && protectedFrame.companionParsed &&
+                protectedFrame.companionCheck &&
+                protectedFrame.companionCheck.entry) {
+            const callerIdentity = protectedFrame.companionParsed;
+            const callerEntry = protectedFrame.companionCheck.entry;
+            const callerRX = this.createGT(
+                callerIdentity.gt_seq, callerIdentity.index, {X: 1}, 1);
+            this.cr[14] = {
+                word0: callerRX >>> 0,
+                word1: callerEntry.word0_location >>> 0,
+                word2: callerEntry.word1_limit >>> 0,
+                word3: 0,
+                m: 0,
+            };
         }
         const maskDesc = mask ? ` MASK=0b${mask.toString(2).padStart(12, '0')} preserved[${preservedCRs.join(',')||'none'}]` : '';
         const desc = `RETURN (${frameTag}/SZ=${frame.sz}) PC→${frame.returnPC}${maskDesc}`;
@@ -7815,6 +8146,14 @@ class ChurchSimulator {
                         this.fault('BOUNDS', `CHANGE CR12: Namespace slot ${targetIdx} has invalid Thread geometry`);
                         return null;
                     }
+                    // CR12 RESTORE_CALL consumes the dormant CHURCH frame
+                    // before the restored CR bank becomes live.  The frame's
+                    // Enter companion and packed STO/NIA are authoritative;
+                    // a gap, stale companion, or looping previous-STO must
+                    // reject the whole CHANGE transaction.
+                    const restoreResume = this._readThreadResumeFrame(
+                        tBase, restoreLayout, targetIdx);
+                    if (!restoreResume) return null;
                     const restoredRegs = [];
                     for (let i = 0; i < 12; i++) {
                         const gtWord = this.memory[tBase + restoreLayout.capsStart + i] >>> 0;
@@ -7871,6 +8210,12 @@ class ChurchSimulator {
                         word3: 0,
                         m: 0,
                     };
+                    this.sto = restoreResume.frame.savedSTO;
+                    this.flags = {...restoreResume.frame.flags};
+                    this._writeRuntimeWord(
+                        tBase + THREAD_STO_OFFSET,
+                        this._packProtectedIndicator(
+                            this.sto, 1, this.flags, 0));
                 }
             }
 
@@ -8431,6 +8776,7 @@ class ChurchSimulator {
             savedSTO,
             sz: 0,
             frameWord,
+            frameAddress: savedSTO,
             isLambda: true,
         });
         this.lambdaActive = true;
@@ -8681,6 +9027,14 @@ class ChurchSimulator {
         const priorFrame_ec = this.callStack[this.callStack.length - 1];
         const frameWord_ec = this._packFrameWord(
             this.pc + 1, priorFrame_ec ? priorFrame_ec.sz : 0, savedSTO_ec);
+        const ecCompanion = this._deriveEnterCompanionGT(
+            (this.cr[6] && this.cr[6].word0) ||
+                (ecThreadBase === null && this.cr[14] && this.cr[14].word0),
+            'ELOADCALL');
+        if (!ecCompanion.ok) {
+            this.fault(ecCompanion.fault, ecCompanion.message);
+            return null;
+        }
         // Save CRs BEFORE any _writeCR calls so RETURN correctly restores the caller's context.
         this.callStack.push({
             returnPC:   this.pc + 1,
@@ -8690,11 +9044,14 @@ class ChurchSimulator {
             savedSTO:   savedSTO_ec,
             sz: 1,
             frameWord:  frameWord_ec,
+            frameAddress: savedSTO_ec,
+            companionGT: ecCompanion.gt,
         });
         if (ecThreadBase !== null) {
-            const oldCR6GT_ec = this.cr[6].word0 >>> 0;
-            if (!this._threadWrite(ecThreadBase + savedSTO_ec, frameWord_ec, `ELOADCALL CR${d.crDst} frame`) ||
-                !this._threadWrite(ecThreadBase + savedSTO_ec - 1, oldCR6GT_ec, `ELOADCALL CR${d.crDst} CR6-save`)) {
+            if (!this._threadWrite(ecThreadBase + savedSTO_ec - 1,
+                    ecCompanion.gt, `ELOADCALL CR${d.crDst} Enter companion`) ||
+                !this._threadWrite(ecThreadBase + savedSTO_ec,
+                    frameWord_ec, `ELOADCALL CR${d.crDst} frame`)) {
                 this.callStack.pop();
                 return null;
             }

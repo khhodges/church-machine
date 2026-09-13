@@ -1366,6 +1366,7 @@ class ChurchCore(Elaboratable):
             u_return.cr5_heap.eq(u_regs.cr5_heap),
             u_return.cr12_thread.eq(u_regs.cr12_thread),
             u_return.thread_base.eq(self.active_thread_base),
+            u_return.thread_hdr.eq(u_change.thread_hdr_out if not self.iot_profile else 0),
             u_return.mem_rd_data.eq(self.dmem_rd_data),
             u_return.mem_rd_valid.eq(self.dmem_rd_valid),
         ]
@@ -1882,6 +1883,7 @@ class ChurchCore(Elaboratable):
                 u_eloadcall.cr_src.eq(cr_src),
                 u_eloadcall.cr_dst.eq(cr_dst),
                 u_eloadcall.index.eq(u_decoder.eloadcall_clist_row),
+                u_eloadcall.caller_pc.eq(nia_reg[2:17]),
                 u_eloadcall.mask.eq(u_decoder.call_mask),
                 u_eloadcall.call_imm.eq(u_decoder.eloadcall_method_index),  # method-table slot (1-based)
                 u_eloadcall.cr_rd_data.eq(u_regs.cr_rd_data),
@@ -2928,6 +2930,7 @@ class ChurchCore(Elaboratable):
                 u_shared_mload.sub_direct.eq(u_call.mload_direct),
                 u_shared_mload.sub_direct_gt.eq(u_call.mload_direct_gt),
                 u_shared_mload.sub_m_elevated.eq(u_call.mload_m_elevated),
+                u_shared_mload.sub_validate_only.eq(0),
             ]
         with m.Elif(u_return.busy):
             m.d.comb += [
@@ -2938,6 +2941,7 @@ class ChurchCore(Elaboratable):
                 u_shared_mload.sub_direct.eq(u_return.mload_direct),
                 u_shared_mload.sub_direct_gt.eq(u_return.mload_direct_gt),
                 u_shared_mload.sub_m_elevated.eq(u_return.mload_m_elevated),
+                u_shared_mload.sub_validate_only.eq(u_return.mload_validate_only),
             ]
         with m.Elif(u_load.load_busy):
             m.d.comb += [
@@ -2952,6 +2956,7 @@ class ChurchCore(Elaboratable):
                     | (boot_state_reg != BootState.COMPLETE)
                     | boot_microcode_active
                 ),
+                u_shared_mload.sub_validate_only.eq(0),
             ]
 
         # Grant-qualified handshake feedback.  The shared mload's busy/done/

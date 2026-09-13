@@ -773,16 +773,34 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
         raise ValueError(
             f"validate_boot_image: encoded Thread count {thread_count} is outside "
             f"1..{MAX_THREAD_COUNT}")
-    thread_slots = [1]
-    candidate = GENERATED_THREAD_FIRST_NS_SLOT
-    while len(thread_slots) < thread_count:
-        if candidate != ARCH_BOOT["minimalSlots"]["M_BIT_DEV"]:
-            if candidate >= ns_capacity:
-                raise ValueError(
-                    f"validate_boot_image: encoded Thread count {thread_count} "
-                    f"exceeds Namespace table capacity {ns_capacity}")
-            thread_slots.append(candidate)
-        candidate += 1
+    # Thread descriptors are positional: slot 1 is the root and subsequent
+    # configured Threads occupy 11, 12, 14, ... .  Do not let a gap (or an
+    # extra root-like typ=2 descriptor in an arbitrary slot) disappear from
+    # validation merely because the legacy count scanner stops at the first
+    # empty slot.
+    resident_thread_slots = []
+    for slot in range(ns_capacity):
+        base = n_words - (slot + 1) * NS_ENTRY_WORDS
+        if base < 0:
+            continue
+        location = words[base]
+        if location >= physical["table_base"] or location >= n_words:
+            continue
+        header_word = words[location]
+        if ((header_word >> 27) & 0x1F) == 0x1F and ((header_word >> 8) & 3) == 2:
+            resident_thread_slots.append(slot)
+    expected_thread_slots = [1]
+    candidate_slot = GENERATED_THREAD_FIRST_NS_SLOT
+    while len(expected_thread_slots) < thread_count:
+        if candidate_slot != ARCH_BOOT["minimalSlots"]["M_BIT_DEV"]:
+            expected_thread_slots.append(candidate_slot)
+        candidate_slot += 1
+    if resident_thread_slots != expected_thread_slots:
+        raise ValueError(
+            "validate_boot_image: Thread descriptors have a malformed gap or "
+            f"duplicate root (found {resident_thread_slots}, "
+            f"expected {expected_thread_slots})")
+    thread_slots = expected_thread_slots
     gt_fields = ARCH_GT_WORD0["fields"]
     gt_type_lsb = field_lsb(gt_fields["gt_type"])
     gt_seq_lsb = field_lsb(gt_fields["gt_seq"])
@@ -839,6 +857,20 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
                 or saved_sto > layout["stack_end"]
                 or resume_sto != saved_sto - 2):
             raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has malformed CHURCH resume frame")
+
+        # The Enter companion and persisted CR0 home carry the same
+        # destination identity.  Permission bits may differ on an intentionally
+        # denied home (the CALL gate reports that fault), but a different slot,
+        # generation, or type is stale frame state.
+        cr0_home = words[thread_loc + layout["caps_start"]]
+        if cr0_home:
+            home_type = (cr0_home >> gt_type_lsb) & _field_mask(gt_fields["gt_type"])
+            home_slot = (cr0_home >> gt_slot_lsb) & _field_mask(gt_fields["slot_id"])
+            home_seq = (cr0_home >> gt_seq_lsb) & _field_mask(gt_fields["gt_seq"])
+            if (home_type, home_slot, home_seq) != (gt_type, code_slot, code_seq):
+                raise ValueError(
+                    f"validate_boot_image: Thread slot {thread_slot} has a stale "
+                    "CHURCH Enter companion")
 
         # CR0 is boot authority only for the fixed Boot.Thread.  It is a
         # persisted capability home, not a boot-time scratch register: the ROM

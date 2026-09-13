@@ -28,6 +28,19 @@ assert.strictEqual(prepared.ok, true, 'valid executable boot selection must prep
 assert.strictEqual(prepared.sequence, 7, 'prepared GT did not use live NS sequence');
 assert.strictEqual(sim.inspectBootEntryBinding().ok, true, 'prepared binding is not coherent');
 
+// Before the ROM consumes it, the prepared dormant frame occupies exactly
+// +238..+243: four untouched stack words, Enter E-GT, and packed NIA=0/SZ=1
+// with saved STO=stackEnd.
+{
+    const threadBase = sim.getThreadInstanceLayout(1).base;
+    assert.deepStrictEqual(
+        Array.from(sim.memory.slice(threadBase + 238, threadBase + 244),
+            word => word >>> 0),
+        [0, 0, 0, 0, prepared.gt >>> 0,
+            sim._packFrameWordRaw(0, 1, 243)],
+        'prepared raw Thread words +238..+243 are not canonical');
+}
+
 let retired = 0;
 while (!sim.bootComplete && !sim.halted && retired < 4) {
     assert.strictEqual(sim._bootStep(), true, 'boot instruction did not retire');
@@ -51,6 +64,20 @@ assert.strictEqual(sim.callStack.length, 1, 'root CALL did not leave its sentine
 assert.strictEqual(sim.callStack[0].sentinel, true, 'root CALL frame is not the reset sentinel');
 assert.strictEqual(sim.callStack[0].returnPC, 0x7FFF, 'root sentinel return PC is not poison');
 
+// The canonical 256-word Thread has stackEnd=243.  Keep the six words at the
+// raw stack/capability boundary explicit: no hidden companion or frame may be
+// shifted into +238..+241, and the two CHURCH words must be the exact live
+// boot identity and poison sentinel frame.
+{
+    const threadBase = sim.getThreadInstanceLayout(1).base;
+    assert.deepStrictEqual(
+        Array.from(sim.memory.slice(threadBase + 238, threadBase + 244),
+            word => word >>> 0),
+        [0, 0, 0, 0, prepared.gt >>> 0,
+            sim._packFrameWordRaw(0x7FFF, 1, 243)],
+        'raw Thread words +238..+243 do not match canonical root frame');
+}
+
 // Exact ROM words are independently encoded from the instruction definition.
 assert.deepStrictEqual(sim.bootProgress.map(row => row.word >>> 0), [
     sim.encodeInstruction(0, 14, 15, 15, 0),
@@ -62,6 +89,140 @@ assert.deepStrictEqual(sim.bootProgress.map(row => row.word >>> 0), [
 sim._execReturn({ opcode: 3, cond: 14, imm: 0, mnemonic: 'RETURN' });
 assert.strictEqual(sim.faultLog.at(-1).type, 'STACK_UNDERFLOW',
     'root RETURN must fault through the sentinel');
+
+// Frame admission rejects a gap and a stale Enter companion before either
+// image can become live.
+{
+    const gap = new ChurchSimulator();
+    assert(gap._bootStep(), 'gap probe: LOAD failed');
+    const gapLayout = gap.getThreadInstanceLayout(1);
+    gap.memory[gapLayout.base + 17] =
+        gap._packProtectedIndicator(gapLayout.stackEnd - 3, 1, {}, 0);
+    assert.strictEqual(gap._bootStep(), false, 'malformed frame gap was admitted');
+    assert(['TYPE', 'PERM_E'].includes(gap.faultLog.at(-1).type));
+}
+{
+    const companion = new ChurchSimulator();
+    assert(companion._bootStep(), 'companion probe: LOAD failed');
+    const companionLayout = companion.getThreadInstanceLayout(1);
+    const otherEntry = companion.readNSEntry(10);
+    const otherSeq = companion.parseNSWord1(otherEntry.word1_limit).gtSeq;
+    companion.memory[companionLayout.base + companionLayout.stackEnd - 1] =
+        companion.createGT(otherSeq, 10, { E: 1 }, 1);
+    assert.strictEqual(companion._bootStep(), false,
+        'stale CHURCH Enter companion was admitted');
+    assert(['TYPE', 'BOUNDS'].includes(companion.faultLog.at(-1).type),
+        'stale companion reached an unexpected gate');
+}
+
+// A root transaction cannot install a second sentinel.  A corrupted previous
+// STO cannot loop RETURN back into itself, while a valid nested frame unwinds
+// to the original root sentinel exactly once.
+{
+    const duplicate = new ChurchSimulator();
+    runToCall(duplicate);
+    assert.strictEqual(duplicate._execCall({
+        opcode: 2, cond: 14, crDst: 0, crSrc: 0, imm: 0,
+        mnemonic: 'CALL', bootRootContext: true,
+    }), null, 'duplicate root sentinel was admitted');
+    assert.strictEqual(duplicate.faultLog.at(-1).type, 'STACK_CORRUPT');
+}
+{
+    const loop = new ChurchSimulator();
+    runToCall(loop);
+    const loopLayout = loop.getThreadInstanceLayout(1);
+    const frameAddr = loop._unpackProtectedIndicator(
+        loop.memory[loopLayout.base + 17] >>> 0).sto + 2;
+    const frameWord = loop.memory[loopLayout.base + frameAddr] >>> 0;
+    loop.memory[loopLayout.base + frameAddr] =
+        (frameWord & ~0xFFF) |
+        ((frameAddr - 2) & 0xFFF);
+    assert.strictEqual(loop._execReturn({
+        opcode: 3, cond: 14, imm: 0, mnemonic: 'RETURN',
+    }), null, 'looping previous STO was admitted');
+    assert.strictEqual(loop.faultLog.at(-1).type, 'STACK_CORRUPT');
+}
+{
+    const zeroCompanion = new ChurchSimulator();
+    runToCall(zeroCompanion);
+    const zeroLayout = zeroCompanion.getThreadInstanceLayout(1);
+    const zeroStoAddress = zeroLayout.base + 17;
+    const beforeStoWord = zeroCompanion.memory[zeroStoAddress] >>> 0;
+    const zeroFrameAddress = (beforeStoWord & 0xFFF) + 2;
+    zeroCompanion.memory[zeroLayout.base + zeroFrameAddress - 1] = 0;
+    assert.strictEqual(zeroCompanion._execReturn({
+        opcode: 3, cond: 14, imm: 0, mnemonic: 'RETURN',
+    }), null, 'zero Enter companion was admitted');
+    assert(['TYPE', 'PERM_E'].includes(zeroCompanion.faultLog.at(-1).type));
+    assert.strictEqual(zeroCompanion.memory[zeroStoAddress] >>> 0,
+        beforeStoWord, 'zero companion fault mutated protected STO');
+}
+{
+    const nested = new ChurchSimulator();
+    runToCall(nested);
+    assert(nested._execCall({
+        opcode: 2, cond: 14, crDst: 0, crSrc: 0, imm: 0, mnemonic: 'CALL',
+    }), 'nested CALL failed');
+    assert(nested._execCall({
+        opcode: 2, cond: 14, crDst: 0, crSrc: 0, imm: 0, mnemonic: 'CALL',
+    }), 'second nested CALL failed');
+    const nestedLayout = nested.getThreadInstanceLayout(1);
+    const nestedGT = nested.cr[0].word0 >>> 0;
+    assert.deepStrictEqual(
+        Array.from(nested.memory.slice(nestedLayout.base + 238,
+            nestedLayout.base + 244), word => word >>> 0),
+        [nestedGT, nested._packFrameWordRaw(2, 1, 239),
+            nestedGT, nested._packFrameWordRaw(2, 1, 241),
+            nestedGT, nested._packFrameWordRaw(0x7FFF, 1, 243)],
+        'nested raw Thread +238..+243 lost a contiguous frame pair');
+    assert.strictEqual(nested.callStack.length, 3);
+    assert(nested._execReturn({
+        opcode: 3, cond: 14, imm: 0, mnemonic: 'RETURN',
+    }), 'nested RETURN failed');
+    assert.strictEqual(nested.callStack.length, 2,
+        'first nested RETURN did not consume exactly one frame');
+    assert(nested._execReturn({
+        opcode: 3, cond: 14, imm: 0, mnemonic: 'RETURN',
+    }), 'second nested RETURN failed');
+    assert.strictEqual(nested.callStack.length, 1,
+        'second nested RETURN did not consume exactly one frame');
+    assert.strictEqual(nested.callStack[0].sentinel, true);
+}
+{
+    const noSnapshot = new ChurchSimulator();
+    runToCall(noSnapshot);
+    assert(noSnapshot._execCall({
+        opcode: 2, cond: 14, crDst: 0, crSrc: 0, imm: 0, mnemonic: 'CALL',
+    }), 'no-snapshot nested CALL failed');
+    const noSnapshotLayout = noSnapshot.getThreadInstanceLayout(1);
+    // Deliberately retain an unrelated diagnostic shadow entry.  It must not
+    // select the frame or redirect the packed NIA/STO return.
+    noSnapshot.callStack = [{
+        frameAddress: noSnapshotLayout.stackEnd,
+        returnPC: 0x1234,
+        savedCRs: null, savedDRs: null, savedFlags: null,
+        sz: 1,
+    }];
+    assert(noSnapshot._execReturn({
+        opcode: 3, cond: 14, imm: 0, mnemonic: 'RETURN',
+    }), 'valid protected RETURN required a JS snapshot');
+    assert.strictEqual(noSnapshot.pc, 2,
+        'mismatched callStack redirected packed return NIA');
+    assert.strictEqual(noSnapshot.callStack.length, 1,
+        'RETURN popped an unrelated diagnostic shadow entry');
+    const noSnapshotCR6 = noSnapshot.parseGT(noSnapshot.cr[6].word0);
+    const noSnapshotCR14 = noSnapshot.parseGT(noSnapshot.cr[14].word0);
+    assert.strictEqual(noSnapshotCR6.permissions.L, 1,
+        'no-snapshot RETURN did not reconstruct caller CR6 L');
+    assert.strictEqual(noSnapshotCR6.permissions.E, 0,
+        'no-snapshot RETURN reconstructed caller CR6 with E');
+    assert.strictEqual(noSnapshotCR14.permissions.X, 1,
+        'no-snapshot RETURN did not reconstruct caller CR14 RX');
+    assert.strictEqual(
+        noSnapshot.memory[noSnapshotLayout.base + 17] & 0xFFF,
+        noSnapshotLayout.stackEnd - 2,
+        'valid no-snapshot RETURN did not restore protected predecessor STO');
+}
 
 function runToCall(machine) {
     assert(machine._bootStep(), 'LOAD CR15 failed unexpectedly');
@@ -132,12 +293,13 @@ expectCallFault('null CR0', 0, 'NULL_CAP');
     assert(stale._bootStep(), 'stale CR0: LOAD failed');
     const home = stale.inspectBootEntryBinding().homeAddress;
     stale.memory[home] = oldGT;
-    assert(stale._bootStep(), 'stale CR0: CHANGE failed');
-    assert.strictEqual(stale._bootStep(), false, 'stale CR0: CALL unexpectedly retired');
+    assert.strictEqual(stale._bootStep(), false,
+        'stale CHURCH companion was admitted by CHANGE');
     const fault = stale.faultLog.at(-1);
-    assert.strictEqual(fault.type, 'VERSION', 'stale CR0 did not reach CALL version gate');
-    assert.strictEqual(fault.bootEvidence.bootRomAddress, 2);
-    assert.strictEqual(fault.bootEvidence.provenanceRegister, 'CR0');
+    assert.strictEqual(fault.type, 'VERSION',
+        'stale CHURCH companion reached an unexpected gate');
+    assert.strictEqual(stale.memory[stale.getThreadInstanceLayout(1).base + 17] & 0xFFF,
+        241, 'rejected stale companion mutated protected STO');
 }
 
 // Malformed Thread geometry is rejected by CHANGE and carries B:01 evidence.

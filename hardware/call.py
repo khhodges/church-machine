@@ -127,8 +127,21 @@ class ChurchCall(Elaboratable):
         MAX_SRC_REG = 11   # cr_src must be in CR0–CR11
 
         phase = Signal()
+        # CALL is a multi-cycle unit: capture every architectural input used
+        # after decode, including the short-lived boot/root request.
+        cr_src_latched = Signal(4)
+        cr5_heap_latched = Signal(CAP_REG_LAYOUT)
+        cr12_thread_latched = Signal(CAP_REG_LAYOUT)
+        cr15_namespace_latched = Signal(CAP_REG_LAYOUT)
+        cr14_code_latched = Signal(CAP_REG_LAYOUT)
+        thread_base_latched = Signal(32)
+        thread_hdr_latched = Signal(32)
+        caller_pc_latched = Signal(15)
+        flags_latched = Signal(COND_FLAGS_LAYOUT)
+        root_frame_latched = Signal()
         src_reg_latched = Signal(CAP_REG_LAYOUT)
         mask_latched = Signal(16)
+        index_latched = Signal(16)
         call_imm_latched = Signal(15)   # method index latched from self.call_imm at call_start
         fault_latched = Signal()
         fault_type_latched = Signal(5)      # 5 bits: covers FaultType 0x0–0x12 (STACK_CORRUPT)
@@ -152,12 +165,12 @@ class ChurchCall(Elaboratable):
         sp_latched = Signal(12)
         protected_sto_addr = Signal(32)
         m.d.comb += protected_sto_addr.eq(
-            self.thread_base + (THREAD_STO_OFFSET << 2))
+            thread_base_latched + (THREAD_STO_OFFSET << 2))
 
         # Thread header — decoded combinatorially from THREAD_HDR hidden register.
         # THREAD_HDR is loaded once by CHANGE on thread restore; valid for the entire
         # lifetime of the thread. No memory read needed per CALL.
-        thread_hdr_view = View(LUMP_HEADER_LAYOUT, self.thread_hdr)
+        thread_hdr_view = View(LUMP_HEADER_LAYOUT, thread_hdr_latched)
 
         # The private Thread zones are all header-derived.  Capability homes
         # occupy the final 12 words; cw is the stack size.
@@ -213,11 +226,14 @@ class ChurchCall(Elaboratable):
         # Written to thread_base + STO*4 (STO+0); E-GT written to STO-1.
         frame_word = Signal(32)
         m.d.comb += frame_word.eq(
-            Cat(sp_latched, sp_indicator[12],
-                (self.caller_pc + 1)[:15], self.flags.as_value())
+            Cat(sp_latched,
+                Mux(root_frame_latched, Const(1, 1), sp_indicator[12]),
+                Mux(root_frame_latched, Const(0x7FFF, 15),
+                    (caller_pc_latched + 1)[:15]),
+                flags_latched.as_value())
         )
 
-        cr5_heap_view = View(CAP_REG_LAYOUT, self.cr5_heap)
+        cr5_heap_view = View(CAP_REG_LAYOUT, cr5_heap_latched)
         cr5_gt = View(GT_LAYOUT, cr5_heap_view.word0_gt)
         cr5_null = Signal()
         cr5_has_r = Signal()
@@ -226,7 +242,7 @@ class ChurchCall(Elaboratable):
             cr5_has_r.eq(~cr5_gt.dom & cr5_gt.perm[PERM_R]),   # Turing dom=0, perm[0]=R
         ]
 
-        cr12_cap_view = View(CAP_REG_LAYOUT, self.cr12_thread)
+        cr12_cap_view = View(CAP_REG_LAYOUT, cr12_thread_latched)
         cr12_gt = View(GT_LAYOUT, cr12_cap_view.word0_gt)
         cr12_null = Signal()
         m.d.comb += cr12_null.eq(cr12_gt.gt_type == GT_TYPE_NULL)
@@ -237,7 +253,7 @@ class ChurchCall(Elaboratable):
         cr14_lat_gt   = View(GT_LAYOUT, cr14_lat_view.word0_gt)
 
         src_in_range = Signal()
-        m.d.comb += src_in_range.eq(self.cr_src <= MAX_SRC_REG)
+        m.d.comb += src_in_range.eq(cr_src_latched <= MAX_SRC_REG)
 
         src_view = View(CAP_REG_LAYOUT, src_reg_latched)
         src_gt = View(GT_LAYOUT, src_view.word0_gt)
@@ -264,9 +280,9 @@ class ChurchCall(Elaboratable):
         mload_dst = Signal(4)
         mload_index = Signal(16)
         m.d.comb += [
-            mload_src.eq(Mux(phase, CR6_CLIST, self.cr_src)),
+            mload_src.eq(Mux(phase, CR6_CLIST, cr_src_latched)),
             mload_dst.eq(Mux(phase, CR14_CODE, CR6_CLIST)),
-            mload_index.eq(Mux(phase, 0, self.index)),
+            mload_index.eq(Mux(phase, 0, index_latched)),
         ]
 
         # M-elevation is permanently asserted: CALL's FSM validates E-perm
@@ -299,9 +315,9 @@ class ChurchCall(Elaboratable):
         ]
 
         # NS lump header fetch
-        cr14_view = View(CAP_REG_LAYOUT, self.cr14_code)
+        cr14_view = View(CAP_REG_LAYOUT, cr14_code_latched)
         cr14_gt = View(GT_LAYOUT, cr14_view.word0_gt)
-        cr15_view = View(CAP_REG_LAYOUT, self.cr15_namespace)
+        cr15_view = View(CAP_REG_LAYOUT, cr15_namespace_latched)
 
         # NS entry base address for Abstract GT M-GT dispatch: CR15.location + (slot_id << 4)
         mgt_ns_entry_base = Signal(32)
@@ -438,13 +454,26 @@ class ChurchCall(Elaboratable):
                 m.d.sync += [use_method_table.eq(0), method_entry_reg.eq(0)]
                 m.d.sync += rd_armed.eq(0)
                 with m.If(self.call_start):
-                    m.d.sync += mask_latched.eq(self.mask)
-                    m.d.sync += call_imm_latched.eq(self.call_imm)
-                    m.d.sync += boot_window_lat.eq(self.boot_window)
+                    m.d.sync += [
+                        cr_src_latched.eq(self.cr_src),
+                        cr5_heap_latched.eq(self.cr5_heap),
+                        cr12_thread_latched.eq(self.cr12_thread),
+                        cr15_namespace_latched.eq(self.cr15_namespace),
+                        cr14_code_latched.eq(self.cr14_code),
+                        thread_base_latched.eq(self.thread_base),
+                        thread_hdr_latched.eq(self.thread_hdr),
+                        caller_pc_latched.eq(self.caller_pc),
+                        flags_latched.eq(self.flags),
+                        root_frame_latched.eq(self.boot_window),
+                        mask_latched.eq(self.mask),
+                        index_latched.eq(self.index),
+                        call_imm_latched.eq(self.call_imm),
+                        boot_window_lat.eq(self.boot_window),
+                    ]
                     m.next = "CHECK_SRC"
 
             with m.State("CHECK_SRC"):
-                m.d.comb += local_cr_rd_addr.eq(self.cr_src)
+                m.d.comb += local_cr_rd_addr.eq(cr_src_latched)
                 with m.If(~src_in_range):
                     m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_E)]
                     m.next = "FAULT"
@@ -452,7 +481,7 @@ class ChurchCall(Elaboratable):
                     m.next = "READ_SRC"
 
             with m.State("READ_SRC"):
-                m.d.comb += local_cr_rd_addr.eq(self.cr_src)
+                m.d.comb += local_cr_rd_addr.eq(cr_src_latched)
                 m.d.sync += src_reg_latched.eq(self.cr_rd_data)
                 m.next = "READ_CALLER_CR6"
 
@@ -645,11 +674,11 @@ class ChurchCall(Elaboratable):
                 m.d.sync += rd_armed.eq(1)
                 with m.If(self.mem_rd_valid & rd_armed):
                     m.d.sync += [
-                        sp_indicator.eq(Mux(self.boot_window, 0, self.mem_rd_data)),
+                        sp_indicator.eq(Mux(root_frame_latched, 0, self.mem_rd_data)),
                         # A reboot starts a fresh machine call stack even though
                         # BRAM retains the prior protected indicator contents.
                         sp_latched.eq(Mux(
-                            self.boot_window, sp_max, self.mem_rd_data[:12])),
+                            root_frame_latched, sp_max, self.mem_rd_data[:12])),
                         rd_armed.eq(0),
                     ]
                     m.next = "STACK_CHECK"
@@ -667,7 +696,7 @@ class ChurchCall(Elaboratable):
                 # BOOT_PROGRAM enters the first resident abstraction before a
                 # normal Thread header is cached; the fixed empty-stack
                 # sentinel remains valid for that one elevated CALL.
-                with m.Elif((sp_latched < sp_min) & ~self.boot_window):
+                with m.Elif((sp_latched < sp_min) & ~root_frame_latched):
                     m.d.sync += [
                         fault_latched.eq(1),
                         fault_type_latched.eq(FaultType.STACK_OVERFLOW),
@@ -681,8 +710,13 @@ class ChurchCall(Elaboratable):
                 # token to reconstruct the caller's CR6 and CR14.
                 # Byte address = thread_base + (STO-1)*4
                 m.d.comb += [
-                    local_mem_wr_addr.eq(stack_slot_addr(self.thread_base, sp_latched, -1)),
-                    local_mem_wr_data.eq(caller_egt_latched),
+                    local_mem_wr_addr.eq(stack_slot_addr(thread_base_latched, sp_latched, -1)),
+                    # Root CALL has no caller authority.  Still materialize a
+                    # valid companion, using the prepared callee E-GT; normal
+                    # CALL retains the caller E-GT for RETURN/cLoad.
+                    local_mem_wr_data.eq(
+                        Mux(root_frame_latched, callee_egt_latched,
+                            caller_egt_latched)),
                     local_mem_wr_en.eq(1),
                 ]
                 m.next = "STACK_WRITE_FRAME"
@@ -692,7 +726,7 @@ class ChurchCall(Elaboratable):
                 # frame_word is a combinatorial signal computed above.
                 # Byte address = thread_base + STO*4
                 m.d.comb += [
-                    local_mem_wr_addr.eq(stack_slot_addr(self.thread_base, sp_latched, 0)),
+                    local_mem_wr_addr.eq(stack_slot_addr(thread_base_latched, sp_latched, 0)),
                     local_mem_wr_data.eq(frame_word),
                     local_mem_wr_en.eq(1),
                 ]
@@ -704,7 +738,7 @@ class ChurchCall(Elaboratable):
                     local_mem_wr_addr.eq(protected_sto_addr),
                     local_mem_wr_data.eq(Cat(
                         (sp_latched - 2)[:12], Const(1, 1),
-                        Const(0, 15), self.flags.as_value())),
+                        Const(0, 15), flags_latched.as_value())),
                     local_mem_wr_en.eq(1),
                 ]
                 m.next = "COMPLETE"

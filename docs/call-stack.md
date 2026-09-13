@@ -23,6 +23,57 @@ Word 1:  NIA | packed machine indicators
 
 **Total frame cost: 2 words per CALL.**
 
+### Persistent Thread frame-chain ABI (normative)
+
+The Thread UI and any offline image inspector decode the saved stack from the
+Thread body itself.  The live simulator `STO` and host `callStack` are not
+authoritative for a dormant Thread.  Let `S` be the protected STO field at
+`Thread[+17]`, `F` be the current frame-word offset, and `P` be the
+`prev_STO` field in that frame:
+
+```
+F = S + 2
+E-GT offset = F − 1
+P = frameWord[11:0]                 (the older protected STO)
+next frame offset = P + 2
+```
+
+The protected indicator's `SZ` must be `1` for this two-word ABI.  The
+sentinel/root frame has `NIA=0x7FFF` and `P=F`; it is terminal.  Ordinary
+frames must advance toward the sentinel (`P > S`) and must remain within the
+Thread stack interval:
+
+```
+stackEnd  = lumpSize − cc − 1
+stackStart = stackEnd − cw + 1
+stackStart − 1 ≤ S ≤ stackEnd − 2
+stackStart ≤ F − 1 < F ≤ stackEnd
+```
+
+`ThreadDesign` is the source of `lumpSize`, `cw`, `cc`, and the protected
+indicator offset; the formulas above are not inferred from a default
+256-word Thread.  A decoder reports the following states and never hides the
+underlying words:
+
+| State | Required condition | Actionable diagnostic |
+|---|---|---|
+| `root` | Exactly one reachable sentinel; `P=F` | Safe terminal root |
+| `ordinary` | One or more ordinary two-word frames followed by `root` | Show each E-GT and its raw companion |
+| `malformed` | Zero companion, parse failure, NULL/Abstract/wrong-type GT, missing E permission, `SZ≠1`, OOB cursor/frame, `P≤S`, repeated cursor, bad sentinel pointer, duplicate root, or stale/missing/malformed/invalid/unavailable E-GT validation | Identify the offset and repair the saved Thread image / Namespace generation |
+
+Freshness is checked against the live Namespace entry when available:
+`E-GT.gt_seq == Namespace[slot].W1.gt_seq`.  A missing or Abstract target is
+reported as unavailable, not silently treated as valid.  Raw stack rows remain
+visible for every word, including data below a sentinel, so a duplicate root
+or stale frame cannot be mistaken for an active call.
+
+The decoder fails closed: only a successfully parsed **Inform** GT with
+`E=1`, followed by a validator result of `status="valid"`, can participate in
+the `root` or `ordinary` classifications.  `missing`, `malformed`, `invalid`,
+and `unavailable` validator results are actionable failures, not affirmative
+identity.  An inspection-only caller may still display the companion's raw
+word and parse diagnostics, but must not promote it to an executable frame.
+
 ### CALL Flow
 
 | Step | Detail |

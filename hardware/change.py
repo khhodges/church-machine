@@ -658,7 +658,13 @@ class ChurchChange(Elaboratable):
                 with m.Elif(self.mem_rd_valid):
                     m.d.sync += [incoming_frame.eq(self.mem_rd_data),
                                  restore_rd_armed.eq(0)]
-                    with m.If((self.mem_rd_data[:12] >= incoming_stack_start) &
+                    # Dormant contexts use the same two-word CHURCH frame as
+                    # CALL: the protected STO points below the frame and the
+                    # frame points back exactly two words.  Do not accept a
+                    # merely in-range pointer that could make RESTORE_POP
+                    # consume an unrelated stack word.
+                    with m.If((self.mem_rd_data[:12] == (incoming_indicator[:12] + 2)) &
+                              (self.mem_rd_data[:12] >= incoming_stack_start) &
                               (self.mem_rd_data[:12] <= incoming_stack_end)):
                         m.next = "PREFLIGHT_EGT_READ"
                     with m.Else():

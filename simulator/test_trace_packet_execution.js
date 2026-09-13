@@ -106,44 +106,39 @@ check('TB2 conditional-skip emits 0 packets', ((rSkip && rSkip.tracePackets) || 
     `got ${((rSkip && rSkip.tracePackets) || []).length}`);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// TC: RETURN — inject fake call frame, verify 3 packets and RETURN_CR14 payload
+// TC: RETURN — install an authoritative Thread-memory frame, verify 3 packets
 //
 // The key correctness property:
-//   frame.savedCRs[14] = "caller's CR14" captured at CALL time.
-//   After RETURN, RETURN_CR14 packet payload MUST equal frame.savedCRs[14].word0,
-//   NOT the current (callee's) CR14.word0 at the time the RETURN instruction retires.
+//   the protected Enter companion identifies the caller's code namespace.
+//   After RETURN, RETURN_CR14 packet payload MUST equal the companion-derived
+//   caller RX capability, NOT the current callee CR14 at retire time.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-// Save boot CR14 so TD can restore it — RETURN replaces sim.cr[14] with the caller's
-// saved CR14 (the fake sentinel frame), leaving word1=0 and breaking the fetch path.
+// Save boot CR14 so TD can restore it after this isolated frame transaction.
 const bootCR14 = { ...sim.cr[14] };
 
 // Set callee's CR14 to a recognisably different value before injecting the frame.
 const CALLEE_CR14_WORD0 = (sim.cr[14] ? (sim.cr[14].word0 >>> 0) : 0);   // current value
 
-// Build a valid caller code capability with a different permission shape so it
-// cannot be confused with the callee's current CR14.  RETURN now restores the
-// complete caller CR14 context, so the fixture must provide current word1/word2
-// prerequisites rather than a malformed payload-only sentinel.
+// Build the caller identity as a real Inform E-GT companion. RETURN derives
+// the caller's normalized RX CR14 from this identity and its Namespace entry.
 const bootCodeSlot = sim.parseGT(bootCR14.word0).index;
 const bootCodeSeq = sim.parseGT(bootCR14.word0).gt_seq;
+const CALLER_COMPANION_GT = sim.createGT(
+    bootCodeSeq, bootCodeSlot, { R:0, W:0, X:0, L:0, S:0, E:1 }, 1);
 const CALLER_CR14_WORD0 = sim.createGT(
     bootCodeSeq, bootCodeSlot, { R:0, W:0, X:1, L:0, S:0, E:0 }, 1);
 
-// Build a minimal fake call frame (same shape as _execCall pushes).
-const fakeFrame = {
-    returnPC:   3,                              // arbitrary return PC
-    savedCRs:   sim.cr.map(c => ({ ...c })),    // snapshot of all CRs
-    savedDRs:   [...sim.dr],
-    savedFlags: { ...sim.flags },
-    savedSTO:   sim.sto,
-    sz: 1,
-    frameWord: 0,
-};
-// Override saved CR14 with the distinct valid caller capability asserted below.
-fakeFrame.savedCRs[14] = { ...bootCR14, word0: CALLER_CR14_WORD0 };
-
-sim.callStack.push(fakeFrame);
+// The boot image currently has the root frame at +243 and protected STO=241.
+// Replace that frame with a complete ordinary CALL pair, but leave the JS
+// shadow empty: RETURN must use these protected words as its sole authority.
+const tcThreadBase = sim._activeThreadBase();
+const tcThreadLayout = sim._threadLayoutAtBase(tcThreadBase);
+const tcFrameAddress = tcThreadLayout.stackEnd;
+sim.memory[tcThreadBase + tcFrameAddress - 1] = CALLER_COMPANION_GT >>> 0;
+sim.memory[tcThreadBase + tcFrameAddress] =
+    sim._packFrameWordRaw(3, 1, tcFrameAddress);
+sim.callStack = [];
 
 // Write RETURN at PC=0 of the current code lump.
 sim.pc = 0;
@@ -162,7 +157,7 @@ check('TC5 RETURN pkt[2].ev_type=RETURN_CR14(11)', (retPkts[2]||{}).ev_type === 
     `got ${(retPkts[2]||{}).ev_type}`);
 
 const retCR14Payload = (retPkts[2] || {}).payload_gt >>> 0;
-check('TC6 RETURN_CR14 payload = caller\'s saved CR14',
+check('TC6 RETURN_CR14 payload = companion-derived caller CR14',
     retCR14Payload === CALLER_CR14_WORD0,
     `got 0x${retCR14Payload.toString(16)}, want 0x${CALLER_CR14_WORD0.toString(16)}`);
 check('TC7 RETURN_CR14 payload ≠ callee\'s CR14 (confirming correct selection)',

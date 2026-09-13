@@ -8,15 +8,15 @@ Test groups
    including the new thread_hdr and cr12_thread inputs.
 2. FSM state ordering — PUSH_CR5_CR12 before PUSH_ARM; PUSH_BOUNDS replaces
    the old PUSH_CHECK.
-3. Sentinel return PC — _SENTINEL_RETURN_PC = 3 is used in the frame word.
+3. Caller return PC — latched caller_pc + 1 is used in the frame word.
 4. FaultType bit-width — fault_type is Signal(5) so STACK_OVERFLOW (0x10) and
    STACK_CORRUPT (0x12) are not truncated.
 5. Frame-word encoding — combinatorial formula for the frame word.
 6. Full DUT simulation — ChurchELoadCall elaborated end-to-end, driven through
    all three mload phases (with DISTINCT phase-0 and phase-1 GTs), DISPATCH,
    and the PUSH_* frame-push states.  Verifies:
-     • Three DMEM writes (callee E-GT from phase-1, frame word, new STO).
-     • callee E-GT is the phase-1 CR6 GT, not the phase-0 loaded_cap GT.
+      • Three DMEM writes (normalized caller CR6 E-GT, frame word, new STO).
+      • caller E-GT is captured before phase 1 overwrites CR6.
      • nia_set asserted with the correct fast-path NIA.
      • PUSH_CR5_CR12 faults: null CR5 → NULL_CAP, no-R CR5 → PERM_R,
        null CR12 → NULL_CAP.
@@ -61,15 +61,14 @@ class _FrameWordEncoder(Elaboratable):
     """Thin wrapper for the frame_word combinatorial formula.
 
     bits[31:28] = FLAGS
-    bits[27:13] = sentinel_return_pc = 3
+    bits[27:13] = caller_pc + 1
     bit[12]     = prior SZ
     bits[11:0]  = prev_STO
     A dummy sync register allows add_clock.
     """
-    _SENTINEL_RETURN_PC = 3
-
     def __init__(self):
         self.sto_in     = Signal(32)
+        self.caller_pc  = Signal(15)
         self.frame_word = Signal(32)
         self._tick_reg  = Signal()
 
@@ -78,7 +77,7 @@ class _FrameWordEncoder(Elaboratable):
         m.d.sync += self._tick_reg.eq(~self._tick_reg)
         m.d.comb += self.frame_word.eq(
             Cat(self.sto_in[:12], Const(0, 1),
-                Const(self._SENTINEL_RETURN_PC, 15),
+                (self.caller_pc + 1)[:15],
                 Const(0, 4))
         )
         return m
@@ -120,6 +119,7 @@ class _FrameWordEncoder(Elaboratable):
 
 _INFORM_EL_SLOT2    = (1 << 25) | (1 << 27) | (0b101 << 28) | 2   # 0x5A000002
 _INFORM_EL_SLOT3    = (1 << 25) | (1 << 27) | (0b101 << 28) | 3   # 0x5A000003 — phase-1 GT
+_INFORM_E_SLOT2     = (1 << 25) | (1 << 27) | (0b100 << 28) | 2   # normalized caller companion
 _CR5_VALID_GT       = (1 << 25) | (1 << 28) | 5                    # 0x12000005 — Turing Inform, R-perm
 _CR5_VALID_NO_R_GT  = (1 << 25) | 5                                # 0x02000005 — Turing Inform, NO R-perm
 _CR12_VALID_GT      = (1 << 25) | 10                               # 0x0200000A — Turing Inform, non-null
@@ -252,24 +252,17 @@ class TestELoadCallFSMOrdering:
             "PUSH_CHECK state found — should have been replaced by PUSH_BOUNDS"
         )
 
-    def test_callee_egt_latched_in_call_p1_done(self):
-        """callee_egt_latched must be assigned inside CALL_P1_DONE, not earlier."""
-        p1_done_start = _state_def_pos("CALL_P1_DONE")
-        call_p2_start = _state_def_pos("CALL_P2")
-        window = FUSED_SRC[p1_done_start:call_p2_start]
-        assert "callee_egt_latched" in window, (
-            "callee_egt_latched must be latched in CALL_P1_DONE (phase-1 CR6 GT)"
-        )
+    def test_caller_egt_captured_before_call_p1(self):
+        assert _state_def_pos("READ_CALLER_CR6") < _state_def_pos("CALL_P1")
+        assert "caller_egt_latched" in FUSED_SRC
 
 
 # ─── 3. Sentinel return PC ─────────────────────────────────────────────────────
 
-class TestELoadCallSentinelReturnPC:
-    def test_sentinel_return_pc_is_3(self):
-        assert "_SENTINEL_RETURN_PC = 3" in FUSED_SRC
-
-    def test_sentinel_constant_used_in_frame_word(self):
-        assert "Const(_SENTINEL_RETURN_PC, 15)" in FUSED_SRC
+class TestELoadCallCallerReturnPC:
+    def test_caller_pc_is_exposed_and_latched(self):
+        assert "self.caller_pc = Signal(15)" in FUSED_SRC
+        assert "caller_pc_latched.eq(self.caller_pc)" in FUSED_SRC
 
 
 # ─── 4. FaultType bit-width ────────────────────────────────────────────────────
@@ -291,12 +284,13 @@ class TestFaultTypeValues:
 
 # ─── 5. Frame-word encoding ────────────────────────────────────────────────────
 
-def _run_frame_word(sto_value: int) -> int:
+def _run_frame_word(sto_value: int, caller_pc: int = 37) -> int:
     dut = _FrameWordEncoder()
     results = {}
 
     async def process(ctx):
         ctx.set(dut.sto_in, sto_value)
+        ctx.set(dut.caller_pc, caller_pc)
         await ctx.tick()
         results["frame_word"] = ctx.get(dut.frame_word)
 
@@ -315,10 +309,10 @@ class TestFrameWordEncoding:
         fw = _run_frame_word(48)
         assert (fw >> 12) & 1 == 0
 
-    def test_sentinel_return_pc_is_3(self):
-        fw = _run_frame_word(48)
+    def test_return_pc_is_caller_pc_plus_one(self):
+        fw = _run_frame_word(48, caller_pc=37)
         return_pc = (fw >> 13) & 0x7FFF
-        assert return_pc == 3
+        assert return_pc == 38
 
     def test_prev_sto_preserved_in_low_bits(self):
         for sto in (_STO_VALID, 128, 10, 2):
@@ -327,9 +321,9 @@ class TestFrameWordEncoding:
             assert prev_sto == sto & 0xFFF
 
     def test_frame_word_for_sto_valid(self):
-        """STO=48 → FLAGS=0 | sentinel=3 | prior_SZ=0 | prev_STO=48."""
-        fw = _run_frame_word(_STO_VALID)
-        expected = (3 << 13) | _STO_VALID
+        """STO=48 → FLAGS=0 | caller_pc+1=38 | prior_SZ=0 | prev_STO=48."""
+        fw = _run_frame_word(_STO_VALID, caller_pc=37)
+        expected = (38 << 13) | _STO_VALID
         assert fw == expected, f"got {fw:#010x}, expected {expected:#010x}"
 
 
@@ -395,6 +389,7 @@ def _run_eloadcall_dut(
     # Simulated register file (96-bit values)
     cr_reg = [0] * 16
     cr_reg[0]  = _make_cap(_INFORM_EL_SLOT2, 0x200, 0xFF)   # source cap (caller c-list)
+    cr_reg[6]  = _make_cap(_INFORM_EL_SLOT2, 0x200, 0xFF)   # caller CR6, before phase 1
     cr_reg[14] = _make_cap(_INFORM_EL_SLOT2, 0x600, 0xFF)   # CLOOMC cap (ns_base=0x600)
 
     # Simulated DMEM (sparse: byte_addr → 32-bit word).
@@ -438,6 +433,7 @@ def _run_eloadcall_dut(
         ctx.set(dut.cr_dst,    1)
         ctx.set(dut.index,     0)
         ctx.set(dut.call_imm,  call_imm)
+        ctx.set(dut.caller_pc, 37)
         ctx.set(dut.mask,      0)
         ctx.set(dut.thread_base,               0x100)
         ctx.set(dut.thread_hdr,                _THREAD_HDR)
@@ -512,7 +508,7 @@ class TestELoadCallDUTFastPath:
 
     Phase-0 GT = INFORM_EL_SLOT2 (0x5A000002).
     Phase-1 GT = INFORM_EL_SLOT3 (0x5A000003) — different cap.
-    callee_egt_latched is taken from CR6 (phase-1 result) = INFORM_EL_SLOT3.
+    caller E-GT is captured from pre-phase1 CR6 and normalized to Inform E.
     """
 
     @pytest.fixture(scope="class")
@@ -533,30 +529,26 @@ class TestELoadCallDUTFastPath:
         )
 
     def test_first_write_is_callee_egt_phase1_gt(self, sim_results):
-        """Write 1: callee E-GT (phase-1 CR6 GT = INFORM_EL_SLOT3) at (STO-1).
+        """Write 1: caller CR6 normalized to Inform E at (STO-1).
 
         With STO=48, thread_base=0x100:
           addr = 0x100 + (48-1)*4 = 0x100 + 0xBC = 0x1BC
 
-        Critical: data must be INFORM_EL_SLOT3 (0x5A000003), NOT the phase-0
-        cap INFORM_EL_SLOT2 (0x5A000002).  The two GTs differ because mem[0x700]
-        (phase-1 c-list entry) is distinct from mem[0x200] (phase-0 c-list entry).
+        CR6 is captured before phase 1 and normalized from E+L to E.
         """
         addr, data = sim_results["writes"][0]
         assert addr == 0x1BC, f"callee E-GT addr: expected 0x1BC, got {addr:#x}"
-        assert data == _INFORM_EL_SLOT3, (
-            f"callee E-GT data: expected INFORM_EL_SLOT3 ({_INFORM_EL_SLOT3:#010x}), "
+        assert data == _INFORM_E_SLOT2, (
+            f"caller E-GT data: expected normalized Inform E ({_INFORM_E_SLOT2:#010x}), "
             f"got {data:#010x}. "
-            "If data is 0x5A000002 (INFORM_EL_SLOT2), the fix is incomplete: "
-            "callee_egt_latched is still sourced from phase-0 loaded_cap, "
-            "not from the phase-1 CR6.word0_gt latch in CALL_P1_DONE."
+            "The companion must be captured before phase 1 overwrites CR6."
         )
 
     def test_second_write_is_frame_word(self, sim_results):
         """Write 2: frame word at thread_base + STO*4 = 0x1C0."""
         addr, data = sim_results["writes"][1]
         assert addr == 0x1C0, f"frame word addr: expected 0x1C0, got {addr:#x}"
-        expected_frame = (3 << 13) | _STO_VALID
+        expected_frame = (38 << 13) | _STO_VALID
         assert data == expected_frame, (
             f"frame word: expected {expected_frame:#010x}, got {data:#010x}"
         )

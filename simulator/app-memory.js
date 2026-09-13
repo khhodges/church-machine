@@ -1,3 +1,16 @@
+// Keep the decoder as a separately testable/shared module without changing the
+// legacy script manifest.  app-memory is loaded synchronously at the end of
+// index.html, so document.write executes the dependency before any renderer
+// can be called.  Source-level tests (which have no currentScript) inject the
+// module explicitly when they exercise frame decoding.
+(function _loadThreadFrameDecoder() {
+    if (typeof ThreadFrameDecoder !== 'undefined' ||
+            typeof document === 'undefined' || !document.currentScript ||
+            typeof document.write !== 'function') return;
+    const scriptURL = new URL('thread-frame-decoder.js', document.currentScript.src).href;
+    document.write(`<script src="${scriptURL}"><\/script>`);
+})();
+
 var _crDetailHighlightPC = null;
 
 function _canonicalEditorTokenForSlot(nsIdx) {
@@ -2371,6 +2384,66 @@ function _threadLayoutForSlot(nsIndex) {
     return sim.getThreadInstanceLayout(nsIndex);
 }
 
+// Both Thread detail surfaces consume the same persistent-image decoder.  The
+// guard keeps source-level/unit-test renderers readable when the optional
+// browser script has not been loaded, while retaining raw stack inspection.
+function _decodeThreadFrameChain(TL) {
+    if (typeof ThreadFrameDecoder === 'undefined' ||
+            !ThreadFrameDecoder || typeof ThreadFrameDecoder.decode !== 'function' ||
+            !sim || !TL || !TL.valid) return null;
+    const validateGT = (word, parsed) => {
+        if (!parsed) {
+            return { status: 'malformed', message: 'E-GT parser returned no result.' };
+        }
+        if (parsed.malformed) {
+            return { status: 'malformed', message: parsed.malformedReason || 'Malformed E-GT.' };
+        }
+        if (parsed.type === 0) {
+            return { status: 'invalid', message: 'E-GT is NULL; an Inform E-GT is required.' };
+        }
+        if (parsed.type === 3) {
+            return { status: 'invalid', message: 'E-GT is Abstract; a Namespace Inform E-GT is required.' };
+        }
+        if (parsed.type !== 1) {
+            return { status: 'invalid', message: `E-GT type ${parsed.typeName || parsed.type} is not Inform.` };
+        }
+        if (!parsed.permissions || parsed.permissions.E !== 1) {
+            return { status: 'invalid', message: 'Inform E-GT is missing E (Enter) permission.' };
+        }
+        let entry = null;
+        try { entry = sim.readNSEntry(parsed.index); } catch (_e) {}
+        if (!entry) {
+            return { status: 'missing', message: `E-GT target NS[${parsed.index}] is unavailable.` };
+        }
+        if (typeof sim.isNSEntryValid === 'function' && !sim.isNSEntryValid(parsed.index)) {
+            return { status: 'missing', message: `E-GT target NS[${parsed.index}] is not resident.` };
+        }
+        if (typeof sim.validateMAC === 'function' && !sim.validateMAC(entry)) {
+            return { status: 'invalid', message: `E-GT target NS[${parsed.index}] has an invalid Namespace seal.` };
+        }
+        let liveSeq = null;
+        try { liveSeq = sim.parseNSWord1(entry.word1_limit).gtSeq; } catch (_e) {}
+        if (liveSeq === null || liveSeq === undefined) {
+            return { status: 'unavailable', message: 'E-GT target generation is unavailable.' };
+        }
+        if ((liveSeq & 0x1FF) !== (parsed.gt_seq & 0x1FF)) {
+            return {
+                status: 'stale',
+                message: `E-GT target NS[${parsed.index}] is stale (saved v${parsed.gt_seq}, live v${liveSeq & 0x1FF}).`,
+            };
+        }
+        return { status: 'valid' };
+    };
+    return ThreadFrameDecoder.decode({
+        memory: sim.memory,
+        base: TL.base,
+        layout: TL,
+        parseGT: word => sim.parseGT(word),
+        validateGT,
+    });
+}
+window._decodeThreadFrameChain = _decodeThreadFrameChain;
+
 // Known Thread labels retain a Thread-specific unavailable state when the body
 // has been evicted or malformed.  A valid typ=2 header identifies any other
 // generated/resident Thread regardless of its label or Namespace slot number.
@@ -2487,6 +2560,11 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
 
     // ── Zone ②: LIFO Stack (immediately before tail capability homes) ────
     const stackWords = sim.memory.slice(slotBase + threadStackStart, slotBase + threadStackEnd + 1);
+    const frameChain = _decodeThreadFrameChain(TL);
+    const frameByOffset = Object.create(null);
+    if (frameChain) {
+        for (const frame of frameChain.frames || []) frameByOffset[frame.offset] = frame;
+    }
     const stackUsed  = stackWords.filter(Boolean).length;
     html += secHdr('②', 'LIFO Stack ↓', `${TL.stackWords} words · offset +${threadStackStart} … +${threadStackEnd} · immediately before capability homes · grows ↓ · ${stackUsed} word${stackUsed!==1?'s':''} non-zero`, '#38bdf8', 'thread-zone-2');
     html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>Offset</th><th>Addr</th><th>Hex</th><th>Decoded</th></tr></thead><tbody>';
@@ -2519,9 +2597,21 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
             }
         }
         const rowStyle = word ? '' : ' style="opacity:0.25;"';
-        html += `<tr id="thread-stack-row-${off}"${rowStyle}><td class="thread-offset-cell" style="color:#38bdf8;">+${off}</td><td class="thread-address-cell" style="font-family:monospace;">${addrOf(off)}</td><td style="color:rgba(206,145,120,0.85);font-family:monospace;">${hex}</td><td>${decoded}</td></tr>`;
+        const chainFrame = frameByOffset[off];
+        const chainBadge = chainFrame
+            ? ` <span style="color:${chainFrame.kind === 'malformed' ? '#f87171' : chainFrame.kind === 'root' ? '#f97316' : '#67e8f9'};font-size:.72em;">[${chainFrame.kind}]</span>`
+            : '';
+        html += `<tr id="thread-stack-row-${off}"${rowStyle}><td class="thread-offset-cell" style="color:#38bdf8;">+${off}</td><td class="thread-address-cell" style="font-family:monospace;">${addrOf(off)}</td><td style="color:rgba(206,145,120,0.85);font-family:monospace;">${hex}</td><td>${decoded}${chainBadge}</td></tr>`;
     }
     html += '</tbody></table>';
+    if (frameChain && frameChain.errors && frameChain.errors.length) {
+        html += '<div style="margin-top:8px;padding:7px 9px;border-left:3px solid #f87171;color:#fecaca;background:rgba(127,29,29,.16);font-size:.76rem;">';
+        html += '<strong>Frame-chain inspection:</strong> ';
+        html += frameChain.errors.map(e => `${e.code}: ${String(e.message).replace(/&/g, '&amp;').replace(/</g, '&lt;')}`).join(' · ');
+        html += '</div>';
+    } else if (frameChain && frameChain.classification) {
+        html += `<div style="margin-top:8px;color:#94a3b8;font-size:.73rem;">Frame-chain: ${frameChain.classification} · protected STO=${frameChain.protected ? frameChain.protected.sto : '\u2014'} · ${frameChain.frames.length} frame${frameChain.frames.length === 1 ? '' : 's'}</div>`;
+    }
     html += secBody();
 
     // ── Zone ①: Capabilities (tail-derived) ──────────────────────────────

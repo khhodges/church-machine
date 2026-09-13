@@ -30,6 +30,8 @@ class ChurchELoadCall(Elaboratable):
         self.cr_wr_data = Signal(CAP_REG_LAYOUT)
         self.cr_wr_en = Signal()
         self.cr15_namespace = Signal(CAP_REG_LAYOUT)
+        # Word offset of the ELOADCALL instruction in its caller.
+        self.caller_pc = Signal(15)
 
         self.mem_addr = Signal(32)
         self.mem_rd_en = Signal()
@@ -93,6 +95,16 @@ class ChurchELoadCall(Elaboratable):
         m.submodules.u_mload = u_mload
 
         phase = Signal(2)
+        # ELOADCALL is multi-cycle too; capture decoded operands and all
+        # architectural stack inputs before the first mLoad starts.
+        cr_src_latched = Signal(4)
+        cr_dst_latched = Signal(4)
+        cr15_namespace_latched = Signal(CAP_REG_LAYOUT)
+        cr5_heap_latched = Signal(CAP_REG_LAYOUT)
+        cr12_thread_latched = Signal(CAP_REG_LAYOUT)
+        thread_base_latched = Signal(32)
+        thread_hdr_latched = Signal(32)
+        flags_latched = Signal(COND_FLAGS_LAYOUT)
         loaded_cap = Signal(CAP_REG_LAYOUT)
         mask_latched = Signal(16)
         call_imm_latched = Signal(15)
@@ -114,30 +126,42 @@ class ChurchELoadCall(Elaboratable):
         local_cr_rd_addr = Signal(4)
 
         # ── Call-stack frame push ──────────────────────────────────────────────
-        # Sentinel return PC = 3 (word offset → NIA = 0x0C = boot ROM BRANCH -1).
-        _SENTINEL_RETURN_PC = 3
-
-        # callee_egt_latched: latched in CALL_P1_DONE by reading CR6.word0_gt.
-        #   This is the phase-1 result cap GT (the capability actually committed
-        #   into the callee’s c-list slot), matching what ChurchCall saves.
-        callee_egt_latched = Signal(32)
+        # ELOADCALL saves the caller's pre-phase1 CR6, normalized to the
+        # canonical Inform E companion.  Phase 1 overwrites CR6, so this must
+        # be captured before launching that mLoad.
+        caller_egt_latched = Signal(32)
+        caller_pc_latched = Signal(15)
+        caller_egt_raw = Signal(32)
+        caller_egt_raw_view = View(GT_LAYOUT, caller_egt_raw)
+        caller_egt_norm = Signal(32)
+        caller_egt_norm_view = View(GT_LAYOUT, caller_egt_norm)
+        m.d.comb += [
+            caller_egt_raw.eq(
+                View(CAP_REG_LAYOUT, self.cr_rd_data).word0_gt),
+            caller_egt_norm_view.slot_id.eq(caller_egt_raw_view.slot_id),
+            caller_egt_norm_view.gt_seq.eq(caller_egt_raw_view.gt_seq),
+            caller_egt_norm_view.gt_type.eq(GT_TYPE_INFORM),
+            caller_egt_norm_view.dom.eq(1),
+            caller_egt_norm_view.perm.eq(0b100),
+            caller_egt_norm_view.b_flag.eq(caller_egt_raw_view.b_flag),
+        ]
 
         # Stack bounds from thread_hdr (LUMP_HEADER_LAYOUT), mirrors call.py.
         #   sp_max = lump_sz − 12 − 1   (max valid STO before the frame push)
         #   sp_min = lump_sz − 10 − cw  (stack floor — code zone boundary)
-        thread_hdr_view = View(LUMP_HEADER_LAYOUT, self.thread_hdr)
+        thread_hdr_view = View(LUMP_HEADER_LAYOUT, thread_hdr_latched)
         thr_lump_sz     = Signal(15)
         sp_max          = Signal(15)
         sp_min          = Signal(15)
         sp_min_base     = Signal(15)
 
         # CR5 / CR12 validity (mirrors ChurchCall.CHECK_CR5_CR12).
-        cr5_view  = View(CAP_REG_LAYOUT, self.cr5_heap)
+        cr5_view  = View(CAP_REG_LAYOUT, cr5_heap_latched)
         cr5_gt    = View(GT_LAYOUT, cr5_view.word0_gt)
         cr5_null  = Signal()
         cr5_has_r = Signal()
 
-        cr12_view = View(CAP_REG_LAYOUT, self.cr12_thread)
+        cr12_view = View(CAP_REG_LAYOUT, cr12_thread_latched)
         cr12_gt   = View(GT_LAYOUT, cr12_view.word0_gt)
         cr12_null = Signal()
 
@@ -156,7 +180,7 @@ class ChurchELoadCall(Elaboratable):
         sto_reading   = Signal()     # asserted to drive the protected STO read
         sto_rd_armed  = Signal()     # one-cycle guard before trusting mem_rd_valid
         sto_read_addr = Signal(32)
-        frame_word    = Signal(32)   # SZ=1 | sentinel_return_pc | prev_STO
+        frame_word    = Signal(32)   # SZ=1 | caller_pc+1 | prev_STO
 
         local_mem_wr_en   = Signal()
         local_mem_wr_addr = Signal(32)
@@ -164,10 +188,10 @@ class ChurchELoadCall(Elaboratable):
 
         m.d.comb += [
             sto_read_addr.eq(
-                self.thread_base + (THREAD_STO_OFFSET << 2)),
+                thread_base_latched + (THREAD_STO_OFFSET << 2)),
             frame_word.eq(Cat(
                 sto_latched, sto_indicator[12],
-                Const(_SENTINEL_RETURN_PC, 15), self.flags.as_value())),
+                (caller_pc_latched + 1)[:15], flags_latched.as_value())),
         ]
 
         loaded_view = View(CAP_REG_LAYOUT, loaded_cap)
@@ -179,7 +203,7 @@ class ChurchELoadCall(Elaboratable):
         index_latched = Signal(16)
 
         src_in_range = Signal()
-        m.d.comb += src_in_range.eq(self.cr_src <= MAX_SRC_REG)
+        m.d.comb += src_in_range.eq(cr_src_latched <= MAX_SRC_REG)
 
         mload_src = Signal(4)
         mload_dst = Signal(4)
@@ -187,13 +211,13 @@ class ChurchELoadCall(Elaboratable):
         with m.Switch(phase):
             with m.Case(0):
                 m.d.comb += [
-                    mload_src.eq(self.cr_src),
-                    mload_dst.eq(self.cr_dst),
-                    mload_index.eq(self.index),
+                    mload_src.eq(cr_src_latched),
+                    mload_dst.eq(cr_dst_latched),
+                    mload_index.eq(index_latched),
                 ]
             with m.Case(1):
                 m.d.comb += [
-                    mload_src.eq(self.cr_dst),
+                    mload_src.eq(cr_dst_latched),
                     mload_dst.eq(CR_CLIST),
                     mload_index.eq(0),
                 ]
@@ -213,7 +237,7 @@ class ChurchELoadCall(Elaboratable):
             u_mload.sub_m_elevated.eq(mload_src == CR_CLIST),
             u_mload.sub_direct_gt.eq(0),
             u_mload.cr_rd_data.eq(self.cr_rd_data),
-            u_mload.cr15_namespace.eq(self.cr15_namespace),
+            u_mload.cr15_namespace.eq(cr15_namespace_latched),
             u_mload.mem_rd_data.eq(self.mem_rd_data),
             u_mload.mem_rd_valid.eq(self.mem_rd_valid),
         ]
@@ -272,6 +296,15 @@ class ChurchELoadCall(Elaboratable):
                 ]
                 with m.If(self.start):
                     m.d.sync += [
+                        cr_src_latched.eq(self.cr_src),
+                        cr_dst_latched.eq(self.cr_dst),
+                        cr15_namespace_latched.eq(self.cr15_namespace),
+                        cr5_heap_latched.eq(self.cr5_heap),
+                        cr12_thread_latched.eq(self.cr12_thread),
+                        thread_base_latched.eq(self.thread_base),
+                        thread_hdr_latched.eq(self.thread_hdr),
+                        flags_latched.eq(self.flags),
+                        caller_pc_latched.eq(self.caller_pc),
                         mask_latched.eq(self.mask),
                         call_imm_latched.eq(self.call_imm),
                         index_latched.eq(self.index),
@@ -286,8 +319,14 @@ class ChurchELoadCall(Elaboratable):
                     ]
                     m.next = "FAULT"
                 with m.Else():
-                    m.d.sync += sub_start_reg.eq(1)
-                    m.next = "LOAD_PHASE"
+                    m.next = "READ_CALLER_CR6"
+
+            with m.State("READ_CALLER_CR6"):
+                # This read is deliberately before phase 1, which writes CR6.
+                m.d.comb += [local_cr_rd_en.eq(1), local_cr_rd_addr.eq(CR_CLIST)]
+                m.d.sync += caller_egt_latched.eq(caller_egt_norm)
+                m.d.sync += sub_start_reg.eq(1)
+                m.next = "LOAD_PHASE"
 
             with m.State("LOAD_PHASE"):
                 mload_wait_body(
@@ -304,7 +343,7 @@ class ChurchELoadCall(Elaboratable):
                 )
 
             with m.State("LOAD_DONE"):
-                m.d.comb += [local_cr_rd_en.eq(1), local_cr_rd_addr.eq(self.cr_dst)]
+                m.d.comb += [local_cr_rd_en.eq(1), local_cr_rd_addr.eq(cr_dst_latched)]
                 m.d.sync += loaded_cap.eq(self.cr_rd_data)
                 m.next = "CHECK_E"
 
@@ -349,14 +388,6 @@ class ChurchELoadCall(Elaboratable):
                 )
 
             with m.State("CALL_P1_DONE"):
-                # Latch the phase-1 callee E-GT from CR6 before phase 2 runs.
-                # CR6 (CR_CLIST) has just been written by CALL_P1’s mLoad; its
-                # word0_gt is the capability actually selected for the callee’s
-                # c-list slot 0, matching what ChurchCall saves in PHASE1_DONE.
-                m.d.comb += [local_cr_rd_en.eq(1), local_cr_rd_addr.eq(CR_CLIST)]
-                m.d.sync += callee_egt_latched.eq(
-                    View(CAP_REG_LAYOUT, self.cr_rd_data).word0_gt.as_value()
-                )
                 m.d.sync += [
                     phase.eq(2), sub_done_latched.eq(0), sub_fault_latched.eq(0),
                 ]
@@ -495,12 +526,12 @@ class ChurchELoadCall(Elaboratable):
 
             with m.State("PUSH_EGT"):
                 # Write callee E-GT to stack slot STO-1.
-                # callee_egt_latched was captured from CR6.word0_gt in CALL_P1_DONE
-                # (phase-1 result), matching what ChurchCall writes in STACK_WRITE_EGT.
+                # The companion is the caller's pre-phase1 CR6, not the
+                # phase-1 callee identity.
                 m.d.comb += [
                     local_mem_wr_en.eq(1),
-                    local_mem_wr_addr.eq(stack_slot_addr(self.thread_base, sto_latched, -1)),
-                    local_mem_wr_data.eq(callee_egt_latched),
+                    local_mem_wr_addr.eq(stack_slot_addr(thread_base_latched, sto_latched, -1)),
+                    local_mem_wr_data.eq(caller_egt_latched),
                 ]
                 m.next = "PUSH_FRAME"
 
@@ -508,7 +539,7 @@ class ChurchELoadCall(Elaboratable):
                 # Write frame word (SZ=1 | sentinel_return_pc | prev_STO) to stack slot STO.
                 m.d.comb += [
                     local_mem_wr_en.eq(1),
-                    local_mem_wr_addr.eq(stack_slot_addr(self.thread_base, sto_latched, 0)),
+                    local_mem_wr_addr.eq(stack_slot_addr(thread_base_latched, sto_latched, 0)),
                     local_mem_wr_data.eq(frame_word),
                 ]
                 m.next = "PUSH_STO"
@@ -521,7 +552,7 @@ class ChurchELoadCall(Elaboratable):
                     local_mem_wr_addr.eq(sto_read_addr),
                     local_mem_wr_data.eq(Cat(
                         (sto_latched - 2)[:12], Const(1, 1),
-                        Const(0, 15), self.flags.as_value())),
+                        Const(0, 15), flags_latched.as_value())),
                 ]
                 m.next = "COMPLETE"
 

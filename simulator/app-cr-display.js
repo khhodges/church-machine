@@ -18,7 +18,8 @@ function _crDisplayName(crIdx, cr) {
             const layout = sim.getThreadInstanceLayout(cr.gtIndex);
             const threadName = sim.nsLabels && sim.nsLabels[cr.gtIndex];
             if (layout && layout.valid && threadName) {
-                const displayThreadName = formatThreadDisplayName(threadName);
+                const displayThreadName = typeof formatThreadDisplayName === 'function'
+                    ? formatThreadDisplayName(threadName) : String(threadName);
                 return `${displayThreadName}.Heap`;
             }
         } catch (_e) {}
@@ -817,28 +818,31 @@ function showZonePopup(evt, zone, nsIdx) {
 
     } else if (zone === 2) {
         const SP_MAX = TL.stackEnd;
-        // Stack records are decoded strictly from the selected Thread body.
-        // The first non-zero word scanning down from its stack ceiling is the
-        // latest available frame candidate; no active simulator STO is used.
-        const frames = [];
-        let ptr = TL.stackEnd;
-        while (ptr >= TL.stackStart && !(sim.memory[TL.base + ptr] >>> 0)) ptr--;
-        const MAX_WALK = 16;  // safety cap against corrupt stacks
-        while (ptr >= TL.stackStart && ptr <= SP_MAX && frames.length < MAX_WALK) {
-            const fw  = sim.memory[TL.base + ptr] >>> 0;
-            if (!fw) break;
-            const niaBits = (fw >>> 13) & 0x7FFF;
-            const szBit   = (fw >>> 12) & 1;
-            const prevSTO =  fw & 0xFFF;
-            const egt     = (szBit && ptr > TL.stackStart) ? (sim.memory[TL.base + ptr - 1] >>> 0) : 0;
-            frames.push({ ptr, fw, niaBits, szBit, prevSTO, egt });
-            if (prevSTO >= ptr || prevSTO < TL.stackStart) break;  // guard against bad prev_STO
-            ptr = prevSTO;
-        }
+        // Decode from the selected Thread's protected STO and geometry.  The
+        // raw rows below remain the complete inspection surface; this summary
+        // merely adds root/ordinary/malformed classification and diagnostics.
+        const chain = typeof _decodeThreadFrameChain === 'function'
+            ? _decodeThreadFrameChain(TL) : null;
+        const frames = chain
+            ? (chain.frames || []).map(frame => ({
+                ptr: frame.offset,
+                fw: frame.frameWord,
+                niaBits: frame.nia,
+                szBit: frame.sz,
+                prevSTO: frame.prevSTO,
+                egt: frame.egt,
+                kind: frame.kind,
+                errors: frame.errors || [],
+                gtValidation: frame.gtValidation || null,
+            }))
+            : [];
 
         html += `<div class="zdp-title" style="border-color:#38bdf8;color:#7dd3fc;">② LIFO Stack · +${TL.stackStart}…+${SP_MAX}</div>`;
         html += `<table>`;
-        html += `<tr><td>depth</td><td class="zdp-note">${frames.length} frame${frames.length!==1?'s':''} (incl. sentinel)</td></tr>`;
+        html += `<tr><td>chain</td><td class="zdp-note">${chain ? chain.classification : 'raw scan'} · ${frames.length} frame${frames.length!==1?'s':''}${chain && chain.protected ? ` · protected STO=${chain.protected.sto}` : ''}</td></tr>`;
+        if (chain && chain.errors && chain.errors.length) {
+            html += `<tr><td>action</td><td class="zdp-note" style="color:#fca5a5;">${chain.errors.map(e => `${e.code}: ${String(e.message).replace(/&/g, '&amp;').replace(/</g, '&lt;')}`).join('<br>')}</td></tr>`;
+        }
         html += `</table>`;
 
         // Show top 2 frames decoded
@@ -860,10 +864,16 @@ function showZonePopup(evt, zone, nsIdx) {
                 } else {
                     egtStr = hexW(f.egt);
                 }
+                if (f.gtValidation && f.gtValidation.status &&
+                        f.gtValidation.status !== 'valid' &&
+                        f.gtValidation.status !== 'null') {
+                    egtStr += ` <span style="color:#fca5a5;">[${f.gtValidation.status}]</span>`;
+                }
             }
 
             html += `<div style="margin-top:0.4rem;padding-top:0.3rem;border-top:1px solid #1e3a5f;">`;
             html += `<span class="${cls}">frame @+${f.ptr}</span>`;
+            if (f.kind) html += ` <span class="zdp-lbl">[${f.kind}]</span>`;
             if (isSentinel) html += ` <span class="zdp-sentinel">sentinel</span>`;
             html += `<table>`;
             html += `<tr><td style="color:#6b8faf;">fw</td><td class="zdp-hex">${hexW(f.fw)}</td></tr>`;
