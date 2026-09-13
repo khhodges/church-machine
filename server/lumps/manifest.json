@@ -300,14 +300,6 @@
     "compiled_at": 1788638922.2078648
   },
   {
-    "token": "00aa1234",
-    "abstraction": "Adder",
-    "filename": "Adder.1.2009489d.lump",
-    "version": "",
-    "lump_version": 321,
-    "compiled_at": 1788638923.3473098
-  },
-  {
     "token": "1eec355e",
     "abstraction": "ide.Alice",
     "filename": "ide.Alice.1.1eec355e.lump"
@@ -533,5 +525,19 @@
       }
     ],
     "operation_id": "00364446-54ea-4c56-b20b-a2050595cc8b"
+  },
+  {
+    "token": "00aa1234",
+    "abstraction": "Adder",
+    "filename": "Adder.1.e437ee2c.lump",
+    "lump_version": 329,
+    "compiled_at": 1789316715.7268434,
+    "dot_name": "Adder",
+    "issue_n": 1,
+    "petname": "",
+    "content_profile": 2,
+    "output_profile": 2,
+    "capabilities": [],
+    "operation_id": "722bf693a7e544de99d01df66e520097"
   }
 ]

@@ -410,6 +410,32 @@
       "filename": "CapabilityTest.1.ba638038.lump",
       "compiled_at": 1789232842.4801483,
       "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
+    },
+    "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b": {
+      "capability_type": "inform",
+      "grants": [
+        "E"
+      ],
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "dot_name": "Adder",
+      "issue_n": 1,
+      "abstraction": "Adder",
+      "filename": "Adder.1.e437ee2c.lump",
+      "compiled_at": 1789316715.7268434,
+      "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f"
+    },
+    "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca": {
+      "capability_type": "inform",
+      "grants": [
+        "E"
+      ],
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "dot_name": "Adder",
+      "issue_n": 1,
+      "abstraction": "Adder",
+      "filename": "Adder.1.13ec2f50.lump",
+      "compiled_at": 1789316712.9409845,
+      "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f"
     }
   }
 }
