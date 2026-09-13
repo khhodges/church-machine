@@ -122,7 +122,9 @@ const context = {
     },
     ChurchSimulator: { SELF_CAPABILITY_PLACEHOLDER: 0xFEED5E1F },
     LumpContentFrame: {
-        async lumpBuildContentFrame() { return { frameWords: [] }; },
+        async lumpBuildContentFrame() {
+            return { frameWords: [0xAB000001] };
+        },
     },
     _lumpsCache: [],
     _petNameDRMap: {},
@@ -202,6 +204,10 @@ vm.runInContext(
         context.window._lastCLOOMCLump.words.length,
         64,
         'compiler candidate should retain its allocated binary separately');
+    assert.strictEqual(
+        context.window._lastCLOOMCLump.words[1 + codeWords.length] >>> 0,
+        0xAB000001,
+        'compiler candidate must place the embedded content frame after code');
 
     // Simulate a saved artifact being evicted from memory.  The real
     // hamburger Save handler must recompile, then continue into Format Lump;

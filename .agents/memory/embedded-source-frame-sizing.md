@@ -12,6 +12,8 @@ to the new tail before the binary is finalized.
 regions but declared source bytes beyond its 1,024-word allocation. That made
 source/identity restoration fail later and surfaced as a generic reload error.
 
-**How to apply:** Builders should size from final frame words; server
-preflight should reject any recognized 0xAB frame whose declared API/source
-extent exceeds the declared freespace, with a specific allocation error.
+**How to apply:** Every source-bearing save path, including direct compile and
+fallback Save, must use the same final frame words before placing the C-list;
+server preflight should reject any recognized 0xAB frame whose declared
+API/source extent exceeds the declared freespace, with a specific allocation
+error.

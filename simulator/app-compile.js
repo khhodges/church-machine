@@ -1605,8 +1605,62 @@ async function compileAndBuild(options) {
     const codeRegion = [...allCode];
     const cw = codeRegion.length;
 
+    // The source/API frame is part of the immutable binary submitted to the
+    // server.  Build it before laying out the LUMP so the freespace reservation
+    // accounts for the complete frame and the C-list remains at the tail.
+    const _frameBuilder = typeof LumpContentFrame !== 'undefined'
+        ? LumpContentFrame : null;
+    if (!_frameBuilder ||
+            typeof _frameBuilder.lumpBuildContentFrame !== 'function') {
+        const _frameError = 'The embedded LUMP content-frame builder is unavailable.';
+        if (con) con.textContent = `Compile failed: ${_frameError}`;
+        if (typeof _showAsmErrors === 'function') {
+            _showAsmErrors([{ line: null, message: _frameError }],
+                'Compile failed — code not applied');
+        }
+        showNextSteps('error');
+        return { ok: false, kind: 'cloomc', error: _frameError };
+    }
+    const _frameApi = typeof _formatLumpApiDefinition === 'function'
+        ? _formatLumpApiDefinition(absName, caps)
+        : {
+            name: absName,
+            language: result.language || 'javascript',
+            methods: (result.methods || []).map((method, index) => ({
+                name: method.name || `method${index}`,
+                index,
+            })),
+            capabilities: caps.map(cap => ({
+                name: typeof cap === 'string' ? cap : cap.name,
+                rights: typeof cap === 'string' ? [] : (cap.rights || []),
+                grants: typeof cap === 'string' ? [] : (cap.grants || []),
+            })),
+        };
+    const _frameSource = typeof source === 'string' ? source : '';
+    const _frameProfile = _frameSource.trim().length > 0 ? 'full' : 'api';
+    let _contentFrame;
+    try {
+        _contentFrame = await _frameBuilder.lumpBuildContentFrame(
+            _frameApi, _frameSource, { profile: _frameProfile });
+    } catch (error) {
+        const _frameError = error && error.message
+            ? error.message : String(error || 'unknown content-frame error');
+        if (con) con.textContent = `Compile failed: ${_frameError}`;
+        if (typeof _showAsmErrors === 'function') {
+            _showAsmErrors([{ line: null, message: _frameError }],
+                'Compile failed — code not applied');
+        }
+        showNextSteps('error');
+        return { ok: false, kind: 'cloomc', error: _frameError };
+    }
+    const _frameWords = Array.isArray(_contentFrame && _contentFrame.frameWords)
+        ? _contentFrame.frameWords.map(word => word >>> 0) : [];
+    const _frameStart = 1 + cw;
+
     let lumpSize = 64;
-    while (lumpSize < 1 + cw + cc) lumpSize <<= 1;
+    while ((lumpSize - cc - _frameStart) < _frameWords.length) {
+        lumpSize <<= 1;
+    }
 
     let nMinus6 = 0;
     while ((64 << nMinus6) < lumpSize) nMinus6++;
@@ -1621,6 +1675,9 @@ async function compileAndBuild(options) {
     lumpWords[0] = header >>> 0;
     for (let i = 0; i < cw; i++) {
         lumpWords[1 + i] = (codeRegion[i] >>> 0);
+    }
+    for (let i = 0; i < _frameWords.length; i++) {
+        lumpWords[_frameStart + i] = _frameWords[i] >>> 0;
     }
     const clistStart = lumpSize - cc;
     const _capContext = {
@@ -1917,7 +1974,7 @@ async function compileAndBuild(options) {
             mtbf_status:     mtbfStatus,
             source_hash:     _simRunHash || _currentEditorHash(),
             source:          source,
-             submitted_source: source,
+             submitted_source: _frameSource.trim().length > 0 ? _frameSource : null,
              // Keep compiler provenance independently of the output frame.
              // A Format/API-only choice may omit embedded source, but never
              // discards the compiler source/words needed for diagnostics.
