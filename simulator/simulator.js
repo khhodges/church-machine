@@ -34,6 +34,16 @@ const ARCH_TRACE = ARCH_CONTRACTS.traceUnits[ARCH_PROFILE.traceUnit];
 const ARCH_GT_FIELDS = ARCH_CONTRACTS.isa.gtWord0.fields;
 const ARCH_ABSTRACT_GT_FIELDS = ARCH_CONTRACTS.isa.abstractGtWord0.fields;
 const ARCH_NS_W1_FIELDS = ARCH_CONTRACTS.isa.nsEntry.word1.fields;
+// This identity is deliberately part of the served simulator source.  The
+// HTML pins the same value and the server exposes it through a no-cache
+// endpoint, so a cached older simulator cannot silently run a retired boot
+// program.
+const CHURCH_SIMULATOR_ASSET_ID = 'simulator-three-instruction-boot-v1';
+const CHURCH_BOOT_PATH_VERSION = 'three-instruction-v1';
+if (typeof window !== 'undefined') {
+    window.__CHURCH_SIMULATOR_ASSET_ID__ = CHURCH_SIMULATOR_ASSET_ID;
+    window.__CHURCH_BOOT_PATH_VERSION__ = CHURCH_BOOT_PATH_VERSION;
+}
 const archFieldShift = field => field[0];
 const archFieldMask = field => (2 ** (field[1] - field[0] + 1)) - 1;
 function formatThreadDisplayName(value) {
@@ -123,6 +133,8 @@ class ChurchSimulator {
         // NS_TABLE_BASE is recomputed in reset() (and in the binary loaders) to
         // memory.length − NS_TABLE_RESERVE. For a 131072-word A7 space: 0x1FC00.
         this.architectureProfile = ARCH_PROFILE_NAME;
+        this.simulatorAssetId = CHURCH_SIMULATOR_ASSET_ID;
+        this.bootPathVersion = CHURCH_BOOT_PATH_VERSION;
         this.NS_TABLE_RESERVE =
             ARCH_PROFILE.namespace.defaultSlots * ARCH_PROFILE.namespace.entryWords;
         this.NS_TABLE_BASE = 0x1FC00;   // for 131072-word A7 space: 0x20000 - 0x400; recomputed in reset()
@@ -10927,6 +10939,8 @@ class ChurchSimulator {
             halted: this.halted,
             bootComplete: this.bootComplete,
             bootStep: this.bootStep,
+            simulatorAssetId: this.simulatorAssetId,
+            bootPathVersion: this.bootPathVersion,
             bootAttemptId: this.bootAttemptId,
             bootProgress: (this.bootProgress || []).map(record => ({ ...record })),
             bootEntryDiscrepancy: this.bootEntryDiscrepancy
@@ -11390,6 +11404,9 @@ class ChurchSimulator {
         return dump;
     }
 }
+
+ChurchSimulator.SIMULATOR_ASSET_ID = CHURCH_SIMULATOR_ASSET_ID;
+ChurchSimulator.BOOT_PATH_VERSION = CHURCH_BOOT_PATH_VERSION;
 
 // ── Task #1077: structured fault record codes ──────────────────────────────
 // Mirrors _FAULT_CODES in app-run.js so fault() can embed a numeric hardware

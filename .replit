@@ -109,6 +109,10 @@ args = "boot-entry-sync-tests"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
+args = "three-instruction-boot-tests"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
 args = "boot-layout-regression"
 
 [[workflows.workflow.tasks]]
@@ -623,6 +627,51 @@ args = "node simulator/test_boot_entry_sync.js"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "lump-save-snapshot-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_lump_save_snapshot.js && node simulator/test_compile_save_roundtrip.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "editor-action-menu-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_editor_action_menu.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "lump-primary-revision-selection-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_lump_primary_revision_selection.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "three-instruction-boot-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node tests/simulator/sim_boot_three_instruction.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[workflows.workflow]]
 name = "ns-slot-policy-restore-tests"
 author = "agent"

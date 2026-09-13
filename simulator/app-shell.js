@@ -1399,8 +1399,80 @@ abstraction ${name} {
 }`;
 }
 
+function _setBootPathIdentityDiagnostic(diagnostic) {
+    window.__CHURCH_BOOT_PATH_DIAGNOSTIC__ = diagnostic;
+    const el = document.getElementById('bootPathIdentity');
+    if (!el) return;
+    const ok = diagnostic && diagnostic.ok === true;
+    el.textContent = ok
+        ? `Boot path ${diagnostic.bootPathVersion} · asset ${diagnostic.assetId}`
+        : `Boot path asset mismatch — ${diagnostic && diagnostic.message
+            ? diagnostic.message : 'reload the IDE to fetch the current simulator'}`;
+    el.style.color = ok ? '#86efac' : '#fca5a5';
+    el.style.borderColor = ok ? '#35664b' : '#7f3030';
+    el.dataset.status = ok ? 'verified' : 'mismatch';
+}
+
+function _verifyServedSimulatorAsset() {
+    const expectedAssetId = window.__CHURCH_EXPECTED_SIMULATOR_ASSET_ID__ || null;
+    const expectedBootPath = window.__CHURCH_EXPECTED_BOOT_PATH_VERSION__ || null;
+    const assetId = window.__CHURCH_SIMULATOR_ASSET_ID__ ||
+        (typeof ChurchSimulator !== 'undefined' ? ChurchSimulator.SIMULATOR_ASSET_ID : null);
+    const bootPathVersion = window.__CHURCH_BOOT_PATH_VERSION__ ||
+        (typeof ChurchSimulator !== 'undefined' ? ChurchSimulator.BOOT_PATH_VERSION : null);
+    const diagnostic = {
+        ok: !!assetId && !!bootPathVersion &&
+            (!expectedAssetId || assetId === expectedAssetId) &&
+            (!expectedBootPath || bootPathVersion === expectedBootPath),
+        assetId,
+        bootPathVersion,
+        expectedAssetId,
+        expectedBootPath,
+        source: 'served-simulator',
+    };
+    if (!diagnostic.ok) {
+        diagnostic.message =
+            `expected ${expectedAssetId || 'unknown'} / ${expectedBootPath || 'unknown'}, ` +
+            `loaded ${assetId || 'missing'} / ${bootPathVersion || 'missing'}`;
+        console.error('[boot-path] ' + diagnostic.message);
+    }
+    _setBootPathIdentityDiagnostic(diagnostic);
+
+    // The server reads the source identity from the file it serves.  Comparing
+    // it independently catches a stale browser asset even when the HTML and
+    // server process were refreshed at different times.
+    fetch('/api/simulator-asset-identity', { cache: 'no-store' })
+        .then(response => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
+        .then(serverIdentity => {
+            const serverAssetId = serverIdentity && serverIdentity.assetId;
+            if (serverAssetId && serverAssetId !== assetId) {
+                _setBootPathIdentityDiagnostic({
+                    ...diagnostic,
+                    ok: false,
+                    serverAssetId,
+                    message: `server expects ${serverAssetId}, browser loaded ${assetId || 'missing'}`,
+                });
+                console.error('[boot-path] browser/server identity disagreement', {
+                    browser: assetId, server: serverAssetId,
+                });
+            } else {
+                diagnostic.serverAssetId = serverAssetId || null;
+                _setBootPathIdentityDiagnostic(diagnostic);
+            }
+        })
+        .catch(error => {
+            // Do not turn a temporary diagnostics endpoint outage into a boot
+            // failure; the local HTML/source identity remains visible.
+            diagnostic.serverIdentityError = error && error.message
+                ? error.message : String(error);
+            _setBootPathIdentityDiagnostic(diagnostic);
+        });
+    return diagnostic;
+}
+
 function init() {
     sim = new ChurchSimulator();
+    _verifyServedSimulatorAsset();
     // Browser storage names a requested next-boot target, not boot authority.
     // The loaded image's reserved Thread home remains authoritative until an
     // explicit prepareBootEntry transaction succeeds.

@@ -11,8 +11,8 @@
 //     The simulator must stay paused — no walk or run loop may start.
 //
 //   Scenario B (Path 2 — manual boot ceremony):
-//     No pending program. The user clicks Step 8 times to step manually through
-//     all 8 boot phases (B:00…B:07). After the final click the simulator must
+//     No pending program. The user clicks Step 3 times to step manually through
+//     the three boot instructions. After the final click the simulator must
 //     be paused — not in a continuous run loop.
 //
 //   Scenario C (Boot → Step race — cancel guard):
@@ -29,8 +29,8 @@
 //   loadSimulator() then calls sim.reset() + instantBoot() explicitly from
 //   page.evaluate().  sim.reset() fires the 'reset' event, which causes
 //   _maybeApplyBootImage() to apply window.bootImage (if the server has one) to
-//   sim.memory.  instantBoot() runs all 8 boot phases synchronously (B:04
-//   CALL_HOME is offline-safe and fully synchronous — no async fetch).
+//   sim.memory.  instantBoot() runs all three boot instructions synchronously;
+//   CALL_HOME is an out-of-band post-boot event and has no progress row.
 //
 //   Each scenario then forces sim.bootComplete=false / sim.bootStep=0 to put
 //   the sim back in pre-boot state, so the Step click(s) exercise the real path.
@@ -43,10 +43,9 @@
 //     - #dashboard has class "active"  (UI landed on the dashboard)
 //     - #toolStepBtn visible and enabled
 //
-// Boot phase count:
-//   B:00 FAULT_RST → B:01 LOAD_NS → B:02 INIT_THRD → B:03 INIT_HEAP →
-//   B:04 CALL_HOME → B:05 INIT_ABSTR → B:06 NUC_CLIST → B:07 NUC_CODE (sets bootComplete).
-//   Eight total phases → Scenario B requires 8 Step clicks.
+// Boot instruction count:
+//   LOAD CR15 → CHANGE CR12 → CALL CR0 (sets bootComplete).
+//   Three instructions → Scenario B requires 3 Step clicks.
 
 const { test, expect } = require('@playwright/test');
 const { loadSimulator } = require('./helpers/simulator');
@@ -91,7 +90,7 @@ async function assertPausedState(page) {
 // ─── Scenario A — instant boot (stepSim Path 1) ───────────────────────────────
 //
 // When _pendingSimLoad is truthy, one click of Step calls instantBoot()
-// synchronously (all 8 phases run in a tight while-loop, no async I/O),
+// synchronously (all three instructions run in a tight while-loop, no async I/O),
 // loads the assembled program, and returns paused.
 // Continuous execution must NOT start.
 
@@ -102,35 +101,49 @@ test.describe('Step button stays paused — Scenario A (instant boot, Path 1)', 
 
         await loadSimulator(page);
 
-        // ── 1. Assemble a minimal NOP program so _pendingSimLoad becomes true ──
+        // ── 1. Assemble a minimal executable program so _pendingSimLoad is true
         //
         // assembleAndLoad() is a global function.  It reads from #asmEditor,
         // assembles the source, writes to lastAssembledWords, and sets the
         // module-level _pendingSimLoad = true.
         await page.evaluate(() => {
             const editor = document.getElementById('asmEditor');
-            if (editor) editor.value = 'NOP';
+            if (editor) editor.value = 'IADD DR1, DR0, 1';
         });
-        await page.evaluate(() => assembleAndLoad());
+        const pendingCandidate = await page.evaluate(() => assembleAndLoad());
         await page.waitForTimeout(200);
 
-        // ── 2. Force the sim back to pre-boot state ────────────────────────────
+        // ── 2. Hard-reset the sim back to pre-boot state ──────────────────────
         //
-        // stepSim() enters the boot branch only when sim.bootComplete === false.
-        // Setting bootStep=0 ensures _bootStep() starts from B:00.
-        // _pendingSimLoad remains true (set by assembleAndLoad above) — stepSim()
-        // will take the instantBoot path.
+        // A field-only rewind would leave the live Thread owner from the
+        // previous boot attached to the reset bank. Use the real reset path so
+        // the three-instruction boot starts with clean architectural state.
         await page.evaluate(() => {
-            sim.bootComplete = false;
-            sim.bootStep     = 0;
-            sim.halted       = false;
+            sim.reset();
+            if (sim._bootImageLoaded !== true && window.bootImage) {
+                sim.loadBootImage(window.bootImage);
+            }
             sim.running      = false;
         });
+        // assembleAndLoad() is allowed to auto-boot when invoked against an
+        // already-running machine. Reinstall its immutable candidate after
+        // the hard reset so this test deterministically exercises Step's
+        // pending-compile branch.
+        await page.evaluate(candidate => {
+            _setPendingSimLoad({
+                token: candidate.token,
+                abstraction: 'step-test',
+                words: candidate.words,
+                capabilities: candidate.capabilities || [],
+                labels: candidate.labels || null,
+                methodTableSize: candidate.methodTableSize || 0,
+            });
+        }, pendingCandidate);
 
         // ── 3. Click Step once — triggers the instant-boot path ───────────────
         //
         // stepSim() sees: !bootComplete && _pendingSimLoad === true
-        //   → calls instantBoot() (8 synchronous phases)
+        //   → calls instantBoot() (3 synchronous instructions)
         //   → loads the NOP program
         //   → calls switchView('dashboard')
         //   → returns WITHOUT calling runSimGo() or walkToggle()
@@ -147,25 +160,20 @@ test.describe('Step button stays paused — Scenario A (instant boot, Path 1)', 
 
 });
 
-// ─── Scenario B — 8-click manual boot ceremony (stepSim Path 2) ──────────────
+// ─── Scenario B — 3-click manual boot ceremony (stepSim Path 2) ──────────────
 //
 // When _pendingSimLoad is false and bootComplete is false, each Step click
-// advances one boot phase:
-//   Click 1 → B:00 FAULT_RST    (bootStep: 0→1)
-//   Click 2 → B:01 LOAD_NS      (bootStep: 1→2)
-//   Click 3 → B:02 INIT_THRD    (bootStep: 2→3)
-//   Click 4 → B:03 INIT_HEAP    (bootStep: 3→4)
-//   Click 5 → B:04 CALL_HOME    (bootStep: 4→5)
-//   Click 6 → B:05 INIT_ABSTR   (bootStep: 5→6)
-//   Click 7 → B:06 NUC_CLIST    (bootStep: 6→7)
-//   Click 8 → B:07 NUC_CODE     (bootComplete=true, bootStep stays at 7)
+// advances one boot instruction:
+//   Click 1 → LOAD CR15   (bootStep: 0→1)
+//   Click 2 → CHANGE CR12 (bootStep: 1→2)
+//   Click 3 → CALL CR0    (bootComplete=true)
 //
 // After click 8, stepSim() sees sim.bootComplete===true, calls
 // switchView('dashboard'), and returns.  runSimGo() is NOT called by
 // the manual-step path (only slowBoot() calls runSimGo() after animation).
 // The machine must be paused.
 
-test.describe('Step button stays paused — Scenario B (manual boot, 8 clicks, Path 2)', () => {
+test.describe('Step button stays paused — Scenario B (manual boot, 3 clicks, Path 2)', () => {
 
     test('stepping through all 8 boot phases manually leaves the sim paused', async ({ page }) => {
         test.setTimeout(60000);
@@ -187,12 +195,12 @@ test.describe('Step button stays paused — Scenario B (manual boot, 8 clicks, P
         const stepBtn = page.locator('#toolStepBtn');
         await stepBtn.waitFor({ state: 'visible' });
 
-        // ── 2. Click Step 8 times — one per boot phase ────────────────────────
+        // ── 2. Click Step 3 times — one per boot instruction ────────────────
         //
-        // B:07 NUC_CODE (click 8) sets bootComplete=true.  stepSim() then
+        // CALL CR0 (click 3) sets bootComplete=true.  stepSim() then
         // calls _autoLoadDefaultProgram(), switchView('dashboard'), and returns —
         // without calling runSimGo() (that is only done by slowBoot()).
-        for (let phase = 1; phase <= 8; phase++) {
+        for (let phase = 1; phase <= 3; phase++) {
             await stepBtn.click();
             // Small pause so DOM updates and the next click sees correct state.
             await page.waitForTimeout(150);

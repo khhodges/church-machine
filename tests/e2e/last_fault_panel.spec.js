@@ -290,65 +290,46 @@ test.describe('Last Fault panel — emit → POST → GET round-trip', () => {
         await expect(page.locator('#faultState')).toContainText('running');
     });
 
-    test('boot mLoad fault modal shows destination CR and preserves executing CR14 context', async ({ page }) => {
+     test('invalid prepared CR0 fault modal shows CALL provenance and bounds reason', async ({ page }) => {
         test.setTimeout(60000);
 
         // Start from the same deterministic IDE harness used by the boot E2E
-        // tests, then drive the real boot state machine into B:05.
+         // tests, then drive the real three-instruction boot state machine.
         await loadSimulator(page);
 
         const faultState = await page.evaluate(() => {
             sim.reset();
-            // Slot 14 is intentionally absent from the reset namespace image.
-            sim.bootEntrySlot = 14;
-
-            // Advance through FAULT_RST, LOAD_NS, INIT_THRD, INIT_HEAP, and
-            // CALL_HOME.  Seed CR14 after reset so the fault record can prove
-            // that the executing abstraction and failed destination are
-            // reported independently.
-            for (let i = 0; i < 5; i++) sim._bootStep();
-            const executingEntry = sim.readNSEntry(6);
-            const executingSeq = sim.parseNSWord1(executingEntry.word1_limit).gtSeq;
-            const executingGT = sim.createGT(
-                executingSeq, 6, { R: 0, W: 0, X: 1, L: 0, S: 0, E: 0 }, 1
-            );
-            sim._writeCR(14, executingGT, executingEntry);
-
-            // B:05 INIT_ABSTR calls mLoad for the destination CR6 and must
-            // report the precise mLoad reason when Slot 14 is invalid.
+             // Replace the prepared CR0 home with an out-of-range Inform GT.
+             sim._bootStep();
+             const home = sim.inspectBootEntryBinding().homeAddress;
+             sim.memory[home] = sim.createGT(0, 14, { E: 1 }, 1);
+             sim._bootStep();
             sim._bootStep();
             const fault = sim.faultLog[sim.faultLog.length - 1];
             return {
                 halted: sim.halted,
                 message: fault && fault.message,
-                faultingAbstractionSlot: fault && fault.faultingAbstractionSlot,
-                faultingAbstractionLabel: fault && fault.faultingAbstractionLabel,
+                 evidence: fault && fault.bootEvidence,
             };
         });
 
         expect(faultState.halted).toBe(true);
-        expect(faultState.message).toBe(
-            'INIT_ABSTR mLoad(CR6, Slot 14) failed: namespace index 14 out of bounds'
-        );
-        expect(faultState.faultingAbstractionSlot).toBe(6);
-        expect(faultState.faultingAbstractionLabel).toBe('SelfTest');
+         expect(faultState.message).toBe('CALL: CR0: namespace index 14 out of bounds');
+         expect(faultState.evidence.provenanceRegister).toBe('CR0');
+         expect(faultState.evidence.bootRomAddress).toBe(2);
+         expect(faultState.evidence.gate).toBe('BOUNDS');
 
         const modal = page.locator('#faultModalOverlay');
         await expect(modal).toBeVisible();
 
         // Assert the rendered browser content rather than only the simulator
-        // record.  CR6 is the failed destination; Slot 14 and the original
-        // mLoad reason must remain visible in the user-facing dialog.
+         // record. The dialog must name CALL CR0 and preserve the gate reason.
         const message = modal.locator('.fault-modal-message');
-        await expect(message).toContainText('CR6');
-        await expect(message).toContainText('Slot 14');
+         await expect(message).toContainText('CALL');
+         await expect(message).toContainText('CR0');
         await expect(message).toContainText('namespace index 14 out of bounds');
-
-        // CR14 remains the executing abstraction context in the modal.  This
-        // guards against replacing the destination CR with the context CR.
-        const location = modal.locator('.fault-modal-lump-chip');
-        await expect(location).toContainText('SelfTest');
-        await expect(message).not.toContainText('mLoad(CR14');
+         await expect(modal).not.toContainText('Boot.NS +0');
+         await expect(modal).toContainText('B:02');
     });
 
 });

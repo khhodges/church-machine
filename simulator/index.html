@@ -1351,6 +1351,10 @@
 
     <div id="pipeline" class="view">
         <div class="panel">
+            <div id="bootPathIdentity" role="status" aria-live="polite"
+                 style="margin:0 0 .65rem;padding:.45rem .65rem;border:1px solid #2a2a4a;border-radius:4px;background:#10101b;color:#8f96ad;font:12px monospace;">
+                Boot path identity: checking served simulator asset…
+            </div>
             <div id="pipelineContainer"></div>
         </div>
     </div>
@@ -3475,7 +3479,14 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="abstract_gt_manager.js"></script>
     <script src="thread_design.js?v=sha256-6c9b749e878a"></script>
     <script src="architecture_contracts.js?v=sha256-1d50622f8024"></script>
-    <script src="simulator.js?v=sha256-cbe8f3b11729"></script>
+    <script>
+    // Must match the identity embedded in simulator.js.  A stale cached
+    // simulator asset is a correctness issue, not merely a cosmetic version
+    // mismatch: it could expose the retired multi-phase boot path.
+    window.__CHURCH_EXPECTED_SIMULATOR_ASSET_ID__ = 'simulator-three-instruction-boot-v1';
+    window.__CHURCH_EXPECTED_BOOT_PATH_VERSION__ = 'three-instruction-v1';
+    </script>
+    <script src="simulator.js?v=sha256-boot3-v1"></script>
     <script src="capability_tokens.js?v=sha256-ff2a6f7b92f6"></script>
     <script src="portable_lump_binding.js?v=sha256-1565bea4b151"></script>
     <script src="assembler.js?v=sha256-12b2fde6a148"></script>

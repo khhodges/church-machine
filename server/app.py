@@ -6435,6 +6435,39 @@ def simulator_versioned(version):
         return resp
     return jsonify({"status": "simulator not yet built"})
 
+@app.route("/api/simulator-asset-identity")
+def simulator_asset_identity():
+    """Expose the identity embedded in the exact simulator source we serve.
+
+    This is diagnostic-only and deliberately no-cache.  The browser compares
+    the returned identity with the loaded classic-script globals so a stale
+    cached simulator cannot be mistaken for the current three-instruction boot.
+    """
+    source_path = os.path.join(SIMULATOR_DIR, "simulator.js")
+    try:
+        with open(source_path, "r", encoding="utf-8") as source_file:
+            source = source_file.read()
+        asset_match = re.search(
+            r"const\s+CHURCH_SIMULATOR_ASSET_ID\s*=\s*['\"]([^'\"]+)['\"]",
+            source,
+        )
+        boot_match = re.search(
+            r"const\s+CHURCH_BOOT_PATH_VERSION\s*=\s*['\"]([^'\"]+)['\"]",
+            source,
+        )
+        if not asset_match or not boot_match:
+            return jsonify({"error": "simulator source identity is missing"}), 500
+        response = jsonify({
+            "assetId": asset_match.group(1),
+            "bootPathVersion": boot_match.group(1),
+            "sourceSha256": hashlib.sha256(source.encode("utf-8")).hexdigest(),
+        })
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        return response
+    except OSError as error:
+        return jsonify({"error": f"simulator source identity unavailable: {error}"}), 503
+
 _STALE_VERSION_RE = re.compile(r'^r\d{8}[a-z]?/?$')
 
 @app.route("/simulator/<path:path>")
