@@ -153,9 +153,14 @@ function _setPendingSimLoad(snapshot) {
         token: snapshot.token !== undefined && snapshot.token !== null
             ? snapshot.token : null,
         abstraction: snapshot.abstraction || 'prog',
+        language: snapshot.language || '',
+        source: typeof snapshot.source === 'string' ? snapshot.source : '',
+        binary: Array.isArray(snapshot.binary)
+            ? Object.freeze(snapshot.binary.slice()) : null,
         words: Object.freeze(Array.isArray(snapshot.words) ? snapshot.words.slice() : []),
         capabilities: Object.freeze(Array.isArray(snapshot.capabilities)
             ? snapshot.capabilities.map(_cloneCap) : []),
+        labels: snapshot.labels ? Object.freeze({ ...snapshot.labels }) : null,
         namedSlots: Array.isArray(snapshot.namedSlots)
             ? Object.freeze(snapshot.namedSlots.slice()) : null,
         methodTableSize: Number.isInteger(snapshot.methodTableSize) ? snapshot.methodTableSize : 0,

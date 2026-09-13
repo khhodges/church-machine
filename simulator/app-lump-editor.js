@@ -1964,6 +1964,17 @@
 
         writeU32BE(0, hdr);
         for (var i = 0; i < cw; i++) writeU32BE((1 + i) * 4, words[i]);
+        // The content token must describe the bytes actually emitted.  Raw
+        // candidates carry their already validated GT materialization here;
+        // treating their c-list as all-zero would fingerprint a different,
+        // capability-stripped artifact.
+        for (var ci = 0; ci < cc; ci++) {
+            var cap = caps[ci];
+            var capToken = cap && typeof cap === 'object' && cap.token !== undefined
+                ? Number(cap.token) : 0;
+            writeU32BE((1 + cw + ci) * 4,
+                Number.isFinite(capToken) ? capToken : 0);
+        }
 
         var crcTable = (function () {
             var t = new Uint32Array(256);
@@ -1979,6 +1990,78 @@
         return ((crc ^ 0xFFFFFFFF) >>> 0).toString(16).toLowerCase().padStart(8, '0');
     };
 
+    function _crc32Bytes(buf) {
+        var table = new Uint32Array(256);
+        for (var n = 0; n < 256; n++) {
+            var c = n;
+            for (var k = 0; k < 8; k++) c = (c & 1)
+                ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+            table[n] = c;
+        }
+        var crc = 0xFFFFFFFF;
+        for (var b = 0; b < buf.length; b++) {
+            crc = table[(crc ^ buf[b]) & 0xFF] ^ (crc >>> 8);
+        }
+        return ((crc ^ 0xFFFFFFFF) >>> 0).toString(16).toLowerCase().padStart(8, '0');
+    }
+
+    function _exportCapabilityContext() {
+        return {
+            sim: (typeof sim !== 'undefined') ? sim : null,
+            lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache))
+                ? _lumpsCache : [],
+        };
+    }
+
+    // Audit the exact serialized code LUMP, rather than merely trusting the
+    // candidate metadata that led to it.  This is deliberately strict: an
+    // unresolved/pending/null GT cannot become a downloadable artifact.
+    function _auditExportedCodeLump(finalWords, cw, caps) {
+        var cc = caps.length;
+        var header = finalWords[0] >>> 0;
+        var nMinus6 = (header >>> 23) & 0xF;
+        var declaredSize = Math.pow(2, nMinus6 + 6);
+        if ((header >>> 27) !== 0x1F || ((header >>> 10) & 0x1FFF) !== cw ||
+                (header & 0xFF) !== cc || declaredSize !== finalWords.length ||
+                1 + cw + cc > finalWords.length) {
+            return { ok: false, error: 'Exported LUMP failed structural header/C-list bounds audit.' };
+        }
+        for (var i = 0; i < cc; i++) {
+            var cap = caps[i] || {};
+            var expected = cap.null_row === true ? 0 : Number(cap.token);
+            if (!Number.isFinite(expected)) {
+                return {
+                    ok: false,
+                    error: 'Capability "' + (cap.name || i) +
+                        '" has no materialized Golden Token for export.'
+                };
+            }
+            if ((finalWords[1 + cw + i] >>> 0) !== (expected >>> 0)) {
+                return {
+                    ok: false,
+                    error: 'Capability "' + (cap.name || i) +
+                        '" C-list bytes differ from its validated Golden Token.'
+                };
+            }
+        }
+        if (cc > 0) {
+            if (typeof CapabilityTokens === 'undefined' ||
+                    typeof CapabilityTokens.validateClist !== 'function') {
+                return { ok: false, error: 'Capability validator is unavailable for export audit.' };
+            }
+            var capAudit = CapabilityTokens.validateClist(
+                finalWords, 1 + cw, caps, _exportCapabilityContext());
+            if (!capAudit.ok) {
+                return {
+                    ok: false,
+                    error: 'Exported LUMP C-list audit failed: ' +
+                        (capAudit.errors || []).join('; ')
+                };
+            }
+        }
+        return { ok: true };
+    }
+
     // ── buildLumpFromAssembly ──────────────────────────────────────────────
     // Packages the most-recently assembled instruction words (lastAssembledWords)
     // into a floating LUMP binary and triggers a browser download.
@@ -1986,24 +2069,59 @@
     // Layout (big-endian 32-bit words):
     //   Word 0       : header — magic(5)|n_minus_6(4)|cw(13)|typ(2)|cc(8)
     //   Words 1..cw  : instruction words (from the assembler)
-    //   Words cw+1.. : zero-pad to lump_size
+    //   Words cw+1..cw+cc : materialized capability GT c-list
+    //   Remaining words   : zero-pad to lump_size
     //
     // cc    — derived from lastAssembledCapabilities.length (0 if none declared).
-    //         c-list slots are zero-initialised in the binary (null GTs filled at
-    //         load time); the ambient boot c-list is used when cc=0.
+    //         Every non-NULL c-list row is the exact validated GT carried by
+    //         the candidate; cc=0 leaves the ambient boot c-list in use.
     // typ=0 — standard code lump, not a Thread or Namespace header.
-    window.buildLumpFromAssembly = function () {
-        var words = (typeof lastAssembledWords !== 'undefined') ? lastAssembledWords : null;
+    window.buildLumpFromAssembly = function (candidate) {
+        // IDEActions passes its immutable candidate explicitly. The legacy
+        // no-argument form remains for existing callers that export a loaded
+        // assembly buffer.
+        if (candidate && Array.isArray(candidate.binary) && candidate.binary.length) {
+            // High-level compilation already built and audited this complete
+            // immutable artifact (including its source/content frame). Export
+            // those exact bytes; rebuilding from execution words would invent
+            // a different method-table/c-list layout.
+            var _candidateBuf = new Uint8Array(candidate.binary.length * 4);
+            var _candidateView = new DataView(_candidateBuf.buffer);
+            candidate.binary.forEach(function(word, index) {
+                _candidateView.setUint32(index * 4, word >>> 0, false);
+            });
+            var _candidateToken = _crc32Bytes(_candidateBuf);
+            var _candidateUrl = URL.createObjectURL(new Blob(
+                [_candidateBuf], { type: 'application/octet-stream' }));
+            var _candidateLink = document.createElement('a');
+            _candidateLink.href = _candidateUrl;
+            _candidateLink.download = _candidateToken + '.lump';
+            document.body.appendChild(_candidateLink);
+            _candidateLink.click();
+            document.body.removeChild(_candidateLink);
+            URL.revokeObjectURL(_candidateUrl);
+            if (typeof appendCompileOutput === 'function') {
+                appendCompileOutput('LUMP exported from the exact build candidate: ' +
+                    _candidateLink.download, 'info');
+            }
+            return { ok: true, token: _candidateToken };
+        }
+        var words = candidate && Array.isArray(candidate.words)
+            ? candidate.words.slice()
+            : ((typeof lastAssembledWords !== 'undefined') ? lastAssembledWords : null);
         if (!words || !words.length) {
-            alert('Nothing assembled yet — compile your assembly program first.');
-            return;
+            const error = 'Nothing assembled yet — compile your assembly program first.';
+            alert(error);
+            return { ok: false, error: error };
         }
 
-        // Honour declared capabilities if present.  cc encodes the count in the
-        // LUMP header; the c-list slots themselves are zero-initialised in the
-        // binary (null GTs) and filled by the loader when the LUMP is installed.
-        var caps = (typeof lastAssembledCapabilities !== 'undefined' &&
-                    lastAssembledCapabilities) ? lastAssembledCapabilities : [];
+        // Raw candidates contain the GT materialization that capability
+        // validation approved at build time.  Preserve those exact values in
+        // the portable c-list; never replace non-NULL declarations with zero.
+        var caps = candidate && Array.isArray(candidate.capabilities)
+            ? candidate.capabilities.slice()
+            : ((typeof lastAssembledCapabilities !== 'undefined' &&
+                    lastAssembledCapabilities) ? lastAssembledCapabilities : []);
         var cw          = words.length;
         var cc          = caps.length;
         var totalNeeded = 1 + cw + cc;
@@ -2027,8 +2145,33 @@
 
         writeU32BE(0, hdr);
         for (var i = 0; i < cw; i++) writeU32BE((1 + i) * 4, words[i]);
+        for (var capIndex = 0; capIndex < cc; capIndex++) {
+            var declaredCap = caps[capIndex] || {};
+            var declaredToken = declaredCap.null_row === true ? 0
+                : Number(declaredCap.token);
+            if (!Number.isFinite(declaredToken)) {
+                var noTokenError = 'Capability "' + (declaredCap.name || capIndex) +
+                    '" has no materialized Golden Token for export.';
+                alert(noTokenError);
+                return { ok: false, error: noTokenError };
+            }
+            writeU32BE((1 + cw + capIndex) * 4, declaredToken);
+        }
 
-        var token = window._computeLumpToken(words, caps);
+        // Decode the final bytes and audit that representation, ensuring the
+        // header, c-list placement, and GT words match the downloaded payload.
+        var finalWords = new Array(lumpSize);
+        var finalView = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+        for (var wordIndex = 0; wordIndex < lumpSize; wordIndex++) {
+            finalWords[wordIndex] = finalView.getUint32(wordIndex * 4, false);
+        }
+        var exportAudit = _auditExportedCodeLump(finalWords, cw, caps);
+        if (!exportAudit.ok) {
+            alert(exportAudit.error);
+            return { ok: false, error: exportAudit.error };
+        }
+
+        var token = _crc32Bytes(buf);
 
         var filename = token + '.lump';
         var blob     = new Blob([buf], { type: 'application/octet-stream' });
@@ -2050,6 +2193,7 @@
                 'info'
             );
         }
+        return { ok: true, token: token };
     };
 
     window.lumpEditorRLUpload = function () {

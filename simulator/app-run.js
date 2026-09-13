@@ -234,8 +234,6 @@ function _materializeRunCapabilities(capabilities, actionLabel) {
 function _blockCapabilityRun(errors, con) {
     const messages = (errors || []).map(message => `[CAP-GT] ${message}`);
     const text = `Capability validation failed — code not loaded:\n${messages.join('\n')}`;
-    _clearPendingSimLoad();
-    window._lastCLOOMCLump = null;
     if (con) {
         con.className = '';
         con.textContent = text;
@@ -247,25 +245,18 @@ function _blockCapabilityRun(errors, con) {
             'Capability validation failed — code not loaded'
         );
     }
-    const saveBtn = document.getElementById('btnSaveNS');
-    if (saveBtn) saveBtn.disabled = true;
-    const toolbarSave = document.getElementById('btnToolbarSaveLump');
-    if (toolbarSave) toolbarSave.disabled = true;
-    const exportBtn = document.getElementById('btnExportLump');
-    if (exportBtn) exportBtn.disabled = true;
     switchCodeTab('console');
     showNextSteps('error');
+    if (window.IDEActions) window.IDEActions.refresh();
 }
 
-function assembleAndLoad() {
+function assembleAndLoad(options) {
+    const _assembleOptions = options && typeof options === 'object' ? options : {};
     const editor = document.getElementById('asmEditor');
-    if (!editor) return;
-    const source = editor.value;
+    if (!editor) return { ok: false, kind: 'assembly', error: 'The source editor is unavailable.' };
+    const source = _assembleOptions.source !== undefined
+        ? String(_assembleOptions.source) : editor.value;
     saveEditorState();
-    _clearLumpPetNames();
-
-    _runStopped = true;
-    sim.running = false;
 
     const con = document.getElementById('editorConsole');
 
@@ -282,10 +273,10 @@ function assembleAndLoad() {
         if (result.errors.length > 0) {
             const errText = result.errors.map(e => `Line ${e.line || '?'}: ${e.message}`).join('\n');
             if (con) con.textContent = `CLOOMC++ errors:\n${errText}`;
-            window._assemblerSymbols = null;
             switchCodeTab('console');
             showNextSteps('error');
-            return;
+            if (window.IDEActions) window.IDEActions.refresh();
+            return { ok: false, kind: 'cloomc', error: errText, errors: result.errors };
         }
         const methods = result.methods || [];
         const methodTableSize = methods.length;
@@ -316,47 +307,51 @@ function assembleAndLoad() {
             for (const w of (m.code || [])) words.push(w);
         }
         const _cluWords = words.slice();
+        const _cluExecutableWords = methods.reduce(function(total, method) {
+            return total + ((method.code || []).length);
+        }, 0);
+        if (_cluExecutableWords === 0) {
+            const error = 'Compile produced no executable instruction words.';
+            if (con) con.textContent = error;
+            showNextSteps('error');
+            if (window.IDEActions) window.IDEActions.refresh();
+            return { ok: false, kind: 'cloomc', error, errors: [{ line: null, message: error }] };
+        }
         const _cluCapsResult = _materializeRunCapabilities(
             result.capabilities || [], 'Compile');
         if (!_cluCapsResult.ok) {
             _blockCapabilityRun(_cluCapsResult.errors, con);
-            return;
+            return {
+                ok: false, kind: 'cloomc',
+                error: (_cluCapsResult.errors || []).join('\n') || 'Capability validation failed.',
+                errors: _cluCapsResult.errors || [],
+            };
         }
         const _cluCaps = _cluCapsResult.capabilities;
-        lastAssembledNamedSlots = (result.namedSlots && result.namedSlots.length > 0) ? result.namedSlots.slice() : null;
-        lastMethodTableSize = methodTableSize;
-        _defaultProgramLoaded = true;
-        sim.programLabels = labels;
-        sim.programCapabilities = _cluCaps.slice();
-        sim.programName = result.abstractionName || (methods.length > 0 ? methods[0].name : 'prog');
+        const _cluNamedSlots = (result.namedSlots && result.namedSlots.length > 0)
+            ? result.namedSlots.slice() : null;
+        const _cluName = result.abstractionName || (methods.length > 0 ? methods[0].name : 'prog');
         const _cluTok = typeof window._computeLumpToken === 'function'
             ? window._computeLumpToken(_cluWords, _cluCaps) : null;
-        if (window.ExecutionIdentity) window.ExecutionIdentity.begin({
-            abstraction: sim.programName,
-            token: _cluTok,
-            source,
-            runKind: 'editor',
-            runStatus: 'assembled',
-        });
-        window._assemblerSymbols = { labels, lumpName: sim.programName };
-        _setPendingSimLoad({
-            token: _cluTok,
-            abstraction: sim.programName,
-            words: _cluWords,
-            capabilities: _cluCaps,
-            namedSlots: lastAssembledNamedSlots,
-            methodTableSize,
-        });
         if (_cluTok) {
             if (window.LumpRegistry) {
-                window.LumpRegistry.registerMemory(_cluTok, sim.programName, _cluWords, _cluCaps, {
+                window.LumpRegistry.registerMemory(_cluTok, _cluName, _cluWords, _cluCaps, {
                     sourceText: source,
                     language: 'cloomc',
                 });
                 window.LumpRegistry.setCurrent(_cluTok);
-                // A new compile invalidates any pending Format Lump binary.
                 window._pendingLumpData = null;
             }
+        }
+        if (window.IDEActionState) {
+            window.IDEActionState.recordCandidate({
+                token: _cluTok, abstraction: _cluName, language: result.language || 'cloomc',
+                source, sourceSurface: _assembleOptions.sourceSurface || 'asmEditor',
+                languageIdentity: (document.getElementById('langSelector') || {}).value ||
+                    result.language || _assembleOptions.languageIdentity || 'cloomc',
+                words: _cluWords, capabilities: _cluCaps,
+                labels, namedSlots: _cluNamedSlots, methodTableSize,
+            });
         }
         const manifestByMethod = {};
         if (result.manifest) {
@@ -520,14 +515,11 @@ function assembleAndLoad() {
             }
         }
         showNextSteps('assembled');
-        const saveBtn = document.getElementById('btnSaveNS');
-        if (saveBtn) saveBtn.disabled = false;
-        const _toolbarSaveBtn0 = document.getElementById('btnToolbarSaveLump');
-        if (_toolbarSaveBtn0) _toolbarSaveBtn0.disabled = false;
-        const _expBtn0 = document.getElementById('btnExportLump');
-        if (_expBtn0) _expBtn0.disabled = false;
-        updateDashboard();
-        return;
+        if (window.IDEActions) window.IDEActions.refresh();
+        return {
+            ok: true, kind: 'cloomc', token: _cluTok, words: _cluWords.slice(),
+            sourceText: source, candidate: true,
+        };
     }
 
     // ── Pass null-GT row pet names to the assembler ──────────────────────────
@@ -548,68 +540,61 @@ function assembleAndLoad() {
     if (result.errors.length > 0) {
         const errText = result.errors.map(e => `Line ${e.line}: ${e.message}`).join('\n');
         if (con) con.textContent = `Assembly errors:\n${errText}`;
-        window._assemblerSymbols = null;
-        lastAssembledNamedSlots = null;
-        if (window.LumpRegistry) window.LumpRegistry.evictMemory(window.LumpRegistry.getCurrent());
-        const _errSaveBtn = document.getElementById('btnSaveNS');
-        if (_errSaveBtn) _errSaveBtn.disabled = true;
-        const _errToolbarSaveBtn = document.getElementById('btnToolbarSaveLump');
-        if (_errToolbarSaveBtn) _errToolbarSaveBtn.disabled = true;
-        const _errExpBtn = document.getElementById('btnExportLump');
-        if (_errExpBtn) _errExpBtn.disabled = true;
         switchCodeTab('console');
         if (typeof _showAsmErrors === 'function') _showAsmErrors(result.errors);
         if (typeof _clearAsmWarnings === 'function') _clearAsmWarnings();
         showNextSteps('error');
-        return;
+        if (window.IDEActions) window.IDEActions.refresh();
+        return { ok: false, kind: 'assembly', error: errText, errors: result.errors };
     }
     if (typeof _clearAsmErrors === 'function') _clearAsmErrors();
     if (typeof _showAsmWarnings === 'function') _showAsmWarnings(result.warnings || []);
 
     const _rawWords = result.words.slice();
+    if (_rawWords.length === 0) {
+        const error = 'Assembly produced no executable instruction words.';
+        if (con) con.textContent = error;
+        switchCodeTab('console');
+        showNextSteps('error');
+        if (window.IDEActions) window.IDEActions.refresh();
+        return { ok: false, kind: 'assembly', error, errors: [{ line: null, message: error }] };
+    }
     const _rawCapsResult = _materializeRunCapabilities(
         result.capabilities || [], 'Assembly');
     if (!_rawCapsResult.ok) {
         _blockCapabilityRun(_rawCapsResult.errors, con);
-        return;
+        return {
+            ok: false, kind: 'assembly',
+            error: (_rawCapsResult.errors || []).join('\n') || 'Capability validation failed.',
+            errors: _rawCapsResult.errors || [],
+        };
     }
     const _rawCaps = _rawCapsResult.capabilities;
-    lastAssembledNamedSlots = (result.namedSlots && result.namedSlots.length > 0)
+    const _rawNamedSlots = (result.namedSlots && result.namedSlots.length > 0)
         ? result.namedSlots.slice() : null;
-    _defaultProgramLoaded = true;
-    sim.programLabels = result.labels || {};
-    sim.programCapabilities = _rawCaps.slice();
     const entryLabel = Object.keys(result.labels || {}).find(k => (result.labels[k] === 0)) || null;
     const _srcAbstrName = (source.match(/;\s*Abstraction:\s*(.+)/i) || [])[1]?.trim() || null;
-    sim.programName = _srcAbstrName || entryLabel || (sim.nsLabels && sim.nsLabels[sim.bootEntrySlot]) || 'SelfTest';
+    const _rawName = _srcAbstrName || entryLabel || 'Assembly';
     const _asmTok = typeof window._computeLumpToken === 'function'
         ? window._computeLumpToken(_rawWords, _rawCaps) : null;
-    if (window.ExecutionIdentity) window.ExecutionIdentity.begin({
-        abstraction: sim.programName,
-        token: _asmTok,
-        source,
-        runKind: 'editor',
-        runStatus: 'assembled',
-    });
-    window._assemblerSymbols = { labels: result.labels || {}, lumpName: sim.programName };
-    _setPendingSimLoad({
-        token: _asmTok,
-        abstraction: sim.programName,
-        words: _rawWords,
-        capabilities: _rawCaps,
-        namedSlots: lastAssembledNamedSlots,
-        methodTableSize: 0,
-    });
     if (_asmTok) {
         if (window.LumpRegistry) {
-            window.LumpRegistry.registerMemory(_asmTok, sim.programName, _rawWords, _rawCaps, {
+            window.LumpRegistry.registerMemory(_asmTok, _rawName, _rawWords, _rawCaps, {
                 sourceText: source,
                 language: 'assembly',
             });
             window.LumpRegistry.setCurrent(_asmTok);
-            // A new compile invalidates any pending Format Lump binary.
             window._pendingLumpData = null;
         }
+    }
+    if (window.IDEActionState) {
+        window.IDEActionState.recordCandidate({
+            token: _asmTok, abstraction: _rawName, language: 'assembly',
+            source, sourceSurface: _assembleOptions.sourceSurface || 'asmEditor',
+            languageIdentity: (document.getElementById('langSelector') || {}).value || 'assembly',
+            words: _rawWords, capabilities: _rawCaps,
+            labels: result.labels || {}, namedSlots: _rawNamedSlots, methodTableSize: 0,
+        });
     }
 
     const _srcComments = (() => {
@@ -653,17 +638,14 @@ function assembleAndLoad() {
     }
     if (con) con.innerHTML = _highlightCodeListing(listing);
     // Push live snippet history for each labelled section of the raw assembly source
-    _pushAsmLabelSnippets(source, result.labels || {}, sim.programName);
+    _pushAsmLabelSnippets(source, result.labels || {}, _rawName);
     showNextSteps('assembled');
 
-    const saveBtn = document.getElementById('btnSaveNS');
-    if (saveBtn) saveBtn.disabled = false;
-    const _toolbarSaveBtn = document.getElementById('btnToolbarSaveLump');
-    if (_toolbarSaveBtn) _toolbarSaveBtn.disabled = false;
-    const _expBtn = document.getElementById('btnExportLump');
-    if (_expBtn) _expBtn.disabled = false;
-
-    updateDashboard();
+    if (window.IDEActions) window.IDEActions.refresh();
+    return {
+        ok: true, kind: 'assembly', token: _asmTok, words: _rawWords.slice(),
+        sourceText: source, candidate: true,
+    };
 }
 
 function _capRightsHTML(text) {
@@ -1168,7 +1150,7 @@ function updateThreadIdentityStrip() {
             `Thread context: ${row.name}${row.active ? ' (active)' : ''}\n` +
             `${gtKeyText}: ${gtName}\nLUMP-relative NIA: ${niaText}\n` +
             `Physical instruction address: ${physicalText}\n${flagsKeyText}: ${flagText}`);
-        card.setAttribute('title', `${card.getAttribute('title')}\nOpen ${row.name} controls`);
+        card.setAttribute('title', `${card.getAttribute('title')}\nInspect ${row.name} (${row.active ? 'live' : 'saved snapshot'})`);
         // Live execution rebuilds this card on each dashboard refresh. A
         // normal click can be lost when replacement occurs between pointer
         // down and pointer up, so activate while the current card still exists.
@@ -1357,6 +1339,8 @@ function updateThreadContextModal() {
     }
     const owns = _threadExecutionOwner(row);
     const executing = Boolean(_simRunActive || sim.running || walkRunning || sim.walkActive);
+    const observation = owns ? 'LIVE — machine register context'
+        : 'SNAPSHOT — saved Thread object';
     const flags = row.indicatorFlags
         ? ['N', 'Z', 'C', 'V'].map(k => `${k}${row.indicatorFlags[k] ? 1 : 0}`).join(' ')
         : 'Unavailable';
@@ -1366,6 +1350,9 @@ function updateThreadContextModal() {
     document.getElementById('threadContextModalTitle').textContent = row.name;
     document.getElementById('threadContextState').textContent = _threadModalState(row);
     document.getElementById('threadContextSlot').textContent = `NS[${row.slot}]`;
+    document.getElementById('threadContextObservation').textContent = observation;
+    document.getElementById('threadContextObservation').className =
+        `thread-context-state ${owns ? 'thread-context-live' : 'thread-context-snapshot'}`;
     document.getElementById('threadContextFlags').textContent = flags;
     document.getElementById('threadContextSto').textContent =
         `${hex(row.sto)} · ${row.frameState}`;
@@ -1397,6 +1384,8 @@ function updateThreadContextModal() {
 
 function openThreadContextModal(slot, origin) {
     if (!sim || !sim.configuredThreadSlots().includes(slot)) return;
+    // Inspection selection is deliberately read-only.  It must not call
+    // selectConfiguredThread/CHANGE while Run or Walk owns the live bank.
     closeThreadContextModal(false);
     _threadContextModalSlot = slot;
     _threadContextModalOrigin = origin || document.activeElement;
@@ -1406,13 +1395,14 @@ function openThreadContextModal(slot, origin) {
     overlay.innerHTML = `
       <section class="thread-context-modal" role="dialog" aria-modal="true"
                aria-labelledby="threadContextModalTitle">
-        <header><div><span class="thread-context-kicker">Thread context</span>
+        <header><div><span class="thread-context-kicker">Thread inspection</span>
           <h2 id="threadContextModalTitle"></h2></div>
           <button type="button" class="thread-context-close" aria-label="Close Thread controls">\u00d7</button>
         </header>
         <div class="thread-context-summary">
           <span id="threadContextState" class="thread-context-state"></span>
           <code id="threadContextSlot"></code>
+          <span id="threadContextObservation" class="thread-context-state"></span>
         </div>
         <dl class="thread-context-details">
           <div><dt>Code location</dt><dd id="threadContextLocation"></dd></div>
@@ -1572,14 +1562,19 @@ function onRunBtnClick() {
     } else {
         _runClickTimer = setTimeout(() => {
             _runClickTimer = null;
-            runSimGo();
+            if (window.IDEActions) window.IDEActions.run();
+            else runSimGo();
         }, 280);
     }
 }
 
 function showRunPopover() {
     const pop = document.getElementById('runPopover');
-    if (!pop) { runSimGo(); return; }
+    if (!pop) {
+        if (window.IDEActions) window.IDEActions.run();
+        else runSimGo();
+        return;
+    }
     if (pop.style.display !== 'none') { hideRunPopover(); return; }
     const sel = document.getElementById('runBatchSelect');
     if (sel) sel.value = String(runBatchSize);
@@ -1854,6 +1849,8 @@ function _applyPendingSimLoad() {
         : (_aplMem ? (_aplMem.capabilities || []) : []);
     if (_aplPending) {
         sim.programName = _aplPending.abstraction;
+        sim.programLabels = _aplPending.labels ? Object.assign({}, _aplPending.labels) : {};
+        sim.programCapabilities = _aplCaps.slice();
         lastAssembledNamedSlots = _aplPending.namedSlots
             ? _aplPending.namedSlots.slice() : null;
         lastMethodTableSize = _aplPending.methodTableSize;
@@ -1983,6 +1980,11 @@ function _applyPendingSimLoad() {
         nsSequence: (typeof _progGtSeq !== 'undefined' ? _progGtSeq : null),
         runStatus: 'ready',
     });
+    if (window.IDEActionState) {
+        // The pending snapshot has now crossed the explicit, validated install
+        // boundary. Until this point it remained only a build candidate.
+        window.IDEActionState.recordInstalled(_aplPending);
+    }
     // The assembled words are the local compile-time baseline. Hashing the
     // exact words handed to loadProgram makes the editor path explicit rather
     // than leaving every successful editor run permanently "unverified".
@@ -3036,13 +3038,20 @@ window._r1TryDemoProgram = function() {
     // Give the view a tick to render before touching the editor.
     setTimeout(function() {
         loadExample('led_control');
-        // assembleAndLoad needs the editor value to be set — another tick.
+        // Build a candidate first, then make the same explicit install/run
+        // transition as every other Run entry point. Never call runSimGo
+        // straight after assembly: candidate construction has no pending load.
         setTimeout(function() {
-            if (typeof assembleAndLoad === 'function') assembleAndLoad();
-            // runSimGo needs the program to be loaded — another tick.
-            setTimeout(function() {
-                if (typeof runSimGo === 'function') runSimGo();
-            }, 120);
+            if (!window.IDEActions) {
+                appendOutput('Demo build unavailable: the shared IDE action command is not loaded.', 'error');
+                return;
+            }
+            Promise.resolve(window.IDEActions.compile()).then(function(result) {
+                if (!result || result.ok === false) return;
+                window.IDEActions.run();
+            }).catch(function(error) {
+                appendOutput('Demo build failed: ' + (error && error.message || error), 'error');
+            });
         }, 60);
     }, 60);
 };
@@ -5532,7 +5541,7 @@ function closeGitHubConsole() {
 
 // ── Turing DR Test source ─────────────────────────────────────────────────
 // Canonical source for the Turing DR Test ✦ section of the led_control example.
-// Used by loadExample() and runTuringSimGate() (pre-flash simulation gate).
+// Used by loadExample() for the Turing DR test example.
 const _TURING_DR_TEST_SOURCE = `; ============================================================
 ; Abstraction:  TuringDRTest
 ; Description:  Full ISA visual test across all DR0-DR15 registers
@@ -12555,8 +12564,11 @@ function showSaveToNamespace() {
         ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())?.sources?.memory
         : null;
     if (!_guardMem || !(_guardMem.words && _guardMem.words.length)) {
-        // Nothing compiled yet — trigger compile; buttons re-enable on success.
-        if (typeof smartCompile === 'function') smartCompile();
+        // Direct callers must not turn Save into an invisible compiler action.
+        // The shared Save command offers an explicit Build and Save choice.
+        const message = 'Save requires a current build candidate. Choose Save LUMP to Build and Save one frozen source snapshot.';
+        if (typeof appendOutput === 'function') appendOutput(message, 'warn');
+        if (window.IDEActions) window.IDEActions.refresh();
         return;
     }
     window._saveNSPreparedSnapshot = _captureLumpSaveSnapshot();
@@ -16193,6 +16205,19 @@ async function confirmSaveToNamespace() {
                     }
                 }
                 window._lastSavedNsToken = resp.token;
+                if (window.IDEActionState) {
+                    // Retain the exact frozen/approved bytes rather than
+                    // rereading the mutable editor after commit.
+                    window.IDEActionState.recordSaved({
+                        token: resp.token || _svTok,
+                        abstraction: _svAbsName,
+                        language: _svLang,
+                        source: _saveSnapshot && _saveSnapshot.sourceText || '',
+                        words: _svWords,
+                        capabilities: _caps,
+                        binary: _svPayload.binary,
+                    });
+                }
                 updateDashboard();
                 if (typeof renderLumps === 'function') renderLumps();
             } catch (err) {
@@ -16535,137 +16560,8 @@ async function downloadFPGAPackage() {
     }
 }
 
-// ── Turing DR Test pre-flash simulation gate ─────────────────────────────────
-// Assembles and runs the led_control (Section 2: Turing DR Test) in a fresh, headless
-// ChurchSimulator instance.  Returns { passed, steps, error? }.
-// A 'fail' breakpoint is set so the run terminates immediately on any assertion
-// failure rather than spinning in the infinite fail loop.  If the breakpoint is
-// never hit within MAX_GATE_STEPS the test is considered passing.
-// The fresh sim runs independently of the IDE's live simulator state.
-function runTuringSimGate() {
-    const MAX_GATE_STEPS     = 50000;
-
-    if (typeof ChurchSimulator === 'undefined') {
-        return { passed: false, error: 'ChurchSimulator not loaded' };
-    }
-    if (typeof ChurchAssembler === 'undefined') {
-        return { passed: false, error: 'ChurchAssembler not loaded' };
-    }
-
-    const testSim = new ChurchSimulator();
-    testSim.reset();
-
-    // Boot the fresh simulator
-    let bootIterations = 0;
-    while (!testSim.bootComplete && !testSim.halted && bootIterations < 200) {
-        testSim._bootStep();
-        bootIterations++;
-    }
-    if (!testSim.bootComplete) {
-        return { passed: false, error: 'Simulation gate: boot did not complete' };
-    }
-
-    // Assemble the Turing DR Test
-    const testAssembler = new ChurchAssembler({});
-    const asmResult = testAssembler.assemble(_TURING_DR_TEST_SOURCE);
-    if (asmResult.errors && asmResult.errors.length > 0) {
-        return { passed: false, error: 'Turing DR Test assembly failed: ' + asmResult.errors.join('; ') };
-    }
-
-    // Load the assembled program into the fresh simulator (resets pc, faultLog, etc.)
-    testSim.loadProgram(asmResult.words, 0);
-
-    // ── Expand limit17 and relocate the DEMO_CLIST ────────────────────────────
-    // After loadProgram, limit17=63 (Boot.Abstr lump is only 64 words) and the
-    // DEMO_CLIST would normally be installed at lumpBase+46..63 — directly over-
-    // writing program words at pc=45‥62, causing a NULL_CAP fault on the first
-    // BRANCHNE at pc=45 and a false "gate pass" (sim crashes before reaching fail).
-    //
-    // Fix: set limit17 = progWords (863) so CR14 can fetch all instructions, then
-    // place the c-list at lumpBase+progWords+1 (well past the last code word).
-    // Re-seal the NS entry so mLoad version/seal checks still pass.
-    {
-        const _nsBase     = testSim._nsSlotBase(testSim.bootEntrySlot);
-        const _lumpBase   = testSim.memory[_nsBase] >>> 0;
-        const _progWords  = asmResult.words.length;          // 863
-        const _newLimit17 = _progWords;                      // fetchAddr for pc=progWords-1 is lumpBase+progWords = lumpBase+limit17
-        const _oldW1f     = testSim.parseNSWord1(testSim.memory[_nsBase + 1]);
-        const _oldGtSeq   = (testSim.memory[_nsBase + 2] >>> 25) & 0x7F;
-
-        // Update NS entry word1: new limit17, cc stays 0 (c-list lives elsewhere)
-        const _newW1 = testSim.packNSWord1(
-            _newLimit17, _oldW1f.b, _oldW1f.g, _oldW1f.chainable, _oldW1f.gtType, 0
-        );
-        testSim.memory[_nsBase + 1] = _newW1;
-
-        // Reseal NS entry word2 so validateMAC passes with the new limit17
-        const _newW2 = testSim.makeVersionSeals(_oldGtSeq, _lumpBase, _newLimit17);
-        testSim.memory[_nsBase + 2] = _newW2;
-
-        // Mirror into CR14 (the code-region capability held live in the register file)
-        if (testSim.cr[14]) {
-            testSim.cr[14].word2 = _newW1;
-            testSim.cr[14].word3 = _newW2;
-        }
-
-        // Install DEMO_CLIST immediately after the last program word — no overlap
-        if (testSim.demoClistGTs && testSim.demoClistGTs.length > 0) {
-            const _cc        = testSim.demoClistGTs.length;   // 19 (slot 18 = ChurchHW, Task #1542)
-            const _clistBase = _lumpBase + _progWords + 1;    // lumpBase + 864
-
-            for (let i = 0; i < _cc; i++) {
-                testSim.memory[_clistBase + i] = testSim.demoClistGTs[i] >>> 0;
-            }
-
-            // CR6: E-GT for Boot.Abstr (gt_seq=0 matches NS entry), c-list at _clistBase
-            // word2 carries the clistCount (18) so _execLoad can bound-check slot offsets
-            const _cr6W1 = testSim.packNSWord1(
-                _newLimit17, _oldW1f.b, _oldW1f.g, _oldW1f.chainable, _oldW1f.gtType, _cc
-            );
-            const _cr6GT = testSim.createGT(0, testSim.bootEntrySlot, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
-            testSim.cr[6] = {
-                word0: _cr6GT,
-                word1: _clistBase >>> 0,
-                word2: _cr6W1    >>> 0,
-                word3: _newW2    >>> 0,
-                m: 0,
-            };
-        }
-    }
-
-    // Locate the 'fail' label word-offset in the assembled program
-    const failOffset = asmResult.labels && asmResult.labels['fail'];
-    if (failOffset === undefined || failOffset === null) {
-        return { passed: false, error: 'Simulation gate: no "fail" label found in Turing DR Test' };
-    }
-
-    // Compute the physical address of 'fail'.
-    // _nextPhysicalAddr() returns  entry.word0_location + 1 + pc
-    // where entry = readNSEntry(bootEntrySlot).
-    const nsEntry = testSim.readNSEntry(testSim.bootEntrySlot);
-    if (!nsEntry) {
-        return { passed: false, error: 'Simulation gate: Boot.Abstr NS entry not found' };
-    }
-    const failPhysAddr = (nsEntry.word0_location + 1 + failOffset) >>> 0;
-
-    // Run with a breakpoint at the 'fail' label
-    const breakpoints  = new Set([failPhysAddr]);
-    const runResult    = testSim.run(MAX_GATE_STEPS, breakpoints);
-
-    if (runResult.stopReason === 'breakpoint' && runResult.breakpointAddr === failPhysAddr) {
-        return { passed: false, steps: runResult.steps,
-                 error: 'Turing DR Test hit the FAIL path at step ' + runResult.steps };
-    }
-    if (testSim.faultLog && testSim.faultLog.length > 0) {
-        const faultTypes = testSim.faultLog.map(f => f.type).join(', ');
-        return { passed: false, steps: runResult.steps,
-                 error: 'Fault(s) during simulation gate: ' + faultTypes };
-    }
-    return { passed: true, steps: runResult.steps };
-}
-
 async function uploadToTang() {
-    if (!requirePermission('deploy', 'Deploy to Tang')) return;
+    if (!requirePermission('deploy', 'Deploy to Wukong')) return;
     switchView('editor');
     switchCodeTab('console');
     const con = document.getElementById('editorConsole');
@@ -16673,186 +16569,42 @@ async function uploadToTang() {
 
     const board = getSelectedBoard();
     const boardLabel = getBoardLabel(board);
-    const isTi60Board = board === 'ti60-f225';
 
     if (board === 'wukong-xc7a100t') {
-        con.textContent = 'Routing Wukong runtime upload through the selected live bridge/server target…\n';
+        const targetState = window.TargetState;
+        const runtimeMode = targetState && targetState.MODES
+            ? targetState.MODES.RUNTIME : 'wukong-runtime-ram';
+        const target = targetState && typeof targetState.resolve === 'function'
+            ? targetState.resolve() : null;
+        if (!targetState || typeof targetState.authorizeDestination !== 'function') {
+            con.textContent =
+                'Runtime Upload unavailable: the programming-target service is not loaded.\n' +
+                'Supported transport: live Wukong bridge/server Runtime Upload only.\n' +
+                'No hardware request was made. Reload the IDE before retrying.\n';
+            return;
+        }
+        if (!target || target.mode !== runtimeMode || target.ok === false) {
+            const targetMessage = !target || target.mode !== runtimeMode
+                ? 'select Wukong RAM — Runtime Upload first.'
+                : 'resolve the live Wukong prerequisite before uploading.';
+            con.textContent =
+                'Runtime Upload unavailable: ' + targetMessage + '\n' +
+                'Current target: ' + ((target && target.reason) || 'no runtime target selected') + '\n' +
+                'Supported transport: live Wukong bridge/server Runtime Upload only; direct WebSerial is not a deployment transport.\n' +
+                'No hardware request was made.\n';
+            return;
+        }
+        con.textContent =
+            'Routing Wukong Runtime Upload through the selected live bridge/server target…\n' +
+            'The bridge, UID/session, artifact, and upload-ACK integrity gates remain required.\n';
         await _wukongLoadToHardware();
         return;
     }
     con.textContent =
-        'Direct WebSerial deployment blocked: this UART protocol cannot verify the exact ' +
-        'device UID/session. Select a live Wukong and use Runtime Upload through its bridge/server path.\n';
-    return;
-
-    if (typeof TangSerial === 'undefined') {
-        con.textContent = 'Error: WebSerial module not loaded (webserial.js missing)';
-        return;
-    }
-
-
-    // ── Pre-flash simulation gate ─────────────────────────────────────────────
-    // Run the Turing DR Test in a headless simulator before touching hardware.
-    // Any assertion failure blocks the flash and surfaces a clear error.
-    con.textContent = 'Pre-flash check: running Turing DR Test in simulation…\n';
-    await new Promise(r => setTimeout(r, 0));   // let the UI render the status line
-    const _gateResult = runTuringSimGate();
-    if (!_gateResult.passed) {
-        con.textContent  = '✗ SIMULATION GATE FAILED — flash blocked.\n\n';
-        con.textContent += (_gateResult.error || 'Turing DR Test failed in simulation.') + '\n\n';
-        con.textContent += 'Fix the regression in the assembly before flashing to hardware.\n';
-        if (_gateResult.steps !== undefined) {
-            con.textContent += '(simulation ran ' + _gateResult.steps + ' steps)\n';
-        }
-        return;
-    }
-    con.textContent  = '✓ Simulation gate passed';
-    if (_gateResult.steps !== undefined) {
-        con.textContent += ' (' + _gateResult.steps + ' steps)';
-    }
-    con.textContent += '. Proceeding with flash…\n\n';
-
-    if (board === 'tang-nano-20k-iot' && typeof checkUploadProfile === 'function') {
-        const fullNames = [];
-        if (typeof BOOT_UPLOADS !== 'undefined') {
-            for (const u of BOOT_UPLOADS) {
-                const check = checkUploadProfile(u, board);
-                if (!check.allowed) fullNames.push(u.abstraction);
-            }
-        }
-        if (abstractionRegistry) {
-            const allAbs = abstractionRegistry.getAllAbstractions();
-            for (const abs of allAbs) {
-                const profile = _getAbstractionProfile(abs);
-                if (profile === 'Full') {
-                    if (!fullNames.includes(abs.name)) fullNames.push(abs.name);
-                }
-            }
-        }
-        if (fullNames.length > 0) {
-            con.textContent += `ERROR: ${fullNames.length} abstraction(s) tagged "Full" cannot run on the Tang Nano 20K (IoT profile): ${fullNames.join(', ')}\n\n`;
-            con.textContent += 'Full-only opcodes (LAMBDA, CHANGE, SWITCH, ELOADCALL, XLOADLAMBDA) are not available on the Tang Nano 20K.\n';
-            con.textContent += 'Switch to the Wukong Artix-7 or remove Full-only instructions from these abstractions.\n';
-            return;
-        }
-    }
-
-    TangSerial.setBoardLabel(boardLabel);
-
-    if (!TangSerial.isSupported()) {
-        con.textContent = `WebSerial is not supported in this browser.\nUse Chrome or Edge to deploy to ${boardLabel}.`;
-        return;
-    }
-
-    function isPermissionsPolicyError(e) {
-        const m = (e.message || '').toLowerCase();
-        return m.includes('permissions policy') || m.includes('disallowed') || e.name === 'SecurityError';
-    }
-
-    function directUrl() {
-        return window.location.origin + '/simulator/';
-    }
-
-    try {
-        const image = sim.exportHardwareImage();
-        con.textContent = `Ready: ${image.namespace.length} NS words + ${image.clist.length} C-list words\n\n`;
-
-        if (!TangSerial.isConnected()) {
-            con.textContent += 'Select the FPGA UART port when prompted...\n';
-            con.textContent += `(Choose the ${boardLabel} serial port)\n\n`;
-            try {
-                await TangSerial.connect();
-            } catch(e) {
-                if (e.name === 'NotFoundError') {
-                    con.textContent += 'No port selected. Cancelled.\n';
-                    return;
-                }
-                if (isPermissionsPolicyError(e)) {
-                    con.textContent = 'WebSerial blocked: the app is running inside an embedded preview frame\n';
-                    con.textContent += 'that does not allow hardware access.\n\n';
-                    con.textContent += 'SOLUTION: Open the app directly in a browser tab:\n\n';
-                    con.textContent += '  ' + directUrl() + '\n\n';
-                    con.textContent += `Then click "Deploy to FPGA" from that tab. Chrome or Edge required.\n`;
-                    return;
-                }
-                con.textContent += e.message + '\n\n';
-                con.textContent += `Check that the ${boardLabel} is connected via USB and no other app (e.g. another serial monitor) has the port open, then try again.\n`;
-                return;
-            }
-        }
-
-        con.textContent += 'Port connected. Sending data...\n';
-
-        const result = await TangSerial.uploadToFPGA(
-            image.namespace,
-            image.clist,
-            function(msg) {
-                con.textContent += msg + '\n';
-            }
-        );
-
-        if (result.success) {
-            con.textContent += '\nUpload complete. Decoding FPGA readback...\n';
-            const rb = TangSerial.parseReadback(result.rawBytes);
-            const hex = w => '0x' + w.toString(16).toUpperCase().padStart(8, '0');
-            const dec = w => w.toString(10).padStart(10, ' ');
-
-            con.textContent += '─'.repeat(56) + '\n';
-
-            if (rb.headerEcho !== null) {
-                const ok = rb.headerEcho === 256 ? ' ✓' : ' ✗ (expected 256)';
-                con.textContent += `  Header echo: ${rb.headerEcho} words${ok}\n`;
-            }
-
-            if (rb.words.length < 2) {
-                con.textContent += `  ${rb.vals.length} value bytes (${rb.words.length} complete words) — too short for register decode.\n`;
-                con.textContent += `  Raw values: ${rb.vals.slice(0, 64).map(b => b.toString(16).padStart(2,'0')).join(' ')}\n`;
-            } else {
-                if (rb.crs.length > 0) {
-                    con.textContent += '\n  Context Registers:\n';
-                    for (let i = 0; i < rb.crs.length; i++) {
-                        const priv = i >= 12 ? ' [priv]' : '';
-                        const label = ('CR' + i).padEnd(4);
-                        con.textContent += `    ${label}  ${hex(rb.crs[i])}  ${dec(rb.crs[i])}${priv}\n`;
-                    }
-                }
-                if (rb.drs.length > 0) {
-                    con.textContent += '\n  Data Registers:\n';
-                    for (let i = 0; i < rb.drs.length; i++) {
-                        const label = ('DR' + i).padEnd(4);
-                        con.textContent += `    ${label}  ${hex(rb.drs[i])}  ${dec(rb.drs[i])}\n`;
-                    }
-                }
-                if (rb.extra.length > 0) {
-                    con.textContent += `\n  Additional words: ${rb.extra.length}`;
-                    con.textContent += ` (${rb.vals.length} value bytes total, ${rb.leftover} leftover)\n`;
-                }
-            }
-
-            con.textContent += '─'.repeat(56) + '\n';
-
-            sim.ledBits = 0b111111;
-            sim.ledMode = 'boot';
-            sim.bootComplete = true;
-            updateLedStrip();
-
-        } else {
-            con.textContent += '\nNo response from FPGA after sending data.\n\n';
-            con.textContent += 'TIPS:\n';
-            con.textContent += `  1. Press the RESET button on the ${boardLabel}\n`;
-            con.textContent += '  2. Click "Deploy to FPGA" within 1-2 seconds of releasing reset\n';
-            con.textContent += '  3. Make sure no other app has the serial port open\n';
-        }
-
-        try {
-            await TangSerial.disconnect();
-            con.textContent += 'Port closed.\n';
-        } catch(e) {}
-
-    } catch(e) {
-        con.textContent += 'Error: ' + e.message + '\n';
-        try { await TangSerial.disconnect(); } catch(_) {}
-    }
+        'Deploy unavailable for ' + boardLabel + '.\n' +
+        'Supported transport: live Wukong bridge/server Runtime Upload only.\n' +
+        'Direct WebSerial and non-Wukong board uploads are not supported.\n' +
+        'No hardware request was made.\n';
 }
 
 async function testUART() {

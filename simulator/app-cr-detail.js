@@ -583,7 +583,8 @@ function _showAsmErrors(errors, titleOverride, action) {
                             lines[idx] = lines[idx].slice(0, colStart) + methodName + lines[idx].slice(colEnd);
                             editor.value = lines.join('\n');
                             if (typeof _clearAsmErrors === 'function') _clearAsmErrors();
-                            if (typeof assembleAndLoad === 'function') assembleAndLoad();
+                            if (window.IDEActions) window.IDEActions.compile();
+                            else if (typeof assembleAndLoad === 'function') assembleAndLoad();
                         }
                     }
                 });
@@ -923,7 +924,32 @@ function _updateEditorPatchBar() {
     if (_editorCREditActive && _editorCREditCR !== null) {
         bar.style.display = 'flex';
         var label = document.getElementById('editorPatchLabel');
-        if (label) label.textContent = 'Editing CR' + _editorCREditCR + ' \u00B7 NS[' + _editorCREditNS + ']';
+        var target = (typeof _editorCREditBinding !== 'undefined')
+            ? _editorCREditBinding : null;
+        var inspection = target && typeof _displayedCRContextText === 'function'
+            ? _displayedCRContextText(target)
+            : ('CR' + _editorCREditCR + ' · NS[' + _editorCREditNS + ']');
+        var check = target && typeof validateDisplayedCRMutationBinding === 'function'
+            ? validateDisplayedCRMutationBinding(target, false) : { ok: true };
+        if (label) {
+            label.textContent = 'Editing CR' + _editorCREditCR + ' · ' + inspection +
+                (check.ok ? '' : ' · refresh required');
+            label.title = check.ok
+                ? 'Patch target is bound to this displayed Thread, CR, Namespace slot, and generation.'
+                : check.reason;
+        }
+        var refresh = document.getElementById('editorPatchRefresh');
+        if (!refresh) {
+            refresh = document.createElement('button');
+            refresh.type = 'button';
+            refresh.id = 'editorPatchRefresh';
+            refresh.className = 'btn editor-patch-btn';
+            refresh.textContent = '↻ Refresh target';
+            refresh.title = 'Re-read this displayed Thread CR Namespace generation before patching';
+            refresh.addEventListener('click', refreshCREditTarget);
+            bar.insertBefore(refresh, label ? label.nextSibling : bar.firstChild);
+        }
+        refresh.hidden = check.ok;
     } else {
         bar.style.display = 'none';
     }
@@ -933,6 +959,7 @@ function clearEditorCREdit() {
     _editorCREditActive = false;
     _editorCREditCR = null;
     _editorCREditNS = null;
+    _editorCREditBinding = null;
     _clearAsmErrors();
     _clearAsmWarnings();
     _updateEditorPatchBar();
@@ -947,14 +974,63 @@ function clearEditorCREdit() {
     if (sel) showIntro(sel.value);
 }
 
+function refreshCREditTarget() {
+    var log = function(message) {
+        if (typeof appendOutput === 'function') appendOutput(message, 'info');
+    };
+    if (!_editorCREditBinding || typeof refreshDisplayedCRMutationBinding !== 'function') {
+        log('Refresh rejected: no displayed CR target is available. Reopen the CR detail.');
+        return false;
+    }
+    var refreshed = refreshDisplayedCRMutationBinding(_editorCREditBinding);
+    if (!refreshed.ok) {
+        log(refreshed.reason);
+        _updateEditorPatchBar();
+        return false;
+    }
+    _editorCREditBinding = refreshed.binding;
+    log('Patch target refreshed: ' +
+        (typeof _displayedCRContextText === 'function'
+            ? _displayedCRContextText(_editorCREditBinding) : ('CR' + _editorCREditCR)));
+    _updateEditorPatchBar();
+    return true;
+}
+
 function injectCRCode(logEl) {
     const log = msg => { if (logEl) { logEl.textContent += msg + '\n'; logEl.scrollTop = logEl.scrollHeight; } };
 
-    if (selectedCR === null) { log('Error: No CR selected.'); return null; }
-    const crIdx = selectedCR;
-    const cr = sim.getFormattedCR(crIdx);
+    // The direct "Patch Memory" menu action may be used before "Edit Source".
+    // Capture its currently displayed CR once; later editor patches retain that
+    // binding rather than falling through to a changed selectedCR.
+    let binding = typeof _editorCREditBinding !== 'undefined'
+        ? _editorCREditBinding : null;
+    if (!binding && typeof getDisplayedCRMutationBinding === 'function') {
+        binding = getDisplayedCRMutationBinding();
+        _editorCREditBinding = binding;
+    }
+    const bindingCheck = typeof validateDisplayedCRMutationBinding === 'function'
+        ? validateDisplayedCRMutationBinding(binding, true)
+        : { ok: false, reason: 'Patch rejected: the displayed CR target cannot be validated.' };
+    // _simRunActive covers the interval between Run batches where sim.running
+    // is deliberately false. Never turn it off here: only the Run control may
+    // pause its lifecycle.
+    if (typeof _simRunActive !== 'undefined' && _simRunActive) {
+        log('Patch rejected: pause execution before changing simulator context.');
+        return null;
+    }
+    if (typeof walkRunning !== 'undefined' && walkRunning) {
+        log('Patch rejected: stop Walk before changing simulator context.');
+        return null;
+    }
+    if (typeof bootAnimating !== 'undefined' && bootAnimating) {
+        log('Patch rejected: wait for Boot to finish before changing simulator context.');
+        return null;
+    }
+    if (!bindingCheck.ok) { log(bindingCheck.reason); return null; }
+    const crIdx = bindingCheck.binding.crIdx;
+    const cr = bindingCheck.cr;
     const baseLoc = cr.word1_location >>> 0;
-    const nsIdx = cr.gtIndex;
+    const nsIdx = bindingCheck.binding.nsIdx;
 
     const src = (document.getElementById('asmEditor') || {}).value || '';
     if (!src.trim()) { log('Editor is empty — type or paste your code first, then click Patch.'); return null; }
@@ -1082,7 +1158,10 @@ function injectCRCode(logEl) {
         sim.callStack = []; sim.flags = { N: false, Z: false, C: false, V: false };
         sim.lambdaActive = false; sim.lambdaReturnPC = 0; sim.lambdaCachedFrame = null;
         updateCRDisplay(); updateDRDisplay(); updateFlagsDisplay(); updateInfoDisplay();
-        return { newWords, baseLoc: newLumpBase, codeStart: newLumpBase + 1, newCW, oldCW: lumpHdr.cw, nsIdx };
+        return {
+            newWords, baseLoc: newLumpBase, codeStart: newLumpBase + 1,
+            newCW, oldCW: lumpHdr.cw, nsIdx, crIdx, binding: bindingCheck.binding,
+        };
     }
 
     log(`CR${crIdx}  NS[${nsIdx}]  base=0x${baseLoc.toString(16).toUpperCase().padStart(4,'0')}  old cw=${oldCW}  new cw=${newCW}  (max ${maxCW})`);
@@ -1154,7 +1233,7 @@ function injectCRCode(logEl) {
     updateDRDisplay();
     updateFlagsDisplay();
     updateInfoDisplay();
-    return { newWords, baseLoc, codeStart, newCW, oldCW, nsIdx };
+    return { newWords, baseLoc, codeStart, newCW, oldCW, nsIdx, crIdx, binding: bindingCheck.binding };
 }
 
 async function injectCRCodeToFPGA(logEl) {
@@ -1270,8 +1349,6 @@ function _updateFaultFreeCounter() {
 
 function patchSimulator() {
     if (!window.TargetState.authorize('simulator', { id: 'simulator-patch' }).ok) return false;
-    _runStopped = true;
-    sim.running = false;
 
     const ed = document.getElementById('asmEditor');
     const srcHash = ed ? _quickHash(ed.value) : '';
@@ -1315,7 +1392,10 @@ function patchSimulator() {
             words: result.newWords,
             newCW: result.newCW,
             nsIdx: result.nsIdx,
-            crIdx: selectedCR,
+            crIdx: result.crIdx,
+            threadSlot: result.binding.threadSlot,
+            namespaceGeneration: result.binding.namespaceGeneration,
+            binding: { ...result.binding },
             src,
         };
         _asmSrcSave(result.nsIdx, src);
@@ -1355,7 +1435,42 @@ window._reapplyStickyPatches = function() {
     for (const [nsIdxStr, patch] of entries) {
         const nsIdx2 = parseInt(nsIdxStr);
         const nse = sim.readNSEntry(nsIdx2);
-        if (!nse) continue;
+        const rejectReplay = function(reason) {
+            console.warn('[sticky] Rejected patch for NS[' + nsIdx2 + ']: ' + reason);
+            delete _stickyPatches[nsIdx2];
+            _clearPersistedStickyPatch(nsIdx2);
+            if (typeof appendOutput === 'function') {
+                appendOutput('Sticky patch rejected for NS[' + nsIdx2 + ']: ' + reason +
+                    ' Reopen the CR detail, refresh target, and patch again.', 'error');
+            }
+        };
+        if (!nse) {
+            rejectReplay('its Namespace entry is no longer available.');
+            continue;
+        }
+        const liveGeneration = sim.parseNSWord1(nse.word1_limit).gtSeq;
+        // Replaying a sticky patch is itself a context mutation.  Validate the
+        // entire originally displayed target, not just the reused Namespace
+        // slot: a new live Thread or CR mapping is a different target even if
+        // the Namespace generation happens to be unchanged.
+        const binding = patch && patch.binding;
+        const bindingComplete = binding &&
+            binding.crIdx === patch.crIdx &&
+            binding.threadSlot === patch.threadSlot &&
+            binding.namespaceGeneration === patch.namespaceGeneration &&
+            binding.nsIdx === nsIdx2 &&
+            binding.mode === 'live';
+        if (!bindingComplete || !Number.isInteger(patch.namespaceGeneration) ||
+                patch.namespaceGeneration !== liveGeneration ||
+                typeof validateDisplayedCRMutationBinding !== 'function') {
+            rejectReplay('the saved Thread/CR/Namespace binding is stale or incomplete.');
+            continue;
+        }
+        const replayCheck = validateDisplayedCRMutationBinding(binding, true);
+        if (!replayCheck.ok) {
+            rejectReplay(replayCheck.reason);
+            continue;
+        }
         const baseLoc2 = nse.word0_location >>> 0;
         if (baseLoc2 === 0 || baseLoc2 >= sim.memory.length) continue;
 

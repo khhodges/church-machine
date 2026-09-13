@@ -1499,6 +1499,8 @@ async function _populateLumpSourceTab(lump, targetId) {
             html += `<button class="lump-source-menu-item lump-source-menu-item-build" onclick="document.querySelectorAll('.lump-source-menu.open').forEach(m=>m.classList.remove('open'));_lumpSourceBuildLump()" title="Build LUMP \u2014 Compile and download .lump binary">Build LUMP &#8595;</button>`;
             html += `</div></div>`;
             html += `<button class="lump-source-btn" onclick="_lumpSourceCompile()" title="Compile \u2014 Compile source and update Binary tab">&#9654; Compile</button>`;
+            html += `<button class="lump-source-btn" onclick="_lumpSourceRunCandidate()" title="Run the exact candidate built from this source">Run candidate</button>`;
+            html += `<button class="lump-source-btn" onclick="_lumpSourceSaveCandidate()" title="Explicitly move this frozen candidate to Programs before saving">Use in Programs</button>`;
             html += `<button class="lump-source-btn lump-source-preview-toggle${_previewOpen ? ' active' : ''}" id="lumpSourcePreviewBtn" title="Toggle syntax-highlighted preview panel">Preview</button>`;
             html += '</div>';
             html += `<div class="lump-fork-banner" id="lumpForkBanner" style="display:none"></div>`;
@@ -1870,7 +1872,7 @@ function _toggleLumpMenu(btn) {
     }
 }
 
-function _lumpSourceCompile() {
+async function _lumpSourceCompile() {
     const status = document.getElementById('lumpSourceStatus');
     if (status) { status.textContent = 'Compiling\u2026'; status.className = 'lump-source-status'; }
     try {
@@ -1878,20 +1880,33 @@ function _lumpSourceCompile() {
         if (!editor) return;
         const src = editor.value;
 
-        if (typeof cloomcCompiler === 'undefined' || !cloomcCompiler) {
+        if (!window.IDEActions) {
             if (status) { status.textContent = 'Compiler not available.'; status.className = 'lump-source-status err'; }
             return;
         }
-
-        const result = cloomcCompiler.compile(src, []);
-
-        if (result.errors && result.errors.length > 0) {
-            const errText = result.errors.map(err => `Line ${err.line || '?'}: ${err.message}`).join('\n');
-            if (status) { status.textContent = `Compile failed \u2014 ${result.errors.length} error(s).`; status.className = 'lump-source-status err'; }
+        // Use the same frozen-candidate command as the editor menu.  This
+        // preview must not create a second compiler policy or install RAM.
+        const outcome = await window.IDEActions.compile({
+            source: src, sourceSurface: 'lumpSourceEditor',
+        });
+        if (!outcome || outcome.ok === false) {
+            const errText = outcome && outcome.error ? outcome.error : 'Compile failed.';
+            if (status) { status.textContent = 'Compile failed — see errors.'; status.className = 'lump-source-status err'; }
             _lumpSourceShowCompiledBinary(null, errText);
             switchLumpWsTab('binary');
             return;
         }
+        const built = window.IDEActionState && window.IDEActionState.get().candidate;
+        if (!built || built.sourceSurface !== 'lumpSourceEditor' || built.source !== src) {
+            throw new Error('Compile did not publish a candidate for this source surface.');
+        }
+        // Do not reuse _lastCLOOMCResult: it may describe an older successful
+        // high-level build after a raw workspace compile.
+        const result = {
+            abstractionName: built.abstraction,
+            language: built.language,
+            methods: [{ name: 'candidate', code: built.words.slice() }],
+        };
 
         if (status) { status.textContent = 'Compiled \u2014 Binary tab updated.'; status.className = 'lump-source-status ok'; }
         const _forkBanner = document.getElementById('lumpForkBanner');
@@ -1969,26 +1984,54 @@ function _lumpSourceDraft() {
     }
 }
 
-function _lumpSourceBuildLump() {
+async function _lumpSourceBuildLump() {
     const editor = document.getElementById('lumpSourceEditor');
     const status = document.getElementById('lumpSourceStatus');
     if (!editor) return;
     const src = editor.value;
-    if (!confirm('Build a new LUMP artifact from this edited source?\n\n' +
-        'The resulting binary is a new immutable artifact and must be explicitly approved by its exact hash before deployment.')) return;
     if (status) { status.textContent = 'Building\u2026'; status.className = 'lump-source-status'; }
     try {
-        const asmEd = document.getElementById('asmEditor');
-        if (asmEd && typeof compileAndBuild === 'function') {
-            const prev = asmEd.value;
-            asmEd.value = src;
-            compileAndBuild();
-            asmEd.value = prev;
-        }
-        if (status) { status.textContent = 'Build triggered. Check Programs view.'; status.className = 'lump-source-status ok'; }
+        if (!window.IDEActions) throw new Error('The shared build command is unavailable.');
+        const outcome = await window.IDEActions.export({
+            source: src, sourceSurface: 'lumpSourceEditor',
+        });
+        if (!outcome || outcome.ok === false) throw new Error(outcome && outcome.error || 'Build failed.');
+        if (status) { status.textContent = 'Canonical candidate exported.'; status.className = 'lump-source-status ok'; }
     } catch (err) {
         if (status) { status.textContent = `Build error: ${err.message}`; status.className = 'lump-source-status err'; }
     }
+}
+
+async function _lumpSourceRunCandidate() {
+    const status = document.getElementById('lumpSourceStatus');
+    if (!window.IDEActions) return;
+    const outcome = window.IDEActions.run({ sourceSurface: 'lumpSourceEditor' });
+    if (!outcome || outcome.ok === false) {
+        if (status) { status.textContent = (outcome && outcome.error) || 'Run failed.'; status.className = 'lump-source-status err'; }
+    }
+}
+
+function _lumpSourceSaveCandidate() {
+    const status = document.getElementById('lumpSourceStatus');
+    const state = window.IDEActionState && window.IDEActionState.get();
+    const built = state && state.candidate;
+    const sourceEditor = document.getElementById('lumpSourceEditor');
+    if (!built || built.sourceSurface !== 'lumpSourceEditor' ||
+            !sourceEditor || sourceEditor.value !== built.source) {
+        if (status) { status.textContent = 'Compile this source before moving it to Programs.'; status.className = 'lump-source-status err'; }
+        return;
+    }
+    if (!confirm('Use this frozen candidate in Programs?\n\nThis replaces the Programs editor text but does not compile, install, or save it.')) return;
+    const programEditor = document.getElementById('asmEditor');
+    if (!programEditor) return;
+    programEditor.value = built.source;
+    // Preserve the exact artifact while making its ownership explicit. The
+    // registry/candidate words are not rebuilt or substituted.
+    window.IDEActionState.recordCandidate(Object.assign({}, built, {
+        sourceSurface: 'asmEditor',
+        languageIdentity: (document.getElementById('langSelector') || {}).value || built.languageIdentity,
+    }));
+    if (status) { status.textContent = 'Candidate moved to Programs. Use Save LUMP there.'; status.className = 'lump-source-status ok'; }
 }
 
 function _lumpContentTypeLabel(lump) {
@@ -6917,9 +6960,12 @@ window._saveLumpDirectVersion = _saveLumpDirectVersion;
 // Always builds a brand-new LUMP from the compiler output following the v1.3
 // spec.  Prior server binaries with the same name are never reused.
 //   • Compiled words in LumpRegistry → showFormatLump() (build + audit + save).
-//   • No compiled words → trigger smartCompile() and continue into the first
-//     Format Lump state once the fresh compiler/source pair is registered.
+//   • No compiled words → report the missing explicit Build prerequisite.
 window.editorSaveLump = function() {
+    // Task 3446: this public compatibility entry point now shares the command
+    // used by the menu/shortcuts. It never compiles recursively or opens two
+    // save dialogs for one click.
+    if (window.IDEActions) return window.IDEActions.save();
     // Existing compiler memory goes straight to showFormatLump(); a missing
     // memory source compiles first and reaches the same formatter below.
     // Record the click before branching on registry state.  A compile-request
@@ -6989,21 +7035,11 @@ window.editorSaveLump = function() {
             error: 'The Format Lump dialog is unavailable.',
         });
     } else {
-        // Nothing compiled yet — compile this exact editor buffer without
-        // entering compileAndBuild's independent save-plan/commit path, then
-        // continue into Format Lump from the freshly registered pair.
-        if (typeof smartCompile !== 'function') {
-            return _reportCompileSaveFailure({
-                error: 'The compiler entry point is unavailable.',
-            });
-        }
-        try {
-            return Promise.resolve(smartCompile({ skipSavePlan: true }))
-                .then(_continueAfterSaveCompile)
-                .catch(_reportCompileSaveFailure);
-        } catch (_compileError) {
-            return _reportCompileSaveFailure(_compileError);
-        }
+        // Compatibility callers without IDEActions must choose Compile first;
+        // Save never hides a recursive compiler invocation.
+        return _reportCompileSaveFailure({
+            error: 'No current build candidate. Compile explicitly before saving.',
+        });
     }
 };
 
@@ -7276,7 +7312,7 @@ window.showFormatLump = async function() {
     var _hasCompiledWords = !!(_regMem && _regMem.memory && _regMem.memory.words
                                && _regMem.memory.words.length > 0);
     if (!_hasCompiledWords) {
-        if (typeof smartCompile === 'function') smartCompile();
+        alert('A current build candidate is required before formatting. Use Save LUMP to explicitly Build and Save the current source.');
         return;
     }
 
@@ -7307,7 +7343,6 @@ window.showFormatLump = async function() {
     if (_regMem.memory && typeof _regMem.memory.sourceText === 'string' &&
             _regMem.memory.sourceText !== _srcText) {
         alert('Cannot format this LUMP: the editor changed after compilation. Compile the current source before saving.');
-        if (typeof smartCompile === 'function') smartCompile();
         return;
     }
     var _apiObj = _formatLumpApiDefinition(_absName, _caps);
@@ -8849,6 +8884,18 @@ async function runSelftestLump() {
             window.ExecutionIdentity.verifyWords(
                 words, selfTestDetail && selfTestDetail.binary_hash, SELFTEST_TOKEN
             );
+        }
+        if (window.IDEActionState) {
+            window.IDEActionState.recordInstalled({
+                token: SELFTEST_TOKEN,
+                abstraction: SELFTEST_NAME,
+                language: 'lump',
+                source: selfTestDetail && typeof selfTestDetail.source === 'string'
+                    ? selfTestDetail.source : '',
+                words: words.slice(),
+                capabilities: [],
+                methodTableSize: 0,
+            });
         }
 
         if (btn) btn.textContent = 'Running\u2026';

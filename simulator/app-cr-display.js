@@ -56,7 +56,15 @@ function updateCRDisplay() {
         15: { group: 'privil', role: 'privil', badge: 'Priv'   },
     };
     const TOTAL_COLS = 15;
-    let html = '<table class="cr-table"><thead>';
+    const inspection = _displayedCRContext && _displayedCRContext.crIdx === selectedCR
+        ? _displayedCRContext : null;
+    let html = inspection
+        ? `<div class="cr-inspection-target" role="status" aria-live="polite" ` +
+            `style="margin:0 0 8px;padding:7px 9px;border-left:3px solid ${inspection.mode === 'live' ? '#4ade80' : '#f4b942'};background:rgba(15,23,42,.5);font-size:.78rem;">` +
+            `<strong>CR target:</strong> ${_escapeCRDisplayName(_displayedCRContextText(inspection))}` +
+            `</div>`
+        : '';
+    html += '<table class="cr-table"><thead>';
     html += '<tr class="cr-table-groups">';
     html += '<th rowspan="2" class="cr-group-cr-id">CR#</th>';
     html += '<th colspan="5" class="cr-group-head cr-group-gt">GT FIELDS (R0)</th>';
@@ -149,6 +157,119 @@ function updateCRDisplay() {
 
 let selectedCR = null;
 
+// A CR detail is an observation of one concrete simulator context, not an
+// implicit reference to whichever Thread happens to own the live bank later.
+// Keep that identity separately from selectedCR: selectedCR controls the
+// dashboard tab, while this record is the optimistic-concurrency binding used
+// by a subsequent patch request.
+let _displayedCRContext = null;
+var _editorCREditBinding = null;
+
+function _namespaceGenerationForCRDisplay(nsIdx) {
+    if (!sim || !Number.isInteger(nsIdx) || typeof sim.readNSEntry !== 'function' ||
+            typeof sim.parseNSWord1 !== 'function') return null;
+    const entry = sim.readNSEntry(nsIdx);
+    if (!entry) return null;
+    return sim.parseNSWord1(entry.word1_limit).gtSeq;
+}
+
+function _liveThreadRowForCRDisplay() {
+    if (!sim || !sim._liveThreadOwned || typeof sim.threadStatusRows !== 'function') return null;
+    return sim.threadStatusRows(10).find(row => row.active) || null;
+}
+
+function _captureDisplayedCRContext(crIdx) {
+    if (!sim || !Number.isInteger(crIdx) || typeof sim.getFormattedCR !== 'function') return null;
+    const cr = sim.getFormattedCR(crIdx);
+    const liveThread = _liveThreadRowForCRDisplay();
+    const nsIdx = Number.isInteger(cr && cr.gtIndex) ? cr.gtIndex : null;
+    return {
+        crIdx,
+        nsIdx,
+        namespaceGeneration: nsIdx === null ? null : _namespaceGenerationForCRDisplay(nsIdx),
+        threadSlot: liveThread ? liveThread.slot : null,
+        threadName: liveThread ? liveThread.name : 'No live Thread',
+        mode: liveThread ? 'live' : 'snapshot',
+    };
+}
+
+function _copyCRContext(context) {
+    return context ? {
+        crIdx: context.crIdx,
+        nsIdx: context.nsIdx,
+        namespaceGeneration: context.namespaceGeneration,
+        threadSlot: context.threadSlot,
+        threadName: context.threadName,
+        mode: context.mode,
+    } : null;
+}
+
+// Public only to the sibling CR-detail module.  It deliberately returns a
+// copy so callers cannot alter the displayed target after it was captured.
+function getDisplayedCRMutationBinding() {
+    if (!_displayedCRContext || _displayedCRContext.crIdx !== selectedCR) {
+        _displayedCRContext = _captureDisplayedCRContext(selectedCR);
+    }
+    return _copyCRContext(_displayedCRContext);
+}
+
+function validateDisplayedCRMutationBinding(binding, requirePaused = true) {
+    if (!binding || !Number.isInteger(binding.crIdx)) {
+        return { ok: false, reason: 'No displayed CR target is bound to this patch. Reopen the CR detail and refresh the target.' };
+    }
+    if (!sim || typeof sim.getFormattedCR !== 'function') {
+        return { ok: false, reason: 'Simulator context is unavailable. Refresh the target after the simulator is ready.' };
+    }
+    if (requirePaused && (sim.running || sim.walkActive)) {
+        return { ok: false, reason: 'Patch rejected: pause execution before changing simulator context.' };
+    }
+    const liveThread = _liveThreadRowForCRDisplay();
+    if (binding.mode !== 'live' || !liveThread || binding.threadSlot !== liveThread.slot) {
+        return { ok: false, reason: 'Patch rejected: the displayed Thread is now a snapshot, not the live context. Select its live context while paused, then refresh.' };
+    }
+    const cr = sim.getFormattedCR(binding.crIdx);
+    const currentNsIdx = Number.isInteger(cr && cr.gtIndex) ? cr.gtIndex : null;
+    if (currentNsIdx !== binding.nsIdx) {
+        return { ok: false, reason: 'Patch rejected: this CR now resolves to a different Namespace slot. Reopen the CR detail and refresh the target.' };
+    }
+    const currentGeneration = currentNsIdx === null
+        ? null : _namespaceGenerationForCRDisplay(currentNsIdx);
+    if (currentGeneration !== binding.namespaceGeneration) {
+        return { ok: false, reason: 'Patch rejected: the displayed Namespace generation is stale. Refresh target before patching.' };
+    }
+    return { ok: true, binding: _copyCRContext(binding), cr, namespaceGeneration: currentGeneration };
+}
+
+function refreshDisplayedCRMutationBinding(binding) {
+    // Refresh is explicit and retains the originally displayed CR and Thread.
+    // It never follows selectedCR, which may have changed while the editor was
+    // open, and it never performs a CHANGE.
+    const checked = validateDisplayedCRMutationBinding(binding, false);
+    if (!checked.ok && !/Namespace generation is stale/.test(checked.reason)) return checked;
+    if (!sim || !binding || !Number.isInteger(binding.nsIdx)) {
+        return { ok: false, reason: 'Refresh rejected: the displayed Namespace target is unavailable.' };
+    }
+    const generation = _namespaceGenerationForCRDisplay(binding.nsIdx);
+    if (!Number.isInteger(generation)) {
+        return { ok: false, reason: 'Refresh rejected: the displayed Namespace entry no longer exists.' };
+    }
+    const refreshed = _copyCRContext(binding);
+    refreshed.namespaceGeneration = generation;
+    _displayedCRContext = _copyCRContext(refreshed);
+    return { ok: true, binding: refreshed };
+}
+
+function _displayedCRContextText(context) {
+    if (!context) return 'No CR target selected';
+    const target = context.threadSlot === null
+        ? context.threadName
+        : `${context.threadName} · NS Thread[${context.threadSlot}]`;
+    const ns = context.nsIdx === null
+        ? 'no Namespace target'
+        : `NS[${context.nsIdx}] generation ${context.namespaceGeneration}`;
+    return `${target} · ${context.mode === 'live' ? 'live' : 'snapshot'} · ${ns}`;
+}
+
 // ── CR cycle button ───────────────────────────────────────────────────────────
 // Cycles through four dashboard views:
 //   0 → CR0-CR15  (register table)
@@ -194,6 +315,7 @@ function _applyCRCycleState() {
 
 function openCRDetail(crIdx) {
     selectedCR = crIdx;
+    _displayedCRContext = _captureDisplayedCRContext(crIdx);
     crDetailTab = 'code';
     const detailTab = document.getElementById('dashTab-crdetail');
     const cr = sim.getFormattedCR(crIdx);
@@ -242,7 +364,10 @@ function openCRDetail(crIdx) {
 
     if (detailTab) {
         const name = _crDisplayName(crIdx, cr);
-        detailTab.textContent = `CR${crIdx}${name ? ' \u2014 ' + name : ''}`;
+        const target = _displayedCRContext
+            ? ` · ${_displayedCRContext.threadName} (${_displayedCRContext.mode})`
+            : '';
+        detailTab.textContent = `CR${crIdx}${name ? ' \u2014 ' + name : ''}${target}`;
         detailTab.style.display = '';
     }
     switchDashTab('crdetail');
@@ -1317,7 +1442,13 @@ var _editorCREditActive = false;
 
 function editCRCodeInEditor() {
     if (selectedCR === null) return;
-    const crIdx = selectedCR;
+    const binding = getDisplayedCRMutationBinding();
+    const bindingCheck = validateDisplayedCRMutationBinding(binding, false);
+    if (!bindingCheck.ok) {
+        if (typeof appendOutput === 'function') appendOutput(bindingCheck.reason, 'error');
+        return;
+    }
+    const crIdx = binding.crIdx;
     const cr = sim.getFormattedCR(crIdx);
     const baseLoc = cr.word1_location >>> 0;
     const nsIdx = cr.gtIndex;
@@ -1372,6 +1503,7 @@ function editCRCodeInEditor() {
     _editorCREditActive = true;
     _editorCREditCR = crIdx;
     _editorCREditNS = nsIdx;
+    _editorCREditBinding = binding;
     switchView('editor');
     const sel = document.getElementById('langSelector');
     if (sel) sel.value = 'assembly';

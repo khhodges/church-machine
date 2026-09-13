@@ -657,15 +657,10 @@ function onLangChange(restoring) {
         return;
     }
 
-    const btnSaveNS = document.getElementById('btnSaveNS');
-    const _hasMemLump = !!(window.LumpRegistry?.resolve(window.LumpRegistry?.getCurrent())?.sources?.memory);
-    if (btnSaveNS) btnSaveNS.disabled = (lang !== 'assembly' || !_hasMemLump);
-    // btnToolbarSaveLump is intentionally NOT enabled here — it requires a fresh
-    // compile (lastAssembledWords non-empty) to avoid the "assemble first" guard
-    // in showSaveToNamespace().  It is enabled only by the explicit compile-success
-    // paths in app-run.js.
-    const btnExportLump = document.getElementById('btnExportLump');
-    if (btnExportLump) btnExportLump.disabled = (lang !== 'assembly' || !_hasMemLump);
+    // Build/install eligibility does not depend on a language-switch side
+    // effect.  The shared action model owns the same rule for menu, toolbar,
+    // and shortcuts (and keeps a valid candidate available across switches).
+    if (window.IDEActions) window.IDEActions.refresh();
 
     // Built-ins are opened from the unified Open File catalog.  Do not
     // manipulate the retired horizontal tab row here.
@@ -733,8 +728,6 @@ function smartCompile(options) {
         });
     }
 
-    _runStopped = true;
-
     const sel = document.getElementById('langSelector');
     let lang = sel ? sel.value : 'assembly';
 
@@ -745,7 +738,8 @@ function smartCompile(options) {
     }
 
     if (lang === 'assembly') {
-        const src = (document.getElementById('asmEditor') || {}).value || '';
+        const src = _smartOptions.source !== undefined
+            ? String(_smartOptions.source) : ((document.getElementById('asmEditor') || {}).value || '');
         if (/^\s*abstraction\s+\w+/im.test(src) || /^\s*method\s+\w+/im.test(src)) {
             lang = 'javascript';
             if (sel) sel.value = 'javascript';
@@ -757,15 +751,18 @@ function smartCompile(options) {
                     return Promise.resolve(_smartCompileError(
                         new Error('The raw assembler is unavailable.'), 'assembly'));
                 }
-                const _previousAssemblyToken = window.LumpRegistry &&
-                    typeof window.LumpRegistry.getCurrent === 'function'
-                    ? window.LumpRegistry.getCurrent() : null;
-                if (_previousAssemblyToken && window.LumpRegistry &&
-                        typeof window.LumpRegistry.evictMemory === 'function') {
-                    window.LumpRegistry.evictMemory(_previousAssemblyToken);
+                const _assemblyResult = assembleAndLoad({
+                    source: src, candidateOnly: true,
+                    sourceSurface: _smartOptions.sourceSurface,
+                    languageIdentity: _smartOptions.languageIdentity,
+                });
+                if (!_assemblyResult || _assemblyResult.ok === false) {
+                    return Promise.resolve(_assemblyResult || {
+                        ok: false, kind: 'assembly',
+                        error: 'Assembly did not produce a candidate.'
+                    });
                 }
-                assembleAndLoad();
-                return Promise.resolve(_smartCompileResult('assembly'));
+                return Promise.resolve(_assemblyResult);
             } catch (error) {
                 return Promise.resolve(_smartCompileError(error, 'assembly'));
             }
@@ -775,6 +772,10 @@ function smartCompile(options) {
     try {
         const _compileResult = compileAndBuild({
             skipSavePlan: _smartOptions.skipSavePlan === true,
+            candidateOnly: _smartOptions.candidateOnly !== false,
+            source: _smartOptions.source,
+            sourceSurface: _smartOptions.sourceSurface,
+            languageIdentity: _smartOptions.languageIdentity,
         });
         return Promise.resolve(_compileResult)
             .then(result => _smartCompileResult('cloomc', result))
@@ -1005,6 +1006,8 @@ function _readLumpSaveResponse(response) {
 function compileDraft() {
     const editor = document.getElementById('asmEditor');
     if (!editor) return;
+    // A caller that chains Build → Save supplies a frozen string.  Never read
+    // the mutable editor again during that command.
     const source = editor.value;
     const con = document.getElementById('editorConsole');
     if (con) con.className = '';
@@ -1476,27 +1479,15 @@ async function compileAndBuild(options) {
             kind: 'cloomc',
         };
     }
-    const source = editor.value;
+    const source = _compileOptions.source !== undefined
+        ? String(_compileOptions.source) : editor.value;
     const con = document.getElementById('editorConsole');
     if (con) con.className = '';
     switchCodeTab('console');
-    // Capture any active LUMP-edit draft token before resetting to null.
-    // Both compile success paths use _compileDraftToken to delete the draft.
+    // Capture draft provenance, but do not evict the prior candidate or stop
+    // the installed program. Failed builds must be observational only.
     _compileDraftToken = window._editorOpenLumpToken ||
         (window.LumpRegistry ? window.LumpRegistry.getCurrent() : null);
-    const _previousCompileToken = window.LumpRegistry &&
-        typeof window.LumpRegistry.getCurrent === 'function'
-        ? window.LumpRegistry.getCurrent() : null;
-    if (_previousCompileToken && window.LumpRegistry &&
-            typeof window.LumpRegistry.evictMemory === 'function') {
-        // A failed/replaced compile must never leave an older source/binary
-        // pair eligible for a Save-request compile continuation.
-        window.LumpRegistry.evictMemory(_previousCompileToken);
-    }
-    if (typeof _invalidateLastSavedToken === 'function') _invalidateLastSavedToken();
-    _runStopped = true;
-    sim.running = false;
-    window._lastCLOOMCLump = null;
 
     const result = cloomcCompiler.compile(source, []);
 
@@ -1516,8 +1507,8 @@ async function compileAndBuild(options) {
     const langNames = { english: 'English', haskell: 'Haskell', symbolic: 'Symbolic Math (Ada)', javascript: 'JavaScript', cloomc: 'CLOOMC++', lambda: 'Lambda Calculus', assembly: 'Assembly' };
     const langLabel = langNames[result.language] || 'CLOOMC++';
 
-    // Store for Load-into-Sim button
-    window._lastCLOOMCResult = result;
+    // Keep this attempt local until all later binary/audit checks succeed.
+    // A failed attempt must not replace the last runnable candidate.
     if (typeof _clearAsmErrors === 'function') _clearAsmErrors();
     if (typeof _clearAsmWarnings === 'function') _clearAsmWarnings();
     if (typeof _showAsmWarnings === 'function') _showAsmWarnings(result.warnings || []);
@@ -1604,6 +1595,16 @@ async function compileAndBuild(options) {
 
     const codeRegion = [...allCode];
     const cw = codeRegion.length;
+    if (cw === 0) {
+        const _emptyCodeError = 'Compile produced no executable instruction words.';
+        if (con) con.textContent = `Compile failed: ${_emptyCodeError}`;
+        if (typeof _showAsmErrors === 'function') {
+            _showAsmErrors([{ line: null, message: _emptyCodeError }],
+                'Compile failed — code not applied');
+        }
+        showNextSteps('error');
+        return { ok: false, kind: 'cloomc', error: _emptyCodeError };
+    }
 
     // The source/API frame is part of the immutable binary submitted to the
     // server.  Build it before laying out the LUMP so the freespace reservation
@@ -1756,7 +1757,7 @@ async function compileAndBuild(options) {
         };
     }
     const resolvedCaps = _capMaterialized.resolvedCaps;
-    window._lastCLOOMCLump = {
+    const _candidateCLOOMCLump = {
         words: Array.from(lumpWords),
         clistStart,
         resolvedCaps: resolvedCaps.map(cap => Object.assign({}, cap)),
@@ -1877,11 +1878,8 @@ async function compileAndBuild(options) {
     }
 
     const lumpWordsArray = Array.from(lumpWords);
-    // Compile is also the editor's source-of-truth handoff.  Register the
-    // exact provisional binary before the optional save-plan confirmation so
-    // callers can observe and preserve the compiled pair even when approval
-    // is cancelled or the repository rejects the plan.  The server remains
-    // authoritative for the eventual destination-local SELF remint.
+    // Keep the attempted binary local until all validation/audit checks pass.
+    // A failed compile must not replace the registry's last valid candidate.
     const _compiledCapabilities = resolvedCaps.map(rc => ({
         name: rc.name,
         rights: Array.isArray(rc.rights) ? rc.rights.slice() : [],
@@ -1902,32 +1900,6 @@ async function compileAndBuild(options) {
     const _compiledToken = typeof window._computeLumpToken === 'function'
         ? window._computeLumpToken(_registeredCodeWords, _compiledCapabilities)
         : null;
-    if (_compiledToken && window.LumpRegistry) {
-        window.LumpRegistry.registerMemory(
-            _compiledToken,
-            absName,
-            _registeredCodeWords,
-            _compiledCapabilities,
-            { sourceText: source, language: result.language || 'javascript' }
-        );
-        window.LumpRegistry.setCurrent(_compiledToken);
-        window._pendingLumpData = null;
-    }
-    if (_compileOptions.skipSavePlan === true) {
-        return _compiledToken
-            ? {
-                ok: true,
-                kind: 'cloomc',
-                token: _compiledToken,
-                words: _registeredCodeWords.slice(),
-                sourceText: source,
-            }
-            : {
-                ok: false,
-                kind: 'cloomc',
-                error: 'CLOOMC++ compile produced no registry token.',
-            };
-    }
     // Petname: programmer's globally-unique dot identity (e.g. "ken" or "org.dep.proj").
     // Issue number: which specific issuance of this abstraction this is.
     // Together: petname.Abstraction#n is the globally meaningful identity of this LUMP.
@@ -2077,6 +2049,77 @@ async function compileAndBuild(options) {
         }
     }
 
+    // Candidate publication is the sole successful-build state transition.
+    // It is immutable and does not load RAM, stop execution, or select an
+    // execution context.  Save/Export/Run consume this exact source snapshot.
+    // The persisted code region has bodies only; execution additionally needs
+    // the method dispatch table used by CALL. Build that install representation
+    // here without mutating simulator memory.
+    const _candidateExecutionWords = [];
+    const _candidateLabels = {};
+    const _candidateMethods = result.methods || [];
+    let _candidateCodeOffset = _candidateMethods.length;
+    for (let _index = 0; _index < _candidateMethods.length; _index++) {
+        const _method = _candidateMethods[_index];
+        _candidateExecutionWords.push(_method.visibility === 'private' ? 0 :
+            (((23 << 27) | ((_candidateCodeOffset - _index) & 0x7FFF)) >>> 0));
+        _candidateLabels[_method.name] = _candidateCodeOffset;
+        _candidateCodeOffset += (_method.code || []).length;
+    }
+    for (const _method of _candidateMethods) {
+        _candidateExecutionWords.push(...(_method.code || []));
+    }
+    if (window.IDEActionState) {
+        window.IDEActionState.recordCandidate({
+            token: _compiledToken,
+            abstraction: absName,
+            language: result.language || 'javascript',
+            source,
+            sourceSurface: _compileOptions.sourceSurface || 'asmEditor',
+            // smartCompile may auto-detect CLOOMC source and switch the UI
+            // selector (for example assembly → javascript). Freshness is the
+            // final editor language identity, not the compiler's internal
+            // dialect label such as "cloomc".
+            languageIdentity: (document.getElementById('langSelector') || {}).value ||
+                result.language || _compileOptions.languageIdentity || '',
+            words: _candidateExecutionWords,
+            capabilities: _compiledCapabilities,
+            labels: _candidateLabels,
+            namedSlots: result.namedSlots || null,
+            methodTableSize: _candidateMethods.length,
+            binary: lumpWordsArray,
+        });
+    }
+    if (_compiledToken && window.LumpRegistry) {
+        window.LumpRegistry.registerMemory(
+            _compiledToken, absName, _registeredCodeWords, _compiledCapabilities,
+            { sourceText: source, language: result.language || 'javascript' }
+        );
+        window.LumpRegistry.setCurrent(_compiledToken);
+        window._pendingLumpData = null;
+    }
+    window._lastCLOOMCResult = result;
+    window._lastCLOOMCLump = _candidateCLOOMCLump;
+
+    // Normal Compile intentionally stops here.  A saved immutable artifact
+    // requires the separate explicit Save command and its approval flow.
+    if (_compileOptions.candidateOnly !== false) {
+        if (con) {
+            con.innerHTML = _capRightsHTML(listing +
+                '\n\n  Candidate ready — use Save LUMP, Export LUMP, or Run to install it.');
+            con.scrollTop = 0;
+        }
+        showNextSteps('compiled');
+        return {
+            ok: true,
+            kind: 'cloomc',
+            token: _compiledToken,
+            words: _registeredCodeWords.slice(),
+            sourceText: source,
+            candidate: true,
+        };
+    }
+
     // Direct download — no popup, no version prompt.  Auto-version from timestamp.
     const _autoVer = (() => {
         const d = new Date();
@@ -2147,6 +2190,17 @@ async function compileAndBuild(options) {
                     abstraction: absName, ns_slot: resolvedNsSlot,
                     language: result.language
                 }, _compileDraftToken);
+            }
+            if (window.IDEActionState) {
+                window.IDEActionState.recordSaved({
+                    token: resp.token || _compiledToken,
+                    abstraction: absName,
+                    language: result.language || 'javascript',
+                    source,
+                    words: _registeredCodeWords,
+                    capabilities: _compiledCapabilities,
+                    binary: savePayload.binary,
+                });
             }
             _compileDraftToken = null;
             if (typeof switchView === 'function') switchView('lumps');
@@ -2318,6 +2372,9 @@ function auditLumpOnly() {
 // can step/walk through individual instructions — bridging the compile-display
 // path and the assemble-and-run path.
 function loadCLOOMCIntoSim() {
+    // Compatibility entry point for older output links. Installation is now a
+    // shared explicit action; candidate construction never reaches RAM.
+    if (window.IDEActions) return window.IDEActions.installCandidate();
     const result = window._lastCLOOMCResult;
     if (!result || !result.methods) {
         appendOutput('Load into Sim: nothing compiled yet — run Compile first.', 'warn');

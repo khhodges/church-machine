@@ -1,10 +1,9 @@
 'use strict';
 
-// Browser-free behavioral regression for the editor's compile → hamburger Save
-// handoff.  Compile approval is deliberately cancelled; the compiled
-// instruction/source pair must remain registered so the real Save Lump entry
-// point can build a candidate whose header cw is the code length, not the
-// allocated LUMP size.
+// Browser-free behavioral regression for the editor's candidate Build → Save
+// handoff. Compile creates a candidate only: it must neither request a save
+// approval nor install/commit an artifact. Save formats that exact candidate;
+// a missing candidate is an explicit prerequisite, never a hidden recompile.
 
 const assert = require('assert');
 const fs = require('fs');
@@ -140,6 +139,7 @@ const context = {
     _clearAsmWarnings() {},
     _showAsmWarnings() {},
     _showAsmErrors() {},
+    _capRightsHTML(value) { return value; },
     showNextSteps() {},
     switchCodeTab() {},
     _invalidateLastSavedToken() {},
@@ -188,10 +188,12 @@ vm.runInContext(
     context);
 
 (async () => {
-    await context.compileAndBuild();
+    const build = await context.compileAndBuild();
 
-    assert.strictEqual(context.confirmationCount, 1,
-        'compile did not reach the cancellable save-plan approval');
+    assert.strictEqual(build.ok, true,
+        'compile did not produce a candidate');
+    assert.strictEqual(context.confirmationCount || 0, 0,
+        'candidate-only compile unexpectedly requested a save-plan approval');
     const token = context.window.LumpRegistry.getCurrent();
     const entry = context.window.LumpRegistry.resolve(token);
     const memory = entry && entry.sources && entry.sources.memory;
@@ -209,15 +211,6 @@ vm.runInContext(
         0xAB000001,
         'compiler candidate must place the embedded content frame after code');
 
-    // Simulate a saved artifact being evicted from memory.  The real
-    // hamburger Save handler must recompile, then continue into Format Lump;
-    // it must not start a second save-plan approval or commit automatically.
-    context.window.LumpRegistry.evictMemory(token);
-    assert.strictEqual(
-        context.window.LumpRegistry.resolve(token),
-        null,
-        'saved LUMP eviction did not remove the stale in-memory source');
-
     // Exercise the actual hamburger Save Lump handler and its real formatter.
     vm.runInContext(
         extractBlock(lumpsSource, 'window.showFormatLump = async function') + ';' +
@@ -226,9 +219,9 @@ vm.runInContext(
         context);
     await context.window.editorSaveLump();
     assert.deepStrictEqual(saveDiagnosticEvents.slice(0, 2), ['begin', 'record'],
-        'hamburger Save click was not diagnosed before compile branching');
-    assert.strictEqual(context.confirmationCount, 1,
-        'Save-request compilation unexpectedly started an automatic save plan');
+        'hamburger Save click was not diagnosed before candidate use');
+    assert.strictEqual(context.confirmationCount || 0, 0,
+        'Save unexpectedly started an automatic save plan');
 
     const pending = context.window._pendingLumpData;
     assert(pending && pending.candidates && pending.candidates.full,
@@ -244,7 +237,20 @@ vm.runInContext(
         codeWords,
         'hamburger Save Lump changed the exact code words in its candidate');
 
-    console.log('compile cancel → hamburger Save cw regression: PASS');
+    // Once the in-memory candidate is unavailable, the compatibility Save
+    // entry point must report the prerequisite rather than compiling behind
+    // the programmer's back or opening a stale dialog.
+    context.window.LumpRegistry.evictMemory(token);
+    context.window._pendingLumpData = null;
+    const missing = await context.window.editorSaveLump();
+    assert.strictEqual(missing.ok, false,
+        'Save without a candidate did not return a structured prerequisite error');
+    assert.match(missing.error, /No current build candidate/,
+        'Save without a candidate attempted an implicit build');
+    assert.strictEqual(context.window._pendingLumpData, null,
+        'Save without a candidate opened a stale format dialog');
+
+    console.log('candidate build → hamburger Save cw regression: PASS');
 })().catch(error => {
     console.error(error);
     process.exit(1);

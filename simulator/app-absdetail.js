@@ -1212,6 +1212,18 @@ function _loadCatalogLumpIntoSim() {
         con.className = '';
         con.textContent = 'Loaded catalog LUMP \u201c' + name + '\u201d \u2014 ' + words.length + ' words \u2014 click Step or Run';
     }
+    if (window.IDEActionState) {
+        window.IDEActionState.recordInstalled({
+            token: typeof window._computeLumpToken === 'function'
+                ? window._computeLumpToken(words, []) : null,
+            abstraction: name,
+            language: 'catalog',
+            source: '',
+            words: words.slice(),
+            capabilities: [],
+            methodTableSize: 0,
+        });
+    }
 }
 
 // ── Export / Import history (JSON roundtrip) ─────────────────────────────────
