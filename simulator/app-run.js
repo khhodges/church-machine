@@ -808,26 +808,53 @@ function _buildNIARows(prevAddr, currAddr) {
 }
 
 const _BOOT_STEPS = [
-    { addrStr: 'B:00', disasm: 'FAULT_RST',  label: 'Capture fault context \u2192 clear all CRs / DRs',                              offset: null, prog: 'boot' },
-    { addrStr: 'B:01', disasm: 'LOAD_NS',    label: 'CR15 \u2190 NS[0] Boot.NS.',                                                   offset: null, prog: 'boot' },
-    { addrStr: 'B:02', disasm: 'INIT_THRD',  label: 'CR12 \u2190 NS[1] thread stack GT (zero perms, Inform)',                         offset: null, prog: 'boot' },
-    { addrStr: 'B:03', disasm: 'INIT_HEAP',  label: 'CR5(RW) \u2190 thread heap \u00b7 CHANGE-consistent synthesis',                  offset: null, prog: 'boot' },
-    { addrStr: 'B:04', disasm: 'CALL_HOME',  label: 'Tunnel.Register \u2192 23-byte packet \u00b7 await ACK',                         offset: null, prog: 'boot' },
-    { addrStr: 'B:05', disasm: 'INIT_ABSTR', label: 'CR6(E) \u2190 NS[3] Boot.Abstr',                                                 offset: null, prog: 'boot' },
-    { addrStr: 'B:06', disasm: 'NUC_CLIST',  label: 'CR6(E) \u2190 lump c-list \u00b7 push sentinel',                                 offset: null, prog: 'boot' },
-    { addrStr: 'B:07', disasm: 'NUC_CODE',   label: 'CR14(R+X) \u2190 lump code \u00b7 CR0 \u2190 boot-entry E-GT \u00b7 PC\u21900 \u00b7 direct dispatch', offset: null, prog: 'boot' },
+    { addrStr: 'B:00', disasm: 'LOAD CR15',   label: 'Simulator/spec-known ROM: LOAD CR15 — establish the Boot.NS capability.', offset: null, prog: 'boot' },
+    { addrStr: 'B:01', disasm: 'CHANGE CR12', label: 'Simulator/spec-known ROM: CHANGE CR12 — restore the Boot.Thread home, including reserved CR0.', offset: null, prog: 'boot' },
+    { addrStr: 'B:02', disasm: 'CALL CR0',    label: 'Simulator/spec-known ROM: CALL CR0 — consume the prepared entry capability.', offset: null, prog: 'boot' },
 ];
 
 function _bootNIARows(bootStep) {
-    const prevIdx = bootStep - 1;
-    const currIdx = bootStep;
-    const nextIdx = bootStep + 1;
+    // bootProgress is an attempt-scoped core record. Do not infer completed
+    // boot-ROM work from reset, fault, or a prior attempt's bootStep.
+    const state = sim && typeof sim.getState === 'function' ? sim.getState() : null;
+    const rawProgress = state && state.bootProgress;
+    const progressList = Array.isArray(rawProgress) ? rawProgress
+        : (rawProgress && Array.isArray(rawProgress.records) ? rawProgress.records
+            : (rawProgress && rawProgress.status ? [rawProgress]
+                : (rawProgress && typeof rawProgress === 'object' ? Object.values(rawProgress) : [])));
+    const attemptId = progressList.reduce((latest, record) => {
+        if (!record || record.attemptId == null) return latest;
+        if (latest == null) return record.attemptId;
+        // Attempt IDs are monotonic numeric core evidence. Selecting the
+        // maximum keeps an appended/restored prior record from repainting a
+        // later failed attempt as complete.
+        return Number(record.attemptId) > Number(latest) ? record.attemptId : latest;
+    }, null);
+    const attemptProgress = progressList.filter(record =>
+        record && (attemptId == null || record.attemptId === attemptId));
+    const steps = _BOOT_STEPS.map((step, index) => {
+        const evidence = attemptProgress.find(record =>
+            Number(record.bootRomAddress) === index || Number(record.bootRomAddress) === (index * 4));
+        return evidence ? Object.assign({}, step, {
+            status: evidence.status || 'unexecuted',
+            word: evidence.word,
+            bootRomAddress: evidence.bootRomAddress,
+            destinationRegister: evidence.destinationRegister,
+            gateReason: evidence.gateReason,
+            attemptId: evidence.attemptId,
+        }) : Object.assign({}, step, { status: 'unexecuted', attemptId });
+    });
+    let currIdx = steps.findIndex(step => step.status === 'pending' || step.status === 'failed');
+    if (currIdx < 0) currIdx = steps.findIndex(step => step.status === 'unexecuted');
+    const prevIdx = currIdx - 1;
+    const nextIdx = currIdx + 1;
     return {
-        last:    prevIdx >= 0 ? _BOOT_STEPS[prevIdx] : null,
-        curr:    _BOOT_STEPS[currIdx] || null,
-        next:    nextIdx < _BOOT_STEPS.length ? _BOOT_STEPS[nextIdx] : null,
-        all:     _BOOT_STEPS,
+        last:    prevIdx >= 0 ? steps[prevIdx] : null,
+        curr:    steps[currIdx] || null,
+        next:    nextIdx < steps.length ? steps[nextIdx] : null,
+        all:     steps,
         currIdx: currIdx,
+        attemptId,
     };
 }
 
@@ -863,6 +890,10 @@ function stepSim() {
         return;
     }
     if (!sim.bootComplete) {
+        if (!_bootHasCommittedImage() || sim._bootImageLoaded !== true) {
+            _ensureCommittedImageForBoot('Step');
+            return;
+        }
         // If a compiled abstraction is waiting, skip the manual boot ceremony
         // and silently complete all boot phases so the user can step their code.
         if (_pendingSimLoad) {
@@ -912,7 +943,7 @@ function stepSim() {
             _bootAuditAccum.push(...sim.auditLog);
         }
         if (con) {
-            con.textContent += `\n[boot ${_stepPhaseNum}/7] ${sim.output.split('\n').filter(l => l).pop()}`;
+            con.textContent += `\n[boot ${_stepPhaseNum}/3] ${sim.output.split('\n').filter(l => l).pop()}`;
             con.scrollTop = con.scrollHeight;
         }
         if (pipelineViz) {
@@ -1866,7 +1897,6 @@ function _applyPendingSimLoad() {
             _progGtSeq = _progEntry
                 ? sim.parseNSWord1(_progEntry.word1_limit).gtSeq
                 : 0;
-            sim.bootEntrySlot = _progSlot;
         }
     }
 
@@ -1883,7 +1913,9 @@ function _applyPendingSimLoad() {
         sim.cr[14].word0 = _cr14GT;
         sim.cr[14].m = 0;
     }
-    if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
+    // Compile/Run installs an explicit live execution context only. It must
+    // never prepare this new LUMP as a next-boot authority; the user performs
+    // that distinct operation with the lightning-bolt Prepare control.
     // Compile+Run does not go through the real boot sequence's NUC_CLIST step,
     // which normally pushes a sentinel CALL frame (returnPC=0x7FFF poison value)
     // before jumping into user code. Without it, a program's trailing RETURN
@@ -1935,39 +1967,6 @@ function _applyPendingSimLoad() {
     const slot2Base  = sim.bootComplete ? (sim.memory[abstrBase2] || (2 * sim.SLOT_SIZE)) : 0;
     const progBase   = (slot3Base >= 0x0400) ? slot3Base + 1 : slot2Base;
     sim.programBaseAddr = progBase;
-
-    // Update Thread.CR0 to the compiled program's NS slot E-GT (Task #2084).
-    // This replaces the SelfTest E-GT that the boot sequence installed at
-    // thread[+capsStart], making CR0 reference the user's program.
-    if (_progSlot !== null && sim.bootComplete) {
-        const _progGT = sim.createGT(_progGtSeq, _progSlot, {E:1}, 1) >>> 0;
-        sim.cr[0] = { word0: _progGT, word1: 0, word2: 0, word3: 0, m: 0 };
-        const _thEntry = sim.readNSEntry(1);
-        if (_thEntry && _thEntry.word0_location > 0) {
-            const _thLayout = typeof sim._threadLayoutAtBase === 'function'
-                ? sim._threadLayoutAtBase(_thEntry.word0_location)
-                : null;
-            if (!_thLayout || !_thLayout.valid) {
-                sim.fault('BOUNDS', 'Compile+Run: Boot.Thread has invalid or unsupported geometry');
-                _clearPendingSimLoad();
-                return;
-            }
-            sim.writePersistentWord(
-                (_thEntry.word0_location + _thLayout.capsStart) >>> 0,
-                _progGT);
-        }
-        // Patch Boot.NS c-list entry [_progSlot] with the new GT so the
-        // dependency graph shows a named entry rather than null/free.
-        const _nsLumpHdr = sim.parseLumpHeader(sim.memory[0] >>> 0);
-        if (_nsLumpHdr.valid && _progSlot < _nsLumpHdr.cc) {
-            sim.writePersistentWord(
-                _nsLumpHdr.lumpSize - _nsLumpHdr.cc + _progSlot,
-                _progGT);
-            if (sim.demoClistGTs && _progSlot < sim.demoClistGTs.length) {
-                sim.demoClistGTs[_progSlot] = _progGT;
-            }
-        }
-    }
 
     if (_injectClistNow(_aplCaps) === false) {
         _clearPendingSimLoad();
@@ -2490,11 +2489,9 @@ function _autoLoadDefaultProgram() {
             : null;
         const _bootWords = _bootMem ? (_bootMem.words || []) : [];
         if (_bootWords.length > 0) {
-            // A completed boot is authoritative: its CALL-equivalent NUC_CODE
-            // path derives CR14 from the selected boot LUMP's live Namespace
-            // descriptor.  Replaying cached editor words through loadProgram()
-            // here would patch that descriptor in place (normally SelfTest at
-            // slot 6), shrinking its code limit before the next CALL reads it.
+            // A completed boot is authoritative: CALL CR0 consumed the prepared
+            // Thread-home capability. Replaying cached editor words through
+            // loadProgram() here would patch that selected descriptor in place.
             // Keep the cached source available in the editor, but never install
             // it as a side effect of reset.
         }
@@ -2503,11 +2500,8 @@ function _autoLoadDefaultProgram() {
         if (!_bootWords.length) {
             _applyBootLumpPetNames();
         }
-        // The user's Lightning Bolt selection is authoritative across reset.
-        // The factory image may temporarily report SelfTest while boot state is
-        // reconstructed; copying that value back into localStorage makes
-        // SelfTest silently take over a deliberately selected CapabilityTest.
-        if (typeof _applyBootEntryToSim === 'function') _applyBootEntryToSim();
+        // Inspect, but do not change, the image's prepared Thread-home binding.
+        if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
         return;
     }
     _defaultProgramLoaded = true;
@@ -2530,7 +2524,7 @@ function _autoLoadDefaultProgram() {
     // lastAssembledWords remains available for an explicit Assemble + Run;
     // boot completion never mutates the selected boot LUMP with cached source.
     _applyBootLumpPetNames();
-    if (typeof _applyBootEntryToSim === 'function') _applyBootEntryToSim();
+    if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
     if (typeof updateLiveLumpBanner === 'function') updateLiveLumpBanner();
 }
 // ── instantBoot ──────────────────────────────────────────────────────────────
@@ -2555,7 +2549,63 @@ function _recordUnreportedBootFailure(context, error) {
     return true;
 }
 
+let _bootImageRefreshInFlight = null;
+
+function _bootHasCommittedImage() {
+    return !!(window.bootImage && window.bootImageAvailable);
+}
+
+function _blockBootForMissingCommittedImage(context) {
+    const detail = `Boot blocked (${context}): no valid committed boot image is cached. ` +
+        'Prepare and save the Lightning Bolt selection, then retry; a factory image is never substituted.';
+    if (window.BootEntryUI && typeof window.BootEntryUI.noteImagePreparation === 'function') {
+        window.BootEntryUI.noteImagePreparation({
+            status: 'stale-image',
+            configuredSlot: typeof bootEntrySlot === 'number' ? bootEntrySlot : null,
+            reason: detail,
+        });
+    }
+    const con = document.getElementById('editorConsole');
+    if (con && !con.textContent.includes(detail)) {
+        con.textContent += (con.textContent ? '\n' : '') + '[BOOTIMG] ' + detail;
+    }
+    if (sim && !sim.halted && !sim.bootComplete && typeof sim.fault === 'function') {
+        sim.fault('BOOT_IMAGE', detail);
+    }
+    return false;
+}
+
+// A cache may intentionally be empty after a saved image was invalidated.
+// Fetching it is asynchronous; do not reset into factory memory while it is
+// pending. The successful retry re-enters the explicit reset/boot path.
+function _ensureCommittedImageForBoot(context) {
+    if (_bootHasCommittedImage()) return true;
+    if (window.bootImageAvailable && typeof window._refreshCommittedBootImageCache === 'function') {
+        if (!_bootImageRefreshInFlight) {
+            _bootImageRefreshInFlight = window._refreshCommittedBootImageCache()
+                .then(() => {
+                    _bootImageRefreshInFlight = null;
+                    if (_bootHasCommittedImage()) resetSim();
+                    else _blockBootForMissingCommittedImage(context);
+                })
+                .catch(error => {
+                    _bootImageRefreshInFlight = null;
+                    _blockBootForMissingCommittedImage(
+                        `${context}; committed image refresh failed: ${error && error.message ? error.message : error}`);
+                });
+        }
+        const con = document.getElementById('editorConsole');
+        if (con) con.textContent += (con.textContent ? '\n' : '') +
+            '[BOOTIMG] Fetching committed boot image before reset…';
+        return false;
+    }
+    return _blockBootForMissingCommittedImage(context);
+}
+
 function instantBoot() {
+    if (!_bootHasCommittedImage() || sim._bootImageLoaded !== true) {
+        return _ensureCommittedImageForBoot('instant boot');
+    }
     if (sim.bootComplete) return true;
     if (bootAnimating) {
         if (_bootAnimTimer !== null) { clearTimeout(_bootAnimTimer); _bootAnimTimer = null; }
@@ -2590,8 +2640,11 @@ function instantBoot() {
 }
 
 function slowBoot() {
+    if (!sim.bootComplete && (!_bootHasCommittedImage() || sim._bootImageLoaded !== true)) {
+        _ensureCommittedImageForBoot('animated boot');
+        return;
+    }
     if (bootAnimating || sim.bootComplete || sim.halted) return;
-    const _savedBootEntrySlow = sim.bootEntrySlot;  // restored in catch on boot error
     bootAnimating = true;
     if (typeof _syncPullToRefreshGuard === 'function') _syncPullToRefreshGuard();
     if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(0)); pipelineViz.render(); }  // prime NIA to B:00 before first step
@@ -2663,7 +2716,7 @@ function slowBoot() {
             const con = document.getElementById('editorConsole');
             if (con) {
                 const lastLine = (sim.output || '').split('\n').filter(l => l).pop() || '';
-                con.textContent += `\n[boot ${_slowPhaseNum}/7] ${lastLine}`;
+                con.textContent += `\n[boot ${_slowPhaseNum}/3] ${lastLine}`;
                 con.scrollTop = con.scrollHeight;
             }
             if (pipelineViz) {
@@ -2685,7 +2738,6 @@ function slowBoot() {
             updateDashboard();
             _bootAnimTimer = setTimeout(nextPhase, delay);
         } catch(e) {
-            sim.bootEntrySlot = _savedBootEntrySlow;
             bootAnimating = false;
             if (typeof _syncPullToRefreshGuard === 'function') _syncPullToRefreshGuard();
             _bootAnimTimer = null;
@@ -2760,11 +2812,8 @@ async function _startBootLumpPrefetch() {
 
 function runSim() {
     if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
-    // Redirect boot to the canonical resident slot (_bootAbstrSlot, always slot 6 =
-    // SelfTest) so B:05 INIT_ABSTR never tries mLoad on the user-selected slot (which
-    // may be the gap slot with limit17=0 after a Tier-3 fault-recovery reset clears
-    // bootComplete while preserving memory).  Restore before _autoLoadDefaultProgram()
-    // so it re-applies the user's program at the correct slot.
+    // Boot is never redirected by the UI. The core executes only LOAD CR15,
+    // CHANGE CR12, CALL CR0 against the image's already-prepared Thread home.
     while (!sim.bootComplete && !sim.halted) {
         try {
             sim._bootStep();
@@ -3600,7 +3649,10 @@ const _FAULT_LOG_FIELDS = ['type','message','pc','physicalPC','step','faultStep'
                            'malformedReason',
                            'tier','catchInvoked','irqInvoked','tier3Recovery',
                            'faultCode','faultingAbstractionSlot','faultingAbstractionLabel',
-                           'faultRawWord'];
+                            'faultRawWord','instructionProvenance','dataProvenance',
+                            'bootAttemptId','bootProgress','bootRomAddress','destinationRegister',
+                            'gateReason','bootEvidence','observed_instr_word',
+                            'observedInstructionWord'];
 
 // Return only the instruction word captured with a fault record.  Fault
 // details are historical evidence: never reinterpret them using live memory,
@@ -3623,26 +3675,6 @@ function _saveFaultLog() {
             return;
         }
         const slim = sim.faultLog.map(f => {
-            // Eagerly resolve the ns snapshot when it hasn't been set yet
-            // (the modal sets it lazily; we want it persisted even if the modal
-            // was never opened in this session).
-            if (!Object.prototype.hasOwnProperty.call(f, '_nsSnapshot')) {
-                // Prefer CR14 snapshot gtIndex — directly names the executing lump's
-                // ns slot without depending on memory range lookups.
-                const _cr14s = f.crSnapshot && f.crSnapshot[14];
-                if (_cr14s && _cr14s.word0) {
-                    const _ni = _cr14s.word0 & 0xFFFF;
-                    // Prefer the label captured at fault() time (immune to eviction churn);
-                    // fall back to the live nsLabels table only when not available.
-                    const _lbl = f.faultLabel || (sim.nsLabels && sim.nsLabels[_ni]) || `NS[${_ni}]`;
-                    const _base = (_cr14s.word1 !== undefined && _cr14s.word1 !== null) ? (_cr14s.word1 >>> 0) : 0;
-                    const _fpc = (f.physicalPC !== undefined && f.physicalPC !== null) ? f.physicalPC : f.pc;
-                    f._nsSnapshot = { label: _lbl, nsIdx: _ni, offset: _fpc - _base };
-                } else {
-                    const _pc = (f.physicalPC !== undefined && f.physicalPC !== null) ? f.physicalPC : f.pc;
-                    f._nsSnapshot = _nsOwnerOf(_pc);
-                }
-            }
             const out = {};
             for (const k of _FAULT_LOG_FIELDS) {
                 if (Object.prototype.hasOwnProperty.call(f, k)) out[k] = f[k];
@@ -3857,21 +3889,39 @@ function showFaultModal(f) {
     const disasm = word !== null
         ? (assembler ? assembler.disassemble(word) : '???')
         : 'instruction unavailable (historical record has no raw word)';
-    if (!Object.prototype.hasOwnProperty.call(f, '_nsSnapshot')) {
-        // Prefer CR14 snapshot — directly names the executing lump's ns slot
-        // without depending on memory-range lookups.
-        const _cr14lazy = f.crSnapshot && f.crSnapshot[14];
-        if (_cr14lazy && _cr14lazy.word0) {
-            const _ni = _cr14lazy.word0 & 0xFFFF;
-            // Prefer the label captured at fault() time; fall back to live nsLabels.
-            const _lbl = f.faultLabel || (sim.nsLabels && sim.nsLabels[_ni]) || `NS[${_ni}]`;
-            const _base = (_cr14lazy.word1 !== undefined && _cr14lazy.word1 !== null) ? (_cr14lazy.word1 >>> 0) : 0;
-            f._nsSnapshot = { label: _lbl, nsIdx: _ni, offset: pc === null ? 0 : pc - _base };
-        } else {
-            f._nsSnapshot = pc === null ? null : _nsOwnerOf(pc);
-        }
-    }
-    const ns     = f._nsSnapshot;
+    const bootEvidence = f.bootEvidence && typeof f.bootEvidence === 'object'
+        ? f.bootEvidence : null;
+    const bootEvidenceHtml = (() => {
+        if (!bootEvidence) return '';
+        const romWord = Number.isInteger(bootEvidence.instructionWord)
+            ? `0x${(bootEvidence.instructionWord >>> 0).toString(16).toUpperCase().padStart(8, '0')}`
+            : 'unavailable';
+        const observedRaw = Number.isInteger(f.observed_instr_word)
+            ? (f.observed_instr_word >>> 0)
+            : (Number.isInteger(f.observedInstructionWord)
+                ? (f.observedInstructionWord >>> 0) : word);
+        const observedWord = observedRaw === null
+            ? 'unavailable'
+            : `0x${observedRaw.toString(16).toUpperCase().padStart(8, '0')}`;
+        const romAddr = Number.isInteger(bootEvidence.bootRomAddress)
+            ? `B:${String(bootEvidence.bootRomAddress).padStart(2, '0')}` : 'unavailable';
+        // A zero/null GT has no Namespace provenance. Never decode its low
+        // zero bits as NS[0].
+        const hasProvenanceGT = Number.isInteger(bootEvidence.provenanceGT) &&
+            (bootEvidence.provenanceGT >>> 0) !== 0;
+        const slot = hasProvenanceGT && Number.isInteger(bootEvidence.slot)
+            ? `NS[${bootEvidence.slot}]` : 'unknown (null/zero GT or absent evidence)';
+        const seq = hasProvenanceGT && Number.isInteger(bootEvidence.sequence)
+            ? String(bootEvidence.sequence) : 'unknown';
+        return `<div class="fault-scope-section fault-boot-evidence-section">` +
+            `<div class="fault-scope-label">Boot-ROM evidence (attempt ${bootEvidence.attemptId ?? 'unknown'})</div>` +
+            `<div class="fault-scope-detail">Known ROM instruction <code>${romAddr} ${romWord}</code>; ` +
+            `observed fault word <code>${observedWord}</code>; provenance ${bootEvidence.provenanceRegister || 'register unavailable'} ` +
+            `→ ${slot}, sequence ${seq}.</div></div>`;
+    })();
+    // A fault record is historical evidence. Do not fill missing provenance
+    // from mutable live memory or assign unknown locations to Boot.NS +0.
+    const ns = f._nsSnapshot || f.instructionProvenance || null;
 
     // locationNs — the authoritative lump label and offset for display.
     // Prefers crSnapshot[14] (captured at fault time) over _nsSnapshot so
@@ -3880,14 +3930,16 @@ function showFaultModal(f) {
     let locationNs;
     if (_cr14snap && _cr14snap.word0) {
         const _ni   = _cr14snap.word0 & 0xFFFF;
-        // Prefer the label captured at fault() time; fall back to live nsLabels.
-        const _lbl  = f.faultLabel || (sim.nsLabels && sim.nsLabels[_ni]) || `NS[${_ni}]`;
+        // Never relabel a historical record with a later image's live table.
+        const _lbl  = f.faultLabel || `NS[${_ni}]`;
         const _base = (_cr14snap.word1 !== undefined && _cr14snap.word1 !== null) ? (_cr14snap.word1 >>> 0) : 0;
-        locationNs  = { label: _lbl, nsIdx: _ni, offset: pc === null ? 0 : pc - _base };
+        locationNs  = { label: _lbl, nsIdx: _ni, offset: pc === null ? null : pc - _base };
     } else {
         locationNs  = ns;
     }
-    const nsStr  = locationNs ? `${locationNs.label} +${locationNs.offset}` : '\u2014';
+    const nsStr  = locationNs && locationNs.label
+        ? `${locationNs.label}${Number.isInteger(locationNs.offset) ? ` +${locationNs.offset}` : ' (offset unavailable)'}`
+        : 'unavailable (no immutable instruction provenance)';
 
     // Authoritative ns index for "view lump" navigation.
     // crSnapshot[14].gtIndex is captured at fault time and directly names
@@ -4391,6 +4443,7 @@ function showFaultModal(f) {
                         <span class="fault-detail-label">Step</span>
                         <span class="fault-detail-value"><button class="gate-loc-step-link fault-step-link" onclick="faultModalDismiss();jumpToTraceStep(${f.step},'${(f.type||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")}');" title="Jump to this step in the Trace view">#${f.step}</button></span>
                     </div>
+                    ${bootEvidenceHtml}
                 </div>`;
     const instrTraceSection = `
         <div class="fault-trace-section fault-trace-collapsible">
@@ -4596,7 +4649,12 @@ function faultModalReboot() {
     // _openLastCompiledLump() in app-misc.js for the matching guard.
     _bootAuditAccum = [];
     if (window.ExecutionIdentity) window.ExecutionIdentity.clear('Fault reboot reset the previous execution identity');
+    if (!_ensureCommittedImageForBoot('fault reboot')) return;
     sim.reset();
+    if (sim._bootImageLoaded !== true) {
+        _blockBootForMissingCommittedImage('fault reboot image overlay');
+        return;
+    }
     _initLazyLoadManifest();
     pipelineViz.reset();
     if (_bootAnimTimer !== null) { clearTimeout(_bootAnimTimer); _bootAnimTimer = null; }
@@ -5036,6 +5094,10 @@ function runLazyLoadTest() {
 
 function resetSim() {
     if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
+    // Reset emits the boot-image overlay hook synchronously only when there is
+    // a validated cached buffer. Gate before reset so a stale/missing image can
+    // never fall through to the constructor's factory Namespace.
+    if (!_ensureCommittedImageForBoot('Boot button')) return;
     // Skip dashboard redirect when a startup default view is pending —
     // slowBoot() will navigate there after boot completes.
     // Search: _startupDefaultView
@@ -5057,6 +5119,10 @@ function resetSim() {
     _clearLumpPetNames();
     if (window.ExecutionIdentity) window.ExecutionIdentity.clear('Reset cleared the previous execution identity');
     sim.reset();
+    if (sim._bootImageLoaded !== true) {
+        _blockBootForMissingCommittedImage('Boot button image overlay');
+        return;
+    }
     _initLazyLoadManifest();
     pipelineViz.reset();
     if (_bootAnimTimer !== null) { clearTimeout(_bootAnimTimer); _bootAnimTimer = null; }
@@ -5069,6 +5135,7 @@ function resetSim() {
 // Fast-reset, complete the boot sequence immediately, then land on the
 // CR14 step view.  Bound to the "↺ Reset & Step" button in the Gate Log panel.
 function resetAndStep() {
+    if (!_ensureCommittedImageForBoot('Reset & Step')) return;
     _lastFault = null;
     faultAlertOff();
     if (sim && sim.faultLog) sim.faultLog = [];
@@ -5082,6 +5149,10 @@ function resetAndStep() {
     _clearLumpPetNames();
     if (window.ExecutionIdentity) window.ExecutionIdentity.clear('Reset cleared the previous execution identity');
     sim.reset();
+    if (sim._bootImageLoaded !== true) {
+        _blockBootForMissingCommittedImage('Reset & Step image overlay');
+        return;
+    }
     _initLazyLoadManifest();
     pipelineViz.reset();
     if (_bootAnimTimer !== null) { clearTimeout(_bootAnimTimer); _bootAnimTimer = null; }
@@ -16913,7 +16984,7 @@ const INSTRUCTION_DATA = [
           + '    2b. First activation: install GT from CRs[idx] into CRd\n'
           + '         and begin execution from PC=0.\n'
           + '  The suspended thread resumes exactly where it left off.',
-        example: 'CHANGE CR12, CR12, 1 ; B:02 INIT_THRD: load thread stack GT from slot 1\n'
+        example: 'CHANGE CR12, CR12, 1 ; boot B:01: restore Boot.Thread context\n'
                + 'CHANGE CR14, CR6, 3  ; Context switch: activate Thread Abstraction at CR6[3]',
         mState: { badge: 'M±', note: 'Saves outgoing thread M-bits (per CR) into the context record; restores incoming thread M-bits on resumption. M-state is transparent to CHANGE — it does not add, remove, or inspect M-bits.' },
     },
@@ -17729,15 +17800,14 @@ Reserved slots:
 User abstractions:
   Slot 2+  IDE-assigned at compile time
 
-Boot sequence (B:00–B:07, 8 steps):
-  B:00  FAULT_RST  — capture fault context; clear all CRs / DRs
-  B:01  LOAD_NS    — CR15 ← NS[0] Boot.NS.
-  B:02  INIT_THRD  — CR12 ← NS[1] thread stack GT (zero perms)
-  B:03  INIT_HEAP  — CR5(RW) ← thread heap (CHANGE-consistent)
-  B:04  CALL_HOME  — Tunnel.Register → 23-byte packet; await ACK
-  B:05  INIT_ABSTR — CR6(E) ← NS[3] Boot.Abstr (pre-CALL token)
-  B:06  NUC_CLIST  — CR6(E) ← lump c-list; push sentinel
-  B:07  NUC_CODE   — CR14(R+X) ← lump code; PC←0; CALL CR0 → dispatch begins
+Boot sequence (three instructions):
+  B:00  LOAD CR15   — establish the Boot.NS capability
+  B:01  CHANGE CR12 — restore the Boot.Thread home, including prepared CR0
+  B:02  CALL CR0    — consume the prepared entry capability
+
+Reset and fault reporting are separate events, not boot instructions. A
+missing or stale prepared CR0 home must be repaired only by an explicit
+Prepare action; boot never substitutes a default target.
 
 Access: LOAD/SAVE instructions using a namespace-scoped GT with L/S perm.`,
         example: `; Assembly: load namespace entry for slot 3
@@ -20592,6 +20662,40 @@ async function _wukongLoadToHardware(exactSourceImage) {
         let entrySel = (typeof sim !== 'undefined' && sim && sim.bootEntrySlot != null)
             ? sim.bootEntrySlot
             : ((typeof bootEntrySlot !== 'undefined' && bootEntrySlot != null) ? bootEntrySlot : 6);
+        // The server treats Lightning Bolt selection as a preparation
+        // transaction.  Commit the already-prepared browser selection first,
+        // then ask it to generate the matching hardware artifact; sending an
+        // entrySlot override against an older saved config is deliberately
+        // rejected rather than silently changing next-boot authority.
+        const configResp = await fetch('/api/boot-config');
+        const configData = await configResp.json().catch(function() { return {}; });
+        const savedConfig = (configData && (configData.config || configData.defaults)) || null;
+        if (!configResp.ok || !savedConfig) {
+            _loadLog('ERROR: could not load saved Lightning Bolt selection before hardware preparation.');
+            return _loadDone(false);
+        }
+        if (Number(savedConfig.bootEntrySlot) !== Number(entrySel)) {
+            const preparedConfig = Object.assign({}, savedConfig, {
+                bootEntrySlot: entrySel,
+                // This path is an intentional hardware Prepare, unlike
+                // ordinary Designer saves which may carry an unchanged slot.
+                prepareBootEntry: true,
+            });
+            const prepareResp = await fetch('/api/boot-config', {
+                method: 'POST',
+                headers: Object.assign({'Content-Type': 'application/json'},
+                    (window.BuildApprovalView && window.BuildApprovalView._authHeaders
+                        ? window.BuildApprovalView._authHeaders() : {})),
+                body: JSON.stringify(preparedConfig),
+            });
+            if (!prepareResp.ok) {
+                const err = await prepareResp.json().catch(function() { return {}; });
+                _loadLog('ERROR: selection was not saved or prepared — ' +
+                    (err.error || prepareResp.status));
+                return _loadDone(false);
+            }
+            _loadLog('Prepared saved Lightning Bolt selection NS[' + entrySel + '].');
+        }
         let exactPayload = {};
         if (exactSourceImage) {
             const bytes = exactSourceImage instanceof Uint8Array
@@ -20615,7 +20719,9 @@ async function _wukongLoadToHardware(exactSourceImage) {
             _loadLog('Generating boot image (\u26A1 entry slot ' + entrySel + ')\u2026');
             const genResp = await fetch('/api/boot-image/generate', {
                 method : 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: Object.assign({'Content-Type': 'application/json'},
+                    (window.BuildApprovalView && window.BuildApprovalView._authHeaders
+                        ? window.BuildApprovalView._authHeaders() : {})),
                 body   : JSON.stringify(Object.assign({entrySlot: entrySel, forHardware: true},
                     _targetAuthorization.request))
             });

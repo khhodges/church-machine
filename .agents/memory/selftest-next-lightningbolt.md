@@ -11,15 +11,14 @@ continuation and must never silently fall back to a separate persisted target.
 same selected abstraction. Separate settings can diverge and make the visible
 continuation label disagree with the generated boot image.
 
-**How to apply:** Whenever the LightningBolt entry changes, update the live
-SelfTest C-List row 1. Boot-image generation and simulator initialization must
-derive row 1 from the selected boot-entry slot; reject or ignore legacy
-independent Next-target configuration. After reset, reapply the persisted
-LightningBolt selection to the simulator; never sync a temporary factory
-SelfTest slot back into the user's selection.
+**How to apply:** Explicit image preparation couples the destination-local
+SelfTest Next capability to the selected target, including its current generation.
+Never rewrite immutable source LUMPs. Never reapply a browser preference during
+reset or boot: imported/prepared image bytes own boot authority. Expose a
+selection discrepancy and require deliberate preparation instead.
 
 Build Approval may show LightningBolt in the same per-slot selector, but it is
-a synthetic boot-role choice: selecting it persists only `bootEntrySlot`. The
+a synthetic boot-role choice, separate from load policy. The
 programmer's per-slot rule is stored separately and is authoritative, including
 for architecture rows; step2 remains only the body-loading projection for
 programmable LUMP rows.

@@ -37,19 +37,22 @@ check('fresh projects load defaults before saving Namespace build settings',
 check('Namespace build settings are persisted through the boot-config endpoint',
     helper.includes("method: 'POST'") && helper.includes("fetch('/api/boot-config'"));
 check('Namespace save carries the selected Lightning Bolt boot entry',
-    helper.includes('bootEntrySlot: cfg.bootEntrySlot') &&
-    helper.includes("localStorage.getItem('bootEntrySlot')"));
+    source.includes('bootConfigCandidate.bootEntrySlot = nsSaveBootEntry'));
 
 const saveStart = source.indexOf('window._nsTableSave = async function(btn)');
 const saveEnd = source.indexOf('// ── NS Table Load', saveStart);
 const save = source.slice(saveStart, saveEnd);
 const saveRaw = save.indexOf("fetch('/api/boot-image/save-ns'");
-const saveConfig = save.lastIndexOf('await window._ensureNamespaceBuildConfig()');
 const clearDirty = save.indexOf('_setNsDirty(false)');
-check('single save writes the Namespace table before next-build settings',
-    saveRaw !== -1 && saveConfig > saveRaw);
-check('single save clears the dirty indicator only after both writes',
-    clearDirty > saveConfig);
+check('single save submits a boot-config candidate with Namespace bytes',
+    saveRaw !== -1 &&
+    save.includes('boot_config: bootConfigCandidate') &&
+    save.includes('bootConfigCandidate.bootEntrySlot = nsSaveBootEntry'));
+check('single save does not issue a separate post-commit config write',
+    save.lastIndexOf('await window._ensureNamespaceBuildConfig()') < saveRaw &&
+    save.includes('window._setActiveBootConfig('));
+check('single save clears the dirty indicator after transaction acknowledgement',
+    clearDirty > saveRaw);
 
 check('Namespace save regenerates and validates a missing boot image before snapshotting',
     save.indexOf("fetch('/api/boot-image/generate'") !== -1 &&
@@ -71,17 +74,16 @@ const step1Save = editorSource.slice(step1Start, step1End);
 check('Step 1 save also carries the selected Lightning Bolt boot entry',
     step1Save.includes('bootEntrySlot:') &&
     step1Save.includes("localStorage.getItem('bootEntrySlot')"));
-check('Step 1 save falls back to the server boot entry before slot 6',
-    step1Save.includes('savedBootEntry') &&
-    step1Save.includes('savedBootEntry : 6'));
+check('Step 1 save carries only an explicitly prepared boot entry',
+    step1Save.includes("preparedUi.status === 'prepared'") &&
+    step1Save.includes('bootEntrySlot = preparedUi'));
 
 const loadStart = editorSource.indexOf('function _rlLoad()');
 const loadEnd = editorSource.indexOf('function _rlInitStep2(', loadStart);
 const residentLoad = editorSource.slice(loadStart, loadEnd);
-check('Resident LUMP load prefers the persisted server boot entry',
-    residentLoad.includes('The server is authoritative') &&
-    residentLoad.indexOf('if (Number.isInteger(savedBootSlot)') <
-        residentLoad.indexOf('else if (Number.isInteger(localBootSlot)'));
+check('Resident LUMP load reads the persisted server boot entry without preparing it',
+    residentLoad.includes('Loading the configuration is inspection only') &&
+    residentLoad.includes('if (Number.isInteger(savedBootSlot)'));
 
 const addStart = source.indexOf('const _doInstall = async function(words)');
 const addEnd = source.indexOf('const _onError = function(err)', addStart);

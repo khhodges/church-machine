@@ -3,6 +3,7 @@
 import hashlib
 import importlib
 import json
+import os
 import struct
 
 from hardware.wukong_bridge import (
@@ -143,7 +144,10 @@ def test_lazy_prefetch_save_retains_capacity_and_hash_binding(monkeypatch, tmp_p
         }]},
     }
     with app_module.app.test_client() as client:
-        response = client.post("/api/boot-config", json=payload)
+        token = os.environ.get("REPORT_TOKEN", "").strip()
+        response = client.post(
+            "/api/boot-config", json=payload,
+            headers={"Authorization": f"Bearer {token}"} if token else {})
     assert response.status_code == 200
     saved = json.loads(config_path.read_text())
     entry = saved["step2"]["lumps"][0]

@@ -1267,6 +1267,8 @@ trackAsync((async function t21() {
     const dom = new JSDOM(`<!DOCTYPE html><body>
         <div id="editor"><div class="editor-layout"></div></div>
         <div id="codeSidebarTabs"></div>
+        <button id="savedLumpIdentityToggle"></button>
+        <div id="savedLumpIdentityPanel"></div>
         <div id="savedLumpDisassemblyPanel" style="display:none">
           <h2 id="savedLumpDisassemblyTitle"></h2>
           <pre id="savedLumpDisassembly" aria-readonly="true"></pre>
@@ -1287,6 +1289,7 @@ trackAsync((async function t21() {
     };
     vm.createContext(sandbox);
     vm.runInContext(
+        extractFunctionByName('app-lumps.js', '_syncSavedLumpIdentityVisibility') + '\n' +
         SWITCH_CODE_TAB_SRC + '\n' + SAVED_LUMP_ENTER_SRC + '\n' + SAVED_LUMP_EXIT_SRC,
         sandbox);
 
@@ -1545,6 +1548,8 @@ trackAsync((async function t26() {
     assert('T26 identity comes from the same exact words response',
         opened.lump.identity_hash === exactResponse.identity_hash &&
         opened.lump.binary_hash === exactResponse.binary_hash, opened.lump);
+    assert('T26 unknown validation fields do not claim verified provenance',
+        opened.lump._identityProvenance === 'unverified', opened.lump);
     assert('T26 exact LUMP identity and name are opened together',
         opened.token === saved.token && opened.name === saved.abstraction, opened);
 })());

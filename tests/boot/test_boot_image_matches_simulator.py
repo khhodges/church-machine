@@ -310,6 +310,7 @@ def _write_synthetic_boot_abstr_lump(lumps_dir, lump_size=64, cw=3, cc=0):
             "abstractions": [{
                 "name": "SelfTest",
                 "slot": BOOT_ABSTR_NS_SLOT,
+                "seq": 0,
                 "token": lump_token,
                 "filename": lump_name,
             }]
@@ -410,7 +411,7 @@ def test_generated_thread_body_overlap_and_nondefault_boot_entry_are_rejected_or
     with pytest.raises(ValueError, match=r"overlaps the fixed boot and generated Thread region"):
         generate_boot_image(colliding, str(tmp_path))
 
-    with pytest.raises(ValueError, match=r"non-executable CHURCH Enter identity"):
+    with pytest.raises(ValueError, match=r"selected boot target NS\[7\].*Namespace-state binding"):
         generate_boot_image(
             _cfg_generated_threads(5), str(tmp_path), boot_entry_slot=7)
 
@@ -552,6 +553,7 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
         "abstractions": [{
             "name": "SelfTest",
             "slot": BOOT_ABSTR_NS_SLOT,
+            "seq": 0,
             "token": saved_token,
                 "filename": saved_filename,
         }]
@@ -719,6 +721,7 @@ def test_boot_image_next_gt_follows_lightning_bolt(tmp_path, lightning_slot, sta
         "abstractions": [{
             "name": "SelfTest",
             "slot": BOOT_ABSTR_NS_SLOT,
+            "seq": 0,
             "token": SAVED_TOKEN,
             "filename": CANONICAL_FILENAME,
         }]

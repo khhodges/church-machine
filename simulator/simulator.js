@@ -158,7 +158,8 @@ class ChurchSimulator {
         // resumes from its pause address; the breakpoint remains installed.
         this._breakpointResumeAddr = null;
 
-        // Which NS slot the boot sequence jumps to at B:05/B:06.
+        // Which NS slot the three-instruction boot sequence enters through
+        // Boot.Thread's prepared CR0 home.
         // Defaults to 6 (SelfTest); overridden by app.js
         // when the user selects a different boot-entry abstraction.
         // Intentionally NOT reset by reset() — persists across soft resets.
@@ -427,22 +428,20 @@ class ChurchSimulator {
         this.NS_TABLE_BASE    = discoveredNsTableBase;
         this.MAX_NS_ENTRIES   = discoveredMaxNsEntries;
         this._loadedThreadSlots = discoveredThreadSlots;
-        if (discoveredBootEntrySlot !== this.bootEntrySlot) {
-            // Honour the binary's stored entry UNLESS the binary is merely reverting
-            // to the default Boot.Abstr slot (_bootAbstrSlot) while the user has
-            // already selected a non-default entry via ⚡.  In that case, preserve
-            // the user's choice so a reboot after ⚡ change doesn't silently reset
-            // the entry back to SelfTest.
-            // Rule: user's selection wins over the binary's DEFAULT; binary's
-            // explicit non-default wins over the user's selection.
-            const _userOverride = (this.bootEntrySlot !== this._bootAbstrSlot)   // user changed
-                                && (discoveredBootEntrySlot === this._bootAbstrSlot); // binary reverts
-            if (_userOverride) {
-                this.output += `[BOOTIMG] Boot entry: preserving user selection Slot ${this.bootEntrySlot} (image stored Slot ${discoveredBootEntrySlot}, ignored — user has a non-default ⚡ active).\n`;
-            } else {
-                this.bootEntrySlot = discoveredBootEntrySlot;
-                this.output += `[BOOTIMG] Boot entry restored from image: Slot ${discoveredBootEntrySlot}\n`;
-            }
+        const priorBootEntrySlot = this.bootEntrySlot;
+        // Imported authority is authoritative. A browser-local selection may
+        // be reported as a discrepancy but can never retarget, repair, or
+        // rewrite the frozen image bytes being loaded.
+        this.bootEntrySlot = discoveredBootEntrySlot;
+        this.bootEntryDiscrepancy = priorBootEntrySlot === discoveredBootEntrySlot ? null : {
+            priorSlot: priorBootEntrySlot,
+            importedSlot: discoveredBootEntrySlot,
+            authority: 'imported-image',
+        };
+        if (priorBootEntrySlot !== discoveredBootEntrySlot) {
+            this.output += `[BOOTIMG] Boot-entry discrepancy: prior UI slot ${priorBootEntrySlot}; imported image slot ${discoveredBootEntrySlot} is authoritative.\n`;
+        } else {
+            this.output += `[BOOTIMG] Boot entry restored from image: Slot ${discoveredBootEntrySlot}\n`;
         }
 
         const n   = src.length;
@@ -505,55 +504,6 @@ class ChurchSimulator {
                 // Also clears stale '(reserved)' that step3 wrote before the image was loaded.
                 const _savedLabel = cfg && cfg.slotLabels && cfg.slotLabels[_bi];
                 this.nsLabels[_bi] = _savedLabel || `slot_${_bi}`;
-            }
-        }
-
-        // ── MMIO slot format upgrade (binary-age-agnostic correction) ───────────
-        // Slots 2–5 are hardware MMIO register banks. Their NS word1 must carry
-        // gtType=1 (Inform). Stale binaries generated before this invariant was
-        // enforced may have the correct MMIO address in word0 but gtType=0 (NULL)
-        // in word1, causing the NS table to show "NULL" for UART/LED/BTN/TIMER.
-        // Re-write word0 and word1 unconditionally so binary age never affects
-        // runtime slot-type behaviour.
-        {
-            const _MMIO_REINIT = {};
-            for (const [name, spec] of Object.entries(ARCH_BOOT.devices)) {
-                _MMIO_REINIT[ARCH_BOOT.minimalSlots[name]] = {
-                    addr: spec.address,
-                    lim17: spec.words - 1,
-                };
-            }
-            for (const [_slotStr, _spec] of Object.entries(_MMIO_REINIT)) {
-                const _slot  = Number(_slotStr);
-                // This is a display/catalog hint, never execution state or authority.
-                const _declared = (this._nsUiTypeHint && this._nsUiTypeHint[_slot]) || 0;
-                if (_declared !== 1) {
-                    // writeNSEntry recomputes W1 (authority) and W2 (integrity32).
-                    this.writeNSEntry(_slot, _spec.addr >>> 0, _spec.lim17, 0, 0, 1, 0, 0,
-                        this.memory[this._nsSlotBase(_slot) + 3] >>> 0);
-                    this.output += `[BOOTIMG] NS[${_slot}] MMIO gtType upgraded NULL→Inform (stale binary).\n`;
-                }
-            }
-        }
-
-        // ── NS slot 1 (Thread) location correction (binary-age-agnostic) ──────────
-        // Stale boot images generated before the A7 v1.2 direct-dispatch layout
-        // finalization may have DEMO_CLIST GT words written into the NS TABLE tail,
-        // which overwrites NS slot 1 word0 (Thread physical location) with a GT
-        // value such as 0x32000003 (an Inform GT for slot 3 = LED_DEV).  A GT word
-        // always has non-zero upper bits (≥ 0x02000000); a valid Thread lump
-        // location for A7 v1.2 is 0 (Thread@0 canonical) and is always less than
-        // NS_TABLE_BASE.  Detect and correct any out-of-range Thread location.
-        {
-            const _threadNsB  = this._nsSlotBase(1);
-            const _threadLoc  = this.memory[_threadNsB] >>> 0;
-            if (_threadLoc >= this.NS_TABLE_BASE) {
-                // Location is in or past the NS table — stale DEMO_CLIST stomp.
-                // Reset to canonical A7 v1.2 Thread location 0 and recompute seals.
-                const _threadLim17 = this.memory[_threadNsB + 1] & 0x1FFFF;
-                this.memory[_threadNsB]     = 0;
-                this.memory[_threadNsB + 2] = this.makeVersionSeals(0, 0, _threadLim17);
-                this.output += `[BOOTIMG] NS[1] Thread location corrected: 0x${_threadLoc.toString(16).padStart(8,'0')} → 0x00000000 (stale binary DEMO_CLIST stomp).\n`;
             }
         }
 
@@ -1024,6 +974,11 @@ class ChurchSimulator {
         this.bootComplete = false;
         this.mElevation = false;
         this.bootStep = 0;
+        this._bootAttemptCounter = (this._bootAttemptCounter || 0) + 1;
+        this.bootAttemptId = this._bootAttemptCounter;
+        this.bootProgress = this._newBootProgress(this.bootAttemptId);
+        this._bootFaultContext = null;
+        this.bootEntryDiscrepancy = null;
         this._initThrdEntry = null;
         this._nucLumpData = null;
         this.callHomeStatus = null;
@@ -1136,8 +1091,11 @@ class ChurchSimulator {
     }
 
     _returnToBoot() {
+        // Resetting the live register bank must not write NULL back through
+        // CR12 into the prepared Boot.Thread homes.
+        this._liveThreadOwned = false;
         for (let i = 0; i < 16; i++) {
-            this._clearCR(i);
+            this.cr[i] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
         }
         this.dr.fill(0);
         this.flags = { N: false, Z: false, C: false, V: false };
@@ -1151,9 +1109,13 @@ class ChurchSimulator {
         this.halted = false;
         this.running = false;
         this.bootComplete = false;
-        this._liveThreadOwned = false;
         this.mElevation = false;
         this.bootStep = 0;
+        this._bootAttemptCounter = (this._bootAttemptCounter || 0) + 1;
+        this.bootAttemptId = this._bootAttemptCounter;
+        this.bootProgress = this._newBootProgress(this.bootAttemptId);
+        this._bootFaultContext = null;
+        this.bootEntryDiscrepancy = null;
         this._initThrdEntry = null;
         this._nucLumpData = null;
         this.callHomeStatus = null;
@@ -1173,12 +1135,12 @@ class ChurchSimulator {
      * _fastBoot(reason)
      *
      * PP250-style instant re-boot on fault.  On real hardware the boot FSM
-     * runs three transitions (IDLE→FAULT_RST→LOAD_NS→COMPLETE) in 240 ns —
+     * runs reset and the three boot-ROM instructions in 240 ns —
      * the programmer never sees the delay.  In the simulator this translates
      * to calling _returnToBoot() (which clears CRs/DRs and resets bootStep=0)
-     * and then letting the normal _bootStep() loop re-run all eight boot
-     * phases from the top — including B:04 CALL_HOME which reads faultLog and
-     * automatically sets boot_reason=2 whenever the log is non-empty.
+     * and then letting the normal _bootStep() loop retire LOAD, CHANGE, and
+     * CALL. Reset capture and CALL_HOME remain separate events, with the
+     * latter reading faultLog and setting boot_reason=2 when appropriate.
      *
      * reason — 0 = cold boot  2 = fault-recovery re-boot (matches firmware
      *          boot_reason field and simulator Tunnel.Register DR1 convention)
@@ -1385,6 +1347,107 @@ class ChurchSimulator {
             tableOffset, bootEntryWord: bootEntry, bootEntrySlot: bootEntry === null ? null : bootEntry / 4, format, sealBoundary,
             namespaceSize, slotCount, entryWords: this.NS_ENTRY_WORDS,
             headerWords: ChurchSimulator.NAMESPACE_HEADER_V2_WORDS,
+        };
+    }
+
+    // ── Boot-entry binding -----------------------------------------------------
+    // A boot selection is data in the Boot.Thread image, not a request for the
+    // boot FSM to manufacture a capability later.  Keep validation and the
+    // small, persistent commit together so a failed selection is strictly
+    // non-mutating (including the V2 header).
+    _validateBootEntryBinding(slot) {
+        const fail = (code, reason) => ({ ok: false, code, reason, slot });
+        if (!Number.isInteger(slot) || slot < 0 || slot >= this.MAX_NS_ENTRIES) {
+            return fail('BOOT_ENTRY_SLOT', `Namespace slot ${slot} is invalid.`);
+        }
+        if (!this.isNSEntryValid(slot)) {
+            return fail('BOOT_ENTRY_ABSENT', `Namespace slot ${slot} has no valid entry.`);
+        }
+        const entry = this.readNSEntry(slot);
+        if (!entry || entry.gtType !== 1) {
+            return fail('BOOT_ENTRY_TYPE', `Namespace slot ${slot} must be an Inform entry.`);
+        }
+        const base = entry.word0_location >>> 0;
+        if (base < ChurchSimulator.NAMESPACE_HEADER_V2_WORDS ||
+                base >= this.NS_TABLE_BASE || base >= this.memory.length) {
+            return fail('BOOT_ENTRY_LOCATION',
+                `Namespace slot ${slot} does not name a resident executable body.`);
+        }
+        const header = this.parseLumpHeader(this.memory[base] >>> 0);
+        if (!header.valid || header.typ !== 0 || header.cw < 1 ||
+                base + header.lumpSize > this.NS_TABLE_BASE) {
+            return fail('BOOT_ENTRY_EXECUTABLE',
+                `Namespace slot ${slot} is not a resident executable LUMP.`);
+        }
+        const thread = this.getThreadInstanceLayout(BOOT_NS_SLOT_THREAD);
+        if (!thread || !thread.valid) {
+            return fail('BOOT_THREAD',
+                `Boot.Thread has invalid geometry: ${(thread && thread.reason) || 'unavailable'}`);
+        }
+        const sequence = this.parseNSWord1(entry.word1_limit).gtSeq;
+        return {
+            ok: true, slot, entry, header, thread, sequence,
+            gt: this.createGT(sequence, slot, { E: 1 }, 1) >>> 0,
+            homeAddress: (thread.base + thread.capsStart) >>> 0,
+        };
+    }
+
+    // Public, transactional selection API used by the boot-entry UI.  Do not
+    // call _writeCR here: a selection must never alter a live running context.
+    prepareBootEntry(slot) {
+        const binding = this._validateBootEntryBinding(slot);
+        if (!binding.ok) return binding;
+        const header = this.parseNamespaceHeaderV2(this.memory, 0);
+        if (!header.valid) {
+            return {
+                ok: false, code: 'BOOT_HEADER',
+                reason: `Namespace Header V2 is invalid: ${header.errors.join(' ')}`,
+                slot,
+            };
+        }
+
+        // Validation completed before the first write. The only image words
+        // selected by this operation are Thread.CR0's home and Header V2 W4.
+        this.memory[binding.homeAddress] = binding.gt;
+        this.memory[4] = ((binding.entry.word0_location >>> 0) * 4) >>> 0;
+        this.bootEntrySlot = slot;
+        return {
+            ok: true, slot, gt: binding.gt, sequence: binding.sequence,
+            threadSlot: BOOT_NS_SLOT_THREAD, homeAddress: binding.homeAddress,
+            imageHeaderUpdated: true,
+        };
+    }
+
+    // Public read-only diagnostics for the UI and boot regression tests.
+    inspectBootEntryBinding() {
+        const slot = this.bootEntrySlot;
+        const binding = this._validateBootEntryBinding(slot);
+        const header = this.parseNamespaceHeaderV2(this.memory, 0);
+        const homeAddress = binding.ok ? binding.homeAddress : null;
+        const homeGT = homeAddress === null ? null : (this.memory[homeAddress] >>> 0);
+        const expectedGT = binding.ok ? binding.gt : null;
+        const headerMatches = binding.ok && header.valid &&
+            (header.bootEntryWord >>> 0) ===
+                (((binding.entry.word0_location >>> 0) * 4) >>> 0);
+        const homeMatches = binding.ok && homeGT === expectedGT;
+        const ok = !!(binding.ok && headerMatches && homeMatches);
+        return {
+            ok,
+            status: ok ? 'bound' : 'invalid',
+            slot,
+            targetSlot: binding.ok ? binding.slot : null,
+            targetLabel: binding.ok ? (binding.entry.label || `NS[${slot}]`) : null,
+            sequence: binding.ok ? binding.sequence : null,
+            homeAddress,
+            homeGT,
+            expectedGT,
+            headerValid: header.valid,
+            headerBootEntryWord: header.bootEntryWord,
+            headerMatches,
+            homeMatches,
+            reason: ok ? null : (binding.reason ||
+                (!header.valid ? `Namespace Header V2 is invalid: ${header.errors.join(' ')}`
+                    : 'Boot.Thread CR0 home or Namespace Header V2 W4 disagrees with the selection.')),
         };
     }
 
@@ -2663,12 +2726,10 @@ class ChurchSimulator {
         // Materialize the canonical V2 physical Namespace header at word zero.
         // It is separate from all resident bodies and the tail-descending table.
         const _nsHeaderStart = 0;
-        // A persisted boot selection may refer to a slot whose dynamic LUMP is
-        // not resident yet.  Keep reset recoverable; setBootEntrySlot will
-        // validate the selection once its descriptor exists.
-        const _bootEntry = this.readNSEntry(this.bootEntrySlot) ||
-            this.readNSEntry(this._bootAbstrSlot) ||
-            this.readNSEntry(0);
+        // A full simulator reset constructs only the architectural default
+        // image. It deliberately does not replay a prior UI selection into a
+        // new Thread home; callers must explicitly prepare selection again.
+        const _bootEntry = this.readNSEntry(this._bootAbstrSlot);
         const _bootEntryLocation = _bootEntry
             ? ((_bootEntry.word0_location >>> 0) * 4)
             : ChurchSimulator.NAMESPACE_HEADER_V2_WORDS;
@@ -2695,8 +2756,8 @@ class ChurchSimulator {
         this.memory[threadLoc + THREAD_STO_OFFSET] =
             this._packProtectedIndicator(_initialResumeSTO, 1, {}, 0);
 
-        // Thread caps zone — CR0 home slot at the Thread tail is pre-set to an Enter-GT
-        // for bootEntrySlot (the ⚡ lightning-bolt selection, e.g. LED Flash at slot 10).
+        // Thread caps zone — a fresh reset image carries only the architectural
+        // default. A non-default entry is written solely by prepareBootEntry().
         // The boot entry's done: loop calls TPERM CR0, E to decide when to dispatch
         // to the programmer's abstraction; INIT_ABSTR overwrites this slot when
         // the user loads their program, and the next Scheduler reschedule updates CR0.
@@ -2704,11 +2765,11 @@ class ChurchSimulator {
         // minted from.  Do not assume the selected entry is generation zero:
         // a user can replace/reissue it before rebooting.  The boot path must
         // carry the live W1 gt_seq into Thread.caps[0].
-        const _initialBootEntry = this.readNSEntry(this.bootEntrySlot);
+        const _initialBootEntry = this.readNSEntry(this._bootAbstrSlot);
         const _initialBootSeq = _initialBootEntry
             ? this.parseNSWord1(_initialBootEntry.word1_limit).gtSeq : 0;
         const _initialEntryGT =
-            this.createGT(_initialBootSeq, this.bootEntrySlot, {E: 1}, 1);
+            this.createGT(_initialBootSeq, this._bootAbstrSlot, {E: 1}, 1);
         this.memory[threadLoc + THREAD_LAYOUT.capsStart] = _initialEntryGT;
         this.memory[threadLoc + _initialResumeSTO + 1] = _initialEntryGT;
         this.memory[threadLoc + _initialResumeSTO + 2] =
@@ -2731,7 +2792,7 @@ class ChurchSimulator {
         // Next.GT at c-list[1]: SelfTest calls through it at done:
         // (CALL AL, CR1, CR1). It must always mirror the ⚡ LightningBolt
         // selection used for Thread.CR0, never a separately persisted target.
-        clistGTs[1] = this.createGT(0, this.bootEntrySlot, {E: 1}, 1);
+        clistGTs[1] = this.createGT(0, this._bootAbstrSlot, {E: 1}, 1);
 
         const DEMO_CLIST_SIZE   = 11;   // slots 0–10 (minimal 11-slot namespace)
 
@@ -2879,7 +2940,254 @@ class ChurchSimulator {
             + `— body lazy-loads on first Tier 2 fault\n`;
     }
 
+    _newBootProgress(attemptId) {
+        const instructions = [
+            { mnemonic: 'LOAD', change: 'LOAD CR15, CR15[0]', destinationRegister: 15, opcode: 0 },
+            { mnemonic: 'CHANGE', change: 'CHANGE CR12, CR15[1]', destinationRegister: 12, opcode: 4 },
+            { mnemonic: 'CALL', change: 'CALL CR0', destinationRegister: 0, opcode: 2 },
+        ];
+        return instructions.map((instruction, bootRomAddress) => ({
+            attemptId,
+            bootRomAddress,
+            word: this.encodeInstruction(
+                instruction.opcode, 14, instruction.destinationRegister,
+                bootRomAddress === 1 ? 15 : instruction.destinationRegister,
+                bootRomAddress === 1 ? 1 : 0),
+            mnemonic: instruction.mnemonic,
+            instruction: instruction.change,
+            destinationRegister: instruction.destinationRegister,
+            status: bootRomAddress === 0 ? 'pending' : 'unexecuted',
+            gateReason: null,
+        }));
+    }
+
+    _setBootProgressStatus(index, status, gateReason = null) {
+        const row = this.bootProgress && this.bootProgress[index];
+        if (!row) return;
+        row.status = status;
+        row.gateReason = gateReason || null;
+        if (status === 'completed' && this.bootProgress[index + 1] &&
+                this.bootProgress[index + 1].status === 'unexecuted') {
+            this.bootProgress[index + 1].status = 'pending';
+        }
+    }
+
+    _bootFailInstruction(index, fallback) {
+        const last = this.faultLog && this.faultLog[this.faultLog.length - 1];
+        this._setBootProgressStatus(index, 'failed',
+            (last && last.message) || fallback);
+        return false;
+    }
+
+    _setBootFaultContext(index, provenanceRegister, provenanceGT = 0) {
+        const row = this.bootProgress && this.bootProgress[index];
+        if (!row) return;
+        let parsed = null;
+        if (!ChurchSimulator.isNullGT(provenanceGT >>> 0)) {
+            try { parsed = this.parseGT(provenanceGT >>> 0); } catch (_) {}
+        }
+        this._bootFaultContext = {
+            attemptId: row.attemptId,
+            word: row.word >>> 0,
+            bootRomAddress: row.bootRomAddress,
+            provenanceRegister,
+            provenanceGT: provenanceGT >>> 0,
+            slot: parsed ? parsed.index : null,
+            sequence: parsed ? parsed.gt_seq : null,
+        };
+    }
+
+    // FAULT_RST is a reset event rather than one of the three visible boot
+    // instructions.  Keep its fault provenance and reset semantics without
+    // allowing it to appear in bootProgress.
+    _bootResetEvent() {
+        if (this.faultLog && this.faultLog.length) {
+            const last = this.faultLog[this.faultLog.length - 1];
+            const snap = last.crSnapshot || [];
+            const slotFor = index => (snap[index] && snap[index].word0)
+                ? (snap[index].word0 & 0xFFFF) : null;
+            const labelFor = slot => slot === null ? '—' :
+                ((this.nsLabels && this.nsLabels[slot]) || `NS[${slot}]`);
+            this.faultViolationData = {
+                namespace: { nsSlot: slotFor(15), label: labelFor(slotFor(15)) },
+                thread: { nsSlot: slotFor(12), label: labelFor(slotFor(12)) },
+                abstraction: { nsSlot: slotFor(14), label: labelFor(slotFor(14)) },
+                method: last.faultingMnemonic || '—',
+                pc: last.pc || 0,
+                physicalPC: last.physicalPC || 0,
+                faultType: last.type || '?',
+                faultMsg: last.message || '?',
+            };
+        } else {
+            this.faultViolationData = null;
+        }
+        if (this._liveThreadOwned &&
+                !this._suspendLiveThread(this._currentThreadSlot)) return false;
+        this._liveThreadOwned = false;
+        this._currentThreadSlot = BOOT_NS_SLOT_THREAD;
+        // This is a reset-bank wipe, not an architectural CR writeback. In
+        // particular it must not zero the prepared CR0 home through CR12.
+        for (let i = 0; i < 16; i++) {
+            this.cr[i] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
+        }
+        this.dr.fill(0);
+        this.flags = { N: false, Z: false, C: false, V: false };
+        this.callStack = [];
+        this.lambdaActive = false;
+        this.lambdaCachedFrame = null;
+        this.pc = 0;
+        this.physicalPC = 0;
+        this.sto = 243;
+        this.mElevation = true;
+        this.auditLog.push({
+            gate: 'RST', desc: 'Reset event: CR0–CR15 and DR0–DR15 cleared before boot ROM.',
+            label: 'Reset event', nsIndex: null, requiredPerm: null,
+            checks: { reset: { pass: true } }, b: 0, f: 0, result: 'pass',
+            stepCtx: 'RESET_EVENT',
+        });
+        return true;
+    }
+
+    // CALL_HOME remains an out-of-band boot event. It has no boot-ROM word and
+    // intentionally never creates a bootProgress record.
+    _bootCallHomeEvent() {
+        const last = this.faultLog && this.faultLog[this.faultLog.length - 1];
+        const reason = last ? 2 : 0;
+        const fault = last ? (last.type || 0) : 0;
+        const nia = last ? (last.pc || 0) : 0;
+        let ack = 0;
+        let mode = 'offline';
+        if (this.abstractionRegistry) {
+            const result = this.abstractionRegistry.dispatchMethod(
+                this._slotByPetName('Tunnel', 8), 'Register', this,
+                { dr1: reason, dr2: fault, dr3: nia });
+            if (result && result.ok !== false) {
+                ack = result.dr0 !== undefined ? (result.dr0 | 0) : 0;
+                mode = ack > 0 ? 'online' : 'offline';
+            }
+        } else if (this.uartRegs) {
+            this.uartRegs[0] = nia;
+            ack = this.uartRegs[1] | 0;
+            mode = ack > 0 ? 'online' : 'offline';
+        }
+        this.callHomeStatus = mode;
+        this.callHomeTimestamp = Date.now();
+        this.auditLog.push({
+            gate: 'CALL_HOME',
+            desc: `Tunnel.Register(reason=${reason}, fault_NIA=0x${nia.toString(16).toUpperCase()}) ACK=${ack} [${mode}]`,
+            label: `Tunnel.Register ACK=${ack}`, nsIndex: null, requiredPerm: null,
+            checks: { callHome: { pass: true } }, b: 0, f: 0, result: 'pass',
+            stepCtx: 'CALL_HOME_EVENT',
+        });
+    }
+
+    // The reset event establishes only reset state.  The boot ROM itself has
+    // exactly three retiring instructions: LOAD CR15, CHANGE CR12, CALL CR0.
+    // The first has an architecturally special Namespace-root source, while
+    // CHANGE and CALL deliberately reuse the regular instruction machinery.
+    _bootStepThreeInstruction() {
+        if (this.bootComplete || this.halted) return false;
+        this.executionStats.bootPhases++;
+        const index = this.bootStep;
+        if (index < 0 || index > 2) return false;
+        this._setBootFaultContext(index, 15, this.cr[15] && this.cr[15].word0);
+        if (index === 0 && !this._bootResetEvent()) return false;
+        this.physicalPC = index;
+        this.mElevation = true; // reset-state privilege, not a boot instruction
+        this._setBootProgressStatus(index, 'pending');
+
+        if (index === 0) {
+            this._setBootFaultContext(index, 15, 0);
+            const entry = this.readNSEntry(BOOT_NS_SLOT_HEADER);
+            if (!entry) {
+                this.fault('BOOT', 'LOAD CR15: Namespace root entry is unavailable.');
+                return this._bootFailInstruction(index, 'Namespace root is unavailable.');
+            }
+            const seq = this.parseNSWord1(entry.word1_limit).gtSeq;
+            const rootGT = this.createGT(seq, BOOT_NS_SLOT_HEADER,
+                {R:0,W:0,X:0,L:0,S:0,E:0}, 1);
+            this._setBootFaultContext(index, 15, rootGT);
+            const check = this.mLoad(rootGT, null, 15);
+            if (!check.ok) {
+                this.fault('BOOT', `LOAD CR15: ${check.message}`);
+                return this._bootFailInstruction(index, check.message);
+            }
+            if (!this._writeCR(15, rootGT, check.entry)) {
+                return this._bootFailInstruction(index, 'CR15 write was rejected.');
+            }
+            this.pc = 1;
+            this._emitTrace(this.physicalPC, TRACE_EV_LOAD_SHADOW, 0);
+            this._emitTrace(this.physicalPC, TRACE_EV_LOAD_NEW, this.cr[15].word0 >>> 0);
+            this.output += 'BOOT LOAD CR15, CR15[0] — Namespace root established\n';
+        } else if (index === 1) {
+            this._setBootFaultContext(index, 15, this.cr[15].word0);
+            const result = this._execChange({
+                opcode: 4, cond: 14, crDst: 12, crSrc: 15, imm: BOOT_NS_SLOT_THREAD,
+                mnemonic: 'CHANGE',
+            });
+            if (!result || this.halted) {
+                return this._bootFailInstruction(index, 'CHANGE CR12 was rejected.');
+            }
+            this.output += 'BOOT CHANGE CR12, CR15[1] — Boot.Thread restored\n';
+        } else {
+            // CR0 is the sole boot-entry authority after CHANGE restored the
+            // prepared Thread home.  Do not consult the mutable UI selection
+            // here: ordinary CALL gates must report null, stale, type, and
+            // permission failures from the actual restored capability.
+            this._setBootFaultContext(index, 0, this.cr[0].word0);
+            // M-elevation permits the privileged LOAD/CHANGE setup, but the
+            // root CALL must begin with a clean M window.  Otherwise CALL's
+            // ordinary writeback gate would interpret setup registers as an
+            // outstanding debugger transaction.
+            this._resetAllMBits();
+            this.mElevation = false;
+            const result = this._execCall({
+                opcode: 2, cond: 14, crDst: 0, crSrc: 0, imm: 0, mnemonic: 'CALL',
+                bootRootContext: true,
+            });
+            if (!result || this.halted) {
+                return this._bootFailInstruction(index, 'CALL CR0 was rejected.');
+            }
+            // The root CALL is the bottom call-frame.  The normal CALL gate
+            // built and validated its frame; tag that same frame as the reset
+            // sentinel so a root RETURN cannot enter boot-ROM memory.
+            const sentinel = this.callStack[this.callStack.length - 1];
+            const threadBase = this._activeThreadBase();
+            if (!sentinel || threadBase === null) {
+                this.fault('BOOT', 'CALL CR0 did not create a root frame.');
+                return this._bootFailInstruction(index, 'CALL CR0 did not create a root frame.');
+            }
+            sentinel.sentinel = true;
+            sentinel.returnPC = 0x7FFF;
+            sentinel.frameWord = this._packFrameWordRaw(
+                0x7FFF, 1, sentinel.savedSTO, sentinel.savedFlags);
+            this._writeRuntimeWord(threadBase + sentinel.savedSTO, sentinel.frameWord);
+            this.mElevation = false;
+            this._resetAllMBits();
+            this.bootComplete = true;
+            this._currentThreadSlot = BOOT_NS_SLOT_THREAD;
+            this._liveThreadOwned = true;
+            this.ledBits = 0b111111;
+            this.ledMode = 'boot';
+            this._bootCallHomeEvent();
+            this.output += 'BOOT CALL CR0 — root abstraction entered\n';
+        }
+
+        this._setBootProgressStatus(index, 'completed');
+        this.bootStep = index + 1;
+        if (this.bootComplete) this._bootFaultContext = null;
+        this.emit('stateChange', this.getState());
+        return true;
+    }
+
     _bootStep() {
+        return this._bootStepThreeInstruction();
+    }
+
+    /*
+     * Retired pre-three-instruction boot FSM, kept as source history only.
+     * It has no callable method or executable synthetic writer path.
+     *
         // All boot CRs are Inform-type (type=1) GTs — they name concrete NS slots that have
         // physical lumps.  Abstract GTs (type=3) are only minted at runtime by Navana.Abstraction.Add
         // and Navana.MintPassKey; the boot ROM never creates them.
@@ -3527,7 +3835,7 @@ class ChurchSimulator {
         }
         this.emit('stateChange', this.getState());  // notify UI that machine state has changed (triggers register/memory panel refresh)
         return true;                                 // return true = a boot step was executed; false = already complete or faulted
-    }
+    */
 
     parseGT(gt32) {
         // v2.0 GT layout: [31]=b_flag [30:28]=perm[2:0] [27]=dom
@@ -5597,6 +5905,33 @@ class ChurchSimulator {
             ? '0x' + (meta.gt >>> 0).toString(16).toUpperCase().padStart(8, '0')
             : null;
 
+        // Boot failures need immutable, instruction-time provenance.  Do not
+        // reconstruct this from bootStep later: a reset/retry can otherwise
+        // attach a previous attempt's instruction to the fault.
+        const bootCtx = (!this.bootComplete && this._bootFaultContext)
+            ? this._bootFaultContext : null;
+        let bootEvidence = null;
+        if (bootCtx) {
+            const provenance = this.cr && this.cr[bootCtx.provenanceRegister];
+            const liveGT = provenance ? (provenance.word0 >>> 0) : 0;
+            const provenanceGT = liveGT || (bootCtx.provenanceGT >>> 0);
+            let parsedGT = null;
+            try {
+                if (!ChurchSimulator.isNullGT(provenanceGT)) parsedGT = this.parseGT(provenanceGT);
+            } catch (_) {}
+            bootEvidence = {
+                attemptId: bootCtx.attemptId,
+                instructionWord: bootCtx.word >>> 0,
+                bootRomAddress: bootCtx.bootRomAddress,
+                domain: 'boot-rom',
+                evidenceProvenance: 'simulator-exact-boot-program',
+                provenanceRegister: `CR${bootCtx.provenanceRegister}`,
+                provenanceGT,
+                slot: parsedGT ? parsedGT.index : null,
+                sequence: parsedGT ? parsedGT.gt_seq : null,
+                gate: type,
+            };
+        }
         const entry = {
             type, message, pc: this.pc, physicalPC: this.physicalPC, step: this.stepCount,
             threadSlot: this._liveThreadOwned && Number.isInteger(this._currentThreadSlot)
@@ -5623,6 +5958,7 @@ class ChurchSimulator {
             primary_gt: _primaryGT,
             gt_snapshot: _gtSnapshot,
             pet_names: _petNames,
+            bootEvidence,
             ...(meta || {}),
         };
 
@@ -6816,7 +7152,10 @@ class ChurchSimulator {
         }
         const hdrWord = this.memory[base] >>> 0;
         const hdr = this.parseLumpHeader(hdrWord);
-        const hasLumpHeader = hdr.valid && hdr.cc > 0;
+        // The boot root may be a deliberately c-list-free executable LUMP.
+        // Its CALL still installs a code context. Preserve historical ordinary
+        // CALL behaviour for cc=0 inputs outside that privileged boot form.
+        const hasLumpHeader = hdr.valid && (hdr.cc > 0 || d.bootRootContext === true);
 
         if (hasLumpHeader) {
             const headerContext = this._installLumpHeaderContext(
@@ -7468,6 +7807,24 @@ class ChurchSimulator {
                     for (let i = 0; i < 12; i++) {
                         const gtWord = this.memory[tBase + restoreLayout.capsStart + i] >>> 0;
                         if (gtWord !== 0) {
+                            // CR0 is deliberately restored as the raw,
+                            // prepared boot credential. Its validation belongs
+                            // to the next architectural instruction, CALL
+                            // CR0, so null/stale/type/permission errors are
+                            // reported by CALL's ordinary gates rather than
+                            // being silently repaired or pre-consumed here.
+                            if (i === 0) {
+                                const raw = this.parseGT(gtWord);
+                                const rawEntry = this.readNSEntry(raw.index);
+                                restoredRegs[i] = {
+                                    word0: gtWord,
+                                    word1: rawEntry ? (rawEntry.word0_location >>> 0) : 0,
+                                    word2: rawEntry ? (rawEntry.word1_limit >>> 0) : 0,
+                                    word3: 0,
+                                    m: 0,
+                                };
+                                continue;
+                            }
                             const capCheck = this.mLoad(gtWord, null, i);
                             if (!capCheck.ok) {
                                 this.fault(capCheck.fault,
@@ -7486,6 +7843,22 @@ class ChurchSimulator {
                         }
                     }
                     for (let i = 0; i < 12; i++) this.cr[i] = restoredRegs[i];
+                    // CHANGE CR12 establishes the active Thread's private heap
+                    // view as part of the privileged RESTORE_CALL transaction.
+                    // This mirrors Thread CHANGE (which also derives CR5 from
+                    // geometry) and lets boot use this one instruction rather
+                    // than a synthetic INIT_HEAP phase.
+                    const restoreSeq = this.parseNSWord1(threadEntry.word1_limit).gtSeq;
+                    const heapGT = this.createGT(
+                        restoreSeq, targetIdx,
+                        {R:1,W:1,X:0,L:0,S:0,E:0}, 1);
+                    this.cr[5] = {
+                        word0: heapGT >>> 0,
+                        word1: (tBase + restoreLayout.heapStart) >>> 0,
+                        word2: (restoreLayout.heapWords - 1) >>> 0,
+                        word3: 0,
+                        m: 0,
+                    };
                 }
             }
 
@@ -10552,6 +10925,12 @@ class ChurchSimulator {
             callFrames: this.callStack.map(f => ({ sz: f.sz, returnPC: f.returnPC, savedSTO: f.savedSTO, frameWord: f.frameWord })),
             stepCount: this.stepCount,
             halted: this.halted,
+            bootComplete: this.bootComplete,
+            bootStep: this.bootStep,
+            bootAttemptId: this.bootAttemptId,
+            bootProgress: (this.bootProgress || []).map(record => ({ ...record })),
+            bootEntryDiscrepancy: this.bootEntryDiscrepancy
+                ? { ...this.bootEntryDiscrepancy } : null,
             output: this.output,
             namespaceTable: this.namespaceTable,
             petNameMemory: Array.from(this.petNameMemory),

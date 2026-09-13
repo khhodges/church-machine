@@ -29,7 +29,7 @@ function extractBlock(srcPath, startMarker, endMarker, includeEnd) {
 
 const ABS_SRC = extractBlock(
     'app-abstractions.js',
-    'function setBootEntrySlot(',
+    'function _syncSelfTestNextGtToBootEntry(',
     'window._pushBootEntryToHardware = _pushBootEntryToHardware;',
     true);
 
@@ -125,10 +125,17 @@ function makeEnv(opts) {
             output: '',
             createGT: function() { return 0x4A000000; },
             _nsSlotBase: function() { return 100; },
-            _threadLayoutAtBase: function() {
-                return { valid: true, capsStart: 244 };
+            getThreadInstanceLayout: function() {
+                return { valid: true, base: 0, capsStart: 244 };
             },
             readNSEntry: function() { return { word0_location: 0x200, word1_limit: 16 }; },
+            parseNSWord1: function() { return { gtSeq: 0 }; },
+            prepareBootEntry: function(slot) {
+                this.bootEntrySlot = slot;
+                this.memory[4] = slot;
+                this.memory[244] = 0x4A000000 | slot;
+                return { ok: true, slot: slot, homeAddress: 244 };
+            },
             nsLabels: {},
             emit: function() {},
         },

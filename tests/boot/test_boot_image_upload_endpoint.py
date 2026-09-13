@@ -24,6 +24,7 @@ Task #397: Additional parametrized cases cover four more validation branches:
   - Image whose byte length is not a multiple of 4
 """
 import base64
+import json
 import os
 import struct
 import sys
@@ -132,6 +133,46 @@ def test_upload_valid_boot_image_returns_200(client):
     assert body.get("words") == len(image) // 4, (
         f"Response 'words' field {body.get('words')} != {len(image) // 4}"
     )
+
+
+def test_upload_rejects_geometry_incompatible_with_saved_step1_without_mutation(
+        client, tmp_path, monkeypatch):
+    """Imports must be loadable by browser memory, not merely structurally valid."""
+    import server.app as app_module
+
+    config_path = tmp_path / "boot-config.json"
+    image_path = tmp_path / "boot-image.bin"
+    provenance_path = tmp_path / "boot-image.provenance.json"
+    state_path = tmp_path / "ns-state.json"
+    saved_cfg = {
+        "targetBoard": "wukong-xc7a100t", "bootEntrySlot": 6,
+        "step1": {**_default_cfg()["step1"], "totalNamespaceWords": 8192},
+    }
+    original = {
+        config_path: json.dumps(saved_cfg).encode("utf-8"),
+        image_path: b"old image",
+        provenance_path: b'{"old":"provenance"}',
+        state_path: b'{"old":"state"}',
+    }
+    for path, content in original.items():
+        path.write_bytes(content)
+    monkeypatch.setattr(app_module, "BOOT_CONFIG_PATH", str(config_path))
+    monkeypatch.setattr(
+        app_module, "BOOT_CONFIG_LEGACY_PATH", str(tmp_path / "no-legacy.json"))
+    monkeypatch.setattr(app_module, "BOOT_IMAGE_PATH", str(image_path))
+    monkeypatch.setattr(app_module, "BOOT_IMAGE_PROVENANCE_PATH", str(provenance_path))
+    monkeypatch.setattr(app_module, "NS_STATE_PATH", str(state_path))
+    incompatible = generate_boot_image(_default_cfg(), LUMPS_DIR)
+
+    response = client.post("/api/boot-image/upload", json={
+        "data_b64": _to_b64(incompatible),
+    })
+
+    assert response.status_code == 409, response.get_json()
+    body = response.get_json()
+    assert body["needsConfigureStep1"] is True
+    assert "Configure matching Step 1 geometry first" in body["error"]
+    assert all(path.read_bytes() == content for path, content in original.items())
 
 
 # ---------------------------------------------------------------------------

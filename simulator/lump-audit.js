@@ -1174,7 +1174,10 @@ async function lumpAuditFromServer(token, _manifest, container, opts) {
         }
 
         container.innerHTML = '';
-        const results = lumpAudit(words, data, null);
+        // Audit facts must come only from the exact immutable word response.
+        // Do not pass the response envelope as a manifest: catalog metadata
+        // must never become an authority or a second input channel.
+        const results = lumpAudit(words, null, null);
         return lumpAuditRenderPanel(container, results, opts);
     } catch (err) {
         const report = err && err.actionable

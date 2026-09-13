@@ -1401,7 +1401,9 @@ abstraction ${name} {
 
 function init() {
     sim = new ChurchSimulator();
-    sim.bootEntrySlot = bootEntrySlot;  // apply user-selected boot entry before first reset
+    // Browser storage names a requested next-boot target, not boot authority.
+    // The loaded image's reserved Thread home remains authoritative until an
+    // explicit prepareBootEntry transaction succeeds.
     assembler = new ChurchAssembler(typeof METHOD_REGISTER_CONVENTIONS !== 'undefined' ? METHOD_REGISTER_CONVENTIONS : {});
     pipelineViz = new PipelineVisualizer('pipelineContainer');
     pipelineViz.setNIAProvider(() => {
@@ -1507,13 +1509,13 @@ function init() {
     _probeBootImage().then(buf => {
         // A user can request a run while this asynchronous fetch is still in
         // flight.  In that case the fallback 64-word SelfTest descriptor has
-        // already completed boot and CALL has installed CR14/CR11 from it.
+        // already completed boot and CALL CR0 has entered its prepared target.
         // Loading the real image below replaces memory, but intentionally does
         // not rewrite an already-running thread's capability registers.
         //
         // Remember this state so an accepted late image can reset through the
         // normal reset hook after it has been cached.  That hook loads the image
-        // synchronously before the next B:05/B:07 sequence establishes CR14.
+        // synchronously before the next three-instruction boot attempt.
         const _wasBootedBeforeImage = !!sim.bootComplete;
         if (buf) {
                    // Task #2867: acceptance state must reflect the loader's
@@ -1525,7 +1527,7 @@ function init() {
                    try {
                        _accepted = sim.loadBootImage(buf) === true;
                        if (_accepted) {
-                           _applyBootEntryToSim();
+                            if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
                            // Evict stale sticky patches for all NS slots now owned
                            // by the boot image.  Patches that differ from the new
                            // binary are cleared and reported; matching (redundant)

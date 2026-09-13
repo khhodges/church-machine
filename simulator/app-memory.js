@@ -397,8 +397,10 @@ function updateCRDetail() {
                         return;
                     }
                     // CR14 pre-boot: show the designed startup value (Thread.CR0 at offset +244)
-                    const CAPS_OFF = 244;
-                    const word = sim.memory[threadBase + CAPS_OFF] >>> 0;
+                    const threadLayout = typeof sim._threadLayoutAtBase === 'function'
+                        ? sim._threadLayoutAtBase(threadBase) : null;
+                    const word = threadLayout && threadLayout.valid
+                        ? (sim.memory[threadBase + threadLayout.capsStart] >>> 0) : 0;
                     let preBootHtml = '';
                     const _selectedThreadLabel = (sim.nsLabels && sim.nsLabels[_selectedThreadSlot])
                         || `Thread slot ${_selectedThreadSlot}`;
@@ -438,7 +440,7 @@ function updateCRDetail() {
                 : `CR${crIdx} may be populated during the boot sequence.`;
             contentEl.innerHTML =
                 `<div style="color:var(--text-secondary);padding:1rem;">` +
-                `<div style="margin-bottom:0.5rem;">Machine not booted yet (BOOT ${sim.bootStep}/4 · RESET).</div>` +
+                `<div style="margin-bottom:0.5rem;">Machine not booted yet (BOOT ${sim.bootStep}/3 · reset is separate).</div>` +
                 `<div>${bootHint} Click <b>Boot</b> (top-right) to run the boot sequence.</div>` +
                 `</div>`;
         } else {
@@ -662,16 +664,10 @@ function updateCRDetail() {
 
         // Show boot preamble rows only while boot is in progress or has faulted.
         if (nsIdx === bootEntrySlot && !(sim.bootComplete && !sim.halted)) {
-            const _beLabel = (sim.nsLabels && sim.nsLabels[bootEntrySlot]) || `Slot ${bootEntrySlot}`;
             const _bootPreamble = [
-                { addr: 'B:00', desc: 'FAULT_RST',   decomp: 'CR0\u2013CR15 \u2190 NULL \u00b7 DR0\u2013DR15 \u2190 0' },
-                { addr: 'B:01', desc: 'LOAD_NS',     decomp: 'CR15 \u2190 NS[0] Boot.NS.' },
-                { addr: 'B:02', desc: 'INIT_THRD',   decomp: 'CR12 \u2190 NS[1] thread stack GT (M=1, Inform, zero perms)' },
-                { addr: 'B:03', desc: 'INIT_HEAP',   decomp: 'CR5(RW) \u2190 thread heap \u00b7 CHANGE-consistent synthesis' },
-                { addr: 'B:04', desc: 'CALL_HOME',   decomp: 'Plaintext FW=2 call-home/status exchange \u00b7 await IDE acknowledgement' },
-                { addr: 'B:05', desc: 'INIT_ABSTR',  decomp: `CR6(E) \u2190 NS[${bootEntrySlot}] \u26a1 ${_beLabel} (M=1, pre-CALL token)` },
-                { addr: 'B:06', desc: 'NUC_CLIST',   decomp: `CR6(M=1, E) \u2190 ${_beLabel} c-list \u00b7 push sentinel` },
-                { addr: 'B:07', desc: 'NUC_CODE',    decomp: 'CR14(M=1, R+X) \u2190 lump code \u00b7 PC\u21900 \u00b7 CALL CR0 \u2192 dispatch begins' },
+                { addr: 'B:00', desc: 'LOAD CR15',   decomp: 'Boot ROM instruction: LOAD CR15 establishes Boot.NS.' },
+                { addr: 'B:01', desc: 'CHANGE CR12', decomp: 'Boot ROM instruction: CHANGE CR12 restores Boot.Thread, including its prepared CR0 home.' },
+                { addr: 'B:02', desc: 'CALL CR0',    decomp: 'Boot ROM instruction: CALL CR0 consumes the stored prepared E-GT. Reset/reporting are not boot instructions.' },
             ];
             const _arrowTd = _brArrows.hasBranches ? '<td class="br-arrow-col"></td>' : '';
             for (const bp of _bootPreamble) {
@@ -2013,7 +2009,7 @@ function updateFlagsDisplay() {
     if (!container) return;
     _initFlagsHover();
     const f = sim.flags;
-    const bootLabel   = !sim.bootComplete ? `BOOT ${sim.bootStep}/4` : '';
+    const bootLabel   = !sim.bootComplete ? `BOOT ${sim.bootStep}/3` : '';
     // ── Hardware-driven status overrides simulator state while board is live ───
     // _wukongGetHwConnected / _wukongGetHwFaulted are getter functions exposed
     // by app-run.js via window so they always read the latest live values.
@@ -2586,39 +2582,16 @@ function _tzToggle(hdr) {
 }
 
 function _installBootEntryGTIntoCR0() {
-    if (!sim) return false;
-    const bSlot = sim.bootEntrySlot;
-    if (bSlot === null || bSlot === undefined) return false;
-    const bEntry = sim.readNSEntry(bSlot);
-    const bSeq = bEntry ? sim.parseNSWord1(bEntry.word1_limit).gtSeq : 0;
-    const gtWord = sim.createGT(bSeq, bSlot, {E:1}, 1);
-    // Write to the primary thread (NS slot 1 — the boot thread).
-    const targets = new Set([1]);
-    let wrote = false;
-    for (const nsIdx of targets) {
-        const entry = sim.readNSEntry(nsIdx);
-        // The canonical boot thread is rooted at address 0, which is a valid
-        // location and must not be rejected by a truthiness check.
-        if (entry && typeof entry.word0_location === 'number') {
-            const layout = _threadLayoutForSlot(nsIdx);
-            if (!layout.valid) continue;
-            sim.writePersistentWord(layout.base + layout.capsStart, gtWord);
-            wrote = true;
-        }
+    // Compatibility command only. The core owns the canonical Thread layout
+    // and transaction boundary; no UI path may synthesize a GT or touch live
+    // CR0 while changing a next-boot selection.
+    if (!sim || typeof sim.prepareBootEntry !== 'function') return false;
+    const prepared = sim.prepareBootEntry(bootEntrySlot);
+    if (!prepared || !prepared.ok) return false;
+    if (typeof window._commitPreparedBootEntry === 'function') {
+        window._commitPreparedBootEntry(bootEntrySlot, prepared);
     }
-    if (wrote) {
-        const gtHex = '0x' + (gtWord >>> 0).toString(16).toUpperCase().padStart(8, '0');
-        const logLine = `[IDE] CR0 \u2190 E-GT(Slot ${bSlot}) ${gtHex} \u2014 boot-entry first-LUMP installed`;
-        sim.output += logLine + '\n';
-        const con = document.getElementById('editorConsole');
-        if (con) {
-            con.textContent += '\n' + logLine;
-            con.scrollTop = con.scrollHeight;
-        }
-        if (typeof updateCRDetail === 'function') updateCRDetail();
-        if (typeof updateNamespace === 'function') updateNamespace();
-    }
-    return wrote;
+    return true;
 }
 
 function renderMemoryDump(location, limit, nsIndex) {
@@ -2851,6 +2824,13 @@ function _loadBootConfig() {
 function _reportBootImageRejection(message, resultEl) {
     const detail = message || (sim && sim.lastBootImageError) ||
         'Saved boot image was rejected. Regenerate it for the current memory configuration.';
+    if (window.BootEntryUI && typeof window.BootEntryUI.noteImagePreparation === 'function') {
+        window.BootEntryUI.noteImagePreparation({
+            status: 'stale-image',
+            configuredSlot: bootEntrySlot,
+            reason: detail,
+        });
+    }
     console.warn('[bootImage] ' + detail);
     if (resultEl) resultEl.textContent = detail;
     const con = document.getElementById('editorConsole');
@@ -2900,6 +2880,36 @@ function _probeBootImage() {
         })
         .catch(() => null);
 }
+
+// Refresh only the browser's next-reset image cache after the server has
+// committed a new binary. This deliberately does not call loadBootImage(),
+// reset(), or write any live register/memory state: the new authority applies
+// on the next reset, not while the current execution context is running.
+async function _refreshCommittedBootImageCache() {
+    let response;
+    try {
+        response = await fetch('/api/boot-image/binary', { cache: 'no-store' });
+    } catch (error) {
+        throw new Error('could not fetch the committed boot image: ' +
+            (error && error.message ? error.message : String(error)));
+    }
+    if (!response.ok) {
+        let detail = '';
+        try {
+            const body = await response.json();
+            detail = body && body.error ? body.error : '';
+        } catch (_) {}
+        throw new Error(detail || `committed boot image fetch failed (HTTP ${response.status})`);
+    }
+    const bytes = await response.arrayBuffer();
+    if (!bytes || bytes.byteLength === 0) {
+        throw new Error('the committed boot image was empty');
+    }
+    window.bootImage = bytes;
+    window.bootImageAvailable = true;
+    return bytes;
+}
+window._refreshCommittedBootImageCache = _refreshCommittedBootImageCache;
 
 // Reset hook: re-overlay the cached boot image (or fetch once) so the
 // programmer-authored binary survives manual resets.
@@ -2975,6 +2985,9 @@ function generateBootImage(onApplied) {
             nextAction: 'Correct the Namespace or boot configuration, then click Generate again.',
         }))
         .then(body => {
+            if (window.BootEntryUI && typeof window.BootEntryUI.noteImagePreparation === 'function') {
+                window.BootEntryUI.noteImagePreparation(body.preparation);
+            }
             const kib = (body.bytes / 1024).toFixed(1);
             if (result) {
                 let html =
@@ -3358,7 +3371,12 @@ function updateNamespace() {
         let selectedBootEntry = null;
         try {
             const storedBootEntry = Number.parseInt(localStorage.getItem('bootEntrySlot'), 10);
-            if (Number.isInteger(storedBootEntry) && storedBootEntry >= 0) {
+            const bindingUi = window.BootEntryUI && typeof window.BootEntryUI.get === 'function'
+                ? window.BootEntryUI.get() : null;
+            // A namespace-policy save must not turn an imported image/local
+            // discrepancy into an implicit boot-target repair.
+            if (bindingUi && bindingUi.status === 'prepared' &&
+                    Number.isInteger(storedBootEntry) && storedBootEntry >= 0) {
                 selectedBootEntry = storedBootEntry;
             }
         } catch (_) {}
@@ -3396,30 +3414,28 @@ function updateNamespace() {
         }
         const cfg = {
             targetBoard: localCfg.targetBoard || baseCfg.targetBoard || 'wukong-xc7a100t',
-            bootEntrySlot: selectedBootEntry != null
-                ? selectedBootEntry
-                : (Number.isInteger(localCfg.bootEntrySlot)
-                    ? localCfg.bootEntrySlot
-                    : (Number.isInteger(baseCfg.bootEntrySlot) ? baseCfg.bootEntrySlot : 6)),
             slotRules,
             step1: localCfg.step1 || baseCfg.step1,
             step2: { lumps: step2Rows },
             step3: localCfg.step3 || baseCfg.step3 || { emptySlotCount: 0 }
         };
+        if (selectedBootEntry != null) cfg.bootEntrySlot = selectedBootEntry;
         if (!cfg.step1) {
             throw new Error('The default build configuration is unavailable.');
         }
         const response = await fetch('/api/boot-config', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: Object.assign({'Content-Type': 'application/json'},
+                (window.BuildApprovalView && window.BuildApprovalView._authHeaders
+                    ? window.BuildApprovalView._authHeaders() : {})),
             body: JSON.stringify((() => {
                 const payload = {
                     targetBoard: cfg.targetBoard,
-                    bootEntrySlot: cfg.bootEntrySlot,
                     step1: cfg.step1,
                     step2: cfg.step2 || { lumps: [] },
                     step3: cfg.step3 || { emptySlotCount: 0 }
                 };
+                if (Number.isInteger(cfg.bootEntrySlot)) payload.bootEntrySlot = cfg.bootEntrySlot;
                 const hasLocalSlotRules = Object.prototype.hasOwnProperty.call(
                     localCfg, 'slotRules');
                 const hasServerSlotRules = Object.prototype.hasOwnProperty.call(
@@ -4565,6 +4581,12 @@ window._nsTableSave = async function(btn) {
     if (!sim) return false;
 
     if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; btn.style.color = '#ccc'; }
+    const nsSaveBootUi = typeof window !== 'undefined' && window.BootEntryUI &&
+        typeof window.BootEntryUI.get === 'function' ? window.BootEntryUI.get() : null;
+    const nsSaveBootEntry = Number(bootEntrySlot);
+    const nsSavePreparedSelection = nsSaveBootUi &&
+        nsSaveBootUi.status === 'prepared' &&
+        Number.isInteger(nsSaveBootEntry) && nsSaveBootUi.slot === nsSaveBootEntry;
 
     // This is a separate Namespace save entry point from /api/lumps/save.
     // Keep its client-side attempt linked to the same diagnostic contract,
@@ -4593,7 +4615,8 @@ window._nsTableSave = async function(btn) {
         // Preserve that image for this explicit Namespace save; regenerating
         // here would discard unsaved slot locations and resident artifacts.
         const hasLiveBootImage = sim._bootImageLoaded === true;
-        if ((!window.bootImage || !window.bootImageAvailable) && !hasLiveBootImage) {
+        if ((!window.bootImage || !window.bootImageAvailable) && !hasLiveBootImage &&
+                !nsSavePreparedSelection) {
             await window._ensureNamespaceBuildConfig();
             if ((!window.bootImage || !window.bootImageAvailable) &&
                     sim._bootImageLoaded !== true) {
@@ -4649,8 +4672,9 @@ window._nsTableSave = async function(btn) {
 
         // Keep the boot-entry sentinel in sync with the current UI selection.
         const sentinelIdx = (sim.NS_TABLE_BASE >>> 0) - 2;
-        if (sentinelIdx >= 0 && sentinelIdx < bootWordCount) {
-            words[sentinelIdx] = bootEntrySlot & 0xFF;
+        if (Number.isInteger(nsSaveBootEntry) &&
+                sentinelIdx >= 0 && sentinelIdx < bootWordCount) {
+            words[sentinelIdx] = nsSaveBootEntry & 0xFF;
         }
 
         // ── Re-seal every active NS slot before encoding ───────────────────────
@@ -4734,7 +4758,7 @@ window._nsTableSave = async function(btn) {
             // locate on the next regeneration.
             const _saved = _savedBySlot.get(_si);
             _nsInheritSavedArtifactMetadata(_rich, _saved, Boolean(_symbolic));
-            if (_si === bootEntrySlot) _rich.boot = true;
+            if (_si === nsSaveBootEntry) _rich.boot = true;
             nsAbstractions.push(_rich);
         }
         const nsState = { abstractions: nsAbstractions };
@@ -4747,6 +4771,35 @@ window._nsTableSave = async function(btn) {
             binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
         }
         const data_b64 = btoa(binary);
+        // The drag-selected Lightning Bolt lives in this serialized image,
+        // not merely in the previously saved Designer config. Submit a full
+        // candidate only when the selection was successfully prepared before
+        // this Save began; ordinary Namespace saves retain their saved config.
+        let bootConfigCandidate = null;
+        if (nsSavePreparedSelection) {
+            bootConfigCandidate = window.bootConfig &&
+                typeof window.bootConfig === 'object'
+                ? Object.assign({}, window.bootConfig) : null;
+            if (!bootConfigCandidate || !bootConfigCandidate.step1 ||
+                    !bootConfigCandidate.targetBoard) {
+                const cfgResponse = await fetch('/api/boot-config', { cache: 'no-store' });
+                const cfgBody = await _actionableJsonResponse(
+                    cfgResponse, 'Load the Namespace build configuration', {
+                        dataChanged: false,
+                        nextAction: 'Open Boot Image Designer, save its geometry, then retry Namespace Save.',
+                    });
+                bootConfigCandidate = Object.assign({},
+                    (cfgBody && (cfgBody.config || cfgBody.defaults)) || {});
+            }
+            if (!bootConfigCandidate.step1 || !bootConfigCandidate.targetBoard) {
+                throw new Error('Namespace Save needs a complete boot configuration for the prepared Lightning Bolt slot.');
+            }
+            bootConfigCandidate.bootEntrySlot = nsSaveBootEntry;
+            // This full Save NS transaction contains an image that was
+            // explicitly prepared in-browser.  Keep intent distinct from a
+            // normal Designer payload that merely repeats its saved slot.
+            bootConfigCandidate.prepareBootEntry = true;
+        }
 
         if (_nsSaveDiagnostics) {
             try {
@@ -4758,13 +4811,18 @@ window._nsTableSave = async function(btn) {
             } catch (_) {}
         }
 
-        // POST to the single-write-path endpoint that writes both files atomically.
+        // POST to the single-write path. A prepared Lightning Bolt selection
+        // carries a complete config candidate so config/image/ns-state commit
+        // together; never config-POST first and risk a partial authority save.
         const resp = await fetch('/api/boot-image/save-ns', {
             method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: Object.assign({'Content-Type': 'application/json'},
+                (window.BuildApprovalView && window.BuildApprovalView._authHeaders
+                    ? window.BuildApprovalView._authHeaders() : {})),
             body:    JSON.stringify({
                 data_b64,
                 ns_state: nsState,
+                boot_config: bootConfigCandidate,
                 // Non-authoritative correlation only; the server's Namespace
                 // state and atomic write identity do not include this field.
                 diagnostic_attempt_id: _nsSaveMetadata.diagnostic_attempt_id,
@@ -4784,19 +4842,26 @@ window._nsTableSave = async function(btn) {
             } catch (_) {}
         }
 
-        // Keep the live table and the next-build policy in one explicit save
-        // action.  This also creates the default Step 1 configuration on a
-        // fresh project, so the user never has to visit Builder just to unlock
-        // the Namespace save button.
-        try {
-            await window._ensureNamespaceBuildConfig();
-        } catch (configErr) {
-            throw new Error('Namespace saved, but next-build settings were not saved: ' + configErr.message);
+        // The accepted response is the transaction's normalized config; do
+        // not issue a separate config POST after image/state commit.
+        if (data && data.config && typeof window._setActiveBootConfig === 'function') {
+            window._setActiveBootConfig(
+                data.config, data.bootImageInvalidated === true,
+                data.invalidatedBootImageWords);
         }
 
-        // Replace cached binary so the next reset re-applies the new image.
-        window.bootImage          = words.buffer;
-        window.bootImageAvailable = true;
+        // Cache the exact committed binary, not the local serialization. This
+        // does not reload/reset the simulator or mutate live registers.
+        let cacheRefreshError = null;
+        try {
+            await _refreshCommittedBootImageCache();
+        } catch (error) {
+            cacheRefreshError = error;
+            // Never leave the old ArrayBuffer eligible to overlay this saved
+            // image. `available` makes the reset hook fetch the committed copy.
+            window.bootImage = null;
+            window.bootImageAvailable = true;
+        }
 
         // Refresh the committed ns-state so _findSrcLump uses the new map.
         window._nsState = nsState;
@@ -4804,9 +4869,20 @@ window._nsTableSave = async function(btn) {
         // Clear dirty flag — committed state now matches in-memory state.
         _setNsDirty(false);
 
+        if (bootConfigCandidate && data && data.preparation &&
+                Number(bootEntrySlot) === nsSaveBootEntry &&
+                window.BootEntryUI && typeof window.BootEntryUI.noteImagePreparation === 'function') {
+            window.BootEntryUI.noteImagePreparation(data.preparation);
+        }
+
         if (btn) {
-            btn.textContent = '\u2713 Saved';
-            btn.style.color = '#4ec9b0';
+            btn.textContent = cacheRefreshError
+                ? '\u2713 Saved — image cache retries on reset'
+                : '\u2713 Saved';
+            btn.style.color = cacheRefreshError ? '#f0a040' : '#4ec9b0';
+            btn.title = cacheRefreshError
+                ? 'Namespace/config save committed. The browser cache could not refresh; reset will fetch the committed image.'
+                : 'Namespace and prepared boot image saved.';
             setTimeout(() => {
                 btn.disabled = false;
                 _setNsDirty(window._nsTableDirty);
@@ -4957,7 +5033,7 @@ function _showNSLumpModal(slotIdx, nsEntry) {
             </tr>`
         ).join('');
 
-        // Hardware boot c-list (from sim.demoClistGTs if booted, else static fallback)
+        // Simulator c-list; this is not an observation from an attached board.
         const _clistSrc = (sim && sim.demoClistGTs && sim.demoClistGTs.length)
             ? sim.demoClistGTs
             : [0,0,0,0,0,0,0,0,0,0,0];
@@ -4984,12 +5060,12 @@ function _showNSLumpModal(slotIdx, nsEntry) {
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
                     <div>
                         <span style="color:#c89b3c;font-weight:700;font-size:1rem;">Boot.NS</span>
-                        <span style="color:#6b7280;font-size:0.78rem;margin-left:8px;">NS[0] — Hardware Boot ROM</span>
+                        <span style="color:#6b7280;font-size:0.78rem;margin-left:8px;">NS[0] — Boot program reference</span>
                     </div>
                     <button onclick="document.getElementById('_nsLumpModalOverlay').remove()" style="background:none;border:none;color:#888;font-size:1.2rem;cursor:pointer;padding:0 4px;">✕</button>
                 </div>
                 <div style="margin-bottom:10px;padding:6px 10px;background:rgba(200,155,60,0.08);border-left:3px solid rgba(200,155,60,0.4);border-radius:3px;color:#9ca3af;font-size:0.78rem;">
-                    This slot is the hardware Boot ROM — 3 fixed instructions executed on every power-on reset. There is no lazy-loaded LUMP body.
+                    These are the three simulator/spec-known boot instructions, not observed board execution. Boot-ROM instruction addresses are separate from NS[0] data addresses. Physical execution evidence is unavailable here.
                 </div>
                 <div style="margin-bottom:14px;">
                     <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">BOOT ROM PROGRAM (3 words)</div>
@@ -5789,10 +5865,10 @@ function _closeCRDetailMenuOnce() {
 
 let selectedAbsIndex = null;
 let absCollapsedLayers = {};
-// Restore the user's selected LightningBolt entry across IDE restarts.
-// SelfTest at slot 6 remains the fallback for a missing or malformed value;
-// app-abstractions.js applies architecture-specific slot migration/bounds.
-let bootEntrySlot = 6;
+// Browser storage is only a requested next-boot selection. It is never a
+// fallback boot authority: an image with no prepared binding stays pending
+// until the user deliberately prepares a valid target.
+let bootEntrySlot = null;
 try {
     const _storedBootEntry = Number.parseInt(localStorage.getItem('bootEntrySlot'), 10);
     if (Number.isInteger(_storedBootEntry) && _storedBootEntry >= 0 && _storedBootEntry <= 0xFFFF) {

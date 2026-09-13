@@ -1,4 +1,4 @@
-const BOOT_SEQ_CODE = {
+/* Retired synthetic boot-slot listing; the active reference is below.
     // ── Slot 0: Boot.NS ──────────────────────────────────────────────────────
     // Covers boot phases B:00 (FAULT_RST) and B:01 (LOAD_NS).
     // This is the first slot the hardware sees; it describes the namespace table
@@ -135,6 +135,20 @@ const BOOT_SEQ_CODE = {
         '; ── Return to caller (Boot.Abstr sentinel frame → warm reboot) ──────',
         '      RETURN',
     ].join('\n'),
+*/
+const BOOT_SEQ_CODE = {
+    bootRom: [
+        '; Boot ROM — exactly three retiring instructions',
+        '; RESET_EVENT and CALL_HOME_EVENT are reported separately, not ROM words.',
+        '',
+        'ROM[0]  LOAD   CR15, CR15[0]   ; validate/load Namespace root',
+        'ROM[1]  CHANGE CR12, CR15, #1  ; validate Thread, restore homes and CR5 heap',
+        'ROM[2]  CALL   CR0             ; consume prepared Thread CR0 E-GT',
+        '',
+        '; CALL is the normal capability gate: null, stale, non-E, residency,',
+        '; and code-context failures are recorded with immutable boot evidence.',
+        '; The root CALL frame is a RETURN sentinel (STACK_UNDERFLOW at root).',
+    ].join('\\n'),
 };
 
 // ── Implementation Status ──────────────────────────────────────────────────
@@ -458,7 +472,21 @@ function renderAbstractions() {
     html += `<span class="abs-search-count">${filtered.length}\u202f/\u202f${all.length}</span>`;
     html += `</div>`;
 
-    html += `<div class="abs-layer-items">`;
+        const bootState = (typeof window !== 'undefined' && window.BootEntryUI)
+            ? window.BootEntryUI.get() : null;
+        if (bootState) {
+            const stateClass = bootState.status === 'prepared' ? 'abs-boot-binding-ok'
+                : bootState.status === 'pending' ? 'abs-boot-binding-pending'
+                : 'abs-boot-binding-error';
+            const saveAction = bootState.status === 'prepared'
+                ? ` <button type="button" class="abs-boot-binding-save" onclick="savePreparedBootEntry()">Save prepared selection</button>`
+                : (bootState.status === 'cache-error'
+                    ? ` <button type="button" class="abs-boot-binding-save" onclick="refreshPreparedBootImageCache()">Retry boot-image cache</button>`
+                    : '');
+            html += `<div id="bootEntryPreparationStatus" class="${stateClass}" role="status">` +
+                `⚡ Boot entry NS[${bootState.slot == null ? '?' : bootState.slot}]: ${bootState.message}${saveAction}</div>`;
+        }
+        html += `<div class="abs-layer-items">`;
     for (const abs of filtered) {
         const matchLump = (typeof _lumpsCache !== 'undefined' ? _lumpsCache : []).find(l => l.abstraction === abs.name);
         const compiledAt = matchLump?.compiled_at
@@ -548,90 +576,208 @@ window.setNextAfterSelfTestSlot = setNextAfterSelfTestSlot;
 
 function _syncSelfTestNextGtToBootEntry(targetSlot) {
     if (!sim || typeof sim.createGT !== 'function') return;
-    const nextGt = sim.createGT(0, targetSlot, {E: 1}, 1) >>> 0;
+    const targetEntry = typeof sim.readNSEntry === 'function'
+        ? sim.readNSEntry(targetSlot) : null;
+    const targetInfo = targetEntry && typeof sim.parseNSWord1 === 'function'
+        ? sim.parseNSWord1(targetEntry.word1_limit) : null;
+    if (!targetInfo || !Number.isInteger(targetInfo.gtSeq)) return;
+    const nextGt = sim.createGT(targetInfo.gtSeq, targetSlot, {E: 1}, 1) >>> 0;
+    // The virtual bootstrap c-list is the UI/runtime projection. The
+    // immutable SelfTest LUMP bytes are not rewritten merely because a local
+    // next-boot selection changed; the explicit Save action regenerates an
+    // image whose derived Next.GT has this same live sequence.
     if (sim.demoClistGTs) sim.demoClistGTs[1] = nextGt;
-    if (typeof sim._nsSlotBase !== 'function' || typeof sim.parseLumpHeader !== 'function') return;
-    try {
-        const selfTestSlot = (typeof sim._slotByPetName === 'function')
-            ? sim._slotByPetName('SelfTest', 6) : 6;
-        const nsBase = sim._nsSlotBase(selfTestSlot);
-        const lumpBase = sim.memory[nsBase] >>> 0;
-        const lump = sim.parseLumpHeader(sim.memory[lumpBase] >>> 0);
-        if (!lump || !lump.valid || lump.cc < 2) return;
-        const clistNext = lumpBase + lump.lumpSize - lump.cc + 1;
-        if (clistNext > 0 && clistNext < sim.memory.length) {
-            sim.memory[clistNext] = nextGt;
-        }
-    } catch (e) {
-        console.warn('[SelfTest Next.GT] live c-list sync skipped:', e);
-    }
 }
 
+
+let _bootEntryPreparation = {
+    slot: (typeof bootEntrySlot === 'number') ? bootEntrySlot : null,
+    status: 'pending',
+    message: 'Saved selection has not been inspected against this image.',
+    binding: null,
+};
+let _bootEntrySelectionRevision = 0;
+
+function _bootEntryMessage(result, fallback) {
+    if (!result) return fallback;
+    return result.message || result.reason || result.error || fallback;
+}
+
+function _setBootEntryPreparation(slot, status, message, binding) {
+    _bootEntryPreparation = {
+        slot: Number.isInteger(slot) ? slot : null,
+        status,
+        message,
+        binding: binding || null,
+    };
+    return _bootEntryPreparation;
+}
+
+function _bootBindingFingerprint(binding) {
+    if (!binding || typeof binding !== 'object') return null;
+    return [
+        binding.targetSlot != null ? binding.targetSlot : binding.slot,
+        binding.homeAddress,
+        binding.expectedGT != null ? binding.expectedGT
+            : (binding.homeGT != null ? binding.homeGT : binding.gt),
+    ].map(value => value == null ? '' : String(value)).join('|');
+}
+
+function _inspectBootEntryBinding() {
+    if (!sim || typeof sim.inspectBootEntryBinding !== 'function') {
+        return _setBootEntryPreparation(
+            typeof bootEntrySlot === 'number' ? bootEntrySlot : null,
+            'pending',
+            'Binding inspection is unavailable until the simulator image is ready.'
+        );
+    }
+    let binding;
+    try {
+        binding = sim.inspectBootEntryBinding();
+    } catch (error) {
+        return _setBootEntryPreparation(
+            typeof bootEntrySlot === 'number' ? bootEntrySlot : null,
+            'error',
+            'Could not inspect the prepared boot entry: ' + _bootEntryMessage(error, 'unknown error')
+        );
+    }
+    const slot = Number.isInteger(binding && binding.configuredSlot) ? binding.configuredSlot
+        : (Number.isInteger(binding && binding.targetSlot) ? binding.targetSlot : bootEntrySlot);
+    if (binding && binding.ok) {
+        if (Number.isInteger(bootEntrySlot) && Number.isInteger(binding.targetSlot) &&
+                bootEntrySlot !== binding.targetSlot) {
+            return _setBootEntryPreparation(bootEntrySlot, 'stale-image',
+                `Saved browser selection NS[${bootEntrySlot}] differs from this image's prepared CR0 target NS[${binding.targetSlot}]. Prepare deliberately to change the image.`,
+                binding);
+        }
+        return _setBootEntryPreparation(slot, 'prepared',
+            _bootEntryMessage(binding, 'Prepared home matches the saved boot image.'), binding);
+    }
+    const stale = binding && (binding.status === 'stale' || binding.status === 'stale-image' ||
+        binding.homeMatches === false || binding.headerMatches === false);
+    const failed = binding && (binding.status === 'failed' || binding.status === 'error' ||
+        (binding.status === 'invalid' && !stale));
+    return _setBootEntryPreparation(slot, failed ? 'error' : (stale ? 'stale-image' : 'pending'),
+        _bootEntryMessage(binding, stale
+            ? 'Image binding is stale. Select a target and explicitly prepare it.'
+            : 'Prepared home is missing. Select a target and explicitly prepare it.'), binding);
+}
+
+function _commitPreparedBootEntry(slot, prepared) {
+    // Persistence is the first UI commit. If it fails, the caller rolls the
+    // core transaction back before any browser selection/status is changed.
+    const previousSlot = bootEntrySlot;
+    const previousPreparation = _bootEntryPreparation;
+    const previousRevision = _bootEntrySelectionRevision;
+    const previousStored = localStorage.getItem('bootEntrySlot');
+    try {
+        localStorage.setItem('bootEntrySlot', String(slot));
+        bootEntrySlot = slot;
+        _bootEntrySelectionRevision++;
+        _syncSelfTestNextGtToBootEntry(slot);
+        _setBootEntryPreparation(slot, 'prepared',
+            _bootEntryMessage(prepared,
+                'Prepared for the next boot. Image/config changes remain unsaved until you save or generate them.'),
+            prepared && (prepared.binding || prepared));
+        renderAbstractions();
+        if (currentView === 'namespace') updateNamespace();
+        if (typeof window.lumpEditorRenderResidentPanel === 'function') window.lumpEditorRenderResidentPanel();
+        return true;
+    } catch (error) {
+        // Rendering can fail independently of persistence. Restore all
+        // browser-side state before allowing setBootEntrySlot to restore core
+        // memory/header authority as well.
+        bootEntrySlot = previousSlot;
+        _bootEntryPreparation = previousPreparation;
+        _bootEntrySelectionRevision = previousRevision;
+        try {
+            if (previousStored === null) localStorage.removeItem('bootEntrySlot');
+            else localStorage.setItem('bootEntrySlot', previousStored);
+        } catch (_) {}
+        throw error;
+    }
+}
+window._commitPreparedBootEntry = _commitPreparedBootEntry;
 
 function setBootEntrySlot(idx, ev) {
     // Modifiers do not change destination.  Keep the event argument only for
     // inline-call compatibility; minimal synthetic events need no DOM methods.
-    if (!window.TargetState.authorize('simulator', { id: 'boot-entry-selection' }).ok) return;
-    idx = Math.max(0, Math.min(255, Math.trunc(Number(idx)) || 0));
-    bootEntrySlot = idx;
-    localStorage.setItem('bootEntrySlot', String(idx));
-    if (sim) {
-        sim.bootEntrySlot = idx;
-        _syncSelfTestNextGtToBootEntry(idx);
-        // Write the E-GT to the active Thread's derived CR0 home so the
-        // 3-instruction Boot.Abstr CHANGE → TPERM → CALL path picks up the new entry.
-        // NS table is INVERTED: slot N is at NS_TABLE_BASE+NS_TABLE_RESERVE−(N+1)×NS_ENTRY_WORDS.
-        // Must use sim._nsSlotBase(1), NOT the ascending formula NS_TABLE_BASE+1×NS_ENTRY_WORDS.
-        if (typeof sim.createGT === 'function' &&
-                typeof sim._nsSlotBase === 'function' &&
-                typeof sim._threadLayoutAtBase === 'function') {
-            const threadBase = sim.memory[sim._nsSlotBase(1)] >>> 0;
-            const threadLayout = sim._threadLayoutAtBase(threadBase);
-            if (!threadLayout || !threadLayout.valid) {
-                console.warn('[setBootEntrySlot] active Thread has invalid or unsupported geometry');
-            } else {
-                const capsOffset = threadLayout.capsStart;
-                sim.memory[threadBase + capsOffset] = sim.createGT(0, idx, {E:1}, 1) >>> 0;
-                console.log('[setBootEntrySlot] wrote GT=0x' + (sim.createGT(0, idx, {E:1}, 1)>>>0).toString(16) + ' to threadBase=0x' + threadBase.toString(16) + '+' + capsOffset + '=0x' + (threadBase+capsOffset).toString(16));
-            }
-        }
-        // Preflight: warn if the chosen slot has no installed lump
-        const entry = sim.readNSEntry(idx);
-        const isEmpty = !entry || (entry.word0_location === 0 && entry.word1_limit === 0);
-        if (isEmpty) {
-            const label = (sim.nsLabels && sim.nsLabels[idx])
-                || abstractionRegistry?.abstractions?.[idx]?.name
-                || `Slot ${idx}`;
-            sim.output += `[BOOT] WARNING: boot entry set to Slot ${idx} (${label}) — no lump installed. Boot will fault at B:04.\n`;
-            if (typeof sim.emit === 'function') sim.emit('stateChange', sim.getState());
-        } else {
-            // Task #2867: residency preflight — the NS entry may be structurally
-            // valid (catalog descriptor) while the lump body at its location is
-            // still zeros (no boot image applied, or image lacks this body).
-            // Surface a clear image/residency warning instead of letting the
-            // user discover a LUMP_MAGIC fault at boot.
-            const _loc = entry.word0_location >>> 0;
-            if (_loc > 0 && _loc < sim.memory.length && typeof sim.parseLumpHeader === 'function') {
-                const _hdr = sim.parseLumpHeader(sim.memory[_loc] >>> 0);
-                if (!_hdr || !_hdr.valid || _hdr.cw === 0) {
-                    const label = (sim.nsLabels && sim.nsLabels[idx])
-                        || abstractionRegistry?.abstractions?.[idx]?.name
-                        || `Slot ${idx}`;
-                    const _why = (!_hdr || !_hdr.valid)
-                        ? 'no lump body is resident at its location (header magic invalid)'
-                        : 'its lump is a CODE_NOT_RESIDENT stub (cw=0)';
-                    sim.output += `[BOOT] WARNING: boot entry Slot ${idx} (${label}) — ${_why}. `
-                        + `Generate/apply a boot image with this entry resident, or boot will `
-                        + `lazy-load (simulator only) or fault with LUMP_MAGIC.\n`;
-                    if (typeof sim.emit === 'function') sim.emit('stateChange', sim.getState());
-                }
-            }
-        }
+    if (!window.TargetState.authorize('simulator', { id: 'boot-entry-selection' }).ok) return false;
+    const requestedSlot = Number(idx);
+    if (!Number.isInteger(requestedSlot) || requestedSlot < 0 || requestedSlot > 255) {
+        _setBootEntryPreparation(null, 'error',
+            'Selection was not saved: choose a valid Namespace slot (0–255).');
+        renderAbstractions();
+        return false;
     }
-    renderAbstractions();
-    if (currentView === 'namespace') updateNamespace();
-    if (typeof window.lumpEditorRenderResidentPanel === 'function') window.lumpEditorRenderResidentPanel();
-
+    idx = requestedSlot;
+    if (!sim || typeof sim.prepareBootEntry !== 'function') {
+        _setBootEntryPreparation(idx, 'error',
+            'Cannot prepare selection: simulator boot-entry preparation is unavailable.');
+        renderAbstractions();
+        return false;
+    }
+    // Capture every core word/field that prepareBootEntry is allowed to commit
+    // before invoking it. This makes browser persistence failure transactional
+    // too: a private/incognito quota exception cannot leave RAM authority ahead
+    // of the displayed/saved selection.
+    let rollback = null;
+    try {
+        const thread = typeof sim.getThreadInstanceLayout === 'function'
+            ? sim.getThreadInstanceLayout(1) : null;
+        const homeAddress = thread && thread.valid
+            ? ((thread.base + thread.capsStart) >>> 0) : null;
+        rollback = {
+            bootEntrySlot: sim.bootEntrySlot,
+            headerWord: sim.memory && sim.memory.length > 4 ? (sim.memory[4] >>> 0) : null,
+            homeAddress,
+            homeWord: homeAddress !== null && sim.memory && homeAddress < sim.memory.length
+                ? (sim.memory[homeAddress] >>> 0) : null,
+            demoClist: sim.demoClistGTs || null,
+            demoNextPresent: Boolean(sim.demoClistGTs &&
+                Object.prototype.hasOwnProperty.call(sim.demoClistGTs, 1)),
+            demoNext: sim.demoClistGTs ? sim.demoClistGTs[1] : undefined,
+        };
+    } catch (_) {
+        // A successful core preparation requires valid Thread geometry, so this
+        // only affects an already-invalid image and will be reported by core.
+    }
+    let prepared;
+    try {
+        prepared = sim.prepareBootEntry(idx);
+    } catch (error) {
+        prepared = { ok: false, error: error && error.message ? error.message : String(error) };
+    }
+    if (!prepared || !prepared.ok) {
+        _setBootEntryPreparation(idx, 'error',
+            'Selection was not saved: ' + _bootEntryMessage(prepared, 'preparation failed.'), prepared);
+        renderAbstractions();
+        return false;
+    }
+    try {
+        _commitPreparedBootEntry(idx, prepared);
+    } catch (error) {
+        if (rollback) {
+            if (rollback.homeAddress !== null && rollback.homeWord !== null &&
+                    sim.memory && rollback.homeAddress < sim.memory.length) {
+                sim.memory[rollback.homeAddress] = rollback.homeWord;
+            }
+            if (rollback.headerWord !== null && sim.memory && sim.memory.length > 4) {
+                sim.memory[4] = rollback.headerWord;
+            }
+            sim.bootEntrySlot = rollback.bootEntrySlot;
+            if (rollback.demoClist) {
+                if (rollback.demoNextPresent) rollback.demoClist[1] = rollback.demoNext;
+                else delete rollback.demoClist[1];
+            }
+        }
+        _setBootEntryPreparation(idx, 'error',
+            'Selection was not saved: browser storage rejected the prepared transaction; simulator state was restored. ' +
+            _bootEntryMessage(error, ''));
+        try { renderAbstractions(); } catch (_) {}
+        return false;
+    }
+    return true;
 }
 
 // ── Task #2532: Cmd+click boot-entry hardware push ───────────────────────────
@@ -707,50 +853,174 @@ async function _pushBootEntryToHardware(idx, anchorEl) {
 window._pushBootEntryToHardware = _pushBootEntryToHardware;
 
 function _syncBootEntryFromSim() {
-    if (!sim) return;
-    const fromSim = sim.bootEntrySlot;
-    if (fromSim !== bootEntrySlot) {
-        bootEntrySlot = fromSim;
-        localStorage.setItem('bootEntrySlot', String(fromSim));
-        renderAbstractions();
-        if (currentView === 'namespace') updateNamespace();
-        if (typeof window.lumpEditorRenderResidentPanel === 'function') window.lumpEditorRenderResidentPanel();
-    }
+    _inspectBootEntryBinding();
+    if (typeof renderAbstractions === 'function') renderAbstractions();
+    if (currentView === 'namespace' && typeof updateNamespace === 'function') updateNamespace();
+    if (typeof window.lumpEditorRenderResidentPanel === 'function') window.lumpEditorRenderResidentPanel();
+    return _bootEntryPreparation;
 }
 
 function _applyBootEntryToSim() {
-    if (!sim) return;
-    const _archCanonical = (typeof sim._bootAbstrSlot === 'number') ? sim._bootAbstrSlot : 6;
-    // Migrate stale localStorage: slots 2–5 are hardware MMIO devices, never valid boot
-    // entries.  A stored value in this range pre-dates the Boot.Abstr slot 3→6 migration.
-    // isNSEntryValid(3) returns true for LED_DEV (non-zero MMIO entry), so the bounds
-    // check below won't catch it — we must guard here explicitly.
-    if (bootEntrySlot >= 2 && bootEntrySlot <= 5) {
-        console.warn(`[bootEntrySlot] slot ${bootEntrySlot} is a hardware MMIO device slot, not a valid boot entry; migrating stale localStorage to canonical slot ${_archCanonical}`);
-        bootEntrySlot = _archCanonical;
-        try { localStorage.setItem('bootEntrySlot', String(_archCanonical)); } catch (e) {}
+    // Compatibility hook for image/reset callers.  Inspection is deliberately
+    // read-only: importing an image must expose its binding, not rewrite it to
+    // match stale browser storage.
+    return _syncBootEntryFromSim();
+}
+
+window.BootEntryUI = {
+    get: () => Object.freeze(Object.assign({}, _bootEntryPreparation)),
+    inspect: _syncBootEntryFromSim,
+    prepare: setBootEntrySlot,
+    noteImagePreparation: function(preparation) {
+        if (!preparation || preparation.status !== 'prepared') {
+            _setBootEntryPreparation(
+                preparation && Number.isInteger(preparation.configuredSlot)
+                    ? preparation.configuredSlot : bootEntrySlot,
+                'stale-image',
+                _bootEntryMessage(preparation,
+                    'Saved image does not match the prepared selection. Prepare deliberately before booting.'),
+                preparation || null);
+        } else {
+            _setBootEntryPreparation(
+                Number.isInteger(preparation.imageSlot) ? preparation.imageSlot : bootEntrySlot,
+                'prepared',
+                'Prepared selection is saved in the boot image.',
+                preparation);
+        }
+        renderAbstractions();
+    },
+};
+
+async function savePreparedBootEntry() {
+    if (!Number.isInteger(bootEntrySlot)) {
+        _setBootEntryPreparation(null, 'error',
+            'No prepared selection is available to save. Select a Namespace target first.');
+        renderAbstractions();
+        return false;
     }
-    const _maxSlots = (sim.MAX_NS_ENTRIES > 0) ? sim.MAX_NS_ENTRIES : 256;
-    // Do NOT check isNSEntryValid(bootEntrySlot) here.  _applyBootEntryToSim() is called
-    // immediately after loadBootImage(), before any runtime LUMPs (e.g. LEDFlash at slot 7)
-    // are installed.  At that point every non-resident slot reads as all-zeros, so
-    // isNSEntryValid() returns false for a perfectly valid user-selected slot — causing
-    // bootEntrySlot to be silently reset from 7 → 6 (SelfTest).  loadLumpBinary() then
-    // sees abstrSlot(7) ≠ bootEntrySlot(6) and skips the CR14 update, leaving CR14 pointing
-    // at SelfTest (limit17=3) instead of LEDFlash (limit17=17).  On the first single-step the
-    // fetch address falls outside SelfTest's range → CR14 RANGE fault.
-    // Bounds checking alone is sufficient: if the slot is in range we trust it — the LUMP will
-    // be installed shortly after (or if it never is, mLoad produces a clear LUMP_MAGIC fault).
-    if (bootEntrySlot >= _maxSlots) {
-        const _fallback = _archCanonical < _maxSlots ? _archCanonical : 6;
-        console.warn(`[bootEntrySlot] stored slot ${bootEntrySlot} is out of bounds for this boot image (max ${_maxSlots}); resetting to ${_fallback}`);
-        bootEntrySlot = _fallback;
-        try { localStorage.setItem('bootEntrySlot', String(_fallback)); } catch (e) {}
-    }
-    if (sim.bootEntrySlot !== bootEntrySlot) {
-        sim.bootEntrySlot = bootEntrySlot;
+    const savedSlot = bootEntrySlot;
+    const savedRevision = _bootEntrySelectionRevision;
+    let savedBindingFingerprint = _bootBindingFingerprint(_bootEntryPreparation.binding);
+    try {
+        if (sim && typeof sim.inspectBootEntryBinding === 'function') {
+            savedBindingFingerprint = _bootBindingFingerprint(sim.inspectBootEntryBinding());
+        }
+    } catch (_) {}
+    _setBootEntryPreparation(savedSlot, 'pending',
+        'Saving the prepared selection and generating its boot image…');
+    renderAbstractions();
+    try {
+        const getResponse = await fetch('/api/boot-config', { cache: 'no-store' });
+        const getBody = await getResponse.json();
+        if (!getResponse.ok) throw new Error(getBody && getBody.error || 'could not load boot configuration');
+        const config = (getBody && (getBody.config || getBody.defaults));
+        if (!config || !config.targetBoard || !config.step1) {
+            throw new Error('Boot configuration is incomplete; open Boot Image Designer and save its geometry first.');
+        }
+        const payload = {
+            targetBoard: config.targetBoard,
+            bootEntrySlot: savedSlot,
+            // This button is the deliberate Prepare action.  Normal Designer
+            // saves may repeat bootEntrySlot but must not patch old image
+            // bytes merely because that field is present.
+            prepareBootEntry: true,
+            step1: config.step1,
+            step2: config.step2 || { lumps: [] },
+            step3: config.step3 || { emptySlotCount: 0 },
+        };
+        if (config.slotRules) payload.slotRules = config.slotRules;
+        const response = await fetch('/api/boot-config', {
+            method: 'POST',
+            headers: Object.assign({'Content-Type': 'application/json'},
+                (window.BuildApprovalView && window.BuildApprovalView._authHeaders
+                    ? window.BuildApprovalView._authHeaders() : {})),
+            body: JSON.stringify(payload),
+        });
+        const body = await response.json();
+        if (!response.ok || !body || body.ok === false) {
+            throw new Error(body && body.error || 'server rejected the prepared selection');
+        }
+        if (typeof window._setActiveBootConfig === 'function') {
+            window._setActiveBootConfig(body.config, body.bootImageInvalidated === true,
+                body.invalidatedBootImageWords);
+        }
+        let cacheError = null;
+        try {
+            if (typeof window._refreshCommittedBootImageCache !== 'function') {
+                throw new Error('boot-image cache refresh is unavailable');
+            }
+            await window._refreshCommittedBootImageCache();
+        } catch (error) {
+            cacheError = error;
+        }
+        let currentBindingFingerprint = savedBindingFingerprint;
+        try {
+            currentBindingFingerprint = sim && typeof sim.inspectBootEntryBinding === 'function'
+                ? _bootBindingFingerprint(sim.inspectBootEntryBinding()) : savedBindingFingerprint;
+        } catch (_) {}
+        const selectionChanged = bootEntrySlot !== savedSlot ||
+            _bootEntrySelectionRevision !== savedRevision ||
+            currentBindingFingerprint !== savedBindingFingerprint;
+        if (selectionChanged) {
+            _setBootEntryPreparation(bootEntrySlot, 'stale-image',
+                `NS[${savedSlot}] was saved while a different prepared selection became current. ` +
+                'The current selection requires an explicit Save before reset.');
+            renderAbstractions();
+            return true;
+        }
+        if (cacheError) {
+            _setBootEntryPreparation(savedSlot, 'cache-error',
+                'Prepared selection was saved on the server, but the next-reset boot-image cache could not refresh. ' +
+                'Retry boot-image cache before resetting: ' + _bootEntryMessage(cacheError, 'unknown cache error'));
+            renderAbstractions();
+            return true;
+        }
+        window.BootEntryUI.noteImagePreparation(body.preparation || {
+            status: body.prepared ? 'prepared' : 'selection-discrepancy',
+            configuredSlot: savedSlot,
+        });
+        return true;
+    } catch (error) {
+        // A later selection is authoritative in the UI; an old save failure
+        // must not repaint it as failed.
+        if (bootEntrySlot === savedSlot && _bootEntrySelectionRevision === savedRevision) {
+            _setBootEntryPreparation(savedSlot, 'error',
+                'Prepared selection was not saved: ' + _bootEntryMessage(error, 'unknown error'));
+            renderAbstractions();
+        }
+        return false;
     }
 }
+window.savePreparedBootEntry = savePreparedBootEntry;
+
+async function refreshPreparedBootImageCache() {
+    const slot = bootEntrySlot;
+    const revision = _bootEntrySelectionRevision;
+    if (!Number.isInteger(slot)) return false;
+    _setBootEntryPreparation(slot, 'pending', 'Refreshing the saved next-reset boot-image cache…');
+    renderAbstractions();
+    try {
+        if (typeof window._refreshCommittedBootImageCache !== 'function') {
+            throw new Error('boot-image cache refresh is unavailable');
+        }
+        await window._refreshCommittedBootImageCache();
+        if (bootEntrySlot === slot && _bootEntrySelectionRevision === revision) {
+            _setBootEntryPreparation(slot, 'prepared',
+                'Prepared selection is saved and its next-reset boot-image cache is current.');
+            renderAbstractions();
+        }
+        return true;
+    } catch (error) {
+        if (bootEntrySlot === slot && _bootEntrySelectionRevision === revision) {
+            _setBootEntryPreparation(slot, 'cache-error',
+                'The prepared selection remains saved, but its next-reset cache is unavailable. ' +
+                'Retry boot-image cache before resetting: ' + _bootEntryMessage(error, 'unknown cache error'));
+            renderAbstractions();
+        }
+        return false;
+    }
+}
+window.refreshPreparedBootImageCache = refreshPreparedBootImageCache;
 
 
 let _pendingLumpAbstractionName = null;

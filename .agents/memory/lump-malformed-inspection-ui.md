@@ -3,8 +3,15 @@ name: Malformed LUMP inspection UI
 description: Malformed LUMP bytes stay inspectable in the IDE while validation remains authoritative.
 ---
 
-The IDE should not hide raw malformed LUMP bytes behind an automatic amber chip or editor banner. The Hex Dump is an inspection and repair surface: it may render raw words and concise diagnostics even when header/layout parsing fails. Audit, load, and runtime integrity validation remain enabled and authoritative.
+The IDE must keep available exact LUMP bytes and recoverable source viewable
+read-only when integrity or approval cannot be established. Show an explicit
+unverified warning, not a blank sealed inspection view or a verified identity.
+Audit, load, and runtime integrity validation remain enabled and authoritative.
 
 **Why:** Developers need to inspect damaged bytes manually, but removing structural validation would allow unsafe binaries to load.
 
-**How to apply:** Keep automatic warning presentation suppressed; preserve explicit Audit results, raw Hex Dump diagnostics, and all server/simulator enforcement.
+**How to apply:** Separate read-only inspection from editable source and
+execution authority. Missing bytes stay explicitly unavailable; never decode
+authentication-error JSON as binary or bypass access controls to retrieve
+private source. The user's confirmed preference is visible available data with
+a warning, not suppression of diagnostic inspection.

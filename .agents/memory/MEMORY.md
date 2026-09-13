@@ -151,3 +151,4 @@
 - [Compiler C-list normalization](compiler-clist-normalization.md) — finalized metadata drives operand rows; preserve concrete positions and investigate row-zero reports separately
 - [Embedded source frame sizing](embedded-source-frame-sizing.md) — allocate LUMPs for the complete API/source frame before placing the relocated c-list
 - [Namespace policy foundation boundary](ns-policy-foundation-boundary.md) — only slots 0–1 are foundational; catalog LUMPs at 6–10 may have Resident/Lazy policies
+- [Prepared boot authority](prepared-boot-authority.md) — explicit preparation owns CR0; boot/import/Run never repair it; ROM evidence stays separate from Namespace data

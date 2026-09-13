@@ -11,9 +11,11 @@ factory `SelfTest` at NS slot 6 and the selectable `WukongCallHome` abstraction
 at NS slot 7. Neither is in the boot ROM; the boot ROM contains only the
 3-instruction `BOOT_PROGRAM` (see `docs/StartupCM.md`).
 
-`SelfTest` is the factory boot target, matching the simulator lightning-bolt
-default. `WukongCallHome` remains available for an explicit boot-entry selection
-and runs the LED/UART diagnostic loop.
+`SelfTest` is the factory image's prepared target. `WukongCallHome` remains
+available for an explicit **Prepare** action and runs the LED/UART diagnostic
+loop. A browser-stored selection is not boot authority: it is committed only
+after preparation validates the selected Namespace entry and stages its live
+sequence-bearing E-GT in the reserved Boot.Thread CR0 home.
 
 ---
 
@@ -23,7 +25,7 @@ and runs the LED/UART diagnostic loop.
 |---|---|---|
 | Location | ROM BRAM (`_WUKONG_ROM` in `wukong_top.py`) | DMEM byte `0x600`, NS slot 6 | DMEM byte `0x1200`, NS slot 7 |
 | Size | 3 instructions (`BOOT_PROGRAM`) | 512-word canonical image | 73 instructions (`WUKONG_NUC_PROGRAM`) |
-| Executed by default | Always (ROM[0..2] on every power-on) | Yes — `Thread.caps[0]` contains `0x4A000006` | Only if the IDE or boot config selects NS slot 7 |
+| Executed by default | Always (ROM[0..2] on every power-on) | Only when its E-GT is the image's prepared `Thread.caps[0]` binding | Only when its E-GT is the image's prepared `Thread.caps[0]` binding |
 | Standalone safe | — | Runs the canonical self-test | Yes — loops without calling into an application c-list |
 
 **The 3-instruction boot ROM (`BOOT_PROGRAM`) always runs first:**
@@ -33,11 +35,28 @@ ROM[1]  CHANGE CR12, CR15, #1  ; switch to Boot.Thread
 ROM[2]  CALL   CR0             ; enter boot entry via Thread.caps[0]
 ```
 
-On factory power-on, `Thread.caps[0]` contains the SelfTest E-GT
-`0x4A000006`; ROM[2] enters SelfTest at NIA `0x604`.
+On the factory image, `Thread.caps[0]` contains the prepared SelfTest E-GT;
+ROM[2] consumes precisely that stored capability. The displayed word must not
+be treated as a permanent constant because a GT includes the target's live
+Namespace sequence.
 
-To enter WukongCallHome on power-on, replace the factory entry with its NS-slot-7
-E-GT in the boot image/build configuration and rebuild/reflash the bitstream.
+To enter WukongCallHome on power-on, explicitly prepare slot 7. Preparation
+validates the target and canonical Thread layout, stages then atomically
+commits only the Boot.Thread CR0 home/header; it never writes live CRs. Save or
+generate the resulting image/config as a separate deliberate action. Imported
+or stale images are reported as unprepared/stale and are never silently
+redirected to SelfTest or another default.
+
+### Reset events, gates, and fault evidence
+
+The former reset/init/load phases are not ROM instructions. `RESET_EVENT`
+captures prior fault context and clears live banks before ROM[0];
+`CALL_HOME_EVENT` reports after the root call. Neither appears in the
+three-row progress display. `LOAD` validates the Namespace root, `CHANGE`
+validates Thread geometry and restores its homes/heap, and ordinary `CALL
+CR0` performs E-permission, sequence/version, residency, and code-context
+checks. A boot fault persists the attempt, ROM word/address, `boot-rom`
+domain, provenance CR/GT, decoded slot/sequence, and rejecting gate.
 
 ---
 

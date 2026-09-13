@@ -232,6 +232,35 @@ def test_unapproved_exact_binary_is_available_but_not_authorized(
     assert identity["reason"] == "approval-missing"
 
 
+@pytest.mark.parametrize("store_failure", ("corrupt", "unreadable"))
+def test_words_inspection_returns_exact_untrusted_bytes_when_approval_store_fails(
+        tmp_path, monkeypatch, store_failure):
+    """Readonly byte inspection must not inherit mutation's fail-closed gate."""
+    binary = _self_defining_lump("return inspection;")
+    digest, token = _approved_library(tmp_path, binary)
+    if store_failure == "corrupt":
+        (tmp_path / "approvals.json").write_text("{not valid json")
+    else:
+        def unreadable(_path):
+            raise OSError("injected approvals read failure")
+        monkeypatch.setattr(app_module, "_shared_read_approvals", unreadable)
+    monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        app_module, "LUMPS_MANIFEST_PATH", str(tmp_path / "manifest.json"))
+
+    response = app_module.app.test_client().get(f"/api/lump/{token}/words")
+
+    assert response.status_code == 200, response.get_json()
+    body = response.get_json()
+    assert body["binary_hash"] == digest
+    assert body["words"] == list(struct.unpack(">64I", binary))
+    assert body["source"] == "return inspection;"
+    assert body["approved"] is False
+    assert body["trusted"] is False
+    assert any("Approval store unavailable" in error
+               for error in body["validation_errors"])
+
+
 @pytest.mark.parametrize("field", [
     "methods", "capabilities", "content_type", "profile", "language",
     "cw", "cc", "lump_size", "source", "api_definition",

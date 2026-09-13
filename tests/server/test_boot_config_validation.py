@@ -56,6 +56,11 @@ FAKE_CATALOG_ENTRY = {
     "binaryHash": "a" * 64,
 }
 
+
+def _boot_config_auth_headers():
+    token = os.environ.get("REPORT_TOKEN", "").strip()
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
 # Namespace Header V2, Thread.1, Boot.Abstr, and catalog bodies at slots 7–10
 # occupy the RAM prefix. Boot.NS metadata resides at the Namespace-table tail.
 # With header=16, thread_lump=256 and BOOT_ABSTR_DEFAULT_SIZE=64 → 592.
@@ -315,7 +320,8 @@ class TestValidateStep2General:
             "step3": {"emptySlotCount": 0},
         }
         with _app_module.app.test_client() as client:
-            response = client.post("/api/boot-config", json=payload)
+            response = client.post("/api/boot-config", json=payload,
+                                   headers=_boot_config_auth_headers())
         assert response.status_code == 400, response.get_json()
         assert "Preload LUMPs are not supported" in response.get_json()["error"]
 
@@ -338,28 +344,31 @@ class TestValidateStep2General:
             "step3": {"emptySlotCount": 0},
         }
         with _app_module.app.test_client() as client:
-            response = client.post("/api/boot-config", json=payload)
+            response = client.post("/api/boot-config", json=payload,
+                                   headers=_boot_config_auth_headers())
         assert response.status_code == 400
         assert "does not match its canonical catalog record" in response.get_json()["error"]
 
-    def test_boot_entry_slot_is_saved_with_the_boot_config(self, monkeypatch, tmp_path):
-        """The Lightning Bolt selection must survive beyond browser-local state."""
+    def test_boot_entry_slot_requires_a_committed_image_to_prepare(
+            self, monkeypatch, tmp_path):
+        """Selection cannot be saved as metadata without a patched image."""
         config_path = tmp_path / "boot-config.json"
         monkeypatch.setattr(_app_module, "BOOT_CONFIG_PATH", str(config_path))
+        monkeypatch.setattr(_app_module, "BOOT_IMAGE_PATH", str(tmp_path / "missing.bin"))
         payload = {
             "targetBoard": TI60_BOARD,
             "bootEntrySlot": 10,
+            "prepareBootEntry": True,
             "step1": dict(DEFAULT_BOOT_CONFIG["step1"]),
             "step2": {"lumps": []},
             "step3": {"emptySlotCount": 0},
         }
         with _app_module.app.test_client() as client:
-            response = client.post("/api/boot-config", json=payload)
-            loaded = client.get("/api/boot-config")
-        assert response.status_code == 200, response.get_json()
-        assert response.get_json()["config"]["bootEntrySlot"] == 10
-        assert json.loads(config_path.read_text())["bootEntrySlot"] == 10
-        assert loaded.get_json()["config"]["bootEntrySlot"] == 10
+            response = client.post("/api/boot-config", json=payload,
+                                   headers=_boot_config_auth_headers())
+        assert response.status_code == 422, response.get_json()
+        assert response.get_json()["prepared"] is False
+        assert not config_path.exists()
 
     @pytest.mark.parametrize("invalid_slot", [True, -1, MAX_NS_ENTRIES])
     def test_boot_entry_slot_rejects_invalid_values(
@@ -374,7 +383,8 @@ class TestValidateStep2General:
             "step3": {"emptySlotCount": 0},
         }
         with _app_module.app.test_client() as client:
-            response = client.post("/api/boot-config", json=payload)
+            response = client.post("/api/boot-config", json=payload,
+                                   headers=_boot_config_auth_headers())
         assert response.status_code == 400
         assert "bootEntrySlot must be an integer" in response.get_json()["error"]
 
@@ -401,6 +411,8 @@ class TestValidateStep2General:
         monkeypatch.setattr(_app_module, "_write_boot_image_bytes", lambda blob: None)
         monkeypatch.setattr(_app_module, "_load_boot_abstr_lump", lambda: None)
         monkeypatch.setattr(_app_module, "_load_boot_ns_lump", lambda: None)
+        monkeypatch.setattr(
+            _app_module, "_boot_image_preparation_status", lambda *_args: {})
 
         with _app_module.app.test_client() as client:
             response = client.post("/api/boot-image/generate", json={})

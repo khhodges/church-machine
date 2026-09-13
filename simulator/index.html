@@ -908,6 +908,9 @@
                         <span id="editorCodeName" class="editor-identity-name" aria-label="Current LUMP identity" title="Current LUMP identity"></span>
 
                         <span id="asmWarnBadge" class="asm-warn-badge" style="display:none;" title="Assembly warnings — scroll up to review">&#x26A0; <span id="asmWarnBadgeCount"></span></span>
+                        <button type="button" id="savedLumpIdentityToggle" class="btn btn-sm saved-lump-identity-toggle" style="display:none;" onclick="toggleSavedLumpIdentity()" aria-controls="savedLumpIdentityPanel" aria-expanded="true" aria-label="Hide artifact identity" title="Hide artifact identity">
+                            <svg width="16" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 3 7v5c0 5 9 10 9 10s9-5 9-10V7Z"/></svg>
+                        </button>
                 </div>
         </div>
         <div class="editor-layout editor-source-console-row" aria-label="Source and console workspace">
@@ -1036,7 +1039,7 @@
             </div>
              <section id="savedLumpDisassemblyPanel" class="saved-lump-disassembly-panel" style="display:none;" aria-label="Complete saved LUMP workspace">
                   <h2 id="savedLumpDisassemblyTitle">Complete LUMP</h2>
-                  <div id="savedLumpIdentityPanel" class="saved-lump-identity-panel" aria-label="Verified saved LUMP identity"></div>
+                  <div id="savedLumpIdentityPanel" class="saved-lump-identity-panel" aria-label="Saved LUMP identity; provenance may be unverified"></div>
                   <p>Exact disassembly from the immutable saved binary.</p>
                  <pre id="savedLumpDisassembly" tabindex="0" aria-readonly="true"></pre>
              </section>
@@ -3472,7 +3475,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="abstract_gt_manager.js"></script>
     <script src="thread_design.js?v=sha256-6c9b749e878a"></script>
     <script src="architecture_contracts.js?v=sha256-1d50622f8024"></script>
-    <script src="simulator.js?v=sha256-5261cbcc2d88"></script>
+    <script src="simulator.js?v=sha256-cbe8f3b11729"></script>
     <script src="capability_tokens.js?v=sha256-ff2a6f7b92f6"></script>
     <script src="portable_lump_binding.js?v=sha256-1565bea4b151"></script>
     <script src="assembler.js?v=sha256-12b2fde6a148"></script>
@@ -3501,31 +3504,31 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script defer src="app-startup-wizard.js?v=sha256-501bb88367f8"></script>
     <script src="lump-registry.js?v=sha256-3088c8f7a525"></script>
     <script src="target-state.js?v=sha256-cc7981e52e84"></script>
-    <script src="app-shell.js?v=sha256-6be9fe026fd5"></script>
-    <script src="app-tools.js?v=sha256-98260bf84d81"></script>
+    <script src="app-shell.js?v=sha256-5a7825cfbcae"></script>
+    <script src="app-tools.js?v=sha256-46944326bbbe"></script>
     <script src="app-cr-display.js?v=sha256-526b6ea2708d"></script>
     <script src="app-cr-detail.js?v=sha256-b11f99009fb8"></script>
     <script src="tab-correction.js?v=sha256-c8d226d6edc8"></script>
     <script src="pet_name_audit.js"></script>
     <script src="save_diagnostics.js?v=sha256-25fc1bbccd1e"></script>
-    <script src="app-memory.js?v=sha256-20bd3e34bcc3"></script>
-    <script src="app-abstractions.js?v=sha256-9413403e14df"></script>
+    <script src="app-memory.js?v=sha256-58e9570b9aa1"></script>
+    <script src="app-abstractions.js?v=sha256-e2f70c0e32ff"></script>
     <script src="app-ns-dna.js"></script>
     <script src="lump-content-frame.js?v=sha256-a21808c93061"></script>
-    <script src="lump-audit.js?v=sha256-803baf1fb1fb"></script>
+    <script src="lump-audit.js?v=sha256-380ac57c6846"></script>
     <script src="rci-show-errs.js?v=sha256-652eda848fcc"></script>
-    <script src="app-lumps.js?v=sha256-11ad12233f40"></script>
-    <script src="app-absdetail.js?v=sha256-2cfd74601324"></script>
+    <script src="app-lumps.js?v=sha256-1802dcdd61a0"></script>
+    <script src="app-absdetail.js?v=sha256-5b3e3ede5e42"></script>
     <!-- Load order matters: app-compile must precede app-run (exports LANG_EXAMPLE_GROUPS
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->
     <script src="app-compile.js?v=sha256-bf8224077b80"></script>
-    <script src="app-lump-editor.js?v=sha256-169bb65dcb8a"></script>
+    <script src="app-lump-editor.js?v=sha256-4281587591e8"></script>
     <script src="app-editor-find.js?v=sha256-aeb1fa51e855"></script>
     <script src="lump_save_handler.js?v=sha256-a912f34d1180"></script>
     <script src="whats-new-feed.js?v=sha256-4f1499720d0d"></script>
-    <script src="app-run.js?v=sha256-f6441256e40c"></script>
+    <script src="app-run.js?v=sha256-4230dc0c632f"></script>
     <script src="app-actions.js?v=sha256-4ce7d3896e9e"></script>
-    <script src="app-build-approval.js?v=sha256-a0bc03cc9ce0"></script>
+    <script src="app-build-approval.js?v=sha256-737779efe980"></script>
     <script src="app-source-library.js?v=sha256-f0acb36b8999"></script>
     <script src="app-invoke.js?v=sha256-376a499e341a"></script>
     <script src="app-misc.js?v=sha256-9309e68bdbab"></script>

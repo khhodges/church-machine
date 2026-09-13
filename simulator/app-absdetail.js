@@ -149,28 +149,18 @@ function _renderBootNSDecoder(contentEl, abs) {
 
     const ns0 = sim.readNSEntry(0);
     const ns1 = sim.readNSEntry(1);
-    // Authoritative boot-entry source: the E-GT at the Thread's tail-relative
-    // CR0 home. setBootEntrySlot() always writes here
-    // but does NOT update mem[NS_TABLE_BASE-2], so reading that word gives stale data.
-    let bootSlot;
-    {
-        const ns1Loc    = ns1 ? (ns1.word0_location >>> 0) : 0;
-        const layout    = ns1Loc && typeof sim._threadLayoutAtBase === 'function'
-            ? sim._threadLayoutAtBase(ns1Loc) : null;
-        const capsOff   = layout ? layout.capsStart : null;
-        const cr0Word   = (ns1Loc && sim.memory && capsOff != null)
-            ? (sim.memory[ns1Loc + capsOff] >>> 0) : 0;
-        if (cr0Word) {
-            const cr0GT = sim.parseGT(cr0Word);
-            if (cr0GT && cr0GT.type === 1 && cr0GT.permissions && cr0GT.permissions.E) {
-                bootSlot = cr0GT.index;
-            }
-        }
-        if (bootSlot == null) {
-            bootSlot = (typeof sim.bootEntrySlot === 'number') ? sim.bootEntrySlot : 3;
-        }
-    }
-    const bootEntryName = (sim.nsLabels && sim.nsLabels[bootSlot]) ||
+    // Inspect the stored home without changing it. A base address of zero is
+    // valid, and an incomplete imported image must remain visibly incomplete
+    // rather than falling back to a UI/default slot.
+    let binding = null;
+    try {
+        binding = typeof sim.inspectBootEntryBinding === 'function'
+            ? sim.inspectBootEntryBinding() : null;
+    } catch (_) {}
+    const bootSlot = binding && Number.isInteger(binding.targetSlot)
+        ? binding.targetSlot : null;
+    const bootEntryName = bootSlot == null ? 'Unprepared / incomplete evidence' :
+        (sim.nsLabels && sim.nsLabels[bootSlot]) ||
         (abstractionRegistry && abstractionRegistry.abstractions && abstractionRegistry.abstractions[bootSlot] &&
          abstractionRegistry.abstractions[bootSlot].name) || `NS[${bootSlot}]`;
 
@@ -178,7 +168,7 @@ function _renderBootNSDecoder(contentEl, abs) {
     const fmtW    = v => '0x' + ((v >>> 0)).toString(16).toUpperCase().padStart(8, '0');
 
     html += '<div class="abs-nsdecoder-section">';
-    html += '<div class="abs-nsdecoder-heading">Hardware Boot Sequence</div>';
+    html += '<div class="abs-nsdecoder-heading">Simulator/spec-known Boot-ROM sequence (not observed hardware)</div>';
     html += '<table class="abs-nsdecoder-boot-table"><tbody>';
 
     const ns0Addr = ns0 ? fmtAddr(ns0.word0_location) : '?';
@@ -192,15 +182,15 @@ function _renderBootNSDecoder(contentEl, abs) {
     const ns1Addr = ns1 ? fmtAddr(ns1.word0_location) : '?';
     html += `<tr>
         <td class="abs-nsdecoder-step">Step 2</td>
-        <td class="abs-nsdecoder-op">Load CR12</td>
-        <td class="abs-nsdecoder-desc">Thread lump &nbsp;@ ${ns1Addr}</td>
+        <td class="abs-nsdecoder-op">CHANGE CR12</td>
+        <td class="abs-nsdecoder-desc">Restore Thread home &nbsp;@ ${ns1Addr}</td>
         <td class="abs-nsdecoder-name">Boot.Thread <span class="abs-nsdecoder-badge-thread">Thread</span> (NS[1])</td>
     </tr>`;
 
     html += `<tr>
         <td class="abs-nsdecoder-step">Step 3</td>
         <td class="abs-nsdecoder-op">CALL CR0</td>
-        <td class="abs-nsdecoder-desc">Boot entry &nbsp;&nbsp;NS[${bootSlot}]</td>
+        <td class="abs-nsdecoder-desc">${binding && binding.ok ? `Prepared boot entry &nbsp;&nbsp;NS[${bootSlot}]` : 'Prepared boot entry unavailable or stale'}</td>
         <td class="abs-nsdecoder-name"><span class="abs-nsdecoder-badge-boot">&#x26A1;</span> ${bootEntryName}</td>
     </tr>`;
 
@@ -209,8 +199,8 @@ function _renderBootNSDecoder(contentEl, abs) {
 
     // ── Hardwired Golden Tokens (CR15 + CR12) ───────────────────────────────
     html += '<div class="abs-nsdecoder-section">';
-    html += '<div class="abs-clist-heading">Hardwired Golden Tokens</div>';
-    html += '<div class="abs-nsdecoder-hint">CR15 (NS root) and CR12 (Thread stack) are loaded by hardware at reset \u2014 never writable by CLOOMC programs</div>';
+    html += '<div class="abs-clist-heading">Simulator/spec-known reset Golden Tokens</div>';
+    html += '<div class="abs-nsdecoder-hint">These are simulator/spec constants, not a capture from attached hardware. CR15 (NS root) and CR12 (Thread stack) are reset-loaded and never writable by CLOOMC programs.</div>';
     html += '<table class="abs-clist-table" style="margin-top:0.5rem;"><thead><tr>';
     html += '<th>CR</th><th>GT (HEX)</th><th>PERMS</th><th>TYPE</th><th>RESOLVED NAME</th>';
     html += '</tr></thead><tbody>';
@@ -3563,18 +3553,15 @@ DWRITE DR1, lump[0]     ; store f_GT into new thread's GT zone word 0
 ; Returns: new Thread GT — call Thread.switchTo to begin execution`,
         },
         'Boot.Thread': {
-            'run': `; Boot.Thread.run — B:02 INIT_THRD boot step (Slot 1)
+            'run': `; Boot.Thread.run — B:01 CHANGE CR12 boot instruction (Slot 1)
 ; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ; This method IS the thread — it has no entry point.
 ; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-B:02  INIT_THRD
-      GT12 ← createGT(Slot=1, perms=[none], type=Inform)
-      entry ← mLoad(GT12)       ; load NS entry for Slot 1
-      CR12 ← { word0=GT12, word1=entry.base,
-               word2=entry.word1_limit, word3=entry.seals }
-      ; CR12 = Thread stack — Priv zone, zero perms
-      ; Informs-only: cannot be used for direct CALL  ◄── see below
+B:01  CHANGE CR12
+       ; Restore the canonical Boot.Thread context and its reserved CR0 home.
+       ; The following B:02 CALL CR0 consumes that prepared home exactly as
+       ; stored; the UI must not synthesize a substitute GT or live CR0 value.
 
 ; ── What does the last line mean? ─────────────────
 ;

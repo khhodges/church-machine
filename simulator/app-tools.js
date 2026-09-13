@@ -275,7 +275,9 @@ function hideLoadingOverlay() {
     setTimeout(() => { el.style.display = 'none'; }, 300);
 }
 
-const BOOT_STEP_NAMES = ['FAULT_RST','LOAD_NS','INIT_THRD','INIT_ABSTR\u2b64LOAD_NUC\u2b64COMPLETE'];
+// Reset/fault reporting are separate events. Only these three boot-ROM
+// instructions participate in boot progress and attempt-bound checkmarks.
+const BOOT_STEP_NAMES = ['LOAD CR15', 'CHANGE CR12', 'CALL CR0'];
 
 function updateLedStrip() {
     if (!sim) return;

@@ -133,10 +133,12 @@ def _active_selftest_binding():
     rows = [row for row in state["abstractions"] if row.get("name") == "SelfTest"]
     assert len(rows) == 1, "SelfTest must have exactly one active ns-state row"
     row = rows[0]
+    # Namespace state owns the live slot.  The manifest is only an exact
+    # token/filename locator and no longer repeats the authoritative ns_slot.
     matches = [entry for entry in manifest if entry.get("abstraction") == "SelfTest"
-               and entry.get("ns_slot") == row["slot"]
                and entry.get("token") == row["token"]
-               and entry.get("filename") == row["filename"]]
+               and entry.get("filename") == row["filename"]
+               and not entry.get("archived")]
     assert len(matches) == 1, "active SelfTest state must have one matching manifest locator"
     return row
 

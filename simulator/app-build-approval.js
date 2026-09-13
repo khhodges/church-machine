@@ -574,7 +574,8 @@ const BuildApprovalView = {
 
             const postRes = await fetch('/api/boot-config', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: Object.assign({'Content-Type': 'application/json'},
+                    this._authHeaders()),
                 body: JSON.stringify(config),
             });
             const postBody = await _actionableJsonResponse(postRes, 'Save the slot rule', {

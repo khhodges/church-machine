@@ -208,9 +208,14 @@ function response(status, body) {
     check('Resident Save persists the selected Lightning Bolt slot with the config',
         saveBody.includes('bootEntrySlot: (function ()') &&
         saveBody.includes("localStorage.getItem('bootEntrySlot')"));
-    check('Resident config load restores a server-saved Lightning Bolt on a fresh browser',
-        editorSource.includes('var savedBootSlot = cfg && cfg.bootEntrySlot;') &&
-        editorSource.includes('setBootEntrySlot(savedBootSlot);'));
+    const residentLoadStart = editorSource.indexOf('function _rlLoad()');
+    const residentLoadEnd = editorSource.indexOf('function _rlInitStep2(', residentLoadStart);
+    const residentLoadBody = editorSource.slice(residentLoadStart, residentLoadEnd);
+    check('Resident config load records the saved Lightning Bolt for display only',
+        residentLoadBody.includes('var savedBootSlot = cfg && cfg.bootEntrySlot;') &&
+        residentLoadBody.includes('_rl.bootEntrySlot = savedBootSlot;') &&
+        !residentLoadBody.includes('setBootEntrySlot(') &&
+        !residentLoadBody.includes('sim.bootEntrySlot'));
 
     console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
     if (failed) process.exit(1);

@@ -1,605 +1,507 @@
 'use strict';
-// test_boot_entry_sync.js — Regression tests for Task #1202
-// Confirms that the boot-entry label (bootEntrySlot) stays current immediately
-// after a simulator reset (_autoLoadDefaultProgram path) and after a catalog
-// LUMP is loaded into the simulator (_loadCatalogLumpIntoSim path).
-//
-// Run:  node simulator/test_boot_entry_sync.js
-//
-// Coverage:
-//   T201 — _autoLoadDefaultProgram path: production function called with a
-//           pre-booted sim whose bootEntrySlot differs from the UI variable;
-//           asserts bootEntrySlot matches sim.bootEntrySlot immediately after.
-//   T202 — _loadCatalogLumpIntoSim path: production function called with a
-//           minimal program; asserts bootEntrySlot matches sim.bootEntrySlot
-//           immediately after (no poll delay).
-//   T203 — No-op guard: _syncBootEntryFromSim leaves bootEntrySlot unchanged
-//           when it already matches sim — no spurious localStorage writes.
-//   T204 — sim.loadProgram() preserves sim.bootEntrySlot across a program load
-//           (guard against the extended-code path silently resetting the slot).
-//   T205 — Sequential resets: bootEntrySlot tracks sim.bootEntrySlot across
-//           three consecutive sync calls (order-dependent state regression).
-//   T206 — Null sim guard: _syncBootEntryFromSim is safe when sim is null.
-//   T209 — browser startup restores a valid LightningBolt selection from
-//           localStorage, with SelfTest (slot 6) as the missing/invalid fallback.
-//   T210 — an unexpected boot halt is promoted to a BOOT fault instead of
-//           freezing at B:NN without the Fault popup.
+// Task #3447 UI regression checks. Run: node simulator/test_boot_entry_sync.js
 
-const vm   = require('vm');
-const fs   = require('fs');
+const assert = require('assert');
+const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
+const vm = require('vm');
+const childProcess = require('child_process');
+const ChurchSimulator = require('./simulator.js');
 
-const ChurchSimulator    = require('./simulator.js');
-const AbstractionRegistry = require('./abstractions.js');
-const SystemAbstractions  = require('./system_abstractions.js');
-
-let pass = 0;
-let fail = 0;
-const temporaryTestRoots = [];
-
-// Keep generated-image inputs out of the workspace.  The process-exit cleanup
-// also covers assertion failures and signals handled by the test runner.
-process.on('exit', () => {
-    for (const root of temporaryTestRoots) {
-        try { fs.rmSync(root, { recursive: true, force: true }); } catch (_) {}
+const abstractions = fs.readFileSync(path.join(__dirname, 'app-abstractions.js'), 'utf8');
+const runner = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
+const memoryUi = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
+let passed = 0;
+function check(name, fn) {
+    try { fn(); console.log('PASS ' + name); passed++; }
+    catch (error) { console.error('FAIL ' + name + ': ' + error.message); process.exitCode = 1; }
+}
+function extract(source, name) {
+    const start = source.indexOf('function ' + name + '(');
+    assert.notStrictEqual(start, -1, name + ' not found');
+    let depth = 0, begun = false;
+    for (let i = start; i < source.length; i++) {
+        if (source[i] === '{') { depth++; begun = true; }
+        if (source[i] === '}' && begun && --depth === 0) return source.slice(start, i + 1);
     }
+    throw new Error('unterminated ' + name);
+}
+
+check('three boot instructions are the only UI progress steps', () => {
+    const block = runner.slice(runner.indexOf('const _BOOT_STEPS ='), runner.indexOf('function _bootNIARows'));
+    assert.match(block, /LOAD CR15/);
+    assert.match(block, /CHANGE CR12/);
+    assert.match(block, /CALL CR0/);
+    assert.strictEqual((block.match(/addrStr:/g) || []).length, 3);
+    assert.doesNotMatch(block, /FAULT_RST|INIT_THRD|NUC_CODE/);
 });
 
-function check(label, cond) {
-    if (cond) {
-        console.log(`PASS ${label}`);
-        pass++;
-    } else {
-        console.log(`FAIL ${label}`);
-        fail++;
-    }
-}
-
-// ── Source extraction ─────────────────────────────────────────────────────────
-//
-// Reads a top-level function definition verbatim from a source file.  The
-// extractor counts `{` / `}` characters to find the closing brace; this is
-// reliable for these functions which are at the top level and contain no
-// template-literal `${…}` brace pairs that would confuse a naive counter
-// (all such expansions in the three target functions are safe here because
-// they are inside string literals, not top-level template tags).
-//
-// Rationale: loading the production source rather than a copy ensures the test
-// catches any future change to the call sites (e.g. a removed _syncBootEntryFromSim
-// call) that a hand-copied replica would silently miss.
-
-function extractTopLevelFn(sourceFile, fnName) {
-    const src   = fs.readFileSync(path.join(__dirname, sourceFile), 'utf8');
-    const lines = src.split('\n');
-    const startPattern = `function ${fnName}(`;
-    let collecting = false;
-    let depth = 0;
-    const buf = [];
-
-    for (const line of lines) {
-        if (!collecting && line.startsWith(startPattern)) {
-            collecting = true;
-        }
-        if (!collecting) continue;
-
-        buf.push(line);
-        for (const ch of line) {
-            if (ch === '{') depth++;
-            else if (ch === '}') depth--;
-        }
-        if (depth === 0 && buf.length > 1) break;
-    }
-
-    if (buf.length === 0) {
-        throw new Error(`extractTopLevelFn: "${fnName}" not found in ${sourceFile}`);
-    }
-    return buf.join('\n');
-}
-
-const syncFnSrc      = extractTopLevelFn('app-abstractions.js', '_syncBootEntryFromSim');
-const autoLoadFnSrc  = extractTopLevelFn('app-run.js',          '_autoLoadDefaultProgram');
-const loadCatalogSrc = extractTopLevelFn('app-absdetail.js',    '_loadCatalogLumpIntoSim');
-const bootFailureFnSrc = extractTopLevelFn('app-run.js', '_recordUnreportedBootFailure');
-
-// ── Sandbox factory ───────────────────────────────────────────────────────────
-//
-// Creates a vm sandbox that wires the three production functions together with
-// a real ChurchSimulator and minimal stubs for all browser globals they touch.
-//
-// The three functions are evaluated inside the context so they close over the
-// same `bootEntrySlot`, `sim`, `localStorage`, etc. variables — exactly as they
-// would in the browser.  Assertions read sandbox.bootEntrySlot after each call.
-
-function makeTestSim() {
-    const sim = new ChurchSimulator();
-    const registry = new AbstractionRegistry();
-    new SystemAbstractions(registry);
-    sim.abstractionRegistry = registry;
-    sim.bootComplete = true;
-    return sim;
-}
-
-function makeSandbox(sim, initialBootEntrySlot) {
-    const lsStore = {};
-
-    const sandbox = {
-        // ── Simulator state ────────────────────────────────────────────────
-        sim,
-        bootEntrySlot: initialBootEntrySlot,
-
-        // ── app-run.js module-level vars used by _autoLoadDefaultProgram ──
-        lastAssembledWords: [],
-        lastMethodTableSize: 0,
-        _defaultProgramLoaded: false,
-        _pendingSimLoad: false,
-        BOOT_ABSTR_NS_SLOT: 3,
-
-        // ── browser APIs (stubbed) ─────────────────────────────────────────
-        localStorage: {
-            setItem(k, v) { lsStore[k] = String(v); },
-            getItem(k)    { return Object.prototype.hasOwnProperty.call(lsStore, k) ? lsStore[k] : null; },
-        },
-        window: {
-            _lastCatalogLumpWords: null,
-            _lastCatalogLumpName:  null,
-            lumpEditorRenderResidentPanel: null,
-        },
-        document: {
-            querySelector()  { return null; },
-            getElementById() { return null; },
-        },
-        currentView:       'code',
-        selectedAbsIndex:  null,
-
-        // ── Stub functions (no-ops; do not affect the sync invariant) ──────
-        renderAbstractions:          () => {},
-        updateNamespace:             () => {},
-        _applyBootEntryToSim() { sim.bootEntrySlot = sandbox.bootEntrySlot; },
-        _reapplyStickyPatches:       () => {},
-        _injectClistNow:             () => {},
-        _applyBootLumpPetNames:      () => {},
-        loadExample:                 () => {},
-        updateLiveLumpBanner:        () => {},
-        updateDashboard:             () => {},
-        instantBoot:                 () => true,
-        console,
-    };
-
-    const ctx = vm.createContext(sandbox);
-
-    // Evaluate the three production function definitions in the shared context.
-    vm.runInContext(syncFnSrc,      ctx, { filename: 'app-abstractions.js' });
-    vm.runInContext(autoLoadFnSrc,  ctx, { filename: 'app-run.js' });
-    vm.runInContext(loadCatalogSrc, ctx, { filename: 'app-absdetail.js' });
-
-    return { ctx, sandbox, lsStore };
-}
-
-// ── T201: _autoLoadDefaultProgram path ───────────────────────────────────────
-//
-// After reset, the factory image may temporarily restore SelfTest into
-// sim.bootEntrySlot. The user's persisted Lightning Bolt remains authoritative.
-//
-// Setup: _defaultProgramLoaded=true (second+ boot cycle), lastAssembledWords=[]
-// (no user program) → _autoLoadDefaultProgram takes the no-assembled-words branch
-// and calls _applyBootEntryToSim().
-console.log('\n--- T201: _autoLoadDefaultProgram preserves Lightning Bolt selection ---');
-{
-    const sim = makeTestSim();
-    const { ctx, sandbox, lsStore } = makeSandbox(sim, 3);
-
-    // Simulate factory SelfTest taking over while Lightning Bolt still selects
-    // CapabilityTest in the UI/persisted setting.
-    sim.bootEntrySlot = 6;
-    // Second+ boot cycle: _defaultProgramLoaded=true, no assembled program
-    sandbox._defaultProgramLoaded = true;
-    sandbox.lastAssembledWords    = [];
-
-    // Pre-condition: divergence is present before the function runs
-    check('T201a: CapabilityTest selection diverges from factory SelfTest before call',
-        sandbox.bootEntrySlot === 3 && sim.bootEntrySlot === 6);
-
-    // Call the production function — it must reapply the Lightning Bolt.
-    vm.runInContext('_autoLoadDefaultProgram()', ctx);
-
-    check('T201b: simulator matches Lightning Bolt immediately after _autoLoadDefaultProgram()',
-        sandbox.bootEntrySlot === sim.bootEntrySlot);
-    check('T201c: CapabilityTest remains selected',
-        sandbox.bootEntrySlot === 3);
-    check('T201d: SelfTest is not persisted over the selection',
-        lsStore['bootEntrySlot'] !== '6');
-    check('T201e: sim.bootEntrySlot is restored to CapabilityTest',
-        sim.bootEntrySlot === 3);
-}
-
-// ── T201f: cached editor source must not overwrite the boot LUMP ──────────────
-//
-// CR14 is derived by the boot CALL path from the selected Namespace descriptor.
-// A previous reset hook passed cached source directly to loadProgram(), which
-// shrank the selected SelfTest descriptor to the cached source length.  The
-// next CALL then correctly built CR14 with the wrong short range.
-console.log('\n--- T201f: cached source preserves the boot LUMP descriptor ---');
-{
-    const sim = makeTestSim();
-    const { ctx, sandbox } = makeSandbox(sim, 6);
-    const CACHED_WORDS = [0x11111111, 0x22222222, 0x33333333];
-    sandbox.window.LumpRegistry = {
-        getCurrent() { return 'cached-source'; },
-        resolve(token) {
-            return token === 'cached-source'
-                ? { sources: { memory: { words: CACHED_WORDS } } }
-                : null;
-        },
-    };
-    sandbox._defaultProgramLoaded = true;
-
-    const entryBefore = sim.readNSEntry(6);
-    const headerBefore = sim.memory[entryBefore.word0_location] >>> 0;
-    vm.runInContext('_autoLoadDefaultProgram()', ctx);
-    const entryAfter = sim.readNSEntry(6);
-    const headerAfter = sim.memory[entryAfter.word0_location] >>> 0;
-
-    check('T201f: reset-time cached source leaves SelfTest Namespace location unchanged',
-        entryAfter.word0_location === entryBefore.word0_location);
-    check('T201g: reset-time cached source leaves SelfTest authority/limit unchanged',
-        entryAfter.word1_limit === entryBefore.word1_limit);
-    check('T201h: reset-time cached source leaves SelfTest header unchanged',
-        headerAfter === headerBefore);
-}
-
-// ── T202: _loadCatalogLumpIntoSim path ───────────────────────────────────────
-//
-// When the user clicks "Load into Sim" in the Abstractions panel,
-// _loadCatalogLumpIntoSim calls sim.loadProgram(words, 0) then
-// _syncBootEntryFromSim.  The test verifies the label updates immediately.
-//
-// Setup: window._lastCatalogLumpWords is a minimal 3-word program; the sim
-// is pre-booted.  After sim.loadProgram() the sim.bootEntrySlot is still 3
-// (the value it held before the load) and the UI variable is stale at 12.
-console.log('\n--- T202: _loadCatalogLumpIntoSim path — sync after catalog lump load ---');
-{
-    const sim = makeTestSim();
-    const { ctx, sandbox, lsStore } = makeSandbox(sim, 12);  // UI stale at 12
-
-    // sim.bootEntrySlot is 3 (default after boot)
-    sim.bootEntrySlot = 3;
-
-    // Provide a minimal 3-word catalog LUMP in window (what the button does)
-    sandbox.window._lastCatalogLumpWords = [0x00000000, 0x00000000, 0x00000000];
-    sandbox.window._lastCatalogLumpName  = 'TestCatalogAbs';
-
-    // Pre-condition: UI is stale
-    check('T202a: bootEntrySlot (12) diverges from sim.bootEntrySlot (3) before call',
-        sandbox.bootEntrySlot === 12 && sim.bootEntrySlot === 3);
-
-    // Call the production function — it calls sim.loadProgram() then _syncBootEntryFromSim()
-    vm.runInContext('_loadCatalogLumpIntoSim()', ctx);
-
-    // Post-condition: sync must have fired inside _loadCatalogLumpIntoSim
-    check('T202b: bootEntrySlot matches sim.bootEntrySlot immediately after _loadCatalogLumpIntoSim()',
-        sandbox.bootEntrySlot === sim.bootEntrySlot);
-    check('T202c: bootEntrySlot updated to 3 (sim.bootEntrySlot)',
-        sandbox.bootEntrySlot === 3);
-    check('T202d: localStorage written with slot "3"',
-        lsStore['bootEntrySlot'] === '3');
-}
-
-// ── T203: No-op guard ─────────────────────────────────────────────────────────
-//
-// _syncBootEntryFromSim must be a no-op when bootEntrySlot already matches
-// sim.bootEntrySlot.  Spurious localStorage writes would cause unneeded
-// re-renders and difficult-to-diagnose UI flicker.
-console.log('\n--- T203: sync is a no-op when already in sync ---');
-{
-    const sim = makeTestSim();
-    const { ctx, sandbox, lsStore } = makeSandbox(sim, 5);  // UI at 5
-    sim.bootEntrySlot = 5;                                   // sim also at 5
-
-    vm.runInContext('_syncBootEntryFromSim()', ctx);
-
-    check('T203a: bootEntrySlot unchanged (still 5) after no-op sync',
-        sandbox.bootEntrySlot === 5);
-    check('T203b: localStorage NOT written when no change needed',
-        !Object.prototype.hasOwnProperty.call(lsStore, 'bootEntrySlot'));
-}
-
-// ── T204: sim.loadProgram() must not clobber sim.bootEntrySlot ───────────────
-//
-// The extended-code path in loadProgram() rewrites NS-slot-3 metadata and
-// CR14/CR6 registers.  A regression here could silently reset bootEntrySlot
-// back to BOOT_ABSTR_NS_SLOT (3), making every subsequent _syncBootEntryFromSim
-// call appear to "fix" a divergence that loadProgram() itself created.
-//
-// This test loads a minimal program into a real ChurchSimulator and verifies
-// that sim.bootEntrySlot survives the call — then confirms the sync correctly
-// propagates the preserved slot to the UI variable.
-console.log('\n--- T204: sim.loadProgram() preserves sim.bootEntrySlot ---');
-{
-    const sim = makeTestSim();
-    sim.bootEntrySlot = 9;          // user has selected slot 9
-
-    try { sim.loadProgram([0x00000000, 0x00000000], 0); } catch (_) { /* pre-boot is OK */ }
-
-    check('T204a: sim.bootEntrySlot preserved across sim.loadProgram() (still 9)',
-        sim.bootEntrySlot === 9);
-
-    // Now confirm the sync path propagates the preserved slot correctly
-    const { ctx, sandbox, lsStore } = makeSandbox(sim, 3);  // UI is stale at 3
-    vm.runInContext('_syncBootEntryFromSim()', ctx);
-
-    check('T204b: sync after loadProgram() propagates user-selected slot 9 to UI',
-        sandbox.bootEntrySlot === 9);
-    check('T204c: localStorage carries "9"', lsStore['bootEntrySlot'] === '9');
-}
-
-// ── T205: Sequential resets — bootEntrySlot tracks across multiple cycles ────
-//
-// Three consecutive resets must not let different encoded/factory slots replace
-// the persisted Lightning Bolt selection.
-console.log('\n--- T205: sequential resets preserve the Lightning Bolt selection ---');
-{
-    const sim = makeTestSim();
-    const { ctx, sandbox, lsStore } = makeSandbox(sim, 3);
-    sandbox._defaultProgramLoaded = true;
-    sandbox.lastAssembledWords    = [];
-
-    // Cycle 1: boot image temporarily reports slot 5
-    sim.bootEntrySlot = 5;
-    vm.runInContext('_autoLoadDefaultProgram()', ctx);
-    check('T205a: cycle 1 — bootEntrySlot remains 3', sandbox.bootEntrySlot === 3);
-    check('T205b: cycle 1 — matches sim',          sandbox.bootEntrySlot === sim.bootEntrySlot);
-
-    // Cycle 2: next reset temporarily reports slot 11
-    sim.bootEntrySlot = 11;
-    vm.runInContext('_autoLoadDefaultProgram()', ctx);
-    check('T205c: cycle 2 — bootEntrySlot remains 3', sandbox.bootEntrySlot === 3);
-    check('T205d: cycle 2 — matches sim',           sandbox.bootEntrySlot === sim.bootEntrySlot);
-    check('T205e: cycle 2 — SelfTest/temporary slots are not persisted',
-        lsStore['bootEntrySlot'] !== '11' && lsStore['bootEntrySlot'] !== '6');
-
-    // Cycle 3: reset back to slot 3
-    sim.bootEntrySlot = 3;
-    vm.runInContext('_autoLoadDefaultProgram()', ctx);
-    check('T205f: cycle 3 — bootEntrySlot === 3', sandbox.bootEntrySlot === 3);
-    check('T205g: cycle 3 — matches sim',          sandbox.bootEntrySlot === sim.bootEntrySlot);
-}
-
-// ── T206: Null sim guard ──────────────────────────────────────────────────────
-//
-// The production _syncBootEntryFromSim starts with `if (!sim) return`.
-// Verify the production code (not a replica) handles null without throwing and
-// leaves bootEntrySlot unchanged.
-console.log('\n--- T206: null sim guard — production _syncBootEntryFromSim is safe ---');
-{
-    const sim = makeTestSim();
-    const { ctx, sandbox, lsStore } = makeSandbox(sim, 8);
-
-    // Temporarily set sim to null in the context
-    ctx.sim = null;
-    let threw = false;
-    try { vm.runInContext('_syncBootEntryFromSim()', ctx); } catch (e) { threw = true; }
-
-    check('T206a: _syncBootEntryFromSim() does not throw when sim is null', !threw);
-    check('T206b: bootEntrySlot unchanged (still 8) when sim is null', sandbox.bootEntrySlot === 8);
-    check('T206c: localStorage not written when sim is null',
-        !Object.prototype.hasOwnProperty.call(lsStore, 'bootEntrySlot'));
-}
-
-// ── T207: fallback placeholder anchored to canonical Boot.Abstr slot ─────────
-//
-// Task #2867: _initNamespaceTable() used to write its synthetic Boot.Abstr
-// placeholder header at the USER-SELECTED bootEntrySlot.  With CapabilityTest
-// (slot 10) selected and no boot image, that fabricated an executable-looking
-// 3-word header at slot 10's location (0x0300) over zero code words, and left
-// the canonical slot 6 without its placeholder.  The placeholder must ALWAYS
-// anchor to sim._bootAbstrSlot (6); a selected non-canonical entry must remain
-// visibly non-resident (invalid header magic) so boot faults clearly instead
-// of running zeros.
-console.log('\n--- T207: fallback placeholder stays at canonical slot 6 (CapabilityTest selected) ---');
-{
-    const sim = new ChurchSimulator();
-    sim.bootEntrySlot = 10;      // user selects CapabilityTest
-    sim.reset();                 // fallback init — no boot image loaded
-
-    const canonical = sim._bootAbstrSlot;
-    check('T207a: _bootAbstrSlot is the canonical architectural slot 6', canonical === 6);
-
-    const loc6  = sim.memory[sim._nsSlotBase(6)]  >>> 0;
-    const loc10 = sim.memory[sim._nsSlotBase(10)] >>> 0;
-    const hdr6  = sim.parseLumpHeader(sim.memory[loc6]  >>> 0);
-    const hdr10 = sim.parseLumpHeader(sim.memory[loc10] >>> 0);
-
-    check('T207b: canonical slot 6 carries a valid placeholder lump header',
-        !!hdr6 && hdr6.valid === true);
-    check('T207c: selected slot 10 does NOT carry a fabricated executable header',
-        !hdr10 || hdr10.valid !== true);
-    check('T207d: bootEntrySlot selection (10) survives the fallback init',
-        sim.bootEntrySlot === 10);
-
-    // Selecting the canonical slot itself must still yield a bootable placeholder.
-    const sim2 = new ChurchSimulator();
-    sim2.bootEntrySlot = 6;
-    sim2.reset();
-    const loc6b = sim2.memory[sim2._nsSlotBase(6)] >>> 0;
-    const hdr6b = sim2.parseLumpHeader(sim2.memory[loc6b] >>> 0);
-    check('T207e: canonical-entry fallback still writes a valid placeholder at slot 6',
-        !!hdr6b && hdr6b.valid === true && hdr6b.cw > 0);
-}
-
-// ── T208: rejected boot image must not be marked available ───────────────────
-//
-// Task #2867: the app-shell startup probe and app-memory reset/generate/upload
-// paths must gate window.bootImage / window.bootImageAvailable on
-// loadBootImage()'s boolean verdict.  Source-level contract check: every
-// call site that sets bootImageAvailable=true must do so only after a
-// `sim.loadBootImage(...) === true` comparison (except the save path, which
-// re-uploads an image that was already accepted).
-console.log('\n--- T208: acceptance state gated on loadBootImage() verdict ---');
-{
-    const shellSrc = fs.readFileSync(path.join(__dirname, 'app-shell.js'),  'utf8');
-    const memSrc   = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
-
-    // app-shell startup probe: must check the loader verdict and have a
-    // false-branch that clears availability.
-    const shellGates = /loadBootImage\((?:buf|window\.bootImage)\)\s*===\s*true/.test(shellSrc);
-    const shellClears = /bootImageAvailable\s*=\s*false/.test(shellSrc);
-    check('T208a: app-shell startup probe gates on loadBootImage() === true', shellGates);
-    check('T208b: app-shell clears bootImageAvailable on rejection', shellClears);
-
-    // app-memory: _maybeApplyBootImage / generateBootImage / uploadBootImageFile
-    const memGateCount = (memSrc.match(/loadBootImage\((?:buf|window\.bootImage)\)\s*===\s*true/g) || []).length;
-    check('T208c: app-memory has >=4 loader-verdict gates (reset x2, generate, upload)',
-        memGateCount >= 4);
-    const memClearCount = (memSrc.match(/bootImageAvailable\s*=\s*false/g) || []).length;
-    check('T208d: app-memory clears bootImageAvailable on rejection in >=4 paths',
-        memClearCount >= 4);
-
-    // Behavioural check: a stale image (no format tag) is rejected by the loader.
-    const sim = new ChurchSimulator();
-    const staleWords = new Uint32Array(sim.memory.length);
-    // all zeros — no BOOT_IMAGE_FORMAT_TAG anywhere
-    const verdict = sim.loadBootImage(staleWords.buffer);
-    check('T208e: loadBootImage() returns false for an image without the format tag',
-        verdict === false);
-}
-
-// ── T209: a new IDE session restores the selected LightningBolt entry ─────────
-//
-// The boot image is fetched asynchronously.  If a run completes from the
-// standalone 64-word placeholder first, simply copying the real image into
-// memory does not replace the already-derived CR14/CR11 state.  The startup
-// loader must reset through its image-overlay hook after caching a late image.
-console.log('\n--- T211: late boot-image arrival replaces fallback CR state ---');
-{
-    const appShellSrc = fs.readFileSync(path.join(__dirname, 'app-shell.js'), 'utf8');
-    // Generate a current physical V2 image from a disposable LUMP copy rather
-    // than allowing a future generator change to touch the workspace catalog.
-    const isolatedLumps = fs.mkdtempSync(path.join(require('os').tmpdir(), 'church-boot-entry-'));
-    temporaryTestRoots.push(isolatedLumps);
-    fs.cpSync(path.join(process.cwd(), 'server', 'lumps'), isolatedLumps, {
-        recursive: true,
-        dereference: false,
-    });
-    const generated = spawnSync('python', ['-c', [
-        'import io, json, sys',
-        'import os',
-        'from server.boot_image import generate_boot_image',
-        'cfg=json.load(open("server/boot-config.json"))',
-        // generate_boot_image may emit approval diagnostics.  Keep stdout a
-        // byte-exact image stream and send diagnostics to the child stderr.
-        'old_stdout=sys.stdout',
-        'sys.stdout=io.StringIO()',
-        'image=generate_boot_image(cfg, os.environ["CHURCH_TEST_LUMPS_DIR"])',
-        'diagnostics=sys.stdout.getvalue()',
-        'sys.stdout=old_stdout',
-        'sys.stderr.write(diagnostics)',
-        'sys.stdout.buffer.write(image)',
-    ].join(';')], {
-        cwd: process.cwd(),
-        encoding: null,
-        env: { ...process.env, CHURCH_TEST_LUMPS_DIR: isolatedLumps },
-    });
-    if (generated.status !== 0) {
-        throw new Error(`Could not generate boot image: ${String(generated.stderr || '')}`);
-    }
-    const bootImageBytes = generated.stdout;
-    const bootImage = bootImageBytes.buffer.slice(
-        bootImageBytes.byteOffset, bootImageBytes.byteOffset + bootImageBytes.byteLength
-    );
-    const bootWords = new Uint32Array(bootImage);
-    const selfTestWord1 = bootWords[bootWords.length - (6 + 1) * 4 + 1] >>> 0;
-    global.window = {
-        bootConfig: {
-            step1: {
-                totalNamespaceWords: bootImageBytes.byteLength / 4,
-                namespaceLumpWords: 64,
-                threadLumpWords: 256,
+check('boot progress renders only the current core attempt', () => {
+    const stepsSrc = runner.slice(runner.indexOf('const _BOOT_STEPS ='),
+        runner.indexOf('function stepSim()'));
+    const context = {
+        sim: {
+            getState() {
+                return {
+                    bootProgress: [
+                        { attemptId: 11, bootRomAddress: 0, status: 'completed', word: 1, destinationRegister: 15 },
+                        { attemptId: 11, bootRomAddress: 1, status: 'completed', word: 2, destinationRegister: 12 },
+                        { attemptId: 11, bootRomAddress: 2, status: 'failed', word: 3, destinationRegister: 0, gateReason: 'stale home' },
+                        // A record from an earlier attempt must not set a checkmark.
+                        { attemptId: 10, bootRomAddress: 2, status: 'completed', word: 99, destinationRegister: 0 },
+                    ],
+                };
             },
         },
+        Number, Object,
     };
+    vm.runInNewContext(stepsSrc + '\nrows = _bootNIARows(0);', context);
+    assert.strictEqual(context.rows.attemptId, 11);
+    assert.deepStrictEqual(Array.from(context.rows.all, row => row.status),
+        ['completed', 'completed', 'failed']);
+    assert.strictEqual(context.rows.curr.disasm, 'CALL CR0');
+    assert.strictEqual(context.rows.curr.gateReason, 'stale home');
+});
+
+check('boot progress never infers a completed hardware row from position', () => {
+    const stepsSrc = runner.slice(runner.indexOf('const _BOOT_STEPS ='),
+        runner.indexOf('function stepSim()'));
+    const context = {
+        sim: { getState: () => ({ bootProgress: [
+            { attemptId: 12, status: 'completed', word: 0x11111111 },
+            { attemptId: 12, status: 'completed', word: 0x22222222 },
+        ] }) },
+        Number, Object,
+    };
+    vm.runInNewContext(stepsSrc + '\nrows = _bootNIARows(2);', context);
+    assert.deepStrictEqual(Array.from(context.rows.all, row => row.status),
+        ['unexecuted', 'unexecuted', 'unexecuted']);
+    assert.strictEqual(context.rows.curr.disasm, 'LOAD CR15');
+});
+
+check('UI has no direct live boot-slot redirect outside persistence rollback', () => {
+    const ui = [runner,
+        fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8'),
+        fs.readFileSync(path.join(__dirname, 'app-shell.js'), 'utf8'),
+        fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8')].join('\n');
+    assert.doesNotMatch(ui, /sim\.bootEntrySlot\s*=/);
+    assert.match(abstractions, /sim\.bootEntrySlot\s*=\s*rollback\.bootEntrySlot/);
+    assert.strictEqual((abstractions.match(/sim\.bootEntrySlot\s*=/g) || []).length, 1);
+    assert.doesNotMatch(extract(runner, '_applyPendingSimLoad'), /prepareBootEntry/);
+    assert.doesNotMatch(fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8'),
+        /setBootEntrySlot\(_targetSlot\)/);
+    const lumpEditor = fs.readFileSync(path.join(__dirname, 'app-lump-editor.js'), 'utf8');
+    assert.doesNotMatch(lumpEditor, /localBootSlot|localStorage\.setItem\('bootEntrySlot'/);
+    assert.match(lumpEditor, /if \(setBootEntrySlot\(nsSlot\) === true\)/);
+});
+
+check('failed Prepare leaves local selection and storage unchanged', () => {
+    const setSrc = extract(abstractions, 'setBootEntrySlot');
+    const writes = [];
+    const context = {
+        bootEntrySlot: 6,
+        sim: { prepareBootEntry: slot => ({ ok: false, slot, reason: 'stale Namespace sequence' }) },
+        window: { TargetState: { authorize: () => ({ ok: true }) } },
+        localStorage: { setItem: (...args) => writes.push(args) },
+        _setBootEntryPreparation: () => {},
+        _bootEntryMessage: result => result.reason,
+        renderAbstractions: () => {},
+        Number, Math, String,
+    };
+    vm.runInNewContext(setSrc + '\nresult = setBootEntrySlot(7);', context);
+    assert.strictEqual(context.result, false);
+    assert.strictEqual(context.bootEntrySlot, 6);
+    assert.deepStrictEqual(writes, []);
+});
+
+check('successful Prepare commits only after core transaction succeeds', () => {
+    const setSrc = extract(abstractions, 'setBootEntrySlot');
+    let committed = null;
+    const context = {
+        bootEntrySlot: 6,
+        sim: { prepareBootEntry: slot => ({ ok: true, slot, sequence: 23, homeAddress: 0 }) },
+        window: {
+            TargetState: { authorize: () => ({ ok: true }) },
+        },
+        _commitPreparedBootEntry: (slot, result) => { committed = { slot, result }; },
+        localStorage: { setItem: () => { throw new Error('setBootEntrySlot must delegate persistence to commit'); } },
+        _setBootEntryPreparation: () => {},
+        renderAbstractions: () => {},
+        Number, Math, String,
+    };
+    vm.runInNewContext(setSrc + '\nresult = setBootEntrySlot(7);', context);
+    assert.strictEqual(context.result, true);
+    assert.deepStrictEqual(committed, { slot: 7, result: { ok: true, slot: 7, sequence: 23, homeAddress: 0 } });
+    assert.strictEqual(context.bootEntrySlot, 6);
+});
+
+check('actual core prepare contract leaves live CR0 untouched for UI Prepare', () => {
+    const setSrc = extract(abstractions, 'setBootEntrySlot');
     const sim = new ChurchSimulator();
-    // This regression specifically exercises the canonical resident SelfTest
-    // placeholder, independently of the new CapabilityTest startup default.
-    sim.bootEntrySlot = 6;
-
-    function completeBoot(machine) {
-        let safety = 0;
-        while (!machine.bootComplete && !machine.halted && safety++ < 32) {
-            machine._bootStep();
-        }
-    }
-
-    completeBoot(sim);
-    const fallbackLimit = sim.parseNSWord1(sim.cr[14].word2 >>> 0).limit;
-    check('T211a: standalone fallback derives the historical 64-word CR14 range',
-        sim.bootComplete && fallbackLimit === 63);
-
-    check('T211b: the checked-in boot image is accepted after fallback boot',
-        sim.loadBootImage(bootImage) === true);
-    check('T211c: overlay alone leaves the old fallback CR14 range in place',
-        sim.parseNSWord1(sim.cr[14].word2 >>> 0).limit === 63);
-
-    // Model the reset listener after app-shell caches a late accepted image.
-    sim.reset();
-    check('T211d: the cached image reloads successfully during reset',
-        sim.loadBootImage(bootImage) === true);
-    completeBoot(sim);
-    const liveLimit = sim.parseNSWord1(sim.cr[14].word2 >>> 0).limit;
-    check('T211e: post-reset CALL derives CR14 from the real SelfTest descriptor',
-        sim.bootComplete && liveLimit === sim.parseNSWord1(selfTestWord1).limit);
-
-    const cacheAt = appShellSrc.indexOf('window.bootImage = buf;');
-    const resetAt = appShellSrc.indexOf('if (_wasBootedBeforeImage)', cacheAt);
-    check('T211f: startup loader caches the accepted image before late-arrival reset',
-        appShellSrc.includes('const _wasBootedBeforeImage = !!sim.bootComplete;') &&
-        cacheAt >= 0 && resetAt > cacheAt &&
-        appShellSrc.indexOf('sim.reset();', resetAt) > resetAt);
-}
-
-// ── T209: a new IDE session restores the selected LightningBolt entry ────────
-console.log('\n--- T209: browser startup restores LightningBolt selection ---');
-{
-    const memSrc = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
-    check('T209a: browser startup keeps SelfTest slot 6 as the fallback',
-        /let bootEntrySlot\s*=\s*6\s*;/.test(memSrc));
-    check('T209b: browser startup reads the persisted boot-entry selection',
-        /localStorage\.getItem\(['"]bootEntrySlot['"]\)/.test(memSrc) &&
-        /bootEntrySlot\s*=\s*_storedBootEntry/.test(memSrc));
-    check('T209c: malformed or out-of-range persisted values are ignored',
-        /_storedBootEntry\s*>=\s*0/.test(memSrc) &&
-        /_storedBootEntry\s*<=\s*0xFFFF/.test(memSrc));
-}
-
-// ── T210: no unreported boot freezes ─────────────────────────────────────────
-console.log('\n--- T210: unreported boot halts become visible BOOT faults ---');
-{
-    const faults = [];
-    const sandbox = {
-        console: { error() {} },
-        sim: {
-            bootComplete: false,
-            bootStep: 6,
-            halted: true,
-            faultLog: [],
-            fault(type, message) {
-                faults.push({ type, message });
-                this.faultLog.push({ type, message });
-            }
-        }
+    const liveCR0Before = JSON.stringify(sim.cr[0]);
+    let committed = null;
+    const context = {
+        bootEntrySlot: 5,
+        sim,
+        window: { TargetState: { authorize: () => ({ ok: true }) } },
+        localStorage: { setItem: () => {} },
+        _commitPreparedBootEntry: (slot, result) => { committed = { slot, result }; },
+        _setBootEntryPreparation: () => {},
+        _bootEntryMessage: result => result && result.reason,
+        renderAbstractions: () => {},
+        Number, Math, String,
     };
-    const ctx = vm.createContext(sandbox);
-    vm.runInContext(`${bootFailureFnSrc}; globalThis.result = _recordUnreportedBootFailure('boot sequence stopped');`, ctx);
-    check('T210a: an unreported halt is recorded as a BOOT fault',
-        sandbox.result === true && faults.length === 1 && faults[0].type === 'BOOT');
-    check('T210b: the BOOT fault identifies the phase where boot stopped',
-        faults[0] && faults[0].message.includes('B:06'));
-    vm.runInContext(`globalThis.duplicate = _recordUnreportedBootFailure('boot sequence stopped');`, ctx);
-    check('T210c: an existing fault is never replaced by a generic BOOT fault',
-        sandbox.duplicate === false && faults.length === 1);
-}
+    vm.runInNewContext(setSrc + '\nresult = setBootEntrySlot(6);', context);
+    assert.strictEqual(context.result, true);
+    assert.strictEqual(committed.slot, 6);
+    assert.strictEqual(committed.result.threadSlot, 1);
+    assert.ok(Number.isInteger(committed.result.homeAddress));
+    assert.strictEqual(JSON.stringify(sim.cr[0]), liveCR0Before);
+    assert.strictEqual(sim.inspectBootEntryBinding().ok, true);
+});
 
-// ── Summary ───────────────────────────────────────────────────────────────────
-console.log(`\n${'─'.repeat(60)}`);
-console.log(`boot-entry-sync results: ${pass} passed, ${fail} failed`);
-if (fail > 0) process.exit(1);
+check('storage failure rolls back core header, home, and browser selection', () => {
+    const setSrc = extract(abstractions, 'setBootEntrySlot');
+    const commitSrc = extract(abstractions, '_commitPreparedBootEntry');
+    const sim = {
+        bootEntrySlot: 6,
+        memory: new Uint32Array(300),
+        getThreadInstanceLayout: () => ({ valid: true, base: 250, capsStart: 10 }),
+        prepareBootEntry(slot) {
+            this.bootEntrySlot = slot;
+            this.memory[4] = 0xDEAD;
+            this.memory[260] = 0xBEEF;
+            return { ok: true, slot, homeAddress: 260 };
+        },
+    };
+    sim.memory[4] = 0x1111;
+    sim.memory[260] = 0x2222;
+    const context = {
+        bootEntrySlot: 6, sim,
+        window: { TargetState: { authorize: () => ({ ok: true }) } },
+        localStorage: { setItem: () => { throw new Error('quota exceeded'); } },
+        _syncSelfTestNextGtToBootEntry: () => {},
+        _setBootEntryPreparation: () => {},
+        _bootEntryMessage: error => error && error.message ? error.message : String(error),
+        renderAbstractions: () => {},
+        Number, Math, String,
+    };
+    vm.runInNewContext(commitSrc + '\n' + setSrc + '\nresult = setBootEntrySlot(7);', context);
+    assert.strictEqual(context.result, false);
+    assert.strictEqual(context.bootEntrySlot, 6);
+    assert.strictEqual(sim.bootEntrySlot, 6);
+    assert.strictEqual(sim.memory[4], 0x1111);
+    assert.strictEqual(sim.memory[260], 0x2222);
+});
+
+check('render failure rolls back browser persistence and core preparation', () => {
+    const setSrc = extract(abstractions, 'setBootEntrySlot');
+    const commitSrc = extract(abstractions, '_commitPreparedBootEntry');
+    const syncNextSrc = extract(abstractions, '_syncSelfTestNextGtToBootEntry');
+    let stored = '6';
+    const sim = new ChurchSimulator();
+    const headerBefore = sim.memory[4] >>> 0;
+    const homeBefore = sim.memory[260] >>> 0;
+    sim.demoClistGTs[1] = 0;
+    const context = {
+        bootEntrySlot: 6, _bootEntrySelectionRevision: 0,
+        _bootEntryPreparation: { slot: 6, status: 'prepared' },
+        sim, window: { TargetState: { authorize: () => ({ ok: true }) } },
+        localStorage: {
+            getItem: () => stored,
+            setItem: (_key, value) => { stored = value; },
+            removeItem: () => { stored = null; },
+        },
+        _setBootEntryPreparation: () => {},
+        _bootEntryMessage: error => error && error.message,
+        renderAbstractions: () => { throw new Error('render interrupted'); },
+        Number, Math, String,
+    };
+    vm.runInNewContext(syncNextSrc + '\n' + commitSrc + '\n' + setSrc +
+        '\nresult = setBootEntrySlot(6);', context);
+    assert.strictEqual(context.result, false);
+    assert.strictEqual(stored, '6');
+    assert.strictEqual(context.bootEntrySlot, 6);
+    assert.strictEqual(sim.bootEntrySlot, 6);
+    assert.strictEqual(sim.memory[4], headerBefore);
+    assert.strictEqual(sim.memory[260], homeBefore);
+    assert.strictEqual(sim.demoClistGTs[1], 0);
+});
+
+check('binding inspection remains read-only and fault UI preserves unknown provenance', () => {
+    const inspectSrc = extract(abstractions, '_syncBootEntryFromSim');
+    assert.doesNotMatch(inspectSrc, /localStorage\.setItem|bootEntrySlot\s*=/);
+    const modalSrc = extract(runner, 'showFaultModal');
+    assert.doesNotMatch(modalSrc, /f\._nsSnapshot\s*=/);
+    assert.match(modalSrc, /no immutable instruction provenance/);
+    assert.match(modalSrc, /bootEvidence/);
+    assert.match(modalSrc, /Known ROM instruction/);
+    assert.match(modalSrc, /observed fault word/);
+    assert.match(modalSrc, /null\/zero GT/);
+    assert.match(runner, /'bootEvidence'/);
+    const bootDecoder = fs.readFileSync(path.join(__dirname, 'app-absdetail.js'), 'utf8');
+    assert.match(bootDecoder, /Simulator\/spec-known Boot-ROM sequence \(not observed hardware\)/);
+});
+
+check('fault evidence survives a local-storage reload with separate ROM and observed words', () => {
+    const persistSrc = runner.slice(runner.indexOf('const _FAULT_LOG_FIELDS ='),
+        runner.indexOf('function _clearRestoredFaultLogAfterGoodStep'));
+    let serialized = null;
+    const context = {
+        sim: { faultLog: [{
+            type: 'BOOT_BINDING', message: 'stale CR0 home', faultRawWord: 0xDEADBEEF,
+            observed_instr_word: 0xA5A5A5A5,
+            bootEvidence: {
+                attemptId: 4, bootRomAddress: 2, instructionWord: 0x10700000,
+                provenanceGT: 0, slot: 0, sequence: 0,
+            },
+        }] },
+        localStorage: {
+            setItem: (_key, value) => { serialized = value; },
+            removeItem: () => {},
+        },
+        _FAULT_LOG_LS_KEY: 'test-fault-log',
+        Number, Object, JSON,
+    };
+    vm.runInNewContext(persistSrc + '\n_saveFaultLog();', context);
+    const restored = JSON.parse(serialized)[0];
+    assert.strictEqual(restored.faultRawWord, 0xDEADBEEF);
+    assert.strictEqual(restored.observed_instr_word, 0xA5A5A5A5);
+    assert.deepStrictEqual(restored.bootEvidence, {
+        attemptId: 4, bootRomAddress: 2, instructionWord: 0x10700000,
+        provenanceGT: 0, slot: 0, sequence: 0,
+    });
+});
+
+check('saved Prepare refreshes only the next-reset image cache', () => {
+    const child = `
+const assert = require('assert');
+const fs = require('fs');
+const vm = require('vm');
+const source = fs.readFileSync('simulator/app-abstractions.js', 'utf8');
+const start = source.indexOf('async function savePreparedBootEntry(');
+if (start < 0) throw new Error('savePreparedBootEntry missing');
+let depth = 0, begun = false, end = -1;
+for (let i = start; i < source.length; i++) {
+  if (source[i] === '{') { depth++; begun = true; }
+  if (source[i] === '}' && begun && --depth === 0) { end = i + 1; break; }
+}
+const save = source.slice(start, end);
+let posted = null, cacheRefreshes = 0, noted = null, status = null, statusMessage = null;
+const context = {
+  bootEntrySlot: 6, _bootEntrySelectionRevision: 0, _bootEntryPreparation: { binding: null },
+  window: {
+    _setActiveBootConfig: () => {},
+    _refreshCommittedBootImageCache: async () => { cacheRefreshes++; context.window.bootImage = new ArrayBuffer(8); },
+    BootEntryUI: { noteImagePreparation: value => { noted = value; } },
+  },
+  fetch: async (url, options) => {
+    if (!options || !options.method) return { ok: true, json: async () => ({ config: {
+      targetBoard: 'sim', step1: { totalNamespaceWords: 1024 }, step2: { lumps: [] }, step3: { emptySlotCount: 0 }
+    } }) };
+    posted = JSON.parse(options.body);
+    return { ok: true, json: async () => ({ ok: true, prepared: true, config: posted,
+      preparation: { status: 'prepared', configuredSlot: 6 } }) };
+  },
+  _setBootEntryPreparation: (_slot, next, message) => { status = next; statusMessage = message; },
+  _bootBindingFingerprint: () => null,
+  _bootEntryMessage: e => e && (e.message || e.reason || e.error),
+  renderAbstractions: () => {},
+  Number, Error, JSON,
+};
+vm.runInNewContext(save + '; promise = savePreparedBootEntry();', context);
+(async () => {
+  const saved = await context.promise;
+  assert.strictEqual(saved, true, 'save failed with UI status: ' + status + ' ' + statusMessage);
+  assert.strictEqual(posted.bootEntrySlot, 6);
+   assert.strictEqual(posted.prepareBootEntry, true);
+  assert.strictEqual(cacheRefreshes, 1);
+  assert.ok(context.window.bootImage instanceof ArrayBuffer);
+  assert.strictEqual(noted.status, 'prepared');
+  assert.notStrictEqual(status, 'cache-error');
+})().catch(error => { console.error(error.stack || error); process.exit(1); });
+`;
+    childProcess.execFileSync(process.execPath, ['-e', child], {
+        cwd: path.resolve(__dirname, '..'), stdio: 'pipe',
+    });
+});
+
+check('an older async save cannot overwrite a newer prepared selection status', () => {
+    const child = `
+const assert = require('assert');
+const fs = require('fs');
+const vm = require('vm');
+const source = fs.readFileSync('simulator/app-abstractions.js', 'utf8');
+const start = source.indexOf('async function savePreparedBootEntry(');
+let depth = 0, begun = false, end = -1;
+for (let i = start; i < source.length; i++) {
+  if (source[i] === '{') { depth++; begun = true; }
+  if (source[i] === '}' && begun && --depth === 0) { end = i + 1; break; }
+}
+const save = source.slice(start, end);
+let resolvePost, noted = null, status = null;
+const context = {
+  bootEntrySlot: 6, _bootEntrySelectionRevision: 0, _bootEntryPreparation: { binding: null },
+  window: {
+    _setActiveBootConfig: () => {},
+    _refreshCommittedBootImageCache: async () => {},
+    BootEntryUI: { noteImagePreparation: value => { noted = value; } },
+  },
+  fetch: async (_url, options) => {
+    if (!options || !options.method) return { ok: true, json: async () => ({ config: {
+      targetBoard: 'sim', step1: { totalNamespaceWords: 1024 }, step2: {}, step3: {}
+    } }) };
+    return new Promise(resolve => { resolvePost = () => resolve({
+      ok: true, json: async () => ({ ok: true, prepared: true, config: {},
+        preparation: { status: 'prepared', configuredSlot: 6 } }),
+    }); });
+  },
+  _setBootEntryPreparation: (_slot, next) => { status = next; },
+  _bootBindingFingerprint: () => null,
+  _bootEntryMessage: e => e && (e.message || e.reason || e.error),
+  renderAbstractions: () => {}, Number, Error, JSON,
+};
+vm.runInNewContext(save + '; promise = savePreparedBootEntry();', context);
+(async () => {
+  while (!resolvePost) await new Promise(resolve => setImmediate(resolve));
+  context.bootEntrySlot = 7;
+  context._bootEntrySelectionRevision = 1;
+  resolvePost();
+  assert.strictEqual(await context.promise, true);
+  assert.strictEqual(status, 'stale-image');
+  assert.strictEqual(noted, null);
+})().catch(error => { console.error(error.stack || error); process.exit(1); });
+`;
+    childProcess.execFileSync(process.execPath, ['-e', child], {
+        cwd: path.resolve(__dirname, '..'), stdio: 'pipe',
+    });
+});
+
+check('Namespace Save submits prepared config with NS bytes atomically and refreshes cache', () => {
+    const saveNs = memoryUi.slice(memoryUi.indexOf('window._nsTableSave = async function'),
+        memoryUi.indexOf('// ── NS label click'));
+    assert.match(saveNs, /nsSavePreparedSelection/);
+    assert.match(saveNs, /boot_config:\s*bootConfigCandidate/);
+    assert.match(saveNs, /_refreshCommittedBootImageCache\(\)/);
+    assert.match(saveNs, /data\.config/);
+    assert.match(saveNs, /!nsSavePreparedSelection/);
+});
+
+check('instant, animated, and manual Step boot entrypoints block factory fallback', () => {
+    const bootGuards = runner.slice(runner.indexOf('function _recordUnreportedBootFailure'),
+        runner.indexOf('function slowBoot()'));
+    const slowSrc = extract(runner, 'slowBoot');
+    const stepSrc = extract(runner, 'stepSim');
+    const invoke = source => {
+        const sim = new ChurchSimulator();
+        const consoleEl = { textContent: '', scrollTop: 0 };
+        const context = {
+            sim,
+            window: {
+                bootImage: null, bootImageAvailable: false,
+                TargetState: { authorize: () => ({ ok: true }) },
+                BootEntryUI: { noteImagePreparation: () => {} },
+            },
+            document: { getElementById: () => consoleEl },
+            console: { error: () => {} },
+            bootAnimating: false, _bootAnimTimer: null, _bootAuditAccum: [],
+            pipelineViz: null, _pendingSimLoad: null,
+            updateDashboard: () => {}, switchView: () => {}, openCRDetail: () => {},
+            _syncPullToRefreshGuard: () => {},
+            Number, String, Math, setTimeout, clearTimeout,
+        };
+        vm.runInNewContext(bootGuards + '\n' + source, context);
+        return { sim, consoleEl, context };
+    };
+    const instant = invoke('result = instantBoot();');
+    assert.strictEqual(instant.context.result, false);
+    assert.strictEqual(instant.sim.bootComplete, false);
+    assert.strictEqual(instant.sim.faultLog.at(-1).type, 'BOOT_IMAGE');
+    assert.match(instant.consoleEl.textContent, /factory image is never substituted/);
+
+    const animated = invoke(slowSrc + '\nslowBoot();');
+    assert.strictEqual(animated.sim.bootComplete, false);
+    assert.strictEqual(animated.sim.faultLog.at(-1).type, 'BOOT_IMAGE');
+
+    const stepped = invoke(stepSrc + '\nstepSim();');
+    assert.strictEqual(stepped.sim.bootComplete, false);
+    assert.strictEqual(stepped.sim.faultLog.at(-1).type, 'BOOT_IMAGE');
+});
+
+check('cached synthetic NS7 image drives all positive boot entrypoints in exactly three steps', () => {
+    // Start with the real simulator's canonical in-memory namespace, then
+    // construct a deterministic resident NS7 body from its real SelfTest body.
+    // This avoids test-only filesystem/server configuration while still using
+    // core validation, `prepareBootEntry`, reset, and binary reload end-to-end.
+    const seed = new ChurchSimulator();
+    const selfTest = seed.readNSEntry(6);
+    const ns7 = seed.readNSEntry(7);
+    seed.memory.copyWithin(ns7.word0_location, selfTest.word0_location,
+        selfTest.word0_location + 64);
+    for (const slot of [6, 7]) {
+        const entry = seed.readNSEntry(slot);
+        const base = entry.word0_location;
+        const header = seed.parseLumpHeader(seed.memory[base]);
+        const selfGT = seed.createGT(seed.parseNSWord1(entry.word1_limit).gtSeq,
+            slot, { E: 1 }, 1);
+        seed.memory[base] = (seed.memory[base] & ~0xFF) | 1;
+        seed.memory[base + header.lumpSize - 1] = selfGT;
+        seed.memory[seed._nsSlotBase(slot) + 3] = selfGT;
+    }
+    assert.strictEqual(seed.prepareBootEntry(7).ok, true);
+    const committedNs7Image = seed.memory.slice().buffer;
+    const bootGuards = runner.slice(runner.indexOf('function _recordUnreportedBootFailure'),
+        runner.indexOf('function slowBoot()'));
+    const slowSrc = extract(runner, 'slowBoot');
+    const stepSrc = extract(runner, 'stepSim');
+
+    const invoke = (entrySource, entryCall) => {
+        const consoleEl = { textContent: '', scrollTop: 0 };
+        const sim = new ChurchSimulator();
+        assert.strictEqual(sim.loadBootImage(committedNs7Image), true);
+        // This is the same reset/reload sequence used by the explicit Boot
+        // path; it proves the cached image, rather than constructor memory,
+        // remains authoritative after reset.
+        sim.reset();
+        assert.strictEqual(sim.loadBootImage(committedNs7Image), true);
+        const context = {
+            window: {
+                bootImage: committedNs7Image,
+                bootImageAvailable: true,
+                TargetState: { authorize: () => ({ ok: true }) },
+                BootEntryUI: { noteImagePreparation: () => {} },
+                _startupDefaultView: null,
+            },
+            sim,
+            console: { error: () => {}, log: () => {} },
+            document: { getElementById: () => consoleEl },
+            Uint32Array, ArrayBuffer, DataView, Math, Number, JSON, Set, Map,
+            Object, String, Boolean, parseInt, Promise,
+            bootAnimating: false, _bootAnimTimer: null, _bootAuditAccum: [],
+            bootEntrySlot: 10, // a later, unsaved UI request must not replace NS7
+            pipelineViz: null, _pendingSimLoad: null,
+            updateDashboard: () => {}, switchView: () => {}, openCRDetail: () => {},
+            runSimGo: () => {}, _setEntryBreakpoint: () => {},
+            _syncPullToRefreshGuard: () => {},
+            _autoLoadDefaultProgram: () => {},
+            _startBootLumpPrefetch: () => Promise.resolve(),
+            setTimeout: fn => { fn(); return 1; }, clearTimeout: () => {},
+        };
+        vm.runInNewContext(`
+            bootCalls = 0;
+            originalBootStep = sim._bootStep.bind(sim);
+            sim._bootStep = function() { bootCalls++; return originalBootStep(); };
+        ` + bootGuards + '\n' + entrySource + '\n' + entryCall, context);
+        assert.strictEqual(context.sim.bootComplete, true);
+        assert.strictEqual(context.sim.halted, false);
+        assert.strictEqual(context.bootCalls, 3);
+        assert.strictEqual(context.sim.inspectBootEntryBinding().targetSlot, 7);
+        assert.strictEqual(context.bootEntrySlot, 10);
+    };
+
+    invoke('', 'result = instantBoot();');
+    invoke(slowSrc, 'slowBoot();');
+    invoke(stepSrc, 'stepSim(); stepSim(); stepSim();');
+});
+
+console.log(`\n${passed} Task #3447 UI checks passed`);

@@ -24,7 +24,8 @@ and asserts:
       - CR14 -> NS Slot 6 (Boot.Abstr/SelfTest, code; R+X)  [direct — no director hop since Task #247]
       - CR6  -> NULL (cc=0 CLOOMC design: no c-list at HALT; Task #651)
   * A sentinel CALL frame was pushed (so a stray RETURN reboots cleanly).
-  * PC=0 and M-elevation has been dropped after boot completes.
+  * PC=1 (the first instruction word after the selected LUMP header) and
+    M-elevation has been dropped after boot completes.
 
 Any regression in `loadBootImage()` (truncation, NS-count miscalculation,
 step-3 reservation handling, ...) or in the boot ROM mirror in
@@ -195,7 +196,10 @@ def test_boot_image_loads_and_boots(cfg, skip_window, expected_ns_count):
     )
 
     # --- post-boot architectural state -------------------------------------
-    assert status["pc"] == 0, f"PC should be 0 at boot entry, got {status['pc']}"
+    assert status["pc"] == 1, (
+        "PC should point at the first instruction after the selected LUMP "
+        f"header at boot entry, got {status['pc']}"
+    )
     assert status["mElevation"] is False, (
         "M-elevation must be dropped before bootComplete; still ON"
     )

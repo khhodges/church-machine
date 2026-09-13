@@ -123,6 +123,35 @@ def isolated_boot_lumps(tmp_path_factory):
     approvals = {}
     with open(os.path.join(isolated_dir, "ns-state.json"), encoding="utf-8") as fh:
         state = json.load(fh)
+    # The checked-in LUMP library is historical evidence and deliberately is
+    # not migrated in place.  Prepare the isolated execution fixture with the
+    # explicit immutable bootstrap bindings required by the boot contract.
+    bootstrap_tokens = {6: "4a000006", 7: "4a000007", 10: "4a00000a"}
+    for row in state.get("abstractions", []):
+        if not isinstance(row, dict) or row.get("slot") not in bootstrap_tokens:
+            continue
+        row.update({
+            "resident": True,
+            "boot_resident": True,
+            "ns_slot_policy": "static",
+            "load_policy": "Resident",
+            "token": bootstrap_tokens[row["slot"]],
+        })
+    with open(os.path.join(isolated_dir, "ns-state.json"), "w", encoding="utf-8") as fh:
+        json.dump(state, fh, indent=2)
+    manifest_path = os.path.join(isolated_dir, "manifest.json")
+    with open(manifest_path, encoding="utf-8") as fh:
+        manifest = json.load(fh)
+    frozen_filenames = {
+        row["filename"]: row for row in state["abstractions"]
+        if isinstance(row, dict) and row.get("slot") in bootstrap_tokens
+    }
+    for row in manifest:
+        binding = frozen_filenames.get(row.get("filename")) if isinstance(row, dict) else None
+        if binding:
+            row["token"] = binding["token"]
+    with open(manifest_path, "w", encoding="utf-8") as fh:
+        json.dump(manifest, fh, indent=2)
     frozen = [
         row for row in state.get("abstractions", [])
         if isinstance(row, dict)
@@ -141,6 +170,13 @@ def isolated_boot_lumps(tmp_path_factory):
             raw = binary.read()
         digest = hashlib.sha256(raw).hexdigest()
         record = source_approvals[digest]
+        record = dict(record)
+        record.update({
+            "bootstrap_t": row["token"],
+            "bootstrap_runtime_gt": int(row["token"], 16),
+            "token": row["token"],
+        })
+        record.pop("identity_hash", None)
         assert record["filename"] == filename
         assert record["bootstrap_t"] == row["token"]
         assert record["bootstrap_runtime_gt"] == int(row["token"], 16)

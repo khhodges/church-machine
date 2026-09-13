@@ -792,7 +792,11 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
         if tbase < 0:
             raise ValueError(f"validate_boot_image: Thread slot {thread_slot} is missing")
         thread_loc = words[tbase]
-        if not NAMESPACE_HEADER_V2_WORDS <= thread_loc < physical["table_base"]:
+        # A Thread body can validly begin at physical word zero in a profile
+        # whose Namespace header is elsewhere.  Zero is not a null location
+        # once its descriptor is populated, so never use truthiness or the
+        # V2-header size as a Thread-base validity test.
+        if not 0 <= thread_loc < physical["table_base"]:
             raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has invalid location")
         hdr = words[thread_loc]
         size = 1 << (((hdr >> 23) & 0xF) + 6)
@@ -836,6 +840,27 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
                 or resume_sto != saved_sto - 2):
             raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has malformed CHURCH resume frame")
 
+        # CR0 is boot authority only for the fixed Boot.Thread.  It is a
+        # persisted capability home, not a boot-time scratch register: the ROM
+        # restores it with CHANGE CR12 and CALL consumes it.  Derive the offset
+        # from the Thread header rather than assuming the historical 256-word
+        # layout (where this happened to be +244).
+        if thread_slot == 1:
+            cr0_index = thread_loc + layout["caps_start"]
+            cr0_home = words[cr0_index]
+            expected_cr0 = create_gt(
+                _ns_word1_get(words[boot_base + 1], "gt_seq"),
+                physical["boot_slot"], {"E": 1}, 1)
+            if cr0_home == 0:
+                raise ValueError(
+                    "validate_boot_image: Boot.Thread CR0 home is missing; "
+                    "prepare the selected boot target before booting")
+            if cr0_home != expected_cr0:
+                raise ValueError(
+                    "validate_boot_image: Boot.Thread CR0 home is stale or "
+                    "does not match the Namespace Header boot target "
+                    f"(stored 0x{cr0_home:08x}, expected 0x{expected_cr0:08x})")
+
     # Do not infer Inform/Outform from any NS word.  State belongs exclusively
     # to access GTs, which are outside this raw table validator.
     for slot in range(physical["slots"]):
@@ -865,7 +890,8 @@ def read_boot_entry_info(image_bytes):
         resident     — True when the entry lump body is resident (valid lump
                        header with cw > 0 at entry_loc)
         reason       — human-readable explanation when resident is False
-        thread_caps0 — the Thread.caps[0] word (thread_loc + 244)
+        thread_caps0 — the Boot.Thread CR0-home word derived from its header
+        thread_caps_offset — derived CR0 offset within Boot.Thread
         expected_gt  — the E-GT expected for entry_slot
         caps0_ok     — thread_caps0 == expected_gt
 
@@ -873,6 +899,10 @@ def read_boot_entry_info(image_bytes):
     or corrupt image).  Used by the send-to-hardware gate so a boot image
     whose entry lump is not resident is rejected before it reaches the board.
     """
+    # Keep this inspection path fail-closed.  In particular, do not turn a
+    # missing/stale CR0 home into a freshly minted token merely to describe an
+    # imported image.
+    validate_boot_image(image_bytes)
     n_words = len(image_bytes) // 4
     words = struct.unpack(f"<{n_words}I", image_bytes[: n_words * 4])
 
@@ -917,8 +947,19 @@ def read_boot_entry_info(image_bytes):
         else:
             resident = True
 
-    thread_loc   = _ns_word0(1) or 0
-    thread_caps0 = words[thread_loc + 244] if 0 <= thread_loc + 244 < n_words else 0
+    thread_loc = _ns_word0(1)
+    thread_caps0 = 0
+    thread_caps_offset = None
+    if thread_loc is not None and 0 <= thread_loc < n_words:
+        thread_header = words[thread_loc]
+        thread_words = 1 << (((thread_header >> 23) & 0xF) + 6)
+        thread_layout_info = thread_layout(
+            thread_words, (thread_header >> 10) & 0x1FFF)
+        if thread_layout_info["valid"]:
+            thread_caps_offset = thread_layout_info["caps_start"]
+            home_index = thread_loc + thread_caps_offset
+            if home_index < n_words:
+                thread_caps0 = words[home_index]
     # Thread.caps[0] is a capability for the selected live descriptor, so its
     # generation must match W1[29:21].  Hardcoding sequence zero rejects a
     # valid reissued boot entry and leads to a boot-time VERSION fault.
@@ -931,6 +972,7 @@ def read_boot_entry_info(image_bytes):
         "resident":     resident,
         "reason":       reason,
         "thread_caps0": thread_caps0,
+        "thread_caps_offset": thread_caps_offset,
         "expected_gt":  expected_gt,
         "caps0_ok":     thread_caps0 == expected_gt,
     }
@@ -1053,6 +1095,7 @@ def build_wukong_upload_image(generic_image, boot_config=None):
         thread_sources.append({
             "number": number, "slot": slot, "source_base": source_base,
             "descriptor": descriptor, "size": size,
+            "caps0_offset": layout["caps_start"],
         })
 
     # Lazy import prevents simulator-only generation from requiring FPGA
@@ -1191,7 +1234,7 @@ def build_wukong_upload_image(generic_image, boot_config=None):
             "source_base": source_base,
             "base_word": thread_target,
             "size": size,
-            "caps0": source_words[source_base + 244],
+            "caps0": source_words[source_base + item["caps0_offset"]],
         })
     dynamic_end = max(end for _, end, _ in occupied)
 
@@ -1657,8 +1700,9 @@ def parse_ns_table_raw(image_bytes):
         thread_block = {
             "headerWord": hdr,
             "size":       _t_size,
-            "cr0Word":    mem[_cr0_idx] if n_words > _cr0_idx else 0,
-            "capsOffset": 244,
+            "cr0Word":    (mem[_thread_loc + _cr0_idx]
+                           if 0 <= _thread_loc + _cr0_idx < n_words else 0),
+            "capsOffset": _cr0_idx,
             "count":      _t_cnt if _t_cnt >= 1 else 1,
             "bootSlot":   physical["boot_slot"],
         }
@@ -2027,12 +2071,18 @@ def validate_resident_artifact_bindings(
     return True
 
 
-def build_boot_image_provenance(image_bytes, lumps_dir):
-    """Bind a generated image to exact selected artifacts and localized rows."""
+def build_boot_image_provenance(image_bytes, lumps_dir, ns_state_path=None):
+    """Bind a generated image to exact selected artifacts and localized rows.
+
+    ``ns_state_path`` permits the boot transaction to bind provenance to its
+    staged authoritative state file when test/deployment storage separates
+    state from the artifact library.
+    """
     validate_boot_image(image_bytes)
     n_words = len(image_bytes) // 4
     image_words = struct.unpack(f"<{n_words}I", image_bytes)
-    with open(os.path.join(lumps_dir, "ns-state.json"), encoding="utf-8") as state_file:
+    state_path = ns_state_path or os.path.join(lumps_dir, "ns-state.json")
+    with open(state_path, encoding="utf-8") as state_file:
         state = json.load(state_file)
     rows = []
     for binding in state.get("abstractions", []):
@@ -2069,6 +2119,16 @@ def build_boot_image_provenance(image_bytes, lumps_dir):
             "slot": slot,
             "filename": filename,
             "artifact_sha256": hashlib.sha256(raw).hexdigest(),
+            # A prepared target is bound to the exact immutable artifact and
+            # deployment policy that supplied this committed body.  Preserve
+            # these state-side identities in provenance so a later selection
+            # patch cannot retarget an image after its state row was rewritten.
+            "token": binding.get("token") or binding.get("cache_token"),
+            "load_policy": binding.get(
+                "load_policy", binding.get("loadPolicy")),
+            "resident": binding.get("resident"),
+            "boot_resident": binding.get("boot_resident"),
+            "ns_slot_policy": binding.get("ns_slot_policy"),
             "localized_clist_sha256": hashlib.sha256(struct.pack(
                 f"<{len(localized_rows)}I", *localized_rows)).hexdigest(),
         })
@@ -2144,6 +2204,32 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             f"configured Namespace capacity {_ns_slots_max}")
     if boot_entry_slot is None:
         boot_entry_slot = _selftest_slot
+    if (isinstance(boot_entry_slot, bool)
+            or not isinstance(boot_entry_slot, int)
+            or not 0 <= boot_entry_slot < _ns_slots_max):
+        raise ValueError(
+            "generate_boot_image: boot entry slot has no allocated resident "
+            "Namespace location (it must be an integer within the configured "
+            f"Namespace capacity 0..{_ns_slots_max - 1})")
+    # A selected boot target must have one current Namespace-state binding.
+    # Do not turn an absent/malformed current generation into sequence zero:
+    # that is a capability revision change, not a harmless default.
+    _target_state_rows = [
+        row for row in _bootstrap_rows
+        if isinstance(row, dict) and row.get("slot") == boot_entry_slot
+        and not row.get("archived")
+    ]
+    if len(_target_state_rows) != 1:
+        raise ValueError(
+            f"generate_boot_image: selected boot target NS[{boot_entry_slot}] "
+            "does not have exactly one current Namespace-state binding")
+    _target_sequence = _target_state_rows[0].get("seq")
+    if (isinstance(_target_sequence, bool)
+            or not isinstance(_target_sequence, int)
+            or not 0 <= _target_sequence <= 0x1FF):
+        raise ValueError(
+            f"generate_boot_image: selected boot target NS[{boot_entry_slot}] "
+            f"has an invalid current sequence {_target_sequence!r}")
 
     # Thread.1 remains the fixed Boot.Thread at NS[1].  Thread.2 onward are
     # generated resident entries immediately after the fixed catalog.  Reject,
@@ -2315,6 +2401,19 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         and e.get("lumpToken")
     }
     trusted_cache_tokens = _load_trusted_cache_token_map(_manifest_path_for_cache)
+    # A frozen bootstrap resident uses its approved SELF capability as the
+    # descriptor's non-authoritative cache word.  This is deliberately not
+    # inferred through the ordinary artifact-token resolver: bootstrap T is a
+    # capability encoding, while the resolver's cache-token convention is
+    # artifact-oriented.  Its exact approval was verified above.
+    for _bootstrap_slot, _bootstrap_owner in _bootstrap_by_slot.items():
+        try:
+            trusted_cache_tokens[_bootstrap_slot] = int(
+                str(_bootstrap_owner["token"]), 16) & 0xFFFFFFFF
+        except (KeyError, TypeError, ValueError):
+            raise ValueError(
+                f"generate_boot_image: frozen resident slot {_bootstrap_slot} "
+                "has an invalid bootstrap T")
     retained_sequences = _load_ns_state_sequence_map(lumps_dir)
     # Resolve boot-resident catalog bodies before assigning any locations.
     # Their declared LUMP allocation, not the historical 64-word catalog
@@ -2531,7 +2630,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         _e2_lim17 = (_e2_size - 1) & 0x1FFFF
         _e2_perms = {"E": 1}   # callable abstraction
         write_ns_entry(mem, total, NS_ENTRY_WORDS, _e2_slot, _e2_phys, _e2_lim17,
-                       0, 0, 1, 0, 0,
+                       0, 0, 1, retained_sequences.get(_e2_slot, 0), 0,
                        trusted_cache_tokens.get(_e2_slot, 0))
         locations[_e2_slot] = _e2_phys
         ns_count = max(ns_count, _e2_slot + 1)
@@ -2570,8 +2669,34 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             f"{', '.join(map(str, THREAD_SUPPORTED_BODY_WORDS))}")
     mem[thread_loc] = pack_lump_header(
         _ns_n_minus_6(thread_size), thread_stack_words, THREAD_CAP_WORDS, 2)
+    # Selection is prepared from the destination Namespace descriptor.  The
+    # descriptor's live sequence is authoritative; neither a UI default nor a
+    # historical artifact revision may replace it.  Do this before touching
+    # Boot.Thread so a bad target leaves no partially prepared output.
     _boot_entry_ns_base = total - (boot_entry_slot + 1) * NS_ENTRY_WORDS
+    if boot_entry_slot in _MMIO_SLOT_SPECS:
+        raise ValueError(
+            f"generate_boot_image: boot entry slot {boot_entry_slot} is an "
+            "MMIO device, not an executable E-GT target")
+    if boot_entry_slot not in locations:
+        raise ValueError(
+            f"generate_boot_image: boot entry slot {boot_entry_slot} has no "
+            "allocated resident Namespace location; explicitly prepare a resident "
+            "target before selecting it")
+    if not (0 <= _boot_entry_ns_base + 1 < total):
+        raise ValueError(
+            f"generate_boot_image: boot entry slot {boot_entry_slot} is outside "
+            "the generated Namespace table")
+    _boot_entry_authority = mem[_boot_entry_ns_base + 1]
+    if mem[_boot_entry_ns_base] == 0 and _boot_entry_authority == 0:
+        raise ValueError(
+            f"generate_boot_image: boot entry slot {boot_entry_slot} does not "
+            "have a valid live Namespace descriptor")
     _boot_entry_seq = _ns_word1_get(mem[_boot_entry_ns_base + 1], "gt_seq")
+    if _boot_entry_seq != _target_sequence:
+        raise ValueError(
+            f"generate_boot_image: selected boot target NS[{boot_entry_slot}] "
+            "descriptor generation disagrees with its current Namespace state")
     _entry_gt = create_gt(_boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
     _resume_sto = layout["stack_end"] - 2
     mem[thread_loc + THREAD_STO_OFFSET] = (1 << 12) | _resume_sto
@@ -2582,15 +2707,19 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     )
 
     # ----- Generated Thread bodies (Thread.2 .. Thread.N) ----------------
-    # Their Namespace descriptors were emitted above.  Initialise each body
-    # after resolving the live boot-entry generation, so every CR0 credential
-    # is identical to Thread.1's selected SelfTest/boot-entry E-GT.
+    # A Lightning Bolt selection prepares *Boot.Thread* only.  Do not use a
+    # new next-boot target as authority to rewrite another Thread's saved
+    # context.  Freshly allocated secondary contexts retain their independent
+    # conventional SelfTest continuation; persisted contexts are never edited
+    # by this image builder.
+    _secondary_thread_gt = create_gt(
+        _selftest_sequence, _selftest_slot, {"E": 1}, 1)
     for _thread_loc in extra_thread_locs:
         mem[_thread_loc] = pack_lump_header(
             _ns_n_minus_6(thread_size), thread_stack_words, THREAD_CAP_WORDS, 2)
         mem[_thread_loc + THREAD_STO_OFFSET] = (1 << 12) | _resume_sto
-        mem[_thread_loc + layout["caps_start"]] = _entry_gt
-        mem[_thread_loc + _resume_sto + 1] = _entry_gt
+        mem[_thread_loc + layout["caps_start"]] = _secondary_thread_gt
+        mem[_thread_loc + _resume_sto + 1] = _secondary_thread_gt
         mem[_thread_loc + _resume_sto + 2] = (
             (1 << 12) | layout["stack_end"]
         )

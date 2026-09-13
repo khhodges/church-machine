@@ -316,21 +316,26 @@
         .then(function(r) { return r.json(); })
         .then(function(current) {
             var selected = parseInt(localStorage.getItem('bootEntrySlot'), 10);
-            var savedBootEntry = current && current.config && current.config.bootEntrySlot;
-            var bootEntrySlot = Number.isInteger(selected) && selected >= 0
-                ? selected
-                : (Number.isInteger(savedBootEntry) && savedBootEntry >= 0
-                    ? savedBootEntry : 6);
+            var preparedUi = (typeof window !== 'undefined' && window.BootEntryUI &&
+                typeof window.BootEntryUI.get === 'function') ? window.BootEntryUI.get() : null;
+            // Persist only an explicitly prepared browser selection or an
+            // explicit Save prepared selection. Do not turn a geometry/policy
+            // edit into a boot-target repair for an unprepared/stale image.
+            var bootEntrySlot = preparedUi && preparedUi.status === 'prepared' &&
+                Number.isInteger(selected) && selected >= 0
+                ? selected : null;
             var merged = {
                 targetBoard: s1payload.targetBoard,
-                bootEntrySlot: bootEntrySlot,
                 step1:       s1payload.step1,
                 step2:       (current && current.config && current.config.step2) || { lumps: [] },
                 step3:       (current && current.config && current.config.step3) || { emptySlotCount: 0 }
             };
+            if (bootEntrySlot !== null) merged.bootEntrySlot = bootEntrySlot;
             return fetch('/api/boot-config', {
                 method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: Object.assign({'Content-Type': 'application/json'},
+                    (window.BuildApprovalView && window.BuildApprovalView._authHeaders
+                        ? window.BuildApprovalView._authHeaders() : {})),
                 body:    JSON.stringify(merged)
             });
         })
@@ -393,7 +398,7 @@
         catalog:        [],
         step2State:     {},
         emptySlotCount: 0,
-        bootEntrySlot:  6,
+        bootEntrySlot:  null,
         limits:         { maxNsEntries: 256, baseNamedNsCount: 47 },
         loaded:         false,
         loading:        false,
@@ -420,21 +425,12 @@
                     : ((data && data.lumpCatalog) || []);
                 _rl.limits  = (data && data.limits) || { maxNsEntries: 256, baseNamedNsCount: 47 };
                 var cfg = (data && data.config) || (data && data.defaults) || {};
-                var localBootSlot = parseInt(localStorage.getItem('bootEntrySlot'), 10);
                 var savedBootSlot = cfg && cfg.bootEntrySlot;
-                // The server is authoritative when the panel is loaded after a
-                // page reload.  localStorage may contain a stale selection from
-                // an older session; use it only when the server has no valid
-                // persisted value yet.
+                // Loading the configuration is inspection only. Never call the
+                // Prepare action here: merely opening this panel must not
+                // rewrite an imported/stale image's Thread CR0 home.
                 if (Number.isInteger(savedBootSlot) && savedBootSlot >= 0) {
                     _rl.bootEntrySlot = savedBootSlot;
-                    if (typeof setBootEntrySlot === 'function') {
-                        setBootEntrySlot(savedBootSlot);
-                    } else {
-                        localStorage.setItem('bootEntrySlot', String(savedBootSlot));
-                    }
-                } else if (Number.isInteger(localBootSlot) && localBootSlot >= 0) {
-                    _rl.bootEntrySlot = localBootSlot;
                 }
                 _rlInitStep2(cfg);
                 var s3 = cfg.step3 || {};
@@ -1749,11 +1745,13 @@
 
     window.lumpEditorBootEntryChange = function (nsSlot) {
         if (!Number.isFinite(nsSlot) || nsSlot < 0) return;
-        _rl.bootEntrySlot = nsSlot;
         if (typeof setBootEntrySlot === 'function') {
-            setBootEntrySlot(nsSlot);
+            if (setBootEntrySlot(nsSlot) === true) {
+                _rl.bootEntrySlot = nsSlot;
+                renderResidentPanel();
+            }
         } else {
-            localStorage.setItem('bootEntrySlot', String(nsSlot));
+            _rl.errorMsg = 'Boot-entry preparation is unavailable. The selection was not saved.';
             renderResidentPanel();
         }
     };
@@ -1887,7 +1885,9 @@
 
         fetch('/api/boot-config', {
             method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: Object.assign({'Content-Type': 'application/json'},
+                (window.BuildApprovalView && window.BuildApprovalView._authHeaders
+                    ? window.BuildApprovalView._authHeaders() : {})),
             body:    JSON.stringify(payload)
         })
         .then(function(r) {

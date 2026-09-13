@@ -3858,53 +3858,53 @@ def boot_config_get():
         },
     })
 
-@app.route("/api/boot-config", methods=["POST"])
-def boot_config_post():
-    data = request.get_json(silent=True) or {}
+def _load_existing_boot_config_unchecked():
+    """Read existing optional UI-only config fields without validating them."""
+    if not os.path.exists(BOOT_CONFIG_PATH):
+        return {}
+    try:
+        with open(BOOT_CONFIG_PATH) as existing_file:
+            existing = json.load(existing_file)
+        return existing if isinstance(existing, dict) else {}
+    except Exception:
+        return {}
+
+
+def _validated_boot_config_candidate(data, existing=None):
+    """Normalize a complete config candidate with the boot-config POST rules."""
+    if not isinstance(data, dict):
+        return None, "Invalid boot configuration body"
+    existing = _load_existing_boot_config_unchecked() if existing is None else existing
     target_board = data.get("targetBoard")
     step1 = data.get("step1") or {}
+    target_board = data.get("targetBoard")
     err = _validate_step1(target_board, step1)
     if err:
-        return jsonify({"ok": False, "error": err}), 400
+        return None, err
     step2 = data.get("step2")
     step2, binding_err = _normalize_step2_preload_bindings(step2)
     if binding_err:
-        return jsonify({"ok": False, "error": binding_err}), 400
+        return None, binding_err
     err2 = _validate_step2(step2, step1, target_board)
     if err2:
-        return jsonify({"ok": False, "error": err2}), 400
+        return None, err2
     step3 = data.get("step3")
     err3 = _validate_step3(step3, step1, step2)
     if err3:
-        return jsonify({"ok": False, "error": err3}), 400
-    # Load the previous config once so clients that predate bootEntrySlot do
-    # not erase a saved Lightning Bolt selection or Namespace slot labels.
-    existing = {}
-    if os.path.exists(BOOT_CONFIG_PATH):
-        try:
-            with open(BOOT_CONFIG_PATH) as existing_file:
-                loaded_existing = json.load(existing_file)
-            if isinstance(loaded_existing, dict):
-                existing = loaded_existing
-        except Exception:
-            pass
+        return None, err3
     boot_entry_slot = data.get(
         "bootEntrySlot",
         existing.get("bootEntrySlot", DEFAULT_BOOT_CONFIG["bootEntrySlot"]),
     )
     if (not isinstance(boot_entry_slot, int) or isinstance(boot_entry_slot, bool)
             or boot_entry_slot < 0 or boot_entry_slot >= MAX_NS_ENTRIES):
-        return jsonify({
-            "ok": False,
-            "error": (
-                "bootEntrySlot must be an integer between 0 and "
-                f"{MAX_NS_ENTRIES - 1}"
-            ),
-        }), 400
+        return None, (
+            "bootEntrySlot must be an integer between 0 and "
+            f"{MAX_NS_ENTRIES - 1}")
     slot_rules = data.get("slotRules", existing.get("slotRules", {}))
     slot_rules_err = _validate_slot_rules(slot_rules)
     if slot_rules_err:
-        return jsonify({"ok": False, "error": slot_rules_err}), 400
+        return None, slot_rules_err
     normalized_slot_rules = {
         str(int(slot)): rule for slot, rule in (slot_rules or {}).items()
     }
@@ -3973,11 +3973,73 @@ def boot_config_post():
     # image. A separately saved continuation target is obsolete and must not
     # survive a Boot Image Designer save.
     cfg.pop("nextAfterSelfTestSlot", None)
+    return cfg, None
+
+
+@app.route("/api/boot-config", methods=["POST"])
+def boot_config_post():
+    ok, auth_error = _optional_report_token_check()
+    if not ok:
+        return auth_error
+    data = request.get_json(silent=True) or {}
+    cfg, candidate_error = _validated_boot_config_candidate(data)
+    if candidate_error:
+        return jsonify({"ok": False, "error": candidate_error}), 400
+    boot_entry_slot = cfg["bootEntrySlot"]
+    # A Lightning Bolt change is a preparation transaction, not a display-only
+    # preference.  Construct and validate the complete destination image
+    # before publishing the new selected target.  In particular this derives
+    # CR0 from the target descriptor's live sequence and its header-derived
+    # Thread home; it cannot fall back to sequence zero or a default slot.
+    prepared_image = None
+    selection_committed = False
+    # A Designer payload routinely carries its unchanged bootEntrySlot while
+    # editing geometry or policy.  That is not permission to republish old
+    # bytes as a newly prepared image.  Only an explicit UI/hardware Prepare
+    # intent may patch and commit a selection.
+    if data.get("prepareBootEntry") is True:
+        prepared_ready = False
+        try:
+            # Read, validate/patch, and publish under one namespace lock.  A
+            # concurrent NS/image writer cannot replace the committed bytes
+            # after validation and before this selection is installed.
+            with _namespace_commit_guard():
+                with open(BOOT_IMAGE_PATH, "rb") as source:
+                    committed_image = source.read()
+                prepared_image = _prepare_selected_boot_image(
+                    committed_image, cfg, boot_entry_slot)
+                prepared_ready = True
+                _commit_boot_selection_transaction(cfg, prepared_image)
+                selection_committed = True
+        except Exception as exc:
+            return jsonify({
+                "ok": False,
+                "error": (
+                    "Lightning Bolt selection was not saved or applied; its "
+                    f"prepared image could not be committed: {exc}"
+                    if prepared_ready else
+                    "Lightning Bolt selection was not saved or applied: "
+                    f"NS[{boot_entry_slot}] could not be prepared from the "
+                    f"committed image: {exc}"
+                ),
+                "prepared": False,
+                **({"needsPrepare": True} if prepared_ready else {}),
+            }), 500 if prepared_ready else 422
     try:
-        with open(BOOT_CONFIG_PATH, "w") as f:
-            json.dump(cfg, f, indent=2)
-    except Exception as e:
-        return jsonify({"ok": False, "error": f"Failed to write boot-config.json: {e}"}), 500
+        if not selection_committed:
+            _atomic_write_json(BOOT_CONFIG_PATH, cfg)
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "error": (
+                "Lightning Bolt selection was not saved or applied; its "
+                f"prepared image could not be committed: {exc}"
+                if prepared_image is not None else
+                f"Failed to write boot-config.json: {exc}"
+            ),
+            "prepared": False,
+            **({"needsPrepare": True} if prepared_image is not None else {}),
+        }), 500
     # A boot image is a complete memory image, not an overlay. If Step 1 now
     # selects a different memory size, report the cached binary as invalidated.
     # Keep the file until explicit regeneration replaces it; all serve/upload
@@ -3989,16 +4051,23 @@ def boot_config_post():
         try:
             image_bytes = os.path.getsize(BOOT_IMAGE_PATH)
             configured_bytes = cfg["step1"]["totalNamespaceWords"] * 4
-            if image_bytes != configured_bytes:
+            if (image_bytes != configured_bytes
+                    or _boot_image_is_stale()):
                 boot_image_invalidated = True
                 invalidated_image_words = image_bytes // 4
         except OSError as exc:
             logging.warning("boot_config_post: could not inspect cached boot image: %s", exc)
+    if prepared_image is not None:
+        boot_image_invalidated = False
+        invalidated_image_words = None
     return jsonify({
         "ok": True,
         "config": cfg,
         "bootImageInvalidated": boot_image_invalidated,
         "invalidatedBootImageWords": invalidated_image_words,
+        "prepared": prepared_image is not None,
+        **({"preparation": _boot_image_preparation_status(prepared_image, cfg)}
+           if prepared_image is not None else {}),
     })
 
 
@@ -4126,27 +4195,158 @@ def _namespace_commit_guard():
     return _guard()
 
 
-def _write_boot_image_bytes(image_bytes):
-    """Atomically replace the committed boot image under the Namespace lock."""
+def _boot_config_freshness_digest(cfg):
+    """Digest only configuration that can change a generated boot image."""
+    if not isinstance(cfg, dict):
+        raise ValueError("boot-image provenance requires a saved boot configuration")
+    image_inputs = {
+        key: value for key, value in cfg.items()
+        if key not in ("slotLabels",)
+    }
+    return hashlib.sha256(json.dumps(
+        image_inputs, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
+def _file_sha256(path):
+    with open(path, "rb") as source:
+        return hashlib.sha256(source.read()).hexdigest()
+
+
+def _write_boot_image_bytes(image_bytes, *, provenance_origin="generated",
+                            invalidate_ns_state=True, boot_config=None):
+    """Atomically replace the committed boot image under the Namespace lock.
+
+    ``provenance_origin`` distinguishes a server-prepared composite from an
+    imported, already-valid image.  It is metadata about the write, never a
+    reason to rewrite bytes supplied by the programmer.  ``invalidate_ns_state``
+    is false only for the final phase of Save NS, where that transaction has
+    already installed the matching decoded state and needs provenance computed
+    from those final inputs.
+    """
     tmp_path = BOOT_IMAGE_PATH + ".tmp"
     provenance_tmp_path = BOOT_IMAGE_PROVENANCE_PATH + ".tmp"
     with _namespace_commit_guard():
+        def _snapshot(path):
+            try:
+                with open(path, "rb") as source:
+                    return source.read()
+            except FileNotFoundError:
+                return None
+
+        def _restore(path, old_bytes):
+            if old_bytes is None:
+                try:
+                    os.remove(path)
+                except FileNotFoundError:
+                    pass
+                return
+            restore_tmp = path + ".rollback"
+            with open(restore_tmp, "wb") as destination:
+                destination.write(old_bytes)
+            os.replace(restore_tmp, path)
+
+        old_image = _snapshot(BOOT_IMAGE_PATH)
+        old_provenance = _snapshot(BOOT_IMAGE_PROVENANCE_PATH)
+        old_state = _snapshot(NS_STATE_PATH)
         try:
-            provenance = _boot_image_gen.build_boot_image_provenance(
-                image_bytes, LUMPS_DIR)
+            # Raw-only image writers deliberately invalidate decoded-table
+            # binding before hashing inputs for provenance.  Hashing first and
+            # then rewriting ns-state would make every fresh image stale.
+            if invalidate_ns_state:
+                _invalidate_ns_state_raw_binding()
+            if provenance_origin == "imported":
+                # Local manifest/ns-state records are not authority to
+                # reinterpret an imported image.  Retain only evidence that
+                # can be read from its immutable bytes; hardware delivery
+                # performs the stricter resident-artifact binding check and
+                # reports missing local provenance explicitly.
+                imported = _boot_image_gen.read_boot_entry_info(image_bytes)
+                provenance = {
+                    "version": 1,
+                    "origin": "imported",
+                    "image_sha256": hashlib.sha256(image_bytes).hexdigest(),
+                    "imported_boot_preparation": {
+                        "entry_slot": imported["entry_slot"],
+                        "entry_sequence": imported["entry_gt_seq"],
+                        "thread_caps_offset": imported["thread_caps_offset"],
+                        "cr0_home": imported["thread_caps0"],
+                    },
+                    "resident_bindings": [],
+                }
+            else:
+                provenance = _boot_image_gen.build_boot_image_provenance(
+                    image_bytes, LUMPS_DIR, ns_state_path=NS_STATE_PATH)
+                provenance["origin"] = provenance_origin
+                if boot_config is None:
+                    boot_config, config_error = _read_saved_boot_config()
+                    if config_error:
+                        raise ValueError(config_error)
+                provenance["boot_config_sha256"] = _boot_config_freshness_digest(
+                    boot_config)
+                # Freshness is content-bound, never mtime-bound: policy/state
+                # saves and copied artifact files may preserve or reorder
+                # timestamps.  The resident rows above bind selected bodies;
+                # these source digests bind the authoritative state/manifest.
+                provenance["source_sha256"] = {
+                    "ns_state": _file_sha256(NS_STATE_PATH),
+                    "manifest": _file_sha256(
+                        os.path.join(LUMPS_DIR, "manifest.json")),
+                }
             with open(tmp_path, "wb") as image_file:
                 image_file.write(image_bytes)
             with open(provenance_tmp_path, "w", encoding="utf-8") as provenance_file:
                 json.dump(provenance, provenance_file, sort_keys=True, indent=2)
             os.replace(tmp_path, BOOT_IMAGE_PATH)
             os.replace(provenance_tmp_path, BOOT_IMAGE_PROVENANCE_PATH)
-            _invalidate_ns_state_raw_binding()
         except Exception:
+            # The image, provenance, and raw-state binding form one visible
+            # commit.  A later replace/invalidation failure must not expose a
+            # hybrid image whose origin or namespace state describes another
+            # generation.
+            for path, old_bytes in (
+                    (BOOT_IMAGE_PATH, old_image),
+                    (BOOT_IMAGE_PROVENANCE_PATH, old_provenance),
+                    (NS_STATE_PATH, old_state)):
+                try:
+                    _restore(path, old_bytes)
+                except Exception as rollback_exc:
+                    logging.critical(
+                        "boot image rollback failed for %s: %s", path, rollback_exc)
             for pending_path in (tmp_path, provenance_tmp_path):
                 try:
                     os.remove(pending_path)
                 except OSError:
                     pass
+            raise
+
+
+def _commit_boot_selection_transaction(cfg, image_bytes):
+    """Atomically publish matching config and selection-patched image.
+
+    The namespace lock covers config, image, provenance, and raw-state
+    invalidation.  Both writers are individually atomic; this wrapper restores
+    the prior config if the image-side transaction rejects or rolls back.
+    """
+    with _namespace_commit_guard():
+        try:
+            with open(BOOT_CONFIG_PATH, "rb") as source:
+                old_config = source.read()
+        except FileNotFoundError:
+            old_config = None
+        _atomic_write_json(BOOT_CONFIG_PATH, cfg)
+        try:
+            _write_boot_image_bytes(image_bytes, boot_config=cfg)
+        except Exception:
+            try:
+                if old_config is None:
+                    os.remove(BOOT_CONFIG_PATH)
+                else:
+                    rollback_path = BOOT_CONFIG_PATH + ".rollback"
+                    with open(rollback_path, "wb") as source:
+                        source.write(old_config)
+                    os.replace(rollback_path, BOOT_CONFIG_PATH)
+            except FileNotFoundError:
+                pass
             raise
 
 
@@ -4214,6 +4414,226 @@ def _read_saved_boot_config():
             return None, f"Saved config fails Step 3 validation: {err3}"
     return cfg, None
 
+
+def _boot_image_preparation_status(image_bytes, cfg=None):
+    """Describe image-truth versus the currently saved Lightning Bolt choice.
+
+    This is deliberately an inspection operation.  A valid imported image may
+    name a different target than the local designer configuration; callers
+    must expose that discrepancy rather than silently minting a replacement
+    CR0 home from the local default.
+    """
+    info = _boot_image_gen.read_boot_entry_info(image_bytes)
+    configured_slot = None
+    if isinstance(cfg, dict):
+        candidate = cfg.get("bootEntrySlot")
+        if isinstance(candidate, int) and not isinstance(candidate, bool):
+            configured_slot = candidate
+    status = "prepared"
+    reason = None
+    if configured_slot is not None and configured_slot != info["entry_slot"]:
+        status = "selection-discrepancy"
+        reason = (
+            f"saved configuration selects NS[{configured_slot}], but this image "
+            f"prepares Boot.Thread CR0 for NS[{info['entry_slot']}].")
+    return {
+        "status": status,
+        "reason": reason,
+        "configuredSlot": configured_slot,
+        "imageSlot": info["entry_slot"],
+        "imageSequence": info["entry_gt_seq"],
+        "threadCapsOffset": info["thread_caps_offset"],
+        "cr0Home": info["thread_caps0"],
+    }
+
+
+def _couple_selftest_next_to_selected_target(image_bytes, cfg):
+    """Validate a browser-prepared candidate and repair only SelfTest.Next.GT.
+
+    The simulator's prepare action owns Header.BootEntry and Boot.Thread CR0.
+    Its demo continuation is not serialized at SelfTest's resident c-list
+    home, so Save NS must install that one authoritative image word before
+    publishing.  Do not use this as a general selection patcher: both header
+    and CR0 must already validate against the submitted config.
+    """
+    total = int(cfg["step1"]["totalNamespaceWords"])
+    _boot_image_gen.validate_boot_image(image_bytes, total)
+    info = _boot_image_gen.read_boot_entry_info(image_bytes)
+    selected_slot = cfg.get("bootEntrySlot")
+    if (not isinstance(selected_slot, int) or isinstance(selected_slot, bool)
+            or info["entry_slot"] != selected_slot):
+        raise ValueError(
+            "submitted image Boot.Thread CR0 target does not match the saved "
+            "Lightning Bolt selection")
+    words = list(struct.unpack(f"<{total}I", image_bytes))
+    target_base = total - (selected_slot + 1) * _boot_image_gen.NS_ENTRY_WORDS
+    target_loc, target_authority = words[target_base], words[target_base + 1]
+    if target_loc == 0 and target_authority == 0:
+        raise ValueError(f"selected NS[{selected_slot}] has no live submitted descriptor")
+    target_gt = _boot_image_gen.create_gt(
+        (target_authority >> 21) & 0x1FF, selected_slot, {"E": 1}, 1)
+    if target_gt != info["thread_caps0"]:
+        raise ValueError(
+            "submitted Boot.Thread CR0 does not carry the selected "
+            "descriptor's live sequence")
+    selftest_base = total - (6 + 1) * _boot_image_gen.NS_ENTRY_WORDS
+    selftest_loc = words[selftest_base]
+    selftest_header = words[selftest_loc] if 0 <= selftest_loc < total else 0
+    selftest_size = 1 << (((selftest_header >> 23) & 0xF) + 6)
+    selftest_cc = selftest_header & 0xFF
+    if (selftest_cc < 2 or selftest_loc + selftest_size > total):
+        raise ValueError("submitted SelfTest has no explicit Next.GT home")
+    next_index = selftest_loc + selftest_size - selftest_cc + 1
+    words[next_index] = target_gt
+    coupled = struct.pack(f"<{total}I", *words)
+    _boot_image_gen.validate_boot_image(coupled, total)
+    return coupled
+
+
+def _boot_image_provenance_origin():
+    """Return origin only when provenance still describes these exact bytes."""
+    try:
+        with open(BOOT_IMAGE_PROVENANCE_PATH, encoding="utf-8") as source:
+            provenance = json.load(source)
+        with open(BOOT_IMAGE_PATH, "rb") as image_source:
+            digest = hashlib.sha256(image_source.read()).hexdigest()
+        if (isinstance(provenance, dict)
+                and hmac.compare_digest(
+                    str(provenance.get("image_sha256", "")), digest)):
+            return provenance.get("origin")
+    except (OSError, ValueError, TypeError):
+        pass
+    return None
+
+
+def _prepare_selected_boot_image(image_bytes, cfg, slot):
+    """Patch only boot-selection authority in a validated committed image.
+
+    A Lightning Bolt change is not permission to rebuild unrelated resident
+    bodies or Thread contexts.  The target's current Namespace-state binding
+    and sequence are checked first; then only Header.BootEntry, Boot.Thread's
+    layout-derived CR0 home, and SelfTest.Next.GT are changed.  The suspended
+    CHURCH frame retains its own Enter/resume identity.
+    """
+    total = int(cfg["step1"]["totalNamespaceWords"])
+    _boot_image_gen.validate_boot_image(image_bytes, total)
+    try:
+        with open(NS_STATE_PATH, encoding="utf-8") as source:
+            state = json.load(source)
+        rows = [row for row in state.get("abstractions", [])
+                if isinstance(row, dict) and row.get("slot") == slot
+                and not row.get("archived")]
+    except (OSError, ValueError, TypeError) as exc:
+        raise ValueError(f"selected NS[{slot}] binding is unreadable: {exc}") from exc
+    if len(rows) != 1:
+        raise ValueError(
+            f"selected NS[{slot}] requires exactly one current Namespace-state binding")
+    target_binding = rows[0]
+    sequence = target_binding.get("seq")
+    if (isinstance(sequence, bool) or not isinstance(sequence, int)
+            or not 0 <= sequence <= 0x1FF):
+        raise ValueError(
+            f"selected NS[{slot}] has no valid current Namespace sequence")
+    # A descriptor sequence alone is not an immutable artifact identity.  The
+    # patch is allowed only when the selected state row still names the exact
+    # target body and load policy recorded for these image bytes.
+    try:
+        with open(BOOT_IMAGE_PROVENANCE_PATH, encoding="utf-8") as source:
+            provenance = json.load(source)
+        image_digest = hashlib.sha256(image_bytes).hexdigest()
+        if (not isinstance(provenance, dict)
+                or not hmac.compare_digest(
+                    str(provenance.get("image_sha256", "")), image_digest)):
+            raise ValueError("committed boot-image provenance does not match its bytes")
+        provenance_rows = [
+            row for row in provenance.get("resident_bindings", [])
+            if isinstance(row, dict) and row.get("slot") == slot
+        ]
+    except (OSError, ValueError, TypeError) as exc:
+        raise ValueError(
+            f"selected NS[{slot}] has no verified committed target provenance: {exc}") from exc
+    if len(provenance_rows) != 1:
+        raise ValueError(
+            f"selected NS[{slot}] requires exactly one committed target provenance binding")
+    provenance_binding = provenance_rows[0]
+    filename = target_binding.get("filename")
+    token = target_binding.get("token") or target_binding.get("cache_token")
+    policy = target_binding.get(
+        "load_policy", target_binding.get("loadPolicy"))
+    if (not isinstance(filename, str) or not filename
+            or os.path.basename(filename) != filename
+            or not isinstance(token, str) or not token
+            or not isinstance(policy, str) or not policy):
+        raise ValueError(
+            f"selected NS[{slot}] lacks required filename, token, or load-policy identity")
+    if (provenance_binding.get("filename") != filename
+            or provenance_binding.get("token") != token
+            or provenance_binding.get("load_policy") != policy
+            or provenance_binding.get("resident") is not target_binding.get("resident")
+            or provenance_binding.get("boot_resident") is not target_binding.get("boot_resident")
+            or provenance_binding.get("ns_slot_policy") != target_binding.get("ns_slot_policy")):
+        raise ValueError(
+            f"selected NS[{slot}] filename, token, or load policy differs from "
+            "the committed target provenance")
+    try:
+        artifact_path = os.path.realpath(os.path.join(LUMPS_DIR, filename))
+        if not artifact_path.startswith(os.path.realpath(LUMPS_DIR) + os.sep):
+            raise ValueError("artifact path escapes the LUMP library")
+        with open(artifact_path, "rb") as artifact_file:
+            artifact_digest = hashlib.sha256(artifact_file.read()).hexdigest()
+    except OSError as exc:
+        raise ValueError(
+            f"selected NS[{slot}] target artifact cannot be read: {exc}") from exc
+    if not hmac.compare_digest(
+            str(provenance_binding.get("artifact_sha256", "")), artifact_digest):
+        raise ValueError(
+            f"selected NS[{slot}] target artifact hash differs from the committed body")
+
+    words = list(struct.unpack(f"<{total}I", image_bytes))
+    physical = _boot_image_gen.read_namespace_header_info(image_bytes)
+    if not 0 <= slot < physical["slot_count"]:
+        raise ValueError(f"selected NS[{slot}] is outside the committed Namespace")
+    target_base = total - (slot + 1) * _boot_image_gen.NS_ENTRY_WORDS
+    target_loc, target_authority = words[target_base], words[target_base + 1]
+    if target_loc == 0 and target_authority == 0:
+        raise ValueError(f"selected NS[{slot}] has no live committed descriptor")
+    target_seq = (target_authority >> 21) & 0x1FF
+    if target_seq != sequence:
+        raise ValueError(
+            f"selected NS[{slot}] sequence {sequence} disagrees with committed "
+            f"descriptor sequence {target_seq}; explicitly rebuild after reconciling it")
+    if not 0 <= target_loc < physical["table_offset_words"]:
+        raise ValueError(f"selected NS[{slot}] location is not resident in the committed image")
+    target_header = words[target_loc]
+    if ((target_header >> 27) & 0x1F) != 0x1F or ((target_header >> 10) & 0x1FFF) == 0:
+        raise ValueError(f"selected NS[{slot}] is not a resident executable target")
+
+    thread_loc = words[total - 2 * _boot_image_gen.NS_ENTRY_WORDS]
+    thread_header = words[thread_loc]
+    thread_words = 1 << (((thread_header >> 23) & 0xF) + 6)
+    thread_layout = _boot_image_gen.thread_layout(
+        thread_words, (thread_header >> 10) & 0x1FFF)
+    if not thread_layout["valid"]:
+        raise ValueError("committed Boot.Thread has no valid layout-derived CR0 home")
+    target_gt = _boot_image_gen.create_gt(sequence, slot, {"E": 1}, 1)
+    words[thread_loc + thread_layout["caps_start"]] = target_gt
+
+    selftest_base = total - (6 + 1) * _boot_image_gen.NS_ENTRY_WORDS
+    selftest_loc = words[selftest_base]
+    selftest_header = words[selftest_loc] if 0 <= selftest_loc < total else 0
+    selftest_size = 1 << (((selftest_header >> 23) & 0xF) + 6)
+    selftest_cc = selftest_header & 0xFF
+    if (selftest_cc < 2 or selftest_loc + selftest_size > total):
+        raise ValueError("committed SelfTest has no explicit Next.GT home")
+    # SelfTest's explicit continuation always couples to the selected
+    # Lightning Bolt target, including a deliberate SelfTest self-loop.
+    words[selftest_loc + selftest_size - selftest_cc + 1] = target_gt
+    # Namespace Header V2 has its canonical boot-entry byte at word 4.
+    words[4] = target_loc * 4
+    patched = struct.pack(f"<{total}I", *words)
+    _boot_image_gen.validate_boot_image(patched, total)
+    return patched
+
 @app.route("/api/boot-image/generate", methods=["POST"])
 def boot_image_generate():
     cfg, err = _read_saved_boot_config()
@@ -4222,13 +4642,40 @@ def boot_image_generate():
     body = request.get_json(silent=True) or {}
     # Explicit requests win; otherwise generation uses the Lightning Bolt
     # selection saved with the Boot Image Designer config.
-    entry_slot = body.get("entrySlot", cfg.get(
-        "bootEntrySlot", DEFAULT_BOOT_CONFIG["bootEntrySlot"]))
-    if entry_slot is not None:
-        try:
-            entry_slot = max(0, min(255, int(entry_slot)))
-        except (TypeError, ValueError):
-            entry_slot = None
+    if "bootEntrySlot" not in cfg:
+        return jsonify({
+            "ok": False,
+            "error": (
+                "Saved boot-config.json has no Lightning Bolt bootEntrySlot. "
+                "Save and prepare an explicit selection before generating."
+            ),
+            "needsPrepare": True,
+        }), 409
+    saved_entry_slot = cfg["bootEntrySlot"]
+    if (isinstance(saved_entry_slot, bool)
+            or not isinstance(saved_entry_slot, int)
+            or not 0 <= saved_entry_slot < MAX_NS_ENTRIES):
+        return jsonify({
+            "ok": False,
+            "error": "Saved boot-config.json has an invalid Lightning Bolt bootEntrySlot.",
+            "needsPrepare": True,
+        }), 409
+    requested_slot = body.get("entrySlot", saved_entry_slot)
+    if (isinstance(requested_slot, bool)
+            or not isinstance(requested_slot, int)):
+        return jsonify({"ok": False, "error":
+                        "entrySlot must be an integer selected and saved in boot-config.json."}), 400
+    if requested_slot != saved_entry_slot:
+        return jsonify({
+            "ok": False,
+            "error": (
+                f"entrySlot NS[{requested_slot}] differs from the saved "
+                f"Lightning Bolt selection NS[{saved_entry_slot}]. Save and "
+                "prepare that selection first; generation does not silently "
+                "change the saved target."
+            ),
+        }), 409
+    entry_slot = saved_entry_slot
     # Hardware-targeted generation (Wukong bridge upload): the entry lump's
     # code body must be resident — the FPGA has no lazy-fetch path.
     for_hardware = bool(body.get("forHardware", False))
@@ -4258,6 +4705,7 @@ def boot_image_generate():
         "downloadUrl": "/api/boot-image/download",
         "binaryUrl": "/api/boot-image/binary",
         "warnings": drift_warnings,
+        "preparation": _boot_image_preparation_status(blob, cfg),
     })
 
 @app.route("/api/boot-image/download", methods=["GET"])
@@ -4267,17 +4715,34 @@ def boot_image_download():
     with open(BOOT_IMAGE_PATH, "rb") as _f:
         _image_bytes = _f.read()
     _cfg, _cfg_err = _read_saved_boot_config()
-    _configured_words = (
-        int(_cfg["step1"]["totalNamespaceWords"])
-        if _cfg_err is None and _cfg is not None else None
-    )
+    _origin = _boot_image_provenance_origin()
     try:
-        _boot_image_gen.validate_boot_image(_image_bytes, _configured_words)
+        # Exports preserve the exact historical/imported bytes.  Config/image
+        # disagreement is reported below, not "fixed" by selecting a default
+        # memory size or a newer artifact revision.
+        _boot_image_gen.validate_boot_image(_image_bytes)
+        _preparation = _boot_image_preparation_status(
+            _image_bytes, None if _cfg_err else _cfg)
     except ValueError as _e:
         logging.error("boot_image_download: stale or invalid boot image on disk: %s", _e)
         return jsonify({"error": f"Boot image on disk is stale or invalid: {_e}"}), 500
-    return send_file(io.BytesIO(_image_bytes), mimetype="application/octet-stream",
-                     as_attachment=True, download_name="boot-image.bin")
+    if _origin != "imported" and _boot_image_is_stale():
+        return jsonify({
+            "error": (
+                "Boot image inputs changed after preparation; the committed "
+                "image is stale and was not regenerated automatically. "
+                "Review the target and use the explicit Prepare action."
+            ),
+            "needsPrepare": True,
+            "provenanceOrigin": _origin,
+            "preparation": _preparation,
+        }), 409
+    response = send_file(io.BytesIO(_image_bytes), mimetype="application/octet-stream",
+                         as_attachment=True, download_name="boot-image.bin")
+    response.headers["X-Boot-Preparation"] = _preparation["status"]
+    if _preparation["status"] != "prepared":
+        response.headers["X-Boot-Preparation-Reason"] = _preparation["reason"]
+    return response
 
 def _boot_image_is_stale():
     """Return True if the image size or any tracked source is stale.
@@ -4290,17 +4755,52 @@ def _boot_image_is_stale():
     if not os.path.isfile(BOOT_IMAGE_PATH):
         return False
     try:
+        with open(BOOT_IMAGE_PATH, "rb") as _image_file:
+            _image_bytes = _image_file.read()
         _cfg, _cfg_err = _read_saved_boot_config()
         if _cfg_err is None and _cfg is not None:
             _expected_bytes = int(_cfg["step1"]["totalNamespaceWords"]) * 4
             if os.path.getsize(BOOT_IMAGE_PATH) != _expected_bytes:
                 return True
+            try:
+                with open(BOOT_IMAGE_PROVENANCE_PATH, encoding="utf-8") as _provenance_file:
+                    _provenance = json.load(_provenance_file)
+                # Old test/imported raw images can have no provenance at all.
+                # A self-described image remains structurally serveable in
+                # that case.  Once generated provenance exists, however, an
+                # absent configuration/source binding is fail-closed.
+                if (_provenance.get("image_sha256") ==
+                        hashlib.sha256(_image_bytes).hexdigest()
+                        and (_provenance.get("origin") == "generated"
+                             or "boot_config_sha256" in _provenance)):
+                    if (_provenance.get("boot_config_sha256") !=
+                            _boot_config_freshness_digest(_cfg)):
+                        return True
+                    _sources = _provenance.get("source_sha256")
+                    if not isinstance(_sources, dict):
+                        return True
+                    if (_sources.get("ns_state") != _file_sha256(NS_STATE_PATH)
+                            or _sources.get("manifest") != _file_sha256(
+                                os.path.join(LUMPS_DIR, "manifest.json"))):
+                        return True
+                    for _binding in _provenance.get("resident_bindings", []):
+                        if not isinstance(_binding, dict):
+                            return True
+                        _filename = _binding.get("filename")
+                        _expected = _binding.get("artifact_sha256")
+                        if (not isinstance(_filename, str) or not isinstance(_expected, str)
+                                or _file_sha256(os.path.join(LUMPS_DIR, _filename)) != _expected):
+                            return True
+            except (OSError, ValueError, TypeError, AttributeError):
+                # Generated images without a configuration binding predate the
+                # authoritative digest protocol.  Never serve them as though
+                # a later Designer save had prepared their current geometry or
+                # load policy.
+                return True
         # Generator source changes do not necessarily make any LUMP/config
         # input newer than an existing image.  Check the normative Thread
         # CHURCH-frame stack pointer by content so retired images regenerate
         # even when all file mtimes otherwise look current.
-        with open(BOOT_IMAGE_PATH, "rb") as _image_file:
-            _image_bytes = _image_file.read()
         _total_words = len(_image_bytes) // 4
         _thread_ns_word0 = _total_words - ((1 + 1) * _boot_image_gen.NS_ENTRY_WORDS)
         if 0 <= _thread_ns_word0 < _total_words:
@@ -4329,46 +4829,22 @@ def _boot_image_is_stale():
             _expected_resume_sto = _layout["stack_end"] - 2
             if (_actual_resume_sto & 0xFFF) != _expected_resume_sto:
                 return True
-        _img_mtime = os.path.getmtime(BOOT_IMAGE_PATH)
-        _lumps_dir = os.path.dirname(BOOT_IMAGE_PATH)
-        _tracked = ["manifest.json", "ns-state.json"]
-        _locator = _active_selftest_locator(_lumps_dir)
-        if _locator is not None:
-            _tracked.append(_locator["filename"])
-        for _fname in _tracked:
-            _p = os.path.join(_lumps_dir, _fname)
-            if os.path.isfile(_p) and os.path.getmtime(_p) > _img_mtime:
-                return True
     except OSError:
         pass
     return False
 
 
 def _auto_regen_boot_image():
-    """Regenerate boot-image.bin from current LUMPs and saved config.
+    """Retired compatibility hook: automatic replacement is prohibited.
 
-    Returns (img_bytes, error_string).  error_string is None on success.
+    Callers must use the explicit preparation route after reviewing the saved
+    target and its current descriptor generation.  Returning an error instead
+    of manufacturing an image preserves both imported bytes and historical
+    target/revision selections.
     """
-    try:
-        _cfg, _err = _read_saved_boot_config()
-        if _err:
-            return None, f"Cannot read boot config: {_err}"
-        # Preserve the programmer-selected LightningBolt/Starter during
-        # staleness regeneration.  Omitting this argument falls back to the
-        # SelfTest slot, which rewrites SelfTest.Next.GT as a self-reference and
-        # turns its final ELOADCALL into unbounded recursion.
-        _entry_slot = _cfg.get(
-            "bootEntrySlot", DEFAULT_BOOT_CONFIG["bootEntrySlot"])
-        _blob = _boot_image_gen.generate_boot_image(
-            _cfg, LUMPS_DIR, boot_entry_slot=_entry_slot)
-        _write_boot_image_bytes(_blob)
-        _load_boot_abstr_lump()
-        _load_boot_ns_lump()
-        logging.info("boot_image_binary: auto-regenerated boot-image.bin (LUMP source was newer)")
-        return _blob, None
-    except Exception as _exc:
-        logging.warning("boot_image_binary: auto-regenerate failed: %s", _exc)
-        return None, str(_exc)
+    return None, (
+        "Automatic boot-image regeneration is disabled; review the selected "
+        "target and use the explicit Prepare action.")
 
 
 @app.route("/api/boot-image/binary", methods=["GET"])
@@ -4384,29 +4860,49 @@ def boot_image_binary():
     with open(BOOT_IMAGE_PATH, "rb") as _f:
         _existing_image_bytes = _f.read()
     _cfg, _cfg_err = _read_saved_boot_config()
+    _origin = _boot_image_provenance_origin()
     _configured_words = (
-        int(_cfg["step1"]["totalNamespaceWords"])
-        if _cfg_err is None and _cfg is not None else None
-    )
+        None if _origin == "imported"
+        else (int(_cfg["step1"]["totalNamespaceWords"]) if not _cfg_err else None))
     try:
-        _boot_image_gen.validate_boot_image(_existing_image_bytes, _configured_words)
+        # Geometry disagreement is freshness, not a malformed-image error:
+        # validate structure before returning the explicit-Prepare 409 below.
+        _boot_image_gen.validate_boot_image(_existing_image_bytes)
     except ValueError as _e:
         logging.error("boot_image_binary: stale or invalid boot image on disk: %s", _e)
         return jsonify({"error": f"Boot image on disk is stale or invalid: {_e}"}), 500
-    if _boot_image_is_stale():
-        _new_bytes, _regen_err = _auto_regen_boot_image()
-        if _regen_err:
-            logging.warning("boot_image_binary: staleness regen failed (%s); cached copy remains unavailable", _regen_err)
+    if (_origin != "imported"
+            and _boot_image_is_stale()):
+        # Serving must not quietly replace a valid prepared CR0 home with the
+        # current server's default, revision, or load policy.  This is
+        # especially important for imported images, whose source artifacts may
+        # not exist locally.  The explicit /generate action is the only
+        # preparation writer.
+        return jsonify({
+            "error": (
+                "Boot image inputs changed after preparation; the committed "
+                "image is stale and was not regenerated automatically. "
+                "Review the target and use the explicit Prepare action."
+            ),
+            "needsPrepare": True,
+            "provenanceOrigin": _origin,
+        }), 409
     with open(BOOT_IMAGE_PATH, "rb") as _f:
         _image_bytes = _f.read()
     try:
         _boot_image_gen.validate_boot_image(_image_bytes, _configured_words)
+        _preparation = _boot_image_preparation_status(
+            _image_bytes, None if _cfg_err else _cfg)
     except ValueError as _e:
         logging.error("boot_image_binary: stale or invalid boot image on disk: %s", _e)
         return jsonify({"error": f"Boot image on disk is stale or invalid: {_e}"}), 500
     resp = send_file(io.BytesIO(_image_bytes), mimetype="application/octet-stream")
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
+    resp.headers["X-Boot-Preparation"] = _preparation["status"]
+    resp.headers["X-Boot-Image-Origin"] = _origin or "unknown"
+    if _preparation["status"] != "prepared":
+        resp.headers["X-Boot-Preparation-Reason"] = _preparation["reason"]
     return resp
 
 @app.route("/api/boot-image/exists", methods=["GET"])
@@ -4415,20 +4911,33 @@ def boot_image_exists():
     if not os.path.isfile(BOOT_IMAGE_PATH):
         return jsonify({"exists": False})
     cfg, cfg_err = _read_saved_boot_config()
-    if cfg_err:
+    origin = _boot_image_provenance_origin()
+    if cfg_err and origin != "imported":
         return jsonify({"exists": False, "reason": cfg_err})
-    configured_words = int(cfg["step1"]["totalNamespaceWords"])
-    image_words = os.path.getsize(BOOT_IMAGE_PATH) // 4
-    if os.path.getsize(BOOT_IMAGE_PATH) != configured_words * 4:
+    try:
+        with open(BOOT_IMAGE_PATH, "rb") as source:
+            image_bytes = source.read()
+        _boot_image_gen.validate_boot_image(image_bytes)
+        preparation = _boot_image_preparation_status(
+            image_bytes, None if cfg_err else cfg)
+    except (OSError, ValueError) as exc:
+        return jsonify({"exists": False, "reason": str(exc), "needsPrepare": True})
+    if (origin != "imported"
+            and _boot_image_is_stale()):
         return jsonify({
             "exists": False,
-            "reason": (
-                f"Saved boot image has {image_words} words, but configured "
-                f"Namespace memory has {configured_words} words; regenerate "
-                "the boot image for the current memory configuration"
-            ),
+            "reason": "Boot image inputs changed after preparation; explicit Prepare is required.",
+            "needsPrepare": True,
+            "provenanceOrigin": origin,
+            "preparation": preparation,
         })
-    return jsonify({"exists": True})
+    # A valid imported image remains downloadable/bootable even when it is not
+    # the local config's choice.  Report, rather than overwrite, its binding.
+    return jsonify({
+        "exists": True,
+        "preparation": preparation,
+        "provenanceOrigin": origin,
+    })
 
 
 def _crc16_ccitt(data_bytes):
@@ -4573,8 +5082,20 @@ def namespace_lump_json():
         except Exception:
             pass
     if not use_cached:
+        entry_slot = cfg.get("bootEntrySlot")
+        if (isinstance(entry_slot, bool)
+                or not isinstance(entry_slot, int)
+                or not 0 <= entry_slot < MAX_NS_ENTRIES):
+            return jsonify({
+                "error": (
+                    "No explicit saved Lightning Bolt bootEntrySlot is available "
+                    "to prepare this Namespace image."
+                ),
+                "needsPrepare": True,
+            }), 409
         try:
-            img_bytes = _boot_image_gen.generate_boot_image(cfg, LUMPS_DIR)
+            img_bytes = _boot_image_gen.generate_boot_image(
+                cfg, LUMPS_DIR, boot_entry_slot=entry_slot)
         except Exception as _e:
             return jsonify({"error": f"Failed to generate boot image: {_e}"}), 500
 
@@ -4728,14 +5249,28 @@ def boot_image_upload():
     cfg, cfg_err = _read_saved_boot_config()
     if cfg_err:
         return jsonify({"ok": False, "error": cfg_err}), 400
-    configured_words = int(cfg["step1"]["totalNamespaceWords"])
     try:
-        _boot_image_gen.validate_boot_image(image_bytes, configured_words)
+        _boot_image_gen.validate_boot_image(image_bytes)
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
+    configured_words = int(cfg["step1"]["totalNamespaceWords"])
+    submitted_words = len(image_bytes) // 4
+    if submitted_words != configured_words:
+        # The browser allocates its simulator memory from saved Step 1.  An
+        # accepted foreign geometry would be downloadable but rejected by
+        # sim.loadBootImage(), so reject before any image/provenance/state
+        # mutation and make the required configuration action explicit.
+        return jsonify({
+            "ok": False,
+            "error": (
+                f"Imported boot image has {submitted_words} words but saved Step 1 "
+                f"configures {configured_words}. Configure matching Step 1 "
+                "geometry first, then upload again."),
+            "needsConfigureStep1": True,
+        }), 409
 
     try:
-        _write_boot_image_bytes(image_bytes)
+        _write_boot_image_bytes(image_bytes, provenance_origin="imported")
     except Exception as e:
         return jsonify({"ok": False, "error": f"Failed to write boot-image.bin: {e}"}), 500
 
@@ -4745,6 +5280,7 @@ def boot_image_upload():
         "words": len(image_bytes) // 4,
         "downloadUrl": "/api/boot-image/download",
         "binaryUrl": "/api/boot-image/binary",
+        "preparation": _boot_image_preparation_status(image_bytes, cfg),
     })
 
 
@@ -4856,6 +5392,7 @@ def boot_image_save_ns():
 
     _data_b64 = _payload.get("data_b64")
     _ns_state  = _payload.get("ns_state") or {}
+    _boot_config_candidate = _payload.get("boot_config")
 
     if _data_b64 is None:
         return jsonify({"ok": False, "error": "Missing 'data_b64' field"}), 400
@@ -4870,14 +5407,47 @@ def boot_image_save_ns():
     except ValueError as _exc:
         return jsonify({"ok": False, "error": str(_exc)}), 400
 
-    cfg, cfg_err = _read_saved_boot_config()
-    if cfg_err:
-        return jsonify({"ok": False, "error": cfg_err}), 400
+    if _boot_config_candidate is not None:
+        # A Namespace drag can change both the serialized image selection and
+        # next-build config.  Validate the supplied complete candidate with
+        # the exact same normalization/validation routine as /boot-config,
+        # then commit it only with this image and decoded state.
+        ok, auth_error = _optional_report_token_check()
+        if not ok:
+            return auth_error
+        cfg, cfg_err = _validated_boot_config_candidate(_boot_config_candidate)
+        if cfg_err:
+            return jsonify({"ok": False, "error": cfg_err}), 400
+    else:
+        cfg, cfg_err = _read_saved_boot_config()
+        if cfg_err:
+            return jsonify({"ok": False, "error": cfg_err}), 400
     configured_words = int(cfg["step1"]["totalNamespaceWords"])
     try:
         _boot_image_gen.validate_boot_image(_img_bytes, configured_words)
+        _saved_preparation = _boot_image_preparation_status(_img_bytes, cfg)
     except ValueError as _exc:
         return jsonify({"ok": False, "error": str(_exc)}), 400
+    if _saved_preparation["status"] != "prepared":
+        return jsonify({
+            "ok": False,
+            "error": (
+                "Namespace save would publish an image whose Boot.Thread CR0 "
+                f"target differs from the saved Lightning Bolt selection: "
+                f"{_saved_preparation['reason']} Save/prepare the target "
+                "selection first."
+            ),
+            "preparation": _saved_preparation,
+            "needsPrepare": True,
+        }), 409
+    try:
+        # Browser preparation updates Header.BootEntry and Thread CR0.  Couple
+        # the separately resident SelfTest continuation before any file is
+        # replaced, preserving every other submitted word.
+        _img_bytes = _couple_selftest_next_to_selected_target(_img_bytes, cfg)
+        _saved_preparation = _boot_image_preparation_status(_img_bytes, cfg)
+    except ValueError as _exc:
+        return jsonify({"ok": False, "error": str(_exc), "needsPrepare": True}), 409
 
     # Commit both files under one lock so an accepted build cannot capture a
     # decoded/raw hybrid while Save NS Table is in progress.
@@ -4918,21 +5488,64 @@ def boot_image_save_ns():
                 if _entry.get(_key) is None and _old_entry.get(_key) is not None:
                     _entry[_key] = _old_entry[_key]
         with _namespace_commit_guard():
-            old_image = None
-            if os.path.isfile(BOOT_IMAGE_PATH):
-                with open(BOOT_IMAGE_PATH, "rb") as old_image_file:
-                    old_image = old_image_file.read()
-            _write_boot_image_bytes(_img_bytes)
-            try:
-                _write_ns_state(_ns_entries)
-            except Exception:
-                if old_image is not None:
-                    _write_boot_image_bytes(old_image)
-                else:
+            def _snapshot_file(_path):
+                try:
+                    with open(_path, "rb") as _source:
+                        return _source.read()
+                except FileNotFoundError:
+                    return None
+
+            def _restore_file(_path, _bytes):
+                if _bytes is None:
                     try:
-                        os.remove(BOOT_IMAGE_PATH)
-                    except OSError:
+                        os.remove(_path)
+                    except FileNotFoundError:
                         pass
+                    return
+                _rollback_path = _path + ".save-ns.rollback"
+                with open(_rollback_path, "wb") as _destination:
+                    _destination.write(_bytes)
+                os.replace(_rollback_path, _path)
+
+            # Keep exact bytes, including imported provenance and decoded/raw
+            # state fingerprints.  Recalling the generic image writer during a
+            # rollback would mint new provenance and invalidate state again.
+            _before = {
+                _path: _snapshot_file(_path)
+                for _path in (
+                    BOOT_CONFIG_PATH, BOOT_IMAGE_PATH,
+                    BOOT_IMAGE_PROVENANCE_PATH, NS_STATE_PATH)
+            }
+            try:
+                # Stage the raw image first because _write_ns_state derives
+                # its committed raw-table fingerprint from BOOT_IMAGE_PATH.
+                # Do not publish stale provenance from the prior decoded
+                # state: the final writer below computes it only after the
+                # candidate state/config are committed.
+                _stage_path = BOOT_IMAGE_PATH + ".save-ns.stage"
+                with open(_stage_path, "wb") as _stage_file:
+                    _stage_file.write(_img_bytes)
+                os.replace(_stage_path, BOOT_IMAGE_PATH)
+                _write_ns_state(_ns_entries)
+                if _boot_config_candidate is not None:
+                    _atomic_write_json(BOOT_CONFIG_PATH, cfg)
+                # This makes the final image timestamp newer than ns-state
+                # and binds provenance to the final committed inputs.  It
+                # deliberately leaves that matching raw fingerprint intact.
+                _write_boot_image_bytes(
+                    _img_bytes, invalidate_ns_state=False, boot_config=cfg)
+            except Exception:
+                for _path, _bytes in _before.items():
+                    try:
+                        _restore_file(_path, _bytes)
+                    except Exception as _rollback_exc:
+                        logging.critical(
+                            "save-ns rollback failed for %s: %s",
+                            _path, _rollback_exc)
+                try:
+                    os.remove(BOOT_IMAGE_PATH + ".save-ns.stage")
+                except OSError:
+                    pass
                 raise
     except Exception as _exc:
         return jsonify({"ok": False, "error": f"Failed to commit Namespace: {_exc}"}), 500
@@ -4941,10 +5554,12 @@ def boot_image_save_ns():
 
     return jsonify({
         "ok":          True,
+        "config":      cfg,
         "bytes":       len(_img_bytes),
         "words":       len(_img_bytes) // 4,
         "downloadUrl": "/api/boot-image/download",
         "binaryUrl":   "/api/boot-image/binary",
+        "preparation": _saved_preparation,
     })
 
 
@@ -8120,7 +8735,8 @@ def _consume_lump_approval_intent(intent, digest, action, plan=None, consume=Tru
     # storage rather than routing one intent between workers.
     with _LUMP_APPROVAL_INTENTS_LOCK:
         key = str(intent or "")
-        record = _LUMP_APPROVAL_INTENTS.get(key)
+        record = (_LUMP_APPROVAL_INTENTS.pop(key, None) if consume
+                  else _LUMP_APPROVAL_INTENTS.get(key))
         session_id = session.get("_lump_approval_session")
         if (not record or record["expires"] < time.time() or
                 record["session"] != session_id or record["digest"] != digest or
@@ -8128,8 +8744,6 @@ def _consume_lump_approval_intent(intent, digest, action, plan=None, consume=Tru
                 (action in {"save", "replace"}
                  and record.get("plan") != str(plan or ""))):
             raise ValueError("a valid, unexpired session-bound approval intent is required")
-        if consume:
-            _LUMP_APPROVAL_INTENTS.pop(key, None)
         return dict(record["approval"])
 
 
@@ -9979,8 +10593,7 @@ def save_lump():
                     f"LightningBolt selection: {_saved_boot_error}"),
                 "selftest_egt_mismatch": True,
             }), 422
-        _starter_slot = _saved_boot_cfg.get(
-            "bootEntrySlot", DEFAULT_BOOT_CONFIG["bootEntrySlot"])
+        _starter_slot = _saved_boot_cfg.get("bootEntrySlot")
         if (isinstance(_starter_slot, bool)
                 or not isinstance(_starter_slot, int)
                 or not 0 <= _starter_slot < MAX_NS_ENTRIES):
@@ -11267,58 +11880,23 @@ def save_lump():
         stage="Commit", event="complete", outcome="committed",
         http_status=200)
 
-    # ── Auto-regenerate boot-image.bin ────────────────────────────────────────
-    # If boot-image.bin already exists and a boot config is present, regenerate
-    # it so the saved lump is available to the next boot. Saving a LUMP and
-    # building a whole boot image are separate authority transitions: a failure
-    # in an unchanged foundational LUMP must not revoke the user's approved save
-    # of this exact artifact. The existing image remains guarded by the normal
-    # stale-image validation and the response reports that it was not refreshed.
+    # ── Boot-image preparation is explicit ────────────────────────────────────
+    # Saving an artifact must not silently replace a prepared image.  That
+    # image can encode an intentionally selected revision/sequence in
+    # Boot.Thread.CR0, so regeneration as a side effect of an unrelated save
+    # would change next-boot authority without an explicit prepare/apply action.
     boot_refreshed = False
     boot_refresh_note = None
     if os.path.isfile(BOOT_IMAGE_PATH):
-        try:
-            cfg_bi, err_bi = _read_saved_boot_config()
-            if not err_bi:
-                # The saved boot configuration is authoritative for the
-                # Lightning Bolt selection.  The image being replaced may be
-                # stale specifically because its format predates the current
-                # reader, so regeneration must not depend on decoding it.
-                _saved_entry_slot = cfg_bi.get(
-                    "bootEntrySlot", DEFAULT_BOOT_CONFIG["bootEntrySlot"])
-                if (not isinstance(_saved_entry_slot, int)
-                        or isinstance(_saved_entry_slot, bool)
-                        or not 0 <= _saved_entry_slot < MAX_NS_ENTRIES):
-                    raise ValueError(
-                        "saved boot config has an invalid bootEntrySlot")
-                blob_bi = _boot_image_gen.generate_boot_image(
-                    cfg_bi,
-                    LUMPS_DIR,
-                    boot_entry_slot=_saved_entry_slot,
-                    require_entry_resident=True,
-                )
-                _write_boot_image_bytes(blob_bi)
-                boot_refreshed = True
-                print(f'[lumps] boot-image.bin regenerated ({len(blob_bi)} bytes)', flush=True)
-                _load_boot_abstr_lump()   # refresh the active SelfTest cache
-                _load_boot_ns_lump()      # refresh _BOOT_NS_META from updated boot-image.bin
-                _save_lump_diagnostic_event(
-                    stage="Reload", event="complete", outcome="committed",
-                    http_status=200)
-            else:
-                boot_refresh_note = f'boot config unavailable: {err_bi}'
-                raise RuntimeError(boot_refresh_note)
-        except Exception as _bie:
-            boot_refresh_note = (
-                "LUMP saved but not yet installed in the hardware image; "
-                f"boot-image.bin was not regenerated: {_bie}"
-            )
-            logging.warning(
-                "[lumps] saved %s but boot image refresh was deferred: %s",
-                lump_filename, _bie)
-            _save_lump_diagnostic_event(
-                stage="Reload", event="exception", outcome="committed",
-                error={"name": type(_bie).__name__, "message": str(_bie)})
+        boot_refresh_note = (
+            "LUMP saved; the existing boot image was preserved unchanged. "
+            "Review the selected target and use the explicit Prepare action "
+            "to apply this revision."
+        )
+        _save_lump_diagnostic_event(
+            stage="Reload", event="skipped", outcome="committed",
+            error={"name": "ExplicitBootPreparationRequired",
+                   "message": boot_refresh_note})
     else:
         _save_lump_diagnostic_event(
             stage="Reload", event="skipped", outcome="committed",
@@ -12105,6 +12683,14 @@ def get_lump_words(token_hex):
 
     try:
         _approval_ret = _matching_lump_approval(LUMPS_DIR, _bh_live)
+    except _LumpApprovalStoreError as exc:
+        # Inspection is deliberately read-only: a damaged approval sidecar
+        # cannot make bytes already on disk disappear from the programmer.
+        # Do not extend this exception handling to mutation/execution paths;
+        # they retain the approval store's fail-closed behavior.
+        _approval_ret = None
+        validation_errors.append(
+            f"Approval store unavailable; bytes are untrusted: {exc}")
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 409
     response = {

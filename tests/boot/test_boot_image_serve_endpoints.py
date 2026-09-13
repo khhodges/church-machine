@@ -17,6 +17,8 @@ server.app.BOOT_IMAGE_PATH is patched to a temp file for each test so the
 real on-disk image is never touched.
 """
 import os
+import hashlib
+import json
 import struct
 import sys
 from unittest.mock import patch
@@ -83,28 +85,19 @@ def _write_valid(path):
     return valid
 
 
-def test_auto_regen_preserves_saved_lightning_bolt_slot():
+def test_automatic_regeneration_is_disabled_to_preserve_prepared_target():
     import server.app as app_module
 
-    cfg = _default_cfg()
-    cfg["bootEntrySlot"] = 10
-    blob = b"generated-boot-image"
-
     with (
-        patch.object(app_module, "_read_saved_boot_config",
-                     return_value=(cfg, None)),
-        patch.object(app_module._boot_image_gen, "generate_boot_image",
-                     return_value=blob) as generate,
+        patch.object(app_module._boot_image_gen, "generate_boot_image") as generate,
         patch.object(app_module, "_write_boot_image_bytes"),
-        patch.object(app_module, "_load_boot_abstr_lump"),
-        patch.object(app_module, "_load_boot_ns_lump"),
     ):
         result, error = app_module._auto_regen_boot_image()
 
-    assert error is None
-    assert result == blob
-    generate.assert_called_once_with(
-        cfg, app_module.LUMPS_DIR, boot_entry_slot=10)
+    assert result is None
+    assert "disabled" in error.lower()
+    assert "explicit prepare" in error.lower()
+    generate.assert_not_called()
 
 
 @pytest.mark.parametrize("slot", [0, 1, 2, 3, 4, 5, 6, 10])
@@ -177,6 +170,9 @@ def client():
     from server.app import app  # noqa: E402 — deferred to avoid side-effects at import
     app.config["TESTING"] = True
     with app.test_client() as c:
+        token = os.environ.get("REPORT_TOKEN", "").strip()
+        if token:
+            c.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {token}"
         yield c
 
 
@@ -244,7 +240,7 @@ def test_binary_rejects_retired_tail_relative_thread_boundary(
     assert "CHURCH frame" in resp.get_json()["error"]
 
 
-def test_binary_regenerates_when_authoritative_ns_state_is_newer(
+def test_binary_ignores_ns_state_mtime_without_matching_content_provenance(
         client, temp_image_path):
     valid_bytes = _write_valid(temp_image_path)
     ns_state_path = os.path.join(
@@ -254,18 +250,14 @@ def test_binary_regenerates_when_authoritative_ns_state_is_newer(
     image_mtime = os.path.getmtime(temp_image_path)
     os.utime(ns_state_path, (image_mtime + 1, image_mtime + 1))
 
-    def regenerate_image():
-        with open(temp_image_path, "wb") as image_file:
-            image_file.write(valid_bytes)
-        return valid_bytes, None
-
     with patch("server.app._auto_regen_boot_image",
-               side_effect=regenerate_image) as regenerate:
+               return_value=(valid_bytes, None)) as regenerate:
         resp = client.get("/api/boot-image/binary")
 
-    regenerate.assert_called_once_with()
+    regenerate.assert_not_called()
+    # Freshness is content/provenance-bound: copied files and a harmless mtime
+    # change do not invalidate a self-described raw image.
     assert resp.status_code == 200
-    assert resp.data == valid_bytes
 
 
 def test_raw_binding_invalidation_does_not_touch_unchanged_ns_state(tmp_path):
@@ -292,11 +284,8 @@ def test_binary_never_serves_cached_image_for_different_memory_size(
                return_value=(None, "regeneration unavailable")):
         resp = client.get("/api/boot-image/binary")
 
-    assert resp.status_code == 500
-    error = resp.get_json()["error"]
-    assert "32768 words" in error
-    assert "16384 words" in error
-    assert "regenerate" in error.lower()
+    assert resp.status_code == 409
+    assert resp.get_json()["needsPrepare"] is True
 
 
 def test_exists_does_not_advertise_image_for_different_memory_size(
@@ -309,8 +298,49 @@ def test_exists_does_not_advertise_image_for_different_memory_size(
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["exists"] is False
-    assert "32768 words" in body["reason"]
-    assert "16384 words" in body["reason"]
+    assert body["needsPrepare"] is True
+    assert "explicit Prepare" in body["reason"]
+
+
+def test_imported_binary_and_exists_use_its_self_described_geometry(
+        client, tmp_path, monkeypatch):
+    """A verified imported artifact is not reinterpreted using local Step 1."""
+    import server.app as app_module
+
+    imported = _make_oversized_image()
+    image_path = tmp_path / "boot-image.bin"
+    provenance_path = tmp_path / "boot-image.provenance.json"
+    config_path = tmp_path / "boot-config.json"
+    image_path.write_bytes(imported)
+    provenance_path.write_text(json.dumps({
+        "origin": "imported",
+        "image_sha256": hashlib.sha256(imported).hexdigest(),
+        "resident_bindings": [],
+    }), encoding="utf-8")
+    config_path.write_text(json.dumps({
+        "targetBoard": "wukong-xc7a100t",
+        "bootEntrySlot": 6,
+        "step1": {
+            "totalNamespaceWords": 16384,
+            "namespaceLumpWords": 64,
+            "threadLumpWords": 256,
+        },
+    }), encoding="utf-8")
+    monkeypatch.setattr(app_module, "BOOT_IMAGE_PATH", str(image_path))
+    monkeypatch.setattr(
+        app_module, "BOOT_IMAGE_PROVENANCE_PATH", str(provenance_path))
+    monkeypatch.setattr(app_module, "BOOT_CONFIG_PATH", str(config_path))
+    monkeypatch.setattr(
+        app_module, "BOOT_CONFIG_LEGACY_PATH", str(tmp_path / "no-legacy.json"))
+
+    binary = client.get("/api/boot-image/binary")
+    exists = client.get("/api/boot-image/exists")
+
+    assert binary.status_code == 200
+    assert binary.data == imported
+    assert binary.headers["X-Boot-Image-Origin"] == "imported"
+    assert exists.get_json()["exists"] is True
+    assert exists.get_json()["provenanceOrigin"] == "imported"
 
 
 def test_boot_config_size_change_invalidates_cached_image_availability(
@@ -343,8 +373,8 @@ def test_boot_config_size_change_invalidates_cached_image_availability(
     assert exists_resp.status_code == 200
     exists_body = exists_resp.get_json()
     assert exists_body["exists"] is False
-    assert "32768 words" in exists_body["reason"]
-    assert "16384 words" in exists_body["reason"]
+    assert exists_body["needsPrepare"] is True
+    assert "explicit Prepare" in exists_body["reason"]
 
 
 # ---------------------------------------------------------------------------
