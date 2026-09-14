@@ -1573,6 +1573,40 @@ class ChurchAssembler {
                         break;
                     }
                 }
+                // A bare named CALL may also use the ISA's active-CR6
+                // C-List lookup form.  If the name has not been explicitly
+                // loaded into a CR, prefer its declared C-List row over
+                // treating the name as though it were a register alias:
+                //
+                //   CALL WukongCallHome
+                //     → ELOADCALL CR0, CR6, <WukongCallHome row>
+                //
+                // This is the fused encoding of CALL CR6[WukongCallHome]
+                // with the fast-path selector (method 0).  Loaded names
+                // still take the ordinary CALL CRn path above, so a prior
+                // LOAD remains authoritative and dot-method calls retain
+                // their existing semantics.
+                if (!parts[2] && !rawDotTok.includes('.') &&
+                        ChurchAssembler._nameKey(this.nsLoaded, rawDotTok) === null) {
+                    const _bareCList = this._resolveCListName(rawDotTok);
+                    if (_bareCList !== null) {
+                        this._checkCapDeclared(_bareCList.key, lineNum);
+                        const _bareRow = _bareCList.slot;
+                        if (!Number.isInteger(_bareRow) || _bareRow < 0 || _bareRow > 31) {
+                            this.errors.push({
+                                line: lineNum,
+                                ...this._tokenCols(this._currentLineText, rawDotTok),
+                                message: `ELOADCALL c-list row ${_bareRow} for "${rawDotTok}" is out of range (0–31 allowed; ELOADCALL uses a 5-bit row field).`
+                            });
+                        } else {
+                            opcode = 8;
+                            crDst = 0;
+                            crSrc = 6;
+                            imm = _bareRow & 0x1F;
+                        }
+                        break;
+                    }
+                }
                 crDst = this._parseCR(parts[1], lineNum);
                 this._checkPrivCR(crDst, 'CALL', lineNum);
                 if (parts[2]) {

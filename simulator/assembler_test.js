@@ -359,6 +359,27 @@ const WUKONG_CALLHOME_CONVENTIONS = {
         result.errors[0] ? result.errors[0].message : '(no error)');
 }
 
+// WCH4a: a bare declared C-List name uses the active CR6 pet-name path
+// without requiring a separate LOAD.  This is the fused ELOADCALL encoding
+// of CALL CR6[WukongCallHome] with the direct/fast-path selector.
+{
+    const a = new ChurchAssembler(WUKONG_CALLHOME_CONVENTIONS);
+    const result = a.assemble(
+        'capabilities { SelfTest E, WukongCallHome E }\n' +
+        'CALL WukongCallHome'
+    );
+    const callWord = result.words[0] >>> 0;
+    assert('WCH4a bare WukongCallHome resolves through active CR6 C-List',
+        result.errors.length === 0, result.errors.map(e => e.message).join('; '));
+    assert('WCH4a bare WukongCallHome emits direct ELOADCALL row 1, selector 0',
+        ((callWord >>> 27) & 0x1F) === 8 &&
+        ((callWord >>> 19) & 0xF) === 0 &&
+        ((callWord >>> 15) & 0xF) === 6 &&
+        (callWord & 0x1F) === 1 &&
+        ((callWord >>> 5) & 0x7F) === 0,
+        `word=0x${callWord.toString(16)}`);
+}
+
 // WCH4b–WCH4e: WukongCallHome.hw is a dotted C-list label, rather than the
 // "hw" method of WukongCallHome.  The hardware-ROM sidecar declares its
 // callable setup entry at offset 0, which maps to ELOADCALL's direct/default
