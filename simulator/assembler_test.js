@@ -179,19 +179,23 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
     assert('T13 imm=3 (Sqrt index 2 → 1-based imm)', imm === 3, 'got ' + imm);
 }
 
-// T14: CALL SlideRule.Multiply without a prior LOAD produces a clear error.
+// T14: an unbound named CALL materializes a normal LOAD + CALL sequence.
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace(NS_SYMBOLS);
     const result = a.assemble('CALL SlideRule.Multiply');
     const errors = a.errors;
-    assert('T14 CALL SlideRule.Multiply (unbound) produces an error',
-        errors.length > 0, 'expected at least one error');
-    assert('T14 error message mentions SlideRule and "not been loaded"',
-        errors.length > 0 &&
-        errors[0].message.includes('SlideRule') &&
-        errors[0].message.includes('not been loaded'),
-        errors.length > 0 ? errors[0].message : '(no error)');
+    assert('T14 CALL SlideRule.Multiply (unbound) assembles without errors',
+        errors.length === 0, errors.map(e => e.message).join('; '));
+    assert('T14 unbound named CALL emits LOAD then CALL',
+        result.words.length === 2 &&
+        ((result.words[0] >>> 27) & 0x1F) === 0 &&
+        ((result.words[1] >>> 27) & 0x1F) === 2,
+        result.words.map(w => '0x' + (w >>> 0).toString(16)).join(', '));
+    assert('T14 ordinary CALL carries the method selector',
+        ((result.words[1] >>> 19) & 0xF) === 0 &&
+        (result.words[1] & 0x7FFF) === 1,
+        `word=0x${(result.words[1] >>> 0).toString(16)}`);
 }
 
 // T15: CALL SlideRule.UnknownMethod produces an error listing known methods.
@@ -342,7 +346,7 @@ const WUKONG_CALLHOME_CONVENTIONS = {
         result.errors.map(e => e.message).join('; '));
 }
 
-// WCH4: a declared but unbound assembly dot-call still requires LOAD.
+// WCH4: a declared but unbound assembly dot-call lowers to LOAD + CALL.
 {
     const a = new ChurchAssembler(WUKONG_CALLHOME_CONVENTIONS);
     a.setNamespace({ 'WukongCallHome': 7 });
@@ -350,40 +354,42 @@ const WUKONG_CALLHOME_CONVENTIONS = {
         'capabilities { WukongCallHome E }\n' +
         'CALL WukongCallHome.Main'
     );
-    assert('WCH4 missing LOAD emits exactly one error',
-        result.errors.length === 1, result.errors.map(e => e.message).join('; '));
-    assert('WCH4 missing LOAD error gives a usable LOAD correction',
-        result.errors[0] &&
-        result.errors[0].message.includes('not been loaded') &&
-        result.errors[0].message.includes('Use LOAD'),
-        result.errors[0] ? result.errors[0].message : '(no error)');
+    assert('WCH4 unbound named call assembles without errors',
+        result.errors.length === 0, result.errors.map(e => e.message).join('; '));
+    assert('WCH4 unbound named call emits LOAD then ordinary CALL',
+        result.words.length === 2 &&
+        ((result.words[0] >>> 27) & 0x1F) === 0 &&
+        ((result.words[1] >>> 27) & 0x1F) === 2 &&
+        ((result.words[1] >>> 19) & 0xF) === 0 &&
+        (result.words[1] & 0x7FFF) === 1,
+        result.words.map(w => '0x' + (w >>> 0).toString(16)).join(', '));
 }
 
-// WCH4a: a bare declared C-List name uses the active CR6 pet-name path
-// without requiring a separate LOAD.  This is the fused ELOADCALL encoding
-// of CALL CR6[WukongCallHome] with the direct/fast-path selector.
+// WCH4a: a bare declared C-List name does not require a separate source LOAD.
+// The compiler materializes the capability and retains an ordinary CALL;
+// ELOADCALL remains explicit-only.
 {
     const a = new ChurchAssembler(WUKONG_CALLHOME_CONVENTIONS);
     const result = a.assemble(
         'capabilities { SelfTest E, WukongCallHome E }\n' +
         'CALL WukongCallHome'
     );
-    const callWord = result.words[0] >>> 0;
+    const loadWord = result.words[0] >>> 0;
+    const callWord = result.words[1] >>> 0;
     assert('WCH4a bare WukongCallHome resolves through active CR6 C-List',
         result.errors.length === 0, result.errors.map(e => e.message).join('; '));
-    assert('WCH4a bare WukongCallHome emits direct ELOADCALL row 1, selector 0',
-        ((callWord >>> 27) & 0x1F) === 8 &&
+    assert('WCH4a bare WukongCallHome emits LOAD then ordinary CALL',
+        ((loadWord >>> 27) & 0x1F) === 0 &&
+        ((callWord >>> 27) & 0x1F) === 2 &&
         ((callWord >>> 19) & 0xF) === 0 &&
-        ((callWord >>> 15) & 0xF) === 6 &&
-        (callWord & 0x1F) === 1 &&
-        ((callWord >>> 5) & 0x7F) === 0,
-        `word=0x${callWord.toString(16)}`);
+        (callWord & 0x7FFF) === 0,
+        `load=0x${loadWord.toString(16)} call=0x${callWord.toString(16)}`);
 }
 
 // WCH4b–WCH4e: WukongCallHome.hw is a dotted C-list label, rather than the
 // "hw" method of WukongCallHome.  The hardware-ROM sidecar declares its
-// callable setup entry at offset 0, which maps to ELOADCALL's direct/default
-// selector 0.
+// callable setup entry at offset 0. The source-level CALL still lowers to
+// LOAD + CALL.
 {
     const a = new ChurchAssembler(WUKONG_CALLHOME_CONVENTIONS);
     const result = a.assemble(
@@ -392,20 +398,25 @@ const WUKONG_CALLHOME_CONVENTIONS = {
         'LOAD CR2, WukongCallHome\n' +
         'CALL WukongCallHome.Main'
     );
-    const directWord = result.words[0] >>> 0;
-    const methodWord = result.words[2] >>> 0;
+    const directLoadWord = result.words[0] >>> 0;
+    const directCallWord = result.words[1] >>> 0;
+    const methodLoadWord = result.words[2] >>> 0;
+    const methodWord = result.words[3] >>> 0;
     assert('WCH4b dotted hardware LUMP label is accepted in capabilities',
         result.capabilities.length === 3 &&
         result.capabilities[1].name === 'WukongCallHome.hw',
         result.capabilities.map(cap => cap.name).join(', '));
-    assert('WCH4c normalized dotted hardware label emits direct ELOADCALL row 1, selector 0',
+    assert('WCH4c normalized dotted hardware label emits LOAD then ordinary CALL',
         result.errors.length === 0 &&
-        ((directWord >>> 27) & 0x1F) === 8 &&
-        ((directWord >>> 19) & 0xF) === 0 &&
-        ((directWord >>> 15) & 0xF) === 6 &&
-        (directWord & 0x1F) === 1 &&
-        ((directWord >>> 5) & 0x7F) === 0,
-        `errors=${result.errors.map(e => e.message).join('; ')} word=0x${directWord.toString(16)}`);
+        ((directLoadWord >>> 27) & 0x1F) === 0 &&
+        ((directCallWord >>> 27) & 0x1F) === 2 &&
+        ((directCallWord >>> 19) & 0xF) === 0 &&
+        (directCallWord & 0x7FFF) === 0,
+        `errors=${result.errors.map(e => e.message).join('; ')} load=0x${directLoadWord.toString(16)} call=0x${directCallWord.toString(16)}`);
+    assert('WCH4c explicit LOAD remains before the registered method call',
+        ((methodLoadWord >>> 27) & 0x1F) === 0 &&
+        ((methodLoadWord >>> 19) & 0xF) === 2,
+        `word=0x${methodLoadWord.toString(16)}`);
     assert('WCH4d WukongCallHome.Main remains a registered method call',
         ((methodWord >>> 27) & 0x1F) === 2 &&
         ((methodWord >>> 19) & 0xF) === 2 &&
@@ -421,6 +432,32 @@ const WUKONG_CALLHOME_CONVENTIONS = {
         unknown.errors[0].message.includes('"Missing" is used but not declared') &&
         unknown.errors[0].message.includes('capabilities { Missing E }'),
         unknown.errors.map(e => e.message).join('; '));
+}
+
+// WCH4f: explicit CR6[name] syntax is the readable C-list lookup form.  It
+// lowers to the same ordinary LOAD + CALL pair, and the selected instruction
+// disassembles as CALL rather than as the fused ELOADCALL opcode.
+{
+    const a = new ChurchAssembler(WUKONG_CALLHOME_CONVENTIONS);
+    a.setNamespace({ 'WukongCallHome': 7 });
+    const result = a.assemble(
+        'capabilities { WukongCallHome E }\n' +
+        'CALL CR6[WukongCallHome], Main'
+    );
+    const callWord = result.words[1] >>> 0;
+    const selected = a.disassemble(callWord);
+    assert('WCH4f CALL CR6[name], method assembles without errors',
+        result.errors.length === 0, result.errors.map(e => e.message).join('; '));
+    assert('WCH4f CALL CR6[name], method emits ordinary CALL',
+        result.words.length === 2 &&
+        ((result.words[0] >>> 27) & 0x1F) === 0 &&
+        ((callWord >>> 27) & 0x1F) === 2 &&
+        ((callWord >>> 19) & 0xF) === 0 &&
+        (callWord & 0x7FFF) === 1,
+        result.words.map(w => '0x' + (w >>> 0).toString(16)).join(', '));
+    assert('WCH4f selected instruction disassembles as CALL',
+        selected.startsWith('CALL') && !selected.startsWith('ELOADCALL'),
+        `selected="${selected}"`);
 }
 
 // ── Salvation abstraction method conventions (task-2032) ────────────────────
@@ -1599,40 +1636,37 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
         encodedRow === 31, 'got ' + encodedRow);
 }
 
-// EL20b: CALL method-name form with NS slot = 32 → out-of-range error.
-//       SlideRule is mapped to slot 32 via nsSymbols (not nsLoaded), so the
-//       CALL handler converts it to ELOADCALL internally using the dot-notation
-//       branch.  That branch adds a > 31 guard and must fire here.
+// EL20b: a named CALL may load a namespace slot above ELOADCALL's 5-bit range.
+//       The source form is no longer lowered to ELOADCALL, so slot 32 remains
+//       valid for the ordinary LOAD + CALL sequence.
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace({ 'SlideRule': 32 }); // slot 32 exceeds the 5-bit row field
-    a.assemble('CALL SlideRule, Multiply');
-    assert('EL20b CALL method-name NS slot=32: produces an error',
-        a.errors.length > 0, 'expected at least one error');
-    assert('EL20b error says "out of range" and shows 32',
-        a.errors.some(e => e.message.includes('out of range') && e.message.includes('32')),
-        a.errors.map(e => e.message).join('; '));
-    assert('EL20b error mentions 5-bit field',
-        a.errors.some(e => e.message.includes('5-bit')),
-        a.errors.map(e => e.message).join('; '));
+    const result = a.assemble('CALL SlideRule, Multiply');
+    assert('EL20b CALL method-name NS slot=32: no errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    assert('EL20b emits LOAD + ordinary CALL instead of ELOADCALL',
+        result.words.length === 2 &&
+        ((result.words[0] >>> 27) & 0x1F) === 0 &&
+        ((result.words[1] >>> 27) & 0x1F) === 2,
+        result.words.map(w => '0x' + (w >>> 0).toString(16)).join(', '));
 }
 
-// EL21: dot-notation CALL with NS slot = 31 → boundary pass (no error).
-//       SlideRule is mapped to slot 31 via nsSymbols (not nsLoaded), so the
-//       CALL handler converts it to ELOADCALL via the dot-notation branch.
-//       Slot 31 is the maximum valid 5-bit value and must assemble cleanly.
+// EL21: dot-notation CALL with NS slot = 31 → ordinary CALL after the
+//       compiler-materialized LOAD.
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace({ 'SlideRule': 31 }); // slot 31 = maximum valid 5-bit row
     const result = a.assemble('CALL SlideRule, Multiply');
     assert('EL21 CALL dot-notation NS slot=31 (boundary): no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
-    const word = result.words[0];
-    const encodedRow    = word & 0x1F;
-    const encodedMethod = (word >>> 5) & 0x7F;
-    assert('EL21 encoded row field is 31',
-        encodedRow === 31, 'got ' + encodedRow);
-    assert('EL21 encoded method field is 1 (Multiply index 0 → 1-based)',
+    const word = result.words[1];
+    const encodedMethod = word & 0x7FFF;
+    assert('EL21 emits ordinary CALL after LOAD',
+        ((result.words[0] >>> 27) & 0x1F) === 0 &&
+        ((word >>> 27) & 0x1F) === 2,
+        result.words.map(w => '0x' + (w >>> 0).toString(16)).join(', '));
+    assert('EL21 encoded method selector is 1 (Multiply index 0 → 1-based)',
         encodedMethod === 1, 'got ' + encodedMethod);
 }
 
@@ -5486,31 +5520,28 @@ function symCompile(body, caps) {
 }
 
 {
-    // BC90–BC94: CALL Scheduler, pause — namespace-slot bare-call path → ELOADCALL
-    //
-    // Encoding: pause index=4 → 1-based=5; Scheduler slot=8; R-type: imm=(5<<5)|8=0x00A8=168
-    //   word = (8<<27)|(14<<23)|(0<<19)|(6<<15)|0x00A8
+    // BC90–BC94: CALL Scheduler, pause — namespace-slot named-call path
+    // materializes LOAD CR0, Scheduler followed by ordinary CALL CR0, pause.
     const a = new ChurchAssembler(SCHED_CONVENTIONS_BC);
     a.setNamespace(SCHED_NS_BC);
     const result = a.assemble('CALL Scheduler, pause\nHALT');
 
     assert('BC90 CALL Scheduler, pause assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
-    assert('BC91 CALL Scheduler, pause emits 2 words (ELOADCALL + HALT)',
-        result.words.length === 2, `got ${result.words.length}`);
+    assert('BC91 CALL Scheduler, pause emits 3 words (LOAD + CALL + HALT)',
+        result.words.length === 3, `got ${result.words.length}`);
 
     {
-        const w      = result.words[0] >>> 0;
+        const load   = result.words[0] >>> 0;
+        const w      = result.words[1] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0x1F;
-        const method = (imm >>> 5) & 0x7F;
-        assert('BC92 CALL Scheduler, pause word[0] — opcode=8 (ELOADCALL, not CALL)',
-            opcode === 8, `got opcode=${opcode}`);
-        assert('BC93 CALL Scheduler, pause word[0] — row=8 (Scheduler NS slot)',
-            row === 8, `got row=${row}`);
-        assert('BC94 CALL Scheduler, pause word[0] — method=5 (pause index 4, 1-based)',
-            method === 5, `got method=${method}`);
+        assert('BC92 CALL Scheduler, pause word[0] — LOAD',
+            ((load >>> 27) & 0x1F) === 0, `got opcode=${(load >>> 27) & 0x1F}`);
+        assert('BC93 CALL Scheduler, pause word[1] — ordinary CALL',
+            opcode === 2 && ((w >>> 19) & 0xF) === 0, `got opcode=${opcode}`);
+        assert('BC94 CALL Scheduler, pause word[1] — method=5 (pause index 4, 1-based)',
+            imm === 5, `got method=${imm}`);
     }
 }
 

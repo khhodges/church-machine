@@ -444,14 +444,15 @@ console.log('\n--- WCH-HW-11: WukongCallHome.hw dispatches through its direct en
         'capabilities { Other E, WukongCallHome.hw E }\n' +
         'CALL wukongcallhome.HW'
     );
-    const callWord = assembled.words[0] >>> 0;
-    check('WCH-HW-11c: assembler emits ELOADCALL row 1 with direct selector 0',
+    const loadWord = assembled.words[0] >>> 0;
+    const callWord = assembled.words[1] >>> 0;
+    check('WCH-HW-11c: assembler emits LOAD + ordinary CALL for the direct entry',
         assembled.errors.length === 0 &&
-        ((callWord >>> 27) & 0x1F) === 8 &&
-        ((callWord >>> 15) & 0xF) === 6 &&
-        (callWord & 0x1F) === 1 &&
-        ((callWord >>> 5) & 0x7F) === 0,
-        `errors=${assembled.errors.map(error => error.message).join('; ')} word=0x${callWord.toString(16)}`);
+        ((loadWord >>> 27) & 0x1F) === 0 &&
+        ((callWord >>> 27) & 0x1F) === 2 &&
+        ((callWord >>> 19) & 0xF) === 0 &&
+        (callWord & 0x7FFF) === 0,
+        `errors=${assembled.errors.map(error => error.message).join('; ')} load=0x${loadWord.toString(16)} call=0x${callWord.toString(16)}`);
 }
 
 // ── WCH-HW-12: Canonical DWRITE reaches physical LED MMIO safely ─────────────

@@ -758,6 +758,10 @@ class ChurchAssembler {
         this._parsePetDirectives(lines);               // pre-pass: .pet aliases
         this._capBlockSlots = this._parseCapBlockSlots(lines); // pre-pass: capabilities {} → slot map
         const instructions = [];
+        // Pass-1 view of named CR bindings. Named CALL sugar is lowered to a
+        // normal LOAD followed by a normal CALL, so explicit source LOADs must
+        // remain authoritative before pass 2 populates nsLoaded.
+        const _pass1LoadedNames = new Set();
         const _collectCapItem = (item, lineNum, endLineNum = lineNum) => {
             const parsed = ChurchAssembler._parseCapItems(item);
             for (const missingName of parsed.missingSeparators) {
@@ -899,6 +903,118 @@ class ChurchAssembler {
             // no machine words and do not shift label or word offsets.
             if (/^\.pet\b/i.test(line)) {
                 continue;
+            }
+
+            // Track source-order LOAD bindings so named CALL lowering does not
+            // overwrite the programmer's explicit loaded-CR choice.
+            {
+                const _loadBind = line.match(/^LOAD\s+CR(?:1[0-5]|[0-9])\s*,\s*([A-Za-z_][\w.]*)\s*$/i);
+                if (_loadBind) {
+                    _pass1LoadedNames.add(_loadBind[1]);
+                }
+            }
+
+            // A source-level named CALL is a normal capability load followed
+            // by a normal CALL.  It is not an implicit ELOADCALL:
+            //
+            //   CALL WukongCallHome.hw
+            //     -> LOAD CR0, WukongCallHome.hw
+            //        CALL CR0
+            //
+            //   CALL Scheduler, pause
+            //     -> LOAD CR0, Scheduler
+            //        CALL CR0, pause
+            //
+            // Keep explicit LOAD bindings authoritative.  Explicit ELOADCALL
+            // remains available when the fused instruction is actually wanted.
+            {
+                const _indexedCall = line.match(
+                    /^CALL\s+CR6\s*\[\s*([A-Za-z_][\w.]*)\s*\]\s*(?:,\s*([A-Za-z_][\w]*))?\s*$/i);
+                if (_indexedCall) {
+                    const _indexedName = _indexedCall[1];
+                    const _indexedDot = _indexedName.indexOf('.');
+                    const _indexedBase = _indexedDot >= 0
+                        ? _indexedName.slice(0, _indexedDot)
+                        : _indexedName;
+                    const _indexedMethod = _indexedCall[2] ||
+                        (_indexedDot >= 0 ? _indexedName.slice(_indexedDot + 1) : '');
+                    const _indexedCap = this._resolveCListName(_indexedName);
+                    const _indexedBaseCap = this._resolveCListName(_indexedBase);
+                    const _indexedExactDotted = _indexedCap !== null && _indexedDot >= 0;
+                    const _indexedMethodEntry = this._methodEntryFor(
+                        this._methodConventionsFor(_indexedBase), _indexedMethod);
+                    const _indexedHasMethod = Boolean(_indexedMethod) &&
+                        !_indexedExactDotted && Boolean(_indexedMethodEntry);
+                    const _indexedCanLower = _indexedCap !== null &&
+                        ((!_indexedMethod && !_indexedDot) ||
+                         (_indexedExactDotted && !_indexedCall[2]) ||
+                         (_indexedBaseCap !== null && _indexedHasMethod));
+                    if (_indexedCanLower) {
+                        const _indexedLoadName = _indexedExactDotted
+                            ? _indexedName
+                            : _indexedBase;
+                        this._checkCapDeclared(_indexedLoadName, lineNum + 1);
+                        instructions.push({
+                            // Keep the generated LOAD in named shorthand so
+                            // pass 2 records the abstraction→CR0 binding used
+                            // by the following method-name CALL.  The named
+                            // shorthand resolves through the same CR6 row.
+                            line: `LOAD CR0, ${_indexedLoadName}`,
+                            lineNum: lineNum + 1,
+                            comment: `${line} \u2192 load named CR6 C-list capability`
+                        });
+                        instructions.push({
+                            line: _indexedHasMethod
+                                ? `CALL CR0, ${_indexedMethod}`
+                                : 'CALL CR0',
+                            lineNum: lineNum + 1,
+                            comment: `${line} \u2192 ordinary CALL`
+                        });
+                        continue;
+                    }
+                }
+
+                const _namedCall = line.match(/^CALL\s+([A-Za-z_][\w.]*)(?:\s*,\s*([A-Za-z_][\w]*))?\s*$/i);
+                const _namedCallBase = _namedCall
+                    ? _namedCall[1].split('.')[0]
+                    : '';
+                if (_namedCall &&
+                        !/^CR(?:1[0-5]|[0-9])$/i.test(_namedCall[1]) &&
+                        !_pass1LoadedNames.has(_namedCall[1]) &&
+                        !_pass1LoadedNames.has(_namedCallBase)) {
+                    const _callToken = _namedCall[1];
+                    const _dot = _callToken.indexOf('.');
+                    const _baseName = _dot >= 0 ? _callToken.slice(0, _dot) : _callToken;
+                    const _methodName = _namedCall[2] ||
+                        (_dot >= 0 ? _callToken.slice(_dot + 1) : '');
+                    const _exactCap = this._resolveCListName(_callToken);
+                    const _baseCap = this._resolveCListName(_baseName);
+                    const _isExactDottedCap = _exactCap !== null && _dot >= 0;
+                    const _methodEntry = this._methodEntryFor(
+                        this._methodConventionsFor(_baseName), _methodName);
+                    const _hasMethod = Boolean(_methodName) &&
+                        !_isExactDottedCap && Boolean(_methodEntry);
+                    const _canLower = (_exactCap !== null &&
+                        ((_dot < 0 && !_methodName) ||
+                         (_isExactDottedCap && !_namedCall[2]))) ||
+                        (_baseCap !== null && _hasMethod);
+                    if (_canLower) {
+                        const _loadName = _isExactDottedCap ? _callToken : _baseName;
+                        this._checkCapDeclared(_loadName, lineNum + 1);
+                        instructions.push({
+                            line: `LOAD CR0, ${_loadName}`,
+                            lineNum: lineNum + 1,
+                            comment: `${line} \u2192 load named C-list capability`
+                        });
+                        instructions.push({
+                            line: _hasMethod ? `CALL CR0, ${_methodName}` : 'CALL CR0',
+                            lineNum: lineNum + 1,
+                            comment: `${line} \u2192 ordinary CALL`
+                        });
+                        _pass1LoadedNames.add(_loadName);
+                        continue;
+                    }
+                }
             }
 
             // ── .petname / PETNAME pseudo-instruction ──────────────────────────

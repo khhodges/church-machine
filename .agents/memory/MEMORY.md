@@ -153,4 +153,4 @@
 - [Namespace policy foundation boundary](ns-policy-foundation-boundary.md) — only slots 0–1 are foundational; catalog LUMPs at 6–10 may have Resident/Lazy policies
 - [Prepared boot authority](prepared-boot-authority.md) — explicit preparation owns CR0; boot/import/Run never repair it; ROM evidence stays separate from Namespace data
 - [Shared served-script dependencies](shared-served-script-dependencies.md) — declare shared UI modules explicitly and test consumers in manifest order; avoid runtime script injection
-- [Named CALL CR6 fallback](named-call-cr6-fallback.md) — unbound named CALLs use the active C-List; prior loaded-CR bindings remain authoritative
+- [Named CALL CR6 lookup](named-call-cr6-fallback.md) — named lookup uses CR6 syntax but materializes a normal LOAD + opcode-2 CALL, never an implicit ELOADCALL
