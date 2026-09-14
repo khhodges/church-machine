@@ -248,7 +248,7 @@ register_suite "build-approval-slot-rule-tests" \
     'node simulator/test_build_approval_slot_rules.js'
 
 register_suite "thread-instance-zone-tests" \
-    'node simulator/test_thread_instance_zones.js && node simulator/test_thread_indicator_display.js && node simulator/test_thread_dashboard_tab.js'
+    'node simulator/test_thread_stack_served_integration.js && node simulator/test_thread_instance_zones.js && node simulator/test_thread_indicator_display.js && node simulator/test_thread_dashboard_tab.js'
 
 register_suite "warning-panel-tests" \
     'node simulator/test_asm_warning_panel.js'

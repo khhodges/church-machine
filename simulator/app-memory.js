@@ -1,16 +1,3 @@
-// Keep the decoder as a separately testable/shared module without changing the
-// legacy script manifest.  app-memory is loaded synchronously at the end of
-// index.html, so document.write executes the dependency before any renderer
-// can be called.  Source-level tests (which have no currentScript) inject the
-// module explicitly when they exercise frame decoding.
-(function _loadThreadFrameDecoder() {
-    if (typeof ThreadFrameDecoder !== 'undefined' ||
-            typeof document === 'undefined' || !document.currentScript ||
-            typeof document.write !== 'function') return;
-    const scriptURL = new URL('thread-frame-decoder.js', document.currentScript.src).href;
-    document.write(`<script src="${scriptURL}"><\/script>`);
-})();
-
 var _crDetailHighlightPC = null;
 
 function _canonicalEditorTokenForSlot(nsIdx) {

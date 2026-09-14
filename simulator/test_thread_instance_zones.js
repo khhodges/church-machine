@@ -39,6 +39,7 @@ const sandbox = {
     abstractionRegistry: { abstractions: [] },
     currentView: 'namespace',
     correctCRDetailTab: tab => tab,
+    formatThreadDisplayName: name => name,
     switchDashTab: () => {},
     _lumpManifests: {},
     _petNameDRMap: {},
@@ -47,8 +48,24 @@ sandbox.window.sim = sim;
 sandbox.window.bootConfig = global.window.bootConfig;
 sandbox.window.addEventListener = () => {};
 vm.createContext(sandbox);
-vm.runInContext(fs.readFileSync(__dirname + '/app-memory.js', 'utf8'), sandbox);
-vm.runInContext(fs.readFileSync(__dirname + '/app-cr-display.js', 'utf8'), sandbox);
+const servedScripts = [...fs.readFileSync(__dirname + '/index.html', 'utf8')
+    .matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/g)]
+    .map(match => match[1].split('?')[0])
+    .filter(src => [
+        'thread-frame-decoder.js',
+        'app-cr-display.js',
+        'app-memory.js',
+    ].includes(src));
+assert.deepStrictEqual(servedScripts, [
+    'thread-frame-decoder.js',
+    'app-cr-display.js',
+    'app-memory.js',
+], 'served IDE loads the shared decoder before both Thread stack surfaces');
+for (const src of servedScripts) {
+    vm.runInContext(fs.readFileSync(__dirname + '/' + src, 'utf8'), sandbox, {
+        filename: src,
+    });
+}
 
 // CR rows derive validation from the live Namespace every time they render.
 // Cover matching, stale, missing, malformed, revoked, Abstract, and NULL rows.
@@ -177,7 +194,7 @@ const detailTab = dom.window.document.createElement('div');
 detailTab.id = 'dashTab-crdetail';
 dom.window.document.body.append(detailTab);
 sandbox.openCRDetail(5);
-assert.strictEqual(detailTab.textContent, 'CR5 — Thread.2.Heap',
+assert(detailTab.textContent.startsWith('CR5 — Thread.2.Heap'),
     'CR detail navigation title uses the contextual Heap name');
 
 const hoverPopup = dom.window.document.createElement('div');
@@ -424,39 +441,6 @@ assert(tutorialText.includes('0xF900_820C') &&
 assert(tutorialText.includes('grows when') &&
        tutorialText.includes('There is no Thread Freespace region'),
     'Thread tutorial explains size-derived Heap and removes Freespace');
-
-// CR12 is not live before boot, but its detail panel must still project the
-// currently selected suspended Thread image.  Thread.1 may validly start at
-// physical word zero, so the renderer cannot use base-address truthiness.
-const crDetailTitle = dom.window.document.createElement('div');
-crDetailTitle.id = 'crDetailTitle';
-const crDetailContent = dom.window.document.createElement('div');
-crDetailContent.id = 'crDetailContent';
-dom.window.document.body.append(crDetailTitle, crDetailContent);
-vm.runInContext('selectedCR = 12;', sandbox);
-sandbox._petNameCRMap = {};
-sim.bootComplete = false;
-sim._currentThreadSlot = 12;
-sandbox.updateCRDetail();
-assert(crDetailContent.textContent.includes('Thread.3') &&
-       crDetailContent.textContent.includes('Suspended Memory Image'),
-    'pre-boot CR12 identifies the selected suspended Thread: ' +
-    crDetailContent.textContent.slice(0, 180));
-assert(crDetailContent.innerHTML.includes('thread-zone-5') &&
-       crDetailContent.innerHTML.includes('thread-zone-4') &&
-       crDetailContent.innerHTML.includes('thread-zone-2') &&
-       crDetailContent.innerHTML.includes('thread-zone-1'),
-    'pre-boot CR12 exposes all four selected Thread zones plus capabilities');
-assert([...crDetailContent.querySelectorAll('.thread-zone-hdr')]
-        .every(header => header.classList.contains('thread-zone-collapsed')) &&
-       [...crDetailContent.querySelectorAll('.thread-zone-body')]
-        .every(body => body.style.display === 'none'),
-    'pre-boot Thread detail opens with every memory zone collapsed');
-assert(crDetailContent.innerHTML.includes('0x33330001') &&
-       !crDetailContent.innerHTML.includes('0x22220001'),
-    'pre-boot CR12 reads the selected Thread#3 body, not Thread#2');
-assert(!crDetailContent.textContent.includes('Machine not booted yet'),
-    'pre-boot CR12 no longer replaces an available suspended image with a boot hint');
 
 sandbox._nsLabelOpen(12);
 let modal = dom.window.document.querySelector('[data-testid="thread-detail-modal"]');

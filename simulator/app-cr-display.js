@@ -843,6 +843,12 @@ function showZonePopup(evt, zone, nsIdx) {
         if (chain && chain.errors && chain.errors.length) {
             html += `<tr><td>action</td><td class="zdp-note" style="color:#fca5a5;">${chain.errors.map(e => `${e.code}: ${String(e.message).replace(/&/g, '&amp;').replace(/</g, '&lt;')}`).join('<br>')}</td></tr>`;
         }
+        const rawStackWords = chain && Array.isArray(chain.rawWords)
+            ? chain.rawWords.filter(raw => raw.word)
+            : [];
+        for (const raw of rawStackWords) {
+            html += `<tr><td>raw +${raw.offset}</td><td class="zdp-hex">${hexW(raw.word)}</td></tr>`;
+        }
         html += `</table>`;
 
         // Show top 2 frames decoded
