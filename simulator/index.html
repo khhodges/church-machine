@@ -904,6 +904,25 @@
                             <option value="abstraction">Abstraction</option>
                             <option value="personal">My Programs</option>
                         </select>
+                        <button type="button" id="editorViewSwitcherToggle" class="editor-view-switcher-link"
+                                aria-controls="editorViewSwitcherPanel" aria-expanded="false">
+                            <span id="editorViewSwitcherCount">0</span> views
+                        </button>
+                        <div id="editorViewSwitcherPanel" class="editor-view-switcher-panel" role="region"
+                             aria-labelledby="editorViewSwitcherToggle" hidden>
+                            <div class="editor-view-switcher-heading">
+                                <div>
+                                    <h2>Simulator editor views</h2>
+                                    <p><span id="editorViewSwitcherPanelCount">0</span> views: the first group is for source languages;
+                                        the last two are workspace views.</p>
+                                </div>
+                                <button type="button" class="editor-view-switcher-close" aria-label="Close editor views">&times;</button>
+                            </div>
+                            <div id="editorViewSwitcherEntries" class="editor-view-switcher-entries"></div>
+                            <a href="#abstractions" id="editorViewSwitcherSourceLink" class="editor-view-switcher-source-link">
+                                Browse all source examples
+                            </a>
+                        </div>
                         <button class="btn btn-sm editor-jump-btn" id="editorJumpToAbsBtn" style="display:none;" onclick="_editorJumpToAbstraction()" data-tooltip="Open in Abstraction Catalog — Jump to this code's Abstraction entry">&#8594; Abstraction</button>
                         <span id="editorCodeName" class="editor-identity-name" aria-label="Current LUMP identity" title="Current LUMP identity"></span>
 
@@ -3542,6 +3561,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="app-actions.js?v=sha256-4ce7d3896e9e"></script>
     <script src="app-build-approval.js?v=sha256-737779efe980"></script>
     <script src="app-source-library.js?v=sha256-f0acb36b8999"></script>
+    <script src="app-editor-view-switcher.js?v=20260914-editor-view-switcher1"></script>
     <script src="app-invoke.js?v=sha256-376a499e341a"></script>
     <script src="app-misc.js?v=sha256-9309e68bdbab"></script>
     <script src="app-popup-lifecycle.js?v=sha256-8777e6faeabb"></script>
