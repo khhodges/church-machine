@@ -298,6 +298,13 @@ class ChurchAssembler {
     }
 
     _recordNsLoaded(name, crIndex) {
+        // A capability register has one current abstraction binding.  Remove
+        // aliases left by an earlier LOAD into the same register before
+        // recording the new one; otherwise CALL CR0, Method can resolve
+        // against stale source-order state after a register is reused.
+        for (const [loadedName, loadedCR] of Object.entries(this.nsLoaded)) {
+            if (loadedCR === crIndex) delete this.nsLoaded[loadedName];
+        }
         this.nsLoaded[name] = crIndex;
         this.nsLoaded[String(name).toUpperCase()] = crIndex;
     }
@@ -762,6 +769,13 @@ class ChurchAssembler {
         // normal LOAD followed by a normal CALL, so explicit source LOADs must
         // remain authoritative before pass 2 populates nsLoaded.
         const _pass1LoadedNames = new Set();
+        const _pass1LoadedByCR = new Map();
+        const _pass1Bind = (name, crIndex) => {
+            const previousName = _pass1LoadedByCR.get(crIndex);
+            if (previousName) _pass1LoadedNames.delete(previousName);
+            _pass1LoadedByCR.set(crIndex, name);
+            _pass1LoadedNames.add(name);
+        };
         const _collectCapItem = (item, lineNum, endLineNum = lineNum) => {
             const parsed = ChurchAssembler._parseCapItems(item);
             for (const missingName of parsed.missingSeparators) {
@@ -908,9 +922,10 @@ class ChurchAssembler {
             // Track source-order LOAD bindings so named CALL lowering does not
             // overwrite the programmer's explicit loaded-CR choice.
             {
-                const _loadBind = line.match(/^LOAD\s+CR(?:1[0-5]|[0-9])\s*,\s*([A-Za-z_][\w.]*)\s*$/i);
+                const _loadBind = line.match(/^LOAD\s+(CR(?:1[0-5]|[0-9]))\s*,\s*([A-Za-z_][\w.]*)\s*$/i);
                 if (_loadBind) {
-                    _pass1LoadedNames.add(_loadBind[1]);
+                    const _loadCR = Number(_loadBind[1].slice(2));
+                    _pass1Bind(_loadBind[2], _loadCR);
                 }
             }
 
@@ -970,6 +985,7 @@ class ChurchAssembler {
                             lineNum: lineNum + 1,
                             comment: `${line} \u2192 ordinary CALL`
                         });
+                        _pass1Bind(_indexedLoadName, 0);
                         continue;
                     }
                 }
@@ -1011,7 +1027,7 @@ class ChurchAssembler {
                             lineNum: lineNum + 1,
                             comment: `${line} \u2192 ordinary CALL`
                         });
-                        _pass1LoadedNames.add(_loadName);
+                        _pass1Bind(_loadName, 0);
                         continue;
                     }
                 }

@@ -470,6 +470,15 @@ const WUKONG_CALLHOME_CONVENTIONS = {
         ((dotted.words[0] >>> 27) & 0x1F) === 0 &&
         ((dotted.words[1] >>> 27) & 0x1F) === 2,
         dotted.words.map(w => '0x' + (w >>> 0).toString(16)).join(', '));
+
+    const reusedRegister = a.assemble(
+        'capabilities { SelfTest E, WukongCallHome E }\n' +
+        'LOAD CR0, SelfTest\n' +
+        'CALL CR6[WukongCallHome].Main'
+    );
+    assert('WCH4f CR6[name].method replaces a stale CR0 binding',
+        reusedRegister.errors.length === 0,
+        reusedRegister.errors.map(e => e.message).join('; '));
 }
 
 // ── Salvation abstraction method conventions (task-2032) ────────────────────

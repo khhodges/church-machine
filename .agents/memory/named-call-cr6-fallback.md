@@ -7,4 +7,4 @@ An unbound named CALL may be written as `CALL Name, Method`, `CALL Name.Method`,
 
 **Why:** CALL and ELOADCALL are distinct ISA instructions. Named lookup is compiler syntax, so it should not change the selected machine instruction or use ELOADCALL's narrower 5-bit row encoding.
 
-**How to apply:** Preserve explicit loaded-CR bindings first; lower unbound names through CR6 lookup to LOAD + CALL; keep exact dotted C-list labels distinct from abstraction.method names. Keep `church_sim/assembler.js` as the compatibility shim.
+**How to apply:** Preserve the current/latest loaded-CR binding; when a register is reused, discard its stale name. Lower unbound names through CR6 lookup to LOAD + CALL, and keep exact dotted C-list labels distinct from abstraction.method names. Keep `church_sim/assembler.js` as the compatibility shim.
