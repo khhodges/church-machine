@@ -929,7 +929,7 @@ class ChurchAssembler {
             // remains available when the fused instruction is actually wanted.
             {
                 const _indexedCall = line.match(
-                    /^CALL\s+CR6\s*\[\s*([A-Za-z_][\w.]*)\s*\]\s*(?:,\s*([A-Za-z_][\w]*))?\s*$/i);
+                    /^CALL\s+CR6\s*\[\s*([A-Za-z_][\w.]*)\s*\]\s*(?:(?:,|\.)\s*([A-Za-z_][\w]*))?\s*$/i);
                 if (_indexedCall) {
                     const _indexedName = _indexedCall[1];
                     const _indexedDot = _indexedName.indexOf('.');

@@ -458,6 +458,18 @@ const WUKONG_CALLHOME_CONVENTIONS = {
     assert('WCH4f selected instruction disassembles as CALL',
         selected.startsWith('CALL') && !selected.startsWith('ELOADCALL'),
         `selected="${selected}"`);
+
+    const dotted = a.assemble(
+        'capabilities { WukongCallHome E }\n' +
+        'CALL CR6[WukongCallHome].Main'
+    );
+    assert('WCH4f dotted CR6[name].method syntax assembles without errors',
+        dotted.errors.length === 0, dotted.errors.map(e => e.message).join('; '));
+    assert('WCH4f dotted CR6[name].method also emits LOAD + ordinary CALL',
+        dotted.words.length === 2 &&
+        ((dotted.words[0] >>> 27) & 0x1F) === 0 &&
+        ((dotted.words[1] >>> 27) & 0x1F) === 2,
+        dotted.words.map(w => '0x' + (w >>> 0).toString(16)).join(', '));
 }
 
 // ── Salvation abstraction method conventions (task-2032) ────────────────────

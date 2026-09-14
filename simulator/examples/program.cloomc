@@ -4,7 +4,7 @@
 ;               using the real hardware boot namespace.
 ; Author:       Church Machine Educational Platform
 ; Version:      3.0
-; Created:      2026-08-11
+; Created:      2026-08-12
 ; Language:     Assembly
 ; ============================================================
 ; Single source of truth for the CapabilityTest abstraction (NS slot 10).
@@ -23,19 +23,19 @@
 
 capabilities {
     SELF E,
-    New.SelfTest E,
+    SelfTest E,
     LED_DEV RW,
     UART_DEV RW,
     BTN_DEV R,
     TIMER_DEV RW,
     M_BIT_DEV RW,
-    New.WukongCallHome E
+    WukongCallHome E
 }
 Start:
 ; ============================================================
 ; TEST 1: LOAD -- materialise all declared capabilities from c-list
 ; ============================================================
-LOAD CR0, New.SelfTest    ; CR0 = SelfTest  E-GT    (c-list[0])
+LOAD CR0, SelfTest    ; CR0 = SelfTest  E-GT    (c-list[0])
 LOAD CR1, LED_DEV     ; CR1 = LED_DEV   RW-GT   (c-list[1])
 LOAD CR2, UART_DEV    ; CR2 = UART_DEV  RW-GT   (c-list[2])
 LOAD CR3, BTN_DEV     ; CR3 = BTN_DEV   R-GT    (c-list[3])
@@ -62,7 +62,7 @@ TPERM CR0, L          ; SelfTest has L?  Z=0 (expected FAIL)
 ; TEST 5: Conditional LOADs (Z=0 from the L-perm TPERM above)
 ; ============================================================
 LOADEQ CR0, LED_DEV   ; SKIP  -- condition EQ not met (Z=0)
-LOADNE CR0, New.SelfTest  ; EXEC  -- condition NE met (Z=0) -- restore CR0
+LOADNE CR0, SelfTest  ; EXEC  -- condition NE met (Z=0) -- restore CR0
 
 ; ============================================================
 ; TEST 6: SWITCH -- isolated-register special LOAD authorization
@@ -95,8 +95,9 @@ SHR  DR4, DR4, 1      ; DR4 = 4
 ; ============================================================
 ; SelfTest already ran before Starter/CapabilityTest. Calling it again here
 ; creates the unbounded SelfTest → CapabilityTest → SelfTest frame cycle.
-ELOADCALL CR0, New.WukongCallHome, 0
-ELOADCALL CR0, New.SelfTest, 0
+CALL SelfTest.Run
+CALL CR6[WukongCallHome].Main
 
-; --- All tests complete ---
+
+; --- All tests complete by Ken---
 BRANCH Start
