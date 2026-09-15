@@ -13241,7 +13241,10 @@ def get_lump_words(token_hex):
         response["legacy_incompatible"] = bool(
             manifest_entry.get("archived") and not bootstrap_identity["valid"])
     if _approval_ret is not None:
-        for field in ("pet_name", "dot_name", "issue_n", "identity_hash"):
+        for field in (
+            "pet_name", "dot_name", "issue_n", "identity_hash",
+            "bootstrap_t", "bootstrap_runtime_gt",
+        ):
             if field in _approval_ret:
                 response[field] = _approval_ret[field]
     _archive_kind = (

@@ -1670,6 +1670,10 @@ function _verifiedSavedLumpIdentity(lump, lookupToken) {
     var text = function(value) {
         return typeof value === 'string' && value.trim() ? value.trim() : null;
     };
+    var hexWord = function(value) {
+        if (!Number.isInteger(value) || value < 0 || value > 0xFFFFFFFF) return null;
+        return '0x' + (value >>> 0).toString(16).toUpperCase().padStart(8, '0');
+    };
     var issue = server && server.issue_n != null && String(server.issue_n).trim()
         ? String(server.issue_n).trim() : null;
     var dotName = server ? text(server.dot_name) : null;
@@ -1677,8 +1681,13 @@ function _verifiedSavedLumpIdentity(lump, lookupToken) {
         canonicalDotToken: dotName && issue && server && text(server.token)
             ? dotName + '.' + issue + '.' + text(server.token) : null,
         lookupToken: server ? text(server.token) : null,
-        goldenT: server ? text(server.golden_t_id) || text(server.identity_hash) : null,
-        goldenToken: server ? text(server.golden_token) : null,
+        goldenT: server
+            ? text(server.golden_t_id) || text(server.identity_hash) ||
+                text(server.bootstrap_t)
+            : null,
+        goldenToken: server
+            ? text(server.golden_token) || hexWord(server.bootstrap_runtime_gt)
+            : null,
         binarySeal: server ? text(server.binary_hash) : null,
         requestedLookupToken: text(lookupToken)
     };
@@ -6833,6 +6842,7 @@ async function openLumpInEditor(token) {
             _wordsResponse.validation_errors.length === 0;
         _exactResponseLump = Object.assign({}, lump);
         ['token', 'binary_hash', 'pet_name', 'dot_name', 'issue_n', 'identity_hash',
+            'bootstrap_t', 'bootstrap_runtime_gt',
             'trusted', 'approved', 'binary_valid', 'validation_errors', 'source',
             'byte_count', 'raw_tail_hex']
         .forEach(function(field) {
@@ -7439,6 +7449,10 @@ async function openLumpInEditor(token) {
     // this LUMP, not a previously-edited method.
     window._pseudoEditContext = null;
     if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
+    // The exact source arrives asynchronously after the LUMP panel initially
+    // opens. Refresh shared action eligibility now that the editor is populated
+    // so Compile and Save Lump do not remain disabled from the empty interim.
+    if (window.IDEActions) window.IDEActions.refresh();
     if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
     if (typeof saveEditorState === 'function') saveEditorState();
 }

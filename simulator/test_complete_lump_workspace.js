@@ -20,9 +20,10 @@ for (const label of [
 ]) {
     assert(lumps.includes(label), `complete workspace shows ${label}`);
 }
-assert(lumps.includes("server ? text(server.golden_token) : null"),
-    'Golden Token is accepted only from server metadata');
-assert(lumps.includes("text(server.golden_t_id) || text(server.identity_hash)"),
+assert(lumps.includes("text(server.golden_token) || hexWord(server.bootstrap_runtime_gt)"),
+    'Golden Token accepts the verified resident runtime GT');
+assert(lumps.includes("text(server.golden_t_id) || text(server.identity_hash) ||") &&
+       lumps.includes("text(server.bootstrap_t)"),
     'Golden T uses verified server identity metadata');
 assert(!lumps.includes('goldenT: server ? text(server.token)'),
     'lookup token is never used as a Golden T fallback');
@@ -42,6 +43,10 @@ assert(lumps.includes("origin: 'integrity-error'") &&
     'source decoder disagreement is surfaced as an integrity failure');
 assert(lumps.includes('_exactResponseLump[field] = _wordsResponse[field]'),
     'identity metadata stays bound to the exact words response');
+assert(lumps.includes("'bootstrap_t', 'bootstrap_runtime_gt'"),
+    'resident Golden identity fields stay bound to the exact words response');
+assert(lumps.includes('if (window.IDEActions) window.IDEActions.refresh();'),
+    'saved source refreshes Compile and Save Lump eligibility after async open');
 assert(lumps.includes('_enterSavedLumpEditorMode(') &&
     lumps.includes('_compiledDisasm, lumpName, _inMemoryLump ? null : _exactResponseLump, token'),
     'identity and exact disassembly enter the same workspace');
