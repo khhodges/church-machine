@@ -334,6 +334,173 @@ Phase 1 therefore proposes:
 - opcodes 8 and 9 become unassigned or reserved after compatibility and
   migration requirements are approved.
 
+### 9.1 End-to-end retirement plan
+
+ELOADCALL and XLOADLAMBDA must be removed through the complete executable
+toolchain. Removing their source syntax while leaving their simulator or RTL
+implementations active is not sufficient.
+
+The work is ordered so that no layer silently assigns two meanings to the same
+instruction word.
+
+#### Gate A — approve replacement encodings
+
+Before changing executable code:
+
+1. Approve the final 32-bit indexed/direct encoding for CALL.
+2. Approve the final 32-bit indexed/direct encoding for LAMBDA.
+3. Confirm the c-list row and method-selector ranges.
+4. Decide whether opcodes 8 and 9 become permanent reserved faults or remain
+   reserved for a future ISA revision.
+5. Assign an ISA or binary-format version boundary that distinguishes old
+   artifacts from the new encoding.
+
+No old opcode may be reinterpreted as a new instruction without a version
+gate.
+
+#### Gate B — stop producing fused instructions
+
+Update every source-producing path:
+
+- CLOOMC++ lowering;
+- symbolic assembler syntax and aliases;
+- assembler pseudo-instruction expansion;
+- examples, tutorials, and embedded source;
+- boot and resident-LUMP generators;
+- migration and fixture-generation scripts.
+
+After this gate:
+
+- no compiler or assembler emits opcode 8 or 9;
+- named calls such as `Scheduler.pause` emit extended CALL;
+- named lambda applications emit extended LAMBDA;
+- explicit `ELOADCALL` and `XLOADLAMBDA` source is rejected with a migration
+  message rather than silently translated.
+
+Rejecting the obsolete mnemonics makes stale source visible. Automatic silent
+translation would conceal encoding and authority mistakes.
+
+#### Gate C — migrate executable artifacts
+
+Find every boot image, resident LUMP, saved test fixture, example binary, and
+release artifact containing opcode 8 or 9.
+
+For each active artifact:
+
+1. rebuild it from authoritative source with the approved compiler;
+2. recompute its code size, c-list placement, identity, hashes, and seals;
+3. re-localize destination GTs;
+4. regenerate boot images that embed it;
+5. verify that the rebuilt artifact contains no opcode 8 or 9.
+
+Immutable historical LUMPs are not edited in place. They remain historical
+evidence under their original ISA version, while a newly approved revision is
+created for current execution.
+
+The loader must reject an obsolete binary that cannot be identified and
+migrated safely. It must not execute that binary using the new ISA.
+
+#### Gate D — simulator and developer tools
+
+Replace the separate fused execution paths with the approved dual-mode
+behavior in CALL and LAMBDA:
+
+- indexed mode reads implicit CR6 under virtual M;
+- direct mode consumes the selected CR;
+- the resolved E/X GT remains internal;
+- CALL retains method dispatch;
+- CALL/RETURN and LAMBDA/RETURN frame behavior remains architectural;
+- opcodes 8 and 9 raise an unassigned/reserved-instruction fault.
+
+Remove obsolete handling from:
+
+- instruction decoding and dispatch;
+- assembler and disassembler tables;
+- instruction pickers and interactive references;
+- pipeline diagrams and trace labels;
+- LUMP audits and c-list-row validation;
+- lazy-resolution routing;
+- tutorials, examples, and API/reference data.
+
+Tests that previously proved fused behavior must be replaced by tests proving
+the corresponding indexed CALL or LAMBDA behavior. Merely deleting those tests
+would leave the replacement unverified.
+
+#### Gate E — synthesizable RTL
+
+Remove the fused instructions from the Amaranth hardware design:
+
+1. Remove ELOADCALL and XLOADLAMBDA opcode constants and decoder outputs.
+2. Remove their dedicated FSMs and hardware submodules.
+3. Remove their start, busy, reset, operand-latch, memory-bus arbitration,
+   CR-write, NIA-write, fault, lazy-resolution, and trace wiring.
+4. Extend the existing CALL and LAMBDA units with the approved indexed/direct
+   mode decode.
+5. Implement indexed CR6 reads through virtual M without generating an
+   architectural L permission or writing the fetched GT to a general CR.
+6. Preserve CALL method dispatch and protected frame semantics.
+7. Make opcodes 8 and 9 enter the normal invalid/reserved-opcode fault path.
+8. Update boot guards, trace-unit behavior, and version telemetry so they
+   describe the new CALL/LAMBDA contract rather than fused-instruction support.
+
+The dedicated fused-unit RTL file is deleted only after all live core profiles
+stop importing or instantiating it.
+
+#### Gate F — regenerate every live FPGA target
+
+After the Amaranth source changes:
+
+1. regenerate all actively synthesized Verilog and RTLIL outputs from the
+   canonical Python sources;
+2. verify their embedded source fingerprints;
+3. confirm that generated RTL contains no ELOADCALL/XLOADLAMBDA decoder or FSM;
+4. rebuild boot ROM and BRAM initialization content from the migrated images;
+5. run synthesis, place-and-route, timing, and bitstream generation for each
+   supported release target;
+6. reject stale generated files, cached synthesis databases, or bitstreams;
+7. produce fresh release provenance binding source commit, generated RTL,
+   boot image, and bitstream digests.
+
+The current Wukong release target must then be flashed with the newly generated
+bitstream. A simulator-only pass does not complete this gate.
+
+#### Gate G — cross-layer release verification
+
+The retirement is complete only when one release candidate proves all of the
+following:
+
+- CLOOMC++ petname calls compile without fused opcodes;
+- disassembly contains no opcode 8 or 9;
+- canonical boot and resident LUMPs contain no opcode 8 or 9;
+- simulator indexed CALL and LAMBDA pass authority, method, frame, return,
+  lazy-resolution, and fault tests;
+- RTL simulation matches those behaviors;
+- generated Verilog/RTLIL contains no fused instruction implementation;
+- FPGA synthesis and timing pass from fresh generated inputs;
+- the physical Wukong board boots the migrated image;
+- a petname CALL such as `Scheduler.pause` executes on the FPGA;
+- indexed LAMBDA executes on the FPGA;
+- trace packets and IDE state show the same CR6, CR14, frame, and NIA results as
+  the simulator;
+- deliberately executing opcode 8 or 9 faults as reserved on both simulator
+  and FPGA.
+
+Only after this cross-layer proof may documentation describe ELOADCALL and
+XLOADLAMBDA as removed rather than deprecated.
+
+### 9.2 Compatibility policy
+
+Phase 1 proposes a clean version boundary:
+
+- new source cannot name ELOADCALL or XLOADLAMBDA;
+- new binaries cannot contain opcode 8 or 9;
+- new simulator and FPGA releases fault on opcode 8 or 9;
+- old immutable artifacts remain identifiable as historical artifacts;
+- an old artifact must be recompiled into a new immutable revision before it
+  can run on the new ISA;
+- no loader, simulator, or FPGA may silently reinterpret an old instruction
+  word.
+
 ---
 
 ## 10. Compiler responsibilities
@@ -390,7 +557,9 @@ After approval, Phase 1 consists of:
    programmer-selected CRs or rows.
 3. Implement indexed CALL/LAMBDA as virtual-M reads from implicit CR6.
 4. Keep fetched E/X GTs internal rather than writing them to general CRs.
-5. Retire ELOADCALL and XLOADLAMBDA after an explicit compatibility decision.
+5. Retire ELOADCALL and XLOADLAMBDA from source, compiler, assembler,
+   simulator, developer tools, active binaries, boot images, RTL, generated
+   Verilog/RTLIL, and released FPGA bitstreams.
 6. Display verified petnames for all GT-bearing CRs in the IDE.
 7. Display `Self`, `Self.Thread`, and `Self.Namespace` according to the active
    execution context.
@@ -435,6 +604,11 @@ Approval of this document confirms:
 - [ ] Abstraction entry authority does not receive L permission.
 - [ ] Extended CALL replaces ELOADCALL.
 - [ ] Extended LAMBDA replaces XLOADLAMBDA.
+- [ ] Opcodes 8 and 9 fault as reserved in the new simulator and FPGA ISA.
+- [ ] Active LUMPs and boot images are rebuilt; immutable historical artifacts
+      are versioned rather than modified.
+- [ ] Retirement is not complete until regenerated RTL and a fresh physical
+      FPGA bitstream pass cross-layer verification.
 - [ ] Final row/method/mode bit allocation requires a separate explicit
       encoding approval.
 
