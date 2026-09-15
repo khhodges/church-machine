@@ -236,6 +236,13 @@ def _same_origin() -> bool:
     fetch_site = request.headers.get("Sec-Fetch-Site", "").strip().lower()
     if fetch_site == "cross-site":
         return False
+    # Sec-Fetch-Site is a browser-controlled forbidden request header. A
+    # same-origin value is stronger evidence than Flask's externally visible
+    # host/scheme after a reverse proxy has rewritten the request. Replit's
+    # preview proxy can otherwise make a relative same-origin fetch appear to
+    # arrive on an internal host and incorrectly reject the crash report.
+    if fetch_site == "same-origin":
+        return True
 
     origin = request.headers.get("Origin")
     if origin is None:

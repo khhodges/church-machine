@@ -102,6 +102,19 @@ def test_origin_and_fetch_site_are_rejected(diagnostics_app):
     assert cross_site.status_code == 403
 
 
+def test_browser_same_origin_metadata_survives_proxy_host_rewrite(diagnostics_app):
+    with diagnostics_app.test_client() as client:
+        response = client.post(
+            "/api/browser-diagnostics",
+            headers={
+                "Origin": "https://public-preview.example",
+                "Sec-Fetch-Site": "same-origin",
+            },
+            json=_report(),
+        )
+    assert response.status_code == 200
+
+
 def test_unknown_filenames_and_bad_schema_are_rejected(diagnostics_app):
     with diagnostics_app.test_client() as client:
         nested = client.post(

@@ -30,6 +30,11 @@ const checks = [
     !abstractionsSource.includes("window.location.replace('/simulator/~/")],
   ['runtime promises never reject with scalar literals',
     !/Promise\.reject\(\s*['"`]/.test(runtimeSources)],
+    ['third-party QR decoder is not loaded during IDE startup',
+     !source.includes('<script src="https://cdn.jsdelivr.net/npm/jsqr')],
+    ['on-demand QR decoder preserves real cross-origin ErrorEvents',
+     source.includes("script.crossOrigin = 'anonymous'") &&
+     source.includes("function _mumLoadJsQr()")],
 ];
 
 for (const [name, ok] of checks) {

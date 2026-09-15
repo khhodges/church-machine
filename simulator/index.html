@@ -3623,8 +3623,6 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <!-- API quick-reference data (must load before app-api-popup) -->
     <script src="api-data.js?v=sha256-2790677649ba"></script>
     <script src="app-api-popup.js?v=sha256-16e763ae20ac"></script>
-    <!-- jsQR — client-side QR code decoder (camera scanning for Hello Mum panel) -->
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script>
     // ── Hello Mum panel — Stage 3 JavaScript ─────────────────────────────────
     // Loaded eagerly so the panel is ready the first time switchView('hello-mum')
@@ -3785,6 +3783,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     }
 
     var _mumConnected = false;
+    var _mumJsQrLoadPromise = null;
 
     function mumActivateStep2() {
         _mumConnected = true;
@@ -3832,25 +3831,56 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
         }).catch(function(){});
     }
 
+    function _mumLoadJsQr() {
+        if (typeof window.jsQR === 'function') return Promise.resolve(window.jsQR);
+        if (_mumJsQrLoadPromise) return _mumJsQrLoadPromise;
+        _mumJsQrLoadPromise = new Promise(function(resolve, reject) {
+            var script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+            // jsDelivr supplies CORS headers. Anonymous mode ensures any library
+            // exception remains a real ErrorEvent instead of an opaque
+            // cross-origin "Script error" with event.error === null.
+            script.crossOrigin = 'anonymous';
+            script.onload = function() {
+                if (typeof window.jsQR === 'function') resolve(window.jsQR);
+                else reject(new Error('QR decoder loaded without exporting jsQR'));
+            };
+            script.onerror = function() {
+                reject(new Error('QR decoder could not be loaded'));
+            };
+            document.head.appendChild(script);
+        }).catch(function(error) {
+            _mumJsQrLoadPromise = null;
+            throw error;
+        });
+        return _mumJsQrLoadPromise;
+    }
+
     function mumStartCamera() {
-        if (!window.jsQR) {
-            alert('jsQR library not loaded — cannot scan. Please paste the identity string instead.');
-            return;
-        }
         var wrap = document.getElementById('mumCameraWrap');
         var video = document.getElementById('mumCameraVideo');
-        if (wrap) wrap.style.display = 'block';
-
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        var statusEl = document.getElementById('mumCameraStatus');
+        if (statusEl) statusEl.textContent = 'Loading QR scanner…';
+        _mumLoadJsQr().then(function() {
+            if (wrap) wrap.style.display = 'block';
+            return navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' }
+            });
+        })
             .then(function(stream){
                 _mumCameraStream = stream;
                 video.srcObject = stream;
-                video.play();
+                return video.play();
+            })
+            .then(function() {
                 _mumCameraRaf = requestAnimationFrame(mumScanFrame);
             })
             .catch(function(err){
                 var st = document.getElementById('mumCameraStatus');
-                if (st) st.textContent = 'Camera error: ' + err.message;
+                if (st) st.textContent = 'QR scanner unavailable: ' +
+                    (err && err.message ? err.message : 'unknown error') +
+                    '. Paste the identity string instead.';
+                if (wrap) wrap.style.display = 'none';
             });
     }
 
@@ -3867,7 +3897,18 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
         var ctx = canvas.getContext('2d');
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+        var code;
+        try {
+            code = window.jsQR(
+                imageData.data, imageData.width, imageData.height,
+                { inversionAttempts: 'dontInvert' });
+        } catch (err) {
+            if (statusEl) statusEl.textContent = 'QR scan failed: ' +
+                (err && err.message ? err.message : 'unknown decoder error') +
+                '. Paste the identity string instead.';
+            mumStopCamera();
+            return;
+        }
         if (code) {
             if (statusEl) statusEl.textContent = 'QR detected! Connecting…';
             mumStopCamera();
