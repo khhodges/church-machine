@@ -500,5 +500,78 @@
     "output_profile": 2,
     "capabilities": [],
     "operation_id": "a6fc2c83c934433b8dd49ae9598fbc1a"
+  },
+  {
+    "token": "4c35bef2",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.1.48acae47.lump",
+    "lump_version": 87,
+    "compiled_at": 1789514842.4015205,
+    "dot_name": "SelfTest",
+    "issue_n": 1,
+    "petname": "",
+    "content_profile": 2,
+    "output_profile": 2,
+    "capabilities": [
+      {
+        "name": "SelfTest",
+        "rights": [
+          "E"
+        ],
+        "grants": [],
+        "nsIndex": 6
+      }
+    ],
+    "operation_id": "a9d03c65-640d-4755-9356-6233c5c73f19"
+  },
+  {
+    "token": "ec840e03",
+    "abstraction": "WukongCallHome",
+    "filename": "WukongCallHome.1.74c8ff97.lump",
+    "lump_version": 11,
+    "compiled_at": 1789515145.740632,
+    "dot_name": "WukongCallHome",
+    "issue_n": 1,
+    "petname": "",
+    "content_profile": 2,
+    "output_profile": 2,
+    "capabilities": [
+      {
+        "name": "__SELF__",
+        "rights": [
+          "E"
+        ],
+        "grants": [
+          "E"
+        ],
+        "nsIndex": null,
+        "compiler_owned_self": true,
+        "placeholder": true
+      },
+      {
+        "name": "LED0",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [
+          "R",
+          "W"
+        ],
+        "nsIndex": 3
+      },
+      {
+        "name": "UART_TX",
+        "rights": [
+          "W"
+        ],
+        "grants": [
+          "R",
+          "W"
+        ],
+        "nsIndex": 2
+      }
+    ],
+    "operation_id": "021684cb-3084-469b-aa65-7dcb1c1640c3"
   }
 ]
