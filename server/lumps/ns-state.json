@@ -133,11 +133,13 @@
       "limit": "0x003F8",
       "seq": 0,
       "seal": "0xDEDA76EF",
-      "token": "0965e265",
-      "filename": "CapabilityTest.1.ba638038.lump",
+      "token": "7ccff26f",
+      "filename": "CapabilityTest.1.83320494.lump",
       "issue_n": 1,
       "resident": true,
-      "boot": true
+      "boot": true,
+      "lump_version": 26,
+      "load_policy": "Resident"
     },
     {
       "name": "Thread.2",
@@ -173,6 +175,6 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1789260391.4785135,
+  "generated_at": 1789424987.4637783,
   "committed_raw_fingerprint": "d30401cd7830dd4645b2a7e1d9962ba71c44631fdfc7b3dbdcd63bda63aa59c2"
 }

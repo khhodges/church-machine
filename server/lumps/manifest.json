@@ -512,17 +512,104 @@
     "variant_group": "selftest-history"
   },
   {
+    "token": "7ccff26f",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.1.83320494.lump",
+    "lump_version": 26,
+    "compiled_at": 1789424987.2815309,
+    "dot_name": "CapabilityTest",
+    "issue_n": 1,
+    "petname": "",
+    "content_profile": 2,
+    "output_profile": 2,
+    "capabilities": [
+      {
+        "name": "__SELF__",
+        "rights": [
+          "E"
+        ],
+        "grants": [
+          "E"
+        ],
+        "nsIndex": null,
+        "compiler_owned_self": true,
+        "placeholder": true
+      },
+      {
+        "name": "SelfTest",
+        "rights": [
+          "E"
+        ],
+        "grants": [],
+        "nsIndex": 6
+      },
+      {
+        "name": "LED_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 3
+      },
+      {
+        "name": "UART_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 2
+      },
+      {
+        "name": "BTN_DEV",
+        "rights": [
+          "R"
+        ],
+        "grants": [],
+        "nsIndex": 4
+      },
+      {
+        "name": "TIMER_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 5
+      },
+      {
+        "name": "M_BIT_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 13
+      },
+      {
+        "name": "WukongCallHome",
+        "rights": [
+          "E"
+        ],
+        "grants": [],
+        "nsIndex": 7
+      }
+    ],
+    "operation_id": "23c05d83-0e84-428d-aedb-3822ddabb977"
+  },
+  {
     "token": "00aa1234",
     "abstraction": "Adder",
     "filename": "Adder.1.e437ee2c.lump",
-    "lump_version": 353,
-    "compiled_at": 1789423622.7513397,
+    "lump_version": 365,
+    "compiled_at": 1789453753.7528746,
     "dot_name": "Adder",
     "issue_n": 1,
     "petname": "",
     "content_profile": 2,
     "output_profile": 2,
     "capabilities": [],
-    "operation_id": "14df9742ecd2417cb27ccc09f66e6f89"
+    "operation_id": "5cc4b9cf3d834c8eb196a47e03664f86"
   }
 ]
