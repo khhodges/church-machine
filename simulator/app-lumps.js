@@ -7425,7 +7425,7 @@ async function openLumpInEditor(token) {
     // Cleared by the discard handler and preserved across recompiles so the
     // button always knows which LUMP it is working with.
     window._editorOpenLumpToken = token   || null;
-    window._editorOpenLumpMeta  = lump    || null;
+    window._editorOpenLumpMeta  = (_inMemoryLump ? lump : _exactResponseLump) || null;
     if (typeof _refreshEditorActionIdentity === 'function') {
         _refreshEditorActionIdentity(lumpName);
     }

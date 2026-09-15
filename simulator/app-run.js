@@ -12057,15 +12057,22 @@ function _editorActionIdentity(name) {
     let dotName = '';
     let issue = '';
     const baseName = String(name || '').trim();
+    const openMeta = window._editorOpenLumpMeta;
+    if (openMeta) {
+        dotName = String(openMeta.dot_name || openMeta.pet_name || '').trim();
+        issue = String(openMeta.issue_n || openMeta.issue || '').trim();
+    }
     try {
         const identity = window.ExecutionIdentity && window.ExecutionIdentity.get
             ? window.ExecutionIdentity.get() : null;
-        dotName = identity && identity.dotName || '';
-        if (identity && identity.token && window.LumpRegistry) {
+        if (!dotName) dotName = identity && identity.dotName || '';
+        if ((!dotName || !issue) && identity && identity.token && window.LumpRegistry) {
             const entry = window.LumpRegistry.resolve(identity.token);
             const server = entry && entry.sources && entry.sources.server;
-            dotName = (server && (server.dot_name || server.identity_string)) || dotName;
-            issue = server && (server.issue_n || server.issue) || '';
+            if (!dotName) {
+                dotName = (server && (server.dot_name || server.identity_string)) || '';
+            }
+            if (!issue) issue = server && (server.issue_n || server.issue) || '';
         }
     } catch (_) {}
     if (baseName.includes('.') || /#\d+$/.test(baseName)) {

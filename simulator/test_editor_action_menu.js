@@ -37,9 +37,11 @@ check(index.includes('id="editorCodeName" class="editor-identity-name"') &&
       run.includes('document.getElementById(\'editorCodeName\')'),
     'the DOM uses one visible full dot.name identity and has no duplicate label');
 check(run.includes('function _editorActionIdentity(name)') &&
+      run.includes('const openMeta = window._editorOpenLumpMeta;') &&
+      run.includes('openMeta.issue_n || openMeta.issue') &&
       run.includes('return `${dotName}#${issue}`;') &&
       run.includes('` · Source v${revision}`'),
-    'the action identity is built as the full dot.pet.name issue identity');
+    'the action identity uses the exact open LUMP dot.name and issue number');
 check(!run.includes('badge.textContent = `LUMP identity: ${identity}`') &&
       run.includes('const primary = identity || chosenName;'),
     'the toolbar consolidates the program name, LUMP identity, and source revision');

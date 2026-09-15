@@ -18,8 +18,12 @@ const ctx = {
     _editorActionIdentity: () => 'WukongCallHome#53',
 };
 vm.createContext(ctx);
-vm.runInContext(source.slice(source.indexOf('function _refreshEditorActionIdentity('),
+vm.runInContext(source.slice(source.indexOf('function _editorActionIdentity('),
     source.indexOf('const _EDITOR_DOCUMENT_STATE_KEY')), ctx);
+ctx.window._editorOpenLumpMeta = { dot_name: 'CapabilityTest', issue_n: 2 };
+assert.equal(ctx._editorActionIdentity('CapabilityTest'), 'CapabilityTest#2');
+ctx.window._editorOpenLumpMeta = null;
+ctx._editorActionIdentity = () => 'WukongCallHome#53';
 ctx._refreshEditorActionIdentity('WukongCallHome');
 assert.equal(heading.textContent, 'WukongCallHome#53 · Source v27');
 assert.equal(elements.editorArtifactIdentity, undefined);
