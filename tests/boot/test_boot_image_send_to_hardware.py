@@ -45,6 +45,7 @@ from server.boot_image import (
     WUKONG_DMEM_WORDS,
     WUKONG_UPLOAD_BODY_BASE_WORD,
 )
+from tests.boot.conftest import select_private_boot_marker
 
 LUMPS_DIR = os.path.join(ROOT, 'server', 'lumps')
 
@@ -116,6 +117,8 @@ def _valid_image(entry_slot=None):
     cfg = {"step1": {"totalNamespaceWords": 16384,
                      "namespaceLumpWords": 1024,
                      "threadLumpWords": 256}}
+    if entry_slot is not None:
+        select_private_boot_marker(LUMPS_DIR, entry_slot)
     return generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=entry_slot)
 
 
@@ -915,7 +918,7 @@ def test_send_to_hardware_rejects_non_resident_entry(client):
     UART_DEV, no code) is rejected with 400 before reaching the bridge."""
     # The V2 physical header now rejects such an image even before the upload
     # endpoint can persist or queue it.
-    with pytest.raises(ValueError, match="outside resident"):
+    with pytest.raises(ValueError, match="outside resident|MMIO"):
         _valid_image(entry_slot=2)
 
 

@@ -39,6 +39,7 @@ from hardware.thread_design import (
     THREAD_CAPS_OFFSET,
     THREAD_STO_OFFSET,
 )
+from tests.boot.conftest import select_private_boot_marker
 
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
 
@@ -168,6 +169,7 @@ def _write_oversized_catalog_fixture(lumps_dir):
 def test_caps0_gt_and_entry_body_resident(slot):
     """Hardware image carries the requested E-GT at Thread.caps[0] and a
     resident entry lump body, for both slot 6 and slot 7."""
+    select_private_boot_marker(LUMPS_DIR, slot)
     cfg = _minimal_cfg()
     image = generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=slot,
                                 require_entry_resident=True)
@@ -199,6 +201,7 @@ def test_caps0_gt_and_entry_body_resident(slot):
 def test_read_boot_entry_info_matches(slot):
     """read_boot_entry_info() (the send-to-hardware gate) agrees with the
     generator: correct slot, resident body, matching caps[0] GT."""
+    select_private_boot_marker(LUMPS_DIR, slot)
     image = generate_boot_image(_minimal_cfg(), LUMPS_DIR, boot_entry_slot=slot,
                                 require_entry_resident=True)
     info = read_boot_entry_info(image)
@@ -212,6 +215,7 @@ def test_read_boot_entry_info_matches(slot):
 def test_non_resident_entry_rejected_for_hardware():
     """require_entry_resident=True must raise for an entry slot whose body is
     not resident (MMIO device slot — never has executable code)."""
+    select_private_boot_marker(LUMPS_DIR, 2)
     with pytest.raises(ValueError, match="not resident|MMIO|outside resident"):
         generate_boot_image(_minimal_cfg(), LUMPS_DIR, boot_entry_slot=2,
                             require_entry_resident=True)
@@ -219,7 +223,8 @@ def test_non_resident_entry_rejected_for_hardware():
 
 def test_non_resident_entry_allowed_for_simulator():
     """The V2 physical header cannot encode an MMIO address as a boot body."""
-    with pytest.raises(ValueError, match="outside resident"):
+    select_private_boot_marker(LUMPS_DIR, 2)
+    with pytest.raises(ValueError, match="outside resident|MMIO"):
         generate_boot_image(_minimal_cfg(), LUMPS_DIR, boot_entry_slot=2)
 
 

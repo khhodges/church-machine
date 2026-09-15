@@ -7723,9 +7723,11 @@ function _renderFormatLumpVersionHistory(absName) {
 }
 
 function _formatLumpApiDefinition(absName, caps) {
-    var _manifest = (typeof _lumpManifests !== 'undefined' && typeof sim !== 'undefined' &&
-                     sim && _lumpManifests[sim.bootEntrySlot])
-        ? _lumpManifests[sim.bootEntrySlot] : null;
+    var _manifest = (typeof _lumpManifests !== 'undefined' &&
+                     typeof bootEntrySlot !== 'undefined' &&
+                     Number.isInteger(bootEntrySlot) &&
+                     _lumpManifests[bootEntrySlot])
+        ? _lumpManifests[bootEntrySlot] : null;
     var _methods = _manifest && Array.isArray(_manifest._methods) ? _manifest._methods : [];
     return {
         name: absName || '',

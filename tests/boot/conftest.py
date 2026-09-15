@@ -50,6 +50,38 @@ def lumps_write_lock():
 _BOOT_ABSTR_NS_SLOT = 6
 _LUMP_SIZE          = 64          # words — must match BOOT_ABSTR_DEFAULT_SIZE
 _LUMP_FILENAME      = f"{_BOOT_ABSTR_NS_SLOT << 8:08x}.lump"   # "00000600.lump"
+
+
+def select_private_boot_marker(lumps_dir, slot):
+    """Select one Namespace boot marker in a private boot-test fixture.
+
+    Tests that exercise an alternate executable target must change the
+    Namespace plan first; passing ``boot_entry_slot`` alone is intentionally
+    not a selector.  This helper is only for the already-isolated fixture
+    created by ``isolated_boot_lumps``.
+    """
+    state_path = os.path.join(lumps_dir, "ns-state.json")
+    with open(state_path, encoding="utf-8") as fh:
+        state = json.load(fh)
+    rows = state.get("abstractions")
+    if not isinstance(rows, list):
+        raise AssertionError("private boot fixture has no abstractions array")
+    matches = [
+        row for row in rows
+        if isinstance(row, dict) and row.get("slot") == slot
+        and not row.get("archived")
+    ]
+    if len(matches) != 1:
+        raise AssertionError(
+            f"private boot fixture cannot select unique Namespace slot {slot}")
+    for row in rows:
+        if isinstance(row, dict):
+            row.pop("boot", None)
+    matches[0]["boot"] = True
+    with open(state_path, "w", encoding="utf-8") as fh:
+        json.dump(state, fh, indent=2)
+
+
 def _make_synthetic_lump(lump_size: int = _LUMP_SIZE, cw: int = 3, cc: int = 0) -> bytes:
     """Return a minimal valid big-endian Boot.Abstr lump binary.
 
@@ -137,6 +169,23 @@ def isolated_boot_lumps(tmp_path_factory):
             "load_policy": "Resident",
             "token": bootstrap_tokens[row["slot"]],
         })
+        # The boot target is a Namespace-state marker, not a config/image
+        # default.  Keep the isolated fixture explicit and unique even if the
+        # checked-in state is a historical fixture with no marker.
+        if row["slot"] == 10:
+            row["boot"] = True
+        else:
+            row.pop("boot", None)
+    state.setdefault("abstractions", []).append({
+        "name": "Step2Fixture",
+        "slot": 18,
+        "location": "0x1000",
+        "type": "Inform",
+        "resident": False,
+        "boot_resident": False,
+        "ns_slot_policy": "dynamic",
+        "load_policy": "Lazy",
+    })
     with open(os.path.join(isolated_dir, "ns-state.json"), "w", encoding="utf-8") as fh:
         json.dump(state, fh, indent=2)
     manifest_path = os.path.join(isolated_dir, "manifest.json")
@@ -227,3 +276,15 @@ def isolated_boot_lumps(tmp_path_factory):
             setattr(module, name, value)
         for name, value in original_app_paths.items():
             setattr(app_module, name, value)
+
+
+@pytest.fixture(autouse=True)
+def reset_private_boot_marker(isolated_boot_lumps):
+    """Start each boot regression with the canonical private target.
+
+    Individual tests may call ``select_private_boot_marker`` to exercise an
+    alternate eligible resident.  Resetting before the next test prevents
+    that deliberate selection from leaking into tests whose default fixture
+    expects the committed target.
+    """
+    select_private_boot_marker(isolated_boot_lumps, 10)

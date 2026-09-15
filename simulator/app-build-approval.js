@@ -49,6 +49,20 @@ const BuildApprovalView = {
         return `${label} — ${detail}`;
     },
 
+    _namespacePolicy(slot, fallback) {
+        const nsRows = typeof window !== 'undefined' && window._nsState &&
+            Array.isArray(window._nsState.abstractions)
+            ? window._nsState.abstractions : [];
+        const row = nsRows.find(candidate => candidate &&
+            Number(candidate.slot) === Number(slot));
+        if (!row) return fallback;
+        const policy = row.load_policy || row.loadPolicy;
+        if (['Bootstrap', 'Hardware', 'Empty', 'Resident', 'Preload', 'Lazy']
+                .includes(policy)) return policy;
+        if (row.resident === true && row.boot_resident === true) return 'Resident';
+        return fallback;
+    },
+
     _checkBadge(check) {
         // check: { ok: bool|null, warn: bool, label, detail }
         const tooltip = this._checkTooltip(check);
@@ -278,6 +292,7 @@ const BuildApprovalView = {
         try {
             const res = await fetch('/api/build-approval/ns-map', {
                 headers: this._authHeaders(),
+                cache: 'no-store',
             });
             if (res.status === 401 || res.status === 403 || res.status === 503) {
                 if (body) body.innerHTML =
@@ -292,6 +307,24 @@ const BuildApprovalView = {
             });
             this._validateApprovalPayload(data);
             this._lastMap = data;
+            // Boot target display comes from the authoritative Namespace
+            // snapshot, never from the compatibility map/config projection.
+            try {
+                const nsResponse = await fetch('/api/boot-image/ns-state', {
+                    cache: 'no-store',
+                });
+                const nsState = await nsResponse.json();
+                if (nsResponse.ok && nsState &&
+                        typeof nsState.namespaceFingerprint === 'string') {
+                    window._nsState = nsState;
+                    if (typeof window._applyNamespaceBootProjection === 'function') {
+                        window._applyNamespaceBootProjection(nsState);
+                    }
+                }
+            } catch (_) {
+                // The map remains viewable; Lightning Bolt commits still
+                // fail explicitly through the Namespace CAS helper.
+            }
             // Store the CSRF nonce for the build-start call.
             if (data.build_nonce) this._buildNonce = data.build_nonce;
             this._render(data);
@@ -422,7 +455,10 @@ const BuildApprovalView = {
         for (const slot of rows) {
             for (const check of (slot.checks || [])) {
                 if (check.ok === false || check.warn) {
-                    issues.push({ slot, check });
+                    issues.push({ slot: Object.assign({}, slot, {
+                        load_policy: this._namespacePolicy(
+                            slot.slot, slot.load_policy || slot.loadPolicy || '—'),
+                    }), check });
                 }
             }
         }
@@ -449,7 +485,8 @@ const BuildApprovalView = {
     },
 
     _slotRuleOptions(s) {
-        const policy = s.load_policy || s.loadPolicy || 'Lazy';
+        const policy = this._namespacePolicy(s.slot,
+            s.load_policy || s.loadPolicy || 'Lazy');
         const options = [
             ['Bootstrap', 'Bootstrap'],
             ['Hardware', 'Hardware'],
@@ -466,9 +503,15 @@ const BuildApprovalView = {
     },
 
     _slotRuleSelection(s) {
-        const policy = s.load_policy || s.loadPolicy || 'Lazy';
+        const policy = this._namespacePolicy(s.slot,
+            s.load_policy || s.loadPolicy || 'Lazy');
         const selectedRule = s.slot_rule || s.slotRule;
-        const bootEntrySlot = this._lastMap && this._lastMap.boot_entry_slot;
+        const nsRows = typeof window !== 'undefined' && window._nsState &&
+            Array.isArray(window._nsState.abstractions)
+            ? window._nsState.abstractions : [];
+        const nsBootRow = nsRows.find(row => row && row.boot === true);
+        const bootEntrySlot = nsBootRow && Number.isInteger(Number(nsBootRow.slot))
+            ? Number(nsBootRow.slot) : null;
         const normalizedBootEntrySlot = Number(bootEntrySlot);
         const hasAuthoritativeBootEntry = bootEntrySlot !== null &&
             bootEntrySlot !== '' && Number.isInteger(normalizedBootEntrySlot);
@@ -488,7 +531,19 @@ const BuildApprovalView = {
         const previous = select ? select.dataset.previousValue : '';
         if (select) select.disabled = true;
         try {
-            const getRes = await fetch('/api/boot-config');
+            // Lightning Bolt is a Namespace marker, not a boot-config slot
+            // rule. Commit it through the Namespace CAS endpoint and only
+            // refresh this view after the server acknowledges the commit.
+            if (value === 'Starter' || value === 'LightningBolt') {
+                if (typeof window._commitNamespaceBootMarker !== 'function') {
+                    throw new Error(
+                        'Namespace marker transaction is unavailable; reload the IDE and retry.');
+                }
+                await window._commitNamespaceBootMarker(Number(slot));
+                await this.refresh(false);
+                return;
+            }
+            const getRes = await fetch('/api/boot-config', { cache: 'no-store' });
             const data = await _actionableJsonResponse(getRes, 'Load the boot configuration', {
                 dataChanged: false,
                 nextAction: 'Refresh Build Approval, then change the slot rule again.',
@@ -507,67 +562,42 @@ const BuildApprovalView = {
             const rows = config.step2.lumps;
             let saved = rows.find(item => item && Number(item.nsSlot) === Number(slot));
 
-            if (value === 'Starter' || value === 'LightningBolt') {
-                // Starter is a boot role, not a fifth load policy. Keep the
-                // persisted LightningBolt role for compatibility, move the
-                // single role, and restore the previous slot's rule so two
-                // boot-entry states cannot persist.
-                const previousBootSlot = Number(config.bootEntrySlot);
-                if (Number.isInteger(previousBootSlot) &&
-                    previousBootSlot !== Number(slot)) {
-                    const previousRow = this._lastMap &&
-                        Array.isArray(this._lastMap.slot_rules)
-                        ? this._lastMap.slot_rules.find(item =>
-                            Number(item.slot) === previousBootSlot)
-                        : null;
-                    const previousRule = previousRow &&
-                        (previousRow.load_policy || previousRow.loadPolicy);
-                    if (previousRule) {
-                        config.slotRules[String(previousBootSlot)] = previousRule;
-                    } else {
-                        delete config.slotRules[String(previousBootSlot)];
+            // The visible slot rule is programmer-owned for every row. Only
+            // programmable LUMP rows also need a step2 body-loading
+            // projection; architecture rows keep their rule in slotRules.
+            config.slotRules[String(slot)] = value;
+            const shouldPersistStep2 = !row || row.programmable !== false;
+            if (shouldPersistStep2) {
+                if (!['Empty', 'Resident', 'Preload', 'Lazy'].includes(value)) {
+                    if (saved) {
+                        config.step2.lumps = rows.filter(item =>
+                            !item || Number(item.nsSlot) !== Number(slot));
                     }
-                }
-                config.slotRules[String(slot)] = 'LightningBolt';
-                config.bootEntrySlot = Number(slot);
-            } else {
-                // The visible slot rule is programmer-owned for every row.
-                // Only programmable LUMP rows also need a step2 body-loading
-                // projection; architecture rows keep their rule in slotRules.
-                config.slotRules[String(slot)] = value;
-                const shouldPersistStep2 = !row || row.programmable !== false;
-                if (shouldPersistStep2) {
-                    if (!['Empty', 'Resident', 'Preload', 'Lazy'].includes(value)) {
-                        if (saved) {
-                            config.step2.lumps = rows.filter(item =>
-                                !item || Number(item.nsSlot) !== Number(slot));
-                        }
-                    } else {
-                        if (!saved) {
-                            saved = {
-                                nsSlot: Number(slot),
-                                abstraction: row && row.name ? row.name : `Slot ${slot}`,
-                                lumpToken: row && row.token ? row.token : '',
-                            };
-                            rows.push(saved);
-                        }
-                        saved.loadPolicy = value;
-                        saved.resident = value === 'Resident';
-                        delete saved.prefetch;
-                        delete saved.prefetchRequired;
-                        delete saved.prefetchOrder;
-                        delete saved.downloadUrl;
+                } else {
+                    if (!saved) {
+                        saved = {
+                            nsSlot: Number(slot),
+                            abstraction: row && row.name ? row.name : `Slot ${slot}`,
+                            lumpToken: row && row.token ? row.token : '',
+                        };
+                        rows.push(saved);
+                    }
+                    saved.loadPolicy = value;
+                    saved.resident = value === 'Resident';
+                    delete saved.prefetch;
+                    delete saved.prefetchRequired;
+                    delete saved.prefetchOrder;
+                    delete saved.downloadUrl;
 
-                        // A Resident row needs the same physical facts as the
-                        // Namespace editor. The approval payload carries the
-                        // committed location and measured binary allocation.
-                        if (value === 'Resident' && row) {
-                            const location = Number.parseInt(String(row.location || ''), 0);
-                            const measured = row.size_budget && row.size_budget.total &&
-                                Number(row.size_budget.total.words);
-                            if (Number.isInteger(location) && location >= 0) saved.physAddr = location;
-                            if (Number.isInteger(measured) && measured > 0) saved.lumpSize = measured;
-                        }
+                    // A Resident row needs the same physical facts as the
+                    // Namespace editor. The approval payload carries the
+                    // committed location and measured binary allocation.
+                    if (value === 'Resident' && row) {
+                        const location = Number.parseInt(String(row.location || ''), 0);
+                        const measured = row.size_budget && row.size_budget.total &&
+                            Number(row.size_budget.total.words);
+                        if (Number.isInteger(location) && location >= 0) saved.physAddr = location;
+                        if (Number.isInteger(measured) && measured > 0) saved.lumpSize = measured;
                     }
                 }
             }

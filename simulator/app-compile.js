@@ -1557,8 +1557,8 @@ async function compileAndBuild(options) {
     // boot. The machine will fall through to a zero word, fault, wipe all
     // CRs to NULL GT, and loop with a dead namespace — fault LED ON.
     (function _checkBootEntryReturn() {
-        const _bootSlot = (typeof sim !== 'undefined' && sim && typeof sim.bootEntrySlot !== 'undefined')
-            ? sim.bootEntrySlot : -1;
+        const _bootSlot = (typeof bootEntrySlot !== 'undefined' &&
+            Number.isInteger(bootEntrySlot)) ? bootEntrySlot : -1;
         if (_bootSlot < 0) return;
         // Check whether this abstraction IS the boot entry (name match in registry).
         let _isBootEntry = false;
@@ -2551,7 +2551,9 @@ function loadCLOOMCIntoSim() {
                 _internal: isInternal
             };
         });
-        _lumpManifests[sim.bootEntrySlot] = {
+        const _manifestSlot = typeof bootEntrySlot !== 'undefined' &&
+            Number.isInteger(bootEntrySlot) ? bootEntrySlot : null;
+        if (_manifestSlot !== null) _lumpManifests[_manifestSlot] = {
             _methods: _manifestMethods,
             methods:  _methodsDict,
             _caps:     _compiledLump.resolvedCaps.map(cap => ({

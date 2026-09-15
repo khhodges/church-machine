@@ -255,7 +255,8 @@ def _compare(py_bytes, sim_words, cfg, extra_skips=None):
 
 # ---- the test -------------------------------------------------------------
 
-def _write_synthetic_boot_abstr_lump(lumps_dir, lump_size=64, cw=3, cc=0):
+def _write_synthetic_boot_abstr_lump(
+        lumps_dir, lump_size=64, cw=3, cc=0, bootstrap_token=None):
     """Write a minimal synthetic Boot.Abstr lump and a companion manifest to lumps_dir.
 
     The lump has a valid header (magic=0x1F, n_minus_6, cw, cc=0) and
@@ -273,24 +274,32 @@ def _write_synthetic_boot_abstr_lump(lumps_dir, lump_size=64, cw=3, cc=0):
     hdr = (0x1F << 27) | (n_minus_6 << 23) | (cw << 10) | cc
     words = [0] * lump_size
     words[0] = hdr
-    from server.boot_image import BOOT_ABSTR_NS_SLOT
+    if cc:
+        words[-cc:] = [
+            create_gt(0, BOOT_ABSTR_NS_SLOT, {"E": 1}, 1)
+        ] * cc
     from server.lump_integrity import compute_number
     from server.lump_approvals import write_approvals
     import hashlib
-    lump_token = f"{BOOT_ABSTR_NS_SLOT << 8:08x}"
+    lump_token = bootstrap_token or f"{BOOT_ABSTR_NS_SLOT << 8:08x}"
     raw = struct.pack(f">{lump_size}I", *words)
     lump_name = f"SelfTest.1.{compute_number('SelfTest', raw)}.lump"
     lump_path = os.path.join(lumps_dir, lump_name)
     with open(lump_path, "wb") as f:
         f.write(raw)
     digest = hashlib.sha256(raw).hexdigest()
-    write_approvals(os.path.join(lumps_dir, "approvals.json"), {
-        digest: {
+    approval = {
             "binary_hash": digest, "filename": lump_name, "dot_name": "SelfTest",
             "issue_n": 1,
             "identity_hash": hashlib.sha256(b"SelfTest#1").hexdigest(),
-        }
-    })
+    }
+    if bootstrap_token is not None:
+        approval.update({
+            "bootstrap_t": bootstrap_token,
+            "bootstrap_runtime_gt": int(bootstrap_token, 16),
+            "token": bootstrap_token,
+        })
+    write_approvals(os.path.join(lumps_dir, "approvals.json"), {digest: approval})
     # Write a minimal manifest so find_lump_file_by_abstraction() resolves
     # "SelfTest" at BOOT_ABSTR_NS_SLOT.  No 'filename' field → falls back to
     # the token-named file written above.
@@ -313,6 +322,21 @@ def _write_synthetic_boot_abstr_lump(lumps_dir, lump_size=64, cw=3, cc=0):
                 "seq": 0,
                 "token": lump_token,
                 "filename": lump_name,
+                "type": "Inform" if bootstrap_token is not None else "Abstraction",
+                "resident": True,
+                "boot_resident": True,
+                "ns_slot_policy": "static",
+                "load_policy": "Resident",
+                "boot": True,
+            }, {
+                "name": "Step2Fixture",
+                "slot": 18,
+                "location": "0x1000",
+                "type": "Inform",
+                "resident": False,
+                "boot_resident": False,
+                "ns_slot_policy": "dynamic",
+                "load_policy": "Lazy",
             }]
         }, _sf)
     return lump_path, lump_size
@@ -392,7 +416,7 @@ def test_generated_thread_slot_collision_and_capacity_are_rejected(tmp_path):
     cfg["step2"] = {"lumps": [{
         "nsSlot": 11, "resident": True, "physAddr": 4096, "lumpSize": 64,
     }]}
-    with pytest.raises(ValueError, match=r"slot 11 is reserved"):
+    with pytest.raises(ValueError, match=r"not present in authoritative Namespace state"):
         generate_boot_image(cfg, str(tmp_path))
 
     cfg = _cfg_generated_threads(2)
@@ -408,14 +432,14 @@ def test_generated_thread_body_overlap_and_nondefault_boot_entry_are_rejected_or
     colliding["step2"] = {"lumps": [{
         "nsSlot": 16, "resident": True, "physAddr": 640, "lumpSize": 256,
     }]}
-    with pytest.raises(ValueError, match=r"overlaps the fixed boot and generated Thread region"):
+    with pytest.raises(ValueError, match=r"not present in authoritative Namespace state"):
         generate_boot_image(colliding, str(tmp_path))
 
-    with pytest.raises(ValueError, match=r"selected boot target NS\[7\].*Namespace-state binding"):
+    with pytest.raises(ValueError, match=r"does not match authoritative Namespace boot:true row"):
         generate_boot_image(
             _cfg_generated_threads(5), str(tmp_path), boot_entry_slot=7)
 
-    with pytest.raises(ValueError, match="no allocated resident Namespace location"):
+    with pytest.raises(ValueError, match="does not match authoritative Namespace boot:true row"):
         generate_boot_image(
             _cfg_generated_threads(5), str(tmp_path), boot_entry_slot=300)
 
@@ -556,6 +580,11 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
             "seq": 0,
             "token": saved_token,
                 "filename": saved_filename,
+            "resident": True,
+            "boot_resident": True,
+            "ns_slot_policy": "static",
+            "load_policy": "Resident",
+            "boot": True,
         }]
     }))
     cfg = {
@@ -724,6 +753,11 @@ def test_boot_image_next_gt_follows_lightning_bolt(tmp_path, lightning_slot, sta
             "seq": 0,
             "token": SAVED_TOKEN,
             "filename": CANONICAL_FILENAME,
+            "resident": True,
+            "boot_resident": True,
+            "ns_slot_policy": "static",
+            "load_policy": "Resident",
+            "boot": True,
         }]
     }))
 
@@ -738,7 +772,7 @@ def test_boot_image_next_gt_follows_lightning_bolt(tmp_path, lightning_slot, sta
         cfg["nextAfterSelfTestSlot"] = stale_next_config
 
     if lightning_slot != BOOT_ABSTR_NS_SLOT:
-        with pytest.raises(ValueError, match="no allocated resident Namespace location"):
+        with pytest.raises(ValueError, match="does not match authoritative Namespace boot:true row"):
             generate_boot_image(cfg, str(tmp_path), boot_entry_slot=lightning_slot)
         return
 

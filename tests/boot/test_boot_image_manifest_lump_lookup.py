@@ -25,6 +25,7 @@ from server.boot_image import (
     NS_ENTRY_WORDS,
     pack_lump_header,
 )
+from tests.boot.conftest import select_private_boot_marker
 
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
 
@@ -145,6 +146,7 @@ class TestBootImageSlot7:
 
     def test_slot7_has_valid_lump_magic(self):
         """boot_entry_slot=7 produces an image with valid lump magic at slot 7's physAddr."""
+        select_private_boot_marker(LUMPS_DIR, 7)
         cfg = _minimal_cfg()
         image = generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=7)
         words = _unpack_words(image)
@@ -185,6 +187,7 @@ class TestBootImageSlot7:
 
     def test_active_selftest_unaffected_by_slot7_boot_entry(self):
         """Selecting another entry does not corrupt the active SelfTest descriptor."""
+        select_private_boot_marker(LUMPS_DIR, 7)
         cfg = _minimal_cfg()
         image6 = generate_boot_image(cfg, LUMPS_DIR)
         image7 = generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=7)

@@ -43,7 +43,12 @@ def client():
 
 def _active_selftest_binding():
     import json
-    with open(os.path.join(ROOT, "server", "lumps", "ns-state.json"), encoding="utf-8") as fh:
+    from server import app as app_module
+    state_path = getattr(
+        app_module, "NS_STATE_PATH",
+        os.path.join(ROOT, "server", "lumps", "ns-state.json"),
+    )
+    with open(state_path, encoding="utf-8") as fh:
         rows = json.load(fh)["abstractions"]
     matches = [row for row in rows if row.get("name") == "SelfTest"]
     assert len(matches) == 1
@@ -62,7 +67,16 @@ def _get_active_selftest_entry(client):
     )
     binding = _active_selftest_binding()
     for e in entries:
-        if e.get("token") == binding["token"] and e.get("ns_slot") == binding["slot"]:
+        if (
+            e.get("abstraction") == "SelfTest"
+            and (
+                e.get("filename") == binding.get("filename")
+                or (
+                    e.get("token") == binding["token"]
+                    and e.get("ns_slot", e.get("slot")) == binding["slot"]
+                )
+            )
+        ):
             return e
     tokens = [e.get("token") for e in entries]
     pytest.fail(

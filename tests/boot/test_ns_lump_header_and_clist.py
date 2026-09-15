@@ -13,6 +13,7 @@ Task #1918 reduced the catalog from 53 to 44 entries (8-slot minimal boot
 namespace: slots 0-7 for boot, 8-43 for extended abstractions).
 """
 import os
+import shutil
 import struct
 import sys
 
@@ -56,6 +57,12 @@ def _default_cfg():
 def boot_words(tmp_path_factory):
     """Generate the default boot image once; return as a list of 32-bit ints."""
     tmp = tmp_path_factory.mktemp("lumps_ns_lump")
+    # Generation now requires an explicit Namespace boot marker and resolves
+    # executable bodies only from that state.  Use a private copy of the
+    # canonical reviewed fixture rather than an empty directory that relies on
+    # the retired slot-derived fallback.
+    shutil.copytree(os.path.join(ROOT, "server", "lumps"), tmp,
+                    dirs_exist_ok=True)
     img = generate_boot_image(_default_cfg(), str(tmp))
     total = 16384
     assert len(img) == total * 4

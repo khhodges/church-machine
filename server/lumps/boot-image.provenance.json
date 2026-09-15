@@ -1,39 +1,45 @@
 {
-  "version": 1,
+  "boot_config_sha256": "39a8ae8177fcfca37447482b75584fb794fb2a4d44c19da92af6cf33cbe38687",
   "image_sha256": "e1e5a790316d947b97baffc725b0b2945cb72f55580d1ecad5c2ab7ce8ea3211",
+  "origin": "generated",
   "resident_bindings": [
     {
-      "slot": 6,
-      "filename": "SelfTest.86.f37bafd6.lump",
       "artifact_sha256": "efa0e4323679355a530f0ce9bcf8cf19f962204bba7a45b543ca308f1ece17d7",
-      "token": "4a000006",
-      "load_policy": "Resident",
-      "resident": true,
       "boot_resident": true,
+      "filename": "SelfTest.86.f37bafd6.lump",
+      "load_policy": "Resident",
+      "localized_clist_sha256": "d07843a6ce6e1ca7cde0a7f2bcf2c0ec2e90ead4d0c63ffe9c33f33d3200f675",
       "ns_slot_policy": "static",
-      "localized_clist_sha256": "d07843a6ce6e1ca7cde0a7f2bcf2c0ec2e90ead4d0c63ffe9c33f33d3200f675"
+      "resident": true,
+      "slot": 6,
+      "token": "4a000006"
     },
     {
-      "slot": 7,
-      "filename": "WukongCallHome.1.e8cb2017.lump",
       "artifact_sha256": "00682247c7536d82f537c9bd26555a752b2215644c1129f76ff6f5fdb35a9224",
-      "token": "4a000007",
-      "load_policy": "Resident",
-      "resident": true,
       "boot_resident": true,
+      "filename": "WukongCallHome.1.e8cb2017.lump",
+      "load_policy": "Resident",
+      "localized_clist_sha256": "70cc37469c258a3183c3f0325b45db1ff0d6bee7f3ebd088a06ccb1b1bd721eb",
       "ns_slot_policy": "static",
-      "localized_clist_sha256": "70cc37469c258a3183c3f0325b45db1ff0d6bee7f3ebd088a06ccb1b1bd721eb"
+      "resident": true,
+      "slot": 7,
+      "token": "4a000007"
     },
     {
-      "slot": 10,
-      "filename": "CapabilityTest.2.e794a764.lump",
       "artifact_sha256": "55f07137513625e0749de30f5d67a7d979e3fa4eedfef3b499a67f358f28db32",
-      "token": "4a00000a",
-      "load_policy": "Resident",
-      "resident": true,
       "boot_resident": true,
+      "filename": "CapabilityTest.2.e794a764.lump",
+      "load_policy": "Resident",
+      "localized_clist_sha256": "429ad6a68465ebb16616d7a5974ceb6314759bb3d9451f873a69734856c03477",
       "ns_slot_policy": "static",
-      "localized_clist_sha256": "429ad6a68465ebb16616d7a5974ceb6314759bb3d9451f873a69734856c03477"
+      "resident": true,
+      "slot": 10,
+      "token": "4a00000a"
     }
-  ]
+  ],
+  "source_sha256": {
+    "manifest": "cb5b271e74f7ce0e01cddafb1e78c4693e293d536ccdce1c720c8a9e7c4f15ee",
+    "ns_state": "56100760728a5552f5c2114cb43b7ee441871255f08e2f0d3368371e1d9caf0e"
+  },
+  "version": 1
 }

@@ -36,18 +36,19 @@ check('fresh projects load defaults before saving Namespace build settings',
     helper.includes('serverData.config || serverData.defaults'));
 check('Namespace build settings are persisted through the boot-config endpoint',
     helper.includes("method: 'POST'") && helper.includes("fetch('/api/boot-config'"));
-check('Namespace save carries the selected Lightning Bolt boot entry',
-    source.includes('bootConfigCandidate.bootEntrySlot = nsSaveBootEntry'));
+check('Namespace save carries the authoritative Namespace fingerprint',
+    source.includes('namespaceFingerprint,') &&
+    source.includes("fetch('/api/boot-image/ns-state'"));
 
 const saveStart = source.indexOf('window._nsTableSave = async function(btn)');
 const saveEnd = source.indexOf('// ── NS Table Load', saveStart);
 const save = source.slice(saveStart, saveEnd);
 const saveRaw = save.indexOf("fetch('/api/boot-image/save-ns'");
 const clearDirty = save.indexOf('_setNsDirty(false)');
-check('single save submits a boot-config candidate with Namespace bytes',
+check('single save submits Namespace bytes without a competing boot-config plan',
     saveRaw !== -1 &&
-    save.includes('boot_config: bootConfigCandidate') &&
-    save.includes('bootConfigCandidate.bootEntrySlot = nsSaveBootEntry'));
+    save.includes('boot_config: null') &&
+    save.includes('namespaceFingerprint,'));
 check('single save does not issue a separate post-commit config write',
     save.lastIndexOf('await window._ensureNamespaceBuildConfig()') < saveRaw &&
     save.includes('window._setActiveBootConfig('));
@@ -71,19 +72,16 @@ const editorSource = fs.readFileSync(path.join(__dirname, 'app-lump-editor.js'),
 const step1Start = editorSource.indexOf('function _postStep1(');
 const step1End = editorSource.indexOf('function _rlLoad()', step1Start);
 const step1Save = editorSource.slice(step1Start, step1End);
-check('Step 1 save also carries the selected Lightning Bolt boot entry',
-    step1Save.includes('bootEntrySlot:') &&
-    step1Save.includes("localStorage.getItem('bootEntrySlot')"));
-check('Step 1 save carries only an explicitly prepared boot entry',
-    step1Save.includes("preparedUi.status === 'prepared'") &&
-    step1Save.includes('bootEntrySlot = preparedUi'));
+check('Step 1 save does not write a boot target through boot-config',
+    !step1Save.includes('bootEntrySlot: (function') &&
+    !step1Save.includes("localStorage.getItem('bootEntrySlot')"));
 
 const loadStart = editorSource.indexOf('function _rlLoad()');
 const loadEnd = editorSource.indexOf('function _rlInitStep2(', loadStart);
 const residentLoad = editorSource.slice(loadStart, loadEnd);
-check('Resident LUMP load reads the persisted server boot entry without preparing it',
-    residentLoad.includes('Loading the configuration is inspection only') &&
-    residentLoad.includes('if (Number.isInteger(savedBootSlot)'));
+check('Resident LUMP load reads the authoritative Namespace boot entry',
+    residentLoad.includes("fetch('/api/boot-image/ns-state'") &&
+    residentLoad.includes('namespaceFingerprint'));
 
 const addStart = source.indexOf('const _doInstall = async function(words)');
 const addEnd = source.indexOf('const _onError = function(err)', addStart);

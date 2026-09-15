@@ -6,7 +6,7 @@
       "location": "0x00000000",
       "type": "Inform",
       "f": 0,
-      "g": 1,
+      "g": 0,
       "limit": "0x000FF",
       "seq": 0,
       "seal": "0xDEB25EEF"
@@ -17,29 +17,21 @@
       "location": "0x00000010",
       "type": "Inform",
       "f": 0,
-      "g": 1,
+      "g": 0,
       "limit": "0x000FF",
       "seq": 0,
       "seal": "0xDEB256EF"
     },
     {
-      "name": "CapabilityTest",
+      "name": "UART_DEV",
       "slot": 2,
       "location": "0x40000014",
       "type": "Inform",
       "f": 0,
-      "g": 1,
+      "g": 0,
       "limit": "0x00002",
       "seq": 0,
-      "seal": "0xDEADF4CF",
-      "token": "4a000002",
-      "filename": "CapabilityTest.2.6fd9df21.lump",
-      "issue_n": 2,
-      "lump_version": 27,
-      "resident": true,
-      "load_policy": "Resident",
-      "boot_resident": true,
-      "ns_slot_policy": "static"
+      "seal": "0xDEADF4CF"
     },
     {
       "name": "LED_DEV",
@@ -47,7 +39,7 @@
       "location": "0x40000000",
       "type": "Inform",
       "f": 0,
-      "g": 1,
+      "g": 0,
       "limit": "0x00004",
       "seq": 0,
       "seal": "0xDEAD3ECF"
@@ -137,26 +129,47 @@
       "seal": "0xDEA2F6EF"
     },
     {
-      "name": "Thread.2",
-      "slot": 11,
-      "location": "0x00003590",
+      "name": "CapabilityTest",
+      "slot": 10,
+      "location": "0x00001190",
       "type": "Inform",
       "f": 0,
-      "g": 1,
+      "g": 0,
+      "limit": "0x007F7",
+      "seq": 0,
+      "seal": "0xDE5B96EF",
+      "token": "4a00000a",
+      "filename": "CapabilityTest.2.e794a764.lump",
+      "issue_n": 2,
+      "lump_version": 2,
+      "resident": true,
+      "load_policy": "Resident",
+      "boot_resident": true,
+      "ns_slot_policy": "static",
+      "binary_hash": "55f07137513625e0749de30f5d67a7d979e3fa4eedfef3b499a67f358f28db32",
+      "boot": true
+    },
+    {
+      "name": "Thread.2",
+      "slot": 11,
+      "location": "0x00003990",
+      "type": "Inform",
+      "f": 0,
+      "g": 0,
       "limit": "0x000FF",
       "seq": 0,
-      "seal": "0xDEA896EF"
+      "seal": "0xDEAE96EF"
     },
     {
       "name": "Thread.3",
       "slot": 12,
-      "location": "0x00003690",
+      "location": "0x00003A90",
       "type": "Inform",
       "f": 0,
-      "g": 1,
+      "g": 0,
       "limit": "0x000FF",
       "seq": 0,
-      "seal": "0xDEA916EF"
+      "seal": "0xDEAF16EF"
     },
     {
       "name": "M_BIT_DEV",
@@ -164,7 +177,7 @@
       "location": "0xFFFFFF1C",
       "type": "Inform",
       "f": 0,
-      "g": 1,
+      "g": 0,
       "limit": "0x00000",
       "seq": 0,
       "seal": "0x21523090"

@@ -205,15 +205,16 @@ function response(status, body) {
         saveBody.includes('_rl.saveInFlight = false;'));
     check('Resident Save surfaces server-provided failure reasons',
         saveBody.includes('res.body.error'));
-    check('Resident Save persists the selected Lightning Bolt slot with the config',
-        saveBody.includes('bootEntrySlot: (function ()') &&
-        saveBody.includes("localStorage.getItem('bootEntrySlot')"));
+    check('Resident Save does not persist the Lightning Bolt slot through config',
+        !saveBody.includes('bootEntrySlot: (function ()') &&
+        !saveBody.includes("localStorage.getItem('bootEntrySlot')"));
     const residentLoadStart = editorSource.indexOf('function _rlLoad()');
     const residentLoadEnd = editorSource.indexOf('function _rlInitStep2(', residentLoadStart);
     const residentLoadBody = editorSource.slice(residentLoadStart, residentLoadEnd);
-    check('Resident config load records the saved Lightning Bolt for display only',
-        residentLoadBody.includes('var savedBootSlot = cfg && cfg.bootEntrySlot;') &&
-        residentLoadBody.includes('_rl.bootEntrySlot = savedBootSlot;') &&
+    check('Resident config load projects the Namespace Lightning Bolt for display only',
+        residentLoadBody.includes("fetch('/api/boot-image/ns-state'") &&
+        residentLoadBody.includes('bootRow = _rl.namespaceRows.find') &&
+        residentLoadBody.includes('_rl.bootEntrySlot = bootRow') &&
         !residentLoadBody.includes('setBootEntrySlot(') &&
         !residentLoadBody.includes('sim.bootEntrySlot'));
 

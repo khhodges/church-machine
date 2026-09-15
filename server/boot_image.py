@@ -277,6 +277,47 @@ def validate_resident_boot_profile(rows, profile_name=RESIDENT_BOOT_PROFILE_NAME
             "unexpected resident rows: " + ", ".join(map(str, extra)))
     return {slot: by_slot[slot] for slot in RESIDENT_BOOT_PROFILE["core_slots"]}
 
+
+def namespace_boot_marker_slot(rows):
+    """Return the sole live Namespace row carrying the Lightning Bolt marker.
+
+    Namespace state is the image plan authority.  In particular, callers must
+    not replace a missing marker with a boot-config value, a browser value, or
+    a historical catalog default.  This helper is intentionally independent
+    of the manifest so direct generator callers get the same fail-closed
+    behavior as the server endpoint.
+    """
+    if not isinstance(rows, list):
+        raise ValueError("authoritative ns-state abstractions must be a list")
+    marked = []
+    seen_slots = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("authoritative ns-state contains a non-object row")
+        slot = row.get("slot")
+        if (isinstance(slot, bool) or not isinstance(slot, int)
+                or not 0 <= slot < MAX_NS_ENTRIES):
+            raise ValueError(
+                f"authoritative ns-state contains invalid Namespace slot {slot!r}")
+        if slot in seen_slots:
+            raise ValueError(
+                f"authoritative ns-state has duplicate Namespace slot {slot}")
+        seen_slots.add(slot)
+        if "boot" in row and not isinstance(row["boot"], bool):
+            raise ValueError(
+                f"authoritative ns-state NS[{slot}] has an invalid boot marker")
+        if row.get("archived") is True and row.get("boot") is True:
+            raise ValueError(
+                f"authoritative ns-state archived NS[{slot}] has boot:true")
+        if row.get("archived") is not True and row.get("boot") is True:
+            marked.append(row)
+    if len(marked) != 1:
+        raise ValueError(
+            "authoritative ns-state must contain exactly one live Namespace "
+            f"row with boot:true (found {len(marked)})")
+    return marked[0]["slot"]
+
+
 # Format-version tag written to mem[NS_TABLE_BASE - 1] so loadBootImage()
 # can reject stale binaries.
 # Thread suspension ABI version. Images with the retired +18 executable-
@@ -1964,22 +2005,15 @@ def _load_ns_state_sequence_map(lumps_dir):
 
 
 def _load_catalog_token_map(manifest_path, selected_by_slot=None):
-    """Return slot→token from Namespace state, with config selections overlaid.
+    """Return slot→token from Namespace state only.
 
     The manifest remains a filename/catalog lookup only.  It must never create
-    membership or assign a token to a slot when Namespace state is present.
+    membership or assign a token to a slot.  ``selected_by_slot`` is retained
+    as a compatibility argument for callers, but deliberately ignored: a
+    separately writable boot-config cannot retarget an image plan.
     """
     lumps_dir = os.path.dirname(manifest_path)
-    out = _load_ns_state_token_map(lumps_dir)
-    # A missing state file is an old image/configuration, not permission to
-    # treat the manifest as authority.  Only explicit designer selections can
-    # supply a slot in that case.
-    # A saved designer choice is explicit and must override the current
-    # ns-state/manifest default for that slot.
-    for slot, token in (selected_by_slot or {}).items():
-        if isinstance(slot, int) and isinstance(token, str) and token:
-            out[slot] = token
-    return out
+    return _load_ns_state_token_map(lumps_dir)
 
 
 def _load_trusted_cache_token_map(manifest_path):
@@ -2106,14 +2140,9 @@ def _load_boot_resident_entries(manifest_path, selected_by_slot=None,
             e.get("filename"),
             int(e.get("lump_version") or e.get("issue_n") or 0),
         ))
-    selected = selected_by_slot or {}
     chosen = {}
     for slot, tok, filename, version in out:
-        if slot in selected:
-            if tok == selected[slot]:
-                chosen[slot] = (slot, tok, filename, int(version or 0))
-            continue
-        elif slot not in chosen:
+        if slot not in chosen:
             chosen[slot] = (slot, tok, filename, int(version or 0))
         elif int(version or 0) >= chosen[slot][3]:
             chosen[slot] = (slot, tok, filename, int(version or 0))
@@ -2342,12 +2371,21 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             f"generate_boot_image: nsSlotsMax must be in 0..{MAX_NS_ENTRIES}; "
             f"got {_ns_slots_max}.")
     _profile_name = cfg.get("residentProfile")
+    if _profile_name is not None:
+        raise ValueError(
+            "generate_boot_image: residentProfile is a boot-config authority; "
+            "set resident/load policy in Namespace state instead")
     _boot_saved_path, _selftest_slot = _resolve_authoritative_selftest_lump(lumps_dir)
     try:
         with open(os.path.join(lumps_dir, "ns-state.json"), encoding="utf-8") as _bf:
-            _bootstrap_rows = json.load(_bf).get("abstractions", [])
+            _bootstrap_state = json.load(_bf)
+            _bootstrap_rows = (
+                _bootstrap_state.get("abstractions")
+                if isinstance(_bootstrap_state, dict) else None
+            )
     except (OSError, ValueError, AttributeError) as exc:
         raise ValueError(f"generate_boot_image: authoritative ns-state is unreadable: {exc}")
+    _marked_boot_slot = namespace_boot_marker_slot(_bootstrap_rows)
     if _profile_name is not None:
         validate_resident_boot_profile(_bootstrap_rows, _profile_name)
         if _ns_slots_max < max(RESIDENT_BOOT_PROFILE["core_slots"]) + 1:
@@ -2374,8 +2412,12 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         raise ValueError(
             f"generate_boot_image: SelfTest slot {_selftest_slot} is outside "
             f"configured Namespace capacity {_ns_slots_max}")
-    if boot_entry_slot is None:
-        boot_entry_slot = _selftest_slot
+    if boot_entry_slot is not None and boot_entry_slot != _marked_boot_slot:
+        raise ValueError(
+            f"generate_boot_image: requested boot entry NS[{boot_entry_slot}] "
+            "does not match authoritative Namespace boot:true row "
+            f"NS[{_marked_boot_slot}]")
+    boot_entry_slot = _marked_boot_slot
     if (isinstance(boot_entry_slot, bool)
             or not isinstance(boot_entry_slot, int)
             or not 0 <= boot_entry_slot < _ns_slots_max):
@@ -2532,6 +2574,57 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     step2_lumps = []
     if isinstance(cfg.get("step2"), dict):
         step2_lumps = cfg["step2"].get("lumps") or []
+    # Step 2 remains a compatibility transport for older designer clients,
+    # but it may not create Namespace membership, choose an artifact, or
+    # change residency.  Every submitted row must agree with the complete
+    # authoritative Namespace plan before it can influence body placement.
+    _state_by_slot = {
+        row["slot"]: row for row in _bootstrap_rows
+        if isinstance(row, dict) and isinstance(row.get("slot"), int)
+    }
+    for _step2_row in step2_lumps:
+        if not isinstance(_step2_row, dict):
+            continue
+        _step2_slot = _step2_row.get("nsSlot")
+        if not isinstance(_step2_slot, int):
+            raise ValueError(
+                "generate_boot_image: Step-2 Namespace rows require an integer nsSlot")
+        _state_row = _state_by_slot.get(_step2_slot)
+        if _state_row is None:
+            raise ValueError(
+                f"generate_boot_image: Step-2 row NS[{_step2_slot}] is not present "
+                "in authoritative Namespace state")
+        _state_token = str(
+            _state_row.get("token") or _state_row.get("cache_token") or "").lower()
+        _step2_token = _step2_row.get("lumpToken")
+        if _step2_token is not None and str(_step2_token).lower() != _state_token:
+            raise ValueError(
+                f"generate_boot_image: Step-2 token for NS[{_step2_slot}] "
+                "disagrees with Namespace state")
+        _state_policy = str(
+            _state_row.get("load_policy", _state_row.get("loadPolicy"))
+            or ("Resident" if _state_row.get("resident") else "Lazy")
+        )
+        _step2_policy = _step2_row.get("loadPolicy", _step2_row.get("load_policy"))
+        if _step2_policy is not None and str(_step2_policy) != _state_policy:
+            raise ValueError(
+                f"generate_boot_image: Step-2 load policy for NS[{_step2_slot}] "
+                "disagrees with Namespace state")
+        _state_resident = _state_policy == "Resident"
+        if "resident" in _step2_row and bool(_step2_row.get("resident")) != _state_resident:
+            raise ValueError(
+                f"generate_boot_image: Step-2 residency for NS[{_step2_slot}] "
+                "disagrees with Namespace state")
+        if _step2_row.get("physAddr") is not None:
+            _state_location = _state_row.get("location")
+            try:
+                _state_location = int(str(_state_location), 0)
+            except (TypeError, ValueError):
+                _state_location = None
+            if _state_location is None or int(_step2_row["physAddr"]) != _state_location:
+                raise ValueError(
+                    f"generate_boot_image: Step-2 physical placement for NS[{_step2_slot}] "
+                    "disagrees with Namespace state")
     # Foundational slots (0=NS, 1=Thread, 6=SelfTest) and MMIO device-register
     # windows (2-5) must not be overridden by caller-supplied physAddr values.
     _FOUNDATIONAL_SLOTS = {0, 1}  # Namespace and Thread are the only protected slots.
@@ -2564,14 +2657,9 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             phys_override[int(ns_slot)] = int(e["physAddr"])
 
     _manifest_path_for_cache = os.path.join(lumps_dir, "manifest.json")
-    _selected_slot_tokens = {
-        int(e.get("nsSlot")): e.get("lumpToken")
-        for e in step2_lumps
-        if isinstance(e, dict)
-        and isinstance(e.get("nsSlot"), int)
-        and isinstance(e.get("lumpToken"), str)
-        and e.get("lumpToken")
-    }
+    # Configured Step-2 tokens were validated above only for compatibility;
+    # Namespace state remains the sole source used to resolve artifact bytes.
+    _selected_slot_tokens = {}
     trusted_cache_tokens = _load_trusted_cache_token_map(_manifest_path_for_cache)
     # A frozen bootstrap resident uses its approved SELF capability as the
     # descriptor's non-authoritative cache word.  This is deliberately not

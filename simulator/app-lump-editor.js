@@ -312,25 +312,15 @@
         var s1payload = _getStep1Payload();
         if (statusEl) statusEl.textContent = 'Saving step 1\u2026';
         if (errEl)    errEl.textContent    = '';
-        return fetch('/api/boot-config')
+        return fetch('/api/boot-config', { cache: 'no-store' })
         .then(function(r) { return r.json(); })
         .then(function(current) {
-            var selected = parseInt(localStorage.getItem('bootEntrySlot'), 10);
-            var preparedUi = (typeof window !== 'undefined' && window.BootEntryUI &&
-                typeof window.BootEntryUI.get === 'function') ? window.BootEntryUI.get() : null;
-            // Persist only an explicitly prepared browser selection or an
-            // explicit Save prepared selection. Do not turn a geometry/policy
-            // edit into a boot-target repair for an unprepared/stale image.
-            var bootEntrySlot = preparedUi && preparedUi.status === 'prepared' &&
-                Number.isInteger(selected) && selected >= 0
-                ? selected : null;
             var merged = {
                 targetBoard: s1payload.targetBoard,
                 step1:       s1payload.step1,
                 step2:       (current && current.config && current.config.step2) || { lumps: [] },
                 step3:       (current && current.config && current.config.step3) || { emptySlotCount: 0 }
             };
-            if (bootEntrySlot !== null) merged.bootEntrySlot = bootEntrySlot;
             return fetch('/api/boot-config', {
                 method:  'POST',
                 headers: Object.assign({'Content-Type': 'application/json'},
@@ -399,6 +389,9 @@
         step2State:     {},
         emptySlotCount: 0,
         bootEntrySlot:  null,
+        namespaceFingerprint: '',
+        namespaceRows:  [],
+        showAllBootTargets: false,
         limits:         { maxNsEntries: 256, baseNamedNsCount: 47 },
         loaded:         false,
         loading:        false,
@@ -415,23 +408,38 @@
         _rl.statusMsg = '';
         var el = document.getElementById('lumpResidentPanel');
         if (el) el.innerHTML = '<div class="le-panel"><p class="le-panel-desc">Loading catalog\u2026</p></div>';
-        fetch('/api/boot-config')
+        fetch('/api/boot-config', { cache: 'no-store' })
             .then(function(r) { return r.json(); })
-            .then(function(data) {
+            .then(async function(data) {
+                const nsResponse = await fetch('/api/boot-image/ns-state', {
+                    cache: 'no-store',
+                });
+                const nsState = await nsResponse.json();
+                if (!nsResponse.ok || !nsState ||
+                        typeof nsState.namespaceFingerprint !== 'string') {
+                    throw new Error((nsState && nsState.error) ||
+                        'authoritative Namespace state is unavailable');
+                }
+                window._nsState = nsState;
+                if (typeof window._applyNamespaceBootProjection === 'function') {
+                    window._applyNamespaceBootProjection(nsState);
+                }
                 _rl.loading = false;
                 _rl.loaded  = true;
                 _rl.catalog = typeof _normalizeLumpCatalogEntries === 'function'
                     ? _normalizeLumpCatalogEntries((data && data.lumpCatalog) || [])
                     : ((data && data.lumpCatalog) || []);
                 _rl.limits  = (data && data.limits) || { maxNsEntries: 256, baseNamedNsCount: 47 };
+                _rl.namespaceFingerprint = nsState.namespaceFingerprint;
+                _rl.namespaceRows = Array.isArray(nsState.abstractions)
+                    ? nsState.abstractions : [];
+                var bootRow = _rl.namespaceRows.find(function(row) {
+                    return row && row.boot === true && Number.isInteger(Number(row.slot));
+                });
+                _rl.bootEntrySlot = bootRow ? Number(bootRow.slot) : null;
+                // boot-config supplies editor geometry/policy projections only;
+                // Namespace state supplies the sole boot target.
                 var cfg = (data && data.config) || (data && data.defaults) || {};
-                var savedBootSlot = cfg && cfg.bootEntrySlot;
-                // Loading the configuration is inspection only. Never call the
-                // Prepare action here: merely opening this panel must not
-                // rewrite an imported/stale image's Thread CR0 home.
-                if (Number.isInteger(savedBootSlot) && savedBootSlot >= 0) {
-                    _rl.bootEntrySlot = savedBootSlot;
-                }
                 _rlInitStep2(cfg);
                 var s3 = cfg.step3 || {};
                 _rl.emptySlotCount = Number.isFinite(s3.emptySlotCount) ? s3.emptySlotCount : 0;
@@ -457,10 +465,18 @@
             if (cat.nsSlotPolicy === 'dynamic' || cat.floating || cat.nsSlot == null) continue;
             if (_isFixedBootStep2Slot(cat.nsSlot)) continue;
             var saved = savedMap[cat.nsSlot];
+            var nsRow = _rl.namespaceRows.find(function(row) {
+                return row && Number(row.slot) === Number(cat.nsSlot);
+            });
+            var nsPolicy = nsRow && (nsRow.load_policy || nsRow.loadPolicy);
+            if (!['Empty', 'Resident', 'Preload', 'Lazy'].includes(nsPolicy) &&
+                    nsRow && nsRow.resident === true && nsRow.boot_resident === true) {
+                nsPolicy = 'Resident';
+            }
             _rl.step2State[cat.nsSlot] = {
                 // The catalog owns all transport and binary metadata.  This
                 // is the programmer-facing decision: exactly one policy.
-                loadPolicy: (saved && (saved.loadPolicy || saved.load_policy)) ||
+                loadPolicy: nsPolicy || (saved && (saved.loadPolicy || saved.load_policy)) ||
                     (saved && saved.resident ? 'Resident' :
                         (saved && saved.prefetch ? 'Preload' : 'Lazy')),
                 physAddr:    (saved && Number.isFinite(saved.physAddr)) ? saved.physAddr : null,
@@ -645,8 +661,9 @@
 
         // Boot entry controls remain available, but the resident summary above
         // is the user-facing source/build/deployment model.
-        var bootSlot = parseInt(localStorage.getItem('bootEntrySlot'), 10);
-        if (!Number.isFinite(bootSlot) || bootSlot < 0) bootSlot = _rl.bootEntrySlot;
+        // The current boot target is projected from committed Namespace state.
+        // Do not fall back to config or browser storage here.
+        var bootSlot = Number.isInteger(_rl.bootEntrySlot) ? _rl.bootEntrySlot : null;
         var bootCatEntry = null;
         for (var bi = 0; bi < _rl.catalog.length; bi++) {
             if (_rl.catalog[bi].nsSlot === bootSlot) { bootCatEntry = _rl.catalog[bi]; break; }
@@ -662,9 +679,15 @@
         if (!_rl.catalog.length) {
             bootEntryCell = '<td class="le-rl-td"><span class="le-rl-boot-note">\u2014 loading catalog \u2014</span></td>';
         } else {
-            var showAll = localStorage.getItem('bootDropdownShowAll') === '1';
+            var showAll = _rl.showAllBootTargets === true;
             var validBootTarget = function (ce) {
-                return ce.nsSlotPolicy !== 'dynamic' && ce.hasExecutableMethods;
+                if (ce.nsSlotPolicy === 'dynamic' || !ce.hasExecutableMethods) return false;
+                var nsRow = _rl.namespaceRows.find(function(row) {
+                    return row && Number(row.slot) === Number(ce.nsSlot);
+                });
+                return !!(nsRow && nsRow.resident === true &&
+                    nsRow.boot_resident === true &&
+                    (nsRow.load_policy || nsRow.loadPolicy) === 'Resident');
             };
             var hiddenCount = 0;
             for (var hci = 0; hci < _rl.catalog.length; hci++) {
@@ -1306,7 +1329,7 @@
         if (_nsDrill.loading) return;
         if (_nsDrill.loaded && !force) return;
         _nsDrill.loading = true;
-        fetch('/api/boot-image/ns-state')
+        fetch('/api/boot-image/ns-state', { cache: 'no-store' })
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 _nsDrill.loading  = false;
@@ -1314,6 +1337,15 @@
                 _nsDrill.errorMsg = (data && data.error) ? String(data.error) : '';
                 _nsDrill.entries  = (data && Array.isArray(data.abstractions)) ? data.abstractions : [];
                 _nsDrill.committed = (data && data.committed) ? data.committed : null;
+                if (data && typeof data.namespaceFingerprint === 'string') {
+                    _rl.namespaceFingerprint = data.namespaceFingerprint;
+                    _rl.namespaceRows = _nsDrill.entries.slice();
+                    var _nsBootRow = _rl.namespaceRows.find(function(row) {
+                        return row && row.boot === true &&
+                            Number.isInteger(Number(row.slot));
+                    });
+                    _rl.bootEntrySlot = _nsBootRow ? Number(_nsBootRow.slot) : null;
+                }
                 // First-run seeding: when the programmer has never saved a
                 // design locally, adopt the committed image's geometry as the
                 // approved starting point so a valid committed image opens clean.
@@ -1562,11 +1594,16 @@
                     shapeFaults.push('Thread CR0 boot-entry capability at +' + (_thr.capsOffset || 244) + ' is a Null GT \u2014 boot cannot dispatch');
                 } else {
                     var _cr0 = _decodeGTWord(_thr.cr0Word >>> 0);
-                    var _apprBoot = parseInt(localStorage.getItem('bootEntrySlot'), 10);
+                    var _bootMarkerRow = _nsDrill.entries.find(function(row) {
+                        return row && row.boot === true;
+                    });
+                    var _apprBoot = _bootMarkerRow &&
+                        Number.isInteger(Number(_bootMarkerRow.slot))
+                        ? Number(_bootMarkerRow.slot) : null;
                     if (typeof _thr.bootSlot === 'number' && _cr0.slot !== _thr.bootSlot) {
                         shapeFaults.push('Thread CR0 targets NS slot ' + _cr0.slot +
                             ' but the committed boot-entry sentinel says slot ' + _thr.bootSlot);
-                    } else if (!isNaN(_apprBoot) && _cr0.slot !== _apprBoot) {
+                    } else if (_apprBoot !== null && _cr0.slot !== _apprBoot) {
                         shapeFaults.push('Thread CR0 targets NS slot ' + _cr0.slot +
                             '; the selected boot entry is slot ' + _apprBoot);
                     }
@@ -1799,15 +1836,35 @@
 
     window.lumpEditorBootEntryChange = function (nsSlot) {
         if (!Number.isFinite(nsSlot) || nsSlot < 0) return;
-        if (typeof setBootEntrySlot === 'function') {
-            if (setBootEntrySlot(nsSlot) === true) {
-                _rl.bootEntrySlot = nsSlot;
-                renderResidentPanel();
-            }
-        } else {
+        if (typeof setBootEntrySlot !== 'function') {
             _rl.errorMsg = 'Boot-entry preparation is unavailable. The selection was not saved.';
             renderResidentPanel();
+            return;
         }
+        _rl.errorMsg = '';
+        _rl.statusMsg = 'Saving Namespace Lightning Bolt…';
+        renderResidentPanel();
+        return Promise.resolve(setBootEntrySlot(nsSlot)).then(function(ok) {
+            if (ok === true) {
+                _rl.bootEntrySlot = Number(nsSlot);
+                if (window._nsState &&
+                        Array.isArray(window._nsState.abstractions)) {
+                    _rl.namespaceRows = window._nsState.abstractions.slice();
+                    _rl.namespaceFingerprint =
+                        window._nsState.namespaceFingerprint || _rl.namespaceFingerprint;
+                }
+                _rl.statusMsg = 'Namespace Lightning Bolt saved. Generate the image before reset.';
+            } else {
+                _rl.statusMsg = '';
+                _rl.errorMsg = 'Namespace Lightning Bolt was not saved. See the Namespace status for the next action.';
+            }
+            renderResidentPanel();
+        }).catch(function(error) {
+            _rl.statusMsg = '';
+            _rl.errorMsg = 'Namespace Lightning Bolt was not saved: ' +
+                (error && error.message ? error.message : String(error));
+            renderResidentPanel();
+        });
     };
 
     window.lumpEditorBootBadgeClick = function (nsSlot) {
@@ -1822,7 +1879,7 @@
     };
 
     window.lumpEditorBootShowAllToggle = function (checked) {
-        localStorage.setItem('bootDropdownShowAll', checked ? '1' : '0');
+        _rl.showAllBootTargets = checked === true;
         renderResidentPanel();
     };
 
@@ -1922,11 +1979,6 @@
         var p = _getStep1Payload();
         var payload = {
             targetBoard: p.targetBoard,
-            bootEntrySlot: (function () {
-                var selected = parseInt(localStorage.getItem('bootEntrySlot'), 10);
-                return Number.isInteger(selected) && selected >= 0
-                    ? selected : _rl.bootEntrySlot;
-            }()),
             step1:       p.step1,
             step2:       { lumps: step2Lumps },
             step3:       { emptySlotCount: _rl.emptySlotCount || 0 }

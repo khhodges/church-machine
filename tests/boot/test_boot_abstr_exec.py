@@ -37,6 +37,9 @@ ROOT      = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)
 
 from server.boot_image import generate_boot_image, BOOT_ABSTR_NS_SLOT  # noqa: E402
+from tests.boot.test_boot_image_matches_simulator import (  # noqa: E402
+    _write_synthetic_boot_abstr_lump,
+)
 
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
 HARNESS   = os.path.join(ROOT, "tests", "boot", "sim_boot_loader.js")
@@ -136,8 +139,11 @@ def test_boot_abstr_direct_dispatch_cr0(cfg, tmp_path):
       - CR0.word0 is non-zero and carries only E-permission.
       - CR0 NS index matches bootEntrySlot.
     """
-    lump_filename = f"{BOOT_ABSTR_NS_SLOT << 8:08x}.lump"
-    (tmp_path / lump_filename).write_bytes(_make_synthetic_lump())
+    # The generator now requires an explicit Namespace marker and an exact
+    # state/manifest/approval binding; use the shared private fixture rather
+    # than the retired slot-derived filename fallback.
+    _write_synthetic_boot_abstr_lump(
+        str(tmp_path), cc=1, bootstrap_token="4a000006")
 
     image = generate_boot_image(cfg, str(tmp_path))
     status = _run_harness(cfg, image)

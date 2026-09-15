@@ -89,10 +89,25 @@ function _hydrateNsSymbolicState() {
 function _nsInheritSavedArtifactMetadata(rich, saved, symbolic) {
     if (symbolic || !saved || saved.name !== rich.name) return rich;
     for (const key of [
-        'token', 'filename', 'issue_n', 'resident',
-        'binaryHash', 'identityHash', 'cacheToken'
+        // Artifact identity (both canonical and compatibility spellings).
+        'token', 'filename', 'issue_n', 'lump_version', 'binaryHash',
+        'binary_hash', 'identityHash', 'identity_hash', 'cacheToken',
+        'cache_token',
+        // Namespace policy and resident eligibility. These fields are not
+        // encoded in the four descriptor words, so a raw-table save must carry
+        // the exact committed values forward for an unchanged row.
+        'resident', 'boot_resident', 'load_policy', 'loadPolicy',
+        'ns_slot_policy', 'static', 'archived',
+        // Resolver/catalog metadata used to bind the row back to its LUMP.
+        'lumpSize', 'lump_size', 'grants', 'rights', 'capabilityType',
+        'capability_type', 'gtType', 'gt_type', 'authorized',
+        'authorization', 'install_authorized', 'physAddr', 'phys_addr',
+        'source', 'abstraction', 'dotName', 'dot_name', 'lumpToken',
+        'lump_token'
     ]) {
-        if (saved[key] !== undefined && saved[key] !== null) rich[key] = saved[key];
+        if (saved[key] !== undefined && saved[key] !== null) {
+            rich[key] = Array.isArray(saved[key]) ? saved[key].slice() : saved[key];
+        }
     }
     return rich;
 }
@@ -103,6 +118,9 @@ function _nsInheritSavedArtifactMetadata(rich, saved, symbolic) {
             if (!s || typeof s !== 'object') return;
             window._nsState = s;
             _hydrateNsSymbolicState();
+            if (typeof window._applyNamespaceBootProjection === 'function') {
+                window._applyNamespaceBootProjection(s);
+            }
             if (typeof updateNamespace === 'function') updateNamespace();
         })
         .catch(function() {});
@@ -211,8 +229,31 @@ function _nsSavedLoadPolicy(slot, manifest) {
     const rows = cfg.step2 && Array.isArray(cfg.step2.lumps) ? cfg.step2.lumps : [];
     const saved = rows.find(row => row && Number(row.nsSlot) === Number(slot)) || null;
     const savedValue = saved && (saved.loadPolicy || saved.load_policy);
+    const authorityRows = window._nsState &&
+        Array.isArray(window._nsState.abstractions)
+        ? window._nsState.abstractions : [];
+    const authorityRow = authorityRows.find(row => row &&
+        Number(row.slot) === Number(slot)) || null;
+    const authorityValue = authorityRow &&
+        (authorityRow.load_policy || authorityRow.loadPolicy);
+    // An unsaved policy edit is an intentional local draft. Otherwise the
+    // authoritative Namespace row wins over boot-config compatibility data,
+    // which may lag (notably for the resident boot target).
+    const draftSlots = window._nsPrefetchDirtySlots || {};
+    if (window._nsPrefetchDirty === true &&
+            draftSlots[String(slot)] === true && valid.includes(savedValue)) {
+        return savedValue;
+    }
+    if (valid.includes(authorityValue)) return authorityValue;
+    if (authorityRow && authorityRow.resident === true &&
+            authorityRow.boot_resident === true) {
+        return 'Resident';
+    }
+    // Once an authoritative Namespace snapshot exists, an absent row is not
+    // membership evidence in boot-config. Let the caller render its neutral
+    // default rather than allowing stale config to invent a Namespace row.
+    if (authorityRows.length > 0) return null;
     if (valid.includes(savedValue)) return savedValue;
-
     const manifestValue = manifest && (manifest.loadPolicy || manifest.load_policy);
     if (valid.includes(manifestValue)) return manifestValue;
     if (manifest && typeof manifest.boot_resident === 'boolean') {
@@ -418,7 +459,7 @@ function updateCRDetail() {
                         }
                         const nsIdx2 = parsed.index;
                         const label2 = (sim.nsLabels && sim.nsLabels[nsIdx2]) || null;
-                        const isBootEntry = (p.E && nsIdx2 === sim.bootEntrySlot);
+                        const isBootEntry = (p.E && nsIdx2 === bootEntrySlot);
                         const nameStr = label2
                             ? (isBootEntry
                                 ? `<span class="abs-nsdecoder-badge-boot">\u26a1</span> <strong>${label2}</strong> <span style="color:#6b7280;font-size:0.8em;margin-left:4px;">NS[${nsIdx2}]</span>`
@@ -2658,17 +2699,12 @@ function _tzToggle(hdr) {
     if (chevron) chevron.textContent = nowCollapsed ? '▶' : '▼';
 }
 
-function _installBootEntryGTIntoCR0() {
-    // Compatibility command only. The core owns the canonical Thread layout
-    // and transaction boundary; no UI path may synthesize a GT or touch live
-    // CR0 while changing a next-boot selection.
-    if (!sim || typeof sim.prepareBootEntry !== 'function') return false;
-    const prepared = sim.prepareBootEntry(bootEntrySlot);
-    if (!prepared || !prepared.ok) return false;
-    if (typeof window._commitPreparedBootEntry === 'function') {
-        window._commitPreparedBootEntry(bootEntrySlot, prepared);
-    }
-    return true;
+async function _installBootEntryGTIntoCR0() {
+    // Compatibility command only. A next-boot choice is a Namespace marker
+    // transaction; never synthesize a GT or touch live CR0 from the UI.
+    if (typeof setBootEntrySlot !== 'function' ||
+            !Number.isInteger(bootEntrySlot)) return false;
+    return (await setBootEntrySlot(bootEntrySlot)) === true;
 }
 
 function renderMemoryDump(location, limit, nsIndex) {
@@ -2922,6 +2958,9 @@ function _setActiveBootConfig(config, serverInvalidated, invalidatedImageWords) 
     const nextWords = config && config.step1
         ? config.step1.totalNamespaceWords : null;
     window.bootConfig = config || null;
+    // bootEntrySlot in boot-config is a compatibility projection only. The
+    // Namespace marker loaded by /api/boot-image/ns-state is the sole plan
+    // authority and is intentionally not replaced by config responses.
     if (serverInvalidated || (
         Number.isInteger(previousWords) && Number.isInteger(nextWords) &&
         previousWords !== nextWords
@@ -3055,7 +3094,10 @@ function generateBootImage(onApplied) {
     fetch('/api/boot-image/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entrySlot: bootEntrySlot }),
+        // The server resolves the entry exclusively from the committed
+        // Namespace marker. A compatibility projection must not become a
+        // second boot-plan authority merely because this is a generate call.
+        body: JSON.stringify({}),
     })
         .then(r => _actionableJsonResponse(r, 'Generate the boot image', {
             dataChanged: false,
@@ -3166,7 +3208,7 @@ function uploadBootImageFile(file) {
                             if (sim.loadBootImage(buf) === true) {
                                 window.bootImage = buf;
                                 window.bootImageAvailable = true;
-                                _syncBootEntryFromSim();
+                                _applyBootEntryToSim();
                             } else {
                                 window.bootImage = null;
                                 window.bootImageAvailable = false;
@@ -3389,6 +3431,8 @@ function updateNamespace() {
                     !item || Number(item.nsSlot) !== Number(slot));
             }
             window._nsPrefetchDirty = true;
+            window._nsPrefetchDirtySlots = window._nsPrefetchDirtySlots || {};
+            window._nsPrefetchDirtySlots[String(slot)] = true;
             _setNsDirty(true);
             updateNamespace();
             return;
@@ -3410,6 +3454,8 @@ function updateNamespace() {
         }
         row.loadPolicy = policy;
         row.resident = row.loadPolicy === 'Resident'; // legacy readers
+        window._nsPrefetchDirtySlots = window._nsPrefetchDirtySlots || {};
+        window._nsPrefetchDirtySlots[String(slot)] = true;
         // Source metadata is catalog-owned.  The server fills any omitted
         // binding, but retain a cached catalog record when it is available so
         // the pending Namespace row remains self-describing before save.
@@ -3445,18 +3491,6 @@ function updateNamespace() {
     window._ensureNamespaceBuildConfig = async function() {
         const localCfg = (window.bootConfig && typeof window.bootConfig === 'object')
             ? window.bootConfig : {};
-        let selectedBootEntry = null;
-        try {
-            const storedBootEntry = Number.parseInt(localStorage.getItem('bootEntrySlot'), 10);
-            const bindingUi = window.BootEntryUI && typeof window.BootEntryUI.get === 'function'
-                ? window.BootEntryUI.get() : null;
-            // A namespace-policy save must not turn an imported image/local
-            // discrepancy into an implicit boot-target repair.
-            if (bindingUi && bindingUi.status === 'prepared' &&
-                    Number.isInteger(storedBootEntry) && storedBootEntry >= 0) {
-                selectedBootEntry = storedBootEntry;
-            }
-        } catch (_) {}
         let serverData = null;
         if (!localCfg.step1) {
             const configResponse = await fetch('/api/boot-config');
@@ -3496,7 +3530,6 @@ function updateNamespace() {
             step2: { lumps: step2Rows },
             step3: localCfg.step3 || baseCfg.step3 || { emptySlotCount: 0 }
         };
-        if (selectedBootEntry != null) cfg.bootEntrySlot = selectedBootEntry;
         if (!cfg.step1) {
             throw new Error('The default build configuration is unavailable.');
         }
@@ -3512,7 +3545,6 @@ function updateNamespace() {
                     step2: cfg.step2 || { lumps: [] },
                     step3: cfg.step3 || { emptySlotCount: 0 }
                 };
-                if (Number.isInteger(cfg.bootEntrySlot)) payload.bootEntrySlot = cfg.bootEntrySlot;
                 const hasLocalSlotRules = Object.prototype.hasOwnProperty.call(
                     localCfg, 'slotRules');
                 const hasServerSlotRules = Object.prototype.hasOwnProperty.call(
@@ -3535,6 +3567,7 @@ function updateNamespace() {
             body.invalidatedBootImageWords
         );
         window._nsPrefetchDirty = false;
+        window._nsPrefetchDirtySlots = {};
         return window.bootConfig;
     };
 
@@ -4660,7 +4693,7 @@ window._nsTableSave = async function(btn) {
     if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; btn.style.color = '#ccc'; }
     const nsSaveBootUi = typeof window !== 'undefined' && window.BootEntryUI &&
         typeof window.BootEntryUI.get === 'function' ? window.BootEntryUI.get() : null;
-    const nsSaveBootEntry = Number(bootEntrySlot);
+    const nsSaveBootEntry = Number.isInteger(bootEntrySlot) ? bootEntrySlot : null;
     const nsSavePreparedSelection = nsSaveBootUi &&
         nsSaveBootUi.status === 'prepared' &&
         Number.isInteger(nsSaveBootEntry) && nsSaveBootUi.slot === nsSaveBootEntry;
@@ -4683,6 +4716,35 @@ window._nsTableSave = async function(btn) {
     } catch (_) {}
 
     try {
+        // Every Namespace write is a compare-and-swap against the exact
+        // server snapshot the user inspected. Do not invent a fingerprint
+        // from browser rows: the server owns canonical identity and policy.
+        let namespaceAuthority = window._nsState;
+        if (!namespaceAuthority ||
+                typeof namespaceAuthority.namespaceFingerprint !== 'string' ||
+                !namespaceAuthority.namespaceFingerprint.trim()) {
+            const nsStateResponse = await fetch('/api/boot-image/ns-state', {
+                cache: 'no-store',
+            });
+            namespaceAuthority = await _actionableJsonResponse(
+                nsStateResponse, 'Load the authoritative Namespace state', {
+                    dataChanged: false,
+                    nextAction: 'Reload Namespace, then retry Save for next build.',
+                });
+            if (!namespaceAuthority ||
+                    typeof namespaceAuthority.namespaceFingerprint !== 'string' ||
+                    !namespaceAuthority.namespaceFingerprint.trim()) {
+                throw new Error(
+                    'The authoritative Namespace fingerprint is unavailable; reload Namespace and retry.');
+            }
+            window._nsState = namespaceAuthority;
+        }
+        const namespaceFingerprint = namespaceAuthority.namespaceFingerprint.trim();
+        if (!Number.isInteger(nsSaveBootEntry)) {
+            throw new Error(
+                'No committed Namespace boot marker is selected; choose a Lightning Bolt target, then retry Save for next build.');
+        }
+
         // A Namespace save must never snapshot the simulator's fallback memory,
         // but it can recover a missing/stale saved image safely.  Persist the
         // selected build config first (which may invalidate the old image),
@@ -4692,6 +4754,31 @@ window._nsTableSave = async function(btn) {
         // Preserve that image for this explicit Namespace save; regenerating
         // here would discard unsaved slot locations and resident artifacts.
         const hasLiveBootImage = sim._bootImageLoaded === true;
+        let imageBinding = null;
+        try {
+            imageBinding = typeof sim.inspectBootEntryBinding === 'function'
+                ? sim.inspectBootEntryBinding() : null;
+        } catch (_) {}
+        const imageTarget = imageBinding &&
+            Number.isInteger(imageBinding.targetSlot) ? imageBinding.targetSlot : null;
+        if (hasLiveBootImage && Number.isInteger(nsSaveBootEntry) &&
+                imageTarget !== nsSaveBootEntry) {
+            // The loaded image is evidence, not a Namespace override. An
+            // explicit Save may prepare a candidate only after the Namespace
+            // marker has committed, so the submitted image and marker agree.
+            if (typeof sim.prepareBootEntry !== 'function') {
+                throw new Error(
+                    `Loaded image targets NS[${imageTarget == null ? '?' : imageTarget}], ` +
+                    `but Namespace targets NS[${nsSaveBootEntry}]. Reload or regenerate before saving.`);
+            }
+            const preparedCandidate = sim.prepareBootEntry(nsSaveBootEntry);
+            if (!preparedCandidate || preparedCandidate.ok !== true) {
+                throw new Error(
+                    `Could not prepare loaded-image evidence for Namespace NS[${nsSaveBootEntry}]: ` +
+                    (preparedCandidate && (preparedCandidate.error || preparedCandidate.reason) ||
+                        'preparation failed'));
+            }
+        }
         if ((!window.bootImage || !window.bootImageAvailable) && !hasLiveBootImage &&
                 !nsSavePreparedSelection) {
             await window._ensureNamespaceBuildConfig();
@@ -4700,7 +4787,9 @@ window._nsTableSave = async function(btn) {
                 const _genResp = await fetch('/api/boot-image/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ entrySlot: bootEntrySlot }),
+                    // Generation resolves the committed Namespace marker;
+                    // do not pass the UI projection as a second plan.
+                    body: JSON.stringify({}),
                 });
                 await _actionableJsonResponse(_genResp, 'Generate the image for Namespace save', {
                     dataChanged: false,
@@ -4848,36 +4937,6 @@ window._nsTableSave = async function(btn) {
             binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
         }
         const data_b64 = btoa(binary);
-        // The drag-selected Lightning Bolt lives in this serialized image,
-        // not merely in the previously saved Designer config. Submit a full
-        // candidate only when the selection was successfully prepared before
-        // this Save began; ordinary Namespace saves retain their saved config.
-        let bootConfigCandidate = null;
-        if (nsSavePreparedSelection) {
-            bootConfigCandidate = window.bootConfig &&
-                typeof window.bootConfig === 'object'
-                ? Object.assign({}, window.bootConfig) : null;
-            if (!bootConfigCandidate || !bootConfigCandidate.step1 ||
-                    !bootConfigCandidate.targetBoard) {
-                const cfgResponse = await fetch('/api/boot-config', { cache: 'no-store' });
-                const cfgBody = await _actionableJsonResponse(
-                    cfgResponse, 'Load the Namespace build configuration', {
-                        dataChanged: false,
-                        nextAction: 'Open Boot Image Designer, save its geometry, then retry Namespace Save.',
-                    });
-                bootConfigCandidate = Object.assign({},
-                    (cfgBody && (cfgBody.config || cfgBody.defaults)) || {});
-            }
-            if (!bootConfigCandidate.step1 || !bootConfigCandidate.targetBoard) {
-                throw new Error('Namespace Save needs a complete boot configuration for the prepared Lightning Bolt slot.');
-            }
-            bootConfigCandidate.bootEntrySlot = nsSaveBootEntry;
-            // This full Save NS transaction contains an image that was
-            // explicitly prepared in-browser.  Keep intent distinct from a
-            // normal Designer payload that merely repeats its saved slot.
-            bootConfigCandidate.prepareBootEntry = true;
-        }
-
         if (_nsSaveDiagnostics) {
             try {
                 _nsSaveDiagnostics.stageComplete(_nsSaveMetadata, 'prepare',
@@ -4888,9 +4947,10 @@ window._nsTableSave = async function(btn) {
             } catch (_) {}
         }
 
-        // POST to the single-write path. A prepared Lightning Bolt selection
-        // carries a complete config candidate so config/image/ns-state commit
-        // together; never config-POST first and risk a partial authority save.
+        // POST to the single-write Namespace transaction. Boot configuration is
+        // deliberately omitted: Namespace state is the sole boot authority and
+        // the server reads policy/config projections without accepting a second
+        // boot-target decision.
         const resp = await fetch('/api/boot-image/save-ns', {
             method:  'POST',
             headers: Object.assign({'Content-Type': 'application/json'},
@@ -4899,7 +4959,8 @@ window._nsTableSave = async function(btn) {
             body:    JSON.stringify({
                 data_b64,
                 ns_state: nsState,
-                boot_config: bootConfigCandidate,
+                namespaceFingerprint,
+                boot_config: null,
                 // Non-authoritative correlation only; the server's Namespace
                 // state and atomic write identity do not include this field.
                 diagnostic_attempt_id: _nsSaveMetadata.diagnostic_attempt_id,
@@ -4940,17 +5001,30 @@ window._nsTableSave = async function(btn) {
             window.bootImageAvailable = true;
         }
 
-        // Refresh the committed ns-state so _findSrcLump uses the new map.
-        window._nsState = nsState;
+        // Refresh the committed ns-state and its new CAS fingerprint. The
+        // submitted fingerprint is now stale because the saved raw table may
+        // have changed; never reuse it for a later mutation.
+        try {
+            const committedStateResponse = await fetch('/api/boot-image/ns-state', {
+                cache: 'no-store',
+            });
+            const committedState = await _actionableJsonResponse(
+                committedStateResponse, 'Refresh committed Namespace state', {
+                    dataChanged: true,
+                    nextAction: 'Reload Namespace state before making another change.',
+                });
+            window._nsState = committedState;
+            if (typeof window._applyNamespaceBootProjection === 'function') {
+                window._applyNamespaceBootProjection(committedState);
+            }
+        } catch (refreshError) {
+            window._nsState = null;
+            cacheRefreshError = cacheRefreshError || refreshError;
+        }
 
         // Clear dirty flag — committed state now matches in-memory state.
         _setNsDirty(false);
-
-        if (bootConfigCandidate && data && data.preparation &&
-                Number(bootEntrySlot) === nsSaveBootEntry &&
-                window.BootEntryUI && typeof window.BootEntryUI.noteImagePreparation === 'function') {
-            window.BootEntryUI.noteImagePreparation(data.preparation);
-        }
+        window._nsPrefetchDirtySlots = {};
 
         if (btn) {
             btn.textContent = cacheRefreshError
@@ -5942,16 +6016,9 @@ function _closeCRDetailMenuOnce() {
 
 let selectedAbsIndex = null;
 let absCollapsedLayers = {};
-// Browser storage is only a requested next-boot selection. It is never a
-// fallback boot authority: an image with no prepared binding stays pending
-// until the user deliberately prepares a valid target.
+// Browser storage is never a boot-plan source.  Until the server's Namespace
+// projection or a validated image is loaded, there is deliberately no target.
 let bootEntrySlot = null;
-try {
-    const _storedBootEntry = Number.parseInt(localStorage.getItem('bootEntrySlot'), 10);
-    if (Number.isInteger(_storedBootEntry) && _storedBootEntry >= 0 && _storedBootEntry <= 0xFFFF) {
-        bootEntrySlot = _storedBootEntry;
-    }
-} catch (_e) {}
 let userMethodData = {};
 let userMethodLists = {};
 

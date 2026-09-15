@@ -222,9 +222,19 @@ def test_boot_image_loads_and_boots(cfg, skip_window, expected_ns_count):
         f"CR12 should hold a GT for NS Slot 1 (Boot.Thread); got "
         f"index={_gt_index(status['cr12']['word0'])}"
     )
-    assert _gt_index(status["cr14"]["word0"]) == 6, (
-        f"CR14 should hold a GT for NS Slot 6 (Boot.Abstr/SelfTest code); got "
-        f"index={_gt_index(status['cr14']['word0'])}"
+    with open(os.path.join(LUMPS_DIR, "ns-state.json"), encoding="utf-8") as fh:
+        ns_state = json.load(fh)
+    boot_rows = [
+        row for row in ns_state.get("abstractions", [])
+        if isinstance(row, dict) and row.get("boot") is True
+    ]
+    assert len(boot_rows) == 1, (
+        "private boot fixture must contain exactly one Namespace boot marker"
+    )
+    expected_boot_slot = boot_rows[0]["slot"]
+    assert _gt_index(status["cr14"]["word0"]) == expected_boot_slot, (
+        f"CR14 should hold a GT for Namespace boot slot {expected_boot_slot}; "
+        f"got index={_gt_index(status['cr14']['word0'])}"
     )
     # CR6 at HALT depends on the embedded Boot.Abstr lump's cc field:
     #   cc=0 (default / pre-LAZY placeholder): B:06 NUC_CLIST leaves CR6 NULL.
@@ -233,8 +243,9 @@ def test_boot_image_loads_and_boots(cfg, skip_window, expected_ns_count):
     # Both are correct — the distinction is whether POLA compression has been
     # applied and saved to 00000600.lump (Task #651 applies to the cc=0 path).
     cr6_idx = _gt_index(status["cr6"]["word0"])
-    assert cr6_idx == 0 or cr6_idx == 6, (
-        f"CR6 at HALT must be NULL (cc=0, index=0) or Boot.Abstr GT (cc>0, index=6); "
+    assert cr6_idx == 0 or cr6_idx == expected_boot_slot, (
+        f"CR6 at HALT must be NULL (cc=0, index=0) or the Namespace boot GT "
+        f"(cc>0, index={expected_boot_slot}); "
         f"got index={cr6_idx}"
     )
 

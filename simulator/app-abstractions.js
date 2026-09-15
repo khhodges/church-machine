@@ -87,9 +87,10 @@
         '      ; Identical behaviour to CHANGE CR12 — no extra boot step required',
     ].join('\n'),
 
-    // ── Slot 3: Boot entry (default: LED Flash demo) ─────────────────────────
+    // ── Slot 3: Boot entry example (not the live boot plan) ──────────────────
     // Covers boot phases B:03 (INIT_ABSTR), B:04 (LOAD_NUC), B:05 (COMPLETE).
-    // The boot entry is user-configurable via ⚡ (bootEntrySlot, default 3).
+    // The live boot entry is projected from the committed Namespace marker
+    // (currently CapabilityTest at NS[10]); this catalog entry is example data.
     // B:03 and B:04 are indivisible — they always execute in the same Step.
     // B:04 and B:05 are also indivisible.
     //
@@ -573,7 +574,7 @@ function renderAbstractions() {
 // LightningBolt selection and cannot be configured independently.
 function setNextAfterSelfTestSlot(idx) {
     // Legacy callers now choose the same target used by the LightningBolt.
-    setBootEntrySlot(idx);
+    return setBootEntrySlot(idx);
 }
 window.setNextAfterSelfTestSlot = setNextAfterSelfTestSlot;
 
@@ -626,6 +627,138 @@ function _bootBindingFingerprint(binding) {
     ].map(value => value == null ? '' : String(value)).join('|');
 }
 
+let _namespaceBootMarkerInFlight = null;
+
+function _namespaceResponseError(action, response, body) {
+    const detail = body && (body.error || body.message)
+        ? String(body.error || body.message)
+        : `HTTP ${response && response.status ? response.status : 'request failure'}`;
+    const next = response && response.status === 409
+        ? ' Next: reload the authoritative Namespace state, then retry.'
+        : '';
+    const error = new Error(`${action} failed. ${detail}${next}`);
+    error.status = response && response.status;
+    error.body = body;
+    error.action = action;
+    return error;
+}
+
+async function _namespaceStateForMutation() {
+    const current = window._nsState;
+    if (current && typeof current.namespaceFingerprint === 'string' &&
+            current.namespaceFingerprint.trim()) {
+        return current;
+    }
+    const response = await fetch('/api/boot-image/ns-state', {
+        cache: 'no-store',
+    });
+    let body = null;
+    try { body = await response.json(); } catch (_) {}
+    if (!response.ok || !body || typeof body !== 'object' ||
+            typeof body.namespaceFingerprint !== 'string') {
+        throw _namespaceResponseError(
+            'Load the authoritative Namespace state', response, body);
+    }
+    window._nsState = body;
+    return body;
+}
+
+function _applyNamespaceBootProjection(state, message) {
+    const rows = state && Array.isArray(state.abstractions)
+        ? state.abstractions : [];
+    const marker = rows.find(row => row && row.boot === true &&
+        Number.isInteger(Number(row.slot)));
+    if (!marker) return null;
+    const slot = Number(marker.slot);
+    const changed = bootEntrySlot !== slot;
+    bootEntrySlot = slot;
+    if (changed) _bootEntrySelectionRevision++;
+
+    // A loaded image is evidence only. It may prove that this target is already
+    // prepared, but it must never overwrite the Namespace plan after a reload
+    // or a marker commit.
+    let evidence = null;
+    try {
+        evidence = sim && typeof sim.inspectBootEntryBinding === 'function'
+            ? sim.inspectBootEntryBinding() : null;
+    } catch (_) {}
+    const evidenceSlot = evidence && Number.isInteger(evidence.targetSlot)
+        ? evidence.targetSlot : null;
+    const status = sim && sim._bootImageLoaded === true
+        ? (evidenceSlot === slot ? 'prepared' : 'stale-image')
+        : 'pending';
+    const detail = message || (status === 'prepared'
+        ? 'Namespace boot marker matches the loaded image.'
+        : status === 'stale-image'
+            ? `Namespace boot marker committed at NS[${slot}]. The loaded image targets ` +
+                `NS[${evidenceSlot == null ? '?' : evidenceSlot}]; generate the committed image before reset.`
+            : `Namespace boot marker committed at NS[${slot}]. Generate the committed image before reset.`);
+    _setBootEntryPreparation(slot, status, detail, evidence || marker);
+    return slot;
+}
+
+async function _commitNamespaceBootMarker(slot) {
+    const target = Number(slot);
+    if (!Number.isInteger(target) || target < 0 || target > 255) {
+        throw new Error('Choose a valid Namespace slot (0–255).');
+    }
+    const previousTransaction = _namespaceBootMarkerInFlight;
+    const transaction = (async function() {
+        if (previousTransaction) await previousTransaction;
+        const state = await _namespaceStateForMutation();
+        const fingerprint = String(state.namespaceFingerprint || '').trim();
+        if (!fingerprint) {
+            throw new Error('The authoritative Namespace fingerprint is unavailable; reload Namespace and retry.');
+        }
+        const response = await fetch('/api/namespace/boot-marker', {
+            method: 'POST',
+            headers: Object.assign({'Content-Type': 'application/json'},
+                (window.BuildApprovalView && window.BuildApprovalView._authHeaders
+                    ? window.BuildApprovalView._authHeaders() : {})),
+            body: JSON.stringify({
+                slot: target,
+                namespaceFingerprint: fingerprint,
+            }),
+        });
+        let body = null;
+        try { body = await response.json(); } catch (_) {}
+        if (!response.ok || !body || body.ok !== true) {
+            throw _namespaceResponseError(
+                `Set Namespace Lightning Bolt to NS[${target}]`, response, body);
+        }
+        const nextFingerprint = typeof body.namespaceFingerprint === 'string'
+            ? body.namespaceFingerprint : fingerprint;
+        const rows = Array.isArray(state.abstractions)
+            ? state.abstractions.map(row => Object.assign({}, row, {
+                boot: row && Number(row.slot) === target,
+            })) : state.abstractions;
+        const nextState = Object.assign({}, state, {
+            abstractions: rows,
+            namespaceFingerprint: nextFingerprint,
+        });
+        // Local projections are updated only after the server has acknowledged
+        // its CAS commit. The loaded image remains untouched evidence.
+        window._nsState = nextState;
+        _applyNamespaceBootProjection(nextState);
+        if (typeof updateNamespace === 'function') updateNamespace();
+        if (typeof renderAbstractions === 'function') renderAbstractions();
+        if (typeof window.lumpEditorRenderResidentPanel === 'function') {
+            window.lumpEditorRenderResidentPanel();
+        }
+        return body;
+    })();
+    _namespaceBootMarkerInFlight = transaction;
+    try {
+        return await transaction;
+    } finally {
+        if (_namespaceBootMarkerInFlight === transaction) {
+            _namespaceBootMarkerInFlight = null;
+        }
+    }
+}
+window._commitNamespaceBootMarker = _commitNamespaceBootMarker;
+window._applyNamespaceBootProjection = _applyNamespaceBootProjection;
+
 function _inspectBootEntryBinding() {
     if (!sim || typeof sim.inspectBootEntryBinding !== 'function') {
         return _setBootEntryPreparation(
@@ -667,42 +800,28 @@ function _inspectBootEntryBinding() {
 }
 
 function _commitPreparedBootEntry(slot, prepared) {
-    // Persistence is the first UI commit. If it fails, the caller rolls the
-    // core transaction back before any browser selection/status is changed.
-    const previousSlot = bootEntrySlot;
-    const previousPreparation = _bootEntryPreparation;
-    const previousRevision = _bootEntrySelectionRevision;
-    const previousStored = localStorage.getItem('bootEntrySlot');
-    try {
-        localStorage.setItem('bootEntrySlot', String(slot));
-        bootEntrySlot = slot;
-        _bootEntrySelectionRevision++;
-        _syncSelfTestNextGtToBootEntry(slot);
-        _setBootEntryPreparation(slot, 'prepared',
-            _bootEntryMessage(prepared,
-                'Prepared for the next boot. Image/config changes remain unsaved until you save or generate them.'),
-            prepared && (prepared.binding || prepared));
-        renderAbstractions();
-        if (currentView === 'namespace') updateNamespace();
-        if (typeof window.lumpEditorRenderResidentPanel === 'function') window.lumpEditorRenderResidentPanel();
-        return true;
-    } catch (error) {
-        // Rendering can fail independently of persistence. Restore all
-        // browser-side state before allowing setBootEntrySlot to restore core
-        // memory/header authority as well.
-        bootEntrySlot = previousSlot;
-        _bootEntryPreparation = previousPreparation;
-        _bootEntrySelectionRevision = previousRevision;
-        try {
-            if (previousStored === null) localStorage.removeItem('bootEntrySlot');
-            else localStorage.setItem('bootEntrySlot', previousStored);
-        } catch (_) {}
-        throw error;
+    // The server CAS is the persistence transaction. This compatibility helper
+    // is intentionally projection-only and is called after that transaction
+    // has succeeded; it never writes browser storage or loaded-image memory.
+    bootEntrySlot = Number(slot);
+    _bootEntrySelectionRevision++;
+    _setBootEntryPreparation(Number(slot), prepared && prepared.status === 'prepared'
+        ? 'prepared' : 'pending',
+        _bootEntryMessage(prepared,
+            'Namespace marker committed. Generate the image before the next reset.'),
+        prepared && (prepared.binding || prepared));
+    renderAbstractions();
+    if (currentView === 'namespace' && typeof updateNamespace === 'function') {
+        updateNamespace();
     }
+    if (typeof window.lumpEditorRenderResidentPanel === 'function') {
+        window.lumpEditorRenderResidentPanel();
+    }
+    return true;
 }
 window._commitPreparedBootEntry = _commitPreparedBootEntry;
 
-function setBootEntrySlot(idx, ev) {
+async function setBootEntrySlot(idx, ev) {
     // Modifiers do not change destination.  Keep the event argument only for
     // inline-call compatibility; minimal synthetic events need no DOM methods.
     if (!window.TargetState.authorize('simulator', { id: 'boot-entry-selection' }).ok) return false;
@@ -714,73 +833,19 @@ function setBootEntrySlot(idx, ev) {
         return false;
     }
     idx = requestedSlot;
-    if (!sim || typeof sim.prepareBootEntry !== 'function') {
-        _setBootEntryPreparation(idx, 'error',
-            'Cannot prepare selection: simulator boot-entry preparation is unavailable.');
+    try {
+        _setBootEntryPreparation(idx, 'pending',
+            `Saving Namespace Lightning Bolt NS[${idx}]…`);
         renderAbstractions();
-        return false;
-    }
-    // Capture every core word/field that prepareBootEntry is allowed to commit
-    // before invoking it. This makes browser persistence failure transactional
-    // too: a private/incognito quota exception cannot leave RAM authority ahead
-    // of the displayed/saved selection.
-    let rollback = null;
-    try {
-        const thread = typeof sim.getThreadInstanceLayout === 'function'
-            ? sim.getThreadInstanceLayout(1) : null;
-        const homeAddress = thread && thread.valid
-            ? ((thread.base + thread.capsStart) >>> 0) : null;
-        rollback = {
-            bootEntrySlot: sim.bootEntrySlot,
-            headerWord: sim.memory && sim.memory.length > 4 ? (sim.memory[4] >>> 0) : null,
-            homeAddress,
-            homeWord: homeAddress !== null && sim.memory && homeAddress < sim.memory.length
-                ? (sim.memory[homeAddress] >>> 0) : null,
-            demoClist: sim.demoClistGTs || null,
-            demoNextPresent: Boolean(sim.demoClistGTs &&
-                Object.prototype.hasOwnProperty.call(sim.demoClistGTs, 1)),
-            demoNext: sim.demoClistGTs ? sim.demoClistGTs[1] : undefined,
-        };
-    } catch (_) {
-        // A successful core preparation requires valid Thread geometry, so this
-        // only affects an already-invalid image and will be reported by core.
-    }
-    let prepared;
-    try {
-        prepared = sim.prepareBootEntry(idx);
+        await _commitNamespaceBootMarker(idx);
+        return true;
     } catch (error) {
-        prepared = { ok: false, error: error && error.message ? error.message : String(error) };
-    }
-    if (!prepared || !prepared.ok) {
         _setBootEntryPreparation(idx, 'error',
-            'Selection was not saved: ' + _bootEntryMessage(prepared, 'preparation failed.'), prepared);
-        renderAbstractions();
-        return false;
-    }
-    try {
-        _commitPreparedBootEntry(idx, prepared);
-    } catch (error) {
-        if (rollback) {
-            if (rollback.homeAddress !== null && rollback.homeWord !== null &&
-                    sim.memory && rollback.homeAddress < sim.memory.length) {
-                sim.memory[rollback.homeAddress] = rollback.homeWord;
-            }
-            if (rollback.headerWord !== null && sim.memory && sim.memory.length > 4) {
-                sim.memory[4] = rollback.headerWord;
-            }
-            sim.bootEntrySlot = rollback.bootEntrySlot;
-            if (rollback.demoClist) {
-                if (rollback.demoNextPresent) rollback.demoClist[1] = rollback.demoNext;
-                else delete rollback.demoClist[1];
-            }
-        }
-        _setBootEntryPreparation(idx, 'error',
-            'Selection was not saved: browser storage rejected the prepared transaction; simulator state was restored. ' +
-            _bootEntryMessage(error, ''));
+            'Namespace Lightning Bolt was not saved: ' +
+            _bootEntryMessage(error, 'reload Namespace and retry.'));
         try { renderAbstractions(); } catch (_) {}
         return false;
     }
-    return true;
 }
 
 // ── Task #2532: Cmd+click boot-entry hardware push ───────────────────────────
@@ -825,9 +890,9 @@ let _bootPushInFlight = false;
 // Regenerate the boot image for the just-selected entry slot and push it to
 // the FPGA via the SAME flow as the toolbar "⚡ Load" button
 // (_wukongLoadToHardware: generate → send-to-hardware → poll upload-ack →
-// {cmd:'r'}). setBootEntrySlot already updated sim.bootEntrySlot, which is
-// exactly what _wukongLoadToHardware forwards as entrySlot to
-// /api/boot-image/generate — no duplication of the upload flow here.
+// {cmd:'r'}). setBootEntrySlot already committed the Namespace marker and
+// updated the bootEntrySlot UI projection. Hardware generation resolves the
+// committed marker server-side; no compatibility slot is forwarded here.
 async function _pushBootEntryToHardware(idx, anchorEl) {
     if (_bootPushInFlight) {
         _showBootPushBadge(anchorEl, 'Upload already in progress\u2026', 'warn', 2000);
@@ -864,9 +929,8 @@ function _syncBootEntryFromSim() {
 }
 
 function _applyBootEntryToSim() {
-    // Compatibility hook for image/reset callers.  Inspection is deliberately
-    // read-only: importing an image must expose its binding, not rewrite it to
-    // match stale browser storage.
+    // A validated image is evidence for the Namespace plan. Never let an
+    // imported or stale image retarget the committed Namespace marker.
     return _syncBootEntryFromSim();
 }
 
@@ -894,6 +958,13 @@ window.BootEntryUI = {
     },
 };
 
+// app-memory starts the no-store Namespace fetch before this script is loaded.
+// If that response won the race, project its committed marker now without
+// consulting config or browser storage.
+if (window._nsState && typeof window._applyNamespaceBootProjection === 'function') {
+    window._applyNamespaceBootProjection(window._nsState);
+}
+
 async function savePreparedBootEntry() {
     if (!Number.isInteger(bootEntrySlot)) {
         _setBootEntryPreparation(null, 'error',
@@ -903,49 +974,28 @@ async function savePreparedBootEntry() {
     }
     const savedSlot = bootEntrySlot;
     const savedRevision = _bootEntrySelectionRevision;
-    let savedBindingFingerprint = _bootBindingFingerprint(_bootEntryPreparation.binding);
-    try {
-        if (sim && typeof sim.inspectBootEntryBinding === 'function') {
-            savedBindingFingerprint = _bootBindingFingerprint(sim.inspectBootEntryBinding());
-        }
-    } catch (_) {}
     _setBootEntryPreparation(savedSlot, 'pending',
-        'Saving the prepared selection and generating its boot image…');
+        'Saving the Namespace marker and generating its boot image…');
     renderAbstractions();
     try {
-        const getResponse = await fetch('/api/boot-config', { cache: 'no-store' });
-        const getBody = await getResponse.json();
-        if (!getResponse.ok) throw new Error(getBody && getBody.error || 'could not load boot configuration');
-        const config = (getBody && (getBody.config || getBody.defaults));
-        if (!config || !config.targetBoard || !config.step1) {
-            throw new Error('Boot configuration is incomplete; open Boot Image Designer and save its geometry first.');
-        }
-        const payload = {
-            targetBoard: config.targetBoard,
-            bootEntrySlot: savedSlot,
-            // This button is the deliberate Prepare action.  Normal Designer
-            // saves may repeat bootEntrySlot but must not patch old image
-            // bytes merely because that field is present.
-            prepareBootEntry: true,
-            step1: config.step1,
-            step2: config.step2 || { lumps: [] },
-            step3: config.step3 || { emptySlotCount: 0 },
-        };
-        if (config.slotRules) payload.slotRules = config.slotRules;
-        const response = await fetch('/api/boot-config', {
+        // Marker CAS is the only boot-plan write. Config remains a projection
+        // and must never be posted merely because this button was clicked.
+        await _commitNamespaceBootMarker(savedSlot);
+        const response = await fetch('/api/boot-image/generate', {
             method: 'POST',
             headers: Object.assign({'Content-Type': 'application/json'},
                 (window.BuildApprovalView && window.BuildApprovalView._authHeaders
                     ? window.BuildApprovalView._authHeaders() : {})),
-            body: JSON.stringify(payload),
+            // The marker CAS above is authoritative; generation resolves it
+            // server-side instead of accepting a projected slot as a plan.
+            body: JSON.stringify({}),
         });
-        const body = await response.json();
-        if (!response.ok || !body || body.ok === false) {
-            throw new Error(body && body.error || 'server rejected the prepared selection');
-        }
-        if (typeof window._setActiveBootConfig === 'function') {
-            window._setActiveBootConfig(body.config, body.bootImageInvalidated === true,
-                body.invalidatedBootImageWords);
+        let generated = null;
+        try { generated = await response.json(); } catch (_) {}
+        if (!response.ok || !generated || generated.ok === false) {
+            throw _namespaceResponseError(
+                'Generate the boot image for the Namespace marker',
+                response, generated);
         }
         let cacheError = null;
         try {
@@ -956,14 +1006,8 @@ async function savePreparedBootEntry() {
         } catch (error) {
             cacheError = error;
         }
-        let currentBindingFingerprint = savedBindingFingerprint;
-        try {
-            currentBindingFingerprint = sim && typeof sim.inspectBootEntryBinding === 'function'
-                ? _bootBindingFingerprint(sim.inspectBootEntryBinding()) : savedBindingFingerprint;
-        } catch (_) {}
         const selectionChanged = bootEntrySlot !== savedSlot ||
-            _bootEntrySelectionRevision !== savedRevision ||
-            currentBindingFingerprint !== savedBindingFingerprint;
+            _bootEntrySelectionRevision !== savedRevision;
         if (selectionChanged) {
             _setBootEntryPreparation(bootEntrySlot, 'stale-image',
                 `NS[${savedSlot}] was saved while a different prepared selection became current. ` +
@@ -978,8 +1022,9 @@ async function savePreparedBootEntry() {
             renderAbstractions();
             return true;
         }
-        window.BootEntryUI.noteImagePreparation(body.preparation || {
-            status: body.prepared ? 'prepared' : 'selection-discrepancy',
+        window.BootEntryUI.noteImagePreparation(generated.preparation || {
+            status: generated.preparation && generated.preparation.status === 'prepared'
+                ? 'prepared' : 'selection-discrepancy',
             configuredSlot: savedSlot,
         });
         return true;

@@ -2481,12 +2481,13 @@ let _bootAnimTimer = null;
 let _bootAuditAccum = [];
 let _defaultProgramLoaded = false;
 
-// The loaded image's boot-entry slot is authoritative. Resolve that slot to
-// the catalog token so Code View opens the same executable marked with ⚡,
-// rather than silently substituting the generic capability_test example.
+// Resolve the committed Namespace marker to the catalog token so Code View
+// opens the same executable marked with ⚡. A loaded image is evidence only
+// and must not retarget this lookup.
 function _configuredBootLumpToken(bootCatalog) {
     if (!window.LumpRegistry || !sim) return null;
-    const slot = Number(sim.bootEntrySlot);
+    const slot = typeof bootEntrySlot !== 'undefined'
+        ? Number(bootEntrySlot) : null;
     if (!Number.isInteger(slot) || slot < 0) return null;
 
     const serverLumps = window.LumpRegistry.getServerList();
@@ -2687,7 +2688,11 @@ function _recordUnreportedBootFailure(context, error) {
 let _bootImageRefreshInFlight = null;
 
 function _bootHasCommittedImage() {
-    return !!(window.bootImage && window.bootImageAvailable);
+    if (!(window.bootImage && window.bootImageAvailable)) return false;
+    const bootState = window.BootEntryUI &&
+        typeof window.BootEntryUI.get === 'function'
+        ? window.BootEntryUI.get() : null;
+    return !bootState || bootState.status === 'prepared';
 }
 
 function _blockBootForMissingCommittedImage(context) {
@@ -2720,6 +2725,12 @@ function _ensureCommittedImageForBoot(context) {
             _bootImageRefreshInFlight = window._refreshCommittedBootImageCache()
                 .then(() => {
                     _bootImageRefreshInFlight = null;
+                    // Apply the freshly fetched bytes before evaluating the
+                    // Namespace/image binding again; the old loaded image may
+                    // still be marked stale until this overlay runs.
+                    if (typeof _maybeApplyBootImage === 'function') {
+                        _maybeApplyBootImage();
+                    }
                     if (_bootHasCommittedImage()) resetSim();
                     else _blockBootForMissingCommittedImage(context);
                 })
@@ -20789,8 +20800,6 @@ function _hwStopShortcutHandler(e) {
 window._hwStopShortcutHandler = _hwStopShortcutHandler;
 
 async function _wukongLoadToHardware(exactSourceImage) {
-    const _entryForTarget = (typeof sim !== 'undefined' && sim && sim.bootEntrySlot != null)
-        ? sim.bootEntrySlot : 6;
     const _targetAuthorization = window.TargetState.authorizeDestination('runtime');
     if (!_targetAuthorization.ok) return false;
     const loadBtn = document.getElementById('toolHWLoadBtn');
@@ -20821,46 +20830,29 @@ async function _wukongLoadToHardware(exactSourceImage) {
     }
 
     try {
-        // Step 1: generate a hardware-targeted boot image carrying the IDE's
-        // selected boot-entry slot.  forHardware:true makes the generator
-        // fail loudly if the entry lump's body is not resident (the board
-        // cannot lazy-fetch code).
-        let entrySel = (typeof sim !== 'undefined' && sim && sim.bootEntrySlot != null)
-            ? sim.bootEntrySlot
-            : ((typeof bootEntrySlot !== 'undefined' && bootEntrySlot != null) ? bootEntrySlot : 6);
-        // The server treats Lightning Bolt selection as a preparation
-        // transaction.  Commit the already-prepared browser selection first,
-        // then ask it to generate the matching hardware artifact; sending an
-        // entrySlot override against an older saved config is deliberately
-        // rejected rather than silently changing next-boot authority.
-        const configResp = await fetch('/api/boot-config');
-        const configData = await configResp.json().catch(function() { return {}; });
-        const savedConfig = (configData && (configData.config || configData.defaults)) || null;
-        if (!configResp.ok || !savedConfig) {
-            _loadLog('ERROR: could not load saved Lightning Bolt selection before hardware preparation.');
+        // Step 1: generate a hardware-targeted boot image from the committed
+        // Namespace marker. forHardware:true makes the generator fail loudly
+        // if the entry lump's body is not resident (the board cannot lazy-fetch
+        // code).
+        const entrySel = (typeof bootEntrySlot !== 'undefined' &&
+            Number.isInteger(bootEntrySlot)) ? bootEntrySlot : null;
+        if (entrySel === null) {
+            _loadLog('ERROR: no committed Namespace boot marker is available.');
             return _loadDone(false);
         }
-        if (Number(savedConfig.bootEntrySlot) !== Number(entrySel)) {
-            const preparedConfig = Object.assign({}, savedConfig, {
-                bootEntrySlot: entrySel,
-                // This path is an intentional hardware Prepare, unlike
-                // ordinary Designer saves which may carry an unchanged slot.
-                prepareBootEntry: true,
-            });
-            const prepareResp = await fetch('/api/boot-config', {
-                method: 'POST',
-                headers: Object.assign({'Content-Type': 'application/json'},
-                    (window.BuildApprovalView && window.BuildApprovalView._authHeaders
-                        ? window.BuildApprovalView._authHeaders() : {})),
-                body: JSON.stringify(preparedConfig),
-            });
-            if (!prepareResp.ok) {
-                const err = await prepareResp.json().catch(function() { return {}; });
-                _loadLog('ERROR: selection was not saved or prepared — ' +
-                    (err.error || prepareResp.status));
+        // Hardware loading consumes the committed Namespace marker. Never
+        // repair it through the compatibility boot-config projection.
+        if (typeof window._commitNamespaceBootMarker === 'function') {
+            try {
+                await window._commitNamespaceBootMarker(entrySel);
+            } catch (error) {
+                _loadLog('ERROR: Namespace Lightning Bolt could not be confirmed — ' +
+                    (error && error.message ? error.message : String(error)));
                 return _loadDone(false);
             }
-            _loadLog('Prepared saved Lightning Bolt selection NS[' + entrySel + '].');
+        } else {
+            _loadLog('ERROR: Namespace marker transaction is unavailable; reload the IDE.');
+            return _loadDone(false);
         }
         let exactPayload = {};
         if (exactSourceImage) {
@@ -20888,7 +20880,7 @@ async function _wukongLoadToHardware(exactSourceImage) {
                 headers: Object.assign({'Content-Type': 'application/json'},
                     (window.BuildApprovalView && window.BuildApprovalView._authHeaders
                         ? window.BuildApprovalView._authHeaders() : {})),
-                body   : JSON.stringify(Object.assign({entrySlot: entrySel, forHardware: true},
+                body   : JSON.stringify(Object.assign({forHardware: true},
                     _targetAuthorization.request))
             });
             if (!genResp.ok) {

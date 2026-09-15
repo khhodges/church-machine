@@ -1618,7 +1618,7 @@ function init() {
                    try {
                        _accepted = sim.loadBootImage(buf) === true;
                        if (_accepted) {
-                            if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
+                            if (typeof _applyBootEntryToSim === 'function') _applyBootEntryToSim();
                            // Evict stale sticky patches for all NS slots now owned
                            // by the boot image.  Patches that differ from the new
                            // binary are cleared and reported; matching (redundant)
@@ -2027,8 +2027,8 @@ function _openLightningBoltDefaultLump(attemptsLeft) {
     const bootState = window.BootEntryUI &&
             typeof window.BootEntryUI.get === 'function'
         ? window.BootEntryUI.get() : null;
-    // bootEntrySlot initially contains a browser placeholder. Wait until the
-    // prepared image has established the authoritative ⚡ target.
+    // Wait until the Namespace marker projection and loaded-image evidence
+    // establish a binding for the ⚡ target.
     const targetName = bootState && bootState.status === 'prepared' &&
             bootState.binding && typeof bootState.binding.targetLabel === 'string'
         ? bootState.binding.targetLabel.trim() : '';
