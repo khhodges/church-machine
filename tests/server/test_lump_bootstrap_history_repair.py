@@ -397,6 +397,69 @@ def test_repair_allocator_skips_populated_residents_but_replaces_nonresident_row
     assert destination["source_row"]["name"] == "LazyOld"
 
 
+def test_repair_replaces_unchanged_nonresident_destination(
+        bootstrap_history):
+    """The approved replacement binding, not the old row, owns validation."""
+    root = bootstrap_history["root"]
+    state = json.loads((root / "ns-state.json").read_text())
+    state["abstractions"].append({
+        "name": "LazyOld",
+        "slot": 2,
+        "seq": 7,
+        "token": "deadbeef",
+        "filename": "LazyOld.1.lump",
+        "resident": False,
+        "boot_resident": False,
+        "type": "Inform",
+        "load_policy": "Lazy",
+        "ns_slot_policy": "dynamic",
+    })
+    (root / "ns-state.json").write_text(json.dumps(state))
+    archive_before = (root / ARCHIVE_NAME).read_bytes()
+
+    with app_module.app.test_client() as client:
+        plan_response = client.post(
+            f"/api/lumps/{CURRENT_TOKEN}/history/1/bootstrap-repair-plan",
+            json={"archive_filename": ARCHIVE_NAME},
+        )
+        assert plan_response.status_code == 201, plan_response.get_data(as_text=True)
+        plan = plan_response.get_json()
+        assert plan["namespace_slot"] == 2
+        assert plan["namespace_sequence"] == 7
+        assert plan["destination_token"] == "4a070002"
+
+        intent_response = client.post("/api/lumps/approval-intent", json={
+            "digest": plan["digest"],
+            "action": plan["action"],
+            "plan_id": plan["plan_id"],
+            "confirmation": True,
+            "approval": {},
+        })
+        assert intent_response.status_code == 201
+        repair_response = client.post(
+            f"/api/lumps/{CURRENT_TOKEN}/history/1/bootstrap-repair",
+            json={
+                "archive_filename": ARCHIVE_NAME,
+                "plan_id": plan["plan_id"],
+                "approval_intent": intent_response.get_json()["intent"],
+                "corrections": [
+                    item["id"] for item in plan["corrections"]
+                ],
+            },
+        )
+
+    assert repair_response.status_code == 200, repair_response.get_data(as_text=True)
+    assert repair_response.get_json()["token"] == "4a070002"
+    assert (root / ARCHIVE_NAME).read_bytes() == archive_before
+    rows = json.loads((root / "ns-state.json").read_text())["abstractions"]
+    destination = [row for row in rows if row.get("slot") == 2]
+    assert len(destination) == 1
+    assert destination[0]["name"] == "CapabilityTest"
+    assert destination[0]["token"] == "4a070002"
+    assert destination[0]["resident"] is True
+    assert destination[0]["boot_resident"] is True
+
+
 def test_repair_plan_fails_closed_when_namespace_changes_before_apply(
         bootstrap_history):
     root = bootstrap_history["root"]

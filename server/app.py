@@ -11179,11 +11179,14 @@ def save_lump():
                     row for row in _fresh_rows if isinstance(row, dict)
                     and row.get("slot") == ns_slot
                 ]
-                if _is_server_bootstrap_history_repair and not _fresh_targets:
-                    # A newly allocated slot is intentionally absent until
-                    # this transition installs its Namespace row.  The full
-                    # Namespace fingerprint above proves that the planned
-                    # empty destination is still the same destination.
+                if _is_server_bootstrap_history_repair:
+                    # The repair destination is a server-derived replacement
+                    # binding, not the descriptor currently occupying the
+                    # selected slot.  The exact Namespace fingerprint above
+                    # proves that both an empty destination and an eligible
+                    # nonresident occupant are unchanged since planning.
+                    # Validate the candidate against the proposed frozen
+                    # binding; Phase 4 will atomically replace the old row.
                     _fresh_binding = dict(_bootstrap_binding)
                 elif len(_fresh_targets) != 1:
                     raise ValueError(
