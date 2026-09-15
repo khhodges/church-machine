@@ -7,4 +7,4 @@ Use petnames for every GT currently held in a Church capability register. Keep T
 
 **Why:** This preserves the Church/Turing split and gives capability-bearing state meaningful identity without requiring CLOOMC++ dataflow metadata for ordinary values.
 
-**How to apply:** IDE register displays, traces, and disassembly should resolve CR-held GTs to petnames when identity is known. Display DRs by register number and value only.
+**How to apply:** IDE register displays, traces, and disassembly should resolve CR-held GTs to petnames when identity is known. Use `Self` for the currently executing abstraction and forms such as `Self.c-list` or `Self.code` when the role needs clarification. Display DRs by register number and value only.
