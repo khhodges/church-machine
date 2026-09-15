@@ -3059,14 +3059,29 @@ async function _fetchAndShowLumpTimeline(token, lump) {
             html += '</tr></thead><tbody>';
 
             for (const { ver, hist, tel } of rows) {
-                const histInspection = _lumpBinaryInspection(hist);
+                const telemetryToken = !hist && tel &&
+                    /^[0-9a-f]{8}$/i.test(String(tel.lump_token || ''))
+                    ? String(tel.lump_token).toLowerCase()
+                    : null;
+                const telemetryCurrent = telemetryToken
+                    ? _lumpsCache.find(item =>
+                        item && item.archived !== true &&
+                        String(item.token || '').toLowerCase() === telemetryToken &&
+                        Number(item.lump_version) === Number(ver))
+                    : null;
+                const histInspection = _lumpBinaryInspection(hist || telemetryCurrent);
                 // "current" = the token this detail panel is showing
                 // History is authoritative when present: archived telemetry rows
-                // deliberately share the current abstraction token.
+                // deliberately share the current abstraction token. A telemetry
+                // row can also identify a different active token created by a
+                // destination-bound correction; that exact record is selectable.
                 const isCurrent = hist
                     ? hist.current === true
-                    : (lump.lump_version != null && ver === lump.lump_version);
-                const compiledTs = hist ? hist.compiled_at : (tel ? tel.compiled_at : null);
+                    : Boolean(telemetryCurrent) ||
+                        (lump.lump_version != null && ver === lump.lump_version);
+                const compiledTs = hist ? hist.compiled_at
+                    : (telemetryCurrent && telemetryCurrent.compiled_at) ||
+                        (tel ? tel.compiled_at : null);
                 const compiledStr = fmtTs(compiledTs) || (ver === 0 ? 'system' : '\u2014');
                 const cwStr = histInspection && histInspection.cw != null ? histInspection.cw : '\u2014';
                 const ccStr = histInspection && histInspection.cc != null ? histInspection.cc : '\u2014';
@@ -3113,14 +3128,18 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                     (!hist.archive_provenance ||
                         hist.archive_provenance.correction_supported !== false)
                 );
-                const previewUsable = Boolean(hist &&
-                    hist.binary_available !== false);
+                const previewUsable = Boolean(
+                    (hist && hist.binary_available !== false) || telemetryCurrent);
                 const eligibility = _historyActivationEligibility(hist);
                 const activationUsable = Boolean(!isCurrent && previewUsable &&
                     eligibility.status === 'eligible');
-                const previewToken = token;
-                const archiveFilename = hist && (
-                    hist.archive_filename || hist.record_filename || '');
+                const previewToken = telemetryCurrent
+                    ? telemetryCurrent.token : token;
+                const previewCurrentToken = telemetryCurrent
+                    ? telemetryCurrent.token : token;
+                const archiveFilename = hist
+                    ? (hist.archive_filename || hist.record_filename || '')
+                    : '';
 
                 let _rowStyle = isCurrent
                     ? 'background:var(--bg-selected,rgba(99,102,241,0.08));'
@@ -3128,7 +3147,7 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                 let _rowAttrs = '';
                 if (previewUsable) {
                     _rowStyle += 'cursor:pointer;';
-                    _rowAttrs = ` style="${_rowStyle}" onclick="_lumpHistorySelectRow(this,'${e(previewToken)}',${ver},${histInspection ? (histInspection.cw||0) : 0},${histInspection ? (histInspection.cc||0) : 0},${histInspection ? (histInspection.lump_size||0) : 0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(token)}','${e(archiveFilename)}',${isCurrent ? 'true' : 'false'})"`;
+                    _rowAttrs = ` style="${_rowStyle}" onclick="_lumpHistorySelectRow(this,'${e(previewToken)}',${ver},${histInspection ? (histInspection.cw||0) : 0},${histInspection ? (histInspection.cc||0) : 0},${histInspection ? (histInspection.lump_size||0) : 0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(previewCurrentToken)}','${e(archiveFilename)}',${isCurrent ? 'true' : 'false'})"`;
                 } else if (_rowStyle) {
                     _rowAttrs = ` style="${_rowStyle}"`;
                 }
@@ -3165,11 +3184,11 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                 // performs the protected restore transition for eligible archives.
                 if (previewUsable) {
                      if (bootstrapCorrectionAvailable) {
-                         html += `<td><button class="btn lump-history-correct-btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_lumpHistoryPreview('${e(previewToken)}',${ver},${histInspection ? (histInspection.cw||0) : 0},${histInspection ? (histInspection.cc||0) : 0},${histInspection ? (histInspection.lump_size||0) : 0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(token)}','${e(archiveFilename)}',${isCurrent ? 'true' : 'false'})" title="Review and apply correction options for v${ver}">Correct</button></td>`;
+                         html += `<td><button class="btn lump-history-correct-btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_lumpHistoryPreview('${e(previewToken)}',${ver},${histInspection ? (histInspection.cw||0) : 0},${histInspection ? (histInspection.cc||0) : 0},${histInspection ? (histInspection.lump_size||0) : 0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(previewCurrentToken)}','${e(archiveFilename)}',${isCurrent ? 'true' : 'false'})" title="Review and apply correction options for v${ver}">Correct</button></td>`;
                      } else {
                          html += '<td></td>';
                      }
-                     html += `<td><button class="btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_lumpHistoryPreview('${e(previewToken)}',${ver},${histInspection ? (histInspection.cw||0) : 0},${histInspection ? (histInspection.cc||0) : 0},${histInspection ? (histInspection.lump_size||0) : 0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(token)}','${e(archiveFilename)}',${isCurrent ? 'true' : 'false'})" title="Preview source and hex of v${ver}">Preview</button></td>`;
+                     html += `<td><button class="btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_lumpHistoryPreview('${e(previewToken)}',${ver},${histInspection ? (histInspection.cw||0) : 0},${histInspection ? (histInspection.cc||0) : 0},${histInspection ? (histInspection.lump_size||0) : 0},'${tk}',${historicalRecord ? 'true' : 'false'},'${e(previewCurrentToken)}','${e(archiveFilename)}',${isCurrent ? 'true' : 'false'})" title="Preview source and hex of v${ver}">Preview</button></td>`;
                     if (!isCurrent && !activationUsable)
                         html += `<td><button class="btn lump-history-delete-btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_deleteLumpHistoryRevision('${e(token)}',${ver},'${e(archiveFilename)}','${tk}')" title="Delete this archived revision">Delete</button></td>`;
                     else
