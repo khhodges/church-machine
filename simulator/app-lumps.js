@@ -8051,7 +8051,7 @@ window.showFormatLump = async function() {
                         _capStatus = 'pending';
                     }
                 }
-                // Enrich with a slot/index suffix so "SelfTest" → "SelfTest#6".
+                // Namespace location is separate metadata, never a name/issue suffix.
                 // Three-stage lookup:
                 //   1. abstractionRegistry (catalog abstractions)
                 //   2. sim.nsLabels reverse-scan (NS-boot entries)
@@ -8080,18 +8080,22 @@ window.showFormatLump = async function() {
                         if (_capLump && typeof _capLump.ns_slot !== 'undefined') _capSlotNum = _capLump.ns_slot;
                     }
                 }
-                var _capFullName = (_capSlotNum !== null) ? (_capName + '#' + _capSlotNum) : _capName;
+                var _capLocation = Number.isInteger(_capSlotNum) && _capSlotNum >= 0
+                    ? '<span class="fmt-caps-location" title="Namespace slot">NS[' + _capSlotNum + ']</span>'
+                    : '';
 
                 if (_capStatus === 'pending') {
                     _capsHtml += '<div class="fmt-caps-row">' +
                         '<span class="fmt-caps-slot">[' + _ci + ']</span>' +
-                        '<span class="fmt-caps-name fmt-caps-pending">\u29d6 ' + _fmtEscape(_capFullName || _capName) + ' (pending)</span>' +
+                        '<span class="fmt-caps-name fmt-caps-pending">\u29d6 ' + _fmtEscape(_capName) + ' (pending)</span>' +
+                        _capLocation +
                         '<span class="fmt-caps-status">unresolved</span>' +
                         '</div>';
                 } else if (_capName) {
                     _capsHtml += '<div class="fmt-caps-row">' +
                         '<span class="fmt-caps-slot">[' + _ci + ']</span>' +
-                        '<span class="fmt-caps-name">' + _fmtEscape(_capFullName) + '</span>' +
+                        '<span class="fmt-caps-name">' + _fmtEscape(_capName) + '</span>' +
+                        _capLocation +
                         '<span class="fmt-caps-status">named</span>' +
                         '</div>';
                 } else {

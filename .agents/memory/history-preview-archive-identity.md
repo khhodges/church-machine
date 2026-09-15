@@ -29,3 +29,12 @@ abstraction's name and issue, making compilation look like a silent rename.
 
 **How to apply:** Display identity separately; do not rewrite source declarations,
 saved names, or issues merely to reconcile the editor heading.
+
+Namespace locations must be shown separately as `NS[n]`, never appended to
+capability names as `#n`.
+
+**Why:** `#n` denotes an identity issue elsewhere; using it for a slot made
+unchanged capability names appear renamed or reissued.
+
+**How to apply:** Preserve explicit names (including intentional issue suffixes)
+and keep location metadata separate for named and pending capabilities.

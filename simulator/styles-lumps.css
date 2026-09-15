@@ -7055,6 +7055,11 @@ pre:hover .code-copy-btn {
     color: #c8a84b;
     font-style: italic;
 }
+.fmt-caps-location {
+    font-size: 0.72rem;
+    color: var(--text-secondary, #9ca3af);
+    white-space: nowrap;
+}
 .fmt-caps-status {
     font-size: 0.66rem;
     color: #6b7280;
