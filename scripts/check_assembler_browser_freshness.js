@@ -22,6 +22,17 @@ function pinnedLocalScripts(index) {
         .filter(url => !/^(?:https?:)?\/\//.test(url) && url.includes('?v='));
 }
 
+function localSourcePath(sourceName, projectRoot) {
+    // Root-relative browser URLs are relative to the site, not simulator/.
+    const relative = sourceName.startsWith('/simulator/')
+        ? sourceName.slice('/simulator/'.length) : sourceName;
+    if (relative.startsWith('/') || /^[a-z][a-z0-9+.-]*:/i.test(relative)) return null;
+    const directory = path.resolve(projectRoot, 'simulator');
+    const resolved = path.resolve(directory, relative);
+    if (!resolved.startsWith(directory + path.sep)) return null;
+    return resolved;
+}
+
 function printHelp() {
     console.log(`Check or update browser cache keys for local scripts in simulator/index.html.
 
@@ -30,8 +41,9 @@ Usage:
       Check that every pinned local script uses its current SHA-256 cache key.
 
   node scripts/check_assembler_browser_freshness.js --update
-      Recalculate cache keys for already-pinned local scripts. Unpinned local
-      scripts and external URLs are left unchanged.
+      Recalculate cache keys for already-pinned local scripts, including legacy
+      or malformed v values. Unpinned local scripts and external URLs are left
+      unchanged. Unresolved pins are reported and cause a nonzero exit.
 
   node scripts/check_assembler_browser_freshness.js --help
       Show this help.`);
@@ -42,12 +54,12 @@ function updateCacheKeys(index, projectRoot = root) {
     const updatedIndex = index.replace(scriptPattern, (scriptTag, url) => {
         if (/^(?:https?:)?\/\//.test(url)) return scriptTag;
 
-        const match = url.match(/^([^?]+)\?v=sha256-[a-f0-9]{12}$/);
+        const match = url.match(/^([^?#]+)\?v=[^&#]*$/);
         if (!match) return scriptTag;
 
         const sourceName = match[1];
-        const sourcePath = path.join(projectRoot, 'simulator', sourceName);
-        if (!fs.existsSync(sourcePath)) return scriptTag;
+        const sourcePath = localSourcePath(sourceName, projectRoot);
+        if (!sourcePath || !fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) return scriptTag;
 
         const updatedUrl = `${sourceName}?v=sha256-${sourceHash(sourcePath)}`;
         if (updatedUrl === url) return scriptTag;
@@ -75,9 +87,9 @@ function checkCacheKeys(index, projectRoot = root) {
         }
 
         const [, sourceName, actualKey] = match;
-        const sourcePath = path.join(projectRoot, 'simulator', sourceName);
-        if (!fs.existsSync(sourcePath)) {
-            failures.push(`${url}: source file does not exist`);
+        const sourcePath = localSourcePath(sourceName, projectRoot);
+        if (!sourcePath || !fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
+            failures.push(`${url}: source file is missing or outside simulator/`);
             continue;
         }
 
@@ -106,6 +118,12 @@ function main(args = process.argv.slice(2)) {
         const { updatedIndex, updatedCount } = updateCacheKeys(index);
         if (updatedIndex !== index) fs.writeFileSync(indexPath, updatedIndex);
         console.log(`${updatedCount} pinned first-party browser script cache keys updated`);
+        const { failures } = checkCacheKeys(updatedIndex);
+        if (failures.length) {
+            console.error('Some browser script cache keys could not be updated:');
+            for (const failure of failures) console.error(`- ${failure}`);
+            process.exitCode = 1;
+        }
         return;
     }
 
