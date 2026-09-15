@@ -24,3 +24,16 @@ so a scalar rejection can still become a generic fatal report.
 events, and ensure both listeners are registered with capture enabled.
 Regression tests should assert capture-phase registration, value normalization,
 and that production code does not call `Promise.reject` with a scalar literal.
+
+Browser telemetry must register before these containment listeners. It records
+only error categories, allowlisted script locations, timing and coarse UI context,
+not arbitrary exception messages or stack text.
+
+**Why:** Containment stops later listeners from seeing the events; exception
+messages can embed editor source or credentials. Location-only frames preserve
+useful evidence without transmitting those values.
+
+**How to apply:** Keep reporting independent of login, bounded and non-recursive.
+Test a browser-produced payload through server ingestion. Reports are untrusted
+client observations, not proof of server failures; tab termination and offline
+delivery may leave no record.

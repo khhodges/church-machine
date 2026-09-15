@@ -1052,6 +1052,17 @@ BUILD_VERSION, BUILD_VERSION_KIND = _build_version_identity()
 _COMPRESSIBLE = ('javascript', 'css', 'html', 'json', 'text/')
 _gz_cache = {}
 
+try:
+    from server.browser_diagnostics import register_browser_diagnostics
+except ImportError:
+    from browser_diagnostics import register_browser_diagnostics
+
+register_browser_diagnostics(
+    app,
+    simulator_dir=SIMULATOR_DIR,
+    server_version=lambda: BUILD_VERSION,
+)
+
 def _serve_file(filepath, filename):
     """Read a file from disk and return a gzip-compressed response with ETag support."""
     if not os.path.isfile(filepath):
