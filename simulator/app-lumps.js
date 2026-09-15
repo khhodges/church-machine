@@ -3525,9 +3525,34 @@ async function _confirmLumpBootstrapRepairs(repairId, currentToken, version, arc
         const plannedIds = (plan.corrections || []).map(correction => correction.id).sort();
         if (plannedIds.length !== corrections.length ||
                 plannedIds.join('|') !== corrections.slice().sort().join('|')) {
-            throw new Error(
-                'The live Namespace changed and the listed corrections are no longer current. No data was changed.'
-            );
+            const freshCorrections = Array.isArray(plan.corrections)
+                ? plan.corrections
+                : [];
+            const list = panel.querySelector('.lump-bootstrap-repair-list');
+            if (!list || freshCorrections.length === 0) {
+                throw new Error(
+                    'The server returned an invalid correction list. No data was changed.'
+                );
+            }
+            list.innerHTML = freshCorrections.map(correction =>
+                `<label class="lump-bootstrap-repair-choice">` +
+                `<input type="checkbox" class="lump-bootstrap-repair-checkbox" ` +
+                `value="${_escHtml(correction.id)}" ` +
+                `onchange="_updateLumpBootstrapRepairControls('${repairId}')">` +
+                `<span><strong>${_escHtml(correction.title)}</strong>` +
+                `<small>${_escHtml(correction.detail)}</small></span>` +
+                `</label>`
+            ).join('');
+            panel.dataset.requiredCount = String(freshCorrections.length);
+            if (button) {
+                button.disabled = true;
+                button.textContent = 'Confirm 0 approved corrections';
+            }
+            if (status) {
+                status.textContent =
+                    'The server found additional required corrections. Review and approve every updated correction, then confirm again. No data was changed.';
+            }
+            return;
         }
         const confirmed = confirm(
             `Apply ${corrections.length} approved specification correction${corrections.length === 1 ? '' : 's'}?\n\n` +
