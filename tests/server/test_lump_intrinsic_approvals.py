@@ -3,6 +3,7 @@ import json
 import struct
 import sys
 import threading
+import time
 import types
 
 import pytest
@@ -152,6 +153,111 @@ def _approved_library(root, binary):
         }
     }))
     return digest, number
+
+
+@pytest.fixture
+def isolated_deploy_lump(tmp_path, monkeypatch):
+    binary = _self_defining_lump("return immutable;")
+    digest, token = _approved_library(tmp_path, binary)
+    monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        app_module, "LUMPS_MANIFEST_PATH", str(tmp_path / "manifest.json"))
+    with app_module._LUMP_APPROVAL_INTENTS_LOCK:
+        app_module._LUMP_APPROVAL_INTENTS.clear()
+    try:
+        yield tmp_path, token, digest, binary
+    finally:
+        with app_module._LUMP_APPROVAL_INTENTS_LOCK:
+            app_module._LUMP_APPROVAL_INTENTS.clear()
+
+
+def _issue_deploy_intent(client, digest, action="deploy"):
+    response = client.post("/api/lumps/approval-intent", json={
+        "digest": digest,
+        "action": action,
+        "confirmation": True,
+        "approval": {"author": "reviewer"},
+    })
+    assert response.status_code == 201, response.get_data(as_text=True)
+    return response.get_json()["intent"]
+
+
+@pytest.mark.parametrize("failure", [
+    "expired", "consumed", "wrong-session", "wrong-digest", "wrong-action",
+])
+def test_deploy_authorization_rejects_replayed_or_mismatched_intents_without_mutation(
+        isolated_deploy_lump, failure):
+    root, token, digest, _binary = isolated_deploy_lump
+    artifact = root / f"Intrinsic.1.{token}.lump"
+    before = artifact.read_bytes()
+    client = app_module.app.test_client()
+
+    if failure == "consumed":
+        intent = _issue_deploy_intent(client, digest)
+        first = client.post("/api/lumps/deploy-authorize", json={
+            "token": token, "approval_intent": intent,
+        })
+        assert first.status_code == 200, first.get_data(as_text=True)
+        response = client.post("/api/lumps/deploy-authorize", json={
+            "token": token, "approval_intent": intent,
+        })
+    elif failure == "wrong-session":
+        intent = _issue_deploy_intent(client, digest)
+        response = app_module.app.test_client().post(
+            "/api/lumps/deploy-authorize", json={
+                "token": token, "approval_intent": intent,
+            })
+    elif failure == "wrong-digest":
+        alternate = bytearray(before)
+        alternate[-4] ^= 0x01
+        wrong_digest = hashlib.sha256(alternate).hexdigest()
+        approvals_path = root / "approvals.json"
+        approvals = json.loads(approvals_path.read_text())
+        approvals["approvals"][wrong_digest] = {
+            "binary_hash": wrong_digest, "author": "reviewer",
+        }
+        approvals_path.write_text(json.dumps(approvals))
+        intent = _issue_deploy_intent(client, wrong_digest)
+        response = client.post("/api/lumps/deploy-authorize", json={
+            "token": token, "approval_intent": intent,
+        })
+    elif failure == "wrong-action":
+        intent = _issue_deploy_intent(client, digest, action="fork")
+        response = client.post("/api/lumps/deploy-authorize", json={
+            "token": token, "approval_intent": intent,
+        })
+    else:
+        intent = _issue_deploy_intent(client, digest)
+        with app_module._LUMP_APPROVAL_INTENTS_LOCK:
+            app_module._LUMP_APPROVAL_INTENTS[intent]["expires"] = time.time() - 1
+        response = client.post("/api/lumps/deploy-authorize", json={
+            "token": token, "approval_intent": intent,
+        })
+
+    assert response.status_code == 403, response.get_data(as_text=True)
+    assert artifact.read_bytes() == before
+    assert intent not in app_module._LUMP_APPROVAL_INTENTS
+
+
+def test_deploy_authorization_binds_the_current_immutable_digest(
+        isolated_deploy_lump):
+    root, token, digest, _binary = isolated_deploy_lump
+    artifact = root / f"Intrinsic.1.{token}.lump"
+    before = artifact.read_bytes()
+    client = app_module.app.test_client()
+    intent = _issue_deploy_intent(client, digest)
+
+    # Change only the server artifact after approval. The old intent must not
+    # authorize the replacement, and the replacement must remain untouched.
+    replacement = bytearray(before)
+    replacement[-4] ^= 0x01
+    artifact.write_bytes(replacement)
+    response = client.post("/api/lumps/deploy-authorize", json={
+        "token": token, "approval_intent": intent,
+    })
+
+    assert response.status_code == 403
+    assert artifact.read_bytes() == bytes(replacement)
 
 
 def test_shared_inspector_rejects_non_exact_allocation():

@@ -9002,6 +9002,13 @@ def _consume_lump_approval_intent(intent, digest, action, plan=None, consume=Tru
                 record["action"] != action or
                 (action in {"save", "replace"}
                  and record.get("plan") != str(plan or ""))):
+            # A presented intent is single-use even when the presented
+            # request is invalid. Burning a live record here prevents an
+            # attacker from probing its binding and then replaying it with
+            # corrected digest/action/session data. Read-only preflight calls
+            # explicitly pass consume=False and retain their intent.
+            if record is not None and consume:
+                _LUMP_APPROVAL_INTENTS.pop(key, None)
             raise ValueError("a valid, unexpired session-bound approval intent is required")
         _recorded_save_as_latest = record.get(
             "save_as_latest",

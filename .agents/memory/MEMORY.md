@@ -148,3 +148,4 @@
 - [Boot-entry UI authority](boot-entry-ui-authority.md) — default Code View follows the loaded image's boot slot, never a stale pending browser selection
 - [Bootstrap repair destination authority](bootstrap-repair-destination-authority.md) — an eligible non-resident occupant supplies sequence only; the approved frozen binding remains authoritative under the fresh Namespace lock
 - [CapabilityTest Namespace slot](capabilitytest-namespace-slot.md) — CapabilityTest stays at NS[10]; UART_DEV stays at NS[2] with hardware address/limit semantics
+- [Deployment approval replay binding](deployment-approval-replay.md) — consuming-path mismatches burn live intents; only explicit read-only preflight may retain them
