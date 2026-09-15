@@ -19,17 +19,29 @@ function sourceHash(sourcePath) {
 
 function pinnedLocalScripts(index) {
     return Array.from(index.matchAll(scriptPattern), match => match[1])
-        .filter(url => !/^(?:https?:)?\/\//.test(url) && url.includes('?v='));
+        .filter(url => !isExternal(url) && /[?&]v=/.test(url));
+}
+
+function isExternal(url) {
+    return /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(url);
 }
 
 function localSourcePath(sourceName, projectRoot) {
-    // Root-relative browser URLs are relative to the site, not simulator/.
+    const base = fs.realpathSync(path.resolve(projectRoot, 'simulator'));
     const relative = sourceName.startsWith('/simulator/')
         ? sourceName.slice('/simulator/'.length) : sourceName;
-    if (relative.startsWith('/') || /^[a-z][a-z0-9+.-]*:/i.test(relative)) return null;
-    const directory = path.resolve(projectRoot, 'simulator');
-    const resolved = path.resolve(directory, relative);
-    if (!resolved.startsWith(directory + path.sep)) return null;
+    if (relative.startsWith('/') || /[%\\#]/.test(relative)) {
+        throw new Error('unsupported local source path');
+    }
+    const resolved = path.resolve(base, relative);
+    if (!resolved.startsWith(base + path.sep)) {
+        throw new Error('source path escapes simulator directory');
+    }
+    if (!fs.existsSync(resolved)) throw new Error('source file does not exist');
+    if (!fs.realpathSync(resolved).startsWith(base + path.sep)) {
+        throw new Error('source path escapes simulator directory');
+    }
+    if (!fs.statSync(resolved).isFile()) throw new Error('source is not a file');
     return resolved;
 }
 
@@ -41,9 +53,9 @@ Usage:
       Check that every pinned local script uses its current SHA-256 cache key.
 
   node scripts/check_assembler_browser_freshness.js --update
-      Recalculate cache keys for already-pinned local scripts, including legacy
-      or malformed v values. Unpinned local scripts and external URLs are left
-      unchanged. Unresolved pins are reported and cause a nonzero exit.
+      Recalculate cache keys, including malformed v values, for local scripts.
+      Unpinned scripts and external URLs are unchanged. Unresolved pins are
+      reported and cause a nonzero exit status.
 
   node scripts/check_assembler_browser_freshness.js --help
       Show this help.`);
@@ -52,21 +64,25 @@ Usage:
 function updateCacheKeys(index, projectRoot = root) {
     let updatedCount = 0;
     const updatedIndex = index.replace(scriptPattern, (scriptTag, url) => {
-        if (/^(?:https?:)?\/\//.test(url)) return scriptTag;
+        if (isExternal(url)) return scriptTag;
 
         const match = url.match(/^([^?#]+)\?v=[^&#]*$/);
         if (!match) return scriptTag;
 
         const sourceName = match[1];
-        const sourcePath = localSourcePath(sourceName, projectRoot);
-        if (!sourcePath || !fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) return scriptTag;
-
-        const updatedUrl = `${sourceName}?v=sha256-${sourceHash(sourcePath)}`;
+        let updatedUrl;
+        try {
+            updatedUrl = `${sourceName}?v=sha256-${sourceHash(localSourcePath(sourceName, projectRoot))}`;
+        } catch (_) {
+            // The post-update check reports unresolved pins; never rewrite an
+            // ambiguous URL or hash a file outside the served script directory.
+            return scriptTag;
+        }
         if (updatedUrl === url) return scriptTag;
         updatedCount++;
         return scriptTag.replace(`src="${url}"`, `src="${updatedUrl}"`);
     });
-    return { updatedIndex, updatedCount };
+    return { updatedIndex, updatedCount, ...checkCacheKeys(updatedIndex, projectRoot) };
 }
 
 function checkCacheKeys(index, projectRoot = root) {
@@ -87,13 +103,14 @@ function checkCacheKeys(index, projectRoot = root) {
         }
 
         const [, sourceName, actualKey] = match;
-        const sourcePath = localSourcePath(sourceName, projectRoot);
-        if (!sourcePath || !fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
-            failures.push(`${url}: source file is missing or outside simulator/`);
+        let expectedKey;
+        try {
+            expectedKey = sourceHash(localSourcePath(sourceName, projectRoot));
+        } catch (error) {
+            failures.push(`${url}: ${error.message}`);
             continue;
         }
 
-        const expectedKey = sourceHash(sourcePath);
         if (actualKey !== expectedKey) {
             failures.push(`${sourceName}: found ${actualKey}, expected ${expectedKey}`);
         }
@@ -113,17 +130,20 @@ function main(args = process.argv.slice(2)) {
         return;
     }
 
-    const index = fs.readFileSync(indexPath, 'utf8');
+    let index = fs.readFileSync(indexPath, 'utf8');
     if (args.includes('--update')) {
         const { updatedIndex, updatedCount } = updateCacheKeys(index);
         if (updatedIndex !== index) fs.writeFileSync(indexPath, updatedIndex);
         console.log(`${updatedCount} pinned first-party browser script cache keys updated`);
-        const { failures } = checkCacheKeys(updatedIndex);
-        if (failures.length) {
+        index = updatedIndex;
+        const result = checkCacheKeys(index);
+        if (result.failures.length > 0) {
             console.error('Some browser script cache keys could not be updated:');
-            for (const failure of failures) console.error(`- ${failure}`);
+            for (const failure of result.failures) console.error(`- ${failure}`);
             process.exitCode = 1;
+            return;
         }
+        console.log(`${result.count} pinned first-party browser script cache keys are fresh`);
         return;
     }
 
