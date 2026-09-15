@@ -6883,7 +6883,9 @@ async function openLumpInEditor(token) {
                 var _clistStart = lhdr.lumpSize - lhdr.cc;
                 var _capItems = _formatSavedLumpCapabilities(
                     _lCaps, serverWords, _clistStart);
-                disasmLines.push('capabilities { ' + _capItems + ' }');
+                disasmLines.push('capabilities {');
+                disasmLines.push('  ' + _capItems);
+                disasmLines.push('}');
                 disasmLines.push('');
             }
             if (trimmed.length === 0) {
@@ -7717,6 +7719,9 @@ function _formatSavedLumpCapabilities(caps, serverWords, clistStart) {
     var _items = caps.map(function(cap, idx) {
         var _cap = (cap && typeof cap === 'object') ? cap : { name: cap };
         var _dotName = _cap.dot_name || _cap.dotName || _cap.name || '';
+        if (idx === 0 && String(_dotName).toUpperCase() === '__SELF__') {
+            _dotName = 'SELF';
+        }
         var _rights = Array.isArray(_cap.rights) ? _cap.rights :
             (Array.isArray(_cap.grants) ? _cap.grants : []);
         var _tokenIndex = Number(clistStart) + idx;
@@ -7728,7 +7733,7 @@ function _formatSavedLumpCapabilities(caps, serverWords, clistStart) {
         var _rightsLabel = _rights.length ? '  rights=' + _rights.join('') : '';
         return '#' + idx + ' ' + _label + 'token=' + _token + _rightsLabel;
     }).filter(Boolean);
-    return _items.join(', ');
+    return _items.join('\n  ');
 }
 
 function _fmtLumpByteSize(bytes) {

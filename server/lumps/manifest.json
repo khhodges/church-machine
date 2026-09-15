@@ -469,5 +469,19 @@
     "output_profile": 2,
     "capabilities": [],
     "operation_id": "4fdf1532065449d29831769edaacbdc3"
+  },
+  {
+    "token": "4a000002",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.2.6fd9df21.lump",
+    "lump_version": 27,
+    "compiled_at": 1789475607.6456692,
+    "dot_name": "CapabilityTest",
+    "issue_n": 2,
+    "petname": "",
+    "content_profile": 2,
+    "output_profile": 2,
+    "capabilities": [],
+    "operation_id": "d5b1527434f94f2e8382fe1daf950096"
   }
 ]

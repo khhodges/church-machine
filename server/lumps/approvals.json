@@ -464,6 +464,16 @@
         "E"
       ],
       "capability_type": "inform"
+    },
+    "1ec3fd949e040d4ea851f8d93f1bd54230679f2e8b7fca07e6d586c4335d475c": {
+      "binary_hash": "1ec3fd949e040d4ea851f8d93f1bd54230679f2e8b7fca07e6d586c4335d475c",
+      "dot_name": "CapabilityTest",
+      "issue_n": 2,
+      "abstraction": "CapabilityTest",
+      "filename": "CapabilityTest.2.6fd9df21.lump",
+      "compiled_at": 1789475607.6456692,
+      "bootstrap_t": "4a000002",
+      "bootstrap_runtime_gt": 1241513986
     }
   }
 }

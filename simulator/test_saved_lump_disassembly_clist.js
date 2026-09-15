@@ -29,7 +29,7 @@ const formatCapabilities = vm.runInNewContext(
 );
 
 const caps = [
-    { name: 'church.Audit', rights: ['R', 'W'], grants: ['R', 'W'] },
+    { name: '__SELF__', rights: ['E'], grants: ['E'] },
     { dot_name: 'New.WukongCallHome', grants: ['E'] },
 ];
 const words = new Array(20).fill(0);
@@ -39,8 +39,8 @@ words[17] = 0xfeed0001;
 const output = formatCapabilities(caps, words, 16);
 assert.equal(
     output,
-    '#0 church.Audit  token=0x1234ABCD  rights=RW, ' +
-    '#1 New.WukongCallHome  token=0xFEED0001  rights=E'
+    '#0 SELF  token=0x1234ABCD  rights=E\n' +
+    '  #1 New.WukongCallHome  token=0xFEED0001  rights=E'
 );
 
 assert(
@@ -50,6 +50,12 @@ assert(
 assert(
     source.includes('var _clistStart = lhdr.lumpSize - lhdr.cc;'),
     'saved-LUMP disassembly locates C-list rows from the authoritative header'
+);
+assert(
+    source.includes("disasmLines.push('capabilities {');") &&
+    source.includes("disasmLines.push('  ' + _capItems);") &&
+    source.includes("disasmLines.push('}');"),
+    'saved-LUMP disassembly renders the C-list as a multiline block'
 );
 
 console.log('saved-LUMP disassembly C-list tests passed');
