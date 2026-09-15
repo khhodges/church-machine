@@ -3,14 +3,18 @@
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
+const crypto = require('crypto');
 
 const lumps = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8');
 const memory = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const css = fs.readFileSync(path.join(__dirname, 'styles-toolbar.css'), 'utf8');
+const lumpsHash = crypto.createHash('sha256').update(lumps).digest('hex').slice(0, 12);
 
 assert(html.includes('id="savedLumpIdentityPanel"'),
     'complete workspace includes the visible verified identity panel');
+assert(html.includes(`app-lumps.js?v=sha256-${lumpsHash}`),
+    'complete workspace cache-busts app-lumps.js with its current content hash');
 assert(html.indexOf('id="asmEditor"') < html.indexOf('id="savedLumpDisassemblyPanel"'),
     'source and exact disassembly coexist in the editor layout');
 
