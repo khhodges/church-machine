@@ -474,6 +474,9 @@ function renderAbstractions() {
 
         const bootState = (typeof window !== 'undefined' && window.BootEntryUI)
             ? window.BootEntryUI.get() : null;
+        const bootTargetName = bootState && bootState.binding &&
+                typeof bootState.binding.targetLabel === 'string'
+            ? bootState.binding.targetLabel.trim() : '';
         if (bootState) {
             const stateClass = bootState.status === 'prepared' ? 'abs-boot-binding-ok'
                 : bootState.status === 'pending' ? 'abs-boot-binding-pending'
@@ -502,8 +505,10 @@ function renderAbstractions() {
         const best = _implStatusBest(abs);
         const dotColor = IMPL_STATUS_COLORS[best] || '#9ca3af';
         const dotTitle = IMPL_STATUS_LABELS[best] || best;
-        const isBootEntry  = abs.index === bootEntrySlot;
-        const isNextEntry  = abs.index === bootEntrySlot;
+        // bootEntrySlot is a Namespace slot, while abs.index is a catalog
+        // index. The prepared binding's target label is the shared identity.
+        const isBootEntry = !!bootTargetName && abs.name === bootTargetName;
+        const isNextEntry = isBootEntry;
         const absProfile = _getAbstractionProfile(abs);
         const profileBadgeClass = absProfile === 'Full' ? 'profile-badge-full' : absProfile === 'XC7A100T' ? 'profile-badge-xc7a100t' : 'profile-badge-iot';
         const profileTitle = absProfile === 'Full' ? 'Full profile only (Wukong Artix-7)' : absProfile === 'XC7A100T' ? 'QMTECH Wukong XC7A100T only' : 'runs on both boards';

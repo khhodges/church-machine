@@ -1694,9 +1694,9 @@ function init() {
     sim.on('programLoaded', () => {
         if (currentView === 'namespace') updateNamespace();
         if (currentView === 'abstractions') renderAbstractions();
-        if (currentView === 'abstractions' &&
-                window._startupLightningBoltSelectionPending) {
-            _selectLightningBoltAbstraction();
+        if (currentView === 'lumps' &&
+                window._startupLightningBoltLumpPending) {
+            _openLightningBoltDefaultLump();
         }
         clearTrace();
     });
@@ -1949,14 +1949,14 @@ function init() {
     if (!startView) {
         try { const saved = localStorage.getItem('church_lastView'); if (saved && views.includes(saved)) startView = saved; } catch(e) {}
     }
-    if (!startView) startView = 'abstractions';
+    if (!startView) startView = 'lumps';
     // Always arm the guard so slowBoot()'s switchView('dashboard') cannot
     // override whatever view was chosen here (including the 'home' default).
     if (!window._startupDefaultView) window._startupDefaultView = startView;
     switchView(startView);
-    if (startView === 'abstractions' && !hashParams.abs) {
-        window._startupLightningBoltSelectionPending = true;
-        _selectLightningBoltAbstraction();
+    if (startView === 'lumps' && !hashParams.lump) {
+        window._startupLightningBoltLumpPending = true;
+        _openLightningBoltDefaultLump();
     }
     if (startView === 'builder' && hashParams.tab) {
         const _hashBuilderTab = hashParams.tab;
@@ -2020,37 +2020,31 @@ function init() {
     });
 }
 
-// The ⚡ marker denotes the live boot-entry slot. Resolve it dynamically
-// rather than assuming a fixed abstraction name or Namespace index.
-function _selectLightningBoltAbstraction(attemptsLeft) {
+// The ⚡ marker denotes the prepared boot-entry LUMP. Namespace slots and
+// catalog indexes are unrelated, so open the LUMP by its binding identity.
+function _openLightningBoltDefaultLump(attemptsLeft) {
     const remaining = Number.isInteger(attemptsLeft) ? attemptsLeft : 100;
     const bootState = window.BootEntryUI &&
             typeof window.BootEntryUI.get === 'function'
         ? window.BootEntryUI.get() : null;
     // bootEntrySlot initially contains a browser placeholder. Wait until the
     // prepared image has established the authoritative ⚡ target.
-    const slot = bootState && bootState.status === 'prepared' &&
-            Number.isInteger(bootState.slot)
-        ? bootState.slot : null;
-    const registry = typeof abstractionRegistry !== 'undefined'
-        ? abstractionRegistry
-        : (typeof sim !== 'undefined' && sim ? sim.abstractionRegistry : null);
-    const abstraction = slot !== null && registry &&
-            typeof registry.getAbstraction === 'function'
-        ? registry.getAbstraction(slot) : null;
-    if (abstraction && typeof showAbstractionDetail === 'function') {
-        showAbstractionDetail(abstraction.index);
-        window._startupLightningBoltSelectionPending = false;
+    const targetName = bootState && bootState.status === 'prepared' &&
+            bootState.binding && typeof bootState.binding.targetLabel === 'string'
+        ? bootState.binding.targetLabel.trim() : '';
+    if (targetName && typeof _goToLumpByAbstractionName === 'function') {
+        _goToLumpByAbstractionName(targetName);
+        window._startupLightningBoltLumpPending = false;
         return true;
     }
     if (remaining > 0) {
         setTimeout(function() {
-            _selectLightningBoltAbstraction(remaining - 1);
+            _openLightningBoltDefaultLump(remaining - 1);
         }, 50);
     }
     return false;
 }
-window._selectLightningBoltAbstraction = _selectLightningBoltAbstraction;
+window._openLightningBoltDefaultLump = _openLightningBoltDefaultLump;
 
 // ── Landing-page card drag-and-drop ordering ───────────────────────────────
 // Each landing section has its own order. Keeping the order keyed by card
