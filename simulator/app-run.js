@@ -12098,11 +12098,30 @@ function _editorActionIdentity(name) {
 }
 
 function _refreshEditorActionIdentity(name) {
-    const identity = _editorActionIdentity(name || window._editorCodeNameValue || '');
+    // The editor document's name is not the execution identity. Compilation,
+    // registry refreshes and global issue settings must not rename the tab.
+    const tab = typeof userTabs !== 'undefined' && typeof activeUserTabId !== 'undefined'
+        ? userTabs.find(item => item.id === activeUserTabId) : null;
+    const chosenName = tab ? tab.name : (name || window._editorCodeNameValue || '');
+    const identity = _editorActionIdentity(chosenName);
     const identityName = document.getElementById('editorCodeName');
     if (identityName) {
-        identityName.textContent = identity;
-        identityName.title = identity ? `Current LUMP identity: ${identity}` : 'Current LUMP identity';
+        identityName.textContent = chosenName;
+        identityName.title = chosenName ? `Program name: ${chosenName}` : 'Program name';
+        identityName.setAttribute('aria-label', 'Program name');
+        let badge = document.getElementById('editorArtifactIdentity');
+        if (identity && identity !== chosenName) {
+            if (!badge && identityName.parentNode) {
+                badge = document.createElement('span');
+                badge.id = 'editorArtifactIdentity';
+                badge.style.cssText = 'margin-left:8px;font-size:0.75rem;color:var(--text-muted,#9ca3af)';
+                identityName.parentNode.appendChild(badge);
+            }
+            if (badge) {
+                badge.textContent = `LUMP identity: ${identity}`;
+                badge.title = 'Artifact identity or proposed identity from IDE settings; not the program name.';
+            }
+        } else if (badge) badge.remove();
     }
 }
 

@@ -20,3 +20,12 @@ Historical provenance belongs in separate draft metadata, never in the program n
 **Why:** The programmer expects to continue the same abstraction; adding “from v…” to its name suggests a rename and can leak into identity handling.
 
 **How to apply:** Retain the abstraction name unchanged and show the originating revision separately. Assembly metadata labels such as `Abstraction:` are not part of the name.
+
+The chosen editor document name must also remain separate from compiled or
+proposed LUMP identity, including issue numbers from IDE settings.
+
+**Why:** Identity refreshes previously replaced a chosen label with another
+abstraction's name and issue, making compilation look like a silent rename.
+
+**How to apply:** Display identity separately; do not rewrite source declarations,
+saved names, or issues merely to reconcile the editor heading.
