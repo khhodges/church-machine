@@ -464,13 +464,6 @@
     "compiled_at": 1789475607.6456692
   },
   {
-    "token": "00aa1234",
-    "abstraction": "Adder",
-    "filename": "Adder.1.e437ee2c.lump",
-    "lump_version": 385,
-    "compiled_at": 1789488358.233411
-  },
-  {
     "token": "4a00000a",
     "abstraction": "CapabilityTest",
     "filename": "CapabilityTest.2.225da6fc.lump",
@@ -493,5 +486,19 @@
     "filename": "WukongCallHome.1.8965def2.lump",
     "lump_version": 1,
     "archived": true
+  },
+  {
+    "token": "00aa1234",
+    "abstraction": "Adder",
+    "filename": "Adder.1.e437ee2c.lump",
+    "lump_version": 393,
+    "compiled_at": 1789512565.993622,
+    "dot_name": "Adder",
+    "issue_n": 1,
+    "petname": "",
+    "content_profile": 2,
+    "output_profile": 2,
+    "capabilities": [],
+    "operation_id": "a6fc2c83c934433b8dd49ae9598fbc1a"
   }
 ]
