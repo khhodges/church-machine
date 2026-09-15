@@ -37,7 +37,7 @@ def test_trusted_cache_map_uses_current_ns_state_not_stale_manifest_slots():
     # exact bootstrap approval check.  The ordinary cache-map resolver must
     # not promote either ambiguous historical manifest family.
     assert 6 not in tokens
-    assert 10 not in tokens
+    assert 2 not in tokens
     assert tokens[7] == 0x4A000007
 
     # Manifest history still contains Constants at slot 9, while current
@@ -61,12 +61,12 @@ def test_generated_resident_entries_use_cache_tokens_not_permission_annotations(
     # Foundational/device entries without a canonical external full identity
     # have no cache value.  In particular, W3 is no longer synthesized from
     # their permission mask.
-    for slot in (0, 1, 2, 3, 4, 5, 9):
+    for slot in (0, 1, 3, 4, 5, 9):
         assert _slot_words(words, slot)[3] == 0
 
     # Frozen bootstrap residents receive their approved runtime GT cache word;
     # ordinary unbound catalog slots remain zero.
     assert _slot_words(words, 6)[3] == 0x4A000006
     assert _slot_words(words, 7)[3] == 0x4A000007
+    assert _slot_words(words, 2)[3] == 0x4A000002
     assert _slot_words(words, 8)[3] == 0
-    assert _slot_words(words, 10)[3] == 0x4A00000A

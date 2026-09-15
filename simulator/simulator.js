@@ -330,6 +330,25 @@ class ChurchSimulator {
             this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected before changing simulator state.\n`;
             return false;
         }
+        // A browser may inspect arbitrary image bytes, but it must never use
+        // those bytes to override the persisted Namespace boot plan.  Runtime
+        // entrypoints load the plan before calling this method; this additional
+        // gate also protects direct image imports after that plan is known.
+        try {
+            const namespacePlan = typeof window !== 'undefined' && window.NamespacePlan;
+            if (namespacePlan && typeof namespacePlan.assertImageSlot === 'function' &&
+                    !namespacePlan.assertImageSlot(discoveredBootEntrySlot)) {
+                this.lastBootImageError =
+                    `Saved image prepares NS[${discoveredBootEntrySlot}], but the persisted Namespace plan selects a different row. Generate an image from the saved plan.`;
+                this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected before changing simulator state.\n`;
+                return false;
+            }
+        } catch (_) {
+            this.lastBootImageError =
+                'Persisted Namespace boot plan could not validate this image. Reload Namespace and choose one boot row.';
+            this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected before changing simulator state.\n`;
+            return false;
+        }
 
         // Stale-trampoline guard — checked against src BEFORE any mutation of
         // simulator state or memory.  Any boot image from before direct-dispatch

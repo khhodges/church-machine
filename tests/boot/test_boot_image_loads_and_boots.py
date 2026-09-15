@@ -53,6 +53,7 @@ from server.boot_image import (  # noqa: E402
 )
 
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
+BOOT_CONFIG_PATH = os.path.join(ROOT, "server", "boot-config.json")
 HARNESS   = os.path.join(ROOT, "tests", "boot", "sim_boot_loader.js")
 
 
@@ -256,26 +257,19 @@ def test_boot_image_loads_and_boots(cfg, skip_window, expected_ns_count):
 # image whose slot-10 body is the current boot-resident program with its
 # declared capabilities — never a synthetic header over zero words — and the simulator
 # capabilities — never a synthetic header over zero words — and the simulator
-# must boot it to completion with CR14 pointing at slot 10.
+# must boot it to completion with CR14 pointing at slot 2.
 
 CAPTEST_SLOT = 10
 
 
 def _saved_project_cfg():
-    """The saved boot-config.json when present (it is gitignored runtime
-    state), else the equivalent default Wukong geometry — keeping the test
-    hermetic on a fresh checkout."""
-    path = os.path.join(ROOT, "server", "boot-config.json")
-    if os.path.isfile(path):
-        with open(path) as f:
-            return json.load(f)
-    return {
-        "step1": {
-            "totalNamespaceWords": 32768,
-            "namespaceLumpWords":   1024,
-            "threadLumpWords":       256,
-        },
-    }
+    """Read the isolated, explicitly provisioned boot configuration."""
+    assert os.path.isfile(BOOT_CONFIG_PATH), (
+        "boot test fixture must explicitly provision boot-config.json; "
+        "tests may not substitute an implicit runtime default"
+    )
+    with open(BOOT_CONFIG_PATH) as f:
+        return json.load(f)
 
 
 def _capabilitytest_manifest_body():
@@ -310,7 +304,20 @@ def _capabilitytest_manifest_body():
     assert len(raw) % 4 == 0
     return entry, struct.unpack(f">{len(raw) // 4}I", raw)
 
-
+def _select_capabilitytest_plan():
+    """Select CapabilityTest through the persisted Namespace marker."""
+    path = os.path.join(LUMPS_DIR, "ns-state.json")
+    with open(path) as source:
+        state = json.load(source)
+    selected = next(row for row in state["abstractions"]
+                    if row.get("name") == "CapabilityTest"
+                    and row.get("slot") == CAPTEST_SLOT)
+    for row in state["abstractions"]:
+        row.pop("boot", None)
+    selected["boot"] = True
+    state["revision"] = int(state.get("revision", 0)) + 1
+    with open(path, "w") as target:
+        json.dump(state, target, indent=2)
 def _slot_body(image_bytes, slot, body_words=64):
     """Return a requested number of body words from an NS slot in an image."""
     import struct
@@ -333,35 +340,37 @@ def _reissue_boot_entry(image_bytes, slot, seq):
 
 def test_capabilitytest_image_payload_integrity():
     """Generated image embeds CapabilityTest's real body at slot 10."""
+    _select_capabilitytest_plan()
     cfg = _saved_project_cfg()
     _, expected_body = _capabilitytest_manifest_body()
     image = generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=CAPTEST_SLOT)
     loc, body = _slot_body(image, CAPTEST_SLOT, len(expected_body))
-    assert loc > 0, "slot 10 has no allocated location"
+    assert loc > 0, "slot 2 has no allocated location"
     hdr = body[0]
-    assert (hdr >> 27) == 0x1F, f"slot 10 header magic invalid: 0x{hdr:08X}"
+    assert (hdr >> 27) == 0x1F, f"slot 2 header magic invalid: 0x{hdr:08X}"
     cw = (hdr >> 10) & 0x1FFF
     cc = hdr & 0xFF
     assert body == expected_body, (
-        "slot 10 body differs from the authoritative boot-resident "
+        "slot 2 body differs from the authoritative boot-resident "
         "CapabilityTest binary"
     )
     # The code region must be real instructions, not a zero-filled placeholder.
     code = body[1:1 + cw]
     nonzero = sum(1 for wv in code if wv != 0)
     assert nonzero >= cw - 1, (
-        f"slot 10 code region is mostly zeros ({nonzero}/{cw} non-zero) — "
+        f"slot 2 code region is mostly zeros ({nonzero}/{cw} non-zero) — "
         f"placeholder body instead of the real CapabilityTest program"
     )
     # Every declared capability must be present at the lump tail.
     clist = body[len(body) - cc:]
     assert all(gv != 0 for gv in clist), (
-        f"slot 10 c-list has zero entries: {[hex(gv) for gv in clist]}"
+        f"slot 2 c-list has zero entries: {[hex(gv) for gv in clist]}"
     )
 
 
 def test_capabilitytest_boot_entry_boots():
     """Simulator boots to completion with CapabilityTest selected (slot 10)."""
+    _select_capabilitytest_plan()
     cfg = _saved_project_cfg()
     image = generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=CAPTEST_SLOT)
     status = _run_harness(cfg, image)
@@ -375,12 +384,13 @@ def test_capabilitytest_boot_entry_boots():
     assert _gt_index(status["cr14"]["word0"]) == CAPTEST_SLOT, (
         f"CR14 index={_gt_index(status['cr14']['word0'])}, expected {CAPTEST_SLOT}"
     )
-    # CR0 (boot-entry E-GT via Thread.caps[0]) must also encode slot 10.
+    # CR0 (boot-entry E-GT via Thread.caps[0]) must also encode slot 2.
     assert (status["cr0"]["word0"] & 0xFFFF) == CAPTEST_SLOT
 
 
 def test_capabilitytest_reissued_generation_boots():
     """A frozen resident descriptor cannot be reissued independently."""
+    _select_capabilitytest_plan()
     cfg = _saved_project_cfg()
     image = generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=CAPTEST_SLOT)
     reissued = _reissue_boot_entry(image, CAPTEST_SLOT, 1)
@@ -436,7 +446,7 @@ def test_capabilitytest_boot_binding_points_to_valid_binary():
 
 def test_served_boot_image_carries_capabilitytest_body(tmp_path):
     """The boot artifact the server ships must carry CapabilityTest's real
-    body at slot 10 (not zeros).
+    body at slot 2 (not zeros).
 
     server/lumps/boot-image.bin is intentionally gitignored: the server
     (re)generates it from tracked inputs — boot-config.json, manifest.json,
@@ -458,14 +468,14 @@ def test_served_boot_image_carries_capabilitytest_body(tmp_path):
     hdr = body[0]
     expected_cw = (expected_body[0] >> 10) & 0x1FFF
     assert (hdr >> 27) == 0x1F and ((hdr >> 10) & 0x1FFF) == expected_cw, (
-        f"served image slot 10 header 0x{hdr:08X} is not the real "
+        f"served image slot 2 header 0x{hdr:08X} is not the real "
         f"CapabilityTest lump (expected magic=0x1F, cw={expected_cw}) — "
         f"the manifest boot_resident flag regressed"
     )
     assert body == expected_body
     nonzero = sum(1 for wv in body[1:1 + expected_cw] if wv != 0)
     assert nonzero >= expected_cw - 1, (
-        "served image slot 10 code region is zero-filled — the manifest "
+        "served image slot 2 code region is zero-filled — the manifest "
         "boot_resident flag regressed"
     )
 

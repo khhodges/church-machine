@@ -17,12 +17,9 @@
 - [Wukong NS base is not ISA-safe at zero](wukong-ns-base-isa-conflict.md) — standalone Wukong currently overrides the ISA top-of-memory NS base to 0; do not promote that shortcut into a new image without resolving DMEM size/base
 - [BRAM NUC_PROGRAM staleness trap](bram-nuc-program-staleness.md) — church_ti60_f225.v BRAM goes stale when boot_rom.py NUC_PROGRAM changes; regen or patch via gen_cm_dmem_direct.py
 - [Verilog/RTLIL regeneration procedure](verilog-regen-procedure.md) — 9 gen commands for all actively-synthesised targets; legacy-frozen files; builder tab visibility trap
-- [CLOOMC source expression subset](cloomc-source-expression-subset.md) — split compound guards and nested expressions into single-op temporaries; use bfext/bfins for bitfield work
 - [v2.0 hardware format audit](v2-format-audit.md) — ARM cond order; Turing opcodes 16–25; ROL-XOR integrity; g_bit toggles; hardware WORD2 differs from simulator NS
 - [OBBS single-patch-location bug class](obbs-single-patch-location.md) — a newer patch step + an un-removed older patch step for the same artifact eventually double-run; make the later step a read-only self-test, not a fallback patch
-- [Ti60 one-button build](ti60-one-button-build.md) — CM DMEM/firmware patches must happen BEFORE synthesis (build_ti60_bitstream.sh, not run_efx_map.sh); patching map.v in PNR is ignored (PNR reads BRAM from top.vdb written by MAP)
 - [Boot namespace architecture rules](boot-namespace-rules.md) — 2 hardwired slots only; namespace liveness rule; authority = Abstract GT not NS entry; 3-layer boot model; SelfTest loop/CALL pattern
-- [Simulator E2E boot-state testing](sim-e2e-boot-testing.md) — instantBoot() fails at B:04 (async fetch); slowBoot() blocked by bootAnimating; force sim.bootComplete=true; suppress #whatsNewModal via addInitScript
 - [LUMP name casing staleness gap](lump-name-casing-staleness-gap.md) — case drift hides orphaned LUMPs from guards; independently audit UI hardcoded tokens
 - [Self-diagnosing remote build guards](self-diagnosing-remote-guards.md) — version-stamp script output and dump actual-vs-expected state on failure when the script runs on a machine you can't directly access
 - [Freshness guards on idempotent patches must be content-based](freshness-guard-content-vs-mtime.md) — if a patch's output text never changes once applied, an mtime comparison against it will eventually false-positive forever
@@ -45,7 +42,6 @@
 - [Thread base address zero](thread-base-address-zero.md) — a non-null CR12 may point to word 0; use an explicit missing-capability sentinel, never a base truthiness check
 - [Mint gate for NS slot registration](mint-gate-ns-registration.md) — only Mint.RegisterOutform→Navana.ADD→writeNSEntry may add NS slots; _seedIrqLazyManifest handles post-allocation state; no direct writeNSEntry outside this chain
 - [Wukong build-host policy](wukong-build-host-policy.md) — serialize resource-constrained Vivado builds and accept releases only with fresh, timing-clean provenance
-- [Wukong sentinel build version](wukong-sentinel-build-version.md) — 4-byte sentinel (0xBC N_INIT TU VER BUILD_VER); 'f' cmd re-arms; WUKONG_BUILD_VERSION in wukong_top.py; bump before each synthesis
 - [Wukong boot CALL/LOAD/retire fixes](wukong-boot-callhome-fixes.md) — sync-BRAM fetch-settle bubble, issue-cycle busy gaps, operand latching, busy-gated decoder faults, boot_retire_count reset on FAULT_RST
 - [Wukong IRQ arm gate](wukong-irq-arm-gate.md) — irq_armed_reg+first_call_done_reg cleared on FAULT_RST; dispatch disabled until first CALL→method→RETURN completes
 - [Wukong boot CALL direct-GT resolution](wukong-boot-call-resolution.md) — decoder call_mask=0 always; boot window uses BOOT_RESTORE_MASK (CR0+CR12); CALL bypasses c-list via mload_direct+boot_window_lat
@@ -57,20 +53,14 @@
 - [Wukong poll rejection containment](wukong-poll-rejection-containment.md) — async hardware polling must contain state-update failures, not only fetch failures
 - [Hardware snapshot separation](hardware-snapshot-separation.md) — hardware NIA/cursor and stored thread context must stay separate from simulator PC, live CR12, and breakpoints
 - [Boot fault register context](boot-fault-register-context.md) — boot mLoad diagnostics name the destination CR, not the executing abstraction's CR14
-- [Wukong bridge Windows support](wukong-windows-bridge.md) — use pyserial port enumeration so the same bridge supports COM ports natively without WSL
-- [Wukong dual-link connectivity](wukong-dual-link-connectivity.md) — JTAG programs the FPGA; a separate USB-UART port carries trace, commands, and upload; COM3 is only a common Windows label
-- [mLoad inclusive c-list bounds](mload-inclusive-c-list-bounds.md) — limit_offset stores count−1, so valid index checks must use inclusive `<=`
 - [Wukong RTL generation initializer bottleneck](wukong-rtl-generation-init-bottleneck.md) — fixed 64 KiB DMEM is not proof of a BRAM issue; Amaranth conversion can stall before Yosys/Vivado
 - [Amaranth shape() memoization](amaranth-shape-memoization.md) — Operator/SwitchValue.shape() uncached in 0.5.8; monkey-patch both before convert() for O(n) instead of O(n²)
-- [Wukong focused production simulation](wukong-focused-production-simulation.md) — full-top PySim preparation can exceed minutes; simulate shared production FSM builders through a focused top profile
 - [ns-state snapshot vs raw binary](ns-state-snapshot-vs-raw.md) — ns-state.json fields can be stale vs boot-image.bin; use the endpoint `committed` raw-words block for hex display and fault checks
-- [ELOADCALL frame-push full bounds](eloadcall-frame-push-bounds.md) — ELOADCALL needs thread_hdr+cr12_thread inputs; PUSH_CR5_CR12 before STO read; callee_egt from CALL_P1_DONE CR6 (phase-1), not phase-0 loaded_cap
 - [Sidecar spec vs implementation](sidecar-spec-vs-implementation.md) — mechanical-cache rule is future-normative; verify field/writer claims against server/app.py before spec edits
 - [Freespace validation zone per typ](freespace-validation-zone-per-typ.md) — freespace scans must branch on lump typ: Thread uses the collision zone, Namespace skips; generic cw/cc bounds reject valid Threads
 - [T7 freespace self-definition format](t7-freespace-format.md) — embedded API JSON must never carry token/issue (circular hash / identity rule); Mint validates framing only
 - [Lump V1.3 self-defining freespace](lump-v13-self-definition.md) — 0xAB frame at word cw+1 (API JSON + optional source); JS/Python emitters must stay in lockstep; compile cache key must include tier
 - [Boot-suite test isolation](boot-suite-triage-clusters.md) — destructive tests on shared live dirs need a cross-process write lock or temp-dir isolation, not snapshot/restore alone; bulk-failure triage needs reconciled per-cluster F/E counts
-- [Direct LUMP call selector](direct-lump-call-selector.md) — single-entry LUMPs whose first code word is executable must use selector 0, never method-table selector 1
 - [Declared C-list B-flag rule](declared-clist-b-flag-rule.md) — declared capability rows must use B=0; browser and server validators must reject B-set Inform tokens consistently
 - [Canonical T vs lookup aliases](canonical-t-vs-lookup-aliases.md) — historical LUMP tokens may locate bytes, but only recomputed canonical T may populate W3 or drive promotion
 - [boot_resident manifest-only](boot-resident-manifest-only.md) — generator reads boot_resident from manifest.json only; sidecar-only flag = NS descriptor with zero-filled body
@@ -157,3 +147,4 @@
 - [Three-LUMP resident profile](three-lump-resident-profile.md) — boot core is an explicit fixed-map policy; manifest history never selects live resident executables
 - [Boot-entry UI authority](boot-entry-ui-authority.md) — default Code View follows the loaded image's boot slot, never a stale pending browser selection
 - [Bootstrap repair destination authority](bootstrap-repair-destination-authority.md) — an eligible non-resident occupant supplies sequence only; the approved frozen binding remains authoritative under the fresh Namespace lock
+- [CapabilityTest Namespace slot](capabilitytest-namespace-slot.md) — CapabilityTest stays at NS[10]; UART_DEV stays at NS[2] with hardware address/limit semantics

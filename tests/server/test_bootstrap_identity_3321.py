@@ -30,10 +30,32 @@ def _tracked_boot_artifact_snapshot():
 
 _TRACKED_BOOT_ARTIFACTS_BEFORE = _tracked_boot_artifact_snapshot()
 _BOOTSTRAP_TEST_ROOT = None
+
+
+def _select_fixture_boot_marker(lumps: Path, *, slot: int) -> None:
+    """Make the test fixture's Lightning Bolt choice explicit and durable."""
+    state_path = lumps / "ns-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    rows = state.get("abstractions")
+    assert isinstance(rows, list)
+    selected = [
+        row for row in rows
+        if isinstance(row, dict) and row.get("slot") == slot
+    ]
+    assert len(selected) == 1
+    state["revision"] = int(state.get("revision", 0))
+    for row in rows:
+        if isinstance(row, dict):
+            row.pop("boot", None)
+    selected[0]["boot"] = True
+    state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+
 if not os.environ.get("CHURCH_TEST_LUMPS_DIR"):
     _BOOTSTRAP_TEST_ROOT = Path(tempfile.mkdtemp(prefix="bootstrap-identity-"))
     isolated_lumps = _BOOTSTRAP_TEST_ROOT / "lumps"
     shutil.copytree(_ROOT / "server" / "lumps", isolated_lumps, symlinks=True)
+    _select_fixture_boot_marker(isolated_lumps, slot=10)
     isolated_config = _BOOTSTRAP_TEST_ROOT / "boot-config.json"
     shutil.copy2(_ROOT / "server" / "boot-config.json", isolated_config)
     os.environ["CHURCH_TEST_LUMPS_DIR"] = str(isolated_lumps)
@@ -139,10 +161,15 @@ def test_bootstrap_helper_fails_closed_outside_frozen_resident(binding):
 
 
 def test_every_frozen_resident_manifest_approval_row0_and_boot_w3_share_t():
-    root = Path(__file__).resolve().parents[2]
-    lumps = root / "server" / "lumps"
+    lumps = Path(app_module.LUMPS_DIR)
     state = json.loads((lumps / "ns-state.json").read_text())
-    image = (lumps / "boot-image.bin").read_bytes()
+    image = generate_boot_image({
+        "step1": {
+            "totalNamespaceWords": 16384,
+            "namespaceLumpWords": 64,
+            "threadLumpWords": 256,
+        },
+    }, str(lumps))
     words = __import__("struct").unpack(f"<{len(image) // 4}I", image)
     approvals = read_approvals(str(lumps / "approvals.json"))
     expected = {"SelfTest": 0x4A000006, "WukongCallHome": 0x4A000007,
@@ -167,8 +194,7 @@ def test_every_frozen_resident_manifest_approval_row0_and_boot_w3_share_t():
 
 
 def test_archived_capabilitytest_hash_token_is_classified_legacy_incompatible():
-    root = Path(__file__).resolve().parents[2]
-    lumps = root / "server" / "lumps"
+    lumps = Path(app_module.LUMPS_DIR)
     manifest = json.loads((lumps / "manifest.json").read_text())
     archived = next(
         row for row in manifest
@@ -198,8 +224,7 @@ def test_archived_capabilitytest_hash_token_is_classified_legacy_incompatible():
 
 
 def test_current_capabilitytest_snapshot_proves_t_equals_row0_equals_destination():
-    root = Path(__file__).resolve().parents[2]
-    lumps = root / "server" / "lumps"
+    lumps = Path(app_module.LUMPS_DIR)
     manifest = json.loads((lumps / "manifest.json").read_text())
     current = next(
         row for row in manifest
@@ -219,8 +244,7 @@ def test_current_capabilitytest_snapshot_proves_t_equals_row0_equals_destination
 
 
 def test_archived_bootstrap_snapshot_cannot_enable_history_restore():
-    root = Path(__file__).resolve().parents[2]
-    lumps = root / "server" / "lumps"
+    lumps = Path(app_module.LUMPS_DIR)
     manifest = json.loads((lumps / "manifest.json").read_text())
     archived = next(
         row for row in manifest
@@ -238,9 +262,8 @@ def test_archived_bootstrap_snapshot_cannot_enable_history_restore():
 @pytest.mark.parametrize("state_mode", ["missing", "malformed", "duplicate"])
 def test_bootstrap_history_fails_closed_when_binding_is_unavailable(
         tmp_path, monkeypatch, state_mode):
-    root = Path(__file__).resolve().parents[2]
     source_lump = (
-        root / "server" / "lumps" / "CapabilityTest.1.83320494.lump")
+        Path(app_module.LUMPS_DIR) / "CapabilityTest.1.83320494.lump")
     current_name = "CapabilityTest.1.83320494.lump"
     archive_name = "CapabilityTest.1.83320494_v1.lump"
     binary = source_lump.read_bytes()
@@ -267,7 +290,7 @@ def test_bootstrap_history_fails_closed_when_binding_is_unavailable(
     elif state_mode == "duplicate":
         binding = {
             "name": "CapabilityTest",
-            "slot": 10,
+            "slot": 2,
             "seq": 0,
             "resident": True,
             "boot_resident": True,
@@ -326,8 +349,7 @@ def test_lump_list_hides_archived_bootstrap_but_words_expose_identity_comparison
 def test_active_bootstrap_history_groups_all_legacy_manifest_records_read_only(
         token, abstraction, active_filename):
     manifest = json.loads(
-        (Path(__file__).resolve().parents[2] / "server" / "lumps"
-         / "manifest.json").read_text())
+        (Path(app_module.LUMPS_DIR) / "manifest.json").read_text())
     archived_rows = [
         row for row in manifest
         if row.get("abstraction") == abstraction and row.get("archived") is True
@@ -388,7 +410,7 @@ def test_programmer_can_plan_slot7_replacement_with_content_token_hint():
     assert response.get_json()["consequence"] in {"create", "replace"}
 
 
-def test_programmer_can_replace_frozen_slot10_with_compiler_owned_lump():
+def test_programmer_can_replace_frozen_slot2_with_compiler_owned_lump():
     """The selected slot binds SELF; the old resident name does not own it."""
     words = [(0x1F << 27) | (1 << 10) | 1, 0] + [0] * 62
     words[-1] = 0xFEED5E1F
@@ -397,7 +419,7 @@ def test_programmer_can_replace_frozen_slot10_with_compiler_owned_lump():
             "binary": words,
             "metadata": {
                 "abstraction": "ProgrammerChoice",
-                "ns_slot": 10,
+                "ns_slot": 2,
                 "token": "deadbeef",
                 "content_type": "code",
                 "capabilities": [{
@@ -413,7 +435,7 @@ def test_programmer_can_replace_frozen_slot10_with_compiler_owned_lump():
     result = response.get_json()
     assert result["consequence"] in {"create", "replace"}
     canonical_words = list(words)
-    canonical_words[-1] = 0x4A00000A
+    canonical_words[-1] = 0x4A000002
     canonical_bytes = __import__("struct").pack(">64I", *canonical_words)
     assert result["digest"] == __import__("hashlib").sha256(
         canonical_bytes).hexdigest()
@@ -428,7 +450,7 @@ def test_stale_browser_self_is_rebound_to_programmer_selected_slot():
             "binary": words,
             "metadata": {
                 "abstraction": "ProgrammerChoice",
-                "ns_slot": 10,
+                "ns_slot": 2,
                 "token": "deadbeef",
                 "content_type": "code",
                 # Older browser snapshots omitted compiler_owned_self while
@@ -440,7 +462,7 @@ def test_stale_browser_self_is_rebound_to_programmer_selected_slot():
 
     assert response.status_code == 201, response.get_data(as_text=True)
     canonical_words = list(words)
-    canonical_words[-1] = 0x4A00000A
+    canonical_words[-1] = 0x4A000002
     canonical_bytes = __import__("struct").pack(">64I", *canonical_words)
     assert response.get_json()["digest"] == __import__("hashlib").sha256(
         canonical_bytes).hexdigest()
@@ -448,8 +470,7 @@ def test_stale_browser_self_is_rebound_to_programmer_selected_slot():
 
 @pytest.mark.parametrize("mutation", ["slot", "seq", "token"])
 def test_resolver_and_boot_reject_descriptor_or_token_mutation(tmp_path, mutation):
-    root = Path(__file__).resolve().parents[2]
-    source = root / "server" / "lumps"
+    source = Path(app_module.LUMPS_DIR)
     lumps = tmp_path / "lumps"
     shutil.copytree(source, lumps, symlinks=True)
     state = json.loads((lumps / "ns-state.json").read_text())
@@ -474,9 +495,8 @@ def test_resolver_and_boot_reject_descriptor_or_token_mutation(tmp_path, mutatio
 
 
 def test_boot_rejects_identity_hash_downgrade_of_frozen_approval(tmp_path):
-    root = Path(__file__).resolve().parents[2]
     lumps = tmp_path / "lumps"
-    shutil.copytree(root / "server" / "lumps", lumps, symlinks=True)
+    shutil.copytree(Path(app_module.LUMPS_DIR), lumps, symlinks=True)
     state = json.loads((lumps / "ns-state.json").read_text())
     row = next(r for r in state["abstractions"] if r.get("name") == "WukongCallHome")
     raw = (lumps / row["filename"]).read_bytes()
@@ -514,9 +534,8 @@ def _repository_snapshot(root):
 
 @pytest.fixture
 def isolated_bootstrap_repository(tmp_path, monkeypatch):
-    root = Path(__file__).resolve().parents[2]
     lumps = tmp_path / "lumps"
-    shutil.copytree(root / "server" / "lumps", lumps, symlinks=True)
+    shutil.copytree(Path(app_module.LUMPS_DIR), lumps, symlinks=True)
     state_path = lumps / "ns-state.json"
     state = json.loads(state_path.read_text())
     capability_test = next(
@@ -594,7 +613,7 @@ def test_final_bootstrap_gate_rejects_before_any_repository_mutation(
     assert _repository_snapshot(isolated_bootstrap_repository) == before
 
 
-def test_valid_slot10_bootstrap_save_commits_exact_sealed_self(
+def test_valid_slot2_bootstrap_save_commits_exact_sealed_self(
         isolated_bootstrap_repository):
     with app_module.app.test_client() as client:
         payload = _bootstrap_save_payload(client)
@@ -693,7 +712,8 @@ def test_namespace_change_before_final_lock_preserves_repository_and_authorizati
         state_path = isolated_bootstrap_repository / "ns-state.json"
         state = json.loads(state_path.read_text())
         row = next(item for item in state["abstractions"]
-                   if item.get("slot") == 10)
+                   if item.get("name") == "CapabilityTest"
+                   and item.get("slot") == 10)
         row["seq"] = 1
         row["token"] = "4a01000a"
         state_path.write_text(json.dumps(state))
@@ -741,8 +761,10 @@ def test_selftest_source_identity_change_between_reads_is_rejected(
         current = json.loads(state_path.read_text())
         row = next(item for item in current["abstractions"]
                    if item.get("name") == "SelfTest")
-        row["slot"] = 11
-        row["token"] = "4a00000b"
+        # Slot 20 is unbound in the fixture.  Do not create a duplicate
+        # Namespace row merely to model the competing writer.
+        row["slot"] = 20
+        row["token"] = "4a000014"
         state_path.write_text(json.dumps(current))
 
     monkeypatch.setattr(app_module, "_bootstrap_pre_lock_hook", mutate_between_reads)

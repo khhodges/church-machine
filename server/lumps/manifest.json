@@ -461,27 +461,13 @@
     "abstraction": "CapabilityTest",
     "filename": "CapabilityTest.2.6fd9df21.lump",
     "lump_version": 27,
-    "compiled_at": 1789475607.6456692,
-    "dot_name": "CapabilityTest",
-    "issue_n": 2,
-    "petname": "",
-    "content_profile": 2,
-    "output_profile": 2,
-    "capabilities": [],
-    "operation_id": "d5b1527434f94f2e8382fe1daf950096"
+    "compiled_at": 1789475607.6456692
   },
   {
     "token": "00aa1234",
     "abstraction": "Adder",
     "filename": "Adder.1.e437ee2c.lump",
-    "lump_version": 389,
-    "compiled_at": 1789500234.3711998,
-    "dot_name": "Adder",
-    "issue_n": 1,
-    "petname": "",
-    "content_profile": 2,
-    "output_profile": 2,
-    "capabilities": [],
-    "operation_id": "fbdd9ea886704802a5a5758309de1c68"
+    "lump_version": 385,
+    "compiled_at": 1789488358.233411
   }
 ]

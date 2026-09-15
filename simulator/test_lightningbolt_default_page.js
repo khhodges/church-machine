@@ -1,15 +1,16 @@
 'use strict';
 
+// Task #3472: the default Code/LUMP route must use the persisted Namespace
+// marker, never a prepared image binding or a browser selection.
 const fs = require('fs');
 const vm = require('vm');
 const assert = require('assert');
 
 const shell = fs.readFileSync('simulator/app-shell.js', 'utf8');
-
 function extractFunction(source, name) {
     const start = source.indexOf(`function ${name}(`);
     assert(start >= 0, `${name} exists`);
-    let brace = source.indexOf('{', start);
+    const brace = source.indexOf('{', start);
     let depth = 0;
     for (let i = brace; i < source.length; i++) {
         if (source[i] === '{') depth++;
@@ -19,42 +20,38 @@ function extractFunction(source, name) {
 }
 
 const opened = [];
+const plan = {
+    revision: 12,
+    plan: { slot: 2, seq: 9, token: '0123abcd', filename: 'CapabilityTest.1.0123abcd.lump' },
+    abstractions: [{ name: 'CapabilityTest', slot: 2, seq: 9, token: '0123abcd',
+        filename: 'CapabilityTest.1.0123abcd.lump', boot: true }],
+};
 const context = {
-    window: {
-        BootEntryUI: {
-            get() {
-                return {
-                    status: 'prepared',
-                    slot: 10,
-                    binding: { targetLabel: 'CapabilityTest' },
-                };
-            },
-        },
-    },
-    _goToLumpByAbstractionName(name) { opened.push(name); },
-    setTimeout() { throw new Error('selection should not retry when registry is ready'); },
+    window: { NamespacePlan: {
+        get: () => plan,
+        identityMatches: (a, b) => a.slot === b.slot && a.seq === b.seq &&
+            a.token === b.token && a.filename === b.filename,
+    } },
+    _goToLumpByAbstractionName: name => opened.push(name),
+    setTimeout: () => { throw new Error('selection should not retry when Namespace is ready'); },
 };
 vm.createContext(context);
 vm.runInContext(extractFunction(shell, '_openLightningBoltDefaultLump'), context);
-
 assert.equal(context._openLightningBoltDefaultLump(), true);
 assert.deepEqual(opened, ['CapabilityTest']);
 assert(shell.includes("if (!startView) startView = 'lumps';"),
     'a true default launch opens the LUMP Repository');
-assert(shell.includes("if (startView === 'lumps' && !hashParams.lump)"),
-    'the startup LUMP Repository opens the live lightning-bolt binding');
-assert(!shell.includes("getAbstractionByName('LightningBolt')"),
-    'the default is resolved from the live boot-entry slot, not a literal name');
+assert(!extractFunction(shell, '_openLightningBoltDefaultLump').includes('BootEntryUI'),
+    'default routing does not defer to an image binding');
 
-const abstractions = fs.readFileSync('simulator/app-abstractions.js', 'utf8');
-const renderAbstractions = extractFunction(abstractions, 'renderAbstractions');
-assert(abstractions.includes("bootState.binding.targetLabel"),
-    'the catalog resolves the lightning-bolt abstraction from the prepared binding');
-assert(abstractions.includes("abs.name === bootTargetName"),
-    'the catalog does not compare a Namespace slot with an abstraction index');
-assert(!renderAbstractions.includes('setBootEntrySlot('),
-    'catalog rows never send abstraction indexes as Namespace slot commands');
-assert(!renderAbstractions.includes('abs-next-entry-btn'),
-    'inactive catalog rows do not render misleading boot-entry controls');
+const runner = fs.readFileSync('simulator/app-run.js', 'utf8');
+const tokenResolver = extractFunction(runner, '_configuredBootLumpToken');
+const runContext = { window: context.window };
+vm.createContext(runContext);
+vm.runInContext(tokenResolver + '\ntoken = _configuredBootLumpToken();', runContext);
+assert.equal(runContext.token, '0123abcd');
+assert(!tokenResolver.includes('sim.bootEntrySlot'));
+assert(!runner.includes("fetch('/api/boot-config', { cache: 'no-store' })"),
+    'default Code routing does not read boot-config catalog authority');
 
-console.log('PASS default launch opens the live lightning-bolt LUMP');
+console.log('PASS default launch and Code routing use Namespace plan');
