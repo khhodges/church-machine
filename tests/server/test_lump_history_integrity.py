@@ -4,12 +4,84 @@ import json
 import struct
 import sys
 import types
+from pathlib import Path
+
+import pytest
 
 _trace_stub = types.ModuleType("hardware.wukong_trace_symbols")
 _trace_stub.trace_metadata = lambda _nia: None
 _trace_stub._disassemble_word = lambda word: f"0x{word:08X}"
 sys.modules.setdefault("hardware.wukong_trace_symbols", _trace_stub)
 import server.app as app_module
+
+
+@pytest.mark.parametrize("filename,token,version,digest", [
+    ("CapabilityTest.2.225da6fc.lump", "4a00000a", 2,
+     "7f36b8a385f82a7b1548deb37b7b25999492b58934b0905fadf06b83d3f659f0"),
+    ("SelfTest.1.b5182a3d.lump", "3b466efc", 80,
+     "e655c01275799838cbaca5e84c0899a93eb42b42119392b63829bda85d5feba4"),
+    ("WukongCallHome.1.8965def2.lump", "4a000007", 1,
+     "968706ae6010d58966a78ed35345608a8997c2192e86f8e1bfb8d4068983edbc"),
+])
+def test_restored_catalog_history_is_exact_and_read_only(
+    tmp_path, monkeypatch, filename, token, version, digest
+):
+    """Real catalog archives remain inspectable, never implicit activation."""
+    root = Path(__file__).resolve().parents[2] / "server" / "lumps"
+    manifest = json.loads((root / "manifest.json").read_text())
+    rows = [row for row in manifest if row.get("filename") == filename]
+    assert len(rows) == 1
+    archived = rows[0]
+    assert archived["archived"] is True
+    assert archived["token"] == token
+    assert archived["lump_version"] == version
+    assert not any(archived.get(key) for key in
+                   ("ns_slot", "boot", "boot_resident", "resident"))
+    raw = (root / filename).read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == digest
+    ns = json.loads((root / "ns-state.json").read_text())
+    live = next(row for row in ns["abstractions"]
+                if row["name"] == archived["abstraction"])
+    assert live["filename"] != filename
+    # Copy all inputs; neither requests nor server helpers may write live state.
+    for path in root.iterdir():
+        if path.is_file() and path.suffix in (".lump", ".json"):
+            (tmp_path / path.name).write_bytes(path.read_bytes())
+    monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
+    monkeypatch.setattr(app_module, "_LUMPS_DIR", str(tmp_path))
+    monkeypatch.setattr(app_module, "NS_STATE_PATH", str(tmp_path / "ns-state.json"))
+    # Read-side Namespace validation takes the normal coordination lock.
+    (tmp_path / ".namespace-commit.lock").touch()
+    before = {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+    without_archive = [row for row in manifest if row is not archived]
+
+    def primary_choice():
+        try:
+            row, _ = app_module._latest_primary_compilation(archived["abstraction"])
+            return row["filename"]
+        except LookupError as exc:
+            return str(exc)
+
+    selected = primary_choice()
+    (tmp_path / "manifest.json").write_text(json.dumps(without_archive))
+    assert primary_choice() == selected
+    (tmp_path / "manifest.json").write_bytes(before["manifest.json"])
+    with app_module.app.test_client() as client:
+        history = client.get(f"/api/lumps/{live['token']}/history")
+        assert history.status_code == 200
+        record, = [row for row in history.get_json()["history"]
+                   if row.get("archive_filename") == filename]
+        assert record["binary_hash"] == digest
+        assert record["current"] is False
+        assert record["preview_enabled"] is True
+        assert record["restore_enabled"] is False
+        response = client.get(
+            f"/api/lumps/{live['token']}/words/{version}",
+            query_string={"archive_filename": filename})
+        assert response.status_code == 200
+        assert response.get_json()["words"] == list(
+            struct.unpack(f">{len(raw) // 4}I", raw))
+    assert {p.name: p.read_bytes() for p in tmp_path.iterdir()} == before
 
 
 def _binary(cw=7, cc=2):

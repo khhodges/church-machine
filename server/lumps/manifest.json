@@ -469,5 +469,29 @@
     "filename": "Adder.1.e437ee2c.lump",
     "lump_version": 385,
     "compiled_at": 1789488358.233411
+  },
+  {
+    "token": "4a00000a",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.2.225da6fc.lump",
+    "variant_group": "capabilitytest-history",
+    "lump_version": 2,
+    "compiled_at": 1788187312.1902559,
+    "archived": true
+  },
+  {
+    "token": "3b466efc",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.1.b5182a3d.lump",
+    "lump_version": 80,
+    "compiled_at": 1788985689.2249203,
+    "archived": true
+  },
+  {
+    "token": "4a000007",
+    "abstraction": "WukongCallHome",
+    "filename": "WukongCallHome.1.8965def2.lump",
+    "lump_version": 1,
+    "archived": true
   }
 ]
