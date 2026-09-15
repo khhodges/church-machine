@@ -3445,6 +3445,18 @@ function updateNamespace() {
     window._ensureNamespaceBuildConfig = async function() {
         const localCfg = (window.bootConfig && typeof window.bootConfig === 'object')
             ? window.bootConfig : {};
+        let selectedBootEntry = null;
+        try {
+            const storedBootEntry = Number.parseInt(localStorage.getItem('bootEntrySlot'), 10);
+            const bindingUi = window.BootEntryUI && typeof window.BootEntryUI.get === 'function'
+                ? window.BootEntryUI.get() : null;
+            // A namespace-policy save must not turn an imported image/local
+            // discrepancy into an implicit boot-target repair.
+            if (bindingUi && bindingUi.status === 'prepared' &&
+                    Number.isInteger(storedBootEntry) && storedBootEntry >= 0) {
+                selectedBootEntry = storedBootEntry;
+            }
+        } catch (_) {}
         let serverData = null;
         if (!localCfg.step1) {
             const configResponse = await fetch('/api/boot-config');
@@ -3484,6 +3496,7 @@ function updateNamespace() {
             step2: { lumps: step2Rows },
             step3: localCfg.step3 || baseCfg.step3 || { emptySlotCount: 0 }
         };
+        if (selectedBootEntry != null) cfg.bootEntrySlot = selectedBootEntry;
         if (!cfg.step1) {
             throw new Error('The default build configuration is unavailable.');
         }
@@ -3499,6 +3512,7 @@ function updateNamespace() {
                     step2: cfg.step2 || { lumps: [] },
                     step3: cfg.step3 || { emptySlotCount: 0 }
                 };
+                if (Number.isInteger(cfg.bootEntrySlot)) payload.bootEntrySlot = cfg.bootEntrySlot;
                 const hasLocalSlotRules = Object.prototype.hasOwnProperty.call(
                     localCfg, 'slotRules');
                 const hasServerSlotRules = Object.prototype.hasOwnProperty.call(
@@ -4646,11 +4660,7 @@ window._nsTableSave = async function(btn) {
     if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; btn.style.color = '#ccc'; }
     const nsSaveBootUi = typeof window !== 'undefined' && window.BootEntryUI &&
         typeof window.BootEntryUI.get === 'function' ? window.BootEntryUI.get() : null;
-    const nsSaveBootEntry = Number.isInteger(bootEntrySlot) ? bootEntrySlot :
-        (window._nsState && Array.isArray(window._nsState.abstractions)
-            ? (window._nsState.abstractions.find(row =>
-                row && row.boot === true && Number.isInteger(row.slot)) || {}).slot
-            : null);
+    const nsSaveBootEntry = Number(bootEntrySlot);
     const nsSavePreparedSelection = nsSaveBootUi &&
         nsSaveBootUi.status === 'prepared' &&
         Number.isInteger(nsSaveBootEntry) && nsSaveBootUi.slot === nsSaveBootEntry;
@@ -4690,7 +4700,7 @@ window._nsTableSave = async function(btn) {
                 const _genResp = await fetch('/api/boot-image/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({}),
+                    body: JSON.stringify({ entrySlot: bootEntrySlot }),
                 });
                 await _actionableJsonResponse(_genResp, 'Generate the image for Namespace save', {
                     dataChanged: false,
@@ -4825,7 +4835,7 @@ window._nsTableSave = async function(btn) {
             // locate on the next regeneration.
             const _saved = _savedBySlot.get(_si);
             _nsInheritSavedArtifactMetadata(_rich, _saved, Boolean(_symbolic));
-             if (_si === nsSaveBootEntry) _rich.boot = true;
+            if (_si === nsSaveBootEntry) _rich.boot = true;
             nsAbstractions.push(_rich);
         }
         const nsState = { abstractions: nsAbstractions };
@@ -5932,10 +5942,16 @@ function _closeCRDetailMenuOnce() {
 
 let selectedAbsIndex = null;
 let absCollapsedLayers = {};
-// The Namespace plan owns the boot target.  This runtime value is only the
-// image/state projection used to render the current simulator; it is never
-// restored from browser storage.
+// Browser storage is only a requested next-boot selection. It is never a
+// fallback boot authority: an image with no prepared binding stays pending
+// until the user deliberately prepares a valid target.
 let bootEntrySlot = null;
+try {
+    const _storedBootEntry = Number.parseInt(localStorage.getItem('bootEntrySlot'), 10);
+    if (Number.isInteger(_storedBootEntry) && _storedBootEntry >= 0 && _storedBootEntry <= 0xFFFF) {
+        bootEntrySlot = _storedBootEntry;
+    }
+} catch (_e) {}
 let userMethodData = {};
 let userMethodLists = {};
 

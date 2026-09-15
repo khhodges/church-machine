@@ -63,15 +63,6 @@ def _tamper_format_tag(image_bytes):
     return struct.pack(f"<{total}I", *words)
 
 
-def _namespace_boot_slot():
-    with open(os.path.join(LUMPS_DIR, "ns-state.json"), encoding="utf-8") as fh:
-        state = json.load(fh)
-    rows = [row for row in state.get("abstractions", [])
-            if isinstance(row, dict) and row.get("boot") is True]
-    assert len(rows) == 1
-    return rows[0]["slot"]
-
-
 def _make_valid_image():
     return generate_boot_image(_default_cfg(), LUMPS_DIR)
 
@@ -109,7 +100,7 @@ def test_automatic_regeneration_is_disabled_to_preserve_prepared_target():
     generate.assert_not_called()
 
 
-@pytest.mark.parametrize("slot", [0, 1, 2, 3, 4, 5, 6])
+@pytest.mark.parametrize("slot", [0, 1, 2, 3, 4, 5, 6, 10])
 def test_binary_rejects_zeroed_mandatory_descriptor(client, temp_image_path, slot):
     words = list(struct.unpack("<16384I", _make_valid_image()))
     base = 16384 - (slot + 1) * 4
@@ -123,16 +114,6 @@ def test_binary_rejects_zeroed_mandatory_descriptor(client, temp_image_path, slo
         response = client.get("/api/boot-image/binary")
     assert response.status_code == 500
     regenerate.assert_not_called()
-
-
-def test_binary_rejects_zeroed_marker_descriptor(client, temp_image_path):
-    slot = _namespace_boot_slot()
-    words = list(struct.unpack("<16384I", _make_valid_image()))
-    base = 16384 - (slot + 1) * 4
-    words[base] = words[base + 1] = 0
-    tampered = struct.pack("<16384I", *words)
-    with pytest.raises(ValueError, match="mandatory NS slot"):
-        validate_boot_image(tampered, 16384)
 
 
 @pytest.mark.parametrize("count", [0, MAX_THREAD_COUNT + 1, 0xFFFFFFFF])

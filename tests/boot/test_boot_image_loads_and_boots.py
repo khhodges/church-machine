@@ -222,42 +222,32 @@ def test_boot_image_loads_and_boots(cfg, skip_window, expected_ns_count):
         f"CR12 should hold a GT for NS Slot 1 (Boot.Thread); got "
         f"index={_gt_index(status['cr12']['word0'])}"
     )
-    assert _gt_index(status["cr14"]["word0"]) == CAPTEST_SLOT, (
-        f"CR14 should hold a GT for the Namespace boot marker slot {CAPTEST_SLOT}; got "
+    assert _gt_index(status["cr14"]["word0"]) == 6, (
+        f"CR14 should hold a GT for NS Slot 6 (Boot.Abstr/SelfTest code); got "
         f"index={_gt_index(status['cr14']['word0'])}"
     )
     # CR6 at HALT depends on the embedded Boot.Abstr lump's cc field:
     #   cc=0 (default / pre-LAZY placeholder): B:06 NUC_CLIST leaves CR6 NULL.
     #   cc>0 (POLA-finalized lump): B:06 NUC_CLIST installs the compacted c-list;
-    #         CR6 holds a valid E-GT for the selected Namespace boot marker.
+    #         CR6 holds a valid E-GT for NS Slot 6 (Boot.Abstr/SelfTest).
     # Both are correct — the distinction is whether POLA compression has been
     # applied and saved to 00000600.lump (Task #651 applies to the cc=0 path).
     cr6_idx = _gt_index(status["cr6"]["word0"])
-    assert cr6_idx == 0 or cr6_idx == CAPTEST_SLOT, (
-        f"CR6 at HALT must be NULL (cc=0, index=0) or marker GT "
-        f"(cc>0, index={CAPTEST_SLOT}); "
+    assert cr6_idx == 0 or cr6_idx == 6, (
+        f"CR6 at HALT must be NULL (cc=0, index=0) or Boot.Abstr GT (cc>0, index=6); "
         f"got index={cr6_idx}"
     )
 
 
 # ---- Task #2867: CapabilityTest boot-entry residency + boot ----------------
 #
-# Selecting the Namespace marker's CapabilityTest row must produce an image
-# whose marked-slot body is the current boot-resident program with its
+# Selecting CapabilityTest (NS slot 10) as the boot entry must produce an
+# image whose slot-10 body is the current boot-resident program with its
 # declared capabilities — never a synthetic header over zero words — and the simulator
 # capabilities — never a synthetic header over zero words — and the simulator
-# must boot it to completion with CR14 pointing at the marker slot.
+# must boot it to completion with CR14 pointing at slot 10.
 
-def _namespace_boot_slot():
-    with open(os.path.join(LUMPS_DIR, "ns-state.json"), encoding="utf-8") as fh:
-        state = json.load(fh)
-    markers = [row for row in state.get("abstractions", [])
-               if isinstance(row, dict) and row.get("boot") is True]
-    assert len(markers) == 1
-    return markers[0]["slot"]
-
-
-CAPTEST_SLOT = _namespace_boot_slot()
+CAPTEST_SLOT = 10
 
 
 def _saved_project_cfg():
@@ -331,36 +321,36 @@ def _reissue_boot_entry(image_bytes, slot, seq):
 
 
 def test_capabilitytest_image_payload_integrity():
-    """Generated image embeds CapabilityTest's real body at its marker slot."""
+    """Generated image embeds CapabilityTest's real body at slot 10."""
     cfg = _saved_project_cfg()
     _, expected_body = _capabilitytest_manifest_body()
     image = generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=CAPTEST_SLOT)
     loc, body = _slot_body(image, CAPTEST_SLOT, len(expected_body))
-    assert loc > 0, f"marker slot {CAPTEST_SLOT} has no allocated location"
+    assert loc > 0, "slot 10 has no allocated location"
     hdr = body[0]
-    assert (hdr >> 27) == 0x1F, f"marker slot header magic invalid: 0x{hdr:08X}"
+    assert (hdr >> 27) == 0x1F, f"slot 10 header magic invalid: 0x{hdr:08X}"
     cw = (hdr >> 10) & 0x1FFF
     cc = hdr & 0xFF
     assert body == expected_body, (
-        "marker-slot body differs from the authoritative boot-resident "
+        "slot 10 body differs from the authoritative boot-resident "
         "CapabilityTest binary"
     )
     # The code region must be real instructions, not a zero-filled placeholder.
     code = body[1:1 + cw]
     nonzero = sum(1 for wv in code if wv != 0)
     assert nonzero >= cw - 1, (
-        f"marker-slot code region is mostly zeros ({nonzero}/{cw} non-zero) — "
+        f"slot 10 code region is mostly zeros ({nonzero}/{cw} non-zero) — "
         f"placeholder body instead of the real CapabilityTest program"
     )
     # Every declared capability must be present at the lump tail.
     clist = body[len(body) - cc:]
     assert all(gv != 0 for gv in clist), (
-        f"marker-slot c-list has zero entries: {[hex(gv) for gv in clist]}"
+        f"slot 10 c-list has zero entries: {[hex(gv) for gv in clist]}"
     )
 
 
 def test_capabilitytest_boot_entry_boots():
-    """Simulator boots to completion with the marked CapabilityTest row."""
+    """Simulator boots to completion with CapabilityTest selected (slot 10)."""
     cfg = _saved_project_cfg()
     image = generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=CAPTEST_SLOT)
     status = _run_harness(cfg, image)
@@ -374,7 +364,7 @@ def test_capabilitytest_boot_entry_boots():
     assert _gt_index(status["cr14"]["word0"]) == CAPTEST_SLOT, (
         f"CR14 index={_gt_index(status['cr14']['word0'])}, expected {CAPTEST_SLOT}"
     )
-    # CR0 (boot-entry E-GT via Thread.caps[0]) must also encode the marker slot.
+    # CR0 (boot-entry E-GT via Thread.caps[0]) must also encode slot 10.
     assert (status["cr0"]["word0"] & 0xFFFF) == CAPTEST_SLOT
 
 
@@ -416,7 +406,7 @@ def test_capabilitytest_manifest_boot_resident():
                and e.get("name") == "CapabilityTest"
                and e.get("slot") == CAPTEST_SLOT]
     assert len(matches) == 1, (
-        "ns-state.json must contain exactly one authoritative CapabilityTest entry; "
+        "ns-state.json must contain exactly one CapabilityTest slot-10 entry; "
         f"found {len(matches)}"
     )
     assert matches[0].get("boot") is True or matches[0].get("resident") is True
@@ -435,7 +425,7 @@ def test_capabilitytest_boot_binding_points_to_valid_binary():
 
 def test_served_boot_image_carries_capabilitytest_body(tmp_path):
     """The boot artifact the server ships must carry CapabilityTest's real
-    body at the marker slot (not zeros).
+    body at slot 10 (not zeros).
 
     server/lumps/boot-image.bin is intentionally gitignored: the server
     (re)generates it from tracked inputs — boot-config.json, manifest.json,
@@ -457,7 +447,7 @@ def test_served_boot_image_carries_capabilitytest_body(tmp_path):
     hdr = body[0]
     expected_cw = (expected_body[0] >> 10) & 0x1FFF
     assert (hdr >> 27) == 0x1F and ((hdr >> 10) & 0x1FFF) == expected_cw, (
-        f"served image marker-slot header 0x{hdr:08X} is not the real "
+        f"served image slot 10 header 0x{hdr:08X} is not the real "
         f"CapabilityTest lump (expected magic=0x1F, cw={expected_cw}) — "
         f"the manifest boot_resident flag regressed"
     )
