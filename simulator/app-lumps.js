@@ -3610,6 +3610,31 @@ async function _confirmLumpBootstrapRepairs(repairId, currentToken, version, arc
     }
 }
 
+function _openLumpHistorySourceInEditor(source, name, version) {
+    if (typeof source !== 'string' || !source.trim()) return;
+    const editor = document.getElementById('asmEditor');
+    if (!editor || typeof createUserTab !== 'function') {
+        throw new Error('The Programs editor is unavailable. Reload the IDE and open History again.');
+    }
+    // Preserve an unowned/source-file buffer before leaving it. Personal tabs
+    // are saved by selectUserTab; archived bytes are never installed or edited.
+    const previousSource = editor.value;
+    const previousLanguage = (document.getElementById('langSelector') || {}).value;
+    const needsBackup = (typeof activeUserTabId === 'undefined' || !activeUserTabId) &&
+        previousSource && previousSource.trim();
+    window._editorSourceFilePath = null;
+    window._activeBuiltInKey = null;
+    if (needsBackup) {
+        createUserTab('Previous editor draft', previousLanguage || 'assembly', previousSource);
+    }
+    const language = typeof _isRawISASource === 'function' && _isRawISASource(source)
+        ? 'assembly' : 'cloomc';
+    createUserTab(`${name} — from v${version}`, language, source);
+    window._editorStartupBufferDirty = true;
+    _closeLumpHistoryPreviewModal();
+    switchView('editor');
+}
+
 async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, historicalRecord, currentToken, archiveFilename, isCurrent) {
     const previewEl = document.getElementById(`lumpHistoryHexPreview_${tk}`);
     if (!previewEl) return;
@@ -3684,6 +3709,7 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
                 `<div class="lump-stored-src-meta-bar lump-stored-src-meta">` +
                 `<span class="lump-stored-src-lang-badge">${sourceLabel}</span>` +
                 `<span class="lump-stored-src-ts">Embedded in the ${isCurrent ? 'current' : 'archived'} binary</span>` +
+                `<button type="button" class="btn lump-history-open-editor" title="Open this exact revision's source as a new editable draft. The active LUMP and boot selection are unchanged.">Open in Editor</button>` +
                 `</div>` +
                 `<pre class="lump-stored-src-pre lump-stored-src-pre-full lump-history-source-pre">${_highlightCLOOMCSource(archivedSource, sourceLanguage)}</pre>` +
                 `</div>`;
@@ -3784,6 +3810,21 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
         _showLumpHistoryPreviewModal(
             version, issueSummary + repairControls + sourcePreview + t
         );
+        const openEditorButton = document.querySelector(
+            '#lumpHistoryPreviewModal .lump-history-open-editor');
+        if (openEditorButton && archivedSource) {
+            const record = _lumpsCache.find(item => item.token === (currentToken || token));
+            const name = (record && record.abstraction) || token;
+            // Capture the exact preview response, never resolve a token again:
+            // normal opening may redirect it to a different current revision.
+            openEditorButton.addEventListener('click', () => {
+                try {
+                    _openLumpHistorySourceInEditor(archivedSource, name, version);
+                } catch (error) {
+                    alert(error.message);
+                }
+            });
+        }
     } catch (err) {
         _noPreview(err.message);
     }
