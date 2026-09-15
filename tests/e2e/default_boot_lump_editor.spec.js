@@ -11,7 +11,6 @@ const BOOT_TOKEN = '4a00000a';
 const STUB_BOOT_LUMP = {
     token:        BOOT_TOKEN,
     abstraction:  'SelfTest',
-    ns_slot:      10,
     lump_type:    'code',
     content_type: 'code',
     language:     'assembly',
@@ -42,6 +41,22 @@ test('default Code View opens the configured Lightning Bolt LUMP', async ({ page
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify([STUB_BOOT_LUMP]),
+        });
+    });
+
+    await page.route('**/api/boot-config', async route => {
+        const response = await route.fetch();
+        const body = await response.json();
+        body.lumpCatalog = [{
+            token: BOOT_TOKEN,
+            abstraction: 'SelfTest',
+            nsSlot: 10,
+            loadPolicy: 'Resident',
+        }];
+        await route.fulfill({
+            response,
+            contentType: 'application/json',
+            body: JSON.stringify(body),
         });
     });
 
@@ -89,10 +104,15 @@ test('default Code View opens the configured Lightning Bolt LUMP', async ({ page
         currentToken: window.LumpRegistry && window.LumpRegistry.getCurrent(),
         bootSlot: sim.bootEntrySlot,
         editor: document.getElementById('asmEditor')?.value || '',
+        disassembly: document.getElementById('savedLumpDisassembly')?.textContent || '',
+        disassemblyVisible:
+            document.getElementById('savedLumpDisassemblyPanel')?.style.display === 'flex',
     }));
 
     expect(result.bootSlot).toBe(10);
     expect(result.token).toBe(BOOT_TOKEN);
     expect(result.currentToken).toBe(BOOT_TOKEN);
     expect(result.editor).not.toContain('Capability Test');
+    expect(result.disassemblyVisible).toBe(true);
+    expect(result.disassembly).toContain('SelfTest');
 });

@@ -2481,22 +2481,42 @@ let _defaultProgramLoaded = false;
 // The loaded image's boot-entry slot is authoritative. Resolve that slot to
 // the catalog token so Code View opens the same executable marked with ⚡,
 // rather than silently substituting the generic capability_test example.
-function _configuredBootLumpToken() {
+function _configuredBootLumpToken(bootCatalog) {
     if (!window.LumpRegistry || !sim) return null;
     const slot = Number(sim.bootEntrySlot);
     if (!Number.isInteger(slot) || slot < 0) return null;
 
-    const candidates = window.LumpRegistry.getServerList().filter(function(lump) {
+    const serverLumps = window.LumpRegistry.getServerList();
+    const serverByToken = new Map();
+    serverLumps.forEach(function(lump) {
+        if (lump && lump.token) serverByToken.set(String(lump.token).toLowerCase(), lump);
+    });
+    const candidates = [];
+    (Array.isArray(bootCatalog) ? bootCatalog : []).forEach(function(binding) {
+        if (!binding || !binding.token) return;
+        const bindingSlot = binding.nsSlot ?? binding.ns_slot ?? binding.slot;
+        if (Number(bindingSlot) !== slot) return;
+        const server = serverByToken.get(String(binding.token).toLowerCase()) || {};
+        candidates.push(Object.assign({}, server, binding));
+    });
+    serverLumps.forEach(function(lump) {
+        if (!lump || !lump.token) return;
+        if (candidates.some(function(candidate) {
+            return String(candidate.token).toLowerCase() === String(lump.token).toLowerCase();
+        })) return;
+        const lumpSlot = lump.ns_slot ?? lump.nsSlot ?? lump.slot;
+        if (Number(lumpSlot) === slot) candidates.push(lump);
+    });
+    const executableCandidates = candidates.filter(function(lump) {
         return lump && lump.token &&
-            Number(lump.ns_slot) === slot &&
             lump.lump_type !== 'namespace' &&
             lump.typ !== 1;
     });
-    if (!candidates.length) return null;
+    if (!executableCandidates.length) return null;
 
     // Historical revisions may share a slot. Prefer the executable that is
     // explicitly part of the resident boot image, then the newest revision.
-    candidates.sort(function(a, b) {
+    executableCandidates.sort(function(a, b) {
         const residentScore = function(lump) {
             return (lump.boot_resident === true ? 4 : 0) +
                 (lump.resident === true ? 2 : 0) +
@@ -2513,7 +2533,7 @@ function _configuredBootLumpToken() {
         return (parseInt(b.lump_version, 10) || 0) -
             (parseInt(a.lump_version, 10) || 0);
     });
-    return candidates[0].token;
+    return executableCandidates[0].token;
 }
 
 function _openConfiguredBootLumpInDefaultEditor() {
@@ -2536,18 +2556,31 @@ function _openConfiguredBootLumpInDefaultEditor() {
         return Promise.resolve(false);
     }
 
-    const openResolved = function() {
-        const token = _configuredBootLumpToken();
+    const openResolved = function(results) {
+        const bootCatalog = results && Array.isArray(results[1]) ? results[1] : [];
+        const token = _configuredBootLumpToken(bootCatalog);
         if (!token) return false;
         return Promise.resolve(openLumpInEditor(token)).then(function() {
             return true;
         });
     };
 
-    // Share the catalog request already started by the LUMP workspace.
-    const catalogReady = window.LumpRegistry.isServerListFetched()
+    // /api/lumps/list supplies artifact metadata, but resident slot bindings
+    // live in /api/boot-config.lumpCatalog. Both are required to resolve the
+    // loaded image's authoritative boot-entry slot.
+    const serverCatalogReady = window.LumpRegistry.isServerListFetched()
         ? Promise.resolve()
         : window.LumpRegistry.warmServerList();
+    const bootCatalogReady = fetch('/api/boot-config', { cache: 'no-store' })
+        .then(function(response) {
+            if (!response.ok) return [];
+            return response.json();
+        })
+        .then(function(data) {
+            return data && Array.isArray(data.lumpCatalog) ? data.lumpCatalog : [];
+        })
+        .catch(function() { return []; });
+    const catalogReady = Promise.all([serverCatalogReady, bootCatalogReady]);
     const openPromise = catalogReady.then(openResolved).catch(function(error) {
         console.warn('[boot-entry-editor] could not open configured boot LUMP:', error);
         return false;
@@ -2607,7 +2640,12 @@ function _autoLoadDefaultProgram() {
             const _ed = document.getElementById('asmEditor');
             const _stillEmpty = !!(_ed && (!_ed.value || !_ed.value.trim()));
             const _stillNoTab = (typeof activeUserTabId === 'undefined') || !activeUserTabId;
-            if (_stillEmpty && _stillNoTab) loadExample('capability_test');
+            if (_stillEmpty && _stillNoTab && typeof appendOutput === 'function') {
+                appendOutput(
+                    'Default Code View could not resolve the Lightning Bolt LUMP from the loaded image. ' +
+                    'No fallback source was substituted.',
+                    'error');
+            }
         });
     }
     // Do NOT auto-assemble here. assembleAndLoad() → sim.loadProgram() would
