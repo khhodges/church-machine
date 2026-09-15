@@ -508,15 +508,13 @@ function renderAbstractions() {
         // bootEntrySlot is a Namespace slot, while abs.index is a catalog
         // index. The prepared binding's target label is the shared identity.
         const isBootEntry = !!bootTargetName && abs.name === bootTargetName;
-        const isNextEntry = isBootEntry;
         const absProfile = _getAbstractionProfile(abs);
         const profileBadgeClass = absProfile === 'Full' ? 'profile-badge-full' : absProfile === 'XC7A100T' ? 'profile-badge-xc7a100t' : 'profile-badge-iot';
         const profileTitle = absProfile === 'Full' ? 'Full profile only (Wukong Artix-7)' : absProfile === 'XC7A100T' ? 'QMTECH Wukong XC7A100T only' : 'runs on both boards';
 
         html += `<div class="abs-item${isActive ? ' active' : ''}" onclick="showAbstractionDetail(${abs.index})" ondblclick="event.stopPropagation();_goToLumpByAbstractionName(abstractionRegistry.getAbstraction(${abs.index}).name)" title="Double-click to jump to this abstraction\u2019s LUMP in the Repository">`;
         html += `<div class="abs-item-row1">`;
-        html += `<span class="abs-item-idx abs-boot-entry-btn${isBootEntry ? ' boot-entry-active' : ''}" onclick="event.stopPropagation();setBootEntrySlot(${abs.index},event)" title="${isBootEntry ? 'Current boot entry \u2014 \u2318/Ctrl+click to push to FPGA' : 'Set as boot entry \u2014 \u2318/Ctrl+click to also push to FPGA'}">${isBootEntry ? '\u26a1' : abs.index}</span>`;
-        html += `<span class="abs-next-entry-btn${isNextEntry ? ' next-entry-active' : ''}" onclick="event.stopPropagation();setBootEntrySlot(${abs.index},event)" title="${isNextEntry ? 'SelfTest Next.GT follows this LightningBolt entry' : 'Set the LightningBolt entry; SelfTest Next.GT follows it'}" style="display:inline-flex;align-items:center;justify-content:center;min-width:1.5em;height:1.5em;border-radius:3px;font-size:0.82em;font-weight:600;cursor:pointer;margin-right:3px;${isNextEntry ? 'background:#16a34a;color:#fff;padding:0 4px;' : 'color:#6b7280;border:1px solid #d1d5db;padding:0 3px;background:transparent;'}" aria-label="${isNextEntry ? 'SelfTest Next follows this LightningBolt entry' : 'Set LightningBolt entry and SelfTest Next'}">${isNextEntry ? '\u2192\u26a1' : '\u2192'}</span>`;
+        html += `<span class="abs-item-idx${isBootEntry ? ' abs-boot-entry-btn boot-entry-active' : ''}"${isBootEntry ? ' title="Current prepared boot-entry LUMP"' : ''}>${isBootEntry ? '\u26a1' : abs.index}</span>`;
         html += `<span class="abs-item-name">${abs.name}</span>`;
         html += `<span class="abs-profile-badge ${profileBadgeClass}" title="${absProfile} profile \u2014 ${profileTitle}">${absProfile}</span>`;
         if (compiledAt) html += `<span class="abs-item-date" title="Compiled ${compiledAt}">${compiledAt}</span>`;

@@ -47,9 +47,14 @@ assert(!shell.includes("getAbstractionByName('LightningBolt')"),
     'the default is resolved from the live boot-entry slot, not a literal name');
 
 const abstractions = fs.readFileSync('simulator/app-abstractions.js', 'utf8');
+const renderAbstractions = extractFunction(abstractions, 'renderAbstractions');
 assert(abstractions.includes("bootState.binding.targetLabel"),
     'the catalog resolves the lightning-bolt abstraction from the prepared binding');
 assert(abstractions.includes("abs.name === bootTargetName"),
     'the catalog does not compare a Namespace slot with an abstraction index');
+assert(!renderAbstractions.includes('setBootEntrySlot('),
+    'catalog rows never send abstraction indexes as Namespace slot commands');
+assert(!renderAbstractions.includes('abs-next-entry-btn'),
+    'inactive catalog rows do not render misleading boot-entry controls');
 
 console.log('PASS default launch opens the live lightning-bolt LUMP');
