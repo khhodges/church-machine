@@ -6356,7 +6356,7 @@ window.lumpSaveLump = async function(nsIdx) {
         }
         const approval = await window._confirmLumpSavePlan(
             words, metadata, () => `Save "${absName}" to the LUMP repository?`);
-        if (!approval) return;
+        if (!approval || approval.status !== 'approved') return;
         const finalBinary = approval.final_binary.slice();
         metadata.approval_intent = approval.intent.intent;
         metadata.save_plan_id = approval.plan.plan_id;

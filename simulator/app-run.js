@@ -12692,6 +12692,14 @@ function _captureLumpSaveSnapshot() {
             ? (parseInt(pending.issueNumber, 10) || 1)
             : (parseInt(localStorage.getItem('church_issue_number') || '1', 10) || 1);
     } catch (_) {}
+    // The stale-editor identity belongs to the artifact that opened the
+    // editor, not to whichever editor/LUMP focus happens to be live when the
+    // second dialog is confirmed.  Copy it into the immutable save snapshot
+    // so a navigation or latest-revision refresh cannot rebind this save to a
+    // different source.
+    const editorBaseIdentity = window._editorOpenLumpBaseIdentity &&
+        typeof window._editorOpenLumpBaseIdentity === 'object'
+        ? Object.assign({}, window._editorOpenLumpBaseIdentity) : null;
     return {
         token: token || null,
         words: memory && Array.isArray(memory.words) ? memory.words.slice() : [],
@@ -12700,6 +12708,7 @@ function _captureLumpSaveSnapshot() {
         sourceText: sourceText,
         editorSourceText: editorSourceText,
         sourceMatchesEditor: sourceText === editorSourceText,
+        editorBaseIdentity: editorBaseIdentity,
         language: entry && entry.sources && entry.sources.server
             ? (entry.sources.server.language || '') : '',
         petname: petname,
@@ -12917,6 +12926,19 @@ function closeSaveDialog() {
     if (_diagnosticButton) _diagnosticButton.remove();
     _setSaveNSFeedback('', '');
 }
+
+// A stale-editor conflict is a modal choice layered over Save Step 2. Suspend
+// Step 2's trap while that choice is visible so Escape/Tab cannot close or
+// focus the underlying dialog instead of the active conflict surface.
+window._suspendSaveNSModalFocus = function() {
+    if (_saveNSTrap) document.removeEventListener('keydown', _saveNSTrap, true);
+};
+window._resumeSaveNSModalFocus = function() {
+    const dialog = document.getElementById('saveNSDialog');
+    if (_saveNSTrap && dialog && dialog.style.display !== 'none') {
+        document.addEventListener('keydown', _saveNSTrap, true);
+    }
+};
 
 function _setSaveNSFeedback(kind, message) {
     const status = document.getElementById('saveNSStatus');
@@ -16322,7 +16344,7 @@ async function confirmSaveToNamespace() {
                 // addressable immediately. The server canonicalizes this field
                 // from the verified SELF row for an existing resident binding.
                 token:        _svTok || undefined,
-                editor_base: window._editorOpenLumpBaseIdentity || undefined,
+                editor_base: (_saveSnapshot && _saveSnapshot.editorBaseIdentity) || undefined,
                 submitted_source: _submittedSource,
                 source_required: typeof _submittedSource === 'string' &&
                     _submittedSource.trim().length > 0,
@@ -16349,9 +16371,44 @@ async function confirmSaveToNamespace() {
                     },
                 }
             );
-            if (!_saveApproval) {
-                _setSaveNSFeedback('info',
-                    'Not saved — confirmation was cancelled. Your compiled source and words remain preserved.');
+            if (!_saveApproval || _saveApproval.status !== 'approved') {
+                const _saveOutcome = _saveApproval &&
+                    (_saveApproval.outcome || _saveApproval.status) || 'cancelled';
+                if (_saveOutcome === 'reload' || _saveOutcome === 'reloaded' ||
+                        _saveOutcome === 'reload-failed') {
+                    // Reload consumes the old editor/save identity.  Do not
+                    // leave Step 2's frozen candidate available to a later
+                    // click; owner-scoped editor drafts remain recoverable.
+                    window._pendingLumpData = null;
+                    window._saveNSPreparedSnapshot = null;
+                    if (typeof closeSaveDialog === 'function') closeSaveDialog();
+                    const _reloadMessage = _saveOutcome === 'reload' ||
+                        _saveOutcome === 'reloaded'
+                        ? 'Latest saved revision reloaded. The older save candidate was discarded; review it and save again if needed.'
+                        : `Latest saved revision could not be reloaded. No data was changed. ${
+                            _saveApproval.error && _saveApproval.error.message ||
+                            'Reopen the LUMP repository and try again.'
+                        }`;
+                    const _didReload = _saveOutcome === 'reload' ||
+                        _saveOutcome === 'reloaded';
+                    if (typeof _showFpgaToast === 'function') {
+                        _showFpgaToast(
+                            _didReload ? 'Latest Revision Reloaded' : 'Reload Failed',
+                            _reloadMessage,
+                            _didReload ? 'ok' : 'error',
+                            9000
+                        );
+                    }
+                    if (typeof appendOutput === 'function') {
+                        appendOutput(_reloadMessage,
+                            _didReload ? 'info' : 'error');
+                    }
+                    return;
+                }
+                const _cancelMessage = _saveOutcome === 'keep-editing'
+                    ? 'Save kept the current editor open. No data was changed; the frozen source and compiled words remain available.'
+                    : 'Not saved — confirmation was cancelled. Your compiled source and words remain preserved.';
+                _setSaveNSFeedback('info', _cancelMessage);
                 const status = document.getElementById('saveNSStatus');
                 if (status) status.dataset.terminal = 'true';
                 return;

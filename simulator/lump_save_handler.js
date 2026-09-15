@@ -167,19 +167,52 @@ function _lumpSaveHandleNetworkError(err) {
 /**
  * Ask how to resolve a stale editor-base rejection.
  *
- * @returns {'reload'|'preserve'|'cancel'|null} null when this is not a stale
- *          editor conflict.
+ * The stale choice is deliberately not implemented with confirm().  The old
+ * two-confirm flow made the first dialog's Cancel mean "preserve", then used
+ * a second Cancel to mean "do not save"; that is particularly easy to trigger
+ * accidentally from a Save button.  Browser callers provide an accessible
+ * three-button chooser (Reload latest / Save separate revision / Keep
+ * editing).  A chooser may return the choice synchronously or as a Promise so
+ * this DOM-free helper remains usable by the focused Node tests.
+ *
+ * @returns {'reload'|'preserve'|'keep-editing'|null|Promise} null when this is
+ *          not a stale editor conflict.
  */
-function _lumpSaveStaleConflictAction(response, confirmImpl) {
+function _lumpSaveStaleConflictAction(response, chooser) {
     if (!response || response.stale_editor_base !== true) return null;
-    var ask = typeof confirmImpl === 'function' ? confirmImpl : function() { return false; };
-    if (ask(
-        'This editor was opened from an older saved revision. A newer revision is now current.\n\n' +
-        'Choose OK to reload the latest source. Choose Cancel to keep this buffer and save it as a separate revision.'
-    )) return 'reload';
-    return ask(
-        'Preserve this older buffer as a separate revision? It will not silently replace the newer source.'
-    ) ? 'preserve' : 'cancel';
+    var ask = typeof chooser === 'function' ? chooser : null;
+    if (!ask) {
+        try {
+            if (typeof window !== 'undefined' &&
+                    typeof window._showLumpSaveStaleConflictDialog === 'function') {
+                ask = window._showLumpSaveStaleConflictDialog;
+            }
+        } catch (_) {}
+    }
+    // No UI is a safe, explicit keep-editing outcome.  Never silently reload
+    // or preserve a stale artifact when the conflict surface is unavailable.
+    if (!ask) return 'keep-editing';
+
+    var normalize = function(choice) {
+        if (choice && typeof choice === 'object') {
+            choice = choice.choice || choice.action || choice.outcome || choice.status;
+        }
+        // Keep accepting the old spelling for non-browser integrations, while
+        // the production modal always emits the unambiguous label below.
+        if (choice === 'cancel') return 'keep-editing';
+        if (choice === 'reload' || choice === 'preserve' ||
+                choice === 'keep-editing') return choice;
+        return 'keep-editing';
+    };
+    try {
+        var result = ask(response);
+        if (result && typeof result.then === 'function') {
+            return result.then(normalize, function() { return 'keep-editing'; });
+        }
+        return normalize(result);
+    } catch (_) {
+        return 'keep-editing';
+    }
 }
 
 /**

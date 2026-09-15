@@ -201,17 +201,21 @@ function withMocks(opts, fn) {
 {
     check('T9a: stale editor conflict can reload latest source',
         _lumpSaveStaleConflictAction(
-            { stale_editor_base: true }, () => true) === 'reload');
-    const preserveAnswers = [false, true];
+            { stale_editor_base: true }, () => 'reload') === 'reload');
     check('T9b: stale editor conflict can preserve buffer separately',
         _lumpSaveStaleConflictAction(
-            { stale_editor_base: true }, () => preserveAnswers.shift()) === 'preserve');
-    const cancelAnswers = [false, false];
+            { stale_editor_base: true }, () => 'preserve') === 'preserve');
     check('T9c: stale editor conflict can cancel without saving',
         _lumpSaveStaleConflictAction(
-            { stale_editor_base: true }, () => cancelAnswers.shift()) === 'cancel');
+            { stale_editor_base: true }, () => 'keep-editing') === 'keep-editing');
     check('T9d: ordinary errors are not stale editor conflicts',
         _lumpSaveStaleConflictAction({ error: 'bad binary' }, () => true) === null);
+    check('T9e: explicit keep-editing is not mistaken for a preserve action',
+        _lumpSaveStaleConflictAction(
+            { stale_editor_base: true }, () => 'keep-editing') === 'keep-editing');
+    check('T9f: asynchronous conflict choosers retain their explicit outcome',
+        _lumpSaveStaleConflictAction(
+            { stale_editor_base: true }, () => Promise.resolve('preserve')) instanceof Promise);
 }
 
 // T10: source verification follows the exact retained/rebuilt binary

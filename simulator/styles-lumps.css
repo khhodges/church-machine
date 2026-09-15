@@ -413,6 +413,32 @@
     overflow: visible;
 }
 
+.lump-save-conflict-dialog {
+    width: min(620px, calc(100vw - 2rem));
+}
+
+.lump-save-conflict-copy {
+    margin: 0.7rem 0;
+    color: var(--text-secondary);
+    line-height: 1.45;
+}
+
+.lump-save-conflict-latest {
+    margin: 0.75rem 0 0.25rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid rgba(96, 165, 250, 0.45);
+    border-radius: 6px;
+    background: rgba(30, 64, 175, 0.18);
+    color: #dbeafe;
+    font-size: 0.84rem;
+    line-height: 1.4;
+}
+
+.lump-save-conflict-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
 .lump-history-issues {
     margin: 0 0 0.9rem;
     padding: 0.85rem;

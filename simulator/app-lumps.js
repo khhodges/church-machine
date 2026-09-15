@@ -526,9 +526,16 @@ async function _showLatestCompilationPromotion(archivedToken) {
                 const approval = await _confirmLumpSavePlan(
                     candidate.words, metadata,
                     plan => `Promote immutable saved revision v${candidate.revision} as a new current revision?`);
-                if (!approval) {
+                if (!approval || approval.status !== 'approved') {
                     confirmButton.disabled = false;
-                    if (status) status.textContent = 'Cancelled — no data was changed.';
+                    if (status) status.textContent = approval &&
+                        approval.status === 'reload-failed'
+                        ? `Reload failed — no data was changed. ${
+                            approval.error && approval.error.message || 'Open the latest saved revision manually.'
+                        }`
+                        : approval && approval.status === 'reloaded'
+                            ? 'Latest saved revision reloaded — no data was changed.'
+                            : 'Cancelled — no data was changed.';
                     return;
                 }
                 metadata.approval_intent = approval.intent.intent;
@@ -3938,7 +3945,7 @@ async function _restoreLumpFromHistory(token, version) {
         const approval = await _confirmLumpSavePlan(words, metadata, plan =>
             `Restore v${version} of "${displayName}" as the current LUMP?\n\n` +
             'The archived binary and its hash-bound approval record will be validated. The current version will be archived first.');
-        if (!approval) return false;
+        if (!approval || approval.status !== 'approved') return false;
         metadata.approval_intent = approval.intent.intent;
         metadata.save_plan_id = approval.plan.plan_id;
         const finalBinary = approval.final_binary.slice();
@@ -4005,7 +4012,7 @@ async function _saveLumpText(token, text, bodyEl, lump) {
         const metadata = _lumpApprovalView(lump || {});
         const approval = await _confirmLumpSavePlan(words, metadata, plan =>
             `Save edited content for LUMP 0x${token}?\n\nThis records approval for the resulting binary hash.`);
-        if (!approval) return;
+        if (!approval || approval.status !== 'approved') return;
         if (saveBtn) saveBtn.disabled = true;
         if (statusEl) statusEl.textContent = 'Saving\u2026';
         metadata.approval_intent = approval.intent.intent;
@@ -5592,7 +5599,7 @@ function _renderLumpImageContent(bodyEl, lump, dataWords, token) {
                 const metadata = _lumpApprovalView(lump || {});
                 const approval = await _confirmLumpSavePlan(words, metadata, plan =>
                     `Replace the content of LUMP 0x${token} with "${file.name}"?\n\nThis requires approval bound to the resulting binary hash.`);
-                if (!approval) return;
+                if (!approval || approval.status !== 'approved') return;
                 replaceBtn.disabled = true;
                 statusEl.textContent = 'Uploading\u2026';
                 statusEl.style.color = '';
@@ -7517,7 +7524,7 @@ async function _saveLumpDirectVersion(token, lump, btn) {
         var _directApproval = await _confirmLumpSavePlan(_wj.words || [], _meta, function() {
             return `Save a new version of "${lump.abstraction || token}"?\n\nThe exact binary hash will be bound to the approval created by this action.`;
         });
-        if (!_directApproval) return;
+        if (!_directApproval || _directApproval.status !== 'approved') return;
         if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
         _meta.approval_intent = _directApproval.intent.intent;
         _meta.save_plan_id = _directApproval.plan.plan_id;
@@ -8686,22 +8693,118 @@ async function _requestLumpApprovalIntent(words, action, metadata, savePlan) {
 window._requestLumpSavePlan = _requestLumpSavePlan;
 window._formatLumpSavePlan = _formatLumpSavePlan;
 
+// The stale-editor branch is a choice, not a yes/no confirmation.  Keep the
+// modal here (rather than in the DOM-free save response handler) so it can use
+// the shared modal focus trap and remain accessible to keyboard users.
+let _lumpSaveConflictResolve = null;
+let _lumpSaveConflictTrap = null;
+let _lumpSaveConflictTrigger = null;
+function _showLumpSaveStaleConflictDialog(response) {
+    const overlay = document.getElementById('lumpSaveStaleConflictDialog');
+    if (!overlay) return Promise.resolve('keep-editing');
+
+    if (_lumpSaveConflictResolve) {
+        _lumpSaveConflictResolve('keep-editing');
+        _lumpSaveConflictResolve = null;
+    }
+    if (typeof window._suspendSaveNSModalFocus === 'function') {
+        window._suspendSaveNSModalFocus();
+    }
+    const latest = response && response.latest && typeof response.latest === 'object'
+        ? response.latest : {};
+    const latestEl = document.getElementById('lumpSaveConflictLatest');
+    if (latestEl) {
+        const name = latest.abstraction || 'this abstraction';
+        const token = latest.token ? ` (token 0x${latest.token})` : '';
+        latestEl.textContent = `Latest saved revision: ${name}${token}.`;
+    }
+
+    const reloadButton = document.getElementById('lumpSaveConflictReload');
+    const preserveButton = document.getElementById('lumpSaveConflictPreserve');
+    const keepButton = document.getElementById('lumpSaveConflictKeep');
+    _lumpSaveConflictTrigger = document.activeElement;
+    overlay.style.display = 'flex';
+
+    return new Promise(resolve => {
+        let settled = false;
+        const finish = choice => {
+            if (settled) return;
+            settled = true;
+            if (_lumpSaveConflictTrap) {
+                document.removeEventListener('keydown', _lumpSaveConflictTrap, true);
+                _lumpSaveConflictTrap = null;
+            }
+            if (reloadButton) reloadButton.onclick = null;
+            if (preserveButton) preserveButton.onclick = null;
+            if (keepButton) keepButton.onclick = null;
+            overlay.onclick = null;
+            overlay.style.display = 'none';
+            const trigger = _lumpSaveConflictTrigger;
+            _lumpSaveConflictTrigger = null;
+            if (trigger && trigger.isConnected && typeof trigger.focus === 'function') {
+                trigger.focus();
+            }
+            if (typeof window._resumeSaveNSModalFocus === 'function') {
+                window._resumeSaveNSModalFocus();
+            }
+            _lumpSaveConflictResolve = null;
+            resolve(choice);
+        };
+        _lumpSaveConflictResolve = finish;
+        if (reloadButton) reloadButton.onclick = () => finish('reload');
+        if (preserveButton) preserveButton.onclick = () => finish('preserve');
+        if (keepButton) keepButton.onclick = () => finish('keep-editing');
+        // Clicking outside a choice has the same explicit meaning as Escape:
+        // keep the editor buffer and do not save it.
+        overlay.onclick = event => {
+            if (event.target === overlay) finish('keep-editing');
+        };
+        if (typeof _makeModalFocusTrap === 'function') {
+            _lumpSaveConflictTrap = _makeModalFocusTrap(
+                'lumpSaveStaleConflictDialog', () => finish('keep-editing'));
+            document.addEventListener('keydown', _lumpSaveConflictTrap, true);
+        }
+        if (reloadButton && typeof reloadButton.focus === 'function') reloadButton.focus();
+    });
+}
+window._showLumpSaveStaleConflictDialog = _showLumpSaveStaleConflictDialog;
+
 async function _confirmLumpSavePlan(words, metadata, prompt, options) {
+    if (!metadata || typeof metadata !== 'object') metadata = {};
     const _saveDiagnostics = typeof window !== 'undefined'
         ? window.LumpSaveDiagnostics : null;
     if (_saveDiagnostics) {
         try { _saveDiagnostics.begin(metadata || {}, 'lump.confirm'); } catch (_) {}
     }
+    // The save-plan request and conflict modal may remain open while the
+    // programmer navigates or types.  Keep this request's words as an
+    // immutable pair; never let a later mutation of the caller's array alter
+    // the artifact being approved.
+    const _wordsSnapshot = Array.isArray(words) ? words.slice() : words;
+    // Metadata can carry editor_base and submitted_source, which are part of
+    // the same immutable candidate.  Use a JSON-safe copy for both plan and
+    // intent requests; copy the deliberate preserve flag back to the caller
+    // below because commit callers use their original metadata object.
+    let _metadataSnapshot = {};
+    try {
+        _metadataSnapshot = metadata && typeof metadata === 'object'
+            ? JSON.parse(JSON.stringify(metadata)) : {};
+    } catch (_) {
+        _metadataSnapshot = Object.assign({}, metadata || {});
+    }
     let plan;
     try {
-        plan = await _requestLumpSavePlan(words, metadata);
+        plan = await _requestLumpSavePlan(_wordsSnapshot, _metadataSnapshot);
     } catch (error) {
         const conflict = error && error.response && error.response.stale_editor_base;
         if (!conflict) throw error;
         const latest = error.response.latest || {};
         const action = typeof _lumpSaveStaleConflictAction === 'function'
-            ? _lumpSaveStaleConflictAction(error.response, confirm)
-            : null;
+            ? await _lumpSaveStaleConflictAction(
+                error.response,
+                typeof window !== 'undefined'
+                    ? window._showLumpSaveStaleConflictDialog : null)
+            : 'keep-editing';
         if (action === 'reload') {
             if (_saveDiagnostics) {
                 try {
@@ -8710,14 +8813,73 @@ async function _confirmLumpSavePlan(words, metadata, prompt, options) {
                     });
                 } catch (_) {}
             }
-            if (latest.token && typeof openLumpInEditor === 'function') {
-                await openLumpInEditor(latest.token);
+            // The stale plan is terminal once the user chooses Reload
+            // latest. Retire its idempotency mapping so a later deliberate
+            // save of the refreshed editor cannot inherit the discarded
+            // candidate's operation identity.
+            if (typeof _lumpSaveRetireOperationId === 'function') {
+                try { _lumpSaveRetireOperationId(_metadataSnapshot); } catch (_) {}
             }
-            return null;
+            // The old candidate must never remain available to a later Save
+            // click after Reload latest.  The editor/source draft remains in
+            // its owner-scoped draft store and is recoverable explicitly.
+            if (typeof window !== 'undefined') {
+                window._pendingLumpData = null;
+                window._saveNSPreparedSnapshot = null;
+            }
+            if (!latest.token || typeof openLumpInEditor !== 'function') {
+                return {
+                    status: 'reload-failed',
+                    outcome: 'reload-failed',
+                    reason: 'latest-source-unavailable',
+                    error: new Error('The repository did not identify a latest saved source to reload.'),
+                };
+            }
+            try {
+                const opened = await openLumpInEditor(latest.token);
+                if (opened === false || (opened && opened.ok === false)) {
+                    throw new Error('The latest saved source could not be opened.');
+                }
+                // openLumpInEditor historically returned undefined on both
+                // success and a 404/410 cleanup path.  Its editor token is
+                // therefore an additional browser-side success signal: a
+                // reload that leaves the old token active (or clears it) is
+                // not reported as successful.
+                if (typeof window !== 'undefined' &&
+                        Object.prototype.hasOwnProperty.call(window, '_editorOpenLumpToken')) {
+                    const activeToken = window._editorOpenLumpToken;
+                    const oldToken = _metadataSnapshot.editor_base &&
+                        _metadataSnapshot.editor_base.token;
+                    if (!activeToken || (oldToken && String(activeToken).toLowerCase() ===
+                            String(oldToken).toLowerCase())) {
+                        throw new Error('The latest saved source did not become active in the editor.');
+                    }
+                }
+                return {
+                    status: 'reloaded',
+                    outcome: 'reload',
+                    latest_token: latest.token,
+                };
+            } catch (reloadError) {
+                return {
+                    status: 'reload-failed',
+                    outcome: 'reload-failed',
+                    latest_token: latest.token,
+                    reason: 'latest-source-load-failed',
+                    error: reloadError,
+                };
+            }
         }
-        if (action !== 'preserve') return null;
+        if (action !== 'preserve') {
+            return {
+                status: 'cancelled',
+                outcome: 'keep-editing',
+                reason: 'keep-editing',
+            };
+        }
         metadata.preserve_stale_revision = true;
-        plan = await _requestLumpSavePlan(words, metadata);
+        _metadataSnapshot.preserve_stale_revision = true;
+        plan = await _requestLumpSavePlan(_wordsSnapshot, _metadataSnapshot);
     }
     const message = typeof prompt === 'function' ? prompt(plan) : String(prompt || '');
     const confirmFn = typeof window !== 'undefined' && typeof window.confirm === 'function'
@@ -8734,7 +8896,11 @@ async function _confirmLumpSavePlan(words, metadata, prompt, options) {
                 });
             } catch (_) {}
         }
-        return null;
+        return {
+            status: 'cancelled',
+            outcome: 'confirmation',
+            reason: 'confirmation',
+        };
     }
     const finalBinary = plan.final_binary;
     // Callers that own an immutable source/compiler pairing may provide a
@@ -8742,9 +8908,10 @@ async function _confirmLumpSavePlan(words, metadata, prompt, options) {
     // before minting the one-time approval intent, so a malformed server plan
     // cannot consume approval state or reach commit.
     if (options && typeof options.validateFinalBinary === 'function') {
-        options.validateFinalBinary(finalBinary, metadata || {}, plan);
+        options.validateFinalBinary(finalBinary, _metadataSnapshot, plan);
     }
-    const intent = await _requestLumpApprovalIntent(finalBinary, plan.action, metadata, plan);
+    const intent = await _requestLumpApprovalIntent(
+        finalBinary, plan.action, _metadataSnapshot, plan);
     if (_saveDiagnostics) {
         try {
             _saveDiagnostics.update(metadata || {}, {
@@ -8753,7 +8920,14 @@ async function _confirmLumpSavePlan(words, metadata, prompt, options) {
             });
         } catch (_) {}
     }
-    return { plan, intent, final_binary: finalBinary.slice() };
+    return {
+        status: 'approved',
+        outcome: metadata && metadata.preserve_stale_revision === true
+            ? 'preserve' : 'approved',
+        plan,
+        intent,
+        final_binary: finalBinary.slice(),
+    };
 }
 window._confirmLumpSavePlan = _confirmLumpSavePlan;
 window._requestLumpApprovalIntent = _requestLumpApprovalIntent;

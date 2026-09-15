@@ -104,7 +104,8 @@ vm.runInContext(source.slice(start, end), sandbox);
     const cancelled = await sandbox.window._confirmLumpSavePlan(
         words, { abstraction: 'Cancel.Test' }, () => 'cancel this save');
     check('explicit confirmation cancellation never requests approval or save',
-        cancelled === null && requests.length === 2 &&
+        cancelled && cancelled.status === 'cancelled' &&
+        cancelled.outcome === 'confirmation' && requests.length === 2 &&
         requests[1].url === '/api/lumps/save-plan');
     delete sandbox.window.confirm;
     let missingConfirmation = '';

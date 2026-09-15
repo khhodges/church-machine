@@ -26,3 +26,15 @@ closed as a plan mismatch.
 **How to apply:** Freeze the finalized plan artifact alongside its plan ID and
 approval intent, and use that immutable binary for the commit and any safe
 retry.
+
+Stale-revision resolution must distinguish reload, preservation, deliberate
+cancellation, and reload failure; a shared empty result is not a cancellation.
+Freeze the editor's base revision alongside its compiled snapshot.
+
+**Why:** Reload and cancellation used to share a return value, falsely blaming
+the user for cancelling; live editor identity could also describe a different
+revision from the compiled candidate.
+
+**How to apply:** Keep explicit outcomes through every caller, retire the old
+save candidate on successful reload, and preserve stale-revision checks when
+offering a separately saved revision.

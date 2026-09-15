@@ -37,6 +37,12 @@ const context = {
             selectedProfile: 'full',
             registeredAt: 101,
         },
+        _editorOpenLumpBaseIdentity: {
+            token: 'old-token',
+            compiled_at: '2026-01-01T00:00:00Z',
+            source_hash: 'old-source-hash',
+            abstraction: 'Snapshot.Test',
+        },
         LumpRegistry: {
             getCurrent: () => 'old-token',
             resolve: () => ({
@@ -72,6 +78,11 @@ if (snapshot.sourceText !== 'method Main { RETURN }') {
 }
 if (snapshot.words.join(',') !== '1,2,3') throw new Error('compiled words were not captured');
 if (snapshot.registeredAt !== 101) throw new Error('registeredAt was not captured');
+if (!snapshot.editorBaseIdentity ||
+    snapshot.editorBaseIdentity.token !== 'old-token' ||
+    snapshot.editorBaseIdentity.source_hash !== 'old-source-hash') {
+    throw new Error('snapshot lost the saved editor base identity');
+}
 if (!snapshot.pending || snapshot.pending.binary[1] !== 0x12345678) {
     throw new Error('pending binary was not retained');
 }
@@ -79,13 +90,15 @@ if (!snapshot.pending || snapshot.pending.binary[1] !== 0x12345678) {
 // Simulate focus/navigation after the dialog opened. The retained object must
 // remain independent from registry and editor changes.
 context.window.LumpRegistry.getCurrent = () => 'new-token';
+context.window._editorOpenLumpBaseIdentity.token = 'new-token';
 context.window.LumpRegistry.resolve = () => ({
     sources: { memory: { words: [9], capabilities: [], registeredAt: 202 } },
 });
 context.window._pendingLumpData.sourceText = 'mutated later';
 if (snapshot.token !== 'old-token' ||
     snapshot.sourceText !== 'method Main { RETURN }' ||
-    snapshot.words.join(',') !== '1,2,3') {
+     snapshot.words.join(',') !== '1,2,3' ||
+     snapshot.editorBaseIdentity.token !== 'old-token') {
     throw new Error('save snapshot changed after focus/navigation state changed');
 }
 

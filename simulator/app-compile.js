@@ -1288,7 +1288,7 @@ async function _doWipVersionSave() {
     const _wipApproval = await window._confirmLumpSavePlan(
         savePayload.binary, savePayload.metadata,
         () => `Save the tested version of "${absName}"?`);
-    if (!_wipApproval) return;
+    if (!_wipApproval || _wipApproval.status !== 'approved') return;
     savePayload.binary = _wipApproval.final_binary.slice();
     if (_wipApproval.plan.ns_slot !== null) {
         savePayload.metadata.ns_slot = _wipApproval.plan.ns_slot;
@@ -1424,7 +1424,7 @@ async function _confirmLumpRelease() {
     const _releaseApproval = await window._confirmLumpSavePlan(
         data.savePayload.binary, data.savePayload.metadata,
         () => `Release version "${ver}" of "${data.absName}"?`);
-    if (!_releaseApproval) return;
+    if (!_releaseApproval || _releaseApproval.status !== 'approved') return;
     data.savePayload.binary = _releaseApproval.final_binary.slice();
     if (_releaseApproval.plan.ns_slot !== null) {
         data.savePayload.metadata.ns_slot = _releaseApproval.plan.ns_slot;
@@ -2132,7 +2132,7 @@ async function compileAndBuild(options) {
     const _buildApproval = await window._confirmLumpSavePlan(
         savePayload.binary, savePayload.metadata,
         () => `Save "${absName}" as an immutable LUMP?\n\nApproval will be bound to the exact SHA-256 of the compiled binary.`);
-    if (!_buildApproval) return;
+    if (!_buildApproval || _buildApproval.status !== 'approved') return;
     // Preserve lumpWordsArray/binaryBuf as compiler diagnostics. The POST must
     // instead use the exact server-canonical final candidate that the approval
     // intent was bound to.
