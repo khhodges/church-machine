@@ -11,9 +11,9 @@ const heading = element();
 heading.parentNode = { appendChild(el) { elements[el.id] = el; } };
 elements.editorCodeName = heading;
 const ctx = {
-    userTabs: [{ id: 'draft', name: 'Chosen.Program' }],
+    userTabs: [{ id: 'draft', name: 'Chosen.Program', sourceRevision: 27 }],
     activeUserTabId: 'draft',
-    window: { _editorCodeNameValue: 'Chosen.Program' },
+    window: { _editorCodeNameValue: 'Chosen.Program', _editorOpenLumpMeta: null },
     document: { getElementById: id => elements[id], createElement: () => ({...element(),style:{}}) },
     _editorActionIdentity: () => 'WukongCallHome#53',
 };
@@ -21,16 +21,16 @@ vm.createContext(ctx);
 vm.runInContext(source.slice(source.indexOf('function _refreshEditorActionIdentity('),
     source.indexOf('const _EDITOR_DOCUMENT_STATE_KEY')), ctx);
 ctx._refreshEditorActionIdentity('WukongCallHome');
-assert.equal(heading.textContent, 'Chosen.Program');
-assert.equal(elements.editorArtifactIdentity.textContent, 'LUMP identity: WukongCallHome#53');
+assert.equal(heading.textContent, 'WukongCallHome#53 · Source v27');
+assert.equal(elements.editorArtifactIdentity, undefined);
 ctx.userTabs[0].name = 'Renamed.Program';
 ctx._refreshEditorActionIdentity();
-assert.equal(heading.textContent, 'Renamed.Program');
+assert.equal(heading.textContent, 'WukongCallHome#53 · Source v27');
 ctx.activeUserTabId = null;
 ctx._refreshEditorActionIdentity('Source.File');
-assert.equal(heading.textContent, 'Source.File');
+assert.equal(heading.textContent, 'WukongCallHome#53');
 ctx._editorActionIdentity = () => '';
 ctx._refreshEditorActionIdentity('Source.File');
 assert.equal(elements.editorArtifactIdentity, undefined);
 assert.equal(heading.textContent, 'Source.File');
-console.log('PASS chosen name survives artifact identity, refresh, rename and source navigation');
+console.log('PASS editor identity is consolidated with its source revision');

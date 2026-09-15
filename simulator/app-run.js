@@ -12046,24 +12046,11 @@ function escapeHtml(str) {
 
 function _updateEditorCodeName(name) {
     window._editorCodeNameValue = name || '';
+    const oldRevision = document.getElementById('editorSourceRevision');
+    if (oldRevision) oldRevision.remove();
+    const oldArtifact = document.getElementById('editorArtifactIdentity');
+    if (oldArtifact) oldArtifact.remove();
     _refreshEditorActionIdentity(name);
-    let badge = document.getElementById('editorSourceRevision');
-    const tab = typeof userTabs !== 'undefined' && typeof activeUserTabId !== 'undefined'
-        ? userTabs.find(item => item.id === activeUserTabId) : null;
-    const revision = tab && tab.name === name ? tab.sourceRevision : null;
-    if (Number.isInteger(revision)) {
-        const nameEl = document.getElementById('editorCodeName');
-        if (!badge && nameEl && nameEl.parentNode) {
-            badge = document.createElement('span');
-            badge.id = 'editorSourceRevision';
-            badge.style.cssText = 'margin-left:8px;font-size:0.75rem;color:var(--text-muted,#9ca3af)';
-            nameEl.parentNode.appendChild(badge);
-        }
-        if (badge) {
-            badge.textContent = `Source: v${revision}`;
-            badge.title = 'Historical source used to start this draft; not part of the program name.';
-        }
-    } else if (badge) badge.remove();
 }
 
 function _editorActionIdentity(name) {
@@ -12106,22 +12093,20 @@ function _refreshEditorActionIdentity(name) {
     const identity = _editorActionIdentity(chosenName);
     const identityName = document.getElementById('editorCodeName');
     if (identityName) {
-        identityName.textContent = chosenName;
-        identityName.title = chosenName ? `Program name: ${chosenName}` : 'Program name';
-        identityName.setAttribute('aria-label', 'Program name');
-        let badge = document.getElementById('editorArtifactIdentity');
-        if (identity && identity !== chosenName) {
-            if (!badge && identityName.parentNode) {
-                badge = document.createElement('span');
-                badge.id = 'editorArtifactIdentity';
-                badge.style.cssText = 'margin-left:8px;font-size:0.75rem;color:var(--text-muted,#9ca3af)';
-                identityName.parentNode.appendChild(badge);
-            }
-            if (badge) {
-                badge.textContent = `LUMP identity: ${identity}`;
-                badge.title = 'Artifact identity or proposed identity from IDE settings; not the program name.';
-            }
-        } else if (badge) badge.remove();
+        const openMeta = window._editorOpenLumpMeta;
+        const revision = tab && Number.isInteger(tab.sourceRevision)
+            ? tab.sourceRevision
+            : (openMeta && Number.isInteger(openMeta.lump_version)
+                ? openMeta.lump_version : null);
+        const primary = identity || chosenName;
+        identityName.textContent = primary +
+            (Number.isInteger(revision) ? ` · Source v${revision}` : '');
+        identityName.title = identity
+            ? `LUMP identity: ${identity}` +
+                (Number.isInteger(revision) ? `; source revision v${revision}` : '')
+            : (chosenName ? `Program name: ${chosenName}` : 'Program name');
+        identityName.setAttribute('aria-label',
+            identity ? 'LUMP identity and source revision' : 'Program name');
     }
 }
 

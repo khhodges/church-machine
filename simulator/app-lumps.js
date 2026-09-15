@@ -7426,6 +7426,9 @@ async function openLumpInEditor(token) {
     // button always knows which LUMP it is working with.
     window._editorOpenLumpToken = token   || null;
     window._editorOpenLumpMeta  = lump    || null;
+    if (typeof _refreshEditorActionIdentity === 'function') {
+        _refreshEditorActionIdentity(lumpName);
+    }
     var _openedSourceHash = null;
     if (!_inMemoryLump && _sourceResolution.restored &&
             typeof _sourceResolution.source === 'string' &&

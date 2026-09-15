@@ -109,6 +109,9 @@
         const panel = _get('editorViewSwitcherPanel');
         const toggle = _get('editorViewSwitcherToggle');
         if (!panel || !toggle) return;
+        if (typeof global.closeEditorActions === 'function') {
+            global.closeEditorActions();
+        }
         _renderEntries();
         panel.hidden = false;
         toggle.setAttribute('aria-expanded', 'true');

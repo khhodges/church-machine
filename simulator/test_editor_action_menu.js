@@ -24,23 +24,25 @@ check(!index.includes('class="asm-picker-toolbar"'),
     'the separate instruction/C-List toolbar is removed');
 check(index.includes('id="btnHamCompile"') &&
       index.includes('id="btnHamInstructions"') &&
-      index.includes('id="btnHamCList"'),
-    'compile, instructions, and C-List actions are in the hamburger menu');
+      index.includes('id="btnHamCList"') &&
+      /editorActionsDropdown[\s\S]*?id="editorViewSwitcherToggle"/.test(index),
+    'compile, instructions, C-List, and editor views are in the hamburger menu');
 check(!index.includes('id="editorActionsIdentity"') &&
       !index.includes('id="editorActionsIdentityValue"'),
     'the hamburger menu has no duplicate identity context');
 check(index.includes('id="editorCodeName" class="editor-identity-name"') &&
       run.includes('window._editorCodeNameValue = name || \'\';') &&
-      run.includes('_editorActionIdentity(name || window._editorCodeNameValue || \'\')') &&
+      run.includes('const identity = _editorActionIdentity(chosenName);') &&
       !index.includes('id="editorIdentityName"') &&
       run.includes('document.getElementById(\'editorCodeName\')'),
     'the DOM uses one visible full dot.name identity and has no duplicate label');
 check(run.includes('function _editorActionIdentity(name)') &&
-      run.includes('return `${dotName}#${issue}`;'),
+      run.includes('return `${dotName}#${issue}`;') &&
+      run.includes('` · Source v${revision}`'),
     'the action identity is built as the full dot.pet.name issue identity');
-check(!run.includes('button.textContent = identity ? `${label} · ${identity}` : label;') &&
-      run.includes('identityName.textContent = identity;'),
-    'only the toolbar displays the full identity');
+check(!run.includes('badge.textContent = `LUMP identity: ${identity}`') &&
+      run.includes('const primary = identity || chosenName;'),
+    'the toolbar consolidates the program name, LUMP identity, and source revision');
 check(shell.includes('_refreshEditorActionIdentity('),
     'execution identity changes refresh the action context');
 check(!compile.includes('_applySealedLumpState') &&

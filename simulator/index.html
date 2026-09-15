@@ -854,6 +854,12 @@
                         <div class="ham-wrap" id="editorActionsWrap">
                             <button class="btn ham-btn editor-actions-btn" id="editorActionsBtn" onclick="toggleEditorActions()" data-tooltip="Actions — Compile · Create · Save">&#9776;</button>
                             <div class="ham-dropdown editor-actions-dropdown" id="editorActionsDropdown" style="display:none;">
+                                 <div class="ham-group-title">Views</div>
+                                 <button type="button" class="ham-item" id="editorViewSwitcherToggle"
+                                         aria-controls="editorViewSwitcherPanel" aria-expanded="false">
+                                     Editor views&hellip; (<span id="editorViewSwitcherCount">0</span>)
+                                 </button>
+                                 <div class="ham-divider"></div>
                                 <div class="ham-group-title">File</div>
                                 <button class="ham-item" onclick="newAbstraction();closeEditorActions()" data-tooltip="New — Start an Assembly abstraction from the proforma">New&hellip;</button>
                                 <button class="ham-item" onclick="showOpenFileDialog();closeEditorActions()" data-tooltip="Open — Browse and open any .cloomc file from the server (C+Shift+O)">Open&hellip;</button>
@@ -905,10 +911,6 @@
                             <option value="abstraction">Abstraction</option>
                             <option value="personal">My Programs</option>
                         </select>
-                        <button type="button" id="editorViewSwitcherToggle" class="editor-view-switcher-link"
-                                aria-controls="editorViewSwitcherPanel" aria-expanded="false">
-                            <span id="editorViewSwitcherCount">0</span> views
-                        </button>
                         <div id="editorViewSwitcherPanel" class="editor-view-switcher-panel" role="region"
                              aria-labelledby="editorViewSwitcherToggle" hidden>
                             <div class="editor-view-switcher-heading">
@@ -3549,7 +3551,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="lump-content-frame.js?v=sha256-a21808c93061"></script>
     <script src="lump-audit.js?v=sha256-380ac57c6846"></script>
     <script src="rci-show-errs.js?v=sha256-652eda848fcc"></script>
-    <script src="app-lumps.js?v=sha256-12097531c991"></script>
+    <script src="app-lumps.js?v=sha256-c2b17346ecae"></script>
     <script src="app-absdetail.js?v=sha256-5b3e3ede5e42"></script>
     <!-- Load order matters: app-compile must precede app-run (exports LANG_EXAMPLE_GROUPS
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->
@@ -3558,11 +3560,11 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="app-editor-find.js?v=sha256-aeb1fa51e855"></script>
     <script src="lump_save_handler.js?v=sha256-a912f34d1180"></script>
     <script src="whats-new-feed.js?v=sha256-4f1499720d0d"></script>
-    <script src="app-run.js?v=sha256-4230dc0c632f"></script>
+    <script src="app-run.js?v=sha256-4908c5b7719c"></script>
     <script src="app-actions.js?v=sha256-4ce7d3896e9e"></script>
     <script src="app-build-approval.js?v=sha256-737779efe980"></script>
     <script src="app-source-library.js?v=sha256-f0acb36b8999"></script>
-    <script src="app-editor-view-switcher.js?v=sha256-a97c4c4bf4aa"></script>
+    <script src="app-editor-view-switcher.js?v=sha256-0890f98dcbf5"></script>
     <script src="app-invoke.js?v=sha256-376a499e341a"></script>
     <script src="app-misc.js?v=sha256-9309e68bdbab"></script>
     <script src="app-popup-lifecycle.js?v=sha256-8777e6faeabb"></script>
