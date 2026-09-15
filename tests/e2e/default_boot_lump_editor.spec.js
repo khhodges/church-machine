@@ -5,7 +5,6 @@
 // example.
 
 const { test, expect } = require('@playwright/test');
-const { loadSimulator } = require('./helpers/simulator');
 
 const BOOT_TOKEN = '4a00000a';
 
@@ -30,6 +29,7 @@ test('default Code View opens the configured Lightning Bolt LUMP', async ({ page
 
     await page.addInitScript(() => {
         localStorage.setItem('church_defaultView', 'editor');
+        localStorage.setItem('churchMachine_autoBootOnOpen', '0');
     });
 
     await page.route('**/api/lumps/list', async route => {
@@ -59,18 +59,18 @@ test('default Code View opens the configured Lightning Bolt LUMP', async ({ page
         });
     });
 
-    await loadSimulator(page);
+    await page.goto('/simulator/');
 
-    // loadSimulator deliberately lands on the dashboard after its deterministic
-    // boot. Re-enter the configured default Code View with an empty editor and
-    // exercise the same resolver used by boot completion.
-    const opened = await page.evaluate(async () => {
-        switchView('editor');
-        const editor = document.getElementById('asmEditor');
-        if (editor) editor.value = '';
-        return await _openConfiguredBootLumpInDefaultEditor();
-    });
-    expect(opened).toBe(true);
+    // This is intentionally tested with auto-boot disabled: loading the
+    // authoritative image must still populate a default Code View with the
+    // selected LUMP's disassembly.
+    await page.waitForFunction(() =>
+        window.bootImageAvailable === true &&
+        typeof sim !== 'undefined' &&
+        sim &&
+        sim._bootImageLoaded === true,
+        { timeout: 15000 }
+    );
 
     await page.waitForFunction(token =>
         window._editorOpenLumpToken === token &&

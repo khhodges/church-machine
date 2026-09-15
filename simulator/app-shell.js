@@ -1629,6 +1629,15 @@ function init() {
                        // real descriptor synchronously.
                        window.bootImage = buf;
                        window.bootImageAvailable = true;
+                       // Code View can be the user's Default View even when
+                       // automatic boot is disabled. The loaded image already
+                       // contains the authoritative boot-entry slot, so show
+                       // its LUMP disassembly without requiring execution.
+                       if (typeof _openConfiguredBootLumpInDefaultEditor === 'function') {
+                           _openConfiguredBootLumpInDefaultEditor().catch(e => {
+                               console.warn('[boot-entry-editor] startup open failed:', e);
+                           });
+                       }
 
                        if (_wasBootedBeforeImage) {
                            // Never continue execution with CR14/CR11 derived

@@ -1995,7 +1995,7 @@ function _applyPendingSimLoad() {
     }
 }
 
-function runSimGo() {
+function runSimGo(preserveView) {
     if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
     // Guard: if a run batch loop is already active (either mid-batch where
     // sim.running is true, or between setTimeout(runBatch) ticks where
@@ -2007,7 +2007,7 @@ function runSimGo() {
     if (sim._bootPrefetchPromise) {
         const pending = sim._bootPrefetchPromise;
         pending.then(() => {
-            if (!sim.halted && !sim._bootPrefetchFailed) runSimGo();
+            if (!sim.halted && !sim._bootPrefetchFailed) runSimGo(preserveView);
         }).catch(err => {
             console.error('[boot-prefetch] run wait failed:', err);
         });
@@ -2018,7 +2018,7 @@ function runSimGo() {
     if (sel) runBatchSize = parseInt(sel.value, 10) || 500;
     hideRunPopover();
     _applyPendingSimLoad();
-    runSim();
+    runSim(preserveView);
 }
 
 function stopSim() {
@@ -2517,6 +2517,9 @@ function _configuredBootLumpToken() {
 }
 
 function _openConfiguredBootLumpInDefaultEditor() {
+    if (window._configuredBootLumpOpenPromise) {
+        return window._configuredBootLumpOpenPromise;
+    }
     const editor = document.getElementById('asmEditor');
     const hasEditorSource = !!(editor && editor.value && editor.value.trim());
     const hasUserTab = (typeof activeUserTabId !== 'undefined') && !!activeUserTabId;
@@ -2540,10 +2543,18 @@ function _openConfiguredBootLumpInDefaultEditor() {
     const catalogReady = window.LumpRegistry.isServerListFetched()
         ? Promise.resolve()
         : window.LumpRegistry.warmServerList();
-    return catalogReady.then(openResolved).catch(function(error) {
+    const openPromise = catalogReady.then(openResolved).catch(function(error) {
         console.warn('[boot-entry-editor] could not open configured boot LUMP:', error);
         return false;
     });
+    window._configuredBootLumpOpenPromise = openPromise.then(function(result) {
+        window._configuredBootLumpOpenPromise = null;
+        return result;
+    }, function(error) {
+        window._configuredBootLumpOpenPromise = null;
+        throw error;
+    });
+    return window._configuredBootLumpOpenPromise;
 }
 
 function _autoLoadDefaultProgram() {
@@ -2776,7 +2787,9 @@ function slowBoot() {
                     _prefetchDone.then(() => {
                         if (sim.halted || sim._bootPrefetchFailed) return;
                         _setEntryBreakpoint();
-                        runSimGo();
+                        // Preserve the user's startup page for automatic boot
+                        // execution. Manual Run still opens the dashboard.
+                        runSimGo(_dest === 'editor');
                     }).catch(e => {
                         console.error('[boot-prefetch] unexpected failure:', e);
                         sim._bootPrefetchFailed = true;
@@ -2888,7 +2901,7 @@ async function _startBootLumpPrefetch() {
     return work;
 }
 
-function runSim() {
+function runSim(preserveView) {
     if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
     // Boot is never redirected by the UI. The core executes only LOAD CR15,
     // CHANGE CR12, CALL CR0 against the image's already-prepared Thread home.
@@ -2937,9 +2950,13 @@ function runSim() {
     _simRunActive = true;
     _showStopBtn(true);
 
-    // Switch to the dashboard with CR14 open so the user sees live execution state
-    switchView('dashboard');
-    openCRDetail(14);
+    // Manual Run opens the dashboard with CR14. Automatic startup execution
+    // must leave the configured Default View visible (notably Code View, where
+    // the selected boot-entry LUMP disassembly was just opened).
+    if (!preserveView) {
+        switchView('dashboard');
+        openCRDetail(14);
+    }
 
     if (con) {
         con.textContent += '\nRunning…';
