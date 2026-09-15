@@ -156,3 +156,4 @@
 - [Named CALL CR6 lookup](named-call-cr6-fallback.md) — named lookup uses CR6 syntax but materializes a normal LOAD + opcode-2 CALL, never an implicit ELOADCALL
 - [Three-LUMP resident profile](three-lump-resident-profile.md) — boot core is an explicit fixed-map policy; manifest history never selects live resident executables
 - [Boot-entry UI authority](boot-entry-ui-authority.md) — default Code View follows the loaded image's boot slot, never a stale pending browser selection
+- [Bootstrap repair destination authority](bootstrap-repair-destination-authority.md) — an eligible non-resident occupant supplies sequence only; the approved frozen binding remains authoritative under the fresh Namespace lock

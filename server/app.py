@@ -8103,6 +8103,16 @@ _lump_bootstrap_history_repair_override = contextvars.ContextVar(
     "_lump_bootstrap_history_repair_override", default=False)
 _LUMP_BOOTSTRAP_REPAIR_PLANS = {}
 _LUMP_BOOTSTRAP_REPAIR_PLANS_LOCK = threading.Lock()
+
+
+class _BootstrapNamespaceRace(ValueError):
+    """The Namespace changed after a bootstrap correction was approved."""
+
+
+class _BootstrapNamespacePolicy(ValueError):
+    """The approved bootstrap correction no longer matches its policy."""
+
+
 _LUMP_APPROVAL_INTENT_FIELDS = frozenset({
     "abstraction", "author", "version", "release_notes", "history_note",
     "display_name", "documentation", "annotations",
@@ -9229,6 +9239,17 @@ def _allocate_bootstrap_history_repair_destination(abstraction):
     again while holding the commit locks.
     """
     rows, namespace_identity = _read_authoritative_namespace_rows()
+    return _allocate_bootstrap_history_repair_destination_from_rows(
+        abstraction, rows, namespace_identity)
+
+
+def _allocate_bootstrap_history_repair_destination_from_rows(
+        abstraction, rows, namespace_identity):
+    """Allocate from already-read Namespace rows.
+
+    The caller may use this while holding the save locks so eligibility is
+    reconciled against the same snapshot whose fingerprint was approved.
+    """
     by_slot = {}
     for row in rows:
         if not isinstance(row, dict):
@@ -11153,7 +11174,7 @@ def save_lump():
                     "_bootstrap_repair_namespace_identity")
                 if (_namespace_state_fingerprint(_fresh_rows)
                         != expected_namespace_identity):
-                    raise ValueError(
+                    raise _BootstrapNamespaceRace(
                         "Namespace state changed while the correction was awaiting approval")
             if _is_selftest_canonical:
                 _fresh_sources = [
@@ -11180,13 +11201,51 @@ def save_lump():
                     and row.get("slot") == ns_slot
                 ]
                 if _is_server_bootstrap_history_repair:
-                    # The repair destination is a server-derived replacement
-                    # binding, not the descriptor currently occupying the
-                    # selected slot.  The exact Namespace fingerprint above
-                    # proves that both an empty destination and an eligible
-                    # nonresident occupant are unchanged since planning.
-                    # Validate the candidate against the proposed frozen
-                    # binding; Phase 4 will atomically replace the old row.
+                    if len(_fresh_targets) > 1:
+                        raise _BootstrapNamespacePolicy(
+                            f"Namespace has multiple rows at approved destination "
+                            f"NS[{ns_slot}]")
+                    planned_source = metadata.get("_bootstrap_repair_source_row")
+                    if planned_source is not None and not isinstance(
+                            planned_source, dict):
+                        raise _BootstrapNamespacePolicy(
+                            "approved correction source row is invalid")
+                    approved_destination_identity = _manifest_entry_identity({
+                        "slot": ns_slot,
+                        "seq": _bootstrap_binding.get("seq"),
+                        "source_row": planned_source,
+                    })
+                    if (approved_destination_identity
+                            != metadata.get("_bootstrap_repair_destination_identity")):
+                        raise _BootstrapNamespacePolicy(
+                            "approved correction destination identity is inconsistent")
+                    fresh_destination = (
+                        _allocate_bootstrap_history_repair_destination_from_rows(
+                            abs_name, _fresh_rows, expected_namespace_identity))
+                    fresh_destination_identity = _manifest_entry_identity({
+                        "slot": fresh_destination["slot"],
+                        "seq": fresh_destination["sequence"],
+                        "source_row": fresh_destination["source_row"],
+                    })
+                    if fresh_destination_identity != approved_destination_identity:
+                        raise _BootstrapNamespacePolicy(
+                            "approved correction destination is no longer eligible")
+                    if planned_source is None:
+                        if _fresh_targets:
+                            raise _BootstrapNamespacePolicy(
+                                f"approved empty destination NS[{ns_slot}] is occupied")
+                    elif not _fresh_targets:
+                        raise _BootstrapNamespacePolicy(
+                            f"approved source row for NS[{ns_slot}] is missing")
+                    elif _fresh_targets[0] != planned_source:
+                        raise _BootstrapNamespacePolicy(
+                            f"approved source row for NS[{ns_slot}] no longer "
+                            "matches the eligible Namespace occupant")
+
+                    # The destination is deliberately a new frozen resident
+                    # binding even when an eligible non-resident row already
+                    # occupies this slot.  The source row proves eligibility;
+                    # it must never replace the server-authorized destination.
                     _fresh_binding = dict(_bootstrap_binding)
                 elif len(_fresh_targets) != 1:
                     raise ValueError(
@@ -11197,17 +11256,53 @@ def save_lump():
                 _fresh_binding, lump_bytes, token8, _binary_hash,
                 _bootstrap_identity)
             _bootstrap_binding = _fresh_binding
-        except (OSError, ValueError, TypeError, json.JSONDecodeError) as _fresh_error:
+        except _BootstrapNamespaceRace as _fresh_error:
             return jsonify({
                 "error": (
                     "The IDE refused the bootstrap save before changing any data. "
-                    "The Namespace changed while the candidate was being prepared; "
-                    f"retry from the unchanged source: {_fresh_error}"
+                    "The Namespace changed after the correction was planned; "
+                    f"recreate the correction plan before retrying: {_fresh_error}"
                 ),
                 "namespace_identity_failed": True,
                 "failure_owner": "ide",
                 "committed": False,
                 "safe_retry": True,
+            }), 409
+        except _BootstrapNamespacePolicy as _fresh_error:
+            return jsonify({
+                "error": (
+                    "The IDE refused the bootstrap save before changing any data "
+                    "because the approved correction no longer matches the "
+                    f"eligible Namespace destination: {_fresh_error}"
+                ),
+                "namespace_identity_failed": True,
+                "failure_owner": "ide",
+                "committed": False,
+                "safe_retry": False,
+            }), 409
+        except (OSError, ValueError, TypeError, json.JSONDecodeError) as _fresh_error:
+            if not _is_server_bootstrap_history_repair:
+                return jsonify({
+                    "error": (
+                        "The IDE refused the bootstrap save before changing any data. "
+                        "The Namespace changed while the candidate was being prepared; "
+                        f"retry from the unchanged source: {_fresh_error}"
+                    ),
+                    "namespace_identity_failed": True,
+                    "failure_owner": "ide",
+                    "committed": False,
+                    "safe_retry": True,
+                }), 409
+            return jsonify({
+                "error": (
+                    "The IDE refused the bootstrap save before changing any data "
+                    "because the authoritative Namespace could not satisfy the "
+                    f"bootstrap identity policy: {_fresh_error}"
+                ),
+                "namespace_identity_failed": True,
+                "failure_owner": "ide",
+                "committed": False,
+                "safe_retry": False,
             }), 409
 
     import re as _re_arch
@@ -13473,6 +13568,7 @@ def _bootstrap_history_repair_candidate(current_token, version, archive_filename
         "submitted_source": snapshot.get("source"),
         "_bootstrap_history_repair": True,
         "_bootstrap_repair_destination": destination_binding,
+        "_bootstrap_repair_source_row": destination["source_row"],
         "_bootstrap_repair_namespace_identity": destination["namespace_identity"],
         "_bootstrap_repair_destination_identity": _manifest_entry_identity({
             "slot": destination["slot"],
@@ -13575,10 +13671,18 @@ def plan_bootstrap_history_repair(token, version):
     except _LumpApprovalStoreError as exc:
         return jsonify({"error": str(exc), "committed": False}), 500
     except (OSError, TypeError, ValueError, _struct.error) as exc:
+        _race = "changed while the correction was awaiting approval" in str(exc)
         return jsonify({
-            "error": f"No data was changed: correction plan was not created: {exc}",
+            "error": (
+                "No data was changed: correction plan was not created because "
+                f"the approved Namespace or archive is stale; recreate the "
+                f"correction plan before retrying: {exc}"
+                if _race else
+                f"No data was changed: correction plan was refused by bootstrap "
+                f"identity policy: {exc}"
+            ),
             "committed": False,
-            "safe_retry": True,
+            "safe_retry": _race,
         }), 409
 
 
@@ -13638,10 +13742,17 @@ def apply_bootstrap_history_repair(token, version):
     except _LumpApprovalStoreError as exc:
         return jsonify({"error": str(exc), "committed": False}), 500
     except (OSError, TypeError, ValueError, _struct.error) as exc:
+        _race = "changed while the correction was awaiting approval" in str(exc)
         return jsonify({
-            "error": f"No data was changed: bootstrap correction was refused: {exc}",
+            "error": (
+                "No data was changed: bootstrap correction approval is stale; "
+                f"recreate the correction plan before retrying: {exc}"
+                if _race else
+                f"No data was changed: bootstrap correction was refused by "
+                f"identity policy: {exc}"
+            ),
             "committed": False,
-            "safe_retry": True,
+            "safe_retry": _race,
         }), 409
 
 

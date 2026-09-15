@@ -30,7 +30,7 @@ def _snapshot(root):
     return {
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()
         for path in root.iterdir()
-        if path.is_file()
+        if path.is_file() and path.name != ".namespace-commit.lock"
     }
 
 
@@ -208,8 +208,8 @@ def test_standard_filename_archive_is_previewable_with_complete_identity_diagnos
     assert "sealed row-zero GT 0x4a000006" in issue_text
     assert "record Token 0x4a00000a" in issue_text
     assert (
-        "Direct History activation is disabled because this revision is not "
-        "a valid live candidate."
+        "The bootstrap record and sealed SELF identity do not both match the "
+        "authoritative Namespace destination."
     ) in issue_text
 
 
@@ -266,7 +266,7 @@ def test_approved_repair_reissues_canonical_live_lump_and_preserves_evidence(
     live = [row for row in manifest
             if row.get("token") == "4a000002" and row.get("archived") is not True]
     assert len(live) == 1
-    assert live[0]["lump_version"] == 1
+    assert live[0]["lump_version"] == 3
     live_raw = (root / live[0]["filename"]).read_bytes()
     live_words = struct.unpack(f">{len(live_raw) // 4}I", live_raw)
     assert live_words[-1] == 0x4A000002
@@ -284,7 +284,69 @@ def test_approved_repair_reissues_canonical_live_lump_and_preserves_evidence(
     assert live_approval["bootstrap_runtime_gt"] == 0x4A000002
     assert live_approval["binary_hash"] == hashlib.sha256(live_raw).hexdigest()
 
+def test_repair_plan_and_apply_replace_eligible_nonresident_target(
+        bootstrap_history):
+    """An eligible occupant supplies sequence only, not bootstrap authority."""
+    root = bootstrap_history["root"]
+    eligible = {
+        "name": "LazyOld",
+        "slot": 2,
+        "seq": 7,
+        "token": "deadbeef",
+        "filename": "LazyOld.1.lump",
+        "resident": False,
+        "load_policy": "Lazy",
+    }
+    _write_namespace_state(root / "ns-state.json", [
+        next(row for row in json.loads(
+            (root / "ns-state.json").read_text())["abstractions"]
+            if row["slot"] == 10),
+        eligible,
+    ])
+    archive_before = (root / ARCHIVE_NAME).read_bytes()
 
+    with app_module.app.test_client() as client:
+        plan_response = client.post(
+            f"/api/lumps/{CURRENT_TOKEN}/history/1/bootstrap-repair-plan",
+            json={"archive_filename": ARCHIVE_NAME},
+        )
+        assert plan_response.status_code == 201, plan_response.get_data(as_text=True)
+        plan = plan_response.get_json()
+        assert plan["namespace_slot"] == 2
+        assert plan["namespace_sequence"] == 7
+        assert plan["destination_token"] == "4a070002"
+
+        intent_response = client.post("/api/lumps/approval-intent", json={
+            "digest": plan["digest"],
+            "action": plan["action"],
+            "plan_id": plan["plan_id"],
+            "confirmation": True,
+            "approval": {},
+        })
+        assert intent_response.status_code == 201
+        response = client.post(
+            f"/api/lumps/{CURRENT_TOKEN}/history/1/bootstrap-repair",
+            json={
+                "archive_filename": ARCHIVE_NAME,
+                "plan_id": plan["plan_id"],
+                "approval_intent": intent_response.get_json()["intent"],
+                "corrections": [item["id"] for item in plan["corrections"]],
+            },
+        )
+
+    assert response.status_code == 200, response.get_data(as_text=True)
+    saved = response.get_json()
+    assert saved["namespace_slot"] == 2
+    assert saved["bootstrap_t"] == "4a070002"
+    assert saved["bootstrap_runtime_gt"] == 0x4A070002
+    assert (root / ARCHIVE_NAME).read_bytes() == archive_before
+
+    state = json.loads((root / "ns-state.json").read_text())
+    destination = next(row for row in state["abstractions"] if row["slot"] == 2)
+    assert destination["name"] == "CapabilityTest"
+    assert destination["resident"] is True
+    assert destination["load_policy"] == "Resident"
+    assert destination["token"] == "4a070002"
 def test_standard_filename_history_archive_can_be_repaired(bootstrap_history):
     """Pattern-discovered archives get the same repair options as manifest rows."""
     root = bootstrap_history["root"]
@@ -461,7 +523,7 @@ def test_repair_replaces_unchanged_nonresident_destination(
 
 
 def test_repair_plan_fails_closed_when_namespace_changes_before_apply(
-        bootstrap_history):
+        bootstrap_history, monkeypatch):
     root = bootstrap_history["root"]
     with app_module.app.test_client() as client:
         plan_response = client.post(
@@ -478,9 +540,14 @@ def test_repair_plan_fails_closed_when_namespace_changes_before_apply(
             "approval": {},
         })
         assert intent_response.status_code == 201
-        state = json.loads((root / "ns-state.json").read_text())
-        state["abstractions"].append({"name": "Changed", "slot": 30, "seq": 0})
-        (root / "ns-state.json").write_text(json.dumps(state))
+
+        def mutate_between_reads():
+            state = json.loads((root / "ns-state.json").read_text())
+            state["abstractions"].append({"name": "Changed", "slot": 30, "seq": 0})
+            (root / "ns-state.json").write_text(json.dumps(state))
+
+        monkeypatch.setattr(
+            app_module, "_bootstrap_pre_lock_hook", mutate_between_reads)
         manifest_before = (root / "manifest.json").read_bytes()
         response = client.post(
             f"/api/lumps/{CURRENT_TOKEN}/history/1/bootstrap-repair",
@@ -493,6 +560,32 @@ def test_repair_plan_fails_closed_when_namespace_changes_before_apply(
         )
 
     assert response.status_code == 409
+    body = response.get_json()
+    assert body["safe_retry"] is True
+    assert "changed after the correction was planned" in body["error"]
+    assert "eligible Namespace destination" not in body["error"]
     assert (root / "manifest.json").read_bytes() == manifest_before
     assert not any(row.get("token") == "4a000002"
                    for row in json.loads(manifest_before))
+
+def test_repair_plan_skips_protected_resident_target(bootstrap_history):
+    """A frozen resident occupant remains ineligible for correction reuse."""
+    root = bootstrap_history["root"]
+    current = next(row for row in json.loads(
+        (root / "ns-state.json").read_text())["abstractions"]
+        if row["slot"] == 10)
+    _write_namespace_state(root / "ns-state.json", [
+        current,
+        _resident_row(2, name="Protected"),
+    ])
+
+    with app_module.app.test_client() as client:
+        response = client.post(
+            f"/api/lumps/{CURRENT_TOKEN}/history/1/bootstrap-repair-plan",
+            json={"archive_filename": ARCHIVE_NAME},
+        )
+
+    assert response.status_code == 201, response.get_data(as_text=True)
+    plan = response.get_json()
+    assert plan["namespace_slot"] == 3
+    assert plan["destination_token"] == "4a000003"
