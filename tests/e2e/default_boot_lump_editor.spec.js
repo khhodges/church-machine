@@ -30,6 +30,11 @@ test('default Code View opens the configured Lightning Bolt LUMP', async ({ page
     await page.addInitScript(() => {
         localStorage.setItem('church_defaultView', 'editor');
         localStorage.setItem('churchMachine_autoBootOnOpen', '0');
+        // Simulate an older generic editor snapshot restored before the
+        // validated boot image arrives. It must not block the boot LUMP.
+        localStorage.setItem('church_editor_code',
+            '; stale source from the previous startup\nLOAD CR3, CR6, 1');
+        localStorage.removeItem('church_editor_document_v1');
     });
 
     await page.route('**/api/lumps/list', async route => {

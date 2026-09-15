@@ -2523,10 +2523,15 @@ function _openConfiguredBootLumpInDefaultEditor() {
     const editor = document.getElementById('asmEditor');
     const hasEditorSource = !!(editor && editor.value && editor.value.trim());
     const hasUserTab = (typeof activeUserTabId !== 'undefined') && !!activeUserTabId;
+    const hasProtectedEditorOwner =
+        hasUserTab ||
+        !!window._editorSourceFilePath ||
+        !!window._pseudoEditContext ||
+        window._editorStartupBufferDirty === true;
     const isDefaultCodeView =
         (typeof currentView !== 'undefined' && currentView === 'editor') ||
         window._startupDefaultView === 'editor';
-    if (!isDefaultCodeView || hasEditorSource || hasUserTab ||
+    if (!isDefaultCodeView || (hasEditorSource && hasProtectedEditorOwner) ||
             typeof openLumpInEditor !== 'function' || !window.LumpRegistry) {
         return Promise.resolve(false);
     }

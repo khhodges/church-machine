@@ -469,6 +469,11 @@ let deviceAbstractions = null;
 let userTabs = [];
 let activeUserTabId = null;
 let userTabDirty = false;
+// A restored generic editor buffer is stale startup state, not proof that the
+// programmer currently owns the editor. Flip this only after real user input
+// so the boot-entry opener can replace old snapshots without overwriting new
+// work typed while the image is loading.
+window._editorStartupBufferDirty = false;
 
 function loadUserTabs() {
     try {
@@ -1728,6 +1733,7 @@ function init() {
     if (asmEd) {
         var _editorAutoSaveTimer = null;
         asmEd.addEventListener('input', function() {
+            window._editorStartupBufferDirty = true;
             updateLineNumbers(); markUserTabDirty(); updateSavePseudoBtn();
             clearTimeout(_editorAutoSaveTimer);
             _editorAutoSaveTimer = setTimeout(saveEditorState, 800);
