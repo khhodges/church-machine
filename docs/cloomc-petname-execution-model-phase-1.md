@@ -1,6 +1,6 @@
 # CLOOMC++ Petname Execution Model — Phase 1
 
-**Status:** Approved architecture; final CALL/LAMBDA bit allocation pending
+**Status:** Approved architecture; proposed CALL/LAMBDA bit allocation pending approval
 **Date:** 2026-09-15  
 **Approved:** 2026-09-15
 **Scope:** Programmer-visible petnames, Church register identity, and symbolic CALL/LAMBDA dispatch
@@ -287,10 +287,130 @@ The final 32-bit encoding must provide:
 - c-list row in indexed mode or source CR in direct mode;
 - method selector in both modes.
 
-The exact bit allocation is intentionally left for approval. The previous
-four-bit row proposal is insufficient for a full c-list, and a design that
-removes or materially reduces the existing method range must not be adopted
-without an explicit architectural decision.
+The previous four-bit row proposal is insufficient for a full c-list.
+
+### 7.4 Proposed common 32-bit format
+
+CALL and LAMBDA use the same top-level field layout:
+
+```text
+ 31          27 26          23 22 21              14 13               0
+┌──────────────┬──────────────┬───┬─────────────────┬──────────────────┐
+│    opcode    │  condition   │ D │    selector     │      detail      │
+│    5 bits    │    4 bits    │1b │     8 bits      │     14 bits      │
+└──────────────┴──────────────┴───┴─────────────────┴──────────────────┘
+```
+
+`D` is the direct-mode bit:
+
+| `D` | Mode | `selector[7:0]` |
+|---:|---|---|
+| 0 | Indexed | unsigned c-list row `0..255`; CR6 is implicit |
+| 1 | Direct | `selector[3:0]` is CR0..CR15; `selector[7:4]` must be zero |
+
+The direct encoding range `D=1, selector[7:4] != 0` is reserved and must
+fault. Requiring the high nibble to be zero gives canonical encodings and
+prevents ignored bits from creating aliases.
+
+This layout provides:
+
+- all 256 possible c-list rows in indexed mode;
+- all 16 capability registers in direct mode;
+- one explicit mode bit;
+- 14 instruction-specific bits;
+- no encoded CR6 field in indexed mode.
+
+The decoder signal should be called `direct_mode`. It is unrelated to the
+processor's virtual M authority.
+
+### 7.5 Proposed CALL encoding
+
+CALL remains opcode 2:
+
+```text
+ 31          27 26          23 22 21              14 13               0
+┌──────────────┬──────────────┬───┬─────────────────┬──────────────────┐
+│  CALL 00010  │  condition   │ D │ row or source CR│ method selector  │
+│    5 bits    │    4 bits    │1b │     8 bits      │     14 bits      │
+└──────────────┴──────────────┴───┴─────────────────┴──────────────────┘
+```
+
+#### Indexed CALL
+
+```text
+D = 0
+selector = caller CR6 c-list row, 0..255
+method = 0..16383
+```
+
+Execution:
+
+```text
+E-GT := virtual-M-read CR6[selector]
+validate E-GT
+enter E-GT at method
+```
+
+#### Direct CALL
+
+```text
+D = 1
+selector[7:4] = 0
+selector[3:0] = source CR, 0..15
+method = 0..16383
+```
+
+Execution:
+
+```text
+E-GT := CR[selector[3:0]]
+validate E-GT
+enter E-GT at method
+```
+
+#### Method field
+
+The 14-bit method selector is defined as:
+
+| Value | Meaning |
+|---:|---|
+| 0 | default/single-entry method |
+| 1..16383 | public method-table slot |
+
+CLOOMC++ resolves `Scheduler.pause` to the Scheduler c-list row and the
+positive public method-table slot for `pause`. The programmer never writes
+either number.
+
+Fourteen method bits retain 16,383 named method-table slots plus the default
+entry. This is preferred over reducing the c-list row to seven bits: an
+abstraction's private vocabulary should retain the complete 8-bit row space.
+
+### 7.6 CALL examples
+
+If `Scheduler` is in caller c-list row 9 and `pause` is public method-table
+slot 3:
+
+```text
+CALL Scheduler.pause
+opcode    = 00010
+condition = AL
+D         = 0
+selector  = 0x09
+method    = 0x0003
+```
+
+If CLOOMC++ already holds Scheduler's E-GT in CR2:
+
+```text
+opcode    = 00010
+condition = AL
+D         = 1
+selector  = 0x02
+method    = 0x0003
+```
+
+These forms have the same authority and method semantics. Only GT resolution
+differs.
 
 ---
 
@@ -315,6 +435,51 @@ that GT directly.
 
 The direct versus indexed choice remains a compiler concern rather than a
 source-language burden.
+
+### 8.3 Proposed LAMBDA encoding
+
+LAMBDA remains opcode 7 and uses the same mode and selector fields:
+
+```text
+ 31          27 26          23 22 21              14 13               0
+┌──────────────┬──────────────┬───┬─────────────────┬──────────────────┐
+│ LAMBDA 00111 │  condition   │ D │ row or source CR│    reserved 0    │
+│    5 bits    │    4 bits    │1b │     8 bits      │     14 bits      │
+└──────────────┴──────────────┴───┴─────────────────┴──────────────────┘
+```
+
+#### Indexed LAMBDA
+
+```text
+D = 0
+selector = caller CR6 c-list row, 0..255
+detail = 0
+```
+
+The processor reads the X-GT internally from implicit CR6 under virtual M,
+validates it, and applies it without modifying CR6 or a general CR.
+
+#### Direct LAMBDA
+
+```text
+D = 1
+selector[7:4] = 0
+selector[3:0] = source CR, 0..15
+detail = 0
+```
+
+The processor validates and applies the X-GT already held in the selected CR.
+
+All nonzero LAMBDA `detail` values are reserved and must fault. They are not
+ignored. This leaves a canonical Phase 1 encoding and preserves 14 bits for a
+future explicitly versioned extension.
+
+### 8.4 Why LAMBDA has no method selector
+
+CALL enters an abstraction and therefore selects one of its public methods.
+LAMBDA applies the code designated by an X-GT directly. It does not perform a
+public abstraction-method dispatch, so its 14-bit detail field is zero in
+Phase 1.
 
 ---
 
