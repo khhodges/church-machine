@@ -33,6 +33,7 @@ const deployAuthorizePos = loader.indexOf("fetch('/api/lumps/deploy-authorize'")
 const authorizeSuccessPos = loader.indexOf("await _actionableJsonResponse(_deployAuth, 'Authorize LUMP deployment'");
 const instantBootPos = loader.indexOf('if (!sim.bootComplete && typeof instantBoot');
 const simulatorLoadPos = loader.indexOf('sim.loadLumpBinary(');
+const authorizationSection = loader.slice(deployAuthorizePos, instantBootPos);
 check('SLCG-4: deploy intent is requested only after explicit confirmation',
     confirmPos >= 0 && deployIntentPos > confirmPos);
 check('SLCG-5: loader validates C-List before simulator mutation',
@@ -48,7 +49,9 @@ check('SLCG-9: legacy synthetic self-seal bypass is absent',
 check('SLCG-10: deploy intent is submitted to the authorization endpoint before load',
     deployAuthorizePos > deployIntentPos && simulatorLoadPos > deployAuthorizePos);
 check('SLCG-11: simulator load occurs only after successful authorization check',
-    authorizeSuccessPos > deployAuthorizePos && simulatorLoadPos > authorizeSuccessPos);
+    authorizeSuccessPos > deployAuthorizePos &&
+    authorizationSection.includes('await _actionableJsonResponse(_deployAuth') &&
+    simulatorLoadPos > authorizeSuccessPos);
 check('SLCG-12: cancellation and authorization failure precede simulator mutation',
     instantBootPos > authorizeSuccessPos && simulatorLoadPos > authorizeSuccessPos);
 
@@ -79,7 +82,9 @@ async function exerciseAuthorization({ status = 200, body = '{"ok":true}', confi
                 ok: status >= 200 && status < 300, status,
                 text: async () => {
                     events.push('body-requested');
-                    return delayed ? pendingBody : body;
+                    const result = delayed ? await pendingBody : body;
+                    events.push('body-resolved');
+                    return result;
                 },
             };
         },
@@ -117,13 +122,20 @@ async function exerciseAuthorization({ status = 200, body = '{"ok":true}', confi
         check(`Runtime: ${label} never boots or loads`, !result.events.includes('boot') && !result.events.includes('load'));
         check(`Runtime: ${label} reports failure or cancels cleanly`,
             options.confirm === false ? result.events.length === 0 && result.alerts.length === 0 : result.alerts.length === 1);
+        check(`Runtime: ${label} does not mutate before authorization response`,
+            options.confirm === false ||
+            (result.events.includes('body-resolved') &&
+                !result.events.includes('boot') &&
+                !result.events.includes('load')));
     }
     const accepted = await exerciseAuthorization({ delayed: true });
     check('Runtime: pending authorization body prevents simulator mutation',
         accepted.beforeRelease.includes('body-requested') &&
+        !accepted.beforeRelease.includes('body-resolved') &&
         !accepted.beforeRelease.includes('boot') && !accepted.beforeRelease.includes('load'));
     check('Runtime: accepted authorization reaches boot then load',
-        accepted.events.indexOf('boot') > accepted.events.indexOf('authorize') &&
+        accepted.events.indexOf('body-resolved') > accepted.events.indexOf('authorize') &&
+        accepted.events.indexOf('boot') > accepted.events.indexOf('body-resolved') &&
         accepted.events.indexOf('load') > accepted.events.indexOf('boot'));
 
     // Mutation sensitivity: demonstrate that removing await would be caught.
@@ -133,7 +145,9 @@ async function exerciseAuthorization({ status = 200, body = '{"ok":true}', confi
         loaderSource: executableLoader.replace('await _actionableJsonResponse(_deployAuth', '_actionableJsonResponse(_deployAuth'),
     });
     check('Harness catches an unawaited authorization regression',
-        unawaited.beforeRelease.includes('boot') && unawaited.beforeRelease.includes('load'));
+        unawaited.beforeRelease.includes('boot') &&
+        unawaited.beforeRelease.includes('load') &&
+        !unawaited.beforeRelease.includes('body-resolved'));
     const bypassed = await exerciseAuthorization({
         body: '{"ok":false}',
         loaderSource: executableLoader.replace(
@@ -141,7 +155,9 @@ async function exerciseAuthorization({ status = 200, body = '{"ok":true}', confi
             '/* deliberately bypassed for test sensitivity */'),
     });
     check('Harness catches a bypassed authorization regression',
-        bypassed.events.includes('boot') && bypassed.events.includes('load'));
+        bypassed.events.includes('boot') &&
+        bypassed.events.includes('load') &&
+        !bypassed.events.includes('body-resolved'));
     console.log(`\n${passed} passed, ${failed} failed`);
     if (failed) process.exitCode = 1;
 })().catch(error => {
