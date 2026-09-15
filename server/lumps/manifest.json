@@ -602,14 +602,14 @@
     "token": "00aa1234",
     "abstraction": "Adder",
     "filename": "Adder.1.e437ee2c.lump",
-    "lump_version": 365,
-    "compiled_at": 1789453753.7528746,
+    "lump_version": 369,
+    "compiled_at": 1789458430.9834328,
     "dot_name": "Adder",
     "issue_n": 1,
     "petname": "",
     "content_profile": 2,
     "output_profile": 2,
     "capabilities": [],
-    "operation_id": "5cc4b9cf3d834c8eb196a47e03664f86"
+    "operation_id": "62c4108237654bcda67c0576ce59b760"
   }
 ]
