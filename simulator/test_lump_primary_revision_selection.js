@@ -80,8 +80,8 @@ assert.strictEqual(
 assert(source.includes('const _primaryLumps = _repositoryPrimaryLumps(lumps)') &&
        source.includes('const name  = lump.dot_name || lump.abstraction ||'),
     'top-level repository groups by canonical dot name and displays it');
-assert(source.includes('_currentRow.archived === true'),
-    'persisted archived selection is repaired on reload');
+assert(source.includes('_primary.token !== _currentToken'),
+    'persisted older-token selection follows the latest active primary revision');
 assert(source.includes('_latestPrimaryLump(lumps, _liveRow.abstraction)') &&
        source.includes('_latestLiveRevision ? _latestLiveRevision.token : _liveToken'),
     'live execution identity selects the latest saved artifact for editor and Run');

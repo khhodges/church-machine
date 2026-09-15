@@ -520,6 +520,9 @@ def test_repair_replaces_unchanged_nonresident_destination(
     assert destination[0]["token"] == "4a070002"
     assert destination[0]["resident"] is True
     assert destination[0]["boot_resident"] is True
+    assert [
+        row for row in rows if row.get("name") == "CapabilityTest"
+    ] == destination
 
 
 def test_repair_plan_fails_closed_when_namespace_changes_before_apply(

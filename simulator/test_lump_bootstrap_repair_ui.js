@@ -84,7 +84,74 @@ vm.runInContext(source.slice(start, end), context);
     assert.ok(list.innerHTML.includes('issue-canonical-bootstrap-identity'));
     assert.match(status.textContent, /additional required corrections/);
     assert.match(status.textContent, /No data was changed/);
-    console.log('PASS fresh server corrections replace stale choices and require explicit reapproval');
+
+    const approvedBoxes = plan.corrections.map(correction => ({
+        checked: true,
+        value: correction.id,
+    }));
+    const successButton = {disabled: false, textContent: ''};
+    const successStatus = {textContent: ''};
+    const successPanel = {
+        dataset: {requiredCount: '2'},
+        querySelector(selector) {
+            if (selector === '.lump-bootstrap-repair-confirm') return successButton;
+            if (selector === '.lump-bootstrap-repair-status') return successStatus;
+            return null;
+        },
+        querySelectorAll(selector) {
+            return selector === '.lump-bootstrap-repair-checkbox:checked'
+                ? approvedBoxes
+                : [];
+        },
+    };
+    const responses = [
+        plan,
+        {intent: 'approved-intent'},
+        {
+            token: '4a000002',
+            abstraction: 'CapabilityTest',
+            lump_version: 27,
+            namespace_slot: 2,
+        },
+    ];
+    let committedToken = null;
+    let openedToken = null;
+    let renderCount = 0;
+    const successContext = {
+        document: {
+            getElementById(id) {
+                return id === 'success-panel' ? successPanel : null;
+            },
+        },
+        fetch: async () => ({ok: true}),
+        _actionableJsonResponse: async () => responses.shift(),
+        _escHtml: context._escHtml,
+        confirm: () => true,
+        _showFpgaToast: () => {},
+        _commitSavedLumpClientState: result => {
+            committedToken = result.token;
+        },
+        _lumpTimelineLoaded: {},
+        _lumpTokenIdentity: value => value,
+        _closeLumpHistoryPreviewModal: () => {},
+        renderLumps: async () => {
+            renderCount += 1;
+        },
+        openLumpInEditor: async token => {
+            openedToken = token;
+        },
+    };
+    vm.createContext(successContext);
+    vm.runInContext(source.slice(start, end), successContext);
+    await successContext._confirmLumpBootstrapRepairs(
+        'success-panel', '4a00000a', 26, 'archive.lump');
+
+    assert.equal(committedToken, '4a000002',
+        'the corrected destination becomes the selected saved LUMP');
+    assert.equal(renderCount, 1, 'the LUMP browser refreshes');
+    assert.equal(openedToken, '4a000002',
+        'the corrected destination source opens in the editor');
+    console.log('PASS fresh corrections require reapproval and a successful repair opens the new live source');
 })().catch(error => {
     console.error(error);
     process.exitCode = 1;

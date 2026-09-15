@@ -3615,9 +3615,23 @@ async function _confirmLumpBootstrapRepairs(repairId, currentToken, version, arc
                 5000
             );
         }
+        const liveToken = result.token || result.destination_token;
+        if (liveToken && typeof _commitSavedLumpClientState === 'function') {
+            _commitSavedLumpClientState(result, {
+                token: liveToken,
+                abstraction: result.abstraction || plan.abstraction,
+                lump_version: liveVersion,
+            }, null);
+        }
         delete _lumpTimelineLoaded[_lumpTokenIdentity(currentToken)];
+        if (liveToken) {
+            delete _lumpTimelineLoaded[_lumpTokenIdentity(liveToken)];
+        }
         _closeLumpHistoryPreviewModal();
         if (typeof renderLumps === 'function') await renderLumps();
+        if (liveToken && typeof openLumpInEditor === 'function') {
+            await openLumpInEditor(liveToken);
+        }
     } catch (err) {
         if (status) {
             status.textContent = /\bNo data was changed\b/.test(err.message)

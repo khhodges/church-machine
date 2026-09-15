@@ -9159,7 +9159,8 @@ def _write_ns_state(entries):
 
 
 def _prepare_saved_lump_ns_state(
-        abstraction, ns_slot, token, filename, issue_n, lump_version):
+        abstraction, ns_slot, token, filename, issue_n, lump_version,
+        replace_abstraction=False):
     """Validate and build a saved artifact's next Namespace state without writing."""
     if not isinstance(ns_slot, int):
         return None
@@ -9176,6 +9177,20 @@ def _prepare_saved_lump_ns_state(
         (row for row in entries
          if isinstance(row, dict) and row.get("slot") == ns_slot),
         None)
+    if replace_abstraction:
+        # A destination-bound bootstrap repair moves one logical abstraction;
+        # it must not leave the superseded source binding active at its old
+        # slot. Preserve the selected destination row so an eligible occupant
+        # can be replaced in place, and remove only same-abstraction rows at
+        # other slots.
+        entries[:] = [
+            row for row in entries
+            if row is entry or not (
+                isinstance(row, dict)
+                and str(row.get("name") or "").casefold()
+                == str(abstraction or "").casefold()
+            )
+        ]
     selftest_rows = [
         row for row in entries
         if isinstance(row, dict) and row.get("name") == "SelfTest"
@@ -11703,7 +11718,8 @@ def save_lump():
         try:
             _prepared_ns_entries = _prepare_saved_lump_ns_state(
                 abs_name, ns_slot, token8, lump_filename, _issue_n_save,
-                next_lump_version)
+                next_lump_version,
+                replace_abstraction=_is_server_bootstrap_history_repair)
             if _prepared_ns_entries is None:
                 raise ValueError("resident save has no Namespace destination")
         except (OSError, ValueError, TypeError, json.JSONDecodeError) as _ns_error:

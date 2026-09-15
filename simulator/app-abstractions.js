@@ -1145,16 +1145,19 @@ async function renderLumps() {
             }
         }
 
-        // A persisted browser selection may point at an archived legacy binary
-        // that shares the same abstraction name as the current approved LUMP.
-        // Archived revisions remain available from the History tab, but must
-        // not silently become the primary editor target after reload.
+        // A persisted browser selection may point at an older token that
+        // shares an abstraction name with a newer active save. This can happen
+        // when a destination-bound correction moves the live artifact to a new
+        // token. History remains available from its own tab, but repository,
+        // editor, and Compile must follow the latest active primary revision.
         if (!_pendingTokenResolved && window.LumpRegistry) {
             const _currentToken = window.LumpRegistry.getCurrent();
             const _currentRow = lumps.find(l => l.token === _currentToken);
-            if (_currentRow && _currentRow.archived === true) {
+            if (_currentRow) {
                 const _primary = _latestPrimaryLump(lumps, _currentRow.abstraction);
-                if (_primary) window.LumpRegistry.setCurrent(_primary.token);
+                if (_primary && _primary.token !== _currentToken) {
+                    window.LumpRegistry.setCurrent(_primary.token);
+                }
             }
         }
 
