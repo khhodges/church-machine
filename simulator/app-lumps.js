@@ -1816,6 +1816,30 @@ function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, 
     if (panel) panel.style.display = 'flex';
 }
 
+// Compilation keeps the recovered/editable source on the left, but replaces
+// immutable saved-binary inspection on the right with the new compiler output.
+// Preserve the open-LUMP identity and draft context so Save Lump still knows
+// which revision is being edited.
+function _showCompilerOutputBesideSource() {
+    if (!window._savedLumpEditorMode) return;
+    window._savedLumpEditorMode = false;
+    var layout = document.querySelector('#editor .editor-layout');
+    var tabs = document.getElementById('codeSidebarTabs');
+    var panel = document.getElementById('savedLumpDisassemblyPanel');
+    if (layout) layout.classList.remove('saved-lump-editor-layout');
+    if (tabs) tabs.style.display = '';
+    if (panel) panel.style.display = 'none';
+    ['codeConsoleContent', 'codeHistoryPanel', 'codeSyntaxPanel', 'codeJsPanel']
+        .forEach(function(id, index) {
+            var el = document.getElementById(id);
+            if (el) el.style.display = index === 0 ? 'flex' : 'none';
+        });
+    if (typeof _syncSavedLumpIdentityVisibility === 'function') {
+        _syncSavedLumpIdentityVisibility();
+    }
+}
+window._showCompilerOutputBesideSource = _showCompilerOutputBesideSource;
+
 function exitSavedLumpEditorMode() {
     // Also invalidate an open that is still awaiting binary/source fetches.
     window._savedLumpOpenRequestId = (window._savedLumpOpenRequestId || 0) + 1;

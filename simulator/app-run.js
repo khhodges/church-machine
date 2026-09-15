@@ -256,6 +256,9 @@ function assembleAndLoad(options) {
     if (!editor) return { ok: false, kind: 'assembly', error: 'The source editor is unavailable.' };
     const source = _assembleOptions.source !== undefined
         ? String(_assembleOptions.source) : editor.value;
+    if (typeof window._showCompilerOutputBesideSource === 'function') {
+        window._showCompilerOutputBesideSource();
+    }
     saveEditorState();
 
     const con = document.getElementById('editorConsole');

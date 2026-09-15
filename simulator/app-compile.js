@@ -1481,6 +1481,9 @@ async function compileAndBuild(options) {
     }
     const source = _compileOptions.source !== undefined
         ? String(_compileOptions.source) : editor.value;
+    if (typeof window._showCompilerOutputBesideSource === 'function') {
+        window._showCompilerOutputBesideSource();
+    }
     const con = document.getElementById('editorConsole');
     if (con) con.className = '';
     switchCodeTab('console');
