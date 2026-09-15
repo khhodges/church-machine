@@ -8296,6 +8296,10 @@ _LUMP_APPROVAL_INTENT_FIELDS = frozenset({
     "abstraction", "author", "version", "release_notes", "history_note",
     "display_name", "documentation", "annotations",
     "pet_name", "pet_names", "grants", "capability_type", "portable_binding",
+    # Saving an older editor snapshot as the newest revision is a distinct
+    # user-approved mode.  Keep it in the approval record rather than
+    # inferring it from the editor base (which is deliberately stale here).
+    "save_as_latest",
 })
 _LUMP_SAVE_OPERATION_ID_RE = re.compile(r"[A-Za-z0-9._:-]{8,128}")
 
@@ -8695,7 +8699,7 @@ def _allocate_new_lump_slot():
 
 def _check_lump_save_plan(plan, *, digest, action, token, filename,
                           consequence, replacement_identity, generation,
-                          consume=False):
+                          save_as_latest=False, consume=False):
     """Validate (and only at mutation time consume) a save plan."""
     plan_id = str(plan or "")
     with _LUMP_SAVE_PLANS_LOCK:
@@ -8712,9 +8716,14 @@ def _check_lump_save_plan(plan, *, digest, action, token, filename,
             "filename": filename, "consequence": consequence,
             "replacement_identity": replacement_identity,
             "generation": generation,
+            # This mode is part of the plan identity.  A commit may not turn
+            # an ordinary plan into a stale-editor latest save (or vice
+            # versa) by changing metadata after approval.
+            "save_as_latest": bool(save_as_latest),
         }
         for key, actual in checks.items():
-            if record[key] != actual:
+            recorded = record.get(key, False) if key == "save_as_latest" else record[key]
+            if recorded != actual:
                 if key == "generation":
                     raise ValueError("save plan is stale: authoritative library changed")
                 raise ValueError(f"save plan {key.replace('_', ' ')} does not match")
@@ -8961,11 +8970,17 @@ def create_lump_approval_intent():
                 return jsonify({"error": "save plan belongs to a different session"}), 403
             if plan["digest"] != digest or plan["action"] != action:
                 return jsonify({"error": "save plan digest or action does not match"}), 403
+            if (supplied.get("save_as_latest") is True) != bool(
+                    plan.get("save_as_latest", False)):
+                return jsonify({
+                    "error": "save-as-latest intent does not match save plan",
+                }), 403
     intent = secrets.token_urlsafe(32)
     with _LUMP_APPROVAL_INTENTS_LOCK:
         _LUMP_APPROVAL_INTENTS[intent] = {
             "session": session_id, "digest": digest, "action": action,
             "approval": dict(supplied), "plan": str(plan_id or ""),
+            "save_as_latest": supplied.get("save_as_latest") is True,
             "expires": time.time() + 300,
         }
     return jsonify({"intent": intent, "digest": digest, "action": action,
@@ -8973,14 +8988,14 @@ def create_lump_approval_intent():
                     "expires_in": 300}), 201
 
 
-def _consume_lump_approval_intent(intent, digest, action, plan=None, consume=True):
+def _consume_lump_approval_intent(intent, digest, action, plan=None, consume=True,
+                                  save_as_latest=False):
     # This process-local lock makes removal atomic among all server threads.
     # Deployments with multiple workers must provide shared process-safe intent
     # storage rather than routing one intent between workers.
     with _LUMP_APPROVAL_INTENTS_LOCK:
         key = str(intent or "")
-        record = (_LUMP_APPROVAL_INTENTS.pop(key, None) if consume
-                  else _LUMP_APPROVAL_INTENTS.get(key))
+        record = _LUMP_APPROVAL_INTENTS.get(key)
         session_id = session.get("_lump_approval_session")
         if (not record or record["expires"] < time.time() or
                 record["session"] != session_id or record["digest"] != digest or
@@ -8988,6 +9003,14 @@ def _consume_lump_approval_intent(intent, digest, action, plan=None, consume=Tru
                 (action in {"save", "replace"}
                  and record.get("plan") != str(plan or ""))):
             raise ValueError("a valid, unexpired session-bound approval intent is required")
+        _recorded_save_as_latest = record.get(
+            "save_as_latest",
+            (record.get("approval") or {}).get("save_as_latest") is True,
+        )
+        if _recorded_save_as_latest != bool(save_as_latest):
+            raise ValueError("save-as-latest intent does not match approval")
+        if consume:
+            _LUMP_APPROVAL_INTENTS.pop(key, None)
         return dict(record["approval"])
 
 
@@ -11604,9 +11627,13 @@ def save_lump():
             f"Details: {_mf_err}"
         )}), 500
 
-    # An editor opened from a saved revision must still be based on the latest
-    # compiled revision of that abstraction. This is checked while holding the
-    # history lock, before a plan is issued or any artifact is changed.
+    # An editor opened from a saved revision normally must still be based on the
+    # latest compiled revision of that abstraction.  Normal Save explicitly
+    # opts into publishing this exact frozen candidate as the newest immutable
+    # revision instead; the plan and one-time approval bind that mode below.
+    # This is checked while holding the history lock, before a plan is issued
+    # or any artifact is changed.
+    _save_as_latest = metadata.get("save_as_latest") is True
     _editor_base = metadata.get("editor_base")
     if _editor_base is not None:
         if not isinstance(_editor_base, dict):
@@ -11658,9 +11685,12 @@ def save_lump():
                 _identity_matches = _editor_base.get("source_hash") == _latest_source_hash
             except (OSError, _struct.error):
                 _identity_matches = False
-        if not _identity_matches and metadata.get("preserve_stale_revision") is not True:
+        if not _identity_matches and not _save_as_latest:
             return jsonify({
-                "error": "A newer saved revision exists. Reload it or explicitly preserve this buffer as a separate revision.",
+                "error": (
+                    "A newer saved revision exists. Reload it or request "
+                    "an explicit save-as-latest plan for this frozen buffer."
+                ),
                 "stale_editor_base": True,
                 "latest": {
                     "token": (_latest_entry or {}).get("token"),
@@ -11847,6 +11877,7 @@ def save_lump():
         if (token8 != _early_plan.get("token")
                 or ns_slot != _early_plan.get("ns_slot")
                 or _binary_hash != _early_plan.get("digest")
+                or bool(_early_plan.get("save_as_latest", False)) != _save_as_latest
                 or list(_sl_words) != _early_plan.get("final_binary")):
             return jsonify({
                 "error": "server-finalized save plan no longer matches this candidate",
@@ -11869,6 +11900,7 @@ def save_lump():
                 "consequence": _plan_consequence,
                 "replacement_identity": _replacement_identity,
                 "generation": _library_generation, "expires": time.time() + 300,
+                "save_as_latest": _save_as_latest,
                 # The output of canonicalisation is the approved artifact.  The
                 # commit endpoint accepts only these words, not a browser
                 # reconstruction that happened to share an earlier digest.
@@ -11886,6 +11918,7 @@ def save_lump():
             "candidate_id": _candidate_id,
             "action": _approval_action,
             "destination": lump_filename, "consequence": _plan_consequence,
+            "save_as_latest": _save_as_latest,
             "replacement_identity": _replacement_identity,
             "current_lump": ({
                 "abstraction": (_destination_entry.get("abstraction")
@@ -11909,10 +11942,11 @@ def save_lump():
                 action=_approval_action, token=token8, filename=lump_filename,
                 consequence=_plan_consequence,
                 replacement_identity=_replacement_identity,
-                generation=_library_generation, consume=False)
+                generation=_library_generation,
+                save_as_latest=_save_as_latest, consume=False)
         _intent_approval = _consume_lump_approval_intent(
             metadata.get("approval_intent"), _binary_hash, _approval_action,
-            _save_plan_id, consume=False)
+            _save_plan_id, consume=False, save_as_latest=_save_as_latest)
     except ValueError as _intent_error:
         _save_lump_diagnostic_event(
             stage="Confirm", event="rejection", outcome="rejected",
@@ -12042,6 +12076,7 @@ def save_lump():
         "compiled_at": _compiled_at,
         "binary_hash": _binary_hash,
         "digest": _binary_hash,
+        "save_as_latest": _save_as_latest,
         "ns_slot": ns_slot,
         "candidate_id": _candidate_id,
         # Immutable finalized words are stored with the durable operation, not
@@ -12120,10 +12155,11 @@ def save_lump():
                 action=_approval_action, token=token8, filename=lump_filename,
                 consequence=_plan_consequence,
                 replacement_identity=_replacement_identity,
-                generation=_library_generation, consume=True)
+                generation=_library_generation,
+                save_as_latest=_save_as_latest, consume=True)
         _consume_lump_approval_intent(
             metadata.get("approval_intent"), _binary_hash, _approval_action,
-            _save_plan_id, consume=True)
+            _save_plan_id, consume=True, save_as_latest=_save_as_latest)
     except ValueError as _intent_error:
         _save_lump_diagnostic_event(
             stage="Confirm", event="rejection", outcome="rejected",

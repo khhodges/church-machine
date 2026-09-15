@@ -35,9 +35,13 @@ function makeFlow(choice, options = {}) {
     let planCalls = 0;
     let approvalCalls = 0;
     let openCalls = 0;
+    let chooserCalls = 0;
     const window = {
         confirm: () => true,
-        _showLumpSaveStaleConflictDialog: () => choice,
+        _showLumpSaveStaleConflictDialog: () => {
+            chooserCalls++;
+            return choice;
+        },
         _saveNSPreparedSnapshot: { candidate: 'old' },
         _pendingLumpData: { binary: [11, 22], sourceText: 'old source' },
     };
@@ -50,6 +54,7 @@ function makeFlow(choice, options = {}) {
             source_hash: 'old-source',
             abstraction: 'SelfTest',
         },
+        ...(options.saveAsLatest ? { save_as_latest: true } : {}),
     };
     const context = {
         console,
@@ -71,6 +76,7 @@ function makeFlow(choice, options = {}) {
                 plan_id: 'plan-' + planCalls,
                 action: 'save',
                 consequence: 'create',
+                save_as_latest: plannedMetadata.save_as_latest === true,
                 final_binary: words.slice(),
             };
         },
@@ -91,7 +97,9 @@ function makeFlow(choice, options = {}) {
         context
     );
     return { context, metadata, requests, get planCalls() { return planCalls; },
-        get approvalCalls() { return approvalCalls; }, get openCalls() { return openCalls; } };
+        get approvalCalls() { return approvalCalls; },
+        get openCalls() { return openCalls; },
+        get chooserCalls() { return chooserCalls; } };
 }
 
 (async () => {
@@ -112,12 +120,12 @@ function makeFlow(choice, options = {}) {
         const words = [11, 22];
         const result = await flow.context.confirm(words, flow.metadata, 'save');
         assert.strictEqual(result.status, 'approved');
-        assert.strictEqual(result.outcome, 'preserve');
+        assert.strictEqual(result.outcome, 'save-as-latest');
         assert.strictEqual(flow.planCalls, 2);
         assert.strictEqual(flow.approvalCalls, 1);
-        assert.strictEqual(flow.requests[1].metadata.preserve_stale_revision, true);
+        assert.strictEqual(flow.requests[1].metadata.save_as_latest, true);
         assert.deepStrictEqual(flow.requests[1].words, [11, 22]);
-        assert.strictEqual(flow.metadata.preserve_stale_revision, true);
+        assert.strictEqual(flow.metadata.save_as_latest, true);
     }
 
     {
@@ -139,6 +147,22 @@ function makeFlow(choice, options = {}) {
         assert.strictEqual(flow.approvalCalls, 0);
         assert.strictEqual(flow.context.window._saveNSPreparedSnapshot, null);
         assert.strictEqual(flow.context.window._pendingLumpData, null);
+    }
+
+    {
+        const flow = makeFlow('reload', { saveAsLatest: true });
+        let rejected = false;
+        try {
+            await flow.context.confirm([11, 22], flow.metadata, 'save');
+        } catch (error) {
+            rejected = true;
+            assert.strictEqual(error.response.stale_editor_base, true);
+        }
+        assert.strictEqual(rejected, true);
+        assert.strictEqual(flow.planCalls, 1);
+        assert.strictEqual(flow.approvalCalls, 0);
+        assert.strictEqual(flow.chooserCalls, 0);
+        assert.strictEqual(flow.openCalls, 0);
     }
 
     {

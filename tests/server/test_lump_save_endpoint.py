@@ -119,7 +119,8 @@ def isolated_lumps(tmp_path, monkeypatch):
 
 
 def _approved_payload(client, words, token="7c501001", name="LumpSaveTest",
-                      submitted_source=None):
+                      submitted_source=None, save_as_latest=False,
+                      editor_base=None):
     identity = hashlib.sha256(f"{name}#1".encode()).hexdigest()
     words[-1] = 0x0A000000 | (int(identity[:8], 16) & 0x1FFFFFF)
     candidate = {
@@ -129,6 +130,8 @@ def _approved_payload(client, words, token="7c501001", name="LumpSaveTest",
             "language": "assembly", "ns_slot": None, "capabilities": [],
             "methods": [], "grants": ["E"],
             "submitted_source": submitted_source,
+            "save_as_latest": save_as_latest,
+            **({"editor_base": editor_base} if editor_base is not None else {}),
         },
     }
     plan_response = client.post("/api/lumps/save-plan", json=candidate)
@@ -142,7 +145,10 @@ def _approved_payload(client, words, token="7c501001", name="LumpSaveTest",
         "action": plan["action"],
         "plan_id": plan["plan_id"],
         "confirmation": True,
-        "approval": {"grants": ["E"], "capability_type": "inform"},
+        "approval": {
+            "grants": ["E"], "capability_type": "inform",
+            **({"save_as_latest": True} if save_as_latest else {}),
+        },
     })
     assert issued.status_code == 201
     return {
@@ -152,6 +158,8 @@ def _approved_payload(client, words, token="7c501001", name="LumpSaveTest",
             "language": "assembly", "ns_slot": None, "capabilities": [],
             "methods": [], "grants": ["E"],
             "submitted_source": submitted_source,
+            "save_as_latest": save_as_latest,
+            **({"editor_base": editor_base} if editor_base is not None else {}),
             "save_plan_id": plan["plan_id"],
             "approval_intent": issued.get_json()["intent"],
         },
@@ -313,9 +321,19 @@ def test_plan_binds_hash_and_token_even_for_same_abstraction(isolated_lumps):
 def test_plan_rejects_authoritative_library_mutation(isolated_lumps):
     with app_module.app.test_client() as client:
         # Establish a valid replacement destination.
-        assert client.post("/api/lumps/save", json=_approved_payload(
-            client, _words(marker=20), token="7c501020")).status_code == 200
-        payload = _approved_payload(client, _words(marker=21), token="7c501020")
+        first = client.post("/api/lumps/save", json=_approved_payload(
+            client, _words(marker=20), token="7c501020"))
+        assert first.status_code == 200
+        first_saved = first.get_json()
+        base = {
+            "token": first_saved["token"],
+            "compiled_at": first_saved["compiled_at"],
+            "source_hash": None,
+            "abstraction": "LumpSaveTest",
+        }
+        payload = _approved_payload(
+            client, _words(marker=21), token="7c501020",
+            save_as_latest=True, editor_base=base)
         manifest = json.loads((isolated_lumps / "manifest.json").read_text())
         (isolated_lumps / manifest[0]["filename"]).write_bytes(_raw(_words(marker=22)))
         response = client.post("/api/lumps/save", json=payload)
@@ -342,7 +360,7 @@ def test_same_abstraction_new_token_is_server_authored_create(isolated_lumps):
     assert plan["current_lump"] is None
 
 
-def test_stale_editor_base_is_blocked_or_explicitly_preserved(isolated_lumps):
+def test_stale_editor_base_requires_explicit_latest_intent(isolated_lumps):
     with app_module.app.test_client() as client:
         first = client.post("/api/lumps/save", json=_approved_payload(
             client, _words(marker=32), token="7c501032"))
@@ -356,13 +374,20 @@ def test_stale_editor_base_is_blocked_or_explicitly_preserved(isolated_lumps):
         }
 
         second = client.post("/api/lumps/save", json=_approved_payload(
-            client, _words(marker=33), token="7c501033"))
+            client, _words(marker=33), token="7c501032"))
         assert second.status_code == 200
+        manifest_before_latest = json.loads(
+            (isolated_lumps / "manifest.json").read_text())
+        historical_bytes_before = {
+            row["filename"]: (isolated_lumps / row["filename"]).read_bytes()
+            for row in manifest_before_latest
+            if row.get("archived") is True
+        }
 
         stale_candidate = {
             "binary": _words(marker=34),
             "metadata": {
-                "token": "7c501034",
+                "token": "7c501032",
                 "abstraction": "LumpSaveTest",
                 "content_type": "code",
                 "language": "assembly",
@@ -374,12 +399,38 @@ def test_stale_editor_base_is_blocked_or_explicitly_preserved(isolated_lumps):
         blocked = client.post("/api/lumps/save-plan", json=stale_candidate)
         assert blocked.status_code == 409
         assert blocked.get_json()["stale_editor_base"] is True
-        assert blocked.get_json()["latest"]["token"] == "7c501033"
+        assert blocked.get_json()["latest"]["token"] == "7c501032"
 
-        stale_candidate["metadata"]["preserve_stale_revision"] = True
-        preserved = client.post("/api/lumps/save-plan", json=stale_candidate)
-        assert preserved.status_code == 201
-        assert preserved.get_json()["consequence"] == "create"
+        stale_candidate["metadata"]["save_as_latest"] = True
+        planned = client.post("/api/lumps/save-plan", json=stale_candidate)
+        assert planned.status_code == 201
+        plan = planned.get_json()
+        assert plan["consequence"] == "replace"
+        assert plan["save_as_latest"] is True
+        issued = client.post("/api/lumps/approval-intent", json={
+            "digest": plan["digest"],
+            "action": plan["action"],
+            "plan_id": plan["plan_id"],
+            "confirmation": True,
+            "approval": {"save_as_latest": True},
+        })
+        assert issued.status_code == 201
+        commit = client.post("/api/lumps/save", json={
+            "binary": plan["final_binary"],
+            "metadata": dict(
+                stale_candidate["metadata"],
+                save_plan_id=plan["plan_id"],
+                approval_intent=issued.get_json()["intent"],
+            ),
+        })
+        assert commit.status_code == 200, commit.get_data(as_text=True)
+        latest = commit.get_json()
+        assert latest["lump_version"] > first_saved["lump_version"]
+        history = client.get(f"/api/lumps/{latest['token']}/history")
+        assert history.status_code == 200
+        assert len(history.get_json()["history"]) >= 3
+        for filename, original_bytes in historical_bytes_before.items():
+            assert (isolated_lumps / filename).read_bytes() == original_bytes
 
 
 def test_submitted_source_must_match_embedded_source(isolated_lumps):

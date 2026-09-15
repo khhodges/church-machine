@@ -27,14 +27,19 @@ closed as a plan mismatch.
 approval intent, and use that immutable binary for the commit and any safe
 retry.
 
-Stale-revision resolution must distinguish reload, preservation, deliberate
-cancellation, and reload failure; a shared empty result is not a cancellation.
-Freeze the editor's base revision alongside its compiled snapshot.
+Normal Save is an explicit `save_as_latest` intent: freeze the editor's base
+revision alongside its compiled snapshot and submit both to the server.  An
+older base is allowed to publish that exact candidate as the newest immutable
+revision of the selected abstraction; it must not trigger a reload/preserve
+dialog.  New Entry remains an explicit Namespace choice.
 
 **Why:** Reload and cancellation used to share a return value, falsely blaming
-the user for cancelling; live editor identity could also describe a different
-revision from the compiled candidate.
+the user for cancelling.  The corrected rule distinguishes an intentionally
+stale editor base from a changed compiler/editor pair, while retaining
+authoritative catalog-generation checks for an already approved plan.
 
 **How to apply:** Keep explicit outcomes through every caller, retire the old
-save candidate on successful reload, and preserve stale-revision checks when
-offering a separately saved revision.
+save candidate on successful reload.  Bind `save_as_latest` into the
+server-issued save plan, one-time approval intent, and atomic commit; never
+remove `editor_base`, bypass binary/capability/Namespace/permission checks, or
+silently reload mutable editor text.

@@ -8475,7 +8475,7 @@ function _lumpBinaryInspection(payload) {
 const _LUMP_APPROVAL_FIELDS = new Set([
     'abstraction', 'author', 'version', 'release_notes', 'history_note',
     'display_name', 'documentation', 'annotations', 'pet_name', 'pet_names',
-    'grants', 'capability_type', 'portable_binding'
+    'grants', 'capability_type', 'portable_binding', 'save_as_latest'
 ]);
 
 function _lumpApprovalView(metadata) {
@@ -8589,6 +8589,9 @@ async function _requestLumpSavePlan(words, metadata) {
             (result.consequence !== 'create' && result.consequence !== 'replace') ||
             !Array.isArray(finalBinary) || finalBinary.length < 2 ||
             String(result.digest || '').toLowerCase() !== finalDigest ||
+            (metadata &&
+                (metadata.save_as_latest === true) !==
+                (result.save_as_latest === true)) ||
             (metadata && metadata.new_entry === true &&
                 (!Number.isInteger(Number(finalSlot)) || Number(finalSlot) < 0))) {
             const error = new Error((result && result.error) || 'Invalid save-plan response');
@@ -8654,6 +8657,11 @@ async function _requestLumpApprovalIntent(words, action, metadata, savePlan) {
     }
     if (savePlan && action !== savePlan.action) {
         throw new Error('Approval action does not match save plan');
+    }
+    if (savePlan &&
+            (metadata && metadata.save_as_latest === true) !==
+            (savePlan.save_as_latest === true)) {
+        throw new Error('Save-as-latest intent does not match save plan');
     }
     const resp = await fetch('/api/lumps/approval-intent', {
         method: 'POST',
@@ -8783,8 +8791,8 @@ async function _confirmLumpSavePlan(words, metadata, prompt, options) {
     const _wordsSnapshot = Array.isArray(words) ? words.slice() : words;
     // Metadata can carry editor_base and submitted_source, which are part of
     // the same immutable candidate.  Use a JSON-safe copy for both plan and
-    // intent requests; copy the deliberate preserve flag back to the caller
-    // below because commit callers use their original metadata object.
+    // intent requests; copy the deliberate save-as-latest choice back to the
+    // caller below because commit callers use their original metadata object.
     let _metadataSnapshot = {};
     try {
         _metadataSnapshot = metadata && typeof metadata === 'object'
@@ -8798,6 +8806,11 @@ async function _confirmLumpSavePlan(words, metadata, prompt, options) {
     } catch (error) {
         const conflict = error && error.response && error.response.stale_editor_base;
         if (!conflict) throw error;
+        // Normal Save has already made the programmer's intent explicit.  Do
+        // not reinterpret that deliberate latest-revision request as a
+        // reload/preserve/cancel choice if an older server still reports the
+        // legacy stale-editor response; surface the typed failure instead.
+        if (_metadataSnapshot.save_as_latest === true) throw error;
         const latest = error.response.latest || {};
         const action = typeof _lumpSaveStaleConflictAction === 'function'
             ? await _lumpSaveStaleConflictAction(
@@ -8877,8 +8890,11 @@ async function _confirmLumpSavePlan(words, metadata, prompt, options) {
                 reason: 'keep-editing',
             };
         }
-        metadata.preserve_stale_revision = true;
-        _metadataSnapshot.preserve_stale_revision = true;
+        // The explicit user choice to publish this older candidate now uses
+        // the same server-bound intent as Normal Save.  Do not revive the
+        // legacy preserve_stale_revision bypass.
+        metadata.save_as_latest = true;
+        _metadataSnapshot.save_as_latest = true;
         plan = await _requestLumpSavePlan(_wordsSnapshot, _metadataSnapshot);
     }
     const message = typeof prompt === 'function' ? prompt(plan) : String(prompt || '');
@@ -8922,8 +8938,9 @@ async function _confirmLumpSavePlan(words, metadata, prompt, options) {
     }
     return {
         status: 'approved',
-        outcome: metadata && metadata.preserve_stale_revision === true
-            ? 'preserve' : 'approved',
+        outcome: metadata && metadata.save_as_latest === true
+            ? 'save-as-latest'
+            : 'approved',
         plan,
         intent,
         final_binary: finalBinary.slice(),

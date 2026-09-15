@@ -125,6 +125,10 @@ if (!source.includes('original_source: _saveSnapshot') ||
     !source.includes('original_binary: _svBinary.slice()')) {
     throw new Error('API-only save path does not retain original compiler source/binary');
 }
+if (!source.includes('save_as_latest: true') ||
+    !source.includes('editor_base: (_saveSnapshot && _saveSnapshot.editorBaseIdentity)')) {
+    throw new Error('normal Save did not submit the frozen latest-revision intent/base');
+}
 const compileSource = fs.readFileSync(path.join(__dirname, 'app-compile.js'), 'utf8');
 const memorySource = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
 if (!compileSource.includes('original_source: source') ||

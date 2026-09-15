@@ -16345,6 +16345,12 @@ async function confirmSaveToNamespace() {
                 // from the verified SELF row for an existing resident binding.
                 token:        _svTok || undefined,
                 editor_base: (_saveSnapshot && _saveSnapshot.editorBaseIdentity) || undefined,
+                // Normal Save deliberately publishes this frozen candidate as
+                // the newest immutable revision, even when editor_base is an
+                // older saved revision.  The server binds this intent to the
+                // save plan and one-time approval; it does not relax any
+                // binary, Namespace, capability, or permission validation.
+                save_as_latest: true,
                 submitted_source: _submittedSource,
                 source_required: typeof _submittedSource === 'string' &&
                     _submittedSource.trim().length > 0,
