@@ -126,7 +126,28 @@ def isolated_boot_lumps(tmp_path_factory):
     # The checked-in LUMP library is historical evidence and deliberately is
     # not migrated in place.  Prepare the isolated execution fixture with the
     # explicit immutable bootstrap bindings required by the boot contract.
-    bootstrap_tokens = {6: "4a000006", 7: "4a000007", 10: "4a00000a"}
+    marker_rows = [
+        row for row in state.get("abstractions", [])
+        if isinstance(row, dict) and row.get("boot") is True
+    ]
+    assert len(marker_rows) == 1, "ns-state.json must have one boot:true row"
+    marker_row = marker_rows[0]
+    marker_slot = marker_row["slot"]
+    # SelfTest and WukongCallHome are architectural bootstrap identities.
+    # The third resident is the Namespace marker identity; its slot and token
+    # are deliberately taken from rich Namespace state, not a catalog index.
+    bootstrap_tokens = {}
+    for row in state.get("abstractions", []):
+        if not isinstance(row, dict):
+            continue
+        if row.get("name") == "SelfTest":
+            bootstrap_tokens[row["slot"]] = row.get("token") or "4a000006"
+        elif row.get("name") == "WukongCallHome":
+            bootstrap_tokens[row["slot"]] = row.get("token") or "4a000007"
+        elif row is marker_row:
+            bootstrap_tokens[row["slot"]] = (
+                row.get("token") or f"4a{row['slot']:06x}"
+            )
     for row in state.get("abstractions", []):
         if not isinstance(row, dict) or row.get("slot") not in bootstrap_tokens:
             continue
@@ -161,7 +182,10 @@ def isolated_boot_lumps(tmp_path_factory):
         and row.get("load_policy") == "Resident"
     ]
     assert {(row.get("name"), row.get("slot")) for row in frozen} == {
-        ("SelfTest", 6), ("WukongCallHome", 7), ("CapabilityTest", 10)
+        (row.get("name"), row.get("slot"))
+        for row in state.get("abstractions", [])
+        if isinstance(row, dict)
+        and row.get("slot") in bootstrap_tokens
     }
     for row in frozen:
         filename = row["filename"]

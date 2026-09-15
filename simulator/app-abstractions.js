@@ -667,14 +667,12 @@ function _inspectBootEntryBinding() {
 }
 
 function _commitPreparedBootEntry(slot, prepared) {
-    // Persistence is the first UI commit. If it fails, the caller rolls the
-    // core transaction back before any browser selection/status is changed.
+    // The server Namespace transaction is the plan commit.  This function only
+    // applies the already-accepted image/runtime projection locally.
     const previousSlot = bootEntrySlot;
     const previousPreparation = _bootEntryPreparation;
     const previousRevision = _bootEntrySelectionRevision;
-    const previousStored = localStorage.getItem('bootEntrySlot');
     try {
-        localStorage.setItem('bootEntrySlot', String(slot));
         bootEntrySlot = slot;
         _bootEntrySelectionRevision++;
         _syncSelfTestNextGtToBootEntry(slot);
@@ -693,13 +691,10 @@ function _commitPreparedBootEntry(slot, prepared) {
         bootEntrySlot = previousSlot;
         _bootEntryPreparation = previousPreparation;
         _bootEntrySelectionRevision = previousRevision;
-        try {
-            if (previousStored === null) localStorage.removeItem('bootEntrySlot');
-            else localStorage.setItem('bootEntrySlot', previousStored);
-        } catch (_) {}
         throw error;
     }
 }
+
 window._commitPreparedBootEntry = _commitPreparedBootEntry;
 
 function setBootEntrySlot(idx, ev) {
@@ -745,6 +740,21 @@ function setBootEntrySlot(idx, ev) {
         // A successful core preparation requires valid Thread geometry, so this
         // only affects an already-invalid image and will be reported by core.
     }
+    const restoreRollback = function() {
+        if (!rollback) return;
+        if (rollback.homeAddress !== null && rollback.homeWord !== null &&
+                sim.memory && rollback.homeAddress < sim.memory.length) {
+            sim.memory[rollback.homeAddress] = rollback.homeWord;
+        }
+        if (rollback.headerWord !== null && sim.memory && sim.memory.length > 4) {
+            sim.memory[4] = rollback.headerWord;
+        }
+        sim.bootEntrySlot = rollback.bootEntrySlot;
+        if (rollback.demoClist) {
+            if (rollback.demoNextPresent) rollback.demoClist[1] = rollback.demoNext;
+            else delete rollback.demoClist[1];
+        }
+    };
     let prepared;
     try {
         prepared = sim.prepareBootEntry(idx);
@@ -757,23 +767,36 @@ function setBootEntrySlot(idx, ev) {
         renderAbstractions();
         return false;
     }
+    // Move the canonical Namespace marker through the server transaction.
+    // Browser/runtime state is not committed until that plan mutation is
+    // accepted.  Test/offline callers without fetch retain the local
+    // preparation compatibility path.
+    if (typeof fetch === 'function') {
+        fetch('/api/namespace/boot-marker', {
+            method: 'POST',
+            headers: Object.assign({'Content-Type': 'application/json'},
+                (window.BuildApprovalView && window.BuildApprovalView._authHeaders
+                    ? window.BuildApprovalView._authHeaders() : {})),
+            body: JSON.stringify({slot: idx}),
+        }).then(function(response) {
+            return response.json().then(function(body) {
+                if (!response.ok || !body || body.ok === false) {
+                    throw new Error(body && body.error || 'Namespace boot plan was rejected');
+                }
+                _commitPreparedBootEntry(idx, prepared);
+            });
+        }).catch(function(error) {
+            restoreRollback();
+            _setBootEntryPreparation(idx, 'error',
+                'Selection was not saved: ' + _bootEntryMessage(error, 'Namespace plan update failed.'));
+            try { renderAbstractions(); } catch (_) {}
+        });
+        return true;
+    }
     try {
         _commitPreparedBootEntry(idx, prepared);
     } catch (error) {
-        if (rollback) {
-            if (rollback.homeAddress !== null && rollback.homeWord !== null &&
-                    sim.memory && rollback.homeAddress < sim.memory.length) {
-                sim.memory[rollback.homeAddress] = rollback.homeWord;
-            }
-            if (rollback.headerWord !== null && sim.memory && sim.memory.length > 4) {
-                sim.memory[4] = rollback.headerWord;
-            }
-            sim.bootEntrySlot = rollback.bootEntrySlot;
-            if (rollback.demoClist) {
-                if (rollback.demoNextPresent) rollback.demoClist[1] = rollback.demoNext;
-                else delete rollback.demoClist[1];
-            }
-        }
+        restoreRollback();
         _setBootEntryPreparation(idx, 'error',
             'Selection was not saved: browser storage rejected the prepared transaction; simulator state was restored. ' +
             _bootEntryMessage(error, ''));

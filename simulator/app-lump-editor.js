@@ -315,22 +315,12 @@
         return fetch('/api/boot-config')
         .then(function(r) { return r.json(); })
         .then(function(current) {
-            var selected = parseInt(localStorage.getItem('bootEntrySlot'), 10);
-            var preparedUi = (typeof window !== 'undefined' && window.BootEntryUI &&
-                typeof window.BootEntryUI.get === 'function') ? window.BootEntryUI.get() : null;
-            // Persist only an explicitly prepared browser selection or an
-            // explicit Save prepared selection. Do not turn a geometry/policy
-            // edit into a boot-target repair for an unprepared/stale image.
-            var bootEntrySlot = preparedUi && preparedUi.status === 'prepared' &&
-                Number.isInteger(selected) && selected >= 0
-                ? selected : null;
             var merged = {
                 targetBoard: s1payload.targetBoard,
                 step1:       s1payload.step1,
                 step2:       (current && current.config && current.config.step2) || { lumps: [] },
                 step3:       (current && current.config && current.config.step3) || { emptySlotCount: 0 }
             };
-            if (bootEntrySlot !== null) merged.bootEntrySlot = bootEntrySlot;
             return fetch('/api/boot-config', {
                 method:  'POST',
                 headers: Object.assign({'Content-Type': 'application/json'},
@@ -645,8 +635,7 @@
 
         // Boot entry controls remain available, but the resident summary above
         // is the user-facing source/build/deployment model.
-        var bootSlot = parseInt(localStorage.getItem('bootEntrySlot'), 10);
-        if (!Number.isFinite(bootSlot) || bootSlot < 0) bootSlot = _rl.bootEntrySlot;
+        var bootSlot = Number.isInteger(_rl.bootEntrySlot) ? _rl.bootEntrySlot : null;
         var bootCatEntry = null;
         for (var bi = 0; bi < _rl.catalog.length; bi++) {
             if (_rl.catalog[bi].nsSlot === bootSlot) { bootCatEntry = _rl.catalog[bi]; break; }
@@ -1562,13 +1551,9 @@
                     shapeFaults.push('Thread CR0 boot-entry capability at +' + (_thr.capsOffset || 244) + ' is a Null GT \u2014 boot cannot dispatch');
                 } else {
                     var _cr0 = _decodeGTWord(_thr.cr0Word >>> 0);
-                    var _apprBoot = parseInt(localStorage.getItem('bootEntrySlot'), 10);
                     if (typeof _thr.bootSlot === 'number' && _cr0.slot !== _thr.bootSlot) {
                         shapeFaults.push('Thread CR0 targets NS slot ' + _cr0.slot +
                             ' but the committed boot-entry sentinel says slot ' + _thr.bootSlot);
-                    } else if (!isNaN(_apprBoot) && _cr0.slot !== _apprBoot) {
-                        shapeFaults.push('Thread CR0 targets NS slot ' + _cr0.slot +
-                            '; the selected boot entry is slot ' + _apprBoot);
                     }
                 }
             } else if (committed.header && committed.header.kind === 'thread' && committed.header.typ !== 2) {
@@ -1922,11 +1907,9 @@
         var p = _getStep1Payload();
         var payload = {
             targetBoard: p.targetBoard,
-            bootEntrySlot: (function () {
-                var selected = parseInt(localStorage.getItem('bootEntrySlot'), 10);
-                return Number.isInteger(selected) && selected >= 0
-                    ? selected : _rl.bootEntrySlot;
-            }()),
+            // Compatibility projection only; Namespace boot:true remains
+            // authoritative and the server rejects disagreement.
+            bootEntrySlot: _rl.bootEntrySlot,
             step1:       p.step1,
             step2:       { lumps: step2Lumps },
             step3:       { emptySlotCount: _rl.emptySlotCount || 0 }

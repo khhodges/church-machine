@@ -226,7 +226,23 @@ def validate_resident_boot_profile(rows, profile_name=RESIDENT_BOOT_PROFILE_NAME
         **RESIDENT_BOOT_PROFILE["devices"],
         **{slot: name for name, slot in RESIDENT_BOOT_PROFILE["residents"].items()},
     }
-    missing = [slot for slot in RESIDENT_BOOT_PROFILE["core_slots"]
+    # The Namespace plan may deliberately deploy CapabilityTest at a slot
+    # different from its catalog index.  Its live boot marker and row identity
+    # are authoritative; the historical profile slot is only a compatibility
+    # projection.
+    _marked_rows = [row for row in rows if row.get("boot") is True
+                    and row.get("archived") is not True]
+    _marked_slot = _marked_rows[0].get("slot") if len(_marked_rows) == 1 else None
+    if (_marked_slot is not None
+            and by_slot.get(_marked_slot, {}).get("name") == "CapabilityTest"
+            and _marked_slot != CAPABILITY_TEST_NS_SLOT):
+        expected.pop(CAPABILITY_TEST_NS_SLOT, None)
+        expected[_marked_slot] = "CapabilityTest"
+    required_slots = set(RESIDENT_BOOT_PROFILE["core_slots"])
+    if _marked_slot is not None and _marked_slot != CAPABILITY_TEST_NS_SLOT:
+        required_slots.discard(CAPABILITY_TEST_NS_SLOT)
+        required_slots.add(_marked_slot)
+    missing = [slot for slot in sorted(required_slots)
                if slot not in by_slot]
     if missing:
         raise ValueError(
@@ -241,7 +257,10 @@ def validate_resident_boot_profile(rows, profile_name=RESIDENT_BOOT_PROFILE_NAME
         raise ValueError("resident boot profile name/slot mismatch: " + "; ".join(wrong))
 
     resident_names = set()
-    for name, slot in RESIDENT_BOOT_PROFILE["residents"].items():
+    resident_slots = dict(RESIDENT_BOOT_PROFILE["residents"])
+    if _marked_slot is not None and _marked_slot != CAPABILITY_TEST_NS_SLOT:
+        resident_slots["CapabilityTest"] = _marked_slot
+    for name, slot in resident_slots.items():
         row = by_slot[slot]
         if (row.get("resident") is not True
                 or row.get("boot_resident") is not True
@@ -812,7 +831,8 @@ def _encoded_thread_count(words, slots):
 
 # ----- pre-flight validator --------------------------------------------------
 
-def validate_boot_image(image_bytes, total_namespace_words=None):
+def validate_boot_image(image_bytes, total_namespace_words=None,
+                        mandatory_slots=None):
     """Inspect the NS table inside a boot image and raise ValueError early.
 
     Checks that the format-version tag at mem[ns_table_base - 1] equals
@@ -857,7 +877,20 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
     ns_table_base = physical["table_base"]
     ns_table_reserve = physical["table_words"]
 
-    for slot in _MANDATORY_NS_SLOTS:
+    if mandatory_slots is None:
+        required_slots = list(_MANDATORY_NS_SLOTS)
+        # CapabilityTest's historical catalog index is not a second authority.
+        # A Namespace plan may move it to the marked boot slot, leaving the
+        # old catalog slot intentionally empty.
+        _legacy_cap_base = n_words - (CAPABILITY_TEST_NS_SLOT + 1) * NS_ENTRY_WORDS
+        if (physical["boot_slot"] != CAPABILITY_TEST_NS_SLOT
+                and _legacy_cap_base >= 0
+                and words[_legacy_cap_base] == 0
+                and words[_legacy_cap_base + 1] == 0):
+            required_slots.remove(CAPABILITY_TEST_NS_SLOT)
+    else:
+        required_slots = list(mandatory_slots)
+    for slot in required_slots:
         base = n_words - (slot + 1) * NS_ENTRY_WORDS
         if base + 1 >= n_words:
             raise ValueError(
@@ -2063,6 +2096,16 @@ def _load_boot_resident_entries(manifest_path, selected_by_slot=None,
             profile_name,
         )
         profile_slots = set(RESIDENT_BOOT_PROFILE["residents"].values())
+        _marked = next(
+            (row for row in (state.get("abstractions", [])
+                             if isinstance(state, dict) else [])
+             if isinstance(row, dict) and row.get("boot") is True
+             and row.get("archived") is not True),
+            None)
+        if (_marked and _marked.get("name") == "CapabilityTest"
+                and _marked.get("slot") != CAPABILITY_TEST_NS_SLOT):
+            profile_slots.discard(CAPABILITY_TEST_NS_SLOT)
+            profile_slots.add(_marked["slot"])
         for slot in sorted(profile_slots):
             row = profile_rows[slot]
             out.append((
@@ -2304,6 +2347,40 @@ def build_boot_image_provenance(image_bytes, lumps_dir, ns_state_path=None):
     }
 
 
+def _namespace_boot_marker_slot(rows):
+    """Return the sole live Namespace row carrying ``boot:true``.
+
+    The caller may provide a legacy ``boot_entry_slot`` projection, but it
+    cannot select another row.  Keep this validator here as generation is also
+    used directly by hardware/tests without going through Flask.
+    """
+    if not isinstance(rows, list):
+        raise ValueError("authoritative ns-state abstractions must be a list")
+    marked = []
+    seen_slots = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("authoritative ns-state contains a non-object row")
+        slot = row.get("slot")
+        if (isinstance(slot, bool) or not isinstance(slot, int)
+                or not 0 <= slot < MAX_NS_ENTRIES):
+            raise ValueError(f"authoritative ns-state contains invalid Namespace slot {slot!r}")
+        if slot in seen_slots:
+            raise ValueError(f"authoritative ns-state has duplicate Namespace slot {slot}")
+        seen_slots.add(slot)
+        if "boot" in row and not isinstance(row["boot"], bool):
+            raise ValueError(f"authoritative ns-state NS[{slot}] has an invalid boot marker")
+        if row.get("archived") is True and row.get("boot") is True:
+            raise ValueError(f"authoritative ns-state archived NS[{slot}] has boot:true")
+        if row.get("archived") is not True and row.get("boot") is True:
+            marked.append(slot)
+    if len(marked) != 1:
+        raise ValueError(
+            "authoritative ns-state must contain exactly one live Namespace "
+            f"row with boot:true (found {len(marked)})")
+    return marked[0]
+
+
 def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
                         require_entry_resident=False):
     """Produce the binary boot image bytes for the given config dict.
@@ -2312,8 +2389,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     Step 2 / Step 3 are optional. Returns a `bytes` object whose length
     is `step1.totalNamespaceWords * 4`.
 
-    `boot_entry_slot` – NS slot the boot ROM will jump to (default: the
-    authoritative SelfTest Namespace-state slot).
+    `boot_entry_slot` – checked projection of the NS slot marked ``boot:true``.
+    When omitted, generation derives the slot from that authoritative marker.
 
     `require_entry_resident` – when True (hardware-targeted images, e.g. Wukong
     bridge uploads), the selected boot-entry lump's code body MUST be resident
@@ -2348,6 +2425,13 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             _bootstrap_rows = json.load(_bf).get("abstractions", [])
     except (OSError, ValueError, AttributeError) as exc:
         raise ValueError(f"generate_boot_image: authoritative ns-state is unreadable: {exc}")
+    _marked_boot_slot = _namespace_boot_marker_slot(_bootstrap_rows)
+    if boot_entry_slot is not None and boot_entry_slot != _marked_boot_slot:
+        raise ValueError(
+            f"generate_boot_image: requested boot entry NS[{boot_entry_slot}] "
+            f"does not match authoritative Namespace boot:true row "
+            f"NS[{_marked_boot_slot}]")
+    boot_entry_slot = _marked_boot_slot
     if _profile_name is not None:
         validate_resident_boot_profile(_bootstrap_rows, _profile_name)
         if _ns_slots_max < max(RESIDENT_BOOT_PROFILE["core_slots"]) + 1:
@@ -2374,8 +2458,6 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         raise ValueError(
             f"generate_boot_image: SelfTest slot {_selftest_slot} is outside "
             f"configured Namespace capacity {_ns_slots_max}")
-    if boot_entry_slot is None:
-        boot_entry_slot = _selftest_slot
     if (isinstance(boot_entry_slot, bool)
             or not isinstance(boot_entry_slot, int)
             or not 0 <= boot_entry_slot < _ns_slots_max):
@@ -2545,6 +2627,22 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     catalog[BOOT_ABSTR_NS_SLOT] = None
     if _selftest_slot < len(catalog):
         catalog[_selftest_slot] = None
+    # Namespace state, not the catalog's positional index, owns the selected
+    # abstraction identity.  CapabilityTest currently lives at NS[2] even
+    # though its historical catalog index is 10; make that row executable
+    # instead of treating the slot as the old UART MMIO projection.
+    _target_row = next(row for row in _bootstrap_rows
+                       if row.get("slot") == boot_entry_slot)
+    if boot_entry_slot in _MMIO_SLOT_SPECS:
+        catalog[boot_entry_slot] = (
+            _target_row.get("name") or f"Slot{boot_entry_slot}",
+            {"R": 0, "W": 0, "X": 0, "L": 0, "S": 0, "E": 1},
+            False,
+        )
+    if (_target_row.get("name") == "CapabilityTest"
+            and boot_entry_slot != CAPABILITY_TEST_NS_SLOT
+            and CAPABILITY_TEST_NS_SLOT < len(catalog)):
+        catalog[CAPABILITY_TEST_NS_SLOT] = None
     _RESERVED_SLOTS = ({0, 1, _selftest_slot}
                        | {slot for slot, entry in enumerate(catalog) if entry is not None}
                        | set(_generated_thread_slots))
@@ -2598,7 +2696,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             _manifest_path_for_cache, _selected_slot_tokens, _profile_name):
         if (_slot == _selftest_slot
                 or not (0 <= _slot < len(catalog))
-                or _slot in _MMIO_SLOT_SPECS):
+                or (_slot in _MMIO_SLOT_SPECS and _slot != boot_entry_slot)):
             continue
         if _profile_name is not None:
             _body_path = os.path.join(lumps_dir, _filename)
@@ -2680,7 +2778,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             # Namespace Header V2 has a real physical block before the table.
             # runningOffset is NOT advanced so Thread (slot 1) naturally gets loc=0.
             loc = ns_header_base
-        elif i in _MMIO_SLOT_SPECS and i != _selftest_slot:
+        elif (i in _MMIO_SLOT_SPECS and i != _selftest_slot
+              and i != boot_entry_slot):
             # MMIO NS slot: physical MMIO byte address, no RAM body allocated.
             loc = _MMIO_SLOT_SPECS[i][0]
             # Don't advance running_offset (no RAM reservation for MMIO).
@@ -2702,7 +2801,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             # clistCount=0; the DEMO_CLIST is managed through clist_gts[] and
             # lazily installed into Boot.Abstr at runtime.
             clist_count = 0
-        elif i in _MMIO_SLOT_SPECS and i != _selftest_slot:
+        elif (i in _MMIO_SLOT_SPECS and i != _selftest_slot
+              and i != boot_entry_slot):
             lim17 = _MMIO_SLOT_SPECS[i][1]
             clist_count = 0
         else:
@@ -2853,7 +2953,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # historical artifact revision may replace it.  Do this before touching
     # Boot.Thread so a bad target leaves no partially prepared output.
     _boot_entry_ns_base = total - (boot_entry_slot + 1) * NS_ENTRY_WORDS
-    if boot_entry_slot in _MMIO_SLOT_SPECS:
+    if boot_entry_slot in _MMIO_SLOT_SPECS and catalog[boot_entry_slot] is None:
         raise ValueError(
             f"generate_boot_image: boot entry slot {boot_entry_slot} is an "
             "MMIO device, not an executable E-GT target")
@@ -3259,7 +3359,13 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
 
     # Pre-flight sanity check: catch a zeroed mandatory NS slot now rather
     # than waiting for the simulator to fault at runtime.
-    validate_boot_image(image, total)
+    validate_boot_image(
+        image, total,
+        mandatory_slots=tuple(
+            slot for slot in _MANDATORY_NS_SLOTS
+            if any(row.get("slot") == slot for row in _bootstrap_rows)
+        ),
+    )
 
     return image
 

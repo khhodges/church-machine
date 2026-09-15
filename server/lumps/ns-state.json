@@ -39,7 +39,8 @@
       "resident": true,
       "load_policy": "Resident",
       "boot_resident": true,
-      "ns_slot_policy": "static"
+      "ns_slot_policy": "static",
+      "boot": true
     },
     {
       "name": "LED_DEV",

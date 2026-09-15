@@ -95,6 +95,15 @@ check('UI has no direct live boot-slot redirect outside persistence rollback', (
     assert.match(lumpEditor, /if \(setBootEntrySlot\(nsSlot\) === true\)/);
 });
 
+check('Namespace marker is not mirrored through bootEntrySlot localStorage', () => {
+    const sources = [
+        abstractions,
+        memoryUi,
+        fs.readFileSync(path.join(__dirname, 'app-lump-editor.js'), 'utf8'),
+    ].join('\n');
+    assert.doesNotMatch(sources, /localStorage\.(?:getItem|setItem|removeItem)\(\s*['"]bootEntrySlot['"]/);
+});
+
 check('failed Prepare leaves local selection and storage unchanged', () => {
     const setSrc = extract(abstractions, 'setBootEntrySlot');
     const writes = [];

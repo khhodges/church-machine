@@ -3209,7 +3209,9 @@ DEFAULT_BOOT_CONFIG = {
     "targetBoard": "wukong-xc7a100t",
     # The selected Lightning Bolt / first executable abstraction.  Older
     # configs omit this field and retain the architectural SelfTest default.
-    "bootEntrySlot": 6,
+    # Projection of the canonical ``boot:true`` Namespace row.  This field is
+    # retained for older clients, but is never a boot-target authority.
+    "bootEntrySlot": 2,
     # Programmer-selected approval/load rules.  This is separate from
     # step2.lumps because architecture-defined Namespace rows do not contain
     # user LUMP bodies, but their approval rule is still user-owned.
@@ -3852,6 +3854,18 @@ def boot_config_get():
             s3 = cfg.get("step3")
             if s3 is not None and _validate_step3(s3, s1, cfg.get("step2")) is not None:
                 cfg.pop("step3", None)
+    try:
+        # bootEntrySlot is a compatibility projection only.  Always expose
+        # the marker carried by the authoritative Namespace plan.
+        _marker_slot = _authoritative_boot_slot()
+        if isinstance(cfg, dict):
+            cfg = dict(cfg)
+            cfg["bootEntrySlot"] = _marker_slot
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        return jsonify({
+            "error": f"Authoritative Namespace boot marker is invalid: {exc}",
+            "namespaceAuthorityInvalid": True,
+        }), 409
     return jsonify({
         "config": cfg,
         "defaults": DEFAULT_BOOT_CONFIG,
@@ -3906,15 +3920,21 @@ def _validated_boot_config_candidate(data, existing=None):
     err3 = _validate_step3(step3, step1, step2)
     if err3:
         return None, err3
-    boot_entry_slot = data.get(
-        "bootEntrySlot",
-        existing.get("bootEntrySlot", DEFAULT_BOOT_CONFIG["bootEntrySlot"]),
-    )
+    try:
+        authoritative_boot_slot = _authoritative_boot_slot()
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        return None, f"Authoritative Namespace boot marker is invalid: {exc}"
+    boot_entry_slot = data.get("bootEntrySlot", authoritative_boot_slot)
     if (not isinstance(boot_entry_slot, int) or isinstance(boot_entry_slot, bool)
             or boot_entry_slot < 0 or boot_entry_slot >= MAX_NS_ENTRIES):
         return None, (
             "bootEntrySlot must be an integer between 0 and "
             f"{MAX_NS_ENTRIES - 1}")
+    if boot_entry_slot != authoritative_boot_slot:
+        return None, (
+            f"bootEntrySlot NS[{boot_entry_slot}] disagrees with the authoritative "
+            f"Namespace boot:true row NS[{authoritative_boot_slot}]; move the "
+            "Lightning Bolt in the Namespace plan first")
     slot_rules = data.get("slotRules", existing.get("slotRules", {}))
     slot_rules_err = _validate_slot_rules(slot_rules)
     if slot_rules_err:
@@ -4434,11 +4454,20 @@ def _read_saved_boot_config():
         err3 = _validate_step3(s3, cfg["step1"], cfg.get("step2"))
         if err3:
             return None, f"Saved config fails Step 3 validation: {err3}"
+    try:
+        marker_slot = _authoritative_boot_slot()
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        return None, f"Saved config cannot be checked against Namespace boot marker: {exc}"
+    # The persisted field is legacy compatibility data.  Ignore a stale
+    # projection rather than letting it block a valid Namespace plan; callers
+    # receive the marker-derived value and never use the stored slot.
+    cfg = dict(cfg)
+    cfg["bootEntrySlot"] = marker_slot
     return cfg, None
 
 
 def _boot_image_preparation_status(image_bytes, cfg=None):
-    """Describe image-truth versus the currently saved Lightning Bolt choice.
+    """Describe image-truth versus the authoritative Namespace boot marker.
 
     This is deliberately an inspection operation.  A valid imported image may
     name a different target than the local designer configuration; callers
@@ -4447,21 +4476,28 @@ def _boot_image_preparation_status(image_bytes, cfg=None):
     """
     info = _boot_image_gen.read_boot_entry_info(image_bytes)
     configured_slot = None
+    marker_slot = _authoritative_boot_slot()
     if isinstance(cfg, dict):
         candidate = cfg.get("bootEntrySlot")
         if isinstance(candidate, int) and not isinstance(candidate, bool):
             configured_slot = candidate
     status = "prepared"
     reason = None
-    if configured_slot is not None and configured_slot != info["entry_slot"]:
+    if marker_slot != info["entry_slot"]:
         status = "selection-discrepancy"
         reason = (
-            f"saved configuration selects NS[{configured_slot}], but this image "
+            f"authoritative Namespace boot:true selects NS[{marker_slot}], but this image "
             f"prepares Boot.Thread CR0 for NS[{info['entry_slot']}].")
+    elif configured_slot is not None and configured_slot != marker_slot:
+        status = "selection-discrepancy"
+        reason = (
+            f"saved configuration projection selects NS[{configured_slot}], but "
+            f"the authoritative Namespace boot:true row is NS[{marker_slot}].")
     return {
         "status": status,
         "reason": reason,
         "configuredSlot": configured_slot,
+        "namespaceSlot": marker_slot,
         "imageSlot": info["entry_slot"],
         "imageSequence": info["entry_gt_seq"],
         "threadCapsOffset": info["thread_caps_offset"],
@@ -4481,7 +4517,7 @@ def _couple_selftest_next_to_selected_target(image_bytes, cfg):
     total = int(cfg["step1"]["totalNamespaceWords"])
     _boot_image_gen.validate_boot_image(image_bytes, total)
     info = _boot_image_gen.read_boot_entry_info(image_bytes)
-    selected_slot = cfg.get("bootEntrySlot")
+    selected_slot = _authoritative_boot_slot()
     if (not isinstance(selected_slot, int) or isinstance(selected_slot, bool)
             or info["entry_slot"] != selected_slot):
         raise ValueError(
@@ -4538,6 +4574,11 @@ def _prepare_selected_boot_image(image_bytes, cfg, slot):
     CHURCH frame retains its own Enter/resume identity.
     """
     total = int(cfg["step1"]["totalNamespaceWords"])
+    authoritative_slot = _authoritative_boot_slot()
+    if slot != authoritative_slot:
+        raise ValueError(
+            f"selected NS[{slot}] is not the authoritative Namespace "
+            f"boot:true row NS[{authoritative_slot}]")
     _boot_image_gen.validate_boot_image(image_bytes, total)
     try:
         with open(NS_STATE_PATH, encoding="utf-8") as source:
@@ -4662,39 +4703,28 @@ def boot_image_generate():
     if err:
         return jsonify({"ok": False, "error": err}), 400
     body = request.get_json(silent=True) or {}
-    # Explicit requests win; otherwise generation uses the Lightning Bolt
-    # selection saved with the Boot Image Designer config.
-    if "bootEntrySlot" not in cfg:
+    try:
+        saved_entry_slot = _authoritative_boot_slot()
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
         return jsonify({
             "ok": False,
-            "error": (
-                "Saved boot-config.json has no Lightning Bolt bootEntrySlot. "
-                "Save and prepare an explicit selection before generating."
-            ),
+            "error": f"Authoritative Namespace boot marker is invalid: {exc}",
             "needsPrepare": True,
         }), 409
-    saved_entry_slot = cfg["bootEntrySlot"]
-    if (isinstance(saved_entry_slot, bool)
-            or not isinstance(saved_entry_slot, int)
-            or not 0 <= saved_entry_slot < MAX_NS_ENTRIES):
-        return jsonify({
-            "ok": False,
-            "error": "Saved boot-config.json has an invalid Lightning Bolt bootEntrySlot.",
-            "needsPrepare": True,
-        }), 409
+    # A request slot is only a checked projection.  It can never retarget the
+    # generated image; a mismatch is visible and fail-closed.
     requested_slot = body.get("entrySlot", saved_entry_slot)
     if (isinstance(requested_slot, bool)
             or not isinstance(requested_slot, int)):
         return jsonify({"ok": False, "error":
-                        "entrySlot must be an integer selected and saved in boot-config.json."}), 400
+                        "entrySlot must be an integer Namespace projection."}), 400
     if requested_slot != saved_entry_slot:
         return jsonify({
             "ok": False,
             "error": (
-                f"entrySlot NS[{requested_slot}] differs from the saved "
-                f"Lightning Bolt selection NS[{saved_entry_slot}]. Save and "
-                "prepare that selection first; generation does not silently "
-                "change the saved target."
+                f"entrySlot NS[{requested_slot}] differs from the authoritative "
+                f"Namespace boot:true row NS[{saved_entry_slot}]; generation "
+                "does not silently change the saved target."
             ),
         }), 409
     entry_slot = saved_entry_slot
@@ -4706,7 +4736,7 @@ def boot_image_generate():
         with _warnings_mod.catch_warnings(record=True) as _caught:
             _warnings_mod.simplefilter("always")
             blob = _boot_image_gen.generate_boot_image(
-                cfg, LUMPS_DIR, boot_entry_slot=entry_slot,
+                cfg, LUMPS_DIR, boot_entry_slot=saved_entry_slot,
                 require_entry_resident=for_hardware)
         for _w in _caught:
             if issubclass(_w.category, UserWarning):
@@ -4779,6 +4809,10 @@ def _boot_image_is_stale():
     try:
         with open(BOOT_IMAGE_PATH, "rb") as _image_file:
             _image_bytes = _image_file.read()
+        _marker_slot = _authoritative_boot_slot()
+        _image_entry = _boot_image_gen.read_boot_entry_info(_image_bytes)
+        if _image_entry.get("entry_slot") != _marker_slot:
+            return True
         _cfg, _cfg_err = _read_saved_boot_config()
         if _cfg_err is None and _cfg is not None:
             _expected_bytes = int(_cfg["step1"]["totalNamespaceWords"]) * 4
@@ -5092,6 +5126,13 @@ def namespace_lump_json():
     step1      = cfg["step1"]
     total      = int(step1["totalNamespaceWords"])
     ns_size    = int(step1["namespaceLumpWords"])
+    try:
+        authoritative_boot_slot = _authoritative_boot_slot()
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        return jsonify({
+            "error": f"Authoritative Namespace boot marker is invalid: {exc}",
+            "namespaceAuthorityInvalid": True,
+        }), 409
 
     use_cached = False
     if os.path.isfile(BOOT_IMAGE_PATH):
@@ -5099,25 +5140,19 @@ def namespace_lump_json():
             _cached = _f.read()
         try:
             _boot_image_gen.validate_boot_image(_cached, total)
+            if (_boot_image_gen.read_boot_entry_info(_cached)["entry_slot"]
+                    != authoritative_boot_slot):
+                raise ValueError(
+                    "cached boot image entry disagrees with the authoritative "
+                    f"Namespace boot:true row NS[{authoritative_boot_slot}]")
             img_bytes  = _cached
             use_cached = True
         except Exception:
             pass
     if not use_cached:
-        entry_slot = cfg.get("bootEntrySlot")
-        if (isinstance(entry_slot, bool)
-                or not isinstance(entry_slot, int)
-                or not 0 <= entry_slot < MAX_NS_ENTRIES):
-            return jsonify({
-                "error": (
-                    "No explicit saved Lightning Bolt bootEntrySlot is available "
-                    "to prepare this Namespace image."
-                ),
-                "needsPrepare": True,
-            }), 409
         try:
             img_bytes = _boot_image_gen.generate_boot_image(
-                cfg, LUMPS_DIR, boot_entry_slot=entry_slot)
+                cfg, LUMPS_DIR, boot_entry_slot=authoritative_boot_slot)
         except Exception as _e:
             return jsonify({"error": f"Failed to generate boot image: {_e}"}), 500
 
@@ -5365,6 +5400,69 @@ def _validate_symbolic_namespace_entries(entries):
             raise ValueError("Symbolic Namespace entries cannot carry binary or resident metadata")
 
 
+@app.route("/api/namespace/boot-marker", methods=["POST"])
+def namespace_boot_marker_post():
+    """Atomically move the one Lightning Bolt marker in Namespace state.
+
+    The marker is the plan authority.  boot-config.json is not rewritten by
+    this mutation; its GET response exposes a derived compatibility projection.
+    An existing image is intentionally left stale until explicit generation.
+    """
+    ok, auth_error = _optional_report_token_check()
+    if not ok:
+        return auth_error
+    payload = request.get_json(silent=True) or {}
+    slot = payload.get("slot")
+    if isinstance(slot, bool) or not isinstance(slot, int):
+        return jsonify({"ok": False, "error": "slot must be an integer"}), 400
+    try:
+        with _namespace_commit_guard():
+            rows, _ = _read_authoritative_namespace_rows()
+            targets = [
+                row for row in rows
+                if isinstance(row, dict) and row.get("slot") == slot
+                and row.get("archived") is not True
+            ]
+            if len(targets) != 1:
+                raise ValueError(
+                    f"Namespace boot target NS[{slot}] does not have exactly one live row")
+            target = targets[0]
+            if (target.get("symbolic") is True
+                    or target.get("resident") is not True
+                    or target.get("load_policy", target.get("loadPolicy")) not in (
+                        None, "Resident")):
+                raise ValueError(
+                    f"Namespace boot target NS[{slot}] is not a live executable row")
+            old_state = None
+            try:
+                with open(NS_STATE_PATH, "rb") as source:
+                    old_state = source.read()
+            except OSError as exc:
+                raise ValueError(f"could not snapshot Namespace plan: {exc}") from exc
+            updated = [dict(row) for row in rows]
+            for row in updated:
+                row.pop("boot", None)
+            next_row = next(row for row in updated if row.get("slot") == slot)
+            next_row["boot"] = True
+            try:
+                _write_ns_state(updated)
+            except Exception:
+                if old_state is not None:
+                    rollback = NS_STATE_PATH + ".boot-marker.rollback"
+                    with open(rollback, "wb") as destination:
+                        destination.write(old_state)
+                    os.replace(rollback, NS_STATE_PATH)
+                raise
+        return jsonify({
+            "ok": True,
+            "slot": slot,
+            "bootEntrySlot": slot,
+            "staleImage": os.path.isfile(BOOT_IMAGE_PATH),
+        })
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "error": f"Namespace boot marker was not changed: {exc}"}), 409
+
+
 @app.route("/api/boot-image/save-ns", methods=["POST"])
 def boot_image_save_ns():
     """Single write path for NS table: writes boot-image.bin + ns-state.json atomically.
@@ -5480,6 +5578,7 @@ def boot_image_save_ns():
             _a for _a in _raw_abs
             if isinstance(_a, dict) and _a.get("name") and isinstance(_a.get("slot"), int)
         ]
+        _validate_namespace_boot_marker(_ns_entries)
         _validate_symbolic_namespace_entries(_ns_entries)
         # The four-word NS entry does not carry the resident artifact locator.
         # Preserve an existing locator when an older/browser client submits the
@@ -9143,6 +9242,7 @@ def _build_ns_state_document(entries):
 
 def _write_ns_state(entries):
     """Write ns-state.json atomically — rich list of NS row objects."""
+    _validate_namespace_boot_marker(entries)
     _tmp = NS_STATE_PATH + ".tmp"
     with _namespace_commit_guard():
         _state = _build_ns_state_document(entries)
@@ -9231,6 +9331,51 @@ def _namespace_state_fingerprint(entries):
     ).encode("utf-8")).hexdigest()
 
 
+def _validate_namespace_boot_marker(entries):
+    """Validate the one canonical Lightning Bolt marker in Namespace state.
+
+    ``boot`` is deliberately state-local: it belongs to a live rich
+    Namespace row, never to the archive manifest, boot-config, or a browser
+    preference.  Non-boot rows may omit the field for compatibility, but any
+    present marker must be a real boolean and archived rows may not carry it.
+    """
+    if not isinstance(entries, list):
+        raise ValueError("ns-state.json abstractions must be a list")
+    marked = []
+    seen_slots = set()
+    for row in entries:
+        if not isinstance(row, dict):
+            raise ValueError("ns-state.json contains a non-object Namespace row")
+        slot = row.get("slot")
+        if isinstance(slot, bool) or not isinstance(slot, int) or not 0 <= slot < MAX_NS_ENTRIES:
+            raise ValueError(f"ns-state.json contains invalid Namespace slot {slot!r}")
+        if slot in seen_slots:
+            raise ValueError(f"ns-state.json has duplicate Namespace slot {slot}")
+        seen_slots.add(slot)
+        if "boot" in row and not isinstance(row["boot"], bool):
+            raise ValueError(
+                f"ns-state.json Namespace NS[{slot}] has an invalid boot marker")
+        if row.get("archived") is True and row.get("boot") is True:
+            raise ValueError(
+                f"ns-state.json archived Namespace NS[{slot}] cannot carry boot:true")
+        if row.get("archived") is not True and row.get("boot") is True:
+            marked.append(row)
+    if len(marked) != 1:
+        if not marked:
+            raise ValueError(
+                "ns-state.json must contain exactly one live Namespace row with boot:true")
+        raise ValueError(
+            "ns-state.json must contain exactly one live Namespace row with boot:true "
+            f"(found {len(marked)})")
+    return marked[0]["slot"]
+
+
+def _authoritative_boot_slot():
+    """Return the boot slot from the live Namespace marker, fail-closed."""
+    rows, _ = _read_authoritative_namespace_rows()
+    return _validate_namespace_boot_marker(rows)
+
+
 def _read_authoritative_namespace_rows():
     """Read rich Namespace state and return rows plus its exact fingerprint."""
     if not os.path.isfile(NS_STATE_PATH):
@@ -9241,6 +9386,7 @@ def _read_authoritative_namespace_rows():
         rows = state.get("abstractions") if isinstance(state, dict) else None
         if not isinstance(rows, list):
             raise ValueError("ns-state.json has no abstractions array")
+    _validate_namespace_boot_marker(rows)
     return rows, _namespace_state_fingerprint(rows)
 
 
@@ -9347,6 +9493,31 @@ def _ensure_ns_state():
                 _write_ns_state(_entries)
                 print(f"[ns-state] migrated to rich format: "
                       f"{len(_entries)} occupied slots", flush=True)
+            elif isinstance(_abs, list) and _abs and isinstance(_abs[0], dict):
+                # Current migration: the prepared CapabilityTest artifact is
+                # the authoritative Lightning Bolt identity at NS[2].  Do
+                # not import the stale prepared slot from boot-config/image
+                # into Namespace state.
+                try:
+                    _validate_namespace_boot_marker(_abs)
+                except ValueError as _marker_error:
+                    if "exactly one live Namespace row" not in str(_marker_error) \
+                            or "found" in str(_marker_error):
+                        raise
+                    _capability_rows = [
+                        row for row in _abs
+                        if row.get("name") == "CapabilityTest"
+                        and row.get("slot") == 2
+                        and row.get("archived") is not True
+                    ]
+                    if len(_capability_rows) != 1:
+                        raise
+                    for _row in _abs:
+                        _row.pop("boot", None)
+                    _capability_rows[0]["boot"] = True
+                    _write_ns_state(_abs)
+                    print("[ns-state] migrated Lightning Bolt marker to CapabilityTest NS[2]",
+                          flush=True)
         except Exception as _exc:
             print(f"[ns-state] migration check failed: {_exc}", flush=True)
         return
@@ -10684,14 +10855,13 @@ def save_lump():
                     f"LightningBolt selection: {_saved_boot_error}"),
                 "selftest_egt_mismatch": True,
             }), 422
-        _starter_slot = _saved_boot_cfg.get("bootEntrySlot")
-        if (isinstance(_starter_slot, bool)
-                or not isinstance(_starter_slot, int)
-                or not 0 <= _starter_slot < MAX_NS_ENTRIES):
+        try:
+            _starter_slot = _validate_namespace_boot_marker(_state_rows)
+        except ValueError as _marker_error:
             return jsonify({
                 "error": (
-                    "SelfTest Next continuation E-GT guard: saved "
-                    f"bootEntrySlot is invalid: {_starter_slot!r}."),
+                    "SelfTest Next continuation E-GT guard: authoritative "
+                    f"Namespace boot marker is invalid: {_marker_error}"),
                 "selftest_egt_mismatch": True,
             }), 422
         if _starter_slot == ns_slot:
@@ -21107,9 +21277,8 @@ def _ba_build_ns_map():
 
     # Load policy belongs to the individual Namespace slot.  Do not infer it
     # from the slot number: slot 6 can be lazy while slot 10 can be resident,
-    # or vice versa.  The saved Boot Image Designer setting is authoritative;
-    # artifact metadata is retained as a compatibility fallback for older
-    # projects that predate persisted per-slot policy rows.
+    # or vice versa.  The Namespace boot marker is authoritative; config and
+    # artifact metadata are compatibility projections only.
     slot_policy_by_slot = {}
     step2_policy_by_slot = {}
     boot_entry_slot = DEFAULT_BOOT_CONFIG["bootEntrySlot"]
@@ -21122,8 +21291,6 @@ def _ba_build_ns_map():
                 saved_step1.update(saved_cfg["step1"])
             generated_thread_slots = _generated_thread_slots_for_step1(
                 saved_cfg.get("step1") or {})
-            if isinstance(saved_cfg.get("bootEntrySlot"), int):
-                boot_entry_slot = saved_cfg["bootEntrySlot"]
             for raw_slot, policy_value in (saved_cfg.get("slotRules") or {}).items():
                 try:
                     policy_slot = int(raw_slot)
@@ -21144,10 +21311,17 @@ def _ba_build_ns_map():
         # be fully validated; the default fallback below still works.
         pass
 
+    try:
+        boot_entry_slot = _authoritative_boot_slot()
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        boot_entry_slot = None
     if namespace_header.get("available"):
-        # A generated image is the boot authority. The saved selection remains
-        # useful while no image exists, but must never relabel an older image.
-        boot_entry_slot = namespace_header["boot_entry_slot"]
+        # The image header is a checked projection. Never let a stale image
+        # relabel the authoritative Namespace plan.
+        namespace_header["namespace_marker_mismatch"] = (
+            boot_entry_slot is not None
+            and namespace_header["boot_entry_slot"] != boot_entry_slot
+        )
 
     thread_size = int(saved_step1.get("threadLumpWords") or 256)
     thread_stack_words = int(saved_step1.get("threadStackWords") or 32)
