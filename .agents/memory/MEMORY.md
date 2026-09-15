@@ -118,6 +118,7 @@
 - [SelfTest dynamic allocation](selftest-dynamic-allocation.md) — SelfTest authority comes from one active manifest+NS binding; size, slot, sequence, and resident layout are never legacy constants
 - [C-List picker programmer authority](clist-picker-programmer-authority.md) — capability declarations may use live, committed, library-only, or not-yet-created pet names
 - [Saved LUMP binary authority](saved-lump-binary-authority.md) — after save, evict code-only memory words so the immutable server binary supplies embedded source
+- [Saved-LUMP browser authorization E2E](saved-lump-browser-auth-e2e.md) — use the real Load into Sim control with a canonical binary fixture while isolating stale boot-image availability
 - [Starter handoff must be acyclic](starter-handoff-acyclic.md) — startup SelfTest hands off once; Starter must continue onward, never call SelfTest back
 - [Trace row correlation](trace-row-correlation.md) — combine NIA symbols and raw words only after identity validation; conflicts must remain visibly unresolved
 - [Pending compile ownership](pending-compile-ownership.md) — delayed simulator loads consume the exact immutable compile snapshot that initiated them, never mutable registry selection
