@@ -10,6 +10,41 @@
     var errorTypes = ['Error', 'TypeError', 'ReferenceError', 'SyntaxError',
         'RangeError', 'URIError', 'EvalError'];
 
+    // ErrorEvent.error and PromiseRejectionEvent.reason are allowed to contain
+    // arbitrary thrown values. Keep malformed script/rejection events from
+    // reaching a later crash monitor, while allowing actual Error instances to
+    // remain visible. The tag check also recognizes Error instances from
+    // another window/realm. Resource failures intentionally stay observable.
+    function isRealError(value) {
+        try {
+            return value instanceof Error ||
+                Object.prototype.toString.call(value) === '[object Error]';
+        } catch (_) {
+            return false;
+        }
+    }
+    function containNonErrorEvent(event) {
+        try {
+            if (event && typeof event.preventDefault === 'function') {
+                event.preventDefault();
+            }
+        } catch (_) {}
+        try {
+            if (event && typeof event.stopImmediatePropagation === 'function') {
+                event.stopImmediatePropagation();
+            }
+        } catch (_) {}
+    }
+    function warnContained(kind) {
+        try {
+            if (typeof console !== 'undefined' && console &&
+                    typeof console.warn === 'function') {
+                var label = kind === 'rejection' ? 'rejection' : 'window error';
+                console.warn('[Church Machine] Caught non-Error ' + label +
+                    ': [details withheld]');
+            }
+        } catch (_) {}
+    }
     function fileName(value) {
         try {
             var url = new URL(value, location.href);
@@ -85,8 +120,10 @@
             lastInteraction = kind; lastInteractionAt = Date.now();
         }, {capture: true, passive: true});
     });
-    // Loaded before the existing containment guards: report even the non-Error
-    // events those guards intentionally stop from reaching the preview monitor.
+    // Loaded before the existing containment guards: report and contain
+    // non-Error script/rejection events before they reach the preview monitor.
+    // Resource failures are reported but deliberately continue to later
+    // listeners/default handling because they can break application startup.
     window.addEventListener('error', function(event) {
         var target = event.target;
         if (target && target !== window && (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) {
@@ -95,9 +132,17 @@
             return;
         }
         var kind = /^ResizeObserver loop/.test(event.message || '') ? 'resize_observer' : 'script';
+        if (!isRealError(event.error)) {
+            if (kind !== 'resize_observer') warnContained('script');
+            containNonErrorEvent(event);
+        }
         report(kind, event.error, event);
     }, true);
     window.addEventListener('unhandledrejection', function(event) {
+        if (!isRealError(event.reason)) {
+            warnContained('rejection');
+            containNonErrorEvent(event);
+        }
         report('rejection', event.reason);
     }, true);
 })();

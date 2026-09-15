@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Church Machine IDE — Capability-Based Secure Computing</title>
-    <script src="/simulator/browser_diagnostics.js?v=sha256-f54be3cc300d"></script>
+    <script src="/simulator/browser_diagnostics.js?v=sha256-b8c9d4db10c0"></script>
     <meta name="description" content="Church Machine IDE: browser-based FPGA simulator, assembler, and CLOOMC compiler with capability-based secure computing. Supports English, JavaScript, Haskell, and Lambda Calculus front-ends.">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://lab.cloomc.org/simulator/">
@@ -30,18 +30,32 @@
     <meta property="og:image:alt" content="Church Machine IDE — lambda symbol in Church Gold on dark background">
     <script>
     (function() {
-        function describeNonError(value, fallback) {
-            if (value === null || value === undefined) return fallback || 'null/undefined';
-            if (typeof value !== 'object') return String(value);
-            if (value.message || value.name) return String(value.message || value.name);
+        function isRealError(value) {
             try {
+                return value instanceof Error ||
+                    Object.prototype.toString.call(value) === '[object Error]';
+            } catch (_) {
+                return false;
+            }
+        }
+        function describeNonError(value, fallback) {
+            try {
+                if (value === null || value === undefined) return fallback || 'null/undefined';
+                if (typeof value !== 'object') return String(value);
+                var message = value.message;
+                var name = value.name;
+                if (message || name) return String(message || name);
                 return JSON.stringify(value);
             } catch (_serializationError) {
-                return Object.prototype.toString.call(value);
+                try {
+                    return Object.prototype.toString.call(value);
+                } catch (_tagError) {
+                    return fallback || '[unprintable non-Error]';
+                }
             }
         }
         window.addEventListener('unhandledrejection', function(event) {
-            if (!(event.reason instanceof Error)) {
+            if (!isRealError(event.reason)) {
                 var msg = describeNonError(event.reason, 'null/undefined rejection');
                 console.warn('[Church Machine] Caught non-Error rejection:', msg);
                 event.preventDefault();
@@ -52,7 +66,14 @@
             }
         }, true);
         window.addEventListener('error', function(event) {
-            if (!(event.error instanceof Error)) {
+            var target = event.target;
+            if (target && target !== window &&
+                    (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) {
+                // Resource failures stay visible: they can prevent the IDE from
+                // loading and must remain observable by the browser monitor.
+                return;
+            }
+            if (!isRealError(event.error)) {
                 // Suppress the well-known benign ResizeObserver notification — wrapping
                 // ResizeObserver callbacks in requestAnimationFrame is the real fix, but
                 // some browsers still emit this on the first frame; it is never actionable.
