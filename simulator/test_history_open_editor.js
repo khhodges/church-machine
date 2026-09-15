@@ -12,7 +12,7 @@ function run(activeTab, source) {
         window: { _editorSourceFilePath: 'old.cloomc', _activeBuiltInKey: 'old' },
         activeUserTabId: activeTab,
         document: { getElementById: id => id === 'asmEditor' ? editor : { value: 'assembly' } },
-        createUserTab: (name, lang, text) => tabs.push({ name, lang, text }),
+        createUserTab: (name, lang, text, sourceRevision) => tabs.push({ name, lang, text, sourceRevision }),
         _isRawISASource: () => true,
         _closeLumpHistoryPreviewModal: () => { ctx.closed = true; },
         switchView: view => { ctx.view = view; },
@@ -27,7 +27,8 @@ let result = run(null, source);
 assert.equal(result.tabs.length, 2);
 assert.equal(result.tabs[0].text, 'previous unsaved source');
 assert.equal(result.tabs[1].text, source);
-assert.equal(result.tabs[1].name, 'CapabilityTest — from v26');
+assert.equal(result.tabs[1].name, 'CapabilityTest');
+assert.equal(result.tabs[1].sourceRevision, 26);
 assert.equal(result.ctx.window._editorSourceFilePath, null);
 assert.equal(result.ctx.view, 'editor');
 assert.equal(result.ctx.closed, true);

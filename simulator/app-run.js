@@ -12047,6 +12047,23 @@ function escapeHtml(str) {
 function _updateEditorCodeName(name) {
     window._editorCodeNameValue = name || '';
     _refreshEditorActionIdentity(name);
+    let badge = document.getElementById('editorSourceRevision');
+    const tab = typeof userTabs !== 'undefined' && typeof activeUserTabId !== 'undefined'
+        ? userTabs.find(item => item.id === activeUserTabId) : null;
+    const revision = tab && tab.name === name ? tab.sourceRevision : null;
+    if (Number.isInteger(revision)) {
+        const nameEl = document.getElementById('editorCodeName');
+        if (!badge && nameEl && nameEl.parentNode) {
+            badge = document.createElement('span');
+            badge.id = 'editorSourceRevision';
+            badge.style.cssText = 'margin-left:8px;font-size:0.75rem;color:var(--text-muted,#9ca3af)';
+            nameEl.parentNode.appendChild(badge);
+        }
+        if (badge) {
+            badge.textContent = `Source: v${revision}`;
+            badge.title = 'Historical source used to start this draft; not part of the program name.';
+        }
+    } else if (badge) badge.remove();
 }
 
 function _editorActionIdentity(name) {

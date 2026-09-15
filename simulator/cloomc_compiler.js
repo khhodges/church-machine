@@ -1107,8 +1107,11 @@ class CLOOMCCompiler {
         // Extract abstraction name: try specific "Name NS[..." header first,
         // then any first meaningful ; comment line, then first label, then default.
         let absName = 'Assembly';
+        const abstractionHeader = source.match(/^\s*;\s*Abstraction:\s*([^\r\n]+?)\s*$/im);
         const headerMatch = source.match(/^;\s*(?:Disassembly\s+of\s+\S+\s+)?([^\n@]+?)\s+(?:NS\[|\@\s*0x)/m);
-        if (headerMatch) {
+        if (abstractionHeader) {
+            absName = abstractionHeader[1].trim();
+        } else if (headerMatch) {
             absName = headerMatch[1].trim();
         } else {
             // First meaningful ; comment line — skip separator-only lines (===, ---, ***, etc.)

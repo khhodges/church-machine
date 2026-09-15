@@ -479,6 +479,19 @@ function loadUserTabs() {
     try {
         const raw = localStorage.getItem('church_user_tabs');
         userTabs = raw ? JSON.parse(raw) : [];
+        // Repair only labels created by the historical-source opener, never
+        // rewrite the embedded source or an arbitrary programmer-chosen name.
+        let historyLabelsChanged = false;
+        for (const tab of userTabs) {
+            const label = String(tab.name || '').match(/^(.+) — from v(\d+)$/);
+            const header = String(tab.code || '').match(/^\s*;\s*Abstraction:\s*([^\r\n]+?)\s*$/im);
+            if (label && header && label[1] === header[1].trim()) {
+                tab.name = label[1];
+                tab.sourceRevision = Number(label[2]);
+                historyLabelsChanged = true;
+            }
+        }
+        if (historyLabelsChanged) saveUserTabsToStorage();
         // Migrate any stale BFEXT/BFINS `pos=N, w=N` syntax captured before the
         // disassembler fix, so re-opened tabs never show unparseable code.
         if (typeof window._migrateBfextBfinsSyntax === 'function') {
@@ -502,9 +515,10 @@ function generateTabId() {
     return 'ut_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
 }
 
-function createUserTab(name, lang, initialCode) {
+function createUserTab(name, lang, initialCode, sourceRevision) {
     const code = (initialCode !== undefined) ? initialCode : '';
     const tab = { id: generateTabId(), name: name, lang: lang || 'assembly', code };
+    if (Number.isInteger(sourceRevision) && sourceRevision >= 0) tab.sourceRevision = sourceRevision;
     userTabs.push(tab);
     _openFileCache = null;
     saveUserTabsToStorage();

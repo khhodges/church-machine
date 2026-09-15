@@ -14,3 +14,9 @@ Opening historical source for editing is a draft-copy operation, not activation.
 **Why:** The normal saved-LUMP opener can redirect an old token to a current revision; that would silently substitute different source for the revision the programmer selected.
 
 **How to apply:** Copy the exact preview response into a personal draft, preserve existing editor work, and leave active artifact and boot bindings unchanged until explicit save/approval.
+
+Historical provenance belongs in separate draft metadata, never in the program name.
+
+**Why:** The programmer expects to continue the same abstraction; adding “from v…” to its name suggests a rename and can leak into identity handling.
+
+**How to apply:** Retain the abstraction name unchanged and show the originating revision separately. Assembly metadata labels such as `Abstraction:` are not part of the name.

@@ -3625,7 +3625,7 @@ function _openLumpHistorySourceInEditor(source, name, version) {
     }
     const language = typeof _isRawISASource === 'function' && _isRawISASource(source)
         ? 'assembly' : 'cloomc';
-    createUserTab(`${name} — from v${version}`, language, source);
+    createUserTab(name, language, source, Number(version));
     window._editorStartupBufferDirty = true;
     _closeLumpHistoryPreviewModal();
     switchView('editor');
