@@ -12097,7 +12097,6 @@ function _refreshEditorActionIdentity(name) {
     const tab = typeof userTabs !== 'undefined' && typeof activeUserTabId !== 'undefined'
         ? userTabs.find(item => item.id === activeUserTabId) : null;
     const chosenName = tab ? tab.name : (name || window._editorCodeNameValue || '');
-    const identity = _editorActionIdentity(chosenName);
     const identityName = document.getElementById('editorCodeName');
     if (identityName) {
         const openMeta = window._editorOpenLumpMeta;
@@ -12105,15 +12104,13 @@ function _refreshEditorActionIdentity(name) {
             ? tab.sourceRevision
             : (openMeta && Number.isInteger(openMeta.lump_version)
                 ? openMeta.lump_version : null);
-        const primary = identity || chosenName;
-        identityName.textContent = primary +
+        identityName.textContent = chosenName +
             (Number.isInteger(revision) ? ` · Source v${revision}` : '');
-        identityName.title = identity
-            ? `LUMP identity: ${identity}` +
+        identityName.title = chosenName
+            ? `Program name: ${chosenName}` +
                 (Number.isInteger(revision) ? `; source revision v${revision}` : '')
-            : (chosenName ? `Program name: ${chosenName}` : 'Program name');
-        identityName.setAttribute('aria-label',
-            identity ? 'LUMP identity and source revision' : 'Program name');
+            : 'Program name';
+        identityName.setAttribute('aria-label', 'Program name and source revision');
     }
 }
 

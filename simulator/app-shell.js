@@ -2649,9 +2649,13 @@ function switchView(viewId) {
         document.querySelectorAll('.trace-row-highlighted').forEach(el => el.classList.remove('trace-row-highlighted'));
         document.querySelectorAll('.trace-gatelog-back').forEach(el => el.remove());
     }
-    // ── LUMP-edit dirty-listener teardown when leaving the editor ─────────
-    // Prevents stale autosave listeners from persisting across view switches.
-    if (viewId !== 'editor' && currentView === 'editor') {
+    // Ordinary view navigation must preserve an open saved-LUMP workspace.
+    // Explicit document changes (new source, example, personal tab, compile,
+    // or another LUMP) own teardown through exitSavedLumpEditorMode(). If we
+    // detach here, returning to Editor leaves the source/name visible but
+    // replaces the immutable disassembly with the normal Console.
+    if (viewId !== 'editor' && currentView === 'editor' &&
+            !window._savedLumpEditorMode) {
         if (window._editorLumpDirtyListener && window._editorLumpDirtyListenerEl) {
             window._editorLumpDirtyListenerEl.removeEventListener('input', window._editorLumpDirtyListener);
         }
@@ -2661,9 +2665,10 @@ function switchView(viewId) {
         var _exitDiscardBtn = document.getElementById('btnDiscardLumpEdit');
         if (_exitDiscardBtn) _exitDiscardBtn.remove();
     }
-    // A saved LUMP owns the right-hand editor pane only while it is open.
-    // Any navigation away restores the ordinary console/reference interface.
-    if ((viewId !== 'editor' || !window._committingSavedLumpOpen) &&
+    // Do not discard a saved-LUMP workspace merely because another main view
+    // is visited. Returning to Editor must restore the exact same two panes.
+    if (!window._savedLumpEditorMode &&
+            (viewId !== 'editor' || !window._committingSavedLumpOpen) &&
             !(viewId === 'editor' && window._restoredEditorOwnerPending) &&
             typeof window.exitSavedLumpEditorMode === 'function') {
         window.exitSavedLumpEditorMode();

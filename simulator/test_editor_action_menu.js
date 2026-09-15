@@ -32,10 +32,10 @@ check(!index.includes('id="editorActionsIdentity"') &&
     'the hamburger menu has no duplicate identity context');
 check(index.includes('id="editorCodeName" class="editor-identity-name"') &&
       run.includes('window._editorCodeNameValue = name || \'\';') &&
-      run.includes('const identity = _editorActionIdentity(chosenName);') &&
+      run.includes('identityName.textContent = chosenName +') &&
       !index.includes('id="editorIdentityName"') &&
       run.includes('document.getElementById(\'editorCodeName\')'),
-    'the DOM uses one visible full dot.name identity and has no duplicate label');
+    'the DOM uses one visible program name and has no duplicate label');
 check(run.includes('function _editorActionIdentity(name)') &&
       run.includes('const openMeta = window._editorOpenLumpMeta;') &&
       run.includes('openMeta.issue_n || openMeta.issue') &&
@@ -43,8 +43,9 @@ check(run.includes('function _editorActionIdentity(name)') &&
       run.includes('` · Source v${revision}`'),
     'the action identity uses the exact open LUMP dot.name and issue number');
 check(!run.includes('badge.textContent = `LUMP identity: ${identity}`') &&
-      run.includes('const primary = identity || chosenName;'),
-    'the toolbar consolidates the program name, LUMP identity, and source revision');
+      run.includes('identityName.textContent = chosenName +') &&
+      !run.includes('identityName.textContent = identity +'),
+    'the compact toolbar shows the program name without a LUMP issue suffix');
 check(shell.includes('_refreshEditorActionIdentity('),
     'execution identity changes refresh the action context');
 check(!compile.includes('_applySealedLumpState') &&
