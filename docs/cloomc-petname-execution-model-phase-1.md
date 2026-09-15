@@ -1,7 +1,8 @@
 # CLOOMC++ Petname Execution Model — Phase 1
 
-**Status:** Proposal for review and approval  
+**Status:** Approved architecture; final CALL/LAMBDA bit allocation pending
 **Date:** 2026-09-15  
+**Approved:** 2026-09-15
 **Scope:** Programmer-visible petnames, Church register identity, and symbolic CALL/LAMBDA dispatch
 
 ---
@@ -597,36 +598,38 @@ The following are outside Phase 1:
 
 Approval of this document confirms:
 
-- [ ] Petnames are the normal CLOOMC++ interface; registers and rows are
+- [x] Petnames are the normal CLOOMC++ interface; registers and rows are
       compiler-managed.
-- [ ] `Scheduler.pause` resolves both an abstraction row and a method
+- [x] `Scheduler.pause` resolves both an abstraction row and a method
       selector.
-- [ ] `Self`, `Self.Thread`, and `Self.Namespace` are reserved relative
+- [x] `Self`, `Self.Thread`, and `Self.Namespace` are reserved relative
       petnames.
-- [ ] C-list row zero is displayed as `Self`, not `Child[0]`.
-- [ ] `Caller` is a dynamic protected-frame relationship, not a permanent
+- [x] C-list row zero is displayed as `Self`, not `Child[0]`.
+- [x] `Caller` is a dynamic protected-frame relationship, not a permanent
       petname.
-- [ ] Every resolved GT in a Church CR may be displayed by petname.
-- [ ] Turing DRs remain numeric and unnamed in Phase 1.
-- [ ] Indexed CALL and LAMBDA use implicit CR6 through virtual M.
-- [ ] The indexed E/X GT remains internal and is not materialized in a
+- [x] Every resolved GT in a Church CR may be displayed by petname.
+- [x] Turing DRs remain numeric and unnamed in Phase 1.
+- [x] Indexed CALL and LAMBDA use implicit CR6 through virtual M.
+- [x] The indexed E/X GT remains internal and is not materialized in a
       programmer-visible CR.
-- [ ] Abstraction entry authority does not receive L permission.
-- [ ] Extended CALL replaces ELOADCALL.
-- [ ] Extended LAMBDA replaces XLOADLAMBDA.
-- [ ] Opcodes 8 and 9 fault as reserved in the new simulator and FPGA ISA.
-- [ ] Existing source is corrected manually; no automatic translation is
+- [x] Abstraction entry authority does not receive L permission.
+- [x] Extended CALL replaces ELOADCALL.
+- [x] Extended LAMBDA replaces XLOADLAMBDA.
+- [x] Opcodes 8 and 9 fault as reserved in the new simulator and FPGA ISA.
+- [x] Existing source is corrected manually; no automatic translation is
       provided.
-- [ ] Any remaining ELOADCALL or XLOADLAMBDA mnemonic causes a recompilation
+- [x] Any remaining ELOADCALL or XLOADLAMBDA mnemonic causes a recompilation
       error.
-- [ ] The boot load contains exactly `CapabilityTest`, `SelfTest`, and
+- [x] The boot load contains exactly `CapabilityTest`, `SelfTest`, and
       `WukongCallHome`.
-- [ ] Those three LUMPs and the boot image are rebuilt and contain no opcode 8
+- [x] Those three LUMPs and the boot image are rebuilt and contain no opcode 8
       or 9.
-- [ ] Retirement is not complete until regenerated RTL and a fresh physical
+- [x] Retirement is not complete until regenerated RTL and a fresh physical
       FPGA bitstream pass cross-layer verification.
 - [ ] Final row/method/mode bit allocation requires a separate explicit
       encoding approval.
 
-Until this checklist and the final encoding are approved, this document is a
-proposal and does not supersede the implemented ISA.
+This architecture is approved. It supersedes conflicting design intent but
+does not claim that the current implementation already conforms. Executable
+changes remain blocked on the separate final row/method/mode bit-allocation
+approval.
