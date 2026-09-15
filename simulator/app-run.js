@@ -2477,6 +2477,75 @@ let _bootAnimTimer = null;
 // Cleared only when the sim is reset (resetSim / resetAndStep / faultClear).
 let _bootAuditAccum = [];
 let _defaultProgramLoaded = false;
+
+// The loaded image's boot-entry slot is authoritative. Resolve that slot to
+// the catalog token so Code View opens the same executable marked with ⚡,
+// rather than silently substituting the generic capability_test example.
+function _configuredBootLumpToken() {
+    if (!window.LumpRegistry || !sim) return null;
+    const slot = Number(sim.bootEntrySlot);
+    if (!Number.isInteger(slot) || slot < 0) return null;
+
+    const candidates = window.LumpRegistry.getServerList().filter(function(lump) {
+        return lump && lump.token &&
+            Number(lump.ns_slot) === slot &&
+            lump.lump_type !== 'namespace' &&
+            lump.typ !== 1;
+    });
+    if (!candidates.length) return null;
+
+    // Historical revisions may share a slot. Prefer the executable that is
+    // explicitly part of the resident boot image, then the newest revision.
+    candidates.sort(function(a, b) {
+        const residentScore = function(lump) {
+            return (lump.boot_resident === true ? 4 : 0) +
+                (lump.resident === true ? 2 : 0) +
+                ((lump.load_policy || lump.loadPolicy) === 'Resident' ? 1 : 0);
+        };
+        const scoreOrder = residentScore(b) - residentScore(a);
+        if (scoreOrder) return scoreOrder;
+        const time = function(lump) {
+            const value = Number(lump.compiled_at);
+            return Number.isFinite(value) ? value : 0;
+        };
+        const timeOrder = time(b) - time(a);
+        if (timeOrder) return timeOrder;
+        return (parseInt(b.lump_version, 10) || 0) -
+            (parseInt(a.lump_version, 10) || 0);
+    });
+    return candidates[0].token;
+}
+
+function _openConfiguredBootLumpInDefaultEditor() {
+    const editor = document.getElementById('asmEditor');
+    const hasEditorSource = !!(editor && editor.value && editor.value.trim());
+    const hasUserTab = (typeof activeUserTabId !== 'undefined') && !!activeUserTabId;
+    const isDefaultCodeView =
+        (typeof currentView !== 'undefined' && currentView === 'editor') ||
+        window._startupDefaultView === 'editor';
+    if (!isDefaultCodeView || hasEditorSource || hasUserTab ||
+            typeof openLumpInEditor !== 'function' || !window.LumpRegistry) {
+        return Promise.resolve(false);
+    }
+
+    const openResolved = function() {
+        const token = _configuredBootLumpToken();
+        if (!token) return false;
+        return Promise.resolve(openLumpInEditor(token)).then(function() {
+            return true;
+        });
+    };
+
+    // Share the catalog request already started by the LUMP workspace.
+    const catalogReady = window.LumpRegistry.isServerListFetched()
+        ? Promise.resolve()
+        : window.LumpRegistry.warmServerList();
+    return catalogReady.then(openResolved).catch(function(error) {
+        console.warn('[boot-entry-editor] could not open configured boot LUMP:', error);
+        return false;
+    });
+}
+
 function _autoLoadDefaultProgram() {
     // Re-apply any sticky patches (set via patchSimulator()) that should survive
     // reset.  Safe to call here because the NS table and lump addresses are stable
@@ -2514,7 +2583,16 @@ function _autoLoadDefaultProgram() {
     const _edHasContent = !!(_dfltEd && _dfltEd.value && _dfltEd.value.trim());
     const _userTabActive = (typeof activeUserTabId !== 'undefined') && !!activeUserTabId;
     if (!_edHasContent && !_userTabActive) {
-        loadExample('capability_test');
+        _openConfiguredBootLumpInDefaultEditor().then(function(opened) {
+            if (opened) return;
+            // Preserve the existing fallback if the authoritative catalog row
+            // is unavailable, while rechecking so an async open cannot erase
+            // source entered by the user in the meantime.
+            const _ed = document.getElementById('asmEditor');
+            const _stillEmpty = !!(_ed && (!_ed.value || !_ed.value.trim()));
+            const _stillNoTab = (typeof activeUserTabId === 'undefined') || !activeUserTabId;
+            if (_stillEmpty && _stillNoTab) loadExample('capability_test');
+        });
     }
     // Do NOT auto-assemble here. assembleAndLoad() → sim.loadProgram() would
     // overwrite Boot.Abstr word[0] with the capability_test first instruction,

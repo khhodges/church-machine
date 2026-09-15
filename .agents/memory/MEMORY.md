@@ -155,3 +155,4 @@
 - [Shared served-script dependencies](shared-served-script-dependencies.md) — declare shared UI modules explicitly and test consumers in manifest order; avoid runtime script injection
 - [Named CALL CR6 lookup](named-call-cr6-fallback.md) — named lookup uses CR6 syntax but materializes a normal LOAD + opcode-2 CALL, never an implicit ELOADCALL
 - [Three-LUMP resident profile](three-lump-resident-profile.md) — boot core is an explicit fixed-map policy; manifest history never selects live resident executables
+- [Boot-entry UI authority](boot-entry-ui-authority.md) — default Code View follows the loaded image's boot slot, never a stale pending browser selection
