@@ -151,3 +151,4 @@
 - [CapabilityTest Namespace slot](capabilitytest-namespace-slot.md) — CapabilityTest stays at NS[10]; UART_DEV stays at NS[2] with hardware address/limit semantics
 - [Deployment approval replay binding](deployment-approval-replay.md) — consuming-path mismatches burn live intents; only explicit read-only preflight may retain them
 - [Church GT petname boundary](church-gt-petname-boundary.md) — resolve every CR-held GT to a petname; leave Turing data registers numeric and unnamed
+- [Retired fused instruction cutover](retired-fused-instruction-cutover.md) — manual source correction, hard compile errors, and only three boot-loaded LUMPs

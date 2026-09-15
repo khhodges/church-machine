@@ -374,31 +374,36 @@ After this gate:
 - no compiler or assembler emits opcode 8 or 9;
 - named calls such as `Scheduler.pause` emit extended CALL;
 - named lambda applications emit extended LAMBDA;
-- explicit `ELOADCALL` and `XLOADLAMBDA` source is rejected with a migration
-  message rather than silently translated.
+- explicit `ELOADCALL` and `XLOADLAMBDA` source causes a recompilation error;
+- existing source is corrected manually before it is recompiled.
 
-Rejecting the obsolete mnemonics makes stale source visible. Automatic silent
-translation would conceal encoding and authority mistakes.
+There is no automatic source migration or silent translation. Rejecting the
+obsolete mnemonics makes every remaining use visible and prevents an encoding
+or authority mistake from being concealed.
 
 #### Gate C — migrate executable artifacts
 
-Find every boot image, resident LUMP, saved test fixture, example binary, and
-release artifact containing opcode 8 or 9.
+The boot load contains exactly three LUMPs:
 
-For each active artifact:
+1. `CapabilityTest`
+2. `SelfTest`
+3. `WukongCallHome`
 
-1. rebuild it from authoritative source with the approved compiler;
-2. recompute its code size, c-list placement, identity, hashes, and seals;
-3. re-localize destination GTs;
-4. regenerate boot images that embed it;
-5. verify that the rebuilt artifact contains no opcode 8 or 9.
+Their authoritative source is inspected and corrected manually. Each is then:
 
-Immutable historical LUMPs are not edited in place. They remain historical
-evidence under their original ISA version, while a newly approved revision is
-created for current execution.
+1. rebuilt with the approved compiler;
+2. assigned freshly computed code size, c-list placement, identity, hashes,
+   and seals;
+3. localized with destination GTs;
+4. placed in the regenerated boot image;
+5. audited to prove that it contains no opcode 8 or 9.
 
-The loader must reject an obsolete binary that cannot be identified and
-migrated safely. It must not execute that binary using the new ISA.
+No additional LUMP is admitted to the boot load in Phase 1.
+
+Other source, examples, and tests that use a retired instruction are also
+corrected manually. Any uncorrected source fails recompilation. An old binary
+containing opcode 8 or 9 is not migrated or reinterpreted by the loader; it
+cannot run on the new ISA.
 
 #### Gate D — simulator and developer tools
 
@@ -495,9 +500,11 @@ Phase 1 proposes a clean version boundary:
 - new source cannot name ELOADCALL or XLOADLAMBDA;
 - new binaries cannot contain opcode 8 or 9;
 - new simulator and FPGA releases fault on opcode 8 or 9;
-- old immutable artifacts remain identifiable as historical artifacts;
-- an old artifact must be recompiled into a new immutable revision before it
-  can run on the new ISA;
+- existing source is corrected manually and must then recompile cleanly;
+- any remaining retired mnemonic causes a recompilation error;
+- the boot load contains only `CapabilityTest`, `SelfTest`, and
+  `WukongCallHome`;
+- old binaries containing opcode 8 or 9 do not run on the new ISA;
 - no loader, simulator, or FPGA may silently reinterpret an old instruction
   word.
 
@@ -560,12 +567,15 @@ After approval, Phase 1 consists of:
 5. Retire ELOADCALL and XLOADLAMBDA from source, compiler, assembler,
    simulator, developer tools, active binaries, boot images, RTL, generated
    Verilog/RTLIL, and released FPGA bitstreams.
-6. Display verified petnames for all GT-bearing CRs in the IDE.
-7. Display `Self`, `Self.Thread`, and `Self.Namespace` according to the active
+6. Manually correct and rebuild the only three boot-loaded LUMPs:
+   `CapabilityTest`, `SelfTest`, and `WukongCallHome`.
+7. Make every remaining source use of a retired mnemonic fail recompilation.
+8. Display verified petnames for all GT-bearing CRs in the IDE.
+9. Display `Self`, `Self.Thread`, and `Self.Namespace` according to the active
    execution context.
-8. Keep DRs numeric and unnamed.
-9. Show unresolved identities explicitly and never reuse stale labels.
-10. Align the interactive reference, ISA documents, simulator, assembler,
+10. Keep DRs numeric and unnamed.
+11. Show unresolved identities explicitly and never reuse stale labels.
+12. Align the interactive reference, ISA documents, simulator, assembler,
     tests, and RTL.
 
 ---
@@ -605,8 +615,14 @@ Approval of this document confirms:
 - [ ] Extended CALL replaces ELOADCALL.
 - [ ] Extended LAMBDA replaces XLOADLAMBDA.
 - [ ] Opcodes 8 and 9 fault as reserved in the new simulator and FPGA ISA.
-- [ ] Active LUMPs and boot images are rebuilt; immutable historical artifacts
-      are versioned rather than modified.
+- [ ] Existing source is corrected manually; no automatic translation is
+      provided.
+- [ ] Any remaining ELOADCALL or XLOADLAMBDA mnemonic causes a recompilation
+      error.
+- [ ] The boot load contains exactly `CapabilityTest`, `SelfTest`, and
+      `WukongCallHome`.
+- [ ] Those three LUMPs and the boot image are rebuilt and contain no opcode 8
+      or 9.
 - [ ] Retirement is not complete until regenerated RTL and a fresh physical
       FPGA bitstream pass cross-layer verification.
 - [ ] Final row/method/mode bit allocation requires a separate explicit
