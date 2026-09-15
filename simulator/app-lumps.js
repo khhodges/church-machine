@@ -3115,9 +3115,9 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                 );
                 const previewUsable = Boolean(hist &&
                     hist.binary_available !== false);
-                const activationUsable = Boolean(!isCurrent && !historicalRecord &&
-                    previewUsable && hist.restore_enabled !== false &&
-                    hist.binary_valid === true);
+                const eligibility = _historyActivationEligibility(hist);
+                const activationUsable = Boolean(!isCurrent && previewUsable &&
+                    eligibility.status === 'eligible');
                 const previewToken = token;
                 const archiveFilename = hist && (
                     hist.archive_filename || hist.record_filename || '');
@@ -3141,9 +3141,8 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                 } else if (activationUsable) {
                     html += `<td><input class="lump-history-current-checkbox" type="checkbox" aria-label="Make v${ver} the current LUMP" title="Make v${ver} the current live LUMP" onclick="event.stopPropagation();" onchange="_setLumpHistoryCurrent(this,'${e(token)}',${ver})"></td>`;
                 } else {
-                    const disabledTitle = bootstrapCorrectionAvailable
-                        ? `v${ver} has a bootstrap identity mismatch. Open Preview or Correct to review the required corrections.`
-                        : 'This revision cannot become live until it has a valid approved binary';
+                    const disabledTitle = eligibility.reasons.map(item => item.message).join(' ') ||
+                        'Activation eligibility could not be determined. Reload History.';
                     html += `<td><input class="lump-history-current-checkbox" type="checkbox" disabled aria-label="v${ver} cannot become the current LUMP" title="${e(disabledTitle)}"></td>`;
                 }
 
@@ -3366,8 +3365,11 @@ function _showLumpHistoryPreviewModal(version, bodyHtml) {
 
 function _lumpBootstrapRepairControls(data, currentToken, version, archiveFilename, tk, historicalRecord, isCurrent) {
     const identity = data && data.bootstrap_identity;
+    const eligibility = _historyActivationEligibility(data);
     if (isCurrent || !identity || identity.applies !== true ||
         identity.valid !== false || !archiveFilename ||
+        !eligibility.checks.some(check => check.category === 'destination' &&
+            check.status === 'fail') ||
         !/^[0-9a-f]{8}$/i.test(String(identity.expected_gt || ''))) {
         return '';
     }
@@ -3379,13 +3381,13 @@ function _lumpBootstrapRepairControls(data, currentToken, version, archiveFilena
         corrections.push({
             id: 'repair-sealed-row-zero-gt',
             title: 'Correct the sealed c-list row-zero GT',
-            detail: `Replace 0x${_escHtml(row0 || '????????')} with the Namespace-derived GT 0x${_escHtml(expected)}.`,
+            detail: `The sealed value 0x${_escHtml(row0 || '????????')} differs from the current binding 0x${_escHtml(expected)}. Review the correction plan's destination before approving.`,
         });
     }
     corrections.push({
         id: 'issue-canonical-bootstrap-identity',
         title: 'Issue the repaired bytes as the canonical live LUMP',
-        detail: `The new live revision will use Token and serialized T 0x${_escHtml(expected)}. The historical archive will not be changed.`,
+        detail: `Review the server-derived destination and identity in the correction plan. The historical archive will not be changed; this process may allocate a new destination rather than replace the boot-selected slot.`,
     });
     const list = corrections.map(correction =>
         `<label class="lump-bootstrap-repair-choice">` +
@@ -3408,50 +3410,44 @@ function _lumpBootstrapRepairControls(data, currentToken, version, archiveFilena
     );
 }
 
+function _historyActivationEligibility(data) {
+    const report = data && data.activation_eligibility;
+    if (report && ['eligible', 'blocked', 'current', 'unknown'].includes(report.status) &&
+            Array.isArray(report.checks) && Array.isArray(report.reasons)) return report;
+    const unknown = {
+        code: 'eligibility_unavailable', category: 'transition', status: 'unknown',
+        message: 'Activation eligibility could not be determined.',
+        next_action: 'Reload History to request the server validation result.',
+    };
+    return { status: 'unknown', checks: [unknown], reasons: [unknown] };
+}
+
 function _lumpHistoryPreviewIssueSummary(data, isCurrent, historicalRecord) {
     const identity = data && data.bootstrap_identity;
-    const validationErrors = data && Array.isArray(data.validation_errors)
-        ? data.validation_errors : [];
-    const serverIssues = data && Array.isArray(data.preview_issues)
-        ? data.preview_issues : [];
+    const eligibility = _historyActivationEligibility(data);
     const messages = [];
-    const addMessage = (message, kind) => {
-        const text = String(message || '').trim();
-        if (!text || messages.some(item => item.message === text)) return;
-        messages.push({ message: text, kind: kind || 'validation' });
-    };
-    serverIssues.forEach(issue => {
-        if (issue && typeof issue === 'object') {
-            addMessage(issue.message, issue.kind);
-        } else {
-            addMessage(issue);
-        }
+    const seen = new Set();
+    eligibility.checks.forEach(check => {
+        if (!check || !check.code || seen.has(check.code)) return;
+        seen.add(check.code);
+        messages.push(check);
     });
-    validationErrors.forEach(message => addMessage(message, 'validation'));
-    if (identity && identity.applies === true && identity.valid === false) {
-        addMessage('Bootstrap identity is inconsistent.', 'bootstrap-identity');
-        (Array.isArray(identity.errors) ? identity.errors : [])
-            .forEach(message => addMessage(message, 'bootstrap-identity-detail'));
-    }
-    if (!isCurrent && (historicalRecord || data && data.binary_valid === false)) {
-        addMessage(
-            'Direct History activation is disabled because the revision is not a valid live candidate.',
-            'activation'
-        );
-    }
 
     const provenance = data && data.archive_provenance;
     let html =
         `<section class="lump-history-issues" aria-label="Issues / Why this cannot be set">` +
-        `<div class="lump-section-title">Issues / Why this cannot be set</div>`;
+        `<div class="lump-section-title">Activation checks — ${_escHtml(eligibility.status)}</div>`;
     if (messages.length) {
         html += `<ul class="lump-history-issues-list">` +
             messages.map(item =>
-                `<li class="lump-history-issue lump-history-issue--${_escHtml(item.kind)}">${_escHtml(item.message)}</li>`
+                `<li class="lump-history-issue" data-reason-code="${_escHtml(item.code)}">` +
+                `<strong>${_escHtml(item.category)} — ${_escHtml(item.status)}</strong>: ${_escHtml(item.message)}` +
+                (item.next_action ? `<br><span>Next: ${_escHtml(item.next_action)}</span>` : '') +
+                `</li>`
             ).join('') +
             `</ul>`;
     } else {
-        html += `<p class="lump-history-issues-clear">No blocking issues were reported for this revision.</p>`;
+        html += `<p>Activation eligibility could not be determined. Reload History.</p>`;
     }
 
     if (identity && identity.applies === true && identity.valid === false) {

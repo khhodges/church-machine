@@ -12023,6 +12023,11 @@ def patch_wip_source(token):
     }), 410
 
 
+_BOOTSTRAP_IDENTITY_NAMES = frozenset({
+    "selftest", "capabilitytest", "wukongcallhome",
+})
+
+
 def _bootstrap_snapshot_identity(
         lumps_dir, manifest_entry, inspected, *, binding_override=None):
     """Compare one exact saved binary with its name's live bootstrap binding.
@@ -12040,8 +12045,7 @@ def _bootstrap_snapshot_identity(
     # These are the ratified frozen bootstrap chain.  Historical manifest rows
     # predate explicit resident flags, so ancestry must be recognized by stable
     # abstraction identity rather than by a current token or filename.
-    if abstraction.casefold() not in {
-            "selftest", "capabilitytest", "wukongcallhome"}:
+    if abstraction.casefold() not in _BOOTSTRAP_IDENTITY_NAMES:
         return None
 
     record_token = str(manifest_entry.get("token") or "").strip().lower()
@@ -12138,51 +12142,390 @@ def _bootstrap_snapshot_identity(
     }
 
 
-def _lump_preview_issues(validation_errors, bootstrap_identity=None, *,
-                         historical=False, current=False,
-                         restore_enabled=None):
-    """Return ordered, user-facing diagnostics for a read-only Preview.
+def _activation_check(code, category, status, message, *, next_action=None,
+                      facts=None):
+    """Build one wire-stable activation check.
 
-    Keep the raw validation messages as individual entries.  Bootstrap
-    identity facts are added separately so a Preview cannot reduce a
-    multi-part identity failure to one generic "invalid binary" message.
+    The activation report is deliberately a read-only explanation.  It is not
+    used by the save/restore path as an authorization decision.  Keep the
+    fields small and JSON-native because History and words responses are also
+    consumed by diagnostic clients outside the IDE.
     """
-    issues = []
-    for message in validation_errors or []:
-        if message:
-            issues.append({"kind": "validation", "message": str(message)})
+    check = {
+        "code": str(code),
+        "category": str(category),
+        "status": str(status),
+        "message": str(message),
+    }
+    if next_action:
+        check["next_action"] = str(next_action)
+    if isinstance(facts, dict) and facts:
+        check["facts"] = facts
+    return check
+
+
+def _bootstrap_identity_error(message):
+    """Whether *message* describes identity rather than damaged bytes."""
+    text = str(message or "").casefold()
+    return (
+        "bootstrap t-equals-gt validation failed" in text
+        or "bootstrap identity failure" in text
+        or "bootstrap identity disagrees" in text
+        or "bootstrap approval gt" in text
+        or "sealed row-zero gt" in text
+        or "record token" in text and "expected gt" in text
+    )
+
+
+def _approval_store_error(message):
+    text = str(message or "").casefold()
+    return (
+        "approval store unavailable" in text
+        or "approvals.json" in text and (
+            "unavailable" in text or "unreadable" in text or "corrupt" in text)
+    )
+
+
+def _activation_eligibility(
+        validation_errors=None, bootstrap_identity=None, *,
+        current=False, historical_record=False, archive_provenance=None,
+        approved=None, binary_available=None, binary_valid=None,
+        binary_hash=None, integrity_result=_LUMP_TRANSITION_UNSET,
+        manifest_entry=None, approval_store_unavailable=False):
+    """Return the read-only activation report for one exact artifact.
+
+    ``binary_valid`` means structural validity only.  In particular, the
+    bootstrap T/row-zero/Namespace relationship is a destination check, not a
+    damaged-byte check.  This distinction is important for legacy bootstrap
+    archives: their bytes remain useful evidence and can be previewed even
+    when their old resident identity cannot be activated.
+
+    This helper intentionally does not implement a restore or save gate.
+    Existing mutation routes retain their validators, approval intents, and
+    atomic transition rules; this report only explains those facts to callers.
+    """
+    abstraction = (
+        manifest_entry.get("abstraction")
+        if isinstance(manifest_entry, dict) else None
+    )
+    known_bootstrap = (
+        isinstance(abstraction, str)
+        and abstraction.casefold() in _BOOTSTRAP_IDENTITY_NAMES
+    )
+    errors = [
+        str(message) for message in (validation_errors or []) if message
+    ]
+    identity_errors = [
+        message for message in errors
+        if known_bootstrap and _bootstrap_identity_error(message)
+    ]
+    approval_errors = [
+        message for message in errors if _approval_store_error(message)
+    ]
+    structural_errors = [
+        message for message in errors
+        if message not in identity_errors and message not in approval_errors
+    ]
+    if approval_store_unavailable or approval_errors:
+        approval_store_unavailable = True
+
+    facts_hash = (
+        {"binary_hash": binary_hash}
+        if isinstance(binary_hash, str) and binary_hash else {}
+    )
+    if binary_available is False:
+        integrity = _activation_check(
+            "binary_unavailable", "integrity", "fail",
+            "The exact binary bytes are unavailable for activation.",
+            next_action="Restore the recorded archive or save a new exact binary.",
+        )
+    elif structural_errors or (binary_valid is False and not identity_errors):
+        detail = structural_errors[0] if structural_errors else (
+            "the binary does not satisfy the LUMP structural validator")
+        integrity = _activation_check(
+            "binary_invalid", "integrity", "fail",
+            f"The exact binary fails structural validation: {detail}",
+            next_action="Rebuild or replace the binary, then obtain approval for "
+                        "the replacement bytes.",
+            facts=facts_hash,
+        )
+    elif (binary_valid is True
+          or (binary_available is True and binary_valid is False
+              and not structural_errors and identity_errors)):
+        integrity = _activation_check(
+            "binary_valid", "integrity", "pass",
+            "The exact binary passes structural validation.",
+            facts=facts_hash,
+        )
+    else:
+        integrity = _activation_check(
+            "binary_validation_unknown", "integrity", "unknown",
+            "Structural validation of the exact binary is unavailable.",
+            next_action="Reload the exact archive and request validation again.",
+            facts=facts_hash,
+        )
+
+    # Canonical filename integrity is meaningful only for the current
+    # manifest-selected artifact.  An archive is an immutable historical
+    # locator and must not be called damaged merely because its old bytes do
+    # not match today's active token/filename.
+    archive_kind = (
+        archive_provenance.get("kind")
+        if isinstance(archive_provenance, dict) else None
+    )
+    is_archive = bool(archive_kind) or bool(historical_record)
+    if is_archive:
+        canonical = _activation_check(
+            "canonical_integrity_not_applicable", "integrity",
+            "not_applicable",
+            "Canonical active-token integrity does not apply to an immutable "
+            "archive locator.",
+        )
+    elif integrity_result is True:
+        canonical = _activation_check(
+            "canonical_integrity", "integrity", "pass",
+            "The current manifest locator matches the exact binary bytes.",
+            facts=facts_hash,
+        )
+    elif isinstance(integrity_result, str):
+        if integrity_result.casefold().startswith("integrity check failed"):
+            canonical = _activation_check(
+                "canonical_integrity_unknown", "integrity", "unknown",
+                integrity_result,
+                next_action="Repair the unreadable manifest or approval store, "
+                            "then reload the current artifact.",
+                facts=facts_hash,
+            )
+        else:
+            canonical = _activation_check(
+                "canonical_integrity_failed", "integrity", "fail",
+                integrity_result,
+                next_action="Reload the current manifest and exact binary before "
+                            "attempting activation.",
+                facts=facts_hash,
+            )
+    elif manifest_entry is None:
+        canonical = _activation_check(
+            "canonical_integrity_unknown", "integrity", "unknown",
+            "The current manifest locator could not be established.",
+            next_action="Reload the current manifest before attempting activation.",
+        )
+    else:
+        # A missing approval is reported in the approval category. There is no
+        # separate canonical claim to make until the hash-bound record exists.
+        canonical = _activation_check(
+            "canonical_integrity_not_applicable", "integrity",
+            "not_applicable",
+            "Canonical filename integrity is evaluated with the exact approved "
+            "current artifact.",
+        )
+
+    if approved is True:
+        approval = _activation_check(
+            "hash_bound_approval", "approval", "pass",
+            "A review record is bound to the exact binary hash.",
+            facts=facts_hash,
+        )
+    elif approval_store_unavailable:
+        approval = _activation_check(
+            "approval_unavailable", "approval", "unknown",
+            "The approval store could not be read, so approval is unknown.",
+            next_action="Repair or restore approvals.json, then reload the "
+                        "artifact preview.",
+            facts=facts_hash,
+        )
+    elif approved is False:
+        approval = _activation_check(
+            "approval_missing", "approval", "fail",
+            "No approval is bound to the exact binary hash.",
+            next_action="Review and approve this exact binary before activation.",
+            facts=facts_hash,
+        )
+    else:
+        approval = _activation_check(
+            "approval_unknown", "approval", "unknown",
+            "The exact binary's approval status is unavailable.",
+            next_action="Reload the exact artifact and request its approval "
+                        "record again.",
+            facts=facts_hash,
+        )
 
     identity = bootstrap_identity
+    if (known_bootstrap and isinstance(identity, dict)
+            and identity.get("applies") is True):
+        identity_facts = {
+            key: identity.get(key)
+            for key in ("record_token", "row0_gt", "expected_gt", "slot", "sequence")
+            if identity.get(key) is not None
+        }
+        if identity.get("valid") is True:
+            destination = _activation_check(
+                "bootstrap_identity_verified", "destination", "pass",
+                "The bootstrap binary identity matches its authoritative "
+                "Namespace destination.",
+                facts=identity_facts,
+            )
+        elif any("audit is unavailable" in str(message).casefold()
+                 for message in identity.get("errors") or []):
+            destination = _activation_check(
+                "bootstrap_identity_unknown", "destination", "unknown",
+                "The authoritative bootstrap destination identity could not "
+                "be audited.",
+                next_action="Repair or restore ns-state.json, then reload the "
+                            "exact archive.",
+                facts=identity_facts,
+            )
+        else:
+            destination = _activation_check(
+                "bootstrap_identity_mismatch", "destination", "fail",
+                ("The archived record token differs from the required bootstrap "
+                 "identity. The sealed SELF GT already matches the destination."
+                 if identity.get("row0_gt") == identity.get("expected_gt")
+                 and identity.get("record_token") != identity.get("expected_gt")
+                 else "The bootstrap record and sealed SELF identity do not "
+                 "both match the authoritative Namespace destination."),
+                next_action="Use the server's bootstrap correction or issue a "
+                            "new revision; do not activate these bytes directly.",
+                facts=identity_facts,
+            )
+    elif known_bootstrap:
+        destination = _activation_check(
+            "bootstrap_identity_unknown", "destination", "unknown",
+            "The authoritative bootstrap destination identity is unavailable.",
+            next_action="Reload ns-state.json and the exact bootstrap artifact.",
+        )
+    elif isinstance(manifest_entry, dict) and abstraction:
+        destination = _activation_check(
+            "destination_not_applicable", "destination", "not_applicable",
+            "This ordinary abstraction has no fixed bootstrap destination "
+            "identity check.",
+            facts={"abstraction": abstraction},
+        )
+    else:
+        destination = _activation_check(
+            "destination_unknown", "destination", "unknown",
+            "The activation destination could not be established.",
+            next_action="Reload the manifest and Namespace state before "
+                        "attempting activation.",
+        )
+
+    if current:
+        transition = _activation_check(
+            "current_revision", "transition", "not_applicable",
+            "This is the current live revision; no activation transition is "
+            "needed.",
+        )
+    elif (
+        historical_record
+        or archive_kind == "archived-manifest-row"
+    ):
+        transition = _activation_check(
+            "historical_record_unsupported", "transition", "fail",
+            "This immutable historical manifest record cannot be activated "
+            "directly.",
+            next_action="Use a current saved revision or promote a newer "
+                        "approved compilation; keep this record read-only.",
+            facts={"archive_kind": "archived-manifest-row"},
+        )
+    elif archive_kind == "standard-filename-pattern":
+        transition = _activation_check(
+            "archive_transition_supported", "transition", "pass",
+            "This standard archive has the existing protected restore "
+            "transition available.",
+            facts={"archive_kind": "standard-filename-pattern"},
+        )
+    else:
+        transition = _activation_check(
+            "transition_unknown", "transition", "unknown",
+            "The archive transition cannot be identified from the immutable "
+            "record.",
+            next_action="Reload History and request the exact archive locator.",
+        )
+
+    checks = [integrity, canonical, approval, destination, transition]
+    blocking = [check for check in checks if check["status"] == "fail"]
+    unknown = [check for check in checks if check["status"] == "unknown"]
+    if current:
+        status = "current"
+    elif blocking:
+        status = "blocked"
+    elif unknown:
+        status = "unknown"
+    else:
+        status = "eligible"
+    return {
+        "status": status,
+        "checks": checks,
+        "reasons": [
+            dict(check) for check in checks
+            if check["status"] in {"fail", "unknown"}
+        ],
+    }
+
+
+def _lump_preview_issues(validation_errors, bootstrap_identity=None, *,
+                         historical=False, current=False,
+                         restore_enabled=None, activation_eligibility=None):
+    """Return ordered, user-facing diagnostics for a read-only Preview.
+
+    The historical implementation appended a generic "invalid live
+    candidate" message to every failed archive.  Keep useful raw validator
+    facts, but derive activation explanations from the coded eligibility
+    report and de-duplicate overlapping identity text.
+    """
+    issues = []
+    seen_messages = set()
+
+    def add(kind, message, *, check=None):
+        text = str(message or "").strip()
+        if not text or text in seen_messages:
+            return
+        seen_messages.add(text)
+        item = {"kind": kind, "message": text}
+        if isinstance(check, dict):
+            for field in ("code", "category", "status", "next_action", "facts"):
+                if field in check:
+                    item[field] = check[field]
+        issues.append(item)
+
+    identity = bootstrap_identity
+    identity_applies = (
+        isinstance(identity, dict) and identity.get("applies") is True
+    )
+    identity_messages = []
+    for message in validation_errors or []:
+        if identity_applies and _bootstrap_identity_error(message):
+            identity_messages.append(str(message))
+        else:
+            add("validation", message)
+
     if isinstance(identity, dict) and identity.get("applies") is True:
         if identity.get("valid") is False:
-            issues.append({
-                "kind": "bootstrap-identity",
-                "message": "Bootstrap identity is inconsistent.",
-            })
+            add("bootstrap-identity", "Bootstrap identity is inconsistent.")
             for message in identity.get("errors") or []:
-                if message:
-                    issues.append({
-                        "kind": "bootstrap-identity-detail",
-                        "message": str(message),
-                    })
+                add("bootstrap-identity-detail", message)
+        for message in identity_messages:
+            add("bootstrap-identity-detail", message)
 
-    if historical and not current:
-        if restore_enabled is False:
-            issues.append({
-                "kind": "activation",
-                "message": (
-                    "Direct History activation is disabled because this "
-                    "revision is not a valid live candidate."
-                ),
-            })
-        else:
-            issues.append({
-                "kind": "activation",
-                "message": (
-                    "Direct History activation is available only after the "
-                    "existing validation and approval checks succeed."
-                ),
-            })
+    report = activation_eligibility
+    if report is None:
+        # Compatibility for callers/tests that use this diagnostic helper
+        # directly. Endpoint responses always provide the full report.
+        report = _activation_eligibility(
+            validation_errors=validation_errors,
+            bootstrap_identity=bootstrap_identity,
+            current=current,
+            historical_record=bool(historical and not current),
+            approved=(
+                True if restore_enabled is True else
+                False if restore_enabled is False else None
+            ),
+            binary_available=True if historical else None,
+            binary_valid=not bool(validation_errors) if validation_errors is not None else None,
+            manifest_entry={} if current or historical else None,
+        )
+    for check in report.get("reasons") or []:
+        add("activation", check.get("message"), check=check)
     return issues
 
 
@@ -12625,12 +12968,13 @@ def get_lump_words(token_hex):
         else:
             active_filename = str(active_entry.get("filename") or "")
             active_stem = (
-                _re.sub(r"_v\d+$", "", active_filename[:-5])
+                _re_words.sub(r"_v\d+$", "", active_filename[:-5])
                 if active_filename.endswith(".lump") else "")
-            safe_name = _re.sub(
+            safe_name = _re_words.sub(
                 r"[^A-Za-z0-9_.-]+", "_",
                 str(active_entry.get("abstraction") or ""))
-            version_match = _re.search(r"_v(\d+)\.lump$", archive_filename)
+            version_match = _re_words.search(
+                r"_v(\d+)\.lump$", archive_filename)
             generated_filenames = {
                 f"{key8}-v{version_match.group(1)}.lump"
                 if version_match else "",
@@ -12775,6 +13119,38 @@ def get_lump_words(token_hex):
         for field in ("pet_name", "dot_name", "issue_n", "identity_hash"):
             if field in _approval_ret:
                 response[field] = _approval_ret[field]
+    _archive_kind = (
+        archive_provenance.get("kind")
+        if isinstance(archive_provenance, dict) else None
+    )
+    _activation_is_historical_record = (
+        _archive_kind == "archived-manifest-row"
+    )
+    _activation_approval_unavailable = any(
+        _approval_store_error(message) for message in validation_errors)
+    activation_eligibility = _activation_eligibility(
+        validation_errors=validation_errors,
+        bootstrap_identity=bootstrap_identity,
+        current=archive_manifest_entry is None,
+        historical_record=_activation_is_historical_record,
+        archive_provenance=archive_provenance,
+        approved=_approval_ret is not None if not _activation_approval_unavailable
+                 else False,
+        binary_available=True,
+        # Identity and active-token checks are deliberately kept out of this
+        # structural fact. They are destination checks in the report.
+        binary_valid=not any(
+            not _bootstrap_identity_error(message)
+            and not _approval_store_error(message)
+            and message != _integrity_result
+            for message in validation_errors
+        ),
+        binary_hash=_bh_live,
+        integrity_result=_integrity_result,
+        manifest_entry=manifest_entry,
+        approval_store_unavailable=_activation_approval_unavailable,
+    )
+    response["activation_eligibility"] = activation_eligibility
     if archive_manifest_entry is not None:
         if archive_provenance is None:
             archive_provenance = _lump_archive_provenance(archive_filename)
@@ -12788,7 +13164,8 @@ def get_lump_words(token_hex):
             restore_enabled=bool(
                 not validation_errors
                 and _approval_ret is not None
-                and _integrity_result is True))
+                and _integrity_result is True),
+            activation_eligibility=activation_eligibility)
         response.update({
             "version": archive_manifest_entry.get("lump_version"),
             "archive_filename": archive_filename,
@@ -12797,7 +13174,8 @@ def get_lump_words(token_hex):
         })
     else:
         response["preview_issues"] = _lump_preview_issues(
-            validation_errors, bootstrap_identity, current=True)
+            validation_errors, bootstrap_identity, current=True,
+            activation_eligibility=activation_eligibility)
     return jsonify(response)
 
 
@@ -13337,6 +13715,34 @@ def get_lump_history(token):
             compiled_at_h = (
                 (_current_manifest_h if current else archived_manifest_h) or {}
             ).get("compiled_at")
+        activation_archive_provenance_h = (
+            _lump_archive_provenance(
+                archive_filename_h,
+                pattern_discovered=pattern_discovered_h,
+                correction_supported=bool(
+                    bootstrap_identity_h
+                    and not bootstrap_identity_h.get("valid", True)))
+            if archive_filename_h else None
+        )
+        activation_eligibility_h = _activation_eligibility(
+            validation_errors=errors,
+            bootstrap_identity=bootstrap_identity_h,
+            current=current,
+            historical_record=bool(
+                archived_manifest_h is not None
+                and not current),
+            archive_provenance=activation_archive_provenance_h,
+            approved=snapshot["approved"],
+            binary_available=snapshot["binary_available"],
+            binary_valid=not any(
+                not _bootstrap_identity_error(message)
+                and not _approval_store_error(message)
+                for message in errors),
+            binary_hash=snapshot["binary_hash"],
+            manifest_entry=_current_manifest_h,
+            approval_store_unavailable=any(
+                _approval_store_error(message) for message in errors),
+        )
         entry = {
             "version": version,
             "current": current,
@@ -13362,15 +13768,12 @@ def get_lump_history(token):
                 errors, bootstrap_identity_h,
                 historical=not current, current=current,
                 restore_enabled=bool(
-                    not current and snapshot["valid"] and snapshot["approved"])),
+                    not current and snapshot["valid"] and snapshot["approved"]),
+                activation_eligibility=activation_eligibility_h),
+            "activation_eligibility": activation_eligibility_h,
             "bootstrap_identity": bootstrap_identity_h,
             "archive_provenance": (
-                _lump_archive_provenance(
-                    archive_filename_h,
-                    pattern_discovered=pattern_discovered_h,
-                    correction_supported=bool(
-                        bootstrap_identity_h
-                        and not bootstrap_identity_h.get("valid", True)))
+                activation_archive_provenance_h
                 if archive_filename_h else None),
             "record_token": (
                 str((_current_manifest_h or {}).get("token") or "").lower()
@@ -13427,6 +13830,29 @@ def get_lump_history(token):
         _archived_compiled_at_h = _archived_approval_h.get("compiled_at")
         if _archived_compiled_at_h is None:
             _archived_compiled_at_h = _archived_manifest_h.get("compiled_at")
+        _archived_provenance_h = _lump_archive_provenance(
+            _archived_filename_h, pattern_discovered=False,
+            correction_supported=bool(
+                _archived_snapshot_h["bootstrap_identity"]
+                and not _archived_snapshot_h["bootstrap_identity"].get(
+                    "valid", True)))
+        _archived_activation_h = _activation_eligibility(
+            validation_errors=_archived_snapshot_h["errors"],
+            bootstrap_identity=_archived_snapshot_h["bootstrap_identity"],
+            historical_record=True,
+            archive_provenance=_archived_provenance_h,
+            approved=_archived_snapshot_h["approved"],
+            binary_available=_archived_snapshot_h["binary_available"],
+            binary_valid=not any(
+                not _bootstrap_identity_error(message)
+                and not _approval_store_error(message)
+                for message in _archived_snapshot_h["errors"]),
+            binary_hash=_archived_snapshot_h["binary_hash"],
+            manifest_entry=_archived_manifest_h,
+            approval_store_unavailable=any(
+                _approval_store_error(message)
+                for message in _archived_snapshot_h["errors"]),
+        )
         entries.append({
             "version": _archived_version_h,
             "current": False,
@@ -13447,6 +13873,7 @@ def get_lump_history(token):
             "restore_enabled": False,
             "validation_errors": _archived_snapshot_h["errors"],
             "bootstrap_identity": _archived_snapshot_h["bootstrap_identity"],
+            "activation_eligibility": _archived_activation_h,
             "legacy_incompatible": True,
             "historical_record": True,
             "record_token": str(
@@ -13457,13 +13884,9 @@ def get_lump_history(token):
             "preview_issues": _lump_preview_issues(
                 _archived_snapshot_h["errors"],
                 _archived_snapshot_h["bootstrap_identity"],
-                historical=True, restore_enabled=False),
-            "archive_provenance": _lump_archive_provenance(
-                _archived_filename_h, pattern_discovered=False,
-                correction_supported=bool(
-                    _archived_snapshot_h["bootstrap_identity"]
-                    and not _archived_snapshot_h["bootstrap_identity"].get(
-                        "valid", True))),
+                historical=True, restore_enabled=False,
+                activation_eligibility=_archived_activation_h),
+            "archive_provenance": _archived_provenance_h,
         })
 
     # The live artifact is part of version history too. Resolve it only through
@@ -13899,6 +14322,37 @@ def get_lump_version_words(token, version):
             )
         }), 409
 
+    _version_archive_filename = archive_filename or os.path.basename(lump_path_v)
+    _version_archive_provenance = _lump_archive_provenance(
+        _version_archive_filename,
+        pattern_discovered=not bool(
+            isinstance(_manifest_entry_v, dict)
+            and _manifest_entry_v.get("archived") is True),
+        correction_supported=bool(
+            snapshot.get("bootstrap_identity")
+            and not snapshot["bootstrap_identity"].get("valid", True)),
+    )
+    _version_approval_store_unavailable = any(
+        _approval_store_error(message) for message in validation_errors)
+    _version_activation = _activation_eligibility(
+        validation_errors=validation_errors,
+        bootstrap_identity=snapshot.get("bootstrap_identity"),
+        historical_record=bool(
+            isinstance(_manifest_entry_v, dict)
+            and _manifest_entry_v.get("archived") is True),
+        archive_provenance=_version_archive_provenance,
+        approved=snapshot["approved"] is True
+                 if not _version_approval_store_unavailable else False,
+        binary_available=snapshot["binary_available"],
+        binary_valid=not any(
+            not _bootstrap_identity_error(message)
+            and not _approval_store_error(message)
+            for message in validation_errors),
+        binary_hash=snapshot["binary_hash"],
+        manifest_entry=_manifest_entry_v,
+        approval_store_unavailable=_version_approval_store_unavailable,
+    )
+
     return jsonify({
         "token":         key8,
         "version":       version,
@@ -13929,15 +14383,12 @@ def get_lump_version_words(token, version):
         "legacy_incompatible": bool(
             snapshot.get("bootstrap_identity")
             and not snapshot["bootstrap_identity"]["valid"]),
+        "activation_eligibility": _version_activation,
         "preview_issues": _lump_preview_issues(
             validation_errors, snapshot.get("bootstrap_identity"),
-            historical=True, restore_enabled=False),
-        "archive_provenance": _lump_archive_provenance(
-            archive_filename,
-            pattern_discovered=not bool(_manifest_entry_v.get("archived")),
-            correction_supported=bool(
-                snapshot.get("bootstrap_identity")
-                and not snapshot["bootstrap_identity"].get("valid", True))),
+            historical=True, restore_enabled=False,
+            activation_eligibility=_version_activation),
+        "archive_provenance": _version_archive_provenance,
     })
 
 

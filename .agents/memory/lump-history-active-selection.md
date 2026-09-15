@@ -30,3 +30,15 @@ the immutable history contract.
 **How to apply:** Bind a repair plan to the exact archive hash, live manifest
 identity, expected Namespace GT, and one-time approval intent. Revalidate each
 of those facts immediately before the normal atomic history transition.
+
+Keep activation diagnosis separate from artifact integrity. Historical status
+is a transition limitation, not proof of damaged bytes; bootstrap record-token
+mismatches are destination failures even when sealed SELF already matches.
+
+**Why:** Generic “invalid live candidate” warnings hid independent causes and
+were duplicated by browser inference. The reporting change intentionally does
+not relax any restoration rule or authorize destination changes.
+
+**How to apply:** Consume server-coded eligibility checks consistently across
+History, Preview, and correction controls. Missing reports are unknown, not
+eligible. Review destination allocation separately before changing repair behavior.
