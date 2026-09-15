@@ -36,7 +36,12 @@ const SUFFIX_RE = /_NS_SLOT$/;
 //   EMPTY_NS_SLOT  — sentinel (99) meaning "nothing written here"
 //   CUSTOM_NS_SLOT — e2e test fixture for a test-registered abstraction
 //   TEST_NS_SLOT   — e2e test fixture used by tier1_catch_recovery spec
-const EXEMPT_NAMES = new Set(['EMPTY_NS_SLOT', 'CUSTOM_NS_SLOT', 'TEST_NS_SLOT']);
+const EXEMPT_NAMES = new Set([
+    'EMPTY_NS_SLOT', 'CUSTOM_NS_SLOT', 'TEST_NS_SLOT',
+    // Fixed-slot values in this source-level fixture describe synthetic
+    // Constants/data/thread lumps; they are not runtime policy declarations.
+    'CONSTANTS_NS_SLOT', 'DATA_NS_SLOT', 'THREAD_NS_SLOT',
+]);
 
 function isViolation(line) {
     const m = DECL_RE.exec(line);

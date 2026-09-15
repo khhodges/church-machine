@@ -4,8 +4,8 @@
 Checks three properties that the structural auto-derivation in wukong_top.py
 cannot catch because they live in separate modules:
 
-  1. WUKONG_DEMO_CLIST[0] is the factory SelfTest E-GT (0x4A000006),
-     matching the simulator's default lightning-bolt entry.
+  1. WUKONG_DEMO_CLIST[0] is the factory CapabilityTest E-GT (0x4A00000A),
+     matching the resident boot profile's selected entry.
 
   2. WUKONG_DEMO_NAMESPACE slot 6 contains the full SelfTest allocation and
      slot 7 alloc ≥ header + WUKONG_NUC_PROGRAM words.
@@ -43,14 +43,14 @@ from hardware.wukong_top import _WUKONG_ROM   # noqa: F401  (triggers the assert
 
 FAILURES = []
 
-# ── Check 1: factory boot entry is SelfTest ───────────────────────────────────
+# ── Check 1: factory boot entry is CapabilityTest ─────────────────────────────
 actual = WUKONG_DEMO_CLIST[0]
-if actual == 0x4A000006:
-    print("OK: WUKONG_DEMO_CLIST[0] = 0x4A000006  (factory SelfTest ⚡ entry)")
+if actual == 0x4A00000A:
+    print("OK: WUKONG_DEMO_CLIST[0] = 0x4A00000A  (factory CapabilityTest entry)")
 else:
     msg = (
-        f"FAIL: WUKONG_DEMO_CLIST[0] = 0x{actual:08X}, expected SelfTest E-GT "
-        "(0x4A000006)."
+        f"FAIL: WUKONG_DEMO_CLIST[0] = 0x{actual:08X}, expected CapabilityTest E-GT "
+        "(0x4A00000A)."
     )
     print(msg)
     FAILURES.append(msg)

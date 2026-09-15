@@ -161,6 +161,122 @@ CAPABILITY_TEST_NS_SLOT = 10  # CapabilityTest capability-validation LUMP
 
 _MANDATORY_NS_SLOTS = (0, 1, 2, 3, 4, 5, 6, 10)
 
+# The resident core is deliberately a named policy rather than an incidental
+# consequence of whichever manifest rows happen to be marked resident.  The
+# table remains extensible (the default capacity is larger than slot 13), but
+# these identities and slots are stable across simulator, generic-image, and
+# Wukong projections.
+RESIDENT_BOOT_PROFILE_NAME = "three-lump-core-v1"
+RESIDENT_BOOT_PROFILE = {
+    "name": RESIDENT_BOOT_PROFILE_NAME,
+    "core_slots": tuple(range(14)),
+    "residents": {
+        "SelfTest": 6,
+        "WukongCallHome": 7,
+        "CapabilityTest": 10,
+    },
+    "threads": {
+        1: "Boot.Thread",
+        11: "Thread.2",
+        12: "Thread.3",
+    },
+    "devices": {
+        2: "UART_DEV",
+        3: "LED_DEV",
+        4: "BTN_DEV",
+        5: "TIMER_DEV",
+        13: "M_BIT_DEV",
+    },
+    "catalog": {
+        0: "Boot.NS",
+        8: "Tunnel",
+        9: "Ethernet",
+    },
+}
+
+
+def validate_resident_boot_profile(rows, profile_name=RESIDENT_BOOT_PROFILE_NAME):
+    """Validate and return the authoritative fixed resident Namespace map.
+
+    A manifest is an artifact index and history store; it is not allowed to
+    promote a different revision or a different abstraction into the resident
+    core.  This check is intentionally performed before any image memory is
+    allocated so malformed or ambiguous state cannot produce a partial image.
+    """
+    if profile_name != RESIDENT_BOOT_PROFILE_NAME:
+        raise ValueError(f"unknown resident boot profile: {profile_name!r}")
+    if not isinstance(rows, list):
+        raise ValueError("resident boot profile requires a Namespace-state array")
+
+    by_slot = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("resident boot profile contains a non-object Namespace row")
+        slot = row.get("slot")
+        if isinstance(slot, bool) or not isinstance(slot, int):
+            continue
+        if slot in by_slot:
+            raise ValueError(
+                f"resident boot profile has duplicate Namespace slot {slot}")
+        by_slot[slot] = row
+
+    expected = {
+        **RESIDENT_BOOT_PROFILE["catalog"],
+        **RESIDENT_BOOT_PROFILE["threads"],
+        **RESIDENT_BOOT_PROFILE["devices"],
+        **{slot: name for name, slot in RESIDENT_BOOT_PROFILE["residents"].items()},
+    }
+    missing = [slot for slot in RESIDENT_BOOT_PROFILE["core_slots"]
+               if slot not in by_slot]
+    if missing:
+        raise ValueError(
+            "resident boot profile is missing fixed Namespace slots: "
+            + ", ".join(map(str, missing)))
+    wrong = [
+        f"slot {slot} is {by_slot[slot].get('name')!r}, expected {name!r}"
+        for slot, name in expected.items()
+        if by_slot[slot].get("name") != name
+    ]
+    if wrong:
+        raise ValueError("resident boot profile name/slot mismatch: " + "; ".join(wrong))
+
+    resident_names = set()
+    for name, slot in RESIDENT_BOOT_PROFILE["residents"].items():
+        row = by_slot[slot]
+        if (row.get("resident") is not True
+                or row.get("boot_resident") is not True
+                or row.get("load_policy") != "Resident"
+                or row.get("ns_slot_policy") != "static"):
+            raise ValueError(
+                f"resident boot profile row {name} at slot {slot} must be "
+                "resident, boot_resident, static, and load_policy=Resident")
+        token = row.get("token") or row.get("cache_token")
+        filename = row.get("filename")
+        if not isinstance(token, str) or not token:
+            raise ValueError(f"resident boot profile row {name} has no selected token")
+        if (not isinstance(filename, str) or not filename
+                or os.path.basename(filename) != filename):
+            raise ValueError(
+                f"resident boot profile row {name} has no exact artifact filename")
+        seq = row.get("seq")
+        if isinstance(seq, bool) or not isinstance(seq, int) or not 0 <= seq <= 0x1FF:
+            raise ValueError(
+                f"resident boot profile row {name} has invalid sequence {seq!r}")
+        resident_names.add(name)
+
+    extra = [
+        row.get("name") for row in rows
+        if isinstance(row, dict)
+        and row.get("type") in ("Inform", "Resident")
+        and (row.get("resident") is True or row.get("boot_resident") is True)
+        and row.get("name") not in resident_names
+    ]
+    if extra:
+        raise ValueError(
+            "resident boot profile allows exactly three executable residents; "
+            "unexpected resident rows: " + ", ".join(map(str, extra)))
+    return {slot: by_slot[slot] for slot in RESIDENT_BOOT_PROFILE["core_slots"]}
+
 # Format-version tag written to mem[NS_TABLE_BASE - 1] so loadBootImage()
 # can reject stale binaries.
 # Thread suspension ABI version. Images with the retired +18 executable-
@@ -1925,7 +2041,8 @@ def _load_trusted_cache_token_map(manifest_path):
     return trusted
 
 
-def _load_boot_resident_entries(manifest_path, selected_by_slot=None):
+def _load_boot_resident_entries(manifest_path, selected_by_slot=None,
+                                profile_name=None):
     """Return exact resident artifact bindings from committed Namespace state.
 
     Manifest history must never choose which artifact occupies a live slot.
@@ -1939,6 +2056,22 @@ def _load_boot_resident_entries(manifest_path, selected_by_slot=None):
     except Exception:
         return []
     out = []
+    profile_slots = None
+    if profile_name is not None:
+        profile_rows = validate_resident_boot_profile(
+            state.get("abstractions", []) if isinstance(state, dict) else [],
+            profile_name,
+        )
+        profile_slots = set(RESIDENT_BOOT_PROFILE["residents"].values())
+        for slot in sorted(profile_slots):
+            row = profile_rows[slot]
+            out.append((
+                slot,
+                str(row.get("token") or row.get("cache_token")).lower(),
+                row["filename"],
+                int(row.get("lump_version") or row.get("issue_n") or 0),
+            ))
+        return [(slot, tok, filename) for slot, tok, filename, _ in out]
     for e in state.get("abstractions", []) if isinstance(state, dict) else []:
         if not isinstance(e, dict) or e.get("type") not in ("Inform", "Resident"):
             continue
@@ -2208,12 +2341,19 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         raise ValueError(
             f"generate_boot_image: nsSlotsMax must be in 0..{MAX_NS_ENTRIES}; "
             f"got {_ns_slots_max}.")
+    _profile_name = cfg.get("residentProfile")
     _boot_saved_path, _selftest_slot = _resolve_authoritative_selftest_lump(lumps_dir)
     try:
         with open(os.path.join(lumps_dir, "ns-state.json"), encoding="utf-8") as _bf:
             _bootstrap_rows = json.load(_bf).get("abstractions", [])
     except (OSError, ValueError, AttributeError) as exc:
         raise ValueError(f"generate_boot_image: authoritative ns-state is unreadable: {exc}")
+    if _profile_name is not None:
+        validate_resident_boot_profile(_bootstrap_rows, _profile_name)
+        if _ns_slots_max < max(RESIDENT_BOOT_PROFILE["core_slots"]) + 1:
+            raise ValueError(
+                f"generate_boot_image: resident profile requires Namespace capacity "
+                f"at least {max(RESIDENT_BOOT_PROFILE['core_slots']) + 1}")
     _bootstrap_by_slot = {
         row["slot"]: row for row in _bootstrap_rows
         if isinstance(row, dict) and isinstance(row.get("slot"), int)
@@ -2455,12 +2595,19 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     _boot_resident_bodies = {}
     _boot_resident_allocations = {}
     for _slot, _tok, _filename in _load_boot_resident_entries(
-            _manifest_path_for_cache, _selected_slot_tokens):
+            _manifest_path_for_cache, _selected_slot_tokens, _profile_name):
         if (_slot == _selftest_slot
                 or not (0 <= _slot < len(catalog))
                 or _slot in _MMIO_SLOT_SPECS):
             continue
-        _body = _read_lump_body(lumps_dir, _tok, _filename)
+        if _profile_name is not None:
+            _body_path = os.path.join(lumps_dir, _filename)
+            _body = _require_approved_executable_lump(
+                _body_path, lumps_dir,
+                f"resident profile slot {_slot}",
+                _bootstrap_by_slot.get(_slot))
+        else:
+            _body = _read_lump_body(lumps_dir, _tok, _filename)
         if _body is None:
             raise ValueError(
                 f"generate_boot_image: boot-resident catalog slot {_slot} "

@@ -14,3 +14,15 @@ Retention and activation are separate decisions. Invalid candidates must remain 
 **Why:** The SAVE LUMP requirement is to retain every submitted source/artifact, including problematic compilations. Rejecting execution is not permission to discard evidence or to delete older versions.
 
 **How to apply:** Preserve original bytes before finalization or validation; keep destination-finalized bytes distinct. Treat uncertain network outcomes as unknown until durable commit evidence or a complete rollback proves the result.
+
+For identity-rebinding saves, the approval/commit request must submit the exact
+server-finalized binary returned by the save plan, not the pre-plan browser
+buffer.
+
+**Why:** The server may canonicalize compiler-owned SELF or destination-local
+capabilities during planning; resubmitting the stale buffer correctly fails
+closed as a plan mismatch.
+
+**How to apply:** Freeze the finalized plan artifact alongside its plan ID and
+approval intent, and use that immutable binary for the commit and any safe
+retry.

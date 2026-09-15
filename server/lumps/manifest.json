@@ -393,7 +393,8 @@
     "token": "4a000007",
     "abstraction": "WukongCallHome",
     "filename": "WukongCallHome.1.9bf03976.lump",
-    "lump_version": 1
+    "lump_version": 1,
+    "archived": true
   },
   {
     "token": "ab1e86af",
@@ -407,7 +408,8 @@
     "abstraction": "CapabilityTest",
     "filename": "CapabilityTest.2.5e701b59.lump",
     "lump_version": 3,
-    "compiled_at": 1789126189.4050355
+    "compiled_at": 1789126189.4050355,
+    "archived": true
   },
   {
     "token": "3b466efc",
@@ -423,86 +425,7 @@
     "filename": "CapabilityTest.1.ba638038.lump",
     "lump_version": 25,
     "compiled_at": 1789232842.4801483,
-    "dot_name": "CapabilityTest",
-    "issue_n": 1,
-    "petname": "",
-    "content_profile": 2,
-    "output_profile": 2,
-    "capabilities": [
-      {
-        "name": "__SELF__",
-        "rights": [
-          "E"
-        ],
-        "grants": [
-          "E"
-        ],
-        "nsIndex": null,
-        "compiler_owned_self": true,
-        "placeholder": true
-      },
-      {
-        "name": "SelfTest",
-        "rights": [
-          "E"
-        ],
-        "grants": [],
-        "nsIndex": 6
-      },
-      {
-        "name": "LED_DEV",
-        "rights": [
-          "R",
-          "W"
-        ],
-        "grants": [],
-        "nsIndex": 3
-      },
-      {
-        "name": "UART_DEV",
-        "rights": [
-          "R",
-          "W"
-        ],
-        "grants": [],
-        "nsIndex": 2
-      },
-      {
-        "name": "BTN_DEV",
-        "rights": [
-          "R"
-        ],
-        "grants": [],
-        "nsIndex": 4
-      },
-      {
-        "name": "TIMER_DEV",
-        "rights": [
-          "R",
-          "W"
-        ],
-        "grants": [],
-        "nsIndex": 5
-      },
-      {
-        "name": "M_BIT_DEV",
-        "rights": [
-          "R",
-          "W"
-        ],
-        "grants": [],
-        "nsIndex": 13
-      },
-      {
-        "name": "WukongCallHome.hw",
-        "rights": [
-          "E"
-        ],
-        "grants": [],
-        "nsIndex": 7
-      }
-    ],
-    "operation_id": "00364446-54ea-4c56-b20b-a2050595cc8b"
+    "archived": true
   },
   {
     "token": "4a000006",
@@ -517,99 +440,27 @@
     "filename": "CapabilityTest.1.83320494.lump",
     "lump_version": 26,
     "compiled_at": 1789424987.2815309,
-    "dot_name": "CapabilityTest",
-    "issue_n": 1,
-    "petname": "",
-    "content_profile": 2,
-    "output_profile": 2,
-    "capabilities": [
-      {
-        "name": "__SELF__",
-        "rights": [
-          "E"
-        ],
-        "grants": [
-          "E"
-        ],
-        "nsIndex": null,
-        "compiler_owned_self": true,
-        "placeholder": true
-      },
-      {
-        "name": "SelfTest",
-        "rights": [
-          "E"
-        ],
-        "grants": [],
-        "nsIndex": 6
-      },
-      {
-        "name": "LED_DEV",
-        "rights": [
-          "R",
-          "W"
-        ],
-        "grants": [],
-        "nsIndex": 3
-      },
-      {
-        "name": "UART_DEV",
-        "rights": [
-          "R",
-          "W"
-        ],
-        "grants": [],
-        "nsIndex": 2
-      },
-      {
-        "name": "BTN_DEV",
-        "rights": [
-          "R"
-        ],
-        "grants": [],
-        "nsIndex": 4
-      },
-      {
-        "name": "TIMER_DEV",
-        "rights": [
-          "R",
-          "W"
-        ],
-        "grants": [],
-        "nsIndex": 5
-      },
-      {
-        "name": "M_BIT_DEV",
-        "rights": [
-          "R",
-          "W"
-        ],
-        "grants": [],
-        "nsIndex": 13
-      },
-      {
-        "name": "WukongCallHome",
-        "rights": [
-          "E"
-        ],
-        "grants": [],
-        "nsIndex": 7
-      }
-    ],
-    "operation_id": "23c05d83-0e84-428d-aedb-3822ddabb977"
+    "archived": true
   },
   {
     "token": "00aa1234",
     "abstraction": "Adder",
     "filename": "Adder.1.e437ee2c.lump",
     "lump_version": 369,
-    "compiled_at": 1789458430.9834328,
-    "dot_name": "Adder",
-    "issue_n": 1,
-    "petname": "",
-    "content_profile": 2,
-    "output_profile": 2,
-    "capabilities": [],
-    "operation_id": "62c4108237654bcda67c0576ce59b760"
+    "compiled_at": 1789458430.9834328
+  },
+  {
+    "token": "4a00000a",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.2.e794a764.lump",
+    "variant_group": "capabilitytest-history",
+    "lump_version": 2,
+    "compiled_at": 1789424987.2815309
+  },
+  {
+    "token": "4a000007",
+    "abstraction": "WukongCallHome",
+    "filename": "WukongCallHome.1.e8cb2017.lump",
+    "lump_version": 1
   }
 ]

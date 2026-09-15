@@ -172,7 +172,7 @@ def test_archived_capabilitytest_hash_token_is_classified_legacy_incompatible():
     manifest = json.loads((lumps / "manifest.json").read_text())
     archived = next(
         row for row in manifest
-        if row.get("token") == "b6182a95"
+            if row.get("token") == "7ccff26f"
         and row.get("abstraction") == "CapabilityTest")
     inspected = app_module._inspect_lump_binary(lumps / archived["filename"])
 
@@ -183,15 +183,15 @@ def test_archived_capabilitytest_hash_token_is_classified_legacy_incompatible():
         "applies": True,
         "valid": False,
         "archived": True,
-        "record_token": "b6182a95",
-        "row0_gt": "4a000006",
+        "record_token": "7ccff26f",
+        "row0_gt": "4a00000a",
         "expected_gt": "4a00000a",
+        "active_namespace_gt": "4a00000a",
         "slot": 10,
         "sequence": 0,
         "errors": [
-            "record Token 0xb6182a95 != expected GT 0x4a00000a",
-            "sealed row-zero GT 0x4a000006 != expected GT 0x4a00000a",
-            "record Token 0xb6182a95 != sealed row-zero GT 0x4a000006",
+            "record Token 0x7ccff26f != expected GT 0x4a00000a",
+            "record Token 0x7ccff26f != sealed row-zero GT 0x4a00000a",
         ],
         "data_changed": False,
     }
@@ -224,7 +224,7 @@ def test_archived_bootstrap_snapshot_cannot_enable_history_restore():
     manifest = json.loads((lumps / "manifest.json").read_text())
     archived = next(
         row for row in manifest
-        if row.get("token") == "b6182a95")
+        if row.get("token") == "7ccff26f")
     snapshot = app_module._validate_lump_snapshot(
         lumps / archived["filename"], archived)
 
@@ -240,21 +240,21 @@ def test_bootstrap_history_fails_closed_when_binding_is_unavailable(
         tmp_path, monkeypatch, state_mode):
     root = Path(__file__).resolve().parents[2]
     source_lump = (
-        root / "server" / "lumps" / "CapabilityTest.1.edfd9e62.lump")
-    current_name = "CapabilityTest.1.edfd9e62.lump"
-    archive_name = "CapabilityTest.1.edfd9e62_v1.lump"
+        root / "server" / "lumps" / "CapabilityTest.1.83320494.lump")
+    current_name = "CapabilityTest.1.83320494.lump"
+    archive_name = "CapabilityTest.1.83320494_v1.lump"
     binary = source_lump.read_bytes()
     (tmp_path / current_name).write_bytes(binary)
     (tmp_path / archive_name).write_bytes(binary)
     archived_manifest_entry = {
-        "token": "b6182a95",
+        "token": "7ccff26f",
         "abstraction": "CapabilityTest",
         "filename": archive_name,
         "lump_version": 1,
         "archived": True,
     }
     active_manifest_entry = {
-        "token": "b6182a95",
+        "token": "7ccff26f",
         "abstraction": "CapabilityTest",
         "filename": current_name,
         "lump_version": 2,
@@ -281,7 +281,7 @@ def test_bootstrap_history_fails_closed_when_binding_is_unavailable(
 
     monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
     with app_module.app.test_client() as client:
-        response = client.get("/api/lumps/b6182a95/history")
+        response = client.get("/api/lumps/7ccff26f/history")
 
     assert response.status_code == 200
     history = response.get_json()["history"]
@@ -300,11 +300,13 @@ def test_bootstrap_history_fails_closed_when_binding_is_unavailable(
 def test_lump_list_hides_archived_bootstrap_but_words_expose_identity_comparison():
     with app_module.app.test_client() as client:
         listed_response = client.get("/api/lumps/list")
-        words_response = client.get("/api/lump/b6182a95/words")
+        words_response = client.get(
+            "/api/lump/7ccff26f/words"
+            "?archive_filename=CapabilityTest.1.83320494.lump")
 
     assert listed_response.status_code == 200
     assert not any(
-        row.get("token") == "b6182a95"
+        row.get("token") == "7ccff26f"
         for row in listed_response.get_json())
 
     assert words_response.status_code == 200
@@ -316,8 +318,8 @@ def test_lump_list_hides_archived_bootstrap_but_words_expose_identity_comparison
 @pytest.mark.parametrize(
     ("token", "abstraction", "active_filename"),
     [
-        ("4a000006", "SelfTest", "SelfTest.80.f37bafd6.lump"),
-        ("4a000007", "WukongCallHome", "WukongCallHome.1.9bf03976.lump"),
+        ("4a000006", "SelfTest", "SelfTest.86.f37bafd6.lump"),
+        ("4a000007", "WukongCallHome", "WukongCallHome.1.e8cb2017.lump"),
         ("4a00000a", "CapabilityTest", "CapabilityTest.2.e794a764.lump"),
     ],
 )
@@ -500,7 +502,13 @@ def _repository_snapshot(root):
             "file", path.read_bytes()
         )
         for path in root.rglob("*")
-        if path.is_file() or path.is_symlink()
+        if (path.is_file() or path.is_symlink())
+        and not (set(path.relative_to(root).parts)
+                 & {"save-candidates", "save-operations"})
+        and path.name not in {
+            "save-runtime-diagnostics.jsonl",
+            "save-runtime-diagnostics.lock",
+        }
     }
 
 
@@ -557,7 +565,9 @@ def _bootstrap_save_payload(client, *, sequence=0):
         "save_plan_id": plan["plan_id"],
         "approval_intent": intent_response.get_json()["intent"],
     })
-    return {"binary": words, "metadata": metadata}
+    # The save plan canonicalizes compiler-owned SELF. Commit the exact
+    # finalized binary rather than the stale browser buffer.
+    return {"binary": plan["final_binary"], "metadata": metadata}
 
 
 def test_final_bootstrap_gate_rejects_before_any_repository_mutation(

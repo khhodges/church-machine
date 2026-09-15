@@ -105,11 +105,12 @@ function contentFrame(name, text) {
 }
 const FRAME = contentFrame('WukongCallHome', source);
 
-if (words.length !== 74) {
-    console.error(`ERROR: expected 74 words, got ${words.length}.`);
-    console.error('wukong_callhome.cloomc must produce exactly 74 instructions.');
+if (words.length !== 75) {
+    console.error(`ERROR: expected 75 words, got ${words.length}.`);
+    console.error('wukong_callhome.cloomc must produce exactly 75 instructions.');
     console.error('Words 0-1 are LOAD setup, words 2-71 mirror WUKONG_NUC_PROGRAM,');
-    console.error('word 72 is CALL WukongCallHome.hw, word 73 is BRANCH loop_top.');
+    console.error('words 72-73 are the materialized LOAD + CALL handoff,');
+    console.error('and word 74 is the BRANCH loop_top fallback.');
     process.exit(1);
 }
 

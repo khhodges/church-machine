@@ -593,7 +593,58 @@
         var maxNs  = _rl.limits.maxNsEntries    || 256;
         var baseNs = 11 + Math.max(0, _getStep1Payload().step1.threadCount - 1);
 
-        // 3-LUMP starter kit — always shown at top, locked as Boot
+        // The resident profile is a projection of the authoritative current
+        // bindings. It is intentionally separate from the editable catalog:
+        // history and nonresident growth remain available below.
+        var residentCore = [
+            { name: 'SelfTest', slot: 6 },
+            { name: 'WukongCallHome', slot: 7 },
+            { name: 'CapabilityTest', slot: 10 }
+        ];
+        var residentSummaryRows = '';
+        for (var ri = 0; ri < residentCore.length; ri++) {
+            var profileEntry = residentCore[ri];
+            var profileCat = null;
+            for (var pci = 0; pci < _rl.catalog.length; pci++) {
+                if (_rl.catalog[pci].nsSlot === profileEntry.slot) {
+                    profileCat = _rl.catalog[pci];
+                    break;
+                }
+            }
+            var currentBuild = profileCat && (profileCat.lumpVersion || profileCat.issueN);
+            var buildLabel = currentBuild ? 'Current build ' + currentBuild : 'Current build unavailable';
+            var sourceAvailable = profileCat && (
+                profileCat.sourceAvailable === true ||
+                Number(profileCat.sourceStorageTier) > 0
+            );
+            var sourceLabel = sourceAvailable
+                ? 'Source available'
+                : 'Source unavailable (binary-only)';
+            var deploymentLabel = profileCat
+                ? 'Deployed at NS slot ' + profileEntry.slot
+                : 'Deployment unavailable';
+            residentSummaryRows +=
+                '<tr class="le-resident-profile-row" data-resident-slot="' +
+                profileEntry.slot + '">' +
+                '<td class="le-rl-td"><strong>' + esc(profileEntry.name) + '</strong></td>' +
+                '<td class="le-rl-td le-rl-td-num">' + profileEntry.slot + '</td>' +
+                '<td class="le-rl-td">' + esc(buildLabel) + '</td>' +
+                '<td class="le-rl-td">' + esc(sourceLabel) + '</td>' +
+                '<td class="le-rl-td">' + esc(deploymentLabel) + '</td>' +
+                '</tr>';
+        }
+        var residentSummary =
+            '<section class="le-resident-profile" data-resident-profile="three-lump-core-v1">' +
+            '<h3 class="le-section-title">Resident core</h3>' +
+            '<p class="le-panel-desc">Current deployment only. Older approved builds remain in History; source edits are drafts until built.</p>' +
+            '<div class="le-rl-table-wrap"><table class="le-resident-summary-table">' +
+            '<thead><tr><th class="le-rl-th">LUMP</th><th class="le-rl-th">NS</th>' +
+            '<th class="le-rl-th">Build</th><th class="le-rl-th">Source</th>' +
+            '<th class="le-rl-th">Deployment</th></tr></thead>' +
+            '<tbody>' + residentSummaryRows + '</tbody></table></div></section>';
+
+        // Boot entry controls remain available, but the resident summary above
+        // is the user-facing source/build/deployment model.
         var bootSlot = parseInt(localStorage.getItem('bootEntrySlot'), 10);
         if (!Number.isFinite(bootSlot) || bootSlot < 0) bootSlot = _rl.bootEntrySlot;
         var bootCatEntry = null;
@@ -705,6 +756,8 @@
             var _ce = _rl.catalog[_ci];
             if (_ce.nsSlotPolicy === 'dynamic' || _ce.floating || _ce.nsSlot == null) {
                 _floatingCatalog.push(_ce);
+            } else if (_ce.nsSlot === 6 || _ce.nsSlot === 7 || _ce.nsSlot === 10) {
+                // The three profile rows are shown once in Resident core.
             } else {
                 _fixedCatalog.push(_ce);
             }
@@ -812,6 +865,7 @@
 
         el.innerHTML =
             '<div class="le-panel le-panel-wide">' +
+            residentSummary +
             '<p class="le-panel-desc">Choose one loading policy per Namespace slot: ' +
             '<strong style="color:var(--church-gold)">Empty</strong>, <strong style="color:var(--church-gold)">Resident</strong>, ' +
             '<strong style="color:var(--church-gold)">Preload</strong>, or <strong>Lazy load</strong>. ' +

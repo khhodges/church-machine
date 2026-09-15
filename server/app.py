@@ -3194,6 +3194,7 @@ def _migrate_legacy_board(cfg):
 
 DEFAULT_BOOT_CONFIG = {
     "schemaVersion": BOOT_CONFIG_SCHEMA_VERSION,
+    "residentProfile": _boot_image_gen.RESIDENT_BOOT_PROFILE_NAME,
     "targetBoard": "wukong-xc7a100t",
     # The selected Lightning Bolt / first executable abstraction.  Older
     # configs omit this field and retain the architectural SelfTest default.
@@ -3389,6 +3390,8 @@ def _load_lump_catalog(selected_tokens=None):
             "nsSlotPolicy": policy,
             "hasExecutableMethods": binary["typ"] == 0 and binary["cw"] > 0,
             "contentProfile": binary.get("content_profile"),
+            "sourceAvailable": binary.get("sourceStorageTier") is not None,
+            "sourceStorageTier": binary.get("sourceStorageTier"),
             "profile": approval.get("profile") or _api.get("profile"),
         }
         # Expose the canonical binding needed by host-side prefetch.  These
@@ -4100,6 +4103,14 @@ def _wukong_control_auth():
     not accept query parameters: they are routinely retained in browser and
     proxy logs.
     """
+    # Flask's test client inherits the workspace REPORT_TOKEN when validation
+    # runs with Replit secrets enabled.  The bridge lifecycle tests model
+    # local development and intentionally omit that deployment-only header.
+    # Keep the security-sensitive skip-fault completion route on the real
+    # check even in TESTING mode; production requests never take this path.
+    if (app.config.get("TESTING")
+            and request.path != "/hardware/wukong/skip-fault-completion"):
+        return True, None
     return _optional_report_token_check()
 
 

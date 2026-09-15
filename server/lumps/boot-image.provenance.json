@@ -1,24 +1,39 @@
 {
-  "image_sha256": "dc50e35546962e4ca7934fac496e50448ceead693dbaea08b220c9b75e0365d9",
+  "version": 1,
+  "image_sha256": "e1e5a790316d947b97baffc725b0b2945cb72f55580d1ecad5c2ab7ce8ea3211",
   "resident_bindings": [
     {
-      "artifact_sha256": "3b142893afc59b9e2ec2561f5afc19c303fac9bd1b8bd7f752d0294f60601aea",
-      "filename": "SelfTest.1.a6d49276.lump",
-      "localized_clist_sha256": "a9ac4f3ca6c88fd6d2205ddc8b0bc9cd228408f7431ffeb3a12a389b35fdf4e5",
-      "slot": 6
+      "slot": 6,
+      "filename": "SelfTest.86.f37bafd6.lump",
+      "artifact_sha256": "efa0e4323679355a530f0ce9bcf8cf19f962204bba7a45b543ca308f1ece17d7",
+      "token": "4a000006",
+      "load_policy": "Resident",
+      "resident": true,
+      "boot_resident": true,
+      "ns_slot_policy": "static",
+      "localized_clist_sha256": "d07843a6ce6e1ca7cde0a7f2bcf2c0ec2e90ead4d0c63ffe9c33f33d3200f675"
     },
     {
-      "artifact_sha256": "dcfe96206305de8503bb6abbc813b4a67911423bd021cc876ec60e0c19b04eef",
-      "filename": "WukongCallHome.1.9bf03976.lump",
-      "localized_clist_sha256": "70cc37469c258a3183c3f0325b45db1ff0d6bee7f3ebd088a06ccb1b1bd721eb",
-      "slot": 7
+      "slot": 7,
+      "filename": "WukongCallHome.1.e8cb2017.lump",
+      "artifact_sha256": "00682247c7536d82f537c9bd26555a752b2215644c1129f76ff6f5fdb35a9224",
+      "token": "4a000007",
+      "load_policy": "Resident",
+      "resident": true,
+      "boot_resident": true,
+      "ns_slot_policy": "static",
+      "localized_clist_sha256": "70cc37469c258a3183c3f0325b45db1ff0d6bee7f3ebd088a06ccb1b1bd721eb"
     },
     {
-      "artifact_sha256": "8d1c67961c6c5c338ff7c3ee5598aa425304fb49309000245966b9dc6d3ab10f",
-      "filename": "CapabilityTest.1.ba638038.lump",
-      "localized_clist_sha256": "b008b67f55a75dab82fae1ded792b87fce6fccce371b1d62957b4919fecefcec",
-      "slot": 10
+      "slot": 10,
+      "filename": "CapabilityTest.2.e794a764.lump",
+      "artifact_sha256": "55f07137513625e0749de30f5d67a7d979e3fa4eedfef3b499a67f358f28db32",
+      "token": "4a00000a",
+      "load_policy": "Resident",
+      "resident": true,
+      "boot_resident": true,
+      "ns_slot_policy": "static",
+      "localized_clist_sha256": "429ad6a68465ebb16616d7a5974ceb6314759bb3d9451f873a69734856c03477"
     }
-  ],
-  "version": 1
+  ]
 }

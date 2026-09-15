@@ -450,6 +450,20 @@
       "filename": "CapabilityTest.1.83320494.lump",
       "compiled_at": 1789424987.2815309,
       "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
+    },
+    "00682247c7536d82f537c9bd26555a752b2215644c1129f76ff6f5fdb35a9224": {
+      "binary_hash": "00682247c7536d82f537c9bd26555a752b2215644c1129f76ff6f5fdb35a9224",
+      "filename": "WukongCallHome.1.e8cb2017.lump",
+      "dot_name": "WukongCallHome",
+      "issue_n": 1,
+      "bootstrap_t": "4a000007",
+      "bootstrap_runtime_gt": 1241513991,
+      "token": "4a000007",
+      "abstraction": "WukongCallHome",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
     }
   }
 }

@@ -29,19 +29,19 @@ function readBigEndianWords(filename) {
 }
 
 const archivedWords = readBigEndianWords(path.join(
-    __dirname, '..', 'server', 'lumps', 'CapabilityTest.1.edfd9e62.lump'));
+    __dirname, '..', 'server', 'lumps', 'CapabilityTest.1.83320494.lump'));
 const invalidIdentity = {
     applies: true,
     valid: false,
     archived: true,
-    record_token: 'b6182a95',
-    row0_gt: '4a000006',
+    record_token: '7ccff26f',
+    row0_gt: '4a00000a',
     expected_gt: '4a00000a',
     slot: 10,
     sequence: 0,
     errors: [
-        'record Token 0xb6182a95 != expected GT 0x4a00000a',
-        'sealed row-zero GT 0x4a000006 != expected GT 0x4a00000a',
+        'record Token 0x7ccff26f != expected GT 0x4a00000a',
+        'record Token 0x7ccff26f != sealed row-zero GT 0x4a00000a',
     ],
     data_changed: false,
 };
@@ -55,8 +55,8 @@ check('archived bootstrap mismatch makes the audit fail',
     lumpAuditHasErrors(invalidResults));
 check('audit reports Token, row zero, and expected destination GT',
     invalidRule &&
-    invalidRule.detail.includes('0xB6182A95') &&
-    invalidRule.detail.includes('0x4A000006') &&
+    invalidRule.detail.includes('0x7CCFF26F') &&
+    invalidRule.detail.includes('0x4A00000A') &&
     invalidRule.detail.includes('0x4A00000A'),
     invalidRule && invalidRule.detail);
 check('audit states that no data changed',
@@ -88,7 +88,7 @@ const lumpsSource = fs.readFileSync(
 const abstractionsSource = fs.readFileSync(
     path.join(__dirname, 'app-abstractions.js'), 'utf8');
 check('server audit metadata is passed into the binary audit',
-    auditSource.includes('lumpAudit(words, data, null)'));
+    auditSource.includes('lumpAudit(words, null, null)'));
 check('invalid bootstrap revisions lose the Run action',
     lumpsSource.includes('_isCodeLump && !_bootstrapIdentityInvalid'));
 check('viewing label identifies invalid archived bootstrap identity',
