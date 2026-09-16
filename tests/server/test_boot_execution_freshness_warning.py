@@ -102,7 +102,18 @@ def test_execution_freshness_excludes_bootstrap_identity_rejections(
     )
 
     assert app_module._boot_execution_freshness(
-        state, str(tmp_path)) == {"status": "current", "warnings": []}
+        state, str(tmp_path)) == {
+            "status": "current",
+            "warnings": [],
+            "failedSaves": [{
+                "abstraction": "SelfTest",
+                "slot": 6,
+                "token": "4c35bef2",
+                "filename": "SelfTest.rejected.lump",
+                "version": 88,
+                "reason": "bootstrap-identity-invalid",
+            }],
+        }
 
 
 def test_update_to_latest_is_retired_without_mutating_repository(tmp_path, monkeypatch):

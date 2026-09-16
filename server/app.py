@@ -5685,6 +5685,7 @@ def boot_image_upload():
 def _boot_execution_freshness(state, lumps_dir):
     """Report when committed Namespace bindings are not the newest compilations."""
     warnings = []
+    failed_saves = []
     manifest = _read_manifest_safe(os.path.join(lumps_dir, "manifest.json"))
     if not isinstance(manifest, list):
         return {"status": "unknown", "warnings": []}
@@ -5742,6 +5743,14 @@ def _boot_execution_freshness(state, lumps_dir):
                 # impossible promotion flow for it.
                 if (bootstrap_identity is not None
                         and bootstrap_identity.get("valid") is not True):
+                    failed_saves.append({
+                        "abstraction": name,
+                        "slot": selected.get("slot"),
+                        "token": entry.get("token"),
+                        "filename": entry.get("filename"),
+                        "version": entry.get("lump_version"),
+                        "reason": "bootstrap-identity-invalid",
+                    })
                     continue
                 compatible.append(entry)
             if inspected_any:
@@ -5775,10 +5784,13 @@ def _boot_execution_freshness(state, lumps_dir):
             },
             "reason": "committed-boot-image-does-not-use-latest-compilation",
         })
-    return {
+    result = {
         "status": "stale" if warnings else "current",
         "warnings": warnings,
     }
+    if failed_saves:
+        result["failedSaves"] = failed_saves
+    return result
 
 
 @app.route("/api/boot-image/update-to-latest", methods=["POST"])

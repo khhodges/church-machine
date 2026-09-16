@@ -63,6 +63,24 @@ context._renderBootExecutionFreshness({
 });
 if (banner.style.display !== 'none') throw new Error('current execution warning did not clear');
 
+context._renderBootExecutionFreshness({
+    executionFreshness: {
+        warnings: [],
+        failedSaves: [{
+            abstraction: 'SelfTest',
+            token: '4c35bef2',
+            version: 88,
+            reason: 'bootstrap-identity-invalid',
+        }],
+    },
+});
+if (banner.style.display !== 'flex' ||
+        !banner.innerHTML.includes('SAVE FAILED') ||
+        !banner.innerHTML.includes('SelfTest v88') ||
+        !banner.innerHTML.includes('Recover source &amp; retry')) {
+    throw new Error('failed save warning is not explicit and actionable');
+}
+
 console.log('boot execution freshness warning tests passed');
 */
 vm.createContext(context);

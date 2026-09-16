@@ -49,7 +49,9 @@ function _renderBootExecutionFreshness(state) {
     const freshness = state && state.executionFreshness;
     const warnings = freshness && Array.isArray(freshness.warnings)
         ? freshness.warnings : [];
-    if (!warnings.length) {
+    const failedSaves = freshness && Array.isArray(freshness.failedSaves)
+        ? freshness.failedSaves : [];
+    if (!warnings.length && !failedSaves.length) {
         banner.style.display = 'none';
         banner.textContent = '';
         return;
@@ -62,23 +64,34 @@ function _renderBootExecutionFreshness(state) {
         return String(item.abstraction) + ' is executing ' + selectedVersion +
             ' instead of latest successful ' + latestVersion;
     });
-    const repair = warnings[0] && warnings[0].latest || {};
+    const failed = failedSaves[0] || null;
+    const repair = failed || (warnings[0] && warnings[0].latest) || {};
     window._bootExecutionRepairTarget = {
-        abstraction: warnings[0] && warnings[0].abstraction || null,
+        abstraction: failed && failed.abstraction ||
+            warnings[0] && warnings[0].abstraction || null,
         token: repair.token || null,
         revision: repair.version,
+        failedSave: !!failed,
     };
     const repairVersion = repair.version == null ? '' : ' v' + repair.version;
-    banner.innerHTML = '<div class="boot-execution-freshness-copy"><strong>WARNING: SIMULATOR IS NOT RUNNING THE LATEST COMPILED CODE.</strong> ' +
-        details.map(function(text) {
+    const headline = failed
+        ? '<strong>SAVE FAILED.</strong> ' + String(failed.abstraction) +
+            repairVersion + ' was rejected because its saved identity is invalid. ' +
+            'The simulator is still safely running the previous valid revision.'
+        : '<strong>WARNING: SIMULATOR IS NOT RUNNING THE LATEST COMPILED CODE.</strong> ' +
+            details.map(function(text) {
             const span = document.createElement('span');
             span.textContent = text;
             return span.innerHTML;
-        }).join('; ') +
-        '. The newer revision cannot boot until the IDE repairs its saved identity.' +
+        }).join('; ');
+    banner.innerHTML = '<div class="boot-execution-freshness-copy">' + headline +
+        (failed ? ' Recover the source and save it again.' :
+            '. The newer revision cannot boot until the IDE repairs its saved identity.') +
         '<div id="bootExecutionUpdateStatus" class="boot-execution-update-status"></div></div>' +
         '<button type="button" id="bootExecutionUpdateButton" class="boot-execution-update-btn" ' +
-        'onclick="_openBootExecutionUpdate()">Fix' + repairVersion + ' now</button>';
+        'onclick="_openBootExecutionUpdate()">' +
+        (failed ? 'Recover source &amp; retry' : 'Fix' + repairVersion + ' now') +
+        '</button>';
 /*
         '. Prepare a new boot image before treating simulator results as current.' +
         '<div id="bootExecutionUpdateStatus" class="boot-execution-update-status"></div></div>' +
@@ -176,10 +189,20 @@ async function _openBootExecutionUpdate() {
     const token = target.token;
     const message = 'Opening the guarded repair for the exact saved revision\u2026';
     if (status) status.textContent = message;
-    if (!token || typeof window._showLatestCompilationPromotion !== 'function') {
+    if (!token) {
         const unavailable = 'Repair could not open. Reload the IDE and click Fix again.';
         if (status) status.textContent = unavailable;
         if (typeof appendOutput === 'function') appendOutput(unavailable, 'error');
+        return false;
+    }
+    if (target.failedSave && typeof openLumpInEditor === 'function') {
+        await openLumpInEditor(token);
+        if (status) status.textContent =
+            'Source recovered. Click Save LUMP to build and save a valid new revision.';
+        return true;
+    }
+    if (typeof window._showLatestCompilationPromotion !== 'function') {
+        if (status) status.textContent = 'Repair could not open. Reload the IDE and click Fix again.';
         return false;
     }
     if (typeof switchView === 'function') switchView('lumps');
