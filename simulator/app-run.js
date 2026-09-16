@@ -2654,10 +2654,8 @@ function _autoLoadDefaultProgram() {
     // pasted while boot was still animating / after a failed compile that
     // never set _defaultProgramLoaded).  Overwriting it here silently
     // destroyed the user's program on boot completion.
-    const _dfltEd = document.getElementById('asmEditor');
-    const _edHasContent = !!(_dfltEd && _dfltEd.value && _dfltEd.value.trim());
     const _userTabActive = (typeof activeUserTabId !== 'undefined') && !!activeUserTabId;
-    if (!_edHasContent && !_userTabActive) {
+    if (!_userTabActive) {
         _openConfiguredBootLumpInDefaultEditor().then(function(opened) {
             if (opened) return;
             // Preserve the existing fallback if the authoritative catalog row

@@ -116,3 +116,16 @@ test('default Code View opens the configured Lightning Bolt LUMP', async ({ page
     expect(result.disassemblyVisible).toBe(true);
     expect(result.disassembly).toContain('SelfTest');
 });
+
+test('default LUMP open is not gated by a restored generic editor buffer', async () => {
+    const fs = require('fs');
+    const source = fs.readFileSync('simulator/app-run.js', 'utf8');
+    const autoLoadStart = source.indexOf('function _autoLoadDefaultProgram()');
+    const autoLoadEnd = source.indexOf(
+        '// Do NOT auto-assemble here.', autoLoadStart);
+    const autoLoad = source.slice(autoLoadStart, autoLoadEnd);
+
+    expect(autoLoad).toContain(
+        "if (!_userTabActive) {\n        _openConfiguredBootLumpInDefaultEditor()");
+    expect(autoLoad).not.toContain('if (!_edHasContent && !_userTabActive)');
+});
