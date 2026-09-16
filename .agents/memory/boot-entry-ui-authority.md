@@ -1,10 +1,10 @@
 ---
 name: Boot-entry UI authority
-description: Default Code View must follow the boot slot embedded in the loaded image, not the pending browser selection.
+description: Default Code View follows the committed Namespace boot marker and opens its exact LUMP disassembly even when the prepared image is stale.
 ---
 
-The simulator's loaded image is the authority for which LUMP carries the Lightning Bolt. A localStorage boot-slot value can be a pending UI selection from a previous session and may differ from the image currently loaded; browser tests and UI resolution must use `sim.bootEntrySlot` after the image is available. Open the LUMP when the validated image arrives, even if automatic boot is disabled, and do not let automatic startup execution redirect Code View to Dashboard. Opening this default LUMP always enters saved-LUMP mode with its exact disassembly visible; a generic restored editor buffer must not suppress that open.
+The committed Namespace `boot: true` marker is the authority for which LUMP carries the Lightning Bolt. A localStorage slot and a stale prepared image are evidence only and must not retarget Code View. Opening the default LUMP always enters saved-LUMP mode with its exact disassembly visible; generic restored editor text and boot-image preparation failures must not suppress inspection.
 
-**Why:** A stale pending slot caused a regression fixture to expect SelfTest at slot 6 while the active image selected CapabilityTest at slot 10, masking the actual startup behavior. Separately, the startup runner immediately redirected to Dashboard after opening the LUMP, and the no-auto-boot path never reached the opener. The artifact list does not carry resident `ns_slot` bindings; those come from the boot-config catalog.
+**Why:** The default opener was coupled to successful boot completion, so a stale-image 409 left Code View on generic Console Output. Large classic scripts also initialize out of order: early calls can hit temporal-dead-zone globals or run before the saved-LUMP opener exists. One-shot load handlers and short timing guesses failed.
 
-**How to apply:** Join the image-selected slot to `boot-config.lumpCatalog`, then resolve that exact token in the artifact list. Replace old generic snapshots or built-ins and show the immutable disassembly, while preserving explicitly owned user tabs, files, and dirty buffers. Make tests reflect the two real API shapes.
+**How to apply:** Read the boot marker from Namespace state, join its slot to `boot-config.lumpCatalog`, then resolve that token in the artifact list. Trigger from both readiness sides and contain early synchronous initialization errors. Replace generic snapshots and show immutable disassembly while preserving explicitly owned user work.

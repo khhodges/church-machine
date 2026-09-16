@@ -7559,6 +7559,10 @@ async function openLumpInEditor(token) {
     if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
     if (typeof saveEditorState === 'function') saveEditorState();
 }
+window._configuredBootLumpOpenerReady = true;
+if (typeof window._requestConfiguredBootLumpOpen === 'function') {
+    window._requestConfiguredBootLumpOpen();
+}
 
 // ── Save an already-persisted LUMP as a new dated version ────────────────────
 // Called by the "Save Lump" toolbar button when the editor was opened from a

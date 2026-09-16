@@ -81,17 +81,6 @@ test('default Code View opens the configured Lightning Bolt LUMP', async ({ page
 
     await page.goto('/simulator/');
 
-    // This is intentionally tested with auto-boot disabled: loading the
-    // authoritative image must still populate a default Code View with the
-    // selected LUMP's disassembly.
-    await page.waitForFunction(() =>
-        window.bootImageAvailable === true &&
-        typeof sim !== 'undefined' &&
-        sim &&
-        sim._bootImageLoaded === true,
-        { timeout: 15000 }
-    );
-
     await page.waitForFunction(token =>
         window._editorOpenLumpToken === token &&
         document.getElementById('editor')?.classList.contains('active'),
@@ -102,7 +91,7 @@ test('default Code View opens the configured Lightning Bolt LUMP', async ({ page
     const result = await page.evaluate(() => ({
         token: window._editorOpenLumpToken,
         currentToken: window.LumpRegistry && window.LumpRegistry.getCurrent(),
-        bootSlot: sim.bootEntrySlot,
+        bootSlot: typeof bootEntrySlot === 'number' ? bootEntrySlot : null,
         editor: document.getElementById('asmEditor')?.value || '',
         disassembly: document.getElementById('savedLumpDisassembly')?.textContent || '',
         disassemblyVisible:

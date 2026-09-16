@@ -683,6 +683,9 @@ function _applyNamespaceBootProjection(state, message) {
     const changed = bootEntrySlot !== slot;
     bootEntrySlot = slot;
     if (changed) _bootEntrySelectionRevision++;
+    if (typeof window._requestConfiguredBootLumpOpen === 'function') {
+        window._requestConfiguredBootLumpOpen();
+    }
 
     // A loaded image is evidence only. It may prove that this target is already
     // prepared, but it must never overwrite the Namespace plan after a reload

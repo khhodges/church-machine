@@ -2506,10 +2506,12 @@ let _defaultProgramLoaded = false;
 // Resolve the committed Namespace marker to the catalog token so Code View
 // opens the same executable marked with ⚡. A loaded image is evidence only
 // and must not retarget this lookup.
-function _configuredBootLumpToken(bootCatalog) {
+function _configuredBootLumpToken(bootCatalog, selectedSlot) {
     if (!window.LumpRegistry || !sim) return null;
-    const slot = typeof bootEntrySlot !== 'undefined'
-        ? Number(bootEntrySlot) : null;
+    const slot = Number.isInteger(Number(selectedSlot))
+        ? Number(selectedSlot)
+        : (typeof bootEntrySlot !== 'undefined'
+            ? Number(bootEntrySlot) : null);
     if (!Number.isInteger(slot) || slot < 0) return null;
 
     const serverLumps = window.LumpRegistry.getServerList();
@@ -2584,7 +2586,17 @@ function _openConfiguredBootLumpInDefaultEditor() {
 
     const openResolved = function(results) {
         const bootCatalog = results && Array.isArray(results[1]) ? results[1] : [];
-        const token = _configuredBootLumpToken(bootCatalog);
+        const namespaceState = results && results[2] &&
+            typeof results[2] === 'object' ? results[2] : null;
+        const bootMarker = namespaceState &&
+            Array.isArray(namespaceState.abstractions)
+            ? namespaceState.abstractions.find(function(row) {
+                return row && row.boot === true &&
+                    Number.isInteger(Number(row.slot));
+            })
+            : null;
+        const token = _configuredBootLumpToken(
+            bootCatalog, bootMarker ? Number(bootMarker.slot) : null);
         if (!token) return false;
         return Promise.resolve(openLumpInEditor(token)).then(function() {
             return true;
@@ -2606,7 +2618,15 @@ function _openConfiguredBootLumpInDefaultEditor() {
             return data && Array.isArray(data.lumpCatalog) ? data.lumpCatalog : [];
         })
         .catch(function() { return []; });
-    const catalogReady = Promise.all([serverCatalogReady, bootCatalogReady]);
+    const namespaceReady = fetch('/api/boot-image/ns-state', {
+        cache: 'no-store',
+    }).then(function(response) {
+        if (!response.ok) return null;
+        return response.json();
+    }).catch(function() { return null; });
+    const catalogReady = Promise.all([
+        serverCatalogReady, bootCatalogReady, namespaceReady,
+    ]);
     const openPromise = catalogReady.then(openResolved).catch(function(error) {
         console.warn('[boot-entry-editor] could not open configured boot LUMP:', error);
         return false;
@@ -2619,6 +2639,34 @@ function _openConfiguredBootLumpInDefaultEditor() {
         throw error;
     });
     return window._configuredBootLumpOpenPromise;
+}
+
+// Default Code View is an artifact-inspection surface, not a boot-success
+// surface. A stale committed boot image may block execution, but it must not
+// leave the configured default LUMP hidden behind the generic Console Output
+// panel. The opener performs its own user-work ownership checks.
+function _scheduleConfiguredBootLumpOpen() {
+    let attempts = 0;
+    const tryOpen = function() {
+        attempts += 1;
+        let opening;
+        try {
+            opening = _openConfiguredBootLumpInDefaultEditor();
+        } catch (_) {
+            if (attempts < 120) setTimeout(tryOpen, 250);
+            return;
+        }
+        void Promise.resolve(opening).then(function(opened) {
+            if (opened || attempts >= 120) return;
+            setTimeout(tryOpen, 250);
+        });
+    };
+    setTimeout(tryOpen, 0);
+}
+window._requestConfiguredBootLumpOpen = _scheduleConfiguredBootLumpOpen;
+_scheduleConfiguredBootLumpOpen();
+if (window._configuredBootLumpOpenerReady === true) {
+    _scheduleConfiguredBootLumpOpen();
 }
 
 function _autoLoadDefaultProgram() {

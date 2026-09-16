@@ -14140,6 +14140,7 @@ def get_lump_words(token_hex):
     archive_filename = request.args.get("archive_filename")
     archive_manifest_entry = None
     archive_provenance = None
+    namespace_selected_active_entry = None
     if archive_filename is not None:
         # History supplies this immutable locator for archived records. Do not
         # accept an arbitrary path: it must be either an exact archived
@@ -14242,6 +14243,40 @@ def get_lump_words(token_hex):
                 and row.get("archived") is not True
                 and str(row.get("token") or "").lower() == key8
             ]
+            if len(active_matches) > 1:
+                # Historical manifest drift can leave more than one active row
+                # with the same runtime GT. The committed Namespace descriptor
+                # is an exact filename+digest binding, so it can disambiguate
+                # read-only inspection without guessing by manifest order.
+                try:
+                    with open(NS_STATE_PATH, encoding="utf-8") as state_file:
+                        selected_rows = json.load(state_file).get(
+                            "abstractions", [])
+                    selected = [
+                        row for row in selected_rows
+                        if isinstance(row, dict)
+                        and str(row.get("token") or "").lower() == key8
+                    ]
+                    if len(selected) == 1:
+                        selected_filename = selected[0].get("filename")
+                        selected_hash = selected[0].get("binary_hash")
+                        selected_matches = [
+                            row for row in active_matches
+                            if row.get("filename") == selected_filename
+                        ]
+                        selected_path = os.path.join(
+                            LUMPS_DIR, str(selected_filename or ""))
+                        if (
+                            len(selected_matches) == 1
+                            and isinstance(selected_hash, str)
+                            and len(selected_hash) == 64
+                            and os.path.isfile(selected_path)
+                            and _sha256_file(selected_path) == selected_hash
+                        ):
+                            active_matches = selected_matches
+                            namespace_selected_active_entry = selected_matches[0]
+                except (OSError, TypeError, ValueError, json.JSONDecodeError):
+                    pass
             if len(active_matches) == 1:
                 active_filename = active_matches[0].get("filename")
                 if (isinstance(active_filename, str) and active_filename
@@ -14295,7 +14330,13 @@ def get_lump_words(token_hex):
     _lh_lumps_dir = LUMPS_DIR
     _integrity_result = _check_lump_canonical_integrity(_lh_lumps_dir, key8, lump_raw)
     if isinstance(_integrity_result, str):
-        validation_errors.append(_integrity_result)
+        _selected_duplicate_only = (
+            namespace_selected_active_entry is not None
+            and _integrity_result
+                == f"Integrity invariant violated: duplicate manifest token {key8}."
+        )
+        if not _selected_duplicate_only:
+            validation_errors.append(_integrity_result)
 
     # Compute a fresh SHA-256 of the binary bytes so the caller can verify
     # the served content matches the hash recorded at compile time.
