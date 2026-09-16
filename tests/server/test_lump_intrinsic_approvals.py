@@ -398,6 +398,68 @@ def test_detail_uses_binary_and_hash_approval_not_sidecar(tmp_path, monkeypatch)
     assert body["author"] == "reviewer"
 
 
+def test_detail_prefers_active_manifest_row_when_archives_share_token(
+        tmp_path, monkeypatch):
+    active = _lump(cw=2, cc=1)
+    digest, token = _approved_library(tmp_path, active)
+    manifest_path = tmp_path / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    archived = _lump(cw=3, cc=1)
+    archived_name = "Archived.1.deadbeef.lump"
+    (tmp_path / archived_name).write_bytes(archived)
+    manifest.insert(0, {
+        "token": token, "abstraction": "Archived",
+        "filename": archived_name, "lump_version": 1, "archived": True,
+    })
+    manifest_path.write_text(json.dumps(manifest))
+    monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
+
+    response = app_module.app.test_client().get(f"/api/lumps/{token}/detail")
+
+    assert response.status_code == 200, response.get_json()
+    body = response.get_json()
+    assert body["binary_hash"] == digest
+    assert body["cw"] == 2
+    assert body["read_only"] is False
+
+
+def test_read_inspection_derives_missing_bootstrap_gt_from_static_binding(
+        tmp_path):
+    token = "4a00000a"
+    words = [0] * 64
+    words[0] = (0x1F << 27) | 1
+    words[-1] = int(token, 16)
+    binary = struct.pack(">64I", *words)
+    digest = hashlib.sha256(binary).hexdigest()
+    filename = "CapabilityTest.1.deadbeef.lump"
+    (tmp_path / filename).write_bytes(binary)
+    (tmp_path / "manifest.json").write_text(json.dumps([{
+        "token": token, "abstraction": "CapabilityTest",
+        "filename": filename,
+    }]))
+    (tmp_path / "ns-state.json").write_text(json.dumps({
+        "abstractions": [{
+            "name": "CapabilityTest", "slot": 10, "seq": 0,
+            "token": token, "filename": filename, "type": "Inform",
+            "resident": True, "boot_resident": True,
+            "ns_slot_policy": "static", "load_policy": "Resident",
+        }],
+    }))
+    (tmp_path / "approvals.json").write_text(json.dumps({
+        "version": 1, "algorithm": "sha256", "approvals": {
+            digest: {
+                "binary_hash": digest, "filename": filename,
+                "dot_name": "CapabilityTest", "issue_n": 1,
+                "identity_hash": hashlib.sha256(
+                    b"CapabilityTest#1").hexdigest(),
+            },
+        },
+    }))
+
+    assert app_module._check_lump_canonical_integrity(
+        str(tmp_path), token, binary) is True
+
+
 def test_detail_inspects_exact_bytes_without_matching_approval(tmp_path, monkeypatch):
     digest, token = _approved_library(tmp_path, _lump())
     (tmp_path / "approvals.json").write_text(json.dumps({

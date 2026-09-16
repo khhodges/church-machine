@@ -146,7 +146,8 @@ def check_lump_canonical_integrity(lumps_dir, key8, lump_raw):
                 row0, approval.get("bootstrap_t"))
         except ValueError as exc:
             return f"Bootstrap identity failure for token {key8}: {exc}"
-        if approval.get("bootstrap_runtime_gt") != row0:
+        approved_runtime_gt = approval.get("bootstrap_runtime_gt")
+        if approved_runtime_gt is not None and approved_runtime_gt != row0:
             return f"Bootstrap identity failure for token {key8}: approval GT differs from row 0."
     return True
 

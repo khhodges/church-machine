@@ -13886,7 +13886,10 @@ def get_lump_detail(token):
         except Exception:
             pass
 
-    entry = next((e for e in manifest if e.get('token') == token8), None)
+    entry = next((
+        e for e in manifest
+        if e.get('token') == token8 and e.get('archived') is not True
+    ), None)
     if entry is None:
         return jsonify({"error": f"No LUMP found for token {token8}"}), 404
 

@@ -8,3 +8,16 @@ Validate a resident boot-image binding with the selected artifact hash, Namespac
 **Why:** SelfTest continuation capabilities and portable capability rows are rewritten for the destination image, so a full disk-artifact byte comparison rejects correctly generated images. The executable/data payload remains immutable and catches an older saved program.
 
 **How to apply:** Use this rule on hardware upload gates and other checks that compare a committed Namespace selection with a generated image. Treat a missing selected filename or mismatched selected artifact hash as a fail-closed condition.
+
+For read-only inspection of an exact hash-approved resident LUMP, derive SELF from
+the live static Namespace descriptor and compare it with c-list row zero. A
+missing redundant approval GT field must not make those matching authorities
+disagree; an explicitly present conflicting field must still fail.
+
+**Why:** Older approved saves may carry the exact binary hash and canonical
+identity without duplicating the runtime GT. The slot plus issued sequence
+already defines that GT, and row zero proves the artifact uses it.
+
+**How to apply:** This exception is only for inspection/trust display. Boot
+generation and mutation admission may continue to require complete bootstrap
+approval metadata and must fail closed when it is absent.
