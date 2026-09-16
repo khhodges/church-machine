@@ -6479,13 +6479,10 @@ async function openLumpInEditor(token) {
     }
 
     // ── Fresh-compilation redirect (dot.name.hash protocol) ───────────────
-    // Each compilation produces a unique hash token.  If the Edit button
-    // carries a SAVED token (old hash) but the user has since compiled a
-    // newer version, that newer compilation has a DIFFERENT token in
-    // LumpRegistry.  Detect this by comparing memory.registeredAt against
-    // the saved entry's fetchedAt for the same abstraction name, and
-    // silently redirect to the fresher token so "Open Lump" always shows
-    // the most recent work, not the last-saved binary.
+    // This is now a comparison only; it must never silently redirect.
+    // A newer in-memory compilation is information, not authority to replace
+    // the explicitly selected saved artifact.  Keep the selected token and
+    // expose the comparison to the editor instead of silently redirecting.
     //
     // Post-reload safety: both sources.server.fetchedAt and
     // sources.memory.registeredAt are in-memory timestamps that reset to 0
@@ -6525,9 +6522,12 @@ async function openLumpInEditor(token) {
                 }
             });
             if (_fresherEntry) {
-                token = _fresherEntry.token;
-                // Re-resolve with the new token; lump descriptor built below.
-                lump = _fresherEntry.sources?.server || null;
+                window._lastFreshCompilationComparison = {
+                    selectedToken: token,
+                    selectedAbstraction: _absName,
+                    newerToken: _fresherEntry.token,
+                    newerRegisteredAt: _fresherAt,
+                };
             }
         }
     }

@@ -1285,16 +1285,19 @@ async function _doWipVersionSave() {
     // tested-version release. Do not replay its idempotency key.
     delete savePayload.metadata.operation_id;
 
-    const _wipApproval = await window._confirmLumpSavePlan(
-        savePayload.binary, savePayload.metadata,
-        () => `Save the tested version of "${absName}"?`);
-    if (!_wipApproval || _wipApproval.status !== 'approved') return;
-    savePayload.binary = _wipApproval.final_binary.slice();
-    if (_wipApproval.plan.ns_slot !== null) {
-        savePayload.metadata.ns_slot = _wipApproval.plan.ns_slot;
+    if (!(savePayload.metadata.compiler_record &&
+            savePayload.metadata.compiler_record.attestation)) {
+        const _wipApproval = await window._confirmLumpSavePlan(
+            savePayload.binary, savePayload.metadata,
+            () => `Save the tested version of "${absName}"?`);
+        if (!_wipApproval || _wipApproval.status !== 'approved') return;
+        savePayload.binary = _wipApproval.final_binary.slice();
+        if (_wipApproval.plan.ns_slot !== null) {
+            savePayload.metadata.ns_slot = _wipApproval.plan.ns_slot;
+        }
+        savePayload.metadata.approval_intent = _wipApproval.intent.intent;
+        savePayload.metadata.save_plan_id = _wipApproval.plan.plan_id;
     }
-    savePayload.metadata.approval_intent = _wipApproval.intent.intent;
-    savePayload.metadata.save_plan_id = _wipApproval.plan.plan_id;
     _lumpSaveRequest(fetch, '/api/lumps/save', savePayload).then(resp => {
         if (resp.ok) {
             const _lv  = resp.lump_version != null ? resp.lump_version : _autoVer;
@@ -1421,16 +1424,19 @@ async function _confirmLumpRelease() {
 
     data.savePayload.metadata.version = ver;
     if (notes) data.savePayload.metadata.release_notes = notes;
-    const _releaseApproval = await window._confirmLumpSavePlan(
-        data.savePayload.binary, data.savePayload.metadata,
-        () => `Release version "${ver}" of "${data.absName}"?`);
-    if (!_releaseApproval || _releaseApproval.status !== 'approved') return;
-    data.savePayload.binary = _releaseApproval.final_binary.slice();
-    if (_releaseApproval.plan.ns_slot !== null) {
-        data.savePayload.metadata.ns_slot = _releaseApproval.plan.ns_slot;
+    if (!(data.savePayload.metadata.compiler_record &&
+            data.savePayload.metadata.compiler_record.attestation)) {
+        const _releaseApproval = await window._confirmLumpSavePlan(
+            data.savePayload.binary, data.savePayload.metadata,
+            () => `Release version "${ver}" of "${data.absName}"?`);
+        if (!_releaseApproval || _releaseApproval.status !== 'approved') return;
+        data.savePayload.binary = _releaseApproval.final_binary.slice();
+        if (_releaseApproval.plan.ns_slot !== null) {
+            data.savePayload.metadata.ns_slot = _releaseApproval.plan.ns_slot;
+        }
+        data.savePayload.metadata.approval_intent = _releaseApproval.intent.intent;
+        data.savePayload.metadata.save_plan_id = _releaseApproval.plan.plan_id;
     }
-    data.savePayload.metadata.approval_intent = _releaseApproval.intent.intent;
-    data.savePayload.metadata.save_plan_id = _releaseApproval.plan.plan_id;
 
     _lumpSaveRequest(fetch, '/api/lumps/save', data.savePayload).then(resp => {
         if (resp.ok) {
@@ -1927,6 +1933,48 @@ async function compileAndBuild(options) {
             _portableStatus = 'portable-invalid';
         }
     }
+    let _compilerBinaryHash = null;
+    if (window.crypto && window.crypto.subtle && window.TextEncoder) {
+        try {
+            const _hashBytes = new Uint8Array(lumpWordsArray.length * 4);
+            const _hashView = new DataView(_hashBytes.buffer);
+            lumpWordsArray.forEach((_word, _index) =>
+                _hashView.setUint32(_index * 4, _word >>> 0, false));
+            const _digest = await window.crypto.subtle.digest('SHA-256', _hashBytes);
+            _compilerBinaryHash = Array.from(new Uint8Array(_digest))
+                .map(_byte => _byte.toString(16).padStart(2, '0')).join('');
+        } catch (_hashError) {
+            _compilerBinaryHash = null;
+        }
+    }
+    let _attestedCompilerRecord = null;
+    // Browser compilation is not itself a server trust boundary. Ask the
+    // Trusted Home IDE compiler to reproduce the exact words before marking
+    // this candidate as trusted; failure deliberately leaves it on the
+    // uploaded/legacy approval path.
+    if (typeof fetch === 'function') {
+        try {
+            const _attestResponse = await fetch('/api/compile/attest', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    source,
+                    language: result.language || 'javascript',
+                    words: lumpWordsArray,
+                }),
+            });
+            if (_attestResponse.ok) {
+                const _attestBody = await _attestResponse.json();
+                if (_attestBody && _attestBody.compiler_record &&
+                        _attestBody.compiler_record.attestation) {
+                    _attestedCompilerRecord = _attestBody.compiler_record;
+                }
+            }
+        } catch (_attestError) {
+            // An unavailable attestation service must never become trust.
+            _attestedCompilerRecord = null;
+        }
+    }
 
     const savePayload = {
         binary: lumpWordsArray,
@@ -1966,6 +2014,9 @@ async function compileAndBuild(options) {
             portable_status: _portableStatus,
             portable_mode: result.portableMode || 'legacy',
             token:          _compiledToken || undefined,
+             // The compiler record is evidence for this exact local build.
+             // The server recomputes the binary hash before accepting it.
+             compiler_record: _attestedCompilerRecord,
         }
     };
 
@@ -2129,19 +2180,20 @@ async function compileAndBuild(options) {
         return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
     })();
     savePayload.metadata.version = _autoVer;
-    const _buildApproval = await window._confirmLumpSavePlan(
-        savePayload.binary, savePayload.metadata,
-        () => `Save "${absName}" as an immutable LUMP?\n\nApproval will be bound to the exact SHA-256 of the compiled binary.`);
-    if (!_buildApproval || _buildApproval.status !== 'approved') return;
-    // Preserve lumpWordsArray/binaryBuf as compiler diagnostics. The POST must
-    // instead use the exact server-canonical final candidate that the approval
-    // intent was bound to.
-    savePayload.binary = _buildApproval.final_binary.slice();
-    if (_buildApproval.plan.ns_slot !== null) {
-        savePayload.metadata.ns_slot = _buildApproval.plan.ns_slot;
+    if (!_attestedCompilerRecord) {
+        const _buildApproval = await window._confirmLumpSavePlan(
+            savePayload.binary, savePayload.metadata,
+            () => `Save "${absName}" as an immutable LUMP?\n\nApproval will be bound to the exact SHA-256 of the compiled binary.`);
+        if (!_buildApproval || _buildApproval.status !== 'approved') return;
+        // Unknown or legacy bytes stay on the explicit admission path. Trusted
+        // compiler output is already bound to these exact immutable words.
+        savePayload.binary = _buildApproval.final_binary.slice();
+        if (_buildApproval.plan.ns_slot !== null) {
+            savePayload.metadata.ns_slot = _buildApproval.plan.ns_slot;
+        }
+        savePayload.metadata.approval_intent = _buildApproval.intent.intent;
+        savePayload.metadata.save_plan_id = _buildApproval.plan.plan_id;
     }
-    savePayload.metadata.approval_intent = _buildApproval.intent.intent;
-    savePayload.metadata.save_plan_id = _buildApproval.plan.plan_id;
 
     // ── WIP version gate ──────────────────────────────────────────────────────
     // If a WIP token is stored (programmer came from the /start page), defer

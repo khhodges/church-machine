@@ -59,3 +59,18 @@ def test_execution_freshness_is_current_when_binding_matches_latest(tmp_path):
 
     assert app_module._boot_execution_freshness(
         state, str(tmp_path)) == {"status": "current", "warnings": []}
+
+
+def test_update_to_latest_is_retired_without_mutating_repository(tmp_path, monkeypatch):
+    before = json.dumps({"abstractions": [{"name": "SelfTest", "slot": 6}]})
+    (tmp_path / "ns-state.json").write_text(before)
+    monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
+    response = app_module.app.test_client().post(
+        "/api/boot-image/update-to-latest",
+        json={"abstraction": "SelfTest", "token": "4c35bef2"},
+    )
+    assert response.status_code == 410
+    body = response.get_json()
+    assert body["selectionRequired"] is True
+    assert body["dataChanged"] is False
+    assert (tmp_path / "ns-state.json").read_text() == before

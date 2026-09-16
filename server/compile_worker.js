@@ -37,6 +37,7 @@
 
 const { Worker, isMainThread, parentPort, workerData } = require('worker_threads');
 const path = require('path');
+const crypto = require('crypto');
 
 const WORKER_TIMEOUT_MS = 10_000; // 10 seconds — main thread terminates worker if exceeded
 
@@ -233,6 +234,25 @@ if (isMainThread) {
         buf.writeUInt32BE(words[i] >>> 0, i * 4);
     }
     const lump_binary = buf.toString('base64');
+    const binary_hash = crypto.createHash('sha256').update(buf).digest('hex');
+    const source_hash = crypto.createHash('sha256').update(
+        Buffer.from(source, 'utf8')).digest('hex');
+    // This record is the compiler's evidence for locally-created output.  It
+    // is deliberately bound to the exact serialized bytes; consumers may
+    // recompute binary_hash, but must never trust a client-supplied hash alone.
+    const compiler_record = {
+        schema: 'church-compiler-output/v1',
+        compiler: 'CLOOMC',
+        compiler_version: 'workspace',
+        language: compileResult.language || language,
+        abstraction: compileResult.abstractionName || '',
+        binary_hash,
+        source_hash,
+        words: words.length,
+        cw: (words[0] >>> 10) & 0x1FFF,
+        cc: words[0] & 0xFF,
+        static_validated: true,
+    };
 
     const methods = (compileResult.methods || []).map(m => ({
         name:       m.name,
@@ -247,6 +267,7 @@ if (isMainThread) {
         methods,
         words:           Array.from(words),
         lump_binary,
+        compiler_record,
         portable_binding: portableBinding,
         portable_status: portableBinding ? 'portable-pinned' : 'legacy-unpinned',
         warnings:        warnings.map(w =>

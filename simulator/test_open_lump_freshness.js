@@ -12,7 +12,7 @@
 // Run:  node simulator/test_open_lump_freshness.js
 //
 // Coverage:
-//   T1 — newer in-memory compilation redirects to the new token
+//   T1 — newer in-memory compilation is reported without substitution
 //   T2 — no redirect when no in-memory compilation exists
 //   T3 — no redirect when in-memory compilation is OLDER than the saved entry
 //   T4 — picks the NEWEST in-memory entry when several candidates exist
@@ -149,7 +149,7 @@ check('T6 redirect block exists in production source (app-lumps.js)',
       REDIRECT_FN_SRC.includes('_fresherEntry') &&
       REDIRECT_FN_SRC.includes('_sessionEpoch'));
 
-// ── T1 — newer in-memory compilation redirects to the new token ──────────────
+// ── T1 — newer in-memory compilation is reported without substitution ───────
 {
     const sb  = makeSandbox();
     const LR  = sb.window.LumpRegistry;
@@ -172,8 +172,11 @@ check('T6 redirect block exists in production source (app-lumps.js)',
     LR.resolve(NEW_TOKEN).sources.memory.registeredAt = 2000;
 
     const redirected = buildRedirectFn(sb)(OLD_TOKEN, sb);
-    check('T1 redirects old saved token to newer in-memory compilation',
-          redirected === NEW_TOKEN, redirected);
+    check('T1 keeps the explicitly selected token',
+          redirected === OLD_TOKEN, redirected);
+    check('T1 records the newer compilation for explicit review',
+          sb._lastFreshCompilationComparison &&
+          sb._lastFreshCompilationComparison.newerToken === NEW_TOKEN);
 }
 
 // ── T2 — no in-memory compilation → token unchanged ──────────────────────────
@@ -210,7 +213,7 @@ check('T6 redirect block exists in production source (app-lumps.js)',
           redirected === OLD_TOKEN, redirected);
 }
 
-// ── T4 — multiple in-memory candidates → picks the NEWEST ────────────────────
+// ── T4 — multiple in-memory candidates → reports the NEWEST ──────────────────
 {
     const sb = makeSandbox();
     const LR = sb.window.LumpRegistry;
@@ -233,8 +236,11 @@ check('T6 redirect block exists in production source (app-lumps.js)',
     LR.resolve(BEST_TOKEN).sources.memory.registeredAt = 3000;  // newest
 
     const redirected = buildRedirectFn(sb)(OLD_TOKEN, sb);
-    check('T4 picks the newest in-memory compilation when multiple candidates exist',
-          redirected === BEST_TOKEN, redirected);
+    check('T4 keeps the selected token when multiple candidates exist',
+          redirected === OLD_TOKEN, redirected);
+    check('T4 reports the newest candidate without changing selection',
+          sb._lastFreshCompilationComparison &&
+          sb._lastFreshCompilationComparison.newerToken === BEST_TOKEN);
 }
 
 // ── T5 — different abstraction name → no redirect ─────────────────────────────
@@ -311,7 +317,7 @@ check('T6 redirect block exists in production source (app-lumps.js)',
           redirected === SAVED_TOKEN, redirected);
 }
 
-// ── T8b — session-epoch guard allows valid current-session compilation ─────────
+// ── T8b — current-session compilation is reported without substitution ────────
 // A real compile in the same session (registeredAt >= SESSION_EPOCH) and newer
 // than the saved binary should still redirect as expected.
 {
@@ -333,8 +339,11 @@ check('T6 redirect block exists in production source (app-lumps.js)',
     LR.resolve(NEW_TOKEN).sources.memory.registeredAt = EPOCH;  // exactly at epoch
 
     const redirected = buildRedirectFn(sb)(SAVED_TOKEN, sb);
-    check('T8b redirect when in-memory entry is at or after SESSION_EPOCH and newer than saved',
-          redirected === NEW_TOKEN, redirected);
+    check('T8b keeps the selected token for a newer current-session compilation',
+          redirected === SAVED_TOKEN, redirected);
+    check('T8b reports the newer current-session compilation',
+          sb._lastFreshCompilationComparison &&
+          sb._lastFreshCompilationComparison.newerToken === NEW_TOKEN);
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

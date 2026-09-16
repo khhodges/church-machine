@@ -45,13 +45,13 @@ if (!banner.innerHTML.includes('NOT RUNNING THE LATEST COMPILED CODE')) {
 if (!banner.innerHTML.includes('SelfTest is executing v86 instead of latest successful v87')) {
     throw new Error('warning does not identify selected and latest versions');
 }
-if (!banner.innerHTML.includes('Update to latest') ||
+if (!banner.innerHTML.includes('Review compilations') ||
         !banner.innerHTML.includes('_openBootExecutionUpdate()')) {
-    throw new Error('warning does not offer the guarded update action');
+    throw new Error('warning does not offer explicit compilation review');
 }
-if (!source.includes("fetch('/api/boot-image/update-to-latest'") ||
-        !source.includes('Update blocked \\u2014 no data changed.')) {
-    throw new Error('update action does not perform or report the guarded server check');
+if (source.includes("fetch('/api/boot-image/update-to-latest'") ||
+        !source.includes("switchView('lumps')")) {
+    throw new Error('freshness action still substitutes instead of requesting review');
 }
 
 context._renderBootExecutionFreshness({
