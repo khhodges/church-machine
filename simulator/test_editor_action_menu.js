@@ -77,5 +77,11 @@ check(!lumps.includes('getElementById(\'btnToolbarCompile\')') &&
     'saved-LUMP discard and recovery state use the action menu and compact indicator');
 check(/getElementById\('editorActionsWrap'\)[\s\S]*?insertBefore\([\s\S]*?_srcBanner[\s\S]*?_editorActionsWrap\.nextSibling/.test(lumps),
     'saved-LUMP recovery indicator is placed to the right of the hamburger');
+check(lumps.includes("_savedArtifactFailed ? 'alert' : 'status'") &&
+      lumps.includes('Saved artifact failed approval or integrity checks') &&
+      lumps.includes("'<span aria-hidden=\"true\">&#10007;</span>'") &&
+      fs.readFileSync(__dirname + '/styles-lumps.css', 'utf8')
+          .includes('.lump-source-restored-indicator.is-failed'),
+    'failed saved-artifact integrity remains visible as a red X');
 
 console.log('Editor action menu regression: PASS');

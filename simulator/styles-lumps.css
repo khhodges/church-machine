@@ -2554,6 +2554,14 @@
 .lump-source-restored-indicator span {
     color: #4ade80 !important;
 }
+.lump-source-restored-indicator.is-failed {
+    border-color: #ef4444;
+    background: #2a0b0b;
+    color: #ef4444 !important;
+}
+.lump-source-restored-indicator.is-failed span {
+    color: #ef4444 !important;
+}
 .lump-source-restored-banner {
     display: flex;
     align-items: center;

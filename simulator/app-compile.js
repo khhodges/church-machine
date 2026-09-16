@@ -883,6 +883,38 @@ function _isCompilerSelfCapability(cap) {
         String(cap.name || '').toUpperCase() === '__SELF__');
 }
 
+function _validateCompiledCandidateClist(words, clistStart, resolvedCaps) {
+    const binary = Array.from(words || [], word => Number(word) >>> 0);
+    const caps = Array.isArray(resolvedCaps) ? resolvedCaps : [];
+    const errors = [];
+    if (binary.length === 0) {
+        errors.push('Compiled candidate has no binary words.');
+        return { ok: false, errors };
+    }
+    const headerCount = binary[0] & 0xFF;
+    const binaryClistStart = binary.length - headerCount;
+    if (headerCount !== caps.length) {
+        errors.push(`Compiled C-list declares ${headerCount} rows but compiler metadata has ${caps.length}.`);
+    }
+    if (binaryClistStart !== clistStart) {
+        errors.push(`Compiled C-list starts at word ${binaryClistStart}, not the expected word ${clistStart}.`);
+    }
+    if (caps.length > 0 && !_isCompilerSelfCapability(caps[0])) {
+        errors.push('C-list fault: row 0 must be SELF.');
+    }
+    if (typeof CapabilityTokens === 'undefined' ||
+            typeof CapabilityTokens.validateClist !== 'function') {
+        errors.push('C-list security validator is unavailable.');
+    } else if (headerCount === caps.length && binaryClistStart === clistStart) {
+        const validation = CapabilityTokens.validateClist(
+            binary, clistStart, caps,
+            { sim: typeof sim !== 'undefined' ? sim : null,
+                allowCompilerSelfPlaceholder: true });
+        if (!validation.ok) errors.push(...validation.errors);
+    }
+    return { ok: errors.length === 0, errors };
+}
+
 // The bootstrap has no symbolic/token projection layer: its sole identifier is
 // the resident slot's current 32-bit SELF GT.  This is intentionally opt-in via
 // frozen boot provenance; ordinary editor builds remain dynamic-local and
@@ -1843,6 +1875,34 @@ async function compileAndBuild(options) {
         clistStart,
         resolvedCaps: resolvedCaps.map(cap => Object.assign({}, cap)),
     };
+    const _candidateClistValidation = _validateCompiledCandidateClist(
+        _candidateCLOOMCLump.words,
+        _candidateCLOOMCLump.clistStart,
+        _candidateCLOOMCLump.resolvedCaps);
+    if (!_candidateClistValidation.ok) {
+        const _candidateErrors = _candidateClistValidation.errors.map(message => ({
+            line: null,
+            message: `[CAP-GT] ${message}`,
+        }));
+        const _candidateMessage =
+            'Capability validation failed — compiled candidate not created:\n' +
+            _candidateClistValidation.errors.join('\n');
+        if (con) {
+            con.textContent = _candidateMessage;
+            con.scrollTop = 0;
+        }
+        if (typeof _showAsmErrors === 'function') {
+            _showAsmErrors(_candidateErrors,
+                'Capability validation failed — candidate not created');
+        }
+        showNextSteps('error');
+        return {
+            ok: false,
+            kind: 'cloomc',
+            error: _candidateClistValidation.errors.join('\n'),
+            errors: _candidateErrors,
+        };
+    }
 
     // ── Pre-save audit — run on assembled binary BEFORE download or server save ──
     // Build LUMP-level lineNums: index 0 = header (null), indices 1..cw = per-word source lines.

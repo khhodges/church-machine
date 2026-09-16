@@ -181,6 +181,7 @@ context.window.LumpSaveDiagnostics = {
 
 vm.runInContext(
     extractBlock(compileSource, 'function _isCompilerSelfCapability(') + '\n' +
+    extractBlock(compileSource, 'function _validateCompiledCandidateClist(') + '\n' +
     extractBlock(compileSource, 'function _materializeLumpCapabilities(') + '\n' +
     extractBlock(compileSource, 'async function compileAndBuild(') + '\n' +
     extractBlock(compileSource, 'function smartCompile(') +

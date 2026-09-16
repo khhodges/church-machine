@@ -7389,20 +7389,25 @@ async function openLumpInEditor(token) {
             // No draft — show recovered source only.
             _setSavedLumpEditorSource(_recoveredSource);
             asmEd.classList.remove('cm-editor-draft');
-            // Show a compact, non-text recovery indicator when original source
-            // was fetched. The title/ARIA label carries the explanation.
-            if (_sourceRestored) {
+            // Keep the saved-artifact source status visible. A failed approval
+            // or integrity check is more important than successful recovery:
+            // show a persistent red X instead of removing the prior green tick.
+            if (_sourceRestored || _sourceResolution.integrityError) {
                 var _existingSourceBanner = document.getElementById('_lumpSourceRestoredBanner');
                 if (_existingSourceBanner) _existingSourceBanner.remove();
                 var _srcBanner = document.createElement('div');
                 _srcBanner.id = '_lumpSourceRestoredBanner';
-                _srcBanner.className = 'lump-source-restored-indicator';
-                _srcBanner.setAttribute('role', 'status');
-                _srcBanner.setAttribute('aria-label', _diagnosticError
-                    ? 'Faulty artifact source opened for repair'
+                var _savedArtifactFailed = !!_sourceResolution.integrityError;
+                _srcBanner.className = 'lump-source-restored-indicator' +
+                    (_savedArtifactFailed ? ' is-failed' : '');
+                _srcBanner.setAttribute('role', _savedArtifactFailed ? 'alert' : 'status');
+                _srcBanner.setAttribute('aria-label', _savedArtifactFailed
+                    ? 'Saved artifact failed approval or integrity checks'
                     : 'Source restored from saved LUMP');
                 _srcBanner.title = _srcBanner.getAttribute('aria-label');
-                _srcBanner.innerHTML = '<span aria-hidden="true">&#10003;</span>';
+                _srcBanner.innerHTML = _savedArtifactFailed
+                    ? '<span aria-hidden="true">&#10007;</span>'
+                    : '<span aria-hidden="true">&#10003;</span>';
                 // Keep the compact status beside the editor actions hamburger,
                 // rather than taking a row in the source workspace.
                 var _editorActionsWrap = document.getElementById('editorActionsWrap');
