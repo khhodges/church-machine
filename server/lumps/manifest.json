@@ -549,15 +549,14 @@
     "token": "00aa1234",
     "abstraction": "Adder",
     "filename": "Adder.1.e437ee2c.lump",
-    "lump_version": 397,
-    "compiled_at": 1789565935.6496658,
+    "lump_version": 401,
+    "compiled_at": 1789569722.5815017,
     "dot_name": "Adder",
     "issue_n": 1,
     "petname": "",
     "content_profile": 2,
     "output_profile": 2,
     "capabilities": [],
-    "provenance": "uploaded-or-legacy",
-    "operation_id": "c7a48b996e6e47e0820d41456a0134c6"
+    "operation_id": "406a38a93ca343d098e2260bbed6c452"
   }
 ]
