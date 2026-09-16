@@ -8855,6 +8855,7 @@ async function _confirmLumpSavePlan(words, metadata, prompt, options) {
         _metadataSnapshot = Object.assign({}, metadata || {});
     }
     let plan;
+    let stopLeaseHeartbeat = null;
     try {
         plan = await _requestLumpSavePlan(_wordsSnapshot, _metadataSnapshot);
     } catch (error) {
@@ -8951,14 +8952,27 @@ async function _confirmLumpSavePlan(words, metadata, prompt, options) {
         _metadataSnapshot.save_as_latest = true;
         plan = await _requestLumpSavePlan(_wordsSnapshot, _metadataSnapshot);
     }
+    if (typeof window !== 'undefined' && window.LumpLeaseUI &&
+            plan && plan.lease) {
+        stopLeaseHeartbeat = window.LumpLeaseUI.startHeartbeat(
+            fetch, plan, 30000);
+    }
+    const stopHeartbeat = function() {
+        if (stopLeaseHeartbeat) {
+            stopLeaseHeartbeat();
+            stopLeaseHeartbeat = null;
+        }
+    };
     const message = typeof prompt === 'function' ? prompt(plan) : String(prompt || '');
     const confirmFn = typeof window !== 'undefined' && typeof window.confirm === 'function'
         ? window.confirm
         : (typeof confirm === 'function' ? confirm : null);
     if (!confirmFn) {
+        stopHeartbeat();
         throw new Error('Save confirmation is unavailable; no approval or repository save was requested.');
     }
     if (!confirmFn(`${_formatLumpSavePlan(plan)}\n\n${message}`.trim())) {
+        stopHeartbeat();
         if (_saveDiagnostics) {
             try {
                 _saveDiagnostics.record(metadata || {}, 'confirm', 'cancelled', {
@@ -8978,10 +8992,21 @@ async function _confirmLumpSavePlan(words, metadata, prompt, options) {
     // before minting the one-time approval intent, so a malformed server plan
     // cannot consume approval state or reach commit.
     if (options && typeof options.validateFinalBinary === 'function') {
-        options.validateFinalBinary(finalBinary, _metadataSnapshot, plan);
+        try {
+            options.validateFinalBinary(finalBinary, _metadataSnapshot, plan);
+        } catch (error) {
+            stopHeartbeat();
+            throw error;
+        }
     }
-    const intent = await _requestLumpApprovalIntent(
-        finalBinary, plan.action, _metadataSnapshot, plan);
+    let intent;
+    try {
+        intent = await _requestLumpApprovalIntent(
+            finalBinary, plan.action, _metadataSnapshot, plan);
+    } catch (error) {
+        stopHeartbeat();
+        throw error;
+    }
     if (_saveDiagnostics) {
         try {
             _saveDiagnostics.update(metadata || {}, {
@@ -8998,6 +9023,7 @@ async function _confirmLumpSavePlan(words, metadata, prompt, options) {
         plan,
         intent,
         final_binary: finalBinary.slice(),
+        stop_lease_heartbeat: stopHeartbeat,
         // Server-issued compiler evidence is opaque to the browser and is
         // carried only so the final save can present it unchanged.
         compiler_record: plan.compiler_record || null,

@@ -11,6 +11,22 @@ if (typeof require === 'function' && typeof _formatActionableHttpError === 'unde
     var _formatActionableHttpError = _actionableErrors._formatActionableHttpError;
     var _formatActionableNetworkError = _actionableErrors._formatActionableNetworkError;
 }
+var _lumpLeaseModule = null;
+if (typeof require === 'function') {
+    try { _lumpLeaseModule = require('./lump_lease_ui.js'); } catch (_) {}
+}
+
+function _lumpLeaseApi() {
+    try {
+        if (typeof window !== 'undefined' && window.LumpLeaseUI) {
+            return window.LumpLeaseUI;
+        }
+        if (typeof globalThis !== 'undefined' && globalThis.LumpLeaseUI) {
+            return globalThis.LumpLeaseUI;
+        }
+    } catch (_) {}
+    return _lumpLeaseModule;
+}
 var _lumpSaveDiagnosticsInstance = null;
 if (typeof require === 'function') {
     try {
@@ -229,6 +245,12 @@ function _lumpSaveSubmittedSource(snapshot, reusedSnapshot, fallbackProfile, fal
 
 function _lumpSaveFailureClassification(status, response) {
     var resp = response && typeof response === 'object' ? response : {};
+    var leaseApi = _lumpLeaseApi();
+    var isWaiting = leaseApi &&
+        (leaseApi.isWaiting || leaseApi._lumpLeaseIsWaiting);
+    if (typeof isWaiting === 'function' && isWaiting(resp, status)) {
+        return { kind: 'lease-wait', committed: false, safeRetry: true };
+    }
     var ideOwned = resp.failure_owner === 'ide' || resp.namespace_identity_failed === true ||
         resp.canonicalization_failed === true || resp.approval_binding_failed === true ||
         resp.atomic_transition_failed === true;
@@ -539,7 +561,9 @@ function _lumpSaveRequest(fetchImpl, url, payload, onCommit, recovery) {
                 var responseError = new Error(
                     _formatActionableHttpError('Save to the LUMP repository', r.status, resp, {
                         dataChanged: classification.committed,
-                        nextAction: classification.kind === 'ide'
+                        nextAction: classification.kind === 'lease-wait'
+                            ? 'Wait for the active update, message the holder, or work on a copy.'
+                            : classification.kind === 'ide'
                             ? 'The IDE must resolve this incident; your source and settings remain preserved.'
                             : 'Correct the identified field, then save again.',
                     }));
@@ -555,6 +579,7 @@ function _lumpSaveRequest(fetchImpl, url, payload, onCommit, recovery) {
     }
     return post().catch(function(err) {
         if (!err || (err.kind !== 'protocol' && err.kind !== 'validation' &&
+                err.kind !== 'lease-wait' &&
                 err.kind !== 'ide' && err.kind !== 'server')) {
             _lumpSaveDiagnosticStageException(payload, 'commit', err,
                 { outcome: 'unknown' });
@@ -572,9 +597,11 @@ function _lumpSaveRequest(fetchImpl, url, payload, onCommit, recovery) {
         }
         if (err && (
             err.kind === 'validation' ||
+            err.kind === 'lease-wait' ||
             err.kind === 'ide' ||
             err.kind === 'server'
         )) {
+            if (err.kind === 'lease-wait') return Promise.reject(err);
             // Even a syntactically valid rejection is not labelled
             // "uncommitted" unless the operation ledger proves it. This also
             // makes server-created diagnostic candidates discoverable after a
@@ -613,6 +640,9 @@ if (typeof module !== 'undefined') {
         _lumpSaveStaleConflictAction,
         _lumpSaveSubmittedSource,
         _lumpSaveFailureClassification,
+        _lumpLeaseInfo: _lumpLeaseModule && _lumpLeaseModule._lumpLeaseInfo,
+        _lumpLeaseIsWaiting: _lumpLeaseModule && _lumpLeaseModule._lumpLeaseIsWaiting,
+        _lumpLeaseWaitingMessage: _lumpLeaseModule && _lumpLeaseModule._lumpLeaseWaitingMessage,
         _lumpSaveDefaultOperationKey,
         _lumpSaveEnsureOperationId,
         _lumpSaveRetireOperationId,

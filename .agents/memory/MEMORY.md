@@ -156,3 +156,4 @@
 - [Executed-artifact freshness warning](executed-artifact-freshness-warning.md) — bootable is not current; always expose committed-vs-latest LUMP mismatches before simulation
 - [Trusted compiler and uploaded LUMPs](lump-trust-paths.md) — local compiler output is authoritative; unknown uploads stay inert through admission; placement is explicit and fail-closed
 - [Golden Token integrity layers](golden-token-integrity-layers.md) — seals prove authenticity, sideband ECC protects stored bits, and runtime checks enforce authority; never alter the 32-bit GT format
+- [Canonical LUMP update leases](canonical-lump-update-leases.md) — serialize by canonical dot-name with server-session ownership; keep compilation concurrent and narrow the shared publication lock

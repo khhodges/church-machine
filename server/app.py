@@ -45,6 +45,195 @@ import hmac
 import time
 _LUMP_TRANSITION_UNSET = object()
 
+# Canonical LUMP write leases deliberately live outside browser state.  Drafts
+# are private to the client; only the short finalize/commit transaction is
+# serialized here.  The in-process index is paired with the filesystem
+# transition lock by the save path, while expiry makes abandoned IDE sessions
+# safe to recover.
+_LUMP_LEASE_TTL = 120.0
+_LUMP_LEASES = {}
+_LUMP_LEASE_WAITERS = {}
+_LUMP_LEASE_MESSAGES = {}
+_LUMP_LEASES_LOCK = threading.RLock()
+_LUMP_LEASE_REGISTRY = ".lump-write-leases.json"
+class _LumpLeaseRegistryCorrupt(RuntimeError):
+    pass
+
+
+def _lump_lease_store_dir():
+    # LUMPS_DIR is resolved from CHURCH_TEST_LUMPS_DIR, allowing every test to
+    # use a private registry rather than ever contending with server/lumps.
+    return os.path.abspath(globals().get("LUMPS_DIR") or
+                           os.path.join(os.path.dirname(__file__), "lumps"))
+
+
+@contextlib.contextmanager
+def _lump_lease_store():
+    root = _lump_lease_store_dir()
+    os.makedirs(root, exist_ok=True)
+    path = os.path.join(root, _LUMP_LEASE_REGISTRY)
+    lock_path = path + ".lock"
+    with open(lock_path, "a+", encoding="utf-8") as lock_handle:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+        try:
+            try:
+                with open(path, encoding="utf-8") as registry_handle:
+                    raw = registry_handle.read()
+            except FileNotFoundError:
+                raw = ""
+            state = json.loads(raw) if raw.strip() else {}
+        except (ValueError, json.JSONDecodeError) as exc:
+            raise _LumpLeaseRegistryCorrupt(
+                "LUMP lease registry is corrupt; refusing to acquire or alter leases"
+            ) from exc
+        state.setdefault("leases", {})
+        state.setdefault("waiters", {})
+        state.setdefault("messages", {})
+        try:
+            yield state
+            _atomic_write_json(path, state)
+        finally:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+
+
+def _lump_lease_now():
+    return time.time()
+
+
+def _lump_lease_display_identity(metadata):
+    metadata = metadata if isinstance(metadata, dict) else {}
+    if metadata.get("automated") is True or metadata.get("holder_type") == "automated":
+        return "Automated release process"
+    value = str(metadata.get("ide_display_name") or metadata.get("display_name")
+                or "Another IDE session").strip()
+    if re.search(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b",
+                 value, re.IGNORECASE):
+        return "Another IDE session"
+    # Display identities are intentionally bounded and cannot carry contact
+    # data, account IDs, or arbitrary markup.
+    value = re.sub(r"[^A-Za-z0-9 ._'-]", "", value)[:80].strip()
+    return value or "Another IDE session"
+
+
+def _lump_lease_public(lease, waiters=None):
+    if not lease:
+        return None
+    return {
+        "canonical_dot_name": lease["canonical_dot_name"],
+        "holder": lease["holder"],
+        "operation": lease["operation"],
+        "stage": lease["stage"],
+        "started_at": lease["started_at"],
+        "expires_at": lease["expires_at"],
+        "waiter_count": len((waiters or {}).get(lease["canonical_dot_name"], [])),
+    }
+
+
+def _lump_lease_prune_locked(now=None, state=None):
+    now = _lump_lease_now() if now is None else now
+    if state is None:
+        state = {"leases": _LUMP_LEASES, "waiters": _LUMP_LEASE_WAITERS}
+    leases, waiters = state["leases"], state["waiters"]
+    expired = []
+    for name, lease in list(leases.items()):
+        if lease["expires_at"] <= now:
+            expired.append(name)
+            leases.pop(name, None)
+    for name, rows in list(waiters.items()):
+        waiters[name] = [
+            row for row in rows if row.get("expires_at", now + 1) > now
+        ]
+    return expired
+
+
+def _lump_lease_key(metadata):
+    # Never accept lease_session/operation_id from the browser as ownership.
+    # The Flask session is the only holder identity.
+    if not has_request_context():
+        return "test-" + hashlib.sha256(
+            str(metadata).encode("utf-8")).hexdigest()[:32]
+    return str(session.setdefault("_lump_approval_session",
+                                  secrets.token_urlsafe(24))).strip()
+
+
+def _lump_lease_acquire(canonical_dot_name, metadata, operation_id, stage="Preparing"):
+    now = _lump_lease_now()
+    identity = _lump_lease_key(metadata)
+    if not identity:
+        identity = secrets.token_urlsafe(18)
+    with _LUMP_LEASES_LOCK, _lump_lease_store() as state:
+        _lump_lease_prune_locked(now, state)
+        current = state["leases"].get(canonical_dot_name)
+        if current and current["owner_key"] != identity:
+            waiter = {
+                "owner_key": identity, "operation_id": operation_id,
+                "requested_at": now, "expires_at": now + 300,
+            }
+            rows = state["waiters"].setdefault(canonical_dot_name, [])
+            if not any(row["owner_key"] == identity for row in rows):
+                rows.append(waiter)
+            return None, _lump_lease_public(current, state["waiters"])
+        if current:
+            current.update({"operation_id": operation_id, "stage": stage,
+                            "expires_at": now + _LUMP_LEASE_TTL})
+            return current, None
+        lease = {
+            "canonical_dot_name": canonical_dot_name,
+            "owner_key": identity,
+            "holder": _lump_lease_display_identity(metadata),
+            "operation": str(metadata.get("operation_label") or
+                             metadata.get("operation") or "update"),
+            "stage": stage,
+            "started_at": now,
+            "expires_at": now + _LUMP_LEASE_TTL,
+            "operation_id": operation_id,
+            "contact_thread_id": "thread-" + secrets.token_urlsafe(18),
+        }
+        state["leases"][canonical_dot_name] = lease
+        return lease, None
+
+
+def _lump_lease_release(canonical_dot_name, owner_key=None, operation_id=None):
+    with _LUMP_LEASES_LOCK, _lump_lease_store() as state:
+        lease = state["leases"].get(canonical_dot_name)
+        if not lease:
+            return False
+        if owner_key and lease["owner_key"] != owner_key:
+            return False
+        if operation_id and lease["operation_id"] != operation_id:
+            return False
+        state["leases"].pop(canonical_dot_name, None)
+        return True
+
+
+def _lump_lease_for_plan(plan):
+    if not isinstance(plan, dict):
+        return
+    _lump_lease_release(plan.get("canonical_dot_name"),
+                        owner_key=plan.get("lease_owner"),
+                        operation_id=plan.get("operation_id"))
+
+
+def _lump_lease_update_for_plan(plan, stage):
+    """Renew one session-owned plan lease and publish its current safe stage."""
+    if not isinstance(plan, dict):
+        raise ValueError("save plan is unavailable")
+    if stage not in {"Preparing", "Compiling and verifying",
+                     "Approving", "Activating"}:
+        raise ValueError("invalid lease stage")
+    owner = _lump_lease_key({})
+    if owner != plan.get("lease_owner"):
+        raise ValueError("save plan lease belongs to a different session")
+    dot_name = plan.get("canonical_dot_name")
+    with _LUMP_LEASES_LOCK, _lump_lease_store() as state:
+        _lump_lease_prune_locked(state=state)
+        lease = state["leases"].get(dot_name)
+        if not lease or lease.get("owner_key") != owner:
+            raise ValueError("save plan lease expired")
+        lease["stage"] = stage
+        lease["expires_at"] = _lump_lease_now() + _LUMP_LEASE_TTL
+        return _lump_lease_public(lease, state["waiters"])
+
 
 def _atomic_write_json(path: str, data) -> None:
     """Write *data* as JSON to *path* atomically.
@@ -166,7 +355,7 @@ def _push_device_event(payload: dict):
 # ─────────────────────────────────────────────────────────────────────────────
 from flask import (
     Flask, after_this_request, jsonify, send_from_directory, send_file,
-    redirect, make_response, request, session, g,
+    redirect, make_response, request, session, g, has_request_context,
 )
 
 # Ensure the server/ directory is on sys.path so local modules (boot_image, etc.)
@@ -9413,6 +9602,14 @@ def create_lump_approval_intent():
                 return jsonify({
                     "error": "save-as-latest intent does not match save plan",
                 }), 403
+            try:
+                _lump_lease_update_for_plan(plan, "Approving")
+            except ValueError as lease_error:
+                return jsonify({
+                    "error": str(lease_error),
+                    "lease_expired": True,
+                    "committed": False,
+                }), 409
     intent = secrets.token_urlsafe(32)
     with _LUMP_APPROVAL_INTENTS_LOCK:
         _LUMP_APPROVAL_INTENTS[intent] = {
@@ -10564,6 +10761,140 @@ def get_lump_bundle():
     return resp
 
 
+@app.route("/api/lumps/lease", methods=["GET"])
+def lump_lease_status():
+    """Return safe lease/wait information for one canonical dot-name."""
+    dot_name = str(request.args.get("dot_name") or "").strip()
+    with _LUMP_LEASES_LOCK, _lump_lease_store() as state:
+        _lump_lease_prune_locked(state=state)
+        return jsonify({"ok": True, "lease": _lump_lease_public(
+            state["leases"].get(dot_name), state["waiters"])})
+
+
+@app.route("/api/lumps/lease/wait", methods=["POST"])
+def lump_lease_wait():
+    payload = request.get_json(silent=True) or {}
+    dot_name = str(payload.get("dot_name") or "").strip()
+    if not dot_name:
+        return jsonify({"error": "canonical dot_name is required"}), 400
+    with _LUMP_LEASES_LOCK, _lump_lease_store() as state:
+        _lump_lease_prune_locked(state=state)
+        lease = state["leases"].get(dot_name)
+        if not lease:
+            return jsonify({"ok": True, "waiting": False, "lease": None})
+        key = _lump_lease_key(payload)
+        rows = state["waiters"].setdefault(dot_name, [])
+        if not any(row["owner_key"] == key for row in rows):
+            rows.append({"owner_key": key, "operation_id": str(
+                payload.get("operation_id") or ""), "requested_at": _lump_lease_now(),
+                "expires_at": _lump_lease_now() + 300})
+        return jsonify({"ok": True, "waiting": True, "actions": {
+            "message": "/api/lumps/lease/message",
+            "cancel": "/api/lumps/lease/cancel",
+            "wait": "/api/lumps/lease/wait",
+            "renew": "/api/lumps/lease/renew",
+            "work_on_copy": True},
+            "message": (f"{lease['holder']} is {lease['stage'].lower()} "
+                        f"{lease['canonical_dot_name']}. Your draft is safe and "
+                        "will continue when this update finishes."),
+            "lease": _lump_lease_public(lease, state["waiters"])})
+
+
+@app.route("/api/lumps/lease/cancel", methods=["POST"])
+def lump_lease_cancel():
+    payload = request.get_json(silent=True) or {}
+    dot_name = str(payload.get("dot_name") or "").strip()
+    key = _lump_lease_key(payload)
+    with _LUMP_LEASES_LOCK, _lump_lease_store() as state:
+        lease = state["leases"].get(dot_name)
+        released = bool(lease and lease.get("owner_key") == key)
+        if released:
+            state["leases"].pop(dot_name, None)
+        rows = state["waiters"].get(dot_name, [])
+        state["waiters"][dot_name] = [
+            row for row in rows if row.get("owner_key") != key]
+    return jsonify({"ok": True, "waiting": False,
+                    "lease_released": released, "action": "cancel-waiting"})
+
+
+@app.route("/api/lumps/lease/renew", methods=["POST"])
+def lump_lease_renew():
+    payload = request.get_json(silent=True) or {}
+    dot_name = str(payload.get("dot_name") or "").strip()
+    key = _lump_lease_key(payload)
+    with _LUMP_LEASES_LOCK, _lump_lease_store() as state:
+        _lump_lease_prune_locked(state=state)
+        lease = state["leases"].get(dot_name)
+        if not lease or lease["owner_key"] != key:
+            return jsonify({"error": "lease is missing or no longer owned",
+                            "lease_expired": True}), 409
+        lease["expires_at"] = _lump_lease_now() + _LUMP_LEASE_TTL
+        if payload.get("stage"):
+            stage = str(payload["stage"])
+            if stage not in {"Preparing", "Compiling and verifying",
+                             "Approving", "Activating"}:
+                return jsonify({"error": "invalid lease stage"}), 400
+            lease["stage"] = stage
+        return jsonify({"ok": True, "lease": _lump_lease_public(lease, state["waiters"])})
+
+
+@app.route("/api/lumps/lease/message", methods=["POST"])
+def lump_lease_message():
+    payload = request.get_json(silent=True) or {}
+    dot_name = str(payload.get("dot_name") or "").strip()
+    text = re.sub(r"[\x00-\x1f\x7f]", "", str(payload.get("text") or
+                payload.get("message") or "").strip())[:1000]
+    if not dot_name or not text:
+        return jsonify({"error": "dot_name and message are required"}), 400
+    with _LUMP_LEASES_LOCK, _lump_lease_store() as state:
+        _lump_lease_prune_locked(state=state)
+        lease = state["leases"].get(dot_name)
+        if not lease:
+            return jsonify({"error": "no active lease"}), 404
+        key = _lump_lease_key(payload)
+        if key != lease.get("owner_key") and not any(
+                row.get("owner_key") == key
+                for row in state["waiters"].get(dot_name, [])):
+            return jsonify({"error": "lease conversation is not authorized"}), 403
+        thread = lease["contact_thread_id"]
+        state["messages"].setdefault(thread, []).append({
+            "text": text, "sent_at": _lump_lease_now(),
+        })
+        return jsonify({"ok": True, "action": "message-in-ide",
+                        "contact_thread_id": thread})
+
+
+@app.route("/api/lumps/lease/message/<thread_id>", methods=["GET"])
+def lump_lease_messages(thread_id):
+    """Read an operation-scoped IDE thread without exposing account details."""
+    if not re.fullmatch(r"thread-[A-Za-z0-9_-]{8,}", str(thread_id or "")):
+        return jsonify({"error": "invalid contact thread"}), 400
+    with _LUMP_LEASES_LOCK, _lump_lease_store() as state:
+        lease = next((item for item in state["leases"].values()
+                      if item.get("contact_thread_id") == thread_id), None)
+        key = _lump_lease_key({})
+        authorized = lease and (lease.get("owner_key") == key or any(
+            row.get("owner_key") == key
+            for row in state["waiters"].get(lease["canonical_dot_name"], [])))
+        if not authorized:
+            return jsonify({"error": "contact thread is not authorized"}), 403
+        return jsonify({"ok": True, "contact_thread_id": thread_id,
+                        "messages": list(state["messages"].get(thread_id, []))})
+
+
+@app.route("/api/lumps/lease/logout", methods=["POST"])
+def lump_lease_logout():
+    payload = request.get_json(silent=True) or {}
+    key = _lump_lease_key(payload)
+    released = []
+    with _LUMP_LEASES_LOCK, _lump_lease_store() as state:
+        for name, lease in list(state["leases"].items()):
+            if lease["owner_key"] == key:
+                state["leases"].pop(name, None)
+                released.append(name)
+    return jsonify({"ok": True, "released": released})
+
+
 @app.route("/api/lumps/save-plan", methods=["POST"])
 @app.route("/api/lumps/finalize", methods=["POST"])
 def preflight_lump_save_plan():
@@ -10758,6 +11089,12 @@ def save_lump():
         if _early_plan is None:
             return jsonify({"error": "a valid save plan is required",
                             "committed": False}), 403
+        @after_this_request
+        def _release_failed_lump_lease(response):
+            if response.status_code >= 400:
+                _lump_lease_release(_early_plan.get("canonical_dot_name"),
+                                    owner_key=_early_plan.get("lease_owner"))
+            return response
         _planned_words = _early_plan.get("final_binary")
         if (not isinstance(_planned_words, list)
                 or any(isinstance(word, bool) or not isinstance(word, int)
@@ -11723,23 +12060,13 @@ def save_lump():
         }), 422
     # ── End pre-flight ────────────────────────────────────────────────────────
 
-    # Freeze Namespace authority before taking the history lock. The same order
-    # is used for this whole request, so final identity validation and commit
-    # cannot observe different slot/sequence/token revisions.
+    # Keep ordinary validation unlocked. Namespace/history locks are owned by
+    # the short preparation/atomic-transition section below; holding them
+    # across plan and approval work causes unrelated revisions to queue.
     lumps_dir = LUMPS_DIR
     os.makedirs(lumps_dir, exist_ok=True)
     if _bootstrap_pre_lock_hook is not None:
         _bootstrap_pre_lock_hook()
-    _save_namespace_guard = _namespace_commit_guard()
-    _save_namespace_guard.__enter__()
-    _save_transaction_guard = _lump_history_transition_lock(lumps_dir)
-    _save_transaction_guard.__enter__()
-
-    @after_this_request
-    def _release_lump_save_transaction(response):
-        _save_transaction_guard.__exit__(None, None, None)
-        _save_namespace_guard.__exit__(None, None, None)
-        return response
 
     # The candidate was constructed from an earlier read so planning could
     # report errors cheaply. Re-read under both commit locks and make that fresh
@@ -12122,6 +12449,18 @@ def save_lump():
         return jsonify({'error':
             f'Canonical dot name {_dot_name_save!r} contains invalid characters; '
             'only A-Z, a-z, 0-9, "." and "-" are permitted.'}), 400
+    if _early_plan is not None:
+        with _LUMP_LEASES_LOCK, _lump_lease_store() as _lease_state:
+            _lump_lease_prune_locked(state=_lease_state)
+            _lease = _lease_state["leases"].get(_early_plan.get("canonical_dot_name"))
+            _owner = _lump_lease_key(metadata)
+            if not _lease or _lease.get("owner_key") != _owner:
+                return jsonify({
+                    "error": "save lease expired; no canonical data was changed",
+                    "lease_expired": True, "committed": False, "safe_retry": True,
+                }), 409
+            _lease["stage"] = "Activating"
+            _lease["expires_at"] = _lump_lease_now() + _LUMP_LEASE_TTL
     _lumps_dir_real = os.path.realpath(lumps_dir)
     # ── End security block ────────────────────────────────────────────────────
 
@@ -12210,6 +12549,29 @@ def save_lump():
         _approval_action = _derived_save_action
         plan_id = secrets.token_urlsafe(32)
         g._lump_save_diagnostic["plan_id"] = plan_id
+        lease, held = _lump_lease_acquire(
+            _dot_name_save, metadata, _operation_id, stage="Preparing")
+        if held is not None:
+            return jsonify({
+                "error": "this canonical LUMP is being updated by another IDE session",
+                "lease_busy": True, "waiting": True, "committed": False,
+                "lease": held,
+                "message": (f"{held['holder']} is {held['stage'].lower()} "
+                            f"{_dot_name_save}. Your draft is safe and will "
+                            "continue when this update finishes."),
+                "actions": {
+                    "message": "/api/lumps/lease/message",
+                    "cancel": "/api/lumps/lease/cancel",
+                    "wait": "/api/lumps/lease/wait",
+                    "renew": "/api/lumps/lease/renew",
+                    "work_on_copy": True,
+                },
+            }), 423
+        @after_this_request
+        def _release_failed_lump_preflight(response):
+            if response.status_code >= 400:
+                _lump_lease_release(_dot_name_save, owner_key=lease["owner_key"])
+            return response
         _save_lump_diagnostic_event(
             stage="Prepare", event="complete", outcome="unknown")
         with _LUMP_SAVE_PLANS_LOCK:
@@ -12255,6 +12617,16 @@ def save_lump():
                 "attempt_id": g._lump_save_diagnostic.get("attempt_id"),
                 "client_diagnostic_attempt_id": g._lump_save_diagnostic.get(
                     "client_diagnostic_attempt_id"),
+                "operation_id": _operation_id,
+                "canonical_dot_name": _dot_name_save,
+                "lease_owner": lease["owner_key"],
+                "lease": _lump_lease_public(lease),
+                "reserved_revision": {
+                    "filename": (_destination_entry or {}).get("filename")
+                    if _destination_entry else None,
+                    "lump_version": (_destination_entry or {}).get("lump_version")
+                    if _destination_entry else None,
+                },
             }
         return jsonify({
             "plan": plan_id, "plan_id": plan_id, "digest": _binary_hash,
@@ -12276,6 +12648,7 @@ def save_lump():
             "expires_in": 300,
             "warnings": _save_warnings,
             "compiler_record": _preflight_compiler_record,
+            "lease": _lump_lease_public(lease),
         }), 201
 
     try:
@@ -12310,6 +12683,54 @@ def save_lump():
             "committed": False,
             "safe_retry": True,
         }), 403
+
+    # Different canonical LUMPs may perform plan, compile, validation, and
+    # approval work concurrently. Only the Namespace preparation and atomic
+    # activation below need the shared Namespace guard.
+    try:
+        _save_commit_namespace_guard = _namespace_commit_guard()
+        _save_commit_namespace_guard.__enter__()
+    except Exception as _guard_error:
+        return jsonify({
+            "error": f"unable to lock Namespace activation: {_guard_error}",
+            "committed": False, "safe_retry": True,
+        }), 503
+
+    @after_this_request
+    def _release_save_commit_namespace_guard(response):
+        _save_commit_namespace_guard.__exit__(None, None, None)
+        return response
+
+    # Compare the active revision reserved by save-plan with a fresh manifest
+    # snapshot before preparing any destination state. The transition helper
+    # repeats this as a CAS under its cross-process history lock.
+    if _early_plan is not None:
+        try:
+            _fresh_manifest = _read_manifest_safe(manifest_path)
+        except ValueError as _fresh_manifest_error:
+            return jsonify({
+                "error": f"unable to verify reserved LUMP revision: {_fresh_manifest_error}",
+                "committed": False, "safe_retry": True,
+            }), 409
+        _fresh_entry = next(
+            (entry for entry in _fresh_manifest
+             if isinstance(entry, dict) and entry.get("token") == token8),
+            None,
+        )
+        _fresh_revision = {
+            "filename": _fresh_entry.get("filename") if _fresh_entry else None,
+            "lump_version": _fresh_entry.get("lump_version") if _fresh_entry else None,
+        }
+        if _fresh_revision != _early_plan.get("reserved_revision"):
+            return jsonify({
+                "error": (
+                    "the active LUMP revision changed after this save was "
+                    "reserved; no canonical data was changed"
+                ),
+                "revision_conflict": True,
+                "committed": False,
+                "safe_retry": True,
+            }), 409
 
     # Build and validate the complete Namespace update before the transition
     # stages any repository destination. Every slot-bound resident save commits
@@ -12735,6 +13156,11 @@ def save_lump():
             "namespace_sequence": _bootstrap_binding.get("seq", 0),
             "destination_token": token8,
         })
+    if _early_plan is not None:
+        _lump_lease_release(
+            _early_plan.get("canonical_dot_name"),
+            owner_key=_early_plan.get("lease_owner"))
+        resp["lease_released"] = True
     return jsonify(resp)
 
 @app.route("/api/lumps/save-wip", methods=["POST"])
@@ -23919,10 +24345,25 @@ def _commit_lump_history_transition(
 def _recover_lump_transition_before_request():
     """Recover, then hold the authoritative file locks through the response."""
     path = request.path
-    if path == "/api/lumps/save-diagnostics":
+    if path in {
+        "/api/lumps/save",
+        "/api/lumps/save-plan",
+        "/api/lumps/finalize",
+        "/api/lumps/lease",
+        "/api/lumps/lease/wait",
+        "/api/lumps/lease/cancel",
+        "/api/lumps/lease/renew",
+        "/api/lumps/lease/message",
+        "/api/lumps/lease/logout",
+        "/api/lumps/save-diagnostics",
+    } or path.startswith("/api/lumps/lease/message/"):
         # Diagnostics are operational metadata only and must remain available
-        # even while a separate LUMP transition is being recovered. They never
-        # read or mutate Namespace/LUMP authority.
+        # even while a separate LUMP transition is being recovered. Save-plan
+        # and lease coordination must also remain outside the repository-wide
+        # request guard, otherwise a same-name caller cannot enter the managed
+        # wait path and different names cannot prepare concurrently. The save
+        # route takes the Namespace guard only around fresh revision checking,
+        # Namespace preparation, and the atomic history transition.
         return None
     # Only LUMP/Namespace API readers and mutators need a stable
     # multi-file snapshot.  In particular do not serialize compilation,

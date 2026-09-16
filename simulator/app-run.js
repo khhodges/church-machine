@@ -12936,6 +12936,10 @@ function onSlotChange() {
 }
 
 function closeSaveDialog() {
+    if (window._saveNSLeaseStop) {
+        window._saveNSLeaseStop();
+        window._saveNSLeaseStop = null;
+    }
     document.getElementById('saveNSDialog').style.display = 'none';
     if (_saveNSTrap) document.removeEventListener('keydown', _saveNSTrap, true);
     if (_saveNSTrigger && _saveNSTrigger.isConnected) _saveNSTrigger.focus();
@@ -12993,6 +12997,64 @@ function _setSaveNSFeedback(kind, message) {
     status.style.border = (kind === 'error' || incident)
         ? '1px solid rgba(248, 113, 113, .65)'
         : '1px solid rgba(96, 165, 250, .55)';
+}
+
+function _saveNSLeasePanel(response) {
+    const api = window.LumpLeaseUI;
+    if (!api || !response || !api.isWaiting(response, response.status)) return null;
+    let panel = document.getElementById('saveNSLeasePanel');
+    if (panel) panel.remove();
+    panel = document.createElement('div');
+    panel.id = 'saveNSLeasePanel';
+    panel.setAttribute('role', 'alert');
+    panel.style.cssText = 'margin-top:10px;padding:10px 12px;border:1px solid rgba(218,165,32,.55);border-radius:6px;background:rgba(75,55,10,.28);color:#f5e6b3;font-size:.86rem;line-height:1.45;';
+    const info = api.info(response);
+    panel.appendChild(document.createTextNode(api.message(response)));
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;';
+    const button = (label, handler) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'btn'; b.textContent = label; b.onclick = handler;
+        return b;
+    };
+    actions.appendChild(button('Message in IDE', async () => {
+        const url = api.url(response, 'message');
+        const text = window.prompt('Message the IDE operation holder:', '');
+        if (text === null) return;
+        const payload = api.messagePayload(info, text.trim());
+        if (!payload.text) return;
+        try {
+            const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
+                body:JSON.stringify(payload)});
+            if (!r.ok) throw new Error('message failed');
+            panel.appendChild(document.createTextNode(' Message sent to the active IDE operation.'));
+        } catch (_) { panel.appendChild(document.createTextNode(' Messaging is unavailable; your draft remains safe.')); }
+    }));
+    actions.appendChild(button('Cancel waiting', async () => {
+        const url = api.url(response, 'cancel');
+        try { await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify(api.cancelPayload(info))}); } catch (_) {}
+        if (window._saveNSLeaseStop) window._saveNSLeaseStop();
+        panel.remove(); _setSaveNSFeedback('', '');
+    }));
+    actions.appendChild(button('Work on a copy', () => {
+        const input = document.getElementById('saveNSLabel');
+        if (input) { input.value = api.copyDotName(input.value || info.dotName); input.focus(); }
+        if (window._saveNSLeaseStop) window._saveNSLeaseStop();
+        panel.remove();
+        _setSaveNSFeedback('', 'Working on a private copy. Your original draft is unchanged.');
+    }));
+    panel.appendChild(actions);
+    const status = document.getElementById('saveNSStatus');
+    (status && status.parentElement || document.getElementById('saveNSDialog')).appendChild(panel);
+    if (window._saveNSLeaseStop) window._saveNSLeaseStop();
+    window._saveNSLeaseStop = api.poll(fetch, response, () => {
+        if (window._saveNSLeaseStop) window._saveNSLeaseStop();
+        panel.remove();
+        _setSaveNSFeedback('loading', 'The active update finished. Resuming your preserved draft safely…');
+        setTimeout(() => beginSaveToNamespace(), 0);
+    }, 5000);
+    return panel;
 }
 
 function _persistSaveOperationStatus(operationId, kind, message) {
@@ -13077,11 +13139,24 @@ let _saveNSRequestInFlight = false;
 async function beginSaveToNamespace() {
     if (_saveNSRequestInFlight) return;
     _saveNSRequestInFlight = true;
+    if (window._saveNSLeaseStop) window._saveNSLeaseStop();
+    window._saveNSLeaseStop = null;
     _setSaveNSFeedback('loading',
-        'Saving this revision… Keep this window open until the result appears.');
+        'Preparing… Your private draft remains unchanged while the update is prepared.');
+    const progressTimer = setTimeout(() => {
+        if (_saveNSRequestInFlight) {
+            _setSaveNSFeedback('loading',
+                'Compiling and verifying… Your private draft remains unchanged.');
+        }
+    }, 120);
     try {
         await confirmSaveToNamespace();
     } catch (err) {
+        if (err && err.kind === 'lease-wait' && err.response) {
+            _saveNSLeasePanel(err.response);
+            _setSaveNSFeedback('error', 'Another update is active. Your draft is safe while you wait.');
+            return;
+        }
         console.error('[SaveNS] unexpected save failure:', err);
         _setSaveNSFeedback('incident',
             'The IDE could not complete its save process, and the commit outcome is unknown. Your source and settings remain preserved. Reload the IDE to check the saved operation before retrying.');
@@ -13091,6 +13166,15 @@ async function beginSaveToNamespace() {
             status.dataset.incident = 'true';
         }
     } finally {
+        if (window._saveNSLeaseHeartbeatStop) {
+            window._saveNSLeaseHeartbeatStop();
+            window._saveNSLeaseHeartbeatStop = null;
+        }
+        if (window._saveNSLeaseStop && !_saveNSRequestInFlight) {
+            window._saveNSLeaseStop();
+            window._saveNSLeaseStop = null;
+        }
+        clearTimeout(progressTimer);
         _saveNSRequestInFlight = false;
         const dialog = document.getElementById('saveNSDialog');
         const status = document.getElementById('saveNSStatus');
@@ -16455,7 +16539,17 @@ async function confirmSaveToNamespace() {
                     ? _saveApproval.plan.namespace_sequence : _targetSequence;
             _svPayload.metadata.approval_intent = _saveApproval.intent.intent;
             _svPayload.metadata.save_plan_id = _saveApproval.plan.plan_id;
+            window._saveNSLeaseHeartbeatStop =
+                typeof _saveApproval.stop_lease_heartbeat === 'function'
+                    ? _saveApproval.stop_lease_heartbeat : null;
         } catch (err) {
+            if (err && err.kind === 'lease-wait' && err.response) {
+                _saveNSLeasePanel(err.response);
+                _setSaveNSFeedback('error', 'Another update is active. Your draft is safe while you wait.');
+                const waitingStatus = document.getElementById('saveNSStatus');
+                if (waitingStatus) waitingStatus.dataset.terminal = 'true';
+                return;
+            }
             if (/confirmation is unavailable/i.test(String(err && err.message))) {
                 const message = `${err.message} The save was not started; restore browser confirmation and try again.`;
                 _setSaveNSFeedback('error', message);
@@ -16479,6 +16573,7 @@ async function confirmSaveToNamespace() {
             // The repository has committed the save. Close immediately so a
             // later client-state/render exception cannot leave a successful
             // transaction looking unfinished.
+            _setSaveNSFeedback('loading', 'Active and verified — the canonical LUMP update is committed.');
             _persistSaveOperationStatus(resp.operation_id ||
                 _svPayload.metadata.operation_id, 'committed',
                 `Saved "${resp.abstraction || label}" as ${resp.lump || resp.token}.`);
