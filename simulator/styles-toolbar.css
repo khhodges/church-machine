@@ -488,12 +488,17 @@
     display: grid;
     grid-template-columns: minmax(9rem, 0.7fr) minmax(0, 1.3fr);
     gap: 0.3rem 0.65rem;
-    margin: 0 0 0.65rem;
+    margin: 0.5rem 0.75rem 0.65rem;
     padding: 0.55rem 0.65rem;
     border: 1px solid var(--border);
     border-radius: 4px;
     background: var(--bg-secondary);
     font-size: 0.7rem;
+}
+#editor > .saved-lump-identity-panel {
+    flex: 0 0 auto;
+    width: calc(100% - 1.5rem);
+    box-sizing: border-box;
 }
 .saved-lump-identity-heading {
     grid-column: 1 / -1;
@@ -517,6 +522,12 @@
     color: var(--text-secondary);
     font-family: inherit;
     font-style: italic;
+}
+.saved-lump-identity-note {
+    grid-column: 1 / -1;
+    color: var(--text-secondary);
+    font-size: 0.68rem;
+    line-height: 1.4;
 }
 .saved-lump-disassembly-panel pre {
     flex: 1;
@@ -545,6 +556,9 @@
         grid-template-columns: 1fr;
     }
     .saved-lump-identity-heading {
+        grid-column: 1;
+    }
+    .saved-lump-identity-note {
         grid-column: 1;
     }
     .saved-lump-identity-row {

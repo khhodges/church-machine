@@ -1711,6 +1711,19 @@ function _verifiedSavedLumpIdentity(lump, lookupToken) {
 }
 window._verifiedSavedLumpIdentity = _verifiedSavedLumpIdentity;
 
+function _sameSavedLumpWord(left, right) {
+    var normalize = function(value) {
+        if (typeof value !== 'string') return null;
+        var text = value.trim().replace(/^0x/i, '');
+        return /^[0-9a-f]{1,8}$/i.test(text)
+            ? text.toLowerCase().padStart(8, '0')
+            : null;
+    };
+    var leftWord = normalize(left);
+    var rightWord = normalize(right);
+    return !!leftWord && leftWord === rightWord;
+}
+
 function toggleSavedLumpIdentity() {
     window._savedLumpIdentityHidden = !window._savedLumpIdentityHidden;
     _syncSavedLumpIdentityVisibility();
@@ -1746,7 +1759,8 @@ function _syncSavedLumpIdentityVisibility() {
                 : anchor);
         }
     }
-    if (panel) panel.style.display = hidden ? 'none' : '';
+    if (panel) panel.style.display =
+        window._savedLumpEditorMode && !hidden ? '' : 'none';
     if (button) {
         button.style.display = window._savedLumpEditorMode ? 'inline-flex' : 'none';
         button.setAttribute('aria-expanded', String(!hidden));
@@ -1785,15 +1799,27 @@ function _renderSavedLumpIdentityPanel(lump, lookupToken) {
             esc(unavailable ? _unavailableTitle : value) + '">' +
             (unavailable ? 'unavailable' : esc(value)) + '</code></div>';
     };
+    var note = function(value) {
+        return '<div class="saved-lump-identity-note">' + esc(value) + '</div>';
+    };
+    var _bootstrapTEqualsGT = _sameSavedLumpWord(
+        identity.goldenT, identity.goldenToken);
+    var _identityRows =
+        row('Canonical identity', identity.canonicalDotToken, 'complete-lump-dot-token') +
+        (_bootstrapTEqualsGT
+            ? row('Bootstrap binding (T = GT)', identity.goldenToken,
+                'complete-lump-bootstrap-binding') +
+              note('Bootstrap note: T === GT for this local binding. T and runtime GT are distinct roles outside this bootstrap equality.')
+            : row('Exact lookup token', identity.lookupToken, 'complete-lump-lookup-token') +
+              row('Golden T ID', identity.goldenT, 'complete-lump-golden-t') +
+              row('Runtime Golden Token', identity.goldenToken,
+                  'complete-lump-golden-token')) +
+        row('Binary seal', identity.binarySeal, 'complete-lump-binary-seal');
     panel.innerHTML =
         '<div class="saved-lump-identity-heading">' +
         (_identityVerified ? 'Verified artifact identity' :
             'Artifact identity — provenance unverified') + '</div>' +
-        row('Canonical dot-name token', identity.canonicalDotToken, 'complete-lump-dot-token') +
-        row('Exact lookup token', identity.lookupToken, 'complete-lump-lookup-token') +
-        row('Golden T ID', identity.goldenT, 'complete-lump-golden-t') +
-        row('Golden Token', identity.goldenToken, 'complete-lump-golden-token') +
-        row('Binary seal', identity.binarySeal, 'complete-lump-binary-seal');
+        _identityRows;
 }
 
 function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, inspection) {

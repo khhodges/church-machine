@@ -13,17 +13,24 @@ const lumpsHash = crypto.createHash('sha256').update(lumps).digest('hex').slice(
 
 assert(html.includes('id="savedLumpIdentityPanel"'),
     'complete workspace includes the visible verified identity panel');
+assert(html.indexOf('id="savedLumpIdentityPanel"') <
+       html.indexOf('class="editor-layout editor-source-console-row"'),
+    'shared identity and seal panel sits above both workspace columns');
 assert(html.includes(`app-lumps.js?v=sha256-${lumpsHash}`),
     'complete workspace cache-busts app-lumps.js with its current content hash');
 assert(html.indexOf('id="asmEditor"') < html.indexOf('id="savedLumpDisassemblyPanel"'),
     'source and exact disassembly coexist in the editor layout');
 
 for (const label of [
-    'Canonical dot-name token', 'Exact lookup token', 'Golden T ID',
-    'Golden Token', 'Binary seal'
+    'Canonical identity', 'Bootstrap binding (T = GT)', 'Exact lookup token',
+    'Golden T ID', 'Runtime Golden Token', 'Binary seal'
 ]) {
     assert(lumps.includes(label), `complete workspace shows ${label}`);
 }
+assert(lumps.includes('Bootstrap note: T === GT for this local binding.') &&
+       lumps.includes('var _bootstrapTEqualsGT = _sameSavedLumpWord(') &&
+       lumps.includes('identity.goldenT, identity.goldenToken);'),
+    'equal bootstrap T and runtime GT collapse into one explained binding');
 assert(lumps.includes("text(server.golden_token) || hexWord(server.bootstrap_runtime_gt)"),
     'Golden Token accepts the verified resident runtime GT');
 assert(lumps.includes("text(server.golden_t_id) || text(server.identity_hash) ||") &&
