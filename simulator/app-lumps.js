@@ -7398,7 +7398,16 @@ async function openLumpInEditor(token) {
         }
 
         if (_sourceResolution.integrityError) {
-            _setSavedLumpEditorSource('');
+            var _sealedInspectionSource = '';
+            if (Array.isArray(_sourceResolution.inspectionSources)) {
+                var _sealedSourceRecord = _sourceResolution.inspectionSources.find(function(item) {
+                    return item && typeof item.source === 'string' && item.source.length > 0;
+                });
+                if (_sealedSourceRecord) {
+                    _sealedInspectionSource = _sealedSourceRecord.source;
+                }
+            }
+            _setSavedLumpEditorSource(_sealedInspectionSource);
             asmEd.readOnly = true;
             asmEd.classList.add('cm-editor-sealed');
             var _sourceIntegrityBanner = document.createElement('div');
@@ -7406,7 +7415,7 @@ async function openLumpInEditor(token) {
             _sourceIntegrityBanner.className = 'lump-malformed-banner';
             _sourceIntegrityBanner.textContent = _sourceResolution.integrityError +
                 (serverWords
-                    ? ' The source pane is sealed; read-only inspection from the exact response remains visible.'
+                    ? ' The source pane is sealed and shows the exact response read-only.'
                     : ' The source pane is sealed; exact binary inspection is unavailable.');
             var _sourceIntegrityParent = asmEd.parentNode && asmEd.parentNode.parentNode;
             if (_sourceIntegrityParent) {

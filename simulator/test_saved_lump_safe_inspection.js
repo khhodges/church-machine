@@ -227,6 +227,7 @@ const OPEN_SRC = extractFunction('openLumpInEditor');
                         return {
                             token: saved.token,
                             words: [0x01020304],
+                            source: '; exact unverified source',
                             raw_tail_hex: 'AABB',
                             byte_count: 6,
                             trusted: false,
@@ -244,6 +245,9 @@ const OPEN_SRC = extractFunction('openLumpInEditor');
                     assert.match(opened.inspection.appendText, /trailing raw bytes/);
                     assert(!opened.inspection.appendText.includes('word[1]'));
                     assert.equal(opened.lump._identityProvenance, 'unverified');
+                    assert.equal(editor.value, '; exact unverified source');
+                    assert.equal(editor.readOnly, true);
+                    assert(classes.has('cm-editor-sealed'));
                     console.log('PASS saved LUMP safe read-only inspection boundaries');
                 });
         })
