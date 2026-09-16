@@ -15,10 +15,14 @@ function makeBanner() {
 }
 
 const banner = makeBanner();
+const renderedActionButton = {
+    onclick: null,
+};
 const context = {
     window: {},
     document: {
-        getElementById: () => banner,
+        getElementById: id => id === 'bootExecutionUpdateButton'
+            ? renderedActionButton : banner,
         createElement: () => ({
             _text: '',
             set textContent(value) {
@@ -100,6 +104,12 @@ const button = { disabled: false, textContent: '' };
 let switchedTo = null;
 const actionContext = {
     window: {
+        _nsState: {
+            executionFreshness: {
+                warnings: [],
+                failedSaves: [{ token: '4c35bef2', version: 88 }],
+            },
+        },
         _bootExecutionRepairTarget: {
             abstraction: 'SelfTest',
             token: '4c35bef2',
@@ -158,7 +168,7 @@ if (!banner.innerHTML.includes('cannot boot until the IDE repairs its saved iden
     throw new Error('warning does not explain why the newer revision cannot run');
 }
 if (!banner.innerHTML.includes('Fix v87 now') ||
-        !banner.innerHTML.includes('_openBootExecutionUpdate()')) {
+        typeof renderedActionButton.onclick !== 'function') {
     throw new Error('warning does not provide the exact revision repair action');
 }
 if (source.includes("fetch('/api/boot-image/update-to-latest'")) {

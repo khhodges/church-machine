@@ -89,8 +89,7 @@ function _renderBootExecutionFreshness(state) {
         (failed ? ' Open the recovered source, then click Save LUMP to create a corrected revision.' :
             '. The newer revision cannot boot until the IDE repairs its saved identity.') +
         '<div id="bootExecutionUpdateStatus" class="boot-execution-update-status"></div></div>' +
-        '<button type="button" id="bootExecutionUpdateButton" class="boot-execution-update-btn" ' +
-        'onclick="_openBootExecutionUpdate()">' +
+        '<button type="button" id="bootExecutionUpdateButton" class="boot-execution-update-btn">' +
         (failed ? 'Open source to save again' : 'Fix' + repairVersion + ' now') +
         '</button>';
 /*
@@ -102,6 +101,20 @@ function _renderBootExecutionFreshness(state) {
         '. Select the exact revision explicitly and prepare a new boot image before treating simulator results as current.' +
         '<div id="bootExecutionUpdateStatus" class="boot-execution-update-status"></div></div>';
     banner.style.display = 'flex';
+    const actionButton = document.getElementById('bootExecutionUpdateButton');
+    if (actionButton) {
+        actionButton.onclick = function() {
+            _openBootExecutionUpdate().catch(function(error) {
+                const status = document.getElementById('bootExecutionUpdateStatus');
+                const message = 'Recovery failed: ' +
+                    (error && error.message || String(error)) +
+                    '. No data was changed.';
+                if (status) status.textContent = message;
+                actionButton.disabled = false;
+                actionButton.textContent = 'Try opening source again';
+            });
+        };
+    }
 }
 window._renderBootExecutionFreshness = _renderBootExecutionFreshness;
 
@@ -118,7 +131,10 @@ async function _openBootExecutionUpdate() {
     const warnings = window._nsState && window._nsState.executionFreshness &&
         Array.isArray(window._nsState.executionFreshness.warnings)
         ? window._nsState.executionFreshness.warnings : [];
-    if (!warnings.length) return;
+    const failedSaves = window._nsState && window._nsState.executionFreshness &&
+        Array.isArray(window._nsState.executionFreshness.failedSaves)
+        ? window._nsState.executionFreshness.failedSaves : [];
+    if (!warnings.length && !failedSaves.length) return false;
     const button = document.getElementById('bootExecutionUpdateButton');
     const status = document.getElementById('bootExecutionUpdateStatus');
     if (button) {
@@ -181,10 +197,6 @@ async function _openBootExecutionUpdate() {
     }
 */
 async function _openBootExecutionUpdate() {
-    const warnings = window._nsState && window._nsState.executionFreshness &&
-        Array.isArray(window._nsState.executionFreshness.warnings)
-        ? window._nsState.executionFreshness.warnings : [];
-    if (!warnings.length) return;
     const status = document.getElementById('bootExecutionUpdateStatus');
     const target = window._bootExecutionRepairTarget || {};
     const token = target.token;

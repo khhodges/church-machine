@@ -7,4 +7,4 @@ Boot freshness comparisons must exclude artifacts that fail the bootstrap identi
 
 **Why:** An identity-invalid compilation was labeled “latest successful,” producing a warning and action that routed users to a server-rejected promotion flow.
 
-**How to apply:** Before ranking revisions for boot freshness, verify record token, sealed SELF row, and live binding agree. Compare only admissible candidates, while reporting rejected newer saves through a distinct recovery action.
+**How to apply:** Compare only admissible candidates and report rejected saves separately. A rendered recovery action must use its frozen target; do not re-gate it on mutable Namespace state that may be replaced after render.
