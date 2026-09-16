@@ -82,6 +82,14 @@ metadata/relocation records; defer registry matching, dynamic-slot allocation, G
 minting, and c-list patching to save/install/run or FPGA image generation. Report
 missing bindings as load-time errors, not compile-time errors.
 
+## Runtime GT availability
+
+A valid live Namespace entry defines its local runtime SELF GT: use that entry's slot and current generation sequence to mint the Inform E-only GT. The UI must derive and show it after confirming the slot still belongs to the exact selected LUMP.
+
+**Why:** Requiring a redundant `golden_token` response field incorrectly reports “unavailable” even though the authoritative live Namespace binding already contains every input needed to derive the GT.
+
+**How to apply:** Show unavailable only when the slot is absent/invalid or its live token does not match the selected LUMP. Never derive from a stale or differently occupied slot.
+
 ## Verification precedence and issue binding
 
 Use compact content token `T` for fast lookup, cache/promotion, and

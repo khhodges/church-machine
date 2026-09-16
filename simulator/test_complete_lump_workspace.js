@@ -4,12 +4,25 @@ const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
 const crypto = require('crypto');
+const vm = require('vm');
 
 const lumps = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8');
 const memory = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const css = fs.readFileSync(path.join(__dirname, 'styles-toolbar.css'), 'utf8');
 const lumpsHash = crypto.createHash('sha256').update(lumps).digest('hex').slice(0, 12);
+
+function extractFunction(source, name) {
+    const start = source.indexOf('function ' + name + '(');
+    assert.notEqual(start, -1, 'missing production function ' + name);
+    const brace = source.indexOf('{', start);
+    let depth = 0;
+    for (let i = brace; i < source.length; i++) {
+        if (source[i] === '{') depth++;
+        if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1);
+    }
+    throw new Error('unbalanced production function ' + name);
+}
 
 assert(html.includes('id="savedLumpIdentityPanel"'),
     'complete workspace includes the visible verified identity panel');
@@ -31,7 +44,7 @@ assert(lumps.includes('Bootstrap note: T === GT for this local binding.') &&
        lumps.includes('var _bootstrapTEqualsGT = _sameSavedLumpWord(') &&
        lumps.includes('identity.goldenT, identity.goldenToken);'),
     'equal bootstrap T and runtime GT collapse into one explained binding');
-assert(lumps.includes("text(server.golden_token) || hexWord(server.bootstrap_runtime_gt)"),
+assert(lumps.includes("text(server.golden_token) || hexWord(server.bootstrap_runtime_gt) ||"),
     'Golden Token accepts the verified resident runtime GT');
 assert(lumps.includes("text(server.golden_t_id) || text(server.identity_hash) ||") &&
        lumps.includes("text(server.bootstrap_t)"),
@@ -40,6 +53,24 @@ assert(!lumps.includes('goldenT: server ? text(server.token)'),
     'lookup token is never used as a Golden T fallback');
 assert(lumps.includes("unavailable in verified server metadata"),
     'missing identity facts fail visibly');
+
+const runtimeGT = vm.runInNewContext(
+    extractFunction(lumps, '_runtimeGoldenTokenForLump') +
+    '\n_runtimeGoldenTokenForLump',
+    {}
+);
+const fakeSim = {
+    isNSEntryValid: slot => slot === 7,
+    lumpTokenAtSlot: slot => slot === 7 ? '1234abcd' : null,
+    readNSEntry: () => ({ word1_limit: 0x00000300 }),
+    parseNSWord1: () => ({ gtSeq: 3 }),
+    createGT: (seq, slot, perms, type) =>
+        ((seq << 28) | (type << 25) | (perms.E << 24) | slot) >>> 0,
+};
+assert.strictEqual(runtimeGT({ ns_slot: 7, token: '1234abcd' }, fakeSim),
+    0x33000007, 'live slot and sequence deterministically produce the runtime SELF E-GT');
+assert.strictEqual(runtimeGT({ ns_slot: 7, token: 'deadbeef' }, fakeSim), null,
+    'a stale slot belonging to another LUMP must not produce a runtime GT');
 
 const nsOpen = memory.slice(memory.indexOf('function _nsLabelOpen'),
     memory.indexOf('// Dedicated read-only popup', memory.indexOf('function _nsLabelOpen')));

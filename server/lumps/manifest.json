@@ -528,7 +528,8 @@
     "content_profile": 2,
     "output_profile": 2,
     "capabilities": [],
-    "operation_id": "a16f98f229d94655ad0bd8e926ef7a6c"
+    "operation_id": "a16f98f229d94655ad0bd8e926ef7a6c",
+    "archived": true
   },
   {
     "token": "4a000006",
@@ -639,5 +640,19 @@
       }
     ],
     "operation_id": "eff436d9-d4cf-4478-b740-3f990c20157b"
+  },
+  {
+    "token": "00aa1234",
+    "abstraction": "Adder",
+    "filename": "Adder.1.0f63efe0.lump",
+    "lump_version": 406,
+    "compiled_at": 1789594236.8838055,
+    "dot_name": "Adder",
+    "issue_n": 1,
+    "petname": "",
+    "content_profile": 2,
+    "output_profile": 2,
+    "capabilities": [],
+    "operation_id": "e04a75c91382489890ce14059ff2e95a"
   }
 ]

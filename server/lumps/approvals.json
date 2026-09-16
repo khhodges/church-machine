@@ -535,6 +535,19 @@
       "filename": "CapabilityTest.1.e2b69e5b.lump",
       "compiled_at": 1789591328.5251067,
       "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
+    },
+    "4e2a163e7c8e1c4f1174cf50fa49631a251c6037619cade8a10d38fc7c40dd21": {
+      "capability_type": "inform",
+      "grants": [
+        "E"
+      ],
+      "binary_hash": "4e2a163e7c8e1c4f1174cf50fa49631a251c6037619cade8a10d38fc7c40dd21",
+      "dot_name": "Adder",
+      "issue_n": 1,
+      "abstraction": "Adder",
+      "filename": "Adder.1.0f63efe0.lump",
+      "compiled_at": 1789594236.8838055,
+      "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f"
     }
   }
 }

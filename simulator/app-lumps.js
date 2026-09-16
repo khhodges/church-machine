@@ -1682,6 +1682,31 @@ function _lumpSrcEditMethod(absIdx, mName) {
 
 // Saved LUMPs are edited as source on the left while their immutable binary is
 // shown in the right-hand column beside it.
+function _runtimeGoldenTokenForLump(lump, simInstance) {
+    if (!lump || !simInstance) return null;
+    var slot = Number(lump.ns_slot);
+    if (!Number.isInteger(slot) || slot < 0 ||
+            typeof simInstance.isNSEntryValid !== 'function' ||
+            !simInstance.isNSEntryValid(slot) ||
+            typeof simInstance.readNSEntry !== 'function' ||
+            typeof simInstance.parseNSWord1 !== 'function' ||
+            typeof simInstance.createGT !== 'function') {
+        return null;
+    }
+    if (lump.token && typeof simInstance.lumpTokenAtSlot === 'function') {
+        var expectedToken = String(lump.token).replace(/^0x/i, '').toLowerCase();
+        var liveToken = String(simInstance.lumpTokenAtSlot(slot) || '')
+            .replace(/^0x/i, '').toLowerCase();
+        if (!liveToken || liveToken !== expectedToken) return null;
+    }
+    var entry = simInstance.readNSEntry(slot);
+    if (!entry) return null;
+    var sequence = simInstance.parseNSWord1(entry.word1_limit >>> 0).gtSeq;
+    if (!Number.isInteger(sequence)) return null;
+    return simInstance.createGT(sequence, slot,
+        { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, 1) >>> 0;
+}
+
 function _verifiedSavedLumpIdentity(lump, lookupToken) {
     var server = lump && lump.token ? lump : null;
     var text = function(value) {
@@ -1694,6 +1719,8 @@ function _verifiedSavedLumpIdentity(lump, lookupToken) {
     var issue = server && server.issue_n != null && String(server.issue_n).trim()
         ? String(server.issue_n).trim() : null;
     var dotName = server ? text(server.dot_name) : null;
+    var runtimeGT = server && typeof sim !== 'undefined'
+        ? _runtimeGoldenTokenForLump(server, sim) : null;
     return {
         canonicalDotToken: dotName && issue && server && text(server.token)
             ? dotName + '.' + issue + '.' + text(server.token) : null,
@@ -1703,7 +1730,8 @@ function _verifiedSavedLumpIdentity(lump, lookupToken) {
                 text(server.bootstrap_t)
             : null,
         goldenToken: server
-            ? text(server.golden_token) || hexWord(server.bootstrap_runtime_gt)
+            ? text(server.golden_token) || hexWord(server.bootstrap_runtime_gt) ||
+                hexWord(runtimeGT)
             : null,
         binarySeal: server ? text(server.binary_hash) : null,
         requestedLookupToken: text(lookupToken)
