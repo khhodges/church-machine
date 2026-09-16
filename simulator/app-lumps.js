@@ -7688,6 +7688,11 @@ window.editorSaveLump = function() {
         }
     };
 
+    var _regEntry = window.LumpRegistry &&
+        typeof window.LumpRegistry.resolve === 'function' &&
+        typeof window.LumpRegistry.getCurrent === 'function'
+        ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())
+        : null;
     var _regMem = _regEntry ? _regEntry.sources : null;
     var _hasCompiledWords = !!(_regMem && _regMem.memory && _regMem.memory.words
                                && _regMem.memory.words.length > 0);
@@ -8021,13 +8026,16 @@ window.showFormatLump = async function() {
         var _profile = _profiles[_profileIndex];
         var _built = await _lcf.lumpBuildContentFrame(_apiObj, _srcText, { profile: _profile });
         var _frameWds = _built.frameWords;
-    var _svLumpSize = _selectedCandidate.lumpSize;
+        var _svLumpSize = 64;
         var _fsStart = 1 + _svCW;
         while ((_svLumpSize - _svCC - _fsStart) < _frameWds.length) _svLumpSize = _svLumpSize << 1;
         var _svNm6 = 0;
         while ((64 << _svNm6) < _svLumpSize) _svNm6++;
-    var _svHdr = _selectedCandidate.binary[0] >>> 0;
-    var _svBinary = _selectedCandidate.binary;
+        var _svHdr = (((0x1F & 0x1F) << 27) |
+                      ((_svNm6 & 0x0F) << 23) |
+                      ((_svCW & 0x1FFF) << 10) |
+                      (_svCC & 0xFF)) >>> 0;
+        var _svBinary = new Array(_svLumpSize).fill(0);
         _svBinary[0] = _svHdr;
         for (var _wordIndex = 0; _wordIndex < _svCW; _wordIndex++) {
             _svBinary[1 + _wordIndex] = _svWords[_wordIndex] >>> 0;
