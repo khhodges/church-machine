@@ -44,10 +44,12 @@ from hardware.boot_rom import (
     WUKONG_CAPABILITY_TEST_WORDS,
     WUKONG_DEMO_NAMESPACE,
     WUKONG_SELFTEST_ALLOC, WUKONG_SELFTEST_BASE_BYTE,
-    WUKONG_SELFTEST_FILENAME, WUKONG_SELFTEST_GT_SEQ,
-    WUKONG_SELFTEST_NS_SLOT, WUKONG_SELFTEST_TOKEN, WUKONG_SELFTEST_WORDS,
-    _select_active_manifest_entry, make_gt, GT_TYPE_INFORM, PERM_MASK_E,
+    WUKONG_SELFTEST_FILENAME, WUKONG_SELFTEST_BINARY_HASH,
+    WUKONG_SELFTEST_GT_SEQ,
+    WUKONG_SELFTEST_NS_SLOT, WUKONG_SELFTEST_TOKEN,
+    _load_admitted_artifact,
 )
+import hardware.boot_rom as boot_rom
 from hardware.wukong_top import (
     _WUKONG_BOOT_WINDOW_BYTES,
     _WUKONG_ROM,
@@ -64,8 +66,8 @@ _EXPECTED_BRANCH_MINUS_1 = encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=(
 _LUMPS_DIR = Path(__file__).resolve().parents[2] / "server" / "lumps"
 
 
-def test_wukong_selftest_uses_active_approved_canonical_artifact():
-    """Factory ROM follows the active ns-state + manifest locator, not a token filename."""
+def test_wukong_selftest_uses_explicit_namespace_artifact():
+    """Factory ROM follows the explicit namespace artifact selection."""
     state = json.loads((_LUMPS_DIR / "ns-state.json").read_text(encoding="utf-8"))
     selected = [entry for entry in state["abstractions"] if entry.get("name") == "SelfTest"]
     assert len(selected) == 1
@@ -73,22 +75,6 @@ def test_wukong_selftest_uses_active_approved_canonical_artifact():
     assert (WUKONG_SELFTEST_FILENAME, WUKONG_SELFTEST_TOKEN,
             WUKONG_SELFTEST_NS_SLOT, WUKONG_SELFTEST_GT_SEQ) == (
         selected["filename"], selected["token"], selected["slot"], selected["seq"])
-
-    manifest = json.loads((_LUMPS_DIR / "manifest.json").read_text(encoding="utf-8"))
-    assert len([entry for entry in manifest
-                if entry.get("abstraction") == "SelfTest"
-                and not entry.get("archived", False)
-                and entry.get("token") == WUKONG_SELFTEST_TOKEN
-                and entry.get("filename") == WUKONG_SELFTEST_FILENAME]) == 1
-
-    # Archived history may retain the same abstraction name, but there must be
-    # exactly one non-archived row for the active namespace locator.
-    active_rows = [entry for entry in manifest
-                   if entry.get("abstraction") == "SelfTest"
-                   and not entry.get("archived", False)
-                   and entry.get("token") == selected["token"]
-                   and entry.get("filename") == selected["filename"]]
-    assert len(active_rows) == 1
 
     raw = (_LUMPS_DIR / WUKONG_SELFTEST_FILENAME).read_bytes()
     header = struct.unpack_from(">I", raw)[0]
@@ -98,43 +84,30 @@ def test_wukong_selftest_uses_active_approved_canonical_artifact():
     assert WUKONG_DEMO_NAMESPACE[WUKONG_SELFTEST_NS_SLOT * 4 + 1] == (
         ((WUKONG_SELFTEST_GT_SEQ & 0x1FF) << 21) | (WUKONG_SELFTEST_ALLOC - 1))
 
-    cc = header & 0xFF
-    expected_egt = make_gt(GT_TYPE_INFORM, PERM_MASK_E,
-                           WUKONG_SELFTEST_NS_SLOT, WUKONG_SELFTEST_GT_SEQ)
-    assert cc >= 2
-    assert WUKONG_SELFTEST_WORDS[-cc:][:2] == (expected_egt, expected_egt)
 
-    approvals = json.loads((_LUMPS_DIR / "approvals.json").read_text(encoding="utf-8"))["approvals"]
-    approval = approvals[hashlib.sha256(raw).hexdigest()]
-    assert all(approval[key] == value for key, value in {
-        "binary_hash": hashlib.sha256(raw).hexdigest(),
-        "filename": WUKONG_SELFTEST_FILENAME,
-        "token": WUKONG_SELFTEST_TOKEN,
-        "abstraction": "SelfTest",
-    }.items())
+def test_wukong_selected_artifact_matches_compiler_integrity_record():
+    """Boot delivery authenticates bytes using ns-state's compiler record."""
+    raw = (_LUMPS_DIR / WUKONG_SELFTEST_FILENAME).read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == WUKONG_SELFTEST_BINARY_HASH
 
 
-def test_selftest_manifest_locator_rejects_archived_or_duplicate_active_rows():
-    locator = {
-        "abstraction": "SelfTest", "ns_slot": 6, "token": "abcdef01",
-        "filename": "SelfTest.9.abcdef01.lump",
-    }
-    archived = dict(locator, archived=True)
-    with pytest.raises(ValueError, match="exactly one active SelfTest"):
-        _select_active_manifest_entry([archived], "SelfTest", 6, "abcdef01",
-                                      "SelfTest.9.abcdef01.lump")
-    with pytest.raises(ValueError, match="exactly one active SelfTest"):
-        _select_active_manifest_entry([locator, dict(locator)], "SelfTest", 6,
-                                      "abcdef01", "SelfTest.9.abcdef01.lump")
-    assert _select_active_manifest_entry(
-        [archived, locator], "SelfTest", 6, "abcdef01",
-        "SelfTest.9.abcdef01.lump") == locator
+def test_boot_delivery_rejects_digest_only_namespace_selection(tmp_path, monkeypatch):
+    """A mutable ns-state digest is insufficient without admission evidence."""
+    raw = b"compiler output"
+    filename = "Example.1.deadbeef.lump"
+    digest = hashlib.sha256(raw).hexdigest()
+    (tmp_path / filename).write_bytes(raw)
+    (tmp_path / "approvals.json").write_text(
+        '{"version":1,"algorithm":"sha256","approvals":{}}', encoding="utf-8")
+    monkeypatch.setattr(boot_rom, "_lumps_dir", tmp_path)
+    with pytest.raises(PermissionError, match="admission record"):
+        _load_admitted_artifact(filename, digest, "Example")
 
 
 def test_optional_capability_test_fails_closed_without_blocking_import():
     if not WUKONG_CAPABILITY_TEST_BOUND:
         assert WUKONG_CAPABILITY_TEST_WORDS == ()
-        assert WUKONG_CAPABILITY_TEST_STATUS["code"] == "approval-required"
+        assert WUKONG_CAPABILITY_TEST_STATUS["code"] == "unavailable"
         assert "omitted" in WUKONG_CAPABILITY_TEST_STATUS["message"]
 
 
@@ -231,7 +204,7 @@ def test_wukong_init_rom_size_matches_python_source():
     wukong_top.py, regenerate it and commit the updated file.
     """.format(expected=WUKONG_N_INIT)
     if not WUKONG_CAPABILITY_TEST_BOUND:
-        pytest.skip("RTLIL may represent a build with an approved optional CapabilityTest")
+        pytest.skip("RTLIL may represent a build with an optional CapabilityTest")
     if not os.path.isfile(_IL_PATH):
         pytest.skip("build/church_wukong_xc7a100t.il not present — skipped")
 

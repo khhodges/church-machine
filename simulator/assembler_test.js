@@ -7543,35 +7543,11 @@ abstraction VlcTest {
                   `canonical=0x${(fileWords[firstMismatch] >>> 0).toString(16)}`);
     }
 
-    // ── EX-PFS dispatch path: last instruction is ELOADCALL CR1, Next ──────────
-    // Regression guard: verifies the done: completion path in post_flash_selftest
-    // dispatches through c-list[1] via ELOADCALL (not the legacy TPERM/CALL CR0
-    // recovery loop and not a bare RETURN). A regression here would break the
-    // IDE "→ Next" continuation configured by boot_image.py in c-list[1].
+    // ── EX-PFS completion path: last instruction is RETURN ────────────────────
+    // The runtime owns continuation selection; compiled SelfTest source no
+    // longer rewrites or dispatches through a post-compile Next c-list row.
     {
         const { errors: canonErr, words: canonWords } = asmFile('examples/post_flash_selftest.cloomc');
-
-        // Minimal 2-instruction reference to capture the ELOADCALL CR1, Next encoding.
-        const refSrc =
-            'capabilities {\n' +
-            '    SelfTest     E,\n' +
-            '    Next         E\n' +
-            '}\n' +
-            'start:\n' +
-            '    ISUB DR0, DR0, DR0\n' +
-            '    ELOADCALL CR1, Next';
-        const { errors: refErr, words: refWords } = asmSrc(refSrc);
-
-        assert('EX-PFS-DISPATCH: reference ELOADCALL snippet assembles without errors',
-            refErr.length === 0,
-            refErr.map(e => 'L' + e.line + ': ' + e.message).join('; '));
-
-        assert('EX-PFS-DISPATCH: reference snippet produces exactly 2 instruction words',
-            refWords.length === 2,
-            `got ${refWords.length}`);
-
-        // refWords[0] = ISUB DR0,DR0,DR0 ; refWords[1] = ELOADCALL CR1, Next
-        const eloadcallEncoding = refWords[1] >>> 0;
 
         assert('EX-PFS-DISPATCH: canonical file assembles without errors',
             canonErr.length === 0,
@@ -7582,9 +7558,9 @@ abstraction VlcTest {
             `got ${canonWords.length} words`);
 
         const lastWord = canonWords[canonWords.length - 1] >>> 0;
-        assert('EX-PFS-DISPATCH: last instruction word encodes ELOADCALL CR1, Next',
-            lastWord === eloadcallEncoding,
-            `last=0x${lastWord.toString(16)} expected ELOADCALL CR1,Next=0x${eloadcallEncoding.toString(16)}`);
+        assert('EX-PFS-DISPATCH: last instruction word encodes RETURN',
+            lastWord === 0x1F000000,
+            `last=0x${lastWord.toString(16)} expected RETURN=0x1f000000`);
     }
 
     // Helper: inline-vs-canonical comparison for a single key.
@@ -10952,9 +10928,11 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
         const _showAsmWarnings = (warns) => { captured = warns; };
         const fn = new Function(
             'sim', 'absName', 'allCode', 'allLineNums', '_showAsmWarnings',
+            'bootEntrySlot',
             '"use strict";\n' + berSrc
         );
-        fn(sim, absName, allCode || [], allLineNums || [], _showAsmWarnings);
+        fn(sim, absName, allCode || [], allLineNums || [], _showAsmWarnings,
+            bootSlot);
         return captured;
     }
 

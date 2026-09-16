@@ -579,18 +579,11 @@ function setNextAfterSelfTestSlot(idx) {
 window.setNextAfterSelfTestSlot = setNextAfterSelfTestSlot;
 
 function _syncSelfTestNextGtToBootEntry(targetSlot) {
-    if (!sim || typeof sim.createGT !== 'function') return;
-    const targetEntry = typeof sim.readNSEntry === 'function'
-        ? sim.readNSEntry(targetSlot) : null;
-    const targetInfo = targetEntry && typeof sim.parseNSWord1 === 'function'
-        ? sim.parseNSWord1(targetEntry.word1_limit) : null;
-    if (!targetInfo || !Number.isInteger(targetInfo.gtSeq)) return;
-    const nextGt = sim.createGT(targetInfo.gtSeq, targetSlot, {E: 1}, 1) >>> 0;
-    // The virtual bootstrap c-list is the UI/runtime projection. The
-    // immutable SelfTest LUMP bytes are not rewritten merely because a local
-    // next-boot selection changed; the explicit Save action regenerates an
-    // image whose derived Next.GT has this same live sequence.
-    if (sim.demoClistGTs) sim.demoClistGTs[1] = nextGt;
+    // Deliberately retained as a compatibility no-op.  SelfTest is an
+    // immutable compiler artifact; changing boot selection must never mutate
+    // its post-compile C-list.  Boot-image preparation owns its own derived
+    // projection instead.
+    return undefined;
 }
 
 
@@ -628,6 +621,23 @@ function _bootBindingFingerprint(binding) {
 }
 
 let _namespaceBootMarkerInFlight = null;
+let _preparedArtifactSelection = null;
+
+// Preparation is intentionally a two-step operation: revision/destination
+// identity is selected first, then the Lightning Bolt is committed.  There is
+// no "latest" or resident fallback.
+function selectArtifactForPreparation(selection, revisions) {
+    const chooser = window.LumpAdmission &&
+        typeof window.LumpAdmission.chooseArtifact === 'function'
+        ? window.LumpAdmission.chooseArtifact : null;
+    if (!chooser) throw new Error('Artifact admission is unavailable; reload the IDE.');
+    const picked = chooser(selection, revisions);
+    if (!picked || !picked.ok) throw new Error(picked && picked.message ||
+        'Choose an exact artifact revision before preparing it.');
+    _preparedArtifactSelection = picked;
+    return picked;
+}
+window.selectArtifactForPreparation = selectArtifactForPreparation;
 
 function _namespaceResponseError(action, response, body) {
     const detail = body && (body.error || body.message)
@@ -702,6 +712,10 @@ async function _commitNamespaceBootMarker(slot) {
     if (!Number.isInteger(target) || target < 0 || target > 255) {
         throw new Error('Choose a valid Namespace slot (0–255).');
     }
+    if (!_preparedArtifactSelection || !_preparedArtifactSelection.artifact ||
+            Number(_preparedArtifactSelection.selection.slot) !== target) {
+        throw new Error('Choose the exact artifact revision and destination before preparing the boot entry.');
+    }
     const previousTransaction = _namespaceBootMarkerInFlight;
     const transaction = (async function() {
         if (previousTransaction) await previousTransaction;
@@ -717,6 +731,10 @@ async function _commitNamespaceBootMarker(slot) {
                     ? window.BuildApprovalView._authHeaders() : {})),
             body: JSON.stringify({
                 slot: target,
+                revision: _preparedArtifactSelection.selection.revision,
+                token: _preparedArtifactSelection.artifact.token ||
+                    _preparedArtifactSelection.artifact.cache_token,
+                filename: _preparedArtifactSelection.artifact.filename,
                 namespaceFingerprint: fingerprint,
             }),
         });
@@ -834,6 +852,34 @@ async function setBootEntrySlot(idx, ev) {
     }
     idx = requestedSlot;
     try {
+        // A destination click is only a request to begin explicit artifact
+        // selection. Resolve the committed row's exact revision/token/filename
+        // and pass it through the admission chooser; never infer "latest".
+        const rows = window._nsState &&
+            Array.isArray(window._nsState.abstractions)
+            ? window._nsState.abstractions : [];
+        const row = rows.find(function(candidate) {
+            return candidate && Number(candidate.slot) === requestedSlot &&
+                candidate.archived !== true;
+        });
+        const revision = row && (row.revision != null ? row.revision :
+            (row.lump_version != null ? row.lump_version : row.issue_n));
+        const token = row && (row.token || row.cache_token);
+        const filename = row && row.filename;
+        const revisions = (typeof _lumpsCache !== 'undefined' &&
+            Array.isArray(_lumpsCache) ? _lumpsCache : []).filter(function(candidate) {
+                return candidate && String(candidate.token || candidate.cache_token || '').toLowerCase() ===
+                    String(token || '').toLowerCase() &&
+                    String(candidate.filename || '') === String(filename || '');
+            });
+        if (!revisions.length && row && token && filename) revisions.push(row);
+        selectArtifactForPreparation({
+            revision: revision,
+            slot: requestedSlot,
+            replace: false,
+            resident: true,
+            boot: true,
+        }, revisions);
         _setBootEntryPreparation(idx, 'pending',
             `Saving Namespace Lightning Bolt NS[${idx}]…`);
         renderAbstractions();

@@ -1,11 +1,15 @@
 from amaranth import *
 import hashlib
-from server.lump_approvals import read_approvals
 import json
 import os
 import struct
 from pathlib import Path
 
+from server.lump_approvals import (
+    configured_compiler_tcb_key,
+    is_trusted_compiler_record,
+    read_approvals,
+)
 from .hw_types import *
 from .integrity32 import integrity32
 from shared.architecture_contracts import (
@@ -66,23 +70,6 @@ def make_gt(gt_type=GT_TYPE_NULL, perms=0, slot_id=0, gt_seq=0, b_flag=0):
     dom, perm3 = gt_encode_perm(perms)
     return (b_flag << 31) | (perm3 << 28) | (dom << 27) | \
            (gt_type << 25) | (gt_seq << 16) | slot_id
-
-
-def _select_active_manifest_entry(manifest, abstraction, slot, token, filename):
-    """Return the one non-archived locator for an already-selected NS binding.
-
-    Placement and identity are intentionally not manifest fields: ``slot`` is
-    selected by ns-state and authentication is hash-bound in approvals.
-    """
-    matches = [entry for entry in manifest
-               if entry.get("abstraction") == abstraction
-               and not entry.get("archived", False)
-               and entry.get("token") == token
-               and entry.get("filename") == filename]
-    if len(matches) != 1:
-        raise ValueError(
-            f"manifest must contain exactly one active {abstraction} locator")
-    return matches[0]
 
 
 # ---------------------------------------------------------------------------
@@ -653,18 +640,55 @@ WUKONG_DEMO_NAMESPACE[0] = _wukong_ns0_loc
 WUKONG_DEMO_NAMESPACE[1] = _wukong_ns0_auth
 WUKONG_DEMO_NAMESPACE[2] = integrity32(_wukong_ns0_loc, _wukong_ns0_auth)
 
-# The active SelfTest is selected by the namespace state, with its canonical
-# filename authenticated by the manifest and approval ledger.  Do not use the
-# legacy address-token filename: it is an archived artifact, not an authority
-# for the factory image.
+# The boot image is the exact artifact named by the explicit namespace
+# selection.  The compiler's record is authoritative for the artifact; this
+# module only performs the structural checks needed before placing bytes in a
+# hardware image.  In particular, hardware must not consult a second approval
+# ledger, reconstruct a canonical source, or apply a SelfTest policy.
 WUKONG_SELFTEST_BASE_BYTE = 0x0600
 WUKONG_SELFTEST_BASE_WORD = WUKONG_SELFTEST_BASE_BYTE // 4
 _lumps_dir = Path(os.environ.get(
     "CHURCH_LUMPS_DIR",
     Path(__file__).resolve().parents[1] / "server" / "lumps",
 )).resolve()
+
+
+def _load_admitted_artifact(filename, expected_hash, abstraction):
+    """Load bytes only after TCB-authenticated compiler/admission evidence.
+
+    Namespace state is a selector, not an authority.  The admission envelope
+    binds the exact digest and filename.  Trusted Home IDE records require the
+    TCB HMAC; bootstrap/Mint records may instead carry both runtime bootstrap
+    fields, which are the hardware admission evidence for that path.
+    """
+    if (not isinstance(filename, str) or Path(filename).name != filename
+            or not isinstance(expected_hash, str)
+            or len(expected_hash) != 64):
+        raise ValueError(f"{abstraction} selection lacks a valid integrity record")
+    raw = (_lumps_dir / filename).read_bytes()
+    digest = hashlib.sha256(raw).hexdigest()
+    if digest != expected_hash:
+        raise ValueError(f"{abstraction} bytes do not match selected digest")
+    records = read_approvals(_lumps_dir / "approvals.json", missing_ok=False)
+    record = records.get(digest)
+    if not isinstance(record, dict) or record.get("filename") != filename:
+        raise PermissionError(f"{abstraction} has no exact admission record")
+    if record.get("abstraction") not in (None, abstraction):
+        raise PermissionError(f"{abstraction} admission record names another artifact")
+    try:
+        signed = is_trusted_compiler_record(
+            record, binary=raw,
+            signing_key=configured_compiler_tcb_key())
+    except RuntimeError:
+        signed = False
+    bootstrap = (isinstance(record.get("bootstrap_t"), str)
+                 and isinstance(record.get("bootstrap_runtime_gt"), int))
+    if not (signed or bootstrap):
+        raise PermissionError(f"{abstraction} admission evidence is not trusted")
+    return raw
+
+
 _selftest_ns_state_path = _lumps_dir / "ns-state.json"
-_selftest_manifest_path = _lumps_dir / "manifest.json"
 try:
     _selftest_ns_state = json.loads(_selftest_ns_state_path.read_text(encoding="utf-8"))
     _selftest_selected = [entry for entry in _selftest_ns_state.get("abstractions", [])
@@ -676,6 +700,7 @@ try:
     WUKONG_SELFTEST_GT_SEQ = _selftest_selected["seq"]
     WUKONG_SELFTEST_FILENAME = _selftest_selected["filename"]
     WUKONG_SELFTEST_TOKEN = _selftest_selected["token"]
+    WUKONG_SELFTEST_BINARY_HASH = _selftest_selected.get("binary_hash")
     if (not isinstance(WUKONG_SELFTEST_NS_SLOT, int)
             or not isinstance(WUKONG_SELFTEST_GT_SEQ, int)
             or not 0 <= WUKONG_SELFTEST_NS_SLOT <= 0xFFFF
@@ -684,16 +709,18 @@ try:
             or Path(WUKONG_SELFTEST_FILENAME).name != WUKONG_SELFTEST_FILENAME
             or not isinstance(WUKONG_SELFTEST_TOKEN, str)):
         raise ValueError("SelfTest namespace selection is malformed")
-    _selftest_manifest = json.loads(_selftest_manifest_path.read_text(encoding="utf-8"))
-    _selftest_manifest_entry = _select_active_manifest_entry(
-        _selftest_manifest, "SelfTest", WUKONG_SELFTEST_NS_SLOT,
-        WUKONG_SELFTEST_TOKEN, WUKONG_SELFTEST_FILENAME)
-    _selftest_raw = (_lumps_dir / WUKONG_SELFTEST_FILENAME).read_bytes()
+    if (not isinstance(WUKONG_SELFTEST_BINARY_HASH, str)
+            or len(WUKONG_SELFTEST_BINARY_HASH) != 64):
+        raise ValueError("selected artifact has no compiler integrity record")
+    _selftest_raw = _load_admitted_artifact(
+        WUKONG_SELFTEST_FILENAME, WUKONG_SELFTEST_BINARY_HASH, "SelfTest")
     if not _selftest_raw or len(_selftest_raw) % 4:
         raise ValueError("active SelfTest is not a non-empty whole-word LUMP")
     WUKONG_SELFTEST_ALLOC = len(_selftest_raw) // 4
     WUKONG_SELFTEST_WORDS = tuple(
         struct.unpack(f">{WUKONG_SELFTEST_ALLOC}I", _selftest_raw))
+    if hashlib.sha256(_selftest_raw).hexdigest() != WUKONG_SELFTEST_BINARY_HASH:
+        raise ValueError("selected artifact failed compiler integrity record")
     _selftest_header = WUKONG_SELFTEST_WORDS[0]
     _selftest_declared_alloc = 1 << (((_selftest_header >> 23) & 0xF) + 6)
     _selftest_cw = (_selftest_header >> 10) & 0x1FFF
@@ -703,24 +730,8 @@ try:
             or 1 + _selftest_cw + _selftest_cc > WUKONG_SELFTEST_ALLOC
             or _selftest_cc < 1):
         raise ValueError("active SelfTest header/allocation is invalid")
-    _selftest_hash = hashlib.sha256(_selftest_raw).hexdigest()
-    _selftest_approval = read_approvals(
-        _lumps_dir / "approvals.json", missing_ok=False).get(_selftest_hash)
-    if (not isinstance(_selftest_approval, dict)
-            or any(_selftest_approval.get(key) != value for key, value in {
-                "binary_hash": _selftest_hash, "filename": WUKONG_SELFTEST_FILENAME,
-                "token": WUKONG_SELFTEST_TOKEN, "abstraction": "SelfTest",
-                "issue_n": _selftest_selected.get("issue_n"),
-            }.items())):
-        raise PermissionError("active SelfTest is not exactly hash-approved")
-    if _selftest_manifest_entry.get("lump_version") != _selftest_selected.get("lump_version"):
-        raise PermissionError("manifest locator and namespace disagree on active SelfTest version")
-    _selftest_egt = make_gt(GT_TYPE_INFORM, PERM_MASK_E,
-                            WUKONG_SELFTEST_NS_SLOT, WUKONG_SELFTEST_GT_SEQ)
-    if WUKONG_SELFTEST_WORDS[-_selftest_cc] != _selftest_egt:
-        raise ValueError("active SelfTest c-list does not contain selected SELF E-GT")
 except Exception as exc:
-    raise RuntimeError(f"Wukong factory image requires an approved active SelfTest: {exc}") from exc
+    raise RuntimeError(f"Wukong boot image has invalid selected artifact: {exc}") from exc
 
 _selftest_word1 = ((WUKONG_SELFTEST_GT_SEQ & 0x1FF) << 21) | (WUKONG_SELFTEST_ALLOC - 1)
 while len(WUKONG_DEMO_NAMESPACE) < (WUKONG_SELFTEST_NS_SLOT + 1) * 4:
@@ -762,14 +773,21 @@ try:
     if len(_capability_test_ns_matches) != 1:
         raise ValueError("Namespace does not select exactly one slot-10 CapabilityTest")
     _capability_test_filename = _capability_test_ns_matches[0].get("filename")
+    _capability_test_binary_hash = _capability_test_ns_matches[0].get("binary_hash")
     if not isinstance(_capability_test_filename, str) or not _capability_test_filename:
         raise ValueError("Namespace selection has no filename")
-    _capability_test_raw = (_lumps_dir / _capability_test_filename).read_bytes()
+    if (not isinstance(_capability_test_binary_hash, str)
+            or len(_capability_test_binary_hash) != 64):
+        raise ValueError("selected binary has no compiler integrity record")
+    _capability_test_raw = _load_admitted_artifact(
+        _capability_test_filename, _capability_test_binary_hash, "CapabilityTest")
     if not _capability_test_raw or len(_capability_test_raw) % 4:
         raise ValueError("selected binary is not a non-empty whole-word LUMP")
     _capability_test_alloc = len(_capability_test_raw) // 4
     _capability_test_words = tuple(
         struct.unpack(f">{_capability_test_alloc}I", _capability_test_raw))
+    if hashlib.sha256(_capability_test_raw).hexdigest() != _capability_test_binary_hash:
+        raise ValueError("selected binary failed compiler integrity record")
     _capability_test_header = _capability_test_words[0]
     _declared = 1 << (((_capability_test_header >> 23) & 0xF) + 6)
     _cw = (_capability_test_header >> 10) & 0x1FFF
@@ -778,23 +796,19 @@ try:
             or _declared != _capability_test_alloc
             or 1 + _cw + _cc > _capability_test_alloc):
         raise ValueError("selected binary has an invalid header or allocation")
-    _capability_test_hash = hashlib.sha256(_capability_test_raw).hexdigest()
-    _approval = read_approvals(
-        _lumps_dir / "approvals.json", missing_ok=False).get(_capability_test_hash)
-    if not isinstance(_approval, dict) or _approval.get("binary_hash") != _capability_test_hash:
-        raise PermissionError("exact binary hash is not approved")
     WUKONG_CAPABILITY_TEST_FILENAME = _capability_test_filename
     WUKONG_CAPABILITY_TEST_ALLOC = _capability_test_alloc
     WUKONG_CAPABILITY_TEST_WORDS = _capability_test_words
     WUKONG_CAPABILITY_TEST_BOUND = True
     WUKONG_CAPABILITY_TEST_STATUS = {
-        "bound": True, "code": "approved", "message": "CapabilityTest is hash-approved.",
-        "binary_hash": _capability_test_hash,
+        "bound": True, "code": "structurally-valid",
+        "message": "CapabilityTest is structurally valid and compiler-authorized.",
+        "binary_hash": _capability_test_binary_hash,
     }
 except Exception as _capability_test_error:
     WUKONG_CAPABILITY_TEST_STATUS = {
         "bound": False,
-        "code": "approval-required",
+        "code": "unavailable",
         "message": f"Optional CapabilityTest omitted: {_capability_test_error}",
     }
 

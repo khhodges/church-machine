@@ -41,7 +41,9 @@ authoritative Namespace state and manifest metadata.
 """
 import json
 import hashlib
-from server.lump_approvals import read_approvals
+from server.lump_approvals import (
+    read_approvals, is_trusted_compiler_record, configured_compiler_tcb_key,
+)
 from server.lump_integrity import (
     compute_number, parse_canonical_filename,
 )
@@ -264,17 +266,6 @@ def validate_resident_boot_profile(rows, profile_name=RESIDENT_BOOT_PROFILE_NAME
                 f"resident boot profile row {name} has invalid sequence {seq!r}")
         resident_names.add(name)
 
-    extra = [
-        row.get("name") for row in rows
-        if isinstance(row, dict)
-        and row.get("type") in ("Inform", "Resident")
-        and (row.get("resident") is True or row.get("boot_resident") is True)
-        and row.get("name") not in resident_names
-    ]
-    if extra:
-        raise ValueError(
-            "resident boot profile allows exactly three executable residents; "
-            "unexpected resident rows: " + ", ".join(map(str, extra)))
     return {slot: by_slot[slot] for slot in RESIDENT_BOOT_PROFILE["core_slots"]}
 
 
@@ -1755,7 +1746,7 @@ def _require_approved_executable_lump(path, lumps_dir, label, bootstrap_binding=
         filename = os.path.basename(path)
         parsed = parse_canonical_filename(filename)
         if approval is None:
-            raise ValueError("no approval matches the exact SHA-256")
+            raise ValueError("no compiler admission record matches the exact SHA-256")
         if approval.get("filename") != filename or parsed is None:
             raise ValueError("approval filename is missing or not canonical")
         dot_name, issue_n, number = parsed
@@ -1764,16 +1755,34 @@ def _require_approved_executable_lump(path, lumps_dir, label, bootstrap_binding=
         bootstrap_record = (
             approval.get("bootstrap_t") is not None
             or approval.get("bootstrap_runtime_gt") is not None)
+        compiler_record = False
+        if not bootstrap_record:
+            try:
+                compiler_record = is_trusted_compiler_record(
+                    approval, binary=raw,
+                    signing_key=configured_compiler_tcb_key())
+            except RuntimeError:
+                # Missing compiler TCB configuration cannot turn untrusted
+                # bytes into compiler-authoritative bytes.
+                compiler_record = False
         if bootstrap_binding is not None and not (
                 approval.get("bootstrap_t") is not None
                 and approval.get("bootstrap_runtime_gt") is not None):
             raise ValueError(
                 "frozen resident approval requires bootstrap_t and bootstrap_runtime_gt")
-        if ((not bootstrap_record and compute_number(dot_name, raw) != number)
+        # Delivery is a TCB boundary: a display label or approval row alone
+        # is not provenance.  Require the server HMAC over this exact raw
+        # byte stream before accepting trusted compiler output.
+        if not bootstrap_record and not compiler_record:
+            raise ValueError(
+                "artifact lacks authenticated compiler or bootstrap provenance")
+        if ((not bootstrap_record and not compiler_record
+             and compute_number(dot_name, raw) != number)
                 or approval.get("dot_name") != dot_name
                 or approval.get("issue_n") != issue_n
-                or (not bootstrap_record and approval.get("identity_hash") != identity_hash)):
-            raise ValueError("approval canonical identity/filename does not match bytes")
+                or (not bootstrap_record and not compiler_record
+                    and approval.get("identity_hash") != identity_hash)):
+            raise ValueError("compiler/approval canonical identity does not match bytes")
         if bootstrap_record:
             if bootstrap_binding is None:
                 raise ValueError("bootstrap approval has no authoritative Namespace owner")
@@ -2091,22 +2100,11 @@ def _load_boot_resident_entries(manifest_path, selected_by_slot=None,
     except Exception:
         return []
     out = []
-    profile_slots = None
-    if profile_name is not None:
-        profile_rows = validate_resident_boot_profile(
-            state.get("abstractions", []) if isinstance(state, dict) else [],
-            profile_name,
-        )
-        profile_slots = set(RESIDENT_BOOT_PROFILE["residents"].values())
-        for slot in sorted(profile_slots):
-            row = profile_rows[slot]
-            out.append((
-                slot,
-                str(row.get("token") or row.get("cache_token")).lower(),
-                row["filename"],
-                int(row.get("lump_version") or row.get("issue_n") or 0),
-            ))
-        return [(slot, tok, filename) for slot, tok, filename, _ in out]
+    # ``residentProfile`` was a legacy fixed identity/slot policy.  Resident
+    # selection is now wholly owned by the Namespace rows below: only rows
+    # carrying an exact token and filename are eligible.  Keep the parameter
+    # for source compatibility with older callers, but never use it to
+    # manufacture or adjudicate bindings.
     for e in state.get("abstractions", []) if isinstance(state, dict) else []:
         if not isinstance(e, dict) or e.get("type") not in ("Inform", "Resident"):
             continue
@@ -2371,11 +2369,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         raise ValueError(
             f"generate_boot_image: nsSlotsMax must be in 0..{MAX_NS_ENTRIES}; "
             f"got {_ns_slots_max}.")
-    _profile_name = cfg.get("residentProfile")
-    if _profile_name is not None:
-        raise ValueError(
-            "generate_boot_image: residentProfile is a boot-config authority; "
-            "set resident/load policy in Namespace state instead")
+    # Older saved configs may still carry residentProfile.  It is ignored:
+    # exact Namespace rows are the only selection authority.
     _boot_saved_path, _selftest_slot = _resolve_authoritative_selftest_lump(lumps_dir)
     try:
         with open(os.path.join(lumps_dir, "ns-state.json"), encoding="utf-8") as _bf:
@@ -2387,12 +2382,9 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     except (OSError, ValueError, AttributeError) as exc:
         raise ValueError(f"generate_boot_image: authoritative ns-state is unreadable: {exc}")
     _marked_boot_slot = namespace_boot_marker_slot(_bootstrap_rows)
-    if _profile_name is not None:
-        validate_resident_boot_profile(_bootstrap_rows, _profile_name)
-        if _ns_slots_max < max(RESIDENT_BOOT_PROFILE["core_slots"]) + 1:
-            raise ValueError(
-                f"generate_boot_image: resident profile requires Namespace capacity "
-                f"at least {max(RESIDENT_BOOT_PROFILE['core_slots']) + 1}")
+    # Resident identities and slots come only from the exact programmer
+    # selections in Namespace state.  A legacy config profile must not add,
+    # replace, or adjudicate those bindings.
     _bootstrap_by_slot = {
         row["slot"]: row for row in _bootstrap_rows
         if isinstance(row, dict) and isinstance(row.get("slot"), int)
@@ -2639,6 +2631,25 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     catalog[BOOT_ABSTR_NS_SLOT] = None
     if _selftest_slot < len(catalog):
         catalog[_selftest_slot] = None
+    # Destination-local resident admissions are authoritative Namespace rows,
+    # not members of the fixed historical catalog. Extend the projection so
+    # their exact approved bodies receive deterministic RAM placement.
+    for _resident_row in _bootstrap_rows:
+        if not isinstance(_resident_row, dict):
+            continue
+        _resident_slot = _resident_row.get("slot")
+        if (_resident_row.get("resident") is not True
+                or isinstance(_resident_slot, bool)
+                or not isinstance(_resident_slot, int)
+                or _resident_slot < len(DEFAULT_ABSTRACTION_CATALOG)):
+            continue
+        while len(catalog) <= _resident_slot:
+            catalog.append(None)
+        catalog[_resident_slot] = (
+            str(_resident_row.get("name") or f"NS[{_resident_slot}]"),
+            {"R": 0, "W": 0, "X": 0, "L": 0, "S": 0, "E": 1},
+            False,
+        )
     _RESERVED_SLOTS = ({0, 1, _selftest_slot}
                        | {slot for slot, entry in enumerate(catalog) if entry is not None}
                        | set(_generated_thread_slots))
@@ -2684,19 +2695,12 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     _boot_resident_bodies = {}
     _boot_resident_allocations = {}
     for _slot, _tok, _filename in _load_boot_resident_entries(
-            _manifest_path_for_cache, _selected_slot_tokens, _profile_name):
+            _manifest_path_for_cache, _selected_slot_tokens):
         if (_slot == _selftest_slot
                 or not (0 <= _slot < len(catalog))
                 or _slot in _MMIO_SLOT_SPECS):
             continue
-        if _profile_name is not None:
-            _body_path = os.path.join(lumps_dir, _filename)
-            _body = _require_approved_executable_lump(
-                _body_path, lumps_dir,
-                f"resident profile slot {_slot}",
-                _bootstrap_by_slot.get(_slot))
-        else:
-            _body = _read_lump_body(lumps_dir, _tok, _filename)
+        _body = _read_lump_body(lumps_dir, _tok, _filename)
         if _body is None:
             raise ValueError(
                 f"generate_boot_image: boot-resident catalog slot {_slot} "

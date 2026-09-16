@@ -6,6 +6,7 @@ local words after the destination namespace is known.
 """
 import hashlib
 import re
+import copy
 
 SCHEMA = "church.portable-lump-binding/v1"
 _NAME = re.compile(r"^([A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*)#([1-9][0-9]*)$")
@@ -171,3 +172,38 @@ def mint_gt(sequence, slot, rights, capability_type):
             if church else (4 if "X" in rights else 0) | (2 if "W" in rights else 0) | (1 if "R" in rights else 0))
     return ((perm << 28) | ((1 if church else 0) << 27) |
             ((capability_type & 3) << 25) | ((sequence & 0x1ff) << 16) | (slot & 0xffff))
+
+
+def bind_portable_derivative(portable_bytes, portable_seal, destination,
+                             *, local_words=None, evidence=None):
+    """Create local binding evidence without rewriting portable content.
+
+    A portable artifact is immutable.  Relocation therefore returns a distinct
+    derivative record whose ``portable_bytes`` and ``portable_seal`` are byte
+    for byte the supplied values; local materialization and destination facts
+    live only under ``binding``/``evidence``.  This small boundary is useful to
+    storage and boot callers because it makes accidental re-sealing of the
+    relocated image impossible.
+    """
+    if not isinstance(portable_bytes, (bytes, bytearray)) or not portable_bytes:
+        raise ValueError("portable artifact bytes are required")
+    if not isinstance(portable_seal, str) or not portable_seal:
+        raise ValueError("portable artifact seal is required")
+    if not isinstance(destination, dict):
+        raise ValueError("portable derivative destination is required")
+    if any(key not in destination for key in ("slot", "sequence")):
+        raise ValueError("portable derivative destination requires slot and sequence")
+    binding = copy.deepcopy(destination)
+    result = {
+        "portable_bytes": bytes(portable_bytes),
+        "portable_seal": portable_seal,
+        "binding": binding,
+        "local_words": None if local_words is None else list(local_words),
+        "evidence": copy.deepcopy(evidence) if isinstance(evidence, dict) else {},
+    }
+    result["evidence"].update({
+        "portable_sha256": hashlib.sha256(bytes(portable_bytes)).hexdigest(),
+        "portable_seal": portable_seal,
+        "destination": copy.deepcopy(destination),
+    })
+    return result

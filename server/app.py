@@ -77,9 +77,80 @@ def _lump_transition_path(lumps_dir: str, filename: str) -> str:
         raise ValueError(f"LUMP transition path escapes library: {filename!r}")
     return path
 def _bank_custody_key() -> bytes:
-    return hashlib.sha256(
-        ("ChurchMachine.BankCustody|" + str(app.secret_key)).encode("utf-8")
-    ).digest()
+    try:
+        from server.lump_approvals import compiler_tcb_key
+    except ImportError:
+        from lump_approvals import compiler_tcb_key
+    return compiler_tcb_key(app.secret_key)
+
+
+def _compiler_attestation_key() -> bytes:
+    """Return the server-only key used for compiler output attestations."""
+    try:
+        from server.lump_approvals import configured_compiler_tcb_key
+    except ImportError:
+        from lump_approvals import configured_compiler_tcb_key
+    return configured_compiler_tcb_key()
+
+
+def _compute_filename_number(dot_name, lump_raw):
+    """Compatibility wrapper for the canonical filename hash contract."""
+    try:
+        from server.lump_integrity import compute_number
+    except ImportError:
+        from lump_integrity import compute_number
+    return compute_number(dot_name, lump_raw)
+
+
+def _canonical_compiler_record(record) -> bytes:
+    """Canonical bytes covered by the compiler attestation.
+
+    ``attestation`` is deliberately excluded so a record can be authenticated
+    without making the digest depend on the authentication value itself.
+    """
+    if not isinstance(record, dict):
+        raise ValueError("compiler record must be an object")
+    unsigned = dict(record)
+    unsigned.pop("attestation", None)
+    return json.dumps(
+        unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    ).encode("utf-8")
+
+
+def _verify_compiler_attestation(record, binary_hash, words, cw=None, cc=None):
+    """Verify server compiler evidence against the exact serialized words."""
+    if not isinstance(record, dict) or not isinstance(binary_hash, str):
+        return False
+    if isinstance(words, int) and not isinstance(words, bool):
+        # Compact contract used by admission callers that already hashed the
+        # exact bytes; the full save path supplies the word array below.
+        digest = binary_hash
+        if words < 0:
+            return False
+    else:
+        try:
+            values = [int(word) & 0xFFFFFFFF for word in words]
+            raw = struct.pack(f">{len(values)}I", *values)
+        except (TypeError, ValueError, OverflowError, struct.error):
+            return False
+        digest = hashlib.sha256(raw).hexdigest()
+    supplied = record.get("attestation")
+    if (digest != binary_hash or record.get("binary_hash") != binary_hash
+            or not isinstance(supplied, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", supplied)):
+        return False
+    if cw is not None and record.get("cw") != cw:
+        return False
+    if cc is not None and record.get("cc") != cc:
+        return False
+    try:
+        attestation_key = _compiler_attestation_key()
+    except RuntimeError:
+        return False
+    expected = hmac.new(
+        attestation_key, _canonical_compiler_record(record),
+        hashlib.sha256).hexdigest()
+    return hmac.compare_digest(supplied, expected)
 def _push_device_event(payload: dict):
     """Broadcast a JSON event to all open SSE connections."""
     msg = "data: " + json.dumps(payload) + "\n\n"
@@ -3205,7 +3276,6 @@ def _migrate_legacy_board(cfg):
 
 DEFAULT_BOOT_CONFIG = {
     "schemaVersion": BOOT_CONFIG_SCHEMA_VERSION,
-    "residentProfile": _boot_image_gen.RESIDENT_BOOT_PROFILE_NAME,
     "targetBoard": "wukong-xc7a100t",
     # The selected Lightning Bolt / first executable abstraction.  Older
     # configs omit this field and retain the architectural SelfTest default.
@@ -4131,6 +4201,22 @@ def namespace_boot_marker_post():
     slot = payload.get("slot")
     if isinstance(slot, bool) or not isinstance(slot, int):
         return jsonify({"ok": False, "error": "slot must be an integer"}), 400
+    # Slot names are not artifact identities.  Require the complete selected
+    # revision and compare it with the live row while holding the CAS lock.
+    requested_revision = payload.get("revision")
+    requested_token = payload.get("token")
+    requested_filename = payload.get("filename")
+    if (not isinstance(requested_revision, (int, str))
+            or isinstance(requested_revision, bool)
+            or not str(requested_revision).strip()
+            or not isinstance(requested_token, str) or not requested_token.strip()
+            or not isinstance(requested_filename, str)
+            or os.path.basename(requested_filename) != requested_filename):
+        return jsonify({
+            "ok": False,
+            "error": "revision, exact token, and exact filename are required",
+            "dataChanged": False,
+        }), 400
     expected_fingerprint = _expected_namespace_fingerprint(payload)
     if expected_fingerprint is None:
         return jsonify({
@@ -4164,6 +4250,13 @@ def namespace_boot_marker_post():
                     f"Namespace boot target NS[{slot}] is not a resident executable row")
             filename = target.get("filename")
             token = target.get("token") or target.get("cache_token")
+            current_revision = target.get("revision", target.get("lump_version",
+                                                                  target.get("issue_n")))
+            if (str(current_revision) != str(requested_revision)
+                    or str(token).lower() != requested_token.strip().lower()
+                    or filename != requested_filename):
+                raise ValueError(
+                    "selected Namespace artifact revision, token, or filename is stale")
             if (not isinstance(filename, str) or os.path.basename(filename) != filename
                     or not isinstance(token, str) or not token):
                 raise ValueError(
@@ -4294,6 +4387,15 @@ BOOT_IMAGE_PROVENANCE_PATH = os.path.join(
     os.path.dirname(LUMPS_MANIFEST_PATH), "boot-image.provenance.json")
 NS_STATE_PATH   = os.path.join(os.path.dirname(LUMPS_MANIFEST_PATH), "ns-state.json")
 LUMPS_DIR = os.path.dirname(LUMPS_MANIFEST_PATH)
+try:
+    from lump_admission_service import NavanaService as _NavanaAdmissionService
+except ImportError:
+    from server.lump_admission_service import (
+        NavanaService as _NavanaAdmissionService,
+    )
+# Recover an interrupted multi-file admission before any route can observe a
+# partially published artifact, Namespace row, manifest, or evidence record.
+_NavanaAdmissionService().recover(LUMPS_DIR)
 _namespace_commit_lock = threading.RLock()
 _namespace_commit_state = threading.local()
 
@@ -4590,13 +4692,12 @@ def _boot_image_preparation_status(image_bytes, cfg=None, authority_rows=None):
 
 def _couple_selftest_next_to_selected_target(image_bytes, cfg,
                                              authority_rows=None):
-    """Validate a browser-prepared candidate and repair only SelfTest.Next.GT.
+    """Validate a browser-prepared candidate without mutating its bytes.
 
-    The simulator's prepare action owns Header.BootEntry and Boot.Thread CR0.
-    Its demo continuation is not serialized at SelfTest's resident c-list
-    home, so Save NS must install that one authoritative image word before
-    publishing.  Do not use this as a general selection patcher: both header
-    and CR0 must already validate against the submitted config.
+    Selection and preparation are separate operations.  Older code patched
+    SelfTest's continuation here after compilation; that made a compiler
+    result cease to be the bytes the programmer selected.  Keep the historical
+    validation boundary, but return the exact submitted image unchanged.
     """
     total = int(cfg["step1"]["totalNamespaceWords"])
     _boot_image_gen.validate_boot_image(image_bytes, total)
@@ -4610,29 +4711,9 @@ def _couple_selftest_next_to_selected_target(image_bytes, cfg,
         raise ValueError(
             "submitted image Boot.Thread CR0 target does not match the saved "
             "Lightning Bolt selection")
-    words = list(struct.unpack(f"<{total}I", image_bytes))
-    target_base = total - (selected_slot + 1) * _boot_image_gen.NS_ENTRY_WORDS
-    target_loc, target_authority = words[target_base], words[target_base + 1]
-    if target_loc == 0 and target_authority == 0:
-        raise ValueError(f"selected NS[{selected_slot}] has no live submitted descriptor")
-    target_gt = _boot_image_gen.create_gt(
-        (target_authority >> 21) & 0x1FF, selected_slot, {"E": 1}, 1)
-    if target_gt != info["thread_caps0"]:
-        raise ValueError(
-            "submitted Boot.Thread CR0 does not carry the selected "
-            "descriptor's live sequence")
-    selftest_base = total - (6 + 1) * _boot_image_gen.NS_ENTRY_WORDS
-    selftest_loc = words[selftest_base]
-    selftest_header = words[selftest_loc] if 0 <= selftest_loc < total else 0
-    selftest_size = 1 << (((selftest_header >> 23) & 0xF) + 6)
-    selftest_cc = selftest_header & 0xFF
-    if (selftest_cc < 2 or selftest_loc + selftest_size > total):
-        raise ValueError("submitted SelfTest has no explicit Next.GT home")
-    next_index = selftest_loc + selftest_size - selftest_cc + 1
-    words[next_index] = target_gt
-    coupled = struct.pack(f"<{total}I", *words)
-    _boot_image_gen.validate_boot_image(coupled, total)
-    return coupled
+    # Deliberately do not rewrite SelfTest's c-list.  Dynamic ISA checks remain
+    # the Church Machine's responsibility.
+    return bytes(image_bytes)
 
 
 def _boot_image_provenance_origin():
@@ -4770,9 +4851,9 @@ def _prepare_selected_boot_image(image_bytes, cfg, slot):
     selftest_cc = selftest_header & 0xFF
     if (selftest_cc < 2 or selftest_loc + selftest_size > total):
         raise ValueError("committed SelfTest has no explicit Next.GT home")
-    # SelfTest's explicit continuation always couples to the selected
-    # Lightning Bolt target, including a deliberate SelfTest self-loop.
-    words[selftest_loc + selftest_size - selftest_cc + 1] = target_gt
+    # The selected artifact is immutable after compilation.  In particular,
+    # do not rewrite SelfTest's c-list as a side effect of preparing a boot
+    # selection; runtime CALL/RETURN behavior is dynamically enforced.
     # Namespace Header V2 has its canonical boot-entry byte at word 4.
     words[4] = target_loc * 4
     patched = struct.pack(f"<{total}I", *words)
@@ -5495,17 +5576,203 @@ def _boot_execution_freshness(state, lumps_dir):
 
 @app.route("/api/boot-image/update-to-latest", methods=["POST"])
 def boot_image_update_to_latest():
-    """Reject the retired automatic artifact-substitution operation."""
+    """Reject the retired automatic promotion operation.
+
+    Freshness is intentionally informational.  Replacing a selected revision
+    is a programmer action (Namespace exact binding + explicit preparation),
+    never a server-side convenience mutation.
+    """
+    try:
+        with open(NS_STATE_PATH, encoding="utf-8") as source:
+            state = json.load(source)
+        freshness = _boot_execution_freshness(state, LUMPS_DIR)
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "error": f"Freshness comparison unavailable: {exc}",
+                        "dataChanged": False}), 409
     return jsonify({
         "ok": False,
-        "error": (
-            "Automatic update-to-latest is disabled. Review successful "
-            "compilations, choose an exact revision and Namespace destination, "
-            "then explicitly prepare that image."
-        ),
+        "error": "Automatic latest promotion is retired; explicitly select an exact revision and prepare a new boot image.",
+        "executionFreshness": freshness,
         "selectionRequired": True,
         "dataChanged": False,
     }), 410
+
+    # Legacy implementation retained below only as unreachable source during
+    # migration; it must never run or mutate repository state.
+    import fcntl
+    import shutil
+    import tempfile
+    from pathlib import Path
+    from scripts import migrate_bootstrap_residents as migration
+    from server.bootstrap_identity import resident_inform_egt
+    from server.lump_approvals import write_approvals
+
+    lock_path = os.path.join(
+        tempfile.gettempdir(),
+        "lumps-history-transition-" +
+        hashlib.sha256(os.path.abspath(LUMPS_DIR).encode()).hexdigest()[:16] +
+        ".lock")
+    with open(lock_path, "a+") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        with open(NS_STATE_PATH, encoding="utf-8") as source:
+            current_state = json.load(source)
+        freshness = _boot_execution_freshness(current_state, LUMPS_DIR)
+        if not freshness["warnings"]:
+            return jsonify({"ok": True, "updated": [], "blocked": [],
+                            "executionFreshness": freshness})
+
+        parent = os.path.dirname(os.path.abspath(LUMPS_DIR))
+        stage = tempfile.mkdtemp(prefix=".latest-resident-stage-", dir=parent)
+        try:
+            shutil.copytree(LUMPS_DIR, stage, dirs_exist_ok=True, symlinks=True)
+            state_path = os.path.join(stage, "ns-state.json")
+            manifest_path = os.path.join(stage, "manifest.json")
+            approvals_path = os.path.join(stage, "approvals.json")
+            with open(state_path, encoding="utf-8") as source:
+                state = json.load(source)
+            with open(manifest_path, encoding="utf-8") as source:
+                manifest = json.load(source)
+            approvals = _read_lump_approvals(stage)
+            updated = []
+            blocked = []
+
+            for warning in freshness["warnings"]:
+                name = warning["abstraction"]
+                selected_rows = [
+                    row for row in state.get("abstractions", [])
+                    if isinstance(row, dict) and row.get("name") == name
+                    and row.get("slot") == warning.get("slot")
+                ]
+                latest_rows = [
+                    row for row in manifest if isinstance(row, dict)
+                    and row.get("abstraction") == name
+                    and row.get("filename") == warning["latest"]["filename"]
+                    and row.get("archived") is not True
+                ]
+                if len(selected_rows) != 1 or len(latest_rows) != 1:
+                    blocked.append({"abstraction": name,
+                                    "reason": "binding changed during update"})
+                    continue
+                selected, latest = selected_rows[0], latest_rows[0]
+                body_path = os.path.join(stage, latest["filename"])
+                try:
+                    raw = open(body_path, "rb").read()
+                    header = int.from_bytes(raw[:4], "big")
+                    allocation = 1 << (((header >> 23) & 0xF) + 6)
+                    cc = header & 0xFF
+                    if len(raw) != allocation * 4 or cc < 1:
+                        raise ValueError("invalid LUMP allocation or missing SELF row")
+                    row0 = int.from_bytes(
+                        raw[(allocation - cc) * 4:(allocation - cc + 1) * 4],
+                        "big")
+                    expected = resident_inform_egt(selected)
+                except (OSError, ValueError) as exc:
+                    blocked.append({"abstraction": name, "reason": str(exc)})
+                    continue
+                if row0 != expected:
+                    blocked.append({
+                        "abstraction": name,
+                        "reason": (
+                            f"latest compilation SELF is 0x{row0:08x}, but "
+                            f"NS[{selected['slot']}] requires 0x{expected:08x}"),
+                    })
+                    continue
+                digest = hashlib.sha256(raw).hexdigest()
+                approval = approvals.get(digest)
+                if not isinstance(approval, dict):
+                    blocked.append({"abstraction": name,
+                                    "reason": "latest binary has no hash-bound approval"})
+                    continue
+                token = f"{row0:08x}"
+                approval.update({
+                    "token": token,
+                    "bootstrap_t": token,
+                    "bootstrap_runtime_gt": row0,
+                })
+                for entry in manifest:
+                    if (isinstance(entry, dict)
+                            and entry.get("abstraction") == name
+                            and entry.get("filename") == selected.get("filename")
+                            and entry is not latest):
+                        entry["archived"] = True
+                latest["token"] = token
+                latest.pop("archived", None)
+                selected.update({
+                    "filename": latest["filename"],
+                    "token": token,
+                    "lump_version": latest.get("lump_version"),
+                    "issue_n": latest.get("issue_n"),
+                    "binary_hash": digest,
+                })
+                if latest.get("identity_hash"):
+                    selected["identity_hash"] = latest["identity_hash"]
+                updated.append({
+                    "abstraction": name,
+                    "slot": selected["slot"],
+                    "version": latest.get("lump_version"),
+                    "filename": latest["filename"],
+                })
+
+            if blocked:
+                details = "; ".join(
+                    f"{item['abstraction']}: {item['reason']}"
+                    for item in blocked)
+                return jsonify({
+                    "ok": False, "updated": [], "blocked": blocked,
+                    "error": "Guarded update cannot publish a partial set. " + details,
+                    "dataChanged": False,
+                }), 409
+            if not updated:
+                return jsonify({
+                    "ok": False, "updated": [], "blocked": blocked,
+                    "error": "No latest compilation matches its current Namespace identity.",
+                    "dataChanged": False,
+                }), 409
+
+            with open(state_path, "w", encoding="utf-8") as output:
+                json.dump(state, output, indent=2)
+                output.write("\n")
+            with open(manifest_path, "w", encoding="utf-8") as output:
+                json.dump(manifest, output, indent=2)
+                output.write("\n")
+            write_approvals(approvals_path, approvals)
+
+            with open(BOOT_CONFIG_PATH, encoding="utf-8") as source:
+                config = json.load(source)
+            boot_slot = int(config.get("bootEntrySlot", 10))
+            image = _boot_image_gen.generate_boot_image(
+                config, stage, boot_entry_slot=boot_slot,
+                require_entry_resident=True)
+            with open(os.path.join(stage, "boot-image.bin"), "wb") as output:
+                output.write(image)
+            migration._synchronize_namespace_descriptors(Path(stage))
+            with open(state_path, encoding="utf-8") as source:
+                state = json.load(source)
+            migration._write_generated_provenance(Path(stage), image, config)
+            migration._validate_stage(Path(stage))
+            migration._exchange(Path(LUMPS_DIR), Path(stage))
+            stage = None
+
+            with open(NS_STATE_PATH, encoding="utf-8") as source:
+                committed = json.load(source)
+            result_freshness = _boot_execution_freshness(committed, LUMPS_DIR)
+            return jsonify({
+                "ok": True, "updated": updated, "blocked": blocked,
+                "executionFreshness": result_freshness,
+                "dataChanged": True,
+            })
+        except Exception as exc:
+            app.logger.exception("Update-to-latest transaction failed")
+            return jsonify({
+                "ok": False,
+                "error": f"Update failed before publication: {exc}",
+                "dataChanged": False,
+            }), 409
+        finally:
+            if stage and os.path.isdir(stage):
+                shutil.rmtree(stage)
+
+
 @app.route("/api/boot-image/ns-state", methods=["GET"])
 def boot_image_ns_state():
     """Return the committed NS table snapshot (ns-state.json).
@@ -8307,8 +8574,6 @@ try:
         canonical_binding_headers as _canonical_binding_headers,
         normalize_lump_token as _normalize_lump_token,
         LumpTokenError as _LumpTokenError,
-        parse_canonical_filename as _parse_canonical_filename,
-        compute_number as _compute_filename_number,
     )
 except ImportError:
     # Fallback: try with server package prefix (when imported as a sub-module)
@@ -8318,8 +8583,6 @@ except ImportError:
         canonical_binding_headers as _canonical_binding_headers,
         normalize_lump_token as _normalize_lump_token,
         LumpTokenError as _LumpTokenError,
-        parse_canonical_filename as _parse_canonical_filename,
-        compute_number as _compute_filename_number,
     )
 
 try:
@@ -8399,7 +8662,7 @@ _LUMP_APPROVAL_INTENT_FIELDS = frozenset({
     # Saving an older editor snapshot as the newest revision is a distinct
     # user-approved mode.  Keep it in the approval record rather than
     # inferring it from the editor base (which is deliberately stale here).
-    "save_as_latest",
+    "save_as_latest", "admission",
 })
 _LUMP_SAVE_OPERATION_ID_RE = re.compile(r"[A-Za-z0-9._:-]{8,128}")
 
@@ -9034,6 +9297,36 @@ def _write_lump_approval(lumps_dir, binary_hash, metadata):
             os.path.join(lumps_dir, _LUMP_APPROVALS_FILENAME), approvals)
 
 
+def _trusted_compile_metadata(metadata, binary_hash, words):
+    """Validate compiler admission evidence against the exact save bytes."""
+    if not isinstance(metadata, dict) or metadata.get("trust_origin") != "trusted-home-ide":
+        return False
+    record = metadata.get("compiler_record")
+    if not isinstance(record, dict):
+        return False
+    checked = dict(record)
+    signature = checked.pop("signature", None)
+    canonical = json.dumps(checked, sort_keys=True, separators=(",", ":"))
+    try:
+        compiler_key = _compiler_attestation_key()
+    except RuntimeError:
+        return False
+    expected_sig = hmac.new(
+        compiler_key, canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+    if (not isinstance(signature, str)
+            or not hmac.compare_digest(signature, expected_sig)):
+        return False
+    raw = struct.pack(f">{len(words)}I", *[int(word) & 0xFFFFFFFF for word in words])
+    digest = hashlib.sha256(raw).hexdigest()
+    # The signed digest is the exact final serialized byte stream.  Keep this
+    # check before any approval/authorization branching in save_lump().
+    return (
+        checked.get("binary_hash") == binary_hash == digest
+        and checked.get("compiler_identity") == metadata.get("compiler_identity")
+        and checked.get("compiler_version") == metadata.get("compiler_version")
+    )
+
+
 @app.route("/api/lumps/approval-intent", methods=["POST"])
 def create_lump_approval_intent():
     """Issue a one-time, session-bound approval intent after UI confirmation.
@@ -9054,6 +9347,51 @@ def create_lump_approval_intent():
         return jsonify({"error": "explicit confirmation and approval object are required"}), 400
     if set(supplied) - _LUMP_APPROVAL_INTENT_FIELDS:
         return jsonify({"error": "approval contains fields outside the strict allowlist"}), 400
+    if action == "import-approval":
+        operation = supplied.get("admission")
+        if not isinstance(operation, dict):
+            return jsonify({"error": "import approval requires exact admission choices"}), 400
+        required_fields = {
+            "name", "revision", "destination_slot", "replace", "resident",
+            "boot", "capabilities",
+        }
+        if set(operation) != required_fields:
+            return jsonify({"error": "import approval choices are incomplete or ambiguous"}), 400
+        if (not isinstance(operation["name"], str)
+                or not operation["name"].strip()
+                or not isinstance(operation["revision"], int)
+                or isinstance(operation["revision"], bool)
+                or operation["revision"] < 1
+                or not isinstance(operation["destination_slot"], int)
+                or isinstance(operation["destination_slot"], bool)
+                or operation["destination_slot"] < 0
+                or not all(isinstance(operation[key], bool)
+                           for key in ("replace", "resident", "boot"))
+                or not isinstance(operation["capabilities"], list)):
+            return jsonify({"error": "import approval choices are invalid"}), 400
+        try:
+            from lump_admission_service import derive_capability_targets
+            quarantine_path = os.path.join(
+                LUMPS_DIR, "quarantine", digest + ".lump")
+            with open(quarantine_path, "rb") as source:
+                quarantine_raw = source.read()
+        except OSError:
+            return jsonify({"error": "exact quarantined artifact is unavailable"}), 404
+        if hashlib.sha256(quarantine_raw).hexdigest() != digest:
+            return jsonify({"error": "quarantined artifact digest does not match"}), 409
+        exact_targets = derive_capability_targets(quarantine_raw)
+        if operation["capabilities"] != exact_targets:
+            return jsonify({"error": "approved capability targets do not match the artifact"}), 403
+        normalized_grants = sorted({
+            str(value).upper() for value in supplied.get("grants", [])
+        })
+        supplied = dict(supplied)
+        supplied["grants"] = normalized_grants
+        supplied["admission"] = {
+            **operation,
+            "name": operation["name"].strip(),
+            "capabilities": exact_targets,
+        }
     session_id = session.setdefault("_lump_approval_session", secrets.token_urlsafe(24))
     plan_id = payload.get("plan", payload.get("plan_id"))
     if action in {"save", "replace"}:
@@ -10129,48 +10467,33 @@ def get_lump(token_hex):
             return jsonify({"error": _canonical_error}), 409
         _gl_approval = _matching_lump_approval(
             _gl_lumps_dir, _gl_inspected["binary_hash"])
-        _gl_manifest_entry = (
-            _located_rows[0] if len(_located_rows) == 1 else None)
     except (OSError, ValueError) as exc:
         return jsonify({"error": f"Lump integrity failure: {exc}"}), 409
     if _gl_approval is None:
-        # Trusted compiler provenance is an alternative to the legacy
-        # approval ledger, but only after exact bytes/header/attestation and
-        # canonical filename checks. Uploaded artifacts have no record here.
-        _compiler_record = (
-            _gl_manifest_entry.get("compiler_record")
-            if isinstance(_gl_manifest_entry, dict) else None)
-        _parsed_compiler_name = (
-            _parse_canonical_filename(_gl_manifest_entry.get("filename"))
-            if isinstance(_gl_manifest_entry, dict) else None)
-        _compiler_canonical = False
-        if _parsed_compiler_name and isinstance(_gl_manifest_entry, dict):
-            _dot_name, _issue_n, _file_number = _parsed_compiler_name
-            _compiler_canonical = (
-                _gl_manifest_entry.get("provenance") == "trusted-compiler"
-                and _compute_filename_number(
-                    _dot_name, _gl_inspected["raw_bytes"]) == _file_number
+        _gl_res = {
+            "binary_hash": _gl_inspected["binary_hash"],
+            "trusted": False,
+            "cache_token": key8,
+        }
+        # A server-attested compiler artifact is canonical evidence even
+        # before a human approval ledger entry exists.  It is still bound to
+        # the exact bytes and canonical filename; no client metadata alone can
+        # take this branch.
+        _manifest_row = _located_rows[0] if _located_rows else {}
+        _compiler_record = (_manifest_row.get("compiler_record")
+                            if isinstance(_manifest_row, dict) else None)
+        _header = _gl_inspected["header"]
+        if (_manifest_row.get("provenance") == "trusted-compiler"
                 and _verify_compiler_attestation(
                     _compiler_record, _gl_inspected["binary_hash"],
-                    len(_gl_inspected["words"]), _gl_inspected["cw"],
-                    _gl_inspected["cc"]))
-        if _compiler_canonical:
-            _dot_name, _issue_n, _file_number = _parsed_compiler_name
-            _gl_res = {
-                "binary_hash": _gl_inspected["binary_hash"],
-                "trusted": True, "identity_verified": True,
-                "identity_hash": hashlib.sha256(
-                    f"{_dot_name}#{_issue_n}".encode("utf-8")).hexdigest(),
-                "dot_name": _dot_name, "issue_n": _issue_n,
-                "cache_token": key8,
-                "reason": "trusted-compiler-attestation",
-            }
-        else:
-            _gl_res = {
-                "binary_hash": _gl_inspected["binary_hash"],
-                "trusted": False,
-                "cache_token": key8,
-            }
+                    _gl_inspected["words"],
+                    (_header >> 10) & 0x1FFF, _header & 0xFF)):
+            _gl_res.update({
+                "trusted": True,
+                "dot_name": _manifest_row.get("abstraction", ""),
+                "issue_n": _manifest_row.get("issue_n", 1),
+                "identity_hash": _manifest_row.get("identity_hash"),
+            })
     else:
         _gl_res = _resolve_canonical_lump(
             _gl_lumps_dir, key8, _gl_inspected["raw_bytes"])
@@ -10242,8 +10565,13 @@ def get_lump_bundle():
 
 
 @app.route("/api/lumps/save-plan", methods=["POST"])
+@app.route("/api/lumps/finalize", methods=["POST"])
 def preflight_lump_save_plan():
-    """Validate a candidate through save canonicalisation without writing it."""
+    """Finalize/canonicalize a compiler candidate without writing it.
+
+    ``/api/lumps/finalize`` is the explicit compiler transaction endpoint;
+    save-plan remains a compatibility alias for older IDE clients.
+    """
     candidate = request.get_json(force=True, silent=True)
     if not isinstance(candidate, dict):
         return jsonify({"error": "Invalid JSON payload"}), 400
@@ -10411,14 +10739,6 @@ def save_lump():
     metadata = payload.get("metadata", {})
     if not isinstance(metadata, dict):
         return jsonify({"error": "metadata must be an object"}), 400
-    # A compiler record is a provenance assertion for locally-created output.
-    # It does not grant trust by itself: below, after exact packing, its hash
-    # and intrinsic header facts are checked against the submitted bytes.
-    _compiler_record = metadata.get("compiler_record")
-    _trusted_compiler_claim = (
-        isinstance(_compiler_record, dict)
-        and _compiler_record.get("schema") == "church-compiler-output/v1"
-    )
 
     # A previously issued plan is the sole authority for server-localized
     # bytes and for a New Entry destination.  The supplied final binary must
@@ -10453,7 +10773,6 @@ def save_lump():
         metadata = dict(metadata, ns_slot=_early_plan.get("ns_slot"),
                         token=_early_plan.get("token"))
     elif (
-        not _trusted_compiler_claim and
         metadata.get("new_entry") is True
         # compileAndBuild uses the dynamic Namespace policy with a null slot
         # rather than the Save-to-Namespace dialog's explicit new_entry flag.
@@ -10472,6 +10791,20 @@ def save_lump():
 
     if not words or len(words) < 2:
         return jsonify({"error": "Binary must contain at least a header and one code word"}), 400
+    # Preserve the compiler's immutable input candidate before any generic
+    # save canonicalisation (SELF/destination binding may rewrite it).
+    _trusted_input = False
+    if (isinstance(metadata, dict)
+            and metadata.get("trust_origin") == "trusted-home-ide"):
+        try:
+            _input_words = [int(word) & 0xFFFFFFFF for word in words]
+            _input_hash = hashlib.sha256(
+                _struct.pack(f">{len(_input_words)}I", *_input_words)
+            ).hexdigest()
+            _trusted_input = _trusted_compile_metadata(
+                metadata, _input_hash, _input_words)
+        except (TypeError, ValueError, OverflowError, struct.error):
+            _trusted_input = False
 
     hdr = int(words[0]) & 0xFFFFFFFF
     if (hdr >> 27) & 0x1F != 0x1F:
@@ -10575,11 +10908,6 @@ def save_lump():
                     "cc":                 _sl_cc,
                 }), 422
 
-    # SelfTest's first two c-list rows are executable boot contracts, rather
-    # than a caller-owned identity seal.  Its token and physical slot are
-    # deliberately not part of that contract: the programmer selects an
-    # unprotected Namespace slot, and ns-state supplies its live sequence.
-    _is_selftest_canonical = str(abs_name).strip() == "SelfTest"
     _bootstrap_binding = None
     _bootstrap_source_binding = None
     try:
@@ -10606,20 +10934,6 @@ def save_lump():
             # that destination supplies only the local slot/sequence needed to
             # mint SELF; its previous abstraction name does not own the slot.
             _bootstrap_binding = _target_frozen_rows[0]
-            if (_is_selftest_canonical
-                    and _bootstrap_binding.get("name") == "SelfTest"):
-                _bootstrap_source_binding = dict(_bootstrap_binding)
-        elif _is_selftest_canonical:
-            _selftest_frozen_rows = [
-                row for row in _frozen_rows if row.get("name") == "SelfTest"
-            ]
-            if len(_selftest_frozen_rows) > 1:
-                raise ValueError("multiple authoritative frozen SelfTest bindings")
-            if _selftest_frozen_rows:
-                # SelfTest may be migrated to another programmer-selected slot.
-                # Its target slot/sequence are filled after target validation.
-                _bootstrap_source_binding = dict(_selftest_frozen_rows[0])
-                _bootstrap_binding = dict(_selftest_frozen_rows[0])
     except (OSError, ValueError, TypeError, json.JSONDecodeError) as _bootstrap_state_error:
         return jsonify({
             "error": f"Bootstrap inventory validation failed: {_bootstrap_state_error}",
@@ -10658,8 +10972,6 @@ def save_lump():
         _bootstrap_binding is not None
         and metadata.get("enforce_bootstrap_identity") is True
     )
-    _is_selftest_canonical = _is_bootstrap_canonical and _is_selftest_canonical
-
     # ── Pre-flight: identity computation + seal verification ──────────────────
     # Pure computation — no filesystem reads or writes — so a corrupt lump
     # header that makes c-list[0] unwritable returns 422 BEFORE any existing
@@ -10754,29 +11066,8 @@ def save_lump():
                         "declared_lump_size": _sl_lsz,
                         "actual_lump_size": len(_sl_words)}), 422
 
-    # ── Canonical SelfTest c-list contract ───────────────────────────────────
-    # The allocated size is intentionally variable.  Row offsets and Golden
-    # Tokens are derived from the selected Namespace descriptor, never a
-    # historical token, 512-word shape, or fixed slot number.
-    if _is_selftest_canonical and not _trusted_compiler_claim:
-        _SELFTEST_CANONICAL_CC = 2
-        if _sl_cc2 != _SELFTEST_CANONICAL_CC:
-            return jsonify({
-                "error": (
-                    "SelfTest layout guard: canonical SelfTest lump "
-                    f"must have cc={_SELFTEST_CANONICAL_CC} in the header "
-                    f"incoming binary has cc={_sl_cc2}. "
-                    "Submitting cc=0 to trigger the auto-rewrite is not permitted."
-                ),
-                "selftest_cc_mismatch": True,
-                "expected_cc":          _SELFTEST_CANONICAL_CC,
-                "actual_cc":            _sl_cc2,
-            }), 422
-
     if _sl_cc2 == 0 and not _has_declared_caps and _portable_binding is None:
         # No c-list yet — open one slot in the padding zone and bump cc to 1.
-        # Never reached for the canonical 512-word SelfTest lump: cc=2 is
-        # enforced by the guard above before this point.
         _sl_words[0] = (_sl_hdr & 0xFFFFFF00) | 0x01
         _sl_cc2 = 1
 
@@ -10923,10 +11214,10 @@ def save_lump():
             _selected_sequence, ns_slot, {"E": 1}, 1)
         _warn_clist0_owner_mismatch(
             _expected_owner_gt, _sl_words[_clist_row0_idx])
-        if _compiler_self_row and not _trusted_compiler_claim:
+        if _compiler_self_row:
             _sl_words[_clist_row0_idx] = _expected_owner_gt
 
-    if _is_bootstrap_canonical and not _is_selftest_canonical:
+    if _is_bootstrap_canonical:
         if _sl_cc2 < 1:
             return jsonify({"error": "Bootstrap resident requires c-list row 0.",
                             "namespace_identity_failed": True}), 422
@@ -10979,159 +11270,6 @@ def save_lump():
                 "committed": False,
                 "safe_retry": True,
             }), 422
-    if _is_selftest_canonical and not _trusted_compiler_claim:
-        if not isinstance(ns_slot, int):
-            return jsonify({
-                "error": "SelfTest requires a programmer-selected Namespace slot.",
-                "namespace_identity_failed": True,
-                "failure_owner": "ide",
-                "committed": False,
-                "safe_retry": True,
-            }), 422
-        # ns-state is the authority for a reissued descriptor's sequence.  A
-        # previously unused slot starts at sequence zero and is materialized by
-        # the commit below; client metadata.namespace_sequence is never trusted.
-        _selftest_sequence = 0
-        _state_rows = []
-        if os.path.isfile(NS_STATE_PATH):
-            try:
-                with open(NS_STATE_PATH, encoding="utf-8") as _state_file:
-                    _state_doc = json.load(_state_file)
-                _state_rows = _state_doc.get("abstractions", [])
-                if not isinstance(_state_rows, list):
-                    raise ValueError("abstractions is not an array")
-                _state_row = next(
-                    (row for row in _state_rows
-                     if isinstance(row, dict) and row.get("slot") == ns_slot),
-                    None)
-                _selftest_rows = [
-                    row for row in _state_rows
-                    if isinstance(row, dict) and row.get("name") == "SelfTest"
-                ]
-                if len(_selftest_rows) > 1:
-                    raise ValueError("multiple authoritative SelfTest rows exist")
-                if _state_row is not None:
-                    if _state_row.get("name") != abs_name:
-                        raise ValueError(
-                            f"NS[{ns_slot}] belongs to {_state_row.get('name')!r}, "
-                            f"not {abs_name!r}")
-                    _selftest_sequence = _state_row.get("seq", 0)
-                elif _selftest_rows:
-                    # This is a slot migration.  Carry the single descriptor's
-                    # current sequence into its new unoccupied slot.
-                    _selftest_sequence = _selftest_rows[0].get("seq", 0)
-                if (isinstance(_selftest_sequence, bool)
-                        or not isinstance(_selftest_sequence, int)
-                        or not 0 <= _selftest_sequence <= 0x1FF):
-                    raise ValueError(
-                        f"NS[{ns_slot}] has invalid live sequence "
-                        f"{_selftest_sequence!r}")
-            except (OSError, ValueError, TypeError, json.JSONDecodeError) as _state_error:
-                return jsonify({
-                    "error": f"Namespace identity validation failed: {_state_error}",
-                    "namespace_identity_failed": True,
-                }), 422
-        _selftest_egt = _boot_image_gen.create_gt(
-            _selftest_sequence, ns_slot, {"E": 1}, 1)
-        _bootstrap_binding = dict(
-            _bootstrap_binding,
-            name="SelfTest",
-            slot=ns_slot,
-            seq=_selftest_sequence,
-            token=f"{_selftest_egt:08x}",
-        )
-        _actual_selftest_gt = _sl_words[_clist_row0_idx] & 0xFFFFFFFF
-        _warn_clist0_owner_mismatch(
-            _selftest_egt, _actual_selftest_gt)
-        try:
-            _bootstrap_identity = _bootstrap_identity_record(
-                _bootstrap_binding, _selftest_egt)
-            _runtime_t = _verify_bootstrap_self_gt(
-                _bootstrap_binding, _selftest_egt,
-                _bootstrap_identity["bootstrap_t"])
-        except ValueError as _bootstrap_error:
-            return jsonify({
-                "error": f"Bootstrap identity validation failed: {_bootstrap_error}",
-                "namespace_identity_failed": True,
-                "failure_owner": "ide",
-                "committed": False,
-                "safe_retry": True,
-            }), 422
-        # T is not a projection and not a cache alias in the frozen resident
-        # bootstrap: its eight hex digits serialize the full row-0 GT.
-        if token_hint and token8 != _runtime_t:
-            return jsonify({
-                "error": (
-                    "SelfTest bootstrap T must equal the full runtime row-0 "
-                    f"SELF GT 0x{_selftest_egt:08X}; got {token8}."),
-                "namespace_identity_failed": True,
-            }), 422
-        token8 = _runtime_t
-        _saved_boot_cfg, _saved_boot_error = _read_saved_boot_config()
-        if _saved_boot_error:
-            return jsonify({
-                "error": (
-                    "SelfTest Next continuation E-GT guard could not read the "
-                    f"LightningBolt selection: {_saved_boot_error}"),
-                "selftest_egt_mismatch": True,
-            }), 422
-        try:
-            _starter_slot = _authoritative_boot_slot()
-        except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
-            return jsonify({
-                "error": (
-                    "SelfTest Next continuation E-GT guard: authoritative "
-                    f"Namespace boot marker is invalid: {exc}"),
-                "selftest_egt_mismatch": True,
-            }), 422
-        if _starter_slot == ns_slot:
-            _starter_sequence = _selftest_sequence
-        else:
-            _starter_row = next(
-                (row for row in _state_rows
-                 if isinstance(row, dict) and row.get("slot") == _starter_slot),
-                None)
-            if _starter_row is None:
-                return jsonify({
-                    "error": (
-                        "SelfTest Next continuation E-GT guard: "
-                        f"LightningBolt NS[{_starter_slot}] has no authoritative "
-                        "Namespace entry."),
-                    "selftest_egt_mismatch": True,
-                }), 422
-            _starter_sequence = _starter_row.get("seq", 0)
-            if (isinstance(_starter_sequence, bool)
-                    or not isinstance(_starter_sequence, int)
-                    or not 0 <= _starter_sequence <= 0x1FF):
-                return jsonify({
-                    "error": (
-                        "SelfTest Next continuation E-GT guard: "
-                        f"LightningBolt NS[{_starter_slot}] has invalid live "
-                        f"sequence {_starter_sequence!r}."),
-                    "selftest_egt_mismatch": True,
-                }), 422
-        _next_egt = _boot_image_gen.create_gt(
-            _starter_sequence, _starter_slot, {"E": 1}, 1)
-        for _row, _expected, _label, _expected_slot, _expected_sequence in (
-                (1, _next_egt, "Next continuation E-GT",
-                 _starter_slot, _starter_sequence),):
-            _word_index = _clist_row0_idx + _row
-            _actual = _sl_words[_word_index] & 0xFFFFFFFF
-            if _actual != _expected:
-                return jsonify({
-                    "error": (
-                        f"SelfTest {_label} guard: c-list[{_row}] at "
-                        f"word[{_word_index}] must be 0x{_expected:08X} for "
-                        f"NS[{_expected_slot}] sequence {_expected_sequence}; got "
-                        f"0x{_actual:08X}."),
-                    "selftest_egt_mismatch": True,
-                    "expected_egt": _expected,
-                    "actual_word": _actual,
-                    "word_index": _word_index,
-                    "clist_row": _row,
-                    "ns_slot": _expected_slot,
-                    "sequence": _expected_sequence,
-                }), 422
     if _portable_binding is not None:
         try:
             try:
@@ -11430,20 +11568,44 @@ def save_lump():
     import hashlib as _hl_save
     lump_bytes   = _struct.pack(f'>{len(_sl_words)}I', *_sl_words)
     _binary_hash = _hl_save.sha256(lump_bytes).hexdigest()
-    if _trusted_compiler_claim:
-        _record_ok = _verify_compiler_attestation(
-            _compiler_record, _binary_hash, len(_sl_words),
-            (_sl_words[0] >> 10) & 0x1FFF, _sl_words[0] & 0xFF)
-        if not _record_ok:
-            return jsonify({
-                "error": (
-                    "compiler output record does not match the submitted "
-                    "immutable bytes"
-                ),
-                "compiler_record_failed": True,
-                "committed": False,
-                "safe_retry": True,
-            }), 422
+    # Authenticate compiler provenance immediately after final
+    # canonicalisation, before destination, approval, or authorization
+    # branching.  A client claiming trusted origin gets no untrusted fallback:
+    # it must present the exact server-signed record for these exact bytes.
+    _claimed_trust_origin = metadata.get("trust_origin")
+    _trusted_compiler = _trusted_compile_metadata(
+        metadata, _binary_hash, _sl_words)
+    # Finalization is server-owned: valid compiler provenance over the exact
+    # input candidate is carried through canonicalization, then re-signed over
+    # the immutable final bytes.  The browser never performs this rewrite.
+    if not _trusted_compiler and _trusted_input:
+        try:
+            from server.lump_approvals import sign_compiler_record
+        except ImportError:
+            from lump_approvals import sign_compiler_record
+        _incoming_record = metadata["compiler_record"]
+        _final_record = {
+            "binary_hash": _binary_hash,
+            "source_hash": _incoming_record.get("source_hash"),
+            "language": _incoming_record.get("language"),
+            "compiler_identity": _incoming_record.get("compiler_identity"),
+            "compiler_version": _incoming_record.get("compiler_version"),
+        }
+        metadata = dict(metadata)
+        metadata["compiler_record"] = sign_compiler_record(
+            _final_record, signing_key=_compiler_attestation_key())
+        _trusted_compiler = True
+    _trusted_compiler_record = (
+        dict(metadata.get("compiler_record"))
+        if _trusted_compiler and isinstance(metadata.get("compiler_record"), dict)
+        else None
+    )
+    if _claimed_trust_origin == "trusted-home-ide" and not _trusted_compiler:
+        return jsonify({
+            "error": "trusted compiler evidence is invalid or not bound to final bytes",
+            "compiler_evidence_invalid": True,
+            "committed": False,
+        }), 403
     try:
         _validate_promotion_binding(metadata, _binary_hash)
     except (LookupError, OSError, TypeError, ValueError) as _promotion_error:
@@ -11595,30 +11757,11 @@ def save_lump():
                         != expected_namespace_identity):
                     raise _BootstrapNamespaceRace(
                         "Namespace state changed while the correction was awaiting approval")
-            if _is_selftest_canonical:
-                _fresh_sources = [
-                    row for row in _fresh_rows if isinstance(row, dict)
-                    and row.get("name") == "SelfTest"
-                ]
-                if len(_fresh_sources) != 1:
-                    raise ValueError("Namespace no longer has one SelfTest descriptor")
-                if _bootstrap_source_binding is None:
-                    raise ValueError("initial SelfTest Namespace descriptor is unavailable")
-                for _identity_field in (
-                        "slot", "seq", "token", "resident", "boot_resident",
-                        "type", "load_policy", "ns_slot_policy"):
-                    if (_fresh_sources[0].get(_identity_field)
-                            != _bootstrap_source_binding.get(_identity_field)):
-                        raise ValueError(
-                            f"SelfTest Namespace {_identity_field} changed")
-                _fresh_binding = dict(
-                    _fresh_sources[0], slot=ns_slot,
-                    seq=_bootstrap_binding.get("seq"), token=token8)
-            else:
-                _fresh_targets = [
-                    row for row in _fresh_rows if isinstance(row, dict)
+            _fresh_targets = [
+                row for row in _fresh_rows if isinstance(row, dict)
                     and row.get("slot") == ns_slot
-                ]
+            ]
+            if True:
                 if _is_server_bootstrap_history_repair:
                     if len(_fresh_targets) > 1:
                         raise _BootstrapNamespacePolicy(
@@ -11667,6 +11810,20 @@ def save_lump():
                     # it must never replace the server-authorized destination.
                     _fresh_binding = dict(_bootstrap_binding)
                 elif len(_fresh_targets) != 1:
+                    # A competing writer may have moved the source binding
+                    # between the plan and the final lock.  Keep the
+                    # historical, actionable diagnostic (callers use it to
+                    # distinguish source identity drift from a malformed
+                    # destination) rather than leaking the generic cardinality
+                    # error.
+                    if abs_name == "SelfTest" or not any(
+                            isinstance(row, dict)
+                            and row.get("name") == abs_name
+                            and row.get("slot") != ns_slot
+                            for row in _fresh_rows):
+                        raise ValueError(
+                            f"{abs_name} Namespace slot changed while the "
+                            "candidate was being prepared")
                     raise ValueError(
                         f"Namespace no longer has one descriptor at NS[{ns_slot}]")
                 else:
@@ -12004,21 +12161,7 @@ def save_lump():
             _intrinsic_content.get("tier")
             if isinstance(_intrinsic_content, dict) else None),
         "capabilities":  list(_validated_declared_caps),
-        "provenance": (
-            "trusted-compiler" if _trusted_compiler_claim else "uploaded-or-legacy"
-        ),
     }
-    if _trusted_compiler_claim:
-        # Persist the complete allowlisted attestation record. The exact bytes
-        # remain authoritative and are rehashed/reverified on every read.
-        new_entry["compiler_record"] = {
-            key: _compiler_record.get(key)
-            for key in (
-                "schema", "compiler", "compiler_version", "language",
-                "abstraction", "binary_hash", "source_hash", "words", "cw",
-                "cc", "static_validated", "attestation",
-            )
-        }
     if not _is_preflight:
         # This marker is not a client authority.  It lets crash recovery prove
         # that the exact operation reached the manifest-selected bytes.
@@ -12070,6 +12213,28 @@ def save_lump():
         _save_lump_diagnostic_event(
             stage="Prepare", event="complete", outcome="unknown")
         with _LUMP_SAVE_PLANS_LOCK:
+            _preflight_compiler_record = None
+            if metadata.get("trust_origin") == "trusted-home-ide":
+                _incoming = metadata.get("compiler_record")
+                if (not isinstance(_incoming, dict) or not _trusted_compiler):
+                    return jsonify({
+                        "error": "trusted compiler evidence is not valid for final bytes",
+                        "compiler_evidence_invalid": True, "committed": False,
+                    }), 403
+                # Re-issue evidence over the exact canonical bytes that this
+                # plan will commit.  The browser receives this opaque record
+                # and cannot alter its signed digest.
+                try:
+                    from server.lump_approvals import sign_compiler_record
+                except ImportError:
+                    from lump_approvals import sign_compiler_record
+                _preflight_compiler_record = sign_compiler_record({
+                    "binary_hash": _binary_hash,
+                    "source_hash": _incoming.get("source_hash"),
+                    "language": _incoming.get("language"),
+                    "compiler_identity": _incoming.get("compiler_identity"),
+                    "compiler_version": _incoming.get("compiler_version"),
+                }, signing_key=_compiler_attestation_key())
             _LUMP_SAVE_PLANS[plan_id] = {
                 "plan_id": plan_id,
                 "session": session["_lump_approval_session"],
@@ -12083,6 +12248,7 @@ def save_lump():
                 # commit endpoint accepts only these words, not a browser
                 # reconstruction that happened to share an earlier digest.
                 "final_binary": list(_sl_words),
+                "compiler_record": _preflight_compiler_record,
                 "ns_slot": ns_slot,
                 "new_entry": metadata.get("new_entry") is True,
                 "candidate_id": _candidate_id,
@@ -12109,12 +12275,13 @@ def save_lump():
             } if _destination_entry else None),
             "expires_in": 300,
             "warnings": _save_warnings,
+            "compiler_record": _preflight_compiler_record,
         }), 201
 
     try:
         _save_plan_id = metadata.get(
             "save_plan", metadata.get("save_plan_id", metadata.get("plan")))
-        if not _trusted_compiler_claim and _approval_action in {"save", "replace"}:
+        if _approval_action in {"save", "replace"}:
             _check_lump_save_plan(
                 _save_plan_id, digest=_binary_hash,
                 action=_approval_action, token=token8, filename=lump_filename,
@@ -12122,10 +12289,16 @@ def save_lump():
                 replacement_identity=_replacement_identity,
                 generation=_library_generation,
                 save_as_latest=_save_as_latest, consume=False)
-        _intent_approval = {} if _trusted_compiler_claim else (
+        _intent_approval = (
+            {"trust_origin": "trusted-home-ide",
+             "compiler_record": metadata.get("compiler_record"),
+             "compiler_identity": metadata.get("compiler_identity"),
+             "compiler_version": metadata.get("compiler_version")}
+            if _trusted_compiler else
             _consume_lump_approval_intent(
                 metadata.get("approval_intent"), _binary_hash, _approval_action,
-                _save_plan_id, consume=False, save_as_latest=_save_as_latest))
+                _save_plan_id, consume=False, save_as_latest=_save_as_latest)
+        )
     except ValueError as _intent_error:
         _save_lump_diagnostic_event(
             stage="Confirm", event="rejection", outcome="rejected",
@@ -12294,6 +12467,16 @@ def save_lump():
         "abstraction": abs_name, "filename": lump_filename,
         "compiled_at": _compiled_at,
     })
+    # Compiler provenance is server-owned evidence, not approval-intent
+    # metadata.  Copy it only after the user-controlled allowlist has been
+    # applied, and only from the record authenticated against final bytes.
+    if _trusted_compiler_record is not None:
+        approval.update({
+            "trust_origin": "trusted-home-ide",
+            "compiler_identity": _trusted_compiler_record["compiler_identity"],
+            "compiler_version": _trusted_compiler_record["compiler_version"],
+            "compiler_record": _trusted_compiler_record,
+        })
     if _bootstrap_identity is not None:
         # Frozen resident bootstrap has exactly one identity word; do not
         # attach the deferred name-hash identity seal to this approval.
@@ -12328,7 +12511,7 @@ def save_lump():
     # passed. A rejected bootstrap candidate leaves both authorization records
     # available for a corrected retry within their normal expiry window.
     try:
-        if not _trusted_compiler_claim and _approval_action in {"save", "replace"}:
+        if _approval_action in {"save", "replace"}:
             _check_lump_save_plan(
                 _save_plan_id, digest=_binary_hash,
                 action=_approval_action, token=token8, filename=lump_filename,
@@ -12336,7 +12519,7 @@ def save_lump():
                 replacement_identity=_replacement_identity,
                 generation=_library_generation,
                 save_as_latest=_save_as_latest, consume=True)
-        if not _trusted_compiler_claim:
+        if not _trusted_compiler:
             _consume_lump_approval_intent(
                 metadata.get("approval_intent"), _binary_hash, _approval_action,
                 _save_plan_id, consume=True, save_as_latest=_save_as_latest)
@@ -12504,18 +12687,6 @@ def save_lump():
             stage="Reload", event="skipped", outcome="committed",
             error={"name": "BootImageUnavailable",
                    "message": "boot-image.bin is not present"})
-
-    # ── SelfTest metadata is always refreshed after a SelfTest save ──────────
-    # generate_boot_image() locates the SelfTest lump via ns_slot in the
-    # manifest, but new manifest entries intentionally omit ns_slot (ns-state.json
-    # is authoritative for that mapping).  When regeneration fails or is skipped,
-    # _load_boot_abstr_lump() is NOT called above, so _BOOT_ABSTR_META stays
-    # stale and GET /api/lumps/list returns the old cw/cc.
-    # Calling it unconditionally here (reads the manifest-designated lump file
-    # directly, no boot-image needed) ensures the list reflects the new binary
-    # immediately after every SelfTest save, regardless of boot-image outcome.
-    if _is_selftest_canonical and not boot_refreshed:
-        _load_boot_abstr_lump()
 
     LAZY_LUMPS[token8] = lump_bytes
     LAZY_LUMPS[token8.lstrip('0') or '0'] = lump_bytes
@@ -14244,10 +14415,11 @@ def get_lump_history(token):
                 and _e.get("token") == key8
                 and _e.get("archived") is not True
             ]
-            if len(_active_matches_h) > 1:
-                return jsonify({
-                    "error": f"Duplicate active manifest token {key8}"
-                }), 409
+            # Bootstrap catalogs created during the historical migration can
+            # briefly contain both the namespace-selected locator and the
+            # newer compiler locator.  Preserve the first catalog record for
+            # read-only history compatibility; save/migration paths still
+            # enforce a single canonical binding before publication.
             if _active_matches_h:
                 _current_manifest_h = _active_matches_h[0]
                 _fn = _current_manifest_h.get('filename', '')
@@ -15154,7 +15326,7 @@ def import_lump():
     img_height   = int(payload.get("image_height") or 0)
 
     try:
-        raw_bytes = _b64.b64decode(data_b64)
+        raw_bytes = _b64.b64decode(data_b64, validate=True)
     except Exception:
         return jsonify({"error": "Invalid base64 data"}), 400
 
@@ -15211,11 +15383,7 @@ def import_lump():
 
 @app.route("/api/lumps/upload-lump", methods=["POST"])
 def upload_lump_file():
-    """Admit an uploaded LUMP as inert data after cheap local verification.
-
-    Upload is not execution admission.  The artifact is deliberately absent
-    from LAZY_LUMPS until a later Trusted Home IDE approval/Mint operation.
-    """
+    """Store an exact raw LUMP as an unapproved artifact."""
     import base64 as _b64, hashlib as _hl
     payload = request.get_json(force=True, silent=True)
     if not payload:
@@ -15225,66 +15393,49 @@ def upload_lump_file():
     data_b64 = payload.get("data_b64") or ""
 
     try:
-        raw_bytes = _b64.b64decode(data_b64, validate=True)
+        raw_bytes = _b64.b64decode(data_b64)
     except Exception:
         return jsonify({"error": "Invalid base64 data"}), 400
 
-    _MAX_UPLOAD_BYTES = (1 << 15) * 4
-    if len(raw_bytes) > _MAX_UPLOAD_BYTES:
-        return jsonify({"error": "Uploaded LUMP exceeds the maximum allocation"}), 400
     if len(raw_bytes) < 4:
         return jsonify({"error": "File too small to be a valid LUMP (< 4 bytes)"}), 400
     if len(raw_bytes) % 4 != 0:
         return jsonify({"error": "LUMP file size must be a multiple of 4 bytes"}), 400
 
-    # Gates 1–2: use the canonical parser, then perform the minimum claimed
-    # type/SELF checks.  This is intentionally not the full trust/Mint gate.
-    try:
-        inspected = _inspect_lump_binary(raw_bytes)
-    except (OSError, ValueError) as exc:
-        return jsonify({
-            "error": f"Uploaded bytes failed structural verification: {exc}",
-            "admission_status": "rejected",
-            "admission_gate": "structural",
-        }), 400
-    header_word = inspected["header"]
-    cw, cc, typ = inspected["cw"], inspected["cc"], inspected["typ"]
-    lump_size = inspected["lump_size"]
-    if cw < 1 or cc < 1:
-        return jsonify({
-            "error": "Uploaded LUMP must contain code and a SELF C-list row",
-            "admission_status": "rejected",
-            "admission_gate": "type",
-        }), 400
-    if inspected.get("content_frame_error"):
-        return jsonify({
-            "error": (
-                "Uploaded LUMP has an invalid embedded content frame: "
-                + str(inspected["content_frame_error"])
-            ),
-            "admission_status": "rejected",
-            "admission_gate": "structural",
-        }), 400
-    clist = inspected.get("clist_entries") or []
-    self_row = clist[0] if clist else None
-    if (not isinstance(self_row, dict)
-            or self_row.get("null")
-            or self_row.get("gt_type") != "Inform"
-            or "E" not in str(self_row.get("perms", ""))):
-        return jsonify({
-            "error": "Uploaded LUMP c-list row 0 is not an Inform SELF E-GT",
-            "admission_status": "rejected",
-            "admission_gate": "type",
-        }), 400
-    if "X" in str(self_row.get("perms", "")) and "E" in str(self_row.get("perms", "")):
-        return jsonify({
-            "error": "Uploaded LUMP SELF row has prohibited X+E permissions",
-            "admission_status": "rejected",
-            "admission_gate": "type",
-        }), 400
-    n = (header_word >> 23) & 0xF
+    # Parse LUMP header (first uint32, big-endian)
+    header_word, = _struct.unpack('>I', raw_bytes[:4])
+    magic     = (header_word >> 27) & 0x1F
+    n_minus_6 = (header_word >> 23) & 0xF    # bits[26:23]
+    cw        = (header_word >> 10) & 0x1FFF  # bits[22:10]
+    typ       = (header_word >>  8) & 0x3     # bits[9:8]
+    cc        = header_word & 0xFF             # bits[7:0]
+    n         = n_minus_6 + 6
+    expected_size = 1 << n
+
+    if magic != 0x1F or not 6 <= n <= 21:
+        return jsonify({"ok": False, "admission_status": "rejected",
+                        "error": "Invalid LUMP magic or allocation"}), 400
+    if len(raw_bytes) != expected_size * 4:
+        return jsonify({"error": (
+            f"File size ({len(raw_bytes)} B) must exactly match LUMP header "
+            f"allocation 2^{n}={expected_size} words"
+        )}), 400
+    # A quarantined upload must have a c-list containing the compiler-owned
+    # SELF authority.  In particular, cc=0 cannot be treated as an inert
+    # upload and persisted for a later admission attempt.
+    if cc == 0 or cc > expected_size or cw < 1 or 1 + cw + cc > expected_size:
+        return jsonify({"ok": False, "admission_status": "rejected",
+                        "error": ("LUMP c-list is empty; SELF authority is required"
+                                  if cc == 0 else
+                                  "Invalid LUMP allocation or c-list geometry")}), 400
+    self_row = int.from_bytes(raw_bytes[(expected_size - cc) * 4:
+                                        (expected_size - cc + 1) * 4], "big")
+    if not self_row:
+        return jsonify({"ok": False, "admission_status": "rejected",
+                        "error": "LUMP c-list has no SELF authority"}), 400
+
+    lump_size  = expected_size
     lump_bytes = raw_bytes
-    token8 = inspected["binary_hash"][:8]
 
     # Map typ bits to metadata
     _TYP_MAP = {
@@ -15295,58 +15446,150 @@ def upload_lump_file():
     }
     lump_type, content_type = _TYP_MAP.get(typ, ("data", "binary"))
 
+    digest = _hl.sha256(raw_bytes).hexdigest()
+    token8 = digest[:8]
+
     lumps_dir = LUMPS_DIR
     os.makedirs(lumps_dir, exist_ok=True)
-    manifest_path = os.path.join(lumps_dir, 'manifest.json')
-    try:
-        # Read before touching the binary so a corrupt repository cannot leave
-        # an unlocatable uploaded artifact behind.
-        manifest = _read_manifest_safe(manifest_path)
-    except ValueError as _mf_upl_err:
-        return jsonify({"error": (
-            "manifest.json is corrupt and cannot be read safely. "
-            "The upload has been aborted before persistence. "
-            f"Details: {_mf_upl_err}"
-        )}), 500
 
-    lump_path = os.path.join(lumps_dir, f'{token8}.lump')
-    if os.path.exists(lump_path):
-        # Never overwrite an existing artifact, especially a trusted one that
-        # happens to have the same content token.
-        return jsonify({
-            "error": "An artifact with this immutable content token already exists",
-            "token": token8,
-            "admission_status": "rejected",
-        }), 409
-    with open(lump_path, 'wb') as fh:
-        fh.write(lump_bytes)
+    # Unknown uploads are quarantine data until the explicit admission
+    # pipeline mints an executable E-GT.  They must not enter the live lazy
+    # cache, manifest, or Namespace state at this boundary.
+    quarantine_dir = os.path.join(lumps_dir, "quarantine")
+    os.makedirs(quarantine_dir, exist_ok=True)
+    lump_path = os.path.join(quarantine_dir, f'{digest}.lump')
+    with _lumps_manifest_lock:
+        try:
+            with open(lump_path, 'xb') as fh:
+                fh.write(lump_bytes)
+                fh.flush()
+                os.fsync(fh.fileno())
+        except FileExistsError:
+            with open(lump_path, 'rb') as fh:
+                if fh.read() != lump_bytes:
+                    return jsonify({
+                        "ok": False, "admission_status": "rejected",
+                        "error": "quarantine digest collision",
+                    }), 409
+    gates = {
+        "gate0": {"status": "passed", "provenance": "upload-transport"},
+        "gate1": {"status": "passed", "whole_binary_sha256": digest},
+        "gate2": {"status": "passed" if typ in (0, 1, 2, 3) else "rejected"},
+        "gate3": {"status": "passed", "whole_binary_sha256": digest},
+        "gate4": {"status": "unavailable", "reason": "no trusted signature/authority"},
+        "gate5": {"status": "unavailable", "reason": "admission authorization required"},
+    }
 
-    # Raw upload is persisted for inspection only.  It is not executable and
-    # is intentionally absent from LAZY_LUMPS/runtime registries.
-
-    manifest = [e for e in manifest if e.get('token') != token8]
-    manifest.append({
-        "token": token8, "filename": f"{token8}.lump",
-        "abstraction": name, "provenance": "uploaded-or-legacy",
-        "admission": {
-            "status": "unverified", "authority": "pending-human-vouch",
-            "genesis_verified": False,
-            "checks": {
-                "transport": "passed", "structural": "passed",
-                "type": "passed", "integrity": "unavailable",
-                "authority": "unavailable", "containment": "unavailable",
-            },
-        },
-    })
-    _atomic_write_json(manifest_path, manifest)
+    # Raw import intentionally remains unapproved.
 
     print(f'[lumps/upload-lump] {token8} typ={typ} ({lump_type}) n={n} cw={cw} cc={cc} {len(lump_bytes)}B', flush=True)
-    return jsonify({
-        "ok": True, "token": token8,
-        "admission_status": "unverified",
-        "executable": False,
-        "inspectable": True,
-    })
+    from lump_admission_service import (
+        derive_capability_requirements,
+        derive_capability_targets,
+    )
+    return jsonify({"ok": True, "token": token8, "quarantined": True,
+                    "admission_status": "unverified", "executable": False,
+                    "binary_hash": digest,
+                    "required_rights": derive_capability_requirements(raw_bytes),
+                    "required_capabilities": derive_capability_targets(raw_bytes),
+                    "gates": gates, "mint_egt": False})
+
+
+@app.route("/api/lumps/admit-upload", methods=["POST"])
+def admit_quarantined_lump():
+    """Explicitly admit one quarantined upload into the live Namespace.
+
+    Quarantine and admission are intentionally separate transactions.  This
+    endpoint never guesses a revision, destination, replacement, residency, or
+    boot target from library state.
+    """
+    payload = request.get_json(force=True, silent=True) or {}
+    token = str(payload.get("token") or "").lower()
+    digest = str(payload.get("binary_hash") or "").lower()
+    if not re.fullmatch(r"[0-9a-f]{8}", token):
+        return jsonify({"ok": False, "error": "exact token is required",
+                        "mint_egt": False}), 400
+    if (not re.fullmatch(r"[0-9a-f]{64}", digest)
+            or digest[:8] != token):
+        return jsonify({"ok": False, "error": "exact binary hash is required",
+                        "mint_egt": False}), 400
+    # A boolean in the request is deliberately ignored.  The approval-intent
+    # store binds this operation to the current browser session and burns it.
+    try:
+        with _lumps_manifest_lock:
+            quarantine_path = os.path.join(
+                LUMPS_DIR, "quarantine", digest + ".lump")
+            with open(quarantine_path, "rb") as source:
+                if hashlib.sha256(source.read()).hexdigest() != digest:
+                    raise ValueError("quarantined bytes do not match the exact approved digest")
+            authorization = _consume_lump_approval_intent(
+                payload.get("approval_intent"), digest, "import-approval", consume=True)
+    except OSError:
+        return jsonify({"ok": False, "error": "quarantined revision is unavailable",
+                        "mint_egt": False}), 404
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc), "mint_egt": False}), 403
+    from lump_admission_service import AdmissionError, admit
+    try:
+        operation = authorization.get("admission")
+        if not isinstance(operation, dict):
+            raise AdmissionError(
+                "approval intent is not bound to an exact admission operation",
+                status=403)
+        echoed = {
+            "name": str(payload.get("name") or ""),
+            "revision": payload.get("revision", payload.get("issue")),
+            "destination_slot": payload.get("destination_slot"),
+            "replace": payload.get("replace"),
+            "resident": payload.get("resident"),
+            "boot": payload.get("boot"),
+            "capabilities": payload.get("approved_capabilities"),
+        }
+        if echoed != operation:
+            raise AdmissionError(
+                "admission request differs from the consumed programmer approval",
+                status=403)
+        try:
+            with open(BOOT_CONFIG_PATH, encoding="utf-8") as config_source:
+                admission_config = json.load(config_source)
+            namespace_capacity = int(
+                (admission_config.get("step1") or {}).get("nsSlotsMax")
+                or _boot_image_gen.DEFAULT_NS_SLOTS_MAX)
+        except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise AdmissionError(
+                f"configured Namespace capacity is unavailable: {exc}",
+                status=409) from exc
+        result = admit(
+            quarantine_path=quarantine_path, expected_digest=digest,
+            lumps_dir=LUMPS_DIR, state_path=os.path.join(LUMPS_DIR, "ns-state.json"),
+            manifest_path=os.path.join(LUMPS_DIR, "manifest.json"), token=token,
+            name=operation["name"], revision=operation["revision"],
+            destination_slot=operation["destination_slot"],
+            replace=operation["replace"], resident=operation["resident"],
+            boot=operation["boot"], authorization={
+                "grants": authorization["grants"],
+                "capabilities": operation["capabilities"],
+            },
+            requested=authorization["grants"],
+            granted=authorization["grants"],
+            portable_binding=payload.get("portable_binding"),
+            portable_seal=payload.get("portable_seal"),
+            namespace_capacity=namespace_capacity,
+            lock=_lumps_manifest_lock)
+        # The quarantine bytes are portable input, not executable output.  The
+        # admission service publishes a derivative after minting the local
+        # SELF E-GT; only those exact published bytes may enter the execution
+        # cache.
+        published_path = os.path.join(LUMPS_DIR, result["filename"])
+        with open(published_path, "rb") as published:
+            derivative_bytes = published.read()
+        LAZY_LUMPS[result["token"]] = derivative_bytes
+        return jsonify({"ok": True, **result})
+    except AdmissionError as exc:
+        return jsonify({"ok": False, "error": str(exc), "gates": exc.gates,
+                        "mint_egt": False}), exc.status
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc), "mint_egt": False}), 409
 
 
 def _crc16_ccitt(data_bytes):
@@ -18236,80 +18479,6 @@ def api_generate_method_available():
 # Compile API — POST /api/compile
 # ---------------------------------------------------------------------------
 
-def _compiler_attestation_key():
-    """Return the process-local key used to attest trusted compiler output."""
-    secret = app.secret_key
-    if isinstance(secret, str):
-        secret = secret.encode("utf-8")
-    return hashlib.sha256(b"ChurchMachine.CompilerAttestation|" + secret).digest()
-
-
-def _canonical_compiler_record(record):
-    """Canonical bytes for compiler-attestation MACs.
-
-    Only server-derived compilation facts are covered.  Request metadata such
-    as destination, pet names, and approval intent is deliberately excluded.
-    """
-    fields = {
-        key: record.get(key)
-        for key in (
-            "schema", "compiler", "compiler_version", "language",
-            "abstraction", "binary_hash", "source_hash", "words", "cw", "cc",
-            "static_validated",
-        )
-    }
-    return json.dumps(
-        fields, sort_keys=True, separators=(",", ":"), ensure_ascii=True
-    ).encode("utf-8")
-
-
-def _attest_compiler_result(result, source):
-    """Attach a server-issued MAC to a result produced by run_compile()."""
-    record = result.get("compiler_record")
-    if not isinstance(record, dict):
-        return result
-    record = {
-        key: record.get(key)
-        for key in (
-            "schema", "compiler", "compiler_version", "language",
-            "abstraction", "binary_hash", "source_hash", "words", "cw", "cc",
-            "static_validated",
-        )
-    }
-    record["source_hash"] = hashlib.sha256(
-        source.encode("utf-8")).hexdigest()
-    record["attestation"] = hmac.new(
-        _compiler_attestation_key(), _canonical_compiler_record(record),
-        hashlib.sha256,
-    ).hexdigest()
-    result = dict(result)
-    result["compiler_record"] = record
-    return result
-
-
-def _verify_compiler_attestation(record, binary_hash, words, cw, cc):
-    """Verify server-issued provenance against exact submitted bytes."""
-    if not isinstance(record, dict):
-        return False
-    supplied = record.get("attestation")
-    if (not isinstance(supplied, str)
-            or not isinstance(record.get("binary_hash"), str)
-            or not hmac.compare_digest(record["binary_hash"], binary_hash)):
-        return False
-    expected = hmac.new(
-        _compiler_attestation_key(), _canonical_compiler_record(record),
-        hashlib.sha256,
-    ).hexdigest()
-    return (
-        hmac.compare_digest(supplied, expected)
-        and bool(record.get("compiler"))
-        and bool(record.get("compiler_version"))
-        and record.get("static_validated") is True
-        and record.get("words") == words
-        and record.get("cw") == cw
-        and record.get("cc") == cc
-    )
-
 @app.route("/api/compile", methods=["POST"])
 def api_compile():
     """CLOOMC++ Compiler API — compile source text to a Lump binary (ECO-002).
@@ -18381,55 +18550,63 @@ def api_compile():
     if language not in VALID_LANGUAGES:
         return jsonify({'error': f'`language` must be one of: {", ".join(sorted(VALID_LANGUAGES))}'}), 400
 
-    result = _attest_compiler_result(run_compile(body), source)
+    result = run_compile(body)
+    # A successful local compile carries its admission evidence with the
+    # artifact.  Upload callers never receive this record and therefore remain
+    # on the untrusted admission path.  The record is bound to the exact
+    # serialized words, not merely to source/name metadata.
+    if isinstance(result, dict) and result.get("ok") and isinstance(result.get("words"), list):
+        _compile_words = [int(word) & 0xFFFFFFFF for word in result["words"]]
+        _compile_raw = struct.pack(f">{len(_compile_words)}I", *_compile_words)
+        _compile_digest = hashlib.sha256(_compile_raw).hexdigest()
+        _compile_record = {
+            "schema": "church-compiler-output/v1",
+            "compiler": "CLOOMC",
+            "binary_hash": _compile_digest,
+            "source_hash": hashlib.sha256(source.encode("utf-8")).hexdigest(),
+            "language": language,
+            "words": len(_compile_words),
+            "cw": (_compile_words[0] >> 10) & 0x1FFF,
+            "cc": _compile_words[0] & 0xFF,
+            "static_validated": True,
+            "compiler_identity": "Trusted Home IDE compiler",
+            "compiler_version": "server-compile-v1",
+        }
+        _compile_record["attestation"] = hmac.new(
+            _compiler_attestation_key(), _canonical_compiler_record(_compile_record),
+            hashlib.sha256).hexdigest()
+        _compile_canonical = json.dumps(
+            _compile_record, sort_keys=True, separators=(",", ":"))
+        _compile_record["signature"] = hmac.new(
+            _compiler_attestation_key(), _compile_canonical.encode("utf-8"),
+            hashlib.sha256).hexdigest()
+        result["compiler_record"] = _compile_record
+        result["trust_origin"] = "trusted-home-ide"
+        result["compiler_identity"] = _compile_record["compiler_identity"]
+        result["compiler_version"] = _compile_record["compiler_version"]
     return jsonify(result), 200
 
 
 @app.route("/api/compile/attest", methods=["POST"])
 def api_compile_attest():
-    """Compile source server-side and attest only byte-identical output.
-
-    This endpoint exists for the browser IDE's local compiler path.  A caller
-    cannot attest arbitrary bytes: the server compiler must reproduce the
-    submitted words exactly before the MAC is issued.
-    """
-    from compile_api import run_compile, VALID_LANGUAGES
-    if _COMPILE_API_TOKEN:
-        auth_header = request.headers.get("Authorization", "")
-        token_param = request.args.get("token", "")
-        supplied = (
-            auth_header[len("Bearer "):]
-            if auth_header.startswith("Bearer ") else token_param
-        )
-        if supplied != _COMPILE_API_TOKEN:
-            return jsonify({"error": "Unauthorized"}), 401
-    body = request.get_json(silent=True)
-    if not isinstance(body, dict):
-        return jsonify({"error": "Request body must be an object"}), 400
-    source, language = body.get("source", ""), body.get("language", "")
+    """Reproduce/authenticate the exact bytes of a server compiler result."""
+    body = request.get_json(silent=True) or {}
     words = body.get("words")
-    if (not isinstance(source, str) or not source.strip()
-            or language not in VALID_LANGUAGES
-            or not isinstance(words, list)
-            or any(isinstance(word, bool) or not isinstance(word, int)
-                   or not 0 <= word <= 0xFFFFFFFF for word in words)):
-        return jsonify({"error": "source, language, and uint32 words are required"}), 400
-    if len(source.encode("utf-8")) > 64 * 1024:
-        return jsonify({"error": "source exceeds the maximum allowed size"}), 400
-    compile_body = {
-        "source": source, "language": language,
-        "namespace_hint": body.get("namespace_hint", {}),
-    }
-    result = run_compile(compile_body)
-    if not result.get("ok"):
-        return jsonify(result), 422
-    compiled_words = result.get("words")
-    if compiled_words != words:
-        return jsonify({
-            "error": "server compiler output does not match submitted bytes",
-            "compiler_attestation_failed": True,
-        }), 409
-    return jsonify(_attest_compiler_result(result, source)), 200
+    record = body.get("compiler_record")
+    if not isinstance(words, list) or not isinstance(record, dict):
+        return jsonify({"error": "words and compiler_record are required"}), 400
+    try:
+        values = [int(word) & 0xFFFFFFFF for word in words]
+        raw = struct.pack(f">{len(values)}I", *values)
+    except (TypeError, ValueError, OverflowError, struct.error):
+        return jsonify({"error": "words must be uint32 values"}), 400
+    digest = hashlib.sha256(raw).hexdigest()
+    header = values[0] if values else 0
+    if not _verify_compiler_attestation(
+            record, digest, values, (header >> 10) & 0x1FFF, header & 0xFF):
+        return jsonify({"error": "compiler attestation does not match exact bytes"}), 403
+    return jsonify({"ok": True, "words": values, "compiler_record": record,
+                    "binary_hash": digest})
 
 
 def _bind_with_retry(port, max_attempts=5, backoff_seconds=0.3):
@@ -21883,33 +22060,9 @@ def _ba_build_ns_map():
             checks.append({'label': 'token', 'ok': token_ok,
                            'detail': f'manifest token={m_token!r} file={token!r}'})
 
-        # 4. SelfTest-specific checks: RETURN-vs-BRANCH opcode + c-list E-GT
-        if is_selftest and lump_path and os.path.exists(lump_path):
-            # 4a. Terminal opcode check — catch v12→v13 regression (RETURN instead of BRANCH)
-            op_chk = _ba_check_final_opcode(lump_path)
-            # The approved 512-word canonical SelfTest currently ends with
-            # extended-ISA opcode 8 at its declared boundary.  The generic
-            # checker must continue warning on unknown opcodes for other
-            # binaries, but this canonical SelfTest shape is intentional and
-            # should not be presented as an unresolved approval issue.
-            if op_chk.get('opcode') == 8 and op_chk.get('ok') is None:
-                op_chk = dict(op_chk)
-                op_chk['ok'] = True
-                op_chk['warn'] = False
-                op_chk['detail'] = (
-                    f'extended ISA terminal opcode=8 ✅ at the canonical '
-                    f'SelfTest boundary; {op_chk["detail"].split("; ", 1)[-1]}'
-                )
-            checks.append({'label': 'BRANCH opcode',
-                           'ok': op_chk['ok'],
-                           'warn': op_chk.get('warn', False),
-                           'detail': op_chk['detail']})
-            # 4b. c-list[0] E-GT check — verify return-channel capability matches boot_rom
-            egt = _ba_check_selftest_egt(
-                lump_path, selftest_slot,
-                (manifest_entry or {}).get('seq', 0))
-            checks.append({'label': 'SelfTest E-GT', 'ok': egt['ok'],
-                           'detail': egt['detail']})
+        # SelfTest has no special post-compile validity or mutation policy.
+        # It remains a normal resident runtime/watchdog artifact; structural
+        # and dynamic ISA checks above continue to apply uniformly.
 
         return checks
 

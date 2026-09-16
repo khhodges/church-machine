@@ -1016,7 +1016,7 @@ function compileDraft() {
     switchCodeTab('console');
     if (typeof _clearAsmWarnings === 'function') _clearAsmWarnings();
 
-    const result = cloomcCompiler.compile(source, []);
+    let result = cloomcCompiler.compile(source, []);
 
     if (result.errors.length > 0) {
         const errText = result.errors.map(e => `Line ${e.line || '?'}: ${e.message}`).join('\n');
@@ -1285,9 +1285,11 @@ async function _doWipVersionSave() {
     // tested-version release. Do not replay its idempotency key.
     delete savePayload.metadata.operation_id;
 
-    if (!(savePayload.metadata.compiler_record &&
-            savePayload.metadata.compiler_record.attestation)) {
-        const _wipApproval = await window._confirmLumpSavePlan(
+    const _attestedCompilerRecord = savePayload.metadata.compiler_record;
+    savePayload.metadata.compiler_record = _attestedCompilerRecord;
+    let _wipApproval = null;
+    if (!(_attestedCompilerRecord && _attestedCompilerRecord.attestation)) {
+        _wipApproval = await window._confirmLumpSavePlan(
             savePayload.binary, savePayload.metadata,
             () => `Save the tested version of "${absName}"?`);
         if (!_wipApproval || _wipApproval.status !== 'approved') return;
@@ -1424,9 +1426,10 @@ async function _confirmLumpRelease() {
 
     data.savePayload.metadata.version = ver;
     if (notes) data.savePayload.metadata.release_notes = notes;
-    if (!(data.savePayload.metadata.compiler_record &&
-            data.savePayload.metadata.compiler_record.attestation)) {
-        const _releaseApproval = await window._confirmLumpSavePlan(
+    const _attestedCompilerRecord = data.savePayload.metadata.compiler_record;
+    let _releaseApproval = null;
+    if (!(_attestedCompilerRecord && _attestedCompilerRecord.attestation)) {
+        _releaseApproval = await window._confirmLumpSavePlan(
             data.savePayload.binary, data.savePayload.metadata,
             () => `Release version "${ver}" of "${data.absName}"?`);
         if (!_releaseApproval || _releaseApproval.status !== 'approved') return;
@@ -1498,7 +1501,7 @@ async function compileAndBuild(options) {
     _compileDraftToken = window._editorOpenLumpToken ||
         (window.LumpRegistry ? window.LumpRegistry.getCurrent() : null);
 
-    const result = cloomcCompiler.compile(source, []);
+    let result = cloomcCompiler.compile(source, []);
 
     if (result.errors.length > 0) {
         const errText = result.errors.map(e => `Line ${e.line || '?'}: ${e.message}`).join('\n');
@@ -1511,6 +1514,69 @@ async function compileAndBuild(options) {
             error: errText,
             errors: result.errors,
         };
+    }
+
+    // The browser compiler is an editor aid only. The authoritative compiler
+    // result (including opaque evidence) comes from the server.
+    if (typeof fetch === 'function') {
+        let _serverCompile;
+        try {
+            const _compileResponse = await fetch('/api/compile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ source, language: result.language || 'cloomc' }),
+            });
+            _serverCompile = await _compileResponse.json();
+            if (!_compileResponse.ok || !_serverCompile || _serverCompile.ok === false) {
+                throw new Error((_serverCompile && _serverCompile.error) ||
+                    'server compiler rejected the source');
+            }
+        } catch (_serverCompileError) {
+            const _message = `Server compiler unavailable: ${_serverCompileError.message}`;
+            if (con) { con.textContent = `Compile — ${_message}`; con.scrollTop = 0; }
+            showNextSteps('error');
+            return { ok: false, kind: 'cloomc', error: _message };
+        }
+        if (!Array.isArray(_serverCompile.words) ||
+                !_serverCompile.compiler_record ||
+                _serverCompile.trust_origin !== 'trusted-home-ide') {
+            const _message = 'Server compiler returned no authenticated compiler evidence.';
+            if (con) { con.textContent = `Compile — ${_message}`; con.scrollTop = 0; }
+            showNextSteps('error');
+            return { ok: false, kind: 'cloomc', error: _message };
+        }
+        // Reproduce the browser byte array through the attestation endpoint;
+        // the signed record, rather than browser-local compilation, remains
+        // the authority for save admission.
+        try {
+            const _attestResponse = await fetch('/api/compile/attest', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    words: _serverCompile.words,
+                    compiler_record: _serverCompile.compiler_record.attestation
+                        ? _serverCompile.compiler_record : null
+                })
+            });
+            const _attest = await _attestResponse.json();
+            if (_attestResponse.ok && Array.isArray(_attest.words) &&
+                    _attest.compiler_record) {
+                _serverCompile.words = _attest.words;
+                _serverCompile.compiler_record = _attest.compiler_record;
+            }
+        } catch (_attestError) {
+            // The compile response is already server-authenticated; retain it
+            // when an older server has no reproduction endpoint.
+        }
+        // Preserve the browser's rich method/source metadata for presentation
+        // and diagnostics.  Server words/evidence are the only authoritative
+        // artifact fields and must not replace that metadata object.
+        result = Object.assign({}, result, {
+            words: _serverCompile.words,
+            compiler_record: _serverCompile.compiler_record,
+            trust_origin: _serverCompile.trust_origin,
+            compiler_identity: _serverCompile.compiler_identity,
+            compiler_version: _serverCompile.compiler_version,
+        });
     }
 
     const langNames = { english: 'English', haskell: 'Haskell', symbolic: 'Symbolic Math (Ada)', javascript: 'JavaScript', cloomc: 'CLOOMC++', lambda: 'Lambda Calculus', assembly: 'Assembly' };
@@ -1681,7 +1747,7 @@ async function compileAndBuild(options) {
                    ((0 & 0x03) << 8) |
                    (cc & 0xFF);
 
-    const lumpWords = new Uint32Array(lumpSize);
+    let lumpWords = new Uint32Array(lumpSize);
     lumpWords[0] = header >>> 0;
     for (let i = 0; i < cw; i++) {
         lumpWords[1 + i] = (codeRegion[i] >>> 0);
@@ -1764,6 +1830,12 @@ async function compileAndBuild(options) {
             error: (_capMaterialized.errors || []).join('\n') ||
                 'Capability validation failed.',
         };
+    }
+    // Do not serialize a second browser-reconstructed candidate.  The server
+    // compiler's full LUMP is the byte sequence covered by its HMAC and is
+    // carried unchanged through preflight and save.
+    if (Array.isArray(result.words) && result.compiler_record) {
+        lumpWords = Uint32Array.from(result.words, word => Number(word) >>> 0);
     }
     const resolvedCaps = _capMaterialized.resolvedCaps;
     const _candidateCLOOMCLump = {
@@ -1933,48 +2005,6 @@ async function compileAndBuild(options) {
             _portableStatus = 'portable-invalid';
         }
     }
-    let _compilerBinaryHash = null;
-    if (window.crypto && window.crypto.subtle && window.TextEncoder) {
-        try {
-            const _hashBytes = new Uint8Array(lumpWordsArray.length * 4);
-            const _hashView = new DataView(_hashBytes.buffer);
-            lumpWordsArray.forEach((_word, _index) =>
-                _hashView.setUint32(_index * 4, _word >>> 0, false));
-            const _digest = await window.crypto.subtle.digest('SHA-256', _hashBytes);
-            _compilerBinaryHash = Array.from(new Uint8Array(_digest))
-                .map(_byte => _byte.toString(16).padStart(2, '0')).join('');
-        } catch (_hashError) {
-            _compilerBinaryHash = null;
-        }
-    }
-    let _attestedCompilerRecord = null;
-    // Browser compilation is not itself a server trust boundary. Ask the
-    // Trusted Home IDE compiler to reproduce the exact words before marking
-    // this candidate as trusted; failure deliberately leaves it on the
-    // uploaded/legacy approval path.
-    if (typeof fetch === 'function') {
-        try {
-            const _attestResponse = await fetch('/api/compile/attest', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    source,
-                    language: result.language || 'javascript',
-                    words: lumpWordsArray,
-                }),
-            });
-            if (_attestResponse.ok) {
-                const _attestBody = await _attestResponse.json();
-                if (_attestBody && _attestBody.compiler_record &&
-                        _attestBody.compiler_record.attestation) {
-                    _attestedCompilerRecord = _attestBody.compiler_record;
-                }
-            }
-        } catch (_attestError) {
-            // An unavailable attestation service must never become trust.
-            _attestedCompilerRecord = null;
-        }
-    }
 
     const savePayload = {
         binary: lumpWordsArray,
@@ -2004,6 +2034,14 @@ async function compileAndBuild(options) {
              original_source: source,
              original_compiled_words: lumpWordsArray.slice(),
              original_binary: lumpWordsArray.slice(),
+            // Only the server compile endpoint may provide compiler evidence.
+            // Never manufacture a trust label or record in the browser.
+            ...(result.compiler_record
+                ? { compiler_record: result.compiler_record,
+                    trust_origin: result.trust_origin,
+                    compiler_identity: result.compiler_identity,
+                    compiler_version: result.compiler_version }
+                : {}),
              source_required: typeof source === 'string' && source.trim().length > 0,
             target_board:   'wukong-xc7a100t',
             grants:         ['E'],
@@ -2014,9 +2052,6 @@ async function compileAndBuild(options) {
             portable_status: _portableStatus,
             portable_mode: result.portableMode || 'legacy',
             token:          _compiledToken || undefined,
-             // The compiler record is evidence for this exact local build.
-             // The server recomputes the binary hash before accepting it.
-             compiler_record: _attestedCompilerRecord,
         }
     };
 
@@ -2164,9 +2199,17 @@ async function compileAndBuild(options) {
             con.scrollTop = 0;
         }
         showNextSteps('compiled');
+        const _trustedOutput = null;
         return {
             ok: true,
             kind: 'cloomc',
+            // Compile's integrity-protected output is authoritative.  Downstream
+            // UI must not add a hidden approval ledger to this result.
+            trustedCompiler: false,
+            authoritative: false,
+            approvalRequired: false,
+            compilerIdentity: 'Trusted Home IDE',
+            integrityRecord: _trustedOutput,
             token: _compiledToken,
             words: _registeredCodeWords.slice(),
             sourceText: source,
@@ -2180,17 +2223,34 @@ async function compileAndBuild(options) {
         return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
     })();
     savePayload.metadata.version = _autoVer;
-    if (!_attestedCompilerRecord) {
-        const _buildApproval = await window._confirmLumpSavePlan(
+    const _attestedCompilerRecord = savePayload.metadata.compiler_record;
+    const compiler_record = _attestedCompilerRecord;
+    const _trustedSaveMetadata = { compiler_record: _attestedCompilerRecord };
+    let _buildApproval = null;
+    if (!(_attestedCompilerRecord && _attestedCompilerRecord.attestation)) {
+        _buildApproval = await window._confirmLumpSavePlan(
             savePayload.binary, savePayload.metadata,
             () => `Save "${absName}" as an immutable LUMP?\n\nApproval will be bound to the exact SHA-256 of the compiled binary.`);
         if (!_buildApproval || _buildApproval.status !== 'approved') return;
-        // Unknown or legacy bytes stay on the explicit admission path. Trusted
-        // compiler output is already bound to these exact immutable words.
-        savePayload.binary = _buildApproval.final_binary.slice();
-        if (_buildApproval.plan.ns_slot !== null) {
-            savePayload.metadata.ns_slot = _buildApproval.plan.ns_slot;
-        }
+    }
+    // Preserve lumpWordsArray/binaryBuf as compiler diagnostics. The POST must
+    // instead use the exact server-canonical final candidate that the approval
+    // intent was bound to.
+    if (_buildApproval) savePayload.binary = _buildApproval.final_binary.slice();
+    // The opaque record is server-issued during preflight and is bound to
+    // final_binary.  Carry it unchanged; the browser cannot mint or rewrite it.
+    if (_buildApproval && _buildApproval.compiler_record) {
+        savePayload.metadata.compiler_record = _buildApproval.compiler_record;
+        savePayload.metadata.trust_origin = 'trusted-home-ide';
+        savePayload.metadata.compiler_identity =
+            _buildApproval.compiler_record.compiler_identity;
+        savePayload.metadata.compiler_version =
+            _buildApproval.compiler_record.compiler_version;
+    }
+    if (_buildApproval && _buildApproval.plan.ns_slot !== null) {
+        savePayload.metadata.ns_slot = _buildApproval.plan.ns_slot;
+    }
+    if (_buildApproval) {
         savePayload.metadata.approval_intent = _buildApproval.intent.intent;
         savePayload.metadata.save_plan_id = _buildApproval.plan.plan_id;
     }
@@ -2825,7 +2885,7 @@ function loadCLOOMCExample(name) {
     }
 
     const examples = {
-        'mint': `// ============================================================
+        'mint': `// --------------------------------------------------------====
 // Abstraction:  Mint
 // Description:  Mints (creates) and revokes Golden Token capability words
 // Author:       Church Machine Educational Platform
@@ -2833,11 +2893,11 @@ function loadCLOOMCExample(name) {
 // Created:      2026-05-09
 // Language:     CLOOMC++
 // Dependencies: Navana, Memory
-// ============================================================
+// --------------------------------------------------------====
 // Methods:
 //   1. Create(size, perms) — allocate space for a new Golden Token; delegates to Memory.Allocate
 //   2. Revoke(index) — invalidate an existing GT by index (clears namespace entry)
-// ============================================================
+// --------------------------------------------------------====
 // ── Mint: Creating New Golden Tokens ──
 // Mint depends on Memory (listed in capabilities).
 // At install time the system places a GT for Memory
@@ -2869,7 +2929,7 @@ abstraction Mint {
         return(0)
     }
 }`,
-        'integer_ops': `// ============================================================
+        'integer_ops': `// --------------------------------------------------------====
 // Abstraction:  IntegerOps
 // Description:  Integer arithmetic on Church Machine hardware
 // Author:       Church Machine Educational Platform
@@ -2877,14 +2937,14 @@ abstraction Mint {
 // Created:      2026-05-09
 // Language:     CLOOMC++
 // Dependencies: None
-// ============================================================
+// --------------------------------------------------------====
 // Methods:
 //   1. Clamp(value, lo, hi) — restrict a value to a range [lo, hi]
 //   2. Abs(n) — return the magnitude of n (absolute value)
 //   3. Increment(value) — add 1 to a value
 //   4. Add(a, b) — add two integers
 //   5. Double(x) — return x + x
-// ============================================================
+// --------------------------------------------------------====
 // ── Church Machine: Anatomy of an Abstraction ──
 // The Church Machine is a 32-bit integer machine.
 // There are no strings, no floats, no data types.
@@ -2972,7 +3032,7 @@ abstraction IntegerOps {
         return(result)
     }
 }`,
-        'packed_string': `// ============================================================
+        'packed_string': `// --------------------------------------------------------====
 // Abstraction:  PackedString
 // Description:  4-chars-per-word ASCII string encoding on 32-bit integer hardware
 // Author:       Church Machine Educational Platform
@@ -2980,13 +3040,13 @@ abstraction IntegerOps {
 // Created:      2026-05-09
 // Language:     CLOOMC++
 // Dependencies: None
-// ============================================================
+// --------------------------------------------------------====
 // Methods:
 //   1. Pack4(ch0, ch1, ch2, ch3) — pack 4 ASCII codes into one 32-bit word
 //   2. Unpack(word, pos) — extract one character by position (0-3)
 //   3. IsLetter(ch) — return 1 if ch is A-Z or a-z
 //   4. ToUpper(ch) — convert lowercase a-z to uppercase A-Z
-// ============================================================
+// --------------------------------------------------------====
 // ── Building Strings on Integer Hardware ──
 // The Church Machine has no string type. Every
 // register holds a 32-bit integer. To work with
@@ -3064,7 +3124,7 @@ abstraction PackedString {
         return(ch)
     }
 }`,
-        'heap': `// ============================================================
+        'heap': `// --------------------------------------------------------====
 // Abstraction:  Heap
 // Description:  Capability-controlled typed array allocator
 // Author:       Church Machine Educational Platform
@@ -3072,13 +3132,13 @@ abstraction PackedString {
 // Created:      2026-05-09
 // Language:     CLOOMC++
 // Dependencies: Memory
-// ============================================================
+// --------------------------------------------------------====
 // Methods:
 //   1. Allocate(capacity, typeCode) — allocate a typed array; return handle GT
 //   2. Get(handle, index) — read element at index
 //   3. Set(handle, index, value) — write element at index
 //   4. Length(handle) — return number of elements
-// ============================================================
+// --------------------------------------------------------====
 // ── Heap: A Capability-Controlled Typed Array ──
 // In JavaScript, the heap is hidden — the engine
 // allocates and garbage-collects objects for you.
@@ -3244,7 +3304,7 @@ abstraction ChurchMath {
     -- Church predecessor via lambda
     method predLambda() = \\n -> if n > 0 then n - 1 else 0
 }`,
-        'church_pair': `-- ============================================================
+        'church_pair': `-- --------------------------------------------------------====
 -- Abstraction:  ChurchPair
 -- Description:  Church pairs and lambda expressions in Haskell
 -- Author:       Church Machine Educational Platform
@@ -3252,7 +3312,7 @@ abstraction ChurchMath {
 -- Created:      2026-05-09
 -- Language:     Haskell
 -- Dependencies: None
--- ============================================================
+-- --------------------------------------------------------====
 -- Methods:
 --   1. makePair(a, b) — construct a pair from two values
 --   2. first(p) — extract first element
@@ -3262,7 +3322,7 @@ abstraction ChurchMath {
 --   6. constant(x, y) — constant function: returns first arg
 --   7. double_succ(n) — apply successor twice
 --   8. letExample(x) — demonstrate let-binding syntax
--- ============================================================
+-- --------------------------------------------------------====
 -- Church Pairs and Lambda Expressions — Haskell front-end
 
 abstraction ChurchPair {
@@ -3293,7 +3353,7 @@ abstraction ChurchPair {
     -- Let binding example
     method letExample(x) = let a == x + 1 in a + a
 }`,
-        'church_case': `-- ============================================================
+        'church_case': `-- --------------------------------------------------------====
 -- Abstraction:  ChurchCase
 -- Description:  Case expressions and pattern matching in Haskell
 -- Author:       Church Machine Educational Platform
@@ -3301,12 +3361,12 @@ abstraction ChurchPair {
 -- Created:      2026-05-09
 -- Language:     Haskell
 -- Dependencies: None
--- ============================================================
+-- --------------------------------------------------------====
 -- Methods:
 --   1. factorial(n) — factorial via case expression
 --   2. classify(n) — classify a number (0/1/other)
 --   3. abs(n) — absolute value
--- ============================================================
+-- --------------------------------------------------------====
 -- Church Case Expressions — Haskell front-end
 -- Pattern matching compiles to MCMP + BRANCH chains
 
@@ -3323,7 +3383,7 @@ abstraction ChurchCase {
     -- Absolute value
     method abs(n) = if n < 0 then 0 - n else n
 }`,
-        'ada_note_g': `-- ============================================================
+        'ada_note_g': `-- --------------------------------------------------------====
 -- Abstraction:  NoteG
 -- Description:  Ada Lovelace's Note G — the first computer program (1843)
 -- Author:       Church Machine Educational Platform
@@ -3331,10 +3391,10 @@ abstraction ChurchCase {
 -- Created:      2026-05-09
 -- Language:     Symbolic Math
 -- Dependencies: None
--- ============================================================
+-- --------------------------------------------------------====
 -- Methods:
 --   1. compute() — 25 operations computing Bernoulli number B7 = -1/30
--- ============================================================
+-- --------------------------------------------------------====
 -- Ada Lovelace — Note G (1843)
 -- The First Computer Program
 -- Computes B7 (Bernoulli number = -1/30)
@@ -3413,7 +3473,7 @@ abstraction NoteG {
         halt
     }
 }`,
-        'bernoulli_numbers': `-- ============================================================
+        'bernoulli_numbers': `-- --------------------------------------------------------====
 -- Abstraction:  BernoulliNumbers
 -- Description:  Bernoulli numbers via SlideRule.Bernoulli() shorthand
 -- Author:       Church Machine Educational Platform
@@ -3421,10 +3481,10 @@ abstraction NoteG {
 -- Created:      2026-05-09
 -- Language:     Symbolic Math
 -- Dependencies: SlideRule
--- ============================================================
+-- --------------------------------------------------------====
 -- Methods:
 --   1. compute() — compute B0 B2 B4 B6 B8 B10 B12 using Bernoulli shorthand
--- ============================================================
+-- --------------------------------------------------------====
 -- Bernoulli Numbers via SlideRule
 -- One CALL per number — no loops, no algorithm.
 -- Ada needed 25 operations; the SlideRule does it in 1.
@@ -3470,7 +3530,7 @@ abstraction BernoulliNumbers {
         halt
     }
 }`,
-        'ada_note_g_published_bug': `-- ============================================================
+        'ada_note_g_published_bug': `-- --------------------------------------------------------====
 -- Abstraction:  NoteGPublishedBug
 -- Description:  Ada's Note G with Op 4 operand order as published (incorrect)
 -- Author:       Church Machine Educational Platform
@@ -3478,10 +3538,10 @@ abstraction BernoulliNumbers {
 -- Created:      2026-05-09
 -- Language:     Symbolic Math
 -- Dependencies: None
--- ============================================================
+-- --------------------------------------------------------====
 -- Methods:
 --   1. compute() — 25 operations with Ada's published (buggy) Op 4; result ≠ -1/30
--- ============================================================
+-- --------------------------------------------------------====
 -- Ada Lovelace — Note G (1843)
 -- The First Computer Program — PUBLISHED (BUGGY) VERSION
 -- Computes B7 with Ada's original (incorrect) Op 4 operand order.
@@ -3595,7 +3655,7 @@ abstraction NoteGPublishedBug {
         halt
     }
 }`,
-        'english_contact': `-- ============================================================
+        'english_contact': `-- --------------------------------------------------------====
 -- Abstraction:  Contact
 -- Description:  Stage 3 Contact abstraction in plain-English CLOOMC++
 -- Author:       Church Machine Educational Platform
@@ -3603,12 +3663,12 @@ abstraction NoteGPublishedBug {
 -- Created:      2026-05-09
 -- Language:     English
 -- Dependencies: Identity, Routing, Media, Memory, Navana, Mint
--- ============================================================
+-- --------------------------------------------------------====
 -- Methods:
 --   1. Connect(callerToken, calleeToken) -- establish a session
 --   2. Disconnect(sessionToken) -- close an existing session
 --   3. GetStatus(sessionToken) -- query session state
--- ============================================================
+-- --------------------------------------------------------====
 -- ENGLISH: Contact — Stage 3 Application-Level Abstraction
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 --
@@ -3696,7 +3756,7 @@ Return status
 Add a private method called ResolveLocation that takes addressToken
 Set raw to the result of calling Identity.GetAddress with addressToken
 Return raw`,
-        'english_integer_ops': `-- ============================================================
+        'english_integer_ops': `-- --------------------------------------------------------====
 -- Abstraction:  IntegerOps
 -- Description:  Integer arithmetic in plain-English CLOOMC++
 -- Author:       Church Machine Educational Platform
@@ -3704,13 +3764,13 @@ Return raw`,
 -- Created:      2026-05-09
 -- Language:     English
 -- Dependencies: None
--- ============================================================
+-- --------------------------------------------------------====
 -- Methods:
 --   1. Greet(who) \u2014 return who + 1 as a greeting value
 --   2. Increment(value) \u2014 add 1 to a value
 --   3. Add(a, b) \u2014 sum two integers
 --   4. Double(x) \u2014 return x + x
--- ============================================================
+-- --------------------------------------------------------====
 
 Create an abstraction called IntegerOps
 
@@ -3729,7 +3789,7 @@ Return the result
 Add a method called Double that takes x
 Set result to x plus x
 Return the result`,
-        'english_loops': `-- ============================================================
+        'english_loops': `-- --------------------------------------------------------====
 -- Abstraction:  EnglishLoops
 -- Description:  Three iteration patterns in plain-English CLOOMC++
 -- Author:       Church Machine Educational Platform
@@ -3737,12 +3797,12 @@ Return the result`,
 -- Created:      2026-05-09
 -- Language:     English
 -- Dependencies: None
--- ============================================================
+-- --------------------------------------------------------====
 -- Methods:
 --   1. WhileSum(n) -- count n + (n-1) + ... + 1 using a while loop (compiled, BRANCH)
 --   2. RecurseSum(n, total) -- same sum via self-invocation (CALL CR6, 2-word frame)
 --   3. LambdaSum(n, total) -- same sum via lambda recursion (LAMBDA CR6, 1-word frame)
--- ============================================================
+-- --------------------------------------------------------====
 -- ENGLISH: Loops — Three Ways to Iterate
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 --
@@ -3809,7 +3869,7 @@ End if
 Set total to total plus n
 Set n to n minus 1
 Apply lambda with n, total`,
-        'english_packed_string': `-- ============================================================
+        'english_packed_string': `-- --------------------------------------------------------====
 -- Abstraction:  StringOps
 -- Description:  Packed ASCII string operations in plain-English CLOOMC++
 -- Author:       Church Machine Educational Platform
@@ -3817,7 +3877,7 @@ Apply lambda with n, total`,
 -- Created:      2026-05-09
 -- Language:     English
 -- Dependencies: None
--- ============================================================
+-- --------------------------------------------------------====
 -- Methods:
 --   1. Pack4(ch0, ch1, ch2, ch3) -- pack 4 ASCII codes into one 32-bit word
 --   2. Unpack(word, pos) -- extract one character by position (0-3)
@@ -3833,7 +3893,7 @@ Apply lambda with n, total`,
 --  12. ReverseWord(word) -- byte-reverse the 4 packed characters
 --  13. CompareWords(w1, w2) -- return 1 if all 4 bytes match
 --  14. CountLetters(word) -- count how many of the 4 bytes are letters
--- ============================================================
+-- --------------------------------------------------------====
 -- ENGLISH: String Operations
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 --
@@ -4099,7 +4159,7 @@ If ch3 is greater than 96
     End if
 End if
 Return count`,
-        'lambda_church_numerals': `-- ============================================================
+        'lambda_church_numerals': `-- --------------------------------------------------------====
 -- Abstraction:  ChurchNumerals
 -- Description:  Church numeral arithmetic (zero through isZero) and Church-path vs compiled-path comparison
 -- Author:       Church Machine Educational Platform
@@ -4107,7 +4167,7 @@ Return count`,
 -- Created:      2026-05-09
 -- Language:     Lambda
 -- Dependencies: None
--- ============================================================
+-- --------------------------------------------------------====
 -- Methods:
 --   1. zero() — Church numeral zero: λf.λx.x
 --   2. successor(n) — Church successor: n + 1
@@ -4119,7 +4179,7 @@ Return count`,
 --   8. church_add / compiled_add — Church-path vs compiled-path for addition
 --   9. church_multiply / compiled_multiply — Church-path vs compiled-path
 --  10. compare_paths(x, y) — compares local Church and compiled results
--- ============================================================
+-- --------------------------------------------------------====
 -- LAMBDA CALCULUS
 -- Church Numerals \u2014 numbers as pure functions
 -- \u03BBf.\u03BBx.x = 0, \u03BBf.\u03BBx.f x = 1, \u03BBf.\u03BBx.f (f x) = 2 ...
@@ -4169,7 +4229,7 @@ abstraction ChurchNumerals {
     -- is calculated as a local let-bound result.
     method compare_paths(x, y) = let church_result == x + y in let compiled_result == x + y in if church_result == compiled_result then 1 else 0
 }`,
-        'lambda_church_encoding': `-- ============================================================
+        'lambda_church_encoding': `-- --------------------------------------------------------====
 -- Abstraction:  ChurchEncoding
 -- Description:  Church boolean encoding: TRUE/FALSE selectors and derived logic gates
 -- Author:       Church Machine Educational Platform
@@ -4177,7 +4237,7 @@ abstraction ChurchNumerals {
 -- Created:      2026-05-09
 -- Language:     Lambda
 -- Dependencies: None
--- ============================================================
+-- --------------------------------------------------------====
 -- Methods:
 --   1. true_(x, y) — Church TRUE: λx.λy.x (first selector)
 --   2. false_(x, y) — Church FALSE: λx.λy.y (second selector)
@@ -4189,7 +4249,7 @@ abstraction ChurchNumerals {
 --   8. first(p) — extract first element: p true_
 --   9. second(p) — extract second element: p false_
 --  10. swap(p) — exchange elements: pair(second p, first p)
--- ============================================================
+-- --------------------------------------------------------====
 -- LAMBDA CALCULUS
 -- Church Booleans — truth values as pure selector functions
 -- TRUE  = λx.λy.x   → picks the FIRST argument
@@ -4247,7 +4307,7 @@ abstraction ChurchEncoding {
         if p < 256 then p * 256
         else (p - (p / 256) * 256) * 256 + p / 256
 }`,
-        'lambda_fixed_point': `-- ============================================================
+        'lambda_fixed_point': `-- --------------------------------------------------------====
 -- Abstraction:  FixedPoint
 -- Description:  Y combinator and fixed-point decimal arithmetic
 -- Author:       Church Machine Educational Platform
@@ -4255,7 +4315,7 @@ abstraction ChurchEncoding {
 -- Created:      2026-05-09
 -- Language:     Lambda
 -- Dependencies: None
--- ============================================================
+-- --------------------------------------------------------====
 -- Methods:
 --   1. factorial(n) \u2014 n! via Y combinator recursion pattern
 --   2. fibonacci(n) \u2014 nth Fibonacci
@@ -4269,7 +4329,7 @@ abstraction ChurchEncoding {
 --  10. divFixed(a, b) \u2014 divide fixed-point (pre-scaled)
 --  11. percent(whole, pct) \u2014 what is pct% of whole?
 --  12. roundFixed(f) \u2014 round fixed-point to nearest integer
--- ============================================================
+-- --------------------------------------------------------====
 -- LAMBDA CALCULUS
 -- Y Combinator and Fixed-Point Arithmetic
 -- Y = \u03BBf.(\u03BBx.f (x x)) (\u03BBx.f (x x))
@@ -4326,7 +4386,7 @@ abstraction FixedPoint {
     -- Round fixed-point to nearest integer
     method roundFixed(f) = (f + 50) / 100
 }`,
-        'lambda_sliderule': `-- ============================================================
+        'lambda_sliderule': `-- --------------------------------------------------------====
 -- Abstraction:  LambdaSlideRule
 -- Description:  Logarithmic slide-rule operations as pure functions
 -- Author:       Church Machine Educational Platform
@@ -4334,7 +4394,7 @@ abstraction FixedPoint {
 -- Created:      2026-05-09
 -- Language:     Lambda
 -- Dependencies: None
--- ============================================================
+-- --------------------------------------------------------====
 -- Methods:
 --   1. Multiply(a, b) \u2014 C/D scale: a \u00d7 b
 --   2. Divide(a, b) \u2014 C/D scale: a / b
@@ -4348,7 +4408,7 @@ abstraction FixedPoint {
 --  10. Clamp(x, lo, hi) \u2014 clamp to [lo, hi]
 --  11. Max(a, b) \u2014 larger of two values
 --  12. Min(a, b) \u2014 smaller of two values
--- ============================================================
+-- --------------------------------------------------------====
 -- LAMBDA CALCULUS
 -- Slide Rule \u2014 logarithmic computation as pure functions
 -- A slide rule computes via log identities:
@@ -4450,7 +4510,7 @@ abstraction LambdaSlideRule {
     -- Min: \u03BBa.\u03BBb.if a < b then a else b
     method Min(a, b) = if a < b then a else b
 }`,
-        'lambda_rational': `-- ============================================================
+        'lambda_rational': `-- --------------------------------------------------------====
 -- Abstraction:  RationalArithmetic
 -- Description:  Exact rational number arithmetic on 32-bit integer hardware
 -- Author:       Church Machine Educational Platform
@@ -4458,7 +4518,7 @@ abstraction LambdaSlideRule {
 -- Created:      2026-05-09
 -- Language:     Lambda
 -- Dependencies: None
--- ============================================================
+-- --------------------------------------------------------====
 -- Methods:
 --   1. numerator(n, d) \u2014 normalised numerator (divides by gcd)
 --   2. denominator(n, d) \u2014 normalised denominator (divides by gcd)
@@ -4471,7 +4531,7 @@ abstraction LambdaSlideRule {
 --   9. divDen(n1, d1, n2, d2) \u2014 denominator of (n1/d1) / (n2/d2)
 --  10. isEqual(n1, d1, n2, d2) \u2014 test equality (cross-multiply)
 --  11. gcd(a, b) \u2014 greatest common divisor (Euclidean algorithm)
--- ============================================================
+-- --------------------------------------------------------====
 -- LAMBDA CALCULUS
 -- Rational Arithmetic \u2014 exact fractions on integer hardware
 -- A fraction is (numerator, denominator)
@@ -4522,7 +4582,7 @@ abstraction RationalArithmetic {
         else if a > b then a - b
         else b - a
 }`,
-        'stack_overflow': `// ============================================================
+        'stack_overflow': `// --------------------------------------------------------====
 // Abstraction:  StackOverflow
 // Description:  Recursive self-call experiment: watch STO drain to BOUNDS fault
 // Author:       Church Machine Educational Platform
@@ -4530,10 +4590,10 @@ abstraction RationalArithmetic {
 // Created:      2026-05-09
 // Language:     CLOOMC++
 // Dependencies: StackOverflow (self)
-// ============================================================
+// --------------------------------------------------------====
 // Methods:
 //   1. run() — entry point: call self recursively until BOUNDS fault fires
-// ============================================================
+// --------------------------------------------------------====
 // ── Stack Overflow Experiment ──
 // The Church Machine thread lump has 256 words.
 // The IDE sets sw=32 stack words in the thread
@@ -4569,7 +4629,7 @@ abstraction StackOverflow {
     }
 }`,
 
-        'recall_demo': `// ============================================================
+        'recall_demo': `// --------------------------------------------------------====
 // Abstraction:  Feedback
 // Description:  Demonstrates recall() — the event-loop primitive (CALL CR6)
 // Author:       Church Machine Educational Platform
@@ -4577,10 +4637,10 @@ abstraction StackOverflow {
 // Created:      2026-05-09
 // Language:     CLOOMC++
 // Dependencies: None
-// ============================================================
+// --------------------------------------------------------====
 // Methods:
 //   1. run() — enter the event loop via recall()
-// ============================================================
+// --------------------------------------------------------====
 // ── recall() — Re-call self via CR6 ──
 // recall() compiles to a single instruction: CALL CR6
 // CR6 always holds the current abstraction, so this
@@ -4615,7 +4675,7 @@ abstraction Feedback {
     }
 }`,
 
-        'billing': `// ============================================================
+        'billing': `// --------------------------------------------------------====
 // Abstraction:  BudgetTracker
 // Description:  Capability-based memory quota accounting (NS slot 47)
 // Author:       Church Machine Educational Platform
@@ -4623,13 +4683,13 @@ abstraction Feedback {
 // Created:      2026-05-09
 // Language:     CLOOMC++
 // Dependencies: Memory, Navana, Mint
-// ============================================================
+// --------------------------------------------------------====
 // Methods:
 //   1. Open(quota) — open a billing account with a memory quota
 //   2. Charge(account, amount) — deduct amount from account quota
 //   3. Balance(account) — return remaining quota
 //   4. Close(account) — close account and release resources
-// ============================================================
+// --------------------------------------------------------====
 // ── Billing (NS 47): Capability-Based Memory Quota ──
 // In a conventional OS, memory limits are enforced by
 // a privileged kernel that any code can try to subvert.
@@ -4697,7 +4757,7 @@ abstraction BudgetTracker {
     }
 }`,
 
-        'turing_memory': `// ============================================================
+        'turing_memory': `// --------------------------------------------------------====
 // Abstraction:  TuringMemory
 // Description:  Code-region allocation charged against a Billing account (NS 48)
 // Author:       Church Machine Educational Platform
@@ -4705,11 +4765,11 @@ abstraction BudgetTracker {
 // Created:      2026-05-09
 // Language:     CLOOMC++
 // Dependencies: Billing, Memory
-// ============================================================
+// --------------------------------------------------------====
 // Methods:
 //   1. AllocCode(account, size) — allocate code region charged to account
 //   2. FreeCode(region) — release a previously allocated code region
-// ============================================================
+// --------------------------------------------------------====
 // ── TuringMemory (NS 48): Code-Region Allocation ──
 // TuringMemory (NS 48) allocates code regions —
 // contiguous physical-memory ranges for executable
@@ -4812,7 +4872,7 @@ abstraction ChurchMemory {
     }
 }`,
 
-        'physical_pool': `// ============================================================
+        'physical_pool': `// --------------------------------------------------------====
 // Abstraction:  DMABuffer
 // Description:  DMA buffer management: Reserve, scratch allocation, and paired scratch buffers
 // Author:       Church Machine Educational Platform
@@ -4820,13 +4880,13 @@ abstraction ChurchMemory {
 // Created:      2026-05-09
 // Language:     CLOOMC++
 // Dependencies: None
-// ============================================================
+// --------------------------------------------------------====
 // Methods:
 //   1. Reserve(size) — reserve a block of 'size' physical words; returns (location, size)
 //   2. Scratch(words) — allocate a scratch buffer; delegates to Memory.Allocate
 //   3. Drop(location) — return a scratch buffer to the pool via Memory.Free
 //   4. ScratchPair(words) — allocate two matched scratch buffers; rolls back on failure
-// ============================================================
+// --------------------------------------------------------====
 // ── Memory (NS 7): Raw Physical Word Allocation ──
 // Memory is the bottom of the Church Machine's
 // memory hierarchy — raw word-addressed blocks with

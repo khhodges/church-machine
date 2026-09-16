@@ -1,5 +1,6 @@
 """Dependency-free canonical LUMP approval-ledger contract."""
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -15,6 +16,8 @@ RECORD_FIELDS = frozenset({
     "history_note", "release_notes", "grants", "capability_type",
     "identity_string", "identity_seal_location", "bootstrap_t",
     "bootstrap_runtime_gt", "save_as_latest",
+    "trust_origin", "compiler_identity", "compiler_version",
+    "compiler_record", "integrity_record",
 })
 INTRINSIC_FIELDS = frozenset({
     "cw", "cc", "typ", "lump_size", "source", "api_definition",
@@ -22,6 +25,44 @@ INTRINSIC_FIELDS = frozenset({
     "content_type", "profile", "language",
 })
 IDENTITY_SEAL_LOCATIONS = frozenset({"approval"})
+
+
+def compiler_tcb_key(secret) -> bytes:
+    """Derive the TCB-only compiler evidence key.
+
+    The key is never accepted from an artifact or browser request.  App and
+    boot-image processes derive the same key from the server session secret.
+    """
+    return hashlib.sha256(
+        ("ChurchMachine.BankCustody|" + str(secret)).encode("utf-8")
+    ).digest()
+
+
+def configured_compiler_tcb_key(environ=None) -> bytes:
+    """Return the dedicated, fail-closed compiler attestation key."""
+    source = os.environ if environ is None else environ
+    secret = source.get("M_BIT_IDE_SECRET")
+    if (not isinstance(secret, str) or len(secret) < 32
+            or secret == "dev-secret-key"):
+        raise RuntimeError(
+            "trusted compiler attestations require a dedicated high-entropy "
+            "M_BIT_IDE_SECRET")
+    return hashlib.sha256(
+        ("ChurchMachine.CompilerAttestation.v1|" + secret).encode("utf-8")
+    ).digest()
+
+
+def sign_compiler_record(record, *, signing_key):
+    """Return an opaque server-signed record."""
+    if not isinstance(record, dict):
+        raise ValueError("compiler record must be an object")
+    unsigned = dict(record)
+    unsigned.pop("signature", None)
+    canonical = json.dumps(unsigned, sort_keys=True, separators=(",", ":"))
+    unsigned["signature"] = hmac.new(
+        bytes(signing_key), canonical.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
+    return unsigned
 
 
 def validate_record(digest, record):
@@ -32,6 +73,18 @@ def validate_record(digest, record):
     unknown = set(record) - RECORD_FIELDS
     if unknown:
         raise ValueError(f"approval record contains unsupported fields: {sorted(unknown)}")
+    origin = record.get("trust_origin")
+    if origin is not None and origin not in {
+            "trusted-home-ide", "untrusted-upload", "human-vouched",
+            "bootstrap-authorized"}:
+        raise ValueError("approval trust_origin is unsupported")
+    if origin == "trusted-home-ide":
+        if not isinstance(record.get("compiler_identity"), str) or not record["compiler_identity"]:
+            raise ValueError("trusted compiler record requires compiler_identity")
+        if not isinstance(record.get("compiler_version"), str) or not record["compiler_version"]:
+            raise ValueError("trusted compiler record requires compiler_version")
+        if not isinstance(record.get("compiler_record"), dict):
+            raise ValueError("trusted compiler record requires integrity-protected compiler_record")
     identity_string = record.get("identity_string")
     seal_location = record.get("identity_seal_location")
     if identity_string is not None or seal_location is not None:
@@ -80,6 +133,45 @@ def validate_envelope(value):
         raise ValueError("approval ledger must use the strict version-1 sha256 envelope")
     return {digest: validate_record(digest, record)
             for digest, record in value["approvals"].items()}
+
+
+def is_trusted_compiler_record(record, *, binary=None, signing_key=None):
+    """Whether *record* is compiler admission evidence, not an approval.
+
+    Callers must still authenticate the envelope and the artifact hash before
+    using this predicate.  Keeping the predicate here prevents each delivery
+    path from inventing a subtly different trust spelling.
+    """
+    valid = (
+        isinstance(record, dict)
+        and record.get("trust_origin") == "trusted-home-ide"
+        and isinstance(record.get("compiler_identity"), str)
+        and bool(record["compiler_identity"])
+        and isinstance(record.get("compiler_version"), str)
+        and bool(record["compiler_version"])
+        and isinstance(record.get("compiler_record"), dict)
+    )
+    if not valid:
+        return False
+    inner = record["compiler_record"]
+    if inner.get("binary_hash") != record.get("binary_hash"):
+        return False
+    if binary is not None:
+        if not isinstance(binary, (bytes, bytearray)):
+            return False
+        if hashlib.sha256(bytes(binary)).hexdigest() != record.get("binary_hash"):
+            return False
+    if signing_key is not None:
+        signature = inner.get("signature")
+        unsigned = dict(inner)
+        unsigned.pop("signature", None)
+        canonical = json.dumps(unsigned, sort_keys=True, separators=(",", ":"))
+        expected = hmac.new(
+            bytes(signing_key), canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+        if (not isinstance(signature, str)
+                or not hmac.compare_digest(signature, expected)):
+            return False
+    return True
 
 
 def read_approvals(path, missing_ok=True):

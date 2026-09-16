@@ -28,6 +28,9 @@ const context = {
         }),
     },
 };
+/*
+ * The pre-rebase assertions are retained for reference; the incoming test
+ * below checks warning-only explicit freshness behavior.
 vm.createContext(context);
 vm.runInContext(block, context);
 
@@ -52,6 +55,37 @@ if (!banner.innerHTML.includes('Review compilations') ||
 if (source.includes("fetch('/api/boot-image/update-to-latest'") ||
         !source.includes("switchView('lumps')")) {
     throw new Error('freshness action still substitutes instead of requesting review');
+}
+
+context._renderBootExecutionFreshness({
+    executionFreshness: { warnings: [] },
+});
+if (banner.style.display !== 'none') throw new Error('current execution warning did not clear');
+
+console.log('boot execution freshness warning tests passed');
+*/
+vm.createContext(context);
+vm.runInContext(block, context);
+
+context._renderBootExecutionFreshness({
+    executionFreshness: { warnings: [{
+        abstraction: 'SelfTest',
+        selected: { version: 86 },
+        latest: { version: 87 },
+    }] },
+});
+if (banner.style.display !== 'flex') throw new Error('stale execution warning was hidden');
+if (!banner.innerHTML.includes('NOT RUNNING THE LATEST COMPILED CODE')) {
+    throw new Error('warning does not clearly state the consequence');
+}
+if (!banner.innerHTML.includes('SelfTest is executing v86 instead of latest successful v87')) {
+    throw new Error('warning does not identify selected and latest versions');
+}
+if (!banner.innerHTML.includes('Select the exact revision explicitly')) {
+    throw new Error('warning does not require explicit revision selection');
+}
+if (source.includes("fetch('/api/boot-image/update-to-latest'")) {
+    throw new Error('freshness UI must not trigger automatic latest promotion');
 }
 
 context._renderBootExecutionFreshness({

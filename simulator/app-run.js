@@ -8907,7 +8907,7 @@ tL81:
 ; ═══════════════════════════════════════════════════════════════════════════════
 done:
     ISUB DR0, DR0, DR0      ; DR0 = 0 (all 81 tests passed)
-    ELOADCALL CR1, Next     ; load Next.GT from c-list[1] and ELOADCALL to it (replaces lump in-place)`,
+    RETURN                  ; resume the boot continuation selected by the runtime`,
         'gt_v1_1_test': `; GT Encoding v1.1 Hardware Self-Test
 ; =====================================
 ; A CLOOMC program that exercises the live mLoad capability pipeline to

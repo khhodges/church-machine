@@ -341,8 +341,8 @@ def test_lump_list_hides_archived_bootstrap_but_words_expose_identity_comparison
 @pytest.mark.parametrize(
     ("token", "abstraction", "active_filename"),
     [
-        ("4a000006", "SelfTest", "SelfTest.86.f37bafd6.lump"),
-        ("4a000007", "WukongCallHome", "WukongCallHome.1.e8cb2017.lump"),
+        ("4a000006", "SelfTest", "SelfTest.1.48acae47.lump"),
+        ("4a000007", "WukongCallHome", "WukongCallHome.1.74c8ff97.lump"),
         ("4a00000a", "CapabilityTest", "CapabilityTest.2.e794a764.lump"),
     ],
 )

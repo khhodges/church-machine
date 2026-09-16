@@ -236,6 +236,22 @@ if (residentRows.length !== 1) {
 // ── Write .lump binary ───────────────────────────────────────────────────────
 const lumpPath    = path.join(LUMPS_DIR, filename);
 
+// The Namespace-selected resident filename is itself an immutable locator.
+// Check it before computing/publicating the new content-id: otherwise a
+// damaged resident body can be silently bypassed when the rebuilt bytes
+// receive a different content-derived filename.
+const stateResident = residentRows[0];
+if (stateResident && stateResident.filename) {
+    const selectedPath = path.join(LUMPS_DIR, stateResident.filename);
+    if (fs.existsSync(selectedPath) &&
+        stateResident.binary_hash &&
+        crypto.createHash('sha256').update(fs.readFileSync(selectedPath))
+            .digest('hex') !== stateResident.binary_hash) {
+        throw new Error(
+            `refusing to overwrite immutable history after content-id collision: ${stateResident.filename}`);
+    }
+}
+
 if (fs.existsSync(lumpPath) && !fs.readFileSync(lumpPath).equals(bytes)) {
     throw new Error(`refusing to overwrite immutable history after content-id collision: ${filename}`);
 }

@@ -24,6 +24,7 @@ Configurations exercised:
   * `step2_resident`    — Step-2 resident lump with a physAddr override
   * `step3_reservation` — Step-3 empty NS slot reservations
 """
+import hashlib
 import json
 import os
 import struct
@@ -31,6 +32,39 @@ import subprocess
 import sys
 
 import pytest
+@pytest.fixture(autouse=True)
+def _configured_compiler_attestation_key(monkeypatch):
+    monkeypatch.setenv("M_BIT_IDE_SECRET", "boot-image-test-secret-" + "a" * 32)
+
+
+def _trusted_compiler_approval(raw, filename, dot_name, issue_n):
+    from server.lump_approvals import (
+        configured_compiler_tcb_key,
+        sign_compiler_record,
+    )
+    digest = hashlib.sha256(raw).hexdigest()
+    compiler_identity = "Boot image fixture compiler"
+    compiler_version = "test"
+    return {
+        "binary_hash": digest,
+        "filename": filename,
+        "dot_name": dot_name,
+        "issue_n": issue_n,
+        "identity_hash": hashlib.sha256(
+            f"{dot_name}#{issue_n}".encode()).hexdigest(),
+        "trust_origin": "trusted-home-ide",
+        "compiler_identity": compiler_identity,
+        "compiler_version": compiler_version,
+        "compiler_record": sign_compiler_record({
+            "binary_hash": digest,
+            "source_hash": "0" * 64,
+            "language": "assembly",
+            "compiler_identity": compiler_identity,
+            "compiler_version": compiler_version,
+        }, signing_key=configured_compiler_tcb_key()),
+    }
+
+
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)
@@ -288,11 +322,8 @@ def _write_synthetic_boot_abstr_lump(
     with open(lump_path, "wb") as f:
         f.write(raw)
     digest = hashlib.sha256(raw).hexdigest()
-    approval = {
-            "binary_hash": digest, "filename": lump_name, "dot_name": "SelfTest",
-            "issue_n": 1,
-            "identity_hash": hashlib.sha256(b"SelfTest#1").hexdigest(),
-    }
+    approval = _trusted_compiler_approval(
+        raw, lump_name, "SelfTest", 1)
     if bootstrap_token is not None:
         approval.update({
             "bootstrap_t": bootstrap_token,
@@ -558,9 +589,8 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
     saved_path.write_bytes(saved_bytes)
     digest = hashlib.sha256(saved_bytes).hexdigest()
     write_approvals(str(tmp_path / "approvals.json"), {
-        digest: {"binary_hash": digest, "filename": saved_filename,
-                 "dot_name": "SelfTest", "issue_n": 1,
-                 "identity_hash": hashlib.sha256(b"SelfTest#1").hexdigest()}
+        digest: _trusted_compiler_approval(
+            saved_bytes, saved_filename, "SelfTest", 1)
     })
     # Manifest without 'filename' field: find_lump_file_by_abstraction() falls
     # back to the token-named file written above.
@@ -721,12 +751,8 @@ def test_boot_image_next_gt_follows_lightning_bolt(tmp_path, lightning_slot, sta
     _digest = hashlib.sha256(_raw).hexdigest()
     _dot_name, _issue_n, _number = parse_canonical_filename(CANONICAL_FILENAME)
     write_approvals(str(tmp_path / "approvals.json"), {
-        _digest: {
-            "binary_hash": _digest, "filename": CANONICAL_FILENAME,
-            "dot_name": _dot_name, "issue_n": _issue_n,
-            "identity_hash": hashlib.sha256(
-                f"{_dot_name}#{_issue_n}".encode()).hexdigest(),
-        },
+        _digest: _trusted_compiler_approval(
+            _raw, CANONICAL_FILENAME, _dot_name, _issue_n),
     })
 
     # Parse lump header to get CC and LUMP_SIZE from the actual binary.

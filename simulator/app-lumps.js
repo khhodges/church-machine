@@ -5856,9 +5856,68 @@ async function _submitLumpImport() {
                 nextAction: 'Correct the selected file or metadata, then click Import again.',
             }));
         }
+        // Uploaded bytes are untrusted, inert data until the server has
+        // completed every admission gate and Mint has issued the executable
+        // E-GT.  In particular, do not pass an upload token to the registry,
+        // Namespace, or run path merely because parsing/import succeeded.
+        let detailToken = result.token;
+        if (ct === 'lump') {
+            // Upload is only quarantine.  Collect every placement decision and
+            // obtain a server-issued, one-use intent before phase two.
+            const revision = Number(prompt('Exact artifact revision:', '1'));
+            const destination_slot = Number(prompt('Exact Namespace slot:', '0'));
+            const replace = confirm('Replace the existing Namespace entry if occupied?');
+            const resident = confirm('Make this artifact resident?');
+            const boot = confirm('Make this artifact the boot entry?');
+            const derivedRights = Array.isArray(result.required_rights)
+                ? result.required_rights : [];
+            const grantText = prompt(
+                `Derived required capability rights: ${derivedRights.join(', ') || 'none'}\n` +
+                'Explicit grants (comma separated):', derivedRights.join(', '));
+            const grants = (grantText || '').split(',').map(v => v.trim()).filter(Boolean);
+            const choices = {revision, destination_slot, replace, resident, boot};
+            if (!Number.isInteger(revision) || revision < 1 ||
+                    !Number.isInteger(destination_slot) || destination_slot < 0) {
+                throw new Error('Admission stopped: exact revision and Namespace slot are required.');
+            }
+            const intentResp = await fetch('/api/lumps/approval-intent', {
+                method: 'POST', credentials: 'same-origin',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    digest: result.binary_hash, action: 'import-approval',
+                    confirmation: true, approval: {
+                        grants,
+                        admission: {
+                            name,
+                            ...choices,
+                            capabilities: result.required_capabilities || [],
+                        },
+                    },
+                })
+            });
+            const intentData = await intentResp.json();
+            if (!intentResp.ok || !intentData.intent)
+                throw new Error(intentData.error || 'Server approval intent was not issued.');
+            const phase = await window.LumpAdmission.admitUploadPhaseTwo(
+                {token: result.token, name, requested_capabilities: grants,
+                 granted_capabilities: grants,
+                 binary_hash: result.binary_hash,
+                 approved_capabilities: result.required_capabilities || []},
+                choices, intentData.intent);
+            if (!phase.ok) {
+                // Keep the server response available for read-only inspection,
+                // but never make it a current/live artifact.
+                if (window.LumpRegistry && result.token) {
+                    window.LumpRegistry.evictMemory(result.token);
+                    window.LumpRegistry.setCurrent(null);
+                }
+                throw new Error(phase.message || 'Admission remains inert: Gate 0–5 and Mint are required.');
+            }
+            detailToken = phase.token;
+        }
         closeLumpImportModal();
         await renderLumps();
-        showLumpDetail(result.token);
+        showLumpDetail(detailToken);
     } catch (err) {
         errEl.textContent = err && /\bNo data was changed\b/.test(err.message)
             ? err.message
@@ -7629,9 +7688,7 @@ window.editorSaveLump = function() {
         }
     };
 
-    var _regMem = window.LumpRegistry
-        ? (window.LumpRegistry.resolve(window.LumpRegistry.getCurrent()) || {}).sources
-        : null;
+    var _regMem = _regEntry ? _regEntry.sources : null;
     var _hasCompiledWords = !!(_regMem && _regMem.memory && _regMem.memory.words
                                && _regMem.memory.words.length > 0);
     if (_hasCompiledWords) {
@@ -7964,16 +8021,13 @@ window.showFormatLump = async function() {
         var _profile = _profiles[_profileIndex];
         var _built = await _lcf.lumpBuildContentFrame(_apiObj, _srcText, { profile: _profile });
         var _frameWds = _built.frameWords;
-        var _svLumpSize = 64;
+    var _svLumpSize = _selectedCandidate.lumpSize;
         var _fsStart = 1 + _svCW;
         while ((_svLumpSize - _svCC - _fsStart) < _frameWds.length) _svLumpSize = _svLumpSize << 1;
         var _svNm6 = 0;
         while ((64 << _svNm6) < _svLumpSize) _svNm6++;
-        var _svHdr = (((0x1F & 0x1F) << 27) |
-                      ((_svNm6 & 0x0F) << 23) |
-                      ((_svCW & 0x1FFF) << 10) |
-                      (_svCC & 0xFF)) >>> 0;
-        var _svBinary = new Array(_svLumpSize).fill(0);
+    var _svHdr = _selectedCandidate.binary[0] >>> 0;
+    var _svBinary = _selectedCandidate.binary;
         _svBinary[0] = _svHdr;
         for (var _wordIndex = 0; _wordIndex < _svCW; _wordIndex++) {
             _svBinary[1 + _wordIndex] = _svWords[_wordIndex] >>> 0;
@@ -8944,6 +8998,9 @@ async function _confirmLumpSavePlan(words, metadata, prompt, options) {
         plan,
         intent,
         final_binary: finalBinary.slice(),
+        // Server-issued compiler evidence is opaque to the browser and is
+        // carried only so the final save can present it unchanged.
+        compiler_record: plan.compiler_record || null,
     };
 }
 window._confirmLumpSavePlan = _confirmLumpSavePlan;

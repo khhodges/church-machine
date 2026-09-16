@@ -780,16 +780,7 @@ tL81:
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
-; All 81 tests passed — call through Next.GT (c-list[1]) to continue
-; NOTE: RETURN is intentionally absent here.  The boot CALL from boot_rom.py
-; pushes a frame with returnPC = byte 0x00C (the word after the boot CALL
-; instruction), which lies outside every valid lump.  Any RETURN at this
-; depth would fault RANGE and restart the boot, creating an infinite reboot
-; loop.  ELOADCALL (CALL with cr_dst == cr_src) does not push its own frame
-; (it replaces the current lump in-place), so the only frame visible here
-; is the boot CALL frame — ELOADCALL is safe here without a RETURN.
-; Default (boot_image.py bakes SelfTest E-GT into c-list[1]): self-loop.
-; Configured (IDE "→ Next" secondary ⚡): transitions to the chosen abstraction.
+; All 81 tests passed — return to the runtime-selected boot continuation.
 ; ═══════════════════════════════════════════════════════════════════════════════
 done:
     ISUB DR0, DR0, DR0      ; DR0 = 0 (all 81 tests passed)
