@@ -121,7 +121,7 @@
 - [Resident image binding validation](resident-image-binding-validation.md) — compare immutable artifact payload plus slot/sequence/allocation; c-list rows are destination-localized
 - [Localized c-list provenance](localized-clist-provenance.md) — bind generated images to both selected artifact hashes and resulting localized capability rows
 - [Editor source authority](editor-source-authority.md) — persisted sources reopen from current authority; divergent browser buffers remain explicit recoverable drafts
-- [C-list row zero advisory SELF](clist-row-zero-advisory-self.md) — new C-lists start with SELF; existing owner-token mismatches warn only and preserve programmer data
+- [C-list row zero SELF boundary](clist-row-zero-advisory-self.md) — compiler output must establish SELF at row zero; immutable historical bytes remain inspectable without rewriting
 - [Latest saved LUMP selection](latest-saved-lump-selection.md) — live identity stays exact, while editor and Run choose the newest saved revision even if history-marked
 - [Trace-symbol preview isolation](trace-symbol-preview-isolation.md) — invalid factory artifacts must block hardware builds without taking down the web IDE’s fallback trace labels
 - [Actionable error reports](actionable-error-reporting.md) — visible errors must state what failed, the real reason, whether data changed, and a concrete next action

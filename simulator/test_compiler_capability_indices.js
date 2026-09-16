@@ -323,17 +323,19 @@ check('direct compileJS leaves an uploaded symbolic_self alias untouched', () =>
     assert.strictEqual(decodeEloadcall(eloadcallWords(result)[0]).row, 1);
 });
 
-check('a concrete upload at source row zero suppresses implicit SELF insertion', () => {
+check('a concrete non-SELF upload at row zero faults without moving rows', () => {
     const source = `abstraction Caller {
         capabilities { Foo E }
         method Run() {
             Foo.Run()
         }
     }`;
-    const result = compileOrThrow(new CLOOMCCompiler(), source, [
+    const result = new CLOOMCCompiler().compile(source, [
         { name: 'Foo', token: 0, grants: ['E'] },
     ]);
 
+    assert.ok(result.errors.some(error =>
+        /C-list fault: row 0 must be SELF/.test(error.message)));
     assert.deepStrictEqual(capabilityNames(result.capabilities), ['Foo']);
     assert.strictEqual(result.capabilities[0].token, 0);
     assert.strictEqual(result.capabilities[0].compiler_owned_self, undefined);
@@ -341,7 +343,7 @@ check('a concrete upload at source row zero suppresses implicit SELF insertion',
     assert.strictEqual(decodeEloadcall(eloadcallWords(result)[0]).row, 0);
 });
 
-check('concrete upload skeleton is a fixed layout, including its NULL hole', () => {
+check('invalid concrete upload skeleton faults and preserves its NULL hole', () => {
     const source = `abstraction Caller {
         capabilities {
             Foo E,
@@ -359,8 +361,10 @@ check('concrete upload skeleton is a fixed layout, including its NULL hole', () 
         { name: 'Bar', rights: ['E'] },
     ];
     const before = JSON.parse(JSON.stringify(uploads));
-    const result = compileOrThrow(new CLOOMCCompiler(), source, uploads);
+    const result = new CLOOMCCompiler().compile(source, uploads);
 
+    assert.ok(result.errors.some(error =>
+        /C-list fault: row 0 must be SELF/.test(error.message)));
     assert.deepStrictEqual(capabilityNames(result.capabilities),
         ['Pinned', 'Foo', 'NULL', 'Bar']);
     assert.strictEqual(result.capabilities[0].token, 0xCAFE);
@@ -395,13 +399,15 @@ for (const concreteField of ['token', 'gt', 'word0']) {
     });
 }
 
-check('numeric zero upload is also a fixed row-zero layout', () => {
-    const result = compileOrThrow(new CLOOMCCompiler(), EMPTY_CAPABILITY_SOURCE, [
+check('unnamed numeric row zero faults because SELF cannot be established', () => {
+    const result = new CLOOMCCompiler().compile(EMPTY_CAPABILITY_SOURCE, [
         0,
         { name: 'Foo', rights: ['E'] },
         { name: 'Bar', rights: ['E'] },
     ]);
 
+    assert.ok(result.errors.some(error =>
+        /C-list fault: row 0 must be SELF/.test(error.message)));
     assert.strictEqual(result.capabilities[0], 0);
     assert.strictEqual(result.capabilities[1].name, 'Foo');
     assert.strictEqual(result.capabilities[2].name, 'Bar');
@@ -527,13 +533,15 @@ function checkAssemblyCase(label, source, expectedNames, expectedRow) {
     });
 }
 
-checkAssemblyCase(
-    'assembly Foo at row zero',
-    `capabilities { Foo E }
-ELOADCALL CR0, CR6, #0, 4`,
-    ['Foo'],
-    0,
-);
+check('assembly faults when row zero is not SELF', () => {
+    const source = `capabilities { Foo E }
+ELOADCALL CR0, CR6, #0, 4`;
+    const assembled = new ChurchAssembler().assemble(source);
+    assert.deepStrictEqual(assembled.errors, []);
+    const compiled = new CLOOMCCompiler().compile(source);
+    assert.ok(compiled.errors.some(error =>
+        /C-list fault: row 0 must be SELF/.test(error.message)));
+});
 
 checkAssemblyCase(
     'assembly SELF/Foo at row one',
@@ -569,6 +577,17 @@ check('SELF cannot be appended to a fixed concrete layout at a nonzero row', () 
         { name: 'Bar', token: 2 },
     ]);
     assert.ok(result.errors.some(error => /SELF must be row 0/.test(error.message)));
+    assert.deepStrictEqual(capabilityNames(result.capabilities), ['Pinned', 'Foo', 'Bar']);
+});
+
+check('fixed concrete C-list faults when row zero is not SELF', () => {
+    const result = new CLOOMCCompiler().compile(EMPTY_CAPABILITY_SOURCE, [
+        { name: 'Pinned', token: 0 },
+        { name: 'Foo', token: 1 },
+        { name: 'Bar', token: 2 },
+    ]);
+    assert.ok(result.errors.some(error =>
+        /C-list fault: row 0 must be SELF/.test(error.message)));
     assert.deepStrictEqual(capabilityNames(result.capabilities), ['Pinned', 'Foo', 'Bar']);
 });
 

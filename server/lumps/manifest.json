@@ -424,7 +424,8 @@
     "filename": "CapabilityTest.2.e794a764.lump",
     "variant_group": "capabilitytest-history",
     "lump_version": 2,
-    "compiled_at": 1789424987.2815309
+    "compiled_at": 1789424987.2815309,
+    "archived": true
   },
   {
     "token": "4a000007",
@@ -551,5 +552,92 @@
       }
     ],
     "operation_id": "21a0de5e-0ee1-4557-8680-9b3c51430c84"
+  },
+  {
+    "token": "4a00000a",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.1.e2b69e5b.lump",
+    "lump_version": 28,
+    "compiled_at": 1789591328.5251067,
+    "dot_name": "CapabilityTest",
+    "issue_n": 1,
+    "petname": "",
+    "content_profile": 2,
+    "output_profile": 2,
+    "capabilities": [
+      {
+        "name": "__SELF__",
+        "rights": [
+          "E"
+        ],
+        "grants": [
+          "E"
+        ],
+        "nsIndex": null,
+        "compiler_owned_self": true,
+        "placeholder": true
+      },
+      {
+        "name": "SelfTest",
+        "rights": [
+          "E"
+        ],
+        "grants": [],
+        "nsIndex": 6
+      },
+      {
+        "name": "LED_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 3
+      },
+      {
+        "name": "UART_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 2
+      },
+      {
+        "name": "BTN_DEV",
+        "rights": [
+          "R"
+        ],
+        "grants": [],
+        "nsIndex": 4
+      },
+      {
+        "name": "TIMER_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 5
+      },
+      {
+        "name": "M_BIT_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 13
+      },
+      {
+        "name": "WukongCallHome",
+        "rights": [
+          "E"
+        ],
+        "grants": [],
+        "nsIndex": 7
+      }
+    ],
+    "operation_id": "eff436d9-d4cf-4478-b740-3f990c20157b"
   }
 ]

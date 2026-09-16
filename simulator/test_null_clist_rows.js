@@ -10,19 +10,20 @@ const CapabilityTokens = require('./capability_tokens.js');
 // An explicit NULL entry occupies a real row without becoming a resolvable name.
 const assembler = new ChurchAssembler();
 const assembled = assembler.assemble([
-    'capabilities { M_BIT_DEV RW, NULL, IRQ E }',
+    'capabilities { SELF E, M_BIT_DEV RW, NULL, IRQ E }',
     'IADD DR1, DR0, #0x2000',
     'DWRITE DR1, CR0, #0',
-    'SWITCH CR13, CR6, #2',
+    'SWITCH CR13, CR6, #3',
 ].join('\n'));
 
 assert.deepStrictEqual(assembled.errors, []);
-assert.strictEqual(assembled.capabilities.length, 3);
-assert.strictEqual(assembled.capabilities[1].null_row, true);
-assert.strictEqual(assembler._capBlockSlots.M_BIT_DEV, 0);
-assert.strictEqual(assembler._capBlockSlots.IRQ, 2);
+assert.strictEqual(assembled.capabilities.length, 4);
+assert.strictEqual(assembled.capabilities[2].null_row, true);
+assert.strictEqual(assembler._capBlockSlots.SELF, 0);
+assert.strictEqual(assembler._capBlockSlots.M_BIT_DEV, 1);
+assert.strictEqual(assembler._capBlockSlots.IRQ, 3);
 assert.strictEqual(assembler._capBlockSlots.NULL, undefined);
-assert.strictEqual(assembled.words[2] & 0x7FFF, 2);
+assert.strictEqual(assembled.words[2] & 0x7FFF, 3);
 
 // Every front-end that uses the shared CLOOMC parser gets the same NULL marker.
 assert.deepStrictEqual(

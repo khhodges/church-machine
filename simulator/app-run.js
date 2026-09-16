@@ -493,17 +493,7 @@ function assembleAndLoad(options) {
         }
         if (result.capabilities && result.capabilities.length > 0) {
             if (typeof _autoFillCapRights === 'function') _autoFillCapRights(result.capabilities);
-            const _cc = result.capabilities.length;
-            listing += `\n; c-list  (${_cc} entr${_cc !== 1 ? 'ies' : 'y'})\n`;
-            listing += `; rights key: [R]=read  [W]=write  [X]=execute  [E]=entry\n`;
-            for (let i = 0; i < result.capabilities.length; i++) {
-                const cap = result.capabilities[i];
-                const capName   = typeof cap === 'string' ? cap : (cap.name || String(cap));
-                const capRights = typeof cap === 'string' ? [] : (cap.rights || []);
-                const permsStr  = capRights.length > 0 ? '  [' + capRights.join('') + ']' : '';
-                const typeStr   = _clistTypeLabel(capName);
-                listing += `  * [${i}]  ${capName.padEnd(14)}${typeStr.padEnd(8)}${permsStr}\n`;
-            }
+            listing += _formatCListListing(result.capabilities);
         }
         if (con) con.innerHTML = _highlightCodeListing(listing);
         if (typeof _clearAsmErrors === 'function') _clearAsmErrors();
@@ -627,17 +617,7 @@ function assembleAndLoad(options) {
     }
     if (result.capabilities && result.capabilities.length > 0) {
         if (typeof _autoFillCapRights === 'function') _autoFillCapRights(result.capabilities);
-        const _cc2 = result.capabilities.length;
-        listing += `\n; c-list  (${_cc2} entr${_cc2 !== 1 ? 'ies' : 'y'})\n`;
-        listing += `; rights key: [R]=read  [W]=write  [X]=execute  [E]=entry\n`;
-        for (let i = 0; i < result.capabilities.length; i++) {
-            const cap = result.capabilities[i];
-            const capName   = typeof cap === 'string' ? cap : (cap.name || String(cap));
-            const capRights = typeof cap === 'string' ? [] : (cap.rights || []);
-            const permsStr  = capRights.length > 0 ? '  [' + capRights.join('') + ']' : '';
-            const typeStr   = _clistTypeLabel(capName);
-            listing += `  * [${i}]  ${capName.padEnd(14)}${typeStr.padEnd(8)}${permsStr}\n`;
-        }
+        listing += _formatCListListing(result.capabilities);
     }
     if (con) con.innerHTML = _highlightCodeListing(listing);
     // Push live snippet history for each labelled section of the raw assembly source
@@ -716,6 +696,31 @@ function _rightsLegendHTML() {
         '<span class="cap-right-x" title="execute">[X]</span>=execute&nbsp; ' +
         '<span class="cap-right-e" title="entry">[E]</span>=entry' +
         '</span>';
+}
+
+function _formatCListListing(capabilities) {
+    const caps = Array.isArray(capabilities) ? capabilities : [];
+    if (caps.length === 0) return '';
+    const rows = caps.map(cap => {
+        const name = typeof cap === 'string' ? cap : (cap.name || String(cap));
+        const rights = typeof cap === 'string' ? [] : (cap.rights || []);
+        return {
+            name,
+            type: _clistTypeLabel(name),
+            permissions: rights.length > 0 ? '[' + rights.join('') + ']' : '',
+        };
+    });
+    const indexWidth = String(rows.length - 1).length;
+    const nameWidth = Math.max(14, ...rows.map(row => row.name.length));
+    const typeWidth = Math.max(6, ...rows.map(row => row.type.length));
+    let listing = `\n; c-list  (${rows.length} entr${rows.length !== 1 ? 'ies' : 'y'})\n`;
+    listing += '; rights key: [R]=read  [W]=write  [X]=execute  [E]=entry\n';
+    rows.forEach((row, index) => {
+        listing += `  * [${String(index).padStart(indexWidth)}]  ` +
+            `${row.name.padEnd(nameWidth)}  ${row.type.padEnd(typeWidth)}  ` +
+            `${row.permissions}\n`;
+    });
+    return listing;
 }
 
 function _clistTypeLabel(name) {

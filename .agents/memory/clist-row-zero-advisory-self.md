@@ -1,14 +1,16 @@
 ---
-name: C-list row zero advisory SELF
-description: Compiler assistance and save-time validation policy for a C-list owner's Golden Token.
+name: C-list row zero SELF boundary
+description: Compiler admission and inspection policy for a C-list owner's Golden Token.
 ---
 
 `SELF` is a universal, case-insensitive contextual pet name. `SELF`, mixed-case spellings, and the internal `__SELF__` spelling all resolve to the current abstraction's Golden Token. Normalize them to exactly one symbolic row-zero owner entry once identity is known. This is compiler assistance, not shared universal authority.
 
-If the programmer later supplies a different row-zero word, preserve it exactly and continue saving. Report the expected and actual words as a warning only. Do not reject, rewrite, auto-fill, or otherwise repair an existing submitted C-list.
+The compiler must fail closed if the finalized C-list does not establish `SELF` at row zero. It may insert its compiler-owned symbolic SELF row for new high-level source, but it must reject concrete layouts whose first row is another or unnamed capability. Complete assembly compilation must likewise reject an explicit capabilities block that does not begin with SELF.
 
-**Why:** Programmers need one stable name analogous to `self` or `this`, while every abstraction must retain a distinct identity. The programmer controls C-list contents; the row-zero owner convention remains advisory for existing concrete entries.
+Existing immutable artifacts remain inspectable without rewriting their bytes; inspection and historical evidence are separate from compiler admission.
 
-**How to apply:** Normalize symbolic SELF aliases in compiler, viewer, Run, Audit, and save-validation paths; never send SELF through the external Namespace/device-registry resolver. Restrict it to row zero and E-only. Existing concrete validation may warn but must not rewrite.
+**Why:** Programmers need one stable name analogous to `self` or `this`, while every abstraction must retain a distinct identity. Emitting a new LUMP without provable row-zero SELF would break owner identity and make later runtime assumptions unsafe.
+
+**How to apply:** Normalize symbolic SELF aliases in compiler, viewer, Run, Audit, and save-validation paths; never send SELF through the external Namespace/device-registry resolver. Restrict it to row zero and E-only. Reject invalid new compiler output, but never rewrite immutable historical bytes during inspection.
 
 ISA `SAVE` may never target c-list row zero through any target CR. Reject statically known row-zero saves in the assembler/compiler and fault `IMMUTABLE_SELF_CAP` before M-bit, permission, Namespace, or memory checks in simulator and hardware.

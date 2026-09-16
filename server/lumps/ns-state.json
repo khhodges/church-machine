@@ -139,14 +139,14 @@
       "seq": 0,
       "seal": "0xDE5196EF",
       "token": "4a00000a",
-      "filename": "CapabilityTest.2.e794a764.lump",
-      "issue_n": 2,
-      "lump_version": 2,
+      "filename": "CapabilityTest.1.e2b69e5b.lump",
+      "issue_n": 1,
+      "lump_version": 28,
       "resident": true,
       "load_policy": "Resident",
       "boot_resident": true,
       "ns_slot_policy": "static",
-      "binary_hash": "55f07137513625e0749de30f5d67a7d979e3fa4eedfef3b499a67f358f28db32",
+      "binary_hash": "6591292b249120aa0a62306237e314f2289ffae42a64bc7556fba336f9330f19",
       "boot": true
     },
     {
@@ -183,6 +183,6 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1789586509.9217753,
+  "generated_at": 1789591328.5690448,
   "committed_raw_fingerprint": "ddebd74b2e149d2c628307881f77fd9bf4f210bfcccfd278bbbcf541c5ae5b21"
 }

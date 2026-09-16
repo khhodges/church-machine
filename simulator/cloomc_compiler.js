@@ -1087,6 +1087,16 @@ class CLOOMCCompiler {
         }
 
         const result = asm.assemble(source);
+        if (asm._hasCapBlock &&
+                (!result.capabilities[0] ||
+                 !/^_?SELF_?$/i.test(String(result.capabilities[0].name || '')))) {
+            result.errors.push({
+                line: asm._capBlockLine || 1,
+                col: 0,
+                endCol: 0,
+                message: 'C-list fault: row 0 must be SELF. Put SELF first in the capabilities block.',
+            });
+        }
 
         if (result.errors && result.errors.length > 0) {
             const normErrors = result.errors.map(e =>
@@ -1214,6 +1224,13 @@ class CLOOMCCompiler {
             outErrors.push({
                 line: 1, col: 0, endCol: 0,
                 message: `Final capabilities list has ${caps.length} entries; only 32 rows fit in the hardware c-list${hasCompilerSelf ? ' (SELF plus 31 additional entries)' : ''}. Remove ${excess} entr${excess === 1 ? 'y' : 'ies'} or split the abstraction into smaller ones.`
+            });
+        }
+        if (outErrors && this._reserveCompilerSelfRow === true &&
+                nameOf(caps[0]) !== '__SELF__') {
+            outErrors.push({
+                line: 1, col: 0, endCol: 0,
+                message: 'C-list fault: row 0 must be SELF. The compiler will not emit a LUMP whose C-list starts with another capability.',
             });
         }
         for (let i = 0; i < caps.length; i++) {

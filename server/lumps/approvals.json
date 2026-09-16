@@ -521,6 +521,20 @@
       "compiled_at": 1789586509.71958,
       "bootstrap_t": "4a000006",
       "bootstrap_runtime_gt": 1241513990
+    },
+    "6591292b249120aa0a62306237e314f2289ffae42a64bc7556fba336f9330f19": {
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "save_as_latest": true,
+      "binary_hash": "6591292b249120aa0a62306237e314f2289ffae42a64bc7556fba336f9330f19",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "filename": "CapabilityTest.1.e2b69e5b.lump",
+      "compiled_at": 1789591328.5251067,
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
     }
   }
 }
