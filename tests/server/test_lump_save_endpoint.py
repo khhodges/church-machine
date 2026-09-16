@@ -935,3 +935,25 @@ def test_resident_namespace_failure_never_enters_commit_helper(
     assert commit_entered is False
     assert json.loads(state.read_text()) == {"abstractions": []}
     assert not list(isolated_lumps.glob("*.lump"))
+
+
+def test_under_lock_transition_conflict_is_safe_revision_retry(
+        isolated_lumps, monkeypatch):
+    def conflict(**_kwargs):
+        raise app_module._LumpTransitionConflict(
+            "LUMP 7c501104 changed while the transition was waiting for its lock")
+
+    words = _words(marker=104)
+    with app_module.app.test_client() as client:
+        payload = _approved_payload(
+            client, words, token="7c501104", name="LockRace")
+        monkeypatch.setattr(
+            app_module, "_commit_lump_history_transition", conflict)
+        response = client.post("/api/lumps/save", json=payload)
+
+    assert response.status_code == 409
+    body = response.get_json()
+    assert body["revision_conflict"] is True
+    assert body["committed"] is False
+    assert body["safe_retry"] is True
+    assert "changed while the transition was waiting" in body["error"]

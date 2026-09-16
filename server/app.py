@@ -13116,7 +13116,12 @@ def save_lump():
         _save_lump_diagnostic_event(
             stage="Commit", event="rejection", outcome="rejected",
             error={"name": "TransitionConflict", "message": str(_transition_conflict)})
-        return jsonify({"error": str(_transition_conflict)}), 409
+        return jsonify({
+            "error": str(_transition_conflict),
+            "revision_conflict": True,
+            "committed": False,
+            "safe_retry": True,
+        }), 409
     except _LumpApprovalStoreError as _approval_err:
         _save_lump_diagnostic_event(
             stage="Commit", event="rejection", outcome="rejected",
