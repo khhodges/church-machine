@@ -874,6 +874,25 @@
     opacity: 1;
 }
 
+.boot-execution-freshness-warning {
+    background: #3b2608;
+    border-top: 1px solid #fbbf24;
+    border-bottom: 1px solid #fbbf24;
+    box-shadow: 0 5px 16px rgba(0,0,0,0.45);
+    color: #ffe29a;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.45;
+    padding: 0.6rem 1rem;
+    text-align: left;
+    width: 100%;
+}
+
+.boot-execution-freshness-warning strong {
+    color: #fbbf24;
+}
+
 .le-save-row {
     display: flex;
     justify-content: flex-start;

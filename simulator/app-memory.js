@@ -43,6 +43,36 @@ window._openSimulatorInstructionSource = _openSimulatorInstructionSource;
 // Fetched once at load and refreshed after every successful Save Namespace.
 // _findSrcLump uses this as its primary lookup to avoid the 3-level fallback.
 window._nsState = null;
+function _renderBootExecutionFreshness(state) {
+    const banner = document.getElementById('bootExecutionFreshnessWarning');
+    if (!banner) return;
+    const freshness = state && state.executionFreshness;
+    const warnings = freshness && Array.isArray(freshness.warnings)
+        ? freshness.warnings : [];
+    if (!warnings.length) {
+        banner.style.display = 'none';
+        banner.textContent = '';
+        return;
+    }
+    const details = warnings.map(function(item) {
+        const selected = item.selected || {};
+        const latest = item.latest || {};
+        const selectedVersion = selected.version == null ? selected.filename : 'v' + selected.version;
+        const latestVersion = latest.version == null ? latest.filename : 'v' + latest.version;
+        return String(item.abstraction) + ' is executing ' + selectedVersion +
+            ' instead of latest successful ' + latestVersion;
+    });
+    banner.innerHTML = '<strong>WARNING: SIMULATOR IS NOT RUNNING THE LATEST COMPILED CODE.</strong> ' +
+        details.map(function(text) {
+            const span = document.createElement('span');
+            span.textContent = text;
+            return span.innerHTML;
+        }).join('; ') +
+        '. Prepare a new boot image before treating simulator results as current.';
+    banner.style.display = 'block';
+}
+window._renderBootExecutionFreshness = _renderBootExecutionFreshness;
+
 function _hydrateNsSymbolicState() {
     const rows = window._nsState && Array.isArray(window._nsState.abstractions)
         ? window._nsState.abstractions : [];
@@ -117,6 +147,7 @@ function _nsInheritSavedArtifactMetadata(rich, saved, symbolic) {
         .then(function(s) {
             if (!s || typeof s !== 'object') return;
             window._nsState = s;
+            _renderBootExecutionFreshness(s);
             _hydrateNsSymbolicState();
             if (typeof window._applyNamespaceBootProjection === 'function') {
                 window._applyNamespaceBootProjection(s);

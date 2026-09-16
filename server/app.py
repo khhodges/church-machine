@@ -5412,6 +5412,58 @@ def boot_image_upload():
     })
 
 
+def _boot_execution_freshness(state, lumps_dir):
+    """Report when committed Namespace bindings are not the newest compilations."""
+    warnings = []
+    manifest = _read_manifest_safe(os.path.join(lumps_dir, "manifest.json"))
+    if not isinstance(manifest, list):
+        return {"status": "unknown", "warnings": []}
+    rows = state.get("abstractions", []) if isinstance(state, dict) else []
+    for selected in rows:
+        if not isinstance(selected, dict) or not selected.get("filename"):
+            continue
+        name = selected.get("name")
+        candidates = [
+            entry for entry in manifest
+            if isinstance(entry, dict)
+            and entry.get("abstraction") == name
+            and entry.get("archived") is not True
+            and entry.get("filename")
+            and os.path.isfile(os.path.join(lumps_dir, entry["filename"]))
+        ]
+        if not candidates:
+            continue
+        latest = max(candidates, key=lambda entry: (
+            entry.get("compiled_at")
+            if isinstance(entry.get("compiled_at"), (int, float)) else -1,
+            entry.get("lump_version")
+            if isinstance(entry.get("lump_version"), int) else -1,
+        ))
+        if (latest.get("filename") == selected.get("filename")
+                and latest.get("token") == selected.get("token")):
+            continue
+        warnings.append({
+            "abstraction": name,
+            "slot": selected.get("slot"),
+            "selected": {
+                "filename": selected.get("filename"),
+                "token": selected.get("token"),
+                "version": selected.get("lump_version"),
+            },
+            "latest": {
+                "filename": latest.get("filename"),
+                "token": latest.get("token"),
+                "version": latest.get("lump_version"),
+                "compiledAt": latest.get("compiled_at"),
+            },
+            "reason": "committed-boot-image-does-not-use-latest-compilation",
+        })
+    return {
+        "status": "stale" if warnings else "current",
+        "warnings": warnings,
+    }
+
+
 @app.route("/api/boot-image/ns-state", methods=["GET"])
 def boot_image_ns_state():
     """Return the committed NS table snapshot (ns-state.json).
@@ -5455,6 +5507,8 @@ def boot_image_ns_state():
                 _state["nextGtSlot"] = None
         except Exception:
             _state["nextGtSlot"] = None
+        _state["executionFreshness"] = _boot_execution_freshness(
+            _state, LUMPS_DIR)
         _state["namespaceFingerprint"] = _namespace_state_fingerprint(
             _state.get("abstractions") or [])
         resp = jsonify(_state)
