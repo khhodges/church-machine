@@ -77,11 +77,65 @@ context._renderBootExecutionFreshness({
 if (banner.style.display !== 'flex' ||
         !banner.innerHTML.includes('SAVE FAILED') ||
         !banner.innerHTML.includes('SelfTest v88') ||
-        !banner.innerHTML.includes('Recover source &amp; retry')) {
+        !banner.innerHTML.includes('different SelfTest ID') ||
+        !banner.innerHTML.includes('Open source to save again')) {
     throw new Error('failed save warning is not explicit and actionable');
 }
+if (!source.includes("'/diagnostic-source'") ||
+        !source.includes("switchView('editor')") ||
+        !source.includes('Try opening source again')) {
+    throw new Error('failed save button does not directly recover source or report failure');
+}
 
-console.log('boot execution freshness warning tests passed');
+const actionStart = source.indexOf('async function _openBootExecutionUpdate');
+const actionEnd = source.indexOf('window._openBootExecutionUpdate = _openBootExecutionUpdate;');
+if (actionStart < 0 || actionEnd < 0) throw new Error('failed save recovery action is missing');
+const editor = {
+    value: '',
+    dispatched: false,
+    dispatchEvent() { this.dispatched = true; },
+};
+const status = { textContent: '' };
+const button = { disabled: false, textContent: '' };
+let switchedTo = null;
+const actionContext = {
+    window: {
+        _bootExecutionRepairTarget: {
+            abstraction: 'SelfTest',
+            token: '4c35bef2',
+            revision: 88,
+            failedSave: true,
+        },
+    },
+    document: {
+        getElementById(id) {
+            if (id === 'bootExecutionUpdateStatus') return status;
+            if (id === 'bootExecutionUpdateButton') return button;
+            if (id === 'asmEditor') return editor;
+            return null;
+        },
+    },
+    fetch: async () => ({
+        ok: true,
+        json: async () => ({ source: 'CALL CR0' }),
+    }),
+    Event: function Event() {},
+    switchView(view) { switchedTo = view; },
+    encodeURIComponent,
+    String,
+};
+vm.createContext(actionContext);
+vm.runInContext(source.slice(actionStart, actionEnd), actionContext);
+actionContext._openBootExecutionUpdate().then(result => {
+    if (result !== true || editor.value !== 'CALL CR0' ||
+            !editor.dispatched || switchedTo !== 'editor') {
+        throw new Error('failed save recovery button did not open source in Programs');
+    }
+    console.log('boot execution freshness warning tests passed');
+}).catch(error => {
+    console.error(error);
+    process.exit(1);
+});
 */
 vm.createContext(context);
 vm.runInContext(block, context);
