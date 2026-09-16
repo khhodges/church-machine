@@ -154,3 +154,4 @@
 - [Retired fused instruction cutover](retired-fused-instruction-cutover.md) — manual source correction, hard compile errors, and only three boot-loaded LUMPs
 - [Thread root-frame invariant](thread-root-frame-invariant.md) — every fresh Thread image carries the canonical poison-root frame; direct runs activate it rather than creating one
 - [Executed-artifact freshness warning](executed-artifact-freshness-warning.md) — bootable is not current; always expose committed-vs-latest LUMP mismatches before simulation
+- [Trusted compiler and uploaded LUMPs](lump-trust-paths.md) — local compiler output is authoritative; unknown uploads stay inert through admission; placement is explicit and fail-closed
