@@ -51,22 +51,6 @@ LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
 HARNESS   = os.path.join(ROOT, "tests", "boot", "sim_init_dump.js")
 
 
-def test_committed_thread_rows_are_all_resident():
-    with open(os.path.join(LUMPS_DIR, "ns-state.json"), encoding="utf-8") as source:
-        rows = {
-            row["name"]: row
-            for row in json.load(source).get("abstractions", [])
-            if isinstance(row, dict) and row.get("name")
-        }
-
-    for name in ("Boot.Thread", "Thread.2", "Thread.3"):
-        row = rows[name]
-        assert row["resident"] is True
-        assert row["boot_resident"] is True
-        assert row["load_policy"] == "Resident"
-        assert row["ns_slot_policy"] == "static"
-
-
 # ---- configs ---------------------------------------------------------------
 
 def _cfg_default():

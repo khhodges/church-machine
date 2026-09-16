@@ -204,7 +204,6 @@ def isolated_boot_lumps(tmp_path_factory):
     frozen = [
         row for row in state.get("abstractions", [])
         if isinstance(row, dict)
-        and row.get("filename")
         and row.get("resident") is True
         and row.get("boot_resident") is True
         and row.get("ns_slot_policy") == "static"
