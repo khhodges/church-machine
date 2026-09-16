@@ -155,3 +155,4 @@
 - [LUMP revision CAS destination identity](lump-revision-cas-destination.md) — compare the reserved active destination token, not a new content-derived candidate token or archived shared-token history
 - [Boot freshness requires admissible identity](boot-freshness-admissible-identity.md) — identity-invalid compilations are failed evidence, never “latest successful” boot candidates
 - [Bootstrap repair publication](bootstrap-repair-publication.md) — recovered source must retain server-issued bootstrap context; corrected publication supersedes active rows sharing its filename
+- [Live LUMP manifest uniqueness](live-lump-manifest-uniqueness.md) — publication retires conflicting live token/destination rows atomically while preserving immutable history

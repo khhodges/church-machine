@@ -446,7 +446,8 @@
     "filename": "CapabilityTest.2.225da6fc.lump",
     "variant_group": "capabilitytest-history",
     "lump_version": 2,
-    "compiled_at": 1788187312.1902559
+    "compiled_at": 1788187312.1902559,
+    "archived": true
   },
   {
     "token": "3b466efc",

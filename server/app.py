@@ -9195,6 +9195,17 @@ def _active_manifest_entry_for_token(manifest, token):
     )
 
 
+def _live_manifest_entries_for_token(manifest, token):
+    """Return every live row for a token so exact transitions can reconcile drift."""
+    token8 = str(token or "").lower()
+    return [
+        entry for entry in manifest
+        if isinstance(entry, dict)
+        and entry.get("archived") is not True
+        and str(entry.get("token") or "").lower() == token8
+    ]
+
+
 def _reserved_manifest_token(destination_entry, candidate_token):
     """Bind revision checks to the live destination, not a new candidate hash."""
     return str(
@@ -24020,8 +24031,9 @@ def _commit_lump_history_transition(
         # Historical revisions may intentionally share the destination token.
         # CAS must compare the one active row reserved by the save, never the
         # first archived row that happens to appear earlier in manifest order.
-        locked_entry = _active_manifest_entry_for_token(
+        locked_entries = _live_manifest_entries_for_token(
             locked_manifest, token8)
+        locked_entry = locked_entries[0] if locked_entries else None
         if expected_manifest_entry is not _LUMP_TRANSITION_UNSET:
             expected_state = (
                 None
@@ -24031,10 +24043,17 @@ def _commit_lump_history_transition(
                     expected_manifest_entry.get("lump_version"),
                 )
             )
+            matching_locked_entries = [
+                entry for entry in locked_entries
+                if (
+                    entry.get("filename"),
+                    entry.get("lump_version"),
+                ) == expected_state
+            ]
             locked_state = (
-                None
-                if locked_entry is None
-                else (
+                expected_state if len(matching_locked_entries) == 1 else
+                None if not locked_entries else
+                (
                     locked_entry.get("filename"),
                     locked_entry.get("lump_version"),
                 )
@@ -24232,15 +24251,71 @@ def _commit_lump_history_transition(
 
             published_filename = os.path.basename(
                 str(manifest_entry.get("filename") or binary_filename))
-            updated_manifest = [
-                entry for entry in locked_manifest
-                if entry.get("token") != token8
-                and not (
+            published_destination = _destination(published_filename)
+            destination_archive_filename = None
+            destination_archive_hash = None
+            if os.path.isfile(published_destination):
+                with open(published_destination, "rb") as source:
+                    destination_archive_bytes = source.read()
+                destination_archive_hash = hashlib.sha256(
+                    destination_archive_bytes).hexdigest()
+                if (archive_info is not None
+                        and archive_source is not None
+                        and os.path.abspath(archive_source)
+                        == os.path.abspath(published_destination)):
+                    destination_archive_filename = archive_info.get("lump")
+                else:
+                    destination_stem = os.path.splitext(published_filename)[0]
+                    destination_archive_filename = (
+                        f"{destination_stem}.retired."
+                        f"{destination_archive_hash[:12]}.lump"
+                    )
+                    destination_archive = _destination(
+                        destination_archive_filename)
+                    if os.path.lexists(destination_archive):
+                        with open(destination_archive, "rb") as source:
+                            if source.read() != destination_archive_bytes:
+                                raise ValueError(
+                                    "retired destination archive name collides "
+                                    "with different immutable bytes")
+                    else:
+                        staged.append((
+                            destination_archive,
+                            _stage_bytes(destination_archive_bytes, ".lump"),
+                        ))
+            updated_manifest = []
+            for entry in locked_manifest:
+                if not isinstance(entry, dict):
+                    updated_manifest.append(entry)
+                    continue
+                same_token = (
+                    str(entry.get("token") or "").lower()
+                    == str(token8 or "").lower()
+                )
+                same_destination = (
                     entry.get("archived") is not True
                     and os.path.basename(str(entry.get("filename") or ""))
                     == published_filename
                 )
-            ]
+                if same_destination:
+                    # The live destination is about to be replaced. Preserve
+                    # its old bytes under an immutable locator before retiring
+                    # the row. A missing old file is not valid history, so do
+                    # not create an archived row that points at new bytes.
+                    if destination_archive_filename is None:
+                        continue
+                    retired_entry = dict(entry)
+                    retired_entry["archived"] = True
+                    retired_entry["filename"] = destination_archive_filename
+                    if destination_archive_hash is not None:
+                        retired_entry["binary_hash"] = destination_archive_hash
+                    updated_manifest.append(retired_entry)
+                elif entry.get("archived") is not True and same_token:
+                    retired_entry = dict(entry)
+                    retired_entry["archived"] = True
+                    updated_manifest.append(retired_entry)
+                else:
+                    updated_manifest.append(entry)
             updated_manifest.append(dict(manifest_entry))
             manifest_stage = _stage_json(updated_manifest)
             staged.append((_destination(os.path.basename(manifest_path)), manifest_stage))

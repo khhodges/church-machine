@@ -111,6 +111,130 @@ def test_transition_cas_uses_active_row_when_archives_share_token(repo):
     assert active_rows == [{
         **active, "filename": "candidate.lump", "lump_version": 4,
     }]
+    assert any(
+        row.get("filename") == "Atomic.Example_v1.lump"
+        and row.get("archived") is True
+        for row in manifest
+    )
+
+
+def test_transition_reconciles_duplicate_live_token_rows_without_deleting_history(repo):
+    old = _binary(3)
+    stale = _binary(8)
+    new = _binary(4)
+    (repo / "current.lump").write_bytes(old)
+    (repo / "stale.lump").write_bytes(stale)
+    active = {
+        "token": "a70f0001", "filename": "current.lump",
+        "abstraction": "Atomic.Example", "lump_version": 2,
+    }
+    stale_live = {
+        "token": "a70f0001", "filename": "stale.lump",
+        "abstraction": "Atomic.Example", "lump_version": 1,
+    }
+    immutable_history = {
+        "token": "a70f0001", "filename": "Atomic.Example_v0.lump",
+        "abstraction": "Atomic.Example", "lump_version": 0,
+        "archived": True,
+    }
+    (repo / "manifest.json").write_text(json.dumps([
+        immutable_history, active, stale_live,
+    ]))
+    digest, approval = _approval(new)
+
+    app_module._commit_lump_history_transition(
+        lumps_dir=str(repo), manifest_path=str(repo / "manifest.json"),
+        token8="a70f0001",
+        manifest_entry={
+            **active, "filename": "candidate.lump", "lump_version": 3,
+        },
+        binary_filename="candidate.lump", binary_bytes=new,
+        approval_hash=digest, approval=approval,
+        expected_manifest_entry=active,
+    )
+
+    manifest = json.loads((repo / "manifest.json").read_text())
+    live = [
+        row for row in manifest
+        if row.get("token") == "a70f0001" and row.get("archived") is not True
+    ]
+    assert live == [{
+        **active, "filename": "candidate.lump", "lump_version": 3,
+    }]
+    assert immutable_history in manifest
+    assert {
+        **active, "archived": True,
+    } in manifest
+    assert {
+        **stale_live, "archived": True,
+    } in manifest
+
+
+def test_transition_retires_live_row_that_collides_with_published_destination(repo):
+    old = _binary(3)
+    new = _binary(4)
+    (repo / "current.lump").write_bytes(old)
+    (repo / "candidate.lump").write_bytes(old)
+    (repo / "manifest.json").write_text(json.dumps([
+        {
+            "token": "other001", "filename": "candidate.lump",
+            "abstraction": "Other.Example", "lump_version": 1,
+        },
+    ]))
+    digest, approval = _approval(new)
+
+    app_module._commit_lump_history_transition(
+        lumps_dir=str(repo), manifest_path=str(repo / "manifest.json"),
+        token8="a70f0001",
+        manifest_entry={
+            "token": "a70f0001", "filename": "candidate.lump",
+            "abstraction": "Atomic.Example", "lump_version": 1,
+        },
+        binary_filename="candidate.lump", binary_bytes=new,
+        approval_hash=digest, approval=approval,
+    )
+
+    manifest = json.loads((repo / "manifest.json").read_text())
+    assert sum(row.get("archived") is not True for row in manifest
+               if row.get("filename") == "candidate.lump") == 1
+    archived, = [
+        row for row in manifest
+        if row.get("token") == "other001" and row.get("archived") is True
+    ]
+    assert archived["filename"] != "candidate.lump"
+    assert (repo / archived["filename"]).read_bytes() == old
+    assert archived["binary_hash"] == hashlib.sha256(old).hexdigest()
+    assert (repo / "candidate.lump").read_bytes() == new
+
+
+def test_same_token_same_filename_replacement_preserves_old_bytes(repo):
+    old = _binary(5)
+    new = _binary(6)
+    current = {
+        "token": "a70f0001", "filename": "current.lump",
+        "abstraction": "Atomic.Example", "lump_version": 1,
+    }
+    (repo / "current.lump").write_bytes(old)
+    (repo / "manifest.json").write_text(json.dumps([current]))
+    digest, approval = _approval(new)
+
+    app_module._commit_lump_history_transition(
+        lumps_dir=str(repo), manifest_path=str(repo / "manifest.json"),
+        token8="a70f0001",
+        manifest_entry={**current, "lump_version": 2},
+        binary_filename="current.lump", binary_bytes=new,
+        approval_hash=digest, approval=approval,
+        expected_manifest_entry=current,
+    )
+
+    manifest = json.loads((repo / "manifest.json").read_text())
+    live, = [row for row in manifest if row.get("archived") is not True]
+    archived, = [row for row in manifest if row.get("archived") is True]
+    assert live["filename"] == "current.lump"
+    assert (repo / "current.lump").read_bytes() == new
+    assert archived["filename"] != "current.lump"
+    assert (repo / archived["filename"]).read_bytes() == old
+    assert archived["binary_hash"] == hashlib.sha256(old).hexdigest()
 
 
 def test_approval_commit_failure_restores_every_file(repo):
