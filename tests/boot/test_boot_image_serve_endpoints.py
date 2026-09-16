@@ -13,8 +13,9 @@ Two scenarios per route:
   2. A valid boot image produced by generate_boot_image() on disk
      → HTTP 200 with an application/octet-stream body matching the file.
 
-server.app.BOOT_IMAGE_PATH is patched to a temp file for each test so the
-real on-disk image is never touched.
+Each test uses a private prepared-image directory containing matching boot
+configuration, Namespace state, manifest, LUMPs, and provenance, so the real
+on-disk image is never touched.
 """
 import os
 import hashlib
@@ -117,7 +118,8 @@ def test_binary_rejects_zeroed_mandatory_descriptor(client, temp_image_path, slo
 
 
 @pytest.mark.parametrize("count", [0, MAX_THREAD_COUNT + 1, 0xFFFFFFFF])
-def test_binary_has_no_tail_thread_count_sentinel(client, temp_image_path, count):
+def test_binary_has_no_tail_thread_count_sentinel(
+        client, temp_image_path, prepared_boot_image_fixture, count):
     words = list(struct.unpack("<16384I", _make_valid_image()))
     ns_base = 16384 - NS_TABLE_RESERVE
     words[ns_base - 4] = count
@@ -125,8 +127,7 @@ def test_binary_has_no_tail_thread_count_sentinel(client, temp_image_path, count
     # V2 does not reserve mutable metadata before the tail table. These words
     # are inactive table capacity unless their descriptors are populated.
     validate_boot_image(tampered, 16384)
-    with open(temp_image_path, "wb") as image_file:
-        image_file.write(tampered)
+    prepared_boot_image_fixture(tampered)
     with patch("server.app._auto_regen_boot_image") as regenerate:
         response = client.get("/api/boot-image/binary")
     assert response.status_code == 200
@@ -177,11 +178,9 @@ def client():
 
 
 @pytest.fixture()
-def temp_image_path(tmp_path):
-    """Redirect server.app.BOOT_IMAGE_PATH to a temp file for one test."""
-    fake_path = str(tmp_path / "boot-image.bin")
-    with patch("server.app.BOOT_IMAGE_PATH", fake_path):
-        yield fake_path
+def temp_image_path(prepared_boot_image_fixture):
+    """Commit a complete prepared image fixture and return its private path."""
+    return prepared_boot_image_fixture(_make_valid_image())
 
 
 # ---------------------------------------------------------------------------
@@ -245,8 +244,6 @@ def test_binary_ignores_ns_state_mtime_without_matching_content_provenance(
     valid_bytes = _write_valid(temp_image_path)
     ns_state_path = os.path.join(
         os.path.dirname(temp_image_path), "ns-state.json")
-    with open(ns_state_path, "w", encoding="utf-8") as state_file:
-        state_file.write('{"abstractions":[]}')
     image_mtime = os.path.getmtime(temp_image_path)
     os.utime(ns_state_path, (image_mtime + 1, image_mtime + 1))
 

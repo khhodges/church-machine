@@ -12,9 +12,9 @@ against the Flask test client:
      with ok=True.  The shared boot fixture routes this write to a temporary
      LUMP library, never the IDE's live ``server/lumps/`` directory.
 
-Neither case requires a saved boot-config.json on disk; the invalid-image
-case is crafted purely in memory, and the valid-image case generates the
-image at test time from a default config.
+The invalid-image case is crafted in memory.  Valid upload and geometry
+fixtures use the shared isolated boot configuration and Namespace state so
+the endpoint reaches the validation branch each test intends to exercise.
 
 Task #397: Additional parametrized cases cover four more validation branches:
   - Missing/empty JSON body
@@ -136,7 +136,7 @@ def test_upload_valid_boot_image_returns_200(client):
 
 
 def test_upload_rejects_geometry_incompatible_with_saved_step1_without_mutation(
-        client, tmp_path, monkeypatch):
+        client, tmp_path, monkeypatch, isolated_boot_lumps):
     """Imports must be loadable by browser memory, not merely structurally valid."""
     import server.app as app_module
 
@@ -148,11 +148,13 @@ def test_upload_rejects_geometry_incompatible_with_saved_step1_without_mutation(
         "targetBoard": "wukong-xc7a100t", "bootEntrySlot": 6,
         "step1": {**_default_cfg()["step1"], "totalNamespaceWords": 8192},
     }
+    with open(os.path.join(isolated_boot_lumps, "ns-state.json"), "rb") as source:
+        valid_state = source.read()
     original = {
         config_path: json.dumps(saved_cfg).encode("utf-8"),
         image_path: b"old image",
         provenance_path: b'{"old":"provenance"}',
-        state_path: b'{"old":"state"}',
+        state_path: valid_state,
     }
     for path, content in original.items():
         path.write_bytes(content)

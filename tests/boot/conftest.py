@@ -14,6 +14,7 @@ import os
 import shutil
 import struct
 import sys
+from unittest.mock import patch
 
 import pytest
 
@@ -288,3 +289,60 @@ def reset_private_boot_marker(isolated_boot_lumps):
     expects the committed target.
     """
     select_private_boot_marker(isolated_boot_lumps, 10)
+
+
+@pytest.fixture()
+def prepared_boot_image_fixture(tmp_path, isolated_boot_lumps):
+    """Provide a complete private prepared-image commit for endpoint tests.
+
+    The serving endpoints intentionally fail closed when an image lacks the
+    config, Namespace state, manifest, and provenance that were current when
+    it was prepared.  Keep those inputs together instead of patching only the
+    image path.
+    """
+    import server.app as app_module
+
+    fixture_dir = tmp_path / "prepared-boot"
+    shutil.copytree(isolated_boot_lumps, fixture_dir)
+    config_path = fixture_dir / "boot-config.json"
+    source_config = app_module.BOOT_CONFIG_PATH
+    if os.path.isfile(source_config):
+        shutil.copy2(source_config, config_path)
+    else:
+        config_path.write_text(json.dumps({
+            "targetBoard": "wukong-xc7a100t",
+            "bootEntrySlot": 10,
+            "step1": {
+                "totalNamespaceWords": 16384,
+                "namespaceLumpWords": 64,
+                "threadLumpWords": 256,
+            },
+        }), encoding="utf-8")
+
+    paths = {
+        "LUMPS_DIR": str(fixture_dir),
+        "LUMPS_MANIFEST_PATH": str(fixture_dir / "manifest.json"),
+        "BOOT_CONFIG_PATH": str(config_path),
+        "BOOT_CONFIG_LEGACY_PATH": str(fixture_dir / "missing-legacy.json"),
+        "BOOT_IMAGE_PATH": str(fixture_dir / "boot-image.bin"),
+        "BOOT_IMAGE_PROVENANCE_PATH": str(
+            fixture_dir / "boot-image.provenance.json"),
+        "NS_STATE_PATH": str(fixture_dir / "ns-state.json"),
+    }
+
+    with contextlib.ExitStack() as stack:
+        for name, value in paths.items():
+            stack.enter_context(patch.object(app_module, name, value))
+
+        def commit(image_bytes):
+            with open(config_path, encoding="utf-8") as config_file:
+                config = json.load(config_file)
+            app_module._write_boot_image_bytes(
+                image_bytes,
+                provenance_origin="generated",
+                invalidate_ns_state=False,
+                boot_config=config,
+            )
+            return paths["BOOT_IMAGE_PATH"]
+
+        yield commit
