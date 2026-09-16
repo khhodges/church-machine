@@ -154,3 +154,4 @@
 - [Canonical LUMP update leases](canonical-lump-update-leases.md) — serialize by canonical dot-name with server-session ownership; keep compilation concurrent and narrow the shared publication lock
 - [LUMP revision CAS destination identity](lump-revision-cas-destination.md) — compare the reserved active destination token, not a new content-derived candidate token or archived shared-token history
 - [Boot freshness requires admissible identity](boot-freshness-admissible-identity.md) — identity-invalid compilations are failed evidence, never “latest successful” boot candidates
+- [Bootstrap repair publication](bootstrap-repair-publication.md) — recovered source must retain server-issued bootstrap context; corrected publication supersedes active rows sharing its filename

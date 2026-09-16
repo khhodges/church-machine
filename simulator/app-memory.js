@@ -231,6 +231,10 @@ async function _openBootExecutionUpdate() {
             if (!editor) throw new Error('The Programs editor is unavailable.');
             editor.value = body.source;
             editor.dispatchEvent(new Event('input', { bubbles: true }));
+            window._pendingBootstrapRepairMetadata =
+                body.metadata && typeof body.metadata === 'object'
+                    ? JSON.parse(JSON.stringify(body.metadata))
+                    : null;
             window._editorOpenLumpToken = null;
             window._pendingLumpData = null;
             window._saveNSPreparedSnapshot = null;

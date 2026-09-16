@@ -24189,7 +24189,17 @@ def _commit_lump_history_transition(
                     _stage_json(_shared_approval_envelope(approvals)),
                 ))
 
-            updated_manifest = [entry for entry in locked_manifest if entry.get("token") != token8]
+            published_filename = os.path.basename(
+                str(manifest_entry.get("filename") or binary_filename))
+            updated_manifest = [
+                entry for entry in locked_manifest
+                if entry.get("token") != token8
+                and not (
+                    entry.get("archived") is not True
+                    and os.path.basename(str(entry.get("filename") or ""))
+                    == published_filename
+                )
+            ]
             updated_manifest.append(dict(manifest_entry))
             manifest_stage = _stage_json(updated_manifest)
             staged.append((_destination(os.path.basename(manifest_path)), manifest_stage))

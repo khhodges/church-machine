@@ -67,6 +67,7 @@ def test_transition_cas_uses_active_row_when_archives_share_token(repo):
     old = _binary(3)
     new = _binary(4)
     (repo / "current.lump").write_bytes(old)
+    (repo / "candidate.lump").write_bytes(_binary(9))
     active = {
         "token": "a70f0001", "filename": "current.lump",
         "abstraction": "Atomic.Example", "lump_version": 2,
@@ -78,6 +79,10 @@ def test_transition_cas_uses_active_row_when_archives_share_token(repo):
             "archived": True,
         },
         active,
+        {
+            "token": "bad0cafe", "filename": "candidate.lump",
+            "abstraction": "Atomic.Example", "lump_version": 3,
+        },
     ]))
     (repo / "Atomic.Example_v1.lump").write_bytes(_binary(1))
     digest, approval = _approval(new)
@@ -85,8 +90,10 @@ def test_transition_cas_uses_active_row_when_archives_share_token(repo):
     result = app_module._commit_lump_history_transition(
         lumps_dir=str(repo), manifest_path=str(repo / "manifest.json"),
         token8="a70f0001",
-        manifest_entry={**active, "lump_version": 3},
-        binary_filename="current.lump", binary_bytes=new,
+        manifest_entry={
+            **active, "filename": "candidate.lump", "lump_version": 4,
+        },
+        binary_filename="candidate.lump", binary_bytes=new,
         approval_hash=digest, approval=approval,
         archive_stem="Atomic.Example", archive_version=2,
         archive_binary_path=str(repo / "current.lump"),
@@ -94,7 +101,16 @@ def test_transition_cas_uses_active_row_when_archives_share_token(repo):
     )
 
     assert result["lump"].endswith(".lump")
-    assert (repo / "current.lump").read_bytes() == new
+    assert (repo / "candidate.lump").read_bytes() == new
+    manifest = json.loads((repo / "manifest.json").read_text())
+    active_rows = [
+        row for row in manifest
+        if row.get("abstraction") == "Atomic.Example"
+        and row.get("archived") is not True
+    ]
+    assert active_rows == [{
+        **active, "filename": "candidate.lump", "lump_version": 4,
+    }]
 
 
 def test_approval_commit_failure_restores_every_file(repo):

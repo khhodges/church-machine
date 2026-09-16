@@ -16480,6 +16480,15 @@ async function confirmSaveToNamespace() {
                 ].join(':'),
             }
         };
+        const _bootstrapRepair = window._pendingBootstrapRepairMetadata;
+        if (_bootstrapRepair &&
+                _bootstrapRepair.abstraction === _svAbsName &&
+                Number(_bootstrapRepair.ns_slot) === Number(idx)) {
+            _svPayload.metadata.token = _bootstrapRepair.token;
+            _svPayload.metadata.namespace_sequence =
+                _bootstrapRepair.namespace_sequence;
+            _svPayload.metadata.enforce_bootstrap_identity = true;
+        }
         let _saveApproval;
         try {
             if (typeof window._confirmLumpSavePlan !== 'function') {
@@ -16504,6 +16513,7 @@ async function confirmSaveToNamespace() {
                     // click; owner-scoped editor drafts remain recoverable.
                     window._pendingLumpData = null;
                     window._saveNSPreparedSnapshot = null;
+                    window._pendingBootstrapRepairMetadata = null;
                     if (typeof closeSaveDialog === 'function') closeSaveDialog();
                     const _reloadMessage = _saveOutcome === 'reload' ||
                         _saveOutcome === 'reloaded'

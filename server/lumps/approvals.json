@@ -518,8 +518,9 @@
       "dot_name": "SelfTest",
       "issue_n": 1,
       "filename": "SelfTest.1.ddd2582f.lump",
-      "compiled_at": 1789580380.2463787,
-      "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25"
+      "compiled_at": 1789586509.71958,
+      "bootstrap_t": "4a000006",
+      "bootstrap_runtime_gt": 1241513990
     }
   }
 }
