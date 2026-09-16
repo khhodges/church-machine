@@ -63,6 +63,40 @@ def test_transition_commits_binary_manifest_history_and_strict_approval(repo):
     assert "sidecar_file" not in json.loads((repo / "manifest.json").read_text())[0]
 
 
+def test_transition_cas_uses_active_row_when_archives_share_token(repo):
+    old = _binary(3)
+    new = _binary(4)
+    (repo / "current.lump").write_bytes(old)
+    active = {
+        "token": "a70f0001", "filename": "current.lump",
+        "abstraction": "Atomic.Example", "lump_version": 2,
+    }
+    (repo / "manifest.json").write_text(json.dumps([
+        {
+            "token": "a70f0001", "filename": "Atomic.Example_v1.lump",
+            "abstraction": "Atomic.Example", "lump_version": 1,
+            "archived": True,
+        },
+        active,
+    ]))
+    (repo / "Atomic.Example_v1.lump").write_bytes(_binary(1))
+    digest, approval = _approval(new)
+
+    result = app_module._commit_lump_history_transition(
+        lumps_dir=str(repo), manifest_path=str(repo / "manifest.json"),
+        token8="a70f0001",
+        manifest_entry={**active, "lump_version": 3},
+        binary_filename="current.lump", binary_bytes=new,
+        approval_hash=digest, approval=approval,
+        archive_stem="Atomic.Example", archive_version=2,
+        archive_binary_path=str(repo / "current.lump"),
+        expected_manifest_entry=active,
+    )
+
+    assert result["lump"].endswith(".lump")
+    assert (repo / "current.lump").read_bytes() == new
+
+
 def test_approval_commit_failure_restores_every_file(repo):
     old = _binary(1)
     new = _binary(2)

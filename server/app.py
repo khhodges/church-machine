@@ -23976,10 +23976,11 @@ def _commit_lump_history_transition(
 
     with _lump_history_transition_lock(lumps_dir):
         locked_manifest = _read_manifest_safe(manifest_path)
-        locked_entry = next(
-            (entry for entry in locked_manifest if entry.get("token") == token8),
-            None,
-        )
+        # Historical revisions may intentionally share the destination token.
+        # CAS must compare the one active row reserved by the save, never the
+        # first archived row that happens to appear earlier in manifest order.
+        locked_entry = _active_manifest_entry_for_token(
+            locked_manifest, token8)
         if expected_manifest_entry is not _LUMP_TRANSITION_UNSET:
             expected_state = (
                 None
