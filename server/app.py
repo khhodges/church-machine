@@ -12400,6 +12400,16 @@ def save_lump():
                 dict(_destination_manifest)
                 if _destination_manifest is not None else _destination_state
             )
+    # Replacement history follows the Namespace destination even when the
+    # freshly compiled content has a different token. Otherwise the old active
+    # row is neither archived nor removed from the manifest.
+    if (_destination_entry is not None
+            and _manifest_entry_identity(_destination_entry)
+            != _manifest_entry_identity(_existing_entry)):
+        _existing_entry = dict(_destination_entry)
+        _exist_filename = _existing_entry.get("filename", f"{token8}.lump")
+        _existing_lump = os.path.join(lumps_dir, _exist_filename)
+    _transition_token = _reserved_manifest_token(_destination_entry, token8)
     _history_versions = _history_versions_for_abstraction(manifest)
 
     # ── Phase 2: Determine current version number ──────────────────────────────
@@ -12768,6 +12778,16 @@ def save_lump():
                 replace_abstraction=_is_server_bootstrap_history_repair)
             if _prepared_ns_entries is None:
                 raise ValueError("resident save has no Namespace destination")
+            _prepared_saved_rows = [
+                row for row in _prepared_ns_entries
+                if isinstance(row, dict) and row.get("slot") == ns_slot
+            ]
+            if len(_prepared_saved_rows) != 1:
+                raise ValueError(
+                    f"resident save destination NS[{ns_slot}] is not unique")
+            # Bind the selector to the exact final bytes staged by this
+            # transaction. Never preserve the replaced artifact's digest.
+            _prepared_saved_rows[0]["binary_hash"] = _binary_hash
         except (OSError, ValueError, TypeError, json.JSONDecodeError) as _ns_error:
             _save_kind = "bootstrap " if _is_bootstrap_canonical else ""
             return jsonify({
@@ -13028,7 +13048,7 @@ def save_lump():
         _transition = _commit_lump_history_transition(
             lumps_dir=lumps_dir,
             manifest_path=manifest_path,
-            token8=token8,
+            token8=_transition_token,
             manifest_entry=new_entry,
             binary_filename=lump_filename,
             binary_bytes=lump_bytes,
@@ -13055,7 +13075,7 @@ def save_lump():
             compat_new_filename=lump_filename,
             variant_group=f"compiled_{abs_name.lower().replace(' ', '_')}",
             ns_slot=ns_slot,
-            expected_manifest_entry=_existing_entry,
+            expected_manifest_entry=_destination_entry,
             additional_json_builder=_save_additional_json,
             operation_id=(
                 _operation_id
