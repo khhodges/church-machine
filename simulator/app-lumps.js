@@ -462,10 +462,18 @@ function showLumpDetail(token) {
 // Recovery for an archived bootstrap-invalid revision.  Every byte and every
 // source character displayed here comes from the server-side immutable
 // promotion candidate; editor drafts, catalog text, and sidecars are excluded.
-async function _showLatestCompilationPromotion(archivedToken) {
-    const archived = _lumpsCache.find(row => row.token === archivedToken);
-    if (!archived || !archived.abstraction) return;
-    const token = archivedToken;
+async function _showLatestCompilationPromotion(archivedToken, exactTarget) {
+    const normalizedToken = String(archivedToken || '').replace(/^0x/i, '').toLowerCase();
+    const archived = _lumpsCache.find(function(row) {
+        return String(row && row.token || '').replace(/^0x/i, '').toLowerCase() ===
+            normalizedToken;
+    }) || (exactTarget && exactTarget.abstraction ? {
+        abstraction: exactTarget.abstraction,
+        token: normalizedToken,
+        lump_version: exactTarget.revision,
+    } : null);
+    if (!archived || !archived.abstraction || !normalizedToken) return false;
+    const token = normalizedToken;
     const requestId = (window._latestPromotionRequestId || 0) + 1;
     window._latestPromotionRequestId = requestId;
     const contentEl = document.getElementById('lumpsDetailContent');
@@ -590,7 +598,9 @@ async function _showLatestCompilationPromotion(archivedToken) {
         contentEl.innerHTML = `<div class="lump-detail-section lump-source-status err">` +
             `${e(err.message || 'Promotion candidate unavailable')} ` +
             `<span> No data was changed. Reload the repository and retry.</span></div>`;
+        return false;
     }
+    return true;
 }
 window._showLatestCompilationPromotion = _showLatestCompilationPromotion;
 

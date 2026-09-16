@@ -153,3 +153,4 @@
 - [Golden Token integrity layers](golden-token-integrity-layers.md) — seals prove authenticity, sideband ECC protects stored bits, and runtime checks enforce authority; never alter the 32-bit GT format
 - [Canonical LUMP update leases](canonical-lump-update-leases.md) — serialize by canonical dot-name with server-session ownership; keep compilation concurrent and narrow the shared publication lock
 - [LUMP revision CAS destination identity](lump-revision-cas-destination.md) — compare the reserved active destination token, not a new content-derived candidate token or archived shared-token history
+- [Boot freshness requires admissible identity](boot-freshness-admissible-identity.md) — identity-invalid compilations are failed evidence, never “latest successful” boot candidates

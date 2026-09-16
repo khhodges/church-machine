@@ -5724,8 +5724,26 @@ def _boot_execution_freshness(state, lumps_dir):
                 row0 = int.from_bytes(
                     raw[(allocation - cc) * 4:(allocation - cc + 1) * 4],
                     "big")
-                if row0 == expected_self:
-                    compatible.append(entry)
+                if row0 != expected_self:
+                    continue
+                words = [
+                    int.from_bytes(raw[offset:offset + 4], "big")
+                    for offset in range(0, len(raw), 4)
+                ]
+                bootstrap_identity = _bootstrap_snapshot_identity(
+                    lumps_dir,
+                    entry,
+                    {"words": words, "lump_size": allocation, "cc": cc},
+                    binding_override=selected,
+                )
+                # A compile whose record token, sealed SELF row, and resident
+                # binding disagree is rejected evidence, not a "latest
+                # successful" boot candidate. Never send the UI into an
+                # impossible promotion flow for it.
+                if (bootstrap_identity is not None
+                        and bootstrap_identity.get("valid") is not True):
+                    continue
+                compatible.append(entry)
             if inspected_any:
                 candidates = compatible
         except (OSError, ValueError, KeyError, TypeError):

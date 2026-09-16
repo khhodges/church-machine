@@ -92,7 +92,7 @@ if (!banner.innerHTML.includes('Fix v87 now') ||
 if (source.includes("fetch('/api/boot-image/update-to-latest'")) {
     throw new Error('freshness UI must not trigger automatic latest promotion');
 }
-if (!source.includes('_showLatestCompilationPromotion(token)')) {
+if (!source.includes('_showLatestCompilationPromotion(token, target)')) {
     throw new Error('freshness action does not open guarded identity repair');
 }
 

@@ -63,7 +63,11 @@ function _renderBootExecutionFreshness(state) {
             ' instead of latest successful ' + latestVersion;
     });
     const repair = warnings[0] && warnings[0].latest || {};
-    window._bootExecutionRepairToken = repair.token || null;
+    window._bootExecutionRepairTarget = {
+        abstraction: warnings[0] && warnings[0].abstraction || null,
+        token: repair.token || null,
+        revision: repair.version,
+    };
     const repairVersion = repair.version == null ? '' : ' v' + repair.version;
     banner.innerHTML = '<div class="boot-execution-freshness-copy"><strong>WARNING: SIMULATOR IS NOT RUNNING THE LATEST COMPILED CODE.</strong> ' +
         details.map(function(text) {
@@ -168,7 +172,8 @@ async function _openBootExecutionUpdate() {
         ? window._nsState.executionFreshness.warnings : [];
     if (!warnings.length) return;
     const status = document.getElementById('bootExecutionUpdateStatus');
-    const token = window._bootExecutionRepairToken;
+    const target = window._bootExecutionRepairTarget || {};
+    const token = target.token;
     const message = 'Opening the guarded repair for the exact saved revision\u2026';
     if (status) status.textContent = message;
     if (!token || typeof window._showLatestCompilationPromotion !== 'function') {
@@ -178,7 +183,10 @@ async function _openBootExecutionUpdate() {
         return false;
     }
     if (typeof switchView === 'function') switchView('lumps');
-    await window._showLatestCompilationPromotion(token);
+    const opened = await window._showLatestCompilationPromotion(token, target);
+    if (opened === false && status) {
+        status.textContent = 'Repair could not open. Reload the IDE and click Fix again.';
+    }
     return true;
 }
 window._openBootExecutionUpdate = _openBootExecutionUpdate;
