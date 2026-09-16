@@ -352,19 +352,22 @@ def _validate_stage(directory):
             raise ValueError(f"{name} boot-image descriptor W3 drift")
         raw_words = list(struct.unpack(f">{len(raw) // 4}I", raw))
         loaded_words = list(words[location:location + alloc])
-        if name == "SelfTest":
-            # Boot generation binds Next.GT to the selected LightningBolt.
+        if name == "SelfTest" and cc >= 2:
+            # Legacy SelfTest revisions may carry a Next.GT continuation row.
+            # Newer standalone revisions need only their SELF row.
             raw_words[alloc - cc + 1] = RESIDENTS["CapabilityTest"][1]
         if loaded_words != raw_words:
             raise ValueError(f"{name} loaded resident body drift")
         tails[name] = words[location + alloc - cc:location + alloc]
     # These are continuation rows, not CapabilityTest's diagnostic SelfTest
     # capability: SelfTest Next is row 1; CapabilityTest ELOADCALL is last.
-    edges = {"SelfTest": [tails["SelfTest"][1] & 0xffff],
+    edges = {"SelfTest": ([tails["SelfTest"][1] & 0xffff]
+                           if len(tails["SelfTest"]) >= 2 else []),
              "CapabilityTest": [tails["CapabilityTest"][-1] & 0xffff],
              "WukongCallHome": []}
-    if (tails["SelfTest"][1] != 0x4A00000A or
-            tails["CapabilityTest"][-1] != 0x4A000007):
+    if ((len(tails["SelfTest"]) >= 2
+            and tails["SelfTest"][1] != 0x4A00000A)
+            or tails["CapabilityTest"][-1] != 0x4A000007):
         raise ValueError("resident E-only startup links drift")
     visited, visiting = set(), set()
     def visit(name):

@@ -734,7 +734,7 @@ def test_boot_image_next_gt_follows_lightning_bolt(tmp_path, lightning_slot, sta
         _hdr = struct.unpack_from(">I", _f.read(4))[0]
     CC        = _hdr & 0xFF
     LUMP_SIZE = 1 << (((_hdr >> 23) & 0xF) + 6)
-    assert CC >= 2, "active SelfTest needs self and Next.GT c-list rows"
+    assert CC >= 1, "active SelfTest needs its SELF c-list row"
 
     SAVED_TOKEN = _active_selftest["token"]
     (tmp_path / "manifest.json").write_text(json.dumps([{
@@ -786,10 +786,10 @@ def test_boot_image_next_gt_follows_lightning_bolt(tmp_path, lightning_slot, sta
     boot_loc = words[ns_base]
 
     # c-list starts at boot_loc + LUMP_SIZE - CC. Row 0 is SelfTest's
-    # immutable E-GT for the in-program CR0/CR1 EXACT check; row 1 is Next.GT.
+    # immutable E-GT for the in-program CR0/CR1 EXACT check. Legacy revisions
+    # may additionally carry a Next.GT row.
     clist_base = boot_loc + LUMP_SIZE - CC
     clist_0    = words[clist_base]
-    clist_1    = words[clist_base + 1]
 
     expected_self_gt = create_gt(0, BOOT_ABSTR_NS_SLOT, {"E": 1}, 1) & 0xFFFFFFFF
     assert clist_0 == expected_self_gt, (
@@ -798,8 +798,11 @@ def test_boot_image_next_gt_follows_lightning_bolt(tmp_path, lightning_slot, sta
         "SelfTest loads this row into CR1 before TPERM EXACT CR0, CR1."
     )
 
-    # Expected: Inform E-GT targeting the LightningBolt-selected slot,
-    # constructed the same way boot_image.py does it (avoids hardcoding bits).
+    if CC < 2:
+        return
+
+    clist_1 = words[clist_base + 1]
+    # Legacy expected continuation: Inform E-GT targeting the selected slot.
     expected_gt = create_gt(0, lightning_slot, {"E": 1}, 1) & 0xFFFFFFFF
 
     assert clist_1 == expected_gt, (

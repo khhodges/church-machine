@@ -1,0 +1,18 @@
+{
+  "token": "00002000",
+  "abstraction": "Keystone",
+  "dot_name": "Keystone",
+  "issue_n": 1,
+  "ns_slot": null,
+  "ns_slot_policy": "dynamic",
+  "lump_size": 64,
+  "status": "released",
+  "language": "CLOOMC",
+  "author": "Church Machine",
+  "cw": 22,
+  "cc": 2,
+  "source_file": "simulator/cloomc/keystone.cloomc",
+  "filename": "Keystone.1.86b853a1.lump",
+  "sidecar_file": "Keystone.1.86b853a1.json",
+  "binary_hash": "539c61d244b2cd509c7840b77602c3ca7324463433bc5fa3943201cd9a25850f"
+}

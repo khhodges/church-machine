@@ -1,0 +1,18 @@
+{
+  "token": "b3076308",
+  "abstraction": "EventRouter",
+  "dot_name": "EventRouter",
+  "issue_n": 1,
+  "ns_slot": null,
+  "ns_slot_policy": "dynamic",
+  "lump_size": 64,
+  "status": "released",
+  "language": "CLOOMC",
+  "author": "Church Machine",
+  "cw": 19,
+  "cc": 0,
+  "source_file": "simulator/cloomc/EventRouter.cloomc",
+  "filename": "EventRouter.1.032ca4ee.lump",
+  "sidecar_file": "EventRouter.1.032ca4ee.json",
+  "binary_hash": "9110a8296cdc5b85eb1583b116345c4a9464819bbeb355013165e1eec5957fdd"
+}

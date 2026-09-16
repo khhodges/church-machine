@@ -1,0 +1,510 @@
+{
+  "version": 1,
+  "algorithm": "sha256",
+  "approvals": {
+    "61198bd843124c4f06f8a5d7a13d84e6d9568925bbd28685453de95a7b3173d1": {
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "61198bd843124c4f06f8a5d7a13d84e6d9568925bbd28685453de95a7b3173d1",
+      "dot_name": "SelfTest",
+      "issue_n": 1,
+      "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25",
+      "filename": "SelfTest.1.485e71f6.lump"
+    },
+    "19943df0ea2dd6dbceb5569aa23ce2e075ac18d1f904be6294b71b817bbd6fc1": {
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "19943df0ea2dd6dbceb5569aa23ce2e075ac18d1f904be6294b71b817bbd6fc1",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
+      "filename": "CapabilityTest.1.ac2b4b1b.lump"
+    },
+    "c5136b8af93669f6a710e64de060ed16b85ae86782af121455041cfbc62c556f": {
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "c5136b8af93669f6a710e64de060ed16b85ae86782af121455041cfbc62c556f",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
+      "filename": "CapabilityTest.1.e158180f.lump"
+    },
+    "13de36cd5e7a7e3994fbf3e06e91a64a8e135eacd91fc43eccdcc4fef8d90366": {
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "13de36cd5e7a7e3994fbf3e06e91a64a8e135eacd91fc43eccdcc4fef8d90366",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
+      "filename": "CapabilityTest.1.2d9ec45d.lump"
+    },
+    "6ef1ecd997d151c0a3fdff9c613b72c673c247414007056f32e5443d1913fb77": {
+      "abstraction": "WukongCallHome",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "6ef1ecd997d151c0a3fdff9c613b72c673c247414007056f32e5443d1913fb77",
+      "dot_name": "WukongCallHome",
+      "issue_n": 1,
+      "identity_hash": "b2c8f3d7d7e755f24ac3ab22726514cfaa9a604d037ab661891c198a0f5d8b90",
+      "filename": "WukongCallHome.1.d54e2115.lump"
+    },
+    "f0b34adb0d54b936778407efafeda8dcf535c351cb0098c38d6873fa2aacac18": {
+      "binary_hash": "f0b34adb0d54b936778407efafeda8dcf535c351cb0098c38d6873fa2aacac18",
+      "filename": "SelfTest.79.eceee227.lump",
+      "dot_name": "SelfTest",
+      "issue_n": 79,
+      "identity_string": "SelfTest#79",
+      "identity_hash": "10b043c80d91a8068e7756a7395ab96010a73825008feadf9c868a2ced70c78f",
+      "identity_seal_location": "approval",
+      "token": "ee750c1b",
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
+    },
+    "5e9e990a14d9c421ad10d902bade71afacd51ec46404b5a94c34902c18c2f65c": {
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "5e9e990a14d9c421ad10d902bade71afacd51ec46404b5a94c34902c18c2f65c",
+      "dot_name": "SelfTest",
+      "issue_n": 1,
+      "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25",
+      "filename": "SelfTest.1.e9f17d7c.lump"
+    },
+    "912730ce6fe79c3de71add611ec6f70b0d34bf91c262e5ed45d2b69c813c0846": {
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "912730ce6fe79c3de71add611ec6f70b0d34bf91c262e5ed45d2b69c813c0846",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
+      "filename": "CapabilityTest.1.2cdca9f6.lump"
+    },
+    "a6e7ce5dbfa5f5d767a7538115eafdc5d4af7522f6f3b3beb84c9613b2d450d0": {
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "a6e7ce5dbfa5f5d767a7538115eafdc5d4af7522f6f3b3beb84c9613b2d450d0",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
+      "filename": "CapabilityTest.1.faf715c2.lump"
+    },
+    "1005a13e648dca745c405ec48581984d0964825217d7821e66f3570c2b67912e": {
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "1005a13e648dca745c405ec48581984d0964825217d7821e66f3570c2b67912e",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
+      "filename": "CapabilityTest.1.36b34aa3.lump"
+    },
+    "8bcabcd5297eb69deb27f6be5dec271d0d42ddaa26f4481f639862a4b9c969a2": {
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "8bcabcd5297eb69deb27f6be5dec271d0d42ddaa26f4481f639862a4b9c969a2",
+      "dot_name": "SelfTest",
+      "issue_n": 1,
+      "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25",
+      "filename": "SelfTest.1.8ab7765f.lump"
+    },
+    "72b7bf26a60e78573be65dae3746b5b048abe66f3b3007585bfb629ce03bd13f": {
+      "binary_hash": "72b7bf26a60e78573be65dae3746b5b048abe66f3b3007585bfb629ce03bd13f",
+      "filename": "SelfTest.81.532be597.lump",
+      "dot_name": "SelfTest",
+      "issue_n": 81,
+      "identity_string": "SelfTest#81",
+      "identity_hash": "a4e385f76694d4289bd09ea4d5ff1bfb4c250a8ccfd55c2e544ec2bd4af48f72",
+      "identity_seal_location": "approval",
+      "token": "141171da",
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
+    },
+    "592412cc4e1946111c160af05db7ee1c5c754785804251c02698f8c2613e1b75": {
+      "binary_hash": "592412cc4e1946111c160af05db7ee1c5c754785804251c02698f8c2613e1b75",
+      "filename": "SelfTest.82.4c1b2651.lump",
+      "dot_name": "SelfTest",
+      "issue_n": 82,
+      "identity_string": "SelfTest#82",
+      "identity_hash": "92a163a05052509f87cfbf50c34695817a9a4d6b941c233ef9dde1330c1b500d",
+      "identity_seal_location": "approval",
+      "token": "04007dff",
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
+    },
+    "aead2856f5557e002534e40828ea463f8bb13248d256e10feecac1787427295f": {
+      "binary_hash": "aead2856f5557e002534e40828ea463f8bb13248d256e10feecac1787427295f",
+      "filename": "SelfTest.83.c80aeda6.lump",
+      "dot_name": "SelfTest",
+      "issue_n": 83,
+      "identity_string": "SelfTest#83",
+      "identity_hash": "f5b7fa267bd37dc5a1a655465c145a7adec70cfe26464b5054c666f57739b995",
+      "identity_seal_location": "approval",
+      "token": "c5646afa",
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
+    },
+    "96000fbb7460ffcbc59d46a22bf03e33bd2e84163f1573ac6c64614062fcf5e9": {
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "96000fbb7460ffcbc59d46a22bf03e33bd2e84163f1573ac6c64614062fcf5e9",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "filename": "CapabilityTest.1.878a5b27.lump",
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
+    },
+    "efa0e4323679355a530f0ce9bcf8cf19f962204bba7a45b543ca308f1ece17d7": {
+      "binary_hash": "efa0e4323679355a530f0ce9bcf8cf19f962204bba7a45b543ca308f1ece17d7",
+      "filename": "SelfTest.86.f37bafd6.lump",
+      "dot_name": "SelfTest",
+      "issue_n": 86,
+      "bootstrap_t": "4a000006",
+      "bootstrap_runtime_gt": 1241513990,
+      "token": "4a000006",
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
+    },
+    "347daaebfcaf1e6a36ac0216ae0aaa36110d6b346f406e80d123811cb98cbb10": {
+      "binary_hash": "347daaebfcaf1e6a36ac0216ae0aaa36110d6b346f406e80d123811cb98cbb10",
+      "filename": "WukongCallHome.1.55884a36.lump",
+      "dot_name": "WukongCallHome",
+      "issue_n": 1,
+      "bootstrap_t": "4a000007",
+      "bootstrap_runtime_gt": 1241513991,
+      "token": "4a000007",
+      "abstraction": "WukongCallHome",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
+    },
+    "7f36b8a385f82a7b1548deb37b7b25999492b58934b0905fadf06b83d3f659f0": {
+      "binary_hash": "7f36b8a385f82a7b1548deb37b7b25999492b58934b0905fadf06b83d3f659f0",
+      "filename": "CapabilityTest.2.225da6fc.lump",
+      "dot_name": "CapabilityTest",
+      "issue_n": 2,
+      "bootstrap_t": "4a00000a",
+      "bootstrap_runtime_gt": 1241513994,
+      "token": "4a00000a",
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
+    },
+    "968706ae6010d58966a78ed35345608a8997c2192e86f8e1bfb8d4068983edbc": {
+      "binary_hash": "968706ae6010d58966a78ed35345608a8997c2192e86f8e1bfb8d4068983edbc",
+      "filename": "WukongCallHome.1.8965def2.lump",
+      "dot_name": "WukongCallHome",
+      "issue_n": 1,
+      "bootstrap_t": "4a000007",
+      "bootstrap_runtime_gt": 1241513991,
+      "token": "4a000007",
+      "abstraction": "WukongCallHome",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
+    },
+    "5a2ec522560b8a1de17ad0f5f752091b0f3469aefc41c5bf0d12ce05124a097b": {
+      "abstraction": "WukongCallHome",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "5a2ec522560b8a1de17ad0f5f752091b0f3469aefc41c5bf0d12ce05124a097b",
+      "dot_name": "WukongCallHome",
+      "issue_n": 1,
+      "filename": "WukongCallHome.1.e3f43d74.lump",
+      "bootstrap_t": "4a000007",
+      "bootstrap_runtime_gt": 1241513991
+    },
+    "9fd1738667d0ad6d41d56377c99baf6e5e88ef9b00fc7294a26b48ef48ae5916": {
+      "abstraction": "WukongCallHome",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "9fd1738667d0ad6d41d56377c99baf6e5e88ef9b00fc7294a26b48ef48ae5916",
+      "dot_name": "WukongCallHome",
+      "issue_n": 1,
+      "filename": "WukongCallHome.1.abde52f5.lump",
+      "bootstrap_t": "4a000007",
+      "bootstrap_runtime_gt": 1241513991
+    },
+    "f631e6d24d722ff7f9512beeef75ea9b26361252c485b37c076cda0d9bb515df": {
+      "abstraction": "WukongCallHome",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "f631e6d24d722ff7f9512beeef75ea9b26361252c485b37c076cda0d9bb515df",
+      "dot_name": "WukongCallHome",
+      "issue_n": 1,
+      "filename": "WukongCallHome.1.70816cc0.lump",
+      "bootstrap_t": "4a000007",
+      "bootstrap_runtime_gt": 1241513991
+    },
+    "ff06e6976cf6694192337e600512b5b37c167532e4b16285f1ec8ca9a3973633": {
+      "abstraction": "WukongCallHome",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "ff06e6976cf6694192337e600512b5b37c167532e4b16285f1ec8ca9a3973633",
+      "dot_name": "WukongCallHome",
+      "issue_n": 1,
+      "filename": "WukongCallHome.1.823c4d65.lump",
+      "bootstrap_t": "4a000007",
+      "bootstrap_runtime_gt": 1241513991
+    },
+    "9ddd954abfbc2e5ecd26c58c8471f886d7467c4aaad0a02de8355f64cf7adc0c": {
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "9ddd954abfbc2e5ecd26c58c8471f886d7467c4aaad0a02de8355f64cf7adc0c",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "filename": "CapabilityTest.1.edfd9e62.lump",
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
+    },
+    "d349714f7fd348ff3e17d7128582b56dc65c74e1c0990081d37b55c36d949dba": {
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "d349714f7fd348ff3e17d7128582b56dc65c74e1c0990081d37b55c36d949dba",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "filename": "CapabilityTest.1.6c161823.lump",
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
+    },
+    "e655c01275799838cbaca5e84c0899a93eb42b42119392b63829bda85d5feba4": {
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "e655c01275799838cbaca5e84c0899a93eb42b42119392b63829bda85d5feba4",
+      "dot_name": "SelfTest",
+      "issue_n": 1,
+      "filename": "SelfTest.1.b5182a3d.lump",
+      "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25"
+    },
+    "dcfe96206305de8503bb6abbc813b4a67911423bd021cc876ec60e0c19b04eef": {
+      "binary_hash": "dcfe96206305de8503bb6abbc813b4a67911423bd021cc876ec60e0c19b04eef",
+      "filename": "WukongCallHome.1.9bf03976.lump",
+      "dot_name": "WukongCallHome",
+      "issue_n": 1,
+      "bootstrap_t": "4a000007",
+      "bootstrap_runtime_gt": 1241513991,
+      "token": "4a000007",
+      "abstraction": "WukongCallHome",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
+    },
+    "baccca61a25497a7e44c9fbd80d87838472f676b494604e4b5dc9289f52fc122": {
+      "version": 1,
+      "abstraction": "TestAbs",
+      "author": "",
+      "binary_hash": "baccca61a25497a7e44c9fbd80d87838472f676b494604e4b5dc9289f52fc122",
+      "dot_name": "TestAbs",
+      "issue_n": 1,
+      "filename": "TestAbs.1.71742676.lump",
+      "identity_hash": "1a7d7e5da79aa2a8153d909e97160628cc411b1a3a4782a3a8f1f9fb655450b5"
+    },
+    "55f07137513625e0749de30f5d67a7d979e3fa4eedfef3b499a67f358f28db32": {
+      "binary_hash": "55f07137513625e0749de30f5d67a7d979e3fa4eedfef3b499a67f358f28db32",
+      "filename": "CapabilityTest.2.e794a764.lump",
+      "dot_name": "CapabilityTest",
+      "issue_n": 2,
+      "bootstrap_t": "4a00000a",
+      "bootstrap_runtime_gt": 1241513994,
+      "token": "4a00000a",
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
+    },
+    "1ee2b6d937936d5261e3b00932bea2b8302fccd1ecb33011a98c998eb0cff26b": {
+      "binary_hash": "1ee2b6d937936d5261e3b00932bea2b8302fccd1ecb33011a98c998eb0cff26b",
+      "dot_name": "CapabilityTest",
+      "issue_n": 2,
+      "abstraction": "CapabilityTest",
+      "filename": "CapabilityTest.2.5e701b59.lump",
+      "bootstrap_t": "4a00000a",
+      "bootstrap_runtime_gt": 1241513994
+    },
+    "3b142893afc59b9e2ec2561f5afc19c303fac9bd1b8bd7f752d0294f60601aea": {
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "3b142893afc59b9e2ec2561f5afc19c303fac9bd1b8bd7f752d0294f60601aea",
+      "dot_name": "SelfTest",
+      "issue_n": 1,
+      "filename": "SelfTest.1.a6d49276.lump",
+      "compiled_at": 1789231503.3886263,
+      "token": "3b466efc",
+      "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25"
+    },
+    "8d1c67961c6c5c338ff7c3ee5598aa425304fb49309000245966b9dc6d3ab10f": {
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "8d1c67961c6c5c338ff7c3ee5598aa425304fb49309000245966b9dc6d3ab10f",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "filename": "CapabilityTest.1.ba638038.lump",
+      "compiled_at": 1789232842.4801483,
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
+    },
+    "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b": {
+      "capability_type": "inform",
+      "grants": [
+        "E"
+      ],
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "dot_name": "Adder",
+      "issue_n": 1,
+      "abstraction": "Adder",
+      "filename": "Adder.1.e437ee2c.lump",
+      "compiled_at": 1789512565.993622,
+      "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f"
+    },
+    "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca": {
+      "capability_type": "inform",
+      "grants": [
+        "E"
+      ],
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "dot_name": "Adder",
+      "issue_n": 1,
+      "abstraction": "Adder",
+      "filename": "Adder.1.13ec2f50.lump",
+      "compiled_at": 1789512564.3680909,
+      "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f"
+    },
+    "a8345236e95b6f964b142f99bce09f53826b3e129d9ad91549af36a50a0c85a4": {
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "binary_hash": "a8345236e95b6f964b142f99bce09f53826b3e129d9ad91549af36a50a0c85a4",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "filename": "CapabilityTest.1.83320494.lump",
+      "compiled_at": 1789424987.2815309,
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
+    },
+    "00682247c7536d82f537c9bd26555a752b2215644c1129f76ff6f5fdb35a9224": {
+      "binary_hash": "00682247c7536d82f537c9bd26555a752b2215644c1129f76ff6f5fdb35a9224",
+      "filename": "WukongCallHome.1.e8cb2017.lump",
+      "dot_name": "WukongCallHome",
+      "issue_n": 1,
+      "bootstrap_t": "4a000007",
+      "bootstrap_runtime_gt": 1241513991,
+      "token": "4a000007",
+      "abstraction": "WukongCallHome",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
+    },
+    "1ec3fd949e040d4ea851f8d93f1bd54230679f2e8b7fca07e6d586c4335d475c": {
+      "binary_hash": "1ec3fd949e040d4ea851f8d93f1bd54230679f2e8b7fca07e6d586c4335d475c",
+      "dot_name": "CapabilityTest",
+      "issue_n": 2,
+      "abstraction": "CapabilityTest",
+      "filename": "CapabilityTest.2.6fd9df21.lump",
+      "compiled_at": 1789475607.6456692,
+      "bootstrap_t": "4a000002",
+      "bootstrap_runtime_gt": 1241513986
+    },
+    "ce48ae00625861fbb9f7ccec53c5dbf8efe3509afd00af8ea14295b66eca247f": {
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "save_as_latest": true,
+      "binary_hash": "ce48ae00625861fbb9f7ccec53c5dbf8efe3509afd00af8ea14295b66eca247f",
+      "dot_name": "SelfTest",
+      "issue_n": 1,
+      "filename": "SelfTest.1.48acae47.lump",
+      "compiled_at": 1789514842.4015205,
+      "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25"
+    },
+    "3a77d0cf1ec8d4df96f877c4fc240ae1c8e94dc490bc266f49db2e07726bd086": {
+      "abstraction": "WukongCallHome",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "save_as_latest": true,
+      "binary_hash": "3a77d0cf1ec8d4df96f877c4fc240ae1c8e94dc490bc266f49db2e07726bd086",
+      "dot_name": "WukongCallHome",
+      "issue_n": 1,
+      "filename": "WukongCallHome.1.74c8ff97.lump",
+      "compiled_at": 1789515145.740632,
+      "identity_hash": "b2c8f3d7d7e755f24ac3ab22726514cfaa9a604d037ab661891c198a0f5d8b90",
+      "token": "4a000007",
+      "bootstrap_t": "4a000007",
+      "bootstrap_runtime_gt": 1241513991
+    }
+  }
+}

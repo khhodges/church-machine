@@ -1,0 +1,136 @@
+{
+  "token": "00001000",
+  "abstraction": "SlideRule",
+  "filename": "SlideRule.1.d960f531.lump",
+  "sidecar_file": "SlideRule.1.d960f531.json",
+  "ns_slot": null,
+  "ns_slot_policy": "dynamic",
+  "lump_size": 4096,
+  "cw": 2602,
+  "cc": 1,
+  "author": "",
+  "version": "2026.08.13",
+  "lump_version": 2,
+  "compiled_at": 1786659063.1567092,
+  "methods": [
+    {
+      "name": "Multiply",
+      "offset": 0,
+      "length": 43
+    },
+    {
+      "name": "Divide",
+      "offset": 43,
+      "length": 41
+    },
+    {
+      "name": "Sqrt",
+      "offset": 84,
+      "length": 40
+    },
+    {
+      "name": "Mod",
+      "offset": 124,
+      "length": 34
+    },
+    {
+      "name": "Sin",
+      "offset": 158,
+      "length": 295
+    },
+    {
+      "name": "Cos",
+      "offset": 453,
+      "length": 280
+    },
+    {
+      "name": "Tan",
+      "offset": 733,
+      "length": 335
+    },
+    {
+      "name": "Asin",
+      "offset": 1068,
+      "length": 282
+    },
+    {
+      "name": "Acos",
+      "offset": 1350,
+      "length": 290
+    },
+    {
+      "name": "Atan",
+      "offset": 1640,
+      "length": 280
+    },
+    {
+      "name": "ToDegrees",
+      "offset": 1920,
+      "length": 39
+    },
+    {
+      "name": "ToRadians",
+      "offset": 1959,
+      "length": 37
+    },
+    {
+      "name": "Bernoulli",
+      "offset": 1996,
+      "length": 130
+    },
+    {
+      "name": "Abs",
+      "offset": 2126,
+      "length": 7
+    },
+    {
+      "name": "Pow",
+      "offset": 2133,
+      "length": 63
+    },
+    {
+      "name": "Min",
+      "offset": 2196,
+      "length": 5
+    },
+    {
+      "name": "Max",
+      "offset": 2201,
+      "length": 5
+    },
+    {
+      "name": "GCD",
+      "offset": 2206,
+      "length": 25
+    },
+    {
+      "name": "Factorial",
+      "offset": 2231,
+      "length": 42
+    },
+    {
+      "name": "Log2",
+      "offset": 2273,
+      "length": 18
+    },
+    {
+      "name": "Atan2",
+      "offset": 2291,
+      "length": 294
+    },
+    {
+      "name": "Signum",
+      "offset": 2585,
+      "length": 17
+    }
+  ],
+  "grants": [
+    "E"
+  ],
+  "binary_hash": "6a449f41a0048c54e2a7b31d078068300832febb88c03c4beb228b1afbff48a3",
+  "petname": "",
+  "issue_number": 1,
+  "identity_hash": "a3514490fec3fce8fe06f9ee6a3b83bd94b1b686c4ecac855951344504989b91",
+  "dot_name": "SlideRule",
+  "issue_n": 1
+}

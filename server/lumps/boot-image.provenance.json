@@ -1,25 +1,25 @@
 {
   "boot_config_sha256": "39a8ae8177fcfca37447482b75584fb794fb2a4d44c19da92af6cf33cbe38687",
-  "image_sha256": "914e584a849947a158bfe54130868dd93c7e8caf8fae7260db429e2f9f367f44",
+  "image_sha256": "3e039833aca4331017d3bcd30b69f1627f8b8cfb958a6f32bd16f94fcfaae554",
   "origin": "generated",
   "resident_bindings": [
     {
-      "artifact_sha256": "efa0e4323679355a530f0ce9bcf8cf19f962204bba7a45b543ca308f1ece17d7",
+      "artifact_sha256": "ce48ae00625861fbb9f7ccec53c5dbf8efe3509afd00af8ea14295b66eca247f",
       "boot_resident": true,
-      "filename": "SelfTest.86.f37bafd6.lump",
+      "filename": "SelfTest.1.48acae47.lump",
       "load_policy": "Resident",
-      "localized_clist_sha256": "d07843a6ce6e1ca7cde0a7f2bcf2c0ec2e90ead4d0c63ffe9c33f33d3200f675",
+      "localized_clist_sha256": "37fa6d81a99764b966f9e8499eb68d6e7c761f303e5f60f397564c88a7ae990a",
       "ns_slot_policy": "static",
       "resident": true,
       "slot": 6,
       "token": "4a000006"
     },
     {
-      "artifact_sha256": "00682247c7536d82f537c9bd26555a752b2215644c1129f76ff6f5fdb35a9224",
+      "artifact_sha256": "3a77d0cf1ec8d4df96f877c4fc240ae1c8e94dc490bc266f49db2e07726bd086",
       "boot_resident": true,
-      "filename": "WukongCallHome.1.e8cb2017.lump",
+      "filename": "WukongCallHome.1.74c8ff97.lump",
       "load_policy": "Resident",
-      "localized_clist_sha256": "70cc37469c258a3183c3f0325b45db1ff0d6bee7f3ebd088a06ccb1b1bd721eb",
+      "localized_clist_sha256": "16473821db96fd35113b74199edec873e691821342837b53ef39434867d03e5c",
       "ns_slot_policy": "static",
       "resident": true,
       "slot": 7,
@@ -38,8 +38,8 @@
     }
   ],
   "source_sha256": {
-    "manifest": "e3816f84f829ea94f4669543b9c8a8117f5f856ac3c62ee5d01f17fb4c16a921",
-    "ns_state": "fc3a7c76b3819e7544d50a363d1b808dae0fe5a59198baff86adc73fcffc92a5"
+    "manifest": "0bb6e1691bcb9b79187a709b53617f0e2e1a93ae444e3020a11c7cf987263b3d",
+    "ns_state": "2a87f7edeeb2e4a21524dd07abf913bda64a6562f25efd00a43ddc6d15cafbe5"
   },
   "version": 1
 }

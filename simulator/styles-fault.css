@@ -897,6 +897,12 @@
     flex: 1 1 auto;
 }
 
+.boot-execution-update-status {
+    color: #ffd66b;
+    font-weight: 600;
+    margin-top: 0.25rem;
+}
+
 .boot-execution-freshness-warning strong {
     color: #fbbf24;
 }
@@ -918,6 +924,11 @@
     background: #ffd66b;
     outline: 2px solid #fff2c7;
     outline-offset: 2px;
+}
+
+.boot-execution-update-btn:disabled {
+    cursor: wait;
+    opacity: 0.72;
 }
 
 @media (max-width: 760px) {

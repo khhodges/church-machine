@@ -7,4 +7,4 @@ A valid, provenance-approved boot image may intentionally contain older LUMPs. T
 
 **Why:** Restoring an older approved resident image made the IDE boot, but the user was blindsided because “boot works” was reported without an equally prominent warning that newer successfully compiled code was not executing.
 
-**How to apply:** Treat boot validity and execution freshness as separate statuses. Show selected and latest versions before simulation, keep the warning visible while they differ, and never describe a successful boot as proof that current source is running.
+**How to apply:** Treat boot validity and execution freshness as separate statuses. Show selected and latest versions before simulation, keep the warning visible while they differ, and never describe a successful boot as proof that current source is running. An “Update” control must attempt the guarded server operation and report success or an exact fail-closed reason; navigation alone is not an update.

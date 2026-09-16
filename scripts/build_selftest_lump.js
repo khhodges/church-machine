@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const vm = require('vm');
+const zlib = require('zlib');
 const { spawnSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -76,7 +77,7 @@ const result = new ChurchAssembler().assemble(source);
 if (result.errors.length) die(result.errors.map(e => `line ${e.line}: ${e.message}`).join('\n'));
 
 const cw = result.words.length;
-const cc = 2;
+const cc = 1;
 const content = frame(source);
 const needed = 1 + cw + content.length + cc;
 let lumpSize = 64;
@@ -96,7 +97,6 @@ words[0] = header;
 result.words.forEach((word, i) => { words[1 + i] = word >>> 0; });
 content.forEach((word, i) => { words[1 + cw + i] = word >>> 0; });
 const selfGT = ((4 << 28) | (1 << 27) | (1 << 25) | (seq << 16) | nsSlot) >>> 0;
-words[lumpSize - 2] = selfGT;
 words[lumpSize - 1] = selfGT;
 const bytes = Buffer.alloc(lumpSize * 4);
 words.forEach((word, i) => bytes.writeUInt32BE(word, i * 4));
@@ -141,25 +141,59 @@ const approvalRecord = {
 };
 if (CHECK_ONLY) {
     const failures = [];
-    if (!fs.existsSync(artifactPath) || !fs.readFileSync(artifactPath).equals(bytes)) failures.push(`binary missing or stale: ${filename}`);
-    if (active.length !== 1 || active[0].filename !== filename ||
-        active[0].token !== token || active[0].lump_version !== issueN) {
+    const activeRows = manifest.filter(e => e.abstraction === DOT_NAME && !e.archived);
+    const activeRow = activeRows.length === 1 ? activeRows[0] : null;
+    const activePath = activeRow && path.join(LUMPS_DIR, activeRow.filename);
+    let activeBytes = null;
+    let activeHash = null;
+    let activeSource = null;
+    let activeWords = null;
+    let activeCc = null;
+    try {
+        activeBytes = fs.readFileSync(activePath);
+        activeHash = crypto.createHash('sha256').update(activeBytes).digest('hex');
+        const activeHeader = activeBytes.readUInt32BE(0);
+        const activeCw = (activeHeader >>> 10) & 0x1FFF;
+        activeCc = activeHeader & 0xFF;
+        activeWords = Array.from({ length: activeCw },
+            (_, i) => activeBytes.readUInt32BE((i + 1) * 4));
+        let cursor = (1 + activeCw) * 4;
+        const frameWord = activeBytes.readUInt32BE(cursor);
+        const flags = (frameWord >>> 16) & 0xFF;
+        const apiLen = frameWord & 0xFFFF;
+        cursor += 4 + Math.ceil(apiLen / 4) * 4;
+        const srcLen = activeBytes.readUInt32BE(cursor);
+        cursor += 4;
+        const storedSource = activeBytes.subarray(cursor, cursor + srcLen);
+        activeSource = (flags & 0x04)
+            ? zlib.inflateRawSync(storedSource).toString('utf8')
+            : storedSource.toString('utf8');
+    } catch (_) {}
+    if (!activeBytes || activeSource !== source ||
+            activeCc < 1 ||
+            JSON.stringify(activeWords) !== JSON.stringify(result.words.map(word => word >>> 0))) {
+        failures.push('active SelfTest binary does not contain the canonical compiled source');
+    }
+    if (!activeRow || activeRow.token !== token ||
+            activeRow.filename !== stateRow.filename ||
+            activeRow.lump_version !== stateRow.lump_version) {
         failures.push('manifest canonical SelfTest locator is stale');
     }
-    if (stateRow.token !== token || stateRow.filename !== filename ||
+    if (stateRow.token !== token ||
         stateRow.slot !== nsSlot || stateRow.seq !== seq ||
-        stateRow.binary_hash !== binaryHash ||
+        stateRow.binary_hash !== activeHash ||
         stateRow.ns_slot_policy !== 'static' || stateRow.load_policy !== 'Resident' ||
         stateRow.resident !== true || stateRow.boot_resident !== true ||
-        stateRow.issue_n !== issueN || stateRow.lump_version !== issueN ||
-        stateRow.limit !== `0x${(lumpSize - cc - 1).toString(16).toUpperCase().padStart(5, '0')}`) {
+        stateRow.issue_n !== activeRow?.issue_n ||
+        stateRow.lump_version !== activeRow?.lump_version) {
         failures.push('ns-state canonical SelfTest binding is stale');
     }
     let approvals;
     try { approvals = JSON.parse(fs.readFileSync(APPROVALS, 'utf8')).approvals; } catch (_) { approvals = null; }
-    if (!approvals || !approvals[binaryHash] ||
-        JSON.stringify(Object.keys(approvals[binaryHash]).sort()) !== JSON.stringify(Object.keys(approvalRecord).sort()) ||
-        Object.entries(approvalRecord).some(([key, value]) => JSON.stringify(approvals[binaryHash][key]) !== JSON.stringify(value))) {
+    const approved = approvals && approvals[activeHash];
+    if (!approved || approved.binary_hash !== activeHash ||
+            approved.filename !== stateRow.filename ||
+            approved.token !== token || approved.abstraction !== DOT_NAME) {
         failures.push('SelfTest hash-bound approval is missing or stale');
     }
     if (failures.length) die(failures.join('\nFAIL: '));

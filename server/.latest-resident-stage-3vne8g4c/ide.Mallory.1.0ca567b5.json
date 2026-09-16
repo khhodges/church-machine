@@ -1,0 +1,82 @@
+{
+  "token": "0ca567b5",
+  "abstraction": "ide.Mallory",
+  "dot_name": "ide.Mallory",
+  "issue_n": 1,
+  "identity_string": "ide.Mallory#1",
+  "identity_hash": "f3b48e1b7403b0e77da69bc18f7b60db71061bfc1b9c0bc672e2ff282d11d1fe",
+  "binary_hash": "a220c45f71efffa1ef401a99343967964ab402786b3236688f161d297f07427f",
+  "filename": "ide.Mallory.1.0ca567b5.lump",
+  "sidecar_file": "ide.Mallory.1.0ca567b5.json",
+  "ns_slot": null,
+  "ns_slot_policy": "dynamic",
+  "boot_resident": false,
+  "lump_size": 256,
+  "cw": 5,
+  "cc": 2,
+  "typ": 0,
+  "status": "released",
+  "language": "Church Machine ISA",
+  "author": "Church Machine",
+  "sourceStorageTier": 2,
+  "source_file": "simulator/examples/mallory.cloomc",
+  "source": "; ============================================================\n; Abstraction:  ide.Mallory\n; Description:  Adversary in the two-enemies containment example\n; Language:     Church Machine ISA assembly\n; ============================================================\n;\n; Public method selector:\n;   1  Steal() -> faults NO_CAPABILITY\n;\n; Physical c-list:\n;   [0] SELF     E   (minted when the dynamic NS slot is allocated)\n;   [1] SCRATCH  RW  (same resident LUMP)\n;\n; Alice's SECRET_DATA is intentionally absent.  Steal asks CR6 for row 2;\n; because Mallory only owns rows 0 and 1, LOAD deterministically faults\n; NO_CAPABILITY before any data read can occur.\n\ncapabilities {\n    __SELF__ E,\n    SCRATCH RW\n}\n\nBRANCH steal\n\nsteal:\nLOAD  CR1, CR6, 2\nDREAD DR1, CR1, #0\nRETURN\n\nWORD 0",
+  "methods": [
+    {
+      "petName": "Steal",
+      "branchOffset": 1,
+      "in": [],
+      "out": [
+        {
+          "name": "stolen",
+          "reg": "DR1"
+        }
+      ],
+      "failure": "NO_CAPABILITY"
+    }
+  ],
+  "capabilities": [
+    {
+      "row": 0,
+      "name": "SELF",
+      "rights": [
+        "E"
+      ],
+      "role": "identity"
+    },
+    {
+      "row": 1,
+      "name": "SCRATCH",
+      "rights": [
+        "R",
+        "W"
+      ],
+      "role": "private_data"
+    }
+  ],
+  "compiler_owned_self": true,
+  "allocation_time_placeholders": [
+    {
+      "row": 0,
+      "role": "identity",
+      "word": "0xFEED5E1F"
+    },
+    {
+      "row": 1,
+      "role": "private_data",
+      "word": "0xFEEDDA7A"
+    }
+  ],
+  "description": "Deterministically faults NO_CAPABILITY because Alice has no row in Mallory’s c-list.",
+  "documentation_case": "fully_documented",
+  "docs": [
+    "alice-mallory-v13-lumps.md"
+  ],
+  "provenance": {
+    "disposition": "reissued from behavioral specification; supplied token and code were placeholders",
+    "supplied_metadata": "attached_assets/mallory.lump_1787597258420.json",
+    "supplied_metadata_sha256": "d27f2492a31fe9cf79970e8ab6cd4c771ed1a25206d3a0213f3f802057061d76",
+    "supplied_word_image": "attached_assets/mallory.lump_1787597641216.hex",
+    "supplied_word_image_sha256": "f28e45e58263597232fc2081aa2f21b512afae9d61515aa92517f456cfda933d"
+  }
+}

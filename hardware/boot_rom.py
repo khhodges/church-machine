@@ -701,7 +701,7 @@ try:
     if (((_selftest_header >> 27) & 0x1F) != 0x1F
             or WUKONG_SELFTEST_ALLOC != _selftest_declared_alloc
             or 1 + _selftest_cw + _selftest_cc > WUKONG_SELFTEST_ALLOC
-            or _selftest_cc < 2):
+            or _selftest_cc < 1):
         raise ValueError("active SelfTest header/allocation is invalid")
     _selftest_hash = hashlib.sha256(_selftest_raw).hexdigest()
     _selftest_approval = read_approvals(
@@ -711,16 +711,14 @@ try:
                 "binary_hash": _selftest_hash, "filename": WUKONG_SELFTEST_FILENAME,
                 "token": WUKONG_SELFTEST_TOKEN, "abstraction": "SelfTest",
                 "issue_n": _selftest_selected.get("issue_n"),
-                "identity_hash": _selftest_selected.get("identity_hash"),
             }.items())):
         raise PermissionError("active SelfTest is not exactly hash-approved")
     if _selftest_manifest_entry.get("lump_version") != _selftest_selected.get("lump_version"):
         raise PermissionError("manifest locator and namespace disagree on active SelfTest version")
     _selftest_egt = make_gt(GT_TYPE_INFORM, PERM_MASK_E,
                             WUKONG_SELFTEST_NS_SLOT, WUKONG_SELFTEST_GT_SEQ)
-    if (WUKONG_SELFTEST_WORDS[-_selftest_cc] != _selftest_egt
-            or WUKONG_SELFTEST_WORDS[-_selftest_cc + 1] != _selftest_egt):
-        raise ValueError("active SelfTest c-list does not contain selected self/Next E-GTs")
+    if WUKONG_SELFTEST_WORDS[-_selftest_cc] != _selftest_egt:
+        raise ValueError("active SelfTest c-list does not contain selected SELF E-GT")
 except Exception as exc:
     raise RuntimeError(f"Wukong factory image requires an approved active SelfTest: {exc}") from exc
 

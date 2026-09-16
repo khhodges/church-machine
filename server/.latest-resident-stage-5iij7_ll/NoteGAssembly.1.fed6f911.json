@@ -1,0 +1,52 @@
+{
+  "token": "fe9c6e42",
+  "abstraction": "NoteGAssembly",
+  "filename": "NoteGAssembly.1.fed6f911.lump",
+  "sidecar_file": "NoteGAssembly.1.fed6f911.json",
+  "ns_slot": null,
+  "ns_slot_policy": "dynamic",
+  "lump_size": 1024,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 141,
+  "cc": 1,
+  "profile": "IoT",
+  "language": "",
+  "author": "",
+  "version": "",
+  "release_notes": "",
+  "methods": [],
+  "capabilities": [],
+  "compiler_owned_self": false,
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown",
+    "source_hash": ""
+  },
+  "deployment": {
+    "target_board": "wukong-xc7a100t",
+    "profile": "IoT",
+    "built_at": "2026-08-22T17:26:24.899503Z",
+    "builder": "CLOOMC++ IDE v1.0"
+  },
+  "grants": [
+    "E"
+  ],
+  "source": "",
+  "binary_hash": "9490b3e536b73c28e1d30f28c6ccb46f4e84a25cdefca6571a27556aed66945a",
+  "petname": "",
+  "issue_number": 1,
+  "identity_string": "NoteGAssembly#1",
+  "identity_hash": "75a7c570e333644077d6e93d2bc905cc61c4da9d6a3bfaad2990c6492c5079ac",
+  "identity_seal_location": "c-list[0]",
+  "dot_name": "NoteGAssembly",
+  "issue_n": 1,
+  "lump_version": 1,
+  "compiled_at": 1787419584.8995218,
+  "sourceStorageTier": 2
+}

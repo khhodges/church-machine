@@ -5431,6 +5431,35 @@ def _boot_execution_freshness(state, lumps_dir):
             and entry.get("filename")
             and os.path.isfile(os.path.join(lumps_dir, entry["filename"]))
         ]
+        # A newer compilation for the same abstraction name is not necessarily
+        # an update for this resident binding. Static bootstrap residents are
+        # destination-specific: compare only artifacts whose embedded SELF row
+        # names the selected Namespace slot/generation. Keep unreadable fixtures
+        # in the legacy path so freshness diagnostics remain available.
+        try:
+            from server.bootstrap_identity import resident_inform_egt
+            expected_self = resident_inform_egt(selected)
+            compatible = []
+            inspected_any = False
+            for entry in candidates:
+                raw = open(os.path.join(lumps_dir, entry["filename"]), "rb").read()
+                if len(raw) < 4:
+                    continue
+                header = int.from_bytes(raw[:4], "big")
+                allocation = 1 << (((header >> 23) & 0xF) + 6)
+                cc = header & 0xFF
+                if len(raw) != allocation * 4 or cc < 1:
+                    continue
+                inspected_any = True
+                row0 = int.from_bytes(
+                    raw[(allocation - cc) * 4:(allocation - cc + 1) * 4],
+                    "big")
+                if row0 == expected_self:
+                    compatible.append(entry)
+            if inspected_any:
+                candidates = compatible
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
         if not candidates:
             continue
         latest = max(candidates, key=lambda entry: (
@@ -5462,6 +5491,183 @@ def _boot_execution_freshness(state, lumps_dir):
         "status": "stale" if warnings else "current",
         "warnings": warnings,
     }
+
+
+@app.route("/api/boot-image/update-to-latest", methods=["POST"])
+def boot_image_update_to_latest():
+    """Atomically promote latest resident-compatible artifacts and rebuild."""
+    import fcntl
+    import shutil
+    import tempfile
+    from pathlib import Path
+    from scripts import migrate_bootstrap_residents as migration
+    from server.bootstrap_identity import resident_inform_egt
+    from server.lump_approvals import write_approvals
+
+    lock_path = os.path.join(
+        tempfile.gettempdir(),
+        "lumps-history-transition-" +
+        hashlib.sha256(os.path.abspath(LUMPS_DIR).encode()).hexdigest()[:16] +
+        ".lock")
+    with open(lock_path, "a+") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        with open(NS_STATE_PATH, encoding="utf-8") as source:
+            current_state = json.load(source)
+        freshness = _boot_execution_freshness(current_state, LUMPS_DIR)
+        if not freshness["warnings"]:
+            return jsonify({"ok": True, "updated": [], "blocked": [],
+                            "executionFreshness": freshness})
+
+        parent = os.path.dirname(os.path.abspath(LUMPS_DIR))
+        stage = tempfile.mkdtemp(prefix=".latest-resident-stage-", dir=parent)
+        try:
+            shutil.copytree(LUMPS_DIR, stage, dirs_exist_ok=True, symlinks=True)
+            state_path = os.path.join(stage, "ns-state.json")
+            manifest_path = os.path.join(stage, "manifest.json")
+            approvals_path = os.path.join(stage, "approvals.json")
+            with open(state_path, encoding="utf-8") as source:
+                state = json.load(source)
+            with open(manifest_path, encoding="utf-8") as source:
+                manifest = json.load(source)
+            approvals = _read_lump_approvals(stage)
+            updated = []
+            blocked = []
+
+            for warning in freshness["warnings"]:
+                name = warning["abstraction"]
+                selected_rows = [
+                    row for row in state.get("abstractions", [])
+                    if isinstance(row, dict) and row.get("name") == name
+                    and row.get("slot") == warning.get("slot")
+                ]
+                latest_rows = [
+                    row for row in manifest if isinstance(row, dict)
+                    and row.get("abstraction") == name
+                    and row.get("filename") == warning["latest"]["filename"]
+                    and row.get("archived") is not True
+                ]
+                if len(selected_rows) != 1 or len(latest_rows) != 1:
+                    blocked.append({"abstraction": name,
+                                    "reason": "binding changed during update"})
+                    continue
+                selected, latest = selected_rows[0], latest_rows[0]
+                body_path = os.path.join(stage, latest["filename"])
+                try:
+                    raw = open(body_path, "rb").read()
+                    header = int.from_bytes(raw[:4], "big")
+                    allocation = 1 << (((header >> 23) & 0xF) + 6)
+                    cc = header & 0xFF
+                    if len(raw) != allocation * 4 or cc < 1:
+                        raise ValueError("invalid LUMP allocation or missing SELF row")
+                    row0 = int.from_bytes(
+                        raw[(allocation - cc) * 4:(allocation - cc + 1) * 4],
+                        "big")
+                    expected = resident_inform_egt(selected)
+                except (OSError, ValueError) as exc:
+                    blocked.append({"abstraction": name, "reason": str(exc)})
+                    continue
+                if row0 != expected:
+                    blocked.append({
+                        "abstraction": name,
+                        "reason": (
+                            f"latest compilation SELF is 0x{row0:08x}, but "
+                            f"NS[{selected['slot']}] requires 0x{expected:08x}"),
+                    })
+                    continue
+                digest = hashlib.sha256(raw).hexdigest()
+                approval = approvals.get(digest)
+                if not isinstance(approval, dict):
+                    blocked.append({"abstraction": name,
+                                    "reason": "latest binary has no hash-bound approval"})
+                    continue
+                token = f"{row0:08x}"
+                approval.update({
+                    "token": token,
+                    "bootstrap_t": token,
+                    "bootstrap_runtime_gt": row0,
+                })
+                for entry in manifest:
+                    if (isinstance(entry, dict)
+                            and entry.get("abstraction") == name
+                            and entry.get("filename") == selected.get("filename")
+                            and entry is not latest):
+                        entry["archived"] = True
+                latest["token"] = token
+                latest.pop("archived", None)
+                selected.update({
+                    "filename": latest["filename"],
+                    "token": token,
+                    "lump_version": latest.get("lump_version"),
+                    "issue_n": latest.get("issue_n"),
+                    "binary_hash": digest,
+                })
+                if latest.get("identity_hash"):
+                    selected["identity_hash"] = latest["identity_hash"]
+                updated.append({
+                    "abstraction": name,
+                    "slot": selected["slot"],
+                    "version": latest.get("lump_version"),
+                    "filename": latest["filename"],
+                })
+
+            if blocked:
+                details = "; ".join(
+                    f"{item['abstraction']}: {item['reason']}"
+                    for item in blocked)
+                return jsonify({
+                    "ok": False, "updated": [], "blocked": blocked,
+                    "error": "Guarded update cannot publish a partial set. " + details,
+                    "dataChanged": False,
+                }), 409
+            if not updated:
+                return jsonify({
+                    "ok": False, "updated": [], "blocked": blocked,
+                    "error": "No latest compilation matches its current Namespace identity.",
+                    "dataChanged": False,
+                }), 409
+
+            with open(state_path, "w", encoding="utf-8") as output:
+                json.dump(state, output, indent=2)
+                output.write("\n")
+            with open(manifest_path, "w", encoding="utf-8") as output:
+                json.dump(manifest, output, indent=2)
+                output.write("\n")
+            write_approvals(approvals_path, approvals)
+
+            with open(BOOT_CONFIG_PATH, encoding="utf-8") as source:
+                config = json.load(source)
+            boot_slot = int(config.get("bootEntrySlot", 10))
+            image = _boot_image_gen.generate_boot_image(
+                config, stage, boot_entry_slot=boot_slot,
+                require_entry_resident=True)
+            with open(os.path.join(stage, "boot-image.bin"), "wb") as output:
+                output.write(image)
+            migration._synchronize_namespace_descriptors(Path(stage))
+            with open(state_path, encoding="utf-8") as source:
+                state = json.load(source)
+            migration._write_generated_provenance(Path(stage), image, config)
+            migration._validate_stage(Path(stage))
+            migration._exchange(Path(LUMPS_DIR), Path(stage))
+            stage = None
+
+            with open(NS_STATE_PATH, encoding="utf-8") as source:
+                committed = json.load(source)
+            result_freshness = _boot_execution_freshness(committed, LUMPS_DIR)
+            return jsonify({
+                "ok": True, "updated": updated, "blocked": blocked,
+                "executionFreshness": result_freshness,
+                "dataChanged": True,
+            })
+        except Exception as exc:
+            app.logger.exception("Update-to-latest transaction failed")
+            return jsonify({
+                "ok": False,
+                "error": f"Update failed before publication: {exc}",
+                "dataChanged": False,
+            }), 409
+        finally:
+            if stage and os.path.isdir(stage):
+                shutil.rmtree(stage)
 
 
 @app.route("/api/boot-image/ns-state", methods=["GET"])

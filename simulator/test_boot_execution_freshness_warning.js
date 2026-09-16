@@ -49,6 +49,10 @@ if (!banner.innerHTML.includes('Update to latest') ||
         !banner.innerHTML.includes('_openBootExecutionUpdate()')) {
     throw new Error('warning does not offer the guarded update action');
 }
+if (!source.includes("fetch('/api/boot-image/update-to-latest'") ||
+        !source.includes('Update blocked \\u2014 no data changed.')) {
+    throw new Error('update action does not perform or report the guarded server check');
+}
 
 context._renderBootExecutionFreshness({
     executionFreshness: { warnings: [] },

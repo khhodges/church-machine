@@ -1,0 +1,49 @@
+{
+  "token": "00130000",
+  "abstraction": "Loader",
+  "filename": "Loader_v1.lump",
+  "sidecar_file": "Loader_v1.json",
+  "ns_slot": null,
+  "ns_slot_policy": "dynamic",
+  "lump_size": 64,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 1,
+  "cc": 1,
+  "status": "wip",
+  "source": "; Loader abstraction\n; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\nabstraction Loader {\n    capabilities {\n    SelfTest E\n}\n\n    method run {\n        ; Main function\n        ; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n        \nCall SelfTest run\n\n        \n    }\n}",
+  "description": "",
+  "methods": [
+    {
+      "name": "run",
+      "offset": 0,
+      "length": 1,
+      "description": "Main function"
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "self",
+      "rights": [
+        "E"
+      ],
+      "grants": [
+        "E"
+      ],
+      "nsIndex": -1
+    }
+  ],
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown"
+  },
+  "lump_version": 1,
+  "compiled_at": 1785333917.725582,
+  "last_edited_at": 1785334019.971098,
+  "binary_hash": "2202a4436a80fcb9c78a5234063e84fa639709b2a7beca27688dc7c1b9ec89d6"
+}

@@ -432,7 +432,8 @@
     "abstraction": "SelfTest",
     "filename": "SelfTest.86.f37bafd6.lump",
     "lump_version": 86,
-    "variant_group": "selftest-history"
+    "variant_group": "selftest-history",
+    "archived": true
   },
   {
     "token": "7ccff26f",
@@ -454,7 +455,8 @@
     "token": "4a000007",
     "abstraction": "WukongCallHome",
     "filename": "WukongCallHome.1.e8cb2017.lump",
-    "lump_version": 1
+    "lump_version": 1,
+    "archived": true
   },
   {
     "token": "4a000002",
@@ -502,7 +504,7 @@
     "operation_id": "a6fc2c83c934433b8dd49ae9598fbc1a"
   },
   {
-    "token": "4c35bef2",
+    "token": "4a000006",
     "abstraction": "SelfTest",
     "filename": "SelfTest.1.48acae47.lump",
     "lump_version": 87,
@@ -525,7 +527,7 @@
     "operation_id": "a9d03c65-640d-4755-9356-6233c5c73f19"
   },
   {
-    "token": "ec840e03",
+    "token": "4a000007",
     "abstraction": "WukongCallHome",
     "filename": "WukongCallHome.1.74c8ff97.lump",
     "lump_version": 11,

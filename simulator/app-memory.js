@@ -68,37 +68,79 @@ function _renderBootExecutionFreshness(state) {
             span.textContent = text;
             return span.innerHTML;
         }).join('; ') +
-        '. Prepare a new boot image before treating simulator results as current.</div>' +
-        '<button type="button" class="boot-execution-update-btn" ' +
+        '. Prepare a new boot image before treating simulator results as current.' +
+        '<div id="bootExecutionUpdateStatus" class="boot-execution-update-status"></div></div>' +
+        '<button type="button" id="bootExecutionUpdateButton" class="boot-execution-update-btn" ' +
         'onclick="_openBootExecutionUpdate()">Update to latest</button>';
     banner.style.display = 'flex';
 }
 window._renderBootExecutionFreshness = _renderBootExecutionFreshness;
 
-function _openBootExecutionUpdate() {
+async function _openBootExecutionUpdate() {
     const warnings = window._nsState && window._nsState.executionFreshness &&
         Array.isArray(window._nsState.executionFreshness.warnings)
         ? window._nsState.executionFreshness.warnings : [];
     if (!warnings.length) return;
-    if (typeof switchView === 'function') switchView('namespace');
-    const summary = warnings.map(function(item) {
-        const latest = item.latest || {};
-        return String(item.abstraction) + ' \u2192 ' +
-            (latest.version == null ? latest.filename : 'v' + latest.version);
-    }).join(', ');
-    if (typeof appendOutput === 'function') {
-        appendOutput(
-            'Update to latest: review and bind these compiled artifacts in the Namespace, ' +
-            'then use the guarded Prepare action: ' + summary,
-            'warning'
-        );
+    const button = document.getElementById('bootExecutionUpdateButton');
+    const status = document.getElementById('bootExecutionUpdateStatus');
+    if (button) {
+        button.disabled = true;
+        button.textContent = 'Checking\u2026';
     }
-    setTimeout(function() {
-        const table = document.getElementById('namespaceTable');
-        if (table && typeof table.scrollIntoView === 'function') {
-            table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (status) status.textContent = 'Checking the immutable latest compilations\u2026';
+    try {
+        const response = await fetch('/api/boot-image/update-to-latest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
+        });
+        let body = null;
+        try { body = await response.json(); } catch (_error) {}
+        if (!response.ok || !body || body.ok !== true) {
+            const message = 'Update blocked \u2014 no data changed. ' +
+                (body && body.error ? String(body.error) : 'The guarded update failed.');
+            if (status) status.textContent = message;
+            if (typeof appendOutput === 'function') appendOutput(message, 'error');
+            if (button) button.textContent = 'Retry update';
+            return false;
         }
-    }, 0);
+        window._nsState.executionFreshness = body.executionFreshness;
+        const updated = Array.isArray(body.updated) ? body.updated : [];
+        const blocked = Array.isArray(body.blocked) ? body.blocked : [];
+        const updatedText = updated.length
+            ? 'Updated ' + updated.map(function(item) {
+                return item.abstraction + ' to v' + item.version;
+            }).join(', ') + '.'
+            : 'No compatible artifacts required an update.';
+        const blockedText = blocked.length
+            ? ' Still blocked: ' + blocked.map(function(item) {
+                return item.abstraction + ' (' + item.reason + ')';
+            }).join(', ') + '.'
+            : '';
+        const message = updatedText + blockedText;
+        if (status) status.textContent = message;
+        if (typeof appendOutput === 'function') appendOutput(
+            message, blocked.length ? 'warning' : 'info');
+        if (!body.executionFreshness ||
+                body.executionFreshness.status === 'current') {
+            _renderBootExecutionFreshness(window._nsState);
+        } else {
+            setTimeout(function() {
+                window.location.reload();
+            }, 1800);
+        }
+        if (button) button.textContent = blocked.length ? 'Updated compatible' : 'Updated';
+        return true;
+    } catch (error) {
+        const message = 'Update failed before changing data: ' +
+            (error && error.message ? error.message : String(error)) + '.';
+        if (status) status.textContent = message;
+        if (typeof appendOutput === 'function') appendOutput(message, 'error');
+        if (button) button.textContent = 'Retry update';
+        return false;
+    } finally {
+        if (button) button.disabled = false;
+    }
 }
 window._openBootExecutionUpdate = _openBootExecutionUpdate;
 

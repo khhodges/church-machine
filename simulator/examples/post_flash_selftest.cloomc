@@ -42,8 +42,7 @@
 ;   CR0 and CR1 hold the same GT word (0x4A000006) — TPERM EXACT cross-check passes.
 capabilities {
     SelfTest     E,         ; slot 0 — E-GT for TPERM/EXACT tests
-    Next         E          ; slot 1 — Next.GT (default=SelfTest self-loop; boot_image.py overrides)
-}
+    }
 ;
 ; Fail-fast pattern (every instruction on its own line, ; is comment):
 ;   BRANCHEQ ok_N        -- Z=1 = correct, skip fail
@@ -794,4 +793,4 @@ tL81:
 ; ═══════════════════════════════════════════════════════════════════════════════
 done:
     ISUB DR0, DR0, DR0      ; DR0 = 0 (all 81 tests passed)
-    ELOADCALL CR1, Next     ; load Next.GT from c-list[1] and ELOADCALL to it (replaces lump in-place)
+    RETURN

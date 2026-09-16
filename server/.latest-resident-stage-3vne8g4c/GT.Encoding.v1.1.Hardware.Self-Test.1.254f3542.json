@@ -1,0 +1,17 @@
+{
+  "token": "cb8739cf",
+  "abstraction": "GT.Encoding.v1.1.Hardware.Self-Test",
+  "dot_name": "GT.Encoding.v1.1.Hardware.Self-Test",
+  "issue_n": 1,
+  "ns_slot": null,
+  "ns_slot_policy": "dynamic",
+  "lump_size": 64,
+  "status": "released",
+  "language": "ISA",
+  "author": "Church Machine",
+  "cw": 26,
+  "cc": 8,
+  "filename": "GT.Encoding.v1.1.Hardware.Self-Test.1.254f3542.lump",
+  "sidecar_file": "GT.Encoding.v1.1.Hardware.Self-Test.1.254f3542.json",
+  "binary_hash": "36eeb671d95b19d63b3f60f5c105d8595d8259b9e775518563fa3dfa10509e94"
+}
