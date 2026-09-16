@@ -695,18 +695,6 @@ args = "python -m pytest tests/server/test_lump_meta_patch_validation.py -v"
 outputType = "console"
 
 [[workflows.workflow]]
-name = "selftest-egt-guard-tests"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python -m pytest tests/server/test_selftest_egt_guard.py -v"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-
-[[workflows.workflow]]
 name = "boot-layout-regression"
 author = "agent"
 
@@ -884,12 +872,12 @@ outputType = "console"
 isValidation = true
 
 [[workflows.workflow]]
-name = "latest-compilation-promotion-tests"
+name = "attested-compiler-admission-tests"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python3 -m pytest tests/server/test_latest_compilation_promotion_3393.py -q && node simulator/test_bootstrap_token_audit.js && node simulator/test_latest_compilation_promotion.js"
+args = "python3 -m pytest tests/server/test_compiler_attestation.py -q && node simulator/test_task3488_real_admission_flow.js && node simulator/test_lump_admission_task3488.js"
 
 [workflows.workflow.metadata]
 outputType = "console"

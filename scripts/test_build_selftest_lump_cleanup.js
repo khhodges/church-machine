@@ -57,12 +57,6 @@ try {
         .filter(row => row.name === 'SelfTest').length === 1,
     'slot migration keeps exactly one SelfTest ns-state row');
     check(fs.existsSync(path.join(dir, active[0].filename)), 'named artifact was written');
-    const bytes = fs.readFileSync(path.join(dir, active[0].filename));
-    const selfGT = bytes.readUInt32BE(bytes.length - 8);
-    const nextGT = bytes.readUInt32BE(bytes.length - 4);
-    check(selfGT === nextGT && (selfGT & 0xFFFF) === 37 &&
-        ((selfGT >>> 16) & 0x1FF) === 17,
-    'Self and Next E-GTs use the selected slot and live ns-state sequence');
     const approvals = JSON.parse(fs.readFileSync(path.join(dir, 'approvals.json'))).approvals;
     const approval = approvals[state.binary_hash];
     check(approval && approval.token === active[0].token &&

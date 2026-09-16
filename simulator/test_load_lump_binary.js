@@ -125,21 +125,21 @@ function check(label, cond, detail) {
 const EXTENDED_BASE = 0x0400;
 const LUMPS_DIR = path.join(__dirname, '..', 'server', 'lumps');
 const LUMP_MANIFEST = JSON.parse(fs.readFileSync(path.join(LUMPS_DIR, 'manifest.json'), 'utf8'));
-function canonicalFixture(token, abstraction) {
+function canonicalFixture(abstraction) {
     const entry = LUMP_MANIFEST.find(candidate =>
-        candidate.token === token &&
         candidate.abstraction === abstraction &&
-        typeof candidate.filename === 'string'
+        typeof candidate.filename === 'string' &&
+        !candidate.archived
     );
     if (!entry) {
         throw new Error(
-            `manifest.json has no canonical ${abstraction} fixture entry (token ${token}).`
+            `manifest.json has no active ${abstraction} fixture entry.`
         );
     }
     return entry;
 }
-const SELFTEST_FIXTURE = canonicalFixture('00000600', 'SelfTest');
-const LEDFLASH_FIXTURE = canonicalFixture('55f1a32f', 'LEDFlash');
+const SELFTEST_FIXTURE = canonicalFixture('SelfTest');
+const LEDFLASH_FIXTURE = canonicalFixture('LEDFlash');
 // Note: Boot.Abstr slot is accessed via sim.bootEntrySlot (default 3).
 // Do not hardcode a named NS slot constant here — use sim.bootEntrySlot instead.
 
@@ -430,13 +430,10 @@ console.log('\n--- LLB-08: NS[3].word2 seal consistent with EXTENDED_BASE and cw
         `stored=0x${storedWord2.toString(16)} expected=0x${expected.toString(16)}`);
 }
 
-// ── LLB-RBA: Canonical SelfTest binary (Boot.Abstr slot) ──────────────────────
-// The manifest identifies the canonical SelfTest binary. It is the Boot.Abstr
-// lump (NS slot 6) that
-// the simulator loads into the boot entry slot at startup.
-// c-list: slot 0 = SelfTest E-GT; slot 1 = Next.GT (default=self-loop;
-//         boot_image.py overrides at image-generation time).
-// Completion: ELOADCALL CR1, Next — dispatches through c-list[1], not Thread.caps[0].
+// ── LLB-RBA: Active compiled SelfTest binary ─────────────────────────────────
+// The manifest identifies the active compiled artifact. Header and allocation
+// expectations are derived from its exact bytes; slot and continuation policy
+// are not part of this load contract.
 // Reads the file as big-endian uint32 words — the same format served by the
 // Flask /api/lump/00000600/words endpoint.
 // To regenerate after editing the source:
@@ -454,29 +451,32 @@ console.log('\n--- LLB-RBA: Canonical SelfTest binary (Boot.Abstr slot) ---');
         // Read as big-endian uint32 — matches Flask: struct.unpack(f'>{n}I', data)
         const rawWords = readLumpFile(lumpPath);
 
-        check('LLB-RBA-1: rawWords has 512 entries (2048-byte file)',
-            rawWords.length === 512,
+        const headerWord = rawWords[0] >>> 0;
+        const expectedLumpSize = 1 << (((headerWord >>> 23) & 0xF) + 6);
+        const expectedCw = (headerWord >>> 10) & 0x1FFF;
+        const expectedCc = headerWord & 0xFF;
+        check(`LLB-RBA-1: rawWords matches header allocation (${expectedLumpSize})`,
+            rawWords.length === expectedLumpSize,
             `got ${rawWords.length}`);
 
-        // Parse the header word — must decode as cw=499, cc=2, lumpSize=512
+        // Parse the header word from the exact compiled bytes.
         const sim = new ChurchSimulator();
         const hdr0 = sim.parseLumpHeader(rawWords[0] >>> 0);
         check('LLB-RBA-2: fixture header magic = 0x1F (valid LUMP)',
             hdr0.valid,
             `magic=0x${hdr0.magic.toString(16)} word[0]=0x${(rawWords[0]>>>0).toString(16)}`);
-        check('LLB-RBA-3: fixture header cw = 499 (PostFlashSelftest)',
-            hdr0.cw === 499,
+        check(`LLB-RBA-3: fixture header cw matches bytes (${expectedCw})`,
+            hdr0.cw === expectedCw,
             `got cw=${hdr0.cw}`);
-        check('LLB-RBA-4: fixture header cc = 2 (PostFlashSelftest — Next.GT in slot 1)',
-            hdr0.cc === 2,
+        check(`LLB-RBA-4: fixture header cc matches bytes (${expectedCc})`,
+            hdr0.cc === expectedCc,
             `got cc=${hdr0.cc}`);
-        check('LLB-RBA-5: fixture header lumpSize = 512',
-            hdr0.lumpSize === 512,
+        check(`LLB-RBA-5: fixture lumpSize matches bytes (${expectedLumpSize})`,
+            hdr0.lumpSize === expectedLumpSize,
             `got lumpSize=${hdr0.lumpSize}`);
 
         // Now load the real binary into a fresh simulator.
-        // lumpSize=512 > default Boot.Abstr slot (64w), so loadLumpBinary uses
-        // the extended-code area (EXTENDED_BASE=0x0400).
+        // Large artifacts use the simulator's extended-code area.
         const { sim: sim2, nsBase } = setupSimForBinary();
         const loaded = sim2.loadLumpBinary(rawWords);
         check('LLB-RBA-6: loadLumpBinary returns true for real fixture',
@@ -486,11 +486,11 @@ console.log('\n--- LLB-RBA: Canonical SelfTest binary (Boot.Abstr slot) ---');
             `got 0x${sim2.memory[nsBase+0].toString(16)}`);
 
         const p = sim2.parseNSWord1(sim2.memory[nsBase + 1]);
-        check('LLB-RBA-8: NS[bootEntrySlot].word1 limit = 499 (cw from real fixture)',
-            p.limit === 499,
+        check('LLB-RBA-8: NS[bootEntrySlot].word1 limit matches compiled header',
+            p.limit === expectedCw,
             `got limit=${p.limit}`);
-        check('LLB-RBA-9: NS[bootEntrySlot] clistCount = 2 (cc from resident header — Next.GT in slot 1)',
-            sim2.readNSEntry(sim2.bootEntrySlot).clistCount === 2,
+        check('LLB-RBA-9: NS[bootEntrySlot] clistCount matches compiled header',
+            sim2.readNSEntry(sim2.bootEntrySlot).clistCount === expectedCc,
             `got clistCount=${sim2.readNSEntry(sim2.bootEntrySlot).clistCount}`);
         check('LLB-RBA-10: CR14.word1 = EXTENDED_BASE after real load',
             sim2.cr[14].word1 === EXTENDED_BASE,

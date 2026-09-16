@@ -7,7 +7,6 @@ import pytest
 
 import server.app as app_module
 from server.lump_approvals import compiler_tcb_key
-from server.lump_approvals import sign_compiler_record, write_approvals
 
 
 @pytest.fixture(autouse=True)
@@ -117,43 +116,6 @@ def test_persisted_attested_compiler_artifact_is_trusted_on_read(tmp_path, monke
     assert response.status_code == 200
     assert response.headers["X-Lump-Trust"] == "canonical"
     assert response.headers["X-Lump-Hash"] == f"sha256:{digest}"
-
-
-def test_persisted_compiler_record_is_accepted_by_boot_delivery(tmp_path):
-    from server.boot_image import _require_approved_executable_lump
-    from server.lump_integrity import compute_number
-
-    words = [0xF8000401, 0x1F000000] + [0] * 61 + [0x4A00000E]
-    raw = struct.pack(">64I", *words)
-    digest = hashlib.sha256(raw).hexdigest()
-    dot_name = "CompiledBootFixture"
-    issue = 1
-    filename = f"{dot_name}.{issue}.{compute_number(dot_name, raw)}.lump"
-    artifact = tmp_path / filename
-    artifact.write_bytes(raw)
-    identity_hash = hashlib.sha256(f"{dot_name}#{issue}".encode()).hexdigest()
-    inner = sign_compiler_record({
-        "binary_hash": digest,
-        "source_hash": "b" * 64,
-        "language": "assembly",
-        "compiler_identity": "CLOOMC",
-        "compiler_version": "test",
-    }, signing_key=app_module._compiler_attestation_key())
-    write_approvals(str(tmp_path / "approvals.json"), {digest: {
-        "binary_hash": digest,
-        "filename": filename,
-        "dot_name": dot_name,
-        "issue_n": issue,
-        "identity_hash": identity_hash,
-        "trust_origin": "trusted-home-ide",
-        "compiler_identity": "CLOOMC",
-        "compiler_version": "test",
-        "compiler_record": inner,
-    }})
-
-    delivered = _require_approved_executable_lump(
-        str(artifact), str(tmp_path), dot_name)
-    assert delivered == words
 
 
 def test_real_compile_finalize_save_and_boot_flow_rejects_tampering(

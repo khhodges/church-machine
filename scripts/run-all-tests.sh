@@ -196,9 +196,6 @@ register_suite "constants-lump-tests" \
 register_suite "lump-save-endpoint-tests" \
     'python -m pytest tests/server/test_lump_save_endpoint.py -v'
 
-register_suite "selftest-egt-guard-tests" \
-    'python -m pytest tests/server/test_selftest_egt_guard.py -v'
-
 register_suite "lump-meta-patch-validation-tests" \
     'python -m pytest tests/server/test_lump_meta_patch_validation.py -v'
 
@@ -355,8 +352,8 @@ register_suite "boot-image-matches-sim" \
 register_suite "bootstrap-resident-identity-tests" \
     'python3 -m pytest tests/server/test_bootstrap_identity_3321.py tests/server/test_bootstrap_migration_atomic_3321.py -v && node simulator/test_bootstrap_resident_identity.js && node simulator/test_bootstrap_token_audit.js'
 
-register_suite "latest-compilation-promotion-tests" \
-    'node scripts/check_assembler_browser_freshness.js && python3 -m pytest tests/server/test_latest_compilation_promotion_3393.py -q && node simulator/test_bootstrap_token_audit.js && node simulator/test_latest_compilation_promotion.js'
+register_suite "attested-compiler-admission-tests" \
+    'node scripts/check_assembler_browser_freshness.js && python3 -m pytest tests/server/test_compiler_attestation.py -q && node simulator/test_task3488_real_admission_flow.js && node simulator/test_lump_admission_task3488.js'
 
 register_suite "boot-image-loads-and-boots" \
     'python -m pytest tests/boot/test_boot_image_loads_and_boots.py -v'

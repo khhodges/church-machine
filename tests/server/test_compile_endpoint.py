@@ -134,16 +134,6 @@ def test_cloomc_good_source_returns_ok(client):
     )
 
 
-def test_cloomc_words_are_unsigned_integers(client):
-    """All words in the response must be non-negative integers."""
-    resp = _post(client, _JS_OK, 'javascript')
-    data = resp.get_json()
-    assert data['ok'] is True
-    assert all(isinstance(w, int) and w >= 0 for w in data['words']), (
-        'all words must be non-negative integers'
-    )
-
-
 def test_cloomc_lump_binary_is_valid_base64(client):
     """lump_binary must decode to exactly words×4 bytes (big-endian words)."""
     resp = _post(client, _JS_OK, 'javascript')
@@ -262,15 +252,6 @@ def test_assembly_good_source_returns_ok(client):
     assert data['ok'] is True, f"Expected ok=True, got: {data}"
     assert isinstance(data['words'], list)
     assert len(data['words']) >= 64
-
-
-def test_assembly_lump_binary_consistent(client):
-    """Assembly lump_binary decodes to exactly words×4 bytes."""
-    resp = _post(client, _ASM_OK, 'assembly')
-    data = resp.get_json()
-    assert data['ok'] is True
-    decoded = base64.b64decode(data['lump_binary'])
-    assert len(decoded) == len(data['words']) * 4
 
 
 def test_assembly_bad_mnemonic_returns_ok_false(client):

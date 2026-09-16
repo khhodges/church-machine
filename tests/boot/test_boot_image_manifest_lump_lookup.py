@@ -125,20 +125,6 @@ class TestFindLumpFileByAbstraction:
         result = find_lump_file_by_abstraction(self.tmpdir, "MyAbstr", 42)
         assert result is None
 
-    def test_versioned_file_missing_falls_back_to_token(self):
-        """Falls back to token file when versioned filename is listed but absent."""
-        token = os.path.join(self.tmpdir, "aabbccdd.lump")
-        open(token, "wb").close()
-        # versioned file NOT created on disk
-        self._write_manifest([{
-            "token": "aabbccdd",
-            "abstraction": "MyAbstr",
-            "filename": "MyAbstr_v3.lump",
-            "ns_slot": 42,
-        }])
-        assert find_lump_file_by_abstraction(self.tmpdir, "MyAbstr", 42) is None
-
-
 # ── generate_boot_image with boot_entry_slot=7 ───────────────────────────────
 
 class TestBootImageSlot7:

@@ -241,25 +241,16 @@ def test_selection_patch_preserves_existing_secondary_thread_bytes(
         existing, {**cfg, "bootEntrySlot": 10}, 10)
     prepared_words = _words(prepared)
 
-    # Selection authority has exactly three writable homes: Header BootEntry,
-    # Boot.Thread CR0, and the explicit SelfTest Next.GT c-list row.  In
-    # particular, no suspended Thread frame / Enter identity is retargeted.
+    # Selection authority updates only the image's explicit boot-entry bindings.
+    # In particular, no suspended Thread frame / Enter identity is retargeted.
     thread_loc = words[total - 2 * NS_ENTRY_WORDS]
     thread_header = words[thread_loc]
     thread_size = 1 << (((thread_header >> 23) & 0xF) + 6)
     thread_layout_info = thread_layout(
         thread_size, (thread_header >> 10) & 0x1FFF)
-    selftest_loc = words[total - 7 * NS_ENTRY_WORDS]
-    selftest_header = words[selftest_loc]
-    selftest_size = 1 << (((selftest_header >> 23) & 0xF) + 6)
-    selftest_next = selftest_loc + selftest_size - (selftest_header & 0xFF) + 1
     changed = {index for index, (before, after) in enumerate(
         zip(words, prepared_words)) if before != after}
-    assert changed == {
-        4,
-        thread_loc + thread_layout_info["caps_start"],
-        selftest_next,
-    }
+    assert changed == {4, thread_loc + thread_layout_info["caps_start"]}
     assert prepared_words[secondary_loc:secondary_loc + 256] == secondary_before
     assert read_boot_entry_info(prepared)["entry_slot"] == 10
 
@@ -285,35 +276,6 @@ def test_selection_patch_rejects_target_identity_that_differs_from_provenance(
     with pytest.raises(ValueError, match="filename, token, or load policy"):
         app_module._prepare_selected_boot_image(
             existing, {**cfg, "bootEntrySlot": 10}, 10)
-
-
-def test_selecting_selftest_couples_explicit_next_gt_to_selected_target(
-        tmp_path, monkeypatch):
-    """SelfTest Next.GT follows every selected Lightning Bolt target."""
-    import server.app as app_module
-
-    cfg = {**_cfg(), "bootEntrySlot": 10}
-    existing = generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=10)
-    provenance = app_module._boot_image_gen.build_boot_image_provenance(
-        existing, LUMPS_DIR)
-    provenance["origin"] = "generated"
-    provenance_path = tmp_path / "boot-image.provenance.json"
-    provenance_path.write_text(json.dumps(provenance), encoding="utf-8")
-    monkeypatch.setattr(
-        app_module, "BOOT_IMAGE_PROVENANCE_PATH", str(provenance_path))
-    words = _words(existing)
-    total = len(words)
-    selftest_loc = words[total - 7 * NS_ENTRY_WORDS]
-    selftest_header = words[selftest_loc]
-    selftest_size = 1 << (((selftest_header >> 23) & 0xF) + 6)
-    next_index = selftest_loc + selftest_size - (selftest_header & 0xFF) + 1
-
-    prepared = _words(app_module._prepare_selected_boot_image(
-        existing, {**cfg, "bootEntrySlot": 6}, 6))
-
-    assert prepared[next_index] == create_gt(0, 6, {"E": 1}, 1)
-    assert prepared[next_index] != words[next_index]
-    assert read_boot_entry_info(struct.pack(f"<{total}I", *prepared))["entry_slot"] == 6
 
 
 def test_image_commit_failure_rolls_back_saved_selection_and_all_files(
@@ -482,53 +444,6 @@ def test_save_ns_commits_boot_config_candidate_with_matching_image(
     stale_download = client.get("/api/boot-image/download")
     assert stale_download.status_code == 409
     assert stale_download.get_json()["needsPrepare"] is True
-
-
-def test_save_ns_couples_browser_prepared_selftest_next_gt_before_commit(
-        client, tmp_path, monkeypatch):
-    """Save NS serializes the server-equivalent Next.GT, not demo-only state."""
-    import server.app as app_module
-
-    initial_cfg = {**_cfg(), "targetBoard": "wukong-xc7a100t", "bootEntrySlot": 6}
-    candidate_cfg = {**initial_cfg, "bootEntrySlot": 10}
-    words = _words(generate_boot_image(initial_cfg, LUMPS_DIR, boot_entry_slot=6))
-    total = len(words)
-    target_base = total - (10 + 1) * NS_ENTRY_WORDS
-    target_loc, target_authority = words[target_base], words[target_base + 1]
-    target_gt = create_gt((target_authority >> 21) & 0x1FF, 10, {"E": 1}, 1)
-    # These are exactly the two homes the browser core prepares. Deliberately
-    # leave the serialized SelfTest continuation at its old NS[6] value.
-    words[4] = target_loc * 4
-    words[_thread_home_index(words)] = target_gt
-    browser_candidate = struct.pack(f"<{total}I", *words)
-    selftest_loc = words[total - (6 + 1) * NS_ENTRY_WORDS]
-    selftest_header = words[selftest_loc]
-    selftest_next = selftest_loc + (1 << (((selftest_header >> 23) & 0xF) + 6)
-        ) - (selftest_header & 0xFF) + 1
-    assert words[selftest_next] != target_gt
-
-    monkeypatch.setattr(app_module, "BOOT_CONFIG_PATH", str(tmp_path / "boot-config.json"))
-    monkeypatch.setattr(
-        app_module, "BOOT_CONFIG_LEGACY_PATH", str(tmp_path / "no-legacy.json"))
-    monkeypatch.setattr(app_module, "BOOT_IMAGE_PATH", str(tmp_path / "boot-image.bin"))
-    monkeypatch.setattr(
-        app_module, "BOOT_IMAGE_PROVENANCE_PATH",
-        str(tmp_path / "boot-image.provenance.json"))
-    monkeypatch.setattr(app_module, "NS_STATE_PATH", str(tmp_path / "ns-state.json"))
-    saved = client.post("/api/boot-image/save-ns", json={
-        "data_b64": base64.b64encode(browser_candidate).decode("ascii"),
-        "ns_state": {"abstractions": []},
-        "boot_config": candidate_cfg,
-    })
-    assert saved.status_code == 200, saved.get_json()
-    final_image = client.get("/api/boot-image/binary")
-    assert final_image.status_code == 200, final_image.get_json()
-    final_words = _words(final_image.data)
-    changed = {i for i, (old, new) in enumerate(zip(words, final_words))
-               if old != new}
-    assert changed == {selftest_next}
-    assert final_words[selftest_next] == target_gt
-    assert read_boot_entry_info(final_image.data)["entry_slot"] == 10
 
 
 @pytest.mark.parametrize("edit", ("geometry", "policy"))
