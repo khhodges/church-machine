@@ -490,20 +490,6 @@
     "archived": true
   },
   {
-    "token": "00aa1234",
-    "abstraction": "Adder",
-    "filename": "Adder.1.e437ee2c.lump",
-    "lump_version": 393,
-    "compiled_at": 1789512565.993622,
-    "dot_name": "Adder",
-    "issue_n": 1,
-    "petname": "",
-    "content_profile": 2,
-    "output_profile": 2,
-    "capabilities": [],
-    "operation_id": "a6fc2c83c934433b8dd49ae9598fbc1a"
-  },
-  {
     "token": "4a000006",
     "abstraction": "SelfTest",
     "filename": "SelfTest.1.48acae47.lump",
@@ -575,5 +561,20 @@
       }
     ],
     "operation_id": "021684cb-3084-469b-aa65-7dcb1c1640c3"
+  },
+  {
+    "token": "00aa1234",
+    "abstraction": "Adder",
+    "filename": "Adder.1.e437ee2c.lump",
+    "lump_version": 397,
+    "compiled_at": 1789565935.6496658,
+    "dot_name": "Adder",
+    "issue_n": 1,
+    "petname": "",
+    "content_profile": 2,
+    "output_profile": 2,
+    "capabilities": [],
+    "provenance": "uploaded-or-legacy",
+    "operation_id": "c7a48b996e6e47e0820d41456a0134c6"
   }
 ]
