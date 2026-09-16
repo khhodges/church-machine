@@ -62,16 +62,19 @@ function _renderBootExecutionFreshness(state) {
         return String(item.abstraction) + ' is executing ' + selectedVersion +
             ' instead of latest successful ' + latestVersion;
     });
+    const repair = warnings[0] && warnings[0].latest || {};
+    window._bootExecutionRepairToken = repair.token || null;
+    const repairVersion = repair.version == null ? '' : ' v' + repair.version;
     banner.innerHTML = '<div class="boot-execution-freshness-copy"><strong>WARNING: SIMULATOR IS NOT RUNNING THE LATEST COMPILED CODE.</strong> ' +
         details.map(function(text) {
             const span = document.createElement('span');
             span.textContent = text;
             return span.innerHTML;
         }).join('; ') +
-        '. Review the exact revisions and explicitly choose what to prepare.' +
+        '. The newer revision cannot boot until the IDE repairs its saved identity.' +
         '<div id="bootExecutionUpdateStatus" class="boot-execution-update-status"></div></div>' +
         '<button type="button" id="bootExecutionUpdateButton" class="boot-execution-update-btn" ' +
-        'onclick="_openBootExecutionUpdate()">Review &amp; prepare</button>';
+        'onclick="_openBootExecutionUpdate()">Fix' + repairVersion + ' now</button>';
 /*
         '. Prepare a new boot image before treating simulator results as current.' +
         '<div id="bootExecutionUpdateStatus" class="boot-execution-update-status"></div></div>' +
@@ -165,14 +168,18 @@ async function _openBootExecutionUpdate() {
         ? window._nsState.executionFreshness.warnings : [];
     if (!warnings.length) return;
     const status = document.getElementById('bootExecutionUpdateStatus');
-    const message = 'Choose the exact saved revision, then use its Prepare action.';
+    const token = window._bootExecutionRepairToken;
+    const message = 'Opening the guarded repair for the exact saved revision\u2026';
     if (status) status.textContent = message;
-    if (typeof switchView === 'function') {
-        switchView('lumps');
-        return true;
+    if (!token || typeof window._showLatestCompilationPromotion !== 'function') {
+        const unavailable = 'Repair could not open. Reload the IDE and click Fix again.';
+        if (status) status.textContent = unavailable;
+        if (typeof appendOutput === 'function') appendOutput(unavailable, 'error');
+        return false;
     }
-    if (typeof appendOutput === 'function') appendOutput(message, 'warning');
-    return false;
+    if (typeof switchView === 'function') switchView('lumps');
+    await window._showLatestCompilationPromotion(token);
+    return true;
 }
 window._openBootExecutionUpdate = _openBootExecutionUpdate;
 
