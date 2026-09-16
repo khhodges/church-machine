@@ -68,11 +68,11 @@ function _renderBootExecutionFreshness(state) {
             span.textContent = text;
             return span.innerHTML;
         }).join('; ') +
-/*
         '. Review the exact revisions and explicitly choose what to prepare.' +
         '<div id="bootExecutionUpdateStatus" class="boot-execution-update-status"></div></div>' +
         '<button type="button" id="bootExecutionUpdateButton" class="boot-execution-update-btn" ' +
-        'onclick="_openBootExecutionUpdate()">Review compilations</button>';
+        'onclick="_openBootExecutionUpdate()">Review &amp; prepare</button>';
+/*
         '. Prepare a new boot image before treating simulator results as current.' +
         '<div id="bootExecutionUpdateStatus" class="boot-execution-update-status"></div></div>' +
         '<button type="button" id="bootExecutionUpdateButton" class="boot-execution-update-btn" ' +
@@ -165,8 +165,12 @@ async function _openBootExecutionUpdate() {
         ? window._nsState.executionFreshness.warnings : [];
     if (!warnings.length) return;
     const status = document.getElementById('bootExecutionUpdateStatus');
-    const message = 'Automatic latest promotion is retired. Select an exact revision and prepare a new boot image explicitly.';
+    const message = 'Choose the exact saved revision, then use its Prepare action.';
     if (status) status.textContent = message;
+    if (typeof switchView === 'function') {
+        switchView('lumps');
+        return true;
+    }
     if (typeof appendOutput === 'function') appendOutput(message, 'warning');
     return false;
 }

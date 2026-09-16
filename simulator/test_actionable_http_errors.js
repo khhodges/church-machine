@@ -112,6 +112,15 @@ check('saved-LUMP audit uses actionable HTTP formatting',
     auditSource.includes("_formatActionableHttpError(") &&
     auditSource.includes('Reload the saved LUMP and run Audit again.'));
 
+const saveSource = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
+check('safe revision conflicts offer a Retry Save button',
+    saveSource.includes("label: 'Retry Save'") &&
+    saveSource.includes('isSafeRevisionRetry ? {') &&
+    saveSource.includes('beginSaveToNamespace();'));
+check('uncertain save outcomes do not offer the retry action',
+    saveSource.includes("isSafeRevisionRetry ? {") &&
+    saveSource.includes('} : null'));
+
     console.log(`\n${passed} passed, ${failed} failed`);
     if (failed) process.exit(1);
 })();

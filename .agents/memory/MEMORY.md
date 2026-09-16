@@ -1,7 +1,6 @@
 - [Save diagnostic evidence](save-diagnostic-evidence.md) — shared safe error codes and occurrence times must survive ingestion; missing logs never prove rejection
 - [Dot pet name identity architecture](dot-pet-name-identity.md) — petname.Abstraction#n is global identity; two seals (identity_hash + binary_hash); self Inform GT at c-list row 0
 - [ns-state.json rich NS-entry format](ns-state-dot-name-format.md) — one rich object per occupied slot (name, slot, location, type, f, g, limit, seq, seal, boot?); no flat-name list or top-level boot_entry
-- [NS slot restore post-c-list-write read](ns-slot-restore-post-clist-read.md) — NS slot 1 location must be captured BEFORE the c-list write loop; same bug existed in both boot_image.py and simulator.js
 - [NULL GT type canonicalisation](null-gt-type-canon.md) — isNullGT checks bits[26:25]===0b00; only replace ===0 with isNullGT at hardware gates (mLoad, _fetchInstruction); UI presence checks (CR6 in resolvePendingSlot) must stay ===0
 - [Wukong single-step trace architecture](wukong-trace-arch.md) — 11-byte 0xAA packets; F3 UART; 4-bit NZCV; step mode guarantees TraceUnit is idle
 - [TraceUnit per-event packet format](trace-unit-per-event-format.md) — 12-byte per-event packets; multi-event queue (1–3 per retire); trace_stall backpressure; ELOADCALL/RETURN-CR14 known gaps
@@ -30,11 +29,9 @@
 - [Sapphire BRAM guard false-positive modes](sapphire-bram-guard-false-positive.md) — RC=3 has 2 modes: stale real content (bad) vs all-FF MAP placeholder (2026.1 normal/false-positive); RC=1 (all-zero) is always fatal
 - [GitHub API PUT for cross-repo file delivery](github-api-put-delivery.md) — when git histories diverge, PUT individual files via Contents API from Replit bash ($GITHUB_PAT); droplet uses `git checkout origin/main -- <file>` to receive them
 - [Ti60 firmware update pipeline](ti60-firmware-update-pipeline.md) — PNR-only skips 3 required steps (patch sapphire.v, delete VDB, MAP); must run full OBBS; serve hex from $SOC_DIR/outflow/ not repo bitstreams/ (git pull overwrites)
-- [CR14.word0 GT update on NS slot migration](cr14-gt-update-on-slot-migration.md) — loadProgram only updates CR14.word1/word2/word3; after changing bootEntrySlot you must also set CR14.word0 to a fresh R+X GT or every fetch faults before stepCount++
 - [A7 v1.2 stored nsCount anti-inflation pattern](a7-nscount-stored-word.md) — c-list at NS TABLE tail inflates nsCount to MAX_NS_ENTRIES; fix: store clean count at NS_TABLE_BASE-3 (scan before c-list + emptyCount); loadBootImage() reads it, forward scan only as fallback
 - [IRQ LUMP lazy-load manifest guard](irq-lump-lazy-gate-guard.md) — gate on a manifest entry; pre-seeded test slots otherwise bypass it via abstractionRegistry
 - [Tier-3 boot recovery slot redirect](tier3-boot-recovery-slot-redirect.md) — stepSim/runSim/instantBoot/slowBoot must save+redirect sim.bootEntrySlot to sim._bootAbstrSlot around every _bootStep() call or B:05 RANGE-faults on an empty gap slot after reset
-- [_applyBootEntryToSim early-fire / _injectClistNow ascending-NS bug class](apply-boot-entry-early-fire.md) — two cooperating bugs producing CR14 RANGE fault on first single-step with a runtime LUMP at slot 7
 - [lump-audit BRANCH opcode drift](lump-audit-branch-opcode.md) — lump-audit.js _rciBranchOp must equal 23 (v2.0); opcode 17=DWRITE; c-list zeros are expected at compile time (runtime fills them)
 - [Wukong write_bitstream DRC NSTD-1/UCIO-1](wukong-bitstream-drc-fix.md) — launch_runs -to_step write_bitstream spawns fresh session; XDC severity overrides lost; use open_run+write_bitstream directly instead
 - [NS slot labels across hard resets](ns-slot-label-persistence.md) — reseeding must override temporary '(reserved)' labels after binary restoration
@@ -52,7 +49,6 @@
 - [Wukong dev/production event relay](wukong-dev-production-relay.md) — local simulator previews need the production relay when the physical bridge is attached to lab.cloomc.org
 - [Wukong poll rejection containment](wukong-poll-rejection-containment.md) — async hardware polling must contain state-update failures, not only fetch failures
 - [Hardware snapshot separation](hardware-snapshot-separation.md) — hardware NIA/cursor and stored thread context must stay separate from simulator PC, live CR12, and breakpoints
-- [Boot fault register context](boot-fault-register-context.md) — boot mLoad diagnostics name the destination CR, not the executing abstraction's CR14
 - [Wukong RTL generation initializer bottleneck](wukong-rtl-generation-init-bottleneck.md) — fixed 64 KiB DMEM is not proof of a BRAM issue; Amaranth conversion can stall before Yosys/Vivado
 - [Amaranth shape() memoization](amaranth-shape-memoization.md) — Operator/SwitchValue.shape() uncached in 0.5.8; monkey-patch both before convert() for O(n) instead of O(n²)
 - [ns-state snapshot vs raw binary](ns-state-snapshot-vs-raw.md) — ns-state.json fields can be stale vs boot-image.bin; use the endpoint `committed` raw-words block for hex display and fault checks
@@ -68,7 +64,6 @@
 - [Boot test private runtime state](boot-test-private-runtime-state.md) — LUMP isolation must include every boot-regeneration persistence input, including saved config
 - [Latched multi-cycle hardware inputs](latched-multicycle-hardware-inputs.md) — capture operands, control-flow state, and security decisions at acceptance; never consume live inputs later
 - [SelfTest Next follows LightningBolt](selftest-next-lightningbolt.md) — Next.GT is coupled to the selected boot-entry GT; independent continuation targets are prohibited
-- [Draft banner placement](draft-banner-placement.md) — recovery banners must be siblings above the editor, never children of the code-editor flex row
 - [Capability picker version selection](capability-picker-version-selection.md) — show one latest eligible LUMP per abstraction by default; place older versions behind an explicit disclosure
 - [SELF row click safety](self-row-click-safety.md) — compiler-owned SELF is display-only in the C-List and must never write an operand into the editor
 - [Hardware readiness fingerprints](hardware-readiness-fingerprint.md) — generated Verilog/RTLIL must carry a content fingerprint of active Python inputs before synthesis

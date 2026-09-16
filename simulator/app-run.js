@@ -12966,7 +12966,7 @@ window._resumeSaveNSModalFocus = function() {
     }
 };
 
-function _setSaveNSFeedback(kind, message) {
+function _setSaveNSFeedback(kind, message, action) {
     const status = document.getElementById('saveNSStatus');
     const button = document.getElementById('saveNSConfirmBtn');
     const cancelButton = document.getElementById('saveNSCancelBtn');
@@ -12990,6 +12990,17 @@ function _setSaveNSFeedback(kind, message) {
     }
     status.style.display = '';
     status.textContent = message;
+    if (action && typeof action.handler === 'function') {
+        const actions = document.createElement('div');
+        actions.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;';
+        const actionButton = document.createElement('button');
+        actionButton.type = 'button';
+        actionButton.className = 'btn btn-primary';
+        actionButton.textContent = action.label || 'Retry Save';
+        actionButton.addEventListener('click', action.handler);
+        actions.appendChild(actionButton);
+        status.appendChild(actions);
+    }
     status.style.color = (kind === 'error' || incident) ? '#fecaca' : '#dbeafe';
     status.style.background = (kind === 'error' || incident)
         ? 'rgba(127, 29, 29, .45)'
@@ -16765,7 +16776,13 @@ async function confirmSaveToNamespace() {
             const reconciledBody = err.kind !== 'transport' && err.committed === false
                 ? `${body} Repository reconciliation proved this operation did not commit.`
                 : body;
-            _setSaveNSFeedback('error', reconciledBody);
+            _setSaveNSFeedback('error', reconciledBody,
+                isSafeRevisionRetry ? {
+                    label: 'Retry Save',
+                    handler: function() {
+                        beginSaveToNamespace();
+                    }
+                } : null);
             const status = document.getElementById('saveNSStatus');
             if (status) status.dataset.terminal = 'true';
             _showFpgaToast(title, reconciledBody, 'error', 10000);

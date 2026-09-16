@@ -81,11 +81,18 @@ if (!banner.innerHTML.includes('NOT RUNNING THE LATEST COMPILED CODE')) {
 if (!banner.innerHTML.includes('SelfTest is executing v86 instead of latest successful v87')) {
     throw new Error('warning does not identify selected and latest versions');
 }
-if (!banner.innerHTML.includes('Select the exact revision explicitly')) {
-    throw new Error('warning does not require explicit revision selection');
+if (!banner.innerHTML.includes('Review the exact revisions')) {
+    throw new Error('warning does not require explicit revision review');
+}
+if (!banner.innerHTML.includes('Review &amp; prepare') ||
+        !banner.innerHTML.includes('_openBootExecutionUpdate()')) {
+    throw new Error('warning does not provide the explicit review and prepare action');
 }
 if (source.includes("fetch('/api/boot-image/update-to-latest'")) {
     throw new Error('freshness UI must not trigger automatic latest promotion');
+}
+if (!source.includes("switchView('lumps')")) {
+    throw new Error('freshness action does not open exact revision review');
 }
 
 context._renderBootExecutionFreshness({
