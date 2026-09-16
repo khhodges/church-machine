@@ -16539,6 +16539,15 @@ async function confirmSaveToNamespace() {
                     ? _saveApproval.plan.namespace_sequence : _targetSequence;
             _svPayload.metadata.approval_intent = _saveApproval.intent.intent;
             _svPayload.metadata.save_plan_id = _saveApproval.plan.plan_id;
+            if (_saveApproval.plan.compiler_record) {
+                _svPayload.metadata.trust_origin = 'trusted-home-ide';
+                _svPayload.metadata.compiler_record =
+                    _saveApproval.plan.compiler_record;
+                _svPayload.metadata.compiler_identity =
+                    _saveApproval.plan.compiler_record.compiler_identity;
+                _svPayload.metadata.compiler_version =
+                    _saveApproval.plan.compiler_record.compiler_version;
+            }
             window._saveNSLeaseHeartbeatStop =
                 typeof _saveApproval.stop_lease_heartbeat === 'function'
                     ? _saveApproval.stop_lease_heartbeat : null;
@@ -16700,6 +16709,14 @@ async function confirmSaveToNamespace() {
                     rebuilt.binary, plan.action, rebuilt.metadata, plan);
                 rebuilt.metadata.approval_intent = intent.intent;
                 rebuilt.metadata.save_plan_id = plan.plan_id;
+                if (plan.compiler_record) {
+                    rebuilt.metadata.trust_origin = 'trusted-home-ide';
+                    rebuilt.metadata.compiler_record = plan.compiler_record;
+                    rebuilt.metadata.compiler_identity =
+                        plan.compiler_record.compiler_identity;
+                    rebuilt.metadata.compiler_version =
+                        plan.compiler_record.compiler_version;
+                }
                 return rebuilt;
             }
         }).catch(function(err) {

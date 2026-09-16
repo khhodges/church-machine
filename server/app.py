@@ -12510,7 +12510,7 @@ def save_lump():
     _compiled_at = _time_save.time()
 
     new_entry = {
-        "token":         token8,
+        "token":         _transition_token,
         "abstraction":   abs_name,
         "filename":      lump_filename,
         "lump_version":  next_lump_version,
@@ -12773,7 +12773,7 @@ def save_lump():
     if isinstance(ns_slot, int):
         try:
             _prepared_ns_entries = _prepare_saved_lump_ns_state(
-                abs_name, ns_slot, token8, lump_filename, _issue_n_save,
+                abs_name, ns_slot, _transition_token, lump_filename, _issue_n_save,
                 next_lump_version,
                 replace_abstraction=_is_server_bootstrap_history_repair)
             if _prepared_ns_entries is None:
