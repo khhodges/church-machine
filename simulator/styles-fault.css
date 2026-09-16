@@ -875,6 +875,7 @@
 }
 
 .boot-execution-freshness-warning {
+    align-items: center;
     background: #3b2608;
     border-top: 1px solid #fbbf24;
     border-bottom: 1px solid #fbbf24;
@@ -885,12 +886,48 @@
     font-weight: 700;
     line-height: 1.45;
     padding: 0.6rem 1rem;
+    display: flex;
+    gap: 0.9rem;
+    justify-content: space-between;
     text-align: left;
     width: 100%;
 }
 
+.boot-execution-freshness-copy {
+    flex: 1 1 auto;
+}
+
 .boot-execution-freshness-warning strong {
     color: #fbbf24;
+}
+
+.boot-execution-update-btn {
+    background: #fbbf24;
+    border: 1px solid #ffe29a;
+    border-radius: 4px;
+    color: #211504;
+    cursor: pointer;
+    flex: 0 0 auto;
+    font: inherit;
+    font-weight: 800;
+    padding: 0.42rem 0.72rem;
+}
+
+.boot-execution-update-btn:hover,
+.boot-execution-update-btn:focus-visible {
+    background: #ffd66b;
+    outline: 2px solid #fff2c7;
+    outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+    .boot-execution-freshness-warning {
+        align-items: stretch;
+        flex-direction: column;
+    }
+    .boot-execution-update-btn {
+        align-self: flex-start;
+    }
 }
 
 .le-save-row {

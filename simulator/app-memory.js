@@ -62,16 +62,45 @@ function _renderBootExecutionFreshness(state) {
         return String(item.abstraction) + ' is executing ' + selectedVersion +
             ' instead of latest successful ' + latestVersion;
     });
-    banner.innerHTML = '<strong>WARNING: SIMULATOR IS NOT RUNNING THE LATEST COMPILED CODE.</strong> ' +
+    banner.innerHTML = '<div class="boot-execution-freshness-copy"><strong>WARNING: SIMULATOR IS NOT RUNNING THE LATEST COMPILED CODE.</strong> ' +
         details.map(function(text) {
             const span = document.createElement('span');
             span.textContent = text;
             return span.innerHTML;
         }).join('; ') +
-        '. Prepare a new boot image before treating simulator results as current.';
-    banner.style.display = 'block';
+        '. Prepare a new boot image before treating simulator results as current.</div>' +
+        '<button type="button" class="boot-execution-update-btn" ' +
+        'onclick="_openBootExecutionUpdate()">Update to latest</button>';
+    banner.style.display = 'flex';
 }
 window._renderBootExecutionFreshness = _renderBootExecutionFreshness;
+
+function _openBootExecutionUpdate() {
+    const warnings = window._nsState && window._nsState.executionFreshness &&
+        Array.isArray(window._nsState.executionFreshness.warnings)
+        ? window._nsState.executionFreshness.warnings : [];
+    if (!warnings.length) return;
+    if (typeof switchView === 'function') switchView('namespace');
+    const summary = warnings.map(function(item) {
+        const latest = item.latest || {};
+        return String(item.abstraction) + ' \u2192 ' +
+            (latest.version == null ? latest.filename : 'v' + latest.version);
+    }).join(', ');
+    if (typeof appendOutput === 'function') {
+        appendOutput(
+            'Update to latest: review and bind these compiled artifacts in the Namespace, ' +
+            'then use the guarded Prepare action: ' + summary,
+            'warning'
+        );
+    }
+    setTimeout(function() {
+        const table = document.getElementById('namespaceTable');
+        if (table && typeof table.scrollIntoView === 'function') {
+            table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, 0);
+}
+window._openBootExecutionUpdate = _openBootExecutionUpdate;
 
 function _hydrateNsSymbolicState() {
     const rows = window._nsState && Array.isArray(window._nsState.abstractions)

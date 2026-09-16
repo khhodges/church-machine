@@ -38,12 +38,16 @@ context._renderBootExecutionFreshness({
         latest: { version: 87 },
     }] },
 });
-if (banner.style.display !== 'block') throw new Error('stale execution warning was hidden');
+if (banner.style.display !== 'flex') throw new Error('stale execution warning was hidden');
 if (!banner.innerHTML.includes('NOT RUNNING THE LATEST COMPILED CODE')) {
     throw new Error('warning does not clearly state the consequence');
 }
 if (!banner.innerHTML.includes('SelfTest is executing v86 instead of latest successful v87')) {
     throw new Error('warning does not identify selected and latest versions');
+}
+if (!banner.innerHTML.includes('Update to latest') ||
+        !banner.innerHTML.includes('_openBootExecutionUpdate()')) {
+    throw new Error('warning does not offer the guarded update action');
 }
 
 context._renderBootExecutionFreshness({
