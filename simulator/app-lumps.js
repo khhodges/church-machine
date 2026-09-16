@@ -2765,6 +2765,20 @@ function _ddRenderSourceFailed(modal, navSlot, navName) {
 }
 /* ---- DD_ANNOTATIONS_UNIT_TEST_EXPORT_END ---- */
 
+function _displayLumpCapabilityName(cap, row) {
+    var record = cap && typeof cap === 'object' ? cap : null;
+    var rawName = record
+        ? (record.dot_name || record.dotName || record.name || '')
+        : String(cap || '');
+    var upper = String(rawName).trim().toUpperCase();
+    if (row === 0 && (upper === 'SELF' || upper === '__SELF__' ||
+            (record && (record.symbolic_self === true ||
+                record.compiler_owned_self === true)))) {
+        return 'SELF';
+    }
+    return rawName || '\u2014';
+}
+
 function _populateLumpApiTab(lump, panelId) {
     const el = document.getElementById(panelId);
     if (!el || el._apiLoaded) return;
@@ -2874,7 +2888,7 @@ function _populateLumpApiTab(lump, panelId) {
             const cap  = _capsHaveSlots
                 ? (caps.find(c => c.slot === si) || null)
                 : (caps[si] || null);
-            const name = cap ? (cap.name || '\u2014') : '\u2014';
+            const name = _displayLumpCapabilityName(cap, si);
             const gtRaw = cap ? (cap.gt || '') : '';
             const gtWord = gtRaw ? (parseInt(gtRaw, 16) >>> 0) : 0;
             const isNull = !gtRaw || ((gtWord >>> 25) & 0x3) === 0;
@@ -2899,7 +2913,12 @@ function _populateLumpApiTab(lump, panelId) {
     html += '<div class="lump-section-title">Embedded JSON Definition</div>';
     if (apiDefinition) {
         html += '<div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:0.35rem;">Read from this LUMP binary (not reconstructed from the sidecar).</div>';
-        html += `<pre class="lump-api-json">${e(JSON.stringify(apiDefinition, null, 2))}</pre>`;
+        const displayDefinition = Object.assign({}, apiDefinition, {
+            capabilities: caps.map((cap, index) => Object.assign({}, cap, {
+                name: _displayLumpCapabilityName(cap, index)
+            }))
+        });
+        html += `<pre class="lump-api-json">${e(JSON.stringify(displayDefinition, null, 2))}</pre>`;
     } else if (lump.token && !lump._apiInspectionComplete) {
         html += '<div style="color:var(--text-secondary);font-style:italic;font-size:0.83rem;padding:0.25rem 0;">Loading the embedded definition…</div>';
     } else {

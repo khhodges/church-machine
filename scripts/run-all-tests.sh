@@ -115,7 +115,7 @@ register_suite "check-selftest-lump-stale" \
     'node scripts/check_selftest_lump_stale.js && node scripts/test_check_selftest_lump_stale.js && node scripts/test_build_selftest_lump_cleanup.js'
 
 register_suite "lump-save-snapshot-tests" \
-    'node simulator/test_lump_save_snapshot.js && node simulator/test_compile_save_roundtrip.js && node simulator/test_compile_candidate_clist_validation.js'
+    'node simulator/test_lump_save_snapshot.js && node simulator/test_compile_save_roundtrip.js && node simulator/test_compile_candidate_clist_validation.js && node simulator/test_saved_lump_disassembly_clist.js'
 
 register_suite "editor-action-menu-tests" \
     'node simulator/test_editor_action_menu.js'

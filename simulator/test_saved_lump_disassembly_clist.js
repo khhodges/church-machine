@@ -22,6 +22,11 @@ function extractFunction(source, name) {
 }
 
 const source = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8');
+const displayNameSource = extractFunction(source, '_displayLumpCapabilityName');
+const displayName = vm.runInNewContext(
+    displayNameSource + '\n_displayLumpCapabilityName',
+    {}
+);
 const formatterSource = extractFunction(source, '_formatSavedLumpCapabilities');
 const formatCapabilities = vm.runInNewContext(
     formatterSource + '\n_formatSavedLumpCapabilities',
@@ -32,6 +37,10 @@ const caps = [
     { name: '__SELF__', rights: ['E'], grants: ['E'] },
     { dot_name: 'New.WukongCallHome', grants: ['E'] },
 ];
+assert.equal(displayName(caps[0], 0), 'SELF',
+    'compiler-internal __SELF__ must never replace the public SELF name');
+assert.equal(displayName({ name: 'SELF' }, 0), 'SELF');
+assert.equal(displayName({ name: 'SelfTest' }, 1), 'SelfTest');
 const words = new Array(20).fill(0);
 words[16] = 0x1234abcd;
 words[17] = 0xfeed0001;
