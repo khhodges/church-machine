@@ -7,8 +7,8 @@
 // _applyPendingSimLoad() / _injectClistNow() verbatim (minus DOM access):
 // compiles simulator/examples/post_flash_selftest.cloomc via CLOOMCCompiler,
 // assembles method table + bodies exactly as assembleAndLoad() does, loads
-// via sim.loadProgram(), pushes the Compile+Run sentinel CALL frame added to
-// fix Task #2028, injects the boot c-list (CASE A/B), and runs to completion.
+// via a dynamic user slot, adopts the Thread image's canonical root sentinel,
+// injects the boot c-list (CASE A/B), and runs to completion.
 //
 // Before the Task #2028 fix, this harness's trailing RETURN underflowed an
 // empty call stack (loadProgram() resets callStack=[]) and faulted with
@@ -60,6 +60,37 @@ const registry = new AbstractionRegistry();
 const sys      = new SystemAbstractions(registry);
 sim.initAbstractions(registry, sys, null);
 
+// Direct Compile+Run is allowed before the boot ROM has established CR12.
+// It must activate the preformatted Boot.Thread root rather than manufacturing
+// a UI-only sentinel frame.
+{
+    const cold = new ChurchSimulator();
+    const coldRegistry = new AbstractionRegistry();
+    cold.initAbstractions(
+        coldRegistry, new SystemAbstractions(coldRegistry), null);
+    if (cold._activeThreadBase() !== null ||
+            !cold._activatePreformattedBootThread()) {
+        throw new Error('Cold Compile+Run could not activate preformatted Boot.Thread');
+    }
+    const coldRoot = cold._readProtectedCallFrame();
+    if (!coldRoot.ok || coldRoot.frame.returnPC !== 0x7FFF ||
+            coldRoot.indicator.sto !== coldRoot.layout.stackEnd - 2) {
+        throw new Error('Cold Compile+Run did not adopt the canonical root sentinel');
+    }
+
+    const invalid = new ChurchSimulator();
+    const invalidRegistry = new AbstractionRegistry();
+    invalid.initAbstractions(
+        invalidRegistry, new SystemAbstractions(invalidRegistry), null);
+    const invalidLayout = invalid.getThreadInstanceLayout(1);
+    invalid.memory[invalidLayout.base + invalidLayout.stackEnd] =
+        invalid._packFrameWordRaw(0, 1, invalidLayout.stackEnd);
+    if (invalid._activatePreformattedBootThread() ||
+            invalid._activeThreadBase() !== null || invalid.bootComplete) {
+        throw new Error('Failed cold activation left a partial Thread context active');
+    }
+}
+
 // ── Boot the simulator ──────────────────────────────────────────────────────
 const MAX_BOOT = 32;
 let bootIters  = 0;
@@ -98,35 +129,43 @@ for (const entry of methodTableEntries) words.push(entry);
 for (const m of methods) {
     for (const w of (m.code || [])) words.push(w);
 }
+// The canonical SelfTest image deliberately ends in a Next.GT self-loop.
+// This Compile+Run regression instead replaces that final handoff with
+// RETURN AL so it can verify that direct execution reaches the Thread image's
+// preformatted root sentinel after all SelfTest checks pass.
+if (words.length > 0) {
+    words[words.length - 1] = ((3 << 27) | (14 << 23)) >>> 0;
+}
 
 const lastAssembledCapabilities = (result.capabilities && result.capabilities.length > 0) ? result.capabilities.slice() : null;
 const lastAssembledNamedSlots   = (result.namedSlots && result.namedSlots.length > 0) ? result.namedSlots.slice() : null;
 
 // ── Load program (mirrors _applyPendingSimLoad(), app-run.js) ──────────────
-sim.loadProgram(words, 0);
+const programToken = 'compile-run-selftest';
+const programSlot = sim.allocOrFindNsSlot(programToken, 'SelfTest');
+if (programSlot === null) {
+    fail({ failMessage: 'No dynamic Namespace slot was available for Compile+Run' });
+}
+sim.writeNsEntryForProgram(programSlot, {
+    words,
+    caps: lastAssembledCapabilities || [],
+    label: 'SelfTest',
+});
+sim.loadProgram(words, 0, programSlot);
+const programEntry = sim.readNSEntry(programSlot);
+const programSeq = sim.parseNSWord1(programEntry.word1_limit).gtSeq;
+sim.cr[14].word0 = sim.createGT(
+    programSeq, programSlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1) >>> 0;
 if (methodTableSize > 0) sim.pc = methodTableSize;
 
-// Task #2028 fix: push the Compile+Run sentinel CALL frame (mirrors
-// simulator.js's NUC_CLIST sentinel push, since loadProgram() resets
-// callStack=[] and Compile+Run never runs the real boot NUC_CLIST step).
+// Compile+Run adopts the canonical root sentinel already formatted in the
+// active Thread image. callStack is only a diagnostic shadow.
 if (sim.callStack && sim.callStack.length === 0) {
-    const sp_max = 243; // THREAD_CAPS_OFFSET(244) - 1
-    const sentinelFrameWord = sim._packFrameWordRaw(0x7FFF, 1, sp_max);
-    sim.callStack.push({
-        sentinel: true,
-        returnPC: 0x7FFF,
-        savedCRs: sim.cr.map(c => ({...c})),
-        savedDRs: [...sim.dr],
-        savedFlags: {...sim.flags},
-        savedSTO: sp_max,
-        sz: 1,
-        frameWord: sentinelFrameWord,
-    });
-    const threadBase = sim.cr[12] && sim.cr[12].word1;
-    if (threadBase) {
-        sim.memory[threadBase + sp_max] = sentinelFrameWord;
+    const root = sim._readProtectedCallFrame();
+    if (!root.ok || !root.frame || root.frame.returnPC !== 0x7FFF) {
+        throw new Error('Compile+Run root sentinel is missing from the Thread image');
     }
-    sim.sto = sp_max - 2;
+    sim.sto = root.indicator.sto;
 }
 
 // ── Inject c-list (mirrors _injectClistNow(), app-run.js CASE A/B) ─────────
@@ -138,8 +177,8 @@ if (sim.callStack && sim.callStack.length === 0) {
         LED0: 3, LED1: 3, LED2: 3, LED3: 3, LED4: 3, LED5: 3,
         UART: 2, BTN: 4, Timer: 5, Display: 2,
     };
-    const BOOT_ABSTR_SLOT = sim.bootEntrySlot;
-    const nsBase    = sim.NS_TABLE_BASE + BOOT_ABSTR_SLOT * sim.NS_ENTRY_WORDS;
+    const BOOT_ABSTR_SLOT = programSlot;
+    const nsBase    = sim._nsSlotBase(BOOT_ABSTR_SLOT);
     const w1f       = sim.parseNSWord1(sim.memory[nsBase + 1]);
     const lumpBase  = sim.memory[nsBase] >>> 0;
     const lumpHdr   = sim.memory[lumpBase] >>> 0;
@@ -159,7 +198,8 @@ if (sim.callStack && sim.callStack.length === 0) {
                 continue;
             }
             if (capName.toUpperCase() === 'BOOT.ABSTR') {
-                sim.memory[clistBase + i] = sim.createGT(0, sim.bootEntrySlot, {E:1}, 1) >>> 0;
+                sim.memory[clistBase + i] = sim.createGT(
+                    programSeq, BOOT_ABSTR_SLOT, {E:1}, 1) >>> 0;
                 continue;
             }
             const devKey = Object.keys(_devSlotMap).find(k => k.toLowerCase() === capName.toLowerCase());
@@ -187,9 +227,10 @@ if (sim.callStack && sim.callStack.length === 0) {
             sim.memory[clistBase + i] = _pendingWord >>> 0;
         }
         sim.memory[lumpBase] = ((lumpHdr & ~0xFF) | (cc & 0xFF)) >>> 0;
-        const nsWord1B = sim.packNSWord1(w1f.limit, w1f.b, w1f.g, w1f.gtType, cc);
-        sim.memory[nsBase + 1] = nsWord1B;
-        const cr6GTb = sim.createGT(0, BOOT_ABSTR_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
+        const nsWord1B = sim.memory[nsBase + 1] >>> 0;
+        sim._nsClistCount[BOOT_ABSTR_SLOT] = cc;
+        const cr6GTb = sim.createGT(
+            programSeq, BOOT_ABSTR_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
         sim.cr[6] = { word0: cr6GTb, word1: clistBase >>> 0, word2: nsWord1B >>> 0, word3: sim.memory[nsBase + 2] >>> 0, m: 0 };
         if (lastAssembledNamedSlots && lastAssembledNamedSlots.length > 0) sim.markNamedSlots(lastAssembledNamedSlots);
     } else {
@@ -197,9 +238,10 @@ if (sim.callStack && sim.callStack.length === 0) {
         const clistBase = lumpBase + SLOT_SIZE - cc;
         for (let i = 0; i < cc; i++) sim.memory[clistBase + i] = sim.demoClistGTs[i] >>> 0;
         sim.memory[lumpBase] = ((lumpHdr & ~0xFF) | (cc & 0xFF)) >>> 0;
-        const nsWord1A = sim.packNSWord1(w1f.limit, w1f.b, w1f.g, w1f.gtType, cc);
-        sim.memory[nsBase + 1] = nsWord1A;
-        const cr6GTa = sim.createGT(0, BOOT_ABSTR_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
+        const nsWord1A = sim.memory[nsBase + 1] >>> 0;
+        sim._nsClistCount[BOOT_ABSTR_SLOT] = cc;
+        const cr6GTa = sim.createGT(
+            programSeq, BOOT_ABSTR_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
         sim.cr[6] = { word0: cr6GTa, word1: clistBase >>> 0, word2: nsWord1A >>> 0, word3: sim.memory[nsBase + 2] >>> 0, m: 0 };
     }
 })();

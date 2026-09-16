@@ -455,7 +455,7 @@ def test_default_thread_count_remains_byte_compatible(tmp_path):
 
 
 def test_generated_threads_use_fixed_stack_boundary(tmp_path):
-    """Every generated Thread starts with one canonical CHURCH resume frame."""
+    """Every generated Thread starts with one canonical CHURCH root frame."""
     _write_synthetic_boot_abstr_lump(str(tmp_path))
     cfg = _cfg_generated_threads(3)
     generated = generate_boot_image(cfg, str(tmp_path))
@@ -478,6 +478,7 @@ def test_generated_threads_use_fixed_stack_boundary(tmp_path):
         enter_gt = words[thread_loc + actual_sto + 1]
         packed = words[thread_loc + actual_sto + 2]
         assert enter_gt == create_gt(0, BOOT_ABSTR_NS_SLOT, {"E": 1}, 1)
+        assert (packed >> 13) & 0x7FFF == 0x7FFF
         assert (packed >> 12) & 1 == 1
         assert packed & 0xFFF == stack_end
 

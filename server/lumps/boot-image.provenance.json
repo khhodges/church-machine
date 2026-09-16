@@ -1,6 +1,6 @@
 {
   "boot_config_sha256": "39a8ae8177fcfca37447482b75584fb794fb2a4d44c19da92af6cf33cbe38687",
-  "image_sha256": "e1e5a790316d947b97baffc725b0b2945cb72f55580d1ecad5c2ab7ce8ea3211",
+  "image_sha256": "914e584a849947a158bfe54130868dd93c7e8caf8fae7260db429e2f9f367f44",
   "origin": "generated",
   "resident_bindings": [
     {

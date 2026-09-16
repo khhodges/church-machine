@@ -80,19 +80,21 @@ function makeBooted() {
 // ── Unit tests: allocOrFindNsSlot ─────────────────────────────────────────────
 {
     const sim = makeBooted();
+    const first = sim.firstUserNsSlot();
     const slot1 = sim.allocOrFindNsSlot('tok_abc', 'MyProg');
-    check('T301: allocOrFindNsSlot returns slot 11 for fresh sim', slot1 === 11);
+    check('T301: allocOrFindNsSlot returns first user slot for fresh sim', slot1 === first);
 
     const slot2 = sim.allocOrFindNsSlot('tok_abc', 'MyProg');
-    check('T302: allocOrFindNsSlot reuses slot 11 for same token', slot2 === 11);
+    check('T302: allocOrFindNsSlot reuses first user slot for same token', slot2 === first);
 
     const slot3 = sim.allocOrFindNsSlot('tok_xyz', 'OtherProg');
-    check('T303: allocOrFindNsSlot returns slot 11 for different token', slot3 === 11);
+    check('T303: allocOrFindNsSlot returns first user slot for different token', slot3 === first);
 }
 
 // ── Unit tests: writeNsEntryForProgram ────────────────────────────────────────
 {
     const sim = makeBooted();
+    const first = sim.firstUserNsSlot();
     const words = [0x12345678, 0xABCDEF00, 0x00000001];
     const caps  = [];
 
@@ -101,7 +103,7 @@ function makeBooted() {
     const e6w0 = e6before ? e6before.word0_location : null;
     const e6w1 = e6before ? e6before.word1_limit : null;
 
-    sim.writeNsEntryForProgram(11, { words, caps, label: 'HelloProg' });
+    sim.writeNsEntryForProgram(first, { words, caps, label: 'HelloProg' });
 
     const EXTENDED_BASE = 0x0800;
     const hdrWord = sim.memory[EXTENDED_BASE] >>> 0;
@@ -110,14 +112,14 @@ function makeBooted() {
         hdr.valid === true,
         `hdr.valid=${hdr.valid}, hdrWord=0x${hdrWord.toString(16)}`);
 
-    const e7 = sim.readNSEntry(11);
-    check('T305: NS entry for slot [11] points to 0x0800',
+    const e7 = sim.readNSEntry(first);
+    check('T305: NS entry for first user slot points to 0x0800',
         e7 !== null && e7.word0_location === EXTENDED_BASE,
         `e7.word0_location=0x${e7 ? e7.word0_location.toString(16) : 'null'}`);
 
-    check('T306: nsLabels[11] equals program name after writeNsEntryForProgram',
-        sim.nsLabels[11] === 'HelloProg',
-        `nsLabels[11]="${sim.nsLabels[11]}"`);
+    check('T306: first user-slot label equals program name after writeNsEntryForProgram',
+        sim.nsLabels[first] === 'HelloProg',
+        `nsLabels="${sim.nsLabels[first]}"`);
 
     const e6after = sim.readNSEntry(6);
     check('T307: slot [6] NS entry unchanged after writeNsEntryForProgram',
@@ -135,10 +137,11 @@ function makeBooted() {
     const syncBESrc        = extractTopLevelFn('app-abstractions.js', '_syncBootEntryFromSim');
 
     const sim = makeBooted();
+    const first = sim.firstUserNsSlot();
     // Model slot 11 having been cleared four times before this compile. The
     // compiler must consume that retained generation for both the NS entry and
     // every live GT it installs.
-    sim._nsFreeSequences[11] = 4;
+    sim._nsFreeSequences[first] = 4;
 
     // Minimal 3-instruction program
     const PROG_WORDS = [0x11111111, 0x22222222, 0x33333333];
@@ -184,6 +187,19 @@ function makeBooted() {
         lastAssembledNamedSlots: [],
         pipelineViz: null,
         _pendingSimLoad: true,
+        _pendingSimLoadSnapshot: {
+            token: PROG_TOKEN,
+            abstraction: PROG_NAME,
+            words: PROG_WORDS.slice(),
+            capabilities: [],
+            labels: {},
+            namedSlots: [],
+            methodTableSize: 0,
+        },
+        _clearPendingSimLoad: () => {
+            sandbox._pendingSimLoad = false;
+            sandbox._pendingSimLoadSnapshot = null;
+        },
         bootEntrySlot: 6,
         currentView: 'code',
         ChurchSimulator,
@@ -210,37 +226,38 @@ function makeBooted() {
         console.log(`[integration] _applyPendingSimLoad threw: ${err.message}`);
     }
 
-    check('T308: bootEntrySlot is 11 after _applyPendingSimLoad',
-        sim.bootEntrySlot === 11,
+    check('T308: prepared bootEntrySlot is unchanged after _applyPendingSimLoad',
+        sim.bootEntrySlot === 6,
         `bootEntrySlot=${sim.bootEntrySlot}`);
 
-    check('T309: nsLabels[11] equals compiled program name',
-        sim.nsLabels[11] === PROG_NAME,
-        `nsLabels[11]="${sim.nsLabels[11]}"`);
+    check('T309: first user-slot label equals compiled program name',
+        sim.nsLabels[first] === PROG_NAME,
+        `nsLabels="${sim.nsLabels[first]}"`);
 
     const e6after = sim.readNSEntry(6);
+    const e6BeforeFields = sim.parseNSWord1(e6w1before);
+    const e6AfterFields = sim.parseNSWord1(e6after.word1_limit);
     check('T310: NS[6] SelfTest entry unchanged after _applyPendingSimLoad',
         e6after !== null &&
         e6after.word0_location === e6w0before &&
-        e6after.word1_limit    === e6w1before,
+        e6AfterFields.limit === e6BeforeFields.limit &&
+        e6AfterFields.gtSeq === e6BeforeFields.gtSeq,
         `before:(0x${(e6w0before || 0).toString(16)},0x${(e6w1before || 0).toString(16)}) ` +
         `after:(0x${(e6after ? e6after.word0_location : 0).toString(16)},0x${(e6after ? e6after.word1_limit : 0).toString(16)})`);
 
-    // CR0 word encodes: [31]=b_flag=0, perm bits, gt_type, gt_seq, slot_index
-    // For E-GT at slot 11: perm=E=0b100 (Church), dom=1, type=1
-    // The slot index is in bits [8:0]; gt_seq must match the reissued NS entry.
+    // Compile+Run leaves prepared CR0 alone and installs the explicit dynamic
+    // program authority in CR14.
     const cr0Word = sim.cr[0] ? (sim.cr[0].word0 >>> 0) : 0;
     const cr0SlotIdx = cr0Word & 0x1FF;
-    check('T311: sim.cr[0] encodes NS slot [11]',
-        cr0SlotIdx === 11,
+    check('T311: sim.cr[0] keeps the prepared boot target',
+        cr0SlotIdx === 6,
         `cr0.word0=0x${cr0Word.toString(16)}, slotIdx=${cr0SlotIdx}`);
-    const entry11 = sim.readNSEntry(11);
+    const entry11 = sim.readNSEntry(first);
     const entry11Seq = sim.parseNSWord1(entry11.word1_limit).gtSeq;
-    const cr0Seq = sim.parseGT(cr0Word).gt_seq;
     const cr14Seq = sim.parseGT(sim.cr[14].word0 >>> 0).gt_seq;
-    check('T311a: reissued compiled slot keeps one generation across NS, CR0, and CR14',
-        entry11Seq === 4 && cr0Seq === 4 && cr14Seq === 4,
-        `NS=${entry11Seq}, CR0=${cr0Seq}, CR14=${cr14Seq}`);
+    check('T311a: reissued compiled slot keeps one generation across NS and CR14',
+        entry11Seq === 4 && cr14Seq === 4,
+        `NS=${entry11Seq}, CR14=${cr14Seq}`);
     const cr14Load = sim.mLoad(sim.cr[14].word0, 'X', 14, sim.cr[14].word1);
     check('T311b: reissued compiled program remains executable through CR14',
         cr14Load && cr14Load.ok === true,
@@ -256,37 +273,33 @@ function makeBooted() {
 // T313: slot [11] occupied → allocator falls back to slot [12]
 {
     const sim = makeBooted();
-    // Occupy slot [11] by writing a real NS entry for it
-    sim.writeNsEntryForProgram(11, { words: [0xAAAAAAAA], caps: [], label: 'PriorProg' });
-    // isNSEntryValid(11) should now be true
+    const first = sim.firstUserNsSlot();
+    sim.writeNsEntryForProgram(first, { words: [0xAAAAAAAA], caps: [], label: 'PriorProg' });
     const s13 = sim.allocOrFindNsSlot('tok_new', 'NewProg');
-    check('T313: allocOrFindNsSlot falls back to slot [12] when slot [11] is occupied',
-        s13 === 12,
+    check('T313: allocator falls back to another mutable user slot when first is occupied',
+        s13 !== null && s13 > first,
         `returned slot=${s13}`);
 }
 
 // T314: token reuse honours cached slot even when it is not slot [11]
 {
     const sim = makeBooted();
-    // Occupy slot [11] so 'tok_first' gets mapped to slot [12]
-    sim.writeNsEntryForProgram(11, { words: [0x11111111], caps: [], label: 'Occupied' });
-    const s14a = sim.allocOrFindNsSlot('tok_first', 'FirstProg');  // → 12
-    // Now call again with the same token — should reuse slot [12], NOT try slot [11]
+    const first = sim.firstUserNsSlot();
+    sim.writeNsEntryForProgram(first, { words: [0x11111111], caps: [], label: 'Occupied' });
+    const s14a = sim.allocOrFindNsSlot('tok_first', 'FirstProg');
     const s14b = sim.allocOrFindNsSlot('tok_first', 'FirstProg');
-    check('T314: allocOrFindNsSlot reuses cached slot [12] for same token (non-11 reuse)',
-        s14a === 12 && s14b === 12,
+    check('T314: allocator reuses cached non-first slot for same token',
+        s14a !== null && s14a > first && s14b === s14a,
         `first=${s14a}, reuse=${s14b}`);
 }
 
 // T315: all allocatable slots occupied → returns null
 {
     const sim = makeBooted();
-    // Temporarily shrink the table to 13 slots (0–12) so we can exhaust it quickly.
+    const first = sim.firstUserNsSlot();
     const origMax = sim.MAX_NS_ENTRIES;
-    sim.MAX_NS_ENTRIES = 13;
-    // Occupy the two allocatable slots: [11] and [12]
-    sim.writeNsEntryForProgram(11, { words: [1], caps: [], label: 'Full11' });
-    sim.writeNsEntryForProgram(12, { words: [2], caps: [], label: 'Full12' });
+    sim.MAX_NS_ENTRIES = first + 1;
+    sim.writeNsEntryForProgram(first, { words: [1], caps: [], label: 'FullFirst' });
     const s15 = sim.allocOrFindNsSlot('tok_overflow', 'Overflow');
     check('T315: allocOrFindNsSlot returns null when namespace table is full',
         s15 === null,

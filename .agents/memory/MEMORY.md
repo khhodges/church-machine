@@ -152,3 +152,4 @@
 - [Deployment approval replay binding](deployment-approval-replay.md) — consuming-path mismatches burn live intents; only explicit read-only preflight may retain them
 - [Church GT petname boundary](church-gt-petname-boundary.md) — resolve every CR-held GT to a petname; leave Turing data registers numeric and unnamed
 - [Retired fused instruction cutover](retired-fused-instruction-cutover.md) — manual source correction, hard compile errors, and only three boot-loaded LUMPs
+- [Thread root-frame invariant](thread-root-frame-invariant.md) — every fresh Thread image carries the canonical poison-root frame; direct runs activate it rather than creating one

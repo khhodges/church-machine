@@ -1638,8 +1638,11 @@ function hideRunPopover() {
 //     • NS-based abstraction → freshly-created E-GT pointing to its NS slot
 //     • Unknown name → null GT (0)
 //   cc = lastAssembledCapabilities.length.
-function _injectClistNow(capabilitiesOverride) {
-    if (!sim.bootComplete || !sim.demoClistGTs || !sim.demoClistGTs.length) return;
+function _injectClistNow(capabilitiesOverride, targetSlotOverride = null) {
+    const _hasActiveThread = typeof sim._activeThreadBase === 'function' &&
+        sim._activeThreadBase() !== null;
+    if ((!sim.bootComplete && !_hasActiveThread) ||
+            !sim.demoClistGTs || !sim.demoClistGTs.length) return;
 
     // Guard against stale named-slot entries from a previous program (Task #1547).
     // Reset petNameMemory to the hardware boot defaults before any markNamedSlots()
@@ -1678,7 +1681,9 @@ function _injectClistNow(capabilitiesOverride) {
     // Boot.Abstr's NS slot is dynamic (sim.bootEntrySlot, default 6 = SelfTest
     // since the slot 3→6 migration) — do NOT hardcode 3 here, or CASE B reads
     // garbage from an unrelated NS entry and every capability resolves wrong.
-    const BOOT_ABSTR_SLOT = sim.bootEntrySlot;
+    const BOOT_ABSTR_SLOT = Number.isInteger(targetSlotOverride)
+        ? targetSlotOverride
+        : sim.bootEntrySlot;
     // IMPORTANT: the NS table is stored TOP-DOWN.  Slot 0 is at the HIGHEST address
     // (NS_TABLE_BASE + NS_TABLE_RESERVE − 4) and slot N at
     // (NS_TABLE_BASE + NS_TABLE_RESERVE − (N+1)×NS_ENTRY_WORDS).
@@ -1764,7 +1769,7 @@ function _injectClistNow(capabilitiesOverride) {
             }
             if (capName.toUpperCase() === 'BOOT.ABSTR') {
                 sim.writePersistentWord(clistBase + i,
-                    sim.createGT(bootGtSeq, sim.bootEntrySlot, {E:1}, 1));
+                    sim.createGT(bootGtSeq, BOOT_ABSTR_SLOT, {E:1}, 1));
                 continue;
             }
 
@@ -1891,26 +1896,48 @@ function _applyPendingSimLoad() {
     }
     let   _progSlot = null;
     let   _progGtSeq = 0;
-    if (sim.bootComplete && _aplToken && typeof sim.allocOrFindNsSlot === 'function') {
+    if (typeof sim.allocOrFindNsSlot === 'function') {
         const _aplName  = sim.programName || 'prog';
-        _progSlot = sim.allocOrFindNsSlot(_aplToken, _aplName);
+        _progSlot = sim.allocOrFindNsSlot(_aplToken || null, _aplName);
         if (_progSlot !== null) {
             sim.writeNsEntryForProgram(_progSlot, { words: _aplWords, caps: _aplCaps, label: _aplName });
             const _progEntry = sim.readNSEntry(_progSlot);
-            _progGtSeq = _progEntry
-                ? sim.parseNSWord1(_progEntry.word1_limit).gtSeq
-                : 0;
+            const _progHeader = _progEntry
+                ? sim.parseLumpHeader(sim.memory[_progEntry.word0_location] >>> 0)
+                : null;
+            if (!_progEntry || !_progHeader || !_progHeader.valid) {
+                sim.fault('BOUNDS',
+                    'Compile+Run: dynamic program slot could not be installed safely');
+                _clearPendingSimLoad();
+                return;
+            }
+            _progGtSeq = sim.parseNSWord1(_progEntry.word1_limit).gtSeq;
         }
     }
+    if (_progSlot === null) {
+        sim.fault('NS_FULL',
+            'Compile+Run: no dynamic user Namespace slot is available; the prepared boot selection was not changed');
+        _clearPendingSimLoad();
+        return;
+    }
 
-    sim.loadProgram(_aplWords, 0);
+    // A formatted Thread image owns its root sentinel before execution. Direct
+    // Compile+Run can begin before the boot ROM has installed Boot.Thread in
+    // CR12, so activate that canonical image rather than constructing a
+    // UI-specific frame after loading the program.
+    if (typeof sim._activatePreformattedBootThread === 'function' &&
+            !sim._activatePreformattedBootThread()) {
+        _clearPendingSimLoad();
+        return;
+    }
+    sim.loadProgram(_aplWords, 0, _progSlot);
     // Update CR14.word0 to a fresh R+X GT for the program slot so that
     // _fetchInstruction's mLoad('X') check passes.  loadProgram() only updates
     // CR14.word1/word2/word3 (the lump base/seals); without this the old boot GT
     // (e.g. slot [6] SelfTest, E-perm) stays in CR14.word0 while CR14.word1
     // already points to the new slot [7] lump at 0x0400 — every instruction
     // fetch faults the bounds check before stepCount++ is reached.
-    if (_progSlot !== null && sim.bootComplete && sim.cr[14]) {
+    if (_progSlot !== null && sim.cr[14]) {
         const _cr14GT = sim.createGT(
             _progGtSeq, _progSlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1) >>> 0;
         sim.cr[14].word0 = _cr14GT;
@@ -1919,13 +1946,9 @@ function _applyPendingSimLoad() {
     // Compile/Run installs an explicit live execution context only. It must
     // never prepare this new LUMP as a next-boot authority; the user performs
     // that distinct operation with the lightning-bolt Prepare control.
-    // Compile+Run does not go through the real boot sequence's NUC_CLIST step,
-    // which normally pushes a sentinel CALL frame (returnPC=0x7FFF poison value)
-    // before jumping into user code. Without it, a program's trailing RETURN
-    // underflows an empty call stack and faults with STACK_UNDERFLOW even though
-    // the same program runs cleanly via a real boot-lump install. Push an
-    // equivalent sentinel frame here so Compile+Run matches real-boot behavior.
-    // loadProgram() above resets callStack to [], so this is always the first frame.
+    // loadProgram resets the diagnostic callStack and STO, but the protected
+    // Thread image remains authoritative. Re-adopt its preformatted root frame;
+    // do not synthesize or write a second sentinel from this UI path.
     if (sim.callStack && sim.callStack.length === 0) {
         const threadBase = typeof sim._activeThreadBase === 'function'
             ? sim._activeThreadBase()
@@ -1939,20 +1962,18 @@ function _applyPendingSimLoad() {
             _clearPendingSimLoad();
             return;
         }
-        const sp_max = threadLayout.stackEnd;
-        const sentinelFrameWord = sim._packFrameWordRaw(0x7FFF, 1, sp_max);
-        sim.callStack.push({
-            sentinel: true,
-            returnPC: 0x7FFF,
-            savedCRs: sim.cr.map(c => ({...c})),
-            savedDRs: [...sim.dr],
-            savedFlags: {...sim.flags},
-            savedSTO: sp_max,
-            sz: 1,
-            frameWord: sentinelFrameWord,
-        });
-        sim._writeRuntimeWord(threadBase + sp_max, sentinelFrameWord);
-        sim.sto = sp_max - 2;
+        const protectedRoot = typeof sim._readProtectedCallFrame === 'function'
+            ? sim._readProtectedCallFrame() : null;
+        if (!protectedRoot || !protectedRoot.ok ||
+                !protectedRoot.frame || protectedRoot.frame.returnPC !== 0x7FFF) {
+            if (!sim.halted) {
+                sim.fault('STACK_CORRUPT',
+                    'Compile+Run: active Thread root sentinel is missing or malformed');
+            }
+            _clearPendingSimLoad();
+            return;
+        }
+        sim.sto = protectedRoot.indicator.sto;
     }
     // Skip past the lump header (word 0) and method table so PC starts at the
     // first real instruction, matching _autoLoadDefaultProgram() on boot/reset.
@@ -1961,7 +1982,8 @@ function _applyPendingSimLoad() {
     // NS table is TOP-DOWN: slot N is at NS_TABLE_BASE + NS_TABLE_RESERVE − (N+1)×NS_ENTRY_WORDS.
     // Using the ascending formula (NS_TABLE_BASE + N×NS_ENTRY_WORDS) reads garbage for any slot > 0.
     const abstrBase2 = sim._nsSlotBase(2);
-    const abstrBase3 = sim._nsSlotBase(sim.bootEntrySlot);
+    const _runSlot = Number.isInteger(_progSlot) ? _progSlot : sim.bootEntrySlot;
+    const abstrBase3 = sim._nsSlotBase(_runSlot);
     // When the compiled program's slot was relocated to the extended-code area
     // (base >= 0x0400, which is always the case for slot [7] allocations), use
     // that base+1 as the code start so labels resolve correctly.  For ordinary
@@ -1971,7 +1993,7 @@ function _applyPendingSimLoad() {
     const progBase   = (slot3Base >= 0x0400) ? slot3Base + 1 : slot2Base;
     sim.programBaseAddr = progBase;
 
-    if (_injectClistNow(_aplCaps) === false) {
+    if (_injectClistNow(_aplCaps, _runSlot) === false) {
         _clearPendingSimLoad();
         return;
     }

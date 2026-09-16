@@ -6,6 +6,20 @@ const ChurchSimulator = require('../../simulator/simulator.js');
 
 const sim = new ChurchSimulator();
 
+// Imports must reject the retired in-range NIA=0 frame even though its Enter
+// identity and stack geometry are otherwise valid.
+{
+    const staleWords = sim.memory.slice();
+    const staleThread = sim.getThreadInstanceLayout(1);
+    staleWords[staleThread.base + staleThread.stackEnd] =
+        sim._packFrameWordRaw(0, 1, staleThread.stackEnd);
+    const importer = new ChurchSimulator();
+    assert.strictEqual(
+        importer.loadBootImage(new Uint8Array(staleWords.buffer)),
+        false,
+        'boot-image import accepted the retired non-sentinel Thread root');
+}
+
 // Selection failure is atomic: neither the prior home nor Header V2 W4 moves.
 const beforeHome = sim.inspectBootEntryBinding().homeGT;
 const beforeHeader = sim.memory[4] >>> 0;
@@ -29,15 +43,15 @@ assert.strictEqual(prepared.sequence, 7, 'prepared GT did not use live NS sequen
 assert.strictEqual(sim.inspectBootEntryBinding().ok, true, 'prepared binding is not coherent');
 
 // Before the ROM consumes it, the prepared dormant frame occupies exactly
-// +238..+243: four untouched stack words, Enter E-GT, and packed NIA=0/SZ=1
-// with saved STO=stackEnd.
+// +238..+243: four untouched stack words, Enter E-GT, and the canonical
+// poison-root sentinel with saved STO=stackEnd.
 {
     const threadBase = sim.getThreadInstanceLayout(1).base;
     assert.deepStrictEqual(
         Array.from(sim.memory.slice(threadBase + 238, threadBase + 244),
             word => word >>> 0),
         [0, 0, 0, 0, prepared.gt >>> 0,
-            sim._packFrameWordRaw(0, 1, 243)],
+            sim._packFrameWordRaw(0x7FFF, 1, 243)],
         'prepared raw Thread words +238..+243 are not canonical');
 }
 

@@ -443,7 +443,7 @@ class ChurchSimulator {
                         ((packed >>> 12) & 1) !== 1 ||
                         savedSTO < layout.stackStart + 1 ||
                         savedSTO > layout.stackEnd ||
-                        resumeSTO !== savedSTO - 2 || nia >= codeHeader.cw) {
+                        resumeSTO !== savedSTO - 2 || nia !== 0x7FFF) {
                     this.lastBootImageError =
                         `Thread slot ${threadSlot} lacks a canonical two-word CHURCH resume frame.`;
                     this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected.\n`;
@@ -1162,16 +1162,10 @@ class ChurchSimulator {
                 bootThreadEntry.word0_location);
             if (bootThreadLayout) {
                 const bootBase = bootThreadEntry.word0_location;
-                const resumeSTO = bootThreadLayout.stackEnd - 2;
                 const bootHome = this.memory[
                     bootBase + bootThreadLayout.capsStart] >>> 0;
-                this.writePersistentWord(
-                    bootBase + THREAD_STO_OFFSET,
-                    this._packProtectedIndicator(resumeSTO, 1, {}, 0));
-                this.writePersistentWord(bootBase + resumeSTO + 1, bootHome);
-                this.writePersistentWord(
-                    bootBase + resumeSTO + 2,
-                    this._packFrameWordRaw(0, 1, bootThreadLayout.stackEnd));
+                this._formatThreadRootSentinel(
+                    bootBase, bootThreadLayout, bootHome, { persistent: true });
             }
         }
         this._liveThreadOwned = false;
@@ -2845,10 +2839,6 @@ class ChurchSimulator {
         const THREAD_STACK_BOUNDARY = THREAD_LAYOUT.stackEnd;
         const threadLoc = this.memory[this._nsSlotBase(1)];
         this.memory[threadLoc] = this.packLumpHeader(THREAD_N_MINUS_6, THREAD_SW, THREAD_CC, 2);
-        const _initialResumeSTO = THREAD_STACK_BOUNDARY - 2;
-        this.memory[threadLoc + THREAD_STO_OFFSET] =
-            this._packProtectedIndicator(_initialResumeSTO, 1, {}, 0);
-
         // Thread caps zone — a fresh reset image carries only the architectural
         // default. A non-default entry is written solely by prepareBootEntry().
         // The boot entry's done: loop calls TPERM CR0, E to decide when to dispatch
@@ -2864,19 +2854,15 @@ class ChurchSimulator {
         const _initialEntryGT =
             this.createGT(_initialBootSeq, this._bootAbstrSlot, {E: 1}, 1);
         this.memory[threadLoc + THREAD_LAYOUT.capsStart] = _initialEntryGT;
-        this.memory[threadLoc + _initialResumeSTO + 1] = _initialEntryGT;
-        this.memory[threadLoc + _initialResumeSTO + 2] =
-            this._packFrameWordRaw(0, 1, THREAD_STACK_BOUNDARY);
+        this._formatThreadRootSentinel(
+            threadLoc, THREAD_LAYOUT, _initialEntryGT, { image: true });
         for (const threadSlot of generatedThreadSlots) {
             const generatedThreadLoc = this.memory[this._nsSlotBase(threadSlot)] >>> 0;
             this.memory[generatedThreadLoc] = this.packLumpHeader(
                 THREAD_N_MINUS_6, THREAD_SW, THREAD_CC, 2);
             this.memory[generatedThreadLoc + THREAD_LAYOUT.capsStart] = _initialEntryGT;
-            this.memory[generatedThreadLoc + _initialResumeSTO + 1] = _initialEntryGT;
-            this.memory[generatedThreadLoc + _initialResumeSTO + 2] =
-                this._packFrameWordRaw(0, 1, THREAD_STACK_BOUNDARY);
-            this.memory[generatedThreadLoc + THREAD_STO_OFFSET] =
-                this._packProtectedIndicator(_initialResumeSTO, 1, {}, 0);
+            this._formatThreadRootSentinel(
+                generatedThreadLoc, THREAD_LAYOUT, _initialEntryGT, { image: true });
         }
 
         // Memory-manager GT at c-list[0]: R|W Inform capability over NS slot 0 (full namespace).
@@ -5199,6 +5185,34 @@ class ChurchSimulator {
         };
     }
 
+    _formatThreadRootSentinel(threadBase, layout, enterGT, options = {}) {
+        if (!Number.isInteger(threadBase) || !layout || !layout.valid ||
+                !Number.isInteger(layout.stackEnd) || layout.stackEnd < 2) {
+            return null;
+        }
+        const frameAddress = layout.stackEnd >>> 0;
+        const activeSTO = (frameAddress - 2) >>> 0;
+        const frameWord = this._packFrameWordRaw(0x7FFF, 1, frameAddress);
+        const indicatorWord = this._packProtectedIndicator(
+            activeSTO, 1, {}, 0);
+        const write = options.image
+            ? (address, value) => { this.memory[address] = value >>> 0; }
+            : options.persistent
+                ? (address, value) => this.writePersistentWord(address, value)
+                : (address, value) => this._writeRuntimeWord(address, value);
+        write(threadBase + frameAddress - 1, enterGT);
+        write(threadBase + frameAddress, frameWord);
+        write(threadBase + THREAD_STO_OFFSET, indicatorWord);
+        return {
+            threadBase,
+            frameAddress,
+            activeSTO,
+            enterGT: enterGT >>> 0,
+            frameWord,
+            indicatorWord,
+        };
+    }
+
     _writeProtectedSto(threadBase, value, sz = null, flags = null) {
         const addr = this._protectedStoAddress(threadBase);
         if (addr === null) return false;
@@ -5262,7 +5276,8 @@ class ChurchSimulator {
                 `CHANGE Thread slot ${threadSlot}: CHURCH Enter does not name executable code`);
             return null;
         }
-        if (frame.returnPC >= codeHeader.cw) {
+        const isRootSentinel = frame.returnPC === 0x7FFF;
+        if (!isRootSentinel && frame.returnPC >= codeHeader.cw) {
             this.fault('BOUNDS',
                 `CHANGE Thread slot ${threadSlot}: CHURCH frame NIA ${frame.returnPC} exceeds code extent ${codeHeader.cw}`);
             return null;
@@ -5294,6 +5309,118 @@ class ChurchSimulator {
             }
         }
         return { enterGT, parsed, checked, codeHeader, frame };
+    }
+
+    _activatePreformattedBootThread(threadSlot = BOOT_NS_SLOT_THREAD) {
+        if (this._activeThreadBase() !== null) return true;
+        const priorState = {
+            cr: this.cr.map(register => ({...register})),
+            sto: this.sto,
+            flags: {...this.flags},
+            currentThreadSlot: this._currentThreadSlot,
+            liveThreadOwned: this._liveThreadOwned,
+            bootComplete: this.bootComplete,
+        };
+        let committed = false;
+        const entry = this.readNSEntry(threadSlot);
+        if (!entry) {
+            this.fault('BOUNDS',
+                `Compile+Run: Boot.Thread Namespace slot ${threadSlot} is unavailable`);
+            return false;
+        }
+        const threadBase = entry.word0_location >>> 0;
+        const layout = this._threadLayoutAtBase(threadBase);
+        if (!layout) {
+            this.fault('BOUNDS',
+                'Compile+Run: Boot.Thread has invalid or unsupported geometry');
+            return false;
+        }
+        const previousElevation = this.mElevation;
+        this.mElevation = true;
+        try {
+            const seq = this.parseNSWord1(entry.word1_limit).gtSeq;
+            const threadGT = this.createGT(
+                seq, threadSlot, {R:0,W:0,X:0,L:0,S:0,E:0}, 1);
+            const check = this.mLoad(threadGT, null, 12, threadBase);
+            if (!check.ok || !this._writeCR(12, threadGT, entry)) {
+                if (!this.halted) {
+                    this.fault(check.fault || 'BOUNDS',
+                        `Compile+Run: Boot.Thread activation failed: ${check.message || 'CR12 write rejected'}`);
+                }
+                return false;
+            }
+            const resume = this._readThreadResumeFrame(
+                threadBase, layout, threadSlot);
+            if (!resume) return false;
+            if (resume.frame.returnPC !== 0x7FFF) {
+                this.fault('STACK_CORRUPT',
+                    'Compile+Run: Boot.Thread does not contain its canonical root sentinel');
+                return false;
+            }
+            const restored = [];
+            for (let i = 0; i < 12; i++) {
+                const gtWord = this.memory[threadBase + layout.capsStart + i] >>> 0;
+                if (gtWord === 0 || ChurchSimulator.isNullGT(gtWord)) {
+                    restored[i] = {word0:0, word1:0, word2:0, word3:0, m:0};
+                    continue;
+                }
+                if (i === 0) {
+                    const parsed = this.parseGT(gtWord);
+                    const target = this.readNSEntry(parsed.index);
+                    restored[i] = {
+                        word0: gtWord,
+                        word1: target ? (target.word0_location >>> 0) : 0,
+                        word2: target ? (target.word1_limit >>> 0) : 0,
+                        word3: 0,
+                        m: 0,
+                    };
+                    continue;
+                }
+                const capCheck = this.mLoad(gtWord, null, i);
+                if (!capCheck.ok) {
+                    this.fault(capCheck.fault,
+                        `Compile+Run restore CR${i}: ${capCheck.message}`);
+                    return false;
+                }
+                restored[i] = {
+                    word0: gtWord,
+                    word1: capCheck.entry.word0_location >>> 0,
+                    word2: capCheck.entry.word1_limit >>> 0,
+                    word3: 0,
+                    m: 0,
+                };
+            }
+            for (let i = 0; i < 12; i++) this.cr[i] = restored[i];
+            const heapGT = this.createGT(
+                seq, threadSlot, {R:1,W:1,X:0,L:0,S:0,E:0}, 1);
+            this.cr[5] = {
+                word0: heapGT >>> 0,
+                word1: (threadBase + layout.heapStart) >>> 0,
+                word2: (layout.heapWords - 1) >>> 0,
+                word3: 0,
+                m: 0,
+            };
+            this.sto = (resume.frame.savedSTO - 2) >>> 0;
+            this.flags = {...resume.frame.flags};
+            this._currentThreadSlot = threadSlot;
+            this._liveThreadOwned = true;
+            // Direct Compile+Run is an alternate activation path: the Thread
+            // image already contains the root frame, so execution must not
+            // fall back into the boot-ROM state machine on the next Step.
+            this.bootComplete = true;
+            committed = true;
+            return true;
+        } finally {
+            this.mElevation = previousElevation;
+            if (!committed) {
+                this.cr = priorState.cr;
+                this.sto = priorState.sto;
+                this.flags = priorState.flags;
+                this._currentThreadSlot = priorState.currentThreadSlot;
+                this._liveThreadOwned = priorState.liveThreadOwned;
+                this.bootComplete = priorState.bootComplete;
+            }
+        }
     }
 
     _prepareThreadSuspendFrame(threadBase, layout, threadSlot) {
@@ -10126,11 +10253,15 @@ class ChurchSimulator {
         });
     }
 
-    loadProgram(words, startAddr) {
-        const abstrSlot = this.bootEntrySlot;  // active boot-entry slot (default 6 = SelfTest; set by ⚡ lightning bolt)
+    loadProgram(words, startAddr, targetSlot = null) {
+        const abstrSlot = Number.isInteger(targetSlot)
+            ? targetSlot
+            : this.bootEntrySlot;  // boot selection remains unchanged unless direct-run supplies a slot
         const abstrBase = this._nsSlotBase(abstrSlot);
         const codeLoc = this.memory[abstrBase] || (abstrSlot * this.SLOT_SIZE);
-        const baseAddr = this.bootComplete ? codeLoc : (startAddr || 0);
+        const baseAddr = (this.bootComplete || Number.isInteger(targetSlot))
+            ? codeLoc
+            : (startAddr || 0);
 
         // When booted, check whether the code fits in the existing lump.
         // If not, allocate a fresh LUMP in the extended-code area instead of

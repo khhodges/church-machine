@@ -1006,7 +1006,8 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
         code_loc = words[code_ns]
         code_cw = ((words[code_loc] >> 10) & 0x1FFF) if code_loc < n_words else 0
         resume_nia = (packed_resume >> 13) & 0x7FFF
-        if (code_loc >= n_words or ((words[code_loc] >> 27) & 0x1F) != 0x1F or code_cw == 0 or resume_nia >= code_cw):
+        if (code_loc >= n_words or ((words[code_loc] >> 27) & 0x1F) != 0x1F
+                or code_cw == 0 or resume_nia != 0x7FFF):
             raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has non-executable CHURCH Enter identity")
         saved_sto = packed_resume & 0xFFF
         if ((packed_resume >> 12) & 1) != 1 or (
@@ -2970,7 +2971,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     mem[thread_loc + layout["caps_start"]] = _entry_gt
     mem[thread_loc + _resume_sto + 1] = _entry_gt
     mem[thread_loc + _resume_sto + 2] = (
-        (1 << 12) | layout["stack_end"]
+        (0x7FFF << 13) | (1 << 12) | layout["stack_end"]
     )
 
     # ----- Generated Thread bodies (Thread.2 .. Thread.N) ----------------
@@ -2988,7 +2989,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         mem[_thread_loc + layout["caps_start"]] = _secondary_thread_gt
         mem[_thread_loc + _resume_sto + 1] = _secondary_thread_gt
         mem[_thread_loc + _resume_sto + 2] = (
-            (1 << 12) | layout["stack_end"]
+            (0x7FFF << 13) | (1 << 12) | layout["stack_end"]
         )
 
     # Memory-manager GT at c-list[0]: R|W capability over NS slot 0 (full namespace).
