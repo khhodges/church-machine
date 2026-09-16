@@ -22,7 +22,6 @@ const dom = new JSDOM(`<!doctype html><body>
     <div id="compileFailedBanner" style="display:none"><span id="compileFailedBannerText"></span></div>
     <div id="codeSidebarTabs"></div>
     <section id="savedLumpDisassemblyPanel" style="display:none">
-        <h2 id="savedLumpDisassemblyTitle"></h2>
         <pre id="savedLumpDisassembly"></pre>
     </section>
     <div id="asmErrorPanel" style="display:none"></div>
@@ -41,6 +40,7 @@ const context = vm.createContext({
     _escHtml: value => String(value),
     _getSyntaxSuggestion: () => null,
     _highlightAsmErrorLines: () => {},
+    _syncSavedLumpIdentityVisibility: () => {},
 });
 context.window._savedLumpEditorMode = false;
 

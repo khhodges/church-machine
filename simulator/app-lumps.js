@@ -1827,7 +1827,6 @@ function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, 
     var tabs = document.getElementById('codeSidebarTabs');
     var layout = document.querySelector('#editor .editor-layout');
     var panel = document.getElementById('savedLumpDisassemblyPanel');
-    var title = document.getElementById('savedLumpDisassemblyTitle');
     var text = document.getElementById('savedLumpDisassembly');
     if (tabs) tabs.style.display = 'none';
     if (layout) layout.classList.add('saved-lump-editor-layout');
@@ -1837,19 +1836,10 @@ function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, 
         var el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
-    if (title) title.textContent = 'Compiled Disassembly — ' + lumpName;
     if (typeof _renderSavedLumpIdentityPanel === 'function') {
         _renderSavedLumpIdentityPanel(lump, lookupToken);
     }
     _syncSavedLumpIdentityVisibility();
-    if (panel) {
-        var _description = panel.querySelector('p');
-        if (_description) {
-            _description.textContent = inspection && inspection.unverified
-                ? 'Read-only inspection of the exact response; artifact provenance is unverified.'
-                : 'Exact disassembly from the immutable saved binary.';
-        }
-    }
     var _displayDisassembly = compiledDisasm || '; Compiled disassembly unavailable.';
     if (inspection && typeof inspection.appendText === 'string' &&
             inspection.appendText.length > 0) {

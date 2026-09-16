@@ -1270,7 +1270,6 @@ trackAsync((async function t21() {
         <button id="savedLumpIdentityToggle"></button>
         <div id="savedLumpIdentityPanel"></div>
         <div id="savedLumpDisassemblyPanel" style="display:none">
-          <h2 id="savedLumpDisassemblyTitle"></h2>
           <pre id="savedLumpDisassembly" aria-readonly="true"></pre>
         </div>
         <div id="codeConsoleContent" style="display:flex"></div>
@@ -1296,9 +1295,6 @@ trackAsync((async function t21() {
     vm.runInContext('_enterSavedLumpEditorMode("RETURN\\n0xF8000000", "Saved.Code")', sandbox);
     const doc = dom.window.document;
     const pre = doc.getElementById('savedLumpDisassembly');
-    assert('T23 split mode labels the compiled disassembly',
-        doc.getElementById('savedLumpDisassemblyTitle').textContent ===
-        'Compiled Disassembly — Saved.Code');
     assert('T23 compiled disassembly is displayed independently',
         pre.textContent === 'RETURN\n0xF8000000', pre.textContent);
     assert('T23 compiled disassembly is read-only semantic content',

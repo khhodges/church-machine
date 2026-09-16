@@ -473,17 +473,6 @@
     min-height: 0;
     flex-direction: column;
 }
-.saved-lump-disassembly-panel h2 {
-    margin: 0 0 0.25rem;
-    font-size: 0.88rem;
-    color: var(--church-gold);
-}
-.saved-lump-disassembly-panel p {
-    margin: 0 0 0.5rem;
-    color: var(--text-secondary);
-    font-size: 0.76rem;
-    line-height: 1.4;
-}
 .saved-lump-identity-panel {
     display: grid;
     grid-template-columns: minmax(9rem, 0.7fr) minmax(0, 1.3fr);
