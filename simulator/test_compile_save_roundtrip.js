@@ -89,7 +89,8 @@ const context = {
                 methods: [{ name: 'Ping', code: codeWords.slice() }],
                 abstractionName: 'Task3430RoundTrip',
                 capabilities: [{
-                    name: '__SELF__',
+                    name: 'SELF',
+                    symbolic_self: true,
                     rights: ['E'],
                     grants: ['E'],
                     compiler_owned_self: true,

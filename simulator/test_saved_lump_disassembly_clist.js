@@ -61,6 +61,10 @@ assert(
     'saved-LUMP disassembly locates C-list rows from the authoritative header'
 );
 assert(
+    source.includes('JSON.stringify(apiDefinition, null, 2)'),
+    'raw embedded API inspection remains byte-faithful instead of rewriting sealed names'
+);
+assert(
     source.includes("disasmLines.push('capabilities {');") &&
     source.includes("disasmLines.push('  ' + _capItems);") &&
     source.includes("disasmLines.push('}');"),

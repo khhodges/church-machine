@@ -29,7 +29,7 @@ vm.createContext(context);
 vm.runInContext(source.slice(start, end), context);
 
 const validCaps = [
-    { name: '__SELF__', compiler_owned_self: true },
+    { name: 'SELF', symbolic_self: true, compiler_owned_self: true },
     { name: 'UART_DEV' },
 ];
 const validWords = [0xF8000002, 0, 0, 0xFEED5E1F, 0x1234];

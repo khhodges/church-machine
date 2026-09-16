@@ -879,8 +879,10 @@ function _isCompilerSelfCapability(cap) {
     if (typeof CapabilityTokens !== 'undefined' &&
             typeof CapabilityTokens.isContextualSelf === 'function' &&
             CapabilityTokens.isContextualSelf(cap)) return true;
-    return !!(typeof cap === 'object' && cap.compiler_owned_self === true &&
-        String(cap.name || '').toUpperCase() === '__SELF__');
+    const name = String(cap.name || '').toUpperCase();
+    return !!(typeof cap === 'object' &&
+        (cap.compiler_owned_self === true || cap.symbolic_self === true) &&
+        (name === 'SELF' || name === '__SELF__'));
 }
 
 function _validateCompiledCandidateClist(words, clistStart, resolvedCaps) {
@@ -961,10 +963,11 @@ function _materializeLumpCapabilities(caps, words, clistStart, context) {
         ok: materialized.ok,
         errors: materialized.errors || [],
         resolvedCaps: [{
-            name: '__SELF__',
+            name: 'SELF',
             rights: ['E'],
             grants: ['E'],
             nsIndex: null,
+            symbolic_self: true,
             compiler_owned_self: true,
             placeholder: !(context && context.bootstrapResidentSlot !== null &&
                 context.bootstrapResidentSlot !== undefined),
@@ -1794,7 +1797,7 @@ async function compileAndBuild(options) {
             ? _lumpsCache
             : [],
         // Compilation is independent of whichever resident currently occupies
-        // the eventual destination. The save/install transaction binds __SELF__
+        // the eventual destination. The save/install transaction binds SELF
         // after the programmer chooses a Namespace slot.
         bootstrapResidentSlot: null,
     };

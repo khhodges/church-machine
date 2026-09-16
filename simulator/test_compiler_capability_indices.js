@@ -121,7 +121,7 @@ check('public compile uses source order and enriches matching named/target uploa
     const result = compileOrThrow(new CLOOMCCompiler(), SOURCE_ORDER_SOURCE, uploads);
 
     assert.deepStrictEqual(capabilityNames(result.capabilities),
-        ['__SELF__', 'Foo', 'Bar', 'NULL', 'Tail', 'UploadOnly']);
+        ['SELF', 'Foo', 'Bar', 'NULL', 'Tail', 'UploadOnly']);
     assert.strictEqual(result.capabilities[1].uploadMarker, 'foo');
     assert.strictEqual(result.capabilities[2].uploadMarker, 'bar');
     assert.strictEqual(result.capabilities[5], 'UploadOnly');
@@ -135,7 +135,8 @@ check('public compile marks the inserted row zero as compiler-owned SELF', () =>
     const result = compileOrThrow(new CLOOMCCompiler(), SOURCE_ORDER_SOURCE, []);
     const self = result.capabilities[0];
 
-    assert.strictEqual(self.name, '__SELF__');
+    assert.strictEqual(self.name, 'SELF');
+    assert.strictEqual(self.symbolic_self, true);
     assert.deepStrictEqual(self.rights, ['E']);
     assert.deepStrictEqual(self.grants, ['E']);
     assert.strictEqual(self.compiler_owned_self, true);
@@ -195,7 +196,7 @@ check('empty source capability list follows named, target, null, and string uplo
     const result = compileOrThrow(new CLOOMCCompiler(), EMPTY_CAPABILITY_SOURCE, uploads);
 
     assert.deepStrictEqual(capabilityNames(result.capabilities),
-        ['__SELF__', 'NULL', 'Foo', 'Bar', 'UploadOnly']);
+        ['SELF', 'NULL', 'Foo', 'Bar', 'UploadOnly']);
     assert.strictEqual(result.capabilities[1].null_row, true);
     assertEloadTargets(result, [
         { name: 'Foo', selector: 4 },
@@ -228,7 +229,7 @@ check('exact Foo-call repro with uploaded SELF then Foo resolves Foo to row one'
         { name: 'Foo', rights: ['E'] },
     ]);
 
-    assert.deepStrictEqual(capabilityNames(result.capabilities), ['__SELF__', 'Foo']);
+    assert.deepStrictEqual(capabilityNames(result.capabilities), ['SELF', 'Foo']);
     assertEloadTargets(result, [{ name: 'Foo', selector: 4 }]);
     assert.strictEqual(decodeEloadcall(eloadcallWords(result)[0]).row, 1);
 });
@@ -246,7 +247,7 @@ for (const selfUpload of [
             { name: 'Foo', rights: ['E'] },
         ]);
 
-        assert.deepStrictEqual(capabilityNames(result.capabilities), ['__SELF__', 'Foo']);
+        assert.deepStrictEqual(capabilityNames(result.capabilities), ['SELF', 'Foo']);
         assert.strictEqual(result.capabilities[0].compiler_owned_self, true);
         assertEloadTargets(result, [{ name: 'Foo', selector: 4 }]);
         assert.strictEqual(decodeEloadcall(eloadcallWords(result)[0]).row, 1);
@@ -269,7 +270,7 @@ const SELF_ALIAS_SOURCE = `abstraction Caller {
 check('public compile collapses SELF aliases to one compiler-owned row zero', () => {
     const result = compileOrThrow(new CLOOMCCompiler(), SELF_ALIAS_SOURCE, []);
 
-    assert.deepStrictEqual(capabilityNames(result.capabilities), ['__SELF__', 'Foo', 'Bar']);
+    assert.deepStrictEqual(capabilityNames(result.capabilities), ['SELF', 'Foo', 'Bar']);
     assert.strictEqual(result.capabilities[0].compiler_owned_self, true);
     assertEloadTargets(result, [{ name: 'Foo', selector: 4 }]);
     assert.strictEqual(decodeEloadcall(eloadcallWords(result)[0]).row, 1);
@@ -294,8 +295,8 @@ check('public compile normalizes an uploaded symbolic_self alias', () => {
     ]);
 
     assert.deepStrictEqual(capabilityNames(result.capabilities),
-        ['__SELF__', 'Foo', 'Bar', 'Tail']);
-    assert.strictEqual(result.capabilities[0].symbolic_self, undefined);
+        ['SELF', 'Foo', 'Bar', 'Tail']);
+    assert.strictEqual(result.capabilities[0].symbolic_self, true);
     assert.strictEqual(result.capabilities[0].compiler_owned_self, true);
     assertEloadTargets(result, [
         { name: 'Foo', selector: 4 },
@@ -432,7 +433,7 @@ check('parallel source and uploaded NULL entries deduplicate to one hole', () =>
     const before = JSON.parse(JSON.stringify(uploads));
     const result = compileOrThrow(new CLOOMCCompiler(), source, uploads);
 
-    assert.deepStrictEqual(capabilityNames(result.capabilities), ['__SELF__', 'NULL', 'Foo']);
+    assert.deepStrictEqual(capabilityNames(result.capabilities), ['SELF', 'NULL', 'Foo']);
     assert.strictEqual(result.capabilities.filter(capability =>
         capability && capability.null_row === true).length, 1);
     assertEloadTargets(result, [{ name: 'Foo', selector: 4 }]);

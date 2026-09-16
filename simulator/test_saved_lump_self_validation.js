@@ -159,7 +159,7 @@ console.log('\n--- portable UI save/load ordering ---');
             compilerSelfMeta({ name: 'NotSelf' }), sim);
     } catch (err) { message = String(err.message || err); }
     check('SLV-3: malformed compiler self metadata is rejected clearly',
-        /exact __SELF__ c-list row 0/i.test(message), message);
+        /canonical SELF c-list row 0/i.test(message), message);
 }
 
 {

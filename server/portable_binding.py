@@ -71,7 +71,7 @@ def validate_portable_binding(binding, cc=None):
             raise ValueError("portable_binding dependency must be an object")
         self_row = (raw.get("symbolic_self") is True or
                     raw.get("compiler_owned_self") is True or
-                    str(raw.get("name", "")).upper() == "__SELF__")
+                    str(raw.get("name", "")).upper() in {"SELF", "__SELF__"})
         dep_dot, dep_issue = _name(f"{dot}#{issue}" if self_row else
                                    raw.get("N") or raw.get("universal_name") or
                                    raw.get("identity_string") or raw.get("name"))

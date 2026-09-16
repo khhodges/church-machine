@@ -14,7 +14,7 @@
  */
 (function exposePortableLumpBinding(root) {
     const SCHEMA = 'church.portable-lump-binding/v1';
-    const SELF_SYMBOL = '__SELF__';
+    const SELF_SYMBOL = 'SELF';
     const HEX8 = /^[0-9a-f]{8}$/;
     const HEX64 = /^[0-9a-f]{64}$/;
     const NAME = /^([A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*)#([1-9][0-9]*)$/;
@@ -60,8 +60,9 @@
 
     function descriptor(cap, row, ownerName) {
         cap = cap || {};
+        const capName = String(cap.name || '').toUpperCase();
         const self = cap.symbolic_self === true || cap.compiler_owned_self === true ||
-            String(cap.name || '').toUpperCase() === SELF_SYMBOL;
+            capName === SELF_SYMBOL || capName === '__SELF__';
         const nValue = self ? ownerName :
             (cap.N || cap.universal_name || cap.identity_string || cap.name);
         const n = canonicalName(nValue);
@@ -169,13 +170,13 @@
             ownerRow.N !== owner.name || ownerRow.capability_type !== TYPE_NAMES.inform ||
             ownerRow.rights.length !== 1 || ownerRow.rights[0] !== 'E') {
             return failure('INVALID_SELF',
-                'portable contract requires compiler-owned __SELF__ as Inform E-only relocation row 0', 0);
+                'portable contract requires compiler-owned SELF as Inform E-only relocation row 0', 0);
         }
         if (contract.dependencies.slice(1).some(dep => {
             try { return descriptor(dep, dep.relocation_row, owner.name).symbolic_self; }
             catch (_) { return false; }
         })) {
-            return failure('INVALID_SELF', 'portable contract may contain __SELF__ only at relocation row 0');
+            return failure('INVALID_SELF', 'portable contract may contain SELF only at relocation row 0');
         }
         const relocationRows = new Set();
         for (let index = 0; index < contract.dependencies.length; index++) {

@@ -11429,10 +11429,24 @@ def save_lump():
     # slot and sequence only exist in the installation transaction, which mints
     # the live self E-GT.  Legacy and architectural binaries keep their existing
     # explicit contracts.
+    _self_record = (
+        _declared_caps_raw[0]
+        if _has_declared_caps and isinstance(_declared_caps_raw[0], dict)
+        else {}
+    )
+    _self_name = str(_self_record.get("name", "")).strip().upper()
     _compiler_self_row = (
         _sl_typ == 0 and _has_declared_caps and
-        isinstance(_declared_caps_raw[0], dict) and
-        str(_declared_caps_raw[0].get("name", "")).strip().upper() == "__SELF__"
+        (
+            _self_name == "__SELF__" or
+            (
+                _self_name == "SELF" and
+                (
+                    _self_record.get("compiler_owned_self") is True or
+                    _self_record.get("symbolic_self") is True
+                )
+            )
+        )
     )
     _SELF_CAPABILITY_PLACEHOLDER = 0xFEED5E1F
     _validated_declared_caps = []
@@ -11820,7 +11834,7 @@ def save_lump():
             if _cap_row == 0:
                 _validated_declared_caps.append({
                     **_cap_obj,
-                    "name": _cap_name or "__SELF__",
+                    "name": _cap_name or "SELF",
                 })
                 continue
 

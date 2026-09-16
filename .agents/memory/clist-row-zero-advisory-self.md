@@ -3,7 +3,7 @@ name: C-list row zero SELF boundary
 description: Compiler admission and inspection policy for a C-list owner's Golden Token.
 ---
 
-`SELF` is a universal, case-insensitive contextual pet name. `SELF`, mixed-case spellings, and the internal `__SELF__` spelling all resolve to the current abstraction's Golden Token. Normalize them to exactly one symbolic row-zero owner entry once identity is known. `__SELF__` is internal provenance syntax only; every programmer-facing source, C-list, disassembly, and metadata view must display `SELF`. This is compiler assistance, not shared universal authority.
+`SELF` is a universal, case-insensitive contextual pet name. New compiler output and sealed/public artifact metadata must preserve the canonical spelling `SELF`; compiler ownership belongs in `compiler_owned_self`/`symbolic_self` flags and must never be encoded by renaming sealed metadata. Legacy `__SELF__` artifacts remain readable without rewriting their immutable bytes or approval hashes. Normalize aliases to one symbolic row-zero owner entry only while compiling new output. This is compiler assistance, not shared universal authority.
 
 The compiler must fail closed if the finalized C-list does not establish `SELF` at row zero. It may insert its compiler-owned symbolic SELF row for new high-level source, but it must reject concrete layouts whose first row is another or unnamed capability. Complete assembly compilation must likewise reject an explicit capabilities block that does not begin with SELF. Every compile and recompile must rerun structural and token validation against the newly assembled candidate bytes before publishing candidate-ready state.
 

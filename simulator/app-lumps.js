@@ -2913,12 +2913,7 @@ function _populateLumpApiTab(lump, panelId) {
     html += '<div class="lump-section-title">Embedded JSON Definition</div>';
     if (apiDefinition) {
         html += '<div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:0.35rem;">Read from this LUMP binary (not reconstructed from the sidecar).</div>';
-        const displayDefinition = Object.assign({}, apiDefinition, {
-            capabilities: caps.map((cap, index) => Object.assign({}, cap, {
-                name: _displayLumpCapabilityName(cap, index)
-            }))
-        });
-        html += `<pre class="lump-api-json">${e(JSON.stringify(displayDefinition, null, 2))}</pre>`;
+        html += `<pre class="lump-api-json">${e(JSON.stringify(apiDefinition, null, 2))}</pre>`;
     } else if (lump.token && !lump._apiInspectionComplete) {
         html += '<div style="color:var(--text-secondary);font-style:italic;font-size:0.83rem;padding:0.25rem 0;">Loading the embedded definition…</div>';
     } else {
@@ -9146,17 +9141,17 @@ async function _loadSavedLumpCapabilities(token, wordsPayload) {
         cap.slot = row;
         cap.binary_word = (wordsPayload.words[clistStart + row] || 0) >>> 0;
         if (!cap.name && approvalLabels[row] != null) cap.name = String(approvalLabels[row]);
-        // The embedded API intentionally carries only public capability
-        // declarations, not compiler provenance.  A row-zero __SELF__ name is
-        // therefore the authoritative recoverable marker for a dynamic
-        // compiler-owned row; the binary word itself must still be a concrete
-        // E-GT below (the placeholder remains invalid at final load).
-        if (row === 0 && String(cap.name || '').toUpperCase() === '__SELF__') {
+        // New artifacts preserve the public SELF spelling and carry ownership
+        // in flags. Historical __SELF__ metadata remains readable as-is.
+        if (row === 0 && ['SELF', '__SELF__'].includes(
+                String(cap.name || '').toUpperCase())) {
             cap.compiler_owned_self = true;
+            cap.symbolic_self = true;
         }
         if (row === 0 &&
             cap.binary_word === ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER) {
-            cap.name = '__SELF__';
+            cap.name = cap.name || 'SELF';
+            cap.symbolic_self = true;
             cap.compiler_owned_self = true;
         }
         if (row === 1 &&
@@ -9198,12 +9193,13 @@ function _validateSavedLumpClist(rawWords, header, savedMetadata, simInstance) {
         cap && typeof cap === 'object' && cap.compiler_owned_self === true
     );
     const compilerSelf = savedCaps[0];
+    const compilerSelfName = String(compilerSelf && compilerSelf.name || '').toUpperCase();
     const hasCompilerSelf = !!(compilerSelf &&
         compilerSelf.compiler_owned_self === true &&
-        String(compilerSelf.name || '').toUpperCase() === '__SELF__' &&
+        (compilerSelfName === 'SELF' || compilerSelfName === '__SELF__') &&
         (compilerSelf.slot == null || Number(compilerSelf.slot) === 0));
     if (selfMarkedRows.length > 0 && !hasCompilerSelf) {
-        throw new Error('compiler-owned self capability must be the exact __SELF__ c-list row 0 record');
+        throw new Error('compiler-owned self capability must be the canonical SELF c-list row 0 record');
     }
     if (savedCaps.length !== header.cc) {
         throw new Error(
@@ -9249,7 +9245,7 @@ function _validateSavedLumpClist(rawWords, header, savedMetadata, simInstance) {
                     `compiler-owned self row 0 must be the compiler placeholder or an E-GT for its recorded source Namespace slot; got 0x${selfWord.toString(16).padStart(8, '0')}`
                 );
             }
-            // __SELF__ is identity provenance, never a user-resolved dependency.
+            // Compiler-owned SELF is identity provenance, never a user-resolved dependency.
             // The trusted loader below remints it after the destination slot and
             // Namespace sequence are known.
             capsToValidate = savedCaps.slice(1);
@@ -9409,9 +9405,10 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
             };
         }
         const _savedCaps = _validateSavedLumpClist(rawWords, _runHeader, _savedMetadata, sim);
+        const _savedSelfName = String(_savedCaps[0] && _savedCaps[0].name || '').toUpperCase();
         const _compilerOwnedSelf = !!(_savedCaps[0] &&
             _savedCaps[0].compiler_owned_self === true &&
-            String(_savedCaps[0].name || '').toUpperCase() === '__SELF__');
+            (_savedSelfName === 'SELF' || _savedSelfName === '__SELF__'));
         let _identityContract = _savedMetadata.identityContract || 'dynamic-local';
         const _privateDataRows = _savedCaps.flatMap((cap, row) =>
             cap && cap.role === 'private_data' ? [row] : []);

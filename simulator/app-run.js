@@ -181,8 +181,9 @@ function _materializeRunCapabilities(capabilities, actionLabel) {
     const hasSelf = !!(caps[0] && (
         (typeof CapabilityTokens.isContextualSelf === 'function' &&
             CapabilityTokens.isContextualSelf(caps[0])) ||
-        (typeof caps[0] === 'object' && caps[0].compiler_owned_self === true &&
-            String(caps[0].name || '').toUpperCase() === '__SELF__')
+        (typeof caps[0] === 'object' &&
+            (caps[0].compiler_owned_self === true || caps[0].symbolic_self === true) &&
+            ['SELF', '__SELF__'].includes(String(caps[0].name || '').toUpperCase()))
     ));
     const userCaps = hasSelf ? caps.slice(1) : caps;
     const tokenWords = new Array(caps.length).fill(0);
@@ -210,8 +211,8 @@ function _materializeRunCapabilities(capabilities, actionLabel) {
         errors: [],
         capabilities: [
             ...(hasSelf ? [{
-                name: '__SELF__', rights: ['E'], grants: ['E'], nsIndex: null,
-                compiler_owned_self: true, placeholder: true,
+                name: 'SELF', rights: ['E'], grants: ['E'], nsIndex: null,
+                symbolic_self: true, compiler_owned_self: true, placeholder: true,
                 identity_contract: 'dynamic-local',
                 token: tokenWords[0] >>> 0,
             }] : []),
@@ -16497,7 +16498,8 @@ async function confirmSaveToNamespace() {
                         ? _fallbackProfile : null),
                 compiler_owned_self: !!(_caps[0] &&
                     _caps[0].compiler_owned_self === true &&
-                    String(_caps[0].name || '').toUpperCase() === '__SELF__'),
+                    ['SELF', '__SELF__'].includes(
+                        String(_caps[0].name || '').toUpperCase())),
                 petname: _svPetname,
                 issue_number: _svIssueNumber,
                 grants:       Object.keys(perms).filter(function(p) { return perms[p]; }),

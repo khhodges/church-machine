@@ -1212,7 +1212,8 @@ class CLOOMCCompiler {
                 if (nameOf(caps[i]) === '__SELF__' && !concrete(caps[i])) caps.splice(i, 1);
             }
             caps.unshift({
-                name: '__SELF__', rights: ['E'], grants: ['E'],
+                name: 'SELF', rights: ['E'], grants: ['E'],
+                symbolic_self: true,
                 compiler_owned_self: true, compiler_assisted_self: true, placeholder: true,
             });
         }

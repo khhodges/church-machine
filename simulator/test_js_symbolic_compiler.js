@@ -107,7 +107,7 @@ console.log('\n--- JS-CAP-COMMENT: generated SELF declaration comments ---');
         result.errors.length === 0, errMsg(result));
     check('JS-CAP-COMMENT-b: SELF remains the only declared capability',
         result.capabilities.length === 1 &&
-        result.capabilities[0].name === '__SELF__' &&
+        result.capabilities[0].name === 'SELF' &&
         result.capabilities[0].rights.join('') === 'E',
         JSON.stringify(result.capabilities));
 }
@@ -130,7 +130,7 @@ for (const spelling of ['self', 'SeLf', '__self__']) {
         result.errors.length === 0, errMsg(result));
     check('JS-SELF-' + spelling + ': emits one contextual SELF at row zero',
         result.capabilities.length === 2 &&
-        result.capabilities[0].name === '__SELF__' &&
+        result.capabilities[0].name === 'SELF' &&
         result.capabilities[0].compiler_owned_self === true &&
         result.capabilities[1].name === 'M_BIT_DEV',
         JSON.stringify(result.capabilities));
