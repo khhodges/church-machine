@@ -506,6 +506,20 @@
       "token": "4a000007",
       "bootstrap_t": "4a000007",
       "bootstrap_runtime_gt": 1241513991
+    },
+    "4e91739c8bb39115e78b6a08f808596c29b1f0839b5a8469b01b3a048055e9f8": {
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "save_as_latest": true,
+      "binary_hash": "4e91739c8bb39115e78b6a08f808596c29b1f0839b5a8469b01b3a048055e9f8",
+      "dot_name": "SelfTest",
+      "issue_n": 1,
+      "filename": "SelfTest.1.ddd2582f.lump",
+      "compiled_at": 1789580380.2463787,
+      "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25"
     }
   }
 }

@@ -558,5 +558,28 @@
     "output_profile": 2,
     "capabilities": [],
     "operation_id": "a16f98f229d94655ad0bd8e926ef7a6c"
+  },
+  {
+    "token": "4c35bef2",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.1.ddd2582f.lump",
+    "lump_version": 88,
+    "compiled_at": 1789580380.2463787,
+    "dot_name": "SelfTest",
+    "issue_n": 1,
+    "petname": "",
+    "content_profile": 2,
+    "output_profile": 2,
+    "capabilities": [
+      {
+        "name": "SelfTest",
+        "rights": [
+          "E"
+        ],
+        "grants": [],
+        "nsIndex": 6
+      }
+    ],
+    "operation_id": "0c5bb06d-d3f5-49fc-946f-bfa407a20ea4"
   }
 ]

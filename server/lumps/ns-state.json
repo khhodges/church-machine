@@ -76,9 +76,9 @@
       "limit": "0x007FE",
       "seq": 0,
       "seal": "0xDE54B6EF",
-      "token": "4a000006",
-      "filename": "SelfTest.1.48acae47.lump",
-      "lump_version": 87,
+      "token": "4c35bef2",
+      "filename": "SelfTest.1.ddd2582f.lump",
+      "lump_version": 88,
       "binary_hash": "ce48ae00625861fbb9f7ccec53c5dbf8efe3509afd00af8ea14295b66eca247f",
       "resident": true,
       "ns_slot_policy": "static",
@@ -183,6 +183,6 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1789515145.7833602,
-  "committed_raw_fingerprint": "df961c3ab2703982b08b304977989a95e5eb02a117dc25994f0d4dad23a01177"
+  "generated_at": 1789580380.287775,
+  "committed_raw_fingerprint": "ddebd74b2e149d2c628307881f77fd9bf4f210bfcccfd278bbbcf541c5ae5b21"
 }
