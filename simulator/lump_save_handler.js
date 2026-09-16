@@ -563,6 +563,8 @@ function _lumpSaveRequest(fetchImpl, url, payload, onCommit, recovery) {
                         dataChanged: classification.committed,
                         nextAction: classification.kind === 'lease-wait'
                             ? 'Wait for the active update, message the holder, or work on a copy.'
+                            : classification.safeRetry && resp.revision_conflict === true
+                            ? 'Start a fresh Save so the IDE can reserve the current active revision.'
                             : classification.kind === 'ide'
                             ? 'The IDE must resolve this incident; your source and settings remain preserved.'
                             : 'Correct the identified field, then save again.',

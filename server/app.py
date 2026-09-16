@@ -9165,6 +9165,13 @@ def _active_manifest_entry_for_token(manifest, token):
     )
 
 
+def _reserved_manifest_token(destination_entry, candidate_token):
+    """Bind revision checks to the live destination, not a new candidate hash."""
+    return str(
+        (destination_entry or {}).get("token") or candidate_token or ""
+    ).lower()
+
+
 def _authoritative_lump_library_generation(
         lumps_dir, manifest_path, manifest, *, token8=None, ns_slot=None,
         dependency_slots=()):
@@ -12639,6 +12646,12 @@ def save_lump():
                     "lump_version": (_destination_entry or {}).get("lump_version")
                     if _destination_entry else None,
                 },
+                # A newly compiled candidate may have a content-derived token
+                # that differs from the stable Golden Token already bound to
+                # the Namespace destination. Revision CAS must follow the
+                # destination that was reserved, not the incoming candidate.
+                "reserved_token": _reserved_manifest_token(
+                    _destination_entry, token8),
             }
         return jsonify({
             "plan": plan_id, "plan_id": plan_id, "digest": _binary_hash,
@@ -12725,7 +12738,7 @@ def save_lump():
                 "committed": False, "safe_retry": True,
             }), 409
         _fresh_entry = _active_manifest_entry_for_token(
-            _fresh_manifest, token8)
+            _fresh_manifest, _early_plan.get("reserved_token", token8))
         _fresh_revision = {
             "filename": _fresh_entry.get("filename") if _fresh_entry else None,
             "lump_version": _fresh_entry.get("lump_version") if _fresh_entry else None,

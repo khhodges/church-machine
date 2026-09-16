@@ -16735,7 +16735,7 @@ async function confirmSaveToNamespace() {
                 err.safeRetry === true && err.response &&
                 err.response.revision_conflict === true;
             const body = isSafeRevisionRetry
-                ? `${err.message} No data was changed. Click Save again; the IDE will reserve the current active revision.`
+                ? `${err.response.error} No data was changed. Click Save again; the IDE will reserve the current active revision.`
                 : err.kind === 'transport'
                 ? (err.committed === false
                     ? 'The repository proved no data was committed. Check your connection, then retry Save with this same operation.'

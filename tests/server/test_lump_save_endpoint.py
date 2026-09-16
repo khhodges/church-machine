@@ -188,6 +188,19 @@ def test_active_revision_lookup_ignores_earlier_shared_token_history():
     assert active["lump_version"] == 87
 
 
+def test_revision_reservation_follows_stable_destination_token():
+    destination = {
+        "token": "4A000006",
+        "filename": "SelfTest.87.active.lump",
+        "lump_version": 87,
+    }
+
+    reserved = app_module._reserved_manifest_token(
+        destination, "12bcf988")
+
+    assert reserved == "4a000006"
+
+
 def test_save_persists_exact_binary_and_exact_approval(isolated_lumps):
     words = _words(cw=1, marker=7)
     with app_module.app.test_client() as client:
