@@ -266,7 +266,7 @@ function _lumpSaveFailureClassification(status, response) {
         kind: status >= 500 ? 'server' : (status >= 400 ? 'validation' : 'protocol'),
         committed: resp.committed === true ? true :
             (resp.committed === false ? false : null),
-        safeRetry: false,
+        safeRetry: resp.committed === false && resp.safe_retry === true,
     };
 }
 
@@ -569,6 +569,7 @@ function _lumpSaveRequest(fetchImpl, url, payload, onCommit, recovery) {
                     }));
                 responseError.kind = classification.kind;
                 responseError.committed = classification.committed;
+                responseError.safeRetry = classification.safeRetry;
                 responseError.status = r.status;
                 responseError.response = resp;
                 throw responseError;

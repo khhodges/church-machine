@@ -91,6 +91,31 @@ function jsonResponse(status, value) {
         correctedAttempts.length === 2 &&
         correctedAttempts[0] !== correctedAttempts[1]);
 
+    const revisionConflictPayload = {
+        binary: [0xF8000400, 0],
+        metadata: { operation_id: 'revision-conflict-attempt' },
+    };
+    try {
+        await _lumpSaveRequest(async (_url, options) => options && options.method === 'POST'
+            ? jsonResponse(409, {
+                error: 'the active LUMP revision changed after this save was reserved',
+                revision_conflict: true,
+                committed: false,
+                safe_retry: true,
+            })
+            : jsonResponse(200, {
+                committed: false,
+                response: { error: 'rejected before commit' },
+            }), '/api/lumps/save', revisionConflictPayload);
+        check('safe revision conflict rejects with actionable metadata', false);
+    } catch (error) {
+        check('safe revision conflict rejects with actionable metadata',
+            error.kind === 'validation' &&
+            error.committed === false &&
+            error.safeRetry === true &&
+            error.response.revision_conflict === true);
+    }
+
     // Simulate a reload with a retained unknown-operation journal. Once the
     // startup ledger lookup proves it settled, the logical mapping must be
     // retired so reconstructing the same deliberate save receives a new id.

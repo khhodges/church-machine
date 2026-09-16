@@ -166,6 +166,28 @@ def _approved_payload(client, words, token="7c501001", name="LumpSaveTest",
     }
 
 
+def test_active_revision_lookup_ignores_earlier_shared_token_history():
+    manifest = [
+        {
+            "token": "4A000006",
+            "filename": "SelfTest.84.history.lump",
+            "lump_version": 84,
+            "archived": True,
+        },
+        {
+            "token": "4a000006",
+            "filename": "SelfTest.87.active.lump",
+            "lump_version": 87,
+        },
+    ]
+
+    active = app_module._active_manifest_entry_for_token(
+        manifest, "4a000006")
+
+    assert active["filename"] == "SelfTest.87.active.lump"
+    assert active["lump_version"] == 87
+
+
 def test_save_persists_exact_binary_and_exact_approval(isolated_lumps):
     words = _words(cw=1, marker=7)
     with app_module.app.test_client() as client:

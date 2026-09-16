@@ -16731,7 +16731,12 @@ async function confirmSaveToNamespace() {
                     : (err.kind === 'server'
                         ? 'LUMP Repository Server Failure'
                         : 'LUMP Repository Protocol Failure'));
-            const body = err.kind === 'transport'
+            const isSafeRevisionRetry = err.committed === false &&
+                err.safeRetry === true && err.response &&
+                err.response.revision_conflict === true;
+            const body = isSafeRevisionRetry
+                ? `${err.message} No data was changed. Click Save again; the IDE will reserve the current active revision.`
+                : err.kind === 'transport'
                 ? (err.committed === false
                     ? 'The repository proved no data was committed. Check your connection, then retry Save with this same operation.'
                     : 'The repository could not prove whether data was committed. Reload the LUMP repository before retrying so this operation is reconciled without creating a duplicate revision.')

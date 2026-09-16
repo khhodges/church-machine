@@ -9153,6 +9153,18 @@ def _manifest_entry_identity(entry):
     ).encode("utf-8")).hexdigest()
 
 
+def _active_manifest_entry_for_token(manifest, token):
+    """Return the live manifest row when historical revisions share a token."""
+    token8 = str(token or "").lower()
+    return next(
+        (entry for entry in manifest
+         if isinstance(entry, dict)
+         and entry.get("archived") is not True
+         and str(entry.get("token") or "").lower() == token8),
+        None,
+    )
+
+
 def _authoritative_lump_library_generation(
         lumps_dir, manifest_path, manifest, *, token8=None, ns_slot=None,
         dependency_slots=()):
@@ -12712,11 +12724,8 @@ def save_lump():
                 "error": f"unable to verify reserved LUMP revision: {_fresh_manifest_error}",
                 "committed": False, "safe_retry": True,
             }), 409
-        _fresh_entry = next(
-            (entry for entry in _fresh_manifest
-             if isinstance(entry, dict) and entry.get("token") == token8),
-            None,
-        )
+        _fresh_entry = _active_manifest_entry_for_token(
+            _fresh_manifest, token8)
         _fresh_revision = {
             "filename": _fresh_entry.get("filename") if _fresh_entry else None,
             "lump_version": _fresh_entry.get("lump_version") if _fresh_entry else None,
