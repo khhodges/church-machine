@@ -10677,7 +10677,9 @@ def get_lump(token_hex):
         return jsonify({"error": str(exc)}), 409
     _located_rows = [
         row for row in _raw_manifest
-        if isinstance(row, dict) and row.get("token") == key8
+        if isinstance(row, dict)
+        and row.get("archived") is not True
+        and row.get("token") == key8
     ]
     if len(_located_rows) > 1:
         return jsonify({"error": f"Duplicate manifest token {key8}"}), 409
@@ -10692,6 +10694,9 @@ def get_lump(token_hex):
             return jsonify({"error": f"Lump integrity failure: {exc}"}), 409
         source = "manifest"
     else:
+        archived_only = _namespace_selected_archived_lump(key8, _raw_manifest)
+        if archived_only is not None:
+            return jsonify(archived_only), 409
         data = LAZY_LUMPS.get(key) or LAZY_LUMPS.get(key8)
 
     if data is None:
@@ -10703,6 +10708,9 @@ def get_lump(token_hex):
         else:
             github_hint = '' if (GITHUB_TOKEN and GITHUB_LIBRARY_REPO) else \
                           ' (GitHub not configured — Mum Tunnel Library unavailable)'
+            archived_only = _namespace_selected_archived_lump(key8, _raw_manifest)
+            if archived_only is not None:
+                return jsonify(archived_only), 409
             return jsonify({"error": f"Unknown lump token 0x{key8}{github_hint}"}), 404
 
     # ── Canonical resolution — fail-closed for canonical manifest entries ──
@@ -12422,6 +12430,7 @@ def save_lump():
             }), 409
 
     _existing_entry = next((e for e in manifest if e.get('token') == token8), None)
+    _expected_active_entry = _existing_entry
     _exist_filename = (_existing_entry or {}).get('filename', f'{token8}.lump')
     _existing_lump  = os.path.join(lumps_dir, _exist_filename)
     _existing_sc    = None
@@ -12455,6 +12464,20 @@ def save_lump():
                 dict(_destination_manifest)
                 if _destination_manifest is not None else _destination_state
             )
+            # Recovery from an archived-only Namespace selection replaces the
+            # selected destination, but its manifest CAS must expect no active
+            # row.  The Namespace fingerprint and selected row are revalidated
+            # separately under the save guard before this transition commits.
+            if _destination_manifest is None:
+                _selected_archived_rows = [
+                    entry for entry in manifest
+                    if isinstance(entry, dict)
+                    and entry.get("archived") is True
+                    and str(entry.get("token") or "").lower() == _destination_token
+                    and entry.get("filename") == _destination_state.get("filename")
+                ]
+                if len(_selected_archived_rows) == 1:
+                    _expected_active_entry = None
     # Replacement history follows the Namespace destination even when the
     # freshly compiled content has a different token. Otherwise the old active
     # row is neither archived nor removed from the manifest.
@@ -12706,10 +12729,10 @@ def save_lump():
                 "lease_owner": lease["owner_key"],
                 "lease": _lump_lease_public(lease),
                 "reserved_revision": {
-                    "filename": (_destination_entry or {}).get("filename")
-                    if _destination_entry else None,
-                    "lump_version": (_destination_entry or {}).get("lump_version")
-                    if _destination_entry else None,
+                    "filename": (_expected_active_entry or {}).get("filename")
+                    if _expected_active_entry else None,
+                    "lump_version": (_expected_active_entry or {}).get("lump_version")
+                    if _expected_active_entry else None,
                 },
                 # A newly compiled candidate may have a content-derived token
                 # that differs from the stable Golden Token already bound to
@@ -13130,7 +13153,7 @@ def save_lump():
             compat_new_filename=lump_filename,
             variant_group=f"compiled_{abs_name.lower().replace(' ', '_')}",
             ns_slot=ns_slot,
-            expected_manifest_entry=_destination_entry,
+            expected_manifest_entry=_expected_active_entry,
             additional_json_builder=_save_additional_json,
             operation_id=(
                 _operation_id
@@ -14157,6 +14180,60 @@ def get_lump_diagnostic_source(token_hex):
     })
 
 
+def _namespace_selected_archived_lump(key8, manifest=None):
+    """Describe one Namespace-selected LUMP whose only manifest row is archived."""
+    try:
+        rows, _ = _read_authoritative_namespace_rows()
+        if manifest is None:
+            manifest = _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json"))
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return None
+    selected = [
+        row for row in rows
+        if isinstance(row, dict)
+        and row.get("archived") is not True
+        and str(row.get("token") or "").lower() == key8
+    ]
+    active = [
+        row for row in manifest
+        if isinstance(row, dict)
+        and row.get("archived") is not True
+        and str(row.get("token") or "").lower() == key8
+    ]
+    if len(selected) != 1 or active:
+        return None
+    namespace_row = selected[0]
+    selected_filename = namespace_row.get("filename")
+    archived = [
+        row for row in manifest
+        if isinstance(row, dict)
+        and row.get("archived") is True
+        and str(row.get("token") or "").lower() == key8
+        and row.get("filename") == selected_filename
+    ]
+    if len(archived) != 1 or not isinstance(selected_filename, str):
+        return None
+    archive = archived[0]
+    return {
+        "error": (
+            f"Namespace slot {namespace_row.get('slot')} selects {selected_filename}, "
+            "but its only manifest record is archived."
+        ),
+        "code": "namespace_selected_archived_lump",
+        "archived_only": True,
+        "token": key8,
+        "ns_slot": namespace_row.get("slot"),
+        "filename": selected_filename,
+        "version": archive.get("lump_version", archive.get("version")),
+        "recovery": {
+            "action": "restore",
+            "label": "Restore archived LUMP as a new active revision",
+            "archive_filename": selected_filename,
+        },
+        "committed": False,
+    }
+
+
 @app.route("/api/lump/<token_hex>/words")
 def get_lump_words(token_hex):
     """Return the raw uint32 word array of a saved lump as JSON."""
@@ -14315,8 +14392,14 @@ def get_lump_words(token_hex):
         except ValueError:
             pass
         if lump_path is None:
+            archived_only = _namespace_selected_archived_lump(key8, manifest)
+            if archived_only is not None:
+                return jsonify(archived_only), 409
             lump_path = _resolve_lump_path(key8, LUMPS_DIR)
     if not lump_path:
+        archived_only = _namespace_selected_archived_lump(key8)
+        if archived_only is not None:
+            return jsonify(archived_only), 409
         return jsonify({"error": f"Unknown lump 0x{key8}"}), 404
     validation_errors = []
     raw_tail_hex = ""
@@ -14418,7 +14501,8 @@ def get_lump_words(token_hex):
             manifest_entry.get("archived") and not bootstrap_identity["valid"])
     if _approval_ret is not None:
         for field in (
-            "pet_name", "dot_name", "issue_n", "identity_hash",
+            "abstraction", "language", "ns_slot", "grants", "capability_type",
+            "pet_name", "petname", "dot_name", "issue_n", "identity_hash",
             "bootstrap_t", "bootstrap_runtime_gt",
         ):
             if field in _approval_ret:

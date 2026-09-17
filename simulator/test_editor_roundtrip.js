@@ -571,6 +571,11 @@ console.log('\n--- T-ER09: orphaned saved-LUMP owner cleanup ---');
         eval('(' + extractFunction(appLumpsSrc, '_clearOrphanedSavedLumpOwner') + ')');
     const _reconcileMissingRestoredLumpOwner =
         eval('(' + extractFunction(appLumpsSrc, '_reconcileMissingRestoredLumpOwner') + ')');
+    check('T-ER09 setup: archived-only recovery uses the approved save flow',
+        appLumpsSrc.includes('async function _offerArchivedOnlyLumpRecovery') &&
+        appLumpsSrc.includes("Restore archived LUMP as a new active revision") &&
+        appLumpsSrc.includes("_confirmLumpSavePlan(wordsData.words, metadata") &&
+        appLumpsSrc.includes("_lumpSaveRequest(fetch, '/api/lumps/save'"));
     const token = '14af977b';
     const documentKey = 'church_editor_document_v1';
     const draftKey = 'cm_lump_draft_v2_' + token;
@@ -634,6 +639,29 @@ console.log('\n--- T-ER09: orphaned saved-LUMP owner cleanup ---');
     const cleanedAgain = await _reconcileMissingRestoredLumpOwner(token, editor);
     check('T-ER09g: subsequent reload is idempotent and does not repeat notice',
         cleanedAgain === false && notices === 1);
+
+    installOwner();
+    window._editorOpenLumpToken = token;
+    let offered = null;
+    global._offerArchivedOnlyLumpRecovery = async function(t, diagnostic) {
+        offered = { t, diagnostic };
+    };
+    global.fetch = async function() {
+        return {
+            status: 409,
+            json: async function() {
+                return {
+                    code: 'namespace_selected_archived_lump',
+                    ns_slot: 7,
+                    filename: 'History_v4.lump'
+                };
+            }
+        };
+    };
+    cleaned = await _reconcileMissingRestoredLumpOwner(token, editor);
+    check('T-ER09h: archived-only diagnosis preserves ownership and offers recovery',
+        cleaned === false && !!stored[documentKey] && offered &&
+        offered.t === token && offered.diagnostic.ns_slot === 7);
 
     // ── Summary ───────────────────────────────────────────────────────────────
     console.log('\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550');

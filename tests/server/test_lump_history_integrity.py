@@ -50,6 +50,7 @@ def test_restored_catalog_history_is_exact_and_read_only(
     monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
     monkeypatch.setattr(app_module, "_LUMPS_DIR", str(tmp_path))
     monkeypatch.setattr(app_module, "NS_STATE_PATH", str(tmp_path / "ns-state.json"))
+    monkeypatch.setitem(app_module.LAZY_LUMPS, token, raw)
     # Read-side Namespace validation takes the normal coordination lock.
     (tmp_path / ".namespace-commit.lock").touch()
     before = {p.name: p.read_bytes() for p in tmp_path.iterdir()}
@@ -94,6 +95,115 @@ def _approve(root, raw):
         "version": 1, "algorithm": "sha256",
         "approvals": {digest: {"binary_hash": digest, "abstraction": "History"}},
     }))
+
+
+def test_token_lookup_diagnoses_namespace_selected_archived_only(
+    tmp_path, monkeypatch
+):
+    token = "aabbccdd"
+    filename = "History_v4.lump"
+    raw = _binary()
+    (tmp_path / filename).write_bytes(raw)
+    (tmp_path / "manifest.json").write_text(json.dumps([{
+        "token": token, "abstraction": "History", "filename": filename,
+        "lump_version": 4, "archived": True,
+    }]))
+    (tmp_path / "ns-state.json").write_text(json.dumps({"abstractions": [
+        {"name": "Boot.NS", "slot": 0, "boot": True},
+        {"name": "History", "slot": 7, "token": token, "filename": filename},
+    ]}))
+    _approve(tmp_path, raw)
+    monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
+    monkeypatch.setattr(app_module, "_LUMPS_DIR", str(tmp_path))
+    monkeypatch.setattr(app_module, "NS_STATE_PATH", str(tmp_path / "ns-state.json"))
+
+    with app_module.app.test_client() as client:
+        raw_missing = client.get(f"/api/lump/{token}")
+        missing = client.get(f"/api/lump/{token}/words")
+        archive = client.get(
+            f"/api/lump/{token}/words",
+            query_string={"archive_filename": filename},
+        )
+
+    assert raw_missing.status_code == 409
+    assert raw_missing.get_json()["code"] == "namespace_selected_archived_lump"
+    assert missing.status_code == 409
+    assert missing.get_json() == {
+        "error": f"Namespace slot 7 selects {filename}, but its only manifest record is archived.",
+        "code": "namespace_selected_archived_lump",
+        "archived_only": True,
+        "token": token,
+        "ns_slot": 7,
+        "filename": filename,
+        "version": 4,
+        "recovery": {
+            "action": "restore",
+            "label": "Restore archived LUMP as a new active revision",
+            "archive_filename": filename,
+        },
+        "committed": False,
+    }
+    assert archive.status_code == 200
+    assert archive.get_json()["words"] == list(struct.unpack(">64I", raw))
+
+
+def test_archived_only_recovery_creates_new_active_revision(
+    tmp_path, monkeypatch
+):
+    token = "00000700"
+    filename = "History_v4.lump"
+    raw = _binary()
+    (tmp_path / filename).write_bytes(raw)
+    (tmp_path / "manifest.json").write_text(json.dumps([{
+        "token": token, "abstraction": "History", "filename": filename,
+        "lump_version": 4, "archived": True,
+    }]))
+    (tmp_path / "ns-state.json").write_text(json.dumps({"abstractions": [
+        {"name": "Boot.NS", "slot": 0, "boot": True},
+        {"name": "History", "slot": 7, "seq": 0, "token": token,
+         "filename": filename, "lump_version": 4, "resident": True},
+    ]}))
+    _approve(tmp_path, raw)
+    monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
+    monkeypatch.setattr(app_module, "_LUMPS_DIR", str(tmp_path))
+    monkeypatch.setattr(app_module, "LUMPS_MANIFEST_PATH", str(tmp_path / "manifest.json"))
+    monkeypatch.setattr(app_module, "NS_STATE_PATH", str(tmp_path / "ns-state.json"))
+    monkeypatch.setattr(app_module, "BOOT_IMAGE_PATH", str(tmp_path / "absent-boot.bin"))
+
+    candidate = {
+        "binary": list(struct.unpack(">64I", raw)),
+        "metadata": {
+            "token": token, "abstraction": "History", "content_type": "code",
+            "language": "assembly", "ns_slot": 7, "capabilities": [],
+            "methods": [], "grants": ["E"], "issue_number": 1,
+        },
+    }
+    with app_module.app.test_client() as client:
+        plan_response = client.post("/api/lumps/save-plan", json=candidate)
+        assert plan_response.status_code == 201, plan_response.get_data(as_text=True)
+        plan = plan_response.get_json()
+        intent_response = client.post("/api/lumps/approval-intent", json={
+            "digest": plan["digest"], "action": plan["action"],
+            "plan_id": plan["plan_id"], "confirmation": True,
+            "approval": {"grants": ["E"], "capability_type": "inform"},
+        })
+        assert intent_response.status_code == 201
+        candidate["binary"] = plan["final_binary"]
+        candidate["metadata"].update({
+            "save_plan_id": plan["plan_id"],
+            "approval_intent": intent_response.get_json()["intent"],
+        })
+        saved_response = client.post("/api/lumps/save", json=candidate)
+
+    assert saved_response.status_code == 200, saved_response.get_data(as_text=True)
+    saved = saved_response.get_json()
+    manifest = json.loads((tmp_path / "manifest.json").read_text())
+    active, = [row for row in manifest if row.get("archived") is not True]
+    assert active["filename"] == saved["filename"]
+    assert active["lump_version"] > 4
+    assert (tmp_path / filename).read_bytes() == raw
+    archived, = [row for row in manifest if row.get("filename") == filename]
+    assert archived["archived"] is True
 
 
 def test_snapshot_is_inspectable_without_approval(tmp_path):

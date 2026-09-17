@@ -4240,6 +4240,22 @@ async function _reconcileMissingRestoredLumpOwner(token, editor) {
     if (!_isRestoredSavedLumpOwner(token)) return false;
     try {
         var response = await fetch('/api/lump/' + token + '/words', { cache: 'no-store' });
+        if (response.status === 409) {
+            var diagnostic = null;
+            try { diagnostic = await response.json(); } catch (_) {}
+            if (diagnostic && diagnostic.code === 'namespace_selected_archived_lump') {
+                try {
+                    await _offerArchivedOnlyLumpRecovery(token, diagnostic);
+                } catch (error) {
+                    alert(/\bNo data was changed\b/.test(error.message) ? error.message :
+                        _formatActionableNetworkError('Restore the archived live LUMP', error, {
+                            dataChanged: null,
+                            nextAction: 'Reload the IDE and retry the archived-LUMP recovery.',
+                        }));
+                }
+                return false;
+            }
+        }
         if (response.status === 404 || response.status === 410) {
             return _clearOrphanedSavedLumpOwner(token, editor);
         }
@@ -4249,6 +4265,57 @@ async function _reconcileMissingRestoredLumpOwner(token, editor) {
     return false;
 }
 window._reconcileMissingRestoredLumpOwner = _reconcileMissingRestoredLumpOwner;
+
+async function _offerArchivedOnlyLumpRecovery(token, diagnostic) {
+    const slot = diagnostic.ns_slot;
+    const filename = diagnostic.filename;
+    const version = diagnostic.version;
+    const message =
+        `Namespace slot ${slot} selects ${filename}, but that exact approved LUMP is archived.\n\n` +
+        'Restore it as a new active revision? Historical evidence will remain unchanged.';
+    if (!confirm(message)) {
+        if (typeof _showFpgaToast === 'function') {
+            _showFpgaToast(
+                'Archived live LUMP needs recovery',
+                `NS[${slot}] — ${filename}. Use Restore archived LUMP as a new active revision when ready.`,
+                'warning', 9000);
+        }
+        return false;
+    }
+    const archiveUrl = `/api/lump/${encodeURIComponent(token)}/words?archive_filename=${encodeURIComponent(filename)}`;
+    const wordsResp = await fetch(archiveUrl, { cache: 'no-store' });
+    if (!wordsResp.ok) throw await _actionableResponseError(
+        wordsResp, 'Load the archived LUMP for recovery', {
+            dataChanged: false,
+            nextAction: 'Reload the IDE and retry the archived-LUMP recovery.',
+        });
+    const wordsData = await wordsResp.json();
+    const inspection = _lumpBinaryInspection(wordsData);
+    if (!inspection || !Array.isArray(wordsData.words) || !wordsData.words.length) {
+        throw new Error('The archived LUMP could not be validated. No data was changed.');
+    }
+    const metadata = Object.assign(
+        { approval_confirmed: true, ns_slot: slot },
+        _hashBoundLumpApproval(wordsData, inspection.binary_hash));
+    const approval = await _confirmLumpSavePlan(wordsData.words, metadata, () =>
+        `Restore ${filename}${version != null ? ` (v${version})` : ''} to NS[${slot}]?\n\n` +
+        'A fresh active revision will be created. The archived record and bytes will not be edited.');
+    if (!approval || approval.status !== 'approved') return false;
+    metadata.approval_intent = approval.intent.intent;
+    metadata.save_plan_id = approval.plan.plan_id;
+    await _lumpSaveRequest(fetch, '/api/lumps/save', {
+        binary: approval.final_binary.slice(), metadata,
+    });
+    if (typeof renderLumps === 'function') await renderLumps();
+    if (typeof _showFpgaToast === 'function') {
+        _showFpgaToast(
+            'Archived LUMP restored',
+            `A fresh active revision now serves NS[${slot}]. ${filename} remains immutable history.`,
+            'ok', 7000);
+    }
+    return true;
+}
+window._offerArchivedOnlyLumpRecovery = _offerArchivedOnlyLumpRecovery;
 
 function _commitSavedLumpClientState(resp, fallback, draftToken) {
     if (!resp || !resp.token) throw new Error('Saved LUMP response has no token');
