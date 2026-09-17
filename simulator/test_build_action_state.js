@@ -73,9 +73,9 @@ if (!state.eligibility('run').ok) {
     throw new Error('auto-detected CLOOMC candidate was stale against the final editor language');
 }
 editor.value = 'broken source';
-if (state.eligibility('run').ok ||
-        !/changed after this candidate/.test(state.eligibility('run').reason)) {
-    throw new Error('Run did not reject a stale candidate explicitly');
+if (!state.eligibility('run').ok ||
+        !/keep the current simulator program/.test(state.eligibility('run').reason)) {
+    throw new Error('Run did not preserve access to the current simulator program');
 }
 if (!state.eligibility('save').ok ||
         !/Build and Save/.test(state.eligibility('save').reason)) {

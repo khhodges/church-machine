@@ -89,12 +89,16 @@
                 return { ok: true, reason: '' };
             }
             if (candidate && !fresh) {
-                return hasInstalledProgram()
-                    ? { ok: true, reason: 'The editor changed after this candidate was built; Run will keep the installed program.' }
-                    : { ok: false, reason: 'The editor changed after this candidate was built. Compile the current source before installing it.' };
+                return {
+                    ok: true,
+                    reason: 'The editor changed after this candidate was built; Run will keep the current simulator program.'
+                };
             }
-            if (candidate || hasInstalledProgram()) return { ok: true, reason: '' };
-            return { ok: false, reason: 'Build a candidate before Run. Run never compiles implicitly.' };
+            // Step and Walk can execute the current simulator/boot state
+            // without first compiling the editor. Run must offer the same
+            // operation. A fresh candidate is installed below; otherwise Run
+            // simply continues the current simulator program.
+            return { ok: true, reason: '' };
         }
         if (action === 'save' || action === 'export') {
             if (fresh) return { ok: true, reason: '' };

@@ -156,3 +156,4 @@
 - [Boot freshness requires admissible identity](boot-freshness-admissible-identity.md) — identity-invalid compilations are failed evidence, never “latest successful” boot candidates
 - [Bootstrap repair publication](bootstrap-repair-publication.md) — recovered source must retain server-issued bootstrap context; corrected publication supersedes active rows sharing its filename
 - [Live LUMP manifest uniqueness](live-lump-manifest-uniqueness.md) — publication retires conflicting live token/destination rows atomically while preserving immutable history
+- [Simulator Run availability](simulator-run-availability.md) — Run stays available like Step/Walk; install a fresh candidate when present, otherwise execute the current simulator program
