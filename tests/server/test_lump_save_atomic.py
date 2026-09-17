@@ -170,6 +170,53 @@ def test_transition_reconciles_duplicate_live_token_rows_without_deleting_histor
     } in manifest
 
 
+def test_namespace_publication_clears_stale_archived_flag_and_preserves_history(repo):
+    new = _binary(4)
+    digest, approval = _approval(new)
+    history = {
+        "token": "a70f0001", "filename": "Atomic.Example_v1.lump",
+        "abstraction": "Atomic.Example", "lump_version": 1,
+        "archived": True,
+    }
+    (repo / "Atomic.Example_v1.lump").write_bytes(_binary(1))
+    (repo / "manifest.json").write_text(json.dumps([history]))
+    ns_path = repo / "ns-state.json"
+
+    def namespace_document(final_entry):
+        return {str(ns_path): {
+            "abstractions": [{
+                "slot": 7,
+                "filename": final_entry["filename"],
+                "binary_hash": digest,
+            }],
+        }}
+
+    with patch.object(app_module, "NS_STATE_PATH", str(ns_path)):
+        app_module._commit_lump_history_transition(
+            lumps_dir=str(repo), manifest_path=str(repo / "manifest.json"),
+            token8="a70f0001",
+            manifest_entry={
+                "token": "a70f0001", "filename": "candidate.lump",
+                "abstraction": "Atomic.Example", "lump_version": 2,
+                "binary_hash": digest, "archived": True,
+            },
+            binary_filename="candidate.lump", binary_bytes=new,
+            approval_hash=digest, approval=approval,
+            additional_json_builder=namespace_document,
+        )
+
+    manifest = json.loads((repo / "manifest.json").read_text())
+    assert history in manifest
+    live = [
+        row for row in manifest
+        if row.get("filename") == "candidate.lump"
+    ]
+    assert len(live) == 1
+    assert live[0].get("archived") is not True
+    namespace = json.loads(ns_path.read_text())
+    assert namespace["abstractions"][0]["filename"] == "candidate.lump"
+
+
 def test_transition_retires_live_row_that_collides_with_published_destination(repo):
     old = _binary(3)
     new = _binary(4)

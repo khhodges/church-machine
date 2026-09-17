@@ -39,6 +39,8 @@ R25b Every git-tracked archive .lump file (<token>-vN.lump, <Name>_vN.lump) with
      manifest-coverage requirement (R25), but a committed archive that was once
      a current binary deserves review before any cleanup sweep removes it.
      (Warning only — does not block CI.)
+R26  Every Namespace-selected filename and binary hash identifies exactly one
+     active manifest row. Historical rows may share its token, but remain archived.
 
 Failure messages are written to be self-diagnosing: they state what was found,
 what was expected, and which file to correct.
@@ -274,6 +276,48 @@ def _represented_binary_hashes() -> set:
 
 
 REPRESENTED_BINARY_HASHES = _represented_binary_hashes()
+
+
+def test_live_namespace_lumps_have_active_manifest_rows():
+    """R26: a live Namespace selector must never resolve only to history."""
+    with open(os.path.join(LUMPS_DIR, "ns-state.json"), encoding="utf-8") as source:
+        namespace = json.load(source)
+    failures = []
+    for row in namespace.get("abstractions", []):
+        if not isinstance(row, dict):
+            continue
+        filename = row.get("filename")
+        binary_hash = row.get("binary_hash")
+        if not filename or not binary_hash:
+            continue
+        matches = [
+            entry for entry in MANIFEST
+            if isinstance(entry, dict)
+            and entry.get("filename") == filename
+        ]
+        path = os.path.join(LUMPS_DIR, filename)
+        file_hash_matches = (
+            os.path.isfile(path) and _binary_sha256(path) == binary_hash
+        )
+        active = [
+            entry for entry in matches
+            if entry.get("archived") is not True
+            and entry.get("binary_hash", binary_hash) == binary_hash
+        ]
+        if len(active) != 1 or not file_hash_matches:
+            statuses = [
+                "archived" if entry.get("archived") is True else "active"
+                for entry in matches
+            ]
+            failures.append(
+                f"NS[{row.get('slot')}] {filename} ({binary_hash}) has "
+                f"{len(active)} active matching manifest rows; "
+                f"file_hash_matches={file_hash_matches}; matches={statuses}"
+            )
+    assert not failures, (
+        "Live Namespace LUMPs must have exactly one active filename/hash manifest "
+        "row. Historical token aliases may remain archived:\n  " + "\n  ".join(failures)
+    )
 
 
 def _is_represented_binary(path: str, represented_hashes: set) -> bool:

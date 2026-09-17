@@ -24041,6 +24041,11 @@ def _commit_lump_history_transition(
     """
     if not isinstance(manifest_entry, dict):
         raise ValueError("manifest_entry must be an object")
+    # The row supplied here is the newly-published current revision.  Archived
+    # rows are created below from displaced live rows; a stale caller copy must
+    # never make the Namespace-selected replacement historical.
+    manifest_entry = dict(manifest_entry)
+    manifest_entry.pop("archived", None)
     os.makedirs(lumps_dir, exist_ok=True)
 
     with _lump_history_transition_lock(lumps_dir):
@@ -24334,17 +24339,46 @@ def _commit_lump_history_transition(
                 else:
                     updated_manifest.append(entry)
             updated_manifest.append(dict(manifest_entry))
-            manifest_stage = _stage_json(updated_manifest)
-            staged.append((_destination(os.path.basename(manifest_path)), manifest_stage))
             if additional_json_builder is not None:
                 additional_json = additional_json_builder(dict(manifest_entry))
                 if not isinstance(additional_json, dict):
                     raise ValueError("additional_json_builder must return a mapping")
+                namespace_document = additional_json.get(NS_STATE_PATH)
+                if namespace_document is not None:
+                    namespace_rows = namespace_document.get("abstractions")
+                    if not isinstance(namespace_rows, list):
+                        raise ValueError("Namespace transition has no abstractions array")
+                    for namespace_row in namespace_rows:
+                        if not isinstance(namespace_row, dict):
+                            continue
+                        selected_filename = namespace_row.get("filename")
+                        selected_hash = namespace_row.get("binary_hash")
+                        if not selected_filename or not selected_hash:
+                            continue
+                        if (selected_filename == manifest_entry.get("filename")
+                                and approval_hash is not None
+                                and selected_hash != approval_hash):
+                            raise ValueError(
+                                "Namespace-selected LUMP hash does not match "
+                                f"the approved publication: {selected_filename}")
+                        active_matches = [
+                            row for row in updated_manifest
+                            if isinstance(row, dict)
+                            and row.get("archived") is not True
+                            and row.get("filename") == selected_filename
+                            and row.get("binary_hash", selected_hash) == selected_hash
+                        ]
+                        if len(active_matches) != 1:
+                            raise ValueError(
+                                "Namespace-selected LUMP must have exactly one "
+                                f"active manifest row: {selected_filename}")
                 for destination, document in additional_json.items():
                     destination = os.path.abspath(destination)
                     if not destination.startswith(os.path.abspath(lumps_dir) + os.sep):
                         raise ValueError("additional JSON destination is outside lumps_dir")
                     staged.append((destination, _stage_json(document)))
+            manifest_stage = _stage_json(updated_manifest)
+            staged.append((_destination(os.path.basename(manifest_path)), manifest_stage))
 
             # A compatibility alias is installed only after the new canonical
             # pair has been staged.  It is included in the same rollback set.
