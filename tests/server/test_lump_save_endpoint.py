@@ -669,6 +669,33 @@ def test_unresolved_self_placeholder_cannot_hide_in_non_self_row(
     assert not list(isolated_lumps.glob("*.lump"))
 
 
+def test_existing_gt_permissions_cannot_be_changed_by_save_metadata(
+        isolated_lumps):
+    words = _words(cw=1, cc=2, marker=0)
+    words[-2] = 0x4A000007
+    words[-1] = 0x4A000003
+    with app_module.app.test_client() as client:
+        response = client.post("/api/lumps/save-plan", json={
+            "binary": words,
+            "metadata": {
+                "token": "7c501086",
+                "abstraction": "ChangedPermission",
+                "content_type": "code",
+                "capabilities": [
+                    {"name": "SELF", "rights": ["E"]},
+                    {"name": "LED_DEV", "rights": ["E"], "nsIndex": 3},
+                ],
+            },
+        })
+
+    assert response.status_code == 422, response.get_data(as_text=True)
+    body = response.get_json()
+    assert body["capability_validation_failed"] is True
+    assert body["clist_row"] == 1
+    assert "fixed as RW by the GT author" in body["error"]
+    assert not list(isolated_lumps.glob("*.lump"))
+
+
 @pytest.mark.parametrize("submitted_word", [0xFEEDDEAD, 0])
 def test_compiler_self_rejects_noncanonical_intermediate_word(
         isolated_lumps, submitted_word):

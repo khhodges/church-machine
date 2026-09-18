@@ -1060,10 +1060,15 @@
         var slotDetail = lump.ns_slot !== null && lump.ns_slot !== undefined
             ? 'NS[' + lump.ns_slot + ']'
             : 'symbolic · not allocated';
-        return '<div class="clist-picker-row" data-cap-name="' + name + '" data-cap-rights="E">' +
+        var authoredRights = window.CapabilityTokens &&
+            typeof window.CapabilityTokens.authoredRightsForName === 'function'
+            ? window.CapabilityTokens.authoredRightsForName(rawName, [lump])
+            : null;
+        var rights = Array.isArray(authoredRights) ? authoredRights.join('') : 'E';
+        return '<div class="clist-picker-row" data-cap-name="' + name + '" data-cap-rights="' + rights + '">' +
             '<span class="clist-picker-type clist-picker-type--inform">Inform</span>' +
             '<span class="clist-picker-name">' + name + '</span>' +
-            '<span class="clist-picker-hint">' + slotDetail + ' · E · ' + escHtml(detail) + '</span>' +
+            '<span class="clist-picker-hint">' + slotDetail + ' · ' + rights + ' · fixed by author · ' + escHtml(detail) + '</span>' +
             '</div>';
     }
 

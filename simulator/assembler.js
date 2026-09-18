@@ -805,6 +805,14 @@ class ChurchAssembler {
                 });
             }
             for (const cap of parsed.caps) {
+                if (!cap.null_row && ChurchAssembler._isThreadCapName(cap.name) &&
+                    cap.rights.length > 0) {
+                    this.errors.push({
+                        line: lineNum + 1,
+                        ...this._tokenCols(this._currentLineText, cap.name),
+                        message: `Thread capability "${cap.name}" must have an empty permission field for SWITCH/CHANGE.`
+                    });
+                }
                 if (!cap.null_row && cap.rights.length === 0 &&
                     !ChurchAssembler._isHardwareCapName(cap.name) &&
                     !ChurchAssembler._isThreadCapName(cap.name)) {

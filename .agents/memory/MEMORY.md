@@ -144,3 +144,4 @@
 - [Resident publication bootstrap approval](resident-publication-bootstrap-approval.md) — derive bootstrap metadata from validated fixed bindings and exact SELF bytes, never a browser flag
 - [Callable LUMP method-table prefix](callable-lump-method-table-prefix.md) — any LUMP entered through CALL method N needs canonical dispatch words before its source body
 - [Static path-write guard precision](static-path-write-guard-precision.md) — distinguish write destinations, lexical scope, temp roots, and env-backed fallbacks to avoid unsafe gaps or read-only false positives
+- [Authored GT permissions are immutable](authored-gt-permissions.md) — consumers must preserve an existing GT’s exact authored rights; registry grants are only the maximum envelope

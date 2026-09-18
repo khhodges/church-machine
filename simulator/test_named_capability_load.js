@@ -48,5 +48,12 @@ check('NCL-4: Thread SWITCH/CHANGE declarations require empty permissions',
     !threadResult.errors.some(error => /has no permission letters/.test(error.message)),
     threadResult.errors.map(error => error.message).join(' | '));
 
+const changedThreadResult = new ChurchAssembler().assemble(
+    'capabilities { Boot.Thread E }\nSWITCH CR12, CR6[Boot.Thread]'
+);
+check('NCL-5: a consuming program cannot add a permission to a Thread GT',
+    changedThreadResult.errors.some(error => /must have an empty permission field/.test(error.message)),
+    changedThreadResult.errors.map(error => error.message).join(' | '));
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed) process.exit(1);

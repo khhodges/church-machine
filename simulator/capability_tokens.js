@@ -64,6 +64,53 @@
         return String(a || '').toUpperCase() === String(b || '').toUpperCase();
     }
 
+    function _isThreadName(name) {
+        return /^Boot\.Thread$/i.test(String(name || '')) ||
+            /^Thread[.#]\d+$/i.test(String(name || ''));
+    }
+
+    function _sameRights(left, right) {
+        const a = new Set((left || []).map(value => String(value).toUpperCase()));
+        const b = new Set((right || []).map(value => String(value).toUpperCase()));
+        return a.size === b.size && [...a].every(value => b.has(value));
+    }
+
+    const FIXED_AUTHORED_RIGHTS = Object.freeze({
+        LED_DEV: ['R', 'W'],
+        LED0: ['R', 'W'],
+        LED1: ['R', 'W'],
+        LED2: ['R', 'W'],
+        LED3: ['R', 'W'],
+        LED4: ['R', 'W'],
+        LED5: ['R', 'W'],
+        UART_DEV: ['R', 'W'],
+        UART0: ['R', 'W'],
+        UART_TX: ['W'],
+        UART_RX: ['R'],
+        BTN_DEV: ['R'],
+        BUTTON0: ['R'],
+        TIMER_DEV: ['R', 'W'],
+        TIMER0: ['R', 'W'],
+        DISPLAY0: ['W'],
+        M_BIT_DEV: ['R', 'W'],
+    });
+
+    function authoredRightsForName(name, lumps) {
+        const key = String(name || '').toUpperCase();
+        if (_isThreadName(name)) return [];
+        if (FIXED_AUTHORED_RIGHTS[key]) return FIXED_AUTHORED_RIGHTS[key].slice();
+        const lump = (Array.isArray(lumps) ? lumps : []).find(item =>
+            _sameName(item && (item.abstraction || item.name), name));
+        if (!lump) return null;
+        const authored = lump.authored_rights || lump.permissions || lump.rights || lump.grants;
+        if (!Array.isArray(authored)) return null;
+        try {
+            return normalizeRights({ rights: authored });
+        } catch (_) {
+            return null;
+        }
+    }
+
     function isContextualSelf(cap) {
         const name = _nameOf(cap).toUpperCase();
         return name === 'SELF' || name === '__SELF__' ||
@@ -129,6 +176,7 @@
         const declaredNsIndex = _validTarget(cap && typeof cap === 'object' ? cap.nsIndex : null);
         let nsIndex = null;
         let grants = [];
+        let authoredRights = authoredRightsForName(name, lumps);
         let source = '';
 
         if (!name) {
@@ -179,6 +227,11 @@
                             nsIndex = target;
                             try {
                                 grants = normalizeRights({ grants: deviceCap.grants || [] });
+                                const authored = deviceCap.authored_rights ||
+                                    deviceCap.permissions || deviceCap.rights;
+                                if (Array.isArray(authored)) {
+                                    authoredRights = normalizeRights({ rights: authored });
+                                }
                             } catch (err) {
                                 return {
                                     name, rights, grants: [], nsIndex: target,
@@ -200,6 +253,23 @@
                 if (_sameName(label, name)) {
                     nsIndex = _validTarget(key);
                     source = 'namespace';
+                    if (authoredRights === null && nsIndex !== null) {
+                        let isOutform = false;
+                        try {
+                            const entry = sim.nsTable && sim.nsTable[nsIndex];
+                            const parsed = entry && typeof sim.parseNSWord1 === 'function'
+                                ? sim.parseNSWord1(entry.word1_limit)
+                                : null;
+                            isOutform = !!(parsed && parsed.f === 1);
+                        } catch (_) {
+                            isOutform = false;
+                        }
+                        // Existing Namespace Inform GTs are E capabilities;
+                        // F-bit Outforms are X capabilities. Device and Thread
+                        // names were assigned their more specific authored
+                        // permissions above.
+                        authoredRights = isOutform ? ['X'] : ['E'];
+                    }
                     break;
                 }
             }
@@ -258,6 +328,21 @@
             };
         }
 
+        // Existing Thread GTs are identified by an empty permission field.
+        // Consumers may neither add permissions nor reinterpret them as E-GTs.
+        if (_isThreadName(name)) {
+            if (rights.length > 0) {
+                return {
+                    name, rights, grants: [], nsIndex: nsIndex === null ? -1 : nsIndex, source,
+                    error: `Thread capability "${name}" must keep its authored permission field empty.`,
+                };
+            }
+            return {
+                name, rights: [], grants: [], nsIndex: nsIndex === null ? -1 : nsIndex,
+                source, pending: nsIndex === null, error: null,
+            };
+        }
+
         if (rights.length === 0) {
             return {
                 name, rights, grants, nsIndex: nsIndex === null ? -1 : nsIndex, source,
@@ -272,6 +357,13 @@
             return {
                 name, rights, grants, nsIndex: nsIndex === null ? -1 : nsIndex, source,
                 error: `Capability "${name}" mixes Turing and Church permissions (${rights.join('')}).`,
+            };
+        }
+
+        if (Array.isArray(authoredRights) && !_sameRights(rights, authoredRights)) {
+            return {
+                name, rights, grants, nsIndex: nsIndex === null ? -1 : nsIndex, source,
+                error: `Capability "${name}" requests ${rights.join('') || '(empty)'} but its authored permissions are ${authoredRights.join('') || '(empty)'} and cannot be changed.`,
             };
         }
 
@@ -487,6 +579,7 @@
 
     return {
         normalizeRights,
+        authoredRightsForName,
         rightsToPerms,
         isContextualSelf,
         isCompilerOwnedSelf,

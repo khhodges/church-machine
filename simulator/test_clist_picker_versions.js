@@ -37,6 +37,7 @@ function nextTurn() { return new Promise(resolve => setTimeout(resolve, 0)); }
                         abstractions: [
                             { name: 'Boot.Thread', slot: 1 },
                             { name: 'Thread.2', slot: 11 },
+                            { name: 'LED_DEV', slot: 3 },
                             { name: 'WukongCallHome', slot: 7 },
                             { name: 'SavedName', slot: 21 }
                         ]
@@ -58,6 +59,7 @@ function nextTurn() { return new Promise(resolve => setTimeout(resolve, 0)); }
             },
         };
     };
+    window.eval(fs.readFileSync(path.join(__dirname, 'capability_tokens.js'), 'utf8'));
     window.eval(fs.readFileSync(path.join(__dirname, 'clist-viewer.js'), 'utf8'));
 
     window.CListViewer.show();
@@ -107,6 +109,10 @@ function nextTurn() { return new Promise(resolve => setTimeout(resolve, 0)); }
         threadRows.map(row => row.dataset.capName).join(',') === 'Boot.Thread,Thread.2');
     check('CPV-10b: Thread entries keep the SWITCH/CHANGE permission check empty',
         threadRows.every(row => row.dataset.capRights === ''));
+    const fixedLed = popup.querySelector('.clist-picker-row[data-cap-name="LED_DEV"]');
+    check('CPV-10c: existing GT rows carry their immutable authored permissions',
+        !!fixedLed && fixedLed.dataset.capRights === 'RW' &&
+        fixedLed.textContent.includes('fixed by author'));
 
     window.document.getElementById('asmEditor').value =
         'capabilities {\n    __self__ E,\n    Dynamic.Pet R\n}\nLOAD CR1, Dynamic.Pet';

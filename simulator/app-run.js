@@ -1813,7 +1813,12 @@ function _injectClistNow(capabilitiesOverride, targetSlotOverride = null) {
                     else if (r === 'S') perms.S = 1;
                     else if (r === 'E') perms.E = 1;
                 }
-                if (!perms.R && !perms.W && !perms.X && !perms.L && !perms.S && !perms.E) {
+                const isThreadCapability =
+                    /^Boot\.Thread$/i.test(capName) ||
+                    /^Thread[.#]\d+$/i.test(capName);
+                if (!isThreadCapability &&
+                    !perms.R && !perms.W && !perms.X &&
+                    !perms.L && !perms.S && !perms.E) {
                     perms.E = 1;  // no rights declared → safe Church entry default
                 }
                 sim.writePersistentWord(clistBase + i,
