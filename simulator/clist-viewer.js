@@ -1068,7 +1068,7 @@
         return '<div class="clist-picker-row" data-cap-name="' + name + '" data-cap-rights="' + rights + '">' +
             '<span class="clist-picker-type clist-picker-type--inform">Inform</span>' +
             '<span class="clist-picker-name">' + name + '</span>' +
-            '<span class="clist-picker-hint">' + slotDetail + ' · ' + rights + ' · fixed by author · ' + escHtml(detail) + '</span>' +
+            '<span class="clist-picker-hint">' + slotDetail + ' · current rights ' + rights + ' · ' + escHtml(detail) + '</span>' +
             '</div>';
     }
 

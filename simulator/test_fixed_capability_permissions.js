@@ -26,13 +26,13 @@ const reduced = CapabilityTokens.resolveCapability(
     { name: 'LED_DEV', rights: ['R'] },
     { sim, lumps: [] }
 );
-assert.match(reduced.error, /authored permissions are RW and cannot be changed/);
+assert.strictEqual(reduced.error, null, 'compiler does not enforce runtime M-bit policy');
 
 const expanded = CapabilityTokens.resolveCapability(
     { name: 'LED_DEV', rights: ['R', 'W', 'X'] },
     { sim, lumps: [] }
 );
-assert.match(expanded.error, /authored permissions are RW and cannot be changed/);
+assert.strictEqual(expanded.error, null, 'registry grants do not become a compiler block');
 
 const thread = CapabilityTokens.resolveCapability(
     { name: 'Thread.2', rights: [] },
@@ -44,12 +44,12 @@ const changedThread = CapabilityTokens.resolveCapability(
     { name: 'Thread.2', rights: ['E'] },
     { sim, lumps: [] }
 );
-assert.match(changedThread.error, /permission field empty/);
+assert.strictEqual(changedThread.error, null, 'Thread declarations are not blocked by the compiler');
 
 const changedNamespace = CapabilityTokens.resolveCapability(
     { name: 'ExistingService', rights: ['X'] },
     { sim: { nsLabels: { 7: 'ExistingService' } }, lumps: [] }
 );
-assert.match(changedNamespace.error, /authored permissions are E and cannot be changed/);
+assert.strictEqual(changedNamespace.error, null);
 
-console.log('PASS: existing GT permissions are immutable for consuming programs');
+console.log('PASS: authored permission policy is deferred to the runtime M-bit mechanism');

@@ -1,10 +1,10 @@
 ---
-name: Authored GT permissions are immutable
-description: Distinguishes exact author-owned GT permissions from broader registry grant envelopes.
+name: GT permission enforcement boundary
+description: Records that authored-permission policy belongs to runtime M-bit enforcement, not compilation.
 ---
 
-An existing Golden Token’s permission field is author-owned and must remain exactly unchanged when another program consumes it. A consumer may not broaden or attenuate those permissions. Permissionless Thread GTs are intentionally exact-empty and remain valid for SWITCH/CHANGE.
+Permission changes involving an existing Golden Token are a runtime M-bit concern. The compiler, capability materializer, and server save admission must not reject a program merely because declared permissions differ from known authored permissions. Permissionless Thread GTs remain valid for SWITCH/CHANGE.
 
-**Why:** Registry `grants` can describe a broader maximum envelope than a specific authored token. For example, an `RW` device grant can legitimately contain an authored `W`-only GT, so treating grants as the exact token rights rejects valid programs and loses the author’s decision.
+**Why:** Compile-time rejection applies runtime authority policy at the wrong boundary and prevents valid programs from compiling or being saved. Registry grants can still describe type envelopes and support diagnostics, but they are not a compile-time equality rule.
 
-**How to apply:** Carry or recover the exact authored rights independently of maximum grants. Enforce equality in the picker, compiler/admission path, runtime token validation, and server save boundary. Only a genuinely new symbolic GT author chooses its initial permissions.
+**How to apply:** Keep syntax, permission-domain, target, and token-shape validation at compile/save time. Defer authority enforcement to the runtime M-bit mechanism. Pickers may show sensible existing defaults without making them a compiler prohibition.

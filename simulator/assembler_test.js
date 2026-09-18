@@ -887,6 +887,23 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
     assert('P12k SWITCH disassembly uses pet name with row as comment',
         kNamedText === 'SWITCH  CR12, CR6[SelfTest] ; c-list[0]',
         `selected="${kNamedText}"`);
+    const kThreadAliases = new ChurchAssembler();
+    const kThreadAliasResult = kThreadAliases.assemble([
+        'capabilities { Thread.1, Boot.Thread }',
+        'SWITCH CR12, Thread.1, CR6, #0',
+        'SWITCH CR15, Boot.Thread',
+    ].join('\n'));
+    assert('P12k Thread M-bit annotation does not block SWITCH compilation',
+        kThreadAliases.errors.length === 0,
+        kThreadAliases.errors.map(e => e.message).join('; '));
+    assert('P12k annotated Thread SWITCH preserves the explicit CR6 row encoding',
+        kThreadAliasResult.words[0] === kResult.words[0],
+        `word=0x${(kThreadAliasResult.words[0] >>> 0).toString(16)}`);
+    assert('P12k bare Boot.Thread SWITCH resolves through its declared C-list row',
+        ((kThreadAliasResult.words[1] >>> 19) & 0xF) === 15 &&
+            ((kThreadAliasResult.words[1] >>> 15) & 0xF) === 6 &&
+            (kThreadAliasResult.words[1] & 0x7FFF) === 1,
+        `word=0x${(kThreadAliasResult.words[1] >>> 0).toString(16)}`);
 
     // P12l: TPERM CR15 → error
     const l = new ChurchAssembler();
@@ -10729,9 +10746,8 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
         rawWrongTarget.errors.join('; '));
     const rawWrongPermission = materializeForRun(
         [{ name: 'LED0', rights: ['E'] }], 'Run');
-    assert('CAP-GT-15: raw-assembly Run gate blocks wrong permission domain',
-        !rawWrongPermission.ok && /LED0/.test(rawWrongPermission.errors.join(' ')) &&
-            /requests E/.test(rawWrongPermission.errors.join(' ')),
+    assert('CAP-GT-15: raw-assembly Run defers permission policy to runtime M-bit enforcement',
+        rawWrongPermission.ok,
         rawWrongPermission.errors.join('; '));
 }
 

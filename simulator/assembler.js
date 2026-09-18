@@ -805,14 +805,6 @@ class ChurchAssembler {
                 });
             }
             for (const cap of parsed.caps) {
-                if (!cap.null_row && ChurchAssembler._isThreadCapName(cap.name) &&
-                    cap.rights.length > 0) {
-                    this.errors.push({
-                        line: lineNum + 1,
-                        ...this._tokenCols(this._currentLineText, cap.name),
-                        message: `Thread capability "${cap.name}" must have an empty permission field for SWITCH/CHANGE.`
-                    });
-                }
                 if (!cap.null_row && cap.rights.length === 0 &&
                     !ChurchAssembler._isHardwareCapName(cap.name) &&
                     !ChurchAssembler._isThreadCapName(cap.name)) {
@@ -1907,22 +1899,42 @@ class ChurchAssembler {
                 // SWITCH has two forms:
                 //   SWITCH CR12..CR15, CRs, #row  — isolated C-list LOAD
                 //   SWITCH CR12..CR15, CR6[PetName] — source-level named row
+                //   SWITCH CR12..CR15, PetName — shorthand for CR6[PetName]
+                //   SWITCH CR12..CR15, PetName, CRs, #row — runtime M-bit
+                //     annotation; PetName does not add a hardware operand
                 //   SWITCH CR15, CR15             — guarded Boot placeholder no-op
                 const switchRef = (parts[2] || '').replace(/,/g, '').trim()
                     .match(/^CR(\d+)\[(.+)\]$/i);
                 const namedSwitch = parts.length === 3 && !!switchRef;
-                const directSwitch = parts.length === 3 && !namedSwitch;
-                if (parts.length !== 4 && !directSwitch && !namedSwitch) {
+                const bareName = parts.length === 3
+                    ? this._resolveCListName((parts[2] || '').replace(/,/g, '').trim())
+                    : null;
+                const bareNamedSwitch = parts.length === 3 && !namedSwitch && !!bareName;
+                const annotatedName = parts.length === 5
+                    ? this._resolveCListName((parts[2] || '').replace(/,/g, '').trim())
+                    : null;
+                const annotatedSwitch = parts.length === 5 && !!annotatedName;
+                const directSwitch = parts.length === 3 && !namedSwitch && !bareNamedSwitch;
+                if (parts.length !== 4 && !directSwitch && !namedSwitch &&
+                    !bareNamedSwitch && !annotatedSwitch) {
                     this.errors.push({
                         line: lineNum,
-                        message: 'SWITCH expects SWITCH CR12–CR15, CRsource, #row; SWITCH CR12–CR15, CR6[PetName]; or the guarded Boot form SWITCH CR15, CR15'
+                        message: 'SWITCH expects SWITCH CR12–CR15, CRsource, #row; SWITCH CR12–CR15, PetName; SWITCH CR12–CR15, CR6[PetName]; SWITCH CR12–CR15, PetName, CRsource, #row; or the guarded Boot form SWITCH CR15, CR15'
                     });
                 }
                 crDst = this._parseCR(parts[1], lineNum);
                 if (crDst < 12 || crDst > 15) {
                     this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, 'CR' + crDst), message: `SWITCH: destination CR${crDst} must be an isolated register CR12–CR15` });
                 }
-                crSrc = this._parseCR(namedSwitch ? `CR${switchRef[1]}` : parts[2], lineNum);
+                if (namedSwitch) {
+                    crSrc = this._parseCR(`CR${switchRef[1]}`, lineNum);
+                } else if (bareNamedSwitch) {
+                    crSrc = 6;
+                } else if (annotatedSwitch) {
+                    crSrc = this._parseCR(parts[3], lineNum);
+                } else {
+                    crSrc = this._parseCR(parts[2], lineNum);
+                }
                 if (directSwitch) {
                     if (crSrc !== 15 || crDst !== 15) {
                         this.errors.push({
@@ -1938,13 +1950,17 @@ class ChurchAssembler {
                     const rowToken = switchRef[2].trim();
                     const namedRow = this._resolveCListName(rowToken);
                     switchRow = namedRow ? namedRow.slot : this._parseImm(rowToken, lineNum);
+                } else if (bareNamedSwitch) {
+                    switchRow = bareName.slot;
+                } else if (annotatedSwitch) {
+                    switchRow = this._parseImm(parts[4], lineNum);
                 } else if (!directSwitch) {
                     switchRow = this._parseImm(parts[3], lineNum);
                 }
                 if (!Number.isInteger(switchRow) || switchRow < 0 || switchRow > 0x7FFF) {
                     const rowToken = namedSwitch
                         ? switchRef[2].trim()
-                        : (parts[3] || '').replace(/,/g, '').trim();
+                        : (annotatedSwitch ? parts[4] : parts[3] || '').replace(/,/g, '').trim();
                     this.errors.push({
                         line: lineNum,
                         ...this._tokenCols(this._currentLineText, rowToken),

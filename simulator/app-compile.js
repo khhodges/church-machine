@@ -837,31 +837,7 @@ function _checkCapAccessRights(caps) {
         const rights = (typeof cap === 'string' ? [] : (cap.rights || []));
         const isThread = /^Boot\.Thread$/i.test(name) || /^Thread[.#]\d+$/i.test(name);
         if (isThread) {
-            if (rights.length > 0) {
-                errors.push(`[ACL] ${name}: Thread permissions are authored as empty and cannot be changed`);
-            }
             continue;
-        }
-        const authoredRights = typeof CapabilityTokens !== 'undefined' &&
-            CapabilityTokens &&
-            typeof CapabilityTokens.authoredRightsForName === 'function'
-            ? CapabilityTokens.authoredRightsForName(
-                name,
-                typeof _lumpsCache !== 'undefined' ? _lumpsCache : []
-            )
-            : null;
-        if (Array.isArray(authoredRights)) {
-            const declaredSet = new Set(rights.map(r => r.toUpperCase()));
-            const authoredSet = new Set(authoredRights.map(r => r.toUpperCase()));
-            const exact = declaredSet.size === authoredSet.size &&
-                [...declaredSet].every(right => authoredSet.has(right));
-            if (!exact) {
-                errors.push(
-                    `[ACL] ${name}: permissions are fixed as ` +
-                    `[${authoredRights.join('') || 'empty'}] by the GT author`
-                );
-                continue;
-            }
         }
         if (rights.length === 0) {
             errors.push(`[ACL] ${name}: access rights required — e.g. "${name} RW"`);
@@ -873,8 +849,7 @@ function _checkCapAccessRights(caps) {
             continue;
         }
         // Type check: compare declared rights against an approved entry for this name.
-        if (!Array.isArray(authoredRights) &&
-            typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) {
+        if (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) {
             let knownGrants = null;
             for (const lump of _lumpsCache) {
                 const entry = (lump.capabilities || []).find(c =>

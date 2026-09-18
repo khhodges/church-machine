@@ -669,7 +669,7 @@ def test_unresolved_self_placeholder_cannot_hide_in_non_self_row(
     assert not list(isolated_lumps.glob("*.lump"))
 
 
-def test_existing_gt_permissions_cannot_be_changed_by_save_metadata(
+def test_runtime_m_bit_policy_does_not_block_save_metadata(
         isolated_lumps):
     words = _words(cw=1, cc=2, marker=0)
     words[-2] = 0x4A000007
@@ -688,12 +688,7 @@ def test_existing_gt_permissions_cannot_be_changed_by_save_metadata(
             },
         })
 
-    assert response.status_code == 422, response.get_data(as_text=True)
-    body = response.get_json()
-    assert body["capability_validation_failed"] is True
-    assert body["clist_row"] == 1
-    assert "fixed as RW by the GT author" in body["error"]
-    assert not list(isolated_lumps.glob("*.lump"))
+    assert response.status_code in (200, 201), response.get_data(as_text=True)
 
 
 @pytest.mark.parametrize("submitted_word", [0xFEEDDEAD, 0])

@@ -11843,24 +11843,6 @@ def save_lump():
             }), 422
 
         _right_order = ("R", "W", "X", "L", "S", "E")
-        _fixed_authored_cap_rights = {
-            "LED_DEV": ("R", "W"), "LED0": ("R", "W"),
-            "LED1": ("R", "W"), "LED2": ("R", "W"),
-            "LED3": ("R", "W"), "LED4": ("R", "W"),
-            "LED5": ("R", "W"), "UART_DEV": ("R", "W"),
-            "UART0": ("R", "W"), "UART_TX": ("W",),
-            "UART_RX": ("R",), "BTN_DEV": ("R",),
-            "BUTTON0": ("R",), "TIMER_DEV": ("R", "W"),
-            "TIMER0": ("R", "W"), "DISPLAY0": ("W",),
-            "M_BIT_DEV": ("R", "W"),
-        }
-        _live_cap_rows = []
-        try:
-            if os.path.isfile(NS_STATE_PATH):
-                with open(NS_STATE_PATH, encoding="utf-8") as _cap_state_file:
-                    _live_cap_rows = json.load(_cap_state_file).get("abstractions", [])
-        except (OSError, TypeError, json.JSONDecodeError):
-            _live_cap_rows = []
         for _cap_row, _cap_raw in enumerate(_declared_caps_raw):
             if isinstance(_cap_raw, str):
                 _cap_name = _cap_raw.strip()
@@ -11978,31 +11960,6 @@ def save_lump():
             if _cap_target < 0 or _cap_target > 0xFFFF:
                 return _cap_reject(
                     f"namespace target {_cap_target} is outside the 16-bit NS range."
-                )
-
-            _authored_cap_rights = _fixed_authored_cap_rights.get(
-                _cap_name.upper())
-            if _cap_is_thread:
-                _authored_cap_rights = ()
-            if _authored_cap_rights is None:
-                _live_cap_row = next((
-                    row for row in _live_cap_rows
-                    if isinstance(row, dict)
-                    and row.get("slot") == _cap_target
-                    and str(row.get("name", row.get("abstraction", ""))).upper()
-                        == _cap_name.upper()
-                ), None)
-                if _live_cap_row is not None:
-                    _authored_cap_rights = (
-                        ("X",) if int(_live_cap_row.get("f", 0) or 0) == 1
-                        else ("E",)
-                    )
-            if (_authored_cap_rights is not None
-                    and set(_cap_rights) != set(_authored_cap_rights)):
-                return _cap_reject(
-                    f"permissions are fixed as "
-                    f"{''.join(_authored_cap_rights) or 'empty'} by the GT "
-                    "author and cannot be changed."
                 )
 
             _cap_word = _sl_words[_clist_row0_idx + _cap_row] & 0xFFFFFFFF

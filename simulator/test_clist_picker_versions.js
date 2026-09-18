@@ -110,9 +110,9 @@ function nextTurn() { return new Promise(resolve => setTimeout(resolve, 0)); }
     check('CPV-10b: Thread entries keep the SWITCH/CHANGE permission check empty',
         threadRows.every(row => row.dataset.capRights === ''));
     const fixedLed = popup.querySelector('.clist-picker-row[data-cap-name="LED_DEV"]');
-    check('CPV-10c: existing GT rows carry their immutable authored permissions',
+    check('CPV-10c: existing GT rows use their current permissions as defaults',
         !!fixedLed && fixedLed.dataset.capRights === 'RW' &&
-        fixedLed.textContent.includes('fixed by author'));
+        fixedLed.textContent.includes('current rights RW'));
 
     window.document.getElementById('asmEditor').value =
         'capabilities {\n    __self__ E,\n    Dynamic.Pet R\n}\nLOAD CR1, Dynamic.Pet';

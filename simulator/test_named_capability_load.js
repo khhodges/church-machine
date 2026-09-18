@@ -44,15 +44,15 @@ const threadResult = new ChurchAssembler().assemble(threadSource);
 check('NCL-3: line-separated capabilities do not require commas',
     !threadResult.errors.some(error => /Missing comma/.test(error.message)),
     threadResult.errors.map(error => error.message).join(' | '));
-check('NCL-4: Thread SWITCH/CHANGE declarations require empty permissions',
+check('NCL-4: permissionless Thread SWITCH/CHANGE declarations remain valid',
     !threadResult.errors.some(error => /has no permission letters/.test(error.message)),
     threadResult.errors.map(error => error.message).join(' | '));
 
 const changedThreadResult = new ChurchAssembler().assemble(
     'capabilities { Boot.Thread E }\nSWITCH CR12, CR6[Boot.Thread]'
 );
-check('NCL-5: a consuming program cannot add a permission to a Thread GT',
-    changedThreadResult.errors.some(error => /must have an empty permission field/.test(error.message)),
+check('NCL-5: compiler defers Thread permission policy to runtime M-bit enforcement',
+    !changedThreadResult.errors.some(error => /permission field/.test(error.message)),
     changedThreadResult.errors.map(error => error.message).join(' | '));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
