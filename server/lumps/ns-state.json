@@ -73,9 +73,9 @@
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x01FFD",
+      "limit": "0x007FE",
       "seq": 0,
-      "seal": "0xDD56D6EF",
+      "seal": "0xDE56B6EF",
       "token": "4a000006",
       "filename": "SelfTest.1.d2f81664.lump",
       "issue_n": 1,
@@ -183,5 +183,6 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1789736233.3509135
+  "generated_at": 1789737225.2524464,
+  "committed_raw_fingerprint": "c59a80f90ceb458d53fa215b17d045ae2383ca3f88265e61562731e4e09d38d4"
 }

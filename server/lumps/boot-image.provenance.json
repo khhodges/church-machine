@@ -1,6 +1,6 @@
 {
   "boot_config_sha256": "39a8ae8177fcfca37447482b75584fb794fb2a4d44c19da92af6cf33cbe38687",
-  "image_sha256": "630b7d421dbc51a1ba3e73ba8e3cda435da3365a470b3f9bd42e8c392980ce3f",
+  "image_sha256": "c31840d8030a2d13f429064a57b02d4758a1739b6c5b2fc88bf9db6022a69685",
   "origin": "generated",
   "resident_bindings": [
     {
@@ -39,7 +39,7 @@
   ],
   "source_sha256": {
     "manifest": "2d4c382c846b5bc7bcaec1158c1c993e15f331b66ed4a0c3ea1e467a77481976",
-    "ns_state": "c7d64711f8a7a34508356646b87c8d9a3b30ff3dd474119cb821de78ad3e8336"
+    "ns_state": "3c509b1137ae5242c652b52ea8d587e503d8ee010ea417b2200ba8853f8c4c1e"
   },
   "version": 1
 }

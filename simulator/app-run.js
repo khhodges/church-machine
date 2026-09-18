@@ -947,10 +947,9 @@ function stepSim() {
             updateDashboard();
             return;
         }
-        // Accumulate this step's gate entries into the persistent boot audit trail
-        if (sim.auditLog.length > 0) {
-            _bootAuditAccum.push(...sim.auditLog);
-        }
+        // The audit panel describes the step that just ran. Replace prior-step
+        // entries so advancing B:00 → B:01 → B:02 never leaves stale cards.
+        _bootAuditAccum = sim.auditLog.slice();
         if (con) {
             con.textContent += `\n[boot ${_stepPhaseNum}/3] ${sim.output.split('\n').filter(l => l).pop()}`;
             con.scrollTop = con.scrollHeight;
@@ -2931,10 +2930,9 @@ function slowBoot() {
             const _slowPhaseNum = sim.bootStep + 1;  // capture before _bootStep() — case 6 (COMPLETE) doesn't increment bootStep
             sim.auditLog = [];
             sim._bootStep();
-            // Accumulate this step's gate entries into the persistent boot audit trail
-            if (sim.auditLog.length > 0) {
-                _bootAuditAccum.push(...sim.auditLog);
-            }
+            // Animated boot follows the same current-step-only log contract as
+            // manual Step: each instruction replaces the prior audit cards.
+            _bootAuditAccum = sim.auditLog.slice();
             const con = document.getElementById('editorConsole');
             if (con) {
                 const lastLine = (sim.output || '').split('\n').filter(l => l).pop() || '';
