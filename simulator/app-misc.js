@@ -918,6 +918,24 @@ function initEditorDivider() {
     const rightPanel = panels[1];
     let dragging = false;
 
+    function resizeEditorPanels(clientX) {
+        const rect = layout.getBoundingClientRect();
+        if (!rect.width) return;
+        const leftPct = Math.max(15, Math.min(85, ((clientX - rect.left) / rect.width) * 100));
+        const rightPct = 100 - leftPct;
+
+        // The editor is a three-column CSS grid. Resizing the panel elements
+        // themselves leaves the grid tracks at 1fr/1fr and makes their content
+        // overflow across the divider. Change the tracks so the divider and
+        // both panes move together.
+        layout.style.gridTemplateColumns =
+            `minmax(0, ${leftPct}fr) 10px minmax(0, ${rightPct}fr)`;
+        leftPanel.style.width = '';
+        leftPanel.style.flex = '';
+        rightPanel.style.width = '';
+        rightPanel.style.flex = '';
+    }
+
     divider.addEventListener('mousedown', function(e) {
         e.preventDefault();
         dragging = true;
@@ -928,13 +946,7 @@ function initEditorDivider() {
 
     document.addEventListener('mousemove', function(e) {
         if (!dragging) return;
-        const rect = layout.getBoundingClientRect();
-        const leftPct = Math.max(15, Math.min(85, ((e.clientX - rect.left) / rect.width) * 100));
-        const rightPct = 100 - leftPct;
-        leftPanel.style.flex = 'none';
-        leftPanel.style.width = leftPct + '%';
-        rightPanel.style.flex = 'none';
-        rightPanel.style.width = rightPct + '%';
+        resizeEditorPanels(e.clientX);
     });
 
     document.addEventListener('mouseup', function() {
@@ -954,13 +966,7 @@ function initEditorDivider() {
     document.addEventListener('touchmove', function(e) {
         if (!dragging) return;
         const touch = e.touches[0];
-        const rect = layout.getBoundingClientRect();
-        const leftPct = Math.max(15, Math.min(85, ((touch.clientX - rect.left) / rect.width) * 100));
-        const rightPct = 100 - leftPct;
-        leftPanel.style.flex = 'none';
-        leftPanel.style.width = leftPct + '%';
-        rightPanel.style.flex = 'none';
-        rightPanel.style.width = rightPct + '%';
+        if (touch) resizeEditorPanels(touch.clientX);
     }, { passive: true });
 
     document.addEventListener('touchend', function() {

@@ -1582,7 +1582,7 @@
 
 .editor-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 6px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 10px minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
     flex: 1;
     min-height: 0;
