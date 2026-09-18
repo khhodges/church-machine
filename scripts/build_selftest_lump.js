@@ -77,7 +77,12 @@ const result = new ChurchAssembler().assemble(source);
 if (result.errors.length) die(result.errors.map(e => `line ${e.line}: ${e.message}`).join('\n'));
 
 const cw = result.words.length;
-const cc = 1;
+// SelfTest owns two capability rows:
+//   row 0 — canonical SELF E-GT
+//   row 1 — Next.GT, localized by boot_image.py to the LightningBolt target
+// The final handoff executes LOAD CR0, CR6[1] followed by CALL CR0, so emitting
+// only row 0 creates an artifact that necessarily faults at the handoff.
+const cc = 2;
 const content = frame(source);
 const needed = 1 + cw + content.length + cc;
 let lumpSize = 64;
@@ -97,6 +102,7 @@ words[0] = header;
 result.words.forEach((word, i) => { words[1 + i] = word >>> 0; });
 content.forEach((word, i) => { words[1 + cw + i] = word >>> 0; });
 const selfGT = ((4 << 28) | (1 << 27) | (1 << 25) | (seq << 16) | nsSlot) >>> 0;
+words[lumpSize - cc] = selfGT;
 words[lumpSize - 1] = selfGT;
 const bytes = Buffer.alloc(lumpSize * 4);
 words.forEach((word, i) => bytes.writeUInt32BE(word, i * 4));
@@ -106,7 +112,7 @@ const token = selfGT.toString(16).toLowerCase().padStart(8, '0');
 const oldSelfTests = manifest.filter(e => e.abstraction === DOT_NAME);
 const manifestLocatorFields = new Set([
     'token', 'filename', 'abstraction', 'version', 'lump_version', 'compiled_at',
-    'archived', 'forked', 'variant_group',
+    'issue_n', 'archived', 'forked', 'variant_group',
 ]);
 function stripToManifestLocator(row) {
     for (const key of Object.keys(row)) {
@@ -124,7 +130,7 @@ const filename = `${DOT_NAME}.${issueN}.${crypto.createHash('sha256').update(DOT
 const entry = {
     // manifest.json is a locator/history index only.  Identity, placement,
     // and intrinsic binary facts are fail-closed in approval + ns-state.
-    token, abstraction: DOT_NAME, filename, lump_version: issueN,
+    token, abstraction: DOT_NAME, filename, issue_n: issueN, lump_version: issueN,
     variant_group: 'selftest-history',
 };
 console.log(`SelfTest artifact: ${filename}`);
@@ -181,6 +187,7 @@ if (CHECK_ONLY) {
     }
     if (stateRow.token !== token ||
         stateRow.slot !== nsSlot || stateRow.seq !== seq ||
+        stateRow.filename !== activeRow?.filename ||
         stateRow.binary_hash !== activeHash ||
         stateRow.ns_slot_policy !== 'static' || stateRow.load_policy !== 'Resident' ||
         stateRow.resident !== true || stateRow.boot_resident !== true ||

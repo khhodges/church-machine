@@ -537,22 +537,7 @@
     "filename": "SelfTest.1.ddd2582f.lump",
     "lump_version": 89,
     "compiled_at": 1789586509.71958,
-    "dot_name": "SelfTest",
-    "issue_n": 1,
-    "petname": "",
-    "content_profile": 2,
-    "output_profile": 2,
-    "capabilities": [
-      {
-        "name": "SelfTest",
-        "rights": [
-          "E"
-        ],
-        "grants": [],
-        "nsIndex": 6
-      }
-    ],
-    "operation_id": "21a0de5e-0ee1-4557-8680-9b3c51430c84"
+    "archived": true
   },
   {
     "token": "4a00000a",
@@ -654,5 +639,13 @@
     "output_profile": 2,
     "capabilities": [],
     "operation_id": "e04a75c91382489890ce14059ff2e95a"
+  },
+  {
+    "token": "4a000006",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.90.cf272798.lump",
+    "lump_version": 90,
+    "variant_group": "selftest-history",
+    "issue_n": 90
   }
 ]

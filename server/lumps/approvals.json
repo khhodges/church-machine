@@ -550,6 +550,20 @@
       "filename": "Adder.1.0f63efe0.lump",
       "compiled_at": 1789594236.8838055,
       "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f"
+    },
+    "dbf3cc91ef70924de94e96307b6254f0e022ebba6359814f0e9333ed5fce87d5": {
+      "binary_hash": "dbf3cc91ef70924de94e96307b6254f0e022ebba6359814f0e9333ed5fce87d5",
+      "filename": "SelfTest.90.cf272798.lump",
+      "dot_name": "SelfTest",
+      "issue_n": 90,
+      "bootstrap_t": "4a000006",
+      "bootstrap_runtime_gt": 1241513990,
+      "token": "4a000006",
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
     }
   }
 }

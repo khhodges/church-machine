@@ -13,6 +13,9 @@ continuation label disagree with the generated boot image.
 
 **How to apply:** Explicit image preparation couples the destination-local
 SelfTest Next capability to the selected target, including its current generation.
+The canonical SelfTest artifact must declare at least two C-list rows: row 0 for
+SELF and row 1 for Next. A builder that emits only SELF makes the final
+`LOAD CR0, CR6[1]` access out of range before the image builder can localize Next.
 Never rewrite immutable source LUMPs. Never reapply a browser preference during
 reset or boot: imported/prepared image bytes own boot authority. Expose a
 selection discrepancy and require deliberate preparation instead.
