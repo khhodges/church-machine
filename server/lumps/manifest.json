@@ -646,6 +646,24 @@
     "filename": "SelfTest.90.cf272798.lump",
     "lump_version": 90,
     "variant_group": "selftest-history",
-    "issue_n": 90
+    "issue_n": 90,
+    "archived": true
+  },
+  {
+    "token": "4a000006",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.1.14d378a6.lump",
+    "lump_version": 91,
+    "compiled_at": 1789734828.7670777,
+    "issue_n": 1,
+    "archived": true
+  },
+  {
+    "token": "4a000006",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.92.cf272798.lump",
+    "issue_n": 92,
+    "lump_version": 92,
+    "variant_group": "selftest-history"
   }
 ]

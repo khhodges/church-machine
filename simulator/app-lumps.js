@@ -2995,11 +2995,10 @@ const _lumpSavedSrcLoaded = {};
 //              to a matching layout). Counts non-comment, non-capabilities
 //              lines in the decompiled/source text so a click never no-ops.
 async function _lumpAuditJump(token, sourceLine, wordIndex) {
-    // When jumping to the current editor (no token), close the Format Lump dialog
-    // first so the editor is visible after the view switch.
+    // When jumping to the current editor (no token), close the unified Save
+    // LUMP dialog first so the editor is visible after the view switch.
     if (!token) {
-        const _fmtDlg = document.getElementById('formatLumpDialog');
-        if (_fmtDlg) _fmtDlg.style.display = 'none';
+        if (typeof closeSaveDialog === 'function') closeSaveDialog();
     }
     if (token && typeof openLumpInEditor === 'function') {
         try { await openLumpInEditor(token); } catch (_e) {}
@@ -7869,12 +7868,11 @@ function _fmtEscape(s) {
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// ── _closeFormatLumpDialog ────────────────────────────────────────────────────
+// ── legacy format-dialog closer ───────────────────────────────────────────────
 var _formatLumpTrigger = null;
 var _formatLumpTrap = null;
 function _closeFormatLumpDialog() {
-    var d = document.getElementById('formatLumpDialog');
-    if (d) d.style.display = 'none';
+    if (typeof closeSaveDialog === 'function') closeSaveDialog();
     if (_formatLumpTrap) document.removeEventListener('keydown', _formatLumpTrap, true);
     if (_formatLumpTrigger && _formatLumpTrigger.isConnected) _formatLumpTrigger.focus();
     _formatLumpTrigger = null;
@@ -8077,7 +8075,8 @@ function _renderFormatLumpCandidate(pending) {
         }
     }
 
-    var _proceedBtn = document.getElementById('fmtProceedBtn');
+    var _proceedBtn = document.getElementById('fmtProceedBtn') ||
+        document.getElementById('saveNSConfirmBtn');
     var _proceedNote = document.getElementById('fmtProceedNote');
     if (!_proceedBtn) return;
     if (_hasErrors) {
@@ -8125,10 +8124,10 @@ function _selectFormatLumpProfile(profile) {
 }
 window._selectFormatLumpProfile = _selectFormatLumpProfile;
 
-// ── showFormatLump — Step 1 of the two-step Save Lump flow ───────────────────
+// ── showFormatLump — build the unified Save Lump review ──────────────────────
 // Builds the spec-compliant binary, runs the lump audit, queries version
-// history, then opens #formatLumpDialog.  Stores the binary on
-// window._pendingLumpData for reuse in Step 2 (confirmSaveToNamespace).
+// history, then opens the single Save LUMP dialog. Stores the binary on
+// window._pendingLumpData for confirmSaveToNamespace().
 window.showFormatLump = async function() {
     var _regEntry = window.LumpRegistry
         ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())
@@ -8451,17 +8450,8 @@ window.showFormatLump = async function() {
     // ── Version history (may be async) ───────────────────────────────────────
     _renderFormatLumpVersionHistory(_absName);
 
-    // ── Show dialog ───────────────────────────────────────────────────────────
-    _formatLumpTrigger = document.activeElement;
-    if (!_formatLumpTrap) _formatLumpTrap = _makeModalFocusTrap('formatLumpDialog', _closeFormatLumpDialog);
-    document.addEventListener('keydown', _formatLumpTrap, true);
-    var _dlg = document.getElementById('formatLumpDialog');
-    if (_dlg) {
-        _dlg.style.display = '';
-        _dlg.scrollTop = 0;
-        var _fmtCloseBtn = _dlg.querySelector('button');
-        if (_fmtCloseBtn) _fmtCloseBtn.focus();
-    }
+    // Format/audit and Namespace choices share one confirmation surface.
+    showSaveToNamespace();
 };
 
 // ── GT Slot Picker ────────────────────────────────────────────────────────────
@@ -9133,14 +9123,22 @@ async function _confirmLumpSavePlan(words, metadata, prompt, options) {
         }
     };
     const message = typeof prompt === 'function' ? prompt(plan) : String(prompt || '');
+    const confirmInDialog = options && typeof options.confirmInDialog === 'function'
+        ? options.confirmInDialog : null;
+    const skipConfirmation = !!(options && options.skipConfirmation === true);
     const confirmFn = typeof window !== 'undefined' && typeof window.confirm === 'function'
         ? window.confirm
         : (typeof confirm === 'function' ? confirm : null);
-    if (!confirmFn) {
+    if (!skipConfirmation && !confirmInDialog && !confirmFn) {
         stopHeartbeat();
         throw new Error('Save confirmation is unavailable; no approval or repository save was requested.');
     }
-    if (!confirmFn(`${_formatLumpSavePlan(plan)}\n\n${message}`.trim())) {
+    const confirmed = skipConfirmation
+        ? true
+        : (confirmInDialog
+            ? await confirmInDialog(plan, message)
+            : confirmFn(`${_formatLumpSavePlan(plan)}\n\n${message}`.trim()));
+    if (!confirmed) {
         stopHeartbeat();
         if (_saveDiagnostics) {
             try {

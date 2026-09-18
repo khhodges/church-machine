@@ -60,8 +60,8 @@ elements.set('asmEditor', asmEditor);
 elements.set('editorConsole', makeElement('editorConsole'));
 elements.set('langSelector', makeElement('langSelector'));
 elements.get('langSelector').value = 'javascript';
-elements.set('formatLumpDialog', makeElement('formatLumpDialog'));
-elements.get('formatLumpDialog').querySelector = () => null;
+elements.set('saveNSDialog', makeElement('saveNSDialog'));
+elements.get('saveNSDialog').querySelector = () => null;
 
 const localValues = new Map();
 const context = {
@@ -155,6 +155,9 @@ const context = {
     _formatLumpApiDefinition() { return {}; },
     _renderFormatLumpCandidate() {},
     _renderFormatLumpVersionHistory() {},
+    showSaveToNamespace() {
+        context.unifiedDialogCount = (context.unifiedDialogCount || 0) + 1;
+    },
     _closeFormatLumpDialog() {},
     _fmtEscape(value) { return String(value); },
     _formatLumpTrap: null,
@@ -224,6 +227,8 @@ vm.runInContext(
         'hamburger Save click was not diagnosed before candidate use');
     assert.strictEqual(context.confirmationCount || 0, 0,
         'Save unexpectedly started an automatic save plan');
+    assert.strictEqual(context.unifiedDialogCount, 1,
+        'Save did not open exactly one unified review and destination dialog');
 
     const pending = context.window._pendingLumpData;
     assert(pending && pending.candidates && pending.candidates.full,

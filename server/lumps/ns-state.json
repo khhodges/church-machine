@@ -77,9 +77,9 @@
       "seq": 0,
       "seal": "0xDE56B6EF",
       "token": "4a000006",
-      "filename": "SelfTest.90.cf272798.lump",
-      "issue_n": 90,
-      "lump_version": 90,
+      "filename": "SelfTest.92.cf272798.lump",
+      "issue_n": 92,
+      "lump_version": 92,
       "binary_hash": "dbf3cc91ef70924de94e96307b6254f0e022ebba6359814f0e9333ed5fce87d5",
       "resident": true,
       "boot_resident": true,
@@ -183,5 +183,6 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1789732217.8065643
+  "generated_at": 1789734828.811191,
+  "committed_raw_fingerprint": "8fedd3c311ec4a272051efd21b19168d6a0a7baa37a46379668dc73fe04b1244"
 }

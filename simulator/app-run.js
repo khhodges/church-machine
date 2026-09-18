@@ -12903,21 +12903,14 @@ function showSaveToNamespace() {
         return;
     }
     window._saveNSPreparedSnapshot = _captureLumpSaveSnapshot();
-    // Close the Format Lump dialog (Step 1) if it is still open.
-    const _fmtDlg = document.getElementById('formatLumpDialog');
-    if (_fmtDlg) _fmtDlg.style.display = 'none';
-    // Update dialog title to indicate Step 2 of 2 only when reached via Format Lump
-    // (i.e. _pendingLumpData is set).  Direct callers (hamburger "Save to NS")
-    // should not show the step badge.
+    // Format/audit and destination settings are one review surface.
     const _nsTitleSpan = document.querySelector('#saveNSDialog .modal-title > span:first-child');
     if (_nsTitleSpan) {
-        if (window._pendingLumpData) {
-            _nsTitleSpan.innerHTML = 'Save to Namespace' +
-                ' <span class="fmt-step-badge">Step 2 of 2</span>';
-        } else {
-            _nsTitleSpan.textContent = 'Save to Namespace';
-        }
+        _nsTitleSpan.textContent = 'Save LUMP';
     }
+    const _unifiedReview = document.getElementById('unifiedLumpReview');
+    if (_unifiedReview) _unifiedReview.style.display =
+        window._pendingLumpData ? '' : 'none';
     const slotSel = document.getElementById('saveNSSlot');
     _populateSaveNamespaceSlotPicker({ selectMatchingCurrent: true });
     const _defaultOption = slotSel.options[slotSel.selectedIndex];
@@ -13027,7 +13020,7 @@ function _setSaveNSFeedback(kind, message, action) {
     if (button) {
         button.disabled = busy || incident;
         button.hidden = incident;
-        button.textContent = busy ? 'Saving…' : 'Save';
+        button.textContent = busy ? 'Saving…' : 'Save LUMP';
         button.setAttribute('aria-busy', busy ? 'true' : 'false');
     }
     if (cancelButton) cancelButton.textContent = incident ? 'Close' : 'Cancel';
@@ -13060,6 +13053,40 @@ function _setSaveNSFeedback(kind, message, action) {
     status.style.border = (kind === 'error' || incident)
         ? '1px solid rgba(248, 113, 113, .65)'
         : '1px solid rgba(96, 165, 250, .55)';
+}
+
+function _confirmSavePlanInDialog(plan) {
+    return new Promise(function(resolve) {
+        const button = document.getElementById('saveNSConfirmBtn');
+        const cancelButton = document.getElementById('saveNSCancelBtn');
+        if (!button || !cancelButton) {
+            resolve(false);
+            return;
+        }
+        const consequence = typeof _formatLumpSavePlan === 'function'
+            ? _formatLumpSavePlan(plan)
+            : String((plan && plan.message) || 'Review the prepared save plan.');
+        const restore = function() {
+            button.onclick = beginSaveToNamespace;
+            cancelButton.onclick = closeSaveDialog;
+            button.textContent = 'Save LUMP';
+            cancelButton.textContent = 'Cancel';
+        };
+        _setSaveNSFeedback('info', consequence);
+        button.disabled = false;
+        button.textContent = 'Approve & Save';
+        cancelButton.textContent = 'Cancel';
+        button.onclick = function() {
+            restore();
+            resolve(true);
+        };
+        cancelButton.onclick = function() {
+            restore();
+            closeSaveDialog();
+            resolve(false);
+        };
+        button.focus();
+    });
 }
 
 function _saveNSLeasePanel(response) {
@@ -16172,9 +16199,9 @@ async function confirmSaveToNamespace() {
         ? 'the compiled source snapshot already differed from the editor'
         : '';
     if (_saveSnapshot) {
-        // The two-dialog handoff must not silently save an older registry
-        // entry if a compile/navigation refresh happened while Step 2 was
-        // open.  Compare the live registry identity before using the frozen
+        // The unified dialog must not silently save an older registry entry
+        // if a compile/navigation refresh happened while it was open. Compare
+        // the live registry identity before using the frozen
         // snapshot; otherwise its own registeredAt value would make the
         // pending-binary check appear fresh forever.
         const _liveToken = window.LumpRegistry &&
@@ -16551,6 +16578,11 @@ async function confirmSaveToNamespace() {
                 _svPayload.binary, _svPayload.metadata,
                 () => `Save "${_svAbsName}" to Namespace slot ${idx}?`,
                 {
+                    // The unified IDE dialog already shows the exact candidate,
+                    // destination and permissions. Keep the server-authored
+                    // consequence in that same dialog and obtain approval there
+                    // instead of opening a Chrome confirmation.
+                    confirmInDialog: _confirmSavePlanInDialog,
                     validateFinalBinary: function(finalBinary) {
                         _validateFinalLumpSaveBinary(finalBinary, _caps);
                     },

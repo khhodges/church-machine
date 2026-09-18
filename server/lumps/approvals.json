@@ -553,9 +553,9 @@
     },
     "dbf3cc91ef70924de94e96307b6254f0e022ebba6359814f0e9333ed5fce87d5": {
       "binary_hash": "dbf3cc91ef70924de94e96307b6254f0e022ebba6359814f0e9333ed5fce87d5",
-      "filename": "SelfTest.90.cf272798.lump",
+      "filename": "SelfTest.92.cf272798.lump",
       "dot_name": "SelfTest",
-      "issue_n": 90,
+      "issue_n": 92,
       "bootstrap_t": "4a000006",
       "bootstrap_runtime_gt": 1241513990,
       "token": "4a000006",
@@ -564,6 +564,20 @@
         "E"
       ],
       "capability_type": "inform"
+    },
+    "3b107282fcc70d3702367c905382cdab7fcc9b9aec1edf8fb9749a2db54972b6": {
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "save_as_latest": true,
+      "binary_hash": "3b107282fcc70d3702367c905382cdab7fcc9b9aec1edf8fb9749a2db54972b6",
+      "dot_name": "SelfTest",
+      "issue_n": 1,
+      "filename": "SelfTest.1.14d378a6.lump",
+      "compiled_at": 1789734828.7670777,
+      "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25"
     }
   }
 }

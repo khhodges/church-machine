@@ -185,15 +185,17 @@
         options = options || {};
         const sourceSurface = options.sourceSurface || 'asmEditor';
         // Formatting a save artifact needs the compiler's source/code region,
-        // not the execution-only method-table representation. Rebuild only
-        // after the same explicit confirmation if that registry snapshot was
-        // evicted by navigation.
+        // not the execution-only method-table representation. Save LUMP itself
+        // is the explicit request to build one frozen snapshot, so it must not
+        // open a redundant browser confirmation before the unified review.
         const needsRegistryCandidate = action === 'save' && !candidateInRegistry(candidate);
         if (!candidateIsCurrent(sourceSurface) || needsRegistryCandidate) {
-            const verb = action === 'save' ? 'Build and Save' : 'Build and Export';
             const snapshot = editorSource(sourceSurface);
-            if (!window.confirm(`${verb} the current source?\n\nThe compiler will use one frozen editor snapshot. It will not install or run the result.`)) {
-                return { ok: false, action, cancelled: true };
+            if (action !== 'save') {
+                const verb = 'Build and Export';
+                if (!window.confirm(`${verb} the current source?\n\nThe compiler will use one frozen editor snapshot. It will not install or run the result.`)) {
+                    return { ok: false, action, cancelled: true };
+                }
             }
             const result = await compileSnapshot(snapshot, options);
             if (!result || result.ok === false) return result;
@@ -225,8 +227,8 @@
         if (window.LumpRegistry && typeof window.LumpRegistry.setCurrent === 'function') {
             window.LumpRegistry.setCurrent(built.token);
         }
-        // showFormatLump is Step 1 only.  It owns the single subsequent Save
-        // dialog; this command never calls Save-to-NS recursively.
+        // showFormatLump builds the single review/destination dialog; this
+        // command never calls Save-to-NS recursively.
         if (typeof showFormatLump !== 'function') {
             return { ok: false, error: 'The Format LUMP dialog is unavailable.' };
         }

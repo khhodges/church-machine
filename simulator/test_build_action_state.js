@@ -32,6 +32,7 @@ let compileCalls = 0;
 let pendingInstalls = 0;
 let identityBegins = 0;
 let runCalls = 0;
+let nativeConfirmCalls = 0;
 const context = {
     console,
     document,
@@ -45,7 +46,7 @@ const context = {
     runSimGo() { runCalls++; },
     _setPendingSimLoad() { pendingInstalls++; },
     window: {
-        confirm: () => true,
+        confirm: () => { nativeConfirmCalls++; return true; },
         ExecutionIdentity: { begin() { identityBegins++; } },
         TargetState: { authorize() { return { ok: true }; } },
     },
@@ -96,6 +97,9 @@ context.window.IDEActions.compile().then(result => {
 }).then(result => {
     if (result.ok !== false || compileCalls !== 2) {
         throw new Error('Build and Save did not stop after its frozen build failed');
+    }
+    if (nativeConfirmCalls !== 0) {
+        throw new Error('Save LUMP opened a redundant browser confirmation before building');
     }
     // An explicit source can be built from another workspace even when the
     // main editor is empty; eligibility must validate that supplied snapshot.

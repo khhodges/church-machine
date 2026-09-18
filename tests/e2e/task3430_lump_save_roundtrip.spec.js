@@ -242,16 +242,9 @@ test.describe('Task 3430 — hamburger Save Lump source round-trip', () => {
         async function openSaveDialog() {
             await page.locator('#editorActionsBtn').click();
             await page.locator('#btnHamSaveLump').click();
-            const formatDialog = page.locator('#formatLumpDialog');
-            await expect(page.locator('#formatLumpDialog:visible, #saveNSDialog:visible')).toBeVisible({ timeout: 10000 });
-            if (await formatDialog.isVisible().catch(() => false)) {
-                await expect(formatDialog).toBeVisible();
-                const proceed = page.locator('#fmtProceedBtn');
-                await expect(proceed).toBeEnabled();
-                await proceed.click();
-                await expect(formatDialog).toBeHidden({ timeout: 10000 });
-            }
             await expect(page.locator('#saveNSDialog')).toBeVisible({ timeout: 10000 });
+            await expect(page.locator('#unifiedLumpReview')).toBeVisible();
+            await expect(page.locator('#saveNSConfirmBtn')).toBeEnabled();
         }
 
         async function saveThroughApproval(slot, label) {
@@ -270,22 +263,30 @@ test.describe('Task 3430 — hamburger Save Lump source round-trip', () => {
             const saveResponsePromise = page.waitForResponse(response =>
                 response.url().endsWith('/api/lumps/save') &&
                 response.request().method() === 'POST');
-            const dialogPromise = page.waitForEvent('dialog');
+            const nativeDialogs = [];
+            const captureNativeDialog = async dialog => {
+                nativeDialogs.push(dialog.message());
+                await dialog.dismiss();
+            };
+            page.on('dialog', captureNativeDialog);
             await page.locator('#saveNSConfirmBtn').click();
             const planResponse = await planResponsePromise;
             if (!planResponse.ok()) {
                 throw new Error(`save-plan ${planResponse.status()}: ${
                     JSON.stringify(await planResponse.json())}`);
             }
-            const approvalDialog = await dialogPromise;
-            expect(approvalDialog.message()).toMatch(/Replace|Create/);
-            await approvalDialog.accept();
-
+            await expect(page.locator('#saveNSStatus')).toBeVisible();
+            await expect(page.locator('#saveNSStatus')).toContainText(/Create|Replace/);
+            await expect(page.locator('#saveNSConfirmBtn')).toHaveText('Approve & Save');
+            expect(nativeDialogs).toEqual([]);
+            await page.locator('#saveNSConfirmBtn').click();
             const [intentResponse, saveRequest, saveResponse] =
                 await Promise.all([
                     intentResponsePromise,
                     saveRequestPromise, saveResponsePromise,
                 ]);
+            page.off('dialog', captureNativeDialog);
+            expect(nativeDialogs).toEqual([]);
             expect(intentResponse.ok()).toBeTruthy();
             expect(saveResponse.ok()).toBeTruthy();
             const plan = await planResponse.json();

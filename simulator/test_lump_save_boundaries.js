@@ -1,7 +1,7 @@
 'use strict';
 
 // Focused, browser-free regressions for the compiler SELF handoff and the
-// actual two-dialog Save-to-Namespace function.  The dialog cases extract the
+// actual unified Save-to-Namespace function. The dialog cases extract the
 // production functions rather than reimplementing their branch logic.
 
 const assert = require('assert');
@@ -163,9 +163,10 @@ console.log('\n--- authoritative final-byte validator ---');
     );
 }
 
-console.log('\n--- extracted two-dialog save flow ---');
+console.log('\n--- extracted unified save flow ---');
 {
     const appRun = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
+    const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
     const elements = {};
     const feedback = [];
     const diagnostics = [];
@@ -258,6 +259,7 @@ console.log('\n--- extracted two-dialog save flow ---');
         _discoverLumpSaveDiagnosticCandidate: async () => null,
         _showFpgaToast: (title, body) => toasts.push({ title, body }),
         _validateFinalLumpSaveBinary: () => true,
+        _confirmSavePlanInDialog: async () => true,
         CapabilityTokens: undefined,
     };
     vm.createContext(context);
@@ -281,14 +283,20 @@ console.log('\n--- extracted two-dialog save flow ---');
             abstractionName: 'Flow.Test',
         };
     }
-    function openSecondDialog() {
+    function openUnifiedDialog() {
         window._pendingLumpData = pendingData();
         window._saveNSPreparedSnapshot = context.capture();
         return window._saveNSPreparedSnapshot;
     }
 
     (async () => {
-        const first = openSecondDialog();
+        check(
+            'happy path has one IDE Save LUMP dialog',
+            (indexHtml.match(/id="saveNSDialog"/g) || []).length === 1 &&
+            !indexHtml.includes('id="formatLumpDialog"') &&
+            indexHtml.includes('id="unifiedLumpReview"')
+        );
+        const first = openUnifiedDialog();
         live.token = 'flow-token-2';
         live.memory = {
             words: [0x87654321],
@@ -298,7 +306,7 @@ console.log('\n--- extracted two-dialog save flow ---');
         };
         await context.confirm();
         check(
-            'Step 2 rejects a stale registry/token snapshot without a network save',
+            'unified dialog rejects a stale registry/token snapshot without a network save',
             diagnostics.length === 1 &&
             feedback.at(-1).kind === 'error' &&
             /active LUMP changed/.test(feedback.at(-1).message)
@@ -316,27 +324,35 @@ console.log('\n--- extracted two-dialog save flow ---');
             sourceText: sourceElement.value,
         };
         sourceElement.value = 'method Main { EDITED AFTER OPEN }';
-        const editorSnapshot = openSecondDialog();
+        const editorSnapshot = openUnifiedDialog();
         sourceElement.value = 'method Main { EDITED WHILE DIALOG OPEN }';
         await context.confirm();
         check(
-            'Step 2 rejects editor drift against the captured compiler pair',
+            'unified dialog rejects editor drift against the captured compiler pair',
             diagnostics[1].snapshot === editorSnapshot &&
             feedback.at(-1).kind === 'error' &&
             /editor changed/.test(feedback.at(-1).message)
         );
         sourceElement.value = 'method Main { RETURN }';
-        const cancelled = openSecondDialog();
+        const cancelled = openUnifiedDialog();
         let planCalls = 0;
-        window._confirmLumpSavePlan = async () => {
+        let approvalOptions = null;
+        window._confirmLumpSavePlan = async (_binary, _metadata, _prompt, options) => {
             planCalls++;
+            approvalOptions = options;
             return null;
         };
         await context.confirm();
         check(
-            'second dialog cancellation records no-save feedback',
+            'unified dialog cancellation records no-save feedback',
             planCalls === 1 && feedback.at(-1).kind === 'info' &&
             /cancelled/.test(feedback.at(-1).message)
+        );
+        check(
+            'unified Save click suppresses the redundant Chrome confirmation',
+            approvalOptions &&
+            typeof approvalOptions.confirmInDialog === 'function' &&
+            approvalOptions.skipConfirmation !== true
         );
         check(
             'cancel preserves the immutable snapshot for a deliberate retry',
@@ -344,7 +360,7 @@ console.log('\n--- extracted two-dialog save flow ---');
             window._pendingLumpData === null
         );
 
-        const failed = openSecondDialog();
+        const failed = openUnifiedDialog();
         window._confirmLumpSavePlan = async () => {
             throw new Error('authoritative plan rejected');
         };
