@@ -13266,13 +13266,24 @@ def save_lump():
             error={"name": "BootImageUnavailable",
                    "message": "boot-image.bin is not present"})
 
-    LAZY_LUMPS[token8] = lump_bytes
-    LAZY_LUMPS[token8.lstrip('0') or '0'] = lump_bytes
+    # Publication may localize a content-derived candidate into an existing
+    # resident Namespace identity. All user-facing and follow-up repository
+    # operations must use the committed manifest token, not the provisional
+    # browser token. Keep the candidate alias only as an internal compatibility
+    # lookup for callers that were already in flight during publication.
+    LAZY_LUMPS[_transition_token] = lump_bytes
+    LAZY_LUMPS[_transition_token.lstrip('0') or '0'] = lump_bytes
+    if token8 != _transition_token:
+        LAZY_LUMPS[token8] = lump_bytes
+        LAZY_LUMPS[token8.lstrip('0') or '0'] = lump_bytes
 
     resp: dict = {
         "ok":             True,
         "committed":      True,
-        "token":          token8,
+        # This token is guaranteed to be the identity written to the active
+        # manifest row. The IDE can immediately reopen and audit the saved LUMP
+        # without understanding resident-token localization.
+        "token":          _transition_token,
         "lump":           lump_filename,
         "filename":       lump_filename,
         "immutable_filename": lump_filename,

@@ -573,14 +573,15 @@ def isolated_bootstrap_repository(tmp_path, monkeypatch):
     return lumps
 
 
-def _bootstrap_save_payload(client, *, sequence=0, enforce=True):
+def _bootstrap_save_payload(
+        client, *, sequence=0, enforce=True, candidate_token="4a00000a"):
     words = [(0x1F << 27) | (1 << 10) | 1, 0] + [0] * 62
     words[-1] = 0x4A000006  # stale browser SELF from the former slot 6
     metadata = {
         "abstraction": "CapabilityTest",
         "ns_slot": 10,
         "namespace_sequence": sequence,
-        "token": "4a00000a",
+        "token": candidate_token,
         "content_type": "code",
         "capabilities": [{
             "name": "__SELF__", "rights": ["E"], "compiler_owned_self": True,
@@ -682,10 +683,18 @@ def test_resident_replacement_derives_approval_and_keeps_namespace_save_usable(
     manifest_path.write_text(json.dumps(manifest))
 
     with app_module.app.test_client() as client:
-        payload = _bootstrap_save_payload(client, enforce=False)
+        payload = _bootstrap_save_payload(
+            client, enforce=False, candidate_token="4c35bef2")
         response = client.post("/api/lumps/save", json=payload)
+        reopened = client.get(
+            f"/api/lump/{response.get_json()['token']}/words")
 
     assert response.status_code == 200, response.get_data(as_text=True)
+    # The browser's content-derived token is provisional. The response must
+    # report the exact active manifest/Namespace token so Open and Audit work
+    # immediately without exposing localization internals to the programmer.
+    assert response.get_json()["token"] == resident["token"]
+    assert reopened.status_code == 200, reopened.get_data(as_text=True)
     saved = (
         isolated_bootstrap_repository / response.get_json()["lump"]
     ).read_bytes()
