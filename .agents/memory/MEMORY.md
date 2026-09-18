@@ -141,3 +141,4 @@
 - [Simulator Run availability](simulator-run-availability.md) — Run stays available like Step/Walk and executes the prepared LightningBolt LUMP, never an arbitrary editor candidate
 - [IDE configuration authorization](ide-browser-write-authorization.md) — ordinary Namespace configuration saves must not depend on REPORT_TOKEN; privileged hardware and deployment operations remain protected
 - [Save LUMP confirmation surface](save-lump-confirmation-surface.md) — happy-path review, destination, server consequence, and approval stay in one IDE modal; native dialogs are error-only
+- [Resident publication bootstrap approval](resident-publication-bootstrap-approval.md) — derive bootstrap metadata from validated fixed bindings and exact SELF bytes, never a browser flag

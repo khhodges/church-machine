@@ -81,8 +81,12 @@ def test_capability_rebuild_archives_displaced_bytes_and_approvals(tmp_path):
     catalog = tmp_path / "lumps"
     shutil.copytree(root / "server" / "lumps", catalog, symlinks=True)
     manifest = json.loads((catalog / "manifest.json").read_text())
-    displaced = [row for row in manifest if row.get("abstraction") == "CapabilityTest"
-                 and (catalog / row.get("filename", "")).is_file()]
+    displaced = [
+        row for row in manifest
+        if row.get("abstraction") == "CapabilityTest"
+        and (catalog / row.get("filename", "")).is_file()
+        and not (catalog / row.get("filename", "")).is_symlink()
+    ]
     before_bodies = {row["filename"]: (catalog / row["filename"]).read_bytes()
                      for row in displaced}
     before_approvals = json.loads((catalog / "approvals.json").read_text())["approvals"]
@@ -90,6 +94,9 @@ def test_capability_rebuild_archives_displaced_bytes_and_approvals(tmp_path):
         hashlib.sha256(raw).hexdigest() for raw in before_bodies.values()
         if hashlib.sha256(raw).hexdigest() in before_approvals
     }
+    reviewed_alias = catalog / "CapabilityTest.2.e794a764.lump"
+    if reviewed_alias.is_symlink():
+        reviewed_alias.unlink()
     subprocess.run(["node", str(root / "scripts" / "build_capability_test_lump.js"),
                     "--out-dir", str(catalog)], cwd=root, check=True)
     after = json.loads((catalog / "manifest.json").read_text())

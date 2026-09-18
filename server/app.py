@@ -8829,6 +8829,7 @@ try:
         validate_bootstrap_candidate as _validate_bootstrap_candidate,
         verify_bootstrap_self_gt as _verify_bootstrap_self_gt,
         resident_inform_egt as _resident_inform_egt,
+        publication_uses_bootstrap_authority as _publication_uses_bootstrap_authority,
     )
 except ImportError:
     from server.bootstrap_identity import (
@@ -8837,6 +8838,7 @@ except ImportError:
         validate_bootstrap_candidate as _validate_bootstrap_candidate,
         verify_bootstrap_self_gt as _verify_bootstrap_self_gt,
         resident_inform_egt as _resident_inform_egt,
+        publication_uses_bootstrap_authority as _publication_uses_bootstrap_authority,
     )
 
 
@@ -11362,9 +11364,11 @@ def save_lump():
             "error": f"Bootstrap inventory validation failed: {_bootstrap_state_error}",
             "namespace_identity_failed": True,
         }), 422
-    # Bootstrap identity enforcement is explicit, never inherited from the
-    # previous occupant of a programmer-selected slot. Generic Namespace saves
-    # may replace every slot with any abstraction.
+    # Bootstrap authority is derived from the server-owned destination binding,
+    # never from a browser flag. Replacing an existing fixed resident must
+    # publish approval metadata for the exact new bytes or the next boot-image
+    # generation will fail closed. Portable artifacts remain outside this
+    # authority path even when their requested destination is a resident slot.
     _is_server_bootstrap_history_repair = bool(
         _lump_bootstrap_history_repair_override.get()
         and metadata.get("_bootstrap_history_repair") is True
@@ -11391,10 +11395,9 @@ def save_lump():
                 "safe_retry": True,
             }), 409
         metadata["namespace_sequence"] = _bootstrap_binding.get("seq", 0)
-    _is_bootstrap_canonical = (
-        _bootstrap_binding is not None
-        and metadata.get("enforce_bootstrap_identity") is True
-    )
+    _is_bootstrap_canonical = _publication_uses_bootstrap_authority(
+        _bootstrap_binding,
+        metadata.get("portable_binding", metadata.get("portableBinding")))
     # ── Pre-flight: identity computation + seal verification ──────────────────
     # Pure computation — no filesystem reads or writes — so a corrupt lump
     # header that makes c-list[0] unwritable returns 422 BEFORE any existing
@@ -11666,7 +11669,8 @@ def save_lump():
             _runtime_t = _verify_bootstrap_self_gt(
                 _bootstrap_binding, _live_bootstrap_gt,
                 f"{_live_bootstrap_gt:08x}")
-            if token_hint and token8 != _runtime_t:
+            if (metadata.get("enforce_bootstrap_identity") is True
+                    and token_hint and token8 != _runtime_t):
                 raise ValueError(
                     "submitted canonical token differs from the selected "
                     "Namespace descriptor and final row-zero SELF")
@@ -12447,7 +12451,10 @@ def save_lump():
                 },
             }), 409
 
-    _existing_entry = next((e for e in manifest if e.get('token') == token8), None)
+    _existing_entry = next(
+        (e for e in manifest
+         if e.get("archived") is not True and e.get("token") == token8),
+        None)
     _expected_active_entry = _existing_entry
     _exist_filename = (_existing_entry or {}).get('filename', f'{token8}.lump')
     _existing_lump  = os.path.join(lumps_dir, _exist_filename)

@@ -549,7 +549,11 @@ def admit(*, quarantine_path, lumps_dir, state_path, manifest_path, token,
                 "gate_schema": gates, "mint_egt": egt,
             },
         }
-        if resident:
+        try:
+            from bootstrap_identity import publication_uses_bootstrap_authority
+        except ImportError:
+            from server.bootstrap_identity import publication_uses_bootstrap_authority
+        if publication_uses_bootstrap_authority(row, portable_binding):
             evidence["approval_record"]["bootstrap_t"] = egt
             evidence["approval_record"]["bootstrap_runtime_gt"] = int(egt, 16)
         if portable_binding is not None:

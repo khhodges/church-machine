@@ -32,9 +32,9 @@ SOURCE_CAPABILITY = {
 }
 CURRENT_CAPABILITY = {
     "slot": 10,
-    "filename": "CapabilityTest.2.e794a764.lump",
+    "filename": "CapabilityTest.1.e2b69e5b.lump",
     "token": "4a00000a",
-    "sha256": "55f07137513625e0749de30f5d67a7d979e3fa4eedfef3b499a67f358f28db32",
+    "sha256": "6591292b249120aa0a62306237e314f2289ffae42a64bc7556fba336f9330f19",
 }
 
 

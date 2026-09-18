@@ -39,6 +39,17 @@ def frozen_resident_bootstrap(binding):
     return True
 
 
+def publication_uses_bootstrap_authority(binding, portable_binding=None):
+    """Return whether publication may derive exact bootstrap approval metadata."""
+    if portable_binding is not None:
+        return False
+    try:
+        frozen_resident_bootstrap(binding)
+    except ValueError:
+        return False
+    return True
+
+
 def bootstrap_t_from_self_gt(binding, self_gt):
     """Return canonical serialized T after proving it is a frozen resident GT."""
     frozen_resident_bootstrap(binding)

@@ -66,6 +66,7 @@ from server import app as app_module
 from server.bootstrap_identity import (
     bootstrap_identity_record,
     bootstrap_t_from_self_gt,
+    publication_uses_bootstrap_authority,
     validate_bootstrap_candidate,
     verify_bootstrap_self_gt,
 )
@@ -82,6 +83,25 @@ def bootstrap_suite_preserves_tracked_boot_artifacts():
     assert Path(app_module.BOOT_CONFIG_PATH) != _ROOT / "server" / "boot-config.json"
     yield
     assert _tracked_boot_artifact_snapshot() == _TRACKED_BOOT_ARTIFACTS_BEFORE
+
+
+@pytest.fixture(autouse=True)
+def bootstrap_suite_isolates_save_authorization_state():
+    with app_module._LUMP_SAVE_PLANS_LOCK:
+        stale_plans = list(app_module._LUMP_SAVE_PLANS.values())
+        app_module._LUMP_SAVE_PLANS.clear()
+    for plan in stale_plans:
+        app_module._lump_lease_for_plan(plan)
+    with app_module._LUMP_APPROVAL_INTENTS_LOCK:
+        app_module._LUMP_APPROVAL_INTENTS.clear()
+    yield
+    with app_module._LUMP_SAVE_PLANS_LOCK:
+        created_plans = list(app_module._LUMP_SAVE_PLANS.values())
+        app_module._LUMP_SAVE_PLANS.clear()
+    for plan in created_plans:
+        app_module._lump_lease_for_plan(plan)
+    with app_module._LUMP_APPROVAL_INTENTS_LOCK:
+        app_module._LUMP_APPROVAL_INTENTS.clear()
 
 
 _RESIDENT = {
@@ -339,15 +359,15 @@ def test_lump_list_hides_archived_bootstrap_but_words_expose_identity_comparison
 
 
 @pytest.mark.parametrize(
-    ("token", "abstraction", "active_filename"),
+    ("token", "abstraction"),
     [
-        ("4a000006", "SelfTest", "SelfTest.1.48acae47.lump"),
-        ("4a000007", "WukongCallHome", "WukongCallHome.1.74c8ff97.lump"),
-        ("4a00000a", "CapabilityTest", "CapabilityTest.2.e794a764.lump"),
+        ("4a000006", "SelfTest"),
+        ("4a000007", "WukongCallHome"),
+        ("4a00000a", "CapabilityTest"),
     ],
 )
 def test_active_bootstrap_history_groups_all_legacy_manifest_records_read_only(
-        token, abstraction, active_filename):
+        token, abstraction):
     manifest = json.loads(
         (Path(app_module.LUMPS_DIR) / "manifest.json").read_text())
     archived_rows = [
@@ -364,7 +384,8 @@ def test_active_bootstrap_history_groups_all_legacy_manifest_records_read_only(
     assert len(current) == 1
     active_manifest = next(
         row for row in manifest
-        if row.get("filename") == active_filename
+        if row.get("token") == token
+        and row.get("abstraction") == abstraction
         and row.get("archived") is not True)
     assert current[0]["version"] == active_manifest["lump_version"]
 
@@ -526,6 +547,7 @@ def _repository_snapshot(root):
         and not (set(path.relative_to(root).parts)
                  & {"save-candidates", "save-operations"})
         and path.name not in {
+            ".lump-write-leases.json",
             "save-runtime-diagnostics.jsonl",
             "save-runtime-diagnostics.lock",
         }
@@ -551,7 +573,7 @@ def isolated_bootstrap_repository(tmp_path, monkeypatch):
     return lumps
 
 
-def _bootstrap_save_payload(client, *, sequence=0):
+def _bootstrap_save_payload(client, *, sequence=0, enforce=True):
     words = [(0x1F << 27) | (1 << 10) | 1, 0] + [0] * 62
     words[-1] = 0x4A000006  # stale browser SELF from the former slot 6
     metadata = {
@@ -564,8 +586,9 @@ def _bootstrap_save_payload(client, *, sequence=0):
             "name": "__SELF__", "rights": ["E"], "compiler_owned_self": True,
         }],
         "grants": ["E"],
-        "enforce_bootstrap_identity": True,
     }
+    if enforce:
+        metadata["enforce_bootstrap_identity"] = True
     plan_response = client.post(
         "/api/lumps/save-plan", json={"binary": words, "metadata": metadata})
     assert plan_response.status_code == 201, plan_response.get_data(as_text=True)
@@ -635,6 +658,59 @@ def test_valid_slot2_bootstrap_save_commits_exact_sealed_self(
     assert approvals[digest]["binary_hash"] == digest
     assert approvals[digest]["bootstrap_runtime_gt"] == row0
     assert approvals[digest]["bootstrap_t"] == "4a00000a"
+
+
+def test_resident_replacement_derives_approval_and_keeps_namespace_save_usable(
+        isolated_bootstrap_repository):
+    state = json.loads(
+        (isolated_bootstrap_repository / "ns-state.json").read_text())
+    resident = next(
+        row for row in state["abstractions"]
+        if row.get("name") == "CapabilityTest" and row.get("slot") == 10)
+    manifest_path = isolated_bootstrap_repository / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    selected = next(
+        row for row in manifest
+        if row.get("filename") == resident["filename"]
+        and row.get("archived") is not True)
+    selected["token"] = resident["token"]
+    for row in manifest:
+        if (row is not selected and row.get("archived") is True
+                and row.get("token") == resident["token"]):
+            row["token"] = hashlib.sha256(
+                row["filename"].encode("utf-8")).hexdigest()[:8]
+    manifest_path.write_text(json.dumps(manifest))
+
+    with app_module.app.test_client() as client:
+        payload = _bootstrap_save_payload(client, enforce=False)
+        response = client.post("/api/lumps/save", json=payload)
+
+    assert response.status_code == 200, response.get_data(as_text=True)
+    saved = (
+        isolated_bootstrap_repository / response.get_json()["lump"]
+    ).read_bytes()
+    digest = hashlib.sha256(saved).hexdigest()
+    approvals = read_approvals(
+        str(isolated_bootstrap_repository / "approvals.json"))
+    assert approvals[digest]["bootstrap_t"] == "4a00000a"
+    assert approvals[digest]["bootstrap_runtime_gt"] == 0x4A00000A
+
+    image = generate_boot_image({
+        "step1": {
+            "totalNamespaceWords": 16384,
+            "namespaceLumpWords": 1024,
+            "threadLumpWords": 256,
+        },
+    }, str(isolated_bootstrap_repository))
+    assert image
+
+
+def test_only_fixed_nonportable_publications_receive_bootstrap_authority():
+    assert publication_uses_bootstrap_authority(_RESIDENT) is True
+    assert publication_uses_bootstrap_authority(
+        _RESIDENT, {"owner": "CapabilityTest#1"}) is False
+    assert publication_uses_bootstrap_authority(
+        dict(_RESIDENT, ns_slot_policy="dynamic")) is False
 
 
 def test_bootstrap_sequence_mismatch_is_rejected_without_mutation(
