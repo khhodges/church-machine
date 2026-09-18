@@ -789,10 +789,9 @@
                               '</span>'
                             : '';
                 srcRows += '<div class="clist-row" data-slot="' + sourceSlot + '" tabindex="-1">' +
-                            '<span class="clist-slot" title="row ' + sourceSlot + ' \u2014 declared in source (not yet compiled)">' + sourceSlot + '</span>' +
+                            '<span class="clist-slot" title="C-List row ' + sourceSlot + '">' + sourceSlot + '</span>' +
                             '<span class="clist-name clist-pet-name">' + escHtml(sourcePetName) + '</span>' +
                             '<span class="clist-dot-name">' + escHtml(sourceDotName || '\u2014') + '</span>' +
-                            '<span class="clist-token" title="programmer-controlled capability declaration">source-declared</span>' +
                             rightsHtml +
                             '<button class="clist-pet-name-btn" data-action="edit-pet-name" data-slot="' + sourceSlot +
                                 '" title="Add or rename the pet name for CR' + sourceSlot + '">\u270e</button>' +
