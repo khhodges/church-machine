@@ -629,7 +629,7 @@ def test_compiler_self_placeholder_requires_namespace_destination(
                 "abstraction": "UnboundCompilerSelf",
                 "content_type": "code",
                 "capabilities": [{
-                    "name": "UnboundCompilerSelf",
+                    "name": "SELF",
                     "rights": ["E"],
                     "compiler_owned_self": True,
                 }],

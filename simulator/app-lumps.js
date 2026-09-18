@@ -8170,13 +8170,13 @@ window.showFormatLump = async function() {
         alert('Cannot format this LUMP: the editor changed after compilation. Compile the current source before saving.');
         return;
     }
-    // Compiler ownership is a row-zero flag, not a PetName. Preserve the
-    // programmer's abstraction name in the review UI and embedded API instead
-    // of leaking the internal SELF marker into saved metadata.
+    // SELF is the one canonical row-zero owner capability. Normalize the
+    // historical internal spelling before it reaches the review UI or the
+    // embedded API; it is never replaced by the abstraction PetName.
     _caps = _caps.map(function(cap, row) {
         if (row !== 0 || !cap || typeof cap !== 'object' ||
                 cap.compiler_owned_self !== true) return cap;
-        return Object.assign({}, cap, { name: _absName });
+        return Object.assign({}, cap, { name: 'SELF' });
     });
     var _apiObj = _formatLumpApiDefinition(_absName, _caps);
     var _candidates = {};
@@ -9296,8 +9296,10 @@ function _validateSavedLumpClist(rawWords, header, savedMetadata, simInstance) {
         cap && typeof cap === 'object' && cap.compiler_owned_self === true
     );
     const compilerSelf = savedCaps[0];
+    const compilerSelfName = String(compilerSelf && compilerSelf.name || '').toUpperCase();
     const hasCompilerSelf = !!(compilerSelf &&
         compilerSelf.compiler_owned_self === true &&
+        (compilerSelfName === 'SELF' || compilerSelfName === '__SELF__') &&
         (compilerSelf.slot == null || Number(compilerSelf.slot) === 0));
     if (selfMarkedRows.length > 0 && !hasCompilerSelf) {
         throw new Error('compiler-owned self capability must be the canonical SELF c-list row 0 record');
@@ -9506,8 +9508,10 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
             };
         }
         const _savedCaps = _validateSavedLumpClist(rawWords, _runHeader, _savedMetadata, sim);
+        const _savedSelfName = String(_savedCaps[0] && _savedCaps[0].name || '').toUpperCase();
         const _compilerOwnedSelf = !!(_savedCaps[0] &&
-            _savedCaps[0].compiler_owned_self === true);
+            _savedCaps[0].compiler_owned_self === true &&
+            (_savedSelfName === 'SELF' || _savedSelfName === '__SELF__'));
         let _identityContract = _savedMetadata.identityContract || 'dynamic-local';
         const _privateDataRows = _savedCaps.flatMap((cap, row) =>
             cap && cap.role === 'private_data' ? [row] : []);

@@ -11464,8 +11464,6 @@ def save_lump():
     _compiler_self_row = (
         _sl_typ == 0 and _has_declared_caps and
         (
-            _self_record.get("compiler_owned_self") is True or
-            _self_record.get("symbolic_self") is True or
             _self_name == "__SELF__" or
             (
                 _self_name == "SELF" and

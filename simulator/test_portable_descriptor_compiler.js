@@ -38,6 +38,10 @@ assert.equal(legacy.capabilities.filter(cap => cap && cap.compiler_owned_self).l
     'visible SELF E must materialize exactly one compiler-owned SELF row');
 assert.equal(legacy.capabilities.length, 2,
     'visible SELF E must not survive as a duplicate user capability');
+assert.equal(legacy.capabilities[0].name, 'SELF',
+    'the one compiler-owned row must keep the canonical SELF name');
+assert.deepEqual(legacy.capabilities[0].rights, ['E'],
+    'the canonical SELF row must be E-only');
 assert.equal(legacy.capabilities[1].name, 'Audit',
     'first user capability must remain at c-list row 1');
 console.log('portable descriptor compiler tests passed');
