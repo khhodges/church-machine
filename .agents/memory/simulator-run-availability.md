@@ -4,14 +4,13 @@ description: Run-button availability when editor source has no fresh compiled ca
 ---
 
 Keep the main simulator Run button enabled whenever Step and Walk can execute.
-If the editor has a fresh candidate, Run installs it first. If the candidate is
-missing or stale, Run executes the current simulator program without compiling
-or silently installing stale editor output.
+Run executes the prepared LightningBolt LUMP. Merely opening or compiling
+another LUMP must not silently replace that execution target.
 
 **Why:** The user explicitly rejected requiring compilation before Run while
-the adjacent execution controls remained enabled. Run, Step, and Walk operate
-on the same current simulator state when there is no fresh candidate.
+the adjacent execution controls remained enabled, and clarified that Run means
+the LightningBolt LUMP.
 
-**How to apply:** Keep stricter candidate ownership for separate LUMP workspace
-surfaces, Save, and Export. Apply this rule to the main simulator toolbar and
-its keyboard Run command.
+**How to apply:** Keep candidate compilation, Save, Export, and explicit install
+separate from the main simulator toolbar. Apply this rule to the toolbar Run
+button and its keyboard command.

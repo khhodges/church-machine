@@ -179,7 +179,27 @@ def test_boot_config_mutation_requires_report_token_when_configured(monkeypatch)
         response = unauthenticated.post("/api/boot-config", json={})
 
     assert response.status_code == 401
-    assert "REPORT_TOKEN" in response.get_json()["error"]
+    assert "Unauthorized IDE write" in response.get_json()["error"]
+
+
+def test_boot_config_mutation_accepts_same_origin_ide_request(monkeypatch):
+    import server.app as app_module
+
+    monkeypatch.setenv("REPORT_TOKEN", "scoped-boot-config-token")
+    app_module.app.config["TESTING"] = True
+    with app_module.app.test_client() as browser:
+        response = browser.post(
+            "/api/boot-config",
+            json={},
+            headers={
+                "Origin": "http://localhost",
+                "Sec-Fetch-Site": "same-origin",
+            },
+        )
+
+    # The empty body is invalid, but it crossed the browser-safe auth boundary.
+    assert response.status_code == 400
+    assert "Unauthorized" not in response.get_json()["error"]
 
 
 def test_failed_selection_preflight_leaves_saved_config_and_image_unchanged(

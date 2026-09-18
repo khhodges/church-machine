@@ -4,7 +4,6 @@
 - [NULL GT type canonicalisation](null-gt-type-canon.md) — isNullGT checks bits[26:25]===0b00; only replace ===0 with isNullGT at hardware gates (mLoad, _fetchInstruction); UI presence checks (CR6 in resolvePendingSlot) must stay ===0
 - [Wukong single-step trace architecture](wukong-trace-arch.md) — 11-byte 0xAA packets; F3 UART; 4-bit NZCV; step mode guarantees TraceUnit is idle
 - [TraceUnit per-event packet format](trace-unit-per-event-format.md) — 12-byte per-event packets; multi-event queue (1–3 per retire); trace_stall backpressure; ELOADCALL/RETURN-CR14 known gaps
-- [Wukong boot three-bug root cause](wukong-boot-perm-l-trap.md) — three cooperating bugs (u_perm timing, CR6 S+E→L+E, BRAM address-stability valid); all fixed; NUC runs clean 2M+ cycles
 - [Amaranth sync-domain self-deadlocking reset](amaranth-sync-reset-deadlock.md) — rst_sr in sync domain driving ResetSignal("sync") locks reset HIGH forever; use reset_less=True + GSR instead
 - [Sapphire ROM BRAM iBus/dBus conflict](sapphire-rom-bram-dbus-hang.md) — ROM BRAM single-port: iBus wins always; any dBus lw from ROM hangs; all firmware strings must be static char[] (.data/RAM)
 - [LUMP binary is big-endian](lump-binary-big-endian.md) — raw .lump file words are big-endian; ad-hoc LE reads/writes silently corrupt header/c-list, verify with lump-audit.js (also in CM_LUMP_SPECIFICATION.md §Developer Traps)
@@ -14,10 +13,6 @@
 - [Sapphire BRAM init — Variant B stub block](sapphire-bram-init-variant.md) — Efinity 2026.1 IP has stub initial begin (4 zeros) not $readmemb; depth=8192 words; patch_sapphire_init.py handles both variants
 - [Sapphire SoC as Trusted Security Base](sapphire-soc-tsb.md) — RISC-V private RAM is the keystore; APB3 register map; 5 free capabilities; FAULT_RST gap; FP verdict; SHA32 commissioning impact
 - [Wukong NS base is not ISA-safe at zero](wukong-ns-base-isa-conflict.md) — standalone Wukong currently overrides the ISA top-of-memory NS base to 0; do not promote that shortcut into a new image without resolving DMEM size/base
-- [BRAM NUC_PROGRAM staleness trap](bram-nuc-program-staleness.md) — church_ti60_f225.v BRAM goes stale when boot_rom.py NUC_PROGRAM changes; regen or patch via gen_cm_dmem_direct.py
-- [Verilog/RTLIL regeneration procedure](verilog-regen-procedure.md) — 9 gen commands for all actively-synthesised targets; legacy-frozen files; builder tab visibility trap
-- [v2.0 hardware format audit](v2-format-audit.md) — ARM cond order; Turing opcodes 16–25; ROL-XOR integrity; g_bit toggles; hardware WORD2 differs from simulator NS
-- [OBBS single-patch-location bug class](obbs-single-patch-location.md) — a newer patch step + an un-removed older patch step for the same artifact eventually double-run; make the later step a read-only self-test, not a fallback patch
 - [Boot namespace architecture rules](boot-namespace-rules.md) — 2 hardwired slots only; namespace liveness rule; authority = Abstract GT not NS entry; 3-layer boot model; SelfTest loop/CALL pattern
 - [LUMP name casing staleness gap](lump-name-casing-staleness-gap.md) — case drift hides orphaned LUMPs from guards; independently audit UI hardcoded tokens
 - [Self-diagnosing remote build guards](self-diagnosing-remote-guards.md) — version-stamp script output and dump actual-vs-expected state on failure when the script runs on a machine you can't directly access
@@ -27,19 +22,13 @@
 - [Editor-state migration coverage gap](editor-state-migration-coverage-gap.md) — a one-shot text migration must be wired into every independent save/restore path (keyed draft store AND generic "last session" snapshot), or the "fixed" bug reappears via the unpatched path
 - [Assembler nsLoaded vs _capBlockSlots slot confusion](assembler-nsloaded-slot-confusion.md) — for 2-op LOAD/SAVE, nsLoaded stores CR register number (not c-list slot); _capBlockSlots[name] is always the correct slot for a fresh c-list access
 - [Sapphire BRAM guard false-positive modes](sapphire-bram-guard-false-positive.md) — RC=3 has 2 modes: stale real content (bad) vs all-FF MAP placeholder (2026.1 normal/false-positive); RC=1 (all-zero) is always fatal
-- [GitHub API PUT for cross-repo file delivery](github-api-put-delivery.md) — when git histories diverge, PUT individual files via Contents API from Replit bash ($GITHUB_PAT); droplet uses `git checkout origin/main -- <file>` to receive them
 - [Ti60 firmware update pipeline](ti60-firmware-update-pipeline.md) — PNR-only skips 3 required steps (patch sapphire.v, delete VDB, MAP); must run full OBBS; serve hex from $SOC_DIR/outflow/ not repo bitstreams/ (git pull overwrites)
-- [A7 v1.2 stored nsCount anti-inflation pattern](a7-nscount-stored-word.md) — c-list at NS TABLE tail inflates nsCount to MAX_NS_ENTRIES; fix: store clean count at NS_TABLE_BASE-3 (scan before c-list + emptyCount); loadBootImage() reads it, forward scan only as fallback
 - [IRQ LUMP lazy-load manifest guard](irq-lump-lazy-gate-guard.md) — gate on a manifest entry; pre-seeded test slots otherwise bypass it via abstractionRegistry
-- [Tier-3 boot recovery slot redirect](tier3-boot-recovery-slot-redirect.md) — stepSim/runSim/instantBoot/slowBoot must save+redirect sim.bootEntrySlot to sim._bootAbstrSlot around every _bootStep() call or B:05 RANGE-faults on an empty gap slot after reset
-- [lump-audit BRANCH opcode drift](lump-audit-branch-opcode.md) — lump-audit.js _rciBranchOp must equal 23 (v2.0); opcode 17=DWRITE; c-list zeros are expected at compile time (runtime fills them)
-- [Wukong write_bitstream DRC NSTD-1/UCIO-1](wukong-bitstream-drc-fix.md) — launch_runs -to_step write_bitstream spawns fresh session; XDC severity overrides lost; use open_run+write_bitstream directly instead
 - [NS slot labels across hard resets](ns-slot-label-persistence.md) — reseeding must override temporary '(reserved)' labels after binary restoration
 - [Boot.Abstr c-list must be pre-populated](boot-abstr-clist-must-be-prepopulated.md) — boot path skips lazy GT injection; LUMP needs correct GTs baked in; JS vs Python GT formats differ; manifest filename field governs lump-consistency binary reads
 - [Thread base address zero](thread-base-address-zero.md) — a non-null CR12 may point to word 0; use an explicit missing-capability sentinel, never a base truthiness check
 - [Mint gate for NS slot registration](mint-gate-ns-registration.md) — only Mint.RegisterOutform→Navana.ADD→writeNSEntry may add NS slots; _seedIrqLazyManifest handles post-allocation state; no direct writeNSEntry outside this chain
 - [Wukong build-host policy](wukong-build-host-policy.md) — serialize resource-constrained Vivado builds and accept releases only with fresh, timing-clean provenance
-- [Wukong boot CALL/LOAD/retire fixes](wukong-boot-callhome-fixes.md) — sync-BRAM fetch-settle bubble, issue-cycle busy gaps, operand latching, busy-gated decoder faults, boot_retire_count reset on FAULT_RST
 - [Wukong IRQ arm gate](wukong-irq-arm-gate.md) — irq_armed_reg+first_call_done_reg cleared on FAULT_RST; dispatch disabled until first CALL→method→RETURN completes
 - [Wukong boot CALL direct-GT resolution](wukong-boot-call-resolution.md) — decoder call_mask=0 always; boot window uses BOOT_RESTORE_MASK (CR0+CR12); CALL bypasses c-list via mload_direct+boot_window_lat
 - [UART magic-byte frame resync](uart-frame-resync.md) — 0xAA-framed streams slip on mid-stream attach/dropped bytes; validate candidate frames (aligned NIA, known ev, sane flags) and advance 1 byte on failure
@@ -49,8 +38,6 @@
 - [Wukong dev/production event relay](wukong-dev-production-relay.md) — local simulator previews need the production relay when the physical bridge is attached to lab.cloomc.org
 - [Wukong poll rejection containment](wukong-poll-rejection-containment.md) — async hardware polling must contain state-update failures, not only fetch failures
 - [Hardware snapshot separation](hardware-snapshot-separation.md) — hardware NIA/cursor and stored thread context must stay separate from simulator PC, live CR12, and breakpoints
-- [Wukong RTL generation initializer bottleneck](wukong-rtl-generation-init-bottleneck.md) — fixed 64 KiB DMEM is not proof of a BRAM issue; Amaranth conversion can stall before Yosys/Vivado
-- [Amaranth shape() memoization](amaranth-shape-memoization.md) — Operator/SwitchValue.shape() uncached in 0.5.8; monkey-patch both before convert() for O(n) instead of O(n²)
 - [ns-state snapshot vs raw binary](ns-state-snapshot-vs-raw.md) — ns-state.json fields can be stale vs boot-image.bin; use the endpoint `committed` raw-words block for hex display and fault checks
 - [Sidecar spec vs implementation](sidecar-spec-vs-implementation.md) — mechanical-cache rule is future-normative; verify field/writer claims against server/app.py before spec edits
 - [Freespace validation zone per typ](freespace-validation-zone-per-typ.md) — freespace scans must branch on lump typ: Thread uses the collision zone, Namespace skips; generic cw/cc bounds reject valid Threads
@@ -74,7 +61,6 @@
 - [Wukong release-host staging](wukong-release-host-staging.md) — Build each candidate in a fresh commit-pinned vendor checkout; never reuse stale or dirty historical build directories
 - [Verified binary merge survival](verified-binary-merge-survival.md) — provenance is not a release unless its ignored binary is explicitly tracked and CI verifies the complete bundle
 - [Historical hardware authority chain](historical-hardware-authority-chain.md) — grant saved test context only through an exact build, source, and artifact-digest binding
-- [Testing iframe health regression](testing-iframe-health-regression.md) — isolate live telemetry when verifying health-panel state across persistent Builder-tab navigation
 - [Wukong UI surface ownership](wukong-ui-surface-ownership.md) — physical-board controls live only on Builder > Testing; simulator controls remain software-only
 - [Primary publish vs static artifact](primary-publish-vs-static-artifact.md) — publishing a nested artifact can replace the custom-domain root despite a correct root autoscale config
 - [Actionable transport incidents](actionable-transport-incidents.md) — latch terminal failures until proven recovery; diagnostics may escalate guidance but never replace incident identity
@@ -83,9 +69,7 @@
 - [Bank recovery grants](bank-recovery-grants.md) — restart recovery needs server-authorized proof-free custody envelopes and a distinct NS generation
 - [Dynamic system LUMP runtime binding](dynamic-system-lump-runtime-binding.md) — dynamic LUMPs must gate dispatch on their generated canonical identity, never only a duplicated registry index
 - [Capability ABI result materialization](capability-abi-result-materialization.md) — a runtime binding must write declared CR/DR outputs and preserve protected proof state, not return authority only in host objects
-- [Bank artifact binding seals](bank-artifact-binding-seals.md) — Bank’s source is embedded in its artifact, so regeneration must also synchronize binding token/hash constants
 - [Bank validation gates](bank-validation-gates.md) — Bank uses structural, E/type, then mechanical identity checks; provenance remains human-vouched until a genesis verifier exists
-- [TPERM domain-purity SelfTest rule](tperm-domain-purity-selftest.md) — cross-domain TPERM requests fault by design; resident self-tests must not expect a Z=0 continuation
 - [Fault trace delivery blocking](fault-trace-delivery-blocking.md) — fault packets await indefinitely for IDE trace acceptance before local reporting, so HTTPS outages surface as missing faults
 - [Fault telemetry delivery isolation](fault-telemetry-delivery-isolation.md) — serial parsing must enqueue IDE telemetry and reject stale incident completions before recovery correlation
 - [Static-slot historical variants](capabilitytest-static-variant-manifest.md) — archive older fixed-slot binaries in a shared variant group while the active manifest record names its exact artifact and sidecar
@@ -100,9 +84,7 @@
 - [Protected Thread indicator](protected-thread-indicator.md) — word +17 packs FLAGS/SZ/STO outside CR5; frame words save the prior indicator state
 - [Portable LUMP binding boundary](portable-lump-binding-boundary.md) — canonical artifacts carry unresolved N/T/hash locks; only verified destination copies may contain local GTs
 - [Thread object runtime authority](thread-object-runtime-authority.md) — a suspended Thread's executable context is its canonical CHURCH frame; never add parallel identity caches
-- [Lazy retry breakpoint E2E timing](lazy-retry-breakpoint-e2e-timing.md) — hold the mocked download pending, then arm the breakpoint; use retirement stats, not attempt count
 - [Immutable LUMP history transitions](immutable-lump-history-transitions.md) — archive/current/sidecar/manifest commit together under flock; reserve with lexists and revalidate generation
-- [Build checkpoint mutates NS state](build-checkpoint-mutates-ns-state.md) — checkpoint generation can rewrite ns-state.json via boot imports; restore/verify it before final provenance
 - [CALL E-GT identity flow](call-egt-identity-flow.md) — CALL resolves source/callee E-GTs directly; RETURN frames must carry normalized caller E authority, never transient CR6 L authority
 - [Bridge-causal retirement gates](bridge-causal-retirement-gates.md) — UART write→retirement proofs must use bridge-side counters, not server receive order
 - [Board-state acknowledgement correlation](board-state-ack-correlation.md) — state-changing UART acknowledgements need a request nonce, atomic receive, and bounded partial-frame recovery
@@ -156,4 +138,5 @@
 - [Boot freshness requires admissible identity](boot-freshness-admissible-identity.md) — identity-invalid compilations are failed evidence, never “latest successful” boot candidates
 - [Bootstrap repair publication](bootstrap-repair-publication.md) — recovered source must retain server-issued bootstrap context; corrected publication supersedes active rows sharing its filename
 - [Live LUMP manifest uniqueness](live-lump-manifest-uniqueness.md) — publication retires conflicting live token/destination rows atomically while preserving immutable history
-- [Simulator Run availability](simulator-run-availability.md) — Run stays available like Step/Walk; install a fresh candidate when present, otherwise execute the current simulator program
+- [Simulator Run availability](simulator-run-availability.md) — Run stays available like Step/Walk and executes the prepared LightningBolt LUMP, never an arbitrary editor candidate
+- [IDE browser write authorization](ide-browser-write-authorization.md) — same-origin IDE config writes must work without exposing REPORT_TOKEN; scripts and cross-origin callers still require bearer auth
