@@ -14,6 +14,8 @@ import subprocess
 
 ROOT    = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 HARNESS = os.path.join(ROOT, "tests", "mwindow", "sim_mwin_writeback.js")
+PERMISSION_HARNESS = os.path.join(
+    ROOT, "tests", "mwindow", "sim_permission_runtime_boundary.js")
 
 
 def _node_available():
@@ -53,3 +55,18 @@ def test_mwin_writeback_harness():
     assert "[PASS]" in stdout, f"No PASS markers in output:\n{stdout}"
     pass_count = stdout.count("[PASS]")
     assert pass_count >= 7, f"Expected at least 7 PASS markers, got {pass_count}:\n{stdout}"
+
+
+@pytest.mark.skipif(not _node_available(), reason="Node.js not available")
+def test_permission_changes_reach_runtime_m_bit_gate():
+    """Compile accepts permission differences; SWITCH rejects M=0 at runtime."""
+    result = subprocess.run(
+        ["node", PERMISSION_HARNESS],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stderr == ""
+    assert result.stdout.count("[PASS]") == 2

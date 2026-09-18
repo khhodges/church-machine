@@ -675,7 +675,7 @@ def test_runtime_m_bit_policy_does_not_block_save_metadata(
     words[-2] = 0x4A000007
     words[-1] = 0x4A000003
     with app_module.app.test_client() as client:
-        response = client.post("/api/lumps/save-plan", json={
+        candidate = {
             "binary": words,
             "metadata": {
                 "token": "7c501086",
@@ -686,9 +686,33 @@ def test_runtime_m_bit_policy_does_not_block_save_metadata(
                     {"name": "LED_DEV", "rights": ["E"], "nsIndex": 3},
                 ],
             },
+        }
+        response = client.post("/api/lumps/save-plan", json=candidate)
+        assert response.status_code in (200, 201), response.get_data(as_text=True)
+        plan = response.get_json()
+        issued = client.post("/api/lumps/approval-intent", json={
+            "digest": plan["digest"],
+            "action": plan["action"],
+            "plan_id": plan["plan_id"],
+            "confirmation": True,
+            "approval": {
+                "grants": ["E"],
+                "capability_type": "inform",
+            },
         })
+        assert issued.status_code == 201, issued.get_data(as_text=True)
+        candidate["metadata"].update({
+            "save_plan_id": plan["plan_id"],
+            "approval_intent": issued.get_json()["intent"],
+        })
+        saved = client.post("/api/lumps/save", json=candidate)
 
-    assert response.status_code in (200, 201), response.get_data(as_text=True)
+    assert saved.status_code == 200, saved.get_data(as_text=True)
+    manifest = json.loads((isolated_lumps / "manifest.json").read_text())
+    persisted = next(
+        row for row in manifest if row["abstraction"] == "ChangedPermission")
+    assert persisted["capabilities"][1]["rights"] == ["E"]
+    assert (isolated_lumps / persisted["filename"]).is_file()
 
 
 @pytest.mark.parametrize("submitted_word", [0xFEEDDEAD, 0])
