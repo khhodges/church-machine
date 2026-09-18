@@ -606,6 +606,34 @@
         "E"
       ],
       "capability_type": "inform"
+    },
+    "194f6ffcb1a37b5ee275099671d02cd2914baead018904d6c915844b056e0088": {
+      "binary_hash": "194f6ffcb1a37b5ee275099671d02cd2914baead018904d6c915844b056e0088",
+      "filename": "CapabilityTest.2.c2194804.lump",
+      "dot_name": "CapabilityTest",
+      "issue_n": 2,
+      "bootstrap_t": "4a00000a",
+      "bootstrap_runtime_gt": 1241513994,
+      "token": "4a00000a",
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
+    },
+    "e919f430e7fe00f45335ea0d425dea8bfff15c83eff17a58798c4c0d63f478c0": {
+      "binary_hash": "e919f430e7fe00f45335ea0d425dea8bfff15c83eff17a58798c4c0d63f478c0",
+      "filename": "WukongCallHome.1.658e6ba8.lump",
+      "dot_name": "WukongCallHome",
+      "issue_n": 1,
+      "bootstrap_t": "4a000007",
+      "bootstrap_runtime_gt": 1241513991,
+      "token": "4a000007",
+      "abstraction": "WukongCallHome",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
     }
   }
 }

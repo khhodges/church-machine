@@ -60,7 +60,7 @@ if (typeof ChurchAssembler === 'undefined') {
 // ── Assemble the CLOOMC source ───────────────────────────────────────────────
 const source = fs.readFileSync(SOURCE, 'utf8');
 const assemblySource = source.replace(
-    /(UART_TX\s+W)(\s*\n\})/,
+    /(UART_TX\s+RW)(\s*\n\})/,
     '$1,\n    WukongCallHome.hw E$2'
 );
 const asm    = new ChurchAssembler();
@@ -115,8 +115,8 @@ console.log(`WUKONG_NUC_PROGRAM has ${nucProgram.length} words.`);
 // ── Verify lengths ────────────────────────────────────────────────────────────
 let failed = false;
 
-if (assembled.length !== 74) {
-    console.error(`FAIL: wukong_callhome.cloomc assembled to ${assembled.length} words; expected 74.`);
+if (assembled.length !== 75) {
+    console.error(`FAIL: wukong_callhome.cloomc assembled to ${assembled.length} words; expected 75.`);
     failed = true;
 }
 if (nucProgram.length !== 73) {
@@ -191,21 +191,28 @@ if (!diverged) {
     console.log('  OK: words [2..71] match exactly.');
 }
 
-// The immutable ROM loops at word 72. The software LUMP instead hands off to
-// the recovered hardware LUMP, then keeps an adjusted loop as a safe fallback.
-// The assembly-only runtime handoff follows the six source declarations, so it
-// is row 6 before the builder inserts compiler-owned SELF at physical row 0.
-const EXPECTED_HW_CALL = 0x47030006;
-const EXPECTED_SW_LOOP = 0xBF007FBA;
+// The immutable ROM loops at word 72. The software LUMP instead materializes
+// the recovered hardware capability into CR0, calls its direct/default entry,
+// then keeps an adjusted loop as a safe fallback. The assembly-only runtime
+// handoff follows the six source declarations, so it is row 6 before the
+// builder inserts compiler-owned SELF at physical row 0.
+const EXPECTED_HW_LOAD = 0x07030006;
+const EXPECTED_HW_CALL = 0x17000000;
+const EXPECTED_SW_LOOP = 0xBF007FB9;
 const EXPECTED_ROM_LOOP = 0xBF007FBB;
-if ((assembled[72] >>> 0) !== EXPECTED_HW_CALL) {
-    console.error(`  DIVERGED word[72]: expected WukongCallHome.hw selector-0 CALL ` +
-                  `0x${EXPECTED_HW_CALL.toString(16)}, got 0x${(assembled[72] >>> 0).toString(16)}.`);
+if ((assembled[72] >>> 0) !== EXPECTED_HW_LOAD) {
+    console.error(`  DIVERGED word[72]: expected WukongCallHome.hw LOAD ` +
+                  `0x${EXPECTED_HW_LOAD.toString(16)}, got 0x${(assembled[72] >>> 0).toString(16)}.`);
     diverged = true;
 }
-if ((assembled[73] >>> 0) !== EXPECTED_SW_LOOP) {
-    console.error(`  DIVERGED word[73]: expected loop fallback 0x${EXPECTED_SW_LOOP.toString(16)}, ` +
-                  `got 0x${(assembled[73] >>> 0).toString(16)}.`);
+if ((assembled[73] >>> 0) !== EXPECTED_HW_CALL) {
+    console.error(`  DIVERGED word[73]: expected selector-0 CALL ` +
+                  `0x${EXPECTED_HW_CALL.toString(16)}, got 0x${(assembled[73] >>> 0).toString(16)}.`);
+    diverged = true;
+}
+if ((assembled[74] >>> 0) !== EXPECTED_SW_LOOP) {
+    console.error(`  DIVERGED word[74]: expected loop fallback 0x${EXPECTED_SW_LOOP.toString(16)}, ` +
+                  `got 0x${(assembled[74] >>> 0).toString(16)}.`);
     diverged = true;
 }
 if ((nucProgram[72] >>> 0) !== EXPECTED_ROM_LOOP) {
@@ -247,7 +254,7 @@ const expectedCaps = [
     { name: 'Mint', rights: ['E'], nsIndex: 6, token: 0x4A000006 },
     { name: 'Memory', rights: ['E'], nsIndex: 7, token: 0x4A000007 },
     { name: 'LED0', rights: ['R', 'W'], nsIndex: 3, token: 0x32000003 },
-    { name: 'UART_TX', rights: ['W'], nsIndex: 2, token: 0x22000002 },
+    { name: 'UART_TX', rights: ['R', 'W'], nsIndex: 2, token: 0x32000002 },
     { name: 'WukongCallHome.hw', rights: ['E'], nsIndex: 7, token: 0x4A000007 },
 ];
 const declaredCaps = result.capabilities || [];

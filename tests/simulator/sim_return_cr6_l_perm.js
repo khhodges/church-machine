@@ -239,7 +239,8 @@ console.log('\n--- PHASE 2: real CALL→RETURN round-trip (cc>0, mask=0) ---');
 
     // CR6: caller's L-GT for the caller's own c-list (slot 5).
     const callerCR6GT = sim.createGT(0, CALLER_SLOT, {L:1}, 1);
-    sim.cr[6] = { word0: callerCR6GT, word1: CALLER_BASE, word2: 0, word3: 0, m: 0 };
+    const callerCListBase = CALLER_BASE + 64 - CALLER_CC;
+    sim.cr[6] = { word0: callerCR6GT, word1: callerCListBase, word2: 0, word3: 0, m: 0 };
 
     // CR14: caller's code register (RX, slot 5).
     const cr14GT = sim.createGT(0, CALLER_SLOT, {R:1, X:1}, 1);
@@ -297,6 +298,10 @@ console.log('\n--- PHASE 2: real CALL→RETURN round-trip (cc>0, mask=0) ---');
         assert('P2-WORD: CR6.word0 is byte-identical to the caller\'s original L-GT',
             cr6w0 === (callerCR6GT >>> 0),
             `got 0x${cr6w0.toString(16).toUpperCase()}, expected 0x${(callerCR6GT >>> 0).toString(16).toUpperCase()}`);
+
+        assert('P2-CLIST-BASE: CR6.word1 restores the caller c-list, not the caller LUMP header',
+            sim.cr[6].word1 === callerCListBase,
+            `got 0x${sim.cr[6].word1.toString(16).toUpperCase()}, expected 0x${callerCListBase.toString(16).toUpperCase()}`);
 
         assert('P2-STACK-EMPTY: callStack is empty after RETURN',
             sim.callStack.length === 0,
@@ -418,7 +423,8 @@ console.log('\n--- PHASE E2E: full fetch/decode/execute via sim.step() ---');
 
     // Caller's CR6 = L-GT for caller slot.
     const callerCR6GT = sim.createGT(0, CALLER_SLOT, {L:1}, 1);
-    sim.cr[6] = { word0: callerCR6GT, word1: CALLER_BASE, word2: 0, word3: 0, m: 0 };
+    const callerCListBase = CALLER_BASE + 64 - CALLER_CC;
+    sim.cr[6] = { word0: callerCR6GT, word1: callerCListBase, word2: 0, word3: 0, m: 0 };
 
     // CR14 points at caller lump.
     const cr14GT = sim.createGT(0, CALLER_SLOT, {R:1, X:1}, 1);
@@ -507,6 +513,10 @@ console.log('\n--- PHASE E2E: full fetch/decode/execute via sim.step() ---');
     assert('E2E-WORD: CR6.word0 is byte-identical to the caller\'s original L-GT',
         cr6w0 === (callerCR6GT >>> 0),
         `got 0x${cr6w0.toString(16).toUpperCase()}, expected 0x${(callerCR6GT >>> 0).toString(16).toUpperCase()}`);
+
+    assert('E2E-CLIST-BASE: decoded RETURN restores the caller c-list base',
+        sim.cr[6].word1 === callerCListBase,
+        `got 0x${sim.cr[6].word1.toString(16).toUpperCase()}, expected 0x${callerCListBase.toString(16).toUpperCase()}`);
 
     assert('E2E-M: decoded RETURN explicitly sets CR6.M',
         sim.cr[6].m === 1,

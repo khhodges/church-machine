@@ -8138,15 +8138,30 @@ class ChurchSimulator {
                 protectedFrame.companionCheck.entry) {
             const callerIdentity = protectedFrame.companionParsed;
             const callerEntry = protectedFrame.companionCheck.entry;
-            const callerL = this.createGT(
-                callerIdentity.gt_seq, callerIdentity.index, {L: 1}, 1);
-            this.cr[6] = {
-                word0: callerL >>> 0,
-                word1: callerEntry.word0_location >>> 0,
-                word2: callerEntry.word1_limit >>> 0,
-                word3: 0,
-                m: 1,
-            };
+            if (protectedFrame.threadBase === null && frame.savedCRs && frame.savedCRs[6]) {
+                // Lump-only fixtures have no protected Thread from which to
+                // reconstruct context. Their captured caller descriptor is the
+                // complete authority available to RETURN.
+                this.cr[6] = {...frame.savedCRs[6], m: 1};
+            } else {
+                const callerBase = callerEntry.word0_location >>> 0;
+                const callerHdr = this.parseLumpHeader(this.memory[callerBase] >>> 0);
+                if (!callerHdr.valid) {
+                    this.fault('STACK_CORRUPT',
+                        `RETURN: caller ${this.nsLabels[callerIdentity.index] || `NS[${callerIdentity.index}]`} has no valid LUMP header for CR6 restoration`);
+                    return null;
+                }
+                const callerCListBase = (callerBase + callerHdr.lumpSize - callerHdr.cc) >>> 0;
+                const callerL = this.createGT(
+                    callerIdentity.gt_seq, callerIdentity.index, {L: 1}, 1);
+                this.cr[6] = {
+                    word0: callerL >>> 0,
+                    word1: callerCListBase,
+                    word2: callerEntry.word1_limit >>> 0,
+                    word3: callerEntry.word2_seals >>> 0,
+                    m: 1,
+                };
+            }
         }
         // RETURN microcode establishes the caller's c-list as the one
         // isolated-register authority carried across the domain boundary.

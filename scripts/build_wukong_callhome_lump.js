@@ -69,7 +69,7 @@ const source = fs.readFileSync(SOURCE, 'utf8');
 // declaration. Add it only to the assembly input so the named CALL can be
 // encoded; the embedded/restored source remains the exact six-row source.
 const assemblySource = source.replace(
-    /(UART_TX\s+W)(\s*\n\})/,
+    /(UART_TX\s+RW)(\s*\n\})/,
     '$1,\n    WukongCallHome.hw E$2'
 );
 const asm    = new ChurchAssembler();

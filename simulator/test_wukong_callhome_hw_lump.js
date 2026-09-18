@@ -534,8 +534,8 @@ console.log('\n--- WCH-HW-13: code view, compile ownership, and popup guards ---
         appShell.includes('let _pendingSimLoadSnapshot = null;') &&
         appShell.includes('_pendingSimLoadSnapshot = snapshot ? Object.freeze({') &&
         appRun.includes('const _aplWords = _aplPending && _aplPending.words.length') &&
-        appRun.includes('function _injectClistNow(capabilitiesOverride)') &&
-        appRun.includes('if (_injectClistNow(_aplCaps) === false)'));
+        appRun.includes('function _injectClistNow(capabilitiesOverride,') &&
+        appRun.includes('if (_injectClistNow(_aplCaps, _runSlot) === false)'));
     check('WCH-HW-13e: boot and run exceptions open a dedicated runtime-error popup',
         appRun.includes('function showRuntimeErrorModal(error, context)') &&
         appRun.includes("title.textContent = 'Simulator Runtime Error';") &&

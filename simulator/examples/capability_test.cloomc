@@ -95,7 +95,7 @@ SHR  DR4, DR4, 1      ; DR4 = 4
 ; ============================================================
 ; SelfTest already ran before Starter/CapabilityTest. Calling it again here
 ; creates the unbounded SelfTest → CapabilityTest → SelfTest frame cycle.
-ELOADCALL CR0, WukongCallHome.hw, 0
+ELOADCALL CR0, WukongCallHome.hw
 
 ; If call-home returns, rerun the capability checks without re-entering SelfTest.
 BRANCH Start

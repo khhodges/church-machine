@@ -74,7 +74,7 @@ capabilities {
     Mint E,
     Memory E,
     LED0 RW,
-    UART_TX W,
+    UART_TX RW,
     WukongCallHome.hw E
 }
 
@@ -85,7 +85,7 @@ capabilities {
 ; instructions (words 2-72) are bit-for-bit identical to WUKONG_NUC_PROGRAM.
 setup:
     LOAD  CR3, LED0               ; [0] LED_DEV → CR3  (physical row 5, RW)
-    LOAD  CR4, UART_TX            ; [1] UART_DEV → CR4  (physical row 6, W)
+    LOAD  CR4, UART_TX            ; [1] UART_DEV → CR4  (physical row 6, RW)
     IADD  DR1, DR0, #1            ; [2] DR1 = 1  (LED "on"; also DREAD STATUS offset)
 
 ; ── Loop top (word 3) — unconditional branch target from word 72 ─────────────

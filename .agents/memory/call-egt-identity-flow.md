@@ -23,11 +23,16 @@ violates the ISA. The saved Enter E-GT is the sole return authority.
 RETURN must explicitly set CR6.M after rebuilding the caller's CR6. M is
 boundary microcode state, not ordinary register state to restore from a frame.
 
+CR6 restoration must rebuild the caller's c-list view: `word1` is the caller
+LUMP base plus `lumpSize - cc`, not the caller LUMP header base. CR14 uses the
+header base; CR6 and CR14 must not be reconstructed with the same address.
+
 **Why:** The boot CALL's direct-resolution path masked both mistakes; a normal
-nested cross-domain CALL failed before entry, and an L-only frame could not
-complete the RETURN cLoad handoff.
+nested cross-domain CALL failed before entry, an L-only frame could not complete
+the RETURN cLoad handoff, and restoring CR6 to the header made the caller read
+instructions/data as GTs after a successful RETURN.
 
 **How to apply:** For CALL/RETURN RTL or simulator changes, test at least two
 nested ordinary domains after the boot window closes. Verify exact frame E-GTs,
-cLoad commits, CR6.M=1 after RETURN, restored STO values, return fetch settling,
-and the absence of extra retires.
+cLoad commits, CR6.M=1 and the caller c-list base after RETURN, restored STO
+values, return fetch settling, and the absence of extra retires.
