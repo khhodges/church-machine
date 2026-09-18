@@ -4153,28 +4153,41 @@ function showFaultModal(f) {
     // Prefers crSnapshot[14] (captured at fault time) over _nsSnapshot so
     // heap-loaded lumps (e.g. LED flash) are shown instead of Boot.NS.
     const _cr14snap = f.crSnapshot && f.crSnapshot[14];
-    let locationNs;
+    let locationNs = null;
     if (_cr14snap && _cr14snap.word0) {
         const _ni   = _cr14snap.word0 & 0xFFFF;
         // Never relabel a historical record with a later image's live table.
         const _lbl  = f.faultLabel || `NS[${_ni}]`;
         const _base = (_cr14snap.word1 !== undefined && _cr14snap.word1 !== null) ? (_cr14snap.word1 >>> 0) : 0;
-        locationNs  = { label: _lbl, nsIdx: _ni, offset: pc === null ? null : pc - _base };
-    } else {
-        locationNs  = ns;
+        const _offset = pc === null ? null : pc - _base;
+        let _limit = null;
+        try {
+            if (_cr14snap.word2 !== undefined && _cr14snap.word2 !== null &&
+                    sim && typeof sim.parseNSWord1 === 'function') {
+                _limit = sim.parseNSWord1(_cr14snap.word2 >>> 0).limit;
+            }
+        } catch (_) {}
+        const _withinCr14 = Number.isInteger(_offset) && _offset >= 0 &&
+            (!Number.isInteger(_limit) || _limit <= 0 || _offset < _limit);
+        if (_withinCr14) {
+            locationNs = { label: _lbl, nsIdx: _ni, offset: _offset };
+        }
+    } else if (ns && Number.isInteger(ns.offset) && ns.offset >= 0) {
+        locationNs = ns;
     }
     const nsStr  = locationNs && locationNs.label
         ? `${locationNs.label}${Number.isInteger(locationNs.offset) ? ` +${locationNs.offset}` : ' (offset unavailable)'}`
-        : 'unavailable (no immutable instruction provenance)';
+        : (pc === null
+            ? 'unavailable (no immutable instruction provenance)'
+            : `unmapped address ${pcHex} (outside the captured code capability)`);
 
     // Authoritative ns index for "view lump" navigation.
     // crSnapshot[14].gtIndex is captured at fault time and directly names
     // the executing code lump's namespace slot — more reliable than
     // _nsOwnerOf which does a memory-range search that can find the wrong
     // lump or return null.
-    const nsIdxForViewLump = (_cr14snap && _cr14snap.word0)
-        ? (_cr14snap.word0 & 0xFFFF)
-        : (ns ? ns.nsIdx : null);
+    const nsIdxForViewLump = locationNs && Number.isInteger(locationNs.nsIdx)
+        ? locationNs.nsIdx : null;
     const color  = _FAULT_COLORS[f.type] || '#e05555';
 
     // Numeric hardware fault code
@@ -4348,8 +4361,9 @@ function showFaultModal(f) {
     // ns.offset is the word offset from the lump base (including header word at 0).
     // lineNums[instrIdx] (instrIdx = ns.offset - 1) gives the source editor line.
     const _editLineNum = (() => {
-        if (!ns || ns.offset === undefined || ns.offset < 1 || !assembler) return null;
-        const instrIdx = ns.offset - 1;
+        if (!locationNs || locationNs.offset === undefined ||
+                locationNs.offset < 1 || !assembler) return null;
+        const instrIdx = locationNs.offset - 1;
         const lns = assembler.getLastLineNums ? assembler.getLastLineNums() : [];
         const ln = lns[instrIdx];
         return (typeof ln === 'number' && ln > 0) ? ln : null;
