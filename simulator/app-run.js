@@ -2264,11 +2264,77 @@ function setAllUniversalBreakpoints(enabled) {
     updateDashboard();
 }
 
+let _stepSettingsViewportListenersBound = false;
+
+function _positionStepSettingsPopover() {
+    const pop = document.getElementById('stepSettingsPopover');
+    const anchor = document.getElementById('toolBreakBtn');
+    if (!pop || !anchor || pop.style.display === 'none') return;
+
+    const vv = window.visualViewport || null;
+    const viewportLeft = vv ? vv.offsetLeft : 0;
+    const viewportTop = vv ? vv.offsetTop : 0;
+    const viewportWidth = vv ? vv.width : window.innerWidth;
+    const viewportHeight = vv ? vv.height : window.innerHeight;
+    const margin = 8;
+    const gap = 6;
+    const availableWidth = Math.max(1, viewportWidth - margin * 2);
+    const availableHeight = Math.max(1, viewportHeight - margin * 2);
+
+    pop.style.position = 'fixed';
+    pop.style.transform = 'none';
+    pop.style.maxWidth = `${availableWidth}px`;
+    pop.style.maxHeight = `${availableHeight}px`;
+
+    const anchorRect = anchor.getBoundingClientRect();
+    const popRect = pop.getBoundingClientRect();
+    const panelWidth = Math.min(
+        popRect.width || pop.offsetWidth || 290, availableWidth);
+    const panelHeight = Math.min(
+        popRect.height || pop.offsetHeight || availableHeight, availableHeight);
+    const minLeft = viewportLeft + margin;
+    const maxLeft = viewportLeft + viewportWidth - margin - panelWidth;
+    const minTop = viewportTop + margin;
+    const maxTop = viewportTop + viewportHeight - margin - panelHeight;
+
+    const centeredLeft = anchorRect.left +
+        (anchorRect.width || (anchorRect.right - anchorRect.left)) / 2 -
+        panelWidth / 2;
+    let top = anchorRect.bottom + gap;
+    const aboveTop = anchorRect.top - gap - panelHeight;
+    if (top > maxTop && aboveTop >= minTop) top = aboveTop;
+
+    pop.style.left = `${Math.max(minLeft, Math.min(centeredLeft, maxLeft))}px`;
+    pop.style.top = `${Math.max(minTop, Math.min(top, maxTop))}px`;
+}
+
+function _ensureStepSettingsViewportListeners() {
+    if (_stepSettingsViewportListenersBound) return;
+    _stepSettingsViewportListenersBound = true;
+    const reposition = () => _positionStepSettingsPopover();
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true);
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', reposition);
+        window.visualViewport.addEventListener('scroll', reposition);
+    }
+}
+
+function _showAndPositionStepSettingsPopover(pop) {
+    pop.style.display = 'block';
+    _ensureStepSettingsViewportListeners();
+    _positionStepSettingsPopover();
+    if (typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(() => _positionStepSettingsPopover());
+    }
+}
+
 function toggleStepSettingsPopover() {
     const pop = document.getElementById('stepSettingsPopover');
     if (!pop) return;
     const open = pop.style.display !== 'none';
-    pop.style.display = open ? 'none' : 'block';
+    if (open) pop.style.display = 'none';
+    else _showAndPositionStepSettingsPopover(pop);
     const breakBtn = document.getElementById('toolBreakBtn');
     if (breakBtn) breakBtn.setAttribute('aria-expanded', open ? 'false' : 'true');
     if (!open) {
@@ -2289,7 +2355,7 @@ function toggleBreakPopover() {
 function openBreakPopoverAt(addr) {
     const pop = document.getElementById('stepSettingsPopover');
     if (!pop) return;
-    pop.style.display = 'block';
+    _showAndPositionStepSettingsPopover(pop);
     pop.scrollTop = 0;
     renderBreakList();
     document.getElementById('toolBreakBtn')?.setAttribute('aria-expanded', 'true');

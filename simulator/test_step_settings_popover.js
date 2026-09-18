@@ -21,6 +21,7 @@
 //   SSP-10 renderBreakList() writes an empty-state message when no breakpoints are set
 //   SSP-11 renderBreakList() renders one entry per breakpoint when breakpoints exist
 //   SSP-12 universal opcode checkboxes are present and wired into the same panel
+//   SSP-14 the open panel is clamped inside the visible viewport
 //
 // Run with:  node simulator/test_step_settings_popover.js
 'use strict';
@@ -267,6 +268,31 @@ check('SSP-2', '#stepSettingsPopover is present in index.html',
         !!btn && btn.getAttribute('aria-expanded') === 'true');
     check('SSP-9d', 'openBreakPopoverAt reveals the first section',
         pop.scrollTop === 0);
+})();
+
+// ── SSP-14  Popover geometry remains inside the visible viewport ─────────────
+(function() {
+    const env = makeEnv();
+    const pop = env.document.getElementById('stepSettingsPopover');
+    const btn = env.document.getElementById('toolBreakBtn');
+    Object.defineProperty(env.window, 'innerWidth', { value: 320 });
+    Object.defineProperty(env.window, 'innerHeight', { value: 240 });
+    btn.getBoundingClientRect = () => ({
+        left: 4, right: 44, top: 2, bottom: 42, width: 40, height: 40,
+    });
+    pop.getBoundingClientRect = () => ({
+        left: -130, right: 160, top: 48, bottom: 748,
+        width: 290, height: 700,
+    });
+    vm.runInContext('toggleStepSettingsPopover();', env);
+    check('SSP-14a', 'popover uses viewport-fixed positioning',
+        pop.style.position === 'fixed' && pop.style.transform === 'none');
+    check('SSP-14b', 'popover top is clamped below the viewport margin',
+        Number.parseFloat(pop.style.top) >= 8);
+    check('SSP-14c', 'popover left is clamped inside the viewport',
+        Number.parseFloat(pop.style.left) >= 8);
+    check('SSP-14d', 'popover height is limited to the visible viewport',
+        Number.parseFloat(pop.style.maxHeight) <= 224);
 })();
 
 // ── SSP-10  renderBreakList() with no breakpoints ─────────────────────────────

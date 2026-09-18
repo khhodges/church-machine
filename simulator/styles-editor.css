@@ -390,8 +390,9 @@
     left: 50%;
     transform: translateX(-50%);
     width: 290px;
+    box-sizing: border-box;
     max-width: min(290px, calc(100vw - 24px));
-    max-height: min(70vh, 460px);
+    max-height: min(70vh, 460px, calc(100vh - 16px));
     overflow-y: auto;
     background: #1a1a2e;
     border: 1px solid rgba(147,197,253,0.42);
