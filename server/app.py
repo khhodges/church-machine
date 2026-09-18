@@ -6062,6 +6062,20 @@ def _validate_symbolic_namespace_entries(entries):
             raise ValueError("Symbolic Namespace entries cannot carry binary or resident metadata")
 
 
+def _validate_active_namespace_lumps(entries):
+    try:
+        from lump_admission_service import (
+            AdmissionError, validate_active_manifest_selections)
+    except ImportError:
+        from server.lump_admission_service import (
+            AdmissionError, validate_active_manifest_selections)
+    manifest = _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json"))
+    try:
+        validate_active_manifest_selections(entries, manifest, LUMPS_DIR)
+    except AdmissionError as exc:
+        raise ValueError(str(exc)) from exc
+
+
 @app.route("/api/boot-image/save-ns", methods=["POST"])
 def boot_image_save_ns():
     """Single write path for NS table: writes boot-image.bin + ns-state.json atomically.
@@ -6173,6 +6187,7 @@ def boot_image_save_ns():
             ):
                 if _entry.get(_key) is None and _old_entry.get(_key) is not None:
                     _entry[_key] = _old_entry[_key]
+        _validate_active_namespace_lumps(_ns_entries)
         _validate_namespace_boot_marker(_ns_entries)
         _submitted_boot_row = next(
             row for row in _ns_entries if row.get("boot") is True)
@@ -6259,12 +6274,13 @@ def boot_image_save_ns():
             raise ValueError(
                 f"submitted image boot entry NS[{_submitted_image_slot}] does not "
                 f"match the Namespace boot marker NS[{_submitted_boot_slot}]")
-        with _namespace_commit_guard():
+        with _namespace_commit_guard(), _lump_history_transition_lock(LUMPS_DIR):
             _current_rows, _current_fingerprint = _read_authoritative_namespace_rows()
             if _expected_namespace != _current_fingerprint:
                 raise ValueError(
                     "Namespace changed while this image was being prepared; "
                     "reload before saving")
+            _validate_active_namespace_lumps(_ns_entries)
             def _snapshot_file(_path):
                 try:
                     with open(_path, "rb") as _source:
@@ -16215,23 +16231,26 @@ def admit_quarantined_lump():
             raise AdmissionError(
                 f"configured Namespace capacity is unavailable: {exc}",
                 status=409) from exc
-        result = admit(
-            quarantine_path=quarantine_path, expected_digest=digest,
-            lumps_dir=LUMPS_DIR, state_path=os.path.join(LUMPS_DIR, "ns-state.json"),
-            manifest_path=os.path.join(LUMPS_DIR, "manifest.json"), token=token,
-            name=operation["name"], revision=operation["revision"],
-            destination_slot=operation["destination_slot"],
-            replace=operation["replace"], resident=operation["resident"],
-            boot=operation["boot"], authorization={
-                "grants": authorization["grants"],
-                "capabilities": operation["capabilities"],
-            },
-            requested=authorization["grants"],
-            granted=authorization["grants"],
-            portable_binding=payload.get("portable_binding"),
-            portable_seal=payload.get("portable_seal"),
-            namespace_capacity=namespace_capacity,
-            lock=_lumps_manifest_lock)
+        with _lump_history_transition_lock(LUMPS_DIR):
+            result = admit(
+                quarantine_path=quarantine_path, expected_digest=digest,
+                lumps_dir=LUMPS_DIR,
+                state_path=os.path.join(LUMPS_DIR, "ns-state.json"),
+                manifest_path=os.path.join(LUMPS_DIR, "manifest.json"),
+                token=token, name=operation["name"],
+                revision=operation["revision"],
+                destination_slot=operation["destination_slot"],
+                replace=operation["replace"], resident=operation["resident"],
+                boot=operation["boot"], authorization={
+                    "grants": authorization["grants"],
+                    "capabilities": operation["capabilities"],
+                },
+                requested=authorization["grants"],
+                granted=authorization["grants"],
+                portable_binding=payload.get("portable_binding"),
+                portable_seal=payload.get("portable_seal"),
+                namespace_capacity=namespace_capacity,
+                lock=_lumps_manifest_lock)
         # The quarantine bytes are portable input, not executable output.  The
         # admission service publishes a derivative after minting the local
         # SELF E-GT; only those exact published bytes may enter the execution
@@ -24058,30 +24077,34 @@ def _recover_lump_history_transition(lumps_dir):
 
 @contextlib.contextmanager
 def _lump_history_transition_lock(lumps_dir: str):
-    """Serialize LUMP transitions across threads and server worker processes."""
+    """Serialize manifest and Namespace transitions with one lock order."""
     import tempfile
     _lock_key = hashlib.sha256(os.path.abspath(lumps_dir).encode()).hexdigest()[:16]
     lock_path = os.path.join(
         tempfile.gettempdir(), f"lumps-history-transition-{_lock_key}.lock")
     os.makedirs(lumps_dir, exist_ok=True)
-    with _lumps_manifest_lock:
-        depth = getattr(_lump_history_lock_state, "depth", 0)
-        if depth:
-            _lump_history_lock_state.depth = depth + 1
-            try:
-                yield
-            finally:
-                _lump_history_lock_state.depth -= 1
-            return
-        with open(lock_path, "a+") as lock_fh:
-            fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
-            _lump_history_lock_state.depth = 1
-            try:
-                _recover_lump_history_transition(lumps_dir)
-                yield
-            finally:
-                _lump_history_lock_state.depth = 0
-                fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+    # Namespace -> process manifest -> cross-process history is the sole lock
+    # order. A history archive cannot cross Namespace validation/publication,
+    # and admission cannot overwrite a concurrent Namespace save.
+    with _namespace_commit_guard():
+        with _lumps_manifest_lock:
+            depth = getattr(_lump_history_lock_state, "depth", 0)
+            if depth:
+                _lump_history_lock_state.depth = depth + 1
+                try:
+                    yield
+                finally:
+                    _lump_history_lock_state.depth -= 1
+                return
+            with open(lock_path, "a+") as lock_fh:
+                fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+                _lump_history_lock_state.depth = 1
+                try:
+                    _recover_lump_history_transition(lumps_dir)
+                    yield
+                finally:
+                    _lump_history_lock_state.depth = 0
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
 
 def _commit_lump_history_transition(
     *,

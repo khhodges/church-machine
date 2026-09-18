@@ -19,3 +19,9 @@ History version numbers are abstraction-wide, not token-wide. Allocation must in
 **Why:** Migrations and replacement saves can use different tokens or filename stems for one abstraction. Token-local allocation creates duplicate visible V# rows, and approval-only timestamps leave older history rows undated.
 
 **How to apply:** Recheck version collisions under the transition lock and bind `compiled_at` to every new approval before publishing the manifest.
+
+Manifest/history transitions and Namespace validation/publication must share one lock order: Namespace lock first, then the in-process manifest lock, then the cross-process history lock. Hold all three through final validation and publication.
+
+**Why:** Independent manifest and Namespace locks permit a selector to validate as live, become archived concurrently, and then enter committed Namespace state; admission can likewise overwrite a concurrent Namespace save.
+
+**How to apply:** Use the combined history-transition guard for every operation that can change either side of the manifest-to-Namespace binding. Revalidate concrete filename/hash selectors only after acquiring it.

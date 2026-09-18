@@ -10,6 +10,7 @@ from server.lump_admission_service import (
     NavanaService,
     admit,
     derive_capability_targets,
+    validate_active_manifest_selections,
 )
 from server.lump_approvals import read_approvals
 
@@ -23,6 +24,44 @@ def _portable_lump():
 
 def _authorization(raw):
     return {"grants": ["E"], "capabilities": derive_capability_targets(raw)}
+
+
+def test_archived_only_namespace_selector_is_rejected_before_state_changes(
+        tmp_path):
+    digest = "a" * 64
+    rows = [{
+        "slot": 14,
+        "filename": "Example_v1.lump",
+        "binary_hash": digest,
+    }]
+    manifest = [{
+        "token": digest[:8],
+        "filename": "Example_v1.lump",
+        "binary_hash": digest,
+        "archived": True,
+    }]
+    (tmp_path / "Example_v1.lump").write_bytes(b"archived")
+    committed = tmp_path / "ns-state.json"
+    original = {"revision": 7, "abstractions": []}
+    committed.write_text(json.dumps(original))
+
+    with pytest.raises(AdmissionError, match="exactly one active manifest row"):
+        validate_active_manifest_selections(rows, manifest, str(tmp_path))
+
+    assert json.loads(committed.read_text()) == original
+
+
+def test_duplicate_active_namespace_selectors_are_rejected(tmp_path):
+    raw = b"active"
+    digest = hashlib.sha256(raw).hexdigest()
+    filename = "Example.1.12345678.lump"
+    (tmp_path / filename).write_bytes(raw)
+    row = {"slot": 14, "filename": filename, "binary_hash": digest}
+    active = {"token": digest[:8], "filename": filename}
+
+    with pytest.raises(AdmissionError, match="exactly one active manifest row"):
+        validate_active_manifest_selections(
+            [row], [active, dict(active)], str(tmp_path))
 
 
 def test_real_admission_atomically_publishes_derivative_and_evidence(tmp_path):

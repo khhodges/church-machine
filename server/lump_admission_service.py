@@ -364,6 +364,49 @@ def _fsync_directory(path):
         os.close(descriptor)
 
 
+def validate_active_manifest_selections(rows, manifest, lumps_dir,
+                                        pending_artifacts=None):
+    """Require every concrete Namespace artifact selector to name one live row."""
+    if not isinstance(rows, list) or not isinstance(manifest, list):
+        raise AdmissionError("Namespace or manifest data is invalid", status=409)
+    pending_artifacts = pending_artifacts or {}
+    for row in rows:
+        if not isinstance(row, dict) or row.get("symbolic") is True:
+            continue
+        filename = row.get("filename")
+        binary_hash = row.get("binary_hash", row.get("binaryHash"))
+        if filename in (None, "") and binary_hash in (None, ""):
+            continue
+        if (not isinstance(filename, str)
+                or os.path.basename(filename) != filename
+                or not isinstance(binary_hash, str)
+                or not re.fullmatch(r"[0-9a-f]{64}", binary_hash.lower())):
+            raise AdmissionError(
+                f"Namespace slot {row.get('slot')} lacks an exact LUMP filename and hash",
+                status=409)
+        matches = [
+            entry for entry in manifest
+            if isinstance(entry, dict)
+            and entry.get("archived") is not True
+            and entry.get("filename") == filename
+        ]
+        if len(matches) == 1 and filename in pending_artifacts:
+            located_hash = hashlib.sha256(
+                pending_artifacts[filename]).hexdigest()
+        elif len(matches) == 1:
+            try:
+                with open(os.path.join(lumps_dir, filename), "rb") as stream:
+                    located_hash = hashlib.sha256(stream.read()).hexdigest()
+            except OSError:
+                located_hash = None
+        else:
+            located_hash = None
+        if len(matches) != 1 or located_hash != binary_hash.lower():
+            raise AdmissionError(
+                f"Namespace slot {row.get('slot')} must select exactly one active manifest row",
+                status=409)
+
+
 def admit(*, quarantine_path, lumps_dir, state_path, manifest_path, token,
           expected_digest,
           name, revision, destination_slot, replace, resident, boot,
@@ -469,6 +512,7 @@ def admit(*, quarantine_path, lumps_dir, state_path, manifest_path, token,
             "filename": filename,
             "abstraction": name,
             "lump_version": revision,
+            "binary_hash": digest,
         })
         row = {"name": name, "slot": destination_slot, "seq": sequence,
                "token": executable_token, "filename": filename,
@@ -486,6 +530,9 @@ def admit(*, quarantine_path, lumps_dir, state_path, manifest_path, token,
         state["abstractions"] = [r for r in state["abstractions"]
                                  if r.get("slot") != destination_slot] + [row]
         state["revision"] = int(state.get("revision", 0)) + 1
+        validate_active_manifest_selections(
+            state["abstractions"], manifest, lumps_dir,
+            pending_artifacts={filename: derivative_raw})
         evidence = {"schema": "church.admission-evidence/v1",
                     "token": executable_token, "portable_token": token,
                     "binary_hash": digest, "revision": revision,
