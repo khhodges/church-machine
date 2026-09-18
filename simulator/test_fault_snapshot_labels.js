@@ -23,4 +23,21 @@ assert.strictEqual(
     'CALL BOUNDS fault in SelfTest: fetch address 0xB7000991 out of memory',
     'fault snapshot includes a useful default note');
 
+const fetchSim = new ChurchSimulator();
+fetchSim.bootComplete = true;
+fetchSim.nsLabels[6] = 'SelfTest';
+fetchSim.cr[14].word0 = fetchSim.createGT(0, 6, { R: 1, X: 1 }, 1);
+fetchSim.cr[14].word1 = 0x200;
+fetchSim.pc = fetchSim.memory.length;
+const fetch = fetchSim._fetchInstruction();
+assert.strictEqual(fetch.ok, false);
+assert.match(fetch.message, /PC 0x[0-9A-F]+ via CR14 \(SelfTest\)/,
+    'fetch-bounds message names the logical PC, code register, and pet name');
+assert.match(fetch.message, /outside physical memory bounds$/,
+    'fetch-bounds message distinguishes address bounds from memory exhaustion');
+assert.deepStrictEqual(
+    { register: fetch.meta.pcRegister, petName: fetch.meta.pcPetName },
+    { register: 'CR14', petName: 'SelfTest' },
+    'fetch-bounds metadata preserves the code register and pet name');
+
 console.log('PASS fault snapshot pet names and note');

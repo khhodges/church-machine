@@ -6209,6 +6209,11 @@ class ChurchSimulator {
             pipelineStage: (meta && meta.pipelineStage) ? meta.pipelineStage : null,
             faultingAbstractionSlot: faultingAbstractionSlot,
             faultingAbstractionLabel: faultLabel,
+            pcRegister: (meta && meta.pcRegister) ? meta.pcRegister : null,
+            pcPetName: (meta && meta.pcPetName) ? meta.pcPetName : null,
+            logicalPC: (meta && Number.isInteger(meta.logicalPC)) ? (meta.logicalPC >>> 0) : null,
+            attemptedPhysicalAddress: (meta && Number.isInteger(meta.attemptedPhysicalAddress))
+                ? (meta.attemptedPhysicalAddress >>> 0) : null,
             diagnosticNote: `${faultingMnemonic ? faultingMnemonic + ' ' : ''}${type} fault${faultLabel ? ' in ' + faultLabel : ''}: ${message}`,
             tier: null,
             catchInvoked: false,
@@ -6491,7 +6496,27 @@ class ChurchSimulator {
         }
         const fetchAddr = cr14.word1 + 1 + this.pc;
         if (fetchAddr >= this.memory.length) {
-            return { ok: false, fault: 'BOUNDS', message: `fetch address 0x${fetchAddr.toString(16)} out of memory` };
+            let pcPetName = 'unknown';
+            try {
+                const parsed = this.parseGT(cr14.word0 >>> 0);
+                pcPetName = (this._petNameCRMap && this._petNameCRMap[14])
+                    || (this.nsLabels && this.nsLabels[parsed.index])
+                    || `NS[${parsed.index}]`;
+            } catch (_) {}
+            const logicalPCHex = `0x${(this.pc >>> 0).toString(16).toUpperCase()}`;
+            const physicalHex = `0x${(fetchAddr >>> 0).toString(16).toUpperCase()}`;
+            return {
+                ok: false,
+                fault: 'BOUNDS',
+                message: `PC ${logicalPCHex} via CR14 (${pcPetName}) resolves to physical address ${physicalHex}, which is outside physical memory bounds`,
+                meta: {
+                    gt: cr14.word0 >>> 0,
+                    pcRegister: 'CR14',
+                    pcPetName,
+                    logicalPC: this.pc >>> 0,
+                    attemptedPhysicalAddress: fetchAddr >>> 0,
+                },
+            };
         }
         const check = this.mLoad(cr14.word0, 'X', 14, fetchAddr);
         if (!check.ok) {
@@ -6551,7 +6576,7 @@ class ChurchSimulator {
 
         const fetch = this._fetchInstruction();
         if (!fetch.ok) {
-            this.fault(fetch.fault, fetch.message);
+            this.fault(fetch.fault, fetch.message, fetch.meta || null);
             return null;
         }
         const instrWord = fetch.word;

@@ -3877,6 +3877,7 @@ const _FAULT_LOG_FIELDS = ['type','message','pc','physicalPC','step','faultStep'
                            'faultCode','faultingAbstractionSlot','faultingAbstractionLabel',
                             'faultRawWord','instructionProvenance','dataProvenance',
                             'bootAttemptId','bootProgress','bootRomAddress','destinationRegister',
+                           'pcRegister','pcPetName','logicalPC','attemptedPhysicalAddress',
                             'gateReason','bootEvidence','observed_instr_word',
                            'observedInstructionWord','gt_snapshot','pet_names'];
 
