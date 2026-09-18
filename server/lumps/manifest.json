@@ -664,6 +664,30 @@
     "filename": "SelfTest.92.cf272798.lump",
     "issue_n": 92,
     "lump_version": 92,
-    "variant_group": "selftest-history"
+    "variant_group": "selftest-history",
+    "archived": true
+  },
+  {
+    "token": "4a000006",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.1.d2f81664.lump",
+    "lump_version": 93,
+    "compiled_at": 1789736233.0328484,
+    "dot_name": "SelfTest",
+    "issue_n": 1,
+    "petname": "",
+    "content_profile": 2,
+    "output_profile": 2,
+    "capabilities": [
+      {
+        "name": "SelfTest",
+        "rights": [
+          "E"
+        ],
+        "grants": [],
+        "nsIndex": 6
+      }
+    ],
+    "operation_id": "4dd4cd9a-e29c-4153-bc38-63e790ba72de"
   }
 ]

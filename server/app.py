@@ -6153,6 +6153,36 @@ def boot_image_save_ns():
             "dataChanged": False,
         }), 428
 
+    # Reject a stale browser projection before interpreting any of its artifact
+    # selectors. Save LUMP can legitimately advance the committed Namespace
+    # while this page remains open; exposing the resulting manifest mismatch
+    # would make an internal synchronization detail look like user input error.
+    try:
+        if os.path.isfile(NS_STATE_PATH):
+            with open(NS_STATE_PATH, encoding="utf-8") as _initial_state_fh:
+                _initial_state = json.load(_initial_state_fh)
+            _initial_rows = _initial_state.get("abstractions") or []
+        else:
+            _initial_rows = []
+        _initial_namespace_fingerprint = _namespace_state_fingerprint(
+            _initial_rows)
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as _exc:
+        return jsonify({
+            "ok": False,
+            "error": "The Namespace could not be refreshed. No data was changed.",
+            "dataChanged": False,
+        }), 409
+    if _expected_namespace != _initial_namespace_fingerprint:
+        return jsonify({
+            "ok": False,
+            "error": (
+                "The Namespace changed since this page was loaded. "
+                "Reload it before saving."
+            ),
+            "dataChanged": False,
+            "refreshRequired": True,
+        }), 409
+
     # Decode and enrich the submitted rows before validating the candidate
     # image/config. Browser NS-table rows contain only the four raw descriptor
     # words; policy and exact artifact identity remain Namespace authority and
@@ -6282,6 +6312,11 @@ def boot_image_save_ns():
                 raise ValueError(
                     "Namespace changed while this image was being prepared; "
                     "reload before saving")
+            # Validate repository selectors only after the Namespace CAS has
+            # proved that this browser is working from the current snapshot.
+            # Otherwise a recent Save LUMP can make an old browser projection
+            # fail with an internal manifest error instead of the recoverable
+            # "Namespace changed" result.
             _validate_active_namespace_lumps(_ns_entries)
             def _snapshot_file(_path):
                 try:

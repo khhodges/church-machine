@@ -89,7 +89,8 @@ def test_namespace_import_rejects_archived_only_selector_before_commit(
         "/api/boot-image/save-ns",
         json={
             "data_b64": base64.b64encode(b"\0\0\0\0").decode(),
-            "namespaceFingerprint": "import-snapshot",
+                "namespaceFingerprint": app_module._namespace_state_fingerprint(
+                    original["abstractions"]),
             "ns_state": {"abstractions": [{
                 "name": "Imported",
                 "slot": 14,
@@ -101,6 +102,39 @@ def test_namespace_import_rejects_archived_only_selector_before_commit(
     assert response.status_code == 409
     assert "exactly one active manifest row" in response.get_json()["error"]
     assert json.loads(state_path.read_text()) == original
+
+
+def test_stale_namespace_snapshot_is_rejected_before_manifest_details_leak(
+        tmp_path, monkeypatch):
+    original = {"revision": 4, "abstractions": []}
+    state_path = tmp_path / "ns-state.json"
+    state_path.write_text(json.dumps(original))
+    (tmp_path / "manifest.json").write_text("[]")
+    monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
+    monkeypatch.setattr(app_module, "NS_STATE_PATH", str(state_path))
+
+    response = app_module.app.test_client().post(
+        "/api/boot-image/save-ns",
+        json={
+            "data_b64": base64.b64encode(b"\0\0\0\0").decode(),
+            "namespaceFingerprint": "stale-browser-snapshot",
+            "ns_state": {"abstractions": [{
+                "name": "OldView",
+                "slot": 6,
+                "filename": "no-longer-active.lump",
+                "binary_hash": "a" * 64,
+            }]},
+        })
+
+    assert response.status_code == 409
+    body = response.get_json()
+    assert body["refreshRequired"] is True
+    assert body["dataChanged"] is False
+    assert body["error"] == (
+        "The Namespace changed since this page was loaded. "
+        "Reload it before saving."
+    )
+    assert "manifest" not in body["error"].lower()
 
 
 def test_history_transition_cannot_cross_namespace_validation_and_commit(

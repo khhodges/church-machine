@@ -16103,6 +16103,32 @@ async function _reloadCommittedLumpArtifact(response, fallbackName) {
     return committedWords;
 }
 
+async function _refreshNamespaceAuthorityAfterLumpSave() {
+    try {
+        const response = await fetch('/api/boot-image/ns-state', {
+            cache: 'no-store',
+        });
+        if (!response.ok) {
+            throw new Error(`Namespace refresh returned HTTP ${response.status}`);
+        }
+        const state = await response.json();
+        if (!state || !Array.isArray(state.abstractions) ||
+                typeof state.namespaceFingerprint !== 'string' ||
+                !state.namespaceFingerprint.trim()) {
+            throw new Error('Namespace refresh returned an incomplete snapshot');
+        }
+        window._nsState = state;
+        return true;
+    } catch (error) {
+        // Do not expose repository synchronization details after a committed
+        // save. Clearing the snapshot makes the next Namespace Save fetch the
+        // authoritative state before it builds its request.
+        window._nsState = null;
+        console.warn('[SaveNS] Namespace authority will refresh on next use');
+        return false;
+    }
+}
+
 function _validateFinalLumpSaveBinary(words, capabilities) {
     if (!Array.isArray(words) || words.length < 2) {
         throw new Error('authoritative save plan returned no complete LUMP binary');
@@ -16701,6 +16727,7 @@ async function confirmSaveToNamespace() {
                 }
                 idx = committedSlot;
                 await _reloadCommittedLumpArtifact(resp, label);
+                await _refreshNamespaceAuthorityAfterLumpSave();
             } catch (err) {
                 try {
                     if (window.LumpSaveDiagnostics) {

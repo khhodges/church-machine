@@ -577,6 +577,21 @@
       "filename": "SelfTest.1.14d378a6.lump",
       "compiled_at": 1789734828.7670777,
       "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25"
+    },
+    "d592cc9c7694f31774cb2e3a17130a0dbb31cc5ad118802e310164de7fe1a561": {
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "save_as_latest": true,
+      "binary_hash": "d592cc9c7694f31774cb2e3a17130a0dbb31cc5ad118802e310164de7fe1a561",
+      "dot_name": "SelfTest",
+      "issue_n": 1,
+      "filename": "SelfTest.1.d2f81664.lump",
+      "compiled_at": 1789736233.0328484,
+      "bootstrap_t": "4a000006",
+      "bootstrap_runtime_gt": 1241513990
     }
   }
 }

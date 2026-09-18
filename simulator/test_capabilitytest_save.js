@@ -128,6 +128,9 @@ function response(status, body) {
     check('confirmed repository success closes modal before local state reload',
         successCallback.indexOf('closeSaveDialog();') >= 0 &&
         successCallback.indexOf('closeSaveDialog();') < successCallback.indexOf('_reloadCommittedLumpArtifact('));
+    check('successful LUMP save refreshes Namespace authority before later Namespace saves',
+        successCallback.indexOf('_reloadCommittedLumpArtifact(') <
+            successCallback.indexOf('_refreshNamespaceAuthorityAfterLumpSave('));
     check('successful save gives actionable Namespace and Run guidance',
         successCallback.includes('Open Namespace to inspect it') &&
         successCallback.includes('choose Run to execute'));
