@@ -27,3 +27,5 @@ when provenance or freshness timestamps describe the pre-save Namespace.
 
 **How to apply:** Treat save success and subsequent boot readability as one
 contract. Cached-image failure must block boot, never substitute factory memory.
+Execution guards apply even if a synthetic standalone fallback has already set
+`bootComplete`; accepted committed-image ownership is a separate requirement.

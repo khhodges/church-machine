@@ -224,6 +224,25 @@ def test_binary_valid_image_returns_200(client, temp_image_path):
     )
 
 
+def test_boot_lump_words_uses_v2_header_and_descending_slot_table(
+        client, temp_image_path):
+    """The diagnostics endpoint must resolve slot 6 from the physical V2
+    header at word zero and the descending descriptor table at image end."""
+    _write_valid(temp_image_path)
+
+    with patch("server.app._active_selftest_locator",
+               return_value={"slot": 6}):
+        resp = client.get("/api/boot-lump-words?name=SelfTest")
+
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["ok"] is True
+    assert body["slot"] == 6
+    assert body["lump_base"] > 0
+    assert body["lump_size"] >= 64
+    assert body["cw"] > 0
+
+
 def test_binary_rejects_retired_tail_relative_thread_boundary(
         client, temp_image_path):
     stale_bytes = _write_retired_tail_relative_thread_image(temp_image_path)

@@ -17297,21 +17297,19 @@ def boot_lump_words():
     if n_words < 16:
         return jsonify({"ok": False, "error": "boot image too small"})
     words = _struct.unpack_from(f'<{n_words}I', _img)
-    BOOT_TAG        = _boot_image_gen.BOOT_IMAGE_FORMAT_TAG
     NS_ENTRY_WORDS  = _boot_image_gen.NS_ENTRY_WORDS
     locator = _active_selftest_locator()
     if locator is None:
         return jsonify({"ok": False, "error": "no authoritative SelfTest binding"})
     BOOT_ABSTR_SLOT = locator["slot"]
-    tag_idx = None
-    for _i in range(n_words - 1, max(n_words - 8192, -1), -1):
-        if words[_i] == BOOT_TAG:
-            tag_idx = _i
-            break
-    if tag_idx is None:
-        return jsonify({"ok": False, "error": "BOOT_IMAGE_FORMAT_TAG not found"})
-    ns_table_base   = tag_idx + 1
-    slot_entry_base = ns_table_base + BOOT_ABSTR_SLOT * NS_ENTRY_WORDS
+    try:
+        header = _boot_image_gen.read_namespace_header_info(_img)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)})
+    ns_table_base = int(header["table_offset_words"])
+    slot_entry_base = n_words - (BOOT_ABSTR_SLOT + 1) * NS_ENTRY_WORDS
+    if slot_entry_base < ns_table_base:
+        return jsonify({"ok": False, "error": "Boot.Abstr NS slot is outside the Namespace table"})
     if slot_entry_base + 3 >= n_words:
         return jsonify({"ok": False, "error": "Boot.Abstr NS slot entry out of range"})
     lump_base = int(words[slot_entry_base])

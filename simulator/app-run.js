@@ -869,6 +869,7 @@ function _bootNIARows(bootStep) {
 
 function stepSim() {
     if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
+    if (!_requireCommittedImageForExecution('Step')) return;
     // A configured boot prefetch is part of startup, not an ordinary lazy-load
     // pause. Never execute user code while its ordered downloads are pending.
     if (sim.bootComplete && sim._bootPrefetchPromise) {
@@ -899,10 +900,6 @@ function stepSim() {
         return;
     }
     if (!sim.bootComplete) {
-        if (!_bootHasCommittedImage() || sim._bootImageLoaded !== true) {
-            _ensureCommittedImageForBoot('Step');
-            return;
-        }
         // If a compiled abstraction is waiting, skip the manual boot ceremony
         // and silently complete all boot phases so the user can step their code.
         if (_pendingSimLoad) {
@@ -1513,6 +1510,10 @@ function runThreadFromModal() {
     const row = _threadModalRow();
     if (!row || _pendingSimLoad || _simRunActive || sim.running ||
             walkRunning || sim.walkActive || bootAnimating) return;
+    if (!_requireCommittedImageForExecution('Thread Run')) {
+        updateThreadContextModal();
+        return;
+    }
     const requestedSlot = row.slot;
     if (!sim.bootComplete && !instantBoot()) {
         updateThreadContextModal();
@@ -1565,6 +1566,7 @@ function resetThreadFromModal() {
 
 function selectThreadContext(slot) {
     if (!sim || typeof sim.selectConfiguredThread !== 'function') return;
+    if (!_requireCommittedImageForExecution('Thread selection')) return;
     // Run/Walk ownership belongs to the UI control plane, not CHANGE
     // architecture.  Programmatic/decoded CHANGE remains canonical.
     if (_simRunActive || sim.walkActive || sim.running) {
@@ -2027,6 +2029,7 @@ function _applyPendingSimLoad() {
 
 function runSimGo(preserveView) {
     if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
+    if (!_requireCommittedImageForExecution('Run')) return;
     // Guard: if a run batch loop is already active (either mid-batch where
     // sim.running is true, or between setTimeout(runBatch) ticks where
     // sim.running has temporarily returned to false), do nothing.
@@ -2887,6 +2890,12 @@ function _ensureCommittedImageForBoot(context) {
         return false;
     }
     return _blockBootForMissingCommittedImage(context);
+}
+
+function _requireCommittedImageForExecution(context) {
+    if (_bootHasCommittedImage() && sim && sim._bootImageLoaded === true) return true;
+    _ensureCommittedImageForBoot(context);
+    return false;
 }
 
 function instantBoot() {
