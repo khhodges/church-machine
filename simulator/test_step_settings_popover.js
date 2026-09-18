@@ -218,10 +218,13 @@ check('SSP-2', '#stepSettingsPopover is present in index.html',
 // ── SSP-6  toggleStepSettingsPopover() opens the popover ─────────────────────
 (function() {
     const env = makeEnv();
-    vm.runInContext('toggleStepSettingsPopover();', env);
     const pop = env.document.getElementById('stepSettingsPopover');
+    pop.scrollTop = 120;
+    vm.runInContext('toggleStepSettingsPopover();', env);
     check('SSP-6', 'toggleStepSettingsPopover() → popover becomes visible',
         !!pop && pop.style.display !== 'none');
+    check('SSP-6b', 'opening Step Settings reveals the first section',
+        pop.scrollTop === 0);
 })();
 
 // ── SSP-7  Second call closes the popover ────────────────────────────────────
@@ -251,8 +254,9 @@ check('SSP-2', '#stepSettingsPopover is present in index.html',
 // ── SSP-9  openBreakPopoverAt(addr) opens popover and pre-fills input ─────────
 (function() {
     const env = makeEnv();
-    vm.runInContext('openBreakPopoverAt(0x01A0);', env);
     const pop = env.document.getElementById('stepSettingsPopover');
+    pop.scrollTop = 120;
+    vm.runInContext('openBreakPopoverAt(0x01A0);', env);
     const inp = env.document.getElementById('breakAddrInput');
     const btn = env.document.getElementById('toolBreakBtn');
     check('SSP-9a', 'openBreakPopoverAt → popover is visible',
@@ -261,6 +265,8 @@ check('SSP-2', '#stepSettingsPopover is present in index.html',
         !!inp && inp.value.toUpperCase() === '0X01A0');
     check('SSP-9c', 'openBreakPopoverAt → aria-expanded set to "true"',
         !!btn && btn.getAttribute('aria-expanded') === 'true');
+    check('SSP-9d', 'openBreakPopoverAt reveals the first section',
+        pop.scrollTop === 0);
 })();
 
 // ── SSP-10  renderBreakList() with no breakpoints ─────────────────────────────

@@ -2272,6 +2272,7 @@ function toggleStepSettingsPopover() {
     const breakBtn = document.getElementById('toolBreakBtn');
     if (breakBtn) breakBtn.setAttribute('aria-expanded', open ? 'false' : 'true');
     if (!open) {
+        pop.scrollTop = 0;
         updateUniversalBreakpointControls();
         renderBreakList();
         document.getElementById('breakAddrInput')?.focus();
@@ -2289,6 +2290,7 @@ function openBreakPopoverAt(addr) {
     const pop = document.getElementById('stepSettingsPopover');
     if (!pop) return;
     pop.style.display = 'block';
+    pop.scrollTop = 0;
     renderBreakList();
     document.getElementById('toolBreakBtn')?.setAttribute('aria-expanded', 'true');
     const inp = document.getElementById('breakAddrInput');
