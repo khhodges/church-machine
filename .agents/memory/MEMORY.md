@@ -121,7 +121,7 @@
 - [Namespace policy foundation boundary](ns-policy-foundation-boundary.md) — only slots 0–1 are foundational; catalog LUMPs at 6–10 may have Resident/Lazy policies
 - [Prepared boot authority](prepared-boot-authority.md) — explicit preparation owns CR0; boot/import/Run never repair it; ROM evidence stays separate from Namespace data
 - [Shared served-script dependencies](shared-served-script-dependencies.md) — declare shared UI modules explicitly and test consumers in manifest order; avoid runtime script injection
-- [Named CALL CR6 lookup](named-call-cr6-fallback.md) — unbound CALL dot.name compiles to one direct CR6-indexed ELOADCALL; never generated LOAD CR0 + CALL CR0
+- [Named CALL CR6 lookup](named-call-cr6-fallback.md) — unbound CALL dot.name compiles to opcode CALL through CR6[petname], never ELOADCALL or CR0 materialization
 - [Three-LUMP resident profile](three-lump-resident-profile.md) — boot core is an explicit fixed-map policy; manifest history never selects live resident executables
 - [Boot-entry UI authority](boot-entry-ui-authority.md) — default Code View follows the loaded image's boot slot, never a stale pending browser selection
 - [Bootstrap repair destination authority](bootstrap-repair-destination-authority.md) — an eligible non-resident occupant supplies sequence only; the approved frozen binding remains authoritative under the fresh Namespace lock

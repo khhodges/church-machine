@@ -767,7 +767,7 @@ class ChurchAssembler {
         const instructions = [];
         // Pass-1 view of named CR bindings. Explicit source LOADs remain
         // authoritative for register-bound CALLs. Calls that directly name a
-        // C-list capability are encoded as one CR6-indexed ELOADCALL instead.
+        // C-list capability are encoded as one indexed CALL through CR6.
         const _pass1LoadedNames = new Set();
         const _pass1LoadedByCR = new Map();
         const _pass1Bind = (name, crIndex) => {
@@ -933,10 +933,10 @@ class ChurchAssembler {
             // the active CR6 C-list in one instruction:
             //
             //   CALL WukongCallHome.hw
-            //     -> ELOADCALL CR0, WukongCallHome.hw
+            //     -> CALL CR6[WukongCallHome.hw]
             //
             //   CALL Scheduler, pause
-            //     -> ELOADCALL CR0, Scheduler, pause
+            //     -> CALL CR6[Scheduler], pause
             //
             // This preserves the named c-list identity through compilation, so
             // row and method validation happen before execution. Keep explicit
@@ -968,8 +968,8 @@ class ChurchAssembler {
                         this._checkCapDeclared(_indexedLoadName, lineNum + 1);
                         instructions.push({
                             line: _indexedHasMethodSyntax
-                                ? `ELOADCALL CR0, ${_indexedLoadName}, ${_indexedMethod}`
-                                : `ELOADCALL CR0, ${_indexedLoadName}`,
+                                ? `CALL CR6[${_indexedLoadName}], ${_indexedMethod}`
+                                : `CALL CR6[${_indexedLoadName}]`,
                             lineNum: lineNum + 1,
                             comment: `${line} \u2192 direct CR6 C-list CALL`
                         });
@@ -1004,8 +1004,8 @@ class ChurchAssembler {
                         this._checkCapDeclared(_loadName, lineNum + 1);
                         instructions.push({
                             line: _hasMethodSyntax
-                                ? `ELOADCALL CR0, ${_loadName}, ${_methodName}`
-                                : `ELOADCALL CR0, ${_loadName}`,
+                                ? `CALL CR6[${_loadName}], ${_methodName}`
+                                : `CALL CR6[${_loadName}]`,
                             lineNum: lineNum + 1,
                             comment: `${line} \u2192 direct CR6 C-list CALL`
                         });
@@ -1549,6 +1549,79 @@ class ChurchAssembler {
                 break;
             }
             case 2: {
+                // Indexed CALL: select the E-GT directly from the active CR6
+                // C-list.  This is CALL opcode 2, not ELOADCALL, and CR0 is not
+                // used as an intermediate capability register.
+                const indexedCall = line.match(
+                    /^CALL\s+CR6\s*\[\s*([A-Za-z_][\w.]*)\s*\]\s*(?:,\s*([A-Za-z_][\w]*|#?(?:0x[0-9A-Fa-f]+|0b[01]+|\d+)))?\s*$/i);
+                if (indexedCall) {
+                    const indexedName = indexedCall[1];
+                    const resolved = this._resolveCListName(indexedName);
+                    if (resolved === null) {
+                        this._checkCapDeclared(indexedName, lineNum);
+                        break;
+                    }
+                    this._checkCapDeclared(resolved.key, lineNum);
+                    const row = resolved.slot;
+                    if (!Number.isInteger(row) || row < 0 || row > 31) {
+                        this.errors.push({
+                            line: lineNum,
+                            ...this._tokenCols(this._currentLineText, indexedName),
+                            message: `CALL c-list row ${row} for "${indexedName}" is out of range (0–31 allowed).`
+                        });
+                        break;
+                    }
+                    let method = 0;
+                    const methodToken = indexedCall[2] || '';
+                    if (methodToken) {
+                        const numeric = this._parseSelectorLiteral(methodToken);
+                        if (numeric !== null) {
+                            if (numeric < 0 || numeric > 126) {
+                                this.errors.push({
+                                    line: lineNum,
+                                    ...this._tokenCols(this._currentLineText, methodToken),
+                                    message: `CALL method index ${numeric} is out of range (0–126 allowed).`
+                                });
+                            } else {
+                                method = numeric + 1;
+                            }
+                        } else {
+                            const conventions = this._methodConventionsFor(resolved.key);
+                            const methodMatch = this._methodEntryFor(conventions, methodToken);
+                            if (methodMatch) {
+                                const entry = methodMatch.entry;
+                                const index = typeof entry === 'object' ? entry.index : entry;
+                                if (index < 0 || index > 126) {
+                                    this.errors.push({
+                                        line: lineNum,
+                                        ...this._tokenCols(this._currentLineText, methodToken),
+                                        message: `CALL method "${methodToken}" has index ${index} out of range (0–126 allowed).`
+                                    });
+                                } else {
+                                    method = index + 1;
+                                }
+                            } else if (conventions) {
+                                const known = Object.keys(conventions).join(', ');
+                                this.errors.push({
+                                    line: lineNum,
+                                    ...this._tokenCols(this._currentLineText, methodToken),
+                                    message: `"${methodToken}" is not a known method of ${resolved.key}. Known methods: ${known}.`
+                                });
+                            } else {
+                                this.errors.push({
+                                    line: lineNum,
+                                    ...this._tokenCols(this._currentLineText, methodToken),
+                                    message: `No method conventions for "${resolved.key}"; cannot resolve method "${methodToken}".`
+                                });
+                            }
+                        }
+                    }
+                    opcode = 2;
+                    crDst = 0; // unused by indexed CALL
+                    crSrc = 6;
+                    imm = (method << 5) | (row & 0x1F);
+                    break;
+                }
                 // Dot-notation: CALL SlideRule.Multiply (single token, no parts[2])
                 const rawDotTok = (parts[1] || '').replace(/,/g, '').trim();
                 // A dotted C-list label is a complete capability name, not
@@ -2738,6 +2811,16 @@ class ChurchAssembler {
             }
             // CALL CRd[, MethodName]  — invoke capability via method-table dispatch
             case 2: {
+                if (crSrc === 6) {
+                    const row = imm & 0x1F;
+                    const method = (imm >>> 5) & 0x7F;
+                    const target = slotNames && slotNames[row]
+                        ? `CR6[${slotNames[row]}]`
+                        : cdOff(row);
+                    return method > 0
+                        ? `${mnemonic}  ${target}, #${method - 1}`
+                        : `${mnemonic}  ${target}`;
+                }
                 if (imm & 0x4000) return `${mnemonic}  CR${crDst}`;
                 // imm=0: fast-path (backward-compat, no table dispatch).
                 // imm>0: 1-based; method index = imm-1 (0-based) used for name resolution.

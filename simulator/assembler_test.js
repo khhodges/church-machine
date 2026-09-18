@@ -187,9 +187,9 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
     const errors = a.errors;
     assert('T14 CALL SlideRule.Multiply (unbound) assembles without errors',
         errors.length === 0, errors.map(e => e.message).join('; '));
-    assert('T14 unbound named CALL emits one direct ELOADCALL',
+    assert('T14 unbound named CALL emits one direct CR6-indexed CALL',
         result.words.length === 1 &&
-        ((result.words[0] >>> 27) & 0x1F) === 8 &&
+        ((result.words[0] >>> 27) & 0x1F) === 2 &&
         ((result.words[0] >>> 15) & 0xF) === 6,
         result.words.map(w => '0x' + (w >>> 0).toString(16)).join(', '));
     assert('T14 direct ELOADCALL carries the C-list row and method selector',
@@ -356,9 +356,9 @@ const WUKONG_CALLHOME_CONVENTIONS = {
     );
     assert('WCH4 unbound named call assembles without errors',
         result.errors.length === 0, result.errors.map(e => e.message).join('; '));
-    assert('WCH4 unbound named call emits one CR6-indexed ELOADCALL',
+    assert('WCH4 unbound named call emits one CR6-indexed CALL',
         result.words.length === 1 &&
-        ((result.words[0] >>> 27) & 0x1F) === 8 &&
+        ((result.words[0] >>> 27) & 0x1F) === 2 &&
         ((result.words[0] >>> 15) & 0xF) === 6 &&
         (result.words[0] & 0x1F) === 0 &&
         ((result.words[0] >>> 5) & 0x7F) === 1,
@@ -376,9 +376,9 @@ const WUKONG_CALLHOME_CONVENTIONS = {
     const callWord = result.words[0] >>> 0;
     assert('WCH4a bare WukongCallHome resolves through active CR6 C-List',
         result.errors.length === 0, result.errors.map(e => e.message).join('; '));
-    assert('WCH4a bare WukongCallHome emits one direct ELOADCALL',
+    assert('WCH4a bare WukongCallHome emits one direct CR6-indexed CALL',
         result.words.length === 1 &&
-        ((callWord >>> 27) & 0x1F) === 8 &&
+        ((callWord >>> 27) & 0x1F) === 2 &&
         ((callWord >>> 15) & 0xF) === 6 &&
         (callWord & 0x1F) === 1 &&
         ((callWord >>> 5) & 0x7F) === 0,
@@ -404,10 +404,10 @@ const WUKONG_CALLHOME_CONVENTIONS = {
         result.capabilities.length === 3 &&
         result.capabilities[1].name === 'WukongCallHome.hw',
         result.capabilities.map(cap => cap.name).join(', '));
-    assert('WCH4c normalized dotted hardware label emits one direct ELOADCALL',
+    assert('WCH4c normalized dotted hardware label emits one direct CR6-indexed CALL',
         result.errors.length === 0 &&
         result.words.length === 3 &&
-        ((directCallWord >>> 27) & 0x1F) === 8 &&
+        ((directCallWord >>> 27) & 0x1F) === 2 &&
         ((directCallWord >>> 15) & 0xF) === 6 &&
         (directCallWord & 0x1F) === 1,
         `errors=${result.errors.map(e => e.message).join('; ')} call=0x${directCallWord.toString(16)}`);
@@ -445,15 +445,15 @@ const WUKONG_CALLHOME_CONVENTIONS = {
     const selected = a.disassemble(callWord);
     assert('WCH4f CALL CR6[name], method assembles without errors',
         result.errors.length === 0, result.errors.map(e => e.message).join('; '));
-    assert('WCH4f CALL CR6[name], method emits direct ELOADCALL',
+    assert('WCH4f CALL CR6[name], method emits indexed CALL',
         result.words.length === 1 &&
-        ((callWord >>> 27) & 0x1F) === 8 &&
+        ((callWord >>> 27) & 0x1F) === 2 &&
         ((callWord >>> 15) & 0xF) === 6 &&
         (callWord & 0x1F) === 0 &&
         ((callWord >>> 5) & 0x7F) === 1,
         result.words.map(w => '0x' + (w >>> 0).toString(16)).join(', '));
-    assert('WCH4f selected instruction disassembles as ELOADCALL',
-        selected.startsWith('ELOADCALL'),
+    assert('WCH4f selected instruction disassembles as CALL CR6[row]',
+        selected.startsWith('CALL') && selected.includes('CR6['),
         `selected="${selected}"`);
 
     const dotted = a.assemble(
@@ -462,9 +462,9 @@ const WUKONG_CALLHOME_CONVENTIONS = {
     );
     assert('WCH4f dotted CR6[name].method syntax assembles without errors',
         dotted.errors.length === 0, dotted.errors.map(e => e.message).join('; '));
-    assert('WCH4f dotted CR6[name].method also emits one direct ELOADCALL',
+    assert('WCH4f dotted CR6[name].method also emits one indexed CALL',
         dotted.words.length === 1 &&
-        ((dotted.words[0] >>> 27) & 0x1F) === 8 &&
+        ((dotted.words[0] >>> 27) & 0x1F) === 2 &&
         ((dotted.words[0] >>> 15) & 0xF) === 6,
         dotted.words.map(w => '0x' + (w >>> 0).toString(16)).join(', '));
 
@@ -1673,9 +1673,9 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     const word = result.words[0];
     const encodedMethod = (word >>> 5) & 0x7F;
-    assert('EL21 emits one direct ELOADCALL',
+    assert('EL21 emits one direct CR6-indexed CALL',
         result.words.length === 1 &&
-        ((word >>> 27) & 0x1F) === 8 &&
+        ((word >>> 27) & 0x1F) === 2 &&
         ((word >>> 15) & 0xF) === 6 &&
         (word & 0x1F) === 31,
         result.words.map(w => '0x' + (w >>> 0).toString(16)).join(', '));
@@ -5547,8 +5547,8 @@ function symCompile(body, caps) {
         const w      = result.words[0] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const imm    = w & 0x7FFF;
-        assert('BC92 CALL Scheduler, pause word[0] — ELOADCALL',
-            opcode === 8 && ((w >>> 15) & 0xF) === 6, `got opcode=${opcode}`);
+        assert('BC92 CALL Scheduler, pause word[0] — indexed CALL',
+            opcode === 2 && ((w >>> 15) & 0xF) === 6, `got opcode=${opcode}`);
         assert('BC93 CALL Scheduler, pause uses c-list row 8',
             (imm & 0x1F) === 8, `got row=${imm & 0x1F}`);
         assert('BC94 CALL Scheduler, pause — method=5 (pause index 4, 1-based)',

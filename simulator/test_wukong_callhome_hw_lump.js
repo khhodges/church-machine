@@ -445,10 +445,10 @@ console.log('\n--- WCH-HW-11: WukongCallHome.hw dispatches through its direct en
         'CALL wukongcallhome.HW'
     );
     const callWord = assembled.words[0] >>> 0;
-    check('WCH-HW-11c: assembler emits one CR6-indexed ELOADCALL for the direct entry',
+    check('WCH-HW-11c: assembler emits one CR6-indexed CALL for the direct entry',
         assembled.errors.length === 0 &&
         assembled.words.length === 1 &&
-        ((callWord >>> 27) & 0x1F) === 8 &&
+        ((callWord >>> 27) & 0x1F) === 2 &&
         ((callWord >>> 15) & 0xF) === 6 &&
         (callWord & 0x1F) === 1 &&
         ((callWord >>> 5) & 0x7F) === 0,
@@ -460,11 +460,35 @@ console.log('\n--- WCH-HW-11: WukongCallHome.hw dispatches through its direct en
     const sourceCallWord = sourceResult.words[sourceResult.words.length - 2] >>> 0;
     check('WCH-HW-11d: canonical source keeps CALL WukongCallHome.hw as one direct instruction',
         sourceResult.errors.length === 0 &&
-        ((sourceCallWord >>> 27) & 0x1F) === 8 &&
+        ((sourceCallWord >>> 27) & 0x1F) === 2 &&
         ((sourceCallWord >>> 15) & 0xF) === 6 &&
         (sourceCallWord & 0x1F) === 6 &&
         ((sourceCallWord >>> 5) & 0x7F) === 0,
         `errors=${sourceResult.errors.map(error => error.message).join('; ')} call=0x${sourceCallWord.toString(16)}`);
+
+    const indexedSim = new ChurchSimulator();
+    const preservedCR0 = 0x3A000123;
+    const selectedGT = 0x3A000456;
+    indexedSim.cr[0].word0 = preservedCR0;
+    indexedSim.cr[6].word0 = 0x32000001;
+    indexedSim.cr[6].word1 = 100;
+    indexedSim.memory[101] = selectedGT;
+    indexedSim._clistCountForCR = () => 2;
+    indexedSim.mLoad = () => ({ ok: true });
+    let capturedCall = null;
+    indexedSim._execCall = instruction => {
+        capturedCall = instruction;
+        return { ok: true };
+    };
+    indexedSim._execIndexedCall({
+        opcode: 2, crDst: 0, crSrc: 6, imm: 1, raw: 0x17030001
+    });
+    check('WCH-HW-11e: indexed CALL passes the selected CR6 GT without touching CR0',
+        capturedCall !== null &&
+        capturedCall.indexedSourceGT === selectedGT &&
+        capturedCall.indexedRow === 1 &&
+        indexedSim.cr[0].word0 === preservedCR0,
+        `captured=${capturedCall && capturedCall.indexedSourceGT} cr0=0x${indexedSim.cr[0].word0.toString(16)}`);
 }
 
 // ── WCH-HW-12: Canonical DWRITE reaches physical LED MMIO safely ─────────────

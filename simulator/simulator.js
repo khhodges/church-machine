@@ -6702,7 +6702,7 @@ class ChurchSimulator {
         switch (d.opcode) {
             case 0: result = this._execLoad(d); break;
             case 1: result = this._execSave(d); break;
-            case 2: result = this._execCall(d); break;
+            case 2: result = d.crSrc === 6 ? this._execIndexedCall(d) : this._execCall(d); break;
             case 3: result = this._execReturn(d); break;
             case 4: result = this._execChange(d); break;
             case 5: result = this._execSwitch(d); break;
@@ -7236,10 +7236,49 @@ class ChurchSimulator {
         return { ok: true, gt: enterGT, parsed, entry };
     }
 
+    _execIndexedCall(d) {
+        const row = d.imm & 0x1F;
+        const method = (d.imm >>> 5) & 0x7F;
+        const clistGT = this.cr[6].word0;
+        if (ChurchSimulator.isNullGT(clistGT)) {
+            this.fault('NULL_CAP', 'CALL: CR6 C-List is NULL');
+            return null;
+        }
+        const srcLoc = this.cr[6].word1;
+        const clistSize = this._clistCountForCR(6);
+        if (row >= clistSize) {
+            this.fault('BOUNDS', `CALL: CR6 c-list row ${row} is outside the active c-list (${clistSize} rows)`);
+            return null;
+        }
+        const absAddr = (srcLoc + row) >>> 0;
+        const range = { base: srcLoc, upperBound: (srcLoc + clistSize - 1) >>> 0 };
+        const loadCheck = this.mLoad(clistGT, null, 6, absAddr, range);
+        if (!loadCheck.ok) {
+            this.fault(loadCheck.fault, `CALL: CR6[${row}]: ${loadCheck.message}`);
+            return null;
+        }
+        const sourceGT = this.memory[absAddr] >>> 0;
+        if (ChurchSimulator.isNullGT(sourceGT)) {
+            this.fault('NULL_CAP', `CALL: CR6 c-list row ${row} is empty`);
+            return null;
+        }
+        return this._execCall({
+            ...d,
+            imm: method,
+            indexedSourceGT: sourceGT,
+            indexedRow: row,
+        });
+    }
+
     _execCall(d) {
-        let sourceGT = this.cr[d.crDst].word0;
+        let sourceGT = d.indexedSourceGT !== undefined
+            ? d.indexedSourceGT >>> 0
+            : this.cr[d.crDst].word0;
         if (sourceGT === 0) {
-            this.fault('NULL_CAP', `CALL: CR${d.crDst} is NULL`);
+            const sourceLabel = d.indexedRow !== undefined
+                ? `CR6[${d.indexedRow}]`
+                : `CR${d.crDst}`;
+            this.fault('NULL_CAP', `CALL: ${sourceLabel} is NULL`);
             return null;
         }
         let srcParsed = this.parseGT(sourceGT);
@@ -7264,7 +7303,9 @@ class ChurchSimulator {
             const nsW1 = this.memory[this._nsSlotBase(nsSlot) + 1] >>> 0;
             const gt_seq = this.parseNSWord1(nsW1).gtSeq;
             const informGT = this.createGT(gt_seq, nsSlot, srcParsed.permissions, 1);
-            this.cr[d.crDst].word0 = informGT;
+            if (d.indexedRow === undefined) {
+                this.cr[d.crDst].word0 = informGT;
+            }
             sourceGT = informGT;
             srcParsed = this.parseGT(informGT);
             this.output += `[LOADER] CALL: Outform→Inform promotion complete for NS[${nsSlot}], proceeding with CALL CR${d.crDst}\n`;
