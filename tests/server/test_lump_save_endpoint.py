@@ -761,8 +761,21 @@ def test_compiler_self_commit_contains_only_final_namespace_gt(
         "name": "PriorEntry",
         "slot": 7,
         "seq": sequence,
+        "token": "4a000007",
+        "filename": "PriorEntry.1.active.lump",
+        "boot": True,
     }]}))
     monkeypatch.setattr(app_module, "NS_STATE_PATH", str(state))
+    prior_words = _words(cw=1, cc=1, marker=41)
+    (isolated_lumps / "PriorEntry.1.active.lump").write_bytes(_raw(prior_words))
+    (isolated_lumps / "manifest.json").write_text(json.dumps([{
+        "name": "PriorEntry",
+        "abstraction": "PriorEntry",
+        "token": "4a000007",
+        "filename": "PriorEntry.1.active.lump",
+        "lump_version": 1,
+        "ns_slot": 7,
+    }]))
     words = _words(cw=1, cc=1, marker=0)
     words[-1] = 0xFEED5E1F
     metadata = {
@@ -782,6 +795,13 @@ def test_compiler_self_commit_contains_only_final_namespace_gt(
         })
         assert planned.status_code == 201, planned.get_data(as_text=True)
         plan = planned.get_json()
+        with app_module._LUMP_SAVE_PLANS_LOCK:
+            reserved = dict(app_module._LUMP_SAVE_PLANS[plan["plan_id"]])
+        assert reserved["reserved_token"] == "4a000007"
+        assert reserved["reserved_revision"] == {
+            "filename": "PriorEntry.1.active.lump",
+            "lump_version": 1,
+        }
         issued = client.post("/api/lumps/approval-intent", json={
             "digest": plan["digest"],
             "action": plan["action"],

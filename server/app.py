@@ -12482,6 +12482,13 @@ def save_lump():
                 dict(_destination_manifest)
                 if _destination_manifest is not None else _destination_state
             )
+            # Revision CAS must snapshot the same live destination whose token
+            # will be checked at commit. A freshly compiled replacement usually
+            # has a different content-derived candidate token; using that
+            # candidate's (often absent) manifest row here makes one Save
+            # conflict with itself.
+            if _destination_manifest is not None:
+                _expected_active_entry = dict(_destination_manifest)
             # Recovery from an archived-only Namespace selection replaces the
             # selected destination, but its manifest CAS must expect no active
             # row.  The Namespace fingerprint and selected row are revalidated
