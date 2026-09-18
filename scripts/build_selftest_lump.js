@@ -76,7 +76,13 @@ const source = fs.readFileSync(path.join(ROOT, 'simulator', 'examples', 'post_fl
 const result = new ChurchAssembler().assemble(source);
 if (result.errors.length) die(result.errors.map(e => `line ${e.line}: ${e.message}`).join('\n'));
 
-const cw = result.words.length;
+// CapabilityTest enters SelfTest through CALL method 1.  LUMP word 1 must
+// therefore be a canonical method-table BRANCH, not the first body
+// instruction.  The entry sits at logical PC 0 and branches over itself to
+// the source body at logical PC 1.
+const method1Dispatch = ((23 << 27) | (14 << 23) | 1) >>> 0;
+const compiledWords = [method1Dispatch, ...result.words.map(word => word >>> 0)];
+const cw = compiledWords.length;
 // SelfTest owns two capability rows:
 //   row 0 — canonical SELF E-GT
 //   row 1 — Next.GT, localized by boot_image.py to the LightningBolt target
@@ -99,7 +105,7 @@ if (cw > 0x1FFF) die('instruction count exceeds LUMP header capacity');
 const header = ((0x1F << 27) | (nMinus6 << 23) | (cw << 10) | cc) >>> 0;
 const words = new Uint32Array(lumpSize);
 words[0] = header;
-result.words.forEach((word, i) => { words[1 + i] = word >>> 0; });
+compiledWords.forEach((word, i) => { words[1 + i] = word; });
 content.forEach((word, i) => { words[1 + cw + i] = word >>> 0; });
 const selfGT = ((4 << 28) | (1 << 27) | (1 << 25) | (seq << 16) | nsSlot) >>> 0;
 words[lumpSize - cc] = selfGT;
@@ -177,7 +183,7 @@ if (CHECK_ONLY) {
     } catch (_) {}
     if (!activeBytes || activeSource !== source ||
             activeCc < 1 ||
-            JSON.stringify(activeWords) !== JSON.stringify(result.words.map(word => word >>> 0))) {
+            JSON.stringify(activeWords) !== JSON.stringify(compiledWords)) {
         failures.push('active SelfTest binary does not contain the canonical compiled source');
     }
     if (!activeRow || activeRow.token !== token ||

@@ -73,14 +73,14 @@
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x007FE",
+      "limit": "0x01FFD",
       "seq": 0,
       "seal": "0xDE56B6EF",
       "token": "4a000006",
-      "filename": "SelfTest.1.d2f81664.lump",
-      "issue_n": 1,
-      "lump_version": 93,
-      "binary_hash": "d592cc9c7694f31774cb2e3a17130a0dbb31cc5ad118802e310164de7fe1a561",
+      "filename": "SelfTest.94.c1e03ab9.lump",
+      "issue_n": 94,
+      "lump_version": 94,
+      "binary_hash": "4268f3b6466e4db6232dd9575275afc48a9df558e7e0a6f8a137b31130241f0d",
       "resident": true,
       "boot_resident": true,
       "load_policy": "Resident",
@@ -183,6 +183,5 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1789737225.2524464,
-  "committed_raw_fingerprint": "c59a80f90ceb458d53fa215b17d045ae2383ca3f88265e61562731e4e09d38d4"
+  "generated_at": 1789737225.2524464
 }

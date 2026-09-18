@@ -1,14 +1,14 @@
 {
   "boot_config_sha256": "39a8ae8177fcfca37447482b75584fb794fb2a4d44c19da92af6cf33cbe38687",
-  "image_sha256": "c31840d8030a2d13f429064a57b02d4758a1739b6c5b2fc88bf9db6022a69685",
+  "image_sha256": "f7823fd2c55e61ff30959f00191f290355420ddfa7e1320e75f7111d2e083981",
   "origin": "generated",
   "resident_bindings": [
     {
-      "artifact_sha256": "d592cc9c7694f31774cb2e3a17130a0dbb31cc5ad118802e310164de7fe1a561",
+      "artifact_sha256": "4268f3b6466e4db6232dd9575275afc48a9df558e7e0a6f8a137b31130241f0d",
       "boot_resident": true,
-      "filename": "SelfTest.1.d2f81664.lump",
+      "filename": "SelfTest.94.c1e03ab9.lump",
       "load_policy": "Resident",
-      "localized_clist_sha256": "37fa6d81a99764b966f9e8499eb68d6e7c761f303e5f60f397564c88a7ae990a",
+      "localized_clist_sha256": "d07843a6ce6e1ca7cde0a7f2bcf2c0ec2e90ead4d0c63ffe9c33f33d3200f675",
       "ns_slot_policy": "static",
       "resident": true,
       "slot": 6,
@@ -38,8 +38,8 @@
     }
   ],
   "source_sha256": {
-    "manifest": "2d4c382c846b5bc7bcaec1158c1c993e15f331b66ed4a0c3ea1e467a77481976",
-    "ns_state": "3c509b1137ae5242c652b52ea8d587e503d8ee010ea417b2200ba8853f8c4c1e"
+    "manifest": "8f39118a4800252567f3643c1a6d411b410c82b1a46bbfc1617f517ff531606e",
+    "ns_state": "68a4125c10924621694b3a6458e6217bc8f2d290728644b1eec1c9f5a678b216"
   },
   "version": 1
 }

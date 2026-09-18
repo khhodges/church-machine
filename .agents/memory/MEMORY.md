@@ -142,3 +142,4 @@
 - [IDE configuration authorization](ide-browser-write-authorization.md) — ordinary Namespace configuration saves must not depend on REPORT_TOKEN; privileged hardware and deployment operations remain protected
 - [Save LUMP confirmation surface](save-lump-confirmation-surface.md) — happy-path review, destination, server consequence, and approval stay in one IDE modal; native dialogs are error-only
 - [Resident publication bootstrap approval](resident-publication-bootstrap-approval.md) — derive bootstrap metadata from validated fixed bindings and exact SELF bytes, never a browser flag
+- [Callable LUMP method-table prefix](callable-lump-method-table-prefix.md) — any LUMP entered through CALL method N needs canonical dispatch words before its source body

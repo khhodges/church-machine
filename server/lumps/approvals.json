@@ -592,6 +592,20 @@
       "compiled_at": 1789736233.0328484,
       "bootstrap_t": "4a000006",
       "bootstrap_runtime_gt": 1241513990
+    },
+    "4268f3b6466e4db6232dd9575275afc48a9df558e7e0a6f8a137b31130241f0d": {
+      "binary_hash": "4268f3b6466e4db6232dd9575275afc48a9df558e7e0a6f8a137b31130241f0d",
+      "filename": "SelfTest.94.c1e03ab9.lump",
+      "dot_name": "SelfTest",
+      "issue_n": 94,
+      "bootstrap_t": "4a000006",
+      "bootstrap_runtime_gt": 1241513990,
+      "token": "4a000006",
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
     }
   }
 }

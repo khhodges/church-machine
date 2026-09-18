@@ -6140,10 +6140,21 @@ class ChurchSimulator {
                 }
             }
         }
-        // pet_names: active CR and DR labels from the per-session name registry
+        // pet_names: freeze the best available label for every captured GT.
+        // Register-specific aliases win; ordinary capabilities fall back to
+        // the fault-time Namespace label for their GT slot.
         const _petNames = {};
-        for (const [_pidx, _pname] of Object.entries(this._petNameCRMap || {})) {
-            if (_pname) _petNames[`CR${_pidx}`] = _pname;
+        for (let _gi = 0; _gi < this.cr.length; _gi++) {
+            const _gc = this.cr[_gi];
+            if (!_gc || (_gc.word0 >>> 0) === 0) continue;
+            let _pname = (this._petNameCRMap || {})[_gi] || null;
+            if (!_pname) {
+                try {
+                    const _parsed = this.parseGT(_gc.word0 >>> 0);
+                    _pname = (this.nsLabels && this.nsLabels[_parsed.index]) || null;
+                } catch (_) {}
+            }
+            if (_pname) _petNames[`CR${_gi}`] = _pname;
         }
         for (const [_pidx, _pname] of Object.entries(this._petNameDRMap || {})) {
             if (_pname) _petNames[`DR${_pidx}`] = _pname;
@@ -6198,6 +6209,7 @@ class ChurchSimulator {
             pipelineStage: (meta && meta.pipelineStage) ? meta.pipelineStage : null,
             faultingAbstractionSlot: faultingAbstractionSlot,
             faultingAbstractionLabel: faultLabel,
+            diagnosticNote: `${faultingMnemonic ? faultingMnemonic + ' ' : ''}${type} fault${faultLabel ? ' in ' + faultLabel : ''}: ${message}`,
             tier: null,
             catchInvoked: false,
             irqInvoked: false,
@@ -7550,9 +7562,15 @@ class ChurchSimulator {
                     ? ((tableEntry & 0x7FFF) | 0xFFFF8000)
                     : (tableEntry & 0x7FFF);
                 this.pc = (methodIndex - 1) + soff;  // = bodyOffset
-            } else {
-                // Legacy: bare lump-relative PC (pre-task-1134 on-disk LUMPs).
+            } else if (tableEntry < hdr.cw) {
+                // Legacy: a bounded bare lump-relative PC from pre-method-table
+                // LUMPs.  Never promote an arbitrary instruction/data word into
+                // the PC merely because its opcode is not BRANCH.
                 this.pc = tableEntry;
+            } else {
+                this.fault('INVALID_OP',
+                    `CALL CR${d.crDst}: method index ${methodIndex} entry 0x${tableEntry.toString(16).padStart(8, '0')} is neither a BRANCH nor a valid legacy code offset`);
+                return null;
             }
         }
         this._emitTrace(this.physicalPC, TRACE_EV_CALL_CR6,  this.cr[6].word0  >>> 0);

@@ -3870,7 +3870,7 @@ const _FAULT_LOG_LS_KEY = 'cm_fault_log';
 let _restoredFaultLogAwaitingGoodStep = false;
 
 // The subset of fault-object fields we serialise (skips the large instrHistory array).
-const _FAULT_LOG_FIELDS = ['type','message','pc','physicalPC','step','faultStep','userNote',
+const _FAULT_LOG_FIELDS = ['type','message','pc','physicalPC','step','faultStep','userNote','diagnosticNote',
                            '_nsSnapshot','faultLabel','crSnapshot','drSnapshot','flagsSnapshot',
                            'malformedReason',
                            'tier','catchInvoked','irqInvoked','tier3Recovery',
@@ -3878,7 +3878,7 @@ const _FAULT_LOG_FIELDS = ['type','message','pc','physicalPC','step','faultStep'
                             'faultRawWord','instructionProvenance','dataProvenance',
                             'bootAttemptId','bootProgress','bootRomAddress','destinationRegister',
                             'gateReason','bootEvidence','observed_instr_word',
-                            'observedInstructionWord'];
+                           'observedInstructionWord','gt_snapshot','pet_names'];
 
 // Return only the instruction word captured with a fault record.  Fault
 // details are historical evidence: never reinterpret them using live memory,
@@ -4571,7 +4571,15 @@ function showFaultModal(f) {
             let snapRows = '';
             for (const regKey of snapKeys) {
                 const gtHex = snap[regKey];
-                const petName = pnames[regKey] || '';
+                let petName = pnames[regKey] || '';
+                if (!petName && typeof _resolveCListPetName === 'function') {
+                    try {
+                        const gtWord = typeof gtHex === 'string'
+                            ? Number.parseInt(gtHex, 16) >>> 0
+                            : Number(gtHex) >>> 0;
+                        if (Number.isFinite(gtWord)) petName = _resolveCListPetName(gtWord) || '';
+                    } catch (_) {}
+                }
                 snapRows += `<tr>
                     <td class="freg-name">${regKey}</td>
                     <td class="freg-base"><code>${gtHex}</code></td>
@@ -4717,6 +4725,15 @@ function showFaultModal(f) {
         ? `<span class="fault-edit-hint">&#x270E; line&nbsp;${_editLineNum}</span>`
         : (nsIdxForViewLump != null ? `<span class="fault-edit-hint">&#x270E; view lump</span>` : '');
     const _msgClass = (_editLineNum || nsIdxForViewLump != null) ? 'fault-modal-message fault-msg-editable' : 'fault-modal-message';
+    const _noteValue = typeof f.userNote === 'string'
+        ? f.userNote
+        : (f.diagnosticNote || `${f.type} fault: ${f.message || 'No additional diagnostic message was captured.'}`);
+    const _faultRecordIndex = sim && sim.faultLog ? sim.faultLog.indexOf(f) : -1;
+    const _noteAttr = String(_noteValue)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
     dialog.innerHTML = `
         <div class="fault-modal-header">
             <span class="fault-type-badge" style="background:${color}22;border-color:${color};color:${color}">${f.type}</span>
@@ -4742,8 +4759,8 @@ function showFaultModal(f) {
             <label class="fault-user-note-label" for="faultUserNoteInput">Note</label>
             <input id="faultUserNoteInput" class="fault-user-note-input" type="text" maxlength="300"
                 placeholder="Add a plain-English description of this fault\u2026"
-                value="${(f.userNote || '').replace(/"/g, '&quot;')}"
-                oninput="(function(v){var fl=sim.faultLog;if(fl&&fl.length>0){fl[fl.length-1].userNote=v;if(typeof _saveFaultNote==='function')_saveFaultNote(fl[fl.length-1],v);}if(typeof updateGateLog==='function')updateGateLog();})(this.value)">
+                value="${_noteAttr}"
+                oninput="(function(v){var fl=sim.faultLog,rec=fl&&fl[${_faultRecordIndex}];if(rec){rec.userNote=v;if(typeof _saveFaultNote==='function')_saveFaultNote(rec,v);}if(typeof updateGateLog==='function')updateGateLog();})(this.value)">
         </div>
         ${historyHtml ? `<div class="fault-detail-grid">
             <div class="fault-detail-row fault-history-row">
