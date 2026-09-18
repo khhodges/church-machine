@@ -4916,7 +4916,7 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
 
     const dis = w => {
         if (typeof assembler !== 'undefined' && assembler) {
-            try { return assembler.disassemble(w >>> 0); } catch (_) {}
+            try { return assembler.disassemble(w >>> 0, clistSlotName); } catch (_) {}
         }
         return `0x${(w >>> 0).toString(16).padStart(8, '0').toUpperCase()}`;
     };

@@ -502,12 +502,16 @@ const WUKONG_CALLHOME_CONVENTIONS = {
     };
     const selfTest = a.disassemble(0x17030021, slotNames);
     const callHome = a.disassemble(0x17030027, slotNames);
+    const loadSelfTest = a.disassemble(0x07030001, slotNames);
     assert('WCH4g SelfTest row 1 disassembles with its local pet name and method',
-        selfTest.includes('CR6[SelfTest].Run'),
+        selfTest.includes('CR6[SelfTest].Run') && selfTest.includes('; c-list[1]'),
         `selected="${selfTest}"`);
     assert('WCH4g WukongCallHome row 7 disassembles with its local pet name and method',
-        callHome.includes('CR6[WukongCallHome].Main'),
+        callHome.includes('CR6[WukongCallHome].Main') && callHome.includes('; c-list[7]'),
         `selected="${callHome}"`);
+    assert('WCH4g LOAD uses the pet name and keeps its row as a comment',
+        loadSelfTest === 'LOAD  CR0, CR6[SelfTest] ; c-list[1]',
+        `selected="${loadSelfTest}"`);
 }
 
 // ── Salvation abstraction method conventions (task-2032) ────────────────────

@@ -2786,16 +2786,33 @@ class ChurchAssembler {
 
         // Format a c-list slot access as CR6[0x…] — CR6 holds the c-list base pointer.
         const cdOff = n => `CR6[${hexOff(n)}]`;
+        // Prefer source-level pet names when the caller supplies the active
+        // c-list row map. Keep the encoded row visible as a comment so the
+        // disassembly remains useful when auditing the binary layout.
+        const cdNamed = n => {
+            const slotName = slotNames && slotNames[n] ? slotNames[n] : null;
+            return {
+                operand: slotName ? `CR6[${slotName}]` : cdOff(n),
+                comment: slotName ? ` ; c-list[${n}]` : '',
+                slotName,
+            };
+        };
 
         switch (opcode) {
-            // LOAD CRd, CR6[offset]  — load GT from c-list (always numeric)
+            // LOAD CRd, CR6[offset]  — load GT from c-list
             case 0: {
-                if (crSrc === 6) return `${mnemonic}  CR${crDst}, ${cdOff(imm)}`;
+                if (crSrc === 6) {
+                    const ref = cdNamed(imm);
+                    return `${mnemonic}  CR${crDst}, ${ref.operand}${ref.comment}`;
+                }
                 return `${mnemonic}  CR${crDst}, CR${crSrc}[${hexOff(imm)}]`;
             }
-            // SAVE CRd, CR6[offset]  — save GT to c-list (always numeric)
+            // SAVE CRd, CR6[offset]  — save GT to c-list
             case 1: {
-                if (crSrc === 6) return `${mnemonic}  CR${crDst}, ${cdOff(imm)}`;
+                if (crSrc === 6) {
+                    const ref = cdNamed(imm);
+                    return `${mnemonic}  CR${crDst}, ${ref.operand}${ref.comment}`;
+                }
                 return `${mnemonic}  CR${crDst}, CR${crSrc}[${hexOff(imm)}]`;
             }
             // CALL CRd[, MethodName]  — invoke capability via method-table dispatch
@@ -2803,13 +2820,10 @@ class ChurchAssembler {
                 if (crSrc === 6) {
                     const row = imm & 0x1F;
                     const method = (imm >>> 5) & 0x7F;
-                    const slotName = slotNames && slotNames[row]
-                        ? slotNames[row]
-                        : null;
-                    const target = slotName
-                        ? `CR6[${slotName}]`
-                        : cdOff(row);
-                    if (method === 0) return `${mnemonic}  ${target}`;
+                    const ref = cdNamed(row);
+                    const slotName = ref.slotName;
+                    const target = ref.operand;
+                    if (method === 0) return `${mnemonic}  ${target}${ref.comment}`;
                     if (slotName) {
                         const conventions = this._methodConventionsFor(slotName);
                         if (conventions) {
@@ -2817,12 +2831,12 @@ class ChurchAssembler {
                             for (const [methodName, entry] of Object.entries(conventions)) {
                                 const index = typeof entry === 'object' ? entry.index : entry;
                                 if (index === selector) {
-                                    return `${mnemonic}  ${target}.${methodName}`;
+                                    return `${mnemonic}  ${target}.${methodName}${ref.comment}`;
                                 }
                             }
                         }
                     }
-                    return `${mnemonic}  ${target}, #${method - 1}`;
+                    return `${mnemonic}  ${target}, #${method - 1}${ref.comment}`;
                 }
                 if (imm & 0x4000) return `${mnemonic}  CR${crDst}`;
                 // imm=0: fast-path (backward-compat, no table dispatch).
@@ -2854,7 +2868,10 @@ class ChurchAssembler {
             }
             // CHANGE CRd, CR6[idx] / CRs[idx]
             case 4: {
-                if (crSrc === 6) return `${mnemonic}  CR${crDst}, ${cdOff(imm)}`;
+                if (crSrc === 6) {
+                    const ref = cdNamed(imm);
+                    return `${mnemonic}  CR${crDst}, ${ref.operand}${ref.comment}`;
+                }
                 return `${mnemonic}  CR${crDst}, CR${crSrc}[${hexOff(imm)}]`;
             }
             // The exact CR15/CR15 encoding is a guarded Boot placeholder.
@@ -2883,13 +2900,18 @@ class ChurchAssembler {
             case 8: {
                 const ec8Row    = imm & 0x1F;
                 const ec8Method = (imm >>> 5) & 0x7F;
-                const ec8Src    = crSrc === 6 ? cdOff(ec8Row) : `CR${crSrc}[${hexOff(ec8Row)}]`;
-                if (ec8Method > 0) return `${mnemonic}  CR${crDst}, ${ec8Src}, ${ec8Method - 1}`;
-                return `${mnemonic}  CR${crDst}, ${ec8Src}`;
+                const ec8Ref    = crSrc === 6 ? cdNamed(ec8Row) : null;
+                const ec8Src    = ec8Ref ? ec8Ref.operand : `CR${crSrc}[${hexOff(ec8Row)}]`;
+                const ec8Cmt    = ec8Ref ? ec8Ref.comment : '';
+                if (ec8Method > 0) return `${mnemonic}  CR${crDst}, ${ec8Src}, ${ec8Method - 1}${ec8Cmt}`;
+                return `${mnemonic}  CR${crDst}, ${ec8Src}${ec8Cmt}`;
             }
             // XLOADLAMBDA CRd, CR6[offset] / CRs[offset]  — fused load + lambda
             case 9: {
-                if (crSrc === 6) return `${mnemonic}  CR${crDst}, ${cdOff(imm)}`;
+                if (crSrc === 6) {
+                    const ref = cdNamed(imm);
+                    return `${mnemonic}  CR${crDst}, ${ref.operand}${ref.comment}`;
+                }
                 return `${mnemonic}  CR${crDst}, CR${crSrc}[${hexOff(imm)}]`;
             }
             // DREAD DRd, CRs, #offset  (bit14=1, immediate) or DRd, CRs, #base, DRx (bit14=0, indexed)
