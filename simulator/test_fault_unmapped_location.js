@@ -17,5 +17,13 @@ assert(modal.includes('const nsIdxForViewLump = locationNs'),
     'View LUMP is offered only for a validated instruction location');
 assert(modal.includes('if (!locationNs || locationNs.offset === undefined'),
     'source-line lookup is offered only for a validated instruction location');
+assert(modal.includes('No captured source location is available for this fault'),
+    'Edit Code is disabled when the fault has no validated source location');
+assert(modal.includes("'<button class=\"btn btn-muted\" disabled"),
+    'unmapped faults do not emit an enabled Edit Code action');
+assert(!modal.includes('onclick="faultModalOpenEditor(null)"'),
+    'an unmapped instruction row does not fall back to the generic editor');
+assert(modal.includes("const _instructionNavHint = _editLineNum"),
+    'instruction navigation remains available for mapped source or a validated LUMP');
 
 console.log('PASS fault unmapped location');

@@ -4648,6 +4648,16 @@ function showFaultModal(f) {
                 </div>
                 <div class="fault-trace-legend">${_rightsLegendHTML()}</div>`;
     }
+    const _instructionNavAttrs = _editLineNum
+        ? `onclick="faultModalOpenEditor(${_editLineNum})" title="Click to open editor at line ${_editLineNum}" style="cursor:pointer"`
+        : (nsIdxForViewLump != null
+            ? `onclick="faultModalOpenBinaryLump(${nsIdxForViewLump})" title="Click to open lump in code view" style="cursor:pointer"`
+            : `title="No captured code location is available for this instruction"`);
+    const _instructionNavHint = _editLineNum
+        ? `<span class="fault-instr-edit-hint">&#x270E;&nbsp;line&nbsp;${_editLineNum}</span>`
+        : (nsIdxForViewLump != null
+            ? `<span class="fault-instr-edit-hint">&#x270E;&nbsp;view lump</span>`
+            : '');
     const _traceFaultDetailsHtml = `
                 <div class="fault-detail-grid fault-trace-fault-details">
                     <div class="fault-detail-row">
@@ -4658,17 +4668,11 @@ function showFaultModal(f) {
                         <span class="fault-detail-label">PC</span>
                         <span class="fault-detail-value"><code>${pcHex}</code></span>
                     </div>
-                    <div class="fault-detail-row fault-instr-row"
-                         ${_editLineNum
-                            ? `onclick="faultModalOpenEditor(${_editLineNum})" title="Click to open editor at line ${_editLineNum}"`
-                            : (nsIdxForViewLump != null
-                                ? `onclick="faultModalOpenBinaryLump(${nsIdxForViewLump})" title="Click to open lump in code view"`
-                                : `onclick="faultModalOpenEditor(null)" title="Click to open editor"`)}
-                         style="cursor:pointer">
+                    <div class="fault-detail-row fault-instr-row" ${_instructionNavAttrs}>
                         <span class="fault-detail-label">Instruction</span>
                         <span class="fault-detail-value">
                             <code class="fault-instr-code">${_petDisasm(disasm, _scopeBadOffsetStr)}</code>
-                            <span class="fault-instr-edit-hint">&#x270E;${_editLineNum ? `&nbsp;line&nbsp;${_editLineNum}` : (nsIdxForViewLump != null ? '&nbsp;view lump' : '&nbsp;edit')}</span>
+                            ${_instructionNavHint}
                         </span>
                     </div>
                     ${_faultCListPetName != null ? `<div class="fault-detail-row">
@@ -4726,7 +4730,9 @@ function showFaultModal(f) {
             <button class="btn btn-danger" onclick="faultModalReboot()">&#x21BA; Reboot</button>
             <button class="btn btn-warning" onclick="faultModalInvestigate()">&#x1F50D; Investigate</button>
             ${isOutformFault ? '<button class="btn btn-primary" onclick="faultModalRetryDownload()">&#x21BB; Retry Download</button>' : ''}
-            <button class="btn btn-primary" onclick="faultModalEditCode()" title="Open the assembly editor to inspect and correct the faulting code">&#x270E; Edit Code</button>
+            ${_editLineNum
+                ? '<button class="btn btn-primary" onclick="faultModalEditCode()" title="Open the assembly editor at the captured fault location">&#x270E; Edit Code</button>'
+                : '<button class="btn btn-muted" disabled title="No captured source location is available for this fault">&#x270E; Edit Code</button>'}
             <button class="btn btn-muted" onclick="faultModalClearAndDismiss()" title="Clear fault state — stops the flashing alert">&#x2715; Clear</button>
         </div>
         <div class="${_msgClass}" ${_editOnclick}>${_transformFaultMsg(f.message)}${_editBadge}</div>
