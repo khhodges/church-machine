@@ -546,8 +546,9 @@ class ChurchAssembler {
 
         // 3.5. Boot-image fixed capability names — always present in the boot c-list
         //      regardless of which abstractions are installed.
-        //      Boot.Nucs  — Nucleus/Turing-domain X-GT  (slot 7, dom=0, perm=X)
-        //      Boot.Abstr — SelfTest E-GT               (slot 6, dom=1, perm=E)
+        //      Boot.Thread — initial Thread L-GT         (slot 1)
+        //      Boot.Nucs   — Nucleus/Turing-domain X-GT (slot 7, dom=0, perm=X)
+        //      Boot.Abstr  — SelfTest E-GT               (slot 6, dom=1, perm=E)
         //      Slot 6 is the Boot.Abstr/SelfTest NS slot; _getHardwareBootCatalog maps
         //      each NS slot index directly to the same-numbered c-list position.
         //      IMPORTANT: slots 0–7 in the DEMO_CLIST mirror NS slots 0–7 exactly:
@@ -555,8 +556,9 @@ class ChurchAssembler {
         //        [4]=BTN_DEV [5]=TIMER_DEV  [6]=SelfTest  [7]=null
         //      Boot.Abstr was historically at slot 3 (before the NS slot migration to 6).
         //      Do NOT revert to 3 — that slot is LED_DEV and the CALL would silently misfire.
-        if (name === 'Boot.Nucs')  return { slot: 7, key: name };
-        if (name === 'Boot.Abstr') return { slot: 6, key: name };
+        if (name === 'Boot.Thread') return { slot: 1, key: name };
+        if (name === 'Boot.Nucs')   return { slot: 7, key: name };
+        if (name === 'Boot.Abstr')  return { slot: 6, key: name };
 
         // 4. Abstract registry (last resort — returns the abstraction's own index)
         const reg = ChurchAssembler._sharedRegistry;
@@ -1910,10 +1912,15 @@ class ChurchAssembler {
                     ? this._resolveCListName((parts[2] || '').replace(/,/g, '').trim())
                     : null;
                 const bareNamedSwitch = parts.length === 3 && !namedSwitch && !!bareName;
-                const annotatedName = parts.length === 5
-                    ? this._resolveCListName((parts[2] || '').replace(/,/g, '').trim())
-                    : null;
-                const annotatedSwitch = parts.length === 5 && !!annotatedName;
+                const annotationToken = parts.length === 5
+                    ? (parts[2] || '').replace(/,/g, '').trim()
+                    : '';
+                // The PetName is a source-level M-bit annotation only.  It is
+                // deliberately not resolved here: the explicit CRsource/#row
+                // operands completely determine the hardware encoding, and
+                // runtime M-bit enforcement owns whether that authority works.
+                const annotatedSwitch = parts.length === 5 &&
+                    /^[A-Za-z_][A-Za-z0-9_.]*$/.test(annotationToken);
                 const directSwitch = parts.length === 3 && !namedSwitch && !bareNamedSwitch;
                 if (parts.length !== 4 && !directSwitch && !namedSwitch &&
                     !bareNamedSwitch && !annotatedSwitch) {

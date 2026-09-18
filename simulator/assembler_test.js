@@ -904,6 +904,22 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
             ((kThreadAliasResult.words[1] >>> 15) & 0xF) === 6 &&
             (kThreadAliasResult.words[1] & 0x7FFF) === 1,
         `word=0x${(kThreadAliasResult.words[1] >>> 0).toString(16)}`);
+    const kScreenshotForms = new ChurchAssembler();
+    const kScreenshotResult = kScreenshotForms.assemble([
+        'SWITCH CR12, Thread.1, CR6, #0',
+        'SWITCH CR15, Boot.Thread',
+    ].join('\n'));
+    assert('P12k screenshot SWITCH forms compile without a capabilities block',
+        kScreenshotForms.errors.length === 0,
+        kScreenshotForms.errors.map(e => e.message).join('; '));
+    assert('P12k unresolved Thread annotation preserves explicit CR6 row encoding',
+        kScreenshotResult.words[0] === kResult.words[0],
+        `word=0x${(kScreenshotResult.words[0] >>> 0).toString(16)}`);
+    assert('P12k fixed Boot.Thread shorthand resolves to boot c-list row 1',
+        ((kScreenshotResult.words[1] >>> 19) & 0xF) === 15 &&
+            ((kScreenshotResult.words[1] >>> 15) & 0xF) === 6 &&
+            (kScreenshotResult.words[1] & 0x7FFF) === 1,
+        `word=0x${(kScreenshotResult.words[1] >>> 0).toString(16)}`);
 
     // P12l: TPERM CR15 → error
     const l = new ChurchAssembler();
