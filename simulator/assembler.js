@@ -2671,28 +2671,17 @@ class ChurchAssembler {
     }
 
     // Build a slot-number → capability-name map suitable for passing to disassemble().
-    // Always includes the boot c-list positions from the current 11-slot DEMO_CLIST:
-    //   UART→2, LED_DEV→3, BTN→4, Timer→5
-    // caps: array of {name} objects or strings from an assembled program's capability list.
-    // nsLabels: sim.nsLabels — maps NS slot index → label string; used to resolve
-    //   non-device abstractions (e.g. Tunnel at slot 31).
+    // caps: array of {name} objects or strings in c-list row order.
+    // A Namespace slot is not a c-list row; never use nsLabels indices to name
+    // these operands or the display will become coincidentally correct only when
+    // an abstraction's NS slot happens to equal its local c-list row.
     static buildSlotNames(caps, nsLabels) {
-        // Boot c-list positions in the current 11-slot DEMO_CLIST:
-        //   [2] UART_DEV  [3] LED_DEV (LED0–LED4)  [4] BTN_DEV  [5] TIMER_DEV
-        const slotNames = {
-            2: 'UART', 3: 'LED_DEV', 4: 'BTN', 5: 'Timer',
-        };
-        if (caps && nsLabels) {
-            for (const cap of caps) {
+        const slotNames = {};
+        if (caps) {
+            caps.forEach((cap, row) => {
                 const name = typeof cap === 'string' ? cap : (cap.name || '');
-                if (!name) continue;
-                for (const [idx, lbl] of Object.entries(nsLabels)) {
-                    if (lbl && lbl.toUpperCase() === name.toUpperCase()) {
-                        slotNames[parseInt(idx)] = name;
-                        break;
-                    }
-                }
-            }
+                if (name) slotNames[row] = name;
+            });
         }
         return slotNames;
     }

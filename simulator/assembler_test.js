@@ -478,6 +478,34 @@ const WUKONG_CALLHOME_CONVENTIONS = {
         reusedRegister.errors.map(e => e.message).join('; '));
 }
 
+// WCH4g: disassembly names indexed CALL rows from the local c-list ordering,
+// never from unrelated Namespace slot numbers.
+{
+    const caps = [
+        { name: 'SELF' },
+        { name: 'SelfTest' },
+        { name: 'LED_DEV' },
+        { name: 'UART_DEV' },
+        { name: 'BTN_DEV' },
+        { name: 'TIMER_DEV' },
+        { name: 'M_BIT_DEV' },
+        { name: 'WukongCallHome' },
+    ];
+    const slotNames = ChurchAssembler.buildSlotNames(caps, {
+        6: 'SelfTest',
+        7: 'WukongCallHome',
+    });
+    const a = new ChurchAssembler();
+    const selfTest = a.disassemble(0x17030021, slotNames);
+    const callHome = a.disassemble(0x17030027, slotNames);
+    assert('WCH4g SelfTest row 1 disassembles with its local pet name',
+        selfTest.includes('CR6[SelfTest]'),
+        `selected="${selfTest}"`);
+    assert('WCH4g WukongCallHome row 7 disassembles with its local pet name',
+        callHome.includes('CR6[WukongCallHome]'),
+        `selected="${callHome}"`);
+}
+
 // ── Salvation abstraction method conventions (task-2032) ────────────────────
 // Mirrors simulator/abstractions.js Salvation method table: Create=0,
 // Release=1, Find=2, Transfer=3, Validate=4, Audit=5, main=14 (boot c-list
