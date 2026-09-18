@@ -626,7 +626,8 @@
         "nsIndex": 7
       }
     ],
-    "operation_id": "eff436d9-d4cf-4478-b740-3f990c20157b"
+    "operation_id": "eff436d9-d4cf-4478-b740-3f990c20157b",
+    "archived": true
   },
   {
     "token": "00aa1234",
@@ -700,5 +701,22 @@
     "abstraction": "WukongCallHome",
     "filename": "WukongCallHome.1.658e6ba8.lump",
     "lump_version": 1
+  },
+  {
+    "token": "4a00000a",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.2.aac8cfa9.lump",
+    "variant_group": "capabilitytest-history",
+    "lump_version": 28,
+    "compiled_at": 1789591328.5251067,
+    "archived": true
+  },
+  {
+    "token": "4a00000a",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.2.35647a26.lump",
+    "variant_group": "capabilitytest-history",
+    "lump_version": 28,
+    "compiled_at": 1789591328.5251067
   }
 ]

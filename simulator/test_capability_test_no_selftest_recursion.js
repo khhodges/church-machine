@@ -23,8 +23,8 @@ for (const source of [canonical, appRun]) {
         'CapabilityTest must not recursively call the startup SelfTest');
     assert.match(
         source,
-        /ELOADCALL\s+CR0,\s*WukongCallHome\.hw(?:,\s*0)?/,
-        'CapabilityTest must continue to WukongCallHome.hw');
+        /ELOADCALL\s+CR0,\s*WukongCallHome\.hw,\s*0/,
+        'CapabilityTest must use WukongCallHome.hw legacy entry zero');
     assert.match(
         source,
         /BRANCH\s+Start\b/,
@@ -35,6 +35,8 @@ assert.match(
     builder,
     /gt:\s*0x4A000007,\s*name:\s*'WukongCallHome\.hw'/,
     'CapabilityTest binary must carry the WukongCallHome.hw E-GT');
+assert.match(builder, /const editorSource = source\.replace/);
+assert.match(builder, /SELF E,[\s\S]*WukongCallHome E/);
 assert.match(appRun, /capabilities\s*\{\s*SELF\s+E,/,
     'default CapabilityTest editor source must expose the v28 SELF row');
 assert.match(appRun, /WukongCallHome\s+E\s*\}/,

@@ -634,6 +634,34 @@
         "E"
       ],
       "capability_type": "inform"
+    },
+    "03492fe1498f76f26547a800331e1da72424772b9dbfad3d8599f834908bc09c": {
+      "binary_hash": "03492fe1498f76f26547a800331e1da72424772b9dbfad3d8599f834908bc09c",
+      "filename": "CapabilityTest.2.aac8cfa9.lump",
+      "dot_name": "CapabilityTest",
+      "issue_n": 2,
+      "bootstrap_t": "4a00000a",
+      "bootstrap_runtime_gt": 1241513994,
+      "token": "4a00000a",
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
+    },
+    "bda0d44f551a4b5b55a04e1b630fe2889ed024ab4a7dd42d7381c4334f9c92fc": {
+      "binary_hash": "bda0d44f551a4b5b55a04e1b630fe2889ed024ab4a7dd42d7381c4334f9c92fc",
+      "filename": "CapabilityTest.2.35647a26.lump",
+      "dot_name": "CapabilityTest",
+      "issue_n": 2,
+      "bootstrap_t": "4a00000a",
+      "bootstrap_runtime_gt": 1241513994,
+      "token": "4a00000a",
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform"
     }
   }
 }

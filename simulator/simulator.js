@@ -6148,6 +6148,21 @@ class ChurchSimulator {
             const _gc = this.cr[_gi];
             if (!_gc || (_gc.word0 >>> 0) === 0) continue;
             let _pname = (this._petNameCRMap || {})[_gi] || null;
+            // CR5 is not the Thread object itself; architecturally it names
+            // that Thread's Heap subregion. Preserve that register-specific
+            // role in the immutable fault snapshot when the referenced
+            // Namespace entry validates as a live Thread.
+            if (!_pname && _gi === 5 &&
+                    typeof this.getThreadInstanceLayout === 'function') {
+                try {
+                    const _parsed = this.parseGT(_gc.word0 >>> 0);
+                    const _layout = this.getThreadInstanceLayout(_parsed.index);
+                    const _threadName = this.nsLabels && this.nsLabels[_parsed.index];
+                    if (_layout && _layout.valid && _threadName) {
+                        _pname = `${_threadName}.Heap`;
+                    }
+                } catch (_) {}
+            }
             if (!_pname) {
                 try {
                     const _parsed = this.parseGT(_gc.word0 >>> 0);

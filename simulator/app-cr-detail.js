@@ -1079,6 +1079,12 @@ function injectCRCode(logEl) {
         _petNameCRMap = {};
         for (const [alias, regIdx] of Object.entries(_asmAliases.cr || {})) _petNameCRMap[regIdx] = alias;
     }
+    // Fault records are captured by the simulator, while the editor and CR
+    // panels use the UI maps above. Keep both owners synchronized so an
+    // immutable fault snapshot preserves every source-defined CR/DR pet name,
+    // including CR14, instead of falling back to its Namespace slot label.
+    sim._petNameDRMap = { ..._petNameDRMap };
+    sim._petNameCRMap = { ..._petNameCRMap };
 
     delete _lumpManifests[nsIdx];
 

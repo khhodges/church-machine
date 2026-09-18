@@ -122,7 +122,29 @@ function contentFrame(name, text) {
     for (let i = 0; i < data.length; i += 4) frame.push(data.readUInt32BE(i));
     return frame;
 }
-const FRAME = contentFrame(DOT_NAME, source);
+// The frozen runtime source uses the installation alias
+// WukongCallHome.hw so the assembler binds NS[7] directly.  That alias is not
+// part of the programmer-facing API, and SELF is compiler-owned rather than a
+// user dependency.  Embed the canonical editor projection while keeping the
+// assembled instruction words and physical c-list unchanged.
+const editorSource = source.replace(
+    /capabilities\s*\{[\s\S]*?\}/,
+    `capabilities {
+    SELF E,
+    SelfTest E,
+    LED_DEV RW,
+    UART_DEV RW,
+    BTN_DEV R,
+    TIMER_DEV RW,
+    M_BIT_DEV RW,
+    WukongCallHome E
+}`,
+);
+if (editorSource === source) {
+    console.error('CapabilityTest capability block was not found for editor projection');
+    process.exit(1);
+}
+const FRAME = contentFrame(DOT_NAME, editorSource);
 
 // ── C-List definition ─────────────────────────────────────────────────────────
 //
@@ -335,7 +357,11 @@ const manifestEntry = {
     abstraction:     'CapabilityTest',
     filename,
     variant_group:   'capabilitytest-history',
-    lump_version:    2,
+    // Rebuilding the fixed resident changes its immutable body/issue, not the
+    // programmer-visible CapabilityTest release selected in the IDE.
+    lump_version:    (existingIdx !== -1 &&
+        Number.isInteger(Number(manifest[existingIdx].lump_version)))
+        ? Number(manifest[existingIdx].lump_version) : 28,
     ...((existingIdx !== -1 && manifest[existingIdx].compiled_at !== undefined)
         ? { compiled_at: manifest[existingIdx].compiled_at } : {}),
 };
