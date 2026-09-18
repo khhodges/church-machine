@@ -5282,32 +5282,13 @@ class ChurchSimulator {
                 `CHANGE Thread slot ${threadSlot}: CHURCH frame NIA ${frame.returnPC} exceeds code extent ${codeHeader.cw}`);
             return null;
         }
-        // A dormant frame is written together with the incoming Thread's
-        // persisted CR0 home.  Treat the two words as a coherent identity,
-        // rather than allowing an old companion Enter GT to redirect resume
-        // after the home has been replaced or its Namespace generation moved.
-        // A NULL CR0 is deliberately admitted through CHANGE so the next
-        // architectural CALL reports NULL_CAP at its real gate.  Any
-        // non-null home, however, must be exactly the frame companion.
-        const homeGT = this.memory[threadBase + layout.capsStart] >>> 0;
-        if (homeGT !== 0 && homeGT !== enterGT) {
-            let homeParsed;
-            try {
-                homeParsed = this.parseGT(homeGT);
-            } catch (_e) {
-                homeParsed = null;
-            }
-            // CALL's next gate owns the permission check, so a deliberately
-            // non-E CR0 must still reach CALL.  Coherence here is identity
-            // (slot/sequence/type), not an equality of permission bits.
-            if (!homeParsed || homeParsed.type !== parsed.type ||
-                    homeParsed.index !== parsed.index ||
-                    homeParsed.gt_seq !== parsed.gt_seq) {
-                this.fault('TYPE',
-                    `CHANGE Thread slot ${threadSlot}: CHURCH Enter companion disagrees with CR0 home`);
-                return null;
-            }
-        }
+        // CR0 is an independently saved general capability register. It may
+        // legitimately name a different abstraction from the code currently
+        // executing (for example, LOAD can prepare the next CALL in CR0 while
+        // CR14 and the CHURCH frame still identify the current abstraction).
+        // CHANGE therefore restores CR0–CR11 from their homes and restores
+        // execution identity/NIA solely from this validated frame. Never force
+        // CR0 to agree with the frame or use CR0 to redirect the resume.
         return { enterGT, parsed, checked, codeHeader, frame };
     }
 

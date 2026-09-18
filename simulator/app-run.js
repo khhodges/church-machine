@@ -1536,7 +1536,11 @@ function runThreadFromModal() {
     // Do not leave this dialog covering completion/fault UI while the run
     // proceeds. The Thread row remains available to reopen with the outcome.
     closeThreadContextModal();
-    runSimGo();
+    // Thread Run is a pure architectural resume. selectConfiguredThread()
+    // has just restored CR0–CR11, DR0–DR15, CR12, CR14/CR6, FLAGS, STO, and
+    // NIA from this Thread's saved image. Never let the generic editor
+    // Compile+Run install path replace that restored code identity or PC.
+    runSimGo(undefined, { applyPendingLoad: false });
 }
 
 function stopThreadFromModal() {
@@ -2027,7 +2031,7 @@ function _applyPendingSimLoad() {
     }
 }
 
-function runSimGo(preserveView) {
+function runSimGo(preserveView, options) {
     if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
     if (!_requireCommittedImageForExecution('Run')) return;
     // Guard: if a run batch loop is already active (either mid-batch where
@@ -2050,7 +2054,9 @@ function runSimGo(preserveView) {
     const sel = document.getElementById('runBatchSelect');
     if (sel) runBatchSize = parseInt(sel.value, 10) || 500;
     hideRunPopover();
-    _applyPendingSimLoad();
+    if (!options || options.applyPendingLoad !== false) {
+        _applyPendingSimLoad();
+    }
     runSim(preserveView);
 }
 

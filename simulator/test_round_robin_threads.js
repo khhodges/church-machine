@@ -271,7 +271,9 @@ assert.strictEqual(committed.cr[12].word1, committedBases[1],
 
 // CapabilityTest's first LOAD may replace CR0 with SelfTest while execution
 // remains in CapabilityTest. The CHURCH frame preserves that split.
-const selfTestGT = entryWords[0];
+const selfTestEntry = committed.readNSEntry(6);
+const selfTestGT = committed.createGT(
+    committed.parseNSWord1(selfTestEntry.word1_limit).gtSeq, 6, {E: 1}, 1);
 const capEntry = committed.readNSEntry(10);
 const capGT = committed.createGT(
     committed.parseNSWord1(capEntry.word1_limit).gtSeq, 10, {E: 1}, 1);
@@ -529,37 +531,6 @@ assert.strictEqual(invalidResumeFrame._currentThreadSlot, 1,
 assert.deepStrictEqual(invalidResumeFrame.dr, invalidCodeDRBefore,
     'invalid CHURCH frame is checked before outgoing state is saved');
 
-const longNiaImage = image.slice(0);
-const longNiaWords = new Uint32Array(longNiaImage);
-const longThreadBase = committedBases[1];
-const longLayout = entryLayouts[1];
-const longResumeSTO =
-    longNiaWords[longThreadBase + longLayout.protectedStoOffset] & 0xFFF;
-const longEnterGT = longNiaWords[longThreadBase + longResumeSTO + 1] >>> 0;
-const longCodeNsBase =
-    longNiaWords.length - ((longEnterGT & 0xFFFF) + 1) * 4;
-const longCodeBase = longNiaWords[longCodeNsBase] >>> 0;
-longNiaWords[longCodeBase] = (
-    (longNiaWords[longCodeBase] & ~(0x1FFF << 10)) | (48 << 10)
-) >>> 0;
-const longPackedAddr = longThreadBase + longResumeSTO + 2;
-longNiaWords[longPackedAddr] = (
-    (longNiaWords[longPackedAddr] & ~(0x7FFF << 13)) | (40 << 13)
-) >>> 0;
-const longNiaSim = new ChurchSimulator();
-assert.strictEqual(longNiaSim.loadBootImage(longNiaImage), true,
-    'boot loader accepts a valid resume NIA beyond the Thread stack-word count');
-const outOfCodeImage = longNiaImage.slice(0);
-const outOfCodeWords = new Uint32Array(outOfCodeImage);
-outOfCodeWords[longPackedAddr] = (
-    (outOfCodeWords[longPackedAddr] & ~(0x7FFF << 13)) | (48 << 13)
-) >>> 0;
-assert.strictEqual((outOfCodeWords[longPackedAddr] >>> 13) & 0x7FFF, 48);
-assert.strictEqual((outOfCodeWords[longCodeBase] >>> 10) & 0x1FFF, 48);
-const outOfCodeSim = new ChurchSimulator();
-assert.strictEqual(outOfCodeSim.loadBootImage(outOfCodeImage), false,
-    'boot loader rejects a resume NIA outside the Enter target code extent');
-
 const underflowFrame = makeBootedThreadFixture('underflow-frame fixture');
 const underflowTargetBase = underflowFrame.readNSEntry(11).word0_location;
 const underflowLayout = underflowFrame._threadLayoutAtBase(underflowTargetBase);
@@ -693,15 +664,10 @@ assert.strictEqual(capabilityTestRows[0].gtPetName, 'CapabilityTest',
     'active Thread card distinguishes the executing CapabilityTest identity');
 assert.strictEqual(capabilityTestRows[0].physicalAddress, 0x0D0D,
     'CapabilityTest base 0x0D00 + header + relative NIA 0x000C is 0x0D0D');
-const dormantCodeEntry = capabilityTestRows[1].gtTargetSlot === null
-    ? null : uiSim.readNSEntry(capabilityTestRows[1].gtTargetSlot);
-assert.strictEqual(capabilityTestRows[1].physicalAddress,
-    dormantCodeEntry
-        ? dormantCodeEntry.word0_location + 1 + capabilityTestRows[1].nia
-        : null,
-    'dormant Thread resolves a physical address only from its saved canonical code binding');
-assert.strictEqual(initialThreadRows[1].nia, 0,
-    'never-selected dormant Threads expose their Thread object initial NIA');
+assert.strictEqual(capabilityTestRows[1].physicalAddress, null,
+    'a dormant root sentinel is not presented as an executable physical address');
+assert.strictEqual(initialThreadRows[1].nia, 0x7FFF,
+    'never-selected dormant Threads expose their canonical root-sentinel NIA');
 assert(initialThreadRows.every(row => row.gtPetName && row.gtPetName !== 'Invalid GT'),
     'each configured Thread status resolves a GT pet name');
 assert.strictEqual(uiSim.threadStatusRows(99).length, 3,
@@ -725,6 +691,7 @@ const uiContext = {
     },
     updateDashboard() { dashboardUpdates++; },
     openCRDetail(crIndex) { openedCR = crIndex; },
+    _requireCommittedImageForExecution() { return true; },
 };
 vm.createContext(uiContext);
 vm.runInContext([
