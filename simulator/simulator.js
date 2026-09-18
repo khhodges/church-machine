@@ -8568,10 +8568,19 @@ class ChurchSimulator {
         for (let i = 0; i < 16; i++) {
             this.dr[i] = this.memory[tBase + 1 + i] >>> 0;
         }
-        // Pop the canonical CHURCH frame; it is the sole resume source.
-        this.sto = resume.frame.savedSTO;
+        // A suspended Thread resumes by popping its saved CHURCH frame. A
+        // freshly formatted Thread instead carries the canonical 0x7FFF root
+        // poison marker: that marker is never an executable NIA. Activate
+        // fresh code at word zero and retain the root frame as the bottom of
+        // the live stack, matching Boot.Thread and direct Compile+Run.
+        const isRootSentinel = resume.frame.returnPC === 0x7FFF;
+        const resumePC = isRootSentinel ? 0 : resume.frame.returnPC;
+        const resumeSTO = isRootSentinel
+            ? (resume.frame.savedSTO - 2) >>> 0
+            : resume.frame.savedSTO;
+        this.sto = resumeSTO;
         this.flags = resume.frame.flags;
-        this.pc = resume.frame.returnPC;
+        this.pc = resumePC;
         this._writeRuntimeWord(
             tBase + THREAD_STO_OFFSET,
             this._packProtectedIndicator(this.sto, 1, this.flags, 0));
@@ -8591,9 +8600,12 @@ class ChurchSimulator {
             codeParsed, codeParsed.index, codeEntry, codeHeader);
         this._currentThreadSlot = targetIdx;
         this._liveThreadOwned = true;
-        const desc = `CHANGE CR${d.crDst} (Thread object restored for slot ${targetIdx}; ${headerContext.desc}; CHURCH frame NIA 0x${resume.frame.returnPC.toString(16).toUpperCase()})`;
+        const frameDesc = isRootSentinel
+            ? 'CHURCH root sentinel retained; entry NIA 0x0'
+            : `CHURCH frame NIA 0x${resume.frame.returnPC.toString(16).toUpperCase()}`;
+        const desc = `CHANGE CR${d.crDst} (Thread object restored for slot ${targetIdx}; ${headerContext.desc}; ${frameDesc})`;
         this.output += desc + '\n';
-        this.pc = resume.frame.returnPC;
+        this.pc = resumePC;
         this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_PUSH, 0);
         this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_CR12, this.cr[12].word0 >>> 0);
         this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_CR5,  this.cr[5].word0  >>> 0);

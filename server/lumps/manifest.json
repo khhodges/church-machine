@@ -717,6 +717,94 @@
     "filename": "CapabilityTest.2.35647a26.lump",
     "variant_group": "capabilitytest-history",
     "lump_version": 28,
-    "compiled_at": 1789591328.5251067
+    "compiled_at": 1789591328.5251067,
+    "archived": true
+  },
+  {
+    "token": "4a00000a",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.1.3dad236a.lump",
+    "lump_version": 30,
+    "compiled_at": 1789744084.135208,
+    "dot_name": "CapabilityTest",
+    "issue_n": 1,
+    "petname": "",
+    "content_profile": 2,
+    "output_profile": 2,
+    "capabilities": [
+      {
+        "name": "SELF",
+        "rights": [
+          "E"
+        ],
+        "grants": [
+          "E"
+        ],
+        "nsIndex": null,
+        "compiler_owned_self": true,
+        "placeholder": true
+      },
+      {
+        "name": "SelfTest",
+        "rights": [
+          "E"
+        ],
+        "grants": [],
+        "nsIndex": 6
+      },
+      {
+        "name": "LED_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 3
+      },
+      {
+        "name": "UART_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 2
+      },
+      {
+        "name": "BTN_DEV",
+        "rights": [
+          "R"
+        ],
+        "grants": [],
+        "nsIndex": 4
+      },
+      {
+        "name": "TIMER_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 5
+      },
+      {
+        "name": "M_BIT_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 13
+      },
+      {
+        "name": "WukongCallHome",
+        "rights": [
+          "E"
+        ],
+        "grants": [],
+        "nsIndex": 7
+      }
+    ],
+    "operation_id": "9c7bf700-3ca8-4cc4-8a01-9af922b7b5c5"
   }
 ]

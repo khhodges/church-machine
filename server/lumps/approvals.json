@@ -662,6 +662,21 @@
         "E"
       ],
       "capability_type": "inform"
+    },
+    "2fc18b2411234ab1b41f9749bbc5b25bea8e8d39798f4312853ab99eb7fb6c68": {
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "save_as_latest": true,
+      "binary_hash": "2fc18b2411234ab1b41f9749bbc5b25bea8e8d39798f4312853ab99eb7fb6c68",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "filename": "CapabilityTest.1.3dad236a.lump",
+      "compiled_at": 1789744084.135208,
+      "bootstrap_t": "4a00000a",
+      "bootstrap_runtime_gt": 1241513994
     }
   }
 }
