@@ -153,13 +153,14 @@ console.log('\n--- portable UI save/load ordering ---');
     const words = new Array(64).fill(0);
     words[0] = header();
     words[63] = ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER;
-    let message = '';
+    let caps;
     try {
-        validateSavedLumpClist(words, sim.parseLumpHeader(words[0]),
+        caps = validateSavedLumpClist(words, sim.parseLumpHeader(words[0]),
             compilerSelfMeta({ name: 'NotSelf' }), sim);
-    } catch (err) { message = String(err.message || err); }
-    check('SLV-3: malformed compiler self metadata is rejected clearly',
-        /canonical SELF c-list row 0/i.test(message), message);
+    } catch (err) { caps = err; }
+    check('SLV-3: compiler ownership preserves the declared PetName',
+        Array.isArray(caps) && caps[0].name === 'NotSelf',
+        String(caps));
 }
 
 {

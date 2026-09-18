@@ -963,7 +963,8 @@ function _materializeLumpCapabilities(caps, words, clistStart, context) {
         ok: materialized.ok,
         errors: materialized.errors || [],
         resolvedCaps: [{
-            name: 'SELF',
+            name: (context && context.selfPetName) ||
+                (allCaps[0] && allCaps[0].name) || 'SELF',
             rights: ['E'],
             grants: ['E'],
             nsIndex: null,
@@ -1800,6 +1801,7 @@ async function compileAndBuild(options) {
         // the eventual destination. The save/install transaction binds SELF
         // after the programmer chooses a Namespace slot.
         bootstrapResidentSlot: null,
+        selfPetName: absName,
     };
     // Portable artifacts intentionally keep destination-local GTs unresolved.
     // Legacy builds, however, are validated and saved against the active

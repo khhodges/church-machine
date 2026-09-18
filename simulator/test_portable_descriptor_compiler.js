@@ -36,7 +36,7 @@ assert.equal(legacy.errors.length, 0, JSON.stringify(legacy.errors));
 assert.equal(legacy.portableMode, 'explicit-legacy');
 assert.equal(legacy.capabilities.filter(cap => cap && cap.compiler_owned_self).length, 1,
     'visible SELF E must materialize exactly one compiler-owned SELF row');
-assert.equal(legacy.capabilities.some(cap => String(cap && cap.name).toUpperCase() === 'SELF'), false,
+assert.equal(legacy.capabilities.length, 2,
     'visible SELF E must not survive as a duplicate user capability');
 assert.equal(legacy.capabilities[1].name, 'Audit',
     'first user capability must remain at c-list row 1');

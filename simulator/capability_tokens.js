@@ -67,7 +67,8 @@
     function isContextualSelf(cap) {
         const name = _nameOf(cap).toUpperCase();
         return name === 'SELF' || name === '__SELF__' ||
-            !!(cap && typeof cap === 'object' && cap.symbolic_self === true);
+            !!(cap && typeof cap === 'object' &&
+                (cap.symbolic_self === true || cap.compiler_owned_self === true));
     }
 
     // A compiler-owned SELF is deliberately different from an unresolved
@@ -78,7 +79,6 @@
     function isCompilerOwnedSelf(cap) {
         return !!(cap && typeof cap === 'object' &&
             cap.compiler_owned_self === true &&
-            (_sameName(cap.name, '__SELF__') || _sameName(cap.name, 'SELF')) &&
             isContextualSelf(cap));
     }
 
@@ -137,14 +137,14 @@
         if (isContextualSelf(cap)) {
             if (rights.length !== 1 || rights[0] !== 'E') {
                 return {
-                    name: 'SELF', rights, grants: ['E'], nsIndex: null,
+                    name, rights, grants: ['E'], nsIndex: null,
                     source: 'contextual-self', symbolic_self: true,
                     compiler_owned_self: true,
-                    error: 'Capability "SELF" must declare exactly E permission.',
+                    error: `Compiler-owned capability "${name}" must declare exactly E permission.`,
                 };
             }
             return {
-                name: '__SELF__', rights: ['E'], grants: ['E'], nsIndex: null,
+                name, rights: ['E'], grants: ['E'], nsIndex: null,
                 source: 'contextual-self', symbolic_self: true,
                 compiler_owned_self: true, placeholder: true, error: null,
             };
