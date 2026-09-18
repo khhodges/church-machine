@@ -17,6 +17,7 @@ class ChurchCall(Elaboratable):
         self.call_start = Signal()
         self.boot_window = Signal()  # 1 during BOOT_PROGRAM microcode (first 3 retires)
         self.cr_src = Signal(4)
+        self.indexed_source = Signal()
         self.index = Signal(16)
         self.call_imm = Signal(15)  # method index from CALL imm15; 0 = single entry (NIA=lump_base+4)
         self.mask = Signal(16)   # bits [0:12] → null-GT write mask for CR0–CR11
@@ -130,6 +131,7 @@ class ChurchCall(Elaboratable):
         # CALL is a multi-cycle unit: capture every architectural input used
         # after decode, including the short-lived boot/root request.
         cr_src_latched = Signal(4)
+        indexed_source_latched = Signal()
         cr5_heap_latched = Signal(CAP_REG_LAYOUT)
         cr12_thread_latched = Signal(CAP_REG_LAYOUT)
         cr15_namespace_latched = Signal(CAP_REG_LAYOUT)
@@ -140,6 +142,7 @@ class ChurchCall(Elaboratable):
         flags_latched = Signal(COND_FLAGS_LAYOUT)
         root_frame_latched = Signal()
         src_reg_latched = Signal(CAP_REG_LAYOUT)
+        indexed_clist_latched = Signal(CAP_REG_LAYOUT)
         mask_latched = Signal(16)
         index_latched = Signal(16)
         call_imm_latched = Signal(15)   # method index latched from self.call_imm at call_start
@@ -258,6 +261,13 @@ class ChurchCall(Elaboratable):
         src_view = View(CAP_REG_LAYOUT, src_reg_latched)
         src_gt = View(GT_LAYOUT, src_view.word0_gt)
         src_has_e_perm = perm_bit(src_view.word0_gt, PERM_E)
+        indexed_clist_view = View(CAP_REG_LAYOUT, indexed_clist_latched)
+        indexed_clist_gt = View(GT_LAYOUT, indexed_clist_view.word0_gt)
+        indexed_clist_w2 = View(WORD2_LAYOUT, indexed_clist_view.word2_w2)
+        indexed_clist_has_l = perm_bit(indexed_clist_view.word0_gt, PERM_L)
+        indexed_addr = Signal(32)
+        m.d.comb += indexed_addr.eq(
+            indexed_clist_view.word1_location + (index_latched << 2))
 
         # boot_window is only asserted by the core during the 3-retire
         # BOOT_PROGRAM microcode window — but the window closes at the CALL's
@@ -456,6 +466,7 @@ class ChurchCall(Elaboratable):
                 with m.If(self.call_start):
                     m.d.sync += [
                         cr_src_latched.eq(self.cr_src),
+                        indexed_source_latched.eq(self.indexed_source),
                         cr5_heap_latched.eq(self.cr5_heap),
                         cr12_thread_latched.eq(self.cr12_thread),
                         cr15_namespace_latched.eq(self.cr15_namespace),
@@ -474,7 +485,7 @@ class ChurchCall(Elaboratable):
 
             with m.State("CHECK_SRC"):
                 m.d.comb += local_cr_rd_addr.eq(cr_src_latched)
-                with m.If(~src_in_range):
+                with m.If(~indexed_source_latched & ~src_in_range):
                     m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_E)]
                     m.next = "FAULT"
                 with m.Else():
@@ -482,8 +493,39 @@ class ChurchCall(Elaboratable):
 
             with m.State("READ_SRC"):
                 m.d.comb += local_cr_rd_addr.eq(cr_src_latched)
-                m.d.sync += src_reg_latched.eq(self.cr_rd_data)
-                m.next = "READ_CALLER_CR6"
+                with m.If(indexed_source_latched):
+                    m.d.sync += indexed_clist_latched.eq(self.cr_rd_data)
+                    m.next = "CHECK_INDEXED_CLIST"
+                with m.Else():
+                    m.d.sync += src_reg_latched.eq(self.cr_rd_data)
+                    m.next = "READ_CALLER_CR6"
+
+            with m.State("CHECK_INDEXED_CLIST"):
+                with m.If(indexed_clist_gt.gt_type == GT_TYPE_NULL):
+                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.NULL_CAP)]
+                    m.next = "FAULT"
+                with m.Elif(~indexed_clist_has_l):
+                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_L)]
+                    m.next = "FAULT"
+                with m.Elif(index_latched > indexed_clist_w2.limit_offset[:16]):
+                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.BOUNDS)]
+                    m.next = "FAULT"
+                with m.Else():
+                    m.d.sync += rd_armed.eq(0)
+                    m.next = "FETCH_INDEXED_GT"
+
+            with m.State("FETCH_INDEXED_GT"):
+                m.d.comb += [
+                    self.mem_rd_addr.eq(indexed_addr),
+                    self.mem_rd_en.eq(1),
+                ]
+                m.d.sync += rd_armed.eq(1)
+                with m.If(self.mem_rd_valid & rd_armed):
+                    m.d.sync += [
+                        rd_armed.eq(0),
+                        src_reg_latched.eq(Cat(self.mem_rd_data, C(0, 64))),
+                    ]
+                    m.next = "READ_CALLER_CR6"
 
             with m.State("READ_CALLER_CR6"):
                 # Snapshot the caller's E-GT before Phase 1 mLoad replaces CR6
@@ -499,6 +541,15 @@ class ChurchCall(Elaboratable):
                     # No lump or stack frame — M-window set fires at M_FETCH_DONE.
                     m.d.sync += mgt_gt_lat.eq(src_view.word0_gt.as_value())
                     m.next = "M_FETCH_NS0"
+                with m.Elif(src_gt.gt_type == GT_TYPE_OUTFORM):
+                    # Match the shared mLoad/ordinary CALL policy.  Hardware
+                    # Outform ingress is currently fail-closed until an
+                    # authenticated lazy-load path is available.
+                    m.d.sync += [
+                        fault_latched.eq(1),
+                        fault_type_latched.eq(FaultType.OUTFORM_UNAUTH),
+                    ]
+                    m.next = "FAULT"
                 with m.Elif(~src_has_e_perm):
                     m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_E)]
                     m.next = "FAULT"

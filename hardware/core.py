@@ -579,7 +579,9 @@ class ChurchCore(Elaboratable):
                 # Outform GTs bypass E-perm: the ChurchOutformFSM intercepts first
                 # to lazily install the lump, then promotes to Inform before the CALL.
                 hw_perm_gt_view = View(GT_LAYOUT, perm_gt_sig)
-                with m.If((hw_perm_gt_view.gt_type == GT_TYPE_ABSTRACT) |
+                with m.If(u_decoder.call_indexed):
+                    m.d.comb += required_perms.eq(PERM_MASK_L)
+                with m.Elif((hw_perm_gt_view.gt_type == GT_TYPE_ABSTRACT) |
                           (hw_perm_gt_view.gt_type == GT_TYPE_OUTFORM)):
                     m.d.comb += required_perms.eq(0)
                 with m.Else():
@@ -1307,7 +1309,8 @@ class ChurchCore(Elaboratable):
         _call_src_gt_view = View(GT_LAYOUT, perm_gt_sig)
         _call_src_is_outform = Signal(name="call_src_is_outform")
         m.d.comb += _call_src_is_outform.eq(
-            _call_src_gt_view.gt_type == GT_TYPE_OUTFORM
+            ~u_decoder.call_indexed &
+            (_call_src_gt_view.gt_type == GT_TYPE_OUTFORM)
         )
 
         # Suppress call_start while the source CR holds an Outform GT.
@@ -1331,8 +1334,9 @@ class ChurchCore(Elaboratable):
             u_call.call_start.eq(call_start_sig),
             u_call.boot_window.eq(boot_microcode_active),
             u_call.cr_src.eq(cr_src),
-            u_call.index.eq(0),               # CALL uses call_imm for method-table dispatch; c-list index always 0
-            u_call.call_imm.eq(u_decoder.call_imm),
+            u_call.indexed_source.eq(u_decoder.call_indexed),
+            u_call.index.eq(u_decoder.call_clist_row),
+            u_call.call_imm.eq(u_decoder.call_method_index),
             u_call.mask.eq(u_decoder.call_mask),
             u_call.cr_rd_data.eq(u_regs.cr_rd_data),
             u_call.cr15_namespace.eq(u_regs.cr15_namespace),
