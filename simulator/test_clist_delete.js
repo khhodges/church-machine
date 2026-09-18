@@ -39,6 +39,9 @@ function nextTurn() {
         '    Diagnostics R',
         '}',
         '',
+        'CALL WukongCallHome.hw',
+        'CALL Continue',
+        'LOAD CR2, Diagnostics',
         'LOAD CR1, CR6 [0x0000]',
     ].join('\n');
 
@@ -56,6 +59,9 @@ function nextTurn() {
     await nextTurn();
 
     let popup = window.document.querySelector('.clist-viewer-popup');
+    await nextTurn();
+    popup.querySelector('[data-action="pola-cleanup"]').click();
+    await nextTurn();
     check('CLD-1: source C-List renders', popup && popup.textContent.includes('SelfTest'));
     check('CLD-2: row 0 is always displayed as SELF',
         popup.querySelector('.clist-row[data-slot="0"] .clist-self-name').textContent === 'SELF' &&
@@ -93,7 +99,6 @@ function nextTurn() {
     window.CListViewer.show();
     await nextTurn();
     popup = window.document.querySelector('.clist-viewer-popup');
-    popup.querySelector('[data-action="show-picker"]').click();
     await nextTurn();
     const pickerRow = window.document.createElement('div');
     pickerRow.className = 'clist-picker-row';

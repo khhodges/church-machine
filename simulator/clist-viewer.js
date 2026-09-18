@@ -638,13 +638,13 @@
         var capRe = /capabilities\s*\{([^}]*)\}/;
         var cm = capRe.exec(src);
         if (!cm) {
-            _showPolaToast(popup, 'No capabilities block found in source \u2014 nothing to clean up.');
+            showViewer('No capabilities block found in source \u2014 nothing to clean up.', true);
             return;
         }
 
         var entries = _parseCapEntries(cm[1]);
         if (!entries.length) {
-            _showPolaToast(popup, 'C-List is already empty.');
+            showViewer('C-List is already empty.', true);
             return;
         }
 
@@ -670,7 +670,7 @@
         });
 
         if (!removedNames.length) {
-            _showPolaToast(popup, '\u2713 No unused capabilities \u2014 C-List already follows POLA.');
+            showViewer('\u2713 No unused capabilities \u2014 C-List already follows POLA.', true);
             return;
         }
 
@@ -680,7 +680,7 @@
 
         var msg = '\u2702 Removed ' + removedNames.length + ' unused capabilit' +
             (removedNames.length === 1 ? 'y' : 'ies') + ': ' + removedNames.join(', ');
-        showViewer(msg);
+        showViewer(msg, true);
     }
 
     // ── Delete one declared capability by its C-List row ────────────────────
@@ -718,7 +718,7 @@
         var newBlock = _formatCapBlock(selfEntries.concat(userEntries));
         ed.value = src.slice(0, cm.index) + newBlock + src.slice(cm.index + cm[0].length);
         ed.dispatchEvent(new Event('input', { bubbles: true }));
-        showViewer('\u2702 Deleted CR' + displaySlot + ' (' + removed + ') from the source C-List.');
+        showViewer('\u2702 Deleted CR' + displaySlot + ' (' + removed + ') from the source C-List.', true);
     }
 
     // ── Async builder: live-sim takes priority when booted; static-binary otherwise ──
@@ -1248,8 +1248,8 @@
         }
 
         return '<div class="clist-viewer-header">' +
-            '<button class="clist-back-btn" data-action="show-view">\u2190 Back</button>' +
-            '<span class="clist-viewer-title">Add Capability</span>' +
+            '<span class="clist-viewer-title">Add GT</span>' +
+            '<button class="clist-pola-btn" data-action="pola-cleanup" title="POLA: remove capabilities never referenced elsewhere in the code (Principle of Least Authority)">\u2696 POLA</button>' +
             '<span class="clist-viewer-hint">click to add \u00b7 Esc to go back</span>' +
             '</div>' +
             '<div class="clist-picker-search">' +
@@ -1411,12 +1411,12 @@
         positionPopup();
     }
 
-    function showPicker() {
+    function showPicker(toastMsg) {
         var popup = getOrCreatePopup();
         focusedRow = -1;
         popup.innerHTML = '<div class="clist-viewer-header">' +
-            '<button class="clist-back-btn" data-action="show-view">\u2190 Back</button>' +
-            '<span class="clist-viewer-title">Add Capability</span>' +
+            '<span class="clist-viewer-title">Add GT</span>' +
+            '<button class="clist-pola-btn" data-action="pola-cleanup" title="POLA: remove capabilities never referenced elsewhere in the code (Principle of Least Authority)">\u2696 POLA</button>' +
             '</div>' +
             '<div class="clist-viewer-empty" style="opacity:0.6;">\u29BF Loading\u2026</div>';
         buildPickerContentAsync().then(function (html) {
@@ -1424,6 +1424,7 @@
                 popup.innerHTML = html;
                 bindPickerSearch(popup);
                 positionPopup();
+                if (toastMsg) _showPolaToast(popup, toastMsg);
             }
         }).catch(function () {
             if (popup.style.display !== 'none') {
@@ -1539,7 +1540,7 @@
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
-    function showViewer(toastMsg) {
+    function showViewer(toastMsg, revealExisting) {
         // Mutual exclusion: close the instruction picker if open
         if (window.AsmInstructionPicker && window.AsmInstructionPicker.hide) {
             window.AsmInstructionPicker.hide();
@@ -1549,13 +1550,20 @@
         focusedRow = -1;
 
         var popup = getOrCreatePopup();
+        popup.style.display = 'flex';
+
+        // Adding a GT is the normal C-List interaction. Existing rows are only
+        // revealed by POLA, where they can be reviewed or removed.
+        if (revealExisting !== true) {
+            showPicker(toastMsg);
+            return;
+        }
 
         // Show a loading spinner immediately, then populate asynchronously
         popup.innerHTML = '<div class="clist-viewer-header">' +
             '<span class="clist-viewer-title">C-List</span>' +
             '</div>' +
             '<div class="clist-viewer-empty" style="opacity:0.6;">\u29BF Loading\u2026</div>';
-        popup.style.display = 'flex';
         positionPopup();
 
         var btn = document.querySelector('.btn-clist-viewer');

@@ -63,8 +63,6 @@ function nextTurn() { return new Promise(resolve => setTimeout(resolve, 0)); }
     window.CListViewer.show();
     await nextTurn();
     const popup = window.document.querySelector('.clist-viewer-popup');
-    popup.querySelector('[data-action="show-picker"]').click();
-    await nextTurn();
     await nextTurn();
 
     const echoRows = Array.from(popup.querySelectorAll('.clist-picker-row'))
@@ -111,8 +109,11 @@ function nextTurn() { return new Promise(resolve => setTimeout(resolve, 0)); }
         threadRows.every(row => row.dataset.capRights === ''));
 
     window.document.getElementById('asmEditor').value =
-        'capabilities {\n    __self__ E,\n    Dynamic.Pet R\n}';
+        'capabilities {\n    __self__ E,\n    Dynamic.Pet R\n}\nLOAD CR1, Dynamic.Pet';
     window.CListViewer.show();
+    await nextTurn();
+    await nextTurn();
+    popup.querySelector('[data-action="pola-cleanup"]').click();
     await nextTurn();
     const displayedRows = Array.from(popup.querySelectorAll('.clist-row[data-slot]'));
     check('CPV-11: internal and mixed-case SELF spelling remains contextual row zero',
