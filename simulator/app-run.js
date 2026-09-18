@@ -7714,32 +7714,34 @@ abstraction NoteGPublishedBug {
 ; Description:  Church Machine capability test -- LOAD, TPERM, CALL
 ;               using the real hardware boot namespace.
 ; Author:       Church Machine Educational Platform
-; Version:      2.0
-; Created:      2026-08-03
+; Version:      3.0
+; Created:      2026-08-12
 ; Language:     Assembly
 ; ============================================================
 ; Single source of truth for the CapabilityTest abstraction (NS slot 10).
 ; The lump is built from this file by scripts/build_capability_test_lump.js,
 ; which supplies hardware GT words for each declared capability.
 ;
-; C-list layout (CapabilityTest's own 7-entry c-list, injected at load):
-;   [0] SelfTest   E    (NS  6)  0x4A000006 -- entry-callable abstraction
-;   [1] LED_DEV    RW   (NS  3)  0x32000003 -- hardware LED register file
-;   [2] UART_DEV   RW   (NS  2)  0x32000002 -- hardware UART TX/STATUS/RX
-;   [3] BTN_DEV    R    (NS  4)  0x12000004 -- hardware button state
-;   [4] TIMER_DEV  RW   (NS  5)  0x32000005 -- hardware timer registers
-;   [5] M_BIT_DEV RW (NS 13) 0x3200000D -- isolated-register M-bit control
-;   [6] WukongCallHome.hw E (NS 7) 0x4A000007 -- hardware continuation
+; C-list layout (CapabilityTest's own 8-entry c-list):
+;   [0] SELF       E    (NS 10)  0x4A00000A -- CapabilityTest identity
+;   [1] SelfTest   E    (NS  6)  0x4A000006 -- entry-callable abstraction
+;   [2] LED_DEV    RW   (NS  3)  0x32000003 -- hardware LED register file
+;   [3] UART_DEV   RW   (NS  2)  0x32000002 -- hardware UART TX/STATUS/RX
+;   [4] BTN_DEV    R    (NS  4)  0x12000004 -- hardware button state
+;   [5] TIMER_DEV  RW   (NS  5)  0x32000005 -- hardware timer registers
+;   [6] M_BIT_DEV  RW   (NS 13)  0x3200000D -- isolated-register M-bit control
+;   [7] WukongCallHome E (NS  7) 0x4A000007 -- call-home continuation
 ; ============================================================
 
 capabilities {
+    SELF E,
     SelfTest E,
     LED_DEV RW,
     UART_DEV RW,
     BTN_DEV R,
     TIMER_DEV RW,
     M_BIT_DEV RW,
-    WukongCallHome.hw E
+    WukongCallHome E
 }
 
 Start:

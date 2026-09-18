@@ -23,7 +23,7 @@ for (const source of [canonical, appRun]) {
         'CapabilityTest must not recursively call the startup SelfTest');
     assert.match(
         source,
-        /ELOADCALL\s+CR0,\s*WukongCallHome\.hw,\s*0/,
+        /ELOADCALL\s+CR0,\s*WukongCallHome\.hw(?:,\s*0)?/,
         'CapabilityTest must continue to WukongCallHome.hw');
     assert.match(
         source,
@@ -35,6 +35,12 @@ assert.match(
     builder,
     /gt:\s*0x4A000007,\s*name:\s*'WukongCallHome\.hw'/,
     'CapabilityTest binary must carry the WukongCallHome.hw E-GT');
+assert.match(appRun, /capabilities\s*\{\s*SELF\s+E,/,
+    'default CapabilityTest editor source must expose the v28 SELF row');
+assert.match(appRun, /WukongCallHome\s+E\s*\}/,
+    'default CapabilityTest editor source must use the v28 canonical call-home name');
+assert.doesNotMatch(appRun, /WukongCallHome\.hw\s+E/,
+    'default CapabilityTest editor source must not show the stale hardware alias');
 assert.match(canonical, /LOAD\s+CR0,\s*M_BIT_DEV/);
 assert.match(canonical, /IADD\s+DR1,\s*#0b0001000000000000/);
 assert.match(canonical, /IADD\s+DR1,\s*#1[\s\S]*SHL\s+DR1,\s*DR1,\s*15/);

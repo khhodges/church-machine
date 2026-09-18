@@ -626,8 +626,7 @@
         "nsIndex": 7
       }
     ],
-    "operation_id": "eff436d9-d4cf-4478-b740-3f990c20157b",
-    "archived": true
+    "operation_id": "eff436d9-d4cf-4478-b740-3f990c20157b"
   },
   {
     "token": "00aa1234",
@@ -693,7 +692,8 @@
     "filename": "CapabilityTest.2.c2194804.lump",
     "variant_group": "capabilitytest-history",
     "lump_version": 2,
-    "compiled_at": 1789591328.5251067
+    "compiled_at": 1789591328.5251067,
+    "archived": true
   },
   {
     "token": "4a000007",
