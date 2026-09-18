@@ -444,15 +444,27 @@ console.log('\n--- WCH-HW-11: WukongCallHome.hw dispatches through its direct en
         'capabilities { Other E, WukongCallHome.hw E }\n' +
         'CALL wukongcallhome.HW'
     );
-    const loadWord = assembled.words[0] >>> 0;
-    const callWord = assembled.words[1] >>> 0;
-    check('WCH-HW-11c: assembler emits LOAD + ordinary CALL for the direct entry',
+    const callWord = assembled.words[0] >>> 0;
+    check('WCH-HW-11c: assembler emits one CR6-indexed ELOADCALL for the direct entry',
         assembled.errors.length === 0 &&
-        ((loadWord >>> 27) & 0x1F) === 0 &&
-        ((callWord >>> 27) & 0x1F) === 2 &&
-        ((callWord >>> 19) & 0xF) === 0 &&
-        (callWord & 0x7FFF) === 0,
-        `errors=${assembled.errors.map(error => error.message).join('; ')} load=0x${loadWord.toString(16)} call=0x${callWord.toString(16)}`);
+        assembled.words.length === 1 &&
+        ((callWord >>> 27) & 0x1F) === 8 &&
+        ((callWord >>> 15) & 0xF) === 6 &&
+        (callWord & 0x1F) === 1 &&
+        ((callWord >>> 5) & 0x7F) === 0,
+        `errors=${assembled.errors.map(error => error.message).join('; ')} call=0x${callWord.toString(16)}`);
+
+    const sourcePath = path.join(__dirname, 'examples', 'wukong_callhome.cloomc');
+    const sourceResult = new ChurchAssembler().assemble(
+        fs.readFileSync(sourcePath, 'utf8'));
+    const sourceCallWord = sourceResult.words[sourceResult.words.length - 2] >>> 0;
+    check('WCH-HW-11d: canonical source keeps CALL WukongCallHome.hw as one direct instruction',
+        sourceResult.errors.length === 0 &&
+        ((sourceCallWord >>> 27) & 0x1F) === 8 &&
+        ((sourceCallWord >>> 15) & 0xF) === 6 &&
+        (sourceCallWord & 0x1F) === 6 &&
+        ((sourceCallWord >>> 5) & 0x7F) === 0,
+        `errors=${sourceResult.errors.map(error => error.message).join('; ')} call=0x${sourceCallWord.toString(16)}`);
 }
 
 // ── WCH-HW-12: Canonical DWRITE reaches physical LED MMIO safely ─────────────

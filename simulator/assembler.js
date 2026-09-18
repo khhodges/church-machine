@@ -765,9 +765,9 @@ class ChurchAssembler {
         this._parsePetDirectives(lines);               // pre-pass: .pet aliases
         this._capBlockSlots = this._parseCapBlockSlots(lines); // pre-pass: capabilities {} → slot map
         const instructions = [];
-        // Pass-1 view of named CR bindings. Named CALL sugar is lowered to a
-        // normal LOAD followed by a normal CALL, so explicit source LOADs must
-        // remain authoritative before pass 2 populates nsLoaded.
+        // Pass-1 view of named CR bindings. Explicit source LOADs remain
+        // authoritative for register-bound CALLs. Calls that directly name a
+        // C-list capability are encoded as one CR6-indexed ELOADCALL instead.
         const _pass1LoadedNames = new Set();
         const _pass1LoadedByCR = new Map();
         const _pass1Bind = (name, crIndex) => {
@@ -929,19 +929,18 @@ class ChurchAssembler {
                 }
             }
 
-            // A source-level named CALL is a normal capability load followed
-            // by a normal CALL.  It is not an implicit ELOADCALL:
+            // A source-level named CALL directly consumes the capability from
+            // the active CR6 C-list in one instruction:
             //
             //   CALL WukongCallHome.hw
-            //     -> LOAD CR0, WukongCallHome.hw
-            //        CALL CR0
+            //     -> ELOADCALL CR0, WukongCallHome.hw
             //
             //   CALL Scheduler, pause
-            //     -> LOAD CR0, Scheduler
-            //        CALL CR0, pause
+            //     -> ELOADCALL CR0, Scheduler, pause
             //
-            // Keep explicit LOAD bindings authoritative.  Explicit ELOADCALL
-            // remains available when the fused instruction is actually wanted.
+            // This preserves the named c-list identity through compilation, so
+            // row and method validation happen before execution. Keep explicit
+            // LOAD bindings authoritative for calls through a named CR alias.
             {
                 const _indexedCall = line.match(
                     /^CALL\s+CR6\s*\[\s*([A-Za-z_][\w.]*)\s*\]\s*(?:(?:,|\.)\s*([A-Za-z_][\w]*))?\s*$/i);
@@ -956,36 +955,24 @@ class ChurchAssembler {
                     const _indexedCap = this._resolveCListName(_indexedName);
                     const _indexedBaseCap = this._resolveCListName(_indexedBase);
                     const _indexedExactDotted = _indexedCap !== null && _indexedDot >= 0;
-                    const _indexedMethodEntry = this._methodEntryFor(
-                        this._methodConventionsFor(_indexedBase), _indexedMethod);
-                    const _indexedHasMethod = Boolean(_indexedMethod) &&
-                        !_indexedExactDotted && Boolean(_indexedMethodEntry);
+                    const _indexedHasMethodSyntax = Boolean(_indexedMethod) &&
+                        !_indexedExactDotted;
                     const _indexedCanLower = _indexedCap !== null &&
                         ((!_indexedMethod && !_indexedDot) ||
                          (_indexedExactDotted && !_indexedCall[2]) ||
-                         (_indexedBaseCap !== null && _indexedHasMethod));
+                         (_indexedBaseCap !== null && _indexedHasMethodSyntax));
                     if (_indexedCanLower) {
                         const _indexedLoadName = _indexedExactDotted
                             ? _indexedName
                             : _indexedBase;
                         this._checkCapDeclared(_indexedLoadName, lineNum + 1);
                         instructions.push({
-                            // Keep the generated LOAD in named shorthand so
-                            // pass 2 records the abstraction→CR0 binding used
-                            // by the following method-name CALL.  The named
-                            // shorthand resolves through the same CR6 row.
-                            line: `LOAD CR0, ${_indexedLoadName}`,
+                            line: _indexedHasMethodSyntax
+                                ? `ELOADCALL CR0, ${_indexedLoadName}, ${_indexedMethod}`
+                                : `ELOADCALL CR0, ${_indexedLoadName}`,
                             lineNum: lineNum + 1,
-                            comment: `${line} \u2192 load named CR6 C-list capability`
+                            comment: `${line} \u2192 direct CR6 C-list CALL`
                         });
-                        instructions.push({
-                            line: _indexedHasMethod
-                                ? `CALL CR0, ${_indexedMethod}`
-                                : 'CALL CR0',
-                            lineNum: lineNum + 1,
-                            comment: `${line} \u2192 ordinary CALL`
-                        });
-                        _pass1Bind(_indexedLoadName, 0);
                         continue;
                     }
                 }
@@ -1006,28 +993,22 @@ class ChurchAssembler {
                     const _exactCap = this._resolveCListName(_callToken);
                     const _baseCap = this._resolveCListName(_baseName);
                     const _isExactDottedCap = _exactCap !== null && _dot >= 0;
-                    const _methodEntry = this._methodEntryFor(
-                        this._methodConventionsFor(_baseName), _methodName);
-                    const _hasMethod = Boolean(_methodName) &&
-                        !_isExactDottedCap && Boolean(_methodEntry);
+                    const _hasMethodSyntax = Boolean(_methodName) &&
+                        !_isExactDottedCap;
                     const _canLower = (_exactCap !== null &&
                         ((_dot < 0 && !_methodName) ||
                          (_isExactDottedCap && !_namedCall[2]))) ||
-                        (_baseCap !== null && _hasMethod);
+                        (_baseCap !== null && _hasMethodSyntax);
                     if (_canLower) {
                         const _loadName = _isExactDottedCap ? _callToken : _baseName;
                         this._checkCapDeclared(_loadName, lineNum + 1);
                         instructions.push({
-                            line: `LOAD CR0, ${_loadName}`,
+                            line: _hasMethodSyntax
+                                ? `ELOADCALL CR0, ${_loadName}, ${_methodName}`
+                                : `ELOADCALL CR0, ${_loadName}`,
                             lineNum: lineNum + 1,
-                            comment: `${line} \u2192 load named C-list capability`
+                            comment: `${line} \u2192 direct CR6 C-list CALL`
                         });
-                        instructions.push({
-                            line: _hasMethod ? `CALL CR0, ${_methodName}` : 'CALL CR0',
-                            lineNum: lineNum + 1,
-                            comment: `${line} \u2192 ordinary CALL`
-                        });
-                        _pass1Bind(_loadName, 0);
                         continue;
                     }
                 }

@@ -1,10 +1,10 @@
 ---
 name: Named CALL CR6 lookup
-description: Named CALL operands use readable CR6 C-list lookup syntax while retaining opcode-2 CALL semantics.
+description: Unbound named CALL operands compile to one direct CR6 C-list instruction.
 ---
 
-An unbound named CALL may be written as `CALL Name, Method`, `CALL Name.Method`, or `CALL CR6[Name], Method`. The assembler materializes the capability with a normal LOAD and emits opcode-2 CALL; it must not silently substitute ELOADCALL. A prior LOAD binding remains authoritative, and explicit ELOADCALL remains available.
+An unbound named CALL may be written as `CALL Name, Method`, `CALL Name.Method`, or `CALL CR6[Name], Method`. The compiler must emit one CR6-indexed ELOADCALL using the declared C-list row and validated method selector. It must not materialize the capability through a generated `LOAD CR0` followed by `CALL CR0`.
 
-**Why:** CALL and ELOADCALL are distinct ISA instructions. Named lookup is compiler syntax, so it should not change the selected machine instruction or use ELOADCALL's narrower 5-bit row encoding.
+**Why:** The two-instruction expansion discards the named target at the CALL boundary, prevents complete compile-time validation, and can defer an invalid selector/target combination to an `INVALID_OP` runtime fault. The user explicitly corrected this architecture on 2026-09-18.
 
-**How to apply:** Preserve the current/latest loaded-CR binding; when a register is reused, discard its stale name. Lower unbound names through CR6 lookup to LOAD + CALL, and keep exact dotted C-list labels distinct from abstraction.method names. Keep `church_sim/assembler.js` as the compatibility shim.
+**How to apply:** Lower unbound names through the active CR6 C-list in one instruction; reject rows above the 5-bit ELOADCALL limit at compile time. Preserve explicit prior LOAD bindings for intentional register-bound CALLs. Keep exact dotted C-list labels distinct from abstraction.method names.
