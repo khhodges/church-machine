@@ -1037,6 +1037,20 @@
             _pickerLumpDate(lump) > 0;
     }
 
+    function _pickerNameIsThread(name) {
+        return String(name || '') === 'Boot.Thread' ||
+            /^Thread[.#]\d+$/.test(String(name || ''));
+    }
+
+    function _pickerThreadRow(thread) {
+        var name = escHtml(thread.abstraction || thread.name || '');
+        return '<div class="clist-picker-row" data-cap-name="' + name + '" data-cap-rights="">' +
+            '<span class="clist-picker-type clist-picker-type--inform">Thread</span>' +
+            '<span class="clist-picker-name">' + name + '</span>' +
+            '<span class="clist-picker-hint">NS[' + thread.ns_slot + '] · SWITCH / CHANGE target · permission check is empty</span>' +
+            '</div>';
+    }
+
     function _pickerLumpRow(lump, label) {
         var rawName = lump.abstraction || lump.name || '';
         var name = escHtml(rawName);
@@ -1124,14 +1138,27 @@
                 }
             }
 
+            var namespaceThreads = Object.keys(namespaceByName).filter(_pickerNameIsThread);
+            if (namespaceThreads.length) {
+                bodyRows += '<div class="clist-picker-section-header">Threads</div>';
+                namespaceThreads.sort(function (a, b) {
+                    return namespaceByName[a].ns_slot - namespaceByName[b].ns_slot;
+                }).forEach(function (threadName) {
+                    bodyRows += _pickerThreadRow(namespaceByName[threadName]);
+                });
+            }
+
             var lresp = await fetch('/api/lumps/list');
             if (lresp.ok) {
                 var lumps = await lresp.json();
                 var selectable = Array.isArray(lumps) ? lumps.filter(function (l) {
-                    return l.abstraction || l.name;
+                    var name = l.abstraction || l.name;
+                    return name && !_pickerNameIsThread(name);
                 }) : [];
                 Object.keys(namespaceByName).forEach(function (nsName) {
-                    selectable.push(namespaceByName[nsName]);
+                    if (!_pickerNameIsThread(nsName)) {
+                        selectable.push(namespaceByName[nsName]);
+                    }
                 });
                 if (selectable.length > 0) {
                     bodyRows += '<div class="clist-picker-section-header">Abstractions</div>';

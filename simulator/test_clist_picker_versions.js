@@ -35,6 +35,8 @@ function nextTurn() { return new Promise(resolve => setTimeout(resolve, 0)); }
                 json: async function () {
                     return {
                         abstractions: [
+                            { name: 'Boot.Thread', slot: 1 },
+                            { name: 'Thread.2', slot: 11 },
                             { name: 'WukongCallHome', slot: 7 },
                             { name: 'SavedName', slot: 21 }
                         ]
@@ -99,6 +101,14 @@ function nextTurn() { return new Promise(resolve => setTimeout(resolve, 0)); }
         visibleNames.length === 1 && visibleNames[0] === 'Dynamic.Pet');
     check('CPV-10: search announces the shortlist size',
         popup.querySelector('.clist-picker-search-count').textContent === '1 match');
+    const threadRows = Array.from(popup.querySelectorAll('.clist-picker-row'))
+        .filter(row => row.querySelector('.clist-picker-type') &&
+            row.querySelector('.clist-picker-type').textContent === 'Thread');
+    check('CPV-10a: Namespace Threads have their own picker section',
+        threadRows.length === 2 &&
+        threadRows.map(row => row.dataset.capName).join(',') === 'Boot.Thread,Thread.2');
+    check('CPV-10b: Thread entries keep the SWITCH/CHANGE permission check empty',
+        threadRows.every(row => row.dataset.capRights === ''));
 
     window.document.getElementById('asmEditor').value =
         'capabilities {\n    __self__ E,\n    Dynamic.Pet R\n}';
