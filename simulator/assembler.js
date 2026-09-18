@@ -680,7 +680,7 @@ class ChurchAssembler {
     // runtime — that is a runtime concern, not a compile-time concern.
     //
     // Returns { name → slot } for all non-NS, non-device capabilities.
-    _parseCapBlockSlots(lines) {
+    _parseCapBlockSlots(lines, allowLineSeparated = false) {
         const slots = {};
         let inCapBlock = false;
         const capNames = [];
@@ -724,7 +724,7 @@ class ChurchAssembler {
                     appendBlockText(line.substring(0, line.indexOf('}')), true);
                     inCapBlock = false;
                 } else {
-                    appendBlockText(line);
+                    appendBlockText(line, allowLineSeparated);
                 }
                 continue;
             }
@@ -762,8 +762,20 @@ class ChurchAssembler {
         this._currentLineText = '';   // set before every error-producing context for _tokenCols
         const lines = source.split('\n');
         this._rawLines = lines.slice();  // original untrimmed lines — used by _tokenCols for accurate col positions
+        // A previous C-List popup release emitted one entry per line without
+        // commas when Thread rows were added. Accept that exact legacy shape so
+        // affected drafts remain compilable; normal blocks still require commas.
+        const _capBlockSourceMatch = source.match(/capabilities\s*\{([\s\S]*?)\}/i);
+        const _capBlockSourceBody = _capBlockSourceMatch ? _capBlockSourceMatch[1] : '';
+        const _legacyThreadBlockWithoutCommas =
+            _capBlockSourceBody.indexOf(',') < 0 &&
+            _capBlockSourceBody.split('\n').some(line =>
+                /^\s*(?:Boot\.Thread|Thread[.#]\d+)\s*$/i.test(line.replace(/;.*$/, '')));
         this._parsePetDirectives(lines);               // pre-pass: .pet aliases
-        this._capBlockSlots = this._parseCapBlockSlots(lines); // pre-pass: capabilities {} → slot map
+        this._capBlockSlots = this._parseCapBlockSlots(
+            lines,
+            _legacyThreadBlockWithoutCommas
+        ); // pre-pass: capabilities {} → slot map
         const instructions = [];
         // Pass-1 view of named CR bindings. Explicit source LOADs remain
         // authoritative for register-bound CALLs. Calls that directly name a
@@ -793,7 +805,9 @@ class ChurchAssembler {
                 });
             }
             for (const cap of parsed.caps) {
-                if (!cap.null_row && cap.rights.length === 0 && !ChurchAssembler._isHardwareCapName(cap.name)) {
+                if (!cap.null_row && cap.rights.length === 0 &&
+                    !ChurchAssembler._isHardwareCapName(cap.name) &&
+                    !ChurchAssembler._isThreadCapName(cap.name)) {
                     this.errors.push({ line: lineNum + 1, ...this._tokenCols(this._currentLineText, cap.name),
                         message: `Capability "${cap.name}" has no permission letters — add at least one of E, R, W, X after the name.\n  Example: capabilities { ${cap.name} E }` });
                 }
@@ -863,7 +877,7 @@ class ChurchAssembler {
                     _appendCapBlockText(line.substring(0, line.indexOf('}')), lineNum, true);
                     _inCapBlock = false;
                 } else {
-                    _appendCapBlockText(line, lineNum);
+                    _appendCapBlockText(line, lineNum, _legacyThreadBlockWithoutCommas);
                 }
                 continue;
             }
@@ -2631,6 +2645,10 @@ class ChurchAssembler {
                /^(UART|UART_TX|UART_RX|BTN|SlideRule|Timer|Display|Boot\.Nucs|Boot\.Abstr)$/i.test(name);
     }
 
+    static _isThreadCapName(name) {
+        return /^Boot\.Thread$/i.test(name) || /^Thread[.#]\d+$/i.test(name);
+    }
+
     // Parse a single "NAME [RIGHTS]" capability item from a capabilities { } block.
     // Examples: "LED0 RW" → {name:'LED0', rights:['R','W']}
     //           "SlideRule E" → {name:'SlideRule', rights:['E']}
@@ -2646,7 +2664,7 @@ class ChurchAssembler {
         if (/^NULL$/i.test(name) && tokens.length === 1) {
             return { name: 'NULL', rights: [], null_row: true };
         }
-        if (!/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)*$/.test(name)) return null;
+        if (!/^[A-Za-z][A-Za-z0-9_]*(?:[.#][A-Za-z0-9_]+)*$/.test(name)) return null;
         const rights = [];
         for (const t of tokens.slice(1)) {
             if (/^[RWXErwxe]+$/.test(t)) {
@@ -2663,7 +2681,7 @@ class ChurchAssembler {
     // also preserves supported rights-less hardware and NULL declarations.
     static _parseCapItems(itemStr) {
         const tokens = itemStr.trim().split(/\s+/).filter(Boolean);
-        const nameRE = /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)*$/;
+        const nameRE = /^[A-Za-z][A-Za-z0-9_]*(?:[.#][A-Za-z0-9_]+)*$/;
         const rightsRE = /^[RWXErwxe]+$/;
         if (!tokens.length || tokens.some(token => !nameRE.test(token)))
             return { caps: [ChurchAssembler._parseCapItem(itemStr)].filter(Boolean), missingSeparators: [] };

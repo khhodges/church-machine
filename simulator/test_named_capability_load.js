@@ -30,5 +30,23 @@ check('NCL-2: named LOAD reads from CR6 row 0',
     (result.words[0] & 0x7FFF) === 0,
     result.words[0] && '0x' + result.words[0].toString(16));
 
+const threadSource = [
+    'capabilities {',
+    '    SelfTest E',
+    '    Boot.Thread',
+    '    Thread.2',
+    '}',
+    'LOAD CR0, SelfTest',
+    'SWITCH CR12, CR6[Boot.Thread]',
+    'CHANGE CR12, CR6[Thread.2]',
+].join('\n');
+const threadResult = new ChurchAssembler().assemble(threadSource);
+check('NCL-3: line-separated capabilities do not require commas',
+    !threadResult.errors.some(error => /Missing comma/.test(error.message)),
+    threadResult.errors.map(error => error.message).join(' | '));
+check('NCL-4: Thread SWITCH/CHANGE declarations require empty permissions',
+    !threadResult.errors.some(error => /has no permission letters/.test(error.message)),
+    threadResult.errors.map(error => error.message).join(' | '));
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed) process.exit(1);

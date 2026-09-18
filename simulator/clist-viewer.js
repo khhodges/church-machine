@@ -1454,7 +1454,7 @@
         return 'capabilities {\n' +
             entries.map(function (e) {
                 return '    ' + e[0] + (e[1] ? ' ' + e[1] : '');
-            }).join('\n') +
+            }).join(',\n') +
             '\n}';
     }
 

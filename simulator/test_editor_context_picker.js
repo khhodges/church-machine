@@ -43,13 +43,13 @@ const editor = window.document.getElementById('asmEditor');
 editor.value =
     '; capabilities { in a comment must be ignored }\n' +
     'capabilities {\n' +
-    '    Boot.Thread S,\n' +
+    '    Boot.Thread,\n' +
     '    SelfTest E\n' +
     '}\n' +
     'SWITCH CR12, CR6[Boot.Thread]\n';
 window.AsmInstructionPicker.attach(editor);
 
-const capPos = editor.value.indexOf('Boot.Thread S') + 2;
+const capPos = editor.value.indexOf('Boot.Thread') + 2;
 editor.setSelectionRange(capPos, capPos);
 editor.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
 check('capabilities click opens C-List', clistShows === 1, 'shows=' + clistShows);
