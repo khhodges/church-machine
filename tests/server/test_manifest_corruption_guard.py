@@ -22,7 +22,7 @@ if ROOT not in sys.path:
 
 import server.app as _app_module
 
-LUMPS_DIR = os.path.join(os.path.dirname(_app_module.__file__), "lumps")
+LUMPS_DIR = _app_module.LUMPS_DIR
 
 
 # ── Module-scoped snapshot/restore ───────────────────────────────────────────
@@ -32,7 +32,7 @@ def lumps_dir_snapshot(tmp_path_factory):
     """Full snapshot/restore of server/lumps/ around this destructive module.
 
     TestManifestCorruptionGuard.setup_method installs a corrupt manifest.json
-    into the real server/lumps/ directory and relies on teardown_method for
+    into the configured LUMP directory and relies on teardown_method for
     per-test restoration.  If pytest terminates the process between setup and
     teardown (e.g. keyboard interrupt, OOM kill), the corrupt manifest is left
     in place and breaks every subsequent server start.  This module-scoped

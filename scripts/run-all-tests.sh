@@ -89,7 +89,10 @@ unset _args _i _arg
 cd "$(dirname "$0")/.."
 
 WORK_DIR=$(mktemp -d)
-trap 'rm -rf "$WORK_DIR"' EXIT
+cleanup() {
+    rm -rf "$WORK_DIR"
+}
+trap cleanup EXIT
 
 # ---------------------------------------------------------------------------
 # Suite registry — two parallel arrays: names and commands
@@ -645,47 +648,39 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Server guard — e2e-tests needs a live Flask server.
-# playwright.config.js uses reuseExistingServer:true: if the chosen port is
-# already responding, Playwright will reuse it and NOT kill it on teardown.
-# If the dev server (Church Machine IDE workflow) is down, we start Flask in
-# a detached session (setsid) so it survives this script's exit and the
-# workflow manager's SIGTERM, keeping the dev preview alive after all-tests.
-#
-# Port-collision prevention: when E2E_PORT is not already set in the
-# environment, pick a free ephemeral port so that a simultaneously running
-# e2e-tests workflow (which defaults to port 5000) cannot collide with us.
+# E2E state preparation — Playwright owns the dedicated Flask process and passes
+# these private paths to it through playwright.config.js. The launcher must not
+# prestart that server because isolated mode deliberately disables server reuse.
 # ---------------------------------------------------------------------------
 _RUN_E2E=0
 for _sn in "${SUITE_NAMES[@]}"; do
     [ "$_sn" = "e2e-tests" ] && _RUN_E2E=1 && break
 done
 if [ "$_RUN_E2E" -eq 1 ]; then
-    if [ -z "${E2E_PORT:-}" ]; then
-        E2E_PORT=$(python3 -c \
-            "import socket; s=socket.socket(); s.bind(('',0)); p=s.getsockname()[1]; s.close(); print(p)")
-        export E2E_PORT
+    _E2E_ISOLATED_STATE="$WORK_DIR/e2e-tests-state"
+    mkdir -p "$_E2E_ISOLATED_STATE/lumps"
+    if [ -d server/lumps ]; then
+        cp -a server/lumps/. "$_E2E_ISOLATED_STATE/lumps/"
     fi
-    if ! curl -sf "http://localhost:${E2E_PORT}/" -o /dev/null 2>&1; then
-        echo ""
-        echo "  [server-guard] Port ${E2E_PORT} not responding — starting Flask server..."
-        setsid python3 server/app.py >> /tmp/church_ide_preflight.log 2>&1 &
-        _sg_ready=0
-        for _sg_i in $(seq 1 30); do
-            sleep 1
-            if curl -sf "http://localhost:${E2E_PORT}/" -o /dev/null 2>&1; then
-                _sg_ready=1
-                break
-            fi
-        done
-        if [ "$_sg_ready" -eq 1 ]; then
-            echo "  [server-guard] Flask ready on port ${E2E_PORT}."
-        else
-            echo "  [server-guard] WARNING: Flask did not respond in 30s — e2e tests may fail."
-        fi
+    if [ -f server/boot-config.json ]; then
+        cp -a server/boot-config.json "$_E2E_ISOLATED_STATE/boot-config.json"
+    else
+        printf '{}\n' > "$_E2E_ISOLATED_STATE/boot-config.json"
     fi
+    mkdir -p "$_E2E_ISOLATED_STATE/build-snapshots"
+    if [ -d server/build-snapshots ]; then
+        cp -a server/build-snapshots/. "$_E2E_ISOLATED_STATE/build-snapshots/"
+    fi
+    if [ -f server/church_machine.db ]; then
+        cp -a server/church_machine.db "$_E2E_ISOLATED_STATE/church_machine.db"
+    else
+        : > "$_E2E_ISOLATED_STATE/church_machine.db"
+    fi
+    E2E_PORT=$(python3 -c \
+        "import socket; s=socket.socket(); s.bind(('',0)); p=s.getsockname()[1]; s.close(); print(p)")
+    export E2E_PORT
 fi
-unset _RUN_E2E _sg_i _sg_ready _sn
+unset _RUN_E2E _sn
 
 # ---------------------------------------------------------------------------
 # Launch selected suites — everything here runs concurrently
@@ -695,24 +690,10 @@ launch_suite() {
     local cmd="$2"
     local out="$WORK_DIR/${name}.out"
     local pid_file="$WORK_DIR/${name}.pid"
-    local isolated_lumps=""
-    local isolated_boot_config=""
-    if [ "$name" = "bootstrap-resident-identity-tests" ]; then
-        isolated_lumps="$WORK_DIR/${name}-lumps"
-        isolated_boot_config="$WORK_DIR/${name}-boot-config.json"
-        mkdir -p "$isolated_lumps"
-        cp -a server/lumps/. "$isolated_lumps/"
-        cp -a server/boot-config.json "$isolated_boot_config"
+    local isolated_state="$WORK_DIR/${name}-state"
+    if [ "$name" = "e2e-tests" ] && [ -n "${_E2E_ISOLATED_STATE:-}" ]; then
+        isolated_state="$_E2E_ISOLATED_STATE"
     fi
-    case " ${ALL_GROUPS[hardware]} " in
-        *" ${name} "*)
-            isolated_lumps="$WORK_DIR/${name}-lumps"
-            mkdir -p "$isolated_lumps"
-            if [ -d "server/lumps" ]; then
-                cp -a server/lumps/. "$isolated_lumps/"
-            fi
-            ;;
-    esac
 
     # Record wall-clock start time so the progress loop can show elapsed seconds
     date +%s > "$WORK_DIR/${name}.start"
@@ -723,18 +704,16 @@ launch_suite() {
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo "  SUITE: $name"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        if [ -n "$isolated_lumps" ]; then
-            echo "  [lumps-isolation] using $isolated_lumps"
-            if [ -n "$isolated_boot_config" ]; then
-                echo "  [boot-config-isolation] using $isolated_boot_config"
-                CHURCH_TEST_LUMPS_DIR="$isolated_lumps" \
-                    CHURCH_TEST_BOOT_CONFIG_PATH="$isolated_boot_config" \
-                    eval "$cmd"
-            else
-                CHURCH_TEST_LUMPS_DIR="$isolated_lumps" eval "$cmd"
-            fi
+        if [ "$name" = "e2e-tests" ] && [ -n "${_E2E_ISOLATED_STATE:-}" ]; then
+            echo "  [state-isolation] $name uses the private state of its Flask server"
+            CHURCH_TEST_ISOLATED_MODE=1 \
+            CHURCH_TEST_LUMPS_DIR="$isolated_state/lumps" \
+                CHURCH_TEST_BOOT_CONFIG_PATH="$isolated_state/boot-config.json" \
+                CHURCH_TEST_BUILD_SNAPSHOTS_DIR="$isolated_state/build-snapshots" \
+                CHURCH_TEST_DB_PATH="$isolated_state/church_machine.db" \
+                eval "$cmd"
         else
-            eval "$cmd"
+            bash scripts/run_test_suite_isolated.sh "$isolated_state" "$name" "$cmd"
         fi
     } > "$out" 2>&1 &
 

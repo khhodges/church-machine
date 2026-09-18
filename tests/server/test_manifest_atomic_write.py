@@ -27,7 +27,7 @@ if ROOT not in sys.path:
 
 import server.app as _app_module
 
-LUMPS_DIR = os.path.join(os.path.dirname(_app_module.__file__), "lumps")
+LUMPS_DIR = _app_module.LUMPS_DIR
 
 
 # ── Module-scoped snapshot/restore ───────────────────────────────────────────
@@ -37,7 +37,7 @@ def lumps_dir_snapshot(tmp_path_factory):
     """Full snapshot/restore of server/lumps/ around this destructive module.
 
     TestManifestWriteSitesUseAtomicHelper.test_mid_write_crash_leaves_manifest_intact
-    writes a baseline manifest.json to the real server/lumps/ directory and
+    writes a baseline manifest.json to the configured LUMP directory and
     relies on an inline try/finally for restoration.  A mid-suite failure or
     exception in that finally block could leave manifest.json corrupt.  This
     module-scoped autouse fixture holds the cross-process lumps_write_lock for
@@ -211,7 +211,7 @@ class TestManifestWriteSitesUseAtomicHelper(unittest.TestCase):
     def test_mid_write_crash_leaves_manifest_intact(self):
         """Simulate a crash inside the manifest write: original content survives."""
         app = _app_module.app
-        lumps_dir = os.path.join(os.path.dirname(_app_module.__file__), "lumps")
+        lumps_dir = _app_module.LUMPS_DIR
         os.makedirs(lumps_dir, exist_ok=True)
         manifest_path = os.path.join(lumps_dir, "manifest.json")
 

@@ -24,9 +24,10 @@ import pytest
 # Constants / helpers shared by both test classes
 # ---------------------------------------------------------------------------
 
-LUMPS_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "server", "lumps")
-)
+LUMPS_DIR = os.path.abspath(os.environ.get(
+    "CHURCH_TEST_LUMPS_DIR",
+    os.path.join(os.path.dirname(__file__), "..", "..", "server", "lumps"),
+))
 MANIFEST_PATH = os.path.join(LUMPS_DIR, "manifest.json")
 
 _CANONICAL_RE = re.compile(r'^(.+)\.(\d+)\.([0-9a-f]{8})\.lump$', re.IGNORECASE)
@@ -39,7 +40,7 @@ def lumps_dir_snapshot(tmp_path_factory):
     """Full snapshot/restore of server/lumps/ around this destructive module.
 
     Tests here POST /api/lumps/save and directly modify manifest.json in the
-    real server/lumps/ directory.  Per-test cleanup fixtures handle the
+    configured LUMP directory.  Per-test cleanup fixtures handle the
     nominal case, but a mid-suite failure could leave stale files or a corrupt
     manifest.  This module-scoped autouse fixture holds the cross-process
     lumps_write_lock for the entire snapshot → tests → restore span and

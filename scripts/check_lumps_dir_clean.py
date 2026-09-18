@@ -28,6 +28,7 @@ import os
 import shutil
 import sys
 import tempfile
+import subprocess
 
 ROOT      = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
@@ -264,7 +265,41 @@ def cmd_selftest() -> None:  # pragma: no cover
                 f"to post-run verify, got {probs7}"
             )
 
-            print("[lumps-guard] self-test PASSED (7/7 checks)")
+            # Test 8: the full-suite isolation wrapper must contain mutations
+            # even when the representative writer exits unsuccessfully.
+            live_before = _take_snapshot(_saved)
+            suite_state = os.path.join(tmp, "failing-suite-state")
+            writer = (
+                "python3 -c \"import os,pathlib,sys; "
+                "p=pathlib.Path(os.environ['CHURCH_TEST_LUMPS_DIR']); "
+                "(p/'test-created.lump').write_bytes(b'broken'); sys.exit(23)\""
+            )
+            result = subprocess.run(
+                [
+                    "bash",
+                    os.path.join(ROOT, "scripts", "run_test_suite_isolated.sh"),
+                    suite_state,
+                    "representative-failing-mutating-suite",
+                    writer,
+                ],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            assert result.returncode == 23, (
+                f"failing isolated writer must preserve its status, got "
+                f"{result.returncode}: {result.stdout} {result.stderr}"
+            )
+            assert os.path.isfile(
+                os.path.join(suite_state, "lumps", "test-created.lump")
+            ), "representative writer did not mutate its private catalog"
+            live_after = _take_snapshot(_saved)
+            assert live_after == live_before, (
+                "isolated failing writer changed live server/lumps byte content"
+            )
+
+            print("[lumps-guard] self-test PASSED (8/8 checks)")
 
         finally:
             LUMPS_DIR = _saved

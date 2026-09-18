@@ -30,7 +30,7 @@ if ROOT not in sys.path:
 
 import server.app as _app_module
 
-LUMPS_DIR = os.path.join(os.path.dirname(_app_module.__file__), "lumps")
+LUMPS_DIR = _app_module.LUMPS_DIR
 
 _TEST_TOKEN = "5c41ce01"
 
@@ -127,7 +127,7 @@ _ABS_STEM = "RoundTripDemo"
 def lumps_dir_snapshot(tmp_path_factory):
     """Full snapshot/restore of server/lumps/ around this destructive module.
 
-    Tests here POST /api/lumps/save to the real server/lumps/ directory.  The
+    Tests here POST /api/lumps/save to the configured LUMP directory.  The
     per-test clean_test_token fixture performs targeted cleanup, but a
     mid-suite failure could leave stale lump/sidecar files or a corrupt
     manifest.json behind.  This module-scoped autouse fixture holds the

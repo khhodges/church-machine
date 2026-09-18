@@ -32,7 +32,7 @@ if ROOT not in sys.path:
 
 import server.app as _app_module
 
-LUMPS_DIR = os.path.join(os.path.dirname(_app_module.__file__), "lumps")
+LUMPS_DIR = _app_module.LUMPS_DIR
 
 
 # ── Module-scoped snapshot/restore ───────────────────────────────────────────
@@ -41,7 +41,7 @@ LUMPS_DIR = os.path.join(os.path.dirname(_app_module.__file__), "lumps")
 def lumps_dir_snapshot(tmp_path_factory):
     """Full snapshot/restore of server/lumps/ around this destructive module.
 
-    Tests here POST /api/lumps/save to the real server/lumps/ directory.  The
+    Tests here POST /api/lumps/save to the configured LUMP directory.  The
     identity-seal guard is expected to reject the saves before any file is
     written, but per-test try/finally cleanup is still the only safety net on
     the nominal path.  A mid-suite failure could leave stale lump/sidecar files
