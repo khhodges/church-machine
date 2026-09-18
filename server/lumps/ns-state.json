@@ -69,22 +69,22 @@
     {
       "name": "SelfTest",
       "slot": 6,
-      "location": "0x00000D90",
+      "location": "0x00000990",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x007FE",
       "seq": 0,
-      "seal": "0xDE54B6EF",
+      "seal": "0xDE56B6EF",
       "token": "4a000006",
       "filename": "SelfTest.1.ddd2582f.lump",
+      "issue_n": 1,
       "lump_version": 89,
       "binary_hash": "4e91739c8bb39115e78b6a08f808596c29b1f0839b5a8469b01b3a048055e9f8",
       "resident": true,
-      "ns_slot_policy": "static",
-      "load_policy": "Resident",
       "boot_resident": true,
-      "issue_n": 1
+      "load_policy": "Resident",
+      "ns_slot_policy": "static"
     },
     {
       "name": "WukongCallHome",
@@ -98,13 +98,13 @@
       "seal": "0xDED2B6EF",
       "token": "4a000007",
       "filename": "WukongCallHome.1.74c8ff97.lump",
+      "issue_n": 1,
       "lump_version": 11,
+      "binary_hash": "3a77d0cf1ec8d4df96f877c4fc240ae1c8e94dc490bc266f49db2e07726bd086",
       "resident": true,
       "boot_resident": true,
       "load_policy": "Resident",
-      "ns_slot_policy": "static",
-      "binary_hash": "3a77d0cf1ec8d4df96f877c4fc240ae1c8e94dc490bc266f49db2e07726bd086",
-      "issue_n": 1
+      "ns_slot_policy": "static"
     },
     {
       "name": "Tunnel",
@@ -135,41 +135,41 @@
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x007F7",
+      "limit": "0x003F7",
       "seq": 0,
-      "seal": "0xDE5196EF",
+      "seal": "0xDED196EF",
       "token": "4a00000a",
       "filename": "CapabilityTest.1.e2b69e5b.lump",
       "issue_n": 1,
       "lump_version": 28,
-      "resident": true,
-      "load_policy": "Resident",
-      "boot_resident": true,
-      "ns_slot_policy": "static",
       "binary_hash": "6591292b249120aa0a62306237e314f2289ffae42a64bc7556fba336f9330f19",
+      "resident": true,
+      "boot_resident": true,
+      "load_policy": "Resident",
+      "ns_slot_policy": "static",
       "boot": true
     },
     {
       "name": "Thread.2",
       "slot": 11,
-      "location": "0x00001590",
+      "location": "0x00001190",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x000FF",
       "seq": 0,
-      "seal": "0xDEB896EF"
+      "seal": "0xDEBA96EF"
     },
     {
       "name": "Thread.3",
       "slot": 12,
-      "location": "0x00001690",
+      "location": "0x00001290",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x000FF",
       "seq": 0,
-      "seal": "0xDEB916EF"
+      "seal": "0xDEBB16EF"
     },
     {
       "name": "M_BIT_DEV",
@@ -183,6 +183,6 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1789591328.5690448,
-  "committed_raw_fingerprint": "ddebd74b2e149d2c628307881f77fd9bf4f210bfcccfd278bbbcf541c5ae5b21"
+  "generated_at": 1789732075.554702,
+  "committed_raw_fingerprint": "c59a80f90ceb458d53fa215b17d045ae2383ca3f88265e61562731e4e09d38d4"
 }
