@@ -876,6 +876,17 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
     assert('P12k SWITCH CR12: encodes destination without truncation',
         ((kResult.words[0] >>> 19) & 0xF) === 12,
         `word=0x${(kResult.words[0] >>> 0).toString(16)}`);
+    const kNamed = new ChurchAssembler();
+    const kNamedResult = kNamed.assemble(
+        'capabilities { SelfTest E }\nSWITCH CR12, CR6[SelfTest]'
+    );
+    const kNamedText = kNamed.disassemble(kNamedResult.words[0], { 0: 'SelfTest' });
+    assert('P12k named SWITCH assembles to the same isolated C-list load',
+        kNamed.errors.length === 0 && kNamedResult.words[0] === kResult.words[0],
+        kNamed.errors.map(e => e.message).join('; '));
+    assert('P12k SWITCH disassembly uses pet name with row as comment',
+        kNamedText === 'SWITCH  CR12, CR6[SelfTest] ; c-list[0]',
+        `selected="${kNamedText}"`);
 
     // P12l: TPERM CR15 → error
     const l = new ChurchAssembler();

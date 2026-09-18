@@ -1884,19 +1884,23 @@ class ChurchAssembler {
             case 5: {
                 // SWITCH has two forms:
                 //   SWITCH CR12..CR15, CRs, #row  — isolated C-list LOAD
+                //   SWITCH CR12..CR15, CR6[PetName] — source-level named row
                 //   SWITCH CR15, CR15             — guarded Boot placeholder no-op
-                const directSwitch = parts.length === 3;
-                if (parts.length !== 4 && !directSwitch) {
+                const switchRef = (parts[2] || '').replace(/,/g, '').trim()
+                    .match(/^CR(\d+)\[(.+)\]$/i);
+                const namedSwitch = parts.length === 3 && !!switchRef;
+                const directSwitch = parts.length === 3 && !namedSwitch;
+                if (parts.length !== 4 && !directSwitch && !namedSwitch) {
                     this.errors.push({
                         line: lineNum,
-                        message: 'SWITCH expects SWITCH CR12–CR15, CRsource, #row or the guarded Boot form SWITCH CR15, CR15'
+                        message: 'SWITCH expects SWITCH CR12–CR15, CRsource, #row; SWITCH CR12–CR15, CR6[PetName]; or the guarded Boot form SWITCH CR15, CR15'
                     });
                 }
                 crDst = this._parseCR(parts[1], lineNum);
                 if (crDst < 12 || crDst > 15) {
                     this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, 'CR' + crDst), message: `SWITCH: destination CR${crDst} must be an isolated register CR12–CR15` });
                 }
-                crSrc = this._parseCR(parts[2], lineNum);
+                crSrc = this._parseCR(namedSwitch ? `CR${switchRef[1]}` : parts[2], lineNum);
                 if (directSwitch) {
                     if (crSrc !== 15 || crDst !== 15) {
                         this.errors.push({
@@ -1907,9 +1911,18 @@ class ChurchAssembler {
                 } else {
                     this._checkPrivCR(crSrc, 'SWITCH source', lineNum);
                 }
-                const switchRow = directSwitch ? 0 : this._parseImm(parts[3], lineNum);
+                let switchRow = 0;
+                if (namedSwitch) {
+                    const rowToken = switchRef[2].trim();
+                    const namedRow = this._resolveCListName(rowToken);
+                    switchRow = namedRow ? namedRow.slot : this._parseImm(rowToken, lineNum);
+                } else if (!directSwitch) {
+                    switchRow = this._parseImm(parts[3], lineNum);
+                }
                 if (!Number.isInteger(switchRow) || switchRow < 0 || switchRow > 0x7FFF) {
-                    const rowToken = (parts[3] || '').replace(/,/g, '').trim();
+                    const rowToken = namedSwitch
+                        ? switchRef[2].trim()
+                        : (parts[3] || '').replace(/,/g, '').trim();
                     this.errors.push({
                         line: lineNum,
                         ...this._tokenCols(this._currentLineText, rowToken),
@@ -2878,6 +2891,10 @@ class ChurchAssembler {
             case 5:
                 if (crDst === 15 && crSrc === 15)
                     return `${mnemonic}  CR${crDst}, CR${crSrc}`;
+                if (crSrc === 6) {
+                    const ref = cdNamed(imm);
+                    return `${mnemonic}  CR${crDst}, ${ref.operand}${ref.comment}`;
+                }
                 return `${mnemonic}  CR${crDst}, CR${crSrc}, #${hexOff(imm)}`;
             // TPERM CRd, preset[B]  — assert/attenuate permission
             case 6: {
