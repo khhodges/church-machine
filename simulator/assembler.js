@@ -2803,12 +2803,26 @@ class ChurchAssembler {
                 if (crSrc === 6) {
                     const row = imm & 0x1F;
                     const method = (imm >>> 5) & 0x7F;
-                    const target = slotNames && slotNames[row]
-                        ? `CR6[${slotNames[row]}]`
+                    const slotName = slotNames && slotNames[row]
+                        ? slotNames[row]
+                        : null;
+                    const target = slotName
+                        ? `CR6[${slotName}]`
                         : cdOff(row);
-                    return method > 0
-                        ? `${mnemonic}  ${target}, #${method - 1}`
-                        : `${mnemonic}  ${target}`;
+                    if (method === 0) return `${mnemonic}  ${target}`;
+                    if (slotName) {
+                        const conventions = this._methodConventionsFor(slotName);
+                        if (conventions) {
+                            const selector = method - 1;
+                            for (const [methodName, entry] of Object.entries(conventions)) {
+                                const index = typeof entry === 'object' ? entry.index : entry;
+                                if (index === selector) {
+                                    return `${mnemonic}  ${target}.${methodName}`;
+                                }
+                            }
+                        }
+                    }
+                    return `${mnemonic}  ${target}, #${method - 1}`;
                 }
                 if (imm & 0x4000) return `${mnemonic}  CR${crDst}`;
                 // imm=0: fast-path (backward-compat, no table dispatch).

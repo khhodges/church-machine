@@ -496,13 +496,17 @@ const WUKONG_CALLHOME_CONVENTIONS = {
         7: 'WukongCallHome',
     });
     const a = new ChurchAssembler();
+    a.methodConventions = {
+        SelfTest: { Run: { index: 0 } },
+        WukongCallHome: { Main: { index: 0 } },
+    };
     const selfTest = a.disassemble(0x17030021, slotNames);
     const callHome = a.disassemble(0x17030027, slotNames);
-    assert('WCH4g SelfTest row 1 disassembles with its local pet name',
-        selfTest.includes('CR6[SelfTest]'),
+    assert('WCH4g SelfTest row 1 disassembles with its local pet name and method',
+        selfTest.includes('CR6[SelfTest].Run'),
         `selected="${selfTest}"`);
-    assert('WCH4g WukongCallHome row 7 disassembles with its local pet name',
-        callHome.includes('CR6[WukongCallHome]'),
+    assert('WCH4g WukongCallHome row 7 disassembles with its local pet name and method',
+        callHome.includes('CR6[WukongCallHome].Main'),
         `selected="${callHome}"`);
 }
 
