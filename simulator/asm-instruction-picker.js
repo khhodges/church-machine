@@ -688,6 +688,12 @@
         return blockStart >= 0 && blockDepth > 0;
     }
 
+    function caretIsInSemicolonComment(textarea) {
+        var lineStart = textarea.value.lastIndexOf('\n', textarea.selectionStart - 1) + 1;
+        var beforeCaretOnLine = textarea.value.substring(lineStart, textarea.selectionStart);
+        return beforeCaretOnLine.indexOf(';') >= 0;
+    }
+
     // ── Insertion ────────────────────────────────────────────────────────────
 
     function insertIntoEditor(item) {
@@ -768,6 +774,13 @@
 
         textarea.addEventListener('click', function () {
             if (textarea.readOnly || textarea.selectionStart !== textarea.selectionEnd) return;
+            if (caretIsInSemicolonComment(textarea)) {
+                hidePicker();
+                if (window.CListViewer && window.CListViewer.hide) {
+                    window.CListViewer.hide();
+                }
+                return;
+            }
             if (caretIsInCapabilitiesBlock(textarea)) {
                 hidePicker();
                 if (window.CListViewer && window.CListViewer.show) {
@@ -845,6 +858,7 @@
         shortcutDefaults: SHORTCUT_DEFAULTS,
         fuzzyScore: fuzzyScore,
         caretIsInCapabilitiesBlock: caretIsInCapabilitiesBlock,
+        caretIsInSemicolonComment: caretIsInSemicolonComment,
     };
 
 }());

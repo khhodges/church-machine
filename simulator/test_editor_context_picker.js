@@ -62,6 +62,12 @@ editor.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
 check('instruction click closes C-List', clistHides === 1, 'hides=' + clistHides);
 check('instruction click opens Instructions', window.AsmInstructionPicker.isVisible());
 
+const commentPos = editor.value.indexOf('; capabilities') + '; capabilities'.length;
+editor.setSelectionRange(commentPos, commentPos);
+editor.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+check('semicolon comment click closes Instructions', !window.AsmInstructionPicker.isVisible());
+check('semicolon comment click opens no C-List', clistShows === 1);
+
 window.AsmInstructionPicker.hide();
 editor.setSelectionRange(instrPos, instrPos + 6);
 editor.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
