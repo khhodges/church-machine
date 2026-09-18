@@ -668,6 +668,26 @@
         return !!(pickerEl && pickerEl.style.display !== 'none');
     }
 
+    function caretIsInCapabilitiesBlock(textarea) {
+        var beforeCaret = textarea.value.substring(0, textarea.selectionStart);
+        // A capabilities example inside a semicolon comment is not a real block.
+        var codeBeforeCaret = beforeCaret.replace(/;[^\n]*/g, '');
+        var blockStart = -1;
+        var blockDepth = 0;
+        var tokenRe = /\bcapabilities\b\s*\{|\}/gi;
+        var match;
+        while ((match = tokenRe.exec(codeBeforeCaret)) !== null) {
+            if (match[0] === '}') {
+                if (blockDepth > 0) blockDepth--;
+                if (blockDepth === 0) blockStart = -1;
+            } else {
+                blockDepth++;
+                if (blockDepth === 1) blockStart = match.index;
+            }
+        }
+        return blockStart >= 0 && blockDepth > 0;
+    }
+
     // ── Insertion ────────────────────────────────────────────────────────────
 
     function insertIntoEditor(item) {
@@ -746,6 +766,21 @@
         if (!textarea || textarea._asmPickerAttached) return;
         textarea._asmPickerAttached = true;
 
+        textarea.addEventListener('click', function () {
+            if (textarea.readOnly || textarea.selectionStart !== textarea.selectionEnd) return;
+            if (caretIsInCapabilitiesBlock(textarea)) {
+                hidePicker();
+                if (window.CListViewer && window.CListViewer.show) {
+                    window.CListViewer.show();
+                }
+                return;
+            }
+            if (window.CListViewer && window.CListViewer.hide) {
+                window.CListViewer.hide();
+            }
+            showPicker(textarea);
+        });
+
         textarea.addEventListener('keydown', function (e) {
             // Let picker handle navigation / confirm / dismiss first
             if (handlePickerKeydown(e)) return;
@@ -809,6 +844,7 @@
         refreshNS: refreshNSItems,
         shortcutDefaults: SHORTCUT_DEFAULTS,
         fuzzyScore: fuzzyScore,
+        caretIsInCapabilitiesBlock: caretIsInCapabilitiesBlock,
     };
 
 }());

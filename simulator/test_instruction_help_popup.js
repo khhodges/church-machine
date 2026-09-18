@@ -24,7 +24,7 @@ expect(
   'the editor Instructions button must open the picker'
 );
 expect(
-  index.includes('asm-instruction-picker.js?v=20260903-isa-sync1'),
+  index.includes('asm-instruction-picker.js?v=sha256-69855571c426'),
   'the editor must request the fixed script instead of a cached copy'
 );
 expect(
