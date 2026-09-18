@@ -467,7 +467,7 @@ register_suite "wukong-preflight-launcher-tests" \
     'python3 -m pytest scripts/test_hardware_namespace_thread_readiness_launchers.py -v'
 
 register_suite "check-lumps-guard" \
-    'python3 scripts/check_lumps_dir_clean.py --selftest'
+    'python3 scripts/check_lumps_dir_clean.py --selftest && python3 scripts/check_test_lumps_path_isolation.py --selftest && python3 scripts/check_test_lumps_path_isolation.py'
 
 register_suite "check-sitemap-figure-count" \
     'node scripts/check-sitemap-figure-count.js'
