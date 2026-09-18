@@ -4265,12 +4265,11 @@ def _validated_boot_config_candidate(data, existing=None, authority_rows=None):
 
 @app.route("/api/boot-config", methods=["POST"])
 def boot_config_post():
-    # Interactive Namespace/Designer saves are same-origin IDE writes. They
-    # must work without copying the server-only REPORT_TOKEN into JavaScript.
-    # Scripted and cross-origin callers still require bearer authorization.
-    ok, auth_error = _ide_browser_or_report_auth()
-    if not ok:
-        return auth_error
+    # This is the IDE's ordinary project-configuration save boundary, not a
+    # hardware-control or deployment boundary. Requiring REPORT_TOKEN here
+    # makes the browser depend on a server-only secret and prevents the
+    # programmer from saving Namespace policy. The payload is fully validated
+    # below; privileged build/upload/control endpoints retain their own auth.
     data = request.get_json(silent=True) or {}
     cfg, candidate_error = _validated_boot_config_candidate(data)
     if candidate_error:
@@ -4496,33 +4495,6 @@ def _optional_report_token_check():
         return True, None
     err = jsonify({'ok': False, 'error':
                    'Unauthorized — supply REPORT_TOKEN via Authorization: Bearer header.'})
-    return False, (err, 401)
-
-
-def _ide_browser_or_report_auth():
-    """Authorize an IDE-originated write without exposing REPORT_TOKEN.
-
-    External automation still uses the bearer token. Interactive browser
-    requests may use the same-origin guarantee supplied by modern browsers;
-    cross-origin requests and headerless scripted callers remain blocked.
-    """
-    ok, _ = _optional_report_token_check()
-    if ok:
-        return True, None
-
-    origin = request.headers.get("Origin", "").rstrip("/")
-    expected_origin = request.host_url.rstrip("/")
-    fetch_site = request.headers.get("Sec-Fetch-Site", "")
-    if origin == expected_origin and fetch_site == "same-origin":
-        return True, None
-
-    err = jsonify({
-        "ok": False,
-        "error": (
-            "Unauthorized IDE write. Open this project in its IDE and retry "
-            "the save; external callers must use server authorization."
-        ),
-    })
     return False, (err, 401)
 
 

@@ -139,4 +139,4 @@
 - [Bootstrap repair publication](bootstrap-repair-publication.md) — recovered source must retain server-issued bootstrap context; corrected publication supersedes active rows sharing its filename
 - [Live LUMP manifest uniqueness](live-lump-manifest-uniqueness.md) — publication retires conflicting live token/destination rows atomically while preserving immutable history
 - [Simulator Run availability](simulator-run-availability.md) — Run stays available like Step/Walk and executes the prepared LightningBolt LUMP, never an arbitrary editor candidate
-- [IDE browser write authorization](ide-browser-write-authorization.md) — same-origin IDE config writes must work without exposing REPORT_TOKEN; scripts and cross-origin callers still require bearer auth
+- [IDE configuration authorization](ide-browser-write-authorization.md) — ordinary Namespace configuration saves must not depend on REPORT_TOKEN; privileged hardware and deployment operations remain protected

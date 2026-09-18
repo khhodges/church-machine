@@ -170,34 +170,16 @@ def test_generate_endpoint_requires_explicit_saved_entry_selection(
     assert "no Lightning Bolt bootEntrySlot" in response.get_json()["error"]
 
 
-def test_boot_config_mutation_requires_report_token_when_configured(monkeypatch):
-    import server.app as app_module
-
-    monkeypatch.setenv("REPORT_TOKEN", "scoped-boot-config-token")
-    app_module.app.config["TESTING"] = True
-    with app_module.app.test_client() as unauthenticated:
-        response = unauthenticated.post("/api/boot-config", json={})
-
-    assert response.status_code == 401
-    assert "Unauthorized IDE write" in response.get_json()["error"]
-
-
-def test_boot_config_mutation_accepts_same_origin_ide_request(monkeypatch):
+def test_boot_config_mutation_is_not_blocked_by_report_token(monkeypatch):
     import server.app as app_module
 
     monkeypatch.setenv("REPORT_TOKEN", "scoped-boot-config-token")
     app_module.app.config["TESTING"] = True
     with app_module.app.test_client() as browser:
-        response = browser.post(
-            "/api/boot-config",
-            json={},
-            headers={
-                "Origin": "http://localhost",
-                "Sec-Fetch-Site": "same-origin",
-            },
-        )
+        response = browser.post("/api/boot-config", json={})
 
-    # The empty body is invalid, but it crossed the browser-safe auth boundary.
+    # The empty body is invalid, but ordinary IDE configuration is not gated by
+    # the unrelated server-only reporting/build token.
     assert response.status_code == 400
     assert "Unauthorized" not in response.get_json()["error"]
 

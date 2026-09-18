@@ -1,17 +1,18 @@
 ---
-name: IDE browser write authorization
-description: Authorization boundary for interactive IDE configuration writes
+name: IDE configuration authorization
+description: Authorization boundary between ordinary project configuration and privileged operations
 ---
 
-Interactive configuration writes initiated by the IDE may be authorized as
-verified same-origin browser requests. Never copy or expose REPORT_TOKEN to
-browser JavaScript. External scripts and cross-origin callers must continue to
-use server bearer authorization.
+Ordinary project-configuration writes such as Namespace policy saves must not
+depend on REPORT_TOKEN. Never copy or expose REPORT_TOKEN to browser JavaScript.
+Validate these configuration payloads at the endpoint. Keep hardware control,
+artifact upload, deployment, and remote build operations on their stronger
+authorization paths.
 
-**Why:** Requiring REPORT_TOKEN for an ordinary Namespace save blocked the
-programmer because a browser cannot safely possess that server-only secret.
+**Why:** Requiring REPORT_TOKEN for an ordinary Namespace save repeatedly
+blocked the programmer because a browser cannot safely possess that server-only
+secret. Proxy-origin checks also proved unreliable in the live IDE path.
 
-**How to apply:** Limit the browser path to IDE configuration operations and
-require matching Origin plus Sec-Fetch-Site: same-origin. Keep hardware,
-deployment, bridge, upload, and other privileged operations on their stronger
-existing authorization paths.
+**How to apply:** Do not add REPORT_TOKEN checks to ordinary IDE configuration
+save endpoints. Keep hardware, deployment, bridge, upload, and other privileged
+operations on their existing authorization paths.
