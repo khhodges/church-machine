@@ -500,6 +500,7 @@
 .fault-scope-detail {
     font-size: 0.82rem;
     color: #e0c080;
+    overflow-wrap: anywhere;
 }
 
 .fault-scope-detail code {
@@ -527,6 +528,7 @@
 .fault-malformed-reason-value {
     display: inline-flex;
     align-items: center;
+    min-width: 0;
 }
 
 .fault-malformed-reason-code {
@@ -539,6 +541,8 @@
     font-size: 0.88rem;
     font-weight: 600;
     letter-spacing: 0.02em;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .fault-trace-section {
@@ -619,12 +623,13 @@
 }
 
 .fault-trace-scroll {
-    overflow-x: auto;
+    overflow-x: hidden;
     max-height: 160px;
     overflow-y: auto;
 }
 .fault-trace-table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
     font-family: var(--font-mono, monospace);
     font-size: 0.78rem;
@@ -648,7 +653,9 @@
 }
 .fault-trace-table tbody td {
     padding: 3px 8px;
-    white-space: nowrap;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .fault-trace-legend {
@@ -657,10 +664,21 @@
     background: rgba(0,0,0,0.12);
 }
 
-.itrace-step { color: var(--text-secondary); }
-.itrace-addr { color: #88ddaa; }
-.itrace-raw  { color: #aaa; font-size: 0.72rem; }
-.itrace-instr { color: #ddeeff; }
+.itrace-step { color: var(--text-secondary); width: 3.5rem; white-space: nowrap; }
+.itrace-addr { color: #88ddaa; width: 5.5rem; white-space: nowrap; }
+.itrace-raw  { color: #aaa; font-size: 0.72rem; width: 7rem; white-space: nowrap; }
+.itrace-instr { color: #ddeeff; min-width: 0; }
+
+@media (max-width: 620px) {
+    .fault-trace-table thead th,
+    .fault-trace-table tbody td {
+        padding-left: 4px;
+        padding-right: 4px;
+    }
+    .itrace-step { width: 2.5rem; }
+    .itrace-addr { width: 4.6rem; }
+    .itrace-raw { width: 5.8rem; font-size: 0.66rem; }
+}
 tr.itrace-fault {
     background: rgba(220, 60, 60, 0.18) !important;
     border-left: 3px solid #e05555;

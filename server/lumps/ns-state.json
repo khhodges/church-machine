@@ -135,13 +135,13 @@
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x003F7",
+      "limit": "0x003F4",
       "seq": 0,
-      "seal": "0xDEDB96EF",
+      "seal": "0xDEDBF6EF",
       "token": "4a00000a",
       "filename": "CapabilityTest.1.8efa26a3.lump",
       "issue_n": 1,
-      "lump_version": 31,
+      "lump_version": 32,
       "binary_hash": "5ade31ec3dff80e622242d889566d24ce301a43ce69c6597669fa9bff9e0e4d3",
       "resident": true,
       "boot_resident": true,
@@ -183,6 +183,6 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1789838780.7989132,
-  "committed_raw_fingerprint": "72862a7c5c7950dc83d94c17b585dca30cc90af2a571a8ec69c8770376e86df8"
+  "generated_at": 1789840232.6560314,
+  "committed_raw_fingerprint": "8eb4177383eca6d14dad3fe81c23542876d54580d774d26690c6ea2c355ba9fa"
 }

@@ -2862,9 +2862,87 @@ function _bootHasCommittedImage() {
     return !bootState || bootState.status === 'prepared';
 }
 
-function _blockBootForMissingCommittedImage(context) {
-    const detail = `Boot blocked (${context}): no valid committed boot image is cached. ` +
-        'Prepare and save the Lightning Bolt selection, then retry; a factory image is never substituted.';
+function _showBootPreparationBlocked(context, reason) {
+    const existing = document.getElementById('bootPreparationBlockedOverlay');
+    if (existing) existing.remove();
+    const operation = context || 'Execution';
+    const actualReason = reason ||
+        'No valid committed boot image is available for the current Namespace.';
+    const overlay = document.createElement('div');
+    overlay.id = 'bootPreparationBlockedOverlay';
+    overlay.className = 'modal-overlay';
+    const dialog = document.createElement('div');
+    dialog.className = 'modal-dialog fault-dialog execution-blocked-dialog';
+
+    const header = document.createElement('div');
+    header.className = 'fault-modal-header';
+    const badge = document.createElement('span');
+    badge.className = 'fault-type-badge execution-blocked-badge';
+    badge.textContent = 'NOT EXECUTED';
+    const title = document.createElement('span');
+    title.className = 'fault-modal-title';
+    title.textContent = 'Boot Preparation Blocked';
+    const close = document.createElement('button');
+    close.className = 'fault-modal-close';
+    close.title = 'Close';
+    close.innerHTML = '&times;';
+    close.onclick = () => overlay.remove();
+    header.append(badge, title, close);
+
+    const summary = document.createElement('div');
+    summary.className = 'fault-modal-message execution-blocked-summary';
+    summary.textContent = `${operation} did not execute. This is a boot-image preparation rejection, not a fault raised by the selected Thread. No machine instruction ran and no Thread state was changed.`;
+
+    const details = document.createElement('div');
+    details.className = 'fault-detail-grid execution-blocked-details';
+    for (const [label, value] of [
+        ['Reason', actualReason],
+        ['Next action', 'Choose the intended Lightning Bolt target, then click Prepare boot image. Retry execution only after the IDE reports that the committed image is prepared.'],
+        ['Safety', 'The IDE did not substitute a factory image or alter the boot image automatically.'],
+    ]) {
+        const row = document.createElement('div');
+        row.className = 'fault-detail-row';
+        const labelEl = document.createElement('span');
+        labelEl.className = 'fault-detail-label';
+        labelEl.textContent = label;
+        const valueEl = document.createElement('span');
+        valueEl.className = 'fault-detail-value';
+        valueEl.textContent = value;
+        row.append(labelEl, valueEl);
+        details.appendChild(row);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'modal-buttons fault-modal-actions';
+    const prepare = document.createElement('button');
+    prepare.className = 'btn btn-warning';
+    prepare.textContent = 'Prepare boot image';
+    prepare.onclick = () => {
+        overlay.remove();
+        if (typeof switchView === 'function') switchView('abstractions');
+        if (typeof savePreparedBootEntry === 'function') void savePreparedBootEntry();
+    };
+    const dismiss = document.createElement('button');
+    dismiss.className = 'btn btn-muted';
+    dismiss.textContent = 'Close';
+    dismiss.onclick = () => overlay.remove();
+    actions.append(prepare, dismiss);
+
+    dialog.append(header, summary, details, actions);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', event => {
+        if (event.target === overlay) overlay.remove();
+    });
+}
+
+function _blockBootForMissingCommittedImage(context, reason) {
+    const actualReason = reason ||
+        'No valid committed boot image is cached for the current Namespace.';
+    const detail = `${context || 'Execution'} did not execute. Boot preparation is blocked; ` +
+        `this is not a Thread fault. Reason: ${actualReason} ` +
+        'No machine instruction ran and no Thread state changed. Next: choose the intended ' +
+        'Lightning Bolt target and click Prepare boot image. The IDE did not alter or substitute an image.';
     if (window.BootEntryUI && typeof window.BootEntryUI.noteImagePreparation === 'function') {
         window.BootEntryUI.noteImagePreparation({
             status: 'stale-image',
@@ -2876,9 +2954,7 @@ function _blockBootForMissingCommittedImage(context) {
     if (con && !con.textContent.includes(detail)) {
         con.textContent += (con.textContent ? '\n' : '') + '[BOOTIMG] ' + detail;
     }
-    if (sim && !sim.halted && !sim.bootComplete && typeof sim.fault === 'function') {
-        sim.fault('BOOT_IMAGE', detail);
-    }
+    _showBootPreparationBlocked(context, actualReason);
     return false;
 }
 
@@ -2903,8 +2979,8 @@ function _ensureCommittedImageForBoot(context) {
                 })
                 .catch(error => {
                     _bootImageRefreshInFlight = null;
-                    _blockBootForMissingCommittedImage(
-                        `${context}; committed image refresh failed: ${error && error.message ? error.message : error}`);
+                    _blockBootForMissingCommittedImage(context,
+                        `The server rejected the committed boot image: ${error && error.message ? error.message : error}`);
                 });
         }
         const con = document.getElementById('editorConsole');
@@ -4852,14 +4928,15 @@ function showFaultModal(f) {
             <button class="btn btn-muted" onclick="faultModalClearAndDismiss()" title="Clear fault state — stops the flashing alert">&#x2715; Clear</button>
         </div>
         <div class="${_msgClass}" ${_editOnclick}>${_transformFaultMsg(f.message)}${_editBadge}</div>
-        ${descSection}
-        ${gtSnapshotSection}
+        <div class="fault-summary-grid">
+            ${descSection}
+            ${gtSnapshotSection}
+        </div>
         <div class="fault-user-note-row">
             <label class="fault-user-note-label" for="faultUserNoteInput">Note</label>
-            <input id="faultUserNoteInput" class="fault-user-note-input" type="text" maxlength="300"
+            <textarea id="faultUserNoteInput" class="fault-user-note-input" rows="2" maxlength="300"
                 placeholder="Add a plain-English description of this fault\u2026"
-                value="${_noteAttr}"
-                oninput="(function(v){var fl=sim.faultLog,rec=fl&&fl[${_faultRecordIndex}];if(rec){rec.userNote=v;if(typeof _saveFaultNote==='function')_saveFaultNote(rec,v);}if(typeof updateGateLog==='function')updateGateLog();})(this.value)">
+                oninput="_autoGrowFaultNote(this);(function(v){var fl=sim.faultLog,rec=fl&&fl[${_faultRecordIndex}];if(rec){rec.userNote=v;if(typeof _saveFaultNote==='function')_saveFaultNote(rec,v);}if(typeof updateGateLog==='function')updateGateLog();})(this.value)">${_noteAttr}</textarea>
         </div>
         ${historyHtml ? `<div class="fault-detail-grid">
             <div class="fault-detail-row fault-history-row">
@@ -4867,17 +4944,26 @@ function showFaultModal(f) {
                 <span class="fault-detail-value">${historyHtml}</span>
             </div>
         </div>` : ''}
-        ${malformedGTSection}
-        ${scopeSection}
-        ${outformSection}
-        ${recoverySection}
+        <div class="fault-diagnostic-grid">
+            ${malformedGTSection}
+            ${scopeSection}
+            ${outformSection}
+            ${recoverySection}
+        </div>
         ${instrTraceSection}
         ${crSection}
         ${drSection}`;
 
     overlay.appendChild(dialog);
     document.body.appendChild(overlay);
+    _autoGrowFaultNote(document.getElementById('faultUserNoteInput'));
     overlay.addEventListener('click', e => { if (e.target === overlay) faultModalDismiss(); });
+}
+
+function _autoGrowFaultNote(input) {
+    if (!input) return;
+    input.style.height = 'auto';
+    input.style.height = `${input.scrollHeight}px`;
 }
 
 function faultModalDismiss() {

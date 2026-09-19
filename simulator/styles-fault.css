@@ -37,10 +37,13 @@
 }
 
 .fault-dialog {
-    min-width: 480px;
-    max-width: 680px;
+    box-sizing: border-box;
+    width: min(960px, calc(100vw - 2rem));
+    min-width: 0;
+    max-width: 960px;
     max-height: 90vh;
     overflow-y: auto;
+    overflow-x: hidden;
     border: 1px solid rgba(220, 60, 60, 0.45);
     box-shadow: 0 0 32px rgba(200, 40, 40, 0.18), 0 4px 24px rgba(0,0,0,0.6);
 }
@@ -50,6 +53,8 @@
     align-items: center;
     gap: 0.75rem;
     margin-bottom: 0.9rem;
+    flex-wrap: wrap;
+    min-width: 0;
 }
 
 .fault-type-badge {
@@ -70,6 +75,8 @@
     font-weight: 700;
     color: #e05050;
     flex: 1;
+    min-width: 12rem;
+    overflow-wrap: anywhere;
 }
 
 .fault-modal-lump-chip {
@@ -84,11 +91,10 @@
     border: 1px solid rgba(100, 180, 220, 0.28);
     border-radius: 4px;
     padding: 2px 8px;
-    white-space: nowrap;
+    white-space: normal;
     flex-shrink: 1;
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
 }
 
 .fault-modal-lump-offset {
@@ -132,9 +138,8 @@
     margin-top: 0;
     margin-bottom: 0.85rem;
     justify-content: flex-start;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 0.4rem;
-    overflow-x: auto;
     padding-bottom: 2px;
 }
 
@@ -153,7 +158,8 @@
     margin-bottom: 1rem;
     font-family: var(--font-mono, monospace);
     line-height: 1.5;
-    word-break: break-word;
+    overflow-wrap: anywhere;
+    word-break: normal;
     display: flex;
     align-items: baseline;
     gap: 0.5rem;
@@ -222,14 +228,89 @@
     color: var(--text-primary);
     font-family: var(--font-mono, monospace);
     background: rgba(0,0,0,0.06);
-    word-break: break-word;
+    overflow-wrap: anywhere;
+    word-break: normal;
     min-width: 0;
+}
+
+.execution-blocked-badge {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: #f59e0b;
+    color: #fbbf24;
+}
+
+.execution-blocked-dialog {
+    border-color: rgba(245, 158, 11, 0.55);
+    box-shadow: 0 0 32px rgba(245, 158, 11, 0.12), 0 4px 24px rgba(0,0,0,0.6);
+}
+
+.execution-blocked-dialog .fault-modal-title {
+    color: #fbbf24;
+}
+
+.execution-blocked-summary {
+    background: rgba(245, 158, 11, 0.08);
+    border-left-color: rgba(245, 158, 11, 0.7);
+}
+
+.execution-blocked-details .fault-detail-value {
+    line-height: 1.55;
+}
+
+.abs-boot-binding-status {
+    align-items: flex-start;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem 0.75rem;
+    line-height: 1.5;
+    margin-bottom: 0.75rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    padding: 0.6rem 0.75rem;
+}
+
+.abs-boot-binding-copy {
+    flex: 1 1 34rem;
+    min-width: 0;
+    white-space: normal;
+}
+
+.abs-boot-binding-save {
+    flex: 0 0 auto;
+    white-space: normal;
+}
+
+@media (max-width: 560px) {
+    .fault-dialog {
+        padding: 1rem;
+        width: calc(100vw - 1rem);
+    }
+    .fault-modal-title {
+        min-width: 8rem;
+    }
+    .fault-detail-row {
+        flex-direction: column;
+    }
+    .fault-detail-label {
+        border-bottom: 1px solid rgba(180,160,100,0.10);
+        border-right: 0;
+        flex-basis: auto;
+        width: 100%;
+    }
+    .fault-detail-value {
+        width: 100%;
+    }
+    .fault-modal-actions .btn,
+    .abs-boot-binding-save {
+        flex: 1 1 12rem;
+    }
 }
 
 .fault-detail-value code {
     font-family: var(--font-mono, monospace);
     color: #d0c890;
     font-size: 0.83rem;
+    overflow-wrap: anywhere;
 }
 
 .fault-history-row .fault-detail-value {
@@ -303,13 +384,14 @@
 }
 
 .fault-regs-scroll {
-    overflow-x: auto;
+    overflow-x: hidden;
     max-height: 160px;
     overflow-y: auto;
 }
 
 .fault-regs-table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
     font-family: var(--font-mono, monospace);
     font-size: 0.78rem;
@@ -337,11 +419,12 @@
 
 .fault-regs-table td {
     padding: 3px 8px;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
     border-bottom: 1px solid rgba(100,140,200,0.06);
 }
 
-.freg-name    { color: #90b8f0; font-weight: 600; }
+.freg-name    { color: #90b8f0; font-weight: 600; width: 3.5rem; }
 .freg-type    { color: #a0c888; }
 .freg-slot    { color: #c0a860; }
 .freg-perms   { color: #d08858; font-weight: 600; letter-spacing: 0.02em; }
@@ -2471,12 +2554,40 @@
     font-size: 0.82rem;
     color: #e0c0b0;
     line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+/* Pair compact diagnostic cards when the fault dialog has room. */
+.fault-summary-grid,
+.fault-diagnostic-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.85rem;
+    margin-bottom: 0.85rem;
+}
+
+.fault-summary-grid:empty,
+.fault-diagnostic-grid:empty {
+    display: none;
+}
+
+.fault-summary-grid > *,
+.fault-diagnostic-grid > * {
+    min-width: 0;
+    margin-bottom: 0;
+}
+
+@media (min-width: 780px) {
+    .fault-summary-grid,
+    .fault-diagnostic-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 /* ── User note row in fault modal ──────────────────────────────────────── */
 .fault-user-note-row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 8px;
     margin-bottom: 0.85rem;
 }
@@ -2500,6 +2611,15 @@
     font-size: 0.82rem;
     font-family: inherit;
     padding: 4px 8px;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: 2.7rem;
+    max-height: 10rem;
+    line-height: 1.4;
+    resize: vertical;
+    overflow-y: auto;
+    overflow-wrap: anywhere;
     outline: none;
     transition: border-color 0.15s;
 }
@@ -2511,6 +2631,19 @@
 .fault-user-note-input:focus {
     border-color: rgba(100, 150, 220, 0.6);
     background: rgba(20, 30, 50, 0.8);
+}
+
+@media (max-width: 520px) {
+    .fault-dialog {
+        width: calc(100vw - 1rem);
+    }
+    .fault-user-note-row {
+        display: block;
+    }
+    .fault-user-note-label {
+        display: block;
+        margin-bottom: 4px;
+    }
 }
 
 /* ── Toolbar fault-panel badge (visible on non-editor views when a snapshot exists) ── */

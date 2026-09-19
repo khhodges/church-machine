@@ -483,12 +483,14 @@ function renderAbstractions() {
                 : bootState.status === 'pending' ? 'abs-boot-binding-pending'
                 : 'abs-boot-binding-error';
             const saveAction = bootState.status === 'prepared'
-                ? ` <button type="button" class="abs-boot-binding-save" onclick="savePreparedBootEntry()">Save prepared selection</button>`
+                ? ` <button type="button" class="abs-boot-binding-save" onclick="savePreparedBootEntry()">Prepare boot image again</button>`
                 : (bootState.status === 'cache-error'
                     ? ` <button type="button" class="abs-boot-binding-save" onclick="refreshPreparedBootImageCache()">Retry boot-image cache</button>`
-                    : '');
-            html += `<div id="bootEntryPreparationStatus" class="${stateClass}" role="status">` +
-                `⚡ Boot entry NS[${bootState.slot == null ? '?' : bootState.slot}]: ${bootState.message}${saveAction}</div>`;
+                    : (bootState.status === 'pending'
+                        ? ''
+                        : ` <button type="button" class="abs-boot-binding-save" onclick="savePreparedBootEntry()">Prepare boot image</button>`));
+            html += `<div id="bootEntryPreparationStatus" class="abs-boot-binding-status ${stateClass}" role="status">` +
+                `<span class="abs-boot-binding-copy">⚡ Boot entry NS[${bootState.slot == null ? '?' : bootState.slot}]: ${bootState.message}</span>${saveAction}</div>`;
         }
         html += `<div class="abs-layer-items">`;
     for (const abs of filtered) {
