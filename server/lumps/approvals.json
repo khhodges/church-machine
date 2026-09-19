@@ -677,6 +677,21 @@
       "compiled_at": 1789744084.135208,
       "bootstrap_t": "4a00000a",
       "bootstrap_runtime_gt": 1241513994
+    },
+    "5ade31ec3dff80e622242d889566d24ce301a43ce69c6597669fa9bff9e0e4d3": {
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "save_as_latest": true,
+      "binary_hash": "5ade31ec3dff80e622242d889566d24ce301a43ce69c6597669fa9bff9e0e4d3",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "filename": "CapabilityTest.1.8efa26a3.lump",
+      "compiled_at": 1789838780.7604177,
+      "bootstrap_t": "4a00000a",
+      "bootstrap_runtime_gt": 1241513994
     }
   }
 }
